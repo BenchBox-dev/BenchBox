@@ -26,6 +26,7 @@ from tests.uat.preflight_budget import (
     format_memory_headroom_failure,
     largest_scale_cells,
     load_budget_table,
+    predict_cell_disk_growth,
     read_memory_snapshot,
 )
 
@@ -61,6 +62,33 @@ def test_estimate_peak_disk_counts_datagen_once_and_reports_unknown(tmp_path: Pa
     assert budget.chunked_database_gib == pytest.approx(3.0)
     assert budget.platforms_total == 3
     assert budget.platforms_with_measured_database == 2
+
+
+def test_predict_cell_disk_growth_discloses_lower_bound_and_reuses_datagen(tmp_path: Path):
+    table = tmp_path / "disk_budget.tsv"
+    table.write_text(
+        "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\t"
+        "peak_database_gib_status\ttransient_growth_gib\n"
+        "duckdb\ttpch\t1\t4.0\t9.0\tunmeasured\t0.5\n"
+        "sqlite\ttpch\t1\t3.0\t8.0\tmeasured\t0.25\n",
+        encoding="utf-8",
+    )
+    budget_table = load_budget_table(table)
+
+    first = predict_cell_disk_growth("duckdb", "tpch", 1.0, table=budget_table)
+    reused = predict_cell_disk_growth("duckdb", "tpch", 1.0, table=budget_table, datagen_already_present=True)
+    measured = predict_cell_disk_growth("sqlite", "tpch", 1.0, table=budget_table)
+
+    assert first is not None
+    assert first.known_growth_gib == pytest.approx(4.5)
+    assert first.database_gib is None
+    assert first.is_lower_bound is True
+    assert reused is not None
+    assert reused.known_growth_gib == pytest.approx(0.5)
+    assert measured is not None
+    assert measured.known_growth_gib == pytest.approx(11.25)
+    assert measured.is_lower_bound is False
+    assert predict_cell_disk_growth("datafusion", "tpch", 1.0, table=budget_table) is None
 
 
 def test_estimate_cells_models_measured_per_platform_database_only(tmp_path: Path):

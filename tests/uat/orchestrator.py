@@ -180,29 +180,78 @@ def _build_disk_floor_runner(
     watch_disk_floor: bool,
     free_space_path: str | Path,
     free_space_min_gib: float,
+    budget_table: preflight_budget.BudgetTable | None = None,
+    free_space_reader: Callable[[str | Path], float] | None = None,
     cell_stream: Callable[[CellResult], None] | None = None,
 ) -> CellRunner:
-    """Wrap a cell runner with attempted-cell capture, incremental durability, and mid-sweep disk checks.
+    """Wrap a cell runner with predictive and post-cell disk checks.
+
+    The predictive check reserves the known lower-bound growth for the next
+    inventory-covered cell before handing it to the subprocess. It prevents a
+    large measured datagen/transient envelope from consuming the configured
+    floor between the existing post-cell observations. Unknown rows and
+    unmeasured database terms remain explicitly lower-bound predictions; the
+    post-cell floor is still the backstop for demand the inventory cannot see.
 
     `cell_stream`, when provided, is called with each cell's result the moment
     it completes -- the hook the durable sweep uses to append + fsync that row
     to cells.jsonl immediately (uat-sweep-durability-and-signal-teardown w1),
     so a mid-sweep process death keeps every completed cell's row instead of
-    losing the whole batch. It fires before the disk-floor check so a row is
-    on disk even when the very next check aborts the sweep.
+    losing the whole batch. It fires before the post-cell disk-floor check so
+    a row is on disk even when that check aborts the sweep.
     """
 
+    seen_datagen_sources: set[tuple[str, float]] = set()
+    read_free_space = free_space_reader or preflight_budget.free_space_gib
+
     def runner(platform: str, benchmark: str, scale: float, **kwargs) -> CellResult:
+        prediction = None
+        if watch_disk_floor and budget_table is not None:
+            source_key = (benchmark, scale)
+            prediction = preflight_budget.predict_cell_disk_growth(
+                platform,
+                benchmark,
+                scale,
+                table=budget_table,
+                datagen_already_present=source_key in seen_datagen_sources,
+            )
+            if prediction is not None:
+                free_gib = read_free_space(free_space_path)
+                required_gib = free_space_min_gib + prediction.known_growth_gib
+                exec_phase.append_lifecycle_log(
+                    kwargs.get("log_dir"),
+                    f"[free-space] before cell {platform}/{benchmark} scale={scale:g}: "
+                    f"{free_gib:.2f} GiB free; reserving {prediction.known_growth_gib:.2f} GiB "
+                    f"predicted lower-bound growth + {free_space_min_gib:.2f} GiB floor "
+                    f"(database_measured={prediction.database_measured})",
+                )
+                if free_gib < required_gib:
+                    coverage = "complete" if prediction.database_measured else "lower-bound"
+                    raise DiskFloorAbort(
+                        f"predictive disk check failed before cell {platform}/{benchmark} scale={scale:g}: "
+                        f"free space {free_gib:.1f} GiB < {required_gib:.1f} GiB required "
+                        f"({prediction.known_growth_gib:.1f} GiB {coverage} predicted cell growth + "
+                        f"{free_space_min_gib:.1f} GiB floor) at {free_space_path}"
+                    )
+            else:
+                exec_phase.append_lifecycle_log(
+                    kwargs.get("log_dir"),
+                    f"[free-space] before cell {platform}/{benchmark} scale={scale:g}: "
+                    "no inventory row for predictive growth; post-cell floor remains the backstop",
+                )
+
         result = base_runner(platform, benchmark, scale, **kwargs)
         attempted_cells.append(result)
         if cell_stream is not None:
             cell_stream(result)
         if watch_disk_floor:
-            free_gib = preflight_budget.free_space_gib(free_space_path)
+            free_gib = read_free_space(free_space_path)
             if free_gib < free_space_min_gib:
                 raise DiskFloorAbort(
                     f"free space {free_gib:.1f} GiB < cutoff {free_space_min_gib:.1f} GiB at {free_space_path}"
                 )
+        if prediction is not None:
+            seen_datagen_sources.add((benchmark, scale))
         return result
 
     return runner
@@ -338,6 +387,12 @@ def _run_sweep_phases(  # noqa: C901
                 break
         elif phase == "execute":
             attempted_cells: list[CellResult] = []
+            # Load the inventory once for the pre-cell predictive guard. A
+            # malformed inventory is not allowed to disable the guard; the
+            # preflight phase already reports the same parse failure as a
+            # structured abort when it is present, while execute-only runs
+            # fail before launching a cell.
+            predictive_budget_table = preflight_budget.load_budget_table() if config.disk_gate_enabled else None
             # Stream each cell's row to cells.jsonl as it completes so a
             # mid-sweep kill keeps the rows already earned (w1). The final
             # atomic write_cells_jsonl below replaces this incrementally-grown
@@ -356,6 +411,7 @@ def _run_sweep_phases(  # noqa: C901
                     watch_disk_floor=config.disk_gate_enabled,
                     free_space_path=config.preflight.free_space_path or str(benchmark_runs_dir),
                     free_space_min_gib=config.preflight.free_space_min_gib,
+                    budget_table=predictive_budget_table,
                     cell_stream=cell_stream_writer.append,
                 ),
             }

@@ -613,6 +613,38 @@ def test_orchestrator_writes_compatibility_pruned_jsonl_and_report_count(tmp_pat
     assert "compatibility_pruned=1" in (tmp_path / "logs" / "matrix_summary.tsv").read_text()
 
 
+def test_predictive_disk_floor_aborts_before_launching_oversized_known_cell(tmp_path: Path):
+    row = orchestrator.preflight_budget.DiskBudgetRow(
+        platform="duckdb",
+        benchmark="tpch",
+        scale_factor=0.01,
+        peak_datagen_gib=2.0,
+        peak_database_gib=0.0,
+        transient_growth_gib=0.5,
+        database_status=orchestrator.preflight_budget.DATABASE_STATUS_UNMEASURED,
+    )
+    attempted: list[tuple[str, str, float]] = []
+
+    def base_runner(platform: str, benchmark: str, scale: float, **kwargs) -> CellResult:
+        attempted.append((platform, benchmark, scale))
+        raise AssertionError("predictive disk guard must run before the cell subprocess")
+
+    runner = orchestrator._build_disk_floor_runner(
+        base_runner,
+        attempted_cells=[],
+        watch_disk_floor=True,
+        free_space_path=tmp_path,
+        free_space_min_gib=3.0,
+        budget_table={("duckdb", "tpch", 0.01): row},
+        free_space_reader=lambda _path: 4.0,
+    )
+
+    with pytest.raises(orchestrator.DiskFloorAbort, match="predictive disk check failed"):
+        runner("duckdb", "tpch", 0.01, log_dir=tmp_path)
+
+    assert attempted == []
+
+
 def test_disk_floor_abort_emits_partial_artifacts(tmp_path: Path):
     """A mid-sweep disk-floor abort still emits the #691 abort-safe artifacts.
 
@@ -657,6 +689,7 @@ def test_disk_floor_abort_emits_partial_artifacts(tmp_path: Path):
         patch.object(orchestrator.exec_phase, "run_cell", return_value=cell),
         patch.object(orchestrator.exec_phase, "default_free_space_reader", return_value=100.0),
         patch.object(orchestrator.preflight_budget, "free_space_gib", return_value=1.0),
+        patch.object(orchestrator.preflight_budget, "load_budget_table", return_value={}),
     ):
         result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
 
@@ -1279,6 +1312,7 @@ def test_disk_floor_abort_threads_startup_failed_count_into_sidecar_and_partial_
         patch.object(orchestrator.exec_phase, "run_cell", return_value=cell),
         patch.object(orchestrator.exec_phase, "default_free_space_reader", return_value=100.0),
         patch.object(orchestrator.preflight_budget, "free_space_gib", return_value=1.0),
+        patch.object(orchestrator.preflight_budget, "load_budget_table", return_value={}),
     ):
         result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
 
