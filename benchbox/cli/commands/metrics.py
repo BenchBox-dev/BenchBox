@@ -23,7 +23,6 @@ def metrics_group():
     \b
       qphh    Calculate TPC-H QphH@Size composite metric
 
-    \b
     Examples:
         # Calculate TPC-H QphH metric
         benchbox metrics qphh \\
