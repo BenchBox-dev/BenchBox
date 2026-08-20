@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-08-05T20:06:22.664928+00:00",
+  "generated_at": "2026-08-20T16:51:22.851815+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_datafusion_sql_20260502_182815_88aab2ac.json",
@@ -1628,6 +1628,19 @@
       "bundle_sha256": "878fc88a8fff0c38c7d1e78464f55992a13f4d6ad79e2bb0c50976a6ab56e46c"
     },
     {
+      "file": "tpcds_sf1_duckdb_sql_20260818_093123_8c8b40ef.json",
+      "benchmark": "tpcds",
+      "benchmark_name": "TPC-DS",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-18T09:31:23.364194",
+      "query_count": 309,
+      "trust_label": "community-submission",
+      "funding": "unspecified",
+      "bundle_sha256": "fbc328590dee3c0be60d9d5f114d3265eac827899b283e971983493d91e6ee1a"
+    },
+    {
       "file": "tpcds_obt_sf1_datafusion_sql_20260502_182906_756bc088.json",
       "benchmark": "tpcds_obt",
       "benchmark_name": "TPC-DS One Big Table",
@@ -1821,6 +1834,32 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "c95e8a8965c1b7d1f985dc5cf6a8b13138cb46f8b3389ceb57318eef59b15393"
+    },
+    {
+      "file": "tpch_sf10_duckdb_sql_20260817_210939_80e1274f.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 10.0,
+      "timestamp": "2026-08-17T21:09:39.443355",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "funding": "unspecified",
+      "bundle_sha256": "ec203a0d519d30890c3ca9280bf9b56def616a56c8bd4d536421359b8d01d3d1"
+    },
+    {
+      "file": "tpch_sf100_duckdb_sql_20260817_214011_d40cb760.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 100.0,
+      "timestamp": "2026-08-17T21:40:11.269685",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "funding": "unspecified",
+      "bundle_sha256": "988048a25feac7c4fc8ca48a991d88e1695ac12df4f9439dadfd9ba6911e3f6e"
     },
     {
       "file": "tpch_sf001_polars_20260403_093741_e744512d.json",
@@ -2871,6 +2910,9 @@
       "SQLite",
       "Spark"
     ],
+    "tpcds@sf1.0": [
+      "DuckDB"
+    ],
     "tpcds_obt@sf1.0": [
       "DataFusion",
       "DuckDB",
@@ -2897,6 +2939,12 @@
       "Polars",
       "PySpark",
       "Spark"
+    ],
+    "tpch@sf10.0": [
+      "DuckDB"
+    ],
+    "tpch@sf100.0": [
+      "DuckDB"
     ],
     "tpch_skew@sf0.01": [
       "DataFusion",
@@ -2969,7 +3017,7 @@
     ]
   },
   "summary": {
-    "total_bundles": 207,
+    "total_bundles": 210,
     "by_benchmark": {
       "amplab": 16,
       "clickbench": 6,
@@ -2984,8 +3032,9 @@
       "ssb": 20,
       "star_schema": 6,
       "tpcdi": 9,
+      "tpcds": 1,
       "tpcds_obt": 5,
-      "tpch": 22,
+      "tpch": 24,
       "tpch_skew": 19,
       "tpchavoc": 10,
       "tsbs_devops": 12,
@@ -2994,7 +3043,7 @@
     "by_platform": {
       "ClickHouse Local": 1,
       "DataFusion": 67,
-      "DuckDB": 16,
+      "DuckDB": 19,
       "LakeSail": 1,
       "Polars": 38,
       "PySpark": 34,
@@ -3002,11 +3051,11 @@
       "Spark": 24
     },
     "by_trust_label": {
-      "community-submission": 191,
+      "community-submission": 194,
       "maintainer-run": 16
     },
     "by_funding": {
-      "unspecified": 207
+      "unspecified": 210
     }
   }
 }
