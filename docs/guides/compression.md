@@ -301,7 +301,7 @@ pip install zstandard
 ```
 
 **"Compressed file not found"**
-- Check that `--compress-data` flag was used during generation
+- Check that `--compression <codec>` was used during generation
 - Verify file extensions (.gz, .zst)
 - Ensure compression completed successfully
 
@@ -315,7 +315,7 @@ pip install zstandard
 Enable verbose logging to troubleshoot compression:
 
 ```bash
-benchbox run --platform duckdb --benchmark tpch --compress-data --verbose
+benchbox run --platform duckdb --benchmark tpch --compression zstd --verbose
 ```
 
 ### File Verification
@@ -386,8 +386,4 @@ class MyGenerator(CompressionMixin):
 
 ## Examples Repository
 
-For more examples, see the `/examples` directory:
-
-- `examples/duckdb_tpch_compressed.py` - TPC-H with compression
-- `examples/compression_performance.py` - Performance testing
-- `examples/multi_benchmark_compression.py` - Multiple benchmarks with compression
+For more examples, see the [`examples/`](../../examples/INDEX.md) directory.

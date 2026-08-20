@@ -55,7 +55,7 @@ With monitoring:
 ```bash
 uv add benchbox[monitoring]
 benchbox run --platform duckdb --benchmark tpch --scale 0.01 -v
-benchbox report benchmark_runs/results/latest.json
+benchbox report import benchmark_runs/results/
 ```
 
 ## BenchBox After The Refactor

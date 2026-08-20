@@ -345,7 +345,7 @@ support-status
 
 ### Quick Performance Test
 ```python
-from benchbox import TPCH, Primitives
+from benchbox import TPCH, ReadPrimitives
 
 # Standard analytical performance
 tpch = TPCH(scale_factor=0.1)

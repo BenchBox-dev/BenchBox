@@ -29,8 +29,8 @@ except ImportError:
 
 def main() -> int:
     """Run Pandas DataFrame TPC-H benchmark demonstration."""
-    from benchbox.core.dataframe.context import PandasDataFrameContext
-    from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES, get_tpch_query
+    from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES, get_query
+    from benchbox.platforms import get_dataframe_adapter
 
     print("=" * 60)
     print("Pandas DataFrame TPC-H Benchmark")
@@ -54,7 +54,7 @@ def main() -> int:
 
     # Create context with Pandas DataFrame
     print("\nCreating Pandas DataFrame context...")
-    ctx = PandasDataFrameContext()
+    ctx = get_dataframe_adapter("pandas-df", working_dir=str(data_dir)).create_context()
 
     # Load tables from Parquet
     parquet_dir = data_dir / "parquet"
@@ -79,8 +79,9 @@ def main() -> int:
 
     sample_queries = ["Q1", "Q3", "Q6"]
     for qid in sample_queries:
-        query = get_tpch_query(qid)
-        if query is None:
+        try:
+            query = get_query(qid)
+        except KeyError:
             print(f"\nQuery {qid} not found")
             continue
 

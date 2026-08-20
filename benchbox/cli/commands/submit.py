@@ -68,7 +68,7 @@ _CONTRIBUTING_TEXT = """\
 Thank you for contributing to the BenchBox community results dataset!
 
 This is a packaged checklist. The full guide lives at:
-https://docs.benchbox.dev/contributing-results
+https://benchbox.dev/docs/contributing-results.html
 
 ## Quick checklist
 
@@ -95,7 +95,7 @@ Open an issue or start a discussion at
 https://github.com/joeharris76/BenchBox.
 
 For the full guide (trust labels, quality expectations, troubleshooting),
-see https://docs.benchbox.dev/contributing-results.
+see https://benchbox.dev/docs/contributing-results.html.
 """
 
 
@@ -471,7 +471,7 @@ def _print_submission_summary(
     console.print(f"  3. uv run -- python scripts/validate_submission.py {bundle_target}")
     console.print(f"  4. PR title:  [cyan]{pr_title}[/cyan]")
     console.print("     PR target: [cyan]published-results[/cyan]")
-    console.print("[dim]Full guide: https://docs.benchbox.dev/contributing-results[/dim]")
+    console.print("[dim]Full guide: https://benchbox.dev/docs/contributing-results.html[/dim]")
 
     if dry_run:
         console.print("\n[yellow](dry run; no files written)[/yellow]")
@@ -597,20 +597,25 @@ def submit(
     RESULT_FILE: Path to result JSON file (optional; with --last, picked
     from history).
 
+    \b
     Examples:
         # Package most recent result for PR contribution (Phase 2; default)
         benchbox submit --last
 
+    \b
         # Print exact result paths, then package one for PR contribution
         benchbox results --paths
         benchbox submit benchmark_runs/results/tpch_sf001_duckdb_20260401_120000.json --output ./submission
 
+    \b
         # Submit most recent result to the hosted platform (Phase 3)
         benchbox submit --last --service
 
+    \b
         # Submit a specific bundle to a non-default service URL
         benchbox submit results/tpch_sf01_duckdb.json --service https://staging.benchbox.dev/v1
 
+    \b
         # Preview what would be uploaded without sending bytes
         benchbox submit --last --service --dry-run
 

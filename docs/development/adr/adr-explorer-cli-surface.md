@@ -2,7 +2,11 @@
 
 ## Status
 
-Accepted.
+Accepted, and implemented. `benchbox explorer` is no longer registered on the
+CLI, and `benchbox/cli/commands/explorer.py` and
+`benchbox/core/explorer_pipeline/` have been removed. The Context section below
+describes the tree as it stood when the decision was taken, not the current
+tree.
 
 ## Date
 

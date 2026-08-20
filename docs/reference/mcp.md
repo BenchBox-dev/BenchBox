@@ -357,7 +357,7 @@ tool.
 | `get_query_details` | execution aid | `none` | MCP-only convenience: CLI users read query SQL from the benchmark source tree; MCP returns it structured per platform/mode. |
 | `get_results` | results | `benchbox results`, `benchbox export` | Lists, reads, and exports result bundles; MCP inline-reads while CLI renders to stdout/files and supports cloud export. |
 | `analyze_results` | analytics | `benchbox compare`, `benchbox report`, `benchbox aggregate` | Comparison, regression, trend, and aggregation over result bundles. |
-| `get_query_plan` | analytics | `benchbox show-plan`, `benchbox compare-plans` | Reads captured plans from a result bundle; CLI also renders live plans. |
+| `get_query_plan` | analytics | `benchbox show-plan`, `benchbox compare --include-plans` | Reads captured plans from a result bundle; CLI also renders live plans. |
 | `validate_results` | analytics | `_project/scripts/validate_results.py` | Result JSON integrity and believability checks (`benchbox validate` checks config YAML, not result bundles). |
 | `suggest_charts` | visualization | `benchbox visualize` | Suggests semantic chart types for result files. |
 | `generate_chart` | visualization | `benchbox visualize` | Generates ASCII charts; MCP is inline-only by contract, CLI may write files. |

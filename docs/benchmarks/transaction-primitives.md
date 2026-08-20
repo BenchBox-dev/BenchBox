@@ -188,16 +188,15 @@ Unlike Write Primitives, Transaction Primitives does not create audit log tables
 
 ```bash
 # List available benchmarks
-benchbox list
+benchbox benchmarks list
 
 # Run Transaction Primitives benchmark (using DuckDB for limited transaction testing)
-benchbox run transaction_primitives --platform duckdb --scale-factor 0.01
+benchbox run --benchmark transaction_primitives --platform duckdb --scale 0.01
 
-# Run specific categories (all transaction ops are in "transaction" category)
-benchbox run transaction_primitives --platform duckdb --categories transaction
-
-# Run specific operations
-benchbox run transaction_primitives --platform duckdb --operations transaction_commit_small,transaction_rollback_small
+# Run specific operations (there are no --categories/--operations options;
+# select individual operations with --queries)
+benchbox run --benchmark transaction_primitives --platform duckdb \
+    --queries transaction_commit_small,transaction_rollback_small
 ```
 
 **Important Notes**:
@@ -392,7 +391,7 @@ for result in results:
 
 ```bash
 # Run Transaction Primitives on PostgreSQL
-benchbox run transaction_primitives --platform postgresql --scale-factor 0.01
+benchbox run --benchmark transaction_primitives --platform postgresql --scale 0.01
 ```
 
 ```python

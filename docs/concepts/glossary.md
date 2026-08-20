@@ -256,7 +256,7 @@ Comprehensive reference for benchmarking, database, and BenchBox-specific termin
 - **`--scale`**: Set scale factor
 - **`--dry-run`**: Preview mode without execution
 - **`--output`**: Results output directory
-- **`--query-subset`**: Run specific queries only
+- **`--queries`**: Run specific queries only (e.g. `Q1,Q6,Q17`)
 - **`--verbose`**: Enable detailed logging
 
 ## See Also

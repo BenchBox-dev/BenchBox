@@ -55,7 +55,7 @@ export BIGQUERY_PROJECT=your-project-id
 ### Interactive Setup
 
 ```bash
-benchbox platforms setup --platform bigquery
+benchbox setup --platform bigquery
 ```
 
 ### CLI Options
@@ -149,7 +149,7 @@ benchbox run --platform bigquery --benchmark tpch --scale 1.0 \
 ```bash
 # For large datasets, use GCS staging
 benchbox run --platform bigquery --benchmark tpch --scale 100.0 \
-  --staging-root gs://your-bucket/benchbox/
+  --output gs://your-bucket/benchbox/
 ```
 
 ### With Cost Controls
@@ -251,7 +251,7 @@ For large datasets, stage in GCS first:
 ```bash
 # Configure GCS staging
 benchbox run --platform bigquery --benchmark tpch --scale 100.0 \
-  --staging-root gs://your-bucket/benchbox/
+  --output gs://your-bucket/benchbox/
 ```
 
 ### Load Job Configuration

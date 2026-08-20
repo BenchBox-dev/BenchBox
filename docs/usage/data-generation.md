@@ -304,7 +304,7 @@ tables = read_primitives.generate_data()
 **Example - Shared Data Usage:**
 
 ```python
-from benchbox import TPCH, Primitives
+from benchbox import TPCH, ReadPrimitives
 
 # Generate TPC-H data once
 tpch = TPCH(scale_factor=1.0)  # Data goes to: data/tpch_sf1.0/
