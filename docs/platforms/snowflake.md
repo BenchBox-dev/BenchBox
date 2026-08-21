@@ -48,7 +48,7 @@ export SNOWFLAKE_SCHEMA=PUBLIC
 ### Interactive Setup
 
 ```bash
-benchbox platforms setup --platform snowflake
+benchbox setup --platform snowflake
 ```
 
 ### CLI Options
@@ -136,17 +136,20 @@ benchbox run --platform snowflake --benchmark tpch \
 ### Basic Benchmark
 
 ```bash
-# TPC-H at scale factor 1
-benchbox run --platform snowflake --benchmark tpch --scale 1.0 \
-  --warehouse BENCHMARK_WH
+# TPC-H at scale factor 1 (warehouse comes from stored credentials
+# or SNOWFLAKE_WAREHOUSE)
+benchbox run --platform snowflake --benchmark tpch --scale 1.0
 ```
+
+The warehouse is not a `benchbox run` option. Set it once with
+`benchbox setup --platform snowflake`, or export `SNOWFLAKE_WAREHOUSE`.
 
 ### With Tuning
 
 ```bash
 # Apply clustering and optimizations
+# (export SNOWFLAKE_WAREHOUSE=LARGE_WH first)
 benchbox run --platform snowflake --benchmark tpch --scale 10.0 \
-  --warehouse LARGE_WH \
   --tuning tuned
 ```
 
@@ -223,11 +226,10 @@ benchbox run --platform snowflake --benchmark tpch --scale 1.0
 For large scale factors, use external staging:
 
 ```bash
-# Configure external stage
+# The cloud --output path becomes the external staging root
 benchbox run --platform snowflake --benchmark tpch --scale 100.0 \
-  --staging-root s3://bucket/benchbox/ \
-  --platform-option stage_type=external \
-  --platform-option external_stage=@my_s3_stage
+  --output s3://bucket/benchbox/ \
+  --table-mode external
 ```
 
 ## Cost Optimization
@@ -286,10 +288,9 @@ GRANT CREATE SCHEMA ON DATABASE benchbox TO ROLE benchbox_role;
 ### Data Loading Timeout
 
 ```bash
-# Use larger warehouse or external stage for big datasets
+# Use a larger warehouse (SNOWFLAKE_WAREHOUSE) or external staging for big datasets
 benchbox run --platform snowflake --benchmark tpch --scale 100.0 \
-  --warehouse LARGE_WH \
-  --staging-root s3://bucket/benchbox/
+  --output s3://bucket/benchbox/
 ```
 
 ## Related Documentation

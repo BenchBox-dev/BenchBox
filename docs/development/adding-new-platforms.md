@@ -838,14 +838,15 @@ make platform-manifest-check
 If your platform has a unique SQL dialect, add SQL compatibility rules or an explicit exemption under the phase-aware SQL compatibility system. Do not hide CREATE TABLE rewrites inside the adapter without registering or exempting them in the DDL governance inventory.
 
 ```python
-from benchbox.sql_compat.actions import RewriteDdlAction
-from benchbox.sql_compat.context import Phase
-from benchbox.sql_compat.registry import REGISTRY
+# benchbox/sql_compat/rules/ddl_optimize/newdatabase_ddl_rewrites.py
+from benchbox.sql_compat.rules._registration import register_ddl_rewrite
 
-REGISTRY.register(
-    RewriteDdlAction(...),
-    Phase.DDL_OPTIMIZE,
-    "newdatabase",
+register_ddl_rewrite(
+    platform="newdatabase",
+    rule_name="convert_to_newdatabase_table",
+    transformer_id="newdatabase_convert_to_newdatabase_table",
+    description="What the adapter rewrites in CREATE TABLE for this platform.",
+    reason="Why this platform needs the rewrite.",
 )
 ```
 
@@ -1004,9 +1005,9 @@ class TestNewDatabaseIntegration:
     @pytest.mark.integration
     def test_end_to_end_benchmark(self, integration_adapter):
         """Test complete benchmark execution."""
-        from benchbox import ReadPrimitivesBenchmark
+        from benchbox import ReadPrimitives
 
-        benchmark = ReadPrimitivesBenchmark(scale_factor=0.001)
+        benchmark = ReadPrimitives(scale_factor=0.001)
         results = integration_adapter.run_benchmark(benchmark)
 
         assert results.status == 'SUCCESS'
@@ -1068,11 +1069,11 @@ uv run -- python -m pytest tests/integration/ -k newdatabase -v
 Test with small benchmark:
 
 ```python
-from benchbox import ReadPrimitivesBenchmark
+from benchbox import ReadPrimitives
 from benchbox.platforms.newdatabase import NewDatabaseAdapter
 
 # Test with minimal benchmark
-benchmark = ReadPrimitivesBenchmark(scale_factor=0.001)
+benchmark = ReadPrimitives(scale_factor=0.001)
 adapter = NewDatabaseAdapter(
     host="localhost",
     database="test",
@@ -1313,4 +1314,4 @@ Your contribution helps make BenchBox more comprehensive and valuable for the an
 - **Test Examples**: `tests/unit/platforms/`
 - **Documentation Examples**: `docs/platforms/`
 - **Acceptance Checklist**: [new-platform-acceptance-checklist.md](new-platform-acceptance-checklist.md)
-- **BenchBox Architecture**: `docs/development/architecture.md`
+- **BenchBox Architecture**: [architecture.md](../design/architecture.md)

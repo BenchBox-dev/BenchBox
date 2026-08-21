@@ -41,8 +41,8 @@ docker compose run --rm velox-runner --benchmark tpch --scale 0.1
 
 # (b) Host-driver / container-backend: start a Gluten-enabled Spark-Connect server
 docker compose up -d velox-connect
-benchbox run --platform velox --velox-deployment remote \
-    --velox-endpoint sc://localhost:50051 \
+benchbox run --platform velox --platform-option deployment=remote \
+    --platform-option endpoint=sc://localhost:50051 \
     --benchmark tpch --scale 0.1
 ```
 
@@ -60,7 +60,7 @@ uv add benchbox --extra velox
 # Run locally with Gluten wired into an in-process SparkSession
 benchbox run --platform velox --benchmark tpch --scale 0.1 \
     --platform-option gluten_jar_path=/opt/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar \
-    --offheap-size 8g
+    --platform-option offheap_size=8g
 ```
 
 ## Configuration
@@ -69,31 +69,35 @@ benchbox run --platform velox --benchmark tpch --scale 0.1 \
 
 ```bash
 benchbox run --platform velox --benchmark tpch --scale 1.0 \
-    --velox-deployment local \
+    --platform-option deployment=local \
     --platform-option gluten_jar_path=/opt/gluten.jar \
-    --velox-version 1.6.0 \
-    --offheap-size 16g \
-    --driver-memory 8g \
-    --shuffle-partitions 200 \
+    --platform-option offheap_size=16g \
+    --platform-option driver_memory=8g \
+    --platform-option shuffle_partitions=200 \
     --table-format parquet
 ```
 
 ### Configuration Options
 
-| Option | CLI Flag | Default | Description |
-|--------|----------|---------|-------------|
-| `deployment` | `--velox-deployment` | `local` | `local` (in-process SparkSession, Linux only) or `remote` (connect to Spark-Connect) |
-| `endpoint` | `--velox-endpoint` | `sc://localhost:50051` | Spark-Connect endpoint for `remote` mode |
-| `gluten_jar_path` | `--platform-option gluten_jar_path=…` (alias: `jar=…`) | - | Absolute path to the Gluten bundle jar (required for `local` mode) |
-| `gluten_version` | `--velox-version` | `1.6.0` | Gluten version (informational, surfaced in `platform_info`) |
-| `offheap_size` | `--offheap-size` | `8g` | `spark.memory.offHeap.size` for Velox (sized separately from JVM heap) |
-| `driver_memory` | `--driver-memory` | `4g` | JVM driver heap |
-| `shuffle_partitions` | `--shuffle-partitions` | `200` | `spark.sql.shuffle.partitions` |
-| `table_format` | `--table-format` | `parquet` | `parquet` or `orc` |
-| `adaptive_enabled` | `--adaptive-enabled` / `--no-adaptive-enabled` | `true` | Enable Adaptive Query Execution (AQE) |
-| `app_name` | `--app-name` | `BenchBox-Velox` | Spark application name |
-| `spark_config` | - | `{}` | Extra Spark configuration (dict). `spark.shuffle.manager` cannot be overridden in `local` mode. |
-| `disable_cache` | - | `true` | Disables `spark.sql.inMemoryColumnarStorage.enabled` for clean timings |
+Options in the "CLI" column are passed as `--platform-option KEY=VALUE`; the
+rest are adapter constructor parameters only.
+
+| Option | CLI | Default | Description |
+|--------|-----|---------|-------------|
+| `deployment` | yes | `local` | `local` (in-process SparkSession, Linux only) or `remote` (connect to Spark-Connect) |
+| `endpoint` | yes | `sc://localhost:50051` | Spark-Connect endpoint for `remote` mode |
+| `gluten_jar_path` | yes (alias: `jar`) | - | Absolute path to the Gluten bundle jar (required for `local` mode) |
+| `offheap_size` | yes | `8g` | `spark.memory.offHeap.size` for Velox (sized separately from JVM heap) |
+| `driver_memory` | yes | `4g` | JVM driver heap |
+| `shuffle_partitions` | yes | `200` | `spark.sql.shuffle.partitions` |
+| `adaptive_enabled` | yes | `true` | Enable Adaptive Query Execution (AQE) |
+| `gluten_version` | no | `1.6.0` | Gluten version (informational, surfaced in `platform_info`) |
+| `app_name` | no | `BenchBox-Velox` | Spark application name |
+| `spark_config` | no | `{}` | Extra Spark configuration (dict). `spark.shuffle.manager` cannot be overridden in `local` mode. |
+| `disable_cache` | no | `true` | Disables `spark.sql.inMemoryColumnarStorage.enabled` for clean timings |
+
+The table format is set with the `benchbox run --table-format` option
+(`parquet` or `orc`), not a platform option.
 
 ### Mandatory Gluten Configuration (Local Mode)
 
@@ -118,13 +122,13 @@ Overriding `spark.shuffle.manager` via `spark_config` raises `ValueError` - `Col
 ```bash
 # TPC-H SF1 with 16 GB off-heap
 benchbox run --platform velox --benchmark tpch --scale 1.0 \
-    --platform-option gluten_jar_path=/opt/gluten.jar --offheap-size 16g
+    --platform-option gluten_jar_path=/opt/gluten.jar --platform-option offheap_size=16g
 
 # TPC-DS SF10, specific queries
 benchbox run --platform velox --benchmark tpcds --scale 10.0 \
     --queries Q1,Q6,Q17 \
-    --platform-option gluten_jar_path=/opt/gluten.jar --offheap-size 24g \
-    --driver-memory 12g --shuffle-partitions 400
+    --platform-option gluten_jar_path=/opt/gluten.jar --platform-option offheap_size=24g \
+    --platform-option driver_memory=12g --platform-option shuffle_partitions=400
 
 # Dry-run preview
 benchbox run --dry-run ./preview --platform velox --benchmark tpch --scale 1.0
@@ -139,8 +143,8 @@ docker compose up -d velox-connect
 
 # 2. Run benchbox on the host, connecting to the container
 benchbox run --platform velox --benchmark tpch --scale 1.0 \
-    --velox-deployment remote \
-    --velox-endpoint sc://localhost:50051
+    --platform-option deployment=remote \
+    --platform-option endpoint=sc://localhost:50051
 ```
 
 The adapter does **not** auto-start a server - if `sc://host:port` is unreachable, connection fails with a clear error.
@@ -153,13 +157,13 @@ benchbox run --platform spark --benchmark tpch --scale 10.0
 
 # Same workload with Gluten + Velox
 benchbox run --platform velox --benchmark tpch --scale 10.0 \
-    --platform-option gluten_jar_path=/opt/gluten.jar --offheap-size 24g
+    --platform-option gluten_jar_path=/opt/gluten.jar --platform-option offheap_size=24g
 
 # LakeSail Sail (Rust / DataFusion)
 benchbox run --platform lakesail --benchmark tpch --scale 10.0
 
 # Compare
-benchbox results compare spark_tpch_sf10.json velox_tpch_sf10.json lakesail_tpch_sf10.json
+benchbox compare spark_tpch_sf10.json velox_tpch_sf10.json lakesail_tpch_sf10.json
 ```
 
 ## Python API
@@ -286,7 +290,7 @@ docker compose logs velox-connect   # check for startup errors
 
 ### Out-of-memory / excessive JVM fallback
 
-Velox uses off-heap memory. Increase `--offheap-size` (default 8 GB). If you see `RowToColumnar` inserted before every operator, the Gluten plugin may not have loaded - check the probe above.
+Velox uses off-heap memory. Increase `--platform-option offheap_size=<size>` (default 8g). If you see `RowToColumnar` inserted before every operator, the Gluten plugin may not have loaded - check the probe above.
 
 ## See Also
 

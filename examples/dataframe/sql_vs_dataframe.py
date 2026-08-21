@@ -113,14 +113,14 @@ def _run_sql_mode(parquet_dir: Path, results: dict) -> None:
 
 
 def _run_dataframe_mode(parquet_dir: Path, results: dict) -> None:
-    from benchbox.core.dataframe.context import PolarsDataFrameContext
-    from benchbox.core.tpch.dataframe_queries import get_tpch_query
+    from benchbox.core.tpch.dataframe_queries import get_query
+    from benchbox.platforms.polars_platform import PolarsAdapter
 
     print("\n" + "-" * 70)
     print("DataFrame Mode (Polars)")
     print("-" * 70)
 
-    ctx = PolarsDataFrameContext()
+    ctx = PolarsAdapter().create_connection()
     for table in TPCH_TABLES:
         table_path = parquet_dir / f"{table}.parquet"
         if table_path.exists():
@@ -128,8 +128,9 @@ def _run_dataframe_mode(parquet_dir: Path, results: dict) -> None:
             ctx.register_table(table, df)
 
     for qid in ["Q1", "Q6"]:
-        query = get_tpch_query(qid)
-        if query is None:
+        try:
+            query = get_query(qid)
+        except KeyError:
             print(f"  {qid}: Query not found")
             continue
         try:

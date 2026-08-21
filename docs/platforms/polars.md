@@ -92,8 +92,8 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.1
 
 ```bash
 # Same benchmark, different execution paradigms
-benchbox run --platform polars --benchmark tpch --scale 1 --output-dir ./polars-sql
-benchbox run --platform polars-df --benchmark tpch --scale 1 --output-dir ./polars-df
+benchbox run --platform polars --benchmark tpch --scale 1 --output ./polars-sql
+benchbox run --platform polars-df --benchmark tpch --scale 1 --output ./polars-df
 
 # Compare results
 benchbox compare ./polars-sql ./polars-df

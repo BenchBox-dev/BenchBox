@@ -173,6 +173,51 @@ def _git_output(repo_root: Path, *args: str) -> str:
     return completed.stdout.strip()
 
 
+def _cell_datagen_dir(benchmark_runs_dir: Path | str | None, benchmark: str, scale: float) -> Path | None:
+    """Return the datagen directory the cell's own CLI invocation will use.
+
+    `tests/uat/runner.py` always launches cells with
+    ``--output <benchmark_runs_dir>/datagen``, and the run command normalizes
+    that root with :func:`benchbox.utils.output_path.normalize_output_root`,
+    which appends ``<requested benchmark>_<sf>``. A custom ``--output`` takes
+    precedence over the shared-datagen resolution in
+    ``benchbox/cli/orchestrator.py``, so under UAT an alias workload does *not*
+    land in its canonical source's directory: ``read_primitives`` writes to
+    ``read_primitives_sf...``, not ``tpch_sf...``.
+
+    Reuse is therefore keyed by this resolved path rather than by the
+    registry's ``data_source``. Keying by the canonical source would merge two
+    directories UAT deliberately keeps apart and drop a reserve for data the
+    cell still has to generate.
+    """
+    if benchmark_runs_dir is None:
+        return None
+    try:
+        from benchbox.utils.output_path import normalize_output_root
+
+        normalized = normalize_output_root(str(Path(benchmark_runs_dir) / "datagen"), benchmark, scale)
+    except Exception:  # pragma: no cover - path resolution is advisory here
+        return None
+    return Path(normalized) if normalized else None
+
+
+def _datagen_cache_complete(path: Path | None) -> bool:
+    """Report whether `path` holds a *finished* dataset.
+
+    Generators populate their output directory before writing
+    ``_datagen_manifest.json`` last, so a non-empty directory can be a
+    generation that died partway. Only the manifest proves the dataset is
+    complete enough for a later cell to reuse; anything short of it keeps the
+    full datagen reserve, which is the safe direction for a disk guard.
+    """
+    if path is None:
+        return False
+    try:
+        return (path / "_datagen_manifest.json").is_file()
+    except OSError:
+        return False
+
+
 def _build_disk_floor_runner(
     base_runner: CellRunner,
     *,
@@ -183,6 +228,8 @@ def _build_disk_floor_runner(
     budget_table: preflight_budget.BudgetTable | None = None,
     free_space_reader: Callable[[str | Path], float] | None = None,
     cell_stream: Callable[[CellResult], None] | None = None,
+    benchmark_runs_dir: Path | str | None = None,
+    datagen_cache_probe: Callable[[Path | None], bool] | None = None,
 ) -> CellRunner:
     """Wrap a cell runner with predictive and post-cell disk checks.
 
@@ -193,6 +240,13 @@ def _build_disk_floor_runner(
     unmeasured database terms remain explicitly lower-bound predictions; the
     post-cell floor is still the backstop for demand the inventory cannot see.
 
+    Datagen reuse is keyed by the datagen directory the cell will actually
+    write -- resolved from the sweep's own `benchmark_runs_dir`, the way the
+    cell's `--output` is resolved -- and counted only once that directory holds
+    a completed dataset. A rerun over existing data does not reserve growth it
+    will not create, while a cell that died before or during generation leaves
+    the next cell's reserve intact.
+
     `cell_stream`, when provided, is called with each cell's result the moment
     it completes -- the hook the durable sweep uses to append + fsync that row
     to cells.jsonl immediately (uat-sweep-durability-and-signal-teardown w1),
@@ -201,19 +255,23 @@ def _build_disk_floor_runner(
     a row is on disk even when that check aborts the sweep.
     """
 
-    seen_datagen_sources: set[tuple[str, float]] = set()
+    seen_datagen_dirs: set[Path] = set()
     read_free_space = free_space_reader or preflight_budget.free_space_gib
+    datagen_complete = datagen_cache_probe or _datagen_cache_complete
 
     def runner(platform: str, benchmark: str, scale: float, **kwargs) -> CellResult:
         prediction = None
+        datagen_dir = _cell_datagen_dir(benchmark_runs_dir, benchmark, scale)
         if watch_disk_floor and budget_table is not None:
-            source_key = (benchmark, scale)
+            already_present = (datagen_dir is not None and datagen_dir in seen_datagen_dirs) or datagen_complete(
+                datagen_dir
+            )
             prediction = preflight_budget.predict_cell_disk_growth(
                 platform,
                 benchmark,
                 scale,
                 table=budget_table,
-                datagen_already_present=source_key in seen_datagen_sources,
+                datagen_already_present=already_present,
             )
             if prediction is not None:
                 free_gib = read_free_space(free_space_path)
@@ -250,8 +308,8 @@ def _build_disk_floor_runner(
                 raise DiskFloorAbort(
                     f"free space {free_gib:.1f} GiB < cutoff {free_space_min_gib:.1f} GiB at {free_space_path}"
                 )
-        if prediction is not None:
-            seen_datagen_sources.add((benchmark, scale))
+        if prediction is not None and datagen_dir is not None and datagen_complete(datagen_dir):
+            seen_datagen_dirs.add(datagen_dir)
         return result
 
     return runner
@@ -413,6 +471,7 @@ def _run_sweep_phases(  # noqa: C901
                     free_space_min_gib=config.preflight.free_space_min_gib,
                     budget_table=predictive_budget_table,
                     cell_stream=cell_stream_writer.append,
+                    benchmark_runs_dir=benchmark_runs_dir,
                 ),
             }
             try:

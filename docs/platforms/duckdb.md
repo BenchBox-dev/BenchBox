@@ -198,7 +198,7 @@ benchbox run --platform duckdb --benchmark tpch --scale 1.0
 ```bash
 # Generate data separately, then run benchmark with pre-generated data
 benchbox datagen --benchmark tpch --scale 1.0 --output ./data/tpch
-benchbox run --platform duckdb --benchmark tpch --scale 1.0 --data-dir ./data/tpch
+benchbox run --platform duckdb --benchmark tpch --scale 1.0 --output ./data/tpch
 ```
 
 ### Direct Query (No Load)

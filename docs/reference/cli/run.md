@@ -32,10 +32,11 @@ benchbox run [OPTIONS]
     - `maintenance` - **Data modification operations (DATABASE RELOAD REQUIRED AFTER)** - See [TPC-H Maintenance](../../guides/tpc/tpc-h-official-guide.md#maintenance-test) or [TPC-DS Maintenance](../../guides/tpc/tpc-ds-official-guide.md#3-maintenance-test)
   - Use comma-separated list: `--phases generate,load,power`
   - **Warning:** Maintenance phase permanently modifies data; reload database before running power/throughput again
-  - **Note:** `run` has no `--streams`/`--concurrency` flag of its own to set the
-    number of concurrent streams for the `throughput` phase. The only CLI flag
-    that sets stream count is `--streams` on the deprecated `run-official`
-    command — see [Deprecated: `run-official`](#deprecated-run-official) below.
+  - **Note:** the number of concurrent streams for the `throughput` phase is set
+    with `--concurrency N`, a hidden option listed by
+    `benchbox run --help-topic all`. The deprecated `run-official` command
+    spells the same setting `--streams` — see
+    [Deprecated: `run-official`](#deprecated-run-official) below.
 - `--force [MODE]`: Force regeneration of data (modes: `all`, `datagen`, `upload`, or `datagen,upload`)
 - `--non-interactive`: Use defaults for all prompts (useful for automation)
 
@@ -413,9 +414,10 @@ benchbox run-official {tpch|tpcds} [OPTIONS]
 - `-v`, `--verbose`: Enable verbose logging
 - `--validate-results`: Enable result validation
 
-**Note:** plain `run` (including `run --official`) has no `--streams` or
-`--concurrency` CLI flag today, so `run-official --streams N` has no direct
-equivalent on `run` yet — see the `throughput` phase note above.
+**Note:** plain `run` (including `run --official`) has no `--streams` flag, but
+it accepts `--concurrency N`, a hidden option that sets the same
+`BenchmarkConfig.concurrency` field. `run-official --streams N` is therefore
+equivalent to `run --concurrency N` — see the `throughput` phase note above.
 
 ## Related
 

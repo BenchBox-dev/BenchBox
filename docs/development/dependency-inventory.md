@@ -190,7 +190,7 @@ or declaration appears unused.
 | `cloudpathlib[s3,gs,azure]` | DEV | tests use `cloudpathlib` core | covered above | KEEP - extras pin S3/GCS/Azure providers for live tests |
 | `pyiceberg[sql-sqlite,pyarrow]` | DEV | tests use `pyiceberg` core | covered above | KEEP - extras pin SQL-SQLite catalog for tests |
 | `ruamel-yaml` | DEV | `_project/scripts/todo_cli.py` | 0 (runtime); 1 (tooling) | KEEP - used by TODO tooling. (Distinct from `jsonschema` because `ruamel-yaml` is dev-only, not declared as a *core* runtime dep.) |
-| `sphinx` | DOC | `tests/conftest.py`, `tests/unit/docs/test_docs_build.py` | 2 | KEEP - drives docs build via `make docs` |
+| `sphinx` | DOC | `tests/conftest.py`, `tests/unit/docs/test_docs_build.py` | 2 | KEEP - drives docs build via `make docs-build` |
 | `sphinx-tags` | DOC | (config in `docs/conf.py:66`) | 0 | KEEP - registered in `extensions` list |
 | `sphinx-design` | DOC | (config in `docs/conf.py:68`) | 0 | KEEP |
 | `sphinxcontrib-mermaid` | DOC | (config in `docs/conf.py:65`) | 1 | KEEP |

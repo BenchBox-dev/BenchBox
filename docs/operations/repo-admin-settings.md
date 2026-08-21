@@ -653,13 +653,24 @@ gh label list --search incident
 
 ## Re-applying after a transfer or restore
 
-If the repo is transferred, restored from backup, or the rules drift,
-re-apply in this order:
+The 2026-08-21 cutover to org `BenchBox-dev` is documented in
+`docs/operations/github-org-transfer.md` (gates G0–G7b, Pages
+serving-only vs publish, org `protected_domain` verification,
+environment `deployment-branch` policies, `RULESET_DRIFT_TOKEN`
+authentication, and **never recreate** `joeharris76/BenchBox`). Follow
+that runbook for an ownership transfer. The numbered restore below is
+the subset that still applies after a backup restore or ruleset wipe
+**without** changing owners.
+
+If the repo is restored from backup or the rules drift without a
+transfer, re-apply in this order:
 
 1. Workflow permissions (`gh api -X PUT … actions/permissions/workflow`).
 2. Develop ruleset — recreate `develop-squash-only` with the required
    contexts list above. The ruleset id will change; update this file
-   and the `Makefile`/`scripts/` references that hard-code it.
+   and the `Makefile`/`scripts/` references that hard-code it. Prefer
+   resolving the live ruleset **by name** (`develop-squash-only`) in
+   workflows; do not treat a stale numeric id as authority.
 3. Verify with the `gh api … rulesets/<id> --jq …` command above.
 4. Push a no-op commit to develop and confirm `develop-post-merge.yml`
    produces a `metrics` artifact and the lint + fast-test jobs are green.

@@ -108,11 +108,11 @@ BenchBox visualizations are designed for accessibility:
 For fine-grained control, use the Python API directly:
 
 ```python
-from benchbox.core.visualization.ascii.base import ASCIIChartOptions
-from benchbox.core.visualization.ascii.bar_chart import ASCIIBarChart, BarData
+from benchbox.core.visualization.ascii.base import ChartOptions
+from benchbox.core.visualization.ascii.bar_chart import BarChart, BarData
 
 # Custom chart options
-opts = ASCIIChartOptions(
+opts = ChartOptions(
     use_color=True,
     use_unicode=True,
     theme="dark",
@@ -126,7 +126,7 @@ data = [
     BarData(label="Platform C", value=200.1, is_worst=True),
 ]
 
-chart = ASCIIBarChart(
+chart = BarChart(
     data=data,
     title="Custom Chart Title",
     metric_label="Execution Time (ms)",
