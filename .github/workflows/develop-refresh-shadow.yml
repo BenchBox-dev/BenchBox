@@ -153,7 +153,18 @@ jobs:
               return None
 
           repo = os.environ["GITHUB_REPOSITORY"]
-          ruleset = api("/repos/{0}/rulesets/15611785".format(repo))
+          listing = api("/repos/{0}/rulesets".format(repo))
+          ruleset_id = None
+          if isinstance(listing, list):
+              for entry in listing:
+                  if isinstance(entry, dict) and entry.get("name") == "develop-squash-only":
+                      ruleset_id = entry.get("id")
+                      break
+          ruleset = (
+              api("/repos/{0}/rulesets/{1}".format(repo, ruleset_id))
+              if ruleset_id
+              else {"_error": "develop-squash-only-missing"}
+          )
           contexts = []
           if isinstance(ruleset, dict) and "_error" not in ruleset:
               for rule in ruleset.get("rules") or []:
