@@ -2,11 +2,10 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/pre
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/db", () => ({
-  getDb: vi.fn(),
   queryRows: vi.fn(),
 }));
 
-import { getDb, queryRows } from "@/db";
+import { queryRows } from "@/db";
 import { clearDuckdbQueryCachesForTests } from "@/lib/duckdbQueries";
 import { DEFAULT_ROW_LIMIT, UNLIMITED_ROW_LIMIT } from "@/lib/queryFilters";
 import { Query } from "@/pages/Query";
@@ -106,7 +105,6 @@ function facetCountCalls() {
 
 beforeEach(() => {
   vi.mocked(queryRows).mockReset();
-  vi.mocked(getDb).mockReset();
   clearDuckdbQueryCachesForTests();
   schemaColumns = BASE_SCHEMA_COLUMNS;
   resultRows = BASE_ROWS;
@@ -124,21 +122,6 @@ beforeEach(() => {
   });
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:csv");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-
-  const preparedQuery = vi.fn().mockResolvedValue(undefined);
-  const preparedClose = vi.fn().mockResolvedValue(undefined);
-  const prepare = vi.fn().mockResolvedValue({
-    query: preparedQuery,
-    close: preparedClose,
-  });
-  const close = vi.fn().mockResolvedValue(undefined);
-  vi.mocked(getDb).mockResolvedValue({
-    connect: vi.fn().mockResolvedValue({ prepare, close }),
-    copyFileToBuffer: vi
-      .fn()
-      .mockResolvedValue(new TextEncoder().encode("benchmark,platform,scale_factor\nclickbench,DuckDB,0.1\n")),
-    dropFile: vi.fn().mockResolvedValue(null),
-  } as unknown as Awaited<ReturnType<typeof getDb>>);
 
   vi.mocked(queryRows).mockImplementation(async (sql: string) => {
     const normalized = normalizeSql(sql);
@@ -790,8 +773,9 @@ describe("Query", () => {
     expect(screen.getByRole("button", { name: /^Default$/ })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("exports the current table rows as CSV", async () => {
+  it("exports the complete filtered row set as quoted CSV without filesystem access", async () => {
     let capturedBlob: Blob | null = null;
+    resultRows = [{ ...BASE_ROWS[0], platform: 'Duck, "DB"\nNext', trust_label: null }];
     const originalCreateElement = document.createElement.bind(document);
     vi.spyOn(document, "createElement").mockImplementation(((tagName: string) => {
       if (tagName === "a") {
@@ -812,11 +796,15 @@ describe("Query", () => {
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByRole("button", { name: "Download CSV (visible columns)" }));
-    await waitFor(() => expect(vi.mocked(getDb)).toHaveBeenCalled());
     await waitFor(() => expect(capturedBlob).not.toBeNull());
     expect(capturedBlob).toBeTruthy();
     const csvText = await capturedBlob!.text();
     expect(csvText).toContain("benchmark,platform,scale_factor");
+    expect(csvText).toContain('"Duck, ""DB""\nNext"');
+    const exportCall = vi
+      .mocked(queryRows)
+      .mock.calls.find(([sql]) => normalizeSql(sql).startsWith("SELECT benchmark, platform, scale_factor"));
+    expect(exportCall?.[0]).toContain(`LIMIT ${UNLIMITED_ROW_LIMIT}`);
   });
 
   it("loads a starter query into the SQL editor when its button is clicked", async () => {

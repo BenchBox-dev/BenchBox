@@ -3,11 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { expectNoAxeViolations } from "@/testing/axe-helper";
 
 vi.mock("@/db", () => ({
-  getDb: vi.fn(),
   queryRows: vi.fn(),
 }));
 
-import { getDb, queryRows } from "@/db";
+import { queryRows } from "@/db";
 import { clearDuckdbQueryCachesForTests } from "@/lib/duckdbQueries";
 import { Query } from "@/pages/Query";
 
@@ -71,14 +70,6 @@ describe("Query visible disabled reasons accessibility", () => {
       observe() {}
       disconnect() {}
     });
-    vi.mocked(getDb).mockResolvedValue({
-      connect: vi.fn().mockResolvedValue({
-        prepare: vi.fn(),
-        close: vi.fn(),
-      }),
-      copyFileToBuffer: vi.fn(),
-      dropFile: vi.fn(),
-    } as unknown as Awaited<ReturnType<typeof getDb>>);
     vi.mocked(queryRows).mockImplementation(async (sql: string) => {
       const normalized = normalizeSql(sql);
       if (normalized.includes("FROM duckdb_columns()")) return SCHEMA_COLUMNS;
