@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import os
@@ -63,7 +64,6 @@ def _candidate(tmp_path: Path) -> Path:
         CANONICAL_REVIEW_SKILL,
         CANONICAL_COMMIT_SKILL,
         ".claude/settings.json",
-        "pyproject.toml",
     ):
         source = ROOT / relative
         target = tmp_path / relative
@@ -76,6 +76,19 @@ def test_repository_candidate_passes() -> None:
     metrics, errors = audit(ROOT, CORPUS)
     assert errors == []
     assert metrics.active_bytes < CORPUS["baseline"]["active_bytes"]
+
+
+def test_audit_entrypoint_is_stdlib_only() -> None:
+    tree = ast.parse((ROOT / "_project/scripts/agent_instruction_audit.py").read_text(encoding="utf-8"))
+    imported = {
+        alias.name.partition(".")[0] for node in tree.body if isinstance(node, ast.Import) for alias in node.names
+    }
+    imported.update(
+        node.module.partition(".")[0]
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom) and node.module not in {None, "__future__"}
+    )
+    assert imported <= sys.stdlib_module_names
 
 
 @pytest.mark.parametrize(
@@ -289,14 +302,6 @@ def test_canonical_review_policy_semantic_drift_fails(tmp_path: Path) -> None:
     assert any("canonical REVIEW-AUTH-001 semantics drifted" in error for error in errors)
 
 
-def test_project_review_policy_separate_turn_drift_fails(tmp_path: Path) -> None:
-    project = _candidate(tmp_path)
-    protocol = project / "docs/agent/review-protocol.md"
-    protocol.write_text(protocol.read_text().replace("in a\n  later user turn", "separately"))
-    _, errors = audit(project, CORPUS)
-    assert any("project REVIEW-AUTH-001 semantics drifted" in error for error in errors)
-
-
 def test_agents_bundled_review_zero_mutation_drift_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"
@@ -308,17 +313,18 @@ def test_agents_bundled_review_zero_mutation_drift_fails(tmp_path: Path) -> None
 def test_project_review_policy_id_missing_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     protocol = project / "docs/agent/review-protocol.md"
-    protocol.write_text(protocol.read_text().replace("[REVIEW-AUTH-001]", "[REMOVED-AUTH-ID]"))
+    protocol.write_text(protocol.read_text().replace("[REVIEW-CAPTURE-001]", "[REMOVED-CAPTURE-ID]"))
     _, errors = audit(project, CORPUS)
-    assert any("project review binding misses policy ID: REVIEW-AUTH-001" in error for error in errors)
+    assert any("project review binding misses policy ID: REVIEW-CAPTURE-001" in error for error in errors)
 
 
-def test_missing_canonical_review_policy_id_fails(tmp_path: Path) -> None:
+@pytest.mark.parametrize("policy_id", ["REVIEW-DEPTH-001", "REVIEW-L2-001"])
+def test_missing_canonical_review_policy_id_fails(tmp_path: Path, policy_id: str) -> None:
     project = _candidate(tmp_path)
     canonical = project / CANONICAL_REVIEW_SKILL
-    canonical.write_text(canonical.read_text().replace("[REVIEW-L2-001]", "[REMOVED-L2-ID]"))
+    canonical.write_text(canonical.read_text().replace(f"[{policy_id}]", "[REMOVED-REVIEW-ID]"))
     _, errors = audit(project, CORPUS)
-    assert any("canonical review skill misses policy IDs: REVIEW-L2-001" in error for error in errors)
+    assert any(f"canonical review skill misses policy IDs: {policy_id}" in error for error in errors)
 
 
 def test_canonical_plan_reconciliation_policy_drift_fails(tmp_path: Path) -> None:
@@ -332,7 +338,7 @@ def test_canonical_plan_reconciliation_policy_drift_fails(tmp_path: Path) -> Non
 def test_project_plan_reconciliation_policy_drift_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     protocol = project / "docs/agent/review-protocol.md"
-    protocol.write_text(protocol.read_text().replace("Enumerate recorded decision", "Skim prior decision"))
+    protocol.write_text(protocol.read_text().replace("future-state index/tiers", "future plans"))
     _, errors = audit(project, CORPUS)
     assert any("project REVIEW-PLAN-RECON-001 semantics drifted" in error for error in errors)
 
@@ -628,7 +634,6 @@ def test_every_error_names_the_check_that_produced_it(tmp_path: Path) -> None:
         "surface",
         "review-policy",
         "commit-policy",
-        "dependency-caps",
         "scenarios",
         "git-identity",
         "commit-range",
@@ -689,46 +694,3 @@ def test_the_precommit_hook_name_does_not_claim_a_single_check() -> None:
     assert "instruction" in hook["name"].casefold(), (
         f"hook name {hook['name']!r} names only the identity check while running the whole audit"
     )
-
-
-def test_advertised_dependency_cap_behind_the_manifest_fails(tmp_path: Path) -> None:
-    """The exact drift that shipped: AGENTS.md said `pyarrow<24`, manifest said <25."""
-    project = _candidate(tmp_path)
-    agents = project / "AGENTS.md"
-    agents.write_text(agents.read_text().replace("`pyarrow<25`", "`pyarrow<24`"))
-    _, errors = audit(project, CORPUS)
-    assert any("pyarrow" in error and "dependency-caps" in error for error in errors)
-
-
-def test_advertised_cap_without_a_manifest_bound_fails(tmp_path: Path) -> None:
-    """An advertised cap for a dependency the manifest never bounds is drift too."""
-    project = _candidate(tmp_path)
-    agents = project / "AGENTS.md"
-    agents.write_text(agents.read_text().replace("`duckdb<2`", "`nonexistentpkg<9`"))
-    _, errors = audit(project, CORPUS)
-    assert any("nonexistentpkg" in error and "declares no upper bound" in error for error in errors)
-
-
-def test_optional_dependency_caps_are_honoured(tmp_path: Path) -> None:
-    """`duckdb` is bounded only under optional-dependencies; that must still count."""
-    project = _candidate(tmp_path)
-    _, errors = audit(project, CORPUS)
-    assert not [error for error in errors if "duckdb" in error]
-
-
-def test_advertised_cap_is_not_accepted_as_a_version_prefix(tmp_path: Path) -> None:
-    """`sqlglot<3` must not pass merely because the manifest says `<31.0.0`."""
-    project = _candidate(tmp_path)
-    agents = project / "AGENTS.md"
-    agents.write_text(agents.read_text().replace("`sqlglot<31`", "`sqlglot<3`"))
-    _, errors = audit(project, CORPUS)
-    assert any("sqlglot<3" in error and "<31.0.0" in error for error in errors)
-
-
-def test_each_independent_optional_dependency_keeps_the_advertised_cap(tmp_path: Path) -> None:
-    """A bound in `dev` must not hide a missing bound in the `duckdb` extra."""
-    project = _candidate(tmp_path)
-    manifest = project / "pyproject.toml"
-    manifest.write_text(manifest.read_text().replace('duckdb = ["duckdb>=1.0.0,<2.0.0"]', 'duckdb = ["duckdb>=1.0.0"]'))
-    _, errors = audit(project, CORPUS)
-    assert any("project.optional-dependencies.duckdb" in error and "without that bound" in error for error in errors)

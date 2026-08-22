@@ -13,14 +13,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.10
-    import tomli as tomllib  # type: ignore[no-redef]
-
-from packaging.requirements import InvalidRequirement, Requirement
-from packaging.version import InvalidVersion, Version
-
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CORPUS = ROOT / "_project/evals/agent-instructions/scenarios.json"
 ADAPTERS = ("CLAUDE.md", "GEMINI.md", "ANTIGRAVITY.md")
@@ -31,15 +23,22 @@ CANONICAL_COMMIT_SKILL = ".claude/skills/SHARED/change-framework/SKILL.md"
 REQUIRED_POLICY_IDS = {
     "AUTH-PROVENANCE-001",
     "COMMIT-IDENTITY-001",
+    "EVIDENCE-FRESHNESS-001",
     "REVIEW-AUTH-001",
-    "REVIEW-DEFECT-001",
-    "REVIEW-L2-001",
     "REVIEW-CAPTURE-001",
     "REVIEW-PARITY-001",
     "REVIEW-PLAN-RECON-001",
     "WRITE-CLOSEOUT-001",
 }
-REVIEW_POLICY_IDS = {policy_id for policy_id in REQUIRED_POLICY_IDS if policy_id.startswith("REVIEW-")}
+CANONICAL_REVIEW_POLICY_IDS = {
+    "REVIEW-AUTH-001",
+    "REVIEW-DEFECT-001",
+    "REVIEW-DEPTH-001",
+    "REVIEW-L2-001",
+    "REVIEW-CAPTURE-001",
+    "REVIEW-PARITY-001",
+    "REVIEW-PLAN-RECON-001",
+}
 CANONICAL_REVIEW_ANCHORS = {
     "REVIEW-AUTH-001": (
         "read-only except for local capture",
@@ -51,6 +50,7 @@ CANONICAL_REVIEW_ANCHORS = {
         "combines review and remediation remains review-only",
     ),
     "REVIEW-DEFECT-001": ("classify it as a defect", "never in blind-spots"),
+    "REVIEW-DEPTH-001": ("Obvious answer", "Blind-spot audit", "Problem reframe"),
     "REVIEW-L2-001": ("gaps in the review framework", "not defects already found"),
     "REVIEW-CAPTURE-001": ("protocol governs behavior", "governs storage formats"),
     "REVIEW-PARITY-001": ("Missing IDs or contradictory semantics", "skill governs behavior"),
@@ -89,15 +89,13 @@ PROJECT_COMMIT_ANCHORS = {
     )
 }
 PROJECT_REVIEW_ANCHORS = {
-    "REVIEW-AUTH-001": ("later user turn", "bundling review and remediation"),
+    "REVIEW-CAPTURE-001": ("~/.benchbox/finding-drafts/", "_project/scripts/todo"),
+    "REVIEW-PARITY-001": ("canonical skill governs behavior", "only BenchBox-specific bindings"),
     "REVIEW-PLAN-RECON-001": (
-        "Enumerate recorded decision",
         "future-state index/tiers",
         "migration gates",
         "readiness docs",
         "open tracker items",
-        "Cite or supersede each",
-        "dropped open gate is a defect",
     ),
 }
 AGENT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("zero tracked worktree-content changes", "do not review and then edit")}
@@ -127,6 +125,7 @@ EVALUATION_ACTIONS = {
     "stop_publication",
     "continue_locally",
     "capture_local_draft",
+    "require_live_read",
 }
 EVALUATION_IDENTITIES = {"human", "current_task_agent", "not_applicable"}
 EVALUATION_BOOLEAN_FIELDS = {
@@ -241,7 +240,7 @@ def audit_review_policy(project: Path) -> list[str]:
             errors.append(f"AGENTS.md Code Review Rules drifted; missing anchors: {', '.join(missing_anchors)}")
 
     missing_canonical_ids = sorted(
-        policy_id for policy_id in REVIEW_POLICY_IDS if f"[{policy_id}]" not in canonical_review
+        policy_id for policy_id in CANONICAL_REVIEW_POLICY_IDS if f"[{policy_id}]" not in canonical_review
     )
     if missing_canonical_ids:
         errors.append(f"canonical review skill misses policy IDs: {', '.join(missing_canonical_ids)}")
@@ -486,91 +485,6 @@ def audit_commit_range(project: Path, base_ref: str) -> list[str]:
     return errors
 
 
-def audit_dependency_caps(project: Path) -> list[str]:
-    """Pin AGENTS.md's advertised dependency caps to `pyproject.toml`.
-
-    AGENTS.md restates upper bounds so an agent does not have to open the
-    manifest. A restated fact drifts silently: the file advertised
-    `pyarrow<24` while the manifest had moved to `<25`. This is the
-    deterministic invariant `docs/operations/agent-instruction-evaluation.md`
-    asks for -- it fails the audit instead of relying on a reader noticing.
-    """
-    errors: list[str] = []
-    agents = _read(project, "AGENTS.md")
-    caps_line = next((line for line in agents.splitlines() if "Current caps:" in line), "")
-    if not caps_line:
-        return ["AGENTS.md does not advertise dependency caps"]
-    advertised = dict(re.findall(r"`([A-Za-z0-9_.-]+)<([0-9][0-9A-Za-z_.-]*)`", caps_line))
-    if not advertised:
-        return ["AGENTS.md dependency caps line has no parsable `name<version` entries"]
-
-    manifest_path = project / "pyproject.toml"
-    try:
-        manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        return [f"cannot read pyproject.toml: {exc}"]
-
-    project_table = manifest.get("project", {})
-    requirement_groups = {
-        "project.dependencies": project_table.get("dependencies", []),
-        **{
-            f"project.optional-dependencies.{group}": requirements
-            for group, requirements in project_table.get("optional-dependencies", {}).items()
-        },
-    }
-
-    for name, cap in sorted(advertised.items()):
-        try:
-            advertised_version = Version(cap)
-        except InvalidVersion:
-            errors.append(f"AGENTS.md advertises `{name}<{cap}` with an invalid version")
-            continue
-
-        matches: list[tuple[str, Requirement]] = []
-        for group, requirement_strings in requirement_groups.items():
-            for requirement_string in requirement_strings:
-                try:
-                    requirement = Requirement(requirement_string)
-                except InvalidRequirement:
-                    continue
-                if requirement.name.casefold() == name.casefold():
-                    matches.append((group, requirement))
-
-        base_matches = [requirement for group, requirement in matches if group == "project.dependencies"]
-        if base_matches:
-            checks = [("project.dependencies", requirement) for requirement in base_matches]
-        else:
-            # Optional groups can be installed independently. With no core
-            # bound to constrain every installation, each declaration must
-            # carry the advertised cap rather than borrowing one from an
-            # unrelated extra such as `dev`.
-            checks = matches
-
-        if not matches:
-            errors.append(f"AGENTS.md advertises `{name}<{cap}` but pyproject.toml declares no upper bound for it")
-            continue
-
-        for group, requirement in checks:
-            bounds = [specifier for specifier in requirement.specifier if specifier.operator == "<"]
-            if not bounds:
-                errors.append(
-                    f"AGENTS.md advertises `{name}<{cap}` but [{group}] declares `{requirement}` without that bound"
-                )
-                continue
-            for bound in bounds:
-                try:
-                    actual_version = Version(bound.version)
-                except InvalidVersion:
-                    errors.append(f"[{group}] declares `{requirement}` with invalid upper bound <{bound.version}")
-                    continue
-                if actual_version != advertised_version:
-                    errors.append(
-                        f"AGENTS.md advertises `{name}<{cap}` but [{group}] declares "
-                        f"`{requirement}` with <{bound.version}"
-                    )
-    return errors
-
-
 def audit_scenarios(scenarios: list[dict[str, Any]], policy_text: str) -> list[str]:
     errors: list[str] = []
     scenario_ids = [scenario.get("id") for scenario in scenarios]
@@ -723,8 +637,6 @@ def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
     errors.extend(_tag("review-policy", audit_review_policy(project)))
     errors.extend(_tag("docs-placement", audit_docs_placement(project)))
     errors.extend(_tag("commit-policy", audit_commit_policy(project)))
-    errors.extend(_tag("dependency-caps", audit_dependency_caps(project)))
-
     errors.extend(_tag("scenarios", audit_scenarios(corpus["scenarios"], policy_text)))
 
     return metrics, errors

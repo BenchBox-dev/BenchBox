@@ -909,8 +909,8 @@ ci-local:
 # value digests differ, so `make test-correctness-gate` FAILS on a correct tree on Apple
 # silicon (the pinned digest references are Linux-generated). This wrapper is the only way
 # to validate that soundness gate pre-PR from a Mac. Purely additive and opt-in: a no-op on
-# non-Apple-silicon / non-macOS-26 hosts, and NEVER a CI or pr-open dependency. One-time
-# setup + usage: AGENTS.md "Apple container Linux CI parity". Override the gate with
+# non-Apple-silicon / non-macOS-26 hosts, and NEVER a CI or pr-open dependency. The target
+# prints one-time setup commands; parity rationale: docs/operations/release-guide.md. Override with
 # `make ci-linux CI_LINUX_CMD='make ci-local'`.
 CI_LINUX_MACHINE ?= benchbox-agent
 CI_LINUX_CMD ?= make test-correctness-gate
@@ -925,11 +925,11 @@ ci-linux:
 		exit 0; \
 	fi; \
 	if ! command -v container >/dev/null 2>&1; then \
-		echo "ci-linux: Apple 'container' not installed -> 'brew install container' (see AGENTS.md)."; \
+		echo "ci-linux: Apple 'container' not installed -> 'brew install container'."; \
 		exit 1; \
 	fi; \
 	if ! container machine list 2>/dev/null | awk 'NR>1{print $$1}' | grep -Fqx "$(CI_LINUX_MACHINE)"; then \
-		echo "ci-linux: machine '$(CI_LINUX_MACHINE)' not found. One-time setup (see AGENTS.md):"; \
+		echo "ci-linux: machine '$(CI_LINUX_MACHINE)' not found. One-time setup:"; \
 		echo "  container system start"; \
 		echo "  container build --arch arm64 --tag local/benchbox-agent docker/benchbox-agent"; \
 		echo "  container machine create local/benchbox-agent --name $(CI_LINUX_MACHINE) --home-mount rw --cpus 4 --memory 8G"; \
@@ -1740,7 +1740,7 @@ uat-prepull:
 # make uat-docker-cleanup [ENGINE=docker|container] [MODE=owned|images|max] [APPLY=1] [PREFIX=benchbox-uat]
 # ENGINE=container reclaims the Apple `container` store (~/Library/Application
 # Support/com.apple.container); MODE widens breadth owned<images<max. See
-# AGENTS.md "Apple container cleanup".
+# docs/operations/uat-framework.md "Docker storage cleanup".
 uat-docker-cleanup:
 	@uv run --no-sync -- python -m tests.uat._cli docker-cleanup \
 		$(if $(ENGINE),--engine "$(ENGINE)",) \
