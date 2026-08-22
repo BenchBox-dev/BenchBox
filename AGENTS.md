@@ -105,8 +105,8 @@ and stop condition). Do not commit raw logs, screenshots, browser reports, or ge
 
 ## Verification and close-out
 
-Assert tracker state, timings, and gate outcomes from a read taken now; a snapshot (`todo export`,
-`_project/todo-db-export/`) is evidence only when you state its age. A validator pass is not a `submit` pass.
+Assert tracker state, timings, and gate outcomes from a live read; a snapshot (`todo export`,
+`_project/todo-db-export/`) dates a past state and never a current one. A validator pass is not a `submit` pass.
 
 Read a claimed TODO's `verification` ladder and run the narrowest proof first.
 Useful local checks: `uv run -- python -m pytest -m fast -q`,
@@ -122,7 +122,7 @@ protected branches. Force-push only feature branches with `--force-with-lease`. 
 by `_project/scripts/auto_merge_soundness_paths.py` require maintainer review; excluded from auto-merge.
 A drift/pinning guard and its required-CI wiring must land in the same PR. Stacked/feature-base PRs are
 unsupported: zero CI by filters; `pr-base-guard.yml` fails loud — retarget/rebase onto `develop` after parent
-squash-merge (`docs/development/pr-base-branch-policy.md`). Bad-base empty checks ≠ `dirty` (conflicts).
+squash-merge (`docs/development/pr-base-branch-policy.md`). Bad-base empty checks ≠ `mergeable_state: dirty`.
 
 ## TODO tracker
 
@@ -139,13 +139,13 @@ never claimable items).
 - Timing durations use `benchbox.utils.clock.mono_time()` and `elapsed_seconds()`; wall clocks are event/audit only.
 - Adapter SDK imports stay lazy. New SQL platforms subclass `PlatformAdapter` and register with `@register_platform`.
 - CREATE TABLE rewrites are registered under `Phase.DDL_OPTIMIZE`; run `make compat-docs-check` and DDL drift check.
-- Dependency upper bounds exceptional. Current caps: `sqlglot<31`, `click<9`, `pydantic<3`, `pyarrow<25`, `duckdb<2`.
+- Upper bounds exceptional. Current caps (core): `sqlglot<31`, `click<9`, `pydantic<3`, `pyarrow<25`, `duckdb<2`.
 - CLI dry runs must propagate explicit phases; deterministic runs use a seed.
 - Green focused/fast tests are not UAT or production certification.
 
-Apple/macOS notes: correctness-gate digests are Linux-generated; `make ci-linux` for parity (release-guide.md).
-Mocker is local-only, never CI; multi-service stacks are unvalidated. See `docs/operations/uat-framework.md`
-("Mocker validation status") for per-stack state, lifecycle, and caveats. Never globally prune without approval.
+Apple/macOS: correctness-gate digests are Linux-generated; use `make ci-linux` (release-guide.md). Mocker is local-only,
+never CI: databend's `minio` was observed to exit under it; doris/starrocks are single-service. `docs/operations/uat-
+framework.md` ("Mocker validation status") holds per-stack state. Never globally prune without approval.
 
 ## Skills and generated mirrors
 

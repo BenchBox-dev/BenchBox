@@ -13,14 +13,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.10
-    import tomli as tomllib  # type: ignore[no-redef]
-
-from packaging.requirements import InvalidRequirement, Requirement
-from packaging.version import InvalidVersion, Version
-
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CORPUS = ROOT / "_project/evals/agent-instructions/scenarios.json"
 ADAPTERS = ("CLAUDE.md", "GEMINI.md", "ANTIGRAVITY.md")
@@ -33,6 +25,7 @@ REQUIRED_POLICY_IDS = {
     "COMMIT-IDENTITY-001",
     "REVIEW-AUTH-001",
     "REVIEW-DEFECT-001",
+    "REVIEW-DEPTH-001",
     "REVIEW-L2-001",
     "REVIEW-CAPTURE-001",
     "REVIEW-PARITY-001",
@@ -50,6 +43,7 @@ CANONICAL_REVIEW_ANCHORS = {
         "without changing tracked worktree content",
         "combines review and remediation remains review-only",
     ),
+    "REVIEW-DEPTH-001": ("L1", "L2", "L3"),
     "REVIEW-DEFECT-001": ("classify it as a defect", "never in blind-spots"),
     "REVIEW-L2-001": ("gaps in the review framework", "not defects already found"),
     "REVIEW-CAPTURE-001": ("protocol governs behavior", "governs storage formats"),
@@ -486,6 +480,64 @@ def audit_commit_range(project: Path, base_ref: str) -> list[str]:
     return errors
 
 
+def _requirement_name(requirement: str) -> str:
+    """Leading distribution name of a PEP 508 requirement string."""
+    match = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", requirement)
+    return match.group(1) if match else ""
+
+
+def _normalize(name: str) -> str:
+    """PEP 503 normalized name, so `foo_bar` and `Foo-Bar` compare equal."""
+    return re.sub(r"[-_.]+", "-", name).casefold()
+
+
+def _version_tuple(version: str) -> tuple[int, ...] | None:
+    """Numeric release components, or None when the version is not comparable."""
+    release = re.match(r"(\d+(?:\.\d+)*)", version.strip())
+    if not release:
+        return None
+    return tuple(int(part) for part in release.group(1).split("."))
+
+
+def _upper_bounds(requirement: str) -> list[str]:
+    """Every `<` bound in a requirement, excluding `<=`."""
+    specifier = requirement.split(";", 1)[0]
+    return re.findall(r"<(?!=)\s*([0-9][0-9A-Za-z_.*+!-]*)", specifier)
+
+
+def _manifest_requirements(manifest: str) -> dict[str, list[str]]:
+    """Quoted requirement strings per dependency table, stdlib-only.
+
+    Deliberately not `tomllib`/`tomli`/`packaging`: `.github/workflows/pr.yml`
+    runs this file with bare `python3` before `uv sync`, so a non-stdlib import
+    here hard-fails the required skill-integrity lane. 3.10 is also supported
+    and has no `tomllib`.
+    """
+    groups: dict[str, list[str]] = {}
+    table = ""
+    key = ""
+    for line in manifest.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("["):
+            table = stripped.strip("[]")
+            key = ""
+            continue
+        assignment = re.match(r"([A-Za-z0-9._-]+)\s*=", stripped)
+        if assignment:
+            key = assignment.group(1)
+        if table not in {"project", "project.optional-dependencies", "dependency-groups"}:
+            continue
+        if table == "project" and key != "dependencies":
+            continue
+        label = table if table != "project" else "project.dependencies"
+        if table != "project" and key:
+            label = f"{table}.{key}"
+        for quoted in re.findall(r'"([^"]+)"', stripped):
+            if _requirement_name(quoted):
+                groups.setdefault(label, []).append(quoted)
+    return groups
+
+
 def audit_dependency_caps(project: Path) -> list[str]:
     """Pin AGENTS.md's advertised dependency caps to `pyproject.toml`.
 
@@ -494,80 +546,70 @@ def audit_dependency_caps(project: Path) -> list[str]:
     `pyarrow<24` while the manifest had moved to `<25`. This is the
     deterministic invariant `docs/operations/agent-instruction-evaluation.md`
     asks for -- it fails the audit instead of relying on a reader noticing.
+
+    Every dependency table is scanned, `[dependency-groups]` included: CI
+    installs with `uv sync --group dev`, so a cap dropped there is a cap the
+    real install path loses.
     """
     errors: list[str] = []
     agents = _read(project, "AGENTS.md")
-    caps_line = next((line for line in agents.splitlines() if "Current caps:" in line), "")
+    caps_line = next((line for line in agents.splitlines() if "Current caps" in line), "")
     if not caps_line:
         return ["AGENTS.md does not advertise dependency caps"]
-    advertised = dict(re.findall(r"`([A-Za-z0-9_.-]+)<([0-9][0-9A-Za-z_.-]*)`", caps_line))
+
+    _, _, tail = caps_line.partition("Current caps")
+    entries = re.findall(r"`([^`]+)`", tail.partition(":")[2])
+    advertised: dict[str, str] = {}
+    for entry in entries:
+        parsed = re.fullmatch(r"([A-Za-z0-9][A-Za-z0-9._-]*)<([0-9][0-9A-Za-z_.]*)", entry.strip())
+        if not parsed:
+            errors.append(f"AGENTS.md caps entry `{entry}` is not a plain `name<version`")
+            continue
+        advertised[parsed.group(1)] = parsed.group(2)
     if not advertised:
-        return ["AGENTS.md dependency caps line has no parsable `name<version` entries"]
+        return errors or ["AGENTS.md dependency caps line has no parsable `name<version` entries"]
 
-    manifest_path = project / "pyproject.toml"
     try:
-        manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        return [f"cannot read pyproject.toml: {exc}"]
-
-    project_table = manifest.get("project", {})
-    requirement_groups = {
-        "project.dependencies": project_table.get("dependencies", []),
-        **{
-            f"project.optional-dependencies.{group}": requirements
-            for group, requirements in project_table.get("optional-dependencies", {}).items()
-        },
-    }
+        manifest = (project / "pyproject.toml").read_text(encoding="utf-8")
+    except OSError as exc:
+        return [*errors, f"cannot read pyproject.toml: {exc}"]
+    requirement_groups = _manifest_requirements(manifest)
 
     for name, cap in sorted(advertised.items()):
-        try:
-            advertised_version = Version(cap)
-        except InvalidVersion:
-            errors.append(f"AGENTS.md advertises `{name}<{cap}` with an invalid version")
+        wanted = _version_tuple(cap)
+        if wanted is None:
+            errors.append(f"AGENTS.md advertises `{name}<{cap}` with an uncomparable version")
             continue
-
-        matches: list[tuple[str, Requirement]] = []
-        for group, requirement_strings in requirement_groups.items():
-            for requirement_string in requirement_strings:
-                try:
-                    requirement = Requirement(requirement_string)
-                except InvalidRequirement:
-                    continue
-                if requirement.name.casefold() == name.casefold():
-                    matches.append((group, requirement))
-
-        base_matches = [requirement for group, requirement in matches if group == "project.dependencies"]
-        if base_matches:
-            checks = [("project.dependencies", requirement) for requirement in base_matches]
-        else:
-            # Optional groups can be installed independently. With no core
-            # bound to constrain every installation, each declaration must
-            # carry the advertised cap rather than borrowing one from an
-            # unrelated extra such as `dev`.
-            checks = matches
-
+        matches = [
+            (label, requirement)
+            for label, requirements in requirement_groups.items()
+            for requirement in requirements
+            if _normalize(_requirement_name(requirement)) == _normalize(name)
+        ]
         if not matches:
             errors.append(f"AGENTS.md advertises `{name}<{cap}` but pyproject.toml declares no upper bound for it")
             continue
-
-        for group, requirement in checks:
-            bounds = [specifier for specifier in requirement.specifier if specifier.operator == "<"]
+        # An unconditional core requirement constrains every install, so extras
+        # may restate the package without repeating the bound. A core entry
+        # carrying an environment marker does not constrain every install, so
+        # in that case each declaration must carry the cap itself.
+        core = [
+            (label, requirement)
+            for label, requirement in matches
+            if label == "project.dependencies" and ";" not in requirement
+        ]
+        checks = core if any(_upper_bounds(requirement) for _, requirement in core) else matches
+        for label, requirement in checks:
+            bounds = _upper_bounds(requirement)
             if not bounds:
                 errors.append(
-                    f"AGENTS.md advertises `{name}<{cap}` but [{group}] declares `{requirement}` without that bound"
+                    f"AGENTS.md advertises `{name}<{cap}` but [{label}] declares `{requirement}` without that bound"
                 )
                 continue
             for bound in bounds:
-                try:
-                    actual_version = Version(bound.version)
-                except InvalidVersion:
-                    errors.append(f"[{group}] declares `{requirement}` with invalid upper bound <{bound.version}")
-                    continue
-                if actual_version != advertised_version:
-                    errors.append(
-                        f"AGENTS.md advertises `{name}<{cap}` but [{group}] declares "
-                        f"`{requirement}` with <{bound.version}"
-                    )
+                found = _version_tuple(bound)
+                if found is None or found[: len(wanted)] != wanted:
+                    errors.append(f"AGENTS.md advertises `{name}<{cap}` but [{label}] pins <{bound}")
     return errors
 
 

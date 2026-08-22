@@ -732,3 +732,54 @@ def test_each_independent_optional_dependency_keeps_the_advertised_cap(tmp_path:
     manifest.write_text(manifest.read_text().replace('duckdb = ["duckdb>=1.0.0,<2.0.0"]', 'duckdb = ["duckdb>=1.0.0"]'))
     _, errors = audit(project, CORPUS)
     assert any("project.optional-dependencies.duckdb" in error and "without that bound" in error for error in errors)
+
+
+def test_audit_entry_point_imports_without_third_party_packages() -> None:
+    """`.github/workflows/pr.yml` runs this file with bare `python3` before `uv sync`.
+
+    A non-stdlib import at module scope hard-fails the required skill-integrity
+    lane. That lane is path-filtered, so the PR that introduced `packaging` and
+    `tomli` never exercised it.
+    """
+    source = (ROOT / "_project/scripts/agent_instruction_audit.py").read_text(encoding="utf-8")
+    forbidden = ("import packaging", "from packaging", "import tomli", "import tomllib")
+    offenders = [needle for needle in forbidden if needle in source]
+    assert not offenders, f"audit entry point imports non-stdlib modules: {offenders}"
+
+
+def test_dependency_group_cap_drift_is_caught(tmp_path: Path) -> None:
+    """CI installs with `uv sync --group dev`, so a cap dropped there is real drift."""
+    project = _candidate(tmp_path)
+    manifest = project / "pyproject.toml"
+    text = manifest.read_text(encoding="utf-8")
+    head, marker, tail = text.partition("[dependency-groups]")
+    manifest.write_text(head + marker + tail.replace('"duckdb>=1.0.0,<2.0.0"', '"duckdb>=1.0.0"', 1))
+    _, errors = audit(project, CORPUS)
+    assert any("duckdb" in error and "without that bound" in error for error in errors)
+
+
+def test_a_shorter_advertised_cap_does_not_prefix_match(tmp_path: Path) -> None:
+    """`sqlglot<3` must not pass against a manifest bound of `<31.0.0`."""
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    agents.write_text(agents.read_text().replace("`sqlglot<31`", "`sqlglot<3`"))
+    _, errors = audit(project, CORPUS)
+    assert any("sqlglot" in error and "pins <31" in error for error in errors)
+
+
+def test_a_non_plain_advertised_cap_is_rejected_not_ignored(tmp_path: Path) -> None:
+    """An advertised `<=` used to be dropped by the parser and silently pass."""
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    agents.write_text(agents.read_text().replace("`pyarrow<25`", "`pyarrow<=25`"))
+    _, errors = audit(project, CORPUS)
+    assert any("pyarrow<=25" in error and "not a plain" in error for error in errors)
+
+
+def test_missing_review_depth_binding_fails_the_parity_audit(tmp_path: Path) -> None:
+    """REVIEW-PARITY-001 requires REVIEW-DEPTH-001; the audit must enforce it."""
+    project = _candidate(tmp_path)
+    protocol = project / "docs/agent/review-protocol.md"
+    protocol.write_text(re.sub(r"- `\[REVIEW-DEPTH-001\]`.*?\n(?=- )", "", protocol.read_text(), flags=re.S))
+    _, errors = audit(project, CORPUS)
+    assert any("REVIEW-DEPTH-001" in error for error in errors)
