@@ -1,11 +1,9 @@
 # Review Protocol (historical)
 
-> **Historical, non-authoritative.** The active behavioral authority is
-> `docs/agent/review-protocol.md` (stable `REVIEW-*` policy IDs,
-> bound to the canonical `SHARED/review-protocol` skill). This unabridged
-> text is retained only as rationale; where it disagrees with the active
-> authority, the active authority wins. Do not bind new commands, skills,
-> or tests to this file.
+> **Historical, non-authoritative.** The canonical `SHARED/review-protocol`
+> skill governs behavior; `docs/agent/review-protocol.md` records BenchBox
+> bindings. This text is retained only as rationale. Do not bind new commands,
+> skills, or tests to it.
 
 The contract for review-shaped actions: code reviews, audits, research,
 compare, to-spec, security reviews, and any L2 blind-spot audit performed
