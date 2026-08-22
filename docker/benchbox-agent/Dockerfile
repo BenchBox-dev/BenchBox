@@ -1,5 +1,5 @@
 # benchbox-agent: Linux parity sandbox for reproducing the non-service
-# pr.yml gate on an Apple-silicon Mac (see AGENTS.md "Apple container Linux CI parity").
+# pr.yml gate on an Apple-silicon Mac (see docs/operations/release-guide.md).
 # Not a service image and NOT part of any docker-compose stack -- it backs the
 # `container machine` used by `make ci-linux`. arm64 only:
 #   container build --arch arm64 --tag local/benchbox-agent docker/benchbox-agent
