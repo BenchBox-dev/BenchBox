@@ -16,7 +16,7 @@ permissions:
 
 env:
   RELEASE_CANARY_REF: develop
-  RELEASE_CANARY_SHARD_COUNT: 4
+  RELEASE_CANARY_SHARD_COUNT: 6
 
 jobs:
   collect-credential-free-non-fast:
@@ -94,10 +94,10 @@ jobs:
           retention-days: 30
 
   credential-free-non-fast:
-    name: credential-free non-fast canary (shard ${{ matrix.shard_number }}/4)
+    name: credential-free non-fast canary (shard ${{ matrix.shard_number }}/6)
     runs-on: ubuntu-latest
     needs: [collect-credential-free-non-fast]
-    timeout-minutes: 45
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -110,6 +110,10 @@ jobs:
             shard_number: 3
           - shard_index: 3
             shard_number: 4
+          - shard_index: 4
+            shard_number: 5
+          - shard_index: 5
+            shard_number: 6
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

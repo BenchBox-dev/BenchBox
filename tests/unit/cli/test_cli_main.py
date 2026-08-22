@@ -69,6 +69,10 @@ class TestCLIMain:
         expected_banner = f"BenchBox {benchbox.__version__} - Interactive database benchmark runner."
         assert expected_banner in result.output
         assert "run" in result.output
+        assert "https://benchbox.dev/docs/" in result.output
+        assert "docs.benchbox.dev" not in result.output
+        assert "run --platform duckdb --benchmark tpch" in result.output
+        assert "run -p duckdb" not in result.output
 
     def test_cli_version(self):
         """Test CLI version command."""
