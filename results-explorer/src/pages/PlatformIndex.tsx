@@ -35,8 +35,10 @@ import { FundingChip } from "@/components/FundingChip";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 import { TimeSeries } from "@/components/TimeSeries";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
+import { RunIdentityLabel } from "@/components/DataTable";
 import type { SortState } from "@/types";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 
 interface PlatformIndexProps extends RoutableProps {
   platform?: string;
@@ -346,6 +348,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     return dir * (av - bv);
   });
   const visiblePlatformResults = platformResults.slice(0, visibleLimit);
+  const runIdentityLabels = formatRunIdentitiesForCohort(platformResults, "table");
 
   function toggleSort(key: PlatformSortKey) {
     setSort((prev) =>
@@ -693,6 +696,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   <span class="sr-only">Compare</span>
                 </th>
                 <th class="table-th">Compare state</th>
+                <th class="table-th">Run</th>
                 <th class="p-0" scope="col" aria-sort={ariaSort("benchmark")}>
                   <button
                     type="button"
@@ -755,10 +759,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               </tr>
             </thead>
             <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
-              {visiblePlatformResults.map((r) => (
+              {visiblePlatformResults.map((r, index) => (
                 <PlatformRow
                   key={r.result_id}
                   entry={r}
+                  runIdentityLabel={runIdentityLabels[index] ?? r.platform}
                   checked={selected.has(r.result_id)}
                   onToggle={() => toggleSelect(r.result_id)}
                   disabledReason={
@@ -934,6 +939,7 @@ function trendValue(row: PlatformIndexRowRow, metric: TrendMetric): number | nul
 
 interface PlatformRowProps {
   entry: PlatformIndexRowRow;
+  runIdentityLabel: string;
   checked: boolean;
   onToggle: () => void;
   /**
@@ -945,7 +951,7 @@ interface PlatformRowProps {
   disabledReason?: string;
 }
 
-function PlatformRow({ entry, checked, onToggle, disabledReason }: PlatformRowProps) {
+function PlatformRow({ entry, runIdentityLabel, checked, onToggle, disabledReason }: PlatformRowProps) {
   const disabledCopy = describeCompareExclusionReason(disabledReason);
   const reasonId = disabledCopy ? `platform-compare-reason-${entry.result_id}` : undefined;
   return (
@@ -972,6 +978,9 @@ function PlatformRow({ entry, checked, onToggle, disabledReason }: PlatformRowPr
       </td>
       <td class="table-td max-w-[16rem]">
         <PlatformCompareReasonStatus id={reasonId} copy={disabledCopy} selected={checked} />
+      </td>
+      <td class="table-td max-w-[24rem]">
+        <RunIdentityLabel label={runIdentityLabel} />
       </td>
       <td class="table-td font-medium">{humanizeBenchmark(entry.benchmark)}</td>
       <td class="table-td">SF {entry.scale_factor}</td>
