@@ -228,7 +228,6 @@ function ReceiptSection({
   showMissing: boolean;
 }) {
   const recordedRows = rows.filter((row) => !row.isMissing);
-  const missingRows = rows.filter((row) => row.isMissing);
   const visibleRows = showMissing ? rows : recordedRows;
 
   return (
@@ -255,11 +254,6 @@ function ReceiptSection({
             </div>
           ))}
         </dl>
-      )}
-      {!showMissing && recordedRows.length > 0 && missingRows.length > 0 && (
-        <p class="mt-2 text-xs text-[var(--bb-data-fg-subtle)]">
-          {missingRows.length} field{missingRows.length === 1 ? "" : "s"} not recorded
-        </p>
       )}
     </section>
   );

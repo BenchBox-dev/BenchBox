@@ -4,6 +4,7 @@ import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures
 // Stable full-form result IDs from the deterministic generated fixture corpus.
 const TPCH_DUCKDB_ID = fixtureIds.ids.duckdb;
 const TPCH_DATAFUSION_ID = fixtureIds.ids.datafusion;
+const TPCH_ZERO_TIMING_ID = fixtureIds.ids.zeroTiming;
 
 test.describe("ResultDetail", () => {
   test("@smoke loads /results/r/<id> and renders the run header, badges, and timings table", async ({ page }) => {
@@ -79,6 +80,22 @@ test.describe("ResultDetail", () => {
     // happy-path slice for route coverage - the failure-injection suite
     // (w7) extends this to snapshot-missing / range-read cases.
     await expect(page.getByText(/No result found for/i)).toBeVisible({ timeout: 20_000 });
+  });
+
+  test("result detail zero timing omits absent metric and timing surfaces", async ({ page }) => {
+    await page.goto(`/results/r/${TPCH_ZERO_TIMING_ID}`);
+    await waitForShell(page);
+    await waitForDataLoaded(page, /TPC-H\s+-\s+DuckDB Zero Timing/);
+
+    const main = page.getByRole("main");
+    const summary = main.getByRole("region", { name: "Result summary" });
+    await expect(summary).not.toContainText("N/A");
+    await expect(summary.getByText(/Primary metric/)).toHaveCount(0);
+    await expect(summary.locator('[data-role="validation"]')).toHaveCount(0);
+    await expect(main.getByRole("heading", { name: /Query Timings/ })).toHaveCount(0);
+    await expect(main.getByText("Charts", { exact: true })).toHaveCount(0);
+    await expect(main.getByText(/\d+ fields? not recorded for this run\./)).toHaveCount(1);
+    await expect(main.getByRole("region", { name: "Run receipt" })).toBeVisible();
   });
 });
 
