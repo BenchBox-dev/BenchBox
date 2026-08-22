@@ -97,9 +97,13 @@
         --bb-skeleton-radius-sm: 0.25rem;
         --bb-skeleton-radius-md: 0.375rem;
         --bb-skeleton-row-height: 2.75rem;
-        /* Inert until viewport-fit=cover is adopted. Browsers without safe-area
-           support use the explicit zero fallback. */
-        --bb-inset-bottom: env(safe-area-inset-bottom, 0px);
+        /* Safe-area tokens remain zero on conventional viewports. Keeping env()
+           behind overridable properties also gives browser tests a deterministic
+           way to exercise notched layouts on desktop Chromium. */
+        --bb-inset-top: max(0px, env(safe-area-inset-top, 0px));
+        --bb-inset-right: max(0px, env(safe-area-inset-right, 0px));
+        --bb-inset-bottom: max(0px, env(safe-area-inset-bottom, 0px));
+        --bb-inset-left: max(0px, env(safe-area-inset-left, 0px));
 
         --bb-site-header-bg: rgba(255, 255, 255, 0.95);
         --bb-site-header-bg-scrolled: rgba(255, 255, 255, 0.98);
@@ -217,8 +221,36 @@
 }
 
 @layer components {
+    .bb-app-shell {
+        padding-top: var(--bb-inset-top);
+        padding-right: var(--bb-inset-right);
+        padding-bottom: var(--bb-inset-bottom);
+        padding-left: var(--bb-inset-left);
+    }
+
+    .bb-app-shell [data-testid="benchbox-global-header"] {
+        top: var(--bb-inset-top) !important;
+    }
+
     .bb-compare-tray {
+        padding-right: max(1rem, var(--bb-inset-right)) !important;
         padding-bottom: max(0.75rem, var(--bb-inset-bottom));
+        padding-left: max(1rem, var(--bb-inset-left)) !important;
+    }
+
+    @media (max-width: 39.999rem) {
+        [aria-label="Filter results"] {
+            padding-top: max(0.75rem, var(--bb-inset-top)) !important;
+            padding-right: max(0.75rem, var(--bb-inset-right)) !important;
+            padding-bottom: max(0.75rem, var(--bb-inset-bottom)) !important;
+            padding-left: max(0.75rem, var(--bb-inset-left)) !important;
+        }
+    }
+
+    @media print {
+        .bb-app-shell {
+            padding: 0;
+        }
     }
 
     /* ---- Surfaces ---- */
