@@ -27,13 +27,13 @@ when the GraphQL lookup populates the field.
 Verify:
 
 ```bash
-gh api repos/joeharris76/BenchBox/actions/permissions/workflow
+gh api repos/BenchBox-dev/BenchBox/actions/permissions/workflow
 ```
 
 Apply (admin only):
 
 ```bash
-gh api -X PUT repos/joeharris76/BenchBox/actions/permissions/workflow \
+gh api -X PUT repos/BenchBox-dev/BenchBox/actions/permissions/workflow \
   -f default_workflow_permissions=read \
   -F can_approve_pull_request_reviews=true
 ```
@@ -121,7 +121,7 @@ set. Missing artifacts fail closed to `full_required`.
 Verify:
 
 ```bash
-gh api repos/joeharris76/BenchBox/rulesets/15611785 --jq '
+gh api repos/BenchBox-dev/BenchBox/rulesets/15611785 --jq '
   {
     target: .target,
     enforcement: .enforcement,
@@ -204,7 +204,7 @@ The soundness gate, as operated:
 available for an immediate live verification:
 
 ```bash
-gh api repos/joeharris76/BenchBox/rules/branches/develop \
+gh api repos/BenchBox-dev/BenchBox/rules/branches/develop \
   | uv run --project _project/scripts -- python _project/scripts/ruleset_review_enforcement.py --rules-file -
 ```
 
@@ -266,8 +266,8 @@ bypass_actors: (none)
 Verify (ruleset id varies; list and inspect):
 
 ```bash
-gh api repos/joeharris76/BenchBox/rulesets --jq '.[] | {id, name, target}'
-gh api repos/joeharris76/BenchBox/rulesets/<release-ruleset-id> --jq '
+gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[] | {id, name, target}'
+gh api repos/BenchBox-dev/BenchBox/rulesets/<release-ruleset-id> --jq '
   {
     target: .target,
     enforcement: .enforcement,
@@ -322,7 +322,7 @@ Verify (list rulesets and look for one whose `conditions.ref_name.include`
 targets `refs/tags/v*` with `target: "tag"`):
 
 ```bash
-gh api repos/joeharris76/BenchBox/rulesets --jq '.[] | {id, name, target, conditions}'
+gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[] | {id, name, target, conditions}'
 ```
 
 Live verification on 2026-07-21 shows `v-tag-restricted` (ruleset id
@@ -336,7 +336,7 @@ required; the commands below remain as historical context for the original
 application:
 
 ```bash
-gh api -X POST repos/joeharris76/BenchBox/rulesets \
+gh api -X POST repos/BenchBox-dev/BenchBox/rulesets \
   -f name='v-tag-restricted' \
   -f target='tag' \
   -f enforcement='active' \
@@ -361,8 +361,8 @@ flag. Feed it the live tag rulesets to check:
 ```bash
 # Fetch each ruleset in full (the list endpoint omits conditions/rules,
 # which the predicate correctly treats as "not protected"):
-ids=$(gh api repos/joeharris76/BenchBox/rulesets --jq '.[].id')
-for id in $ids; do gh api repos/joeharris76/BenchBox/rulesets/$id; done \
+ids=$(gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[].id')
+for id in $ids; do gh api repos/BenchBox-dev/BenchBox/rulesets/$id; done \
   | jq -s '.' \
   | uv run -- python _project/scripts/ruleset_review_enforcement.py --rulesets-file -
 ```
@@ -431,7 +431,7 @@ well as full ruleset visibility.
 Verify:
 
 ```bash
-gh api repos/joeharris76/BenchBox/environments/pypi \
+gh api repos/BenchBox-dev/BenchBox/environments/pypi \
   --jq '{name, can_admins_bypass, protection_rules: [.protection_rules[] | {type, prevent_self_review, reviewers: [.reviewers[]?.reviewer.login]}]}'
 ```
 
@@ -441,7 +441,7 @@ already carries a required-reviewers gate:
 ```text
 # pypi environment live state
 # checked: 2026-08-10  by: joeharris76 (admin)
-# command: gh api repos/joeharris76/BenchBox/environments/pypi --jq '{name, can_admins_bypass, protection_rules: [.protection_rules[] | {type, prevent_self_review, reviewers: [.reviewers[]?.reviewer.login]}]}'
+# command: gh api repos/BenchBox-dev/BenchBox/environments/pypi --jq '{name, can_admins_bypass, protection_rules: [.protection_rules[] | {type, prevent_self_review, reviewers: [.reviewers[]?.reviewer.login]}]}'
 # observed: {"name":"pypi","can_admins_bypass":true,"protection_rules":[{"reviewers":["joeharris76"],"type":"required_reviewers","prevent_self_review":false}]}
 # type: required_reviewers  reviewer login(s): joeharris76  (User id 57046)
 # can_admins_bypass: true  prevent_self_review: false  wait_timer: null  deployment_branch_policy: null
@@ -460,7 +460,7 @@ reports drift.
 publish paths). Observed on 2026-08-05:
 
 ```bash
-gh api repos/joeharris76/BenchBox/environments/test-pypi --jq '{name, protection_rules}'
+gh api repos/BenchBox-dev/BenchBox/environments/test-pypi --jq '{name, protection_rules}'
 # {"name":"test-pypi","protection_rules":[]}
 ```
 
@@ -472,7 +472,7 @@ Historical re-apply reference (admin only, if the live verify ever shows the
 gate missing):
 
 ```bash
-gh api -X PUT repos/joeharris76/BenchBox/environments/pypi \
+gh api -X PUT repos/BenchBox-dev/BenchBox/environments/pypi \
   -f 'reviewers[][type]=User' \
   -f 'reviewers[][id]=57046'
 ```
@@ -530,7 +530,7 @@ from both CI call sites without a separate code path.
 
 > **RESOLVED 2026-07-08 by the default-branch switch (Decision A,
 > `branch-default-switch-to-develop`).** The GitHub default branch is now
-> `develop` (`gh api repos/joeharris76/BenchBox --jq .default_branch` →
+> `develop` (`gh api repos/BenchBox-dev/BenchBox --jq .default_branch` →
 > `develop`). GitHub runs `on.schedule` workflows from the **default** branch's
 > copy, so every develop-authored scheduled workflow now registers and fires
 > directly — the "land it on `main`" problem below no longer exists. Verified
@@ -601,7 +601,7 @@ Admin steps (w2 — maintainer action, never an agent push):
 1. Land `develop`'s `.github/workflows/release-canary.yml` on `main` via the
    admin/release flow.
 2. Confirm registration: the workflow appears in
-   `gh api repos/joeharris76/BenchBox/actions/workflows --jq '.workflows[].path'`.
+   `gh api repos/BenchBox-dev/BenchBox/actions/workflows --jq '.workflows[].path'`.
 3. Trigger `workflow_dispatch` (or wait for the next 08:00 UTC cron) and
    record the run URL here as proof-of-life.
 4. **Expected first result: RED** — pypi-latest-installability correctly

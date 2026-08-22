@@ -27,7 +27,7 @@ def test_update_landing_page_version_handles_multiline_anchor(tmp_path, monkeypa
     landing = landing_dir / "index.html"
     landing.write_text(
         """<a
-    href="https://github.com/joeharris76/benchbox/releases"
+    href="https://github.com/BenchBox-dev/benchbox/releases"
     target="_blank"
     class="badge badge-version"
     >v0.2.1</a

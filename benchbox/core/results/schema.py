@@ -30,6 +30,7 @@ from benchbox.core.results.environment import (
     build_environment_payload,
     build_platform_metadata_payload,
 )
+from benchbox.core.results.metrics import percentile_ms
 from benchbox.core.results.platform_options import sanitize_platform_options
 from benchbox.core.results.query_execution import (
     query_execution_from_legacy_dict,
@@ -1380,20 +1381,9 @@ def _compute_timing_stats(times_ms: list[float]) -> dict[str, Any]:
             pass
 
     if len(times_ms) >= 10:
-        sorted_times = sorted(times_ms)
-        n = len(sorted_times)
-
-        # p90
-        p90_idx = int(n * 0.90)
-        stats["p90_ms"] = _round_duration_ms_for_export(sorted_times[min(p90_idx, n - 1)])
-
-        # p95
-        p95_idx = int(n * 0.95)
-        stats["p95_ms"] = _round_duration_ms_for_export(sorted_times[min(p95_idx, n - 1)])
-
-        # p99
-        p99_idx = int(n * 0.99)
-        stats["p99_ms"] = _round_duration_ms_for_export(sorted_times[min(p99_idx, n - 1)])
+        stats["p90_ms"] = _round_duration_ms_for_export(percentile_ms(times_ms, 0.90))
+        stats["p95_ms"] = _round_duration_ms_for_export(percentile_ms(times_ms, 0.95))
+        stats["p99_ms"] = _round_duration_ms_for_export(percentile_ms(times_ms, 0.99))
 
     return stats
 

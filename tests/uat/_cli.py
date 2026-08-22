@@ -160,6 +160,7 @@ def _handle_report(args: argparse.Namespace) -> int:
         cells_inprogress_path,
         cells_run_incomplete,
         coerce_accounting_count,
+        coerce_accounting_count_with_validity,
         read_accounting_sidecar,
         read_cells_jsonl,
     )
@@ -211,8 +212,12 @@ def _handle_report(args: argparse.Namespace) -> int:
     # a malformed count (null, a non-numeric string) instead of crashing
     # report regeneration.
     accounting, sidecar_present = read_accounting_sidecar(Path(args.cells_jsonl))
-    skipped_unreachable_count = coerce_accounting_count(accounting.get("skipped_unreachable_count", 0))
-    startup_failed_count = coerce_accounting_count(accounting.get("startup_failed_count", 0))
+    skipped_unreachable_count, skipped_unreachable_valid = coerce_accounting_count_with_validity(
+        accounting.get("skipped_unreachable_count", 0)
+    )
+    startup_failed_count, startup_failed_valid = coerce_accounting_count_with_validity(
+        accounting.get("startup_failed_count", 0)
+    )
     # Same sidecar, same estimated-ness caveat: cells whose platform died
     # partway through its own cell list are not JSONL rows either, so a
     # regenerated report reads their count from here or `total_defined`
@@ -237,7 +242,7 @@ def _handle_report(args: argparse.Namespace) -> int:
         skipped_unreachable_count=skipped_unreachable_count,
         startup_failed_count=startup_failed_count,
         died_mid_platform_count=died_mid_platform_count,
-        unreachable_count_is_estimated=not sidecar_present,
+        unreachable_count_is_estimated=not sidecar_present or not (skipped_unreachable_valid and startup_failed_valid),
         finalized=finalized,
     )
     print(

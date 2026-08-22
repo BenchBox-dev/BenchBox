@@ -4,6 +4,12 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
+import {
+  compareVisualManifests,
+  PUBLIC_SITE_CAPTURE_PROFILE,
+  type VisualCapture,
+  type VisualManifest,
+} from "../../src/lib/publicSiteVisual";
 import { waitForDataLoaded } from "../support/fixtures";
 
 const OUTPUT = path.resolve(
@@ -37,7 +43,7 @@ test.skip(!process.env.E2E_PAGES_SHAPED || !process.env.E2E_SITE_DIR, "requires 
 
 test("captures the public route and viewport matrix", async ({ browser }) => {
   await mkdir(OUTPUT, { recursive: true });
-  const captures: Array<Record<string, unknown>> = [];
+  const captures: VisualCapture[] = [];
 
   for (const width of VIEWPORTS) {
     for (const route of ROUTES) {
@@ -46,22 +52,34 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
       await page.goto(route.path, { waitUntil: "networkidle" });
       await expect(page.locator("body")).toContainText(route.heading);
       if ("ready" in route) await waitForDataLoaded(page, route.ready);
-      // The landing page fades in `.feature-card`/`.benchmark-card`/`.install-step`
-      // via an IntersectionObserver (landing/script.js) independent of
-      // `networkidle`, so capture timing races the fade-in transition and
-      // produces a non-deterministic screenshot digest at viewports where
-      // those elements start in view. Force the settled end state before
-      // every capture so the digest reflects layout, not animation timing.
-      // Trade-off: this also means a real CSS regression that leaves one of
-      // these elements permanently mis-transformed or invisible can no
-      // longer be caught here, since the override always paints the
-      // settled state regardless of what the page actually renders.
+      if (route.slug === "landing") {
+        for (const selector of [".feature-card", ".benchmark-card", ".install-step"]) {
+          const cards = page.locator(selector);
+          for (let index = 0; index < (await cards.count()); index += 1) {
+            const card = cards.nth(index);
+            await card.scrollIntoViewIfNeeded();
+            await expect(card).toBeVisible();
+            await expect
+              .poll(() => card.evaluate((element) => getComputedStyle(element).opacity))
+              .toBe("1");
+            await expect
+              .poll(() =>
+                card.evaluate((element) => {
+                  const transform = getComputedStyle(element).transform;
+                  return transform === "none" || new DOMMatrixReadOnly(transform).isIdentity;
+                }),
+              )
+              .toBe(true);
+          }
+        }
+      }
+      // Disable timing only after production IntersectionObserver behavior has
+      // reached and proved the visible end state.
       await page.addStyleTag({
         content: `
           .feature-card, .benchmark-card, .install-step {
-            opacity: 1 !important;
-            transform: none !important;
             transition: none !important;
+            animation: none !important;
           }
         `,
       });
@@ -79,6 +97,7 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
 
   const manifest = {
     browser: "chromium",
+    capture_profile: PUBLIC_SITE_CAPTURE_PROFILE,
     captures,
     source_sha: SOURCE_SHA,
     viewports: VIEWPORTS,
@@ -98,26 +117,13 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
   if (process.env.PUBLIC_SITE_VISUAL_BASE_SHA) {
     expect(baseline.source_sha).toBe(process.env.PUBLIC_SITE_VISUAL_BASE_SHA);
   }
-  const expected = new Map(baseline.captures.map((capture) => [`${capture.route}@${capture.viewport_width}`, capture.digest]));
-  // Baselines produced by the initial implementation may contain a
-  // `cold_results_load` marker.  Ignore those legacy digests during the
-  // transition so the first readiness-enforced develop baseline can replace
-  // them without making every intervening PR fail against a skeleton image.
-  const legacyColdKeys = new Set(
-    baseline.captures
-      .filter((capture) => capture.cold_results_load === true)
-      .map((capture) => `${capture.route}@${capture.viewport_width}`),
+  const { missing, unexpected, changed } = compareVisualManifests(
+    baseline as VisualManifest,
+    manifest as VisualManifest,
   );
-  const actualKeys = new Set(captures.map((capture) => `${capture.route}@${capture.viewport_width}`));
-  const missing = [...expected.keys()].filter((key) => !actualKeys.has(key));
-  const unexpected = [...actualKeys].filter((key) => !expected.has(key));
   expect(
     { missing, unexpected },
     "visual baseline route/viewport matrix must match exactly",
   ).toEqual({ missing: [], unexpected: [] });
-  const changed = captures
-    .filter((capture) => !legacyColdKeys.has(`${capture.route}@${capture.viewport_width}`))
-    .filter((capture) => expected.get(`${capture.route}@${capture.viewport_width}`) !== capture.digest)
-    .map((capture) => `${capture.route}@${capture.viewport_width}`);
   expect(changed, `visual baseline mismatch; changed captures: ${changed.join(", ")}`).toEqual([]);
 });

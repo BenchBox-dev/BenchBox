@@ -481,6 +481,10 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
             available = list(benchmark.get_available_tables())
         elif hasattr(benchmark, "get_table_names") and callable(benchmark.get_table_names):
             available = list(benchmark.get_table_names())
+        elif hasattr(benchmark, "get_schema") and callable(benchmark.get_schema):
+            schema = benchmark.get_schema()
+            if isinstance(schema, dict):
+                available = list(schema)
         else:
             tables = getattr(benchmark, "tables", None)
             if isinstance(tables, dict):

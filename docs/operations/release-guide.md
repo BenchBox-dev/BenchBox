@@ -1,7 +1,7 @@
 # Cutting a BenchBox release
 
 BenchBox releases follow a **version-branch flow** on a single repo
-(`joeharris76/BenchBox`) with two long-lived branches: `develop` (dev work)
+(`BenchBox-dev/BenchBox`) with two long-lived branches: `develop` (dev work)
 and `release` (release-only). This guide is the maintainer runbook.
 
 ## The flow (2 commands)

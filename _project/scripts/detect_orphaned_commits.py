@@ -192,8 +192,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--repo",
-        default=os.environ.get("GITHUB_REPOSITORY", "joeharris76/BenchBox"),
-        help="owner/name (default: $GITHUB_REPOSITORY or joeharris76/BenchBox)",
+        default=os.environ.get("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox"),
+        help="owner/name (default: $GITHUB_REPOSITORY or BenchBox-dev/BenchBox)",
     )
     args = parser.parse_args(argv)
 

@@ -19,7 +19,7 @@ This document provides guidelines and instructions for contributing.
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/joeharris76/BenchBox.git
+   git clone https://github.com/BenchBox-dev/BenchBox.git
    cd BenchBox
    ```
 

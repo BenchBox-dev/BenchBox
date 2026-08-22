@@ -76,7 +76,7 @@ All examples are in the `examples/` directory of the BenchBox repository:
 
 ```bash
 # Clone the repository (if not already cloned)
-git clone https://github.com/joeharris76/benchbox.git
+git clone https://github.com/BenchBox-dev/benchbox.git
 cd benchbox/examples
 
 # Install BenchBox

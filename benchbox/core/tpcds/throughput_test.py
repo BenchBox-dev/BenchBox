@@ -239,6 +239,7 @@ class TPCDSThroughputTest:
         # (falls back to inline per-query generation in _execute_single_query)
         # when enable_preflight=False, matching today's behavior for callers
         # that explicitly opt out of upfront validation/generation.
+        self._pregenerated_queries = None
         if config.enable_preflight:
             self._pregenerated_queries = self._pregenerate_stream_queries(config)
 
@@ -401,10 +402,15 @@ class TPCDSThroughputTest:
         # NOTE: the `else raw_sql` branch is a test-double tolerance only --
         # the real TPC-DS benchmark always provides translate_query_text, so
         # untranslated netezza SQL must never reach this path in production.
+        implementation = getattr(self.benchmark, "_impl", None)
         translate_fn = getattr(self.benchmark, "translate_query_text", None)
+        if not callable(translate_fn) and implementation is not None:
+            translate_fn = getattr(implementation, "translate_query_text", None)
         translated = translate_fn(raw_sql, "netezza", target) if callable(translate_fn) else raw_sql
 
         override_fn = getattr(self.benchmark, "_apply_target_dialect_overrides", None)
+        if not callable(override_fn) and implementation is not None:
+            override_fn = getattr(implementation, "_apply_target_dialect_overrides", None)
         if callable(override_fn):
             translated = override_fn(stream_query.query_id, translated, target)
 

@@ -32,7 +32,7 @@ from pathlib import Path
 # Defaults
 # ---------------------------------------------------------------------------
 
-DEFAULT_REPO = "joeharris76/BenchBox"
+DEFAULT_REPO = "BenchBox-dev/BenchBox"
 DEFAULT_BASE = "published-results"
 DEFAULT_NOTES = Path("_project/notes/phase-2-requests.md")
 DEFAULT_HANDOFFS_DIR = Path("_project/handoffs")

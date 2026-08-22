@@ -82,6 +82,8 @@ def test_soundness_predicate_matches_review_required_paths(path: str) -> None:
         # exporter.py and schema.py stay auto-mergeable.
         "benchbox/core/results/exporter.py",
         "benchbox/core/results/schema.py",
+        "benchbox/core/results/anonymization.py.bak",
+        "benchbox/core/results/anonymization_specs.yaml.example",
     ],
 )
 def test_soundness_predicate_ignores_fast_default_paths(path: str) -> None:
@@ -211,6 +213,7 @@ def test_codeowners_matches_soundness_prefixes_1to1() -> None:
     expected_paths = set()
     for prefix in soundness.SOUNDNESS_PREFIXES:
         expected_paths.add(prefix if not prefix.endswith("/") else f"{prefix}**")
+    expected_paths.update(soundness.SOUNDNESS_FILES)
     expected_paths.add("benchbox/core/**/validation.py")
 
     assert owned_paths == expected_paths

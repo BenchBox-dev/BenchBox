@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from benchbox.core.results.metrics import percentile_ms
 from benchbox.core.results.models import ExecutionPhases, SetupPhase, ThroughputStream, ThroughputTestPhase
 from benchbox.core.results.query_execution import QueryExecutionContractError
 from benchbox.core.results.schema import build_result_payload
@@ -177,6 +178,27 @@ def test_build_result_payload_preserves_positive_sub_ms_measurements() -> None:
     assert payload["queries"][0]["ms"] == 0.04
     assert payload["summary"]["timing"]["min_ms"] == 0.04
     assert payload["summary"]["timing"]["max_ms"] == 0.04
+
+
+def test_build_result_payload_uses_shared_nearest_rank_percentiles() -> None:
+    times_ms = [float(value) for value in range(1, 101)]
+    result = _result_with_queries(
+        [
+            {
+                "query_id": f"Q{index}",
+                "status": "SUCCESS",
+                "execution_time_seconds": value / 1000,
+                "rows_returned": 1,
+            }
+            for index, value in enumerate(times_ms, start=1)
+        ]
+    )
+
+    timing = build_result_payload(result)["summary"]["timing"]
+
+    assert timing["p90_ms"] == percentile_ms(times_ms, 0.90)
+    assert timing["p95_ms"] == percentile_ms(times_ms, 0.95)
+    assert timing["p99_ms"] == percentile_ms(times_ms, 0.99)
 
 
 def test_build_result_payload_run_type_contract_and_compat_fallback() -> None:

@@ -1602,6 +1602,35 @@ def default_log_dir(config: UATConfig, now: _dt.datetime | None = None) -> Path:
     return path
 
 
+def reserve_default_log_dir(config: UATConfig, now: _dt.datetime | None = None) -> Path:
+    """Atomically reserve the default log directory for a sweep.
+
+    Time-bearing templates represent one durable run and must never be shared.
+    Explicit date-only templates retain their historical reusable-directory
+    behavior.
+    """
+    now = now or _dt.datetime.now()
+    template = _resolve_output_base(
+        config.output.logs_dir_template,
+        _DEFAULT_OUTPUT.logs_dir_template,
+        explicit="logs_dir_template" in config.output.explicitly_set,
+    )
+    candidate = default_log_dir(config, now=now)
+    if "{time}" not in template:
+        candidate.mkdir(parents=True, exist_ok=True)
+        return candidate
+
+    base = candidate
+    suffix = 2
+    while True:
+        try:
+            candidate.mkdir(parents=True, exist_ok=False)
+            return candidate
+        except FileExistsError:
+            candidate = base.with_name(f"{base.name}-{suffix}")
+            suffix += 1
+
+
 def default_benchmark_runs_dir(config: UATConfig, now: _dt.datetime | None = None) -> Path:
     """Resolve the YAML benchmark_runs root against {date} and {name}.
 

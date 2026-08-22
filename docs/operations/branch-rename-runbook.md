@@ -29,13 +29,13 @@ the branch before the PR merges, or `release-cut` would open PRs against a
 2. **Rename the branch** (GitHub redirects old `main` URLs and retargets open
    PRs):
    ```bash
-   gh api -X POST repos/joeharris76/BenchBox/branches/main/rename -f new_name=release
+   gh api -X POST repos/BenchBox-dev/BenchBox/branches/main/rename -f new_name=release
    ```
 3. **Recreate the ruleset** as `release-only` on `refs/heads/release`, preserving
    the current `main-release-only` properties. Inspect the old one first:
    ```bash
-   gh api repos/joeharris76/BenchBox/rulesets --jq '.[] | {id, name, target}'
-   gh api repos/joeharris76/BenchBox/rulesets/<old-id>        # capture rules
+   gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[] | {id, name, target}'
+   gh api repos/BenchBox-dev/BenchBox/rulesets/<old-id>        # capture rules
    ```
    Recreate with: target `refs/heads/release`; required checks `validate-base`,
    `release-required-result`; `strict_required_status_checks_policy: false`;
@@ -47,11 +47,11 @@ the branch before the PR merges, or `release-cut` would open PRs against a
 
 ```bash
 # Branch renamed
-gh api repos/joeharris76/BenchBox/branches/release --jq .name   # -> release
-gh api repos/joeharris76/BenchBox/branches/main --jq .name      # -> 404 (redirect covers old URLs)
+gh api repos/BenchBox-dev/BenchBox/branches/release --jq .name   # -> release
+gh api repos/BenchBox-dev/BenchBox/branches/main --jq .name      # -> 404 (redirect covers old URLs)
 
 # Ruleset targets the release branch
-gh api repos/joeharris76/BenchBox/rulesets --jq '.[] | {name, target}'  # release-only -> refs/heads/release
+gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[] | {name, target}'  # release-only -> refs/heads/release
 
 # Drift check parses the doc and matches live state (once the PR is on develop)
 uv run -- python scripts/ruleset_drift_check.py --token "$RULESET_DRIFT_TOKEN" --require-bypass-actor-visibility

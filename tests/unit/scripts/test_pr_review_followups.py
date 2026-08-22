@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import shutil
 import stat
@@ -84,6 +85,9 @@ def _comment(
     created_at: str = "2026-05-04T11:00:00Z",
     in_reply_to_id: int | None = None,
     body: str = "[P1] Fix the current behavior",
+    thread_id: str | None = "PRRT_example",
+    thread_is_resolved: bool | None = False,
+    thread_is_outdated: bool | None = False,
 ):
     return pr_review_followups.ReviewComment(
         id=comment_id,
@@ -93,6 +97,9 @@ def _comment(
         user_login=user_login,
         created_at=created_at,
         in_reply_to_id=in_reply_to_id,
+        thread_id=thread_id,
+        thread_is_resolved=thread_is_resolved,
+        thread_is_outdated=thread_is_outdated,
     )
 
 
@@ -252,6 +259,327 @@ def test_action_marker_match_requires_html_comment_at_start_of_line() -> None:
     # comment 1 is still pending because the quoted-marker reply doesn't
     # match; comment 3 is skipped because the real marker reply does.
     assert [item.comment.id for item in pending] == [1]
+
+
+def test_review_inventory_separates_actionable_and_resolved_audit_threads() -> None:
+    comments = [
+        _comment(1, thread_is_resolved=False),
+        _comment(2, thread_is_resolved=True, thread_is_outdated=False),
+        _comment(3, thread_is_resolved=True, thread_is_outdated=True),
+    ]
+
+    inventory = pr_review_followups.review_inventory_for_pr(
+        _pr(),
+        comments,
+        author_logins={"chatgpt-codex-connector[bot]"},
+    )
+
+    assert [item.comment.id for item in inventory.actionable] == [1]
+    assert [item.comment.id for item in inventory.resolved_for_audit] == [2, 3]
+
+
+def test_resolved_action_marked_thread_still_surfaces_for_phantom_audit() -> None:
+    comments = [
+        _comment(1, thread_is_resolved=True),
+        _comment(
+            2,
+            user_login="joeharris76",
+            in_reply_to_id=1,
+            body=f"<!-- {pr_review_followups.ACTION_MARKER}: pr=123 comment_id=1 -->\nActioned.",
+            thread_is_resolved=True,
+        ),
+    ]
+
+    inventory = pr_review_followups.review_inventory_for_pr(
+        _pr(), comments, author_logins={"chatgpt-codex-connector[bot]"}
+    )
+
+    assert inventory.actionable == ()
+    assert [item.comment.id for item in inventory.resolved_for_audit] == [1]
+
+
+def test_unknown_thread_state_is_actionable_in_non_strict_preview() -> None:
+    inventory = pr_review_followups.review_inventory_for_pr(
+        _pr(),
+        [_comment(1, thread_id=None, thread_is_resolved=None, thread_is_outdated=None)],
+        author_logins={"chatgpt-codex-connector[bot]"},
+    )
+
+    assert [item.comment.id for item in inventory.actionable] == [1]
+    assert inventory.resolved_for_audit == ()
+
+
+def test_thread_state_output_preserves_unknown_and_prints_thread_id(capsys) -> None:
+    pending = pr_review_followups.PendingComment(
+        pr=_pr(),
+        comment=_comment(1, thread_id="PRRT_visible", thread_is_resolved=False, thread_is_outdated=None),
+        replies=(),
+    )
+
+    pr_review_followups.print_pending_table([pending])
+
+    output = capsys.readouterr().out
+    assert "PRRT_visible" in output
+    assert "false" in output
+    assert "unknown" in output
+
+
+def test_graphql_comment_mapping_retains_thread_state() -> None:
+    thread = {"id": "PRRT_123", "isResolved": True, "isOutdated": False}
+    node = {
+        "databaseId": 42,
+        "body": "finding",
+        "path": "benchbox/example.py",
+        "url": "https://example.test/thread",
+        "createdAt": "2026-05-04T11:00:00Z",
+        "author": {"login": "chatgpt-codex-connector[bot]"},
+    }
+
+    mapped = pr_review_followups._graphql_comment_to_api_shape(node, thread=thread)
+    comment = pr_review_followups.review_comment_from_api(mapped)
+
+    assert comment.thread_id == "PRRT_123"
+    assert comment.thread_is_resolved is True
+    assert comment.thread_is_outdated is False
+
+
+def test_graphql_fetch_paginates_comments_inside_each_thread() -> None:
+    root = {
+        "databaseId": 42,
+        "body": "root",
+        "path": "benchbox/example.py",
+        "url": "https://example.test/root",
+        "createdAt": "2026-05-04T11:00:00Z",
+        "author": {"login": "chatgpt-codex-connector[bot]"},
+    }
+    reply = {
+        "databaseId": 43,
+        "body": "reply",
+        "path": "benchbox/example.py",
+        "url": "https://example.test/reply",
+        "createdAt": "2026-05-04T11:05:00Z",
+        "replyTo": {"databaseId": 42},
+        "author": {"login": "joeharris76"},
+    }
+    initial_payload = {
+        "data": {
+            "repository": {
+                "pullRequest": {
+                    "reviewThreads": {
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "nodes": [
+                            {
+                                "id": "PRRT_123",
+                                "isResolved": False,
+                                "isOutdated": False,
+                                "comments": {
+                                    "pageInfo": {"hasNextPage": True, "endCursor": "comment-cursor"},
+                                    "nodes": [root],
+                                },
+                            }
+                        ],
+                    }
+                }
+            }
+        }
+    }
+    next_payload = {
+        "data": {
+            "node": {
+                "comments": {
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    "nodes": [reply],
+                }
+            }
+        }
+    }
+
+    class PaginatedGraphqlRunner(RecordingRunner):
+        def run(self, args, input_text=None):  # type: ignore[override]
+            self.commands.append(list(args))
+            payload = next_payload if any("query($thread:" in arg for arg in args) else initial_payload
+            return subprocess.CompletedProcess(list(args), 0, json.dumps(payload), "")
+
+    runner = PaginatedGraphqlRunner()
+    comments = pr_review_followups.fetch_review_comments_via_graphql(
+        runner,
+        repo="joeharris76/BenchBox",
+        pr_number=123,
+    )
+
+    assert comments is not None
+    assert [comment.id for comment in comments] == [42, 43]
+    assert comments[1].in_reply_to_id == 42
+    assert all(comment.thread_id == "PRRT_123" for comment in comments)
+    assert len(runner.commands) == 2
+
+
+def test_write_mode_refuses_rest_fallback_without_thread_state() -> None:
+    class GraphqlFailureRunner(RecordingRunner):
+        def run(self, args, input_text=None):  # type: ignore[override]
+            self.commands.append(list(args))
+            return subprocess.CompletedProcess(list(args), 1, "", "GraphQL unavailable")
+
+    with pytest.raises(RuntimeError, match="REST comments cannot establish resolution state"):
+        pr_review_followups.load_pr_review_comments(
+            GraphqlFailureRunner(),
+            repo="joeharris76/BenchBox",
+            pr_number=123,
+            require_thread_state=True,
+        )
+
+
+def test_authoritative_mode_rejects_incomplete_graphql_thread_state() -> None:
+    payload = {
+        "data": {
+            "repository": {
+                "pullRequest": {
+                    "reviewThreads": {
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "nodes": [
+                            {
+                                "id": "PRRT_incomplete",
+                                "isResolved": False,
+                                "comments": {
+                                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                                    "nodes": [],
+                                },
+                            }
+                        ],
+                    }
+                }
+            }
+        }
+    }
+    runner = RecordingRunner(
+        responses={
+            (
+                "gh",
+                "api",
+                "graphql",
+                "-f",
+                f"query={pr_review_followups.REVIEW_COMMENTS_GRAPHQL_QUERY}",
+                "-F",
+                "owner=joeharris76",
+                "-F",
+                "name=BenchBox",
+                "-F",
+                "number=123",
+            ): subprocess.CompletedProcess([], 0, json.dumps(payload), "")
+        }
+    )
+
+    with pytest.raises(RuntimeError, match="REST comments cannot establish resolution state"):
+        pr_review_followups.load_pr_review_comments(
+            runner,
+            repo="joeharris76/BenchBox",
+            pr_number=123,
+            require_thread_state=True,
+        )
+
+
+def test_list_fail_on_pending_returns_nonzero(monkeypatch) -> None:
+    pending = pr_review_followups.PendingComment(pr=_pr(), comment=_comment(99), replies=())
+    monkeypatch.setattr(
+        pr_review_followups,
+        "discover_review_inventory",
+        lambda runner, **_: pr_review_followups.ReviewInventory((pending,), ()),
+    )
+
+    args = pr_review_followups.build_parser().parse_args(
+        [
+            "list",
+            "--repo",
+            "joeharris76/BenchBox",
+            "--fail-on-pending",
+            "--no-usage-limit-review-retry",
+        ]
+    )
+
+    assert pr_review_followups.run_action_loop(args, RecordingRunner()) == 1
+
+
+def test_fail_on_pending_ignores_resolved_audit_rows(monkeypatch) -> None:
+    resolved = pr_review_followups.PendingComment(pr=_pr(), comment=_comment(99, thread_is_resolved=True), replies=())
+    monkeypatch.setattr(
+        pr_review_followups,
+        "discover_review_inventory",
+        lambda runner, **_: pr_review_followups.ReviewInventory((), (resolved,)),
+    )
+
+    args = pr_review_followups.build_parser().parse_args(
+        [
+            "list",
+            "--repo",
+            "joeharris76/BenchBox",
+            "--include-resolved",
+            "--fail-on-pending",
+            "--no-usage-limit-review-retry",
+        ]
+    )
+
+    assert pr_review_followups.run_action_loop(args, RecordingRunner()) == 0
+
+
+@pytest.mark.parametrize("awaiting_result", [False, True])
+def test_fail_on_pending_fails_for_usage_limit_followup(monkeypatch, awaiting_result: bool) -> None:
+    usage = _issue_comment(77, body=pr_review_followups.CODEX_USAGE_LIMIT_REVIEW_TEXT)
+    trigger = _issue_comment(78, body=pr_review_followups.CODEX_REVIEW_TRIGGER_BODY) if awaiting_result else None
+    retry = pr_review_followups.UsageLimitReviewRetry(pr=_pr(), usage_comment=usage, trigger_comment=trigger)
+    monkeypatch.setattr(
+        pr_review_followups,
+        "discover_review_inventory",
+        lambda runner, **_: pr_review_followups.ReviewInventory((), ()),
+    )
+    monkeypatch.setattr(pr_review_followups, "discover_usage_limit_review_retries", lambda runner, **_: [retry])
+
+    args = pr_review_followups.build_parser().parse_args(
+        ["list", "--repo", "joeharris76/BenchBox", "--fail-on-pending"]
+    )
+
+    assert pr_review_followups.run_action_loop(args, RecordingRunner()) == 1
+
+
+def test_fail_on_pending_uses_full_queue_before_max_comments(monkeypatch, capsys) -> None:
+    pending = tuple(
+        pr_review_followups.PendingComment(pr=_pr(), comment=_comment(comment_id), replies=())
+        for comment_id in (91, 92)
+    )
+    monkeypatch.setattr(
+        pr_review_followups,
+        "discover_review_inventory",
+        lambda runner, **_: pr_review_followups.ReviewInventory(pending, ()),
+    )
+
+    args = pr_review_followups.build_parser().parse_args(
+        [
+            "list",
+            "--repo",
+            "joeharris76/BenchBox",
+            "--fail-on-pending",
+            "--max-comments",
+            "1",
+            "--no-usage-limit-review-retry",
+        ]
+    )
+
+    assert pr_review_followups.run_action_loop(args, RecordingRunner()) == 1
+    output = capsys.readouterr().out
+    assert "91" in output
+    assert "92" not in output
+
+
+def test_makefile_wires_resolved_audit_and_fail_on_pending_to_list_only() -> None:
+    makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+
+    assert "PR_REVIEW_INCLUDE_RESOLVED ?= 0" in makefile
+    assert "PR_REVIEW_FAIL_ON_PENDING ?= 0" in makefile
+    list_recipe = makefile.split("pr-review-followups-list:", 1)[1].split("\n\n", 1)[0]
+    run_recipe = makefile.split("pr-review-followups:", 1)[1].split("\n\n", 1)[0]
+    assert "--include-resolved" in list_recipe
+    assert "--fail-on-pending" in list_recipe
+    assert "--include-resolved" not in run_recipe
+    assert "--fail-on-pending" not in run_recipe
 
 
 def test_usage_limit_retry_needed_when_latest_limit_comment_has_no_later_trigger() -> None:
@@ -614,8 +942,8 @@ def test_run_action_loop_commits_before_replying(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(pr_review_followups, "resolve_repo", lambda runner, repo: "joeharris76/BenchBox")
     monkeypatch.setattr(
         pr_review_followups,
-        "discover_pending_comments",
-        lambda runner, **_: [pending_item],
+        "discover_review_inventory",
+        lambda runner, **_: pr_review_followups.ReviewInventory((pending_item,), ()),
     )
 
     real_commit = pr_review_followups.commit_changes_for_result
@@ -670,7 +998,11 @@ def test_run_action_loop_triggers_usage_limit_review_retry(monkeypatch) -> None:
     finalize_calls: list[dict[str, object]] = []
 
     monkeypatch.setattr(pr_review_followups, "check_executor_version", lambda runner: (0, 128, 0))
-    monkeypatch.setattr(pr_review_followups, "discover_pending_comments", lambda runner, **_: [])
+    monkeypatch.setattr(
+        pr_review_followups,
+        "discover_review_inventory",
+        lambda runner, **_: pr_review_followups.ReviewInventory((), ()),
+    )
     monkeypatch.setattr(pr_review_followups, "discover_usage_limit_review_retries", lambda runner, **_: [retry])
     monkeypatch.setattr(
         pr_review_followups,
@@ -730,7 +1062,11 @@ def test_run_action_loop_caps_usage_limit_review_retries_with_max_comments(monke
     finalize_calls: list[dict[str, object]] = []
 
     monkeypatch.setattr(pr_review_followups, "check_executor_version", lambda runner: (0, 128, 0))
-    monkeypatch.setattr(pr_review_followups, "discover_pending_comments", lambda runner, **_: [])
+    monkeypatch.setattr(
+        pr_review_followups,
+        "discover_review_inventory",
+        lambda runner, **_: pr_review_followups.ReviewInventory((), ()),
+    )
     monkeypatch.setattr(pr_review_followups, "discover_usage_limit_review_retries", lambda runner, **_: retries)
     monkeypatch.setattr(
         pr_review_followups,
@@ -791,7 +1127,11 @@ def test_run_action_loop_spends_max_comments_on_pending_before_usage_limit_retri
     finalize_calls: list[dict[str, object]] = []
 
     monkeypatch.setattr(pr_review_followups, "check_executor_version", lambda runner: (0, 128, 0))
-    monkeypatch.setattr(pr_review_followups, "discover_pending_comments", lambda runner, **_: [pending])
+    monkeypatch.setattr(
+        pr_review_followups,
+        "discover_review_inventory",
+        lambda runner, **_: pr_review_followups.ReviewInventory((pending,), ()),
+    )
     monkeypatch.setattr(pr_review_followups, "discover_usage_limit_review_retries", lambda runner, **_: [retry])
     monkeypatch.setattr(
         pr_review_followups,
@@ -851,7 +1191,11 @@ def test_run_action_loop_does_not_duplicate_inflight_usage_limit_retry(monkeypat
     finalize_calls: list[dict[str, object]] = []
 
     monkeypatch.setattr(pr_review_followups, "check_executor_version", lambda runner: (0, 128, 0))
-    monkeypatch.setattr(pr_review_followups, "discover_pending_comments", lambda runner, **_: [])
+    monkeypatch.setattr(
+        pr_review_followups,
+        "discover_review_inventory",
+        lambda runner, **_: pr_review_followups.ReviewInventory((), ()),
+    )
     monkeypatch.setattr(pr_review_followups, "discover_usage_limit_review_retries", lambda runner, **_: [retry])
     monkeypatch.setattr(
         pr_review_followups,
@@ -1169,8 +1513,8 @@ def test_resume_skips_comments_already_committed_locally(monkeypatch, tmp_path) 
     monkeypatch.setattr(pr_review_followups, "resolve_repo", lambda runner, repo: "joeharris76/BenchBox")
     monkeypatch.setattr(
         pr_review_followups,
-        "discover_pending_comments",
-        lambda runner, **_: [pending_already, pending_fresh],
+        "discover_review_inventory",
+        lambda runner, **_: pr_review_followups.ReviewInventory((pending_already, pending_fresh), ()),
     )
     monkeypatch.setattr(pr_review_followups, "check_executor_version", lambda runner: (0, 128, 0))
     monkeypatch.setattr(
@@ -1258,8 +1602,8 @@ def test_resume_finalizes_when_all_pending_comments_are_already_committed(monkey
     monkeypatch.setattr(pr_review_followups, "resolve_repo", lambda runner, repo: "joeharris76/BenchBox")
     monkeypatch.setattr(
         pr_review_followups,
-        "discover_pending_comments",
-        lambda runner, **_: [pending_already],
+        "discover_review_inventory",
+        lambda runner, **_: pr_review_followups.ReviewInventory((pending_already,), ()),
     )
     monkeypatch.setattr(pr_review_followups, "check_executor_version", lambda runner: (0, 128, 0))
     monkeypatch.setattr(

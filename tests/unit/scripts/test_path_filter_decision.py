@@ -230,6 +230,13 @@ def test_docs_markdown_is_safe(rules: dict[str, list[str]]) -> None:
     assert decision["needs_code_ci"] is False
 
 
+def test_dependency_audit_inventory_runs_code_ci(rules: dict[str, list[str]]) -> None:
+    decision = classify_paths(["docs/development/dependency-audit-raw.md"], rules)
+
+    assert decision["needs_code_ci"] is True
+    assert decision["safe_content_only"] is False
+
+
 def test_docs_rst_is_safe(rules: dict[str, list[str]]) -> None:
     decision = classify_paths(["docs/api/index.rst"], rules)
     assert decision["safe_content_only"] is True

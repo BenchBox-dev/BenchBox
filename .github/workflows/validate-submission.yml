@@ -207,6 +207,10 @@ jobs:
               stem="${companion:0:$(( ${#companion} - strip ))}"
               bundle=$(git ls-tree -r --name-only HEAD -- results-data/bundles \
                 | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { print; exit }')
+              if [ -z "$bundle" ] && git cat-file -e "HEAD:${companion}" 2>/dev/null; then
+                echo "::error file=${companion}::Live companion has no primary bundle at ${stem}.json"
+                exit 1
+              fi
               # Only add if the paired bundle exists and is not already in CHANGED.
               if git cat-file -e "HEAD:${bundle}" 2>/dev/null \
                   && ! printf '%s\n' "$CHANGED" | grep -qxF "$bundle"; then

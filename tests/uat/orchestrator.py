@@ -350,7 +350,7 @@ def run_sweep(
     try/finally instead of threading it through every `break`.
     """
     now = _dt.datetime.now()
-    log_dir = log_dir_override or exec_phase.default_log_dir(config, now=now)
+    log_dir = log_dir_override or exec_phase.reserve_default_log_dir(config, now=now)
     benchmark_runs_dir = exec_phase.default_benchmark_runs_dir(config, now=now)
     log_dir.mkdir(parents=True, exist_ok=True)
     container_engine = _record_container_engine_identity(log_dir)

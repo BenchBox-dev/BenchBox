@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Documentation
-    url: https://github.com/joeharris/benchbox/blob/main/README.md
+    url: https://github.com/BenchBox-dev/benchbox/blob/develop/README.md
     about: Check the documentation for usage guides and examples
   - name: Discussions
-    url: https://github.com/joeharris/benchbox/discussions
+    url: https://github.com/BenchBox-dev/benchbox/discussions
     about: Ask questions and discuss ideas with the community

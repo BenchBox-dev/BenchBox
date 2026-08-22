@@ -290,6 +290,36 @@ def test_report_cli_malformed_sidecar_falls_back_to_estimated(tmp_path: Path, ca
     payload = json.loads(capsys.readouterr().out)
     assert payload["unreachable"] == 0
     assert payload["startup_failed"] == 0
+    assert payload["unreachable_is_estimated"] is True
+    assert "unreachable_is_estimated=true" in output_tsv.read_text(encoding="utf-8")
+
+
+def test_report_cli_valid_zero_sidecar_is_not_estimated(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_jsonl.write_text(
+        json.dumps(
+            {
+                "platform": "duckdb",
+                "benchmark": "tpch",
+                "scale": 0.01,
+                "status": "passed",
+                "exit_code": 0,
+                "elapsed_s": 1.0,
+                "log_path": "/tmp/a.log",
+                "result_path": "/tmp/a.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    cells_jsonl.with_name("cells.jsonl.accounting.json").write_text(
+        json.dumps({"skipped_unreachable_count": 0, "startup_failed_count": 0}), encoding="utf-8"
+    )
+    output_tsv = tmp_path / "matrix_summary.tsv"
+
+    assert uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["unreachable_is_estimated"] is False
 
 
 def test_report_cli_non_mapping_sidecar_treated_as_absent(tmp_path: Path, capsys: pytest.CaptureFixture[str]):

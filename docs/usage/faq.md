@@ -43,7 +43,7 @@ BenchBox is MIT-licensed open-source software. When citing BenchBox in academic 
 
 ```
 Harris, Joe. (2025). BenchBox: A Benchmarking Toolbox for Analytical Databases.
-GitHub repository: https://github.com/joeharris76/benchbox
+GitHub repository: https://github.com/BenchBox-dev/benchbox
 ```
 
 Please also cite the underlying benchmark specifications (TPC-H, TPC-DS, etc.) when reporting results.
@@ -381,7 +381,7 @@ You can also contribute by:
 
 ### Where do I report bugs?
 
-[Create an issue on GitHub](https://github.com/joeharris76/benchbox/issues/new) with:
+[Create an issue on GitHub](https://github.com/BenchBox-dev/benchbox/issues/new) with:
 - BenchBox version (`benchbox --version`)
 - Platform and benchmark being used
 - Complete error messages and logs
@@ -389,7 +389,7 @@ You can also contribute by:
 
 ### How do I request new features?
 
-[Open a feature request](https://github.com/joeharris76/benchbox/issues/new) on GitHub describing:
+[Open a feature request](https://github.com/BenchBox-dev/benchbox/issues/new) on GitHub describing:
 - The use case and motivation
 - Proposed behavior or API
 - Alternative solutions you've considered
@@ -398,7 +398,7 @@ You can also contribute by:
 ### Where can I ask questions?
 
 For questions not covered in the documentation:
-1. Check existing [GitHub issues and discussions](https://github.com/joeharris76/benchbox/issues)
+1. Check existing [GitHub issues and discussions](https://github.com/BenchBox-dev/benchbox/issues)
 2. Open a new discussion or issue
 3. Provide context and specific details
 

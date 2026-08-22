@@ -22,13 +22,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from auto_merge_soundness_paths import SOUNDNESS_PREFIXES
+from auto_merge_soundness_paths import SOUNDNESS_FILES, SOUNDNESS_PREFIXES
 
 # Human-readable globs for the CODEOWNERS-owned soundness surface, derived from
 # the shared predicate so this narration cannot drift from auto-merge gating.
-SOUNDNESS_PATH_GLOBS: tuple[str, ...] = tuple(
-    f"{prefix}**" if prefix.endswith("/") else prefix for prefix in SOUNDNESS_PREFIXES
-) + ("benchbox/core/**/validation.py",)
+SOUNDNESS_PATH_GLOBS: tuple[str, ...] = (
+    tuple(f"{prefix}**" if prefix.endswith("/") else prefix for prefix in SOUNDNESS_PREFIXES)
+    + SOUNDNESS_FILES
+    + ("benchbox/core/**/validation.py",)
+)
 
 
 def extract_rules(payload: Any) -> list[dict[str, Any]]:
@@ -90,18 +92,59 @@ TAG_REF_PATTERN = "refs/tags/v*"
 def _tag_glob_covers(pattern: str) -> bool:
     """True if a ref-name glob ``pattern`` matches every ``refs/tags/v*`` ref.
 
-    GitHub's ``ref_name`` condition patterns are fnmatch-style globs, so
-    ``refs/tags/*`` covers (or negates, in an ``exclude``) ``refs/tags/v*``
-    just as fully as the literal pattern. Fnmatch-ing ``TAG_REF_PATTERN``
-    itself against ``pattern`` answers that without enumerating concrete tag
-    names: every character in ``refs/tags/v*`` is literal except the trailing
-    ``*``, so a pattern matches it here exactly when that pattern's own
-    wildcard structure would match any real ``refs/tags/vX...`` ref too.
+    Simulate the glob NFA over the literal ``refs/tags/v`` prefix. Coverage is
+    proven only when a reachable trailing ``*`` can consume every possible
+    suffix. Finite samples cannot establish that language containment.
     """
-    return fnmatch.fnmatchcase(TAG_REF_PATTERN, pattern)
+    tokens: list[str] = []
+    index = 0
+    while index < len(pattern):
+        if pattern[index] == "[":
+            closing = index + 1
+            if closing < len(pattern) and pattern[closing] == "!":
+                closing += 1
+            if closing < len(pattern) and pattern[closing] == "]":
+                closing += 1
+            while closing < len(pattern) and pattern[closing] != "]":
+                closing += 1
+            if closing < len(pattern):
+                tokens.append(pattern[index : closing + 1])
+                index = closing + 1
+                continue
+        token = pattern[index]
+        if token != "*" or not tokens or tokens[-1] != "*":
+            tokens.append(token)
+        index += 1
+
+    def closure(states: set[int]) -> set[int]:
+        expanded = set(states)
+        pending = list(states)
+        while pending:
+            state = pending.pop()
+            if state < len(tokens) and tokens[state] == "*" and state + 1 not in expanded:
+                expanded.add(state + 1)
+                pending.append(state + 1)
+        return expanded
+
+    states = closure({0})
+    for char in TAG_REF_PATTERN.removesuffix("*"):
+        following: set[int] = set()
+        for state in states:
+            if state >= len(tokens):
+                continue
+            token = tokens[state]
+            if token == "*":
+                following.add(state)
+            elif token == "?" or fnmatch.fnmatchcase(char, token):
+                following.add(state + 1)
+        states = closure(following)
+
+    return any(state < len(tokens) and all(token == "*" for token in tokens[state:]) for state in states)
 
 
-def tag_protection_findings(rulesets: list[dict[str, Any]]) -> list[str]:
+def tag_protection_findings(
+    rulesets: list[dict[str, Any]], *, require_bypass_actor_visibility: bool = False
+) -> list[str]:
     """Reasons the live rulesets fail to restrict ``v*`` tag *creation*.
 
     Empty list == at least one ACTIVE ruleset with ``target == "tag"`` whose
@@ -124,13 +167,9 @@ def tag_protection_findings(rulesets: list[dict[str, Any]]) -> list[str]:
     not exact strings: an ``include`` of ``refs/tags/*`` covers ``refs/tags/v*``
     just as well as the literal pattern, and an ``exclude`` of ``refs/tags/*``
     negates that coverage even though it is not byte-identical to
-    ``TAG_REF_PATTERN``. Coverage is therefore tested by fnmatch-ing
-    ``TAG_REF_PATTERN`` itself against each candidate pattern (every character
-    in ``refs/tags/v*`` is literal except the trailing ``*``, so this exactly
-    answers "does this pattern's wildcard structure swallow the whole
-    refs/tags/v* domain" without enumerating concrete tag names). ``~ALL`` is
-    GitHub's literal sentinel for "every ref" and is matched by exact string,
-    not fnmatch.
+    ``TAG_REF_PATTERN``. Coverage is proven by glob-language containment, not
+    sampled ref names. ``~ALL`` is GitHub's literal sentinel for "every ref"
+    and is matched by exact string.
 
     NOTE on ``bypass_actors``: this predicate deliberately does NOT treat a
     non-empty bypass list as a structural failure. This TODO's must_preserve
@@ -174,7 +213,9 @@ def tag_protection_findings(rulesets: list[dict[str, Any]]) -> list[str]:
         rule_types = {rule.get("type") for rule in ruleset.get("rules") or [] if isinstance(rule, dict)}
         if "creation" not in rule_types:
             issues.append("no 'creation' rule")
-        if ruleset.get("bypass_actors") == []:
+        if require_bypass_actor_visibility and "bypass_actors" not in ruleset:
+            issues.append("bypass actors are not visible to this token")
+        elif ruleset.get("bypass_actors") == []:
             issues.append(
                 "bypass_actors is empty -- `make release-finalize`'s `git push origin "
                 "v$(VERSION)` would be blocked with no exception for the release-finalize "
@@ -269,7 +310,7 @@ def _load_rules(args: argparse.Namespace) -> list[dict[str, Any]]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rules-file", help="Path to a JSON rules/ruleset payload, or '-' to read stdin.")
-    parser.add_argument("--repo", default="joeharris76/BenchBox", help="owner/repo for live fetch.")
+    parser.add_argument("--repo", default="BenchBox-dev/BenchBox", help="owner/repo for live fetch.")
     parser.add_argument("--branch", default="develop", help="Branch whose ruleset to check.")
     parser.add_argument("--token", default="", help="Ruleset-read token for live fetch.")
     parser.add_argument(

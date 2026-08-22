@@ -47,7 +47,7 @@ export const HEADER_LINKS: readonly HeaderLink[] = [
   { label: "Blog", href: "https://benchbox.dev/blog/", activeOnSurface: "blog" },
   { label: "Results", href: "https://benchbox.dev/results/", activeOnSurface: "results" },
   { label: "Instruct an agent", href: "https://benchbox.dev/prompts/", activeOnSurface: "prompts" },
-  { label: "GitHub", href: "https://github.com/joeharris76/BenchBox", external: true },
+  { label: "GitHub", href: "https://github.com/BenchBox-dev/BenchBox", external: true },
 ];
 
 export const HEADER_CTA = {

@@ -377,11 +377,11 @@ benchbox = "benchbox.cli.app:main"
 benchbox-mcp = "benchbox.mcp.cli:main"
 
 [project.urls]
-"Homepage" = "https://github.com/joeharris76/benchbox"
-"Bug Tracker" = "https://github.com/joeharris76/benchbox/issues"
+"Homepage" = "https://github.com/BenchBox-dev/benchbox"
+"Bug Tracker" = "https://github.com/BenchBox-dev/benchbox/issues"
 "Documentation" = "https://benchbox.readthedocs.io/"
-"Repository" = "https://github.com/joeharris76/benchbox.git"
-"Changelog" = "https://github.com/joeharris76/benchbox/blob/release/CHANGELOG.md"
+"Repository" = "https://github.com/BenchBox-dev/benchbox.git"
+"Changelog" = "https://github.com/BenchBox-dev/benchbox/blob/release/CHANGELOG.md"
 
 [tool.ty]
 # ty configuration

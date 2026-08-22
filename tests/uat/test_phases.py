@@ -1944,6 +1944,24 @@ def test_default_log_dir_same_second_collision_gets_disambiguated(tmp_path: Path
     assert second.name == f"{first.name}-2"
 
 
+def test_reserve_default_log_dir_is_atomic_for_same_timestamp(tmp_path: Path):
+    from concurrent.futures import ThreadPoolExecutor
+
+    cfg = validate_config(
+        {
+            "name": "collision-smoke",
+            "output": {"logs_dir_template": str(tmp_path / "uat_{date}_{time}")},
+        }
+    )
+    now = _dt.datetime(2026, 5, 5, 9, 0, 0)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        reserved = list(pool.map(lambda _: exec_phase.reserve_default_log_dir(cfg, now=now), range(2)))
+
+    assert reserved[0] != reserved[1]
+    assert all(path.is_dir() for path in reserved)
+
+
 def test_default_log_dir_explicit_date_only_template_still_works():
     """Existing configs with an explicit {date}-only template keep working verbatim."""
     cfg = validate_config(

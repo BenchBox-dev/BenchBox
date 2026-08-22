@@ -237,3 +237,66 @@ def test_plans_or_tuning_only_change_discovers_paired_primary_bundle(tmp_path: P
 
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip().splitlines() == ["results-data/bundles/result.json"]
+
+
+@pytest.mark.parametrize("companion_suffix", [".plans.json", ".tuning.json"])
+def test_live_orphan_companion_is_rejected(tmp_path: Path, companion_suffix: str) -> None:
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+    placeholder = tmp_path / "README"
+    placeholder.write_text("base\n", encoding="utf-8")
+    _git(tmp_path, "add", "README")
+    _git(tmp_path, "commit", "--quiet", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    companion = tmp_path / "results-data" / "bundles" / f"orphan{companion_suffix}"
+    companion.parent.mkdir(parents=True)
+    companion.write_text("{}\n", encoding="utf-8")
+    _git(tmp_path, "add", str(companion.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "orphan")
+
+    skip_without_posix_shell()
+    env = {**os.environ, "BASE_SHA": base_sha}
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode != 0
+    assert str(companion.relative_to(tmp_path)) in result.stdout
+    assert "has no primary bundle" in result.stdout
+
+
+@pytest.mark.parametrize("companion_suffix", [".plans.json", ".tuning.json"])
+def test_deleted_orphan_companion_is_allowed(tmp_path: Path, companion_suffix: str) -> None:
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+    companion = tmp_path / "results-data" / "bundles" / f"orphan{companion_suffix}"
+    companion.parent.mkdir(parents=True)
+    companion.write_text("{}\n", encoding="utf-8")
+    _git(tmp_path, "add", str(companion.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "base orphan")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+    companion.unlink()
+    _git(tmp_path, "add", "-u")
+    _git(tmp_path, "commit", "--quiet", "-m", "remove orphan")
+
+    skip_without_posix_shell()
+    env = {**os.environ, "BASE_SHA": base_sha}
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == ""

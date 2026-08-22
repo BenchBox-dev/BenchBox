@@ -9,6 +9,8 @@ PR_FANOUT_JOBS ?= 4
 PR_REVIEW_BASE ?= develop
 PR_REVIEW_PR_LIMIT ?= 1000
 PR_REVIEW_MAX_COMMENTS ?= 0
+PR_REVIEW_INCLUDE_RESOLVED ?= 0
+PR_REVIEW_FAIL_ON_PENDING ?= 0
 PR_REVIEW_EXECUTOR_SANDBOX ?= workspace-write
 PR_REVIEW_EXECUTOR_APPROVAL ?= never
 DEV_LOOP_METRICS_DAYS ?= 30
@@ -974,7 +976,7 @@ run-test:
 # ---------------------------------------------------------------------------
 # Release flow (single-repo migration, version-branch model)
 # ---------------------------------------------------------------------------
-# These targets must be run from the public clone (origin -> joeharris76/BenchBox).
+# These targets must be run from the public clone (origin -> BenchBox-dev/BenchBox).
 # Do NOT invoke from the legacy private clone — it has no `origin` remote.
 #
 # Flow: develop -> v$(VERSION) -> (squash) release -> tag release -> release.yml publishes
@@ -1521,6 +1523,8 @@ pr-review-followups-list:
 		--base "$(PR_REVIEW_BASE)" \
 		--limit-prs "$(PR_REVIEW_PR_LIMIT)" \
 		--max-comments "$(PR_REVIEW_MAX_COMMENTS)" \
+		$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_RESOLVED)),--include-resolved) \
+		$(if $(filter 1 true yes,$(PR_REVIEW_FAIL_ON_PENDING)),--fail-on-pending) \
 		$(if $(PR_REVIEW_REPO),--repo "$(PR_REVIEW_REPO)") \
 		$(if $(PR_REVIEW_SINCE),--since "$(PR_REVIEW_SINCE)") \
 		$(if $(PR_REVIEW_UNTIL),--until "$(PR_REVIEW_UNTIL)")

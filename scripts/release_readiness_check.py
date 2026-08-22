@@ -378,7 +378,7 @@ def main(argv: list[str] | None = None) -> int:
         "--max-age-hours", type=float, default=float(os.environ.get("RELEASE_CANARY_MAX_AGE_HOURS", "48"))
     )
     parser.add_argument("--head-sha", default=os.environ.get("GITHUB_SHA", ""))
-    parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "joeharris76/BenchBox"))
+    parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox"))
     parser.add_argument("--token", default=os.environ.get("GITHUB_TOKEN", ""))
     parser.add_argument("--checked-ref", default=os.environ.get("RELEASE_CANARY_CHECKED_REF", "develop"))
     parser.add_argument("--no-ancestor-check", action="store_true")

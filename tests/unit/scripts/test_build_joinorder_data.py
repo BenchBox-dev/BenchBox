@@ -979,3 +979,51 @@ def test_manifest_hash_ignores_archive_sha256_after_packaging(tmp_path: Path) ->
     manifest.write_text(manifest.read_text(encoding="utf-8").replace(archive_hash_a, archive_hash_b), encoding="utf-8")
 
     assert build_joinorder_data.compute_manifest_hash(manifest) == before
+
+
+def test_resolve_canonical_parquet_dir_verifies_manifest_hashes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    parquet = tmp_path / "title.parquet"
+    parquet.write_bytes(b"canonical parquet bytes")
+    digest = build_joinorder_data.sha256_file(parquet)
+    manifest = tmp_path / "data_manifest.toml"
+    manifest.write_text(
+        "\n".join(
+            [
+                "[[tables]]",
+                'name = "title"',
+                'file = "title.parquet"',
+                f'sha256 = "{digest}"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(build_joinorder_data, "TABLE_NAMES", ["title"])
+    monkeypatch.setattr(build_joinorder_data, "runtime_manifest_path", lambda: manifest)
+
+    assert build_joinorder_data.resolve_canonical_parquet_dir(str(tmp_path)) == tmp_path.resolve()
+
+
+def test_resolve_canonical_parquet_dir_rejects_corrupted_table(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    parquet = tmp_path / "title.parquet"
+    parquet.write_bytes(b"corrupted")
+    manifest = tmp_path / "data_manifest.toml"
+    manifest.write_text(
+        "\n".join(
+            [
+                "[[tables]]",
+                'name = "title"',
+                'file = "title.parquet"',
+                f'sha256 = "{"0" * 64}"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(build_joinorder_data, "TABLE_NAMES", ["title"])
+    monkeypatch.setattr(build_joinorder_data, "runtime_manifest_path", lambda: manifest)
+
+    with pytest.raises(build_joinorder_data.JoinOrderBuildError, match="hash mismatch for title"):
+        build_joinorder_data.resolve_canonical_parquet_dir(str(tmp_path))
