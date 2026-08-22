@@ -150,28 +150,36 @@ def convert(
     The command reads the manifest file in the input directory to discover
     tables and their source files, then converts each table to the target format.
 
+    \b
     Examples:
 
+    \b
         # Convert to Parquet with default settings
         benchbox convert --input ./data/tpch_sf1 --format parquet
 
+    \b
         # Convert to Vortex for high compression
         benchbox convert --input ./data/tpch_sf1 --format vortex
 
+    \b
         # Convert to Delta Lake with Zstd compression
         benchbox convert --input ./data/tpch_sf1 --format delta --compression zstd
 
+    \b
         # Convert to partitioned Parquet by date column
         benchbox convert --input ./data/tpch_sf1 --format parquet \\
             --partition l_shipdate
 
+    \b
         # Convert with multiple partition columns
         benchbox convert --input ./data/tpch_sf1 --format parquet \\
             --partition l_shipdate --partition l_returnflag
 
+    \b
         # Convert to Iceberg without validation (faster, not TPC compliant)
         benchbox convert --input ./data/tpch_sf1 --format iceberg --no-validate
 
+    \b
         # Specify benchmark explicitly for schema lookup
         benchbox convert --input ./data/custom --format parquet --benchmark tpch
 

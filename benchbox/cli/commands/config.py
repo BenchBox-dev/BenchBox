@@ -14,6 +14,7 @@ def validate(ctx, config):
     Checks configuration file syntax, validates platform settings, and verifies
     that required options are properly specified.
 
+    \b
     Examples:
         benchbox validate                    # Validate default configuration
         benchbox validate --config custom.yaml  # Validate specific config file

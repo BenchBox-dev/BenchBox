@@ -56,16 +56,20 @@ def datagen(ctx, benchmark, scale, output_dir, data_format, seed, verbose):
 
     This is a convenience wrapper for: benchbox run --phases generate
 
+    \b
     Examples:
         # Generate TPC-H data at scale factor 0.1
         benchbox datagen --benchmark tpch --scale 0.1 --output ./data/tpch_0.1
 
+    \b
         # Generate TPC-DS data with specific seed
         benchbox datagen --benchmark tpcds --scale 1 --seed 42 --output ./data/tpcds_1
 
+    \b
         # Generate ClickBench data
         benchbox datagen --benchmark clickbench --scale 1 --output ./data/clickbench
 
+    \b
         # Generate with verbose logging
         benchbox datagen --benchmark tpch --scale 0.01 --output ./data --verbose
     """
