@@ -478,6 +478,50 @@ def audit_commit_range(project: Path, base_ref: str) -> list[str]:
     return errors
 
 
+def audit_dependency_caps(project: Path) -> list[str]:
+    """Pin AGENTS.md's advertised dependency caps to `pyproject.toml`.
+
+    AGENTS.md restates upper bounds so an agent does not have to open the
+    manifest. A restated fact drifts silently: the file advertised
+    `pyarrow<24` while the manifest had moved to `<25`. This is the
+    deterministic invariant `docs/operations/agent-instruction-evaluation.md`
+    asks for -- it fails the audit instead of relying on a reader noticing.
+    """
+    errors: list[str] = []
+    agents = _read(project, "AGENTS.md")
+    caps_line = next((line for line in agents.splitlines() if "Current caps:" in line), "")
+    if not caps_line:
+        return ["AGENTS.md does not advertise dependency caps"]
+    advertised = dict(re.findall(r"`([A-Za-z0-9_.-]+)<([0-9][0-9A-Za-z_.-]*)`", caps_line))
+    if not advertised:
+        return ["AGENTS.md dependency caps line has no parsable `name<version` entries"]
+
+    manifest_path = project / "pyproject.toml"
+    try:
+        manifest = manifest_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return [f"cannot read pyproject.toml: {exc}"]
+    # Matched textually rather than with a TOML parser: `tomllib` is 3.11+ and
+    # this repository still supports 3.10. Scanning every quoted requirement
+    # also covers optional-dependency tables without enumerating them.
+    requirements = re.findall(r'"([A-Za-z0-9_.-]+(?:\[[^\]]*\])?[^"]*)"', manifest)
+
+    for name, cap in sorted(advertised.items()):
+        actual = None
+        for requirement in requirements:
+            if not re.match(rf"^{re.escape(name)}\s*[<>=!~\[]", requirement.strip()):
+                continue
+            found = re.search(r"<\s*([0-9][0-9A-Za-z_.]*)", requirement)
+            if found:
+                actual = found.group(1)
+                break
+        if actual is None:
+            errors.append(f"AGENTS.md advertises `{name}<{cap}` but pyproject.toml declares no upper bound for it")
+        elif not actual.startswith(cap):
+            errors.append(f"AGENTS.md advertises `{name}<{cap}` but pyproject.toml pins <{actual}")
+    return errors
+
+
 def audit_scenarios(scenarios: list[dict[str, Any]], policy_text: str) -> list[str]:
     errors: list[str] = []
     scenario_ids = [scenario.get("id") for scenario in scenarios]
@@ -630,6 +674,7 @@ def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
     errors.extend(_tag("review-policy", audit_review_policy(project)))
     errors.extend(_tag("docs-placement", audit_docs_placement(project)))
     errors.extend(_tag("commit-policy", audit_commit_policy(project)))
+    errors.extend(_tag("dependency-caps", audit_dependency_caps(project)))
 
     errors.extend(_tag("scenarios", audit_scenarios(corpus["scenarios"], policy_text)))
 

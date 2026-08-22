@@ -18,6 +18,8 @@ BenchBox binding for `SHARED/review-protocol`. Supersedes
 
 - `[REVIEW-DEFECT-001]`: correctness, security, or performance failures stay
   owned review actions, not blind spots.
+- `[REVIEW-DEPTH-001]`: apply L1 obvious answer, L2 blind-spot audit, L3
+  problem reframe before committing to a plan or interpretation.
 - `[REVIEW-L2-001]`: L2 is a missed dimension, not a found defect.
 - `[REVIEW-CAPTURE-001]`: append-only under `~/.benchbox/finding-drafts/`.
   Hosted sync, commits, pushes, and PRs need separate authorization.
