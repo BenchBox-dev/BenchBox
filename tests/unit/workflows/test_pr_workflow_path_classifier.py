@@ -6,7 +6,9 @@ import importlib.util
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -33,7 +35,7 @@ CI_PATHS_OUTPUT_REFERENCE_RE = (
 )
 
 
-def _load_path_filter_decision():
+def _load_path_filter_decision() -> Any:
     """Load scripts/path_filter_decision.py the way the workflow uses it.
 
     tests/unit/scripts/ has a conftest sys.path shim; here we load by file
@@ -41,6 +43,9 @@ def _load_path_filter_decision():
     `load_rules` + `extra_group_keys` logic the classify step runs (output
     naming additionally mirrors write_github_output's `_`→`-` mapping).
     """
+    scripts_dir = str(REPO_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
     script = REPO_ROOT / "scripts" / "path_filter_decision.py"
     spec = importlib.util.spec_from_file_location("path_filter_decision_lockstep", script)
     assert spec is not None and spec.loader is not None
@@ -97,7 +102,7 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
 
 def test_pr_path_classifier_fetches_base_history_for_merge_base() -> None:
     workflow = (REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8")
-    base_fetch = 'git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"'
+    base_fetch = "git fetch --no-tags origin \"${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}\""
 
     # The classifier uses `git diff origin/develop...HEAD`; a depth-1 base fetch
     # on GitHub's synthetic PR merge ref can leave no merge base available.
@@ -368,11 +373,13 @@ def test_classifier_and_certification_bind_to_pull_request_event_base() -> None:
     classify = next(step for step in workflow["jobs"]["ci-paths"]["steps"] if step.get("id") == "classify")
     certification = workflow["jobs"]["certification-identity"]
 
-    assert '--base-ref "${{ github.event.pull_request.base.sha }}"' in classify["run"]
+    assert (
+        '--base-ref "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"' in classify["run"]
+    )
     assert "origin/${{ github.base_ref }}" not in classify["run"]
     assert certification["needs"] == "ci-paths"
     record = next(step for step in certification["steps"] if step.get("name") == "Record certification identity")
-    assert record["env"]["BASE_SHA"] == "${{ github.event.pull_request.base.sha }}"
+    assert record["env"]["BASE_SHA"] == "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
     assert record["env"]["SKILL_INTEGRITY_NEEDED"] == ("${{ needs.ci-paths.outputs.skill-integrity-needed }}")
     assert 'certification_kind = "skill_integrity"' in record["run"]
     assert 'certification_kind = "full"' in record["run"]
