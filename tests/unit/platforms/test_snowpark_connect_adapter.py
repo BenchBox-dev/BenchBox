@@ -421,6 +421,13 @@ class TestSnowparkConnectAdapterResolveTableNames:
         def get_table_names(self):
             return ["region", "nation"]
 
+    class _FakeBenchmarkWithSchema:
+        def get_schema(self):
+            return {"lineitem": object(), "orders": object(), "customer": object()}
+
+        def get_table_loading_order(self, available_tables):
+            return [name for name in ("customer", "orders", "lineitem") if name in available_tables]
+
     def test_resolves_and_orders_via_required_arg_loading_order(self, mock_snowpark):
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
@@ -434,6 +441,13 @@ class TestSnowparkConnectAdapterResolveTableNames:
         result = SnowparkConnectAdapter._resolve_table_names(self._FakeBenchmarkWithoutOrdering())
 
         assert result == ["region", "nation"]
+
+    def test_falls_back_to_schema_keys_and_applies_loading_order(self, mock_snowpark):
+        from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
+
+        result = SnowparkConnectAdapter._resolve_table_names(self._FakeBenchmarkWithSchema())
+
+        assert result == ["customer", "orders", "lineitem"]
 
     def test_raises_when_benchmark_exposes_no_table_names(self, mock_snowpark):
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter

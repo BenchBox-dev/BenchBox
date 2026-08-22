@@ -74,6 +74,31 @@ def test_run_computes_metrics(monkeypatch):
     assert result.query_throughput == pytest.approx(0.5)
 
 
+def test_run_without_preflight_clears_stale_pregenerated_queries(monkeypatch):
+    benchmark = SimpleNamespace(get_query=lambda *_args, **_kwargs: "SELECT inline")
+    throughput = TPCDSThroughputTest(benchmark=benchmark, connection_factory=DummyConn, num_streams=1)
+    throughput._pregenerated_queries = {0: [(DummyStreamQuery(query_id=1), "SELECT stale")]}
+
+    def fake_execute_stream(stream_id, seed, config):
+        assert throughput._pregenerated_queries is None
+        return TPCDSThroughputStreamResult(
+            stream_id=stream_id,
+            start_time=10.0,
+            end_time=11.0,
+            duration=1.0,
+            queries_executed=1,
+            queries_successful=1,
+            queries_failed=0,
+            success=True,
+        )
+
+    monkeypatch.setattr(throughput, "_execute_stream", fake_execute_stream)
+
+    throughput.run(TPCDSThroughputTestConfig(num_streams=1, enable_preflight=False))
+
+    assert throughput._pregenerated_queries is None
+
+
 def test_validate_results_branches():
     benchmark = SimpleNamespace(get_query=lambda *_args, **_kwargs: "SELECT 1")
     throughput = TPCDSThroughputTest(benchmark=benchmark, connection_factory=DummyConn, num_streams=1)
@@ -216,6 +241,29 @@ def test_pregenerate_stream_queries_routes_through_dsqgen_streams(monkeypatch):
 
     assert result[0][0][1] == "TRANSLATED::select 1;"
     assert result[1][0][1] == "TRANSLATED::select 2;"
+
+
+def test_pregenerate_stream_queries_resolves_translation_from_wrapper_impl(monkeypatch):
+    calls: list[tuple[str, object]] = []
+    implementation = SimpleNamespace(
+        translate_query_text=lambda sql, _src, _tgt: calls.append(("translate", sql)) or f"T::{sql}",
+        _apply_target_dialect_overrides=lambda qid, sql, _tgt: calls.append(("override", qid)) or f"O::{sql}",
+    )
+    throughput = TPCDSThroughputTest(
+        benchmark=SimpleNamespace(_impl=implementation),
+        connection_factory=DummyConn,
+        num_streams=1,
+        dialect="duckdb",
+    )
+    monkeypatch.setattr(
+        "benchbox.core.tpcds.streams.generate_dsqgen_streams",
+        lambda **_kwargs: {0: [DummyStreamQueryWithSql(query_id=7, sql="select 7;")]},
+    )
+
+    result = throughput._pregenerate_stream_queries(TPCDSThroughputTestConfig(num_streams=1, enable_preflight=True))
+
+    assert result[0][0][1] == "O::T::select 7;"
+    assert calls == [("translate", "select 7;"), ("override", 7)]
 
 
 def test_pregenerate_stream_queries_wraps_dsqgen_failure(monkeypatch):

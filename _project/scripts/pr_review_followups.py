@@ -71,6 +71,9 @@ class ReviewComment:
     commit_id: str | None = None
     line: int | None = None
     original_line: int | None = None
+    thread_id: str | None = None
+    thread_is_resolved: bool | None = None
+    thread_is_outdated: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -87,6 +90,12 @@ class PendingComment:
     pr: PullRequest
     comment: ReviewComment
     replies: tuple[ReviewComment, ...]
+
+
+@dataclass(frozen=True)
+class ReviewInventory:
+    actionable: tuple[PendingComment, ...]
+    resolved_for_audit: tuple[PendingComment, ...]
 
 
 @dataclass(frozen=True)
@@ -263,6 +272,9 @@ def review_comment_from_api(item: dict[str, Any]) -> ReviewComment:
         commit_id=item.get("commit_id"),
         line=item.get("line"),
         original_line=item.get("original_line"),
+        thread_id=item.get("thread_id"),
+        thread_is_resolved=item.get("thread_is_resolved"),
+        thread_is_outdated=item.get("thread_is_outdated"),
     )
 
 
@@ -322,7 +334,11 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
       reviewThreads(first: 50, after: $cursor) {
         pageInfo { hasNextPage endCursor }
         nodes {
+          id
+          isResolved
+          isOutdated
           comments(first: 100) {
+            pageInfo { hasNextPage endCursor }
             nodes {
               databaseId
               body
@@ -345,8 +361,34 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
 }
 """.strip()
 
+REVIEW_THREAD_COMMENTS_GRAPHQL_QUERY = """
+query($thread: ID!, $cursor: String!) {
+  node(id: $thread) {
+    ... on PullRequestReviewThread {
+      comments(first: 100, after: $cursor) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          databaseId
+          body
+          path
+          url
+          createdAt
+          diffHunk
+          line
+          originalLine
+          originalCommit { oid }
+          commit { oid }
+          replyTo { databaseId }
+          author { login }
+        }
+      }
+    }
+  }
+}
+""".strip()
 
-def _graphql_comment_to_api_shape(node: dict[str, Any]) -> dict[str, Any]:
+
+def _graphql_comment_to_api_shape(node: dict[str, Any], *, thread: dict[str, Any]) -> dict[str, Any]:
     author = node.get("author") or {}
     reply_to = node.get("replyTo") or {}
     original_commit = node.get("originalCommit") or {}
@@ -364,7 +406,48 @@ def _graphql_comment_to_api_shape(node: dict[str, Any]) -> dict[str, Any]:
         "commit_id": commit.get("oid"),
         "line": node.get("line"),
         "original_line": node.get("originalLine"),
+        "thread_id": thread.get("id"),
+        "thread_is_resolved": thread.get("isResolved"),
+        "thread_is_outdated": thread.get("isOutdated"),
     }
+
+
+def _fetch_additional_thread_comment_nodes(
+    runner: CommandRunner,
+    *,
+    thread: dict[str, Any],
+    initial_connection: dict[str, Any],
+) -> list[dict[str, Any]] | None:
+    nodes = list(initial_connection.get("nodes") or [])
+    page_info = initial_connection.get("pageInfo") or {}
+    while page_info.get("hasNextPage"):
+        thread_id = thread.get("id")
+        cursor = page_info.get("endCursor")
+        if not thread_id or not cursor:
+            return None
+        result = runner.run(
+            [
+                "gh",
+                "api",
+                "graphql",
+                "-f",
+                f"query={REVIEW_THREAD_COMMENTS_GRAPHQL_QUERY}",
+                "-F",
+                f"thread={thread_id}",
+                "-F",
+                f"cursor={cursor}",
+            ]
+        )
+        if result.returncode != 0:
+            return None
+        try:
+            payload = json.loads(result.stdout) if result.stdout.strip() else {}
+        except json.JSONDecodeError:
+            return None
+        connection = ((payload.get("data") or {}).get("node") or {}).get("comments") or {}
+        nodes.extend(connection.get("nodes") or [])
+        page_info = connection.get("pageInfo") or {}
+    return nodes
 
 
 def fetch_review_comments_via_graphql(
@@ -409,10 +492,23 @@ def fetch_review_comments_via_graphql(
         pr = ((payload.get("data") or {}).get("repository") or {}).get("pullRequest") or {}
         threads = pr.get("reviewThreads") or {}
         for thread in threads.get("nodes") or []:
-            for node in (thread.get("comments") or {}).get("nodes") or []:
+            if (
+                not thread.get("id")
+                or not isinstance(thread.get("isResolved"), bool)
+                or not isinstance(thread.get("isOutdated"), bool)
+            ):
+                return None
+            comment_nodes = _fetch_additional_thread_comment_nodes(
+                runner,
+                thread=thread,
+                initial_connection=thread.get("comments") or {},
+            )
+            if comment_nodes is None:
+                return None
+            for node in comment_nodes:
                 if node.get("databaseId") is None:
                     continue
-                rows.append(_graphql_comment_to_api_shape(node))
+                rows.append(_graphql_comment_to_api_shape(node, thread=thread))
         page_info = threads.get("pageInfo") or {}
         if not page_info.get("hasNextPage"):
             break
@@ -422,11 +518,22 @@ def fetch_review_comments_via_graphql(
     return [review_comment_from_api(row) for row in rows]
 
 
-def load_pr_review_comments(runner: CommandRunner, *, repo: str, pr_number: int) -> list[ReviewComment]:
+def load_pr_review_comments(
+    runner: CommandRunner,
+    *,
+    repo: str,
+    pr_number: int,
+    require_thread_state: bool = False,
+) -> list[ReviewComment]:
     """Prefer GraphQL; fall back to REST on any failure for resilience."""
     via_graphql = fetch_review_comments_via_graphql(runner, repo=repo, pr_number=pr_number)
     if via_graphql is not None:
         return via_graphql
+    if require_thread_state:
+        raise RuntimeError(
+            f"GraphQL review-thread state is unavailable for PR #{pr_number}; "
+            "refusing a write-mode sweep because REST comments cannot establish resolution state."
+        )
     return fetch_pr_review_comments(runner, repo=repo, pr_number=pr_number)
 
 
@@ -449,18 +556,19 @@ def comment_precedes_merge(comment: ReviewComment, pr: PullRequest) -> bool:
     return comment_time < merged_time
 
 
-def pending_comments_for_pr(
+def review_inventory_for_pr(
     pr: PullRequest,
     comments: Sequence[ReviewComment],
     *,
     author_logins: set[str],
-) -> list[PendingComment]:
+) -> ReviewInventory:
     replies_by_parent: dict[int, list[ReviewComment]] = {}
     for comment in comments:
         if comment.in_reply_to_id is not None:
             replies_by_parent.setdefault(int(comment.in_reply_to_id), []).append(comment)
 
-    pending: list[PendingComment] = []
+    actionable: list[PendingComment] = []
+    resolved_for_audit: list[PendingComment] = []
     for comment in comments:
         if comment.in_reply_to_id is not None:
             continue
@@ -468,11 +576,28 @@ def pending_comments_for_pr(
             continue
         if not comment_precedes_merge(comment, pr):
             continue
-        replies = tuple(replies_by_parent.get(comment.id, []))
-        if has_action_marker(replies):
+        item = PendingComment(
+            pr=pr,
+            comment=comment,
+            replies=tuple(replies_by_parent.get(comment.id, [])),
+        )
+        if comment.thread_is_resolved is True:
+            resolved_for_audit.append(item)
             continue
-        pending.append(PendingComment(pr=pr, comment=comment, replies=replies))
-    return pending
+        if has_action_marker(item.replies):
+            continue
+        actionable.append(item)
+    return ReviewInventory(tuple(actionable), tuple(resolved_for_audit))
+
+
+def pending_comments_for_pr(
+    pr: PullRequest,
+    comments: Sequence[ReviewComment],
+    *,
+    author_logins: set[str],
+) -> list[PendingComment]:
+    """Compatibility wrapper returning only the executor-actionable queue."""
+    return list(review_inventory_for_pr(pr, comments, author_logins=author_logins).actionable)
 
 
 def _comment_sort_key(comment: IssueComment) -> tuple[dt.datetime, int]:
@@ -556,6 +681,40 @@ def discover_usage_limit_review_retries(
     return retries
 
 
+def discover_review_inventory(
+    runner: CommandRunner,
+    *,
+    repo: str,
+    base: str,
+    limit_prs: int,
+    since: dt.datetime | None,
+    until: dt.datetime | None,
+    author_logins: set[str],
+    require_thread_state: bool = False,
+) -> ReviewInventory:
+    actionable: list[PendingComment] = []
+    resolved_for_audit: list[PendingComment] = []
+    pull_requests = discover_merged_pull_requests(
+        runner,
+        repo=repo,
+        base=base,
+        limit=limit_prs,
+        since=since,
+        until=until,
+    )
+    for pr in pull_requests:
+        comments = load_pr_review_comments(
+            runner,
+            repo=repo,
+            pr_number=pr.number,
+            require_thread_state=require_thread_state,
+        )
+        inventory = review_inventory_for_pr(pr, comments, author_logins=author_logins)
+        actionable.extend(inventory.actionable)
+        resolved_for_audit.extend(inventory.resolved_for_audit)
+    return ReviewInventory(tuple(actionable), tuple(resolved_for_audit))
+
+
 def discover_pending_comments(
     runner: CommandRunner,
     *,
@@ -566,19 +725,18 @@ def discover_pending_comments(
     until: dt.datetime | None,
     author_logins: set[str],
 ) -> list[PendingComment]:
-    pending: list[PendingComment] = []
-    pull_requests = discover_merged_pull_requests(
-        runner,
-        repo=repo,
-        base=base,
-        limit=limit_prs,
-        since=since,
-        until=until,
+    """Compatibility wrapper for callers that only need actionable comments."""
+    return list(
+        discover_review_inventory(
+            runner,
+            repo=repo,
+            base=base,
+            limit_prs=limit_prs,
+            since=since,
+            until=until,
+            author_logins=author_logins,
+        ).actionable
     )
-    for pr in pull_requests:
-        comments = load_pr_review_comments(runner, repo=repo, pr_number=pr.number)
-        pending.extend(pending_comments_for_pr(pr, comments, author_logins=author_logins))
-    return pending
 
 
 def first_body_line(body: str) -> str:
@@ -593,11 +751,28 @@ def print_pending_table(pending: Sequence[PendingComment]) -> None:
     if not pending:
         print("No pending PR review comments found.")
         return
-    print(f"{'PR':>6}  {'Comment':>12}  {'Path':<52}  Finding")
-    print(f"{'-' * 6}  {'-' * 12}  {'-' * 52}  {'-' * 40}")
+    print(f"{'PR':>6}  {'Comment':>12}  {'Thread':<24}  {'Resolved':<9}  {'Outdated':<9}  {'Path':<36}  Finding")
+    print(f"{'-' * 6}  {'-' * 12}  {'-' * 24}  {'-' * 9}  {'-' * 9}  {'-' * 36}  {'-' * 40}")
     for item in pending:
-        path = item.comment.path[:52]
-        print(f"#{item.pr.number:<5}  {item.comment.id:>12}  {path:<52}  {first_body_line(item.comment.body)}")
+        path = item.comment.path[:36]
+        resolved = (
+            "unknown" if item.comment.thread_is_resolved is None else str(item.comment.thread_is_resolved).lower()
+        )
+        outdated = (
+            "unknown" if item.comment.thread_is_outdated is None else str(item.comment.thread_is_outdated).lower()
+        )
+        print(
+            f"#{item.pr.number:<5}  {item.comment.id:>12}  {(item.comment.thread_id or 'unknown')[:24]:<24}  "
+            f"{resolved:<9}  {outdated:<9}  {path:<36}  {first_body_line(item.comment.body)}"
+        )
+
+
+def print_resolved_audit_table(candidates: Sequence[PendingComment]) -> None:
+    if not candidates:
+        print("\nNo resolved PR review threads require phantom-resolution audit.")
+        return
+    print("\nResolved PR review threads for phantom-resolution audit:")
+    print_pending_table(candidates)
 
 
 def print_usage_limit_retry_table(retries: Sequence[UsageLimitReviewRetry]) -> None:
@@ -1095,7 +1270,10 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
             allow_dirty=args.allow_dirty or args.dry_run or resume,
             base_ref=f"origin/{args.base}",
         )
-    pending = discover_pending_comments(
+    require_thread_state = (args.command == "run" and not args.dry_run) or bool(
+        getattr(args, "include_resolved", False) or getattr(args, "fail_on_pending", False)
+    )
+    inventory = discover_review_inventory(
         runner,
         repo=repo,
         base=args.base,
@@ -1103,7 +1281,10 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
         since=since,
         until=until,
         author_logins=authors,
+        require_thread_state=require_thread_state,
     )
+    all_pending = list(inventory.actionable)
+    pending = list(all_pending)
     usage_limit_retries: list[UsageLimitReviewRetry] = []
     if args.retry_usage_limit_reviews:
         usage_limit_retries = discover_usage_limit_review_retries(
@@ -1125,8 +1306,12 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
         pending = pending[: args.max_comments]
 
     print_pending_table(pending)
+    if bool(getattr(args, "include_resolved", False)):
+        print_resolved_audit_table(inventory.resolved_for_audit)
     print_usage_limit_retry_table(usage_limit_retries)
     if args.command == "list" or args.dry_run:
+        if bool(getattr(args, "fail_on_pending", False)) and (all_pending or usage_limit_retries):
+            return 1
         return 0
     retried_usage_limit_reviews = select_usage_limit_retry_triggers(
         usage_limit_retries,
@@ -1200,6 +1385,19 @@ def build_parser() -> argparse.ArgumentParser:
                 "`@codex review` trigger when no later trigger or review result exists."
             ),
         )
+    list_parser = subparsers.choices["list"]
+    list_parser.add_argument(
+        "--include-resolved",
+        action="store_true",
+        default=os.environ.get("PR_REVIEW_INCLUDE_RESOLVED", "0").lower() in {"1", "true", "yes"},
+        help="Include resolved, unmarked threads for the separate phantom-resolution audit.",
+    )
+    list_parser.add_argument(
+        "--fail-on-pending",
+        action="store_true",
+        default=os.environ.get("PR_REVIEW_FAIL_ON_PENDING", "0").lower() in {"1", "true", "yes"},
+        help="Exit non-zero when the filtered review-comment queue is non-empty.",
+    )
     run_parser = subparsers.choices["run"]
     run_parser.add_argument("--dry-run", action="store_true")
     run_parser.add_argument("--allow-dirty", action="store_true")

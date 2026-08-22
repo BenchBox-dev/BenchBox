@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 
 from benchbox.core.data_fetch import compute_manifest_hash, fetch_data
-from benchbox.core.data_fetch.locking import archive_lock
+from benchbox.core.data_fetch.locking import archive_lock, interprocess_lock
 
 pytestmark = [
     pytest.mark.unit,
@@ -94,6 +94,10 @@ def test_archive_lock_serializes_across_threads(tmp_path: Path) -> None:
     assert len(events) == 4
     assert events[0].startswith("enter") and events[1] == f"exit-{events[0].split('-')[1]}"
     assert events[2].startswith("enter") and events[3] == f"exit-{events[2].split('-')[1]}"
+
+
+def test_archive_lock_remains_the_general_interprocess_lock_alias() -> None:
+    assert archive_lock is interprocess_lock
 
 
 def test_concurrent_fetch_downloads_once_and_reuses(tmp_path: Path) -> None:

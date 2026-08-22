@@ -192,7 +192,7 @@ test.describe("Query workbench", () => {
     expect(parsed.length).toBeGreaterThan(0);
   });
 
-  test("Download CSV emits a file sourced from a COPY of the filtered set", async ({ page }) => {
+  test("Download CSV emits a file while DuckDB external access is disabled", async ({ page }) => {
     await page.goto("/results/query");
     await waitForDataLoaded(page, /matching result bundle/);
 

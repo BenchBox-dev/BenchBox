@@ -99,6 +99,24 @@ def mock_tpch_generator(shared_tpch_seed_dir: Path, monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(TPCHDataGenerator, "generate", _mock_generate)
 
 
+def test_generation_lock_target_does_not_materialize_remote_path() -> None:
+    class RemotePath:
+        def __str__(self) -> str:
+            return "s3://benchbox-example/primitives"
+
+        def __fspath__(self) -> str:
+            raise AssertionError("remote lock selection must not materialize the cloud path")
+
+    generator = object.__new__(WritePrimitivesDataGenerator)
+    generator.output_dir = RemotePath()
+    generator._auxiliary_dir = "write_primitives_auxiliary"
+
+    lock_target = generator._generation_lock_target()
+
+    assert lock_target.parent.name == "benchbox-primitives-locks"
+    assert len(lock_target.name) == 64
+
+
 @pytest.mark.slow
 class TestFileLocking:
     """Tests for file locking mechanisms during bulk load generation."""

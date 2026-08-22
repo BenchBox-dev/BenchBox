@@ -61,16 +61,16 @@ logic and can drift silently:
   renderer, not an existing generators caller, and needs its own
   migration/equivalence pass during consolidation, not just deletion of the
   dead `generate_tuning_clause` methods below.
-- Per-adapter `generate_tuning_clause` mixin methods (singular — one clause
-  string, not the generators' `TuningClauses` object), implemented
-  independently on ~20 adapters (ClickHouse, Databricks, Redshift, BigQuery,
-  Snowflake, Trino, Spark, DuckDB, Firebolt, Azure Synapse, Athena, Presto,
-  and others). This is the path that touches real database connections
-  during execution for those (non-Spark) platforms.
+- Runtime execution calls `apply_standard_unified_tuning()` and then the
+  adapter's `apply_table_tunings()` hook in
+  `benchbox/platforms/base/tuning_config.py`. That is the production path that
+  touches real database connections. Per-adapter singular
+  `generate_tuning_clause` methods are direct-test-only/dead where no adapter
+  hook calls them; they are not the non-Spark runtime renderer.
 
 Because dry-run preview renders through `generators/*` and execution renders
-through the adapter mixins, a preview can show DDL that the real run never
-issues. Some adapter implementations are dead: `ClickHouse.generate_tuning_clause`
+through `apply_table_tunings()`, a preview can show DDL that the real run never
+issues. Some singular adapter implementations are dead: `ClickHouse.generate_tuning_clause`
 (`benchbox/platforms/clickhouse/tuning.py:354`) has zero production callers —
 `rg -n "\.generate_tuning_clause\(" benchbox --include=*.py` (excluding the
 `def` lines) returns nothing; it is exercised only by unit tests that call

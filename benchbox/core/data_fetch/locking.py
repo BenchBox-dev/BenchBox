@@ -19,7 +19,7 @@ from typing import Iterator
 
 
 @contextmanager
-def archive_lock(target_path: str | Path) -> Iterator[Path]:
+def interprocess_lock(target_path: str | Path) -> Iterator[Path]:
     """Hold an exclusive interprocess lock scoped to *target_path*.
 
     The lock is keyed on a sibling ``<target_path>.lock`` file so the
@@ -44,6 +44,10 @@ def archive_lock(target_path: str | Path) -> Iterator[Path]:
             _unlock(fd)
     finally:
         os.close(fd)
+
+
+# Compatibility name for existing archive callers.
+archive_lock = interprocess_lock
 
 
 def _lock_exclusive(fd: int) -> None:

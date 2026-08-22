@@ -33,8 +33,8 @@ git_wt() {
 # the resolved value would happily echo back a contaminated common config and
 # pin the contamination into worktree scope, which is the one outcome worse
 # than doing nothing.
-name=$(git_wt config --global --get user.name 2>/dev/null || true)
-email=$(git_wt config --global --get user.email 2>/dev/null || true)
+name=$(git_wt config --global --includes --get user.name 2>/dev/null || true)
+email=$(git_wt config --global --includes --get user.email 2>/dev/null || true)
 
 if [ -z "$name" ] || [ -z "$email" ]; then
   cat >&2 <<EOF

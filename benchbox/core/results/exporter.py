@@ -918,8 +918,8 @@ class ResultExporter:
         perf_current = self._extract_performance_metrics(current_data)
 
         comparison: dict[str, Any] = {
-            "baseline_file": str(baseline_path),
-            "current_file": str(current_path),
+            "baseline_file": baseline_path.name if self.anonymize else str(baseline_path),
+            "current_file": current_path.name if self.anonymize else str(current_path),
             "baseline_version": baseline_version,
             "current_version": current_version,
             "performance_changes": {},

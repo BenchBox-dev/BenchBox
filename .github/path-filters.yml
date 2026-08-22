@@ -85,6 +85,9 @@ code-ci:
   - "docs/**.jinja"
   - "docs/**.j2"
   - "docs/agent/**"
+  # This Markdown file is executable CI input: audit-raw-check parses it as
+  # the dependency allowlist/inventory, so prose-only routing is unsafe.
+  - "docs/development/dependency-audit-raw.md"
   - "docs/operations/agent-instruction*.md"
   - "pyproject.toml"
   - "uv.lock"

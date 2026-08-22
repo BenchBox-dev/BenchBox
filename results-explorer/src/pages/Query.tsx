@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
-import { getDb, queryRows } from "@/db";
+import { queryRows } from "@/db";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { FacetDrawer, FacetRail, type ActiveFacetChip, type FacetGroup } from "@/components/FacetRail";
 import { TableScrollHint } from "@/components/TableScrollHint";
@@ -592,32 +592,13 @@ export function Query(_: RoutableProps) {
   }
 
   async function downloadCsv() {
-    const db = await getDb();
-    const conn = await db.connect();
-    // Filename is interpolated into a COPY TO ... SQL literal below. DuckDB
-    // does not parameterize the file path, so we pin the name to a strict
-    // whitelist so a future edit can't accidentally introduce SQL injection.
     const exportName = `benchbox-query-export-${Date.now()}.csv`;
-    if (!/^benchbox-query-export-\d+\.csv$/.test(exportName)) {
-      setDownloadError("Internal error: unexpected export filename");
-      return;
-    }
     const selectQuery = buildSelectQuery(activeFilters, visibleColumns, sort, UNLIMITED_ROW_LIMIT);
-    let statement: {
-      query: (...params: unknown[]) => Promise<unknown>;
-      close?: () => Promise<void>;
-    } | null = null;
 
     setDownloadError(null);
     try {
-      statement = await conn.prepare(
-        `COPY (${selectQuery.sql}) TO '${exportName}' (FORMAT CSV, HEADER, DELIMITER ',')`,
-      );
-      await statement.query(...selectQuery.params);
-      const buffer = await db.copyFileToBuffer(exportName);
-      const csvBytes = new Uint8Array(buffer.byteLength);
-      csvBytes.set(buffer);
-      const blob = new Blob([csvBytes], { type: "text/csv;charset=utf-8" });
+      const exportRows = await queryRows<ResultRow>(selectQuery.sql, selectQuery.params);
+      const blob = new Blob([serializeCsv(exportRows, visibleColumns)], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -626,12 +607,6 @@ export function Query(_: RoutableProps) {
       URL.revokeObjectURL(url);
     } catch (err: unknown) {
       setDownloadError(err instanceof Error ? err.message : "CSV export failed");
-    } finally {
-      if (statement?.close) {
-        await statement.close();
-      }
-      await conn.close();
-      await db.dropFile(exportName).catch(() => null);
     }
   }
 
@@ -1152,6 +1127,20 @@ function formatCell(value: unknown): string {
 
 function projectVisibleRow(row: ResultRow, visibleColumns: string[]): ResultRow {
   return Object.fromEntries(visibleColumns.map((column) => [column, row[column]]));
+}
+
+function serializeCsv(rows: ResultRow[], columns: string[]): string {
+  const lines = [
+    columns.map(serializeCsvCell).join(","),
+    ...rows.map((row) => columns.map((column) => serializeCsvCell(row[column])).join(",")),
+  ];
+  return `${lines.join("\r\n")}\r\n`;
+}
+
+function serializeCsvCell(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const text = value instanceof Date ? value.toISOString() : String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
 // Cell formatter that intercepts known enum columns (trust_label,

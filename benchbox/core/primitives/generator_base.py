@@ -15,14 +15,24 @@ from __future__ import annotations
 import bz2
 import csv
 import gzip
+import hashlib
 import io
 import logging
 import os
+import tempfile
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
+from benchbox.core.data_fetch.locking import interprocess_lock
+from benchbox.core.tpch.generator import TPCHDataGenerator
 from benchbox.utils.clock import elapsed_seconds, mono_time
+from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path_handler, is_cloud_path
+from benchbox.utils.compression_mixin import CompressionMixin
+from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
+from benchbox.utils.file_format import detect_compression
+from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
+from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
 
 if TYPE_CHECKING:
     import pyarrow as pa
@@ -30,14 +40,6 @@ if TYPE_CHECKING:
 
 # Type alias for paths that could be local or cloud
 PathLike = Union[Path, "CloudPath"]
-
-from benchbox.core.tpch.generator import TPCHDataGenerator
-from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path_handler
-from benchbox.utils.compression_mixin import CompressionMixin
-from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
-from benchbox.utils.file_format import detect_compression
-from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
-from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
 
 
 class PrimitivesDataGeneratorBase(CompressionMixin, CloudStorageGeneratorMixin, VerbosityMixin):
@@ -144,6 +146,18 @@ class PrimitivesDataGeneratorBase(CompressionMixin, CloudStorageGeneratorMixin, 
         Returns:
             Dictionary mapping table names to data file paths
         """
+        with interprocess_lock(self._generation_lock_target()):
+            return self._generate_locked()
+
+    def _generation_lock_target(self) -> Path:
+        """Return a local lock target without materializing a remote path."""
+        if not is_cloud_path(self.output_dir):
+            return Path(self.output_dir) / f".{self._auxiliary_dir}.generation"
+        digest = hashlib.sha256(str(self.output_dir).encode("utf-8")).hexdigest()
+        return Path(tempfile.gettempdir()) / "benchbox-primitives-locks" / digest
+
+    def _generate_locked(self) -> dict[str, Path]:
+        """Generate or reuse every artifact while holding the output lock."""
         self.log_verbose(f"Generating {self._display_name} data at scale factor {self.scale_factor}...")
 
         # 1. Generate base TPC-H data (or reuse existing)

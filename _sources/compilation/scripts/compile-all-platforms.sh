@@ -59,6 +59,9 @@ CONTAINER_ENGINE="${BENCHBOX_CONTAINER_ENGINE:-}"
 if [ -z "$CONTAINER_ENGINE" ]; then
     for _engine in container docker podman mocker; do
         if command -v "$_engine" >/dev/null 2>&1; then
+            if [ "$_engine" = "container" ] && ! container system status >/dev/null 2>&1; then
+                continue
+            fi
             CONTAINER_ENGINE="$_engine"
             break
         fi

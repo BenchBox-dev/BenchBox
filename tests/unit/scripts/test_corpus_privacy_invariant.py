@@ -22,6 +22,7 @@ import pytest
 
 from benchbox.core.results.anonymization import AnonymizationManager, find_public_path_leaks
 from benchbox.core.results.canonical_json import canonical_json_bytes
+from benchbox.validation.bundle import is_primary_bundle_file
 
 pytestmark = [
     pytest.mark.unit,
@@ -30,8 +31,6 @@ pytestmark = [
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RESULTS_DATA = REPO_ROOT / "results-data"
-COMPANION_SUFFIXES = (".manifest.json", ".plans.json", ".tuning.json", ".applied.json")
-MIGRATION_MANIFEST = "path-privacy-migration.manifest.json"
 
 
 def _corpus_json_files() -> list[Path]:
@@ -176,8 +175,8 @@ def test_rederived_corpus_publishes_byte_identically_to_what_is_stored() -> None
     drifted: list[str] = []
     scanned = 0
 
-    for path in sorted((RESULTS_DATA / "bundles").rglob("*.json")):
-        if path.name.endswith(COMPANION_SUFFIXES) or path.name == MIGRATION_MANIFEST:
+    for path in sorted((RESULTS_DATA / "bundles").rglob("*")):
+        if not is_primary_bundle_file(path):
             continue
         stored = path.read_bytes()
         payload = json.loads(stored.decode("utf-8"))
@@ -192,6 +191,23 @@ def test_rederived_corpus_publishes_byte_identically_to_what_is_stored() -> None
         f"{len(drifted)} bundle(s) are not stored at the publication fixed point; "
         "publishing would rewrite them:\n" + "\n".join(drifted[:20])
     )
+
+
+def test_primary_rederivation_discovery_uses_canonical_case_insensitive_rules(tmp_path: Path) -> None:
+    primary = tmp_path / "RESULT.JSON"
+    primary.write_text("{}\n", encoding="utf-8")
+    companions = [
+        tmp_path / "RESULT.PLANS.JSON",
+        tmp_path / "RESULT.TUNING.JSON",
+        tmp_path / "RESULT.MANIFEST.JSON",
+        tmp_path / "SUBMISSION-MANIFEST.JSON",
+    ]
+    for companion in companions:
+        companion.write_text("{}\n", encoding="utf-8")
+
+    selected = [path.name for path in sorted(tmp_path.rglob("*")) if is_primary_bundle_file(path)]
+
+    assert selected == ["RESULT.JSON"]
 
 
 def test_corpus_checks_out_with_lf_on_every_platform() -> None:

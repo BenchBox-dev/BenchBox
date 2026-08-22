@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "1452987abd5b22d3988f558f7cbbfedd21ac569746b3d5dde78c489dc1e50d8a",
+  "contract_sha256": "3a1ef4bc027dbe8db18f1e44db0afc79f3b01e7a5e615aba3d09cfdded890e19",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -1124,8 +1124,8 @@
       },
       {
         "header": "pr-review-followups-list:",
-        "recipe": "\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\")",
-        "recipe_sha256": "d8fbabb6a0adedd4c0e4ccc612304b248b7f4459f7841c5a46564e44d8931723"
+        "recipe": "\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_RESOLVED)),--include-resolved) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_FAIL_ON_PENDING)),--fail-on-pending) \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\")",
+        "recipe_sha256": "15af64c2d95acde8c5e6b4eaf3141f5524f00629ea207c84a542f3edc6f3c633"
       }
     ],
     "pr-status": [
@@ -1892,7 +1892,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "2efde7fd7e1d2fe30118dcac68cd11af326e0e4ee09875349798fd35f4c2407d",
+  "semantic_sha256": "1fadf4616e202adb5c61633e60e2f4cfacfe3110ba8c4b5d2d1c2766017180a1",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -1923,6 +1923,18 @@
       "kind": "variable",
       "name": "PR_REVIEW_MAX_COMMENTS",
       "sha256": "6ef38ceea950544c328d57c9e3270f007160be528928143e54bf3b2572fc76dd"
+    },
+    {
+      "body": "PR_REVIEW_INCLUDE_RESOLVED ?= 0",
+      "kind": "variable",
+      "name": "PR_REVIEW_INCLUDE_RESOLVED",
+      "sha256": "b3580c2d9a6eac4f66ca8556373515fcc1fdb5f9ca96bd42617cb8e3efcf9f4b"
+    },
+    {
+      "body": "PR_REVIEW_FAIL_ON_PENDING ?= 0",
+      "kind": "variable",
+      "name": "PR_REVIEW_FAIL_ON_PENDING",
+      "sha256": "f7649a5d676b5d13c16222b93780c2f6d74abd8bc51ed1dca0faeb4c9801aee5"
     },
     {
       "body": "PR_REVIEW_EXECUTOR_SANDBOX ?= workspace-write",
@@ -3545,9 +3557,9 @@
       ]
     },
     {
-      "body": "pr-review-followups-list:\n\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\")",
+      "body": "pr-review-followups-list:\n\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_RESOLVED)),--include-resolved) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_FAIL_ON_PENDING)),--fail-on-pending) \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\")",
       "kind": "rule",
-      "sha256": "d60b7ee3b37d6b2629137d80cb71bf27bec5f815efcf3db0390331abb4daae51",
+      "sha256": "16658e3c4e23217a4e00d93c2b5fe6649fbb45e1a7e90f72190d1ab03045b7c3",
       "targets": [
         "pr-review-followups-list"
       ]
@@ -4161,6 +4173,20 @@
     "PR_REVIEW_EXECUTOR_SANDBOX": [
       {
         "body": "PR_REVIEW_EXECUTOR_SANDBOX ?= workspace-write",
+        "directive": "",
+        "operator": "?="
+      }
+    ],
+    "PR_REVIEW_FAIL_ON_PENDING": [
+      {
+        "body": "PR_REVIEW_FAIL_ON_PENDING ?= 0",
+        "directive": "",
+        "operator": "?="
+      }
+    ],
+    "PR_REVIEW_INCLUDE_RESOLVED": [
+      {
+        "body": "PR_REVIEW_INCLUDE_RESOLVED ?= 0",
         "directive": "",
         "operator": "?="
       }

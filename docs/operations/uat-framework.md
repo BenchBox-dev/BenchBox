@@ -830,12 +830,15 @@ fails):
 uv run -- python -m tests.uat.clickhouse_memory \
   --output "$BENCHBOX_OUTPUT_DIR/clickhouse-memory-baseline-1g.json" \
   --rung baseline-1g \
-  --engine mocker \
+  --engine docker \
   --project-name <managed-compose-project> \
   --compose-file docker/clickhouse/docker-compose.yml \
   -- -- uv run -- benchbox run --platform clickhouse-server \
        --benchmark tpch --scale 0.01 --phases load
 ```
+
+The SF1 certification trace runs on Linux with Docker. A macOS smoke may use
+`--engine mocker`, but it is not SF1 certification evidence.
 
 Run a small smoke cell first. Only if that trace is responsive and free of
 OOM/cgroup-kill/timeout evidence should the same rung be tried at SF1. Advance
@@ -865,8 +868,8 @@ host reserve.
 
 ClickHouse is the exception to the generic "declared limit or engine default"
 diagnostic above. Its managed UAT compose file requires the caller to resolve
-`preflight.clickhouse_memory_limit` (default `8g`, the calibration-selected
-SF1 rung) into `CLICKHOUSE_MEMORY_LIMIT`; the compose file has no `:-1g` or
+`preflight.clickhouse_memory_limit` (currently configured as the `8g` SF1
+candidate) into `CLICKHOUSE_MEMORY_LIMIT`; the compose file has no `:-1g` or
 other fallback. A missing, empty, or malformed request is an admission error
 before `compose up`, never a reason to recreate the historical 1 GiB batch.
 An operator override is allowed only when it names a separately measured
@@ -885,9 +888,11 @@ driver batch size. The existing `free_memory_min_gib: 0` setting remains an
 explicit, supervised opt-out of the pre-start floor, but it does not permit
 an unverified ClickHouse runtime limit or post-start reserve shortfall.
 
-#### Why the selected rung is 8 GiB
+#### Why the current candidate is 8 GiB
 
-The 8 GiB rung is a ceiling with headroom, not a measured demand. The failed
+No SF1 rung has been selected yet: `select_lowest_successful_rung()` has no
+valid passing Linux trace to consume. The configured 8 GiB candidate is a
+ceiling with headroom, not a measured demand. The failed
 SF1 4 GiB trace (`clickhouse-memory-sf1-4g.json`, 2026-08-13) recorded
 `peak_engine_usage_bytes = 3.4 GB` and a peak `metric.MemoryTracking` of
 3.21 GB at t=127s of a 142-second load, back down to 589 MB by the final
@@ -898,7 +903,9 @@ SF1 TPC-H is about 1.26 GB of compressed input. ClickHouse also derives its
 own server-wide cap from the RAM it detects, so the 4 GiB run tripped at
 "would use 3.51 GiB" against a 3.73 GiB cgroup, roughly 94% of the cap; a
 larger container raises that internal ceiling while the working peak stays
-put. 8 GiB is simply the next rung above the one that failed.
+put. 8 GiB is simply the next rung above the one that failed; it remains
+pending until a valid passing Linux trace establishes the lowest successful
+rung.
 
 Note that on macOS the container runs inside a Linux VM, so the request is
 backed by host RAM plus VM overhead and the effective host cost is roughly
