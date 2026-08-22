@@ -207,7 +207,9 @@ def test_soundness_unions_base_ref_and_pr_copy_predicates() -> None:
     """
     text = AUTO_MERGE_WORKFLOW.read_text(encoding="utf-8")
     assert "predicate_base.py" in text
-    assert 'git show "origin/${{ github.base_ref }}:_project/scripts/auto_merge_soundness_paths.py"' in text
+    assert (
+        "git show \"origin/${{ github.base_ref || 'develop' }}:_project/scripts/auto_merge_soundness_paths.py\"" in text
+    )
     # PR checkout copy is evaluated for the union (widening).
     assert "python3 _project/scripts/auto_merge_soundness_paths.py --stdin --format github-output" in text
     # Union is OR of both results.

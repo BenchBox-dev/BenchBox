@@ -23,6 +23,8 @@ on:
     # browser jobs skip when nothing relevant changed, and the gate job always
     # reports.
     branches: [ release, develop ]
+  merge_group:
+    branches: [ release, develop ]
   workflow_dispatch:
 
 permissions:
@@ -30,7 +32,7 @@ permissions:
 
 # The browser suite is expensive - cancel superseded runs on the same branch.
 concurrency:
-  group: results-explorer-browser-${{ github.ref }}
+  group: results-explorer-browser-${{ github.event_name == 'merge_group' && github.event.merge_group.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
