@@ -1,3 +1,9 @@
+---
+develop_sha: 626d829a0b7320e229f9f696296570ec51928c01
+measured_at_sha: fb293ede62528c92c21df940e93f557e7ea46be2
+checked_sha: fb293ede62528c92c21df940e93f557e7ea46be2
+---
+
 # Audit: Native Merge Queue Canary Rehearsal & Validation
 
 Date: 2026-08-22
