@@ -1,8 +1,7 @@
 # Decision: Transfer BenchBox to GitHub organization `BenchBox-dev`
 
 Date: 2026-08-21
-Status: Accepted for planning and pre-transfer in-repo work. Transfer itself
-is operator-only and remains behind gates G0+G1+G2+G3.
+Status: Complete. Transfer executed and G0–G7 verified 2026-08-22.
 Destination: `https://github.com/BenchBox-dev/BenchBox`
 Source: `https://github.com/joeharris76/BenchBox`
 
@@ -109,3 +108,14 @@ apex is 200, then Verify on `BenchBox-dev`.
 
 Phase 1/6 PRs revert on `develop`. Transfer org→user is last resort
 (Pages flaps twice). Queue disable is N/A (must not be enabled).
+
+## Execution and closeout (2026-08-22)
+
+1. **G0–G2:** Org hardened, PAT policy pinned, PyPI trusted publisher configured for `BenchBox-dev/BenchBox`.
+2. **G3–G4:** Freeze observed, transfer executed via API to `BenchBox-dev/BenchBox`.
+3. **G5 / G5b:** Admin state rebuilt, environment branch policies restored, Pages serving verified (apex 200, www 301->200).
+4. **G6:** Pin update PR #1803 merged to `develop` without touching soundness prefixes.
+5. **G7:** Old git redirect (`joeharris76/BenchBox.git`), release asset downloads, active workflow schedules (30 active), and Codecov integration verified.
+6. **G7b:** Handed off to tracker item `github-org-transfer-05-pages-publish-path` to verify Pages publish on the next push to `release`.
+7. **Merge queue & base refresh:** Native merge queue remains disabled; `SHADOW_ONLY` activation still governs; `strict-base-refresh-07b` remains dropped.
+8. **Local remotes:** Worktrees and local clones may retarget `origin` via `git remote set-url origin https://github.com/BenchBox-dev/BenchBox.git`.
