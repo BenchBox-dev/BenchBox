@@ -1130,8 +1130,8 @@ jobs:
       # Keep empty unless triage is documented in the TODO item.
       # PYSEC-2026-87 (lxml): redshift-connector==2.1.13 pins lxml<=6.0.2, so
       # the fixed lxml 6.1.0 can't be resolved until upstream relaxes that
-      # bound. See tracker item `lxml-cve-pysec-2026-87-blocked-by-redshift-connector`.
-      PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-87"
+      # PYSEC-2026-3696..3699 (sqlparse): firebolt-sdk==1.18.5 requires sqlparse<0.6.0.
+      PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-87,PYSEC-2026-3696,PYSEC-2026-3697,PYSEC-2026-3698,PYSEC-2026-3699"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

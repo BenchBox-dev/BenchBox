@@ -94,7 +94,7 @@ def test_lifecycle_commands_receive_identity_and_actor(monkeypatch: pytest.Monke
         "--project-id",
         "benchbox",
         "--repository",
-        "https://github.com/BenchBox-dev/BenchBox",
+        "https://github.com/joeharris76/BenchBox",
     ]
     assert argv[command_position:] == ["claim", "item"]
 
