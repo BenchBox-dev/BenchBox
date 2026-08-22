@@ -58,7 +58,13 @@ audit_commit_range = agent_instruction_audit.audit_commit_range
 
 
 def _candidate(tmp_path: Path) -> Path:
-    for relative in (*ACTIVE_TEXT, CANONICAL_REVIEW_SKILL, CANONICAL_COMMIT_SKILL, ".claude/settings.json"):
+    for relative in (
+        *ACTIVE_TEXT,
+        CANONICAL_REVIEW_SKILL,
+        CANONICAL_COMMIT_SKILL,
+        ".claude/settings.json",
+        "pyproject.toml",
+    ):
         source = ROOT / relative
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -617,7 +623,16 @@ def test_every_error_names_the_check_that_produced_it(tmp_path: Path) -> None:
     (project / "AGENTS.md").write_text("Co-Authored-By: Claude\n", encoding="utf-8")
     _, errors = audit(project, CORPUS)
     assert errors, "the mutated candidate must fail, or this asserts nothing"
-    known = {"budget", "surface", "review-policy", "commit-policy", "scenarios", "git-identity", "commit-range"}
+    known = {
+        "budget",
+        "surface",
+        "review-policy",
+        "commit-policy",
+        "dependency-caps",
+        "scenarios",
+        "git-identity",
+        "commit-range",
+    }
     unattributed = [error for error in errors if error.split(":", 1)[0] not in known]
     assert not unattributed, f"errors with no check name: {unattributed}"
 
@@ -674,3 +689,46 @@ def test_the_precommit_hook_name_does_not_claim_a_single_check() -> None:
     assert "instruction" in hook["name"].casefold(), (
         f"hook name {hook['name']!r} names only the identity check while running the whole audit"
     )
+
+
+def test_advertised_dependency_cap_behind_the_manifest_fails(tmp_path: Path) -> None:
+    """The exact drift that shipped: AGENTS.md said `pyarrow<24`, manifest said <25."""
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    agents.write_text(agents.read_text().replace("`pyarrow<25`", "`pyarrow<24`"))
+    _, errors = audit(project, CORPUS)
+    assert any("pyarrow" in error and "dependency-caps" in error for error in errors)
+
+
+def test_advertised_cap_without_a_manifest_bound_fails(tmp_path: Path) -> None:
+    """An advertised cap for a dependency the manifest never bounds is drift too."""
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    agents.write_text(agents.read_text().replace("`duckdb<2`", "`nonexistentpkg<9`"))
+    _, errors = audit(project, CORPUS)
+    assert any("nonexistentpkg" in error and "declares no upper bound" in error for error in errors)
+
+
+def test_optional_dependency_caps_are_honoured(tmp_path: Path) -> None:
+    """`duckdb` is bounded only under optional-dependencies; that must still count."""
+    project = _candidate(tmp_path)
+    _, errors = audit(project, CORPUS)
+    assert not [error for error in errors if "duckdb" in error]
+
+
+def test_advertised_cap_is_not_accepted_as_a_version_prefix(tmp_path: Path) -> None:
+    """`sqlglot<3` must not pass merely because the manifest says `<31.0.0`."""
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    agents.write_text(agents.read_text().replace("`sqlglot<31`", "`sqlglot<3`"))
+    _, errors = audit(project, CORPUS)
+    assert any("sqlglot<3" in error and "<31.0.0" in error for error in errors)
+
+
+def test_each_independent_optional_dependency_keeps_the_advertised_cap(tmp_path: Path) -> None:
+    """A bound in `dev` must not hide a missing bound in the `duckdb` extra."""
+    project = _candidate(tmp_path)
+    manifest = project / "pyproject.toml"
+    manifest.write_text(manifest.read_text().replace('duckdb = ["duckdb>=1.0.0,<2.0.0"]', 'duckdb = ["duckdb>=1.0.0"]'))
+    _, errors = audit(project, CORPUS)
+    assert any("project.optional-dependencies.duckdb" in error and "without that bound" in error for error in errors)
