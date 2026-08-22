@@ -15,6 +15,7 @@ import {
   resultIdentityAriaLabel,
   resultReceiptHref,
   visibleResultIdForRow,
+  MAX_COMPARE_SELECTIONS,
 } from "@/lib/resultLinks";
 import { stringSerde, useUrlState } from "@/lib/useUrlState";
 import {
@@ -455,6 +456,25 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const zeroSelectableReasons = summarizeCompareExclusionReasons(
     matrixCompareRows.map((row) => row.comparison_exclusion_reason),
   );
+  const matrixSummary = analysisSummary ?? filteredSummary;
+  const selectionAwareMatrixSummary =
+    matrixSummary && selectedIds.size >= MAX_COMPARE_SELECTIONS
+      ? {
+          ...matrixSummary,
+          platforms: matrixSummary.platforms.map((row) =>
+            selectedIds.has(compareIdForRow(row))
+              ? row
+              : {
+                  ...row,
+                  comparison_exclusion_reason: `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared.`,
+                },
+          ),
+        }
+      : matrixSummary;
+
+  const updateSelectedIds = (next: Set<string>) => {
+    if (next.size <= MAX_COMPARE_SELECTIONS) setSelectedIds(next);
+  };
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -714,9 +734,9 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             </div>
           ) : (
             <QueryHeatmap
-              summary={analysisSummary ?? filteredSummary}
+              summary={selectionAwareMatrixSummary ?? filteredSummary}
               selectedIds={selectedIds}
-              onSelectionChange={setSelectedIds}
+              onSelectionChange={updateSelectedIds}
               highContrast={highContrast}
             />
           )}
