@@ -691,49 +691,6 @@ def test_the_precommit_hook_name_does_not_claim_a_single_check() -> None:
     )
 
 
-def test_advertised_dependency_cap_behind_the_manifest_fails(tmp_path: Path) -> None:
-    """The exact drift that shipped: AGENTS.md said `pyarrow<24`, manifest said <25."""
-    project = _candidate(tmp_path)
-    agents = project / "AGENTS.md"
-    agents.write_text(agents.read_text().replace("`pyarrow<25`", "`pyarrow<24`"))
-    _, errors = audit(project, CORPUS)
-    assert any("pyarrow" in error and "dependency-caps" in error for error in errors)
-
-
-def test_advertised_cap_without_a_manifest_bound_fails(tmp_path: Path) -> None:
-    """An advertised cap for a dependency the manifest never bounds is drift too."""
-    project = _candidate(tmp_path)
-    agents = project / "AGENTS.md"
-    agents.write_text(agents.read_text().replace("`duckdb<2`", "`nonexistentpkg<9`"))
-    _, errors = audit(project, CORPUS)
-    assert any("nonexistentpkg" in error and "declares no upper bound" in error for error in errors)
-
-
-def test_optional_dependency_caps_are_honoured(tmp_path: Path) -> None:
-    """`duckdb` is bounded only under optional-dependencies; that must still count."""
-    project = _candidate(tmp_path)
-    _, errors = audit(project, CORPUS)
-    assert not [error for error in errors if "duckdb" in error]
-
-
-def test_advertised_cap_is_not_accepted_as_a_version_prefix(tmp_path: Path) -> None:
-    """`sqlglot<3` must not pass merely because the manifest says `<31.0.0`."""
-    project = _candidate(tmp_path)
-    agents = project / "AGENTS.md"
-    agents.write_text(agents.read_text().replace("`sqlglot<31`", "`sqlglot<3`"))
-    _, errors = audit(project, CORPUS)
-    assert any("sqlglot<3" in error and "<31.0.0" in error for error in errors)
-
-
-def test_each_independent_optional_dependency_keeps_the_advertised_cap(tmp_path: Path) -> None:
-    """A bound in `dev` must not hide a missing bound in the `duckdb` extra."""
-    project = _candidate(tmp_path)
-    manifest = project / "pyproject.toml"
-    manifest.write_text(manifest.read_text().replace('duckdb = ["duckdb>=1.0.0,<2.0.0"]', 'duckdb = ["duckdb>=1.0.0"]'))
-    _, errors = audit(project, CORPUS)
-    assert any("project.optional-dependencies.duckdb" in error and "without that bound" in error for error in errors)
-
-
 def test_audit_entry_point_imports_without_third_party_packages() -> None:
     """`.github/workflows/pr.yml` runs this file with bare `python3` before `uv sync`.
 
@@ -747,35 +704,6 @@ def test_audit_entry_point_imports_without_third_party_packages() -> None:
     assert not offenders, f"audit entry point imports non-stdlib modules: {offenders}"
 
 
-def test_dependency_group_cap_drift_is_caught(tmp_path: Path) -> None:
-    """CI installs with `uv sync --group dev`, so a cap dropped there is real drift."""
-    project = _candidate(tmp_path)
-    manifest = project / "pyproject.toml"
-    text = manifest.read_text(encoding="utf-8")
-    head, marker, tail = text.partition("[dependency-groups]")
-    manifest.write_text(head + marker + tail.replace('"duckdb>=1.0.0,<2.0.0"', '"duckdb>=1.0.0"', 1))
-    _, errors = audit(project, CORPUS)
-    assert any("duckdb" in error and "without that bound" in error for error in errors)
-
-
-def test_a_shorter_advertised_cap_does_not_prefix_match(tmp_path: Path) -> None:
-    """`sqlglot<3` must not pass against a manifest bound of `<31.0.0`."""
-    project = _candidate(tmp_path)
-    agents = project / "AGENTS.md"
-    agents.write_text(agents.read_text().replace("`sqlglot<31`", "`sqlglot<3`"))
-    _, errors = audit(project, CORPUS)
-    assert any("sqlglot" in error and "pins <31" in error for error in errors)
-
-
-def test_a_non_plain_advertised_cap_is_rejected_not_ignored(tmp_path: Path) -> None:
-    """An advertised `<=` used to be dropped by the parser and silently pass."""
-    project = _candidate(tmp_path)
-    agents = project / "AGENTS.md"
-    agents.write_text(agents.read_text().replace("`pyarrow<25`", "`pyarrow<=25`"))
-    _, errors = audit(project, CORPUS)
-    assert any("pyarrow<=25" in error and "not a plain" in error for error in errors)
-
-
 def test_missing_review_depth_binding_fails_the_parity_audit(tmp_path: Path) -> None:
     """REVIEW-PARITY-001 requires REVIEW-DEPTH-001; the audit must enforce it."""
     project = _candidate(tmp_path)
@@ -783,3 +711,26 @@ def test_missing_review_depth_binding_fails_the_parity_audit(tmp_path: Path) -> 
     protocol.write_text(re.sub(r"- `\[REVIEW-DEPTH-001\]`.*?\n(?=- )", "", protocol.read_text(), flags=re.S))
     _, errors = audit(project, CORPUS)
     assert any("REVIEW-DEPTH-001" in error for error in errors)
+
+
+def test_restating_a_dependency_cap_in_agents_md_fails(tmp_path: Path) -> None:
+    """`pyproject.toml` owns the bounds; a restated copy drifted once already."""
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    agents.write_text(agents.read_text().replace("- Upper bounds exceptional;", "- Caps: `pyarrow<25`;"))
+    _, errors = audit(project, CORPUS)
+    assert any("restates dependency caps" in error and "pyarrow<25" in error for error in errors)
+
+
+def test_the_cap_guard_is_not_defeated_by_same_line_placement(tmp_path: Path) -> None:
+    """An exemption keyed on the pointer text would be bypassed by one line."""
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    agents.write_text(
+        agents.read_text().replace(
+            "- Upper bounds exceptional;",
+            "- Upper bounds exceptional. Caps: `duckdb<2`;",
+        )
+    )
+    _, errors = audit(project, CORPUS)
+    assert any("restates dependency caps" in error and "duckdb<2" in error for error in errors)

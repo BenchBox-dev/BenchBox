@@ -118,7 +118,7 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-commit]
-        files: ^(AGENTS\.md|CLAUDE\.md|GEMINI\.md|ANTIGRAVITY\.md|\.claude/(commands/|settings\.json)|\.claude/skills/|docs/(agent/|operations/agent-instruction)|_project/(evals/agent-instructions/|scripts/agent_instruction_audit\.py)|skill-sync\.(yaml|lock)|pyproject\.toml)
+        files: ^(AGENTS\.md|CLAUDE\.md|GEMINI\.md|ANTIGRAVITY\.md|\.claude/(commands/|settings\.json)|\.claude/skills/|docs/(agent/|operations/agent-instruction)|_project/(evals/agent-instructions/|scripts/agent_instruction_audit\.py)|skill-sync\.(yaml|lock))
 
       # Enforce the linked-worktree boundary at the last safe point before Git
       # creates a commit object. The same declarations accepted by the session

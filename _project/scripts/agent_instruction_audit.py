@@ -480,137 +480,30 @@ def audit_commit_range(project: Path, base_ref: str) -> list[str]:
     return errors
 
 
-def _requirement_name(requirement: str) -> str:
-    """Leading distribution name of a PEP 508 requirement string."""
-    match = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", requirement)
-    return match.group(1) if match else ""
-
-
-def _normalize(name: str) -> str:
-    """PEP 503 normalized name, so `foo_bar` and `Foo-Bar` compare equal."""
-    return re.sub(r"[-_.]+", "-", name).casefold()
-
-
-def _version_tuple(version: str) -> tuple[int, ...] | None:
-    """Numeric release components, or None when the version is not comparable."""
-    release = re.match(r"(\d+(?:\.\d+)*)", version.strip())
-    if not release:
-        return None
-    return tuple(int(part) for part in release.group(1).split("."))
-
-
-def _upper_bounds(requirement: str) -> list[str]:
-    """Every `<` bound in a requirement, excluding `<=`."""
-    specifier = requirement.split(";", 1)[0]
-    return re.findall(r"<(?!=)\s*([0-9][0-9A-Za-z_.*+!-]*)", specifier)
-
-
-def _manifest_requirements(manifest: str) -> dict[str, list[str]]:
-    """Quoted requirement strings per dependency table, stdlib-only.
-
-    Deliberately not `tomllib`/`tomli`/`packaging`: `.github/workflows/pr.yml`
-    runs this file with bare `python3` before `uv sync`, so a non-stdlib import
-    here hard-fails the required skill-integrity lane. 3.10 is also supported
-    and has no `tomllib`.
-    """
-    groups: dict[str, list[str]] = {}
-    table = ""
-    key = ""
-    for line in manifest.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("["):
-            table = stripped.strip("[]")
-            key = ""
-            continue
-        assignment = re.match(r"([A-Za-z0-9._-]+)\s*=", stripped)
-        if assignment:
-            key = assignment.group(1)
-        if table not in {"project", "project.optional-dependencies", "dependency-groups"}:
-            continue
-        if table == "project" and key != "dependencies":
-            continue
-        label = table if table != "project" else "project.dependencies"
-        if table != "project" and key:
-            label = f"{table}.{key}"
-        for quoted in re.findall(r'"([^"]+)"', stripped):
-            if _requirement_name(quoted):
-                groups.setdefault(label, []).append(quoted)
-    return groups
-
-
 def audit_dependency_caps(project: Path) -> list[str]:
-    """Pin AGENTS.md's advertised dependency caps to `pyproject.toml`.
+    """Forbid AGENTS.md restating dependency version caps.
 
-    AGENTS.md restates upper bounds so an agent does not have to open the
-    manifest. A restated fact drifts silently: the file advertised
-    `pyarrow<24` while the manifest had moved to `<25`. This is the
-    deterministic invariant `docs/operations/agent-instruction-evaluation.md`
-    asks for -- it fails the audit instead of relying on a reader noticing.
+    `pyproject.toml` owns the bounds and carries the rationale inline;
+    `docs/development/dependency-compatibility.md` explains them. AGENTS.md
+    used to restate the list as a convenience, and it drifted silently --
+    advertising `pyarrow<24` long after the manifest moved to `<25`.
 
-    Every dependency table is scanned, `[dependency-groups]` included: CI
-    installs with `uv sync --group dev`, so a cap dropped there is a cap the
-    real install path loses.
+    A synchronization check would have to run forever to keep a duplicate
+    honest. Deleting the duplicate ends the drift class instead, so this
+    invariant guards the deletion: reintroducing a restated cap fails the
+    audit. It is deliberately the inverse of the check it replaces.
     """
-    errors: list[str] = []
     agents = _read(project, "AGENTS.md")
-    caps_line = next((line for line in agents.splitlines() if "Current caps" in line), "")
-    if not caps_line:
-        return ["AGENTS.md does not advertise dependency caps"]
-
-    _, _, tail = caps_line.partition("Current caps")
-    entries = re.findall(r"`([^`]+)`", tail.partition(":")[2])
-    advertised: dict[str, str] = {}
-    for entry in entries:
-        parsed = re.fullmatch(r"([A-Za-z0-9][A-Za-z0-9._-]*)<([0-9][0-9A-Za-z_.]*)", entry.strip())
-        if not parsed:
-            errors.append(f"AGENTS.md caps entry `{entry}` is not a plain `name<version`")
-            continue
-        advertised[parsed.group(1)] = parsed.group(2)
-    if not advertised:
-        return errors or ["AGENTS.md dependency caps line has no parsable `name<version` entries"]
-
-    try:
-        manifest = (project / "pyproject.toml").read_text(encoding="utf-8")
-    except OSError as exc:
-        return [*errors, f"cannot read pyproject.toml: {exc}"]
-    requirement_groups = _manifest_requirements(manifest)
-
-    for name, cap in sorted(advertised.items()):
-        wanted = _version_tuple(cap)
-        if wanted is None:
-            errors.append(f"AGENTS.md advertises `{name}<{cap}` with an uncomparable version")
-            continue
-        matches = [
-            (label, requirement)
-            for label, requirements in requirement_groups.items()
-            for requirement in requirements
-            if _normalize(_requirement_name(requirement)) == _normalize(name)
+    # No per-line exemption: an exemption keyed on the pointer text would be
+    # defeated by putting the caps on the same line as the pointer.
+    offenders = re.findall(r"`([A-Za-z0-9][A-Za-z0-9._-]*\s*<=?\s*[0-9][0-9A-Za-z_.]*)`", agents)
+    if offenders:
+        return [
+            "AGENTS.md restates dependency caps ("
+            + ", ".join(sorted(set(offenders)))
+            + "); pyproject.toml owns them and docs/development/dependency-compatibility.md explains them"
         ]
-        if not matches:
-            errors.append(f"AGENTS.md advertises `{name}<{cap}` but pyproject.toml declares no upper bound for it")
-            continue
-        # An unconditional core requirement constrains every install, so extras
-        # may restate the package without repeating the bound. A core entry
-        # carrying an environment marker does not constrain every install, so
-        # in that case each declaration must carry the cap itself.
-        core = [
-            (label, requirement)
-            for label, requirement in matches
-            if label == "project.dependencies" and ";" not in requirement
-        ]
-        checks = core if any(_upper_bounds(requirement) for _, requirement in core) else matches
-        for label, requirement in checks:
-            bounds = _upper_bounds(requirement)
-            if not bounds:
-                errors.append(
-                    f"AGENTS.md advertises `{name}<{cap}` but [{label}] declares `{requirement}` without that bound"
-                )
-                continue
-            for bound in bounds:
-                found = _version_tuple(bound)
-                if found is None or found[: len(wanted)] != wanted:
-                    errors.append(f"AGENTS.md advertises `{name}<{cap}` but [{label}] pins <{bound}")
-    return errors
+    return []
 
 
 def audit_scenarios(scenarios: list[dict[str, Any]], policy_text: str) -> list[str]:
