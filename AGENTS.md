@@ -137,7 +137,8 @@ never claimable items).
 ## BenchBox invariants
 
 - Timing durations use `benchbox.utils.clock.mono_time()` and `elapsed_seconds()`; wall clocks are event/audit only.
-- Adapter SDK imports stay lazy. New SQL platforms subclass `PlatformAdapter` and register with `@register_platform`.
+- Adapter SDK imports stay lazy. New platforms follow `docs/development/adding-new-platforms.md` (manifest-driven;
+  decorator discovery was rejected) and must pass `make platform-manifest-check`.
 - CREATE TABLE rewrites are registered under `Phase.DDL_OPTIMIZE`; run `make compat-docs-check` and DDL drift check.
 - CLI dry runs must propagate explicit phases; deterministic runs use a seed.
 - Green focused/fast tests are not UAT or production certification.
