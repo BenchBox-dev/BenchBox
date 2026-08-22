@@ -117,7 +117,7 @@ def test_backstop_workflow_uses_shared_predicate_and_skips_auto_merge() -> None:
     # auto-merge-predicate-base-ref-execution: base-ref copy must still run so
     # a PR that narrows the predicate can't judge its own diff by its own rules.
     assert (
-        'git show "origin/${{ github.base_ref }}:_project/scripts/auto_merge_soundness_paths.py" > /tmp/predicate_base.py'
+        "git show \"origin/${{ github.base_ref || 'develop' }}:_project/scripts/auto_merge_soundness_paths.py\" > /tmp/predicate_base.py"
         in workflow
     )
     assert "python3 /tmp/predicate_base.py --stdin --format github-output" in workflow

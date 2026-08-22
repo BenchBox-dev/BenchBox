@@ -6,7 +6,9 @@ import importlib.util
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -33,7 +35,7 @@ CI_PATHS_OUTPUT_REFERENCE_RE = (
 )
 
 
-def _load_path_filter_decision():
+def _load_path_filter_decision() -> Any:
     """Load scripts/path_filter_decision.py the way the workflow uses it.
 
     tests/unit/scripts/ has a conftest sys.path shim; here we load by file
@@ -41,6 +43,9 @@ def _load_path_filter_decision():
     `load_rules` + `extra_group_keys` logic the classify step runs (output
     naming additionally mirrors write_github_output's `_`→`-` mapping).
     """
+    scripts_dir = str(REPO_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
     script = REPO_ROOT / "scripts" / "path_filter_decision.py"
     spec = importlib.util.spec_from_file_location("path_filter_decision_lockstep", script)
     assert spec is not None and spec.loader is not None

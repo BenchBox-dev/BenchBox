@@ -78,7 +78,7 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch base branch
-        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+        run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
 
       - name: Check explicit hold label
         id: hold
@@ -107,12 +107,12 @@ jobs:
           # source path. With rename detection on, `git diff` reports only the
           # (unprotected) destination, so a PR that removes a soundness-critical
           # file via rename would slip past the gate.
-          diff_paths="$(git diff --name-only --no-renames "origin/${{ github.base_ref }}...HEAD")"
+          diff_paths="$(git diff --name-only --no-renames "origin/${{ github.base_ref || 'develop' }}...HEAD")"
 
           # (a) BASE-REF copy: a PR that narrows SOUNDNESS_PREFIXES must still be
           # judged by develop's rules, not its own. The base branch is already
           # fetched by the preceding "Fetch base branch" step.
-          git show "origin/${{ github.base_ref }}:_project/scripts/auto_merge_soundness_paths.py" > /tmp/predicate_base.py
+          git show "origin/${{ github.base_ref || 'develop' }}:_project/scripts/auto_merge_soundness_paths.py" > /tmp/predicate_base.py
           base_result="$(printf '%s\n' "$diff_paths" | python3 /tmp/predicate_base.py --stdin --format github-output)"
 
           # (b) PR checkout copy: a gate *widened* in this PR still revokes

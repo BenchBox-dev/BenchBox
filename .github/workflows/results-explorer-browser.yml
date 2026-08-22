@@ -50,13 +50,13 @@ jobs:
       - name: Detect explorer-relevant changes
         id: detect
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
           set -euo pipefail
-          # Anything that is not a pull_request (push, workflow_dispatch)
+          # Anything that is not a pull_request or merge_group (push, workflow_dispatch)
           # already passed the `on.push.paths` filter or was requested by hand,
           # so it always runs the suite.
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
+          if [ "${{ github.event_name }}" != "pull_request" ] && [ "${{ github.event_name }}" != "merge_group" ]; then
             echo "needed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
