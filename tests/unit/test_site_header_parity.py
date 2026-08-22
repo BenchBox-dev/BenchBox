@@ -19,7 +19,7 @@ EXPECTED_LINKS = [
     ("Blog", "https://benchbox.dev/blog/"),
     ("Results", "https://benchbox.dev/results/"),
     ("Instruct an agent", "https://benchbox.dev/prompts/"),
-    ("GitHub", "https://github.com/joeharris76/BenchBox"),
+    ("GitHub", "https://github.com/BenchBox-dev/BenchBox"),
     ("Run benchmark", "https://benchbox.dev/docs/usage/installation.html"),
 ]
 

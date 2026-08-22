@@ -647,7 +647,7 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         self.log_verbose(f"  Downloading BTS data: {year}-{month:02d}")
 
         req = urllib.request.Request(
-            url, headers={"User-Agent": "BenchBox/1.0 (https://github.com/joeharris76/BenchBox)"}
+            url, headers={"User-Agent": "BenchBox/1.0 (https://github.com/BenchBox-dev/BenchBox)"}
         )
         with urllib.request.urlopen(req, timeout=120) as response:
             zip_bytes = response.read()

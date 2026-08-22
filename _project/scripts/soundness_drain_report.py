@@ -86,7 +86,7 @@ FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "soundness_drain_fixture.json"
 # need the owner's eyes (e.g. a manual review request on a normal PR).
 OWNER_LOGIN = "joeharris76"
 
-DEFAULT_REPO = "joeharris76/BenchBox"
+DEFAULT_REPO = "BenchBox-dev/BenchBox"
 DRAIN_LABEL = "awaiting-owner"
 DRAIN_LABEL_COLOR = "b60205"
 DRAIN_LABEL_DESCRIPTION = "Green, gated on owner review, parked >24h (see docs/operations/soundness-drain.md)"

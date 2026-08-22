@@ -72,7 +72,7 @@ https://benchbox.dev/docs/contributing-results.html
 
 ## Quick checklist
 
-1. Fork https://github.com/joeharris76/BenchBox (or use your existing fork).
+1. Fork https://github.com/BenchBox-dev/BenchBox (or use your existing fork).
 2. Copy the contents of `bundle/` into `results-data/bundles/` in your fork.
 3. Copy the generated `<result>.manifest.json` alongside the bundle files.
 4. Regenerate the corpus inventory before you commit:
@@ -92,7 +92,7 @@ https://benchbox.dev/docs/contributing-results.html
 ## Questions?
 
 Open an issue or start a discussion at
-https://github.com/joeharris76/BenchBox.
+https://github.com/BenchBox-dev/BenchBox.
 
 For the full guide (trust labels, quality expectations, troubleshooting),
 see https://benchbox.dev/docs/contributing-results.html.

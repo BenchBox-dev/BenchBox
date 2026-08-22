@@ -976,7 +976,7 @@ run-test:
 # ---------------------------------------------------------------------------
 # Release flow (single-repo migration, version-branch model)
 # ---------------------------------------------------------------------------
-# These targets must be run from the public clone (origin -> joeharris76/BenchBox).
+# These targets must be run from the public clone (origin -> BenchBox-dev/BenchBox).
 # Do NOT invoke from the legacy private clone — it has no `origin` remote.
 #
 # Flow: develop -> v$(VERSION) -> (squash) release -> tag release -> release.yml publishes

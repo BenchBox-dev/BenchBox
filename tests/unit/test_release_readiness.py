@@ -200,11 +200,11 @@ def test_main_queries_trusted_default_branch(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_SHA", raising=False)
     monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_REASON", raising=False)
 
-    rc = release_readiness_check.main(["--head-sha", "release-head", "--repo", "joeharris76/BenchBox"])
+    rc = release_readiness_check.main(["--head-sha", "release-head", "--repo", "BenchBox-dev/BenchBox"])
 
     assert rc == 1
     assert captured_urls == [
-        "https://api.github.com/repos/joeharris76/BenchBox/actions/workflows/release-canary.yml/runs?"
+        "https://api.github.com/repos/BenchBox-dev/BenchBox/actions/workflows/release-canary.yml/runs?"
         "branch=develop&status=completed&per_page=20"
     ]
 

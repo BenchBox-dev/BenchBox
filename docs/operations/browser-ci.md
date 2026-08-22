@@ -47,8 +47,8 @@ Firefox and WebKit remain advisory (`non-blocking` in the job name,
 Live ruleset confirmation:
 
 ```bash
-gh api repos/joeharris76/BenchBox/rulesets --jq '.[] | select(.name=="develop-squash-only") | .id' \
-  | xargs -I{} gh api repos/joeharris76/BenchBox/rulesets/{} \
+gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[] | select(.name=="develop-squash-only") | .id' \
+  | xargs -I{} gh api repos/BenchBox-dev/BenchBox/rulesets/{} \
   --jq '.rules[]|select(.type=="required_status_checks")'
 ```
 

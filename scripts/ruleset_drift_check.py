@@ -358,7 +358,7 @@ def render_summary(findings: list[str], expected: dict[str, ExpectedRuleset]) ->
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runbook", type=Path, default=DEFAULT_RUNBOOK)
-    parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "joeharris76/BenchBox"))
+    parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox"))
     parser.add_argument("--token", default=os.environ.get("GITHUB_TOKEN", ""))
     parser.add_argument("--output", type=Path)
     parser.add_argument(

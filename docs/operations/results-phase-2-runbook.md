@@ -277,8 +277,8 @@ misleading, and whether a corrected resubmission is welcome.
 If the corpus is correct but the explorer build needs to rerun:
 
 ```bash
-gh workflow run docs.yml --repo joeharris76/BenchBox
-gh run watch --repo joeharris76/BenchBox
+gh workflow run docs.yml --repo BenchBox-dev/BenchBox
+gh run watch --repo BenchBox-dev/BenchBox
 ```
 
 Use `workflow_dispatch` only after confirming there is no newer push already

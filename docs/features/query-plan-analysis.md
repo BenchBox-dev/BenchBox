@@ -737,5 +737,5 @@ The comparison engine uses:
 ## Support
 
 For issues or questions:
-- [GitHub Issues](https://github.com/joeharris76/benchbox/issues)
+- [GitHub Issues](https://github.com/BenchBox-dev/benchbox/issues)
 - Check logs in `benchmark_runs/` for detailed error messages

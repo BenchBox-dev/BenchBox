@@ -94,7 +94,7 @@ class TestReleaseInfrastructure:
 
         # Check URLs point to correct repository
         urls = project["urls"]
-        expected_repo = "https://github.com/joeharris76/benchbox"
+        expected_repo = "https://github.com/BenchBox-dev/benchbox"
         assert urls["Homepage"] == expected_repo
         assert urls["Repository"] == f"{expected_repo}.git"
         assert urls["Bug Tracker"] == f"{expected_repo}/issues"
@@ -146,7 +146,7 @@ class TestReleaseInfrastructure:
             content = f.read()
 
         # Should have correct repository URL
-        assert "https://github.com/joeharris76/benchbox/issues" in content
+        assert "https://github.com/BenchBox-dev/benchbox/issues" in content
         # Should not have incorrect URLs
         assert "anthropics/claude-code" not in content
 
