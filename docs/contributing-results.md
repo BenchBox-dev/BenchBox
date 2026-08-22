@@ -105,7 +105,13 @@ uv run -- python scripts/generate_corpus_inventory.py --write
 
 ### 5. Review and merge
 
-A maintainer reviews the submission for quality and environment consistency. Once approved and merged into `published-results`, the bundle enters the public corpus. The Results Explorer is not built directly from `published-results`; the documented `docs.yml` workflow builds on the curated release path and deploys only after a protected push to `release`. The Explorer is a curated preview, not a broad leaderboard claim. See [`docs/operations/results-phase-2-runbook.md`](operations/results-phase-2-runbook.md#13-explorer-publish-path) for the publication path and launch evidence.
+A maintainer reviews the submission for quality and environment consistency. Once approved and merged into `published-results`, the bundle enters the public corpus.
+
+Maintainer-run refreshes are monthly via `.github/workflows/seed-corpus.yml`
+(see [`docs/operations/corpus-refresh.md`](operations/corpus-refresh.md)). That
+path is not a substitute for community `benchbox submit` PRs.
+
+The Results Explorer is not built directly from `published-results`; the documented `docs.yml` workflow builds on the curated release path and deploys only after a protected push to `release`. The Explorer is a curated preview, not a broad leaderboard claim. See [`docs/operations/results-phase-2-runbook.md`](operations/results-phase-2-runbook.md#13-explorer-publish-path) for the publication path and launch evidence.
 
 ## What Makes a Good Submission
 

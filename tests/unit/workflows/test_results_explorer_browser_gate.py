@@ -9,9 +9,10 @@ following hold:
 3. The gate job's `name:` (`Results Explorer browser gate`) is the context
    recorded in the admin runbook and in `docs/operations/browser-ci.md`.
 
-The live ruleset membership (develop ruleset `develop-squash-only` /
-15611785 requires that context) is not reachable from unit tests; pin the
+The live ruleset membership (develop ruleset `develop-squash-only`
+requires that context) is not reachable from unit tests; pin the
 documented agreement here and confirm the ruleset with `gh api` when triaging.
+The numeric ruleset id changes on repository transfer; the name does not.
 """
 
 from __future__ import annotations
@@ -79,7 +80,7 @@ def test_gate_context_matches_the_documented_required_check(workflow: dict[str, 
     assert GATE_CONTEXT in admin_runbook, "required gate context is not recorded in the repo admin runbook"
     browser_runbook = BROWSER_CI_RUNBOOK.read_text(encoding="utf-8")
     assert GATE_CONTEXT in browser_runbook, "required gate context is not recorded in docs/operations/browser-ci.md"
-    assert "15611785" in browser_runbook, "browser-ci runbook must cite develop ruleset id 15611785"
+    assert "develop-squash-only" in browser_runbook, "browser-ci runbook must cite develop ruleset name"
 
 
 def test_lane_still_runs_on_pull_requests_into_develop(workflow: dict[str, Any]) -> None:
