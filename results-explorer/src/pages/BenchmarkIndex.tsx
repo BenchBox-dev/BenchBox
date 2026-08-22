@@ -36,6 +36,7 @@ import { RankTable } from "@/components/RankTable";
 import { ChartPanel } from "@/components/ChartPanel";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
+import { CompareTray } from "@/components/CompareTray";
 import { NotFound } from "@/pages/NotFound";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
@@ -798,58 +799,27 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
 
       {/* Sticky Compare bar */}
       {compareUrl && (
-        <div class="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-lg">
-          <div class="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0 flex-1">
-              <div class="text-sm text-[var(--bb-data-fg-primary)]">
-                <strong>{selectedComparableCount}</strong> platforms selected for compare
-              </div>
-              <div
-                class="mt-2 flex max-h-32 flex-wrap gap-2 overflow-y-auto pr-1"
-                role="list"
-                aria-label="Selected compare results"
-              >
-                {selectedCompareRows.map((row) => {
-                  const id = compareIdForRow(row);
-                  const cohortBenchmark = summaryWithResultMetadata?.benchmark ?? benchmark;
-                  const cohortScale = summaryWithResultMetadata?.scale_factor ?? effectiveSf;
-                  const cohortPhase = summaryWithResultMetadata?.phase ?? effectivePhase;
-                  return (
-                    <div
-                      key={id}
-                      data-testid={`compare-tray-row-${id}`}
-                      role="listitem"
-                      class="flex max-w-full flex-wrap items-center gap-1.5 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-2 py-1 text-xs text-[var(--bb-data-fg-muted)]"
-                    >
-                      <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
-                      <span>{humanizeBenchmark(cohortBenchmark)}</span>
-                      <span>SF {cohortScale}</span>
-                      <span>{cohortPhase}</span>
-                      <span>{row.run_date}</span>
-                      <TrustBadge trustLabel={row.trust_label} compact />
-                      <FundingChip funding={row.funding} compact />
-                      <span class="font-mono text-[var(--bb-data-fg-muted)]">
-                        Public ID {visibleResultIdForRow(row)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div class="flex shrink-0 items-center gap-3">
-              <button
-                type="button"
-                class="text-sm text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]"
-                onClick={() => setSelectedIds(new Set())}
-              >
-                Clear
-              </button>
-              <a href={compareUrl} class="btn btn-primary text-sm no-underline">
-                Compare {selectedComparableCount} selected →
-              </a>
-            </div>
-          </div>
-        </div>
+        <CompareTray
+          summary={
+            <>
+              <strong>{selectedComparableCount}</strong> platforms selected for compare
+            </>
+          }
+          items={selectedCompareRows.map((row) => ({
+            id: compareIdForRow(row),
+            platform: row.platform,
+            benchmarkLabel: humanizeBenchmark(summaryWithResultMetadata?.benchmark ?? benchmark),
+            scaleFactor: summaryWithResultMetadata?.scale_factor ?? effectiveSf,
+            phase: summaryWithResultMetadata?.phase ?? effectivePhase,
+            runDate: row.run_date,
+            trustLabel: row.trust_label,
+            funding: row.funding,
+            visibleResultId: visibleResultIdForRow(row),
+          }))}
+          compareHref={compareUrl}
+          compareLabel={`Compare ${selectedComparableCount} selected`}
+          onClear={() => setSelectedIds(new Set())}
+        />
       )}
       <ProvenanceLegend />
 </div>
