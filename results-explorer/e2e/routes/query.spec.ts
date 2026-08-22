@@ -107,7 +107,7 @@ test.describe("Query workbench", () => {
     await expect(header).toContainText("↓");
   });
 
-  test("row-limit toggle updates the URL and shows the all-rows query limit", async ({ page }) => {
+  test("row-limit toggle updates the URL and keeps one reconciled count", async ({ page }) => {
     await page.goto("/results/query");
     await waitForDataLoaded(page, /matching result bundle/);
 
@@ -115,8 +115,8 @@ test.describe("Query workbench", () => {
     await expect
       .poll(() => new URL(page.url()).searchParams.get("limit"))
       .toBe("all");
-    await expect(page.getByText(/Query limit: all/)).toBeVisible();
-    await expect(page.getByText(/Showing \d+ of \d+ returned rows/)).toBeVisible();
+    await expect(page.getByTestId("query-result-summary")).toContainText(/Showing \d+ of \d+ matching result bundle/);
+    await expect(page.getByText(/Query limit:/)).toHaveCount(0);
 
     await page.getByRole("button", { name: /^Default$/ }).click();
     await expect
