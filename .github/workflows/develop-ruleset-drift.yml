@@ -5,9 +5,12 @@ on:
     branches:
       - develop
     types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    branches:
+      - develop
 
 concurrency:
-  group: develop-ruleset-drift-${{ github.event.pull_request.number }}
+  group: develop-ruleset-drift-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -22,7 +25,7 @@ jobs:
       - name: Checkout trusted develop policy
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
           persist-credentials: false
 
       - name: Compare live governance with the trusted runbook
@@ -39,7 +42,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: develop-ruleset-drift-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
+          name: develop-ruleset-drift-${{ github.event.pull_request.number || github.run_id }}-${{ github.run_attempt }}
           path: ruleset-drift.json
           if-no-files-found: warn
           retention-days: 30
