@@ -13,14 +13,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.10
-    import tomli as tomllib  # type: ignore[no-redef]
-
-from packaging.requirements import InvalidRequirement, Requirement
-from packaging.version import InvalidVersion, Version
-
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CORPUS = ROOT / "_project/evals/agent-instructions/scenarios.json"
 ADAPTERS = ("CLAUDE.md", "GEMINI.md", "ANTIGRAVITY.md")
@@ -33,6 +25,7 @@ REQUIRED_POLICY_IDS = {
     "COMMIT-IDENTITY-001",
     "REVIEW-AUTH-001",
     "REVIEW-DEFECT-001",
+    "REVIEW-DEPTH-001",
     "REVIEW-L2-001",
     "REVIEW-CAPTURE-001",
     "REVIEW-PARITY-001",
@@ -50,6 +43,7 @@ CANONICAL_REVIEW_ANCHORS = {
         "without changing tracked worktree content",
         "combines review and remediation remains review-only",
     ),
+    "REVIEW-DEPTH-001": ("L1", "L2", "L3"),
     "REVIEW-DEFECT-001": ("classify it as a defect", "never in blind-spots"),
     "REVIEW-L2-001": ("gaps in the review framework", "not defects already found"),
     "REVIEW-CAPTURE-001": ("protocol governs behavior", "governs storage formats"),
@@ -487,88 +481,31 @@ def audit_commit_range(project: Path, base_ref: str) -> list[str]:
 
 
 def audit_dependency_caps(project: Path) -> list[str]:
-    """Pin AGENTS.md's advertised dependency caps to `pyproject.toml`.
+    """Forbid AGENTS.md restating dependency version caps.
 
-    AGENTS.md restates upper bounds so an agent does not have to open the
-    manifest. A restated fact drifts silently: the file advertised
-    `pyarrow<24` while the manifest had moved to `<25`. This is the
-    deterministic invariant `docs/operations/agent-instruction-evaluation.md`
-    asks for -- it fails the audit instead of relying on a reader noticing.
+    Bounds are already owned mechanically three times over: `pyproject.toml`
+    declares them with rationale inline, `uv lock` enforces them at install,
+    and `scripts/check_dependency_bounds.py --fail-on=cap-reached` blocks in
+    `test.yml` and `release.yml`. `docs/development/dependency-compatibility.md`
+    explains them. None of that needs an agent to be told anything.
+
+    AGENTS.md restated the list anyway, and it drifted -- advertising
+    `pyarrow<24` long after the manifest moved to `<25`. A synchronization
+    check would have to run forever to keep that duplicate honest. The
+    duplicate is gone; this invariant guards its absence, so the drift class
+    cannot return through a well-meaning convenience edit.
     """
-    errors: list[str] = []
     agents = _read(project, "AGENTS.md")
-    caps_line = next((line for line in agents.splitlines() if "Current caps:" in line), "")
-    if not caps_line:
-        return ["AGENTS.md does not advertise dependency caps"]
-    advertised = dict(re.findall(r"`([A-Za-z0-9_.-]+)<([0-9][0-9A-Za-z_.-]*)`", caps_line))
-    if not advertised:
-        return ["AGENTS.md dependency caps line has no parsable `name<version` entries"]
-
-    manifest_path = project / "pyproject.toml"
-    try:
-        manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        return [f"cannot read pyproject.toml: {exc}"]
-
-    project_table = manifest.get("project", {})
-    requirement_groups = {
-        "project.dependencies": project_table.get("dependencies", []),
-        **{
-            f"project.optional-dependencies.{group}": requirements
-            for group, requirements in project_table.get("optional-dependencies", {}).items()
-        },
-    }
-
-    for name, cap in sorted(advertised.items()):
-        try:
-            advertised_version = Version(cap)
-        except InvalidVersion:
-            errors.append(f"AGENTS.md advertises `{name}<{cap}` with an invalid version")
-            continue
-
-        matches: list[tuple[str, Requirement]] = []
-        for group, requirement_strings in requirement_groups.items():
-            for requirement_string in requirement_strings:
-                try:
-                    requirement = Requirement(requirement_string)
-                except InvalidRequirement:
-                    continue
-                if requirement.name.casefold() == name.casefold():
-                    matches.append((group, requirement))
-
-        base_matches = [requirement for group, requirement in matches if group == "project.dependencies"]
-        if base_matches:
-            checks = [("project.dependencies", requirement) for requirement in base_matches]
-        else:
-            # Optional groups can be installed independently. With no core
-            # bound to constrain every installation, each declaration must
-            # carry the advertised cap rather than borrowing one from an
-            # unrelated extra such as `dev`.
-            checks = matches
-
-        if not matches:
-            errors.append(f"AGENTS.md advertises `{name}<{cap}` but pyproject.toml declares no upper bound for it")
-            continue
-
-        for group, requirement in checks:
-            bounds = [specifier for specifier in requirement.specifier if specifier.operator == "<"]
-            if not bounds:
-                errors.append(
-                    f"AGENTS.md advertises `{name}<{cap}` but [{group}] declares `{requirement}` without that bound"
-                )
-                continue
-            for bound in bounds:
-                try:
-                    actual_version = Version(bound.version)
-                except InvalidVersion:
-                    errors.append(f"[{group}] declares `{requirement}` with invalid upper bound <{bound.version}")
-                    continue
-                if actual_version != advertised_version:
-                    errors.append(
-                        f"AGENTS.md advertises `{name}<{cap}` but [{group}] declares "
-                        f"`{requirement}` with <{bound.version}"
-                    )
-    return errors
+    # No per-line exemption: an exemption keyed on the pointer text would be
+    # defeated by putting the caps on the same line as the pointer.
+    offenders = re.findall(r"`([A-Za-z0-9][A-Za-z0-9._-]*\s*<=?\s*[0-9][0-9A-Za-z_.]*)`", agents)
+    if offenders:
+        return [
+            "AGENTS.md restates dependency caps ("
+            + ", ".join(sorted(set(offenders)))
+            + "); pyproject.toml owns them and docs/development/dependency-compatibility.md explains them"
+        ]
+    return []
 
 
 def audit_scenarios(scenarios: list[dict[str, Any]], policy_text: str) -> list[str]:

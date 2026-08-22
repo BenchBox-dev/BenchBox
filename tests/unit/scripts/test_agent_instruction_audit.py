@@ -691,44 +691,43 @@ def test_the_precommit_hook_name_does_not_claim_a_single_check() -> None:
     )
 
 
-def test_advertised_dependency_cap_behind_the_manifest_fails(tmp_path: Path) -> None:
-    """The exact drift that shipped: AGENTS.md said `pyarrow<24`, manifest said <25."""
+def test_audit_entry_point_imports_without_third_party_packages() -> None:
+    """`.github/workflows/pr.yml` runs this file with bare `python3` before `uv sync`.
+
+    A non-stdlib import at module scope hard-fails the required skill-integrity
+    lane. That lane is path-filtered, so the PR that introduced `packaging` and
+    `tomli` never exercised it.
+    """
+    source = (ROOT / "_project/scripts/agent_instruction_audit.py").read_text(encoding="utf-8")
+    forbidden = ("import packaging", "from packaging", "import tomli", "import tomllib")
+    offenders = [needle for needle in forbidden if needle in source]
+    assert not offenders, f"audit entry point imports non-stdlib modules: {offenders}"
+
+
+def test_missing_review_depth_binding_fails_the_parity_audit(tmp_path: Path) -> None:
+    """REVIEW-PARITY-001 requires REVIEW-DEPTH-001; the audit must enforce it."""
+    project = _candidate(tmp_path)
+    protocol = project / "docs/agent/review-protocol.md"
+    protocol.write_text(re.sub(r"- `\[REVIEW-DEPTH-001\]`.*?\n(?=- )", "", protocol.read_text(), flags=re.S))
+    _, errors = audit(project, CORPUS)
+    assert any("REVIEW-DEPTH-001" in error for error in errors)
+
+
+def test_restating_a_dependency_cap_in_agents_md_fails(tmp_path: Path) -> None:
+    """`pyproject.toml` owns the bounds; a restated copy drifted once already."""
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"
-    agents.write_text(agents.read_text().replace("`pyarrow<25`", "`pyarrow<24`"))
+    agents.write_text(agents.read_text() + "\n- Caps: `pyarrow<25`.\n")
     _, errors = audit(project, CORPUS)
-    assert any("pyarrow" in error and "dependency-caps" in error for error in errors)
+    assert any("restates dependency caps" in error and "pyarrow<25" in error for error in errors)
 
 
-def test_advertised_cap_without_a_manifest_bound_fails(tmp_path: Path) -> None:
-    """An advertised cap for a dependency the manifest never bounds is drift too."""
+def test_the_cap_guard_is_not_defeated_by_same_line_placement(tmp_path: Path) -> None:
+    """An exemption keyed on the pointer text would be bypassed by one line."""
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"
-    agents.write_text(agents.read_text().replace("`duckdb<2`", "`nonexistentpkg<9`"))
+    agents.write_text(
+        agents.read_text() + "\n- See `docs/development/dependency-compatibility.md`; caps: `duckdb<2`.\n"
+    )
     _, errors = audit(project, CORPUS)
-    assert any("nonexistentpkg" in error and "declares no upper bound" in error for error in errors)
-
-
-def test_optional_dependency_caps_are_honoured(tmp_path: Path) -> None:
-    """`duckdb` is bounded only under optional-dependencies; that must still count."""
-    project = _candidate(tmp_path)
-    _, errors = audit(project, CORPUS)
-    assert not [error for error in errors if "duckdb" in error]
-
-
-def test_advertised_cap_is_not_accepted_as_a_version_prefix(tmp_path: Path) -> None:
-    """`sqlglot<3` must not pass merely because the manifest says `<31.0.0`."""
-    project = _candidate(tmp_path)
-    agents = project / "AGENTS.md"
-    agents.write_text(agents.read_text().replace("`sqlglot<31`", "`sqlglot<3`"))
-    _, errors = audit(project, CORPUS)
-    assert any("sqlglot<3" in error and "<31.0.0" in error for error in errors)
-
-
-def test_each_independent_optional_dependency_keeps_the_advertised_cap(tmp_path: Path) -> None:
-    """A bound in `dev` must not hide a missing bound in the `duckdb` extra."""
-    project = _candidate(tmp_path)
-    manifest = project / "pyproject.toml"
-    manifest.write_text(manifest.read_text().replace('duckdb = ["duckdb>=1.0.0,<2.0.0"]', 'duckdb = ["duckdb>=1.0.0"]'))
-    _, errors = audit(project, CORPUS)
-    assert any("project.optional-dependencies.duckdb" in error and "without that bound" in error for error in errors)
+    assert any("restates dependency caps" in error and "duckdb<2" in error for error in errors)
