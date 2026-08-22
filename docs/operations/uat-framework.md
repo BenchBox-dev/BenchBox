@@ -237,11 +237,11 @@ a lowercase, non-Docker schema) -- rather than crash, it falls back to
 mocker's one faithful plain-text verb (`mocker volume ls`) to find and remove
 leaked named volumes, and the report's `NOTE:` line says container/image/
 network inventory was skipped. On macOS, prefer `ENGINE=container` for
-reliable native inventory and cleanup of images/containers/networks (see
-"Docker storage cleanup" above); that mode speaks the native `container`
-CLI directly and does not go through `resolve_container_cli()`. It cannot see
-mocker-managed named volumes, though -- Apple's native `container volume ls`
-is empty for them; mocker tracks its own compose-created volumes separately.
+reliable native inventory and cleanup of images/containers/networks; that mode
+speaks the native `container` CLI directly and does not go through
+`resolve_container_cli()`. It cannot see mocker-managed named volumes, though
+-- Apple's native `container volume ls` is empty for them; mocker tracks its
+own compose-created volumes separately.
 Use `ENGINE=docker` (the default) for volume cleanup and `ENGINE=container`
 for everything else.
 

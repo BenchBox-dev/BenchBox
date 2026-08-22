@@ -1740,7 +1740,7 @@ uat-prepull:
 # make uat-docker-cleanup [ENGINE=docker|container] [MODE=owned|images|max] [APPLY=1] [PREFIX=benchbox-uat]
 # ENGINE=container reclaims the Apple `container` store (~/Library/Application
 # Support/com.apple.container); MODE widens breadth owned<images<max. See
-# docs/operations/uat-framework.md "Docker storage cleanup".
+# docs/operations/uat-framework.md "Container engine resolution".
 uat-docker-cleanup:
 	@uv run --no-sync -- python -m tests.uat._cli docker-cleanup \
 		$(if $(ENGINE),--engine "$(ENGINE)",) \
