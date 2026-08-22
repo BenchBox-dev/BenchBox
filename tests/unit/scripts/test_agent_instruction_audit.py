@@ -694,3 +694,47 @@ def test_the_precommit_hook_name_does_not_claim_a_single_check() -> None:
     assert "instruction" in hook["name"].casefold(), (
         f"hook name {hook['name']!r} names only the identity check while running the whole audit"
     )
+
+
+def test_audit_entry_point_imports_without_third_party_packages() -> None:
+    """`.github/workflows/pr.yml` runs this file with bare `python3` before `uv sync`.
+
+    A non-stdlib import at module scope hard-fails the required skill-integrity
+    lane. That lane is path-filtered, so the PR that introduced `packaging` and
+    `tomli` never exercised it.
+    """
+    source = (ROOT / "_project/scripts/agent_instruction_audit.py").read_text(encoding="utf-8")
+    forbidden = ("import packaging", "from packaging", "import tomli", "import tomllib")
+    offenders = [needle for needle in forbidden if needle in source]
+    assert not offenders, f"audit entry point imports non-stdlib modules: {offenders}"
+
+
+def test_missing_review_depth_binding_fails_the_parity_audit(tmp_path: Path) -> None:
+    """REVIEW-PARITY-001 requires REVIEW-DEPTH-001; the audit must enforce it."""
+    project = _candidate(tmp_path)
+    protocol = project / "docs/agent/review-protocol.md"
+    # Strip the ID wherever it is bound; the binding is a combined bullet, not a
+    # dedicated one, because SHARED section 5 forbids restating its behavior.
+    protocol.write_text(protocol.read_text().replace("`[REVIEW-DEPTH-001]`", ""))
+    _, errors = audit(project, CORPUS)
+    assert any("REVIEW-DEPTH-001" in error for error in errors)
+
+
+def test_restating_a_dependency_cap_in_agents_md_fails(tmp_path: Path) -> None:
+    """`pyproject.toml` owns the bounds; a restated copy drifted once already."""
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    agents.write_text(agents.read_text() + "\n- Caps: `pyarrow<25`.\n")
+    _, errors = audit(project, CORPUS)
+    assert any("restates dependency caps" in error and "pyarrow<25" in error for error in errors)
+
+
+def test_the_cap_guard_is_not_defeated_by_same_line_placement(tmp_path: Path) -> None:
+    """An exemption keyed on the pointer text would be bypassed by one line."""
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    agents.write_text(
+        agents.read_text() + "\n- See `docs/development/dependency-compatibility.md`; caps: `duckdb<2`.\n"
+    )
+    _, errors = audit(project, CORPUS)
+    assert any("restates dependency caps" in error and "duckdb<2" in error for error in errors)

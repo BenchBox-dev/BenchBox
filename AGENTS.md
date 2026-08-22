@@ -112,7 +112,7 @@ protected branches. Force-push only feature branches with `--force-with-lease`. 
 by `_project/scripts/auto_merge_soundness_paths.py` require maintainer review; excluded from auto-merge.
 A drift/pinning guard and its required-CI wiring must land in the same PR. Stacked/feature-base PRs are
 unsupported: zero CI by filters; `pr-base-guard.yml` fails loud — retarget/rebase onto `develop` after parent
-squash-merge (`docs/development/pr-base-branch-policy.md`). Bad-base empty checks ≠ `dirty` (conflicts).
+squash-merge (`docs/development/pr-base-branch-policy.md`). Bad-base empty checks ≠ `mergeable_state: dirty`.
 
 ## TODO tracker
 
@@ -128,9 +128,9 @@ Use the `todo` skill for tracker operations. Tracker writes follow worktree poli
 - CLI dry runs must propagate explicit phases; deterministic runs use a seed.
 - Green focused/fast tests are not UAT or production certification.
 
-Apple/macOS notes: correctness-gate digests are Linux-generated; `make ci-linux` for parity (release-guide.md).
-See `docs/operations/uat-framework.md` ("Mocker validation status") for current Mocker support and caveats.
-Never globally prune without approval.
+Apple/macOS: correctness-gate digests are Linux-generated; use `make ci-linux` (release-guide.md). Mocker is
+local-only, never CI: databend's `minio` was observed to exit under it; doris/starrocks are single-service.
+`docs/operations/uat-framework.md` ("Mocker validation status") holds per-stack state. Never prune globally.
 
 ## Skills and generated mirrors
 

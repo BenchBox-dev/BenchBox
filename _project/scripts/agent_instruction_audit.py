@@ -25,6 +25,9 @@ REQUIRED_POLICY_IDS = {
     "COMMIT-IDENTITY-001",
     "EVIDENCE-FRESHNESS-001",
     "REVIEW-AUTH-001",
+    "REVIEW-DEFECT-001",
+    "REVIEW-DEPTH-001",
+    "REVIEW-L2-001",
     "REVIEW-CAPTURE-001",
     "REVIEW-PARITY-001",
     "REVIEW-PLAN-RECON-001",
@@ -485,6 +488,34 @@ def audit_commit_range(project: Path, base_ref: str) -> list[str]:
     return errors
 
 
+def audit_dependency_caps(project: Path) -> list[str]:
+    """Forbid AGENTS.md restating dependency version caps.
+
+    Bounds are already owned mechanically three times over: `pyproject.toml`
+    declares them with rationale inline, `uv lock` enforces them at install,
+    and `scripts/check_dependency_bounds.py --fail-on=cap-reached` blocks in
+    `test.yml` and `release.yml`. `docs/development/dependency-compatibility.md`
+    explains them. None of that needs an agent to be told anything.
+
+    AGENTS.md restated the list anyway, and it drifted -- advertising
+    `pyarrow<24` long after the manifest moved to `<25`. A synchronization
+    check would have to run forever to keep that duplicate honest. The
+    duplicate is gone; this invariant guards its absence, so the drift class
+    cannot return through a well-meaning convenience edit.
+    """
+    agents = _read(project, "AGENTS.md")
+    # No per-line exemption: an exemption keyed on the pointer text would be
+    # defeated by putting the caps on the same line as the pointer.
+    offenders = re.findall(r"`([A-Za-z0-9][A-Za-z0-9._-]*\s*<=?\s*[0-9][0-9A-Za-z_.]*)`", agents)
+    if offenders:
+        return [
+            "AGENTS.md restates dependency caps ("
+            + ", ".join(sorted(set(offenders)))
+            + "); pyproject.toml owns them and docs/development/dependency-compatibility.md explains them"
+        ]
+    return []
+
+
 def audit_scenarios(scenarios: list[dict[str, Any]], policy_text: str) -> list[str]:
     errors: list[str] = []
     scenario_ids = [scenario.get("id") for scenario in scenarios]
@@ -637,6 +668,7 @@ def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
     errors.extend(_tag("review-policy", audit_review_policy(project)))
     errors.extend(_tag("docs-placement", audit_docs_placement(project)))
     errors.extend(_tag("commit-policy", audit_commit_policy(project)))
+    errors.extend(_tag("dependency-caps", audit_dependency_caps(project)))
     errors.extend(_tag("scenarios", audit_scenarios(corpus["scenarios"], policy_text)))
 
     return metrics, errors
