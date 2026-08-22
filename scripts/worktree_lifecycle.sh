@@ -104,6 +104,10 @@ acquire_creation_lock() {
     return 0
   fi
 
+  if [ ! -e "$creation_lock_dir" ] && [ ! -L "$creation_lock_dir" ]; then
+    die "Could not create worktree-create lock directory: $creation_lock_dir"
+  fi
+
   lock_pid=$(cat "$creation_lock_dir/pid" 2>/dev/null || true)
   if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
     die "Refusing: another worktree-create is in progress (pid $lock_pid)"

@@ -7,7 +7,8 @@
 #   uv run --project _project/scripts -- todo-db <args>
 #   _project/scripts/todo <args>   # BenchBox policy adapter over todo-db
 #
-# See CLAUDE.md and AGENTS.md for the canonical pre-approved command forms.
+# See `.claude/skills/todo/SKILL.md` and `_project/scripts/todo --help` for the
+# current workflow and command forms.
 
 [project]
 name = "benchbox-project-scripts"

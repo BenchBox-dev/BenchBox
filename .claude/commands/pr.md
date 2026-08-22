@@ -25,7 +25,8 @@ Execute the following in order, stopping on the first failure:
 3. **Stage authorized changes and commit.** Stage authorized paths explicitly (never `git add -A`),
    verify `make agent-identity-check`, and create a conventional commit.
 
-4. **Run `make pr-preflight`** to mirror CI locally. Fix root causes if failing; do not use `--no-verify`.
+4. **Run `make pr-preflight`** as the path-aware local gate. CI-only coverage remains separate.
+   Fix root causes if failing; do not use `--no-verify`.
 
 5. **Run `make pr-open`** — pushes branch and opens a PR vs `develop`. Note: auto-merge stays withheld
    unless `READY=1` (`make pr-open READY=1` or `make pr-ready`).
