@@ -1,9 +1,8 @@
 """Fast-test coverage for tests/uat/throughput.py.
 
-Covers the two pieces a `run-official --streams N`-backed UAT cell needs
-that a `--quiet` `benchbox run` cell gets for free (see the module
-docstring in tests/uat/throughput.py): locating the result JSON on disk,
-and validating a throughput result against the requested stream count.
+Covers the two pieces a `run-official --streams N`-backed UAT cell needs:
+resolving the emitted quiet result path, and validating a throughput result
+against the requested stream count.
 """
 
 from __future__ import annotations
@@ -25,206 +24,59 @@ from tests.uat.throughput import (
 pytestmark = pytest.mark.fast
 
 
-# ``resolve_official_result_path`` filters candidates by ``st_mtime >=
-# started_after``. Capturing ``started_after = datetime.now()`` immediately
-# before writing the fixture file is racy: filesystem mtime granularity (or a
-# small backward NTP step between the two calls) can floor the written file's
-# mtime just *below* ``started_after``, dropping the file and returning None
-# (observed as a one-off CI flake). Backdating ``started_after`` by a slack
-# margin makes the boundary robust without weakening any test's intent -- the
-# "ignores older files" case backdates its stale file by a full hour, well
-# outside this margin.
-_MTIME_SLACK = _dt.timedelta(seconds=2)
-
-
 # ---------------------------------------------------------------------------
 # resolve_official_result_path
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_official_result_path_returns_none_for_missing_dir(tmp_path: Path):
-    missing = tmp_path / "results"
+def test_resolve_official_result_path_returns_none_without_emitted_path(tmp_path: Path):
+    results_dir = tmp_path / "shared-runs" / "results"
     assert (
-        resolve_official_result_path(missing, platform="duckdb", benchmark="tpch", started_after=_dt.datetime.now())
+        resolve_official_result_path(results_dir, platform="duckdb", benchmark="tpch", started_after=_dt.datetime.now())
         is None
     )
 
 
-def test_resolve_official_result_path_returns_none_when_no_candidates(tmp_path: Path):
-    results_dir = tmp_path / "results"
-    results_dir.mkdir()
-    (results_dir / "tpcds_sf1_duckdb_sql_unrelated.json").write_text("{}", encoding="utf-8")
+def test_resolve_official_result_path_accepts_absolute_emitted_path(tmp_path: Path):
+    results_dir = tmp_path / "shared-runs" / "results"
+    result_path = results_dir / "tpch_sf1_duckdb_sql_20260822_130141_a3f0c570.json"
+    result_path.parent.mkdir(parents=True)
+    result_path.write_text("{}", encoding="utf-8")
+
     out = resolve_official_result_path(
-        results_dir, platform="duckdb", benchmark="tpch", started_after=_dt.datetime.now()
+        results_dir,
+        platform="duckdb",
+        benchmark="tpch",
+        started_after=_dt.datetime.now(),
+        emitted_path=str(result_path),
     )
-    assert out is None
+    assert out == result_path
 
 
-def test_resolve_official_result_path_matches_platform_and_benchmark(tmp_path: Path):
-    results_dir = tmp_path / "results"
-    results_dir.mkdir()
-    started = _dt.datetime.now() - _MTIME_SLACK
-    match = results_dir / "tpch_sf1_duckdb_sql_20260709_223304_0865bb91.json"
-    match.write_text("{}", encoding="utf-8")
-    # A same-timestamp but different-platform file must not match.
-    (results_dir / "tpch_sf1_postgresql_sql_20260709_223304_deadbeef.json").write_text("{}", encoding="utf-8")
-    out = resolve_official_result_path(results_dir, platform="duckdb", benchmark="tpch", started_after=started)
-    assert out == match
-
-
-def test_resolve_official_result_path_ignores_files_older_than_started_after(tmp_path: Path):
-    results_dir = tmp_path / "results"
-    results_dir.mkdir()
-    stale = results_dir / "tpch_sf1_duckdb_sql_stale.json"
-    stale.write_text("{}", encoding="utf-8")
-    # Backdate the stale file's mtime well before "started_after".
-    import os
-
-    old_time = (_dt.datetime.now() - _dt.timedelta(hours=1)).timestamp()
-    os.utime(stale, (old_time, old_time))
+def test_resolve_official_result_path_resolves_runs_relative_path(tmp_path: Path):
+    results_dir = tmp_path / "shared-runs" / "results"
+    results_dir.mkdir(parents=True)
     out = resolve_official_result_path(
-        results_dir, platform="duckdb", benchmark="tpch", started_after=_dt.datetime.now()
+        results_dir,
+        platform="duckdb",
+        benchmark="tpch",
+        started_after=_dt.datetime.now(),
+        emitted_path="results/tpch_sf1_duckdb_sql_20260822_130141_a3f0c570.json",
     )
-    assert out is None
+    assert out == results_dir / "tpch_sf1_duckdb_sql_20260822_130141_a3f0c570.json"
 
 
-def test_resolve_official_result_path_picks_newest_of_multiple_candidates(tmp_path: Path):
-    results_dir = tmp_path / "results"
-    results_dir.mkdir()
-    started = _dt.datetime.now() - _MTIME_SLACK
-    older = results_dir / "tpch_sf1_duckdb_sql_older.json"
-    newer = results_dir / "tpch_sf1_duckdb_sql_newer.json"
-    older.write_text("{}", encoding="utf-8")
-    newer.write_text("{}", encoding="utf-8")
-    import os
-    import time
-
-    time.sleep(0.01)
-    now = _dt.datetime.now().timestamp()
-    os.utime(newer, (now, now))
-    out = resolve_official_result_path(results_dir, platform="duckdb", benchmark="tpch", started_after=started)
-    assert out == newer
-
-
-def test_resolve_official_result_path_is_case_and_dash_insensitive(tmp_path: Path):
-    """Platform tokens with dashes (e.g. `pg-duckdb`) normalize like the CLI's own output filenames."""
-    results_dir = tmp_path / "results"
-    results_dir.mkdir()
-    started = _dt.datetime.now() - _MTIME_SLACK
-    match = results_dir / "tpch_sf1_pg_duckdb_sql_20260709.json"
-    match.write_text("{}", encoding="utf-8")
-    out = resolve_official_result_path(results_dir, platform="pg-duckdb", benchmark="tpch", started_after=started)
-    assert out == match
-
-
-def test_resolve_official_result_path_duckdb_does_not_match_pg_duckdb_file(tmp_path: Path):
-    """Regression: the old substring glob (`*{platform_token}*`) let platform="duckdb" match a
-    `pg_duckdb` result file because "duckdb" is a substring of "pg_duckdb". Token-exact matching
-    must reject it -- this is the collision direction the pre-existing test above didn't cover
-    (it only asserted the *positive* pg-duckdb match, not that plain duckdb excludes it).
-    """
-    results_dir = tmp_path / "results"
-    results_dir.mkdir()
-    started = _dt.datetime.now() - _MTIME_SLACK
-    (results_dir / "tpch_sf1_pg_duckdb_sql_20260709_223304_deadbeef.json").write_text("{}", encoding="utf-8")
-    out = resolve_official_result_path(results_dir, platform="duckdb", benchmark="tpch", started_after=started)
-    assert out is None
-
-
-def test_resolve_official_result_path_pg_duckdb_does_not_match_plain_duckdb_file(tmp_path: Path):
-    """Reverse collision direction: platform="pg-duckdb" must not resolve a plain `duckdb` file."""
-    results_dir = tmp_path / "results"
-    results_dir.mkdir()
-    started = _dt.datetime.now() - _MTIME_SLACK
-    (results_dir / "tpch_sf1_duckdb_sql_20260709_223304_0865bb91.json").write_text("{}", encoding="utf-8")
-    out = resolve_official_result_path(results_dir, platform="pg-duckdb", benchmark="tpch", started_after=started)
-    assert out is None
-
-
-def test_resolve_official_result_path_matches_multi_token_benchmark(tmp_path: Path):
-    """Regression (C1): registry ids like `tpcds_obt`/`tsbs_devops` split into MULTIPLE
-    `_`-tokens, so a matcher that hardcoded benchmark=token[0]/scale=token[1] shifted every
-    index and returned None for a real `tpcds_obt_sf1_duckdb_sql_*.json` file -- a NEW
-    false-negative worse than the substring false-positive it replaced (a None result
-    downgrades a passing official cell to FAILED). The benchmark must match as a token
-    *prefix sequence*, with scale/platform offsets derived from its length.
-    """
-    results_dir = tmp_path / "results"
-    results_dir.mkdir()
-    started = _dt.datetime.now() - _MTIME_SLACK
-    match = results_dir / "tpcds_obt_sf1_duckdb_sql_20260709_223304_abcdabcd.json"
-    match.write_text("{}", encoding="utf-8")
-    # A pg_duckdb file for the same multi-token benchmark must NOT collide with plain duckdb.
-    (results_dir / "tpcds_obt_sf1_pg_duckdb_sql_20260709_223304_deadbeef.json").write_text("{}", encoding="utf-8")
+def test_resolve_official_result_path_resolves_benchmark_runs_prefixed_path(tmp_path: Path):
+    results_dir = tmp_path / "shared-runs" / "results"
+    results_dir.mkdir(parents=True)
     out = resolve_official_result_path(
-        results_dir, platform="duckdb", benchmark="tpcds_obt", started_after=started, scale=1
+        results_dir,
+        platform="duckdb",
+        benchmark="tpch",
+        started_after=_dt.datetime.now(),
+        emitted_path="benchmark_runs/results/tpch_sf1_duckdb_sql_20260822_130141_a3f0c570.json",
     )
-    assert out == match
-
-
-def test_resolve_official_result_path_multi_token_benchmark_without_scale(tmp_path: Path):
-    """The multi-token benchmark prefix + platform-token match holds even when `scale` is omitted."""
-    results_dir = tmp_path / "results"
-    results_dir.mkdir()
-    started = _dt.datetime.now() - _MTIME_SLACK
-    match = results_dir / "tsbs_devops_sf1_duckdb_sql_20260709_223304_abcdabcd.json"
-    match.write_text("{}", encoding="utf-8")
-    out = resolve_official_result_path(results_dir, platform="duckdb", benchmark="tsbs_devops", started_after=started)
-    assert out == match
-
-
-def test_resolve_official_result_path_filters_by_scale_when_given(tmp_path: Path):
-    """`scale` (optional, keyword) narrows candidates to the matching sf<N> token."""
-    results_dir = tmp_path / "results"
-    results_dir.mkdir()
-    started = _dt.datetime.now() - _MTIME_SLACK
-    sf1 = results_dir / "tpch_sf1_duckdb_sql_20260709_223304_aaaaaaaa.json"
-    sf10 = results_dir / "tpch_sf10_duckdb_sql_20260709_223304_bbbbbbbb.json"
-    sf1.write_text("{}", encoding="utf-8")
-    sf10.write_text("{}", encoding="utf-8")
-    out = resolve_official_result_path(results_dir, platform="duckdb", benchmark="tpch", started_after=started, scale=1)
-    assert out == sf1
-    out10 = resolve_official_result_path(
-        results_dir, platform="duckdb", benchmark="tpch", started_after=started, scale=10
-    )
-    assert out10 == sf10
-
-
-def test_resolve_official_result_path_ignores_scale_when_omitted(tmp_path: Path):
-    """Backward compatibility: existing callers that don't pass `scale` are unaffected by SF."""
-    results_dir = tmp_path / "results"
-    results_dir.mkdir()
-    started = _dt.datetime.now() - _MTIME_SLACK
-    sf1 = results_dir / "tpch_sf1_duckdb_sql_20260709_223304_aaaaaaaa.json"
-    sf1.write_text("{}", encoding="utf-8")
-    out = resolve_official_result_path(results_dir, platform="duckdb", benchmark="tpch", started_after=started)
-    assert out == sf1
-
-
-def test_resolve_official_result_path_breaks_equal_mtime_ties_deterministically(tmp_path: Path):
-    """Equal-mtime candidates (within filesystem mtime granularity) must resolve to the same file
-    on every call, not whatever order the filesystem/glob happens to yield -- the arbitrary
-    max-mtime tie-break this test guards used to depend on iteration order when mtimes tied.
-    """
-    import os
-
-    results_dir = tmp_path / "results"
-    results_dir.mkdir()
-    started = _dt.datetime.now() - _MTIME_SLACK
-    file_a = results_dir / "tpch_sf1_duckdb_sql_20260709_223304_aaaaaaaa.json"
-    file_z = results_dir / "tpch_sf1_duckdb_sql_20260709_223304_zzzzzzzz.json"
-    file_a.write_text("{}", encoding="utf-8")
-    file_z.write_text("{}", encoding="utf-8")
-    same_time = _dt.datetime.now().timestamp()
-    os.utime(file_a, (same_time, same_time))
-    os.utime(file_z, (same_time, same_time))
-
-    results = {
-        resolve_official_result_path(results_dir, platform="duckdb", benchmark="tpch", started_after=started)
-        for _ in range(5)
-    }
-    assert len(results) == 1, "tie-break must be deterministic across repeated calls"
-    assert results == {file_z}, "tie-break must prefer the lexicographically-greater filename"
+    assert out == tmp_path / "benchmark_runs" / "results" / "tpch_sf1_duckdb_sql_20260822_130141_a3f0c570.json"
 
 
 # ---------------------------------------------------------------------------

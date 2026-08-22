@@ -6,14 +6,14 @@ option of its own -- see the `throughput-stream-count-wiring-defect` TODO's
 `deferred` section. `benchbox run-official --streams N` is, today, the only
 CLI surface that can make a requested stream count reach the throughput
 driver, via a transient `BenchmarkOrchestrator.execute_benchmark` patch
-(`benchbox/cli/commands/run_official.py::_forward_requested_streams`). This
-module supplies the two things a `run-official`-backed UAT cell needs that a
-`--quiet` `benchbox run` cell gets for free:
+(`benchbox/cli/commands/run_official.py::_forward_requested_streams`). UAT
+now runs that deprecated command with `--quiet`, so it reuses the same final
+bare-path stdout contract as every other `benchbox run` cell. This module
+supplies the two things a `run-official`-backed UAT cell needs:
 
-1. `resolve_official_result_path` -- `run-official` has no `--quiet` flag, so
-   it never prints a bare, parseable result-path line the way `run_cell`'s
-   default stdout parsing (`last_nonempty_output_line`) expects. The result
-   JSON is instead located on disk by filename + mtime.
+1. `resolve_official_result_path` -- reads the emitted quiet-path line through
+   a backward-compatible resolver wrapper, so the official branch keeps its
+   existing call shape while retiring glob/mtime inference entirely.
 2. `validate_throughput_result` -- checks the exported result JSON for the
    three things a silent concurrency regression would break: every requested
    stream actually executed at least one query (`validate_stream_count`),
@@ -34,7 +34,6 @@ from pathlib import Path
 from typing import Any
 
 from benchbox.core.results.metrics import TPCMetricsCalculator
-from benchbox.utils.scale_factor import format_scale_factor
 
 # Mirrors benchbox/cli/commands/run_official.py::TPC_ALLOWED_SCALE_FACTORS.
 # `run-official` rejects any other scale factor outright, so a throughput UAT
@@ -50,87 +49,35 @@ def resolve_official_result_path(
     benchmark: str,
     started_after: _dt.datetime,
     scale: float | None = None,
+    emitted_path: str | None = None,
 ) -> Path | None:
-    """Find the newest result JSON exported for (platform, benchmark[, scale]).
+    """Resolve the result JSON path emitted by `run-official --quiet`.
 
-    `run-official` prints its result path through Rich's non-quiet console
-    output (e.g. ``JSON: [dim]/path/to/result.json[/dim]``), which is not a
-    bare, parseable stdout line -- unlike `--quiet` `benchbox run`, which
-    `run_cell`'s default `last_nonempty_output_line` parsing expects.
-    Locating the file by name + mtime instead works regardless of console
-    formatting and also survives a non-clean (exit code != 0) run, which
-    `run-official` still exports a full result JSON for.
+    The authoritative contract is now the same one `benchbox run --quiet`
+    already exposes: the final non-empty stdout line is the exported result
+    JSON path. `run_cell` passes that line here via `emitted_path`.
 
-    Filename grammar (pinned from the exporter every result JSON funnels
-    through, ``benchbox.core.results.filenames.build_result_filename_base``,
-    as exercised by the fixtures in ``tests/uat/test_throughput.py``)::
+    `results_dir`/`platform`/`benchmark`/`started_after`/`scale` remain in the
+    signature for backward compatibility with the historical glob-based
+    resolver and existing call sites/tests, but resolution itself is now a
+    read, not a filename search. There is intentionally NO fallback to glob or
+    mtime inference: a missing/invalid emitted path returns `None`, and the
+    caller must fail loudly.
 
-        {benchmark...}_{sf<N>}_{platform...}_{mode}_{timestamp}[_{execution_id}].json
-
-    The exporter writes the registry ``benchmark_id`` and the normalized
-    platform name verbatim, and BOTH can themselves contain underscores, so
-    each spans a *variable-length* run of ``"_"``-split tokens rather than a
-    single fixed slot:
-
-    - single-token benchmark, single-token platform --
-      ``tpch_sf1_duckdb_sql_20260709_223304_0865bb91.json`` ->
-      ``["tpch", "sf1", "duckdb", "sql", ...]``
-    - single-token benchmark, two-token platform (``pg-duckdb`` ->
-      ``pg_duckdb``) -- ``tpch_sf1_pg_duckdb_sql_20260709.json`` ->
-      ``["tpch", "sf1", "pg", "duckdb", "sql", ...]``
-    - two-token benchmark (``tpcds_obt``, ``tsbs_devops``, ``tpch_skew``,
-      ``vector_search``, ``*_primitives`` ...) --
-      ``tpcds_obt_sf1_duckdb_sql_20260709.json`` ->
-      ``["tpcds", "obt", "sf1", "duckdb", "sql", ...]``
-
-    Matching is token-exact, not substring. A candidate's ``"_"``-split stem
-    must (1) begin with the benchmark's own token sequence as a prefix, then
-    (2) carry the scale-factor token at index ``len(benchmark_tokens)`` (only
-    *checked* when `scale` is given, but always skipped over so the platform
-    slice lines up), then (3) carry the platform's own token sequence in the
-    slots immediately after. This is what stops ``platform="duckdb"`` from
-    matching a ``pg_duckdb`` result file (or the reverse), and
-    ``benchmark="tpcds_obt"`` from being shifted/rejected -- both of which
-    the old glob-based ``f"{benchmark}_*{platform}*.json"`` pattern got
-    wrong (a false-positive on the platform, a false-negative on the
-    multi-token benchmark).
-
-    `scale` is optional and keyword-only for backward compatibility with
-    existing callers that don't (yet) pass it; when omitted, the
-    scale-factor token is present in the filename but not checked.
-
-    Ties (equal ``st_mtime``, e.g. within filesystem mtime granularity) are
-    broken deterministically by filename, not left to whatever order the
-    filesystem happens to yield candidates in.
+    Relative paths resolve the same way the runner resolves quiet output from
+    normal `benchbox run` cells: relative to the shared runs root, with a
+    leading `benchmark_runs/...` anchored one directory above it.
     """
-    if not results_dir.is_dir():
+    _ = (platform, benchmark, started_after, scale)
+    if not emitted_path:
         return None
-    benchmark_tokens = benchmark.lower().split("_")
-    platform_tokens = platform.lower().replace("-", "_").split("_")
-    scale_token = format_scale_factor(scale) if scale is not None else None
-    scale_idx = len(benchmark_tokens)
-    platform_start = scale_idx + 1
-    platform_end = platform_start + len(platform_tokens)
-    started_ts = started_after.timestamp()
-
-    candidates: list[Path] = []
-    for path in results_dir.glob(f"{benchmark.lower()}_*.json"):
-        if not path.is_file() or path.stat().st_mtime < started_ts:
-            continue
-        tokens = path.stem.split("_")
-        if tokens[:scale_idx] != benchmark_tokens:
-            continue
-        # The scale-factor token always occupies ``scale_idx`` in the pinned
-        # grammar; only *check* it when the caller supplied `scale`, but the
-        # platform slice below is offset past it regardless.
-        if scale_token is not None and (len(tokens) <= scale_idx or tokens[scale_idx] != scale_token):
-            continue
-        if tokens[platform_start:platform_end] != platform_tokens:
-            continue
-        candidates.append(path)
-    if not candidates:
-        return None
-    return max(candidates, key=lambda path: (path.stat().st_mtime, path.name))
+    path = Path(emitted_path).expanduser()
+    if path.is_absolute() or path.exists():
+        return path
+    runs_dir = results_dir.parent
+    if len(path.parts) >= 2 and path.parts[0] == "benchmark_runs":
+        return runs_dir.parent / path
+    return runs_dir / path
 
 
 def validate_stream_count(

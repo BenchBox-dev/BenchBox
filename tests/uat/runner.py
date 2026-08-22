@@ -237,6 +237,77 @@ def _materialize_load_failure_sidecar(
     return result_path, sidecar
 
 
+def _diagnostic_rerun_argv(
+    *,
+    official: bool,
+    platform: str,
+    benchmark: str,
+    scale: float,
+    phases: str,
+    compression: str | None,
+    runs_dir: Path,
+    extra_args,
+    local_managed_platform: bool,
+    streams: int | None,
+    seed: int | None,
+) -> list[str]:
+    """Return the verbose rerun argv for a quiet cell that failed silently."""
+    output_args = ("--output", str(runs_dir / "datagen"), *extra_args)
+    if official:
+        return benchbox_run_official_argv(
+            platform,
+            benchmark,
+            scale,
+            phases=phases,
+            streams=streams,
+            seed=seed,
+            extra_args=output_args,
+            local_managed_platform=local_managed_platform,
+            quiet=False,
+        )
+    return benchbox_run_argv(
+        platform,
+        benchmark,
+        scale,
+        phases=phases,
+        compression=compression,
+        extra_args=output_args,
+        local_managed_platform=local_managed_platform,
+        quiet=False,
+    )
+
+
+def _resolve_cell_result_path(
+    *,
+    official: bool,
+    stdout_text: str,
+    runs_dir: Path,
+    platform: str,
+    benchmark: str,
+    scale: float,
+    started_at: _dt.datetime,
+) -> Path | None:
+    """Resolve the exported result JSON for one cell from its stdout contract."""
+    if official:
+        result_path = resolve_official_result_path(
+            runs_dir / "results",
+            platform=platform,
+            benchmark=benchmark,
+            started_after=started_at,
+            scale=scale,
+            emitted_path=last_nonempty_output_line(stdout_text),
+        )
+        if result_path is not None and (result_path.suffix.lower() != ".json" or not result_path.exists()):
+            return None
+        return result_path
+
+    result_path_str = last_nonempty_output_line(stdout_text)
+    result_path = _resolve_result_path(result_path_str, runs_dir) if result_path_str else None
+    if result_path is not None and (result_path.suffix.lower() != ".json" or not result_path.exists()):
+        return None
+    return result_path
+
+
 def run_cell(
     platform: str,
     benchmark: str,
@@ -321,24 +392,28 @@ def run_cell(
             log_fh.write(stdout_text)
         if timeout_result.timed_out:
             log_fh.write(f"# UAT_TIMEOUT timeout_s={timeout_s} exit_code={timeout_result.exit_code}\n")
-        elif not official and timeout_result.exit_code != 0 and not stdout_text.strip() and not stderr_has_content:
-            # Only `--quiet` `benchbox run` cells can suppress their own error
-            # reporting this way; `run-official` never runs quiet, so an
-            # empty-output failure there is a real crash, not a suppressed
-            # one, and re-running with `quiet=False` would also silently
-            # drop the --streams/--seed flags this cell was built with.
+        elif timeout_result.exit_code != 0 and not stdout_text.strip() and not stderr_has_content:
+            # Both `benchbox run` and `run-official` now run quiet under UAT,
+            # so a nonzero empty-output failure may just mean the CLI
+            # suppressed its own diagnostic text before exiting. Re-run the
+            # SAME cell verbosely (preserving official/streams/seed wiring) and
+            # append that output to the log.
+            rerun_argv = _diagnostic_rerun_argv(
+                official=official,
+                platform=platform,
+                benchmark=benchmark,
+                scale=scale,
+                phases=phases,
+                compression=compression,
+                runs_dir=runs_dir,
+                extra_args=extra_args,
+                local_managed_platform=local_managed_platform,
+                streams=streams,
+                seed=seed,
+            )
             _append_diagnostic_rerun(
                 log_fh,
-                benchbox_run_argv(
-                    platform,
-                    benchmark,
-                    scale,
-                    phases=phases,
-                    compression=compression,
-                    extra_args=("--output", str(runs_dir / "datagen"), *extra_args),
-                    local_managed_platform=local_managed_platform,
-                    quiet=False,
-                ),
+                rerun_argv,
                 timeout_s=min(timeout_s, DIAGNOSTIC_RERUN_TIMEOUT_S),
                 env=env,
             )
@@ -347,26 +422,20 @@ def run_cell(
         # Fail loudly if datagen (or anything else) leaked into the local tree.
         assert_no_local_growth(local_snapshot, external_root)
 
-    if official:
-        # `run-official` has no --quiet flag, so it never prints a bare,
-        # parseable result-path stdout line -- resolve the exported JSON by
-        # filename + mtime instead. It also still exports a result JSON for
-        # a non-clean (exit code != 0) run, so this isn't gated on exit_code.
-        result_path = resolve_official_result_path(
-            runs_dir / "results",
-            platform=platform,
-            benchmark=benchmark,
-            started_after=now,
-            scale=scale,
-        )
-    else:
-        # A failed query can still export a result bundle before the CLI exits
-        # nonzero. Preserve that path so reporting/classification can explain
-        # the query failure instead of misclassifying it as missing JSON.
-        result_path_str = last_nonempty_output_line(stdout_text)
-        result_path = _resolve_result_path(result_path_str, runs_dir) if result_path_str else None
-        if result_path is not None and (result_path.suffix.lower() != ".json" or not result_path.exists()):
-            result_path = None
+    # A failed query can still export a result bundle before the CLI exits
+    # nonzero. Preserve that path so reporting/classification can explain the
+    # query failure instead of misclassifying it as missing JSON. Official
+    # cells use the same helper, but read the backward-compatible emitted-path
+    # wrapper instead of globbing the results directory.
+    result_path = _resolve_cell_result_path(
+        official=official,
+        stdout_text=stdout_text,
+        runs_dir=runs_dir,
+        platform=platform,
+        benchmark=benchmark,
+        scale=scale,
+        started_at=now,
+    )
 
     result_path, load_failure_path = _materialize_load_failure_sidecar(
         log_path=log_path,
