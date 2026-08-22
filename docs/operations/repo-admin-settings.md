@@ -655,7 +655,8 @@ gh label list --search incident
 
 The 2026-08-21 cutover to org `BenchBox-dev` is documented in
 `docs/operations/github-org-transfer.md` (gates G0–G7b, Pages
-serving-only vs publish, org `protected_domain` verification,
+serving-only vs publish, exclusive Pages domain lock: do not click
+org Verify before G4, org `protected_domain` verification after G4,
 environment `deployment-branch` policies, `RULESET_DRIFT_TOKEN`
 authentication, and **never recreate** `joeharris76/BenchBox`). Follow
 that runbook for an ownership transfer. The numbered restore below is

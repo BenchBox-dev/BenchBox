@@ -56,13 +56,21 @@ retargeting lands **after** hosted rebuild.
 
 Accepted: transfer-fragile `GITHUB_REPOSITORY` tests; JoinOrder URL is
 identity; Pages `curl` is serving-only; shadow workflow must resolve
-`develop-squash-only` by name not id `15611785`; org-level
-`benchbox.dev` verification before transfer; `admin:org` and PAT policy;
-Actions `allowed_actions=all`; environment JSON rebuild including
+`develop-squash-only` by name not id `15611785`; `admin:org` and PAT
+policy; Actions `allowed_actions=all`; environment JSON rebuild including
 `github-pages` release-only branch policy; pin-update avoids soundness
 paths; never change answers default URL; issue template is wrong user
 **and** `main`; `ruleset-drift` keys by name not ID; PyPI dual-register
 on the existing `benchbox` project is the primary G2 path.
+
+**Superseded 2026-08-21 (00b):** Claude C5 / Agy “org domain verification
+before transfer” is **rejected**. GitHub Pages domain verification is
+exclusive to one account. Verifying `benchbox.dev` on `BenchBox-dev`
+while the site is still published from `joeharris76/BenchBox` would
+either fail (already verified by the user) or immediately unbind the
+live site. Do not click Verify on the org before G4. Optional: add the
+org challenge TXT only. Keep `_github-pages-challenge-joeharris76`.
+Org-verify **after G4** once apex and www still return 200.
 
 Rebutted: adding `User:57046` or `OrganizationAdmin` bypass on
 `develop-squash-only`. Live policy is `bypass_actors: none`. This program
@@ -71,14 +79,15 @@ preserves that gate.
 ## Gates
 
 ```text
-G0  Org hardening + admin:org + benchbox.dev org verification + PAT policy
-G1  Decision/runbook + owner-agnostic CI merged
+G0  Org hardening + admin:org + PAT policy (no org Pages Verify)
+G1  Decision/runbook + owner-agnostic CI merged (includes 00b)
 G2  PyPI + TestPyPI trusted publishers for BenchBox-dev/BenchBox
-G3  Merge freeze + ruleset/env JSON snapshot + written operator GO
+G3  Merge freeze + ruleset/env/Pages snapshot + written operator GO
 G4  Transfer
-G5  Hosted rebuild (capability, not names-only); Pages serving-only
+G5  Hosted rebuild; Pages serving-only (apex and www 200)
+G5b Org-verify benchbox.dev; then drop user verification; www CNAME
 G6  Pin-update PR (no soundness paths)
-G7  Redirects, downloads, scheduled workflows, Codecov, ruleset-drift
+G7  Redirects, downloads, workflows, Codecov, drift, org domain lock
 G7b First post-transfer push to release proves Pages publish path
 ```
 
@@ -90,8 +99,11 @@ operator. Completing an operator-gated TODO without its gate is a defect.
 Abort G0 if `BenchBox-dev` is not empty of a `BenchBox` repo or the
 operator is not org admin. Abort G3 if a release is in flight or
 `incident:develop-red` is open. Abort G4 if dest `full_name` is wrong.
-Abort G5 if `benchbox.dev` stops serving. Do not leave the custom domain
-unverified overnight.
+Abort G5 if `benchbox.dev` or `www.benchbox.dev` stops serving. Do not
+click org Pages Verify before G4. After G4, if GitHub refuses org
+verification because the user still holds the exclusive lock, remove
+user-account verification only after the repo is already in the org and
+apex is 200, then Verify on `BenchBox-dev`.
 
 ## Rollback
 
