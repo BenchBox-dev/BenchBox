@@ -194,12 +194,13 @@ def test_main_queries_trusted_default_branch(monkeypatch: pytest.MonkeyPatch) ->
 
     monkeypatch.setattr(release_readiness_check, "_api_json", _fake_api_json)
     monkeypatch.setenv("GITHUB_TOKEN", "token")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox")
     monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
     monkeypatch.delenv("RELEASE_CANARY_BRANCH", raising=False)
     monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_SHA", raising=False)
     monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_REASON", raising=False)
 
-    rc = release_readiness_check.main(["--head-sha", "release-head"])
+    rc = release_readiness_check.main(["--head-sha", "release-head", "--repo", "joeharris76/BenchBox"])
 
     assert rc == 1
     assert captured_urls == [

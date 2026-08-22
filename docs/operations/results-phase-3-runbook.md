@@ -8,6 +8,12 @@ Phase 1 and Phase 2 have no hosted services. This runbook applies exclusively to
 Phase 3. Until Phase 3 launches, file GitHub issues for any anomalies found in
 the static explorer or PR-based submission pipeline.
 
+> **Not implemented yet.** The CLI surfaces described below - `benchbox admin
+> ...`, `benchbox result withdraw`, and `benchbox setup --service` - are Phase 3
+> designs, not part of the shipped CLI. Hosted submission credentials are
+> managed today with `benchbox auth login --service <url>`; see
+> `benchbox auth --help`.
+
 ---
 
 ## w4 - Auth Model

@@ -1,6 +1,6 @@
 ---
 allowed-tools: Bash(git:*), Bash(gh:*), Bash(make:*), Bash(uv:*)
-description: BenchBox PR workflow - path-aware preflight, push, open PR vs develop, enable auto-merge
+description: BenchBox PR workflow - path-aware preflight, push, open PR vs develop; does not enable auto-merge unless READY=1
 ---
 
 ## Context

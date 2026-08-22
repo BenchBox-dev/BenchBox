@@ -38,8 +38,6 @@ End-to-end tests that validate complete benchmark workflows through the CLI.
 
 ```bash
 # Quick E2E tests (dry-run mode)
-make test-e2e-quick
-# or
 uv run -- python -m pytest -m e2e_quick
 
 # Local platform E2E tests (full execution)

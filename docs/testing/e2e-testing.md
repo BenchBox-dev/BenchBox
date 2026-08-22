@@ -45,8 +45,6 @@ uv run -- python -m pytest tests/e2e/ -n auto
 
 ```bash
 # Quick tests using dry-run mode (no actual benchmark execution)
-make test-e2e-quick
-# or
 uv run -- python -m pytest -m e2e_quick
 ```
 

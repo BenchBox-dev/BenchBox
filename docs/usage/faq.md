@@ -320,17 +320,17 @@ This is a limitation of the upstream TPC-DS tools, not BenchBox.
 
 ### Can I run benchmarks in parallel?
 
-Yes! Some benchmarks support throughput tests with concurrent queries. The
-primary `run` command does not have a `--streams`/`--concurrency` flag yet, so
-today the number of concurrent streams is set through the deprecated
-`run-official` compatibility command:
+Yes! Some benchmarks support throughput tests with concurrent queries. Set the
+stream count with `--concurrency` (a hidden option on `run`, shown by
+`benchbox run --help-topic all`):
 
 ```bash
-benchbox run-official tpch --platform duckdb --scale 1 --phases throughput --streams 4 --seed 42
+benchbox run --official --benchmark tpch --platform duckdb --scale 1 \
+  --phases throughput --concurrency 4 --seed 42
 ```
 
-See [CLI Reference → Deprecated: `run-official`](../reference/cli/run.md#deprecated-run-official)
-and [Power Run & Concurrent Queries](../advanced/power-run-concurrent-queries.md).
+The throughput driver floors the stream count at the TPC minimum of 2.
+See [Power Run & Concurrent Queries](../advanced/power-run-concurrent-queries.md).
 
 ### How do I compare results across runs?
 
@@ -346,7 +346,7 @@ See [Result Schema](../reference/result-schema-v1.md) and [API Reference](../ref
 Yes! BenchBox provides APIs for creating custom benchmarks:
 
 ```python
-from benchbox.core.base import BaseBenchmark
+from benchbox.base import BaseBenchmark
 
 class MyCustomBenchmark(BaseBenchmark):
     # Implement required methods

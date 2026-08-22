@@ -54,7 +54,7 @@ Core users interact with supported benchmarks only:
 
 ```bash
 uv add benchbox
-benchbox list-benchmarks
+benchbox benchmarks list
 benchbox run --platform duckdb --benchmark tpch --scale 0.01
 ```
 

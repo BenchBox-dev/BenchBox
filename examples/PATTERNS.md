@@ -473,7 +473,7 @@ jobs:
 
       - name: Run regression test
         run: |
-          python examples/ci/regression_test.py
+          python examples/use_cases/ci_regression_test.py
         env:
           BASELINE_FILE: .github/baselines/tpch_sf01.json
           THRESHOLD: "0.15"  # 15% slowdown threshold
