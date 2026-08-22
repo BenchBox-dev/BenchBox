@@ -138,9 +138,34 @@ gh api repos/BenchBox-dev/BenchBox/rulesets/15611785 --jq '
     ),
     linear_history: any(.rules[]; .type == "required_linear_history"),
     non_fast_forward: any(.rules[]; .type == "non_fast_forward"),
-    deletion: any(.rules[]; .type == "deletion")
+    deletion: any(.rules[]; .type == "deletion"),
+    merge_queue: any(.rules[]; .type == "merge_queue")
   }'
 ```
+
+### Native Merge Queue Configuration (Post-v0.4.0)
+
+When Native Merge Queue is activated on `develop-squash-only` (ruleset id `15611785`), the following rule parameters govern queue operations:
+
+```json
+{
+  "type": "merge_queue",
+  "parameters": {
+    "check_response_timeout_minutes": 60,
+    "grouping_strategy": "ALLGREEN",
+    "max_entries_to_build": 5,
+    "max_entries_to_merge": 1,
+    "merge_method": "SQUASH",
+    "min_entries_to_merge": 1,
+    "min_entries_to_merge_wait_minutes": 0
+  }
+}
+```
+
+- **Speculative Integration:** `max_entries_to_build: 5` evaluates up to 5 concurrent pull requests speculatively without serializing check waits.
+- **Atomic Squash:** `merge_method: SQUASH` preserves the single-commit linear history invariant.
+- **Soundness Gate:** Soundness PRs are withheld from auto-enqueue by `auto_merge_soundness_paths.py` and require CODEOWNERS approval before entry.
+- **Rollback:** Disable the `merge_queue` rule object in ruleset `15611785` to immediately revert to standard squash merges.
 
 ### Soundness-path review enforcement (enforced; operational caution)
 
