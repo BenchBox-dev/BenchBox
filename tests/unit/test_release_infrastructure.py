@@ -382,9 +382,9 @@ class TestReleaseInfrastructure:
         # Each shard is deliberately single-threaded; process-level sharding
         # keeps the timeout bounded without enabling unsafe xdist concurrency.
         non_fast_job = jobs["credential-free-non-fast"]
-        assert non_fast_job["timeout-minutes"] == 45
+        assert non_fast_job["timeout-minutes"] == 75
         assert non_fast_job["strategy"]["fail-fast"] is False
-        assert len(non_fast_job["strategy"]["matrix"]["include"]) == 4
+        assert len(non_fast_job["strategy"]["matrix"]["include"]) == 6
 
         # pypi-latest-installability must not gate on (or be gated by) the
         # other canary jobs, and must not check out the repo (it installs
