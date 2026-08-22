@@ -60,7 +60,7 @@ FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "fast_lane_ratchet_fixture.json"
 POLICY_PATH = REPO_ROOT / "_project" / "config" / "fast_test_lane_policy.json"
 CEILING_LOG_PATH = "_project/config/fast_lane_ceiling_log.md"
 
-DEFAULT_REPO = "joeharris76/BenchBox"
+DEFAULT_REPO = "BenchBox-dev/BenchBox"
 API_ROOT = "https://api.github.com"
 
 # Same threshold timing_policy_check.py's FAST_LANE_WARNING uses -- this

@@ -25,7 +25,7 @@ This guide provides information for developers who want to contribute to BenchBo
 1.  **Clone the repository:**
 
     ```bash
-    git clone https://github.com/joeharris76/benchbox.git
+    git clone https://github.com/BenchBox-dev/benchbox.git
     cd BenchBox
     ```
 

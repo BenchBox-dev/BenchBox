@@ -436,7 +436,7 @@ def run_shadow(
     target.parent.mkdir(parents=True, exist_ok=True)
     environment = os.environ.copy()
     environment["TODO_DB_PROJECT_ID"] = "benchbox"
-    environment["TODO_DB_REPOSITORY"] = "https://github.com/joeharris76/BenchBox"
+    environment["TODO_DB_REPOSITORY"] = "https://github.com/BenchBox-dev/BenchBox"
     created_target = False
     export_path: Path | None = None
     command_reports: list[dict[str, Any]] = []
@@ -453,7 +453,7 @@ def run_shadow(
                     "--project-id",
                     "benchbox",
                     "--repository",
-                    "https://github.com/joeharris76/BenchBox",
+                    "https://github.com/BenchBox-dev/BenchBox",
                 ],
                 cwd=repo_root,
                 env=environment,
@@ -474,7 +474,7 @@ def run_shadow(
                     "--project-id",
                     "benchbox",
                     "--repository",
-                    "https://github.com/joeharris76/BenchBox",
+                    "https://github.com/BenchBox-dev/BenchBox",
                 ],
                 cwd=repo_root,
                 env=environment,
@@ -496,7 +496,7 @@ def run_shadow(
                     "--project-id",
                     "benchbox",
                     "--repository",
-                    "https://github.com/joeharris76/BenchBox",
+                    "https://github.com/BenchBox-dev/BenchBox",
                 ],
                 cwd=repo_root,
                 env=environment,

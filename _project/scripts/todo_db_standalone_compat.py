@@ -169,7 +169,7 @@ def _with_identity(argv: list[str], command_index: int) -> list[str]:
         identity.extend(
             [
                 "--repository",
-                os.environ.get("BENCHBOX_TODO_DB_REPOSITORY", "https://github.com/joeharris76/BenchBox"),
+                os.environ.get("BENCHBOX_TODO_DB_REPOSITORY", "https://github.com/BenchBox-dev/BenchBox"),
             ]
         )
     return before + identity + after

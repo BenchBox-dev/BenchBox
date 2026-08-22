@@ -579,7 +579,7 @@ benchbox run --platform <platform> --benchmark tpch --scale 0.01 \
 
 ### Resources
 
-- [GitHub Issues](https://github.com/joeharris76/benchbox/issues) - Report bugs
+- [GitHub Issues](https://github.com/BenchBox-dev/benchbox/issues) - Report bugs
 - [Platform Docs](../platforms/index.md) - Platform-specific guides
 - [Configuration Guide](configuration.md) - Detailed options
 

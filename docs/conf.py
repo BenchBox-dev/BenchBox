@@ -222,7 +222,7 @@ html_theme_options = {
         "color-foreground-primary": "#f0f6fc",
         "color-foreground-secondary": "#c9d1d9",
     },
-    "source_repository": "https://github.com/joeharris76/benchbox/",
+    "source_repository": "https://github.com/BenchBox-dev/benchbox/",
     "source_branch": "main",
     "source_directory": "docs/",
 }

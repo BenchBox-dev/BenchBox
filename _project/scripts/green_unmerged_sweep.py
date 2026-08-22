@@ -126,7 +126,7 @@ from required_lane import (  # noqa: E402
 
 FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "green_unmerged_fixture.json"
 
-DEFAULT_REPO = "joeharris76/BenchBox"
+DEFAULT_REPO = "BenchBox-dev/BenchBox"
 GRACE_PERIOD_HOURS = 2.0
 API_ROOT = "https://api.github.com"
 DEVELOP_POST_MERGE_WORKFLOW = "develop-post-merge.yml"

@@ -3,8 +3,8 @@
 # BenchBox
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Beta Software](https://img.shields.io/badge/Status-Beta-blue.svg)](https://github.com/joeharris76/benchbox/issues)
-[![codecov](https://codecov.io/github/joeharris76/BenchBox/graph/badge.svg?token=3NY6DK7MDO)](https://codecov.io/github/joeharris76/BenchBox)
+[![Beta Software](https://img.shields.io/badge/Status-Beta-blue.svg)](https://github.com/BenchBox-dev/benchbox/issues)
+[![codecov](https://codecov.io/github/BenchBox-dev/BenchBox/graph/badge.svg?token=3NY6DK7MDO)](https://codecov.io/github/BenchBox-dev/BenchBox)
 [![PyPI Release](https://img.shields.io/pypi/v/benchbox)](https://pypi.org/project/benchbox/)
 [![PyPI Downloads](https://img.shields.io/pepy/dt/benchbox.svg?label=PyPI%20Downloads)](https://pypi.org/project/benchbox/)
 
@@ -1259,13 +1259,13 @@ As Beta software, BenchBox benefits greatly from community feedback and contribu
 
 ### Reporting Issues
 
-**Bug Reports**: Found a problem? [Create an issue](https://github.com/joeharris76/benchbox/issues/new) with:
+**Bug Reports**: Found a problem? [Create an issue](https://github.com/BenchBox-dev/benchbox/issues/new) with:
 - Steps to reproduce the issue
 - Expected vs actual behavior
 - Environment details (Python version, platform, database)
 - Minimal code example if possible
 
-**Feature Requests**: Have an idea? [Open an issue](https://github.com/joeharris76/benchbox/issues/new) describing:
+**Feature Requests**: Have an idea? [Open an issue](https://github.com/BenchBox-dev/benchbox/issues/new) describing:
 - The use case and problem you're trying to solve
 - Proposed solution or approach
 - How it fits with existing functionality
@@ -1273,7 +1273,7 @@ As Beta software, BenchBox benefits greatly from community feedback and contribu
 ### Community Guidelines
 
 - **Be patient**: As Beta software, responses may take time
-- **Search first**: Check existing [issues](https://github.com/joeharris76/benchbox/issues) before creating new ones
+- **Search first**: Check existing [issues](https://github.com/BenchBox-dev/benchbox/issues) before creating new ones
 - **Be specific**: Detailed reports help us understand and fix issues faster
 - **Stay constructive**: Focus on problems and solutions, not criticism
 

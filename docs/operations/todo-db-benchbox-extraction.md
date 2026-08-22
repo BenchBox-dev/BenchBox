@@ -155,7 +155,7 @@ test -n "$TODO_DB_URL"
 test -n "$TODO_DB_RO_AUTH_TOKEN"
 
 SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/todo-db-live-restore.XXXXXX")"
-IDENTITY="--project-id benchbox --repository https://github.com/joeharris76/BenchBox"
+IDENTITY="--project-id benchbox --repository https://github.com/BenchBox-dev/BenchBox"
 
 _project/scripts/todo export --out "$SCRATCH/views" \
   --lossless-out "$SCRATCH/lossless"

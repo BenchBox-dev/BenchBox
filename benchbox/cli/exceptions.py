@@ -304,7 +304,7 @@ class ErrorHandler:
 
         # Suggest reporting the issue
         self.console.print("\n[yellow]This appears to be an unexpected error.[/yellow]")
-        self.console.print("Please report this issue at: [blue]https://github.com/joeharris76/benchbox/issues[/blue]")
+        self.console.print("Please report this issue at: [blue]https://github.com/BenchBox-dev/benchbox/issues[/blue]")
         self.console.print("[dim]Include the version information above in your report.[/dim]")
 
     def _show_configuration_help(self, error: BenchboxCLIError, context: Optional[ErrorContext]) -> None:

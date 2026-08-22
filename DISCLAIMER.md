@@ -13,7 +13,7 @@ BenchBox is an independent open-source project created and maintained by Joe Har
 > - Production use is not recommended
 > - Support is best-effort through GitHub issues
 >
-> Feedback is always appreciated. [Report issues and add request features here →](https://github.com/joeharris76/benchbox/issues)
+> Feedback is always appreciated. [Report issues and add request features here →](https://github.com/BenchBox-dev/benchbox/issues)
 
 ### What Alpha Status Means for BenchBox
 
@@ -21,7 +21,7 @@ As alpha software, BenchBox is **actively developed and experimental**. Here's w
 
 **API Stability**: APIs, method signatures, and configuration formats may change between versions without deprecation warnings. We recommend pinning to specific versions in production environments.
 
-**Feature Completeness**: While core functionality works, some features may be incomplete, experimental, or have known limitations. Check our [GitHub Issues](https://github.com/joeharris76/benchbox/issues) for current known issues.
+**Feature Completeness**: While core functionality works, some features may be incomplete, experimental, or have known limitations. Check our [GitHub Issues](https://github.com/BenchBox-dev/benchbox/issues) for current known issues.
 
 **Support & Response Times**: Support is provided on a best-effort basis through GitHub issues. Response times may vary, and immediate fixes for non-critical issues cannot be guaranteed.
 
@@ -42,9 +42,9 @@ As alpha software, BenchBox is **actively developed and experimental**. Here's w
 
 ### Getting Help
 
-- **Bug Reports**: [Create an issue](https://github.com/joeharris76/benchbox/issues/new) with reproduction steps
-- **Feature Requests**: [Propose new features](https://github.com/joeharris76/benchbox/issues/new) with use case details
-- **Questions**: Check existing [discussions and issues](https://github.com/joeharris76/benchbox/issues) first
+- **Bug Reports**: [Create an issue](https://github.com/BenchBox-dev/benchbox/issues/new) with reproduction steps
+- **Feature Requests**: [Propose new features](https://github.com/BenchBox-dev/benchbox/issues/new) with use case details
+- **Questions**: Check existing [discussions and issues](https://github.com/BenchBox-dev/benchbox/issues) first
 - **Contributions**: See the [Contributing](README.md#contributing) section in the README
 
 ## Employment Affiliation

@@ -66,7 +66,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_REPO = "joeharris76/BenchBox"
+DEFAULT_REPO = "BenchBox-dev/BenchBox"
 FAST_LANE_POLICY_PATH = "_project/config/fast_test_lane_policy.json"
 REQUIRED_LANE_WORKFLOW_NAME = "Develop PR"
 FAST_TEST_JOB_NAME = "test (ubuntu-latest, 3.12)"
