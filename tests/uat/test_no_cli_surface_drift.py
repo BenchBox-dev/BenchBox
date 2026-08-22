@@ -124,7 +124,6 @@ ALLOWED_INTERNAL_CLI_FILES = {
     # or function signature changed; the guard's decorator/signature snapshot
     # stays equal. File-level allow is required because this test first diffs
     # names under benchbox/cli/ against the allowlist.
-    "benchbox/cli/onboarding.py",
     "benchbox/cli/commands/benchmarks.py",
     "benchbox/cli/commands/config.py",
     "benchbox/cli/commands/download_answers.py",
