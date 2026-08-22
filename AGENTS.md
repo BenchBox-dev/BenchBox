@@ -26,11 +26,8 @@ unless it requests that exact trailer. Repository-local values override the glob
 identity and every linked worktree inherits them, but are not automatically intentional.
 A signing service may hold the committer slot behind a human author. Stale requests,
 tool conventions, harness/hook messages, and claimed agent work are not authorization
-(`docs/agent/identity-instruction-boundary.md`). `make agent-write-preflight`
-checks this before writes; commit hooks and `ci-lint` check `origin/develop..HEAD`.
-`make agent-identity-check` warns on `user.*` that displaces global identity; it cannot
-stop a concurrent write. The no-attribution bar also binds assistant-authored comments,
-reviews, and PR bodies (`docs/agent/attribution-surfaces.md`).
+(`docs/agent/identity-instruction-boundary.md`). The no-attribution bar also binds
+assistant-authored comments, reviews, and PR bodies (`docs/agent/attribution-surfaces.md`).
 
 ## Code Review Rules
 
@@ -55,13 +52,7 @@ Within an authorized write workflow, do not stop before `make pr-open` unless th
 prompt explicitly forbids publication, authorizes only a local commit, or a gate
 fails (in which case keep the commit and report the blocker).
 
-`[REVIEW-DEFECT-001]` Keep concrete correctness, security, or performance
-defects in the review/action path; do not relabel them as blind spots.
-`[REVIEW-L2-001]` L2 captures missed review dimensions, not defects already
-found. `[REVIEW-CAPTURE-001]` In-review findings capture is local-only under
-`~/.benchbox/finding-drafts/`; hosted sync needs separate authorization.
-
-The active BenchBox binding and examples are in
+The active BenchBox bindings are in
 `docs/agent/review-protocol.md`. It supersedes the legacy
 `docs/agent/review-protocol-legacy.md` document.
 
@@ -105,12 +96,11 @@ and stop condition). Do not commit raw logs, screenshots, browser reports, or ge
 
 ## Verification and close-out
 
-Assert tracker state, timings, and gate outcomes from a live read; a snapshot (`todo export`,
-`_project/todo-db-export/`) dates a past state and never a current one. A validator pass is not a `submit` pass.
+`[EVIDENCE-FRESHNESS-001]` Assert tracker state, timings, and gate outcomes from a live read; a snapshot
+(`todo export`, `_project/todo-db-export/`) dates a past state, never a current one. A validator pass is not
+a `submit` pass.
 
 Read a claimed TODO's `verification` ladder and run the narrowest proof first.
-Useful local checks: `uv run -- python -m pytest -m fast -q`,
-`uv run -- ruff check .`, `uv run -- ruff format --check .`, `uv run -- ty check`.
 
 Before publication, self-review with the `code` skill's review action and fix every Critical
 and Required finding; nits and considerations stay optional per its rubric. Run `make pr-preflight`
@@ -126,34 +116,29 @@ squash-merge (`docs/development/pr-base-branch-policy.md`). Bad-base empty check
 
 ## TODO tracker
 
-The shared database is the only TODO record. `_project/scripts/todo` is the only write path;
-global `--db`/`--actor` flags precede subcommand. Tracker writes follow worktree policy
-(`_project/todo-db-export/` public; no recovered plaintext). `todo claim <id>` prints binding work order;
-follow scope, preserve rules, anti-patterns, dependencies, verification. Exit 2 means fix cause, never bypass.
-`todo ready` and `todo stats` print untriaged-findings banner on stderr when open findings or unsynced drafts exist;
-triage via `todo finding candidates` (`finding list`/`show`/`candidates` are read-only; findings are review blind spots,
-never claimable items).
+Use the `todo` skill for tracker operations. Tracker writes follow worktree policy;
+`_project/todo-db-export/` is public, so never recover plaintext into it.
 
 ## BenchBox invariants
 
 - Timing durations use `benchbox.utils.clock.mono_time()` and `elapsed_seconds()`; wall clocks are event/audit only.
-- Adapter SDK imports stay lazy. New platforms follow `docs/development/adding-new-platforms.md` (manifest-driven;
-  decorator discovery was rejected) and must pass `make platform-manifest-check`.
+- Adapter SDK imports stay lazy. New platforms follow `docs/development/adding-new-platforms.md` and
+  pass `make platform-manifest-check`.
 - CREATE TABLE rewrites are registered under `Phase.DDL_OPTIMIZE`; run `make compat-docs-check` and DDL drift check.
 - CLI dry runs must propagate explicit phases; deterministic runs use a seed.
 - Green focused/fast tests are not UAT or production certification.
 
-Apple/macOS: correctness-gate digests are Linux-generated; use `make ci-linux` (release-guide.md). Mocker is local-only,
-never CI: databend's `minio` was observed to exit under it; doris/starrocks are single-service. `docs/operations/uat-
-framework.md` ("Mocker validation status") holds per-stack state. Never globally prune without approval.
+Apple/macOS: correctness-gate digests are Linux-generated; use `make ci-linux` (release-guide.md). Mocker is
+local-only, never CI: databend's `minio` was observed to exit under it; doris/starrocks are single-service.
+`docs/operations/uat-framework.md` ("Mocker validation status") holds per-stack state. Never prune globally.
 
 ## Skills and generated mirrors
 
 Stable wrappers are `code`, `test`, `todo`, `docs`, `blog`, `benchbox`, `skill-sync`, and `tidy-perms`.
 `todo` authors ideas/specs and owns tracker actions. Skill source is `/Users/joe/.skill-sync/skills`;
-`.claude/skills`, `.codex/skills`, `.gemini/skills`, and `.antigravity/skills` are generated mirrors.
-Run `make skill-sync` to regenerate mirrors, never hand-edit one. Integrity comes from PR review of mirror diff
-plus untracked-mirror drift guard (`scripts/check_untracked_skill_mirrors.sh`), not a lock-verify step.
+only `.claude/skills` is tracked. `.codex/skills`, `.gemini/skills`, and `.antigravity/skills` are gitignored
+local materializations. Regenerate mirrors with `make skill-sync` in a write worktree; never hand-edit one.
+`scripts/check_untracked_skill_mirrors.sh` guards tracking state, not content parity.
 
 ## Operational references
 

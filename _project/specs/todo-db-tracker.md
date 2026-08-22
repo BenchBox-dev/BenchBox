@@ -663,19 +663,16 @@ tracker suite (93 tests: `test_todo_db.py`, `test_todo_db_v2.py`,
 passes unchanged. Replayable acceptance protocol:
 `_project/audits/todo-db-hosted-acceptance-2026-07-18.md`.
 
-### Pilot status & readiness (2026-07-19, PR #1222 review follow-up)
+### Historical pilot checkpoint (2026-07-19, PR #1222 review follow-up)
 
-Current readiness: **ready for controlled agent use via the explicit
-`todo-db` skill, one process per worktree, with hosted credentials
-configured** — NOT the default project-wide TODO process.
+At this checkpoint the implementation was ready for controlled agent use via
+the explicit `todo-db` skill, one process per worktree, with hosted credentials
+configured, but it was not yet the default project-wide TODO process. For
+current routing, use `.claude/skills/todo/SKILL.md` and `_project/scripts/todo --help`.
 
-- **Cutover contract (opt-in pilot, not migrated).** Generic TODO routing
-  still points at the YAML tree: `AGENTS.md` "Planning & TODOs" and the
-  skill-synced `todo` skill direct agents to `_project/TODO/**` +
-  `todo_cli.py`; `todo-db` is an unmanaged, opt-in sibling. The routing/docs
-  cutover is **G5** (deferred, maintainer-gated). Until G5, describe this as
-  an opt-in DB-backend pilot — do not claim the project-wide TODO process has
-  migrated.
+- **Cutover contract at the time (opt-in pilot, not migrated).** Generic TODO
+  routing still pointed at the YAML tree; `todo-db` was an unmanaged, opt-in
+  sibling. The routing/docs cutover was **G5** (deferred, maintainer-gated).
 - **Same-worktree replica concurrency (one process per worktree).** The
   `_replica_setup_lock()` advisory flock serializes replica open+sync across
   processes but is released while the connection stays open, so it does not

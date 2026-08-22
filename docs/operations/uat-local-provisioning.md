@@ -22,7 +22,7 @@ started by the operator.
 env override (verbatim) > macOS: `mocker` if on `PATH`, else `docker` > every
 other platform: always `docker`. A missing resolved binary is a hard error.
 Full contract and mocker teardown interaction: `docs/operations/uat-framework.md`
-"Container engine resolution", AGENTS.md "UAT container engine resolution".
+"Container engine resolution".
 
 ## Automated Docker-backed platforms
 

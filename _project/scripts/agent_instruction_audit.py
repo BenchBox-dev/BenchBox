@@ -23,6 +23,7 @@ CANONICAL_COMMIT_SKILL = ".claude/skills/SHARED/change-framework/SKILL.md"
 REQUIRED_POLICY_IDS = {
     "AUTH-PROVENANCE-001",
     "COMMIT-IDENTITY-001",
+    "EVIDENCE-FRESHNESS-001",
     "REVIEW-AUTH-001",
     "REVIEW-DEFECT-001",
     "REVIEW-DEPTH-001",
@@ -32,7 +33,15 @@ REQUIRED_POLICY_IDS = {
     "REVIEW-PLAN-RECON-001",
     "WRITE-CLOSEOUT-001",
 }
-REVIEW_POLICY_IDS = {policy_id for policy_id in REQUIRED_POLICY_IDS if policy_id.startswith("REVIEW-")}
+CANONICAL_REVIEW_POLICY_IDS = {
+    "REVIEW-AUTH-001",
+    "REVIEW-DEFECT-001",
+    "REVIEW-DEPTH-001",
+    "REVIEW-L2-001",
+    "REVIEW-CAPTURE-001",
+    "REVIEW-PARITY-001",
+    "REVIEW-PLAN-RECON-001",
+}
 CANONICAL_REVIEW_ANCHORS = {
     "REVIEW-AUTH-001": (
         "read-only except for local capture",
@@ -43,8 +52,8 @@ CANONICAL_REVIEW_ANCHORS = {
         "without changing tracked worktree content",
         "combines review and remediation remains review-only",
     ),
-    "REVIEW-DEPTH-001": ("L1", "L2", "L3"),
     "REVIEW-DEFECT-001": ("classify it as a defect", "never in blind-spots"),
+    "REVIEW-DEPTH-001": ("Obvious answer", "Blind-spot audit", "Problem reframe"),
     "REVIEW-L2-001": ("gaps in the review framework", "not defects already found"),
     "REVIEW-CAPTURE-001": ("protocol governs behavior", "governs storage formats"),
     "REVIEW-PARITY-001": ("Missing IDs or contradictory semantics", "skill governs behavior"),
@@ -83,15 +92,13 @@ PROJECT_COMMIT_ANCHORS = {
     )
 }
 PROJECT_REVIEW_ANCHORS = {
-    "REVIEW-AUTH-001": ("later user turn", "bundling review and remediation"),
+    "REVIEW-CAPTURE-001": ("~/.benchbox/finding-drafts/", "_project/scripts/todo"),
+    "REVIEW-PARITY-001": ("canonical skill governs behavior", "only BenchBox-specific bindings"),
     "REVIEW-PLAN-RECON-001": (
-        "Enumerate recorded decision",
         "future-state index/tiers",
         "migration gates",
         "readiness docs",
         "open tracker items",
-        "Cite or supersede each",
-        "dropped open gate is a defect",
     ),
 }
 AGENT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("zero tracked worktree-content changes", "do not review and then edit")}
@@ -121,6 +128,7 @@ EVALUATION_ACTIONS = {
     "stop_publication",
     "continue_locally",
     "capture_local_draft",
+    "require_live_read",
 }
 EVALUATION_IDENTITIES = {"human", "current_task_agent", "not_applicable"}
 EVALUATION_BOOLEAN_FIELDS = {
@@ -235,7 +243,7 @@ def audit_review_policy(project: Path) -> list[str]:
             errors.append(f"AGENTS.md Code Review Rules drifted; missing anchors: {', '.join(missing_anchors)}")
 
     missing_canonical_ids = sorted(
-        policy_id for policy_id in REVIEW_POLICY_IDS if f"[{policy_id}]" not in canonical_review
+        policy_id for policy_id in CANONICAL_REVIEW_POLICY_IDS if f"[{policy_id}]" not in canonical_review
     )
     if missing_canonical_ids:
         errors.append(f"canonical review skill misses policy IDs: {', '.join(missing_canonical_ids)}")
@@ -661,7 +669,6 @@ def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
     errors.extend(_tag("docs-placement", audit_docs_placement(project)))
     errors.extend(_tag("commit-policy", audit_commit_policy(project)))
     errors.extend(_tag("dependency-caps", audit_dependency_caps(project)))
-
     errors.extend(_tag("scenarios", audit_scenarios(corpus["scenarios"], policy_text)))
 
     return metrics, errors
