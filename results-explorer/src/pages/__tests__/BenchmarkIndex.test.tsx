@@ -650,6 +650,61 @@ describe("BenchmarkIndex", () => {
     expect(compareLink.getAttribute("href")).toBe("/results/compare?ids=aaaaaaaa,bbbbbbbb");
   });
 
+  it("blocks a fifth comparison selection and describes the cap outside the accessible name", async () => {
+    const resultRows = Array.from({ length: 5 }, (_, index) => ({
+      ...RESULT_ROWS[0]!,
+      result_id: `r-cap-${index + 1}`,
+      platform: `Platform ${index + 1}`,
+      platform_id: `platform-${index + 1}`,
+      power_score: 3000 - index * 100,
+      geomean_ms: 10 + index,
+      display_geomean_ms: 10 + index,
+    }));
+    const rankingRows = Array.from({ length: 5 }, (_, index) => ({
+      ...RANKING_ROWS[0]!,
+      result_id: `r-cap-${index + 1}`,
+      short_id: `cap0000${index + 1}`,
+      platform: `Platform ${index + 1}`,
+      platform_id: `platform-${index + 1}`,
+      power_score: 3000 - index * 100,
+      display_geomean_ms: 10 + index,
+      rank: index + 1,
+      total_in_cohort: 5,
+      cohort_ranked_count: 5,
+    }));
+    const cellRows = rankingRows.flatMap((row, index) => [
+      {
+        ...CELL_ROWS[0]!,
+        result_id: row.result_id,
+        platform_id: row.platform_id,
+        display_ms: 10 + index,
+      },
+      {
+        ...CELL_ROWS[1]!,
+        result_id: row.result_id,
+        platform_id: row.platform_id,
+        display_ms: 20 + index,
+      },
+    ]);
+    vi.mocked(queryRows).mockImplementation(defaultImpl(resultRows, rankingRows, cellRows));
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    const grid = await screen.findByRole("grid", { name: /tpch SF0\.1 power results/ });
+    const checkboxes = within(grid).getAllByRole("checkbox") as HTMLInputElement[];
+    expect(checkboxes).toHaveLength(5);
+    for (const checkbox of checkboxes.slice(0, 4)) fireEvent.click(checkbox);
+
+    const fifth = within(grid).getAllByRole("checkbox")[4] as HTMLInputElement;
+    await waitFor(() => expect(fifth.disabled).toBe(true));
+    expect(fifth.checked).toBe(false);
+    expect(fifth.getAttribute("aria-label")).not.toContain("Selection limit");
+    const reasonId = fifth.getAttribute("aria-describedby");
+    expect(reasonId).toBeTruthy();
+    expect(document.getElementById(reasonId!)?.textContent).toContain("Selection limit reached");
+    expect(document.getElementById(reasonId!)?.textContent).toContain("Clear one selected run");
+    expect(screen.getByRole("link", { name: /Compare 4 selected/ })).toBeTruthy();
+  });
+
   it("excludes no-timing rows from analysis and keeps receipt provenance in Excluded runs", async () => {
     const noTimingResult = {
       ...RESULT_ROWS[0]!,
