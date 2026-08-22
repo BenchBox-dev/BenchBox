@@ -13,6 +13,14 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10
+    import tomli as tomllib  # type: ignore[no-redef]
+
+from packaging.requirements import InvalidRequirement, Requirement
+from packaging.version import InvalidVersion, Version
+
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CORPUS = ROOT / "_project/evals/agent-instructions/scenarios.json"
 ADAPTERS = ("CLAUDE.md", "GEMINI.md", "ANTIGRAVITY.md")
@@ -498,27 +506,68 @@ def audit_dependency_caps(project: Path) -> list[str]:
 
     manifest_path = project / "pyproject.toml"
     try:
-        manifest = manifest_path.read_text(encoding="utf-8")
-    except OSError as exc:
+        manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
         return [f"cannot read pyproject.toml: {exc}"]
-    # Matched textually rather than with a TOML parser: `tomllib` is 3.11+ and
-    # this repository still supports 3.10. Scanning every quoted requirement
-    # also covers optional-dependency tables without enumerating them.
-    requirements = re.findall(r'"([A-Za-z0-9_.-]+(?:\[[^\]]*\])?[^"]*)"', manifest)
+
+    project_table = manifest.get("project", {})
+    requirement_groups = {
+        "project.dependencies": project_table.get("dependencies", []),
+        **{
+            f"project.optional-dependencies.{group}": requirements
+            for group, requirements in project_table.get("optional-dependencies", {}).items()
+        },
+    }
 
     for name, cap in sorted(advertised.items()):
-        actual = None
-        for requirement in requirements:
-            if not re.match(rf"^{re.escape(name)}\s*[<>=!~\[]", requirement.strip()):
-                continue
-            found = re.search(r"<\s*([0-9][0-9A-Za-z_.]*)", requirement)
-            if found:
-                actual = found.group(1)
-                break
-        if actual is None:
+        try:
+            advertised_version = Version(cap)
+        except InvalidVersion:
+            errors.append(f"AGENTS.md advertises `{name}<{cap}` with an invalid version")
+            continue
+
+        matches: list[tuple[str, Requirement]] = []
+        for group, requirement_strings in requirement_groups.items():
+            for requirement_string in requirement_strings:
+                try:
+                    requirement = Requirement(requirement_string)
+                except InvalidRequirement:
+                    continue
+                if requirement.name.casefold() == name.casefold():
+                    matches.append((group, requirement))
+
+        base_matches = [requirement for group, requirement in matches if group == "project.dependencies"]
+        if base_matches:
+            checks = [("project.dependencies", requirement) for requirement in base_matches]
+        else:
+            # Optional groups can be installed independently. With no core
+            # bound to constrain every installation, each declaration must
+            # carry the advertised cap rather than borrowing one from an
+            # unrelated extra such as `dev`.
+            checks = matches
+
+        if not matches:
             errors.append(f"AGENTS.md advertises `{name}<{cap}` but pyproject.toml declares no upper bound for it")
-        elif not actual.startswith(cap):
-            errors.append(f"AGENTS.md advertises `{name}<{cap}` but pyproject.toml pins <{actual}")
+            continue
+
+        for group, requirement in checks:
+            bounds = [specifier for specifier in requirement.specifier if specifier.operator == "<"]
+            if not bounds:
+                errors.append(
+                    f"AGENTS.md advertises `{name}<{cap}` but [{group}] declares `{requirement}` without that bound"
+                )
+                continue
+            for bound in bounds:
+                try:
+                    actual_version = Version(bound.version)
+                except InvalidVersion:
+                    errors.append(f"[{group}] declares `{requirement}` with invalid upper bound <{bound.version}")
+                    continue
+                if actual_version != advertised_version:
+                    errors.append(
+                        f"AGENTS.md advertises `{name}<{cap}` but [{group}] declares "
+                        f"`{requirement}` with <{bound.version}"
+                    )
     return errors
 
 

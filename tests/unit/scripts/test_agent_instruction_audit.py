@@ -714,3 +714,21 @@ def test_optional_dependency_caps_are_honoured(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     _, errors = audit(project, CORPUS)
     assert not [error for error in errors if "duckdb" in error]
+
+
+def test_advertised_cap_is_not_accepted_as_a_version_prefix(tmp_path: Path) -> None:
+    """`sqlglot<3` must not pass merely because the manifest says `<31.0.0`."""
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    agents.write_text(agents.read_text().replace("`sqlglot<31`", "`sqlglot<3`"))
+    _, errors = audit(project, CORPUS)
+    assert any("sqlglot<3" in error and "<31.0.0" in error for error in errors)
+
+
+def test_each_independent_optional_dependency_keeps_the_advertised_cap(tmp_path: Path) -> None:
+    """A bound in `dev` must not hide a missing bound in the `duckdb` extra."""
+    project = _candidate(tmp_path)
+    manifest = project / "pyproject.toml"
+    manifest.write_text(manifest.read_text().replace('duckdb = ["duckdb>=1.0.0,<2.0.0"]', 'duckdb = ["duckdb>=1.0.0"]'))
+    _, errors = audit(project, CORPUS)
+    assert any("project.optional-dependencies.duckdb" in error and "without that bound" in error for error in errors)
