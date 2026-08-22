@@ -1,15 +1,17 @@
 """Guardrails for the seed-corpus workflow's PR base branch.
 
-`seed-corpus.yml` is `workflow_dispatch`-only and `release-cut` curates it out
-of the release tree, so no CI job ever exercises its `gh pr create` call. These
-tests stand in for that missing coverage: they pin the base branch to `develop`
-and encode why the release-only branch can never be a valid target.
+`seed-corpus.yml` is scheduled monthly and remains `workflow_dispatch`-callable.
+`release-cut` curates it out of the release tree, so no CI job ever exercises
+its `gh pr create` call. These tests stand in for that missing coverage: they
+pin the base branch to `develop` and encode why the release-only branch can
+never be a valid target.
 """
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -45,6 +47,40 @@ def _rendered_head_branch(commit_script: str) -> str:
     return branch.replace("${DATE}", "20260710")
 
 
+def _workflow() -> dict[str, Any]:
+    return yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+
+
+def _triggers(workflow: dict[str, Any]) -> dict[str, Any]:
+    on = workflow.get("on", workflow.get(True))
+    assert on is not None, "seed-corpus.yml has no `on:` block"
+    return on
+
+
+def test_seed_corpus_is_scheduled_monthly_and_still_dispatchable() -> None:
+    """Publication was stalling because generation existed only as a manual click."""
+    on = _triggers(_workflow())
+    crons = [entry["cron"] for entry in on["schedule"]]
+    assert "0 7 1 * *" in crons
+    assert "workflow_dispatch" in on
+
+
+def test_schedule_runs_the_full_matrix() -> None:
+    selected = _workflow()["jobs"]["generate-seed-corpus"]["env"]["SELECTED"]
+    assert "github.event_name == 'schedule'" in selected
+
+
+def test_tpcds_runs_are_official() -> None:
+    """Unofficial TPC-DS must not be published as official."""
+    run = next(
+        step["run"]
+        for step in _workflow()["jobs"]["generate-seed-corpus"]["steps"]
+        if step.get("name") == "Run benchmark"
+    )
+    assert "--official" in run
+    assert "tpcds" in run
+
+
 def test_seed_corpus_pr_targets_develop() -> None:
     """The seed corpus PR opens against `develop`, the default branch.
 
@@ -56,6 +92,20 @@ def test_seed_corpus_pr_targets_develop() -> None:
     assert "--base develop" in run
     assert "--base main" not in run
     assert "--base release" not in run
+
+
+def test_seed_corpus_pr_regenerates_and_stages_inventory() -> None:
+    """A generated-bundle PR must keep develop's derived inventory current."""
+    steps = _workflow()["jobs"]["create-pr"]["steps"]
+    names = [step.get("name") for step in steps]
+    regenerate_index = names.index("Regenerate corpus inventory")
+    stage_index = names.index("Check for new corpus changes")
+
+    assert regenerate_index < stage_index
+    assert "scripts/generate_corpus_inventory.py --write" in steps[regenerate_index]["run"]
+    stage_script = steps[stage_index]["run"]
+    assert "results-data/bundles/" in stage_script
+    assert "results-data/corpus-inventory.json" in stage_script
 
 
 def test_seed_corpus_head_branch_can_never_target_the_release_branch() -> None:
