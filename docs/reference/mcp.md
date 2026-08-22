@@ -57,9 +57,12 @@ port forward, or reverse proxy. Non-loopback binding requires a complete
 `--security-config` policy. See [Remote MCP security and tenancy](../operations/mcp-remote-security.md)
 for its threat model, token-digest provisioning, scopes, tenant workspaces,
 shared admission store, and fail-closed proxy requirements. This capability is
-not a production-readiness claim; keep shared endpoint publication disabled
-until the [production-readiness gate](../operations/mcp-production-readiness.md)
-has current evidence for the deployed revision.
+not a production-readiness claim. Shared, non-loopback endpoint publication and
+its operational acceptance matrix are explicitly
+[deferred until post-release](../operations/mcp-production-readiness.md). That
+deferral does not block the local stdio/loopback MCP MVP: its release checks are
+limited to current DuckDB package/execution evidence and pinned protocol
+conformance.
 
 ### SDK Compatibility
 
@@ -83,6 +86,20 @@ handshake-era clients. Protocol discovery, version negotiation, headers, and
 DNS-rebinding checks are provided by the MCP SDK rather than reimplemented by
 BenchBox. Responses remain streaming-capable; JSON-only mode is intentionally
 disabled so progress and future request-scoped notifications remain possible.
+
+### MVP release checks
+
+The MCP MVP has two release-blocking checks:
+
+1. install the built BenchBox wheel with `[mcp]` in a clean environment and run
+   a real small DuckDB benchmark through local `run_benchmark`; and
+2. run `uv run -- python scripts/verify_mcp_conformance.py
+   --protocol-version 2026-07-28` with no unexpected failures or warnings.
+
+The external registry, TLS/identity edge, multi-host storage, OTLP, incident
+exercise, transcript, and named approval belong to deferred post-release
+shared-service publication. See the
+[MCP evidence boundary](../operations/mcp-production-readiness-evidence.md).
 
 ### Testing Locally
 

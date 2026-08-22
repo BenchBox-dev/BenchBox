@@ -18,8 +18,11 @@ The pre-provisioned token verifier is a resource-server integration seam, not
 an authorization server. Tokens must be issued out of band. For horizontally
 scaled deployments, every worker must mount the configured state database and
 workspace root from storage with shared locking and durability semantics. Do
-not use node-local files on multiple hosts. The production-readiness gate must
-pass for the exact deployed revision before publishing a shared endpoint.
+not use node-local files on multiple hosts. The post-release
+production-publication gate must pass for the exact deployed revision before
+publishing a shared endpoint. That external deployment work is
+deferred until after the MVP release and is not part of local stdio/loopback
+MVP modernization.
 
 ## Configuration
 
@@ -205,7 +208,12 @@ job directory, and only then records `completed`. This prevents a completed
 status from preceding its durable artifact. Terminal metadata and its owned
 artifact are removed after `retention_seconds`.
 
-## Fail-closed deployment
+## Deferred post-release deployment
+
+Everything in this section and the storage, recovery, and incident sections
+below is deferred until after the MCP MVP release. These controls remain the
+fail-closed contract for any future shared non-loopback endpoint; they are not
+release blockers for local stdio or loopback Streamable HTTP.
 
 Run the process behind a TLS-terminating reverse proxy. The externally visible
 issuer and resource-server URLs must use HTTPS. The proxy must preserve the
@@ -214,7 +222,8 @@ not log bearer values. Configure request-body and header-size limits at the
 proxy, disable response caching, and set an upstream timeout long enough for
 normal MCP calls; benchmark execution itself uses durable job handles.
 
-Do not run the following command until the acceptance matrix is complete. The
+Do not run the following command during MVP modernization or until the
+post-release acceptance matrix is complete. The
 evidence JSON must name the deployed `BENCHBOX_BUILD_SHA`, be no more than seven
 days old, contain passing automated and external gates, and match the digest
 provisioned independently as `BENCHBOX_MCP_READINESS_SHA256`. OTLP credentials

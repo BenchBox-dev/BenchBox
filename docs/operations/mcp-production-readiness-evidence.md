@@ -1,9 +1,16 @@
-# MCP local-staging evidence and production gaps
+# MCP MVP evidence boundary and deferred production observations
 
 This record preserves observations from a controlled local Apple Container
-exercise. It is not production acceptance. None of the observations below is
-bound by one replayable transcript to the same readiness digest, image digest,
-source revision, and timestamp. Production publication remains fail-closed.
+exercise. It is historical diagnostic evidence, not release acceptance and not
+production acceptance. None of the observations below is bound by one
+replayable transcript to the same readiness digest, image digest, source
+revision, and timestamp.
+
+MVP modernization and external production publication are separate claims.
+Only a current DuckDB package/execution proof and current pinned protocol
+conformance block the MCP MVP release. Every external deployment, operations,
+and approval action in this record is deferred until post-release. The future
+non-loopback publication path remains fail-closed while deferred.
 
 ## Identity and immutable inputs
 
@@ -17,7 +24,7 @@ evidence_owner: Joe Harris
 
 local_staging_authorization: user-authorized local exercise on 2026-08-13
 
-record_updated_at: 2026-08-13T22:22:54Z
+record_updated_at: 2026-08-22T19:40:03Z
 
 image: local/benchbox-mcp:96d1-local
 
@@ -64,29 +71,41 @@ local_otlp_receipt_observation: OBSERVED_UNBOUND
 
 local_multiworker_observation: PARTIAL_UNBOUND
 
-## Production gate status
+## Claim status
 
-tls_edge: BLOCKED
+mvp_modernization_scope: LOCAL_STDIO_AND_LOOPBACK_HTTP
 
-backup_restore: BLOCKED
+mvp_duckdb_execution: NEEDS_CURRENT_EVIDENCE
 
-scaling_rollback_incident: BLOCKED
+mvp_protocol_conformance: NEEDS_CURRENT_EVIDENCE
 
-otlp: BLOCKED
+external_acceptance_schedule: DEFERRED_POST_RELEASE
 
-multiworker: BLOCKED
+tls_edge: DEFERRED_POST_RELEASE
 
-public_acceptance: NOT_RUN
+backup_restore: DEFERRED_POST_RELEASE
 
-publication_status: BLOCKED
+scaling_rollback_incident: DEFERRED_POST_RELEASE
 
-production_gate_status: BLOCKED
+otlp: DEFERRED_POST_RELEASE
+
+multiworker: DEFERRED_POST_RELEASE
+
+public_acceptance: DEFERRED_POST_RELEASE
+
+publication_status: DEFERRED_POST_RELEASE
+
+production_gate_status: DEFERRED_POST_RELEASE
 
 named_production_approver: NOT_ASSIGNED
 
 immutable_registry_digest: NOT_AVAILABLE
 
-## Staged DuckDB execution defect
+`DEFERRED_POST_RELEASE` is not `PASS` or `APPROVED`. It prevents accidental
+shared-endpoint publication without presenting post-release operational work as
+a blocker to the local MCP MVP.
+
+## MVP blocker 1: DuckDB package and execution proof
 
 The staged image statically registered and advertised DuckDB, but its build
 installed `benchbox[mcp]` without the separate DuckDB extra. A read-only probe
@@ -96,24 +115,48 @@ registry or runtime-policy defect.
 
 PR #1716 merged into `develop` as
 `3ffa5ba0265e065805e28aab6f092682d3039f2a`. It adds the repository's
-supported `duckdb>=1.0.0,<2.0.0` dependency to the MCP extra and real
-synchronous and durable surface tests. No corrected immutable image has been
-built or exercised from that merged revision. A new image must still be built,
-published by immutable registry digest, and exercised through an actual DuckDB
-benchmark before execution acceptance can pass.
+supported `duckdb>=1.0.0,<2.0.0` dependency to the MCP extra and synchronous and
+durable surface regression tests. The implementation defect is corrected; the
+remaining MVP blocker is a current release-artifact proof, not an external
+image-publication exercise.
 
-## Required production evidence
+The release operator should build the wheel, install that wheel with `[mcp]` in
+a clean environment, confirm `duckdb` imports, and invoke a small real TPC-H
+DuckDB run through local MCP `run_benchmark`. Record the source revision, wheel
+digest, command, timestamp, and redacted result. No registry, TLS edge, or
+production approver is required for this proof.
 
-- Build the corrected merged revision and publish it to the approved registry.
-- Record the immutable registry digest and one matching readiness-evidence
-  digest.
-- Deploy behind the approved production TLS and identity edge.
-- Prove the supported shared storage class across separate workers or hosts,
-  including WAL-safe backup and clean restore.
-- Verify HTTPS OTLP export, W3C parent propagation, bounded attributes, and
-  redaction.
-- Run the full pinned deployed-endpoint matrix, including DuckDB execution,
-  tenant isolation, quotas, durable jobs, cancellation, artifacts, cache
-  policy, scaling, rollback, dashboards, alerts, and incident diagnostics.
-- Publish a redacted replayable transcript and obtain named production
-  approval before changing any production gate above to `PASS` or `APPROVED`.
+## MVP blocker 2: current protocol conformance
+
+Run the exact pinned verifier documented in
+[the conformance baseline](mcp-conformance-baseline.md):
+
+```bash
+uv run -- python scripts/verify_mcp_conformance.py \
+  --protocol-version 2026-07-28
+```
+
+Retain its redacted output with the source revision and timestamp. Resolve every
+unexpected failure or warning; only the two individually named fixture
+non-applicabilities in the baseline are allowed. This loopback protocol and
+Inspector proof requires no external deployment.
+
+## Deferred post-release production evidence
+
+The following work is deliberately unscheduled until after the MVP release:
+
+- select an approved external HTTPS target, operator, approver, and registry;
+- publish an immutable image and bind it to a readiness-evidence digest;
+- deploy behind the approved production TLS and identity edge;
+- prove shared storage, WAL-safe backup/restore, and separate-worker or
+  multi-host behavior;
+- verify HTTPS OTLP export, W3C propagation, bounded attributes, and redaction;
+- exercise deployed tenant isolation, quotas, durable jobs, cancellation,
+  artifacts, cache policy, scaling, rollback, dashboards, alerts, and incident
+  diagnostics; and
+- publish one replayable redacted production transcript and obtain named
+  approval.
+
+When this work resumes, every item must pass before changing a production field
+to `PASS` or `APPROVED`. Until then, these fields constrain only future
+non-loopback publication and must not be cited as MVP release blockers.
