@@ -155,9 +155,10 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          echo "Soundness-critical paths changed; clearing any auto-merge pending review."
+          echo "Soundness-critical paths changed; clearing any auto-merge/queue enrollment pending review."
           # A push that newly touches a soundness path must not ride an auto-merge
-          # enabled by an earlier (non-soundness) push. --disable-auto exits
+          # enabled by an earlier (non-soundness) push. Disabling auto-merge also
+          # dequeues the PR from any active merge queue. --disable-auto exits
           # non-zero when auto-merge is already off, so tolerate that.
           gh pr merge --disable-auto --repo "$REPO" "$PR_NUMBER" || true
 
@@ -169,5 +170,5 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          echo "Explicit hold label no-auto-merge present; clearing any auto-merge."
+          echo "Explicit hold label no-auto-merge present; clearing any auto-merge/queue enrollment."
           gh pr merge --disable-auto --repo "$REPO" "$PR_NUMBER" || true
