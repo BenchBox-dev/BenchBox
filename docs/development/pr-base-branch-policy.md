@@ -91,5 +91,5 @@ empty or partial check list alone.
 - Never open a PR with `--base` set to another feature branch.
 - If `pr-base-guard` fails, fix the base; do not try to "add CI" to the
   stacked base by editing branch filters.
-- Short agent-facing summary: `AGENTS.md` → section **PR base branch
-  (stacked PRs unsupported)**.
+- Short agent-facing summary: `AGENTS.md` → section **Verification and
+  close-out** (stacked/feature-base PRs are unsupported).
