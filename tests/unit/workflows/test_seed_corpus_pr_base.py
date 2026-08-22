@@ -94,6 +94,20 @@ def test_seed_corpus_pr_targets_develop() -> None:
     assert "--base release" not in run
 
 
+def test_seed_corpus_pr_regenerates_and_stages_inventory() -> None:
+    """A generated-bundle PR must keep develop's derived inventory current."""
+    steps = _workflow()["jobs"]["create-pr"]["steps"]
+    names = [step.get("name") for step in steps]
+    regenerate_index = names.index("Regenerate corpus inventory")
+    stage_index = names.index("Check for new corpus changes")
+
+    assert regenerate_index < stage_index
+    assert "scripts/generate_corpus_inventory.py --write" in steps[regenerate_index]["run"]
+    stage_script = steps[stage_index]["run"]
+    assert "results-data/bundles/" in stage_script
+    assert "results-data/corpus-inventory.json" in stage_script
+
+
 def test_seed_corpus_head_branch_can_never_target_the_release_branch() -> None:
     """The pushed head is a `chore/` branch, so the release branch would reject it."""
     steps = _create_pr_steps()
