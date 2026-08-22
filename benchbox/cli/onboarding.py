@@ -95,7 +95,7 @@ def _show_welcome_message() -> None:
     welcome_text.append("\n\n", style="white")
 
     welcome_text.append("Documentation: ", style="dim")
-    welcome_text.append("https://docs.benchbox.dev", style="cyan underline")
+    welcome_text.append("https://benchbox.dev/docs/", style="cyan underline")
 
     console.print(Panel(welcome_text, title="🎯 Getting Started", border_style="cyan", padding=(1, 2)))
 

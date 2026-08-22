@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 MARKER_EXPRESSION = "(slow or resource_heavy) and not (stress or live_integration)"
-DEFAULT_SHARD_COUNT = 4
+DEFAULT_SHARD_COUNT = 6
 
 
 def _canonical_node_ids(node_ids: Iterable[str]) -> list[str]:

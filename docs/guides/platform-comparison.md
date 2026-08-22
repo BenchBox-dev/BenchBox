@@ -23,9 +23,9 @@ A key BenchBox design principle: benchmark data is generated once as Parquet fil
 
 ```bash
 # All three commands read the same generated Parquet files
-benchbox run --platform duckdb --benchmark tpch --scale 1 -o results/duckdb.json
-benchbox run --platform datafusion --benchmark tpch --scale 1 -o results/datafusion.json
-benchbox run --platform polars-df --benchmark tpch --scale 1 -o results/polars.json
+benchbox run --platform duckdb --benchmark tpch --scale 1 --output results/duckdb.json
+benchbox run --platform datafusion --benchmark tpch --scale 1 --output results/datafusion.json
+benchbox run --platform polars-df --benchmark tpch --scale 1 --output results/polars.json
 
 # Compare the results
 benchbox compare results/duckdb.json results/datafusion.json results/polars.json
@@ -170,15 +170,13 @@ Mode is automatically detected from arguments:
 | `-q, --queries TEXT` | all | Comma-separated query IDs (e.g., Q1,Q6,Q10) |
 | `--warmup INTEGER` | `1` | Warmup iterations |
 | `--iterations INTEGER` | `3` | Benchmark iterations |
-| `--timeout FLOAT` | `300` | Per-query timeout (seconds) |
-| `--parallel` | false | Run platforms in parallel |
 
 ### Output Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `-o, --output PATH` | none | Output directory for results |
-| `--format [json\|markdown\|text\|csv]` | `text` | Output format |
+| `--format [text\|json\|markdown\|html]` | `text` | Output format |
 | `--generate-charts` | false | Generate ASCII visualization charts in output directory |
 | `--theme [light\|dark]` | `light` | Chart color theme (with --generate-charts) |
 | `--data-dir DIRECTORY` | auto | Directory containing benchmark data |
@@ -271,8 +269,7 @@ benchbox compare \
   -p bigquery \
   -p redshift \
   --benchmark tpch \
-  --scale 1 \
-  --timeout 600
+  --scale 1
 ```
 
 ### Generate Reports and Charts
@@ -308,8 +305,8 @@ Compare previously saved benchmark results:
 
 ```bash
 # Export results from individual runs
-benchbox run --platform duckdb --benchmark tpch --scale 0.1 -o results/duckdb
-benchbox run --platform sqlite --benchmark tpch --scale 0.1 -o results/sqlite
+benchbox run --platform duckdb --benchmark tpch --scale 0.1 --output results/duckdb
+benchbox run --platform sqlite --benchmark tpch --scale 0.1 --output results/sqlite
 
 # Compare the result files
 benchbox compare results/duckdb/results.json results/sqlite/results.json
@@ -336,7 +333,6 @@ benchbox compare \
   -p duckdb \
   -p sqlite \
   -p clickhouse-local \
-  --parallel \
   --iterations 3
 ```
 
@@ -446,17 +442,17 @@ print(f"Speedup ratio: {summary.speedup_ratio:.2f}x")
 
 ```python
 from benchbox.core.visualization import ResultPlotter, export_ascii
-from benchbox.core.visualization.ascii.base import ASCIIChartOptions
+from benchbox.core.visualization.ascii.base import ChartOptions
 
 # Load results from JSON files
 plotter = ResultPlotter.from_sources(["results/duckdb.json", "results/sqlite.json"])
 
 # Render individual chart types
-from benchbox.core.visualization.ascii import ASCIIBarChart
+from benchbox.core.visualization.ascii import BarChart
 from benchbox.core.visualization.ascii.bar_chart import BarData
 
 bar_data = [BarData(label=r.platform, value=r.total_time_ms or 0) for r in plotter.results]
-chart = ASCIIBarChart(data=bar_data, title="Performance Comparison")
+chart = BarChart(data=bar_data, title="Performance Comparison")
 print(chart.render())
 
 # Or use the CLI for automatic chart generation
@@ -612,7 +608,7 @@ Either:
 For large scale factors:
 - Use streaming-capable platforms (Polars, DuckDB)
 - Reduce concurrent platforms compared
-- Use `--parallel=false` for sequential execution
+- Compare fewer platforms per invocation
 
 ## Query Plan Comparison
 
@@ -654,8 +650,8 @@ Plan comparison requires benchmark results captured with `--capture-plans`:
 
 ```bash
 # Capture plans during benchmark runs
-benchbox run --platform duckdb --benchmark tpch --capture-plans -o baseline
-benchbox run --platform duckdb --benchmark tpch --capture-plans -o current
+benchbox run --platform duckdb --benchmark tpch --capture-plans --output baseline
+benchbox run --platform duckdb --benchmark tpch --capture-plans --output current
 
 # Compare with plan analysis
 benchbox compare baseline/results.json current/results.json --include-plans

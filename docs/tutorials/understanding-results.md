@@ -19,7 +19,7 @@ After running a benchmark, BenchBox produces:
 benchbox results --limit 1
 
 # Export detailed JSON
-benchbox export --last --format json -o results.json
+benchbox export --last --format json --output-dir ./results
 ```
 
 ## Key Metrics
@@ -99,8 +99,8 @@ Price/Performance = (Platform Cost) / QphH
 
 ```bash
 # Run on two platforms
-benchbox run --platform duckdb --benchmark tpch -o duckdb.json
-benchbox run --platform sqlite --benchmark tpch -o sqlite.json
+benchbox run --platform duckdb --benchmark tpch --output duckdb.json
+benchbox run --platform sqlite --benchmark tpch --output sqlite.json
 
 # Compare results
 benchbox compare duckdb.json sqlite.json

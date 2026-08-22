@@ -867,7 +867,6 @@ def continuous_benchmark():
 The TPC-DS official benchmark implementation provides a systematic, certification-ready solution for running TPC-DS benchmarks with official QphDS@Size metric calculation. The implementation follows TPC-DS specifications and includes extensive validation, reporting, and error handling capabilities.
 
 For additional support:
-- Check the examples in `examples/tpcds_official_benchmark_example.py`
 - Review the integration tests in `tests/integration/test_tpcds_official_benchmark.py`
 - Consult the TPC-DS specification at http://www.tpc.org/tpcds/
 

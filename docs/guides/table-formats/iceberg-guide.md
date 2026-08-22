@@ -232,7 +232,7 @@ BenchBox validates query results against reference answers, catching:
 
 ```bash
 # Compare results from different engines
-benchbox compare-results spark-results.json trino-results.json --validate
+benchbox compare spark-results.json trino-results.json
 ```
 
 ### Common Multi-Engine Issues

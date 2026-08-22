@@ -406,7 +406,7 @@ Format setup guide for cloud storage provider.
     #    export AWS_SECRET_ACCESS_KEY=your_secret_key
     #    export AWS_DEFAULT_REGION=us-west-2
     # 2. Usage example:
-    #    benchbox run --database duckdb --benchmark tpch --scale 0.01 \
+    #    benchbox run --platform duckdb --benchmark tpch --scale 0.01 \
     #                  --output s3://your-bucket/benchbox/results
 
 Support Validation

@@ -29,10 +29,7 @@ benchbox run --platform duckdb --benchmark tpch --scale 1 --capture-plans
 benchbox show-plan --run benchmark_runs/latest/results.json --query-id q05
 
 # 3. Compare plans between two runs
-benchbox compare-plans \
-  --run1 run_before.json \
-  --run2 run_after.json \
-  --query-id q05
+benchbox compare run_before.json run_after.json --include-plans
 ```
 
 ## Capturing Query Plans
@@ -158,7 +155,7 @@ which only succeeds when that id maps to a single executed SQL variant.
 
 Multi-stream runs persist one plan record per `(query_id, stream_id)` in the `.plans.json` companion -
 streams are never deduplicated or last-writer-wins collapsed, so every stream's plan and fingerprint
-survive a result-file round trip (`show-plan`, `compare-plans`).
+survive a result-file round trip (`show-plan`, `compare --include-plans`).
 
 > **Bespoke DML query sets.** A *bespoke* query set that runs an `INSERT`/`UPDATE`/`DELETE` partway
 > through and then more `SELECT`s has no maintenance phase boundary, so the isolated model captures
@@ -267,10 +264,7 @@ benchbox show-plan --run results.json --query-id q05 --max-depth 3
 Compare the same query between two benchmark runs:
 
 ```bash
-benchbox compare-plans \
-  --run1 results_duckdb.json \
-  --run2 results_datafusion.json \
-  --query-id q05
+benchbox compare results_duckdb.json results_datafusion.json --include-plans
 ```
 
 Output example:
@@ -305,9 +299,7 @@ Property Differences (1):
 Compare all queries from two runs:
 
 ```bash
-benchbox compare-plans \
-  --run1 before_optimization.json \
-  --run2 after_optimization.json
+benchbox compare before_optimization.json after_optimization.json --include-plans
 ```
 
 Output example:
@@ -332,10 +324,8 @@ Summary: 4 queries compared
 Show only queries with significant plan changes:
 
 ```bash
-benchbox compare-plans \
-  --run1 version_1.2.json \
-  --run2 version_1.3.json \
-  --threshold 0.9
+benchbox compare version_1.2.json version_1.3.json \
+  --include-plans --plan-threshold 0.9
 ```
 
 This shows only queries with <90% similarity, helping identify potential regressions.
@@ -345,10 +335,8 @@ This shows only queries with <90% similarity, helping identify potential regress
 Export comparison results for further analysis:
 
 ```bash
-benchbox compare-plans \
-  --run1 run_a.json \
-  --run2 run_b.json \
-  --output json > comparison_results.json
+benchbox compare run_a.json run_b.json \
+  --include-plans --format json > comparison_results.json
 ```
 
 ## Understanding Plan Differences
@@ -565,7 +553,7 @@ To compare costs/estimates, examine the JSON export directly.
 1. **Capture baseline**: Run benchmark with `--capture-plans` and save results
 2. **Make changes**: Modify queries, update database, change configuration
 3. **Capture new run**: Run same benchmark again with `--capture-plans`
-4. **Compare**: Use `benchbox compare-plans` to identify changes
+4. **Compare**: Use `benchbox compare --include-plans` to identify changes
 5. **Investigate**: For significant differences, use `show-plan` to inspect details
 
 ### Cross-Platform Analysis
@@ -576,26 +564,22 @@ benchbox run --platform duckdb --benchmark tpch --scale 1 --capture-plans
 benchbox run --platform datafusion --benchmark tpch --scale 1 --capture-plans
 
 # Compare plans
-benchbox compare-plans \
-  --run1 benchmark_runs/duckdb_*/results.json \
-  --run2 benchmark_runs/datafusion_*/results.json
+benchbox compare benchmark_runs/duckdb_*/results.json \
+  benchmark_runs/datafusion_*/results.json --include-plans
 
-# Focus on interesting queries
-benchbox compare-plans \
-  --run1 benchmark_runs/duckdb_*/results.json \
-  --run2 benchmark_runs/datafusion_*/results.json \
-  --query-id q05
+# Show only the most-changed plans
+benchbox compare benchmark_runs/duckdb_*/results.json \
+  benchmark_runs/datafusion_*/results.json \
+  --include-plans --plan-threshold 0.9
 ```
 
 ### Regression Testing
 
 ```bash
 # Automated regression check
-benchbox compare-plans \
-  --run1 baseline.json \
-  --run2 current.json \
-  --threshold 0.95 \
-  --output json > regression_report.json
+benchbox compare baseline.json current.json \
+  --include-plans --plan-threshold 0.95 \
+  --format json > regression_report.json
 
 # Check exit code
 if [ $? -ne 0 ]; then
@@ -621,7 +605,7 @@ Plans are fingerprinted using SHA256 of the logical structure:
 | Same query, same schema, same engine version | **Same fingerprint** |
 | Stats refresh / `VACUUM ANALYZE` (no plan change) | **Same fingerprint** |
 | Adding an index that is not used by the query | **Same fingerprint** |
-| Adding an index the planner starts using | **May differ** — only when it changes the *logical* structure (e.g. an index join replacing a hash join). A pure scan-method switch (Seq Scan → Index Scan on the same table) keeps the **same fingerprint**, because scan variants normalize to a logical `Scan` and physical operator details are excluded from the hash. Use `compare-plans` or the physical-plan details to detect scan-method changes. |
+| Adding an index the planner starts using | **May differ** — only when it changes the *logical* structure (e.g. an index join replacing a hash join). A pure scan-method switch (Seq Scan → Index Scan on the same table) keeps the **same fingerprint**, because scan variants normalize to a logical `Scan` and physical operator details are excluded from the hash. Use `compare --include-plans` or the physical-plan details to detect scan-method changes. |
 | Engine minor version upgrade with no plan change | **Usually same** — not guaranteed across major versions |
 | `analyze_plans=true` vs `analyze_plans=false` (DuckDB) | **Same fingerprint** — timing/cardinality excluded from hash |
 | Same query, **different benchmark seed** (data-driven filter literal) | **Differs by default** — filter/join/projection *literals* are part of the hash, so a seed-varied threshold (`l_quantity < 1234.56` vs `< 2345.67`) changes the fingerprint even though the plan shape is identical. Use literal normalization (below) for seed-independent comparison. |
@@ -666,7 +650,7 @@ available through the API above and the metadata helper.
 **Recommended use:**
 - Within a single run: deduplicate identical plans across concurrent streams
 - Cross-run regression detection: flag queries where the fingerprint changed between runs on the same engine version
-- Cross-platform comparison: use `compare-plans` for structural similarity; fingerprints will differ across platforms
+- Cross-platform comparison: use `compare --include-plans` for structural similarity; fingerprints will differ across platforms
 
 ### Literal-Normalized Fingerprints
 

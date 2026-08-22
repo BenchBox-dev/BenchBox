@@ -25,7 +25,7 @@ It is wired through the develop branch ruleset instead:
 
 | Piece | Value |
 |-------|--------|
-| Ruleset | `develop-squash-only` (id `15611785`) |
+| Ruleset | `develop-squash-only` (resolve by name; current id `15611785` until a transfer) |
 | Required context | `Results Explorer browser gate` |
 | Gate job | `browser-required-result` in `results-explorer-browser.yml` |
 | Gate inputs | `needs: [explorer-changes, chromium]`, `if: always()` |
@@ -47,7 +47,8 @@ Firefox and WebKit remain advisory (`non-blocking` in the job name,
 Live ruleset confirmation:
 
 ```bash
-gh api repos/joeharris76/BenchBox/rulesets/15611785 \
+gh api repos/joeharris76/BenchBox/rulesets --jq '.[] | select(.name=="develop-squash-only") | .id' \
+  | xargs -I{} gh api repos/joeharris76/BenchBox/rulesets/{} \
   --jq '.rules[]|select(.type=="required_status_checks")'
 ```
 
