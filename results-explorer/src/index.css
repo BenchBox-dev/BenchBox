@@ -508,9 +508,145 @@
     }
 }
 
+@page {
+    size: A4 landscape;
+    margin: 10mm;
+}
+
 @media print {
+    :root,
+    :root[data-bb-theme="dark"] {
+        color-scheme: light !important;
+        --bb-bg-primary: #ffffff;
+        --bb-bg-panel: #ffffff;
+        --bb-bg-elevated: #f1f5f9;
+        --bb-fg-primary: #0f172a;
+        --bb-fg-muted: #475569;
+        --bb-fg-inverse: #ffffff;
+        --bb-border-default: #cbd5e1;
+        --bb-border-subtle: #e2e8f0;
+        --bb-accent: #1d4ed8;
+        --bb-accent-hover: #1e40af;
+        --bb-surface-app: #ffffff;
+        --bb-surface-data: #ffffff;
+        --bb-surface-data-muted: #f8fafc;
+        --bb-surface-elevated: #ffffff;
+        --bb-surface-hero: #ffffff;
+        --bb-surface-hero-muted: #f1f5f9;
+        --bb-surface-sticky: #f1f5f9;
+        --bb-data-fg-primary: #0f172a;
+        --bb-data-fg-muted: #475569;
+        --bb-data-fg-subtle: #64748b;
+        --bb-data-border: #cbd5e1;
+        --bb-data-border-strong: #94a3b8;
+        --bb-tone-info-bg: #dbeafe;
+        --bb-tone-info-fg: #1e3a8a;
+        --bb-tone-success-bg: #dcfce7;
+        --bb-tone-success-fg: #14532d;
+        --bb-tone-warning-bg: #fef3c7;
+        --bb-tone-warning-fg: #78350f;
+        --bb-tone-danger-bg: #fee2e2;
+        --bb-tone-danger-fg: #7f1d1d;
+        --bb-tone-neutral-bg: #e2e8f0;
+        --bb-tone-neutral-fg: #1f2937;
+    }
+
+    html,
+    body {
+        min-height: 0;
+        background: var(--bb-surface-app) !important;
+        color: var(--bb-data-fg-primary) !important;
+    }
+
+    [data-testid="benchbox-global-header"],
+    [data-testid="results-explorer-nav"],
+    [aria-label="Result facets"],
+    [aria-label="Mobile result facets"],
+    [data-testid="query-heatmap-page-sticky-header-shell"],
+    [data-testid$="-scroll-hint"],
+    .bb-scroll-affordance,
     .bb-compare-tray,
-    .bb-compare-tray-spacer {
+    .bb-compare-tray-spacer,
+    footer,
+    main button:not(th > button),
+    main input,
+    main select,
+    main textarea {
         display: none !important;
+    }
+
+    /* Removing the Query facet rail must also release its reserved grid
+       column, otherwise the printable results keep an empty 18rem gutter. */
+    .grid:has(> [data-testid="query-desktop-filters"]) {
+        display: block !important;
+    }
+
+    [class*="overflow-"] {
+        overflow: visible !important;
+    }
+
+    table {
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: auto;
+        border-collapse: collapse;
+        font-size: 7.5pt;
+    }
+
+    th,
+    td {
+        position: static !important;
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        padding: 1.25mm !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+    }
+
+    /* Dense benchmark grids need a second compacting step: TPC-H alone has
+       22 query columns in addition to its identity and score columns. */
+    table[role="grid"] {
+        font-size: 6pt;
+        zoom: 0.85;
+    }
+
+    table[role="grid"] th,
+    table[role="grid"] td {
+        padding: 0.5mm !important;
+    }
+
+    th > button {
+        display: block !important;
+        color: inherit !important;
+        font: inherit;
+        text-align: inherit;
+    }
+
+    thead {
+        display: table-header-group;
+    }
+
+    caption {
+        display: table-caption;
+        break-after: avoid;
+        color: var(--bb-data-fg-muted) !important;
+    }
+
+    tr,
+    article,
+    .card,
+    .panel {
+        break-inside: avoid;
+    }
+
+    pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+
+    a {
+        color: var(--bb-accent-hover) !important;
+        text-decoration: underline;
     }
 }
