@@ -53,6 +53,7 @@ interface TuningModeSummary {
 }
 
 export function Home(_: RoutableProps) {
+  const recentResultsScrollerRef = useRef<HTMLDivElement>(null);
   useDocumentTitle("Results · BenchBox");
   const [results, setResults] = useState<ResultRow[] | null>(null);
   const [metaLeaderboard, setMetaLeaderboard] = useState<MetaLeaderboardData | null>(null);
@@ -535,12 +536,13 @@ export function Home(_: RoutableProps) {
           <h2 class="mb-4 text-xl font-semibold text-[var(--bb-data-fg-primary)]">Recent Results</h2>
           <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
             <TableScrollHint
+              scrollerRef={recentResultsScrollerRef}
               testId="recent-results-scroll-hint"
               label="Scroll table for row actions →"
               wrapperClassName="flex justify-end"
               className="m-2"
             />
-            <div class="overflow-x-auto" data-testid="recent-results-scroll-container">
+            <div ref={recentResultsScrollerRef} class="overflow-x-auto" data-testid="recent-results-scroll-container">
               <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                 <thead class="bg-[var(--bb-surface-data-muted)]">
                   <tr>

@@ -412,23 +412,13 @@
         height: auto;
     }
 
-    /* Compact "←/→ scroll" cue for dense tables that overflow at narrow
-       widths. Pair with `overflow-x-auto` on the parent so the table
-       still scrolls; this label only signals scrollability so users
-       don't think they are seeing a clipped view. Threshold matches
-       --bb-bp-mobile inclusively so 768px tablets (where dense
-       cohort/query tables still overflow horizontally) keep the cue. */
+    /* Compact "←/→ scroll" cue for measured overflow containers. */
     .bb-scroll-affordance {
-        display: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
         font-size: var(--bb-text-xs);
         color: var(--bb-data-fg-subtle);
-    }
-    @media (max-width: 48rem) {
-        .bb-scroll-affordance {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
     }
 
     /* Heatmap cells use a single-hue sequential palette by default.
