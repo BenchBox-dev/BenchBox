@@ -483,15 +483,17 @@ def audit_commit_range(project: Path, base_ref: str) -> list[str]:
 def audit_dependency_caps(project: Path) -> list[str]:
     """Forbid AGENTS.md restating dependency version caps.
 
-    `pyproject.toml` owns the bounds and carries the rationale inline;
-    `docs/development/dependency-compatibility.md` explains them. AGENTS.md
-    used to restate the list as a convenience, and it drifted silently --
-    advertising `pyarrow<24` long after the manifest moved to `<25`.
+    Bounds are already owned mechanically three times over: `pyproject.toml`
+    declares them with rationale inline, `uv lock` enforces them at install,
+    and `scripts/check_dependency_bounds.py --fail-on=cap-reached` blocks in
+    `test.yml` and `release.yml`. `docs/development/dependency-compatibility.md`
+    explains them. None of that needs an agent to be told anything.
 
-    A synchronization check would have to run forever to keep a duplicate
-    honest. Deleting the duplicate ends the drift class instead, so this
-    invariant guards the deletion: reintroducing a restated cap fails the
-    audit. It is deliberately the inverse of the check it replaces.
+    AGENTS.md restated the list anyway, and it drifted -- advertising
+    `pyarrow<24` long after the manifest moved to `<25`. A synchronization
+    check would have to run forever to keep that duplicate honest. The
+    duplicate is gone; this invariant guards its absence, so the drift class
+    cannot return through a well-meaning convenience edit.
     """
     agents = _read(project, "AGENTS.md")
     # No per-line exemption: an exemption keyed on the pointer text would be

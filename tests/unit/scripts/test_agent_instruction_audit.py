@@ -717,7 +717,7 @@ def test_restating_a_dependency_cap_in_agents_md_fails(tmp_path: Path) -> None:
     """`pyproject.toml` owns the bounds; a restated copy drifted once already."""
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"
-    agents.write_text(agents.read_text().replace("- Upper bounds exceptional;", "- Caps: `pyarrow<25`;"))
+    agents.write_text(agents.read_text() + "\n- Caps: `pyarrow<25`.\n")
     _, errors = audit(project, CORPUS)
     assert any("restates dependency caps" in error and "pyarrow<25" in error for error in errors)
 
@@ -727,10 +727,7 @@ def test_the_cap_guard_is_not_defeated_by_same_line_placement(tmp_path: Path) ->
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"
     agents.write_text(
-        agents.read_text().replace(
-            "- Upper bounds exceptional;",
-            "- Upper bounds exceptional. Caps: `duckdb<2`;",
-        )
+        agents.read_text() + "\n- See `docs/development/dependency-compatibility.md`; caps: `duckdb<2`.\n"
     )
     _, errors = audit(project, CORPUS)
     assert any("restates dependency caps" in error and "duckdb<2" in error for error in errors)

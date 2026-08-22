@@ -139,7 +139,6 @@ never claimable items).
 - Timing durations use `benchbox.utils.clock.mono_time()` and `elapsed_seconds()`; wall clocks are event/audit only.
 - Adapter SDK imports stay lazy. New SQL platforms subclass `PlatformAdapter` and register with `@register_platform`.
 - CREATE TABLE rewrites are registered under `Phase.DDL_OPTIMIZE`; run `make compat-docs-check` and DDL drift check.
-- Upper bounds exceptional; `pyproject.toml` owns them, `docs/development/dependency-compatibility.md` explains them.
 - CLI dry runs must propagate explicit phases; deterministic runs use a seed.
 - Green focused/fast tests are not UAT or production certification.
 
