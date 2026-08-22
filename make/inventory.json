@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "3a1ef4bc027dbe8db18f1e44db0afc79f3b01e7a5e615aba3d09cfdded890e19",
+  "contract_sha256": "3e9650c48144c4de139919c814097ea365aa43d514f113339477ab52ee6322d3",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -551,8 +551,8 @@
     "ci-linux": [
       {
         "header": "ci-linux:",
-        "recipe": "\t@if [ \"$$(uname -s)\" != \"Darwin\" ] || [ \"$$(uname -m)\" != \"arm64\" ]; then \\\n\t\techo \"ci-linux: skipped -- Apple silicon macOS only (host $$(uname -s)/$$(uname -m)); no-op.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\tif [ \"$$(sw_vers -productVersion | cut -d. -f1)\" -lt 26 ]; then \\\n\t\techo \"ci-linux: skipped -- needs macOS 26+ (host $$(sw_vers -productVersion)); no-op.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\tif ! command -v container >/dev/null 2>&1; then \\\n\t\techo \"ci-linux: Apple 'container' not installed -> 'brew install container' (see AGENTS.md).\"; \\\n\t\texit 1; \\\n\tfi; \\\n\tif ! container machine list 2>/dev/null | awk 'NR>1{print $$1}' | grep -Fqx \"$(CI_LINUX_MACHINE)\"; then \\\n\t\techo \"ci-linux: machine '$(CI_LINUX_MACHINE)' not found. One-time setup (see AGENTS.md):\"; \\\n\t\techo \"  container system start\"; \\\n\t\techo \"  container build --arch arm64 --tag local/benchbox-agent docker/benchbox-agent\"; \\\n\t\techo \"  container machine create local/benchbox-agent --name $(CI_LINUX_MACHINE) --home-mount rw --cpus 4 --memory 8G\"; \\\n\t\texit 1; \\\n\tfi; \\\n\techo \"==> ci-linux: '$(CI_LINUX_CMD)' inside container machine '$(CI_LINUX_MACHINE)'\"; \\\n\tcontainer machine run -n $(CI_LINUX_MACHINE) -- bash -lc 'cd \"$(CURDIR)\" && $(CI_LINUX_CMD)'",
-        "recipe_sha256": "21f5e99b0c584ea9d844d47b1c49420a30ac1cc111668e8c5498951f96c7c6de"
+        "recipe": "\t@if [ \"$$(uname -s)\" != \"Darwin\" ] || [ \"$$(uname -m)\" != \"arm64\" ]; then \\\n\t\techo \"ci-linux: skipped -- Apple silicon macOS only (host $$(uname -s)/$$(uname -m)); no-op.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\tif [ \"$$(sw_vers -productVersion | cut -d. -f1)\" -lt 26 ]; then \\\n\t\techo \"ci-linux: skipped -- needs macOS 26+ (host $$(sw_vers -productVersion)); no-op.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\tif ! command -v container >/dev/null 2>&1; then \\\n\t\techo \"ci-linux: Apple 'container' not installed -> 'brew install container'.\"; \\\n\t\texit 1; \\\n\tfi; \\\n\tif ! container machine list 2>/dev/null | awk 'NR>1{print $$1}' | grep -Fqx \"$(CI_LINUX_MACHINE)\"; then \\\n\t\techo \"ci-linux: machine '$(CI_LINUX_MACHINE)' not found. One-time setup:\"; \\\n\t\techo \"  container system start\"; \\\n\t\techo \"  container build --arch arm64 --tag local/benchbox-agent docker/benchbox-agent\"; \\\n\t\techo \"  container machine create local/benchbox-agent --name $(CI_LINUX_MACHINE) --home-mount rw --cpus 4 --memory 8G\"; \\\n\t\texit 1; \\\n\tfi; \\\n\techo \"==> ci-linux: '$(CI_LINUX_CMD)' inside container machine '$(CI_LINUX_MACHINE)'\"; \\\n\tcontainer machine run -n $(CI_LINUX_MACHINE) -- bash -lc 'cd \"$(CURDIR)\" && $(CI_LINUX_CMD)'",
+        "recipe_sha256": "d40e4e0ed11403903aaa91247ffe1c8d066d1995cc86db9d840e0adbdc4b3d2a"
       }
     ],
     "ci-local": [
@@ -1892,7 +1892,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "1fadf4616e202adb5c61633e60e2f4cfacfe3110ba8c4b5d2d1c2766017180a1",
+  "semantic_sha256": "c3d8b9b1f5819354a3450b9d738707b55f3f74e6e09c2b070c39261401c50ee7",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3199,9 +3199,9 @@
       ]
     },
     {
-      "body": "ci-linux:\n\t@if [ \"$$(uname -s)\" != \"Darwin\" ] || [ \"$$(uname -m)\" != \"arm64\" ]; then \\\n\t\techo \"ci-linux: skipped -- Apple silicon macOS only (host $$(uname -s)/$$(uname -m)); no-op.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\tif [ \"$$(sw_vers -productVersion | cut -d. -f1)\" -lt 26 ]; then \\\n\t\techo \"ci-linux: skipped -- needs macOS 26+ (host $$(sw_vers -productVersion)); no-op.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\tif ! command -v container >/dev/null 2>&1; then \\\n\t\techo \"ci-linux: Apple 'container' not installed -> 'brew install container' (see AGENTS.md).\"; \\\n\t\texit 1; \\\n\tfi; \\\n\tif ! container machine list 2>/dev/null | awk 'NR>1{print $$1}' | grep -Fqx \"$(CI_LINUX_MACHINE)\"; then \\\n\t\techo \"ci-linux: machine '$(CI_LINUX_MACHINE)' not found. One-time setup (see AGENTS.md):\"; \\\n\t\techo \"  container system start\"; \\\n\t\techo \"  container build --arch arm64 --tag local/benchbox-agent docker/benchbox-agent\"; \\\n\t\techo \"  container machine create local/benchbox-agent --name $(CI_LINUX_MACHINE) --home-mount rw --cpus 4 --memory 8G\"; \\\n\t\texit 1; \\\n\tfi; \\\n\techo \"==> ci-linux: '$(CI_LINUX_CMD)' inside container machine '$(CI_LINUX_MACHINE)'\"; \\\n\tcontainer machine run -n $(CI_LINUX_MACHINE) -- bash -lc 'cd \"$(CURDIR)\" && $(CI_LINUX_CMD)'",
+      "body": "ci-linux:\n\t@if [ \"$$(uname -s)\" != \"Darwin\" ] || [ \"$$(uname -m)\" != \"arm64\" ]; then \\\n\t\techo \"ci-linux: skipped -- Apple silicon macOS only (host $$(uname -s)/$$(uname -m)); no-op.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\tif [ \"$$(sw_vers -productVersion | cut -d. -f1)\" -lt 26 ]; then \\\n\t\techo \"ci-linux: skipped -- needs macOS 26+ (host $$(sw_vers -productVersion)); no-op.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\tif ! command -v container >/dev/null 2>&1; then \\\n\t\techo \"ci-linux: Apple 'container' not installed -> 'brew install container'.\"; \\\n\t\texit 1; \\\n\tfi; \\\n\tif ! container machine list 2>/dev/null | awk 'NR>1{print $$1}' | grep -Fqx \"$(CI_LINUX_MACHINE)\"; then \\\n\t\techo \"ci-linux: machine '$(CI_LINUX_MACHINE)' not found. One-time setup:\"; \\\n\t\techo \"  container system start\"; \\\n\t\techo \"  container build --arch arm64 --tag local/benchbox-agent docker/benchbox-agent\"; \\\n\t\techo \"  container machine create local/benchbox-agent --name $(CI_LINUX_MACHINE) --home-mount rw --cpus 4 --memory 8G\"; \\\n\t\texit 1; \\\n\tfi; \\\n\techo \"==> ci-linux: '$(CI_LINUX_CMD)' inside container machine '$(CI_LINUX_MACHINE)'\"; \\\n\tcontainer machine run -n $(CI_LINUX_MACHINE) -- bash -lc 'cd \"$(CURDIR)\" && $(CI_LINUX_CMD)'",
       "kind": "rule",
-      "sha256": "fb4698e48fc16e2efb983d12a6da4770decde3e08646db3725e85bc753e02689",
+      "sha256": "d987cf523e9501b0591dfa05945a457bee32b66c2cb338176ce68d7d927e4010",
       "targets": [
         "ci-linux"
       ]

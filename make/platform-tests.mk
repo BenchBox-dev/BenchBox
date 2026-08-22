@@ -107,7 +107,7 @@ DOCKER_TEST_STATE_DIR ?= /tmp/benchbox-docker-projects
 # and the ONLY engine CI uses) or `mocker` (Docker-compatible CLI over Apple
 # `container`; Apple-silicon/macOS-26 LOCAL DEV ONLY, MUST NOT run in CI). The
 # docker/*/docker-compose.yml files stay unmodified; only the driver swaps.
-# See AGENTS.md "Mocker as a local test-docker engine".
+# See docs/operations/uat-framework.md "Mocker validation status".
 CONTAINER_ENGINE ?= docker
 COMPOSE := $(CONTAINER_ENGINE) compose
 
