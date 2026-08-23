@@ -53,6 +53,7 @@ interface TuningModeSummary {
 }
 
 export function Home(_: RoutableProps) {
+  const recentResultsScrollerRef = useRef<HTMLDivElement>(null);
   useDocumentTitle("Results · BenchBox");
   const [results, setResults] = useState<ResultRow[] | null>(null);
   const [metaLeaderboard, setMetaLeaderboard] = useState<MetaLeaderboardData | null>(null);
@@ -61,7 +62,7 @@ export function Home(_: RoutableProps) {
   const [emptyResultsRetryFinished, setEmptyResultsRetryFinished] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { facets, where: facetWhere, setFacet, resetFacets } = useFacetState();
-  const [modeRaw, setModeRaw] = useUrlState<string>("mode", "times", stringSerde);
+  const [modeRaw, setModeRaw] = useUrlState<string>("mode", "speedup", stringSerde);
   const benchmarkFilters = facets.benchmark;
   const scaleFilters = facets.scale_factor;
   const phaseFilter = singleFacetValue(facets.phase, "all");
@@ -258,7 +259,7 @@ export function Home(_: RoutableProps) {
   }
 
   const mode: MetaLeaderboardMode =
-    modeRaw === "ranks" || modeRaw === "speedup" ? modeRaw : "times";
+    modeRaw === "times" || modeRaw === "ranks" ? modeRaw : "speedup";
   const benchmarks = [...new Set(results.map((result) => canonicalBenchmarkSlug(result.benchmark)))].sort();
   const platformIdToName = new Map(
     (metaLeaderboard?.platforms ?? []).map((platform) => [platform.platform_id, platform.platform]),
@@ -532,12 +533,13 @@ export function Home(_: RoutableProps) {
           <h2 class="mb-4 text-xl font-semibold text-[var(--bb-data-fg-primary)]">Recent Results</h2>
           <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
             <TableScrollHint
+              scrollerRef={recentResultsScrollerRef}
               testId="recent-results-scroll-hint"
               label="Scroll table for row actions →"
               wrapperClassName="flex justify-end"
               className="m-2"
             />
-            <div class="overflow-x-auto" data-testid="recent-results-scroll-container">
+            <div ref={recentResultsScrollerRef} class="overflow-x-auto" data-testid="recent-results-scroll-container">
               <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                 <thead class="bg-[var(--bb-surface-data-muted)]">
                   <tr>
