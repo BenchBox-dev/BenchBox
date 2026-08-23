@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   compareVisualManifests,
+  hasExactHeadVisualApproval,
   PUBLIC_SITE_CAPTURE_PROFILE,
   type VisualManifest,
 } from "../publicSiteVisual";
@@ -54,6 +55,61 @@ describe("public site visual manifest comparison", () => {
     expect(compareVisualManifests(baseline, current)).toMatchObject({
       missing: ["/@390", "/docs/@390"],
       unexpected: ["/@768"],
+    });
+  });
+
+  it("allows reviewed changed and unexpected captures only for the exact PR head", () => {
+    const baseline: VisualManifest = { capture_profile: PUBLIC_SITE_CAPTURE_PROFILE, captures };
+    const current: VisualManifest = {
+      capture_profile: PUBLIC_SITE_CAPTURE_PROFILE,
+      captures: [
+        { ...captures[0]!, digest: "landing-reviewed" },
+        captures[1]!,
+        { route: "/results/benchmarks/", viewport_width: 390, digest: "new-route" },
+      ],
+    };
+
+    expect(
+      compareVisualManifests(baseline, current, {
+        approvedHeadSha: "abc123",
+        currentHeadSha: "abc123",
+        reason: "Reviewed the section indexes at all captured widths",
+      }),
+    ).toEqual({
+      missing: [],
+      unexpected: [],
+      changed: [],
+      approvedUnexpected: ["/results/benchmarks/@390"],
+      approvedChanged: ["/@390"],
+      approvalApplied: true,
+    });
+  });
+
+  it.each([
+    { approvedHeadSha: "stale", currentHeadSha: "current", reason: "reviewed" },
+    { approvedHeadSha: "current", currentHeadSha: "current", reason: "   " },
+    { approvedHeadSha: "", currentHeadSha: "current", reason: "reviewed" },
+  ])("rejects stale or incomplete approval: %o", (approval) => {
+    expect(hasExactHeadVisualApproval(approval)).toBe(false);
+  });
+
+  it("never allows an exact-head approval to hide missing captures", () => {
+    const current: VisualManifest = {
+      capture_profile: PUBLIC_SITE_CAPTURE_PROFILE,
+      captures: [captures[0]!],
+    };
+
+    expect(
+      compareVisualManifests(
+        { capture_profile: PUBLIC_SITE_CAPTURE_PROFILE, captures },
+        current,
+        { approvedHeadSha: "abc123", currentHeadSha: "abc123", reason: "reviewed" },
+      ),
+    ).toMatchObject({
+      missing: ["/docs/@390"],
+      unexpected: [],
+      changed: [],
+      approvalApplied: true,
     });
   });
 });
