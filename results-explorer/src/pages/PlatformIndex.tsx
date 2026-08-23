@@ -36,6 +36,8 @@ import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 import { TimeSeries } from "@/components/TimeSeries";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { TableScrollHint } from "@/components/TableScrollHint";
+import { DataTable } from "@/components/DataTable";
+import { CompareTray } from "@/components/CompareTray";
 import type { SortState } from "@/types";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
@@ -48,6 +50,20 @@ type TrendMetric = "power_score" | "display_geomean_ms";
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
 const MIN_TREND_OBSERVATIONS = 3;
+const PLATFORM_TABLE_COLUMNS = [
+  "compare",
+  "compare_state",
+  "benchmark",
+  "scale",
+  "phase",
+  "metric_contract",
+  "date",
+  "power_score",
+  "geomean",
+  "source",
+  "receipt",
+] as const;
+type PlatformTableColumn = (typeof PLATFORM_TABLE_COLUMNS)[number];
 const PLATFORM_ROUTE_ALIASES: Readonly<Record<string, string>> = {
   // Historical links used underscores, while the registry's canonical ID is
   // hyphenated. Keep this explicit: arbitrary underscore rewriting would
@@ -105,6 +121,11 @@ function trendMetricDescription(metric: TrendMetric): string {
 
 function primaryMetricContract(metric: string): string {
   return trendMetricDescription(normalizeTrendMetric(metric));
+}
+
+function platformTableColumnIndex(column: PlatformTableColumn, showMetricContract: boolean): number {
+  const baseIndex = PLATFORM_TABLE_COLUMNS.indexOf(column) + 1;
+  return !showMetricContract && baseIndex > 6 ? baseIndex - 1 : baseIndex;
 }
 
 function selectedCohortDifferences(rows: PlatformIndexRowRow[]): string[] {
@@ -265,6 +286,13 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   // Fall back to matching by display name for backward compatibility with any
   // old links constructed from the display name.
   const allPlatformResults = platformRowsForRequest(rows, platform);
+  const routeMetricContracts = new Set(
+    allPlatformResults.map((row) => primaryMetricContract(row.primary_metric)),
+  );
+  const hoistedMetricContract =
+    routeMetricContracts.size === 1 ? routeMetricContracts.values().next().value ?? null : null;
+  const showMetricContract = hoistedMetricContract === null;
+  const platformColumnCount = PLATFORM_TABLE_COLUMNS.length - (showMetricContract ? 0 : 1);
   const canonicalPlatformId = normalizePlatformKey(allPlatformResults[0]?.platform_id ?? canonicalPlatformRouteKey(platform));
 
   // Distinct platform options for the in-page sibling pivot, sorted by
@@ -693,14 +721,27 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             />
           </div>
           <div ref={resultsScrollerRef} class="overflow-x-auto" data-testid="platform-results-scroll-container">
-          <table class="min-w-max divide-y divide-[var(--bb-data-border)]">
+          <DataTable
+            ariaLabel={`${platformDisplayName} results`}
+            ariaColCount={platformColumnCount}
+            caption={
+              hoistedMetricContract ? (
+                <span data-testid="platform-hoisted-metric-contract">
+                  Route-wide metric contract: {hoistedMetricContract}
+                </span>
+              ) : (
+                "Platform results"
+              )
+            }
+            class="min-w-max divide-y divide-[var(--bb-data-border)]"
+          >
             <thead class="bg-[var(--bb-surface-data-muted)]">
               <tr>
-                <th class="table-th w-8">
+                <th class="table-th w-8" aria-colindex={platformTableColumnIndex("compare", showMetricContract)}>
                   <span class="sr-only">Compare</span>
                 </th>
-                <th class="table-th">Compare state</th>
-                <th class="p-0" scope="col" aria-sort={ariaSort("benchmark")}>
+                <th class="table-th" aria-colindex={platformTableColumnIndex("compare_state", showMetricContract)}>Compare state</th>
+                <th class="p-0" scope="col" aria-sort={ariaSort("benchmark")} aria-colindex={platformTableColumnIndex("benchmark", showMetricContract)}>
                   <button
                     type="button"
                     class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
@@ -710,7 +751,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                     {ariaSortAnnouncement("benchmark")}
                   </button>
                 </th>
-                <th class="p-0" scope="col" aria-sort={ariaSort("scale_factor")}>
+                <th class="p-0" scope="col" aria-sort={ariaSort("scale_factor")} aria-colindex={platformTableColumnIndex("scale", showMetricContract)}>
                   <button
                     type="button"
                     class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
@@ -720,9 +761,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                     {ariaSortAnnouncement("scale_factor")}
                   </button>
                 </th>
-                <th class="table-th">Phase</th>
-                <th class="table-th">Metric contract</th>
-                <th class="p-0" scope="col" aria-sort={ariaSort("run_date")}>
+                <th class="table-th" aria-colindex={platformTableColumnIndex("phase", showMetricContract)}>Phase</th>
+                {showMetricContract && (
+                  <th class="table-th" aria-colindex={platformTableColumnIndex("metric_contract", true)}>Metric contract</th>
+                )}
+                <th class="p-0" scope="col" aria-sort={ariaSort("run_date")} aria-colindex={platformTableColumnIndex("date", showMetricContract)}>
                   <button
                     type="button"
                     class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
@@ -732,7 +775,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                     {ariaSortAnnouncement("run_date")}
                   </button>
                 </th>
-                <th class="p-0" scope="col" aria-sort={ariaSort("power_score")}>
+                <th class="p-0" scope="col" aria-sort={ariaSort("power_score")} aria-colindex={platformTableColumnIndex("power_score", showMetricContract)}>
                   <button
                     type="button"
                     class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
@@ -746,6 +789,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   class="p-0"
                   scope="col"
                   aria-sort={ariaSort("geomean_ms")}
+                  aria-colindex={platformTableColumnIndex("geomean", showMetricContract)}
                   title="Geometric mean of per-query execution times (measurement runs only). Lower is faster."
                 >
                   <button
@@ -757,8 +801,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                     {ariaSortAnnouncement("geomean_ms")}
                   </button>
                 </th>
-                <th class="table-th">Source</th>
-                <th class="table-th" />
+                <th class="table-th" aria-colindex={platformTableColumnIndex("source", showMetricContract)}>Source</th>
+                <th class="table-th" aria-colindex={platformTableColumnIndex("receipt", showMetricContract)} />
               </tr>
             </thead>
             <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
@@ -768,6 +812,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   entry={r}
                   checked={selected.has(r.result_id)}
                   onToggle={() => toggleSelect(r.result_id)}
+                  showMetricContract={showMetricContract}
                   disabledReason={
                     comparisonExclusionReason(r) ??
                     cohortLockReason(r) ??
@@ -778,7 +823,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                 />
               ))}
             </tbody>
-          </table>
+          </DataTable>
           </div>
           {visiblePlatformResults.length < platformResults.length && (
             <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
@@ -797,54 +842,27 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       {selected.size === 1 && <p class="mt-3 text-sm text-[var(--bb-data-fg-muted)]">Select at least one more result to compare.</p>}
 
       {compareUrl && (
-        <div class="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-lg">
-          <div class="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0 flex-1">
-              <div class="text-sm text-[var(--bb-data-fg-primary)]">
-                <strong>{formatCount(selected.size, "result")}</strong> selected for compare
-              </div>
-              <div
-                class="mt-2 flex max-h-32 flex-wrap gap-2 overflow-y-auto pr-1"
-                role="list"
-                aria-label="Selected compare results"
-              >
-                {selectedRows.map((row) => {
-                  return (
-                    <div
-                      key={row.result_id}
-                      data-testid={`compare-tray-row-${row.result_id}`}
-                      role="listitem"
-                      class="flex max-w-full flex-wrap items-center gap-1.5 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-2 py-1 text-xs text-[var(--bb-data-fg-muted)]"
-                    >
-                      <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
-                      <span>{humanizeBenchmark(row.benchmark)}</span>
-                      <span>SF {row.scale_factor}</span>
-                      <span>{row.phase}</span>
-                      <span>{row.run_date}</span>
-                      <TrustBadge trustLabel={row.trust_label} compact />
-                      <FundingChip funding={row.funding} compact />
-                      <span class="font-mono text-[var(--bb-data-fg-muted)]">
-                        Public ID {visibleResultIdForRow(row)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div class="flex shrink-0 items-center gap-3">
-              <button
-                type="button"
-                class="text-sm text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]"
-                onClick={() => setSelected(new Set())}
-              >
-                Clear
-              </button>
-              <a href={compareUrl} class="btn btn-primary text-sm no-underline">
-                Compare {selected.size} selected →
-              </a>
-            </div>
-          </div>
-        </div>
+        <CompareTray
+          summary={
+            <>
+              <strong>{formatCount(selected.size, "result")}</strong> selected for compare
+            </>
+          }
+          items={selectedRows.map((row) => ({
+            id: row.result_id,
+            platform: row.platform,
+            benchmarkLabel: humanizeBenchmark(row.benchmark),
+            scaleFactor: row.scale_factor,
+            phase: row.phase,
+            runDate: row.run_date,
+            trustLabel: row.trust_label,
+            funding: row.funding,
+            visibleResultId: visibleResultIdForRow(row),
+          }))}
+          compareHref={compareUrl}
+          compareLabel={`Compare ${selected.size} selected`}
+          onClear={() => setSelected(new Set())}
+        />
       )}
 
       {platformResultsRaw.length > 0 && (
@@ -943,6 +961,7 @@ interface PlatformRowProps {
   entry: PlatformIndexRowRow;
   checked: boolean;
   onToggle: () => void;
+  showMetricContract: boolean;
   /**
    * w6 (compare-flow-entrypoints): when a row outside the locked
    * cohort signature is rendered, the checkbox is disabled with a
@@ -952,12 +971,12 @@ interface PlatformRowProps {
   disabledReason?: string;
 }
 
-function PlatformRow({ entry, checked, onToggle, disabledReason }: PlatformRowProps) {
+function PlatformRow({ entry, checked, onToggle, showMetricContract, disabledReason }: PlatformRowProps) {
   const disabledCopy = describeCompareExclusionReason(disabledReason);
   const reasonId = disabledCopy ? `platform-compare-reason-${entry.result_id}` : undefined;
   return (
     <tr class="hover:bg-[var(--bb-surface-data-muted)]" data-testid={entry.result_id}>
-      <td class="table-td">
+      <td class="table-td" aria-colindex={platformTableColumnIndex("compare", showMetricContract)}>
         <input
           type="checkbox"
           checked={checked}
@@ -977,19 +996,21 @@ function PlatformRow({ entry, checked, onToggle, disabledReason }: PlatformRowPr
           data-testid={`platform-compare-checkbox-${entry.result_id}`}
         />
       </td>
-      <td class="table-td max-w-[16rem]">
+      <td class="table-td max-w-[16rem]" aria-colindex={platformTableColumnIndex("compare_state", showMetricContract)}>
         <PlatformCompareReasonStatus id={reasonId} copy={disabledCopy} selected={checked} />
       </td>
-      <td class="table-td font-medium">{humanizeBenchmark(entry.benchmark)}</td>
-      <td class="table-td">SF {entry.scale_factor}</td>
-      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.phase}</td>
-      <td class="table-td max-w-[12rem] text-xs text-[var(--bb-data-fg-muted)]">
-        {primaryMetricContract(entry.primary_metric)}
-      </td>
-      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.run_date}</td>
-      <td class="table-td font-mono">{fmtScore(entry.power_score)}</td>
-      <td class="table-td font-mono">{fmtGeomean(entry.geomean_ms)}</td>
-      <td class="table-td">
+      <td class="table-td font-medium" aria-colindex={platformTableColumnIndex("benchmark", showMetricContract)}>{humanizeBenchmark(entry.benchmark)}</td>
+      <td class="table-td" aria-colindex={platformTableColumnIndex("scale", showMetricContract)}>SF {entry.scale_factor}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("phase", showMetricContract)}>{entry.phase}</td>
+      {showMetricContract && (
+        <td class="table-td max-w-[12rem] text-xs text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("metric_contract", true)}>
+          {primaryMetricContract(entry.primary_metric)}
+        </td>
+      )}
+      <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("date", showMetricContract)}>{entry.run_date}</td>
+      <td class="table-td font-mono" aria-colindex={platformTableColumnIndex("power_score", showMetricContract)}>{fmtScore(entry.power_score)}</td>
+      <td class="table-td font-mono" aria-colindex={platformTableColumnIndex("geomean", showMetricContract)}>{fmtGeomean(entry.geomean_ms)}</td>
+      <td class="table-td" aria-colindex={platformTableColumnIndex("source", showMetricContract)}>
         <div class="flex flex-wrap gap-1">
           <TrustBadge trustLabel={entry.trust_label} compact />
           <FundingChip funding={entry.funding} compact />
@@ -997,7 +1018,7 @@ function PlatformRow({ entry, checked, onToggle, disabledReason }: PlatformRowPr
           {entry.tuning_mode && <TuningBadge tuningMode={entry.tuning_mode} />}
         </div>
       </td>
-      <td class="table-td text-right">
+      <td class="table-td text-right" aria-colindex={platformTableColumnIndex("receipt", showMetricContract)}>
         <a
           href={resultReceiptHref(entry)}
           aria-label={resultIdentityAriaLabel(entry, "receipt")}

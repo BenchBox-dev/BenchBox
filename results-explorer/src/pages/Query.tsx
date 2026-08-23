@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import { queryRows } from "@/db";
+import { EmptyState } from "@/components/EmptyState";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { FacetDrawer, FacetRail, type ActiveFacetChip, type FacetGroup } from "@/components/FacetRail";
 import { TableScrollHint } from "@/components/TableScrollHint";
@@ -234,7 +235,6 @@ export function Query(_: RoutableProps) {
   }, [compareCohortSignature, compareCompatibleOnly, compareRowPartition, rows]);
   const visibleRows = reorderedRows.slice(0, visibleResultLimit);
   const displayedResultTotal = reorderedRows.length;
-  const displayedResultLabel = compareIncompatibleHiddenCount > 0 ? "displayed rows" : "returned rows";
   const visibleSqlRows = sqlRows.slice(0, visibleSqlLimit);
 
   useEffect(() => {
@@ -634,8 +634,8 @@ export function Query(_: RoutableProps) {
       <div class="mb-6">
         <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">Results Query Workbench</h1>
         <p class="mt-2 max-w-3xl text-sm text-[var(--bb-data-fg-muted)]">
-          Query the <code class="rounded bg-[var(--bb-surface-app)] px-1 font-mono text-xs">results.duckdb</code> snapshot in-browser
-          with shareable facet state, schema-driven columns, CSV export, and an optional read-only SQL scratchpad.
+          Explore published benchmark runs with shareable filters, configurable columns, CSV and JSON exports, and an optional
+          read-only SQL workspace.
         </p>
       </div>
 
@@ -646,10 +646,11 @@ export function Query(_: RoutableProps) {
             class="order-1 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm"
           >
             <div class="text-sm text-[var(--bb-data-fg-muted)]">
-              {rows.length} matching result bundle(s)
+              Showing {visibleRows.length.toLocaleString()} of {displayedResultTotal.toLocaleString()} matching result{" "}
+              {displayedResultTotal === 1 ? "bundle" : "bundles"}
               {rowLimitMode === "default" && rows.length >= DEFAULT_ROW_LIMIT && (
                 <span class="ml-2 text-xs text-[var(--bb-tone-warning-fg)]">
-                  (capped at {DEFAULT_ROW_LIMIT.toLocaleString()} - add more filters to narrow)
+                  The query reached the {DEFAULT_ROW_LIMIT.toLocaleString()}-result cap; add filters to narrow the set.
                 </span>
               )}
             </div>
@@ -702,17 +703,30 @@ export function Query(_: RoutableProps) {
           <div data-testid="query-results-panel" class="order-3">
             {loading ? (
               <QueryRowsSkeleton
-                message="Querying results.duckdb..."
+                message="Loading matching results..."
                 columns={visibleColumns.length || DEFAULT_COLUMNS.length}
               />
+            ) : rows.length === 0 ? (
+              <div data-testid="query-empty-state">
+                <EmptyState
+                  title={activeFilterChips.length > 0 ? "No results match these filters" : "No published results"}
+                  description={
+                    activeFilterChips.length > 0
+                      ? `Narrowed by ${activeFilterChips.map((chip) => chip.label).join(", ")}. Clear the filters to widen the query.`
+                      : "The published corpus has no result bundles to show."
+                  }
+                  action={
+                    activeFilterChips.length > 0 ? (
+                      <button type="button" class="btn btn-secondary" onClick={resetQueryFilters}>
+                        Clear all filters
+                      </button>
+                    ) : undefined
+                  }
+                />
+              </div>
             ) : (
               <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
-                  <span>
-                    Showing {visibleRows.length.toLocaleString()} of {displayedResultTotal.toLocaleString()}{" "}
-                    {displayedResultLabel}
-                  </span>
-                  <span>Query limit: {rowLimitMode === "all" ? "all" : DEFAULT_ROW_LIMIT.toLocaleString()}</span>
+                <div class="flex flex-wrap items-center justify-end gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
                   <TableScrollHint
                     scrollerRef={resultsScrollerRef}
                     testId="query-results-scroll-hint"

@@ -78,6 +78,21 @@ now uploads the protected baseline from `develop` and retrieves the exact
 base-SHA artifact for pull requests; the comparison is blocking once the
 one-time bootstrap baseline exists.
 
+An intentional visual change or route/viewport addition needs explicit
+maintainer acceptance. After reviewing the PR's `public-site-visual-diagnostics-*`
+artifact, set the repository variable `APPROVED_HEAD_SHA` to the PR's complete
+head SHA and set `APPROVAL_REASON` to a nonempty review note, then rerun the
+failed workflow. The approval applies only when both values are present and the
+approved SHA exactly equals GitHub's current PR head SHA. It may accept changed
+digests and unexpected new captures, but it never accepts a capture missing
+from the current matrix. Clear both variables after the approved run so only
+one reviewed head occupies the repository-wide approval slot.
+
+This approval does not create or replace a baseline. Only the protected
+`develop` push or its `workflow_dispatch` run uploads the next SHA-bound
+baseline after the reviewed PR merges; PR diagnostic artifacts remain
+short-lived and non-promotable.
+
 ## What CI gates
 
 [`.github/workflows/results-explorer-browser.yml`](../../.github/workflows/results-explorer-browser.yml)

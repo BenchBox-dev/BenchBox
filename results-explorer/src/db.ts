@@ -229,7 +229,7 @@ function throwReadModelVersionError(found: number): never {
     : "Refresh the published snapshot or ask a maintainer to rebuild the Explorer data.";
   throw new Error(
     `DuckDB snapshot read-model v${found}; UI requires v${EXPECTED_READ_MODEL_VERSION}. ` +
-      `${remediation} Check the deployed results.duckdb file.`,
+      `${remediation} Check that the published results snapshot is available.`,
   );
 }
 
