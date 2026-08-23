@@ -306,7 +306,10 @@ class ClickHouseMemoryTrace:
 
 
 def utc_now() -> str:
-    return _dt.datetime.now(_dt.UTC).isoformat().replace("+00:00", "Z")
+    # datetime.UTC is 3.11+; this project supports >=3.10 (pyproject
+    # requires-python), and the 3.10 nightly lane failed every run on
+    # AttributeError: module 'datetime' has no attribute 'UTC'.
+    return _dt.datetime.now(_dt.timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def parse_memory_bytes(value: Any) -> int | None:
