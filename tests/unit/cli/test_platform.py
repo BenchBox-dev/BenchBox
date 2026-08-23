@@ -766,6 +766,18 @@ class TestCLICommands:
         mock_manager.display_platform_list.assert_called_once_with(show_all=True)
 
     @patch("benchbox.cli.platform.get_platform_manager")
+    def test_list_platforms_json_flag(self, mock_get_manager):
+        """The documented --json shorthand selects the lossless output path."""
+        mock_manager = Mock()
+        mock_get_manager.return_value = mock_manager
+
+        result = self.runner.invoke(list_platforms, ["--json"])
+
+        assert result.exit_code == 0
+        mock_manager.emit_platform_json.assert_called_once()
+        mock_manager.display_platform_status.assert_not_called()
+
+    @patch("benchbox.cli.platform.get_platform_manager")
     def test_list_platforms_show_deployments(self, mock_get_manager):
         """Test list platforms command with deployment mode output."""
         mock_manager = Mock()

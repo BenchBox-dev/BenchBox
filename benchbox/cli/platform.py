@@ -700,6 +700,12 @@ def platforms():
     help="Output format",
 )
 @click.option(
+    "--json",
+    "json_output",
+    is_flag=True,
+    help="Emit the full platform records as JSON",
+)
+@click.option(
     "--detail",
     is_flag=True,
     help="Add the category and description columns (needs a wide terminal)",
@@ -709,12 +715,12 @@ def platforms():
     is_flag=True,
     help="Show available deployment modes (local, server, cloud) per platform",
 )
-def list_platforms(show_all: bool, format: str, detail: bool, show_deployments: bool):
+def list_platforms(show_all: bool, format: str, json_output: bool, detail: bool, show_deployments: bool):
     """List all available platforms and their status.
 
     The default table is ordered by support tier and omits category and
     description so it stays readable at 80 columns. Use --detail to add them
-    back, or --format json for the full record.
+    back, or --json/--format json for the full record.
 
     Use --show-deployments to see available deployment modes for platforms
     that support multiple deployment targets (e.g., clickhouse-local, clickhouse-server).
@@ -723,7 +729,7 @@ def list_platforms(show_all: bool, format: str, detail: bool, show_deployments: 
 
     if show_deployments:
         manager.display_platform_deployments()
-    elif format == "json":
+    elif json_output or format == "json":
         manager.emit_platform_json()
     elif format == "table":
         manager.display_platform_status(detail=detail)
