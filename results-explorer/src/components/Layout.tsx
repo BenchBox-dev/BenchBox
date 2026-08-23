@@ -16,7 +16,7 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   return (
-    <div class="flex min-h-screen flex-col">
+    <div class="bb-app-shell flex min-h-screen flex-col" data-testid="app-shell">
       <Header />
       <main class="flex-1">{children}</main>
       <Footer />
@@ -114,10 +114,13 @@ function Header() {
             <ExplorerNavLink href="/results/" active={currentPath === "/results" || currentPath === "/results/"}>
               Leaderboards
             </ExplorerNavLink>
-            <ExplorerNavLink href="/results/tpch/" active={isBenchmarkPath(currentPath)}>
+            <ExplorerNavLink href="/results/benchmarks/" active={isBenchmarkPath(currentPath)}>
               Benchmarks
             </ExplorerNavLink>
-            <ExplorerNavLink href="/results/p/duckdb/" active={currentPath.startsWith("/results/p/")}>
+            <ExplorerNavLink
+              href="/results/platforms/"
+              active={currentPath.startsWith("/results/p/") || /^\/results\/platforms\/?$/.test(currentPath)}
+            >
               Platforms
             </ExplorerNavLink>
             <ExplorerNavLink href="/results/compare" active={currentPath.startsWith("/results/compare")}>
@@ -184,7 +187,7 @@ function ExplorerNavLink({
 }
 
 function isBenchmarkPath(path: string): boolean {
-  return /^\/results\/(?!compare\/?$|query\/?$|p\/|r\/)[^/]+\/?$/.test(path);
+  return /^\/results\/(?!compare\/?$|query\/?$|platforms\/?$|p\/|r\/)[^/]+\/?$/.test(path);
 }
 
 function themeLabel(choice: string): string {
