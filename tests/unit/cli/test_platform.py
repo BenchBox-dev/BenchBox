@@ -237,13 +237,30 @@ class TestSupportStatusIsDistinctFromDriverAvailability:
         manager = PlatformManager()
         manager.console = console
 
-        manager.display_platform_status()
+        manager.display_platform_status(detail=True)
         output = console.file.getvalue()
 
         header = next(line for line in output.splitlines() if "Platform" in line and "Category" in line)
         assert "Driver" in header
         assert "Support" in header
         # The old conflated heading must not come back as a column of its own.
+        assert "Status" not in header
+
+    def test_both_signals_survive_the_narrow_default_view(self):
+        """Narrowing the default must not drop either signal.
+
+        Category and Description move behind --detail; Driver and Support are
+        the two the taxonomy says must never be conflated, so they stay.
+        """
+        console = Console(file=StringIO(), width=80)
+        manager = PlatformManager()
+        manager.console = console
+
+        manager.display_platform_status()
+        output = console.file.getvalue()
+
+        header = next(line for line in output.splitlines() if "Platform" in line and "Driver" in line)
+        assert "Support" in header
         assert "Status" not in header
 
 
@@ -1395,3 +1412,103 @@ class TestSetupPlatformsCommand:
         assert result.exit_code == 0
         mock_select.assert_called_once()
         assert "No enabled platforms to disable." in result.output
+
+
+STANDARD_TERMINAL_WIDTH = 80
+DEFAULT_HEADERS = ("Platform", "Driver", "Support", "Libraries")
+
+
+def _render_platform_status(width: int, *, detail: bool = False) -> str:
+    """Render the real registry's status table at *width* columns.
+
+    Deliberately not mocked. The defect was a property of the real 51-platform
+    registry meeting a real terminal width; a three-row fixture would fit at
+    any width and prove nothing.
+    """
+    stream = StringIO()
+    manager = get_platform_manager()
+    manager.console = Console(file=stream, force_terminal=False, color_system=None, width=width)
+    manager.display_platform_status(detail=detail)
+    return stream.getvalue()
+
+
+def _header_line(output: str) -> str:
+    for line in output.splitlines():
+        if "Platform" in line and "Driver" in line:
+            return line
+    raise AssertionError(f"no header row found in:\n{output[:2000]}")
+
+
+def test_platform_status_headers_are_not_truncated_at_80_columns() -> None:
+    """Every default column header must survive an 80-column terminal.
+
+    `benchbox platforms list` is one of four commands `benchbox --help`
+    advertises. At 80 columns the old six-column table rendered as
+    `Platform | Driver | Suppo… | Libra… | Categ… | Desc…`, so every column
+    carrying the answer -- support tier above all -- was an ellipsis.
+    """
+    header = _header_line(_render_platform_status(STANDARD_TERMINAL_WIDTH))
+
+    assert "\u2026" not in header, f"a default column header is truncated at 80 columns: {header}"
+    for column in DEFAULT_HEADERS:
+        assert column in header, f"{column} missing from the default header: {header}"
+
+
+def test_platform_status_does_not_overflow_80_columns() -> None:
+    output = _render_platform_status(STANDARD_TERMINAL_WIDTH)
+
+    overflowing = [line for line in output.splitlines() if len(line.rstrip()) > STANDARD_TERMINAL_WIDTH]
+
+    assert not overflowing, "output wider than the terminal:\n" + "\n".join(overflowing[:5])
+
+
+def test_platform_status_default_omits_the_columns_that_forced_the_truncation() -> None:
+    header = _header_line(_render_platform_status(STANDARD_TERMINAL_WIDTH))
+
+    assert "Category" not in header
+    assert "Description" not in header
+
+
+def test_platform_status_detail_restores_the_full_table() -> None:
+    header = _header_line(_render_platform_status(200, detail=True))
+
+    for column in (*DEFAULT_HEADERS, "Category", "Description"):
+        assert column in header, f"{column} missing from --detail header: {header}"
+
+
+def test_the_width_gate_still_detects_a_truncated_header() -> None:
+    """Negative control.
+
+    Once the default fits, nothing in the real output is truncated, so a
+    control has to reproduce the condition: the same table with the two wide
+    columns restored, at the same 80 columns, must still truncate. If this
+    ever stops truncating, the assertions above have gone vacuous.
+    """
+    header = _header_line(_render_platform_status(STANDARD_TERMINAL_WIDTH, detail=True))
+
+    assert "\u2026" in header, f"expected --detail to truncate at 80 columns, got: {header}"
+
+
+def test_every_default_row_still_carries_its_support_tier() -> None:
+    """Narrowing must not cost the tier, which is the point of the command."""
+    output = _render_platform_status(STANDARD_TERMINAL_WIDTH)
+    tiers = ("stable", "beta", "experimental", "deprecated")
+
+    counted = sum(output.count(tier) for tier in tiers)
+    listed = len(get_platform_manager().detect_platforms())
+
+    assert counted >= listed, f"{counted} tier labels for {listed} platforms"
+
+
+def test_platform_status_orders_stable_platforms_before_experimental_ones() -> None:
+    output = _render_platform_status(STANDARD_TERMINAL_WIDTH)
+    # Table rows only. The trailing "By support tier: 5 stable, ..." summary
+    # also names every tier, and counting it would make the ordering assertion
+    # unsatisfiable rather than merely false.
+    lines = [line for line in output.splitlines() if line.startswith("\u2502")]
+
+    stable_rows = [index for index, line in enumerate(lines) if "stable" in line]
+    experimental_rows = [index for index, line in enumerate(lines) if "experimental" in line]
+
+    assert stable_rows and experimental_rows, "fixture assumption changed"
+    assert max(stable_rows) < min(experimental_rows)

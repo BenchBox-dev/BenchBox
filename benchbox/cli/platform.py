@@ -5,6 +5,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import json
 import sys
 from pathlib import Path
 from typing import Any, Optional
@@ -53,6 +54,39 @@ _SUPPORT_STATUS_STYLES = {
     "experimental": "yellow",
     "deprecated": "red",
 }
+
+
+#: Tier order for display: the tiers a user can rely on come first, and an
+#: unrecognised status sorts last rather than being folded into a known tier.
+_SUPPORT_STATUS_ORDER = ("stable", "beta", "experimental", "deprecated")
+
+
+def _support_tier_rank(support_status: str | None) -> tuple[int, str]:
+    if not support_status or support_status not in _SUPPORT_STATUS_ORDER:
+        return (len(_SUPPORT_STATUS_ORDER), support_status or "")
+    return (_SUPPORT_STATUS_ORDER.index(support_status), "")
+
+
+def _platforms_by_support_tier(platforms: dict) -> list[tuple[str, Any]]:
+    """Order platforms by support tier, then by display name within a tier.
+
+    Stable rows first answers "which of these actually work" without the user
+    reading all 51. Ordering is stable within a tier so the table does not
+    reshuffle between runs.
+    """
+    return sorted(
+        platforms.items(),
+        key=lambda item: (_support_tier_rank(item[1].support_status), item[1].display_name.lower()),
+    )
+
+
+def _support_tier_counts(platforms: dict) -> dict[str, int]:
+    """Count platforms per support tier, in display order."""
+    counts: dict[str, int] = {}
+    for _name, info in _platforms_by_support_tier(platforms):
+        tier = info.support_status if info.support_status else "unknown"
+        counts[tier] = counts.get(tier, 0) + 1
+    return counts
 
 
 def _format_support_status(support_status: str | None) -> str:
@@ -403,8 +437,24 @@ class PlatformManager:
             "category": platform_info.category,
         }
 
-    def display_platform_status(self):
-        """Display comprehensive platform status table."""
+    def display_platform_status(self, detail: bool = False):
+        """Display the platform status table.
+
+        The default view is deliberately narrow. With 51 platforms, the full
+        table does not fit an 80-column terminal: Rich truncates every
+        informative header to an ellipsis and wraps Description into six rows
+        of single-word fragments per platform, which destroys exactly the
+        answer the user came for -- which of these platforms actually work.
+
+        So Category and Description move behind ``--detail``, and rows are
+        ordered by support tier with a per-tier count in the summary. Nothing
+        is hidden or gated: every platform still appears, and every row still
+        carries its tier, per
+        ``_project/decisions/architecture-support-tier-commitment.md``.
+
+        Args:
+            detail: Restore the Category and Description columns.
+        """
         platforms = self.detect_platforms()
 
         table = Table(title="BenchBox Platform Status")
@@ -417,53 +467,38 @@ class PlatformManager:
         table.add_column("Driver", style="bold")
         table.add_column("Support", style="bold")
         table.add_column("Libraries", style="dim")
-        table.add_column("Category", style="magenta")
-        table.add_column("Description", style="dim")
+        if detail:
+            table.add_column("Category", style="magenta")
+            table.add_column("Description", style="dim")
 
-        # Group by category
-        categories = {"analytical": [], "cloud": [], "traditional": [], "embedded": []}
+        for name, info in _platforms_by_support_tier(platforms):
+            # Driver column - is the local dependency installed?
+            if info.enabled:
+                status = "[green]✅ Enabled[/green]"
+            elif info.available:
+                status = "[yellow]○ Available[/yellow]"
+            else:
+                status = "[red]❌ Missing[/red]"
 
-        for name, info in platforms.items():
-            category = info.category if info.category in categories else "database"
-            if category not in categories:
-                categories[category] = []
-            categories[category].append((name, info))
+            # Support column - product support tier, independent of the above
+            support = _format_support_status(info.support_status)
 
-        for category_name, platform_list in categories.items():
-            if not platform_list:
-                continue
-
-            for name, info in platform_list:
-                # Driver column - is the local dependency installed?
-                if info.enabled:
-                    status = "[green]✅ Enabled[/green]"
-                elif info.available:
-                    status = "[yellow]○ Available[/yellow]"
+            # Libraries column
+            lib_statuses = []
+            for lib in info.libraries:
+                if lib.installed:
+                    version_str = f" ({lib.version})" if lib.version else ""
+                    lib_statuses.append(f"[green]{lib.name}{version_str}[/green]")
                 else:
-                    status = "[red]❌ Missing[/red]"
+                    lib_statuses.append(f"[red]{lib.name}[/red]")
 
-                # Support column - product support tier, independent of the above
-                support = _format_support_status(info.support_status)
+            libraries = ", ".join(lib_statuses)
 
-                # Libraries column
-                lib_statuses = []
-                for lib in info.libraries:
-                    if lib.installed:
-                        version_str = f" ({lib.version})" if lib.version else ""
-                        lib_statuses.append(f"[green]{lib.name}{version_str}[/green]")
-                    else:
-                        lib_statuses.append(f"[red]{lib.name}[/red]")
-
-                libraries = ", ".join(lib_statuses)
-
-                table.add_row(
-                    info.display_name,
-                    status,
-                    support,
-                    libraries,
-                    category_name.title(),
-                    info.description,
-                )
+            row = [info.display_name, status, support, libraries]
+            if detail:
+                category = info.category if info.category else "database"
+                row.extend([category.title(), info.description])
+            table.add_row(*row)
 
         self.console.print(table)
 
@@ -474,6 +509,39 @@ class PlatformManager:
 
         summary = f"[bold]Summary:[/bold] {enabled_count} enabled, {available_count} available, {total_platforms} total"
         self.console.print(f"\n{summary}")
+        tier_counts = _support_tier_counts(platforms)
+        if tier_counts:
+            tiers = ", ".join(f"{count} {tier}" for tier, count in tier_counts.items())
+            self.console.print(f"[bold]By support tier:[/bold] {tiers}")
+        if not detail:
+            self.console.print("[dim]Run with --detail for category and description.[/dim]")
+
+    def emit_platform_json(self) -> None:
+        """Emit the full platform record as JSON on stdout.
+
+        The narrow default table drops columns to stay readable. This is the
+        path that loses nothing, so a script never has to parse the table.
+        Printed through ``print`` rather than the Rich console so the output
+        is exactly JSON, with no wrapping or markup.
+        """
+        platforms = self.detect_platforms()
+        payload = [
+            {
+                "name": name,
+                "display_name": info.display_name,
+                "support_status": info.support_status,
+                "category": info.category,
+                "description": info.description,
+                "enabled": info.enabled,
+                "available": info.available,
+                "installation_command": info.installation_command,
+                "libraries": [
+                    {"name": lib.name, "installed": lib.installed, "version": lib.version} for lib in info.libraries
+                ],
+            }
+            for name, info in _platforms_by_support_tier(platforms)
+        ]
+        print(json.dumps({"platforms": payload}, indent=2))
 
     def display_platform_list(self, show_all: bool = True):
         """Display platform list for 'benchbox platforms list' command.
@@ -627,17 +695,26 @@ def platforms():
 )
 @click.option(
     "--format",
-    type=click.Choice(["table", "simple"]),
+    type=click.Choice(["table", "simple", "json"]),
     default="table",
     help="Output format",
+)
+@click.option(
+    "--detail",
+    is_flag=True,
+    help="Add the category and description columns (needs a wide terminal)",
 )
 @click.option(
     "--show-deployments",
     is_flag=True,
     help="Show available deployment modes (local, server, cloud) per platform",
 )
-def list_platforms(show_all: bool, format: str, show_deployments: bool):
+def list_platforms(show_all: bool, format: str, detail: bool, show_deployments: bool):
     """List all available platforms and their status.
+
+    The default table is ordered by support tier and omits category and
+    description so it stays readable at 80 columns. Use --detail to add them
+    back, or --format json for the full record.
 
     Use --show-deployments to see available deployment modes for platforms
     that support multiple deployment targets (e.g., clickhouse-local, clickhouse-server).
@@ -646,8 +723,10 @@ def list_platforms(show_all: bool, format: str, show_deployments: bool):
 
     if show_deployments:
         manager.display_platform_deployments()
+    elif format == "json":
+        manager.emit_platform_json()
     elif format == "table":
-        manager.display_platform_status()
+        manager.display_platform_status(detail=detail)
     else:
         manager.display_platform_list(show_all=show_all)
 
