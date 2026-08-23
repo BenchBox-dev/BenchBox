@@ -438,7 +438,9 @@ export function MetaLeaderboard({
                           <div class="mt-0.5 flex flex-wrap justify-center gap-1">
                             <TrustBadge trustLabel={metadata.trust_label} compact />
                             <FundingChip funding={metadata.funding} compact />
-                            <ValidationBadge validationStatus={metadata.validation_status} showMissing />
+                            {metadata.validation_status?.trim().toLowerCase() !== "passed" && (
+                              <ValidationBadge validationStatus={metadata.validation_status} showMissing />
+                            )}
                           </div>
                         )}
                       </td>

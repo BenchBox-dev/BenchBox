@@ -637,6 +637,29 @@ describe("MetaLeaderboard", () => {
     expect(cell.querySelector('[data-role="validation"]')).toBeNull();
   });
 
+  it("keeps a validation badge when a result failed validation", () => {
+    render(
+      <MetaLeaderboard
+        data={DATA}
+        mode="times"
+        onModeChange={vi.fn()}
+        resultMetadataById={new Map([
+          ["r1", { trust_label: "maintainer-run", validation_status: "failed" }],
+          ["r2", { trust_label: "community-submission", validation_status: "passed" }],
+        ])}
+      />,
+    );
+
+    const failedCell = screen.getByRole("gridcell", { name: "DuckDB times for ClickBench SF0.1: 10 ms" });
+    const failedBadge = failedCell.querySelector('[data-role="validation"]');
+    expect(failedBadge?.textContent).toBe("failed");
+    expect(failedBadge?.getAttribute("data-tone")).toBe("danger");
+
+    const passedCell = screen.getByRole("gridcell", { name: "SQLite times for ClickBench SF0.1: 20 ms" });
+    expect(passedCell.querySelector('[data-role="validation"]')).toBeNull();
+    expect(passedCell.textContent).toContain("Community");
+  });
+
   it("explains an all-excluded ranking and preserves distinct exclusion reasons", () => {
     const excludedPlatforms = [
       {
