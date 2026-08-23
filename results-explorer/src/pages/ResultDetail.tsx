@@ -35,6 +35,8 @@ interface DetailState {
 }
 
 export function ResultDetail({ resultId = "" }: ResultDetailProps) {
+  const timingsScrollerRef = useRef<HTMLDivElement>(null);
+  const samplesScrollerRef = useRef<HTMLDivElement>(null);
   const [detailState, setDetailState] = useState<DetailState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sort, setSort] = useState<SortState<MedianSortKey>>({
@@ -360,8 +362,8 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             <h2 class="mb-4 text-base font-semibold text-[var(--bb-data-fg-primary)]">
               Query Timings ({detail.display_timings.length})
             </h2>
-            <TableScrollHint testId="detail-timings-scroll-hint" />
-            <div class="overflow-x-auto" data-testid="detail-timings-scroll-container">
+            <TableScrollHint scrollerRef={timingsScrollerRef} testId="detail-timings-scroll-hint" />
+            <div ref={timingsScrollerRef} class="overflow-x-auto" data-testid="detail-timings-scroll-container">
               <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                 <thead class="bg-[var(--bb-surface-data-muted)]">
                   <tr>
@@ -407,10 +409,11 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                   Individual samples ({detail.queries.length})
                 </summary>
                 <TableScrollHint
+                  scrollerRef={samplesScrollerRef}
                   testId="detail-samples-scroll-hint"
                   wrapperClassName="mt-3 mb-2 flex justify-end"
                 />
-                <div class="overflow-x-auto" data-testid="detail-samples-scroll-container">
+                <div ref={samplesScrollerRef} class="overflow-x-auto" data-testid="detail-samples-scroll-container">
                   <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                     <thead class="bg-[var(--bb-surface-data-muted)]">
                       <tr>

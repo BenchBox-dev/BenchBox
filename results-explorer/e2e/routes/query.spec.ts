@@ -131,7 +131,9 @@ test.describe("Query workbench", () => {
     await expect
       .poll(() => new URL(page.url()).searchParams.get("limit"))
       .toBe("all");
-    await expect(page.getByTestId("query-result-summary")).toContainText(/Showing \d+ of \d+ matching result bundle/);
+    await expect(page.getByTestId("query-result-summary")).toContainText(
+      /Showing \d+–\d+ of \d+ matching result bundle/,
+    );
     await expect(page.getByText(/Query limit:/)).toHaveCount(0);
 
     await page.getByRole("button", { name: /^Default$/ }).click();

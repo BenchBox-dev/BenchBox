@@ -186,6 +186,32 @@ test.describe("responsive explorer assertions", () => {
     await expect(pageStickyHeader.locator("th", { hasText: /^3\b/ }).first()).toBeVisible();
   });
 
+  test("scroll affordance follows measured overflow at 1440px", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    await page.goto("/results/tpch/?sf=0.01&phase=standard");
+    await waitForDataLoaded(page, /TPC-H Results/i);
+    const heatmap = page.getByTestId("query-heatmap-scroll-container").first();
+    await waitForDataElement(page, heatmap);
+    await expect.poll(() => heatmap.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+    await expect(page.getByTestId("query-heatmap-scroll-hint")).toBeVisible();
+
+    await page.goto("/results/query");
+    await waitForDataLoaded(page, /matching result bundle/);
+    const queryResults = page.getByTestId("query-results-scroll-container");
+    await queryResults.locator("table").evaluate((table) => {
+      table.style.width = "1800px";
+    });
+    await expect.poll(() => queryResults.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+    await expect(page.getByTestId("query-results-scroll-hint")).toBeVisible();
+
+    await page.goto(`/results/r/${DETAIL_ID}`);
+    await waitForDataLoaded(page, /Query Timings/i);
+    const timings = page.getByTestId("detail-timings-scroll-container");
+    await expect.poll(() => timings.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(false);
+    await expect(page.getByTestId("detail-timings-scroll-hint")).toHaveCount(0);
+  });
+
   for (const viewport of VIEWPORTS.filter((item) => item.width <= 768)) {
     test(`audited routes avoid document overflow at ${viewport.name}`, async ({ page }) => {
       await setViewport(page, viewport);
@@ -196,24 +222,24 @@ test.describe("responsive explorer assertions", () => {
       }
     });
 
-    test(`mobile table affordances remain visible at ${viewport.name}`, async ({ page }) => {
+    test(`mobile table affordances match measured overflow at ${viewport.name}`, async ({ page }) => {
       await setViewport(page, viewport);
 
       await page.goto("/results/");
       await waitForDataLoaded(page, /Recent Results/i);
-      await expect(page.getByTestId("recent-results-scroll-hint")).toBeVisible();
+      await expectScrollAffordance(page, "recent-results-scroll-container", "recent-results-scroll-hint");
 
       await page.goto(`/results/r/${DETAIL_ID}`);
       await waitForDataLoaded(page, /Query Timings/i);
-      await expect(page.getByTestId("detail-timings-scroll-hint")).toBeVisible();
+      await expectScrollAffordance(page, "detail-timings-scroll-container", "detail-timings-scroll-hint");
 
       await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DATAFUSION}`);
       await waitForDataLoaded(page, /TPC-H Comparison/i);
-      await expect(page.getByTestId("query-diff-scroll-hint")).toBeVisible();
+      await expectScrollAffordance(page, "query-diff-scroll-container", "query-diff-scroll-hint");
 
       await page.goto("/results/query");
       await waitForDataLoaded(page, /matching result bundle/);
-      await expect(page.getByTestId("query-results-scroll-hint")).toBeVisible();
+      await expectScrollAffordance(page, "query-results-scroll-container", "query-results-scroll-hint");
     });
   }
 });
@@ -223,6 +249,17 @@ async function setViewport(
   viewport: (typeof VIEWPORTS)[number],
 ) {
   await page.setViewportSize({ width: viewport.width, height: viewport.height });
+}
+
+async function expectScrollAffordance(page: Page, containerTestId: string, hintTestId: string) {
+  const container = page.getByTestId(containerTestId);
+  await expect(container).toBeAttached();
+  const hasHorizontalOverflow = await container.evaluate((element) => element.scrollWidth > element.clientWidth);
+  if (hasHorizontalOverflow) {
+    await expect(page.getByTestId(hintTestId)).toBeVisible();
+  } else {
+    await expect(page.getByTestId(hintTestId)).toHaveCount(0);
+  }
 }
 
 async function topOf(locator: Locator): Promise<number> {

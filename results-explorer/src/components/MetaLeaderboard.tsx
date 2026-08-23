@@ -80,6 +80,7 @@ export function MetaLeaderboard({
 }: MetaLeaderboardProps) {
   const { cohorts = [], platforms = [] } = data ?? {};
   const gridRef = useRef<HTMLTableElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [focusPos, setFocusPos] = useState({ row: 0, col: 0 });
   const [announcement, setAnnouncement] = useState("");
   const [sortKey, setSortKey] = useState<MetaLeaderboardSort>("avg_rank");
@@ -287,12 +288,13 @@ export function MetaLeaderboard({
 
       <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
         <TableScrollHint
+          scrollerRef={scrollContainerRef}
           testId="meta-leaderboard-scroll-hint"
           label="Scroll table for more rankings →"
           wrapperClassName="flex justify-end"
           className="m-2"
         />
-        <div class="overflow-x-auto" data-testid="meta-leaderboard-scroll-container">
+        <div ref={scrollContainerRef} class="overflow-x-auto" data-testid="meta-leaderboard-scroll-container">
           <table
             ref={gridRef}
             role="grid"
@@ -324,7 +326,7 @@ export function MetaLeaderboard({
                       >
                         <span class="font-semibold text-[var(--bb-data-fg-primary)]">{cohort.label}</span>
                         <span class="text-[10px] font-normal normal-case tracking-normal text-[var(--bb-data-fg-subtle)]">
-                          {cohortMetricSublabel(cohort)}
+                          {cohortMetricSublabel(cohort, mode)}
                         </span>
                         {allExcludedReason && (
                           <span
@@ -425,6 +427,11 @@ export function MetaLeaderboard({
                         {receiptHref && receiptState ? (
                           <a
                             href={receiptHref}
+                            aria-label={
+                              mode === "speedup" && cellState.kind === "ranked"
+                                ? `${cellText(cellState.rank, cohort, mode)}; ${nativeMetricText(cellState.rank, cohort)}`
+                                : undefined
+                            }
                             class="font-mono no-underline hover:text-[var(--bb-accent-hover)]"
                             onClick={(event) => event.stopPropagation()}
                             title={receiptLinkTitle(receiptState, cohort)}
@@ -523,14 +530,21 @@ export function MetaLeaderboard({
  * Surfaces the audit's required "every cohort must clearly state metric, unit,
  * and direction" without relying on tooltip-only disclosure.
  */
-function cohortMetricSublabel(cohort: MetaCohort): string {
+function cohortMetricSublabel(cohort: MetaCohort, mode: MetaLeaderboardMode): string {
   const metric = cohort.primary_metric;
   const direction = cohort.primary_order === "desc" ? "higher is better" : "lower is better";
-  if (metric === "power_score") return `${cohort.phase} · Power score · ${direction}`;
-  if (metric === "display_geomean_ms") return `${cohort.phase} · Geomean latency · ${direction}`;
-  if (metric === "geomean_ms") return `${cohort.phase} · Geomean latency · ${direction}`;
-  if (metric === "total_duration_s") return `${cohort.phase} · Total duration · ${direction}`;
-  return `${cohort.phase} · ${metric} · ${direction}`;
+  const metricLabel = metric === "power_score"
+    ? "Power score"
+    : metric === "display_geomean_ms" || metric === "geomean_ms"
+      ? "Geomean latency"
+      : metric === "total_duration_s"
+        ? "Total duration"
+        : metric;
+  if (mode === "speedup") {
+    return `${cohort.phase} · Speedup vs best · 1.00x is best; lower is worse · Native: ${metricLabel}, ${direction}`;
+  }
+  if (mode === "ranks") return `${cohort.phase} · Rank · 1 is best; higher is worse · Native: ${metricLabel}`;
+  return `${cohort.phase} · ${metricLabel} · ${direction}`;
 }
 
 function cellText(rank: MetaRank, cohort: MetaCohort, mode: MetaLeaderboardMode): string {
@@ -542,6 +556,12 @@ function cellText(rank: MetaRank, cohort: MetaCohort, mode: MetaLeaderboardMode)
   }
   if (rank.metric_value === null || rank.metric_value === undefined) return "-";
   return cohort.primary_order === "desc" ? fmtScoreCompact(rank.metric_value) : fmtGeomean(rank.metric_value);
+}
+
+function nativeMetricText(rank: MetaRank, cohort: MetaCohort): string {
+  if (rank.metric_value === null || rank.metric_value === undefined) return "Native value unavailable";
+  const value = cohort.primary_order === "desc" ? fmtScoreCompact(rank.metric_value) : fmtGeomean(rank.metric_value);
+  return `Native: ${value}`;
 }
 
 function exactMetricTitle(rank: MetaRank | undefined, cohort: MetaCohort): string | null {
@@ -632,6 +652,16 @@ function renderCellValue(
       <span class={rank.rank === 1 ? "font-semibold text-[var(--bb-tone-success-fg)]" : "text-[var(--bb-data-fg-primary)]"}>{text}</span>
     );
   }
+  if (mode === "speedup") {
+    return (
+      <span>
+        <span class="block font-medium text-[var(--bb-data-fg-primary)]">{text}</span>
+        <span class="mt-0.5 block text-[10px] font-normal text-[var(--bb-data-fg-muted)]">
+          {nativeMetricText(rank, cohort)}
+        </span>
+      </span>
+    );
+  }
   return text;
 }
 
@@ -668,7 +698,8 @@ function describeCell(
   }
   const rank = state.rank;
   const text = cellText(rank, cohort, mode);
-  return `${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}: ${text}`;
+  const nativeSuffix = mode === "speedup" ? `; ${nativeMetricText(rank, cohort)}` : "";
+  return `${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}: ${text}${nativeSuffix}`;
 }
 
 function hasPublishedEvidence(platform: MetaPlatform, cohorts: MetaCohort[]): boolean {

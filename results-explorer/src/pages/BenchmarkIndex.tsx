@@ -36,10 +36,12 @@ import { RankTable } from "@/components/RankTable";
 import { ChartPanel } from "@/components/ChartPanel";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
+import { RankingEligibilityLegend, RunIdentityLabel } from "@/components/DataTable";
 import { CompareTray } from "@/components/CompareTray";
 import { NotFound } from "@/pages/NotFound";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
+import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 
 interface BenchmarkIndexProps extends RoutableProps {
   benchmark?: string;
@@ -734,12 +736,17 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               </p>
             </div>
           ) : (
-            <QueryHeatmap
-              summary={selectionAwareMatrixSummary ?? filteredSummary}
-              selectedIds={selectedIds}
-              onSelectionChange={updateSelectedIds}
-              highContrast={highContrast}
-            />
+            <>
+              {(analysisSummary ?? filteredSummary).platforms.some((row) => row.ranking_exclusion_reason !== null) && (
+                <RankingEligibilityLegend />
+              )}
+              <QueryHeatmap
+                summary={selectionAwareMatrixSummary ?? filteredSummary}
+                selectedIds={selectedIds}
+                onSelectionChange={updateSelectedIds}
+                highContrast={highContrast}
+              />
+            </>
           )}
         </>
       )}
@@ -970,6 +977,7 @@ function ListTable({
     .filter((row) => matchesFacetRow(row, facets, { keys: BENCHMARK_ROW_FACET_KEYS }))
     .sort((a, b) => compareListRows(a, b, sort));
   const visibleRows = filtered.slice(0, visibleLimit);
+  const runIdentityLabels = formatRunIdentitiesForCohort(filtered, "table");
 
   useEffect(() => {
     setVisibleLimit(TABLE_RENDER_LIMIT);
@@ -1095,8 +1103,8 @@ function ListTable({
           </tr>
         </thead>
         <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
-          {visibleRows.map((r) => (
-            <BenchmarkRow key={r.result_id} entry={r} />
+          {visibleRows.map((r, index) => (
+            <BenchmarkRow key={r.result_id} entry={r} runIdentityLabel={runIdentityLabels[index] ?? r.platform} />
           ))}
         </tbody>
       </table>
@@ -1115,18 +1123,13 @@ function ListTable({
   );
 }
 
-function BenchmarkRow({ entry }: { entry: ResultRow }) {
+function BenchmarkRow({ entry, runIdentityLabel }: { entry: ResultRow; runIdentityLabel: string }) {
   return (
     <tr class="hover:bg-[var(--bb-surface-data-muted)]" data-testid={entry.result_id}>
       <td class="table-td">
-        <a href={`/results/p/${entry.platform_id}/`} class="font-medium no-underline">
-          {entry.platform}
-        </a>
+        <RunIdentityLabel label={runIdentityLabel} href={`/results/p/${entry.platform_id}/`} />
         {entry.compliance_class && entry.compliance_class !== "official" && (
           <span class="ml-2 text-xs text-[var(--bb-data-fg-subtle)]">{complianceLabel(entry.compliance_class)}</span>
-        )}
-        {entry.driver_version && (
-          <span class="ml-2 text-xs text-[var(--bb-data-fg-subtle)]">v{entry.driver_version}</span>
         )}
       </td>
       <td class="table-td">SF {entry.scale_factor}</td>

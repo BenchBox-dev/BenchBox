@@ -57,6 +57,7 @@ describe("FacetRail", () => {
     expect(onReset).toHaveBeenCalled();
 
     const platformSection = screen.getByRole("heading", { name: "Platform" }).closest("section")!;
+    expect(within(platformSection).getByTestId("facet-platform-options").className).toContain("overflow-y-auto");
     fireEvent.input(within(platformSection).getByRole("searchbox"), { target: { value: "duck" } });
     expect(within(platformSection).getByText("DuckDB")).toBeTruthy();
     expect(within(platformSection).queryByText("SQLite")).toBeNull();
