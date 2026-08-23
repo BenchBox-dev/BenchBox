@@ -1,4 +1,5 @@
 import type { ComponentChildren } from "preact";
+import { useRef } from "preact/hooks";
 import { TableScrollHint } from "@/components/TableScrollHint";
 
 interface DataTableProps {
@@ -12,6 +13,7 @@ interface DataTableProps {
 }
 
 export function DataTable({ ariaLabel, ariaColCount, caption, scrollable = false, class: extraClass = "", children }: DataTableProps) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const inner = (
     <table aria-label={ariaLabel} aria-colcount={ariaColCount} class={`w-full text-sm ${extraClass}`}>
       {caption && <caption class="text-left text-xs uppercase tracking-wide text-[var(--bb-data-fg-subtle)] py-2">{caption}</caption>}
@@ -22,11 +24,12 @@ export function DataTable({ ariaLabel, ariaColCount, caption, scrollable = false
   return (
     <div>
       <TableScrollHint
+        scrollerRef={scrollerRef}
         label="Scroll table for more columns →"
         wrapperClassName="flex justify-end"
         className="mb-2"
       />
-      <div class="overflow-x-auto">{inner}</div>
+      <div ref={scrollerRef} class="overflow-x-auto">{inner}</div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import { queryRows } from "@/db";
 import { EmptyState } from "@/components/EmptyState";
@@ -86,6 +86,8 @@ const COMPARE_METADATA_COLUMNS = [
 
 export function Query(_: RoutableProps) {
   useDocumentTitle("Query · BenchBox Results");
+  const resultsScrollerRef = useRef<HTMLDivElement>(null);
+  const sqlScrollerRef = useRef<HTMLDivElement>(null);
   const [benchmarks, setBenchmarks] = useFacetField("benchmark");
   const [platforms, setPlatforms] = useFacetField("platform");
   const [scaleFactors, setScaleFactors] = useFacetField("scale_factor");
@@ -725,7 +727,11 @@ export function Query(_: RoutableProps) {
             ) : (
               <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
                 <div class="flex flex-wrap items-center justify-end gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
-                  <TableScrollHint testId="query-results-scroll-hint" wrapperClassName={null} />
+                  <TableScrollHint
+                    scrollerRef={resultsScrollerRef}
+                    testId="query-results-scroll-hint"
+                    wrapperClassName={null}
+                  />
                 </div>
                 {(() => {
                   const rowsByResultId = new Map(rows.map((row) => [String(row.result_id), row]));
@@ -832,7 +838,11 @@ export function Query(_: RoutableProps) {
                           </div>
                         </section>
                       )}
-                      <div class="overflow-x-auto">
+                      <div
+                        ref={resultsScrollerRef}
+                        class="overflow-x-auto"
+                        data-testid="query-results-scroll-container"
+                      >
                         <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                           <thead class="bg-[var(--bb-surface-data-muted)]">
                             <tr>
@@ -963,9 +973,13 @@ export function Query(_: RoutableProps) {
                 <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)]">
                   <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
                     <span>Showing {visibleSqlRows.length.toLocaleString()} of {sqlRows.length.toLocaleString()} SQL rows</span>
-                    <TableScrollHint testId="query-sql-scroll-hint" wrapperClassName={null} />
+                    <TableScrollHint
+                      scrollerRef={sqlScrollerRef}
+                      testId="query-sql-scroll-hint"
+                      wrapperClassName={null}
+                    />
                   </div>
-                  <div class="overflow-x-auto">
+                  <div ref={sqlScrollerRef} class="overflow-x-auto">
                     <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                       <thead class="bg-[var(--bb-surface-data-muted)]">
                         <tr>

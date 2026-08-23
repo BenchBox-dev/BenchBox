@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import { route } from "preact-router";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
@@ -35,6 +35,7 @@ import { FundingChip } from "@/components/FundingChip";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 import { TimeSeries } from "@/components/TimeSeries";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
+import { TableScrollHint } from "@/components/TableScrollHint";
 import { DataTable } from "@/components/DataTable";
 import { CompareTray } from "@/components/CompareTray";
 import type { SortState } from "@/types";
@@ -162,6 +163,7 @@ function platformCompareGuidanceMessage(
 }
 
 export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
+  const resultsScrollerRef = useRef<HTMLDivElement>(null);
   const [rows, setRows] = useState<PlatformIndexRowRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -711,9 +713,14 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
           </div>
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-xs text-[var(--bb-data-fg-muted)]">
             <span>Rows are labelled by comparable ranking: benchmark, scale, phase, and primary metric.</span>
-            <span data-testid="platform-table-scroll-hint">Scroll table for source and receipt columns →</span>
+            <TableScrollHint
+              scrollerRef={resultsScrollerRef}
+              testId="platform-table-scroll-hint"
+              label="Scroll table for source and receipt columns →"
+              wrapperClassName={null}
+            />
           </div>
-          <div class="overflow-x-auto" data-testid="platform-results-scroll-container">
+          <div ref={resultsScrollerRef} class="overflow-x-auto" data-testid="platform-results-scroll-container">
           <DataTable
             ariaLabel={`${platformDisplayName} results`}
             ariaColCount={platformColumnCount}
