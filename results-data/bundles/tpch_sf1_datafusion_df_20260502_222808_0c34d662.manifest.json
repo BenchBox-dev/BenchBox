@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-H",
   "bundle_file": "tpch_sf1_datafusion_df_20260502_222808_0c34d662.json",
-  "bundle_hash": "e594a23a8118902ea8864dbc81a6cfb9de5700510c07247c61826f07c59125e3",
+  "bundle_hash": "a78c59f1a3c7a7d0121d06f746a2578df2e0296115c8219717c77c601df7a45d",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",

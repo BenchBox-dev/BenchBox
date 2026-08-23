@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-DS-OBT",
   "bundle_file": "tpcds_obt_sf1_polars_df_20260502_211324_60c565bf.json",
-  "bundle_hash": "b8aea7569b84abc416f2cfd06b876af4dc9daa97956a7d078340b11f80c2f1e0",
+  "bundle_hash": "11aec8778b86663c324c827b5e2a40f9283cdfb7b0c358ff7cf5fa66eeb4a86f",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",
