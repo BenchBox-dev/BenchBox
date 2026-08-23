@@ -30,17 +30,25 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { join, relative, resolve, sep } from "node:path";
+import { basename, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const projectRoot = resolve(here, "..");
 const repoRoot = resolve(projectRoot, "..");
-const genRoot = join(projectRoot, "test-fixtures", ".generated");
+const customGenRoot = process.env.E2E_FIXTURE_OUTPUT_ROOT;
+const genRoot = resolve(customGenRoot ?? join(projectRoot, "test-fixtures", ".generated"));
+if (customGenRoot && !basename(genRoot).startsWith("benchbox-large-browser-fixture-")) {
+  throw new Error(
+    "E2E_FIXTURE_OUTPUT_ROOT must name a dedicated benchbox-large-browser-fixture-* temporary directory",
+  );
+}
 const genBundlesDir = join(genRoot, "source", "bundles");
 const dbRelativePath = "data/results.duckdb";
 const dbPath = join(genRoot, ...dbRelativePath.split("/"));
 const generatorPath = join(projectRoot, "scripts", "generate-browser-fixtures.mjs");
+const fixtureProfile = process.env.E2E_FIXTURE_PROFILE ?? "default";
+const LARGE_CORPUS_MINIMUM_RESULTS = 250;
 
 const BYTE_DIFF_ALLOWLIST = new Map([
   [
@@ -115,6 +123,7 @@ container_rows = con.execute(
 ).fetchall()
 
 result = {
+    "result_count": con.execute("SELECT COUNT(*) FROM results").fetchone()[0],
     "platforms_per_cohort": platforms_per_cohort,
     "benchmarks": benchmarks,
     "trust_labels": sorted(trust_labels),
@@ -178,6 +187,11 @@ function runUvPythonJson(source, args) {
 function verifyFixtureInvariants() {
   const data = runUvPythonJson(fixtureSummaryPython, [dbPath]);
   const errors = [];
+  if (fixtureProfile === "large" && data.result_count < LARGE_CORPUS_MINIMUM_RESULTS) {
+    errors.push(
+      `large fixture has ${data.result_count} results; expected at least ${LARGE_CORPUS_MINIMUM_RESULTS}`,
+    );
+  }
   const comparableCohort = data.platforms_per_cohort.find(([, , count]) => count >= 3);
   if (!comparableCohort) {
     errors.push("no benchmark × scale has ≥3 distinct platforms (compare happy-path needs one)");
