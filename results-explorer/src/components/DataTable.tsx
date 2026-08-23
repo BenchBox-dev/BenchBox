@@ -3,6 +3,7 @@ import { TableScrollHint } from "@/components/TableScrollHint";
 
 interface DataTableProps {
   ariaLabel?: string;
+  ariaColCount?: number;
   caption?: ComponentChildren;
   /** When true, wraps the table in a horizontally scrollable region with sticky first column support. */
   scrollable?: boolean;
@@ -10,9 +11,9 @@ interface DataTableProps {
   children: ComponentChildren;
 }
 
-export function DataTable({ ariaLabel, caption, scrollable = false, class: extraClass = "", children }: DataTableProps) {
+export function DataTable({ ariaLabel, ariaColCount, caption, scrollable = false, class: extraClass = "", children }: DataTableProps) {
   const inner = (
-    <table aria-label={ariaLabel} class={`w-full text-sm ${extraClass}`}>
+    <table aria-label={ariaLabel} aria-colcount={ariaColCount} class={`w-full text-sm ${extraClass}`}>
       {caption && <caption class="text-left text-xs uppercase tracking-wide text-[var(--bb-data-fg-subtle)] py-2">{caption}</caption>}
       {children}
     </table>
