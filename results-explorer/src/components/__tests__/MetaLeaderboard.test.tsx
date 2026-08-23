@@ -308,6 +308,54 @@ describe("MetaLeaderboard", () => {
     expect(header.textContent).toContain("power · Geomean latency · lower is better");
   });
 
+  it("uses one speedup reading rule across mixed-direction columns and keeps native values", () => {
+    const powerCohort = {
+      ...DATA.cohorts[0]!,
+      key: "tpch-sf1-throughput",
+      benchmark: "tpch",
+      label: "TPC-H SF1 throughput",
+      primary_metric: "power_score",
+      primary_order: "desc" as const,
+      platforms: [
+        {
+          ...DATA.cohorts[0]!.platforms![0]!,
+          result_id: "r-power",
+          metric_value: 2500,
+          primary_metric: "power_score",
+          primary_order: "desc" as const,
+        },
+      ],
+    };
+    const data: MetaLeaderboardData = {
+      ...DATA,
+      cohorts: [DATA.cohorts[0]!, powerCohort],
+      platforms: [
+        {
+          ...DATA.platforms[0]!,
+          n_cohorts: 2,
+          ranks: {
+            ...DATA.platforms[0]!.ranks,
+            [powerCohort.key]: { rank: 1, total: 1, metric_value: 2500, speedup_vs_best: 1 },
+          },
+        },
+      ],
+    };
+
+    render(<MetaLeaderboard data={data} mode="speedup" onModeChange={vi.fn()} />);
+
+    const headers = [
+      screen.getByRole("columnheader", { name: /ClickBench SF0\.1/ }),
+      screen.getByRole("columnheader", { name: /TPC-H SF1 throughput/ }),
+    ];
+    for (const header of headers) {
+      expect(header.textContent).toContain("Speedup vs best · 1.00x is best; lower is worse");
+    }
+    expect(headers[0]!.textContent).toContain("Native: Geomean latency, lower is better");
+    expect(headers[1]!.textContent).toContain("Native: Power score, higher is better");
+    expect(screen.getByText("Native: 10 ms")).toBeTruthy();
+    expect(screen.getByText("Native: 2,500")).toBeTruthy();
+  });
+
   it("does not focus the first leaderboard cell on initial render", () => {
     render(<MetaLeaderboard data={DATA} mode="times" onModeChange={vi.fn()} />);
 

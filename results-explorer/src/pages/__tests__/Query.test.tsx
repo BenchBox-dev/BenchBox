@@ -14,6 +14,7 @@ const BASE_SCHEMA_COLUMNS = [
   { name: "result_id", type: "VARCHAR" },
   { name: "benchmark", type: "VARCHAR" },
   { name: "platform", type: "VARCHAR" },
+  { name: "platform_version", type: "VARCHAR" },
   { name: "scale_factor", type: "DOUBLE" },
   { name: "run_date", type: "VARCHAR" },
   { name: "power_score", type: "DOUBLE" },
@@ -125,8 +126,17 @@ beforeEach(() => {
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:csv");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
 
-  vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+  vi.mocked(queryRows).mockImplementation(async (sql: string, params: unknown[] = []) => {
     const normalized = normalizeSql(sql);
+    const searchTerm = normalized.includes("CONTAINS(LOWER(COALESCE(CAST(platform AS VARCHAR)")
+      ? String(params.at(-1) ?? "").toLowerCase()
+      : "";
+    const matchingRows = searchTerm === ""
+      ? resultRows
+      : resultRows.filter((row) =>
+          [row.platform, row.platform_version, row.result_id]
+            .some((value) => String(value ?? "").toLowerCase().includes(searchTerm)),
+        );
 
     if (normalized.includes("FROM duckdb_columns()")) {
       return schemaColumns;
@@ -207,9 +217,14 @@ beforeEach(() => {
     if (normalized.startsWith("CREATE TABLE")) {
       throw new Error("read-only connection");
     }
+    if (normalized.startsWith("SELECT LEAST(COUNT(*)")) {
+      return [{ count: matchingRows.length }];
+    }
     if (isDefaultResultSelect(sql)) {
       if (resultQueryError) throw resultQueryError;
-      return resultRows;
+      const limit = Number(normalized.match(/ LIMIT (\d+)/)?.[1] ?? matchingRows.length);
+      const offset = Number(normalized.match(/ OFFSET (\d+)/)?.[1] ?? 0);
+      return matchingRows.slice(offset, offset + limit);
     }
     if (normalized.startsWith("SELECT * FROM bench.results")) {
       return resultRows;
@@ -376,29 +391,29 @@ describe("Query", () => {
     expect(screen.getByTestId("query-compare-tray").textContent).toContain("1 incompatible row hidden");
   });
 
-  it("bases Query pagination on rows displayed by the compare cohort filter", async () => {
+  it("pages in SQL and preserves compare selection across page changes", async () => {
     resultRows = [
       { ...BASE_ROWS[0]!, result_id: "r1", platform: "DuckDB compatible" },
-      ...Array.from({ length: 200 }, (_, index) => ({
+      ...Array.from({ length: 60 }, (_, index) => ({
         ...BASE_ROWS[0]!,
-        result_id: `hidden-${index}`,
-        platform: `Hidden ${index}`,
+        result_id: `page-row-${index}`,
+        platform: `Page row ${index}`,
         run_date: `2026-04-${String(16 - (index % 15)).padStart(2, "0")}T12:00:00Z`,
-        test_type: "throughput",
-        primary_metric: "power_score",
       })),
     ];
 
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB compatible").length).toBeGreaterThan(0));
-    expect(screen.getByRole("button", { name: "Show more results" })).toBeTruthy();
+    expect(screen.getByText("Showing 1–24 of 61 matching result bundles")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("query-compare-checkbox-r1"));
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
 
-    await waitFor(() =>
-      expect(screen.getByTestId("query-compare-tray").textContent).toContain("200 incompatible rows hidden"),
-    );
-    expect(screen.getByText("Showing 1 of 1 matching result bundle")).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("Showing 25–48 of 61 matching result bundles")).toBeTruthy());
+    expect(screen.getByTestId("query-compare-tray").textContent).toContain("1 result selected");
+    expect(new URL(window.location.href).searchParams.get("page")).toBe("2");
+    const latestSelect = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql)).at(-1);
+    expect(latestSelect?.[0]).toContain("LIMIT 24 OFFSET 24");
     expect(screen.queryByRole("button", { name: "Show more results" })).toBeNull();
   });
 
@@ -635,8 +650,10 @@ describe("Query", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^All$/ }));
     await waitFor(() => {
-      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
-      expect(selectCalls.at(-1)?.[0]).toContain(`LIMIT ${UNLIMITED_ROW_LIMIT}`);
+      const countCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
+        normalizeSql(sql).startsWith("SELECT LEAST(COUNT(*)"),
+      );
+      expect(countCalls.at(-1)?.[0]).toContain(`LEAST(COUNT(*), ${UNLIMITED_ROW_LIMIT})`);
     });
     expect(facetCountCalls()).toHaveLength(initialFacetCallCount);
   });
@@ -769,8 +786,10 @@ describe("Query", () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
-    const selectCallsBefore = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
-    expect(selectCallsBefore.at(-1)?.[0]).toContain(`LIMIT ${DEFAULT_ROW_LIMIT}`);
+    const countCallsBefore = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
+      normalizeSql(sql).startsWith("SELECT LEAST(COUNT(*)"),
+    );
+    expect(countCallsBefore.at(-1)?.[0]).toContain(`LEAST(COUNT(*), ${DEFAULT_ROW_LIMIT})`);
 
     fireEvent.click(screen.getByRole("button", { name: /^All$/ }));
 
@@ -778,10 +797,12 @@ describe("Query", () => {
       expect(new URL(window.location.href).searchParams.get("limit")).toBe("all"),
     );
     await waitFor(() => {
-      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
-      expect(selectCalls.at(-1)?.[0]).toContain(`LIMIT ${UNLIMITED_ROW_LIMIT}`);
+      const countCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
+        normalizeSql(sql).startsWith("SELECT LEAST(COUNT(*)"),
+      );
+      expect(countCalls.at(-1)?.[0]).toContain(`LEAST(COUNT(*), ${UNLIMITED_ROW_LIMIT})`);
     });
-    expect(screen.getByText("Showing 2 of 2 matching result bundles")).toBeTruthy();
+    expect(screen.getByText("Showing 1–2 of 2 matching result bundles")).toBeTruthy();
     expect(screen.queryByText(/Query limit:/)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /^Default$/ }));
@@ -789,6 +810,30 @@ describe("Query", () => {
     await waitFor(() =>
       expect(new URL(window.location.href).searchParams.get("limit")).toBeNull(),
     );
+  });
+
+  it("searches platform, platform version, and public ID in SQL", async () => {
+    resultRows = [
+      { ...BASE_ROWS[0]!, result_id: "public-duckdb-1", platform_version: "1.4.0" },
+      { ...BASE_ROWS[1]!, result_id: "public-sqlite-2", platform_version: "3.49.1" },
+    ];
+
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    fireEvent.input(screen.getByRole("searchbox", { name: "Search results" }), {
+      target: { value: "3.49" },
+    });
+
+    await waitFor(() => expect(screen.getByText("Showing 1–1 of 1 matching result bundle")).toBeTruthy());
+    expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("query-compare-checkbox-public-duckdb-1")).toBeNull();
+    expect(new URL(window.location.href).searchParams.get("q")).toBe("3.49");
+    const latestSelect = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql)).at(-1);
+    expect(latestSelect?.[0]).toContain("CAST(platform AS VARCHAR)");
+    expect(latestSelect?.[0]).toContain("CAST(platform_version AS VARCHAR)");
+    expect(latestSelect?.[0]).toContain("CAST(result_id AS VARCHAR)");
+    expect(latestSelect?.[1]?.slice(-3)).toEqual(["3.49", "3.49", "3.49"]);
   });
 
   it("coerces invalid row-limit URL state back to the default", async () => {
@@ -825,7 +870,7 @@ describe("Query", () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
-    fireEvent.click(screen.getByRole("button", { name: "Download CSV (visible columns)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Download CSV (filtered rows)" }));
     await waitFor(() => expect(capturedBlob).not.toBeNull());
     expect(capturedBlob).toBeTruthy();
     const csvText = await capturedBlob!.text();
@@ -834,7 +879,7 @@ describe("Query", () => {
     const exportCall = vi
       .mocked(queryRows)
       .mock.calls.find(([sql]) => normalizeSql(sql).startsWith("SELECT benchmark, platform, scale_factor"));
-    expect(exportCall?.[0]).toContain(`LIMIT ${UNLIMITED_ROW_LIMIT}`);
+    expect(exportCall?.[0]).toContain(`LIMIT ${DEFAULT_ROW_LIMIT}`);
   });
 
   it("loads a starter query into the SQL editor when its button is clicked", async () => {
@@ -863,8 +908,13 @@ describe("Query", () => {
     expect(textarea.value).toContain("cloud_provider");
   });
 
-  it("exports the current table rows as JSON", async () => {
+  it("exports all filtered rows, not only the current page, as JSON", async () => {
     let capturedBlob: Blob | null = null;
+    resultRows = Array.from({ length: 61 }, (_, index) => ({
+      ...BASE_ROWS[0]!,
+      result_id: `json-${index}`,
+      platform: `JSON platform ${index}`,
+    }));
     vi.spyOn(URL, "createObjectURL").mockImplementation((blob: Blob | MediaSource) => {
       if (blob instanceof Blob) capturedBlob = blob;
       return "blob:json";
@@ -873,12 +923,12 @@ describe("Query", () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
-    fireEvent.click(screen.getByRole("button", { name: "Download JSON (visible columns)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Download JSON (filtered rows)" }));
     await waitFor(() => expect(capturedBlob).not.toBeNull());
     const jsonText = await capturedBlob!.text();
     const parsed = JSON.parse(jsonText);
     expect(Array.isArray(parsed)).toBe(true);
-    expect(parsed.length).toBeGreaterThan(0);
+    expect(parsed).toHaveLength(61);
     expect(parsed[0]).toHaveProperty("benchmark");
     expect(parsed[0]).not.toHaveProperty("result_id");
   });

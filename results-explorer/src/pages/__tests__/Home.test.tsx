@@ -681,13 +681,20 @@ describe("Home", () => {
   });
 
   it("restores and updates Home leaderboard mode through the URL", async () => {
-    window.history.replaceState(null, "", "/results/?mode=speedup");
+    window.history.replaceState(null, "", "/results/");
 
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
     expect(screen.getByRole("radio", { name: "Speedup" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByText("0.50x")).toBeTruthy();
+    expect(new URL(window.location.href).searchParams.get("mode")).toBeNull();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Times" }));
+    await waitFor(() => expect(new URL(window.location.href).searchParams.get("mode")).toBe("times"));
+
+    fireEvent.click(screen.getByRole("radio", { name: "Speedup" }));
+    await waitFor(() => expect(new URL(window.location.href).searchParams.get("mode")).toBeNull());
 
     fireEvent.click(screen.getByRole("radio", { name: "Ranks" }));
 
@@ -830,7 +837,7 @@ describe("Home", () => {
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
     const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
-    const receiptLink = within(grid).getByRole("link", { name: "10 ms" }) as HTMLAnchorElement;
+    const receiptLink = within(grid).getByRole("link", { name: "1.00x; Native: 10 ms" }) as HTMLAnchorElement;
 
     expect(receiptLink.getAttribute("href")).toBe("/results/r/r1#run-receipt");
     expect(within(grid).getAllByText("Maintainer").length).toBeGreaterThan(0);

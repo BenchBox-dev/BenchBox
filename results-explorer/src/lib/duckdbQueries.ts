@@ -9,6 +9,7 @@
  */
 
 import { queryRows } from "@/db";
+import type { BuiltQuery } from "@/lib/queryFilters";
 import type { FacetWhereClause } from "@/lib/facetModel";
 import { canonicalBenchmarkSlug } from "@/lib/displayLabels";
 import type {
@@ -25,6 +26,94 @@ import type {
   QueryDisplayTiming,
   QueryTiming,
 } from "@/types";
+
+export const QUERY_RESULT_PAGE_SIZE = 24;
+
+export interface QueryResultPageQueries {
+  rows: BuiltQuery;
+  count: BuiltQuery;
+}
+
+const RESULT_SEARCH_SQL = ["platform", "platform_version", "result_id"]
+  .map((column) => `CONTAINS(LOWER(COALESCE(CAST(${column} AS VARCHAR), '')), LOWER(?))`)
+  .join(" OR ");
+
+/**
+ * Turn the Query workbench's canonical filtered select into one SQL page and
+ * a matching count. Keeping the transformation here makes the paging/search
+ * contract testable without coupling it to component state.
+ */
+export function buildQueryResultPageQueries(
+  baseQuery: BuiltQuery,
+  searchText: string,
+  offset: number,
+  pageSize: number = QUERY_RESULT_PAGE_SIZE,
+): QueryResultPageQueries {
+  const parsed = parseResultSelect(baseQuery);
+  const search = normalizeResultSearch(searchText);
+  const whereSql = search === ""
+    ? parsed.whereSql
+    : `${parsed.whereSql}${parsed.whereSql === "" ? " WHERE " : " AND "}(${RESULT_SEARCH_SQL})`;
+  const searchParams = search === "" ? [] : [search, search, search];
+  const safeOffset = Math.max(0, Math.floor(offset));
+  const safePageSize = Math.max(1, Math.floor(pageSize));
+  const remaining = Math.max(0, parsed.limit - safeOffset);
+  const pageLimit = Math.min(safePageSize, remaining);
+  const sharedParams = [...baseQuery.params, ...searchParams];
+
+  return {
+    rows: {
+      sql: `${parsed.selectSql}${whereSql} ORDER BY ${parsed.sortColumn} ${parsed.sortDirection} LIMIT ${pageLimit} OFFSET ${safeOffset}`,
+      params: sharedParams,
+    },
+    count: {
+      sql: `SELECT LEAST(COUNT(*), ${parsed.limit})::INTEGER AS count${parsed.fromSql}${whereSql}`,
+      params: sharedParams,
+    },
+  };
+}
+
+/** Return every filtered/search-matching row within the selected Query cap. */
+export function buildQueryResultExportQuery(baseQuery: BuiltQuery, searchText: string): BuiltQuery {
+  const parsed = parseResultSelect(baseQuery);
+  const search = normalizeResultSearch(searchText);
+  const whereSql = search === ""
+    ? parsed.whereSql
+    : `${parsed.whereSql}${parsed.whereSql === "" ? " WHERE " : " AND "}(${RESULT_SEARCH_SQL})`;
+  return {
+    sql: `${parsed.selectSql}${whereSql} ORDER BY ${parsed.sortColumn} ${parsed.sortDirection} LIMIT ${parsed.limit}`,
+    params: search === "" ? baseQuery.params : [...baseQuery.params, search, search, search],
+  };
+}
+
+interface ParsedResultSelect {
+  selectSql: string;
+  fromSql: string;
+  whereSql: string;
+  sortColumn: string;
+  sortDirection: "ASC" | "DESC";
+  limit: number;
+}
+
+function parseResultSelect(query: BuiltQuery): ParsedResultSelect {
+  const normalizedSql = query.sql.replace(/\s+/g, " ").trim();
+  const match = normalizedSql.match(
+    /^(SELECT .+?)( FROM bench\.results)( WHERE .+?)? ORDER BY ([a-z_]+) (ASC|DESC) LIMIT (\d+)$/s,
+  );
+  if (!match) throw new Error("Unexpected Query workbench select shape");
+  return {
+    selectSql: `${match[1]}${match[2]}`,
+    fromSql: match[2]!,
+    whereSql: match[3] ?? "",
+    sortColumn: match[4]!,
+    sortDirection: match[5] as "ASC" | "DESC",
+    limit: Number(match[6]),
+  };
+}
+
+function normalizeResultSearch(searchText: string): string {
+  return searchText.trim();
+}
 
 // ---------------------------------------------------------------------------
 // Row shapes - one-to-one with the DDL in browser-duckdb-schema.sql

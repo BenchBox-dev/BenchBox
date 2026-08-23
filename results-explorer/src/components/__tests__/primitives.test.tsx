@@ -20,7 +20,13 @@ import { Button } from "@/components/Button";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Tabs } from "@/components/Tabs";
 import { Panel, DataCard } from "@/components/Panel";
-import { DataTable, TableHead, TableBody } from "@/components/DataTable";
+import {
+  DataTable,
+  RankingEligibilityLegend,
+  RunIdentityLabel,
+  TableBody,
+  TableHead,
+} from "@/components/DataTable";
 import { Select } from "@/components/Select";
 import { Checkbox } from "@/components/Checkbox";
 import { FacetChip } from "@/components/FacetChip";
@@ -275,7 +281,7 @@ describe("Panel / DataCard", () => {
 describe("DataTable", () => {
   it("renders an accessible table with optional caption", () => {
     render(
-      <DataTable ariaLabel="Latency" caption="Latency by platform">
+      <DataTable ariaLabel="Latency" ariaColCount={2} caption="Latency by platform">
         <TableHead>
           <tr>
             <th>Platform</th>
@@ -292,7 +298,27 @@ describe("DataTable", () => {
     );
     const table = screen.getByRole("table", { name: "Latency" });
     expect(table.querySelector("caption")?.textContent).toContain("Latency by platform");
+    expect(table).toHaveAttribute("aria-colcount", "2");
     expect(screen.getByRole("cell", { name: "DuckDB" })).toBeTruthy();
+  });
+
+  it("renders resolved run identities as text or links without changing their labels", () => {
+    render(
+      <div>
+        <RunIdentityLabel label="DuckDB · v1.4.3 · 2026-04-03" href="/results/p/duckdb/" />
+        <RunIdentityLabel label="DuckDB · v1.4.3 · 2026-04-04" />
+      </div>,
+    );
+
+    expect(screen.getByRole("link", { name: "DuckDB · v1.4.3 · 2026-04-03" }).getAttribute("href")).toBe(
+      "/results/p/duckdb/",
+    );
+    expect(screen.getByText("DuckDB · v1.4.3 · 2026-04-04").tagName).toBe("SPAN");
+  });
+
+  it("explains the ranking eligibility asterisk inline", () => {
+    render(<RankingEligibilityLegend />);
+    expect(screen.getByTestId("ranking-eligibility-legend").textContent).toContain("Not eligible for ranking");
   });
 });
 

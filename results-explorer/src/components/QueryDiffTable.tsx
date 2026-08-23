@@ -5,6 +5,7 @@ import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import { fmtMs } from "@/utils";
 import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
 import { TableScrollHint } from "@/components/TableScrollHint";
+import { useRef } from "preact/hooks";
 
 export type QueryDiffStatus = "faster" | "slower" | "tie" | "missing";
 
@@ -26,6 +27,7 @@ interface QueryDiffTableProps {
 }
 
 export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason = null }: QueryDiffTableProps) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
   if (results.length < 2) return null;
   const normalizedBaselineIndex = normalizeBaselineIndex(results, baselineIndex);
   const baseline = results[normalizedBaselineIndex]!;
@@ -64,8 +66,8 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
         </div>
       )}
 
-      <TableScrollHint testId="query-diff-scroll-hint" />
-      <div class="overflow-x-auto" data-testid="query-diff-scroll-container">
+      <TableScrollHint scrollerRef={scrollerRef} testId="query-diff-scroll-hint" />
+      <div ref={scrollerRef} class="overflow-x-auto" data-testid="query-diff-scroll-container">
         <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)] text-sm">
           <thead class="bg-[var(--bb-surface-data-muted)]">
             <tr>
