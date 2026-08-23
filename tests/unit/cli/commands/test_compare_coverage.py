@@ -209,16 +209,27 @@ def test_run_platform_comparison_formats(monkeypatch: pytest.MonkeyPatch, tmp_pa
             self.__dict__.update(kwargs)
 
     class _Result:
+        # success_rate / query_results model a platform that ran cleanly, so
+        # this format-coverage test exercises the output paths rather than the
+        # failure exit that _exit_on_comparison_failure now enforces.
+        platform = "duckdb"
+        success_rate = 100.0
+        query_results: list = []
+
         def to_dict(self):
             return {"ok": True}
 
     class _Summary:
+        is_comparable = True
+        speedup_ratio = 2.0
+
         def to_dict(self):
             return {"summary": True}
 
     class _Suite:
-        def __init__(self, config):
+        def __init__(self, config, platform_runner=None):
             self.config = config
+            self.platform_runner = platform_runner
 
         def run_comparison(self, **_kwargs):
             return [_Result()]

@@ -199,7 +199,11 @@ class UnifiedPlatformResult:
         query_results: Results for each query
         total_time_ms: Total execution time
         geometric_mean_ms: Geometric mean of query times
-        success_rate: Percentage of successful queries
+        success_rate: Percentage of successful queries. Defaults to 0.0: a
+            result that has not been aggregated by
+            ``UnifiedBenchmarkSuite._build_platform_result`` has not
+            demonstrated any successful query, and defaulting to 100.0
+            let failed platforms report full success.
     """
 
     platform: str
@@ -207,7 +211,7 @@ class UnifiedPlatformResult:
     query_results: list[UnifiedQueryResult] = field(default_factory=list)
     total_time_ms: float = 0.0
     geometric_mean_ms: float = 0.0
-    success_rate: float = 100.0
+    success_rate: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -228,20 +232,33 @@ class UnifiedComparisonSummary:
     Attributes:
         platforms: List of compared platforms
         platform_type: Type of platforms compared
-        fastest_platform: Platform with best performance
-        slowest_platform: Platform with worst performance
-        speedup_ratio: How much faster the fastest is vs slowest
+        fastest_platform: Platform with best performance, or None when no
+            platform produced a usable timing
+        slowest_platform: Platform with worst performance, or None when no
+            platform produced a usable timing
+        speedup_ratio: How much faster the fastest is vs slowest, or None
+            when there is nothing to compare
         query_winners: Best platform per query
         total_queries: Number of queries compared
     """
 
     platforms: list[str]
     platform_type: PlatformType
-    fastest_platform: str
-    slowest_platform: str
-    speedup_ratio: float
+    fastest_platform: str | None
+    slowest_platform: str | None
+    speedup_ratio: float | None
     query_winners: dict[str, str]
     total_queries: int
+
+    @property
+    def is_comparable(self) -> bool:
+        """True when at least one platform produced a usable timing.
+
+        When no platform timed a query there is nothing to rank, and
+        ``fastest_platform`` / ``slowest_platform`` / ``speedup_ratio`` are
+        ``None`` rather than a fabricated self-comparison.
+        """
+        return self.fastest_platform is not None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
