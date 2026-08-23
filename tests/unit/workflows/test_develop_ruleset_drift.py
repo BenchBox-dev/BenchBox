@@ -22,7 +22,7 @@ def test_ruleset_drift_uses_trusted_base_code_with_minimal_permissions() -> None
 
     assert workflow["permissions"] == {"contents": "read"}
     assert checkout["uses"] == "actions/checkout@v4"
-    assert checkout["with"]["ref"] == "${{ github.event.pull_request.base.sha }}"
+    assert checkout["with"]["ref"] == "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
     assert checkout["with"]["persist-credentials"] is False
     assert "head.sha" not in WORKFLOW.read_text(encoding="utf-8")
 
