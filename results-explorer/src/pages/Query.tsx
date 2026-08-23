@@ -30,7 +30,12 @@ import {
 import { buildCompareUrl, compareIdForRow, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCategory } from "@/lib/starterQueries";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
-import { memoizedSnapshotQueryRows } from "@/lib/duckdbQueries";
+import {
+  buildQueryResultExportQuery,
+  buildQueryResultPageQueries,
+  memoizedSnapshotQueryRows,
+  QUERY_RESULT_PAGE_SIZE,
+} from "@/lib/duckdbQueries";
 import { formatQueryCell, formatQueryColumnLabel, formatQueryFacetValue } from "@/lib/queryLabels";
 import { formatPlainNumber } from "@/lib/metricFormatters";
 import {
@@ -72,8 +77,8 @@ const DEFAULT_COLUMNS = [
   "geomean_ms",
   "trust_label",
 ];
-const TABLE_RENDER_LIMIT = 200;
-const TABLE_RENDER_INCREMENT = 200;
+const SQL_TABLE_RENDER_LIMIT = 200;
+const SQL_TABLE_RENDER_INCREMENT = 200;
 const COMPARE_METADATA_COLUMNS = [
   "result_id",
   "benchmark",
@@ -116,12 +121,15 @@ export function Query(_: RoutableProps) {
     arraySerde,
   );
   const [rowLimitRaw, setRowLimitRaw] = useUrlState<string>("limit", "default", stringSerde);
+  const [searchText, setSearchText] = useUrlState<string>("q", "", stringSerde);
+  const [pageRaw, setPageRaw] = useUrlState<string>("page", "1", stringSerde);
   const [hasCost, setHasCost] = useUrlState<string>("has_cost", "all", stringSerde);
   const [dateWindow, setDateWindowFacet] = useFacetField("date_window");
   const setDateWindow = (value: string) => setDateWindowFacet(toDateWindowFacet(value));
   const [schema, setSchema] = useState<SchemaColumn[]>([]);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [rows, setRows] = useState<ResultRow[]>([]);
+  const [resultTotal, setResultTotal] = useState(0);
   const [facetCounts, setFacetCounts] = useState<Record<string, FacetBucket[]>>({});
   const [sort, setSort] = useState<QuerySort>({ column: "run_date", direction: "desc" });
   const [loading, setLoading] = useState(true);
@@ -131,27 +139,30 @@ export function Query(_: RoutableProps) {
   const [sqlError, setSqlError] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [visibleResultLimit, setVisibleResultLimit] = useState(TABLE_RENDER_LIMIT);
-  const [visibleSqlLimit, setVisibleSqlLimit] = useState(TABLE_RENDER_LIMIT);
+  const [visibleSqlLimit, setVisibleSqlLimit] = useState(SQL_TABLE_RENDER_LIMIT);
   // w4 (compare-flow-entrypoints): select-for-compare state. The first
   // pick locks the cohort signature; subsequent rows that don't match
   // render disabled. The Compare tray below the result count surfaces
   // the active cohort and the launch button.
-  const [compareSelectedIds, setCompareSelectedIds] = useState<Set<string>>(new Set());
+  const [compareSelectedRows, setCompareSelectedRows] = useState<Map<string, ResultRow>>(new Map());
+  const compareSelectedIds = useMemo(() => new Set(compareSelectedRows.keys()), [compareSelectedRows]);
   const toggleCompareSelection = (row: ResultRow) =>
-    setCompareSelectedIds((prev) => {
+    setCompareSelectedRows((prev) => {
       const resultId = String(row.result_id);
-      const next = new Set(prev);
+      const next = new Map(prev);
       if (next.has(resultId)) next.delete(resultId);
-      else if (next.size < MAX_COMPARE_SELECTIONS && comparisonExclusionReason(row) === undefined) next.add(resultId);
+      else if (next.size < MAX_COMPARE_SELECTIONS && comparisonExclusionReason(row) === undefined) next.set(resultId, row);
       return next;
     });
-  const clearCompareSelection = () => setCompareSelectedIds(new Set());
+  const clearCompareSelection = () => setCompareSelectedRows(new Map());
   // Default compatible-only on once the cohort signature locks; users can
   // disable to inspect (still-disabled) incompatible rows. See finding #3.
   const [compareCompatibleOnly, setCompareCompatibleOnly] = useState(true);
   const rowLimitMode = rowLimitRaw === "all" ? "all" : "default";
   const rowLimit = rowLimitMode === "all" ? UNLIMITED_ROW_LIMIT : DEFAULT_ROW_LIMIT;
+  const parsedPage = Number.parseInt(pageRaw, 10);
+  const currentPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const pageOffset = (currentPage - 1) * QUERY_RESULT_PAGE_SIZE;
 
   const filters: QueryFilterState = useMemo(
     () => ({
@@ -197,21 +208,30 @@ export function Query(_: RoutableProps) {
     () => COMPARE_METADATA_COLUMNS.filter((column) => schema.some((item) => item.name === column)),
     [schema],
   );
-  const queryColumns = useMemo(
-    () => [...new Set([...compareMetadataColumns, ...visibleColumns])],
-    [compareMetadataColumns, visibleColumns],
-  );
+  const queryColumns = useMemo(() => {
+    const searchColumns = ["result_id", "platform", "platform_version"].filter((column) =>
+      schema.some((item) => item.name === column),
+    );
+    return [...new Set([...compareMetadataColumns, ...searchColumns, ...visibleColumns])];
+  }, [compareMetadataColumns, schema, visibleColumns]);
   const activeFilters = useMemo(() => applySchemaFilterSupport(filters, schema), [filters, schema]);
   const facetQueries = useMemo(
     () => (schema.length === 0 ? null : buildQueryFacetCountQueries(activeFilters, schema)),
     [activeFilters, schema],
   );
-  const selectQuery = useMemo(
+  const baseSelectQuery = useMemo(
     () =>
       visibleColumns.length === 0
         ? null
         : buildSelectQuery(activeFilters, queryColumns, sort, rowLimit),
     [activeFilters, queryColumns, rowLimit, sort, visibleColumns.length],
+  );
+  const pageQueries = useMemo(
+    () =>
+      baseSelectQuery === null
+        ? null
+        : buildQueryResultPageQueries(baseSelectQuery, searchText, pageOffset),
+    [baseSelectQuery, pageOffset, searchText],
   );
   // Cohort lock signature for compare-selection. Computed at the top of the
   // component so visibleRows can re-partition compatible rows above
@@ -219,9 +239,9 @@ export function Query(_: RoutableProps) {
   const compareCohortSignature = useMemo(() => {
     const firstId = [...compareSelectedIds][0];
     if (firstId === undefined) return null;
-    const firstRow = rows.find((row) => String(row.result_id) === firstId);
+    const firstRow = compareSelectedRows.get(firstId);
     return firstRow ? compareCohortSignatureForRow(firstRow) : null;
-  }, [rows, compareSelectedIds]);
+  }, [compareSelectedIds, compareSelectedRows]);
   const compareRowPartition = useMemo(
     () => compareCohortPartition(rows, compareCohortSignature),
     [rows, compareCohortSignature],
@@ -233,22 +253,27 @@ export function Query(_: RoutableProps) {
     if (compareCompatibleOnly) return compareRowPartition.compatible;
     return [...compareRowPartition.compatible, ...compareRowPartition.incompatible];
   }, [compareCohortSignature, compareCompatibleOnly, compareRowPartition, rows]);
-  const visibleRows = reorderedRows.slice(0, visibleResultLimit);
-  const displayedResultTotal = reorderedRows.length;
+  const visibleRows = reorderedRows;
   const visibleSqlRows = sqlRows.slice(0, visibleSqlLimit);
 
   useEffect(() => {
-    setVisibleResultLimit(TABLE_RENDER_LIMIT);
-  }, [activeFilters, queryColumns, rowLimit, sort]);
-
-  useEffect(() => {
-    setVisibleSqlLimit(TABLE_RENDER_LIMIT);
+    setVisibleSqlLimit(SQL_TABLE_RENDER_LIMIT);
   }, [sqlRows]);
 
   useEffect(() => {
     if (rowLimitRaw === "default" || rowLimitRaw === "all") return;
     setRowLimitRaw("default");
   }, [rowLimitRaw, setRowLimitRaw]);
+
+  useEffect(() => {
+    if (String(currentPage) === pageRaw) return;
+    setPageRaw(String(currentPage));
+  }, [currentPage, pageRaw]);
+
+  useEffect(() => {
+    if (currentPage === 1) return;
+    setPageRaw("1");
+  }, [activeFilters, queryColumns, rowLimit, searchText, sort]);
 
   useEffect(() => {
     let cancelled = false;
@@ -295,15 +320,26 @@ export function Query(_: RoutableProps) {
   }, [facetQueries]);
 
   useEffect(() => {
-    if (selectQuery === null) return;
+    if (pageQueries === null) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
 
-    queryRows<ResultRow>(selectQuery.sql, selectQuery.params)
-      .then((nextRows) => {
+    Promise.all([
+      queryRows<ResultRow>(pageQueries.rows.sql, pageQueries.rows.params),
+      queryRows<{ count: number }>(pageQueries.count.sql, pageQueries.count.params),
+    ])
+      .then(([nextRows, countRows]) => {
         if (cancelled) return;
+        const count = Number(countRows[0]?.count);
+        const nextTotal = Number.isFinite(count) ? count : nextRows.length;
+        const lastPage = Math.max(1, Math.ceil(nextTotal / QUERY_RESULT_PAGE_SIZE));
+        if (currentPage > lastPage) {
+          setPageRaw(String(lastPage));
+          return;
+        }
         setRows(nextRows);
+        setResultTotal(nextTotal);
         setLoading(false);
       })
       .catch((err: unknown) => {
@@ -314,7 +350,7 @@ export function Query(_: RoutableProps) {
     return () => {
       cancelled = true;
     };
-  }, [selectQuery]);
+  }, [currentPage, pageQueries, setPageRaw]);
 
   useEffect(() => {
     if (loading || rows.length === 0 || visibleColumns.length === 0) return;
@@ -331,6 +367,9 @@ export function Query(_: RoutableProps) {
   }, [loading, rows.length, visibleColumns.length]);
 
   const sqlColumns = useMemo(() => [...new Set(sqlRows.flatMap((row) => Object.keys(row)))], [sqlRows]);
+  const pageCount = Math.max(1, Math.ceil(resultTotal / QUERY_RESULT_PAGE_SIZE));
+  const pageStart = resultTotal === 0 ? 0 : pageOffset + 1;
+  const pageEnd = Math.min(pageOffset + rows.length, resultTotal);
 
   if (error) return <ErrorMessage message={error} />;
   if (schema.length === 0 && loading) {
@@ -399,14 +438,14 @@ export function Query(_: RoutableProps) {
     makeFacetGroup(
       "has_cost",
       "Has cost",
-      [{ value: "all", count: rows.length }, ...(facetCounts.has_cost ?? [])],
+      [{ value: "all", count: resultTotal }, ...(facetCounts.has_cost ?? [])],
       [hasCost],
       { formatLabel: formatHasCostLabel, defaultCollapsed: true },
     ),
     makeFacetGroup(
       "date_window",
       "Date window",
-      [{ value: "all", count: rows.length }, ...(facetCounts.date_window ?? [])],
+      [{ value: "all", count: resultTotal }, ...(facetCounts.date_window ?? [])],
       [dateWindow],
       { formatLabel: formatDateWindowLabel, defaultCollapsed: true },
     ),
@@ -563,19 +602,26 @@ export function Query(_: RoutableProps) {
     setPhysicalRenderingIds([]);
     setHasCost("all");
     setDateWindow("all");
+    setSearchText("");
   }
 
   function buildSqlFromFilters() {
     setSqlText(buildFacetSql(activeFilters, visibleColumns, sort, rowLimit));
   }
 
-  function downloadJson() {
+  async function downloadJson() {
     setDownloadError(null);
     try {
+      const query = buildQueryResultExportQuery(
+        buildSelectQuery(activeFilters, visibleColumns, sort, rowLimit),
+        searchText,
+      );
+      const exportRows = await queryRows<ResultRow>(query.sql, query.params);
       const exportName = `benchbox-query-export-${Date.now()}.json`;
-      const blob = new Blob([JSON.stringify(rows.map((row) => projectVisibleRow(row, visibleColumns)), null, 2)], {
-        type: "application/json;charset=utf-8",
-      });
+      const blob = new Blob(
+        [JSON.stringify(exportRows.map((row) => projectVisibleRow(row, visibleColumns)), null, 2)],
+        { type: "application/json;charset=utf-8" },
+      );
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -595,7 +641,10 @@ export function Query(_: RoutableProps) {
 
   async function downloadCsv() {
     const exportName = `benchbox-query-export-${Date.now()}.csv`;
-    const selectQuery = buildSelectQuery(activeFilters, visibleColumns, sort, UNLIMITED_ROW_LIMIT);
+    const selectQuery = buildQueryResultExportQuery(
+      buildSelectQuery(activeFilters, visibleColumns, sort, rowLimit),
+      searchText,
+    );
 
     setDownloadError(null);
     try {
@@ -629,6 +678,11 @@ export function Query(_: RoutableProps) {
     return reason;
   }
 
+  const queryNarrowingLabels = [
+    ...activeFilterChips.map((chip) => chip.label),
+    ...(searchText === "" ? [] : [`Search: ${searchText}`]),
+  ];
+
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div class="mb-6">
@@ -646,9 +700,9 @@ export function Query(_: RoutableProps) {
             class="order-1 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm"
           >
             <div class="text-sm text-[var(--bb-data-fg-muted)]">
-              Showing {visibleRows.length.toLocaleString()} of {displayedResultTotal.toLocaleString()} matching result{" "}
-              {displayedResultTotal === 1 ? "bundle" : "bundles"}
-              {rowLimitMode === "default" && rows.length >= DEFAULT_ROW_LIMIT && (
+              Showing {pageStart.toLocaleString()}–{pageEnd.toLocaleString()} of {resultTotal.toLocaleString()} matching result{" "}
+              {resultTotal === 1 ? "bundle" : "bundles"}
+              {rowLimitMode === "default" && resultTotal >= DEFAULT_ROW_LIMIT && (
                 <span class="ml-2 text-xs text-[var(--bb-tone-warning-fg)]">
                   The query reached the {DEFAULT_ROW_LIMIT.toLocaleString()}-result cap; add filters to narrow the set.
                 </span>
@@ -676,22 +730,34 @@ export function Query(_: RoutableProps) {
                 </div>
               </div>
               <button class="btn btn-secondary" onClick={downloadCsv}>
-                Download CSV (visible columns)
+                Download CSV (filtered rows)
               </button>
               <button class="btn btn-secondary" onClick={downloadJson}>
-                Download JSON (visible columns)
+                Download JSON (filtered rows)
               </button>
             </div>
             <p class="w-full text-xs text-[var(--bb-data-fg-muted)]">
-              Exports include the currently visible columns only; row View links keep hidden result IDs available.
+              Exports include every row matching the facets and search within the selected Query limit, using the currently
+              visible columns. Paging does not narrow export scope.
             </p>
+            <label class="w-full text-sm text-[var(--bb-data-fg-muted)]">
+              <span class="font-medium">Search results</span>
+              <input
+                type="search"
+                value={searchText}
+                onInput={(event) => setSearchText((event.target as HTMLInputElement).value)}
+                placeholder="Platform, version, or public ID"
+                class="mt-1 w-full rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-2 text-[var(--bb-data-fg-primary)]"
+                data-testid="query-result-search"
+              />
+            </label>
             {downloadError && <div class="w-full text-sm text-[var(--bb-tone-danger-fg)]">{downloadError}</div>}
           </div>
 
           <div data-testid="query-mobile-filter-drawer" class="order-2 lg:hidden">
             <FacetDrawer
               groups={facetGroups}
-              resultCount={rows.length}
+              resultCount={resultTotal}
               activeChips={activeFilterChips}
               onToggle={toggleQueryFacet}
               onReset={resetQueryFilters}
@@ -706,17 +772,21 @@ export function Query(_: RoutableProps) {
                 message="Loading matching results..."
                 columns={visibleColumns.length || DEFAULT_COLUMNS.length}
               />
-            ) : rows.length === 0 ? (
+            ) : resultTotal === 0 ? (
               <div data-testid="query-empty-state">
                 <EmptyState
-                  title={activeFilterChips.length > 0 ? "No results match these filters" : "No published results"}
+                  title={
+                    queryNarrowingLabels.length > 0
+                      ? "No results match these filters or search"
+                      : "No published results"
+                  }
                   description={
-                    activeFilterChips.length > 0
-                      ? `Narrowed by ${activeFilterChips.map((chip) => chip.label).join(", ")}. Clear the filters to widen the query.`
+                    queryNarrowingLabels.length > 0
+                      ? `Narrowed by ${queryNarrowingLabels.join(", ")}. Clear the filters or search text to widen the query.`
                       : "The published corpus has no result bundles to show."
                   }
                   action={
-                    activeFilterChips.length > 0 ? (
+                    queryNarrowingLabels.length > 0 ? (
                       <button type="button" class="btn btn-secondary" onClick={resetQueryFilters}>
                         Clear all filters
                       </button>
@@ -734,7 +804,6 @@ export function Query(_: RoutableProps) {
                   />
                 </div>
                 {(() => {
-                  const rowsByResultId = new Map(rows.map((row) => [String(row.result_id), row]));
                   const lockReason = (row: ResultRow): string | undefined => {
                     const id = String(row.result_id);
                     if (compareSelectedIds.has(id)) return undefined;
@@ -747,10 +816,9 @@ export function Query(_: RoutableProps) {
                   const zeroSelectableReasons = summarizeCompareExclusionReasons(
                     visibleRows.map((row) => comparisonExclusionReason(row)),
                   );
-                  const selectedCompareIds = [...compareSelectedIds].map((id) => {
-                    const row = rowsByResultId.get(id);
-                    return row ? compareIdForRow(row as Parameters<typeof compareIdForRow>[0]) : id;
-                  });
+                  const selectedCompareIds = [...compareSelectedRows.values()].map((row) =>
+                    compareIdForRow(row as Parameters<typeof compareIdForRow>[0]),
+                  );
                   const compareUrl = compareSelectedIds.size >= 2 ? buildCompareUrl(selectedCompareIds) : null;
                   return (
                     <>
@@ -889,7 +957,11 @@ export function Query(_: RoutableProps) {
                               const disabledCopy = describeCompareExclusionReason(reason);
                               const reasonId = disabledCopy ? `query-compare-reason-${id}` : undefined;
                               return (
-                                <tr key={id} class="hover:bg-[var(--bb-surface-data-muted)]">
+                                <tr
+                                  key={id}
+                                  class="hover:bg-[var(--bb-surface-data-muted)]"
+                                  data-testid={`query-result-row-${id}`}
+                                >
                                   <td class="table-td sticky left-0 z-10 bg-[var(--bb-surface-data)]">
                                     <input
                                       type="checkbox"
@@ -932,16 +1004,32 @@ export function Query(_: RoutableProps) {
                     </>
                   );
                 })()}
-                {visibleRows.length < displayedResultTotal && (
-                  <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
+                {pageCount > 1 && (
+                  <nav
+                    aria-label="Query result pages"
+                    class="flex items-center justify-between border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3"
+                    data-testid="query-pagination"
+                  >
                     <button
                       type="button"
                       class="btn btn-secondary"
-                      onClick={() => setVisibleResultLimit((limit) => limit + TABLE_RENDER_INCREMENT)}
+                      disabled={currentPage === 1}
+                      onClick={() => setPageRaw(String(currentPage - 1))}
                     >
-                      Show more results
+                      Previous page
                     </button>
-                  </div>
+                    <span class="text-sm text-[var(--bb-data-fg-muted)]">
+                      Page {currentPage.toLocaleString()} of {pageCount.toLocaleString()}
+                    </span>
+                    <button
+                      type="button"
+                      class="btn btn-secondary"
+                      disabled={currentPage >= pageCount}
+                      onClick={() => setPageRaw(String(currentPage + 1))}
+                    >
+                      Next page
+                    </button>
+                  </nav>
                 )}
               </div>
             )}
@@ -1008,7 +1096,7 @@ export function Query(_: RoutableProps) {
                       <button
                         type="button"
                         class="btn btn-secondary"
-                        onClick={() => setVisibleSqlLimit((limit) => limit + TABLE_RENDER_INCREMENT)}
+                        onClick={() => setVisibleSqlLimit((limit) => limit + SQL_TABLE_RENDER_INCREMENT)}
                       >
                         Show more SQL rows
                       </button>
@@ -1083,7 +1171,7 @@ export function Query(_: RoutableProps) {
         >
           <FacetRail
             groups={facetGroups}
-            resultCount={rows.length}
+            resultCount={resultTotal}
             activeChips={activeFilterChips}
             onToggle={toggleQueryFacet}
             onReset={resetQueryFilters}
