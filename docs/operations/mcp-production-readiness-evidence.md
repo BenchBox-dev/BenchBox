@@ -1,10 +1,11 @@
 # MCP MVP evidence boundary and deferred production observations
 
-This record preserves observations from a controlled local Apple Container
-exercise. It is historical diagnostic evidence, not release acceptance and not
-production acceptance. None of the observations below is bound by one
+The historical section of this record preserves observations from a controlled
+local Apple Container exercise. Those observations are diagnostic evidence, not
+MVP release acceptance or production acceptance. None is bound by one
 replayable transcript to the same readiness digest, image digest, source
-revision, and timestamp.
+revision, and timestamp. The separate current MVP evidence section below is
+revision-bound release evidence for the two scoped MVP checks only.
 
 MVP modernization and external production publication are separate claims.
 Only a current DuckDB package/execution proof and current pinned protocol
@@ -24,7 +25,7 @@ evidence_owner: Joe Harris
 
 local_staging_authorization: user-authorized local exercise on 2026-08-13
 
-record_updated_at: 2026-08-22T19:40:03Z
+record_updated_at: 2026-08-23T00:08:21Z
 
 image: local/benchbox-mcp:96d1-local
 
@@ -75,9 +76,9 @@ local_multiworker_observation: PARTIAL_UNBOUND
 
 mvp_modernization_scope: LOCAL_STDIO_AND_LOOPBACK_HTTP
 
-mvp_duckdb_execution: NEEDS_CURRENT_EVIDENCE
+mvp_duckdb_execution: PASS
 
-mvp_protocol_conformance: NEEDS_CURRENT_EVIDENCE
+mvp_protocol_conformance: PASS
 
 external_acceptance_schedule: DEFERRED_POST_RELEASE
 
@@ -105,7 +106,21 @@ immutable_registry_digest: NOT_AVAILABLE
 shared-endpoint publication without presenting post-release operational work as
 a blocker to the local MCP MVP.
 
-## MVP blocker 1: DuckDB package and execution proof
+## Current MVP evidence
+
+Both MVP checks passed on source revision
+`b8ba98f6d72702fdd31ceeea260ebad68e37cba1` on 2026-08-23 UTC.
+
+| Check | Result | Revision-bound evidence |
+| --- | --- | --- |
+| DuckDB package and execution | `PASS` | Built `benchbox-0.3.1-py3-none-any.whl` with SHA-256 `264fd20a7aa801b33465caca6625fa07e7ddc545720037e472d835deed6c1424`; installed that wheel with `[mcp]` in a new virtual environment; imported DuckDB `1.5.5`; local stdio MCP `run_benchmark` completed TPC-H SF0.01 with 66/66 measured queries passing and execution ID `mcp_641c076d` from `2026-08-23T00:07:15Z` through `2026-08-23T00:07:20Z`. |
+| Current protocol conformance | `PASS` | Pinned protocol `2026-07-28`, conformance revision `81eb1c3edaed87d7fd585d7b80186da7a2960660`, and Inspector `2.0.0` passed. Every scenario passed except the two documented fixture non-applicabilities, with zero conformance warnings; the automated acceptance suite passed 8 tests. Evidence JSON generated at `2026-08-23T00:08:21.573940Z` has SHA-256 `c6983be879d050083927755923cb4cb31ac84650fbeef9f5e6f281d8093dd17e`. |
+
+The generated conformance JSON deliberately leaves `multiworker` and all
+external fields false. Those fields belong to deferred post-release production
+publication and do not qualify either MVP `PASS` above.
+
+## MVP check 1: DuckDB package and execution proof
 
 The staged image statically registered and advertised DuckDB, but its build
 installed `benchbox[mcp]` without the separate DuckDB extra. A read-only probe
@@ -116,9 +131,9 @@ registry or runtime-policy defect.
 PR #1716 merged into `develop` as
 `3ffa5ba0265e065805e28aab6f092682d3039f2a`. It adds the repository's
 supported `duckdb>=1.0.0,<2.0.0` dependency to the MCP extra and synchronous and
-durable surface regression tests. The implementation defect is corrected; the
-remaining MVP blocker is a current release-artifact proof, not an external
-image-publication exercise.
+durable surface regression tests. The implementation defect is corrected, and
+the current release-artifact proof is recorded above. No external
+image-publication exercise was required.
 
 The release operator should build the wheel, install that wheel with `[mcp]` in
 a clean environment, confirm `duckdb` imports, and invoke a small real TPC-H
@@ -126,7 +141,7 @@ DuckDB run through local MCP `run_benchmark`. Record the source revision, wheel
 digest, command, timestamp, and redacted result. No registry, TLS edge, or
 production approver is required for this proof.
 
-## MVP blocker 2: current protocol conformance
+## MVP check 2: current protocol conformance
 
 Run the exact pinned verifier documented in
 [the conformance baseline](mcp-conformance-baseline.md):

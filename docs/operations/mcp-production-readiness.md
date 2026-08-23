@@ -1,9 +1,11 @@
 # MCP post-release production-publication gate
 
 This runbook governs a future shared, non-loopback MCP deployment. It is **not**
-a release-readiness gate for the existing MCP MVP. MVP modernization is limited
-to two release blockers: proving DuckDB execution from the shipped `mcp` extra
-and passing the pinned current-protocol conformance gate. Local stdio and
+a release-readiness gate for the existing MCP MVP. MVP modernization has two
+release checks: proving DuckDB execution from the shipped `mcp` extra and
+passing the pinned current-protocol conformance gate. Both are currently
+recorded `PASS` in the
+[MCP evidence boundary](mcp-production-readiness-evidence.md). Local stdio and
 loopback Streamable HTTP are the MVP deployment modes and do not require an
 external target, registry, service operator, or production approver.
 
@@ -37,13 +39,14 @@ change.
 
 ## MVP release boundary
 
-Only these two checks block completion of MCP MVP modernization:
+These are the only two checks that can block completion of MCP MVP
+modernization; both currently pass:
 
 1. **DuckDB package and execution proof.** Build the release wheel, install that
    wheel with its `mcp` extra into a clean environment, confirm `duckdb` imports,
    and run a small real DuckDB benchmark through the MCP `run_benchmark`
-   surface. PR #1716 fixed the dependency declaration; current-wheel execution
-   evidence is still required.
+   surface. PR #1716 fixed the dependency declaration, and the current-wheel
+   execution proof is recorded in the evidence document.
 2. **Current protocol proof.** Run the pinned conformance verifier for
    `2026-07-28` and resolve every unexpected failure or warning. The two exact
    fixture non-applicabilities documented in
@@ -53,7 +56,7 @@ Only these two checks block completion of MCP MVP modernization:
 The shortest operator actions are:
 
 ```bash
-# Blocker 1: clean release-artifact proof
+# Check 1: clean release-artifact proof
 proof_root="$(mktemp -d)"
 uv build --wheel --out-dir "${proof_root}/dist"
 wheel="$(find "${proof_root}/dist" -name 'benchbox-*.whl' -print -quit)"
@@ -64,13 +67,13 @@ uv pip install --python "${proof_root}/venv/bin/python" "${wheel}[mcp]"
 # Then invoke run_benchmark(platform="duckdb", benchmark="tpch",
 # scale_factor=0.01) through a local stdio MCP client and retain the redacted result.
 
-# Blocker 2: current protocol/Inspector proof
+# Check 2: current protocol/Inspector proof
 uv run -- python scripts/verify_mcp_conformance.py \
   --protocol-version 2026-07-28
 ```
 
-These commands need current, redacted evidence, but no image publication,
-external deployment, production transcript, or named approval.
+These commands reproduce the current redacted evidence. They require no image
+publication, external deployment, production transcript, or named approval.
 
 ## Protocol policy
 

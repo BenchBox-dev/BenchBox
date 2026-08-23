@@ -76,8 +76,9 @@ cross-reference and must keep extraction blocked on the evidence gate.
   multi-host, and named approver) remains outside this program and is explicitly
   **DEFERRED_POST_RELEASE** under
   `docs/operations/mcp-production-readiness-evidence.md`. It does not block MCP
-  MVP modernization; only current DuckDB package/execution evidence and pinned
-  protocol conformance do.
+  MVP modernization; the only two MVP checks are current DuckDB
+  package/execution evidence and pinned protocol conformance, both now recorded
+  `PASS`.
 - No registry metadata, runtime code, packaging file, or test file is changed
   by this decision.
 - The public `support_status` vocabulary remains

@@ -89,7 +89,8 @@ disabled so progress and future request-scoped notifications remain possible.
 
 ### MVP release checks
 
-The MCP MVP has two release-blocking checks:
+The MCP MVP has two release checks, both currently recorded `PASS` in the
+[MCP evidence boundary](../operations/mcp-production-readiness-evidence.md):
 
 1. install the built BenchBox wheel with `[mcp]` in a clean environment and run
    a real small DuckDB benchmark through local `run_benchmark`; and
@@ -98,8 +99,7 @@ The MCP MVP has two release-blocking checks:
 
 The external registry, TLS/identity edge, multi-host storage, OTLP, incident
 exercise, transcript, and named approval belong to deferred post-release
-shared-service publication. See the
-[MCP evidence boundary](../operations/mcp-production-readiness-evidence.md).
+shared-service publication.
 
 ### Testing Locally
 
