@@ -255,10 +255,15 @@ class TestGetSummary:
         assert abs(summary.speedup_ratio - 5.0) < 0.01
 
     def test_handles_no_geomeans(self):
+        """No timings means no ranking, not a fabricated 1.00x self-comparison."""
         suite = UnifiedBenchmarkSuite()
         results = [_pr("duckdb", geomean=0.0), _pr("sqlite", geomean=0.0)]
         summary = suite.get_summary(results)
-        assert summary.speedup_ratio == 1.0
+        assert summary.speedup_ratio is None
+        assert summary.fastest_platform is None
+        assert summary.slowest_platform is None
+        assert summary.is_comparable is False
+        assert summary.total_queries == 0
 
     def test_finds_query_winners(self):
         suite = UnifiedBenchmarkSuite()
@@ -438,99 +443,79 @@ class TestRunDataframeComparison:
 
 
 class TestBenchmarkSqlPlatform:
-    def test_remote_platform_uses_adapter_connect(self):
-        """Test non-embedded platform calls adapter.connect() and runs queries."""
-        config = UnifiedBenchmarkConfig(query_ids=["Q1"])
+    """The SQL path routes through the canonical run service.
+
+    It used to be a private TPC-H-only runner that required pre-generated data
+    at a guessed directory and never reached the real benchmark path, so the
+    documented ``benchbox compare -p duckdb -p sqlite`` invocation could not
+    work. These tests pin the delegation and the result conversion instead.
+    """
+
+    def test_delegates_to_the_canonical_run_path(self):
+        config = UnifiedBenchmarkConfig(query_ids=["Q1"], benchmark="tpch", scale_factor=0.01)
         suite = UnifiedBenchmarkSuite(config=config)
 
-        mock_conn = MagicMock()
-        mock_adapter = MagicMock()
-        mock_adapter.connect.return_value = mock_conn
+        run_results = SimpleNamespace(
+            query_results=[
+                {
+                    "query_id": "Q1",
+                    "status": "SUCCESS",
+                    "execution_time_seconds": 0.05,
+                    "rows_returned": 4,
+                    "run_type": "measurement",
+                }
+            ]
+        )
+        with patch.object(suite, "_execute_platform_run", return_value=run_results) as run:
+            result = suite._benchmark_sql_platform("duckdb")
 
-        mock_qr = _qr("Q1", "snowflake", 150.0)
+        run.assert_called_once_with("duckdb", None)
+        assert result.platform == "duckdb"
+        assert result.success_rate == 100.0
+        assert [q.query_id for q in result.query_results] == ["Q1"]
+        assert result.query_results[0].mean_time_ms == pytest.approx(50.0)
+
+    def test_run_failure_propagates_so_the_caller_records_a_failure(self):
+        suite = UnifiedBenchmarkSuite(config=UnifiedBenchmarkConfig(query_ids=["Q1"]))
         with (
-            patch("benchbox.platforms.get_adapter", return_value=mock_adapter),
-            patch.object(suite, "_run_sql_query", return_value=mock_qr),
+            patch.object(suite, "_execute_platform_run", side_effect=RuntimeError("no driver")),
+            pytest.raises(RuntimeError, match="no driver"),
         ):
-            result = suite._benchmark_sql_platform("snowflake")
+            suite._benchmark_sql_platform("snowflake")
 
-        mock_adapter.connect.assert_called_once()
-        mock_conn.close.assert_called_once()
-        assert result.platform == "snowflake"
+    def test_warmup_iterations_are_excluded(self):
+        suite = UnifiedBenchmarkSuite(config=UnifiedBenchmarkConfig())
+        run_results = SimpleNamespace(
+            query_results=[
+                {"query_id": "Q1", "status": "SUCCESS", "execution_time_seconds": 9.0, "run_type": "warmup"},
+                {"query_id": "Q1", "status": "SUCCESS", "execution_time_seconds": 0.1, "run_type": "measurement"},
+                {"query_id": "Q1", "status": "SUCCESS", "execution_time_seconds": 0.3, "run_type": "measurement"},
+            ]
+        )
+        results = suite._to_unified_query_results(run_results, "duckdb")
+        assert len(results) == 1
+        assert results[0].iterations == 2
+        assert results[0].mean_time_ms == pytest.approx(200.0)
 
-    def test_embedded_platform_raises_on_missing_data_dir(self, tmp_path):
-        """Test embedded platform raises ValueError if data dir missing."""
-        config = UnifiedBenchmarkConfig(query_ids=["Q1"])
-        suite = UnifiedBenchmarkSuite(config=config)
-        mock_adapter = MagicMock()
+    def test_a_query_whose_iterations_all_failed_stays_in_the_denominator(self):
+        suite = UnifiedBenchmarkSuite(config=UnifiedBenchmarkConfig())
+        run_results = SimpleNamespace(
+            query_results=[
+                {"query_id": "Q1", "status": "SUCCESS", "execution_time_seconds": 0.1, "run_type": "measurement"},
+                {"query_id": "Q2", "status": "ERROR", "error": "syntax", "run_type": "measurement"},
+            ]
+        )
+        results = suite._to_unified_query_results(run_results, "duckdb")
+        assert [(q.query_id, q.status) for q in results] == [("Q1", "SUCCESS"), ("Q2", "ERROR")]
+        built = suite._build_platform_result("duckdb", PlatformType.SQL, results)
+        assert built.success_rate == pytest.approx(50.0)
 
-        with (
-            patch("benchbox.platforms.get_adapter", return_value=mock_adapter),
-            pytest.raises(ValueError, match="Data directory not found"),
-        ):
-            suite._benchmark_sql_platform("duckdb", data_dir="/nonexistent/path")
+    def test_query_ids_are_normalized_for_the_run_path(self):
+        suite = UnifiedBenchmarkSuite(config=UnifiedBenchmarkConfig(query_ids=["Q1", "6", "q22"]))
+        assert suite._normalized_query_ids() == ["1", "6", "22"]
 
-    def test_embedded_platform_auto_data_dir_missing(self):
-        """Test embedded platform with None data_dir raises when auto-path missing."""
-        config = UnifiedBenchmarkConfig(query_ids=["Q1"])
-        suite = UnifiedBenchmarkSuite(config=config)
-        mock_adapter = MagicMock()
-
-        with (
-            patch("benchbox.platforms.get_adapter", return_value=mock_adapter),
-            pytest.raises(ValueError, match="Data directory not found"),
-        ):
-            suite._benchmark_sql_platform("duckdb", data_dir=None)
-
-
-# ---------------------------------------------------------------------------
-# _run_sql_query
-# ---------------------------------------------------------------------------
-
-
-class TestRunSqlQuery:
-    def test_success_path(self):
-        import sys
-
-        config = UnifiedBenchmarkConfig(warmup_iterations=0, benchmark_iterations=1)
-        suite = UnifiedBenchmarkSuite(config=config)
-
-        mock_conn = MagicMock()
-        mock_conn.execute.return_value.fetchall.return_value = [("row1",), ("row2",)]
-
-        mock_tpch_query = MagicMock()
-        mock_tpch_query.sql = "SELECT 1"
-
-        mock_tpch_class = MagicMock()
-        mock_tpch_class.get_query.return_value = mock_tpch_query
-
-        mock_queries_mod = MagicMock()
-        mock_queries_mod.TPCHQuery = mock_tpch_class
-
-        with patch.dict(sys.modules, {"benchbox.core.tpch.queries": mock_queries_mod}):
-            result = suite._run_sql_query("Q1", "duckdb", mock_conn)
-
-        assert result.status == "SUCCESS"
-        assert result.rows_returned == 2
-        assert result.query_id == "Q1"
-
-    def test_error_path(self):
-        import sys
-
-        config = UnifiedBenchmarkConfig(warmup_iterations=0, benchmark_iterations=1)
-        suite = UnifiedBenchmarkSuite(config=config)
-        mock_conn = MagicMock()
-
-        mock_tpch_class = MagicMock()
-        mock_tpch_class.get_query.side_effect = RuntimeError("query not found")
-        mock_queries_mod = MagicMock()
-        mock_queries_mod.TPCHQuery = mock_tpch_class
-
-        with patch.dict(sys.modules, {"benchbox.core.tpch.queries": mock_queries_mod}):
-            result = suite._run_sql_query("Q1", "duckdb", mock_conn)
-
-        assert result.status == "ERROR"
-        assert "query not found" in result.error_message
+    def test_no_query_ids_means_every_query(self):
+        assert UnifiedBenchmarkSuite(config=UnifiedBenchmarkConfig())._normalized_query_ids() is None
 
 
 # ---------------------------------------------------------------------------
