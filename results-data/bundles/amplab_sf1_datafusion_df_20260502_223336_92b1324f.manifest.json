@@ -1,7 +1,7 @@
 {
   "benchmark": "AMPLab",
   "bundle_file": "amplab_sf1_datafusion_df_20260502_223336_92b1324f.json",
-  "bundle_hash": "61aec83d9a40a8cc2e858186dca68fea5aec7ddf6c61afd0be77124cc4407828",
+  "bundle_hash": "7eed18f3c1917f5c18d95f2891c8ddd74a727afc630714312aae49ea5fad6061",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",

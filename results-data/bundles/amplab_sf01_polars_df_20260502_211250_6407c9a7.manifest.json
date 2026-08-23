@@ -1,7 +1,7 @@
 {
   "benchmark": "AMPLab",
   "bundle_file": "amplab_sf01_polars_df_20260502_211250_6407c9a7.json",
-  "bundle_hash": "7cc0663f28ae75c94db74a0d5c7e0aa393b841abcee5f621976c3b0049e94c0c",
+  "bundle_hash": "afba8548c384118c3882f66e6c30b5c1c9c7bfed1115fdd811a55e7c044bd8a0",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",
