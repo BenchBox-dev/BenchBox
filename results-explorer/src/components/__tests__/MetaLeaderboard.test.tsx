@@ -110,6 +110,20 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("0.50x")).toBeTruthy();
   });
 
+  it("describes darker heat cells as worse in every mode", () => {
+    const { rerender } = render(<MetaLeaderboard data={DATA} mode="times" onModeChange={vi.fn()} />);
+    expect(screen.getByText(/Heat: darker = worse within each ranking/)).toBeTruthy();
+
+    rerender(<MetaLeaderboard data={DATA} mode="ranks" onModeChange={vi.fn()} />);
+    expect(screen.getByText(/Heat: darker = a worse rank within each ranking/)).toBeTruthy();
+
+    rerender(<MetaLeaderboard data={DATA} mode="speedup" onModeChange={vi.fn()} />);
+    const legend = screen.getByText(/Heat: darker = farther from the ranking best/);
+    expect(legend.textContent).toContain("ranking best (1.00x)");
+    expect(legend.textContent).toContain("Values below 1.00x are worse than the ranking best");
+    expect(legend.textContent).not.toContain("≥1.00x");
+  });
+
   it("formats large power scores for scanning while preserving the exact value in titles", () => {
     const data: MetaLeaderboardData = {
       ...DATA,
@@ -305,7 +319,7 @@ describe("MetaLeaderboard", () => {
   it("speedup mode visibly explains below-1.00x values", () => {
     render(<MetaLeaderboard data={DATA} mode="speedup" onModeChange={vi.fn()} />);
 
-    expect(screen.getByText(/Values < 1\.00x are slower than baseline/)).toBeTruthy();
+    expect(screen.getByText(/Values below 1\.00x are worse than the ranking best/)).toBeTruthy();
     expect(screen.getByText("0.50x")).toBeTruthy();
   });
 
