@@ -171,6 +171,46 @@ const VARIANTS = [
     },
   },
   {
+    // Synthetic zero-timing result for ResultDetail's empty-state contract.
+    // This additive browser-only variant never changes the checked-in source
+    // corpus or public results. A distinct platform name keeps it out of
+    // exact-row-count assertions for the canonical DuckDB platform.
+    source: "tpch-duckdb-sf0.01-20260403-7fe93365.json",
+    subdir: "zero-timing",
+    derived: "tpch-fixture-zero-timing-sf0.01-20260403.json",
+    mutate: (bundle) => {
+      const mutated = structuredClone(bundle);
+      mutated.run = {
+        ...(mutated.run ?? {}),
+        id: `${mutated.run?.id ?? "run"}-zero-timing`,
+        query_time_ms: 0,
+      };
+      mutated.platform = {
+        ...(mutated.platform ?? {}),
+        name: "DuckDB Zero Timing",
+      };
+      mutated.queries = [];
+      mutated.summary = {
+        ...(mutated.summary ?? {}),
+        queries: { total: 0, passed: 0, failed: 0 },
+        timing: {
+          total_ms: 0,
+          avg_ms: 0,
+          min_ms: 0,
+          max_ms: 0,
+          geometric_mean_ms: null,
+          stdev_ms: 0,
+          p90_ms: 0,
+          p95_ms: 0,
+          p99_ms: 0,
+        },
+      };
+      delete mutated.summary.tpc_metrics;
+      delete mutated.environment;
+      return mutated;
+    },
+  },
+  {
     // Synthetic AWS managed-cloud variant: fixture-only coverage for the
     // environment facets flattened into the browser snapshot. This never
     // touches the public corpus.
@@ -563,6 +603,7 @@ const FIXTURE_ROLES = {
   "9c0925d1-env-aws-cloud": "awsCloud",
   "9c0925d1-env-container-local": "containerLocal",
   "9c0925d1-env-gcp-serverless": "gcpServerless",
+  "9c0925d1-zero-timing": "zeroTiming",
   c235e698: "datafusion",
   "c235e698-partial-query": "datafusionPartial",
   d4ec318a: "starSchema",

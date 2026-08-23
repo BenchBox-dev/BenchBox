@@ -210,20 +210,13 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
     }
   }
 
-  const environmentRows = [
-    detail.environment.os ? { label: "OS", value: detail.environment.os } : null,
-    detail.environment.arch ? { label: "Arch", value: detail.environment.arch } : null,
-    detail.environment.cpu_count !== undefined
-      ? { label: "CPUs", value: String(detail.environment.cpu_count) }
-      : null,
-    detail.environment.memory_gb !== undefined
-      ? { label: "Memory", value: `${detail.environment.memory_gb} GB` }
-      : null,
-    detail.environment.python ? { label: "Python", value: detail.environment.python } : null,
-  ].filter((row): row is { label: string; value: string } => row !== null);
-
   const showTuningSection = detail.tuning_mode !== null || detail.has_tuning;
   const plansUrl = planDownloadUrl(detail);
+  const showSidebar = showTuningSection || (detail.has_plans && !plansUrl);
+  const hasTimings = detail.display_timings.length > 0 || detail.queries.length > 0;
+  const hasPrimaryMetric = primaryMetric === "power_score"
+    ? detail.power_score !== null && detail.power_score !== undefined
+    : detail.display_geomean_ms !== null && detail.display_geomean_ms !== undefined;
   const primaryMetricDirection = primaryMetric === "power_score" ? "higher is better" : "lower is better";
   const primaryMetricName = primaryMetric === "power_score" ? "Power score" : "Geomean query time";
   const primaryMetricExactTitle =
@@ -250,7 +243,9 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
               </h1>
               <TrustBadge trustLabel={detail.trust_label} />
               <FundingChip funding={detail.funding} />
-              <ValidationBadge validationStatus={detail.validation_status} showMissing />
+              {!isPassingValidationStatus(detail.validation_status) && (
+                <ValidationBadge validationStatus={detail.validation_status} showMissing />
+              )}
               {detail.tuning_mode && <TuningBadge tuningMode={detail.tuning_mode} />}
               {detail.visibility === "public-curated" && (
                 <StatusBadge role="visibility" tone="success">curated</StatusBadge>
@@ -277,13 +272,15 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
           </div>
         </div>
 
-        <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <ResultMetricCard
-            label={`Primary metric · ${primaryMetricDirection}`}
-            value={formatPrimaryMetric(detail, primaryMetric)}
-            helper={primaryMetricName}
-            valueTitle={primaryMetricExactTitle}
-          />
+        <div class={`mt-5 grid gap-3 sm:grid-cols-2 ${hasPrimaryMetric ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
+          {hasPrimaryMetric && (
+            <ResultMetricCard
+              label={`Primary metric · ${primaryMetricDirection}`}
+              value={formatPrimaryMetric(detail, primaryMetric)}
+              helper={primaryMetricName}
+              valueTitle={primaryMetricExactTitle}
+            />
+          )}
           <ResultMetricCard
             label="Scale / phase"
             value={`SF ${detail.scale_factor}`}
@@ -303,20 +300,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
       </section>
 
       <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div class="space-y-6">
-          <section class="card">
-            <h2 class="mb-4 text-base font-semibold text-[var(--bb-data-fg-primary)]">Environment</h2>
-            {environmentRows.length > 0 ? (
-              <dl class="space-y-2 text-sm">
-                {environmentRows.map((row) => (
-                  <EnvironmentRow key={row.label} label={row.label} value={row.value} />
-                ))}
-              </dl>
-            ) : (
-              <p class="text-sm text-[var(--bb-data-fg-muted)]">Environment metadata was not recorded for this run.</p>
-            )}
-          </section>
-
+        <div class={showSidebar ? "space-y-6" : "hidden"}>
           {showTuningSection && (
             <section class="card">
               <h2 class="mb-3 text-base font-semibold text-[var(--bb-data-fg-primary)]">Tuning Config</h2>
@@ -364,14 +348,15 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
           )}
         </div>
 
-        <div class="lg:col-span-2 space-y-6">
-          {(detail.display_timings.length > 0 || detail.queries.length > 0) && (
+        <div class={showSidebar ? "lg:col-span-2 space-y-6" : "lg:col-span-3 space-y-6"}>
+          {hasTimings && (
             <ChartPanel context={chartContext} />
           )}
 
           <RunReceipt detail={detail} />
 
-          <section class="card">
+          {hasTimings && (
+            <section class="card">
             <h2 class="mb-4 text-base font-semibold text-[var(--bb-data-fg-primary)]">
               Query Timings ({detail.display_timings.length})
             </h2>
@@ -467,7 +452,8 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                 </div>
               </details>
             )}
-          </section>
+            </section>
+          )}
 
           <MethodologyDisclosure detail={detail} />
 
@@ -509,13 +495,9 @@ function formatPrimaryMetric(detail: DetailResult, primaryMetric: PrimaryMetric)
   return fmtGeomean(detail.display_geomean_ms);
 }
 
-function EnvironmentRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div class="flex justify-between gap-2">
-      <dt class="text-[var(--bb-data-fg-muted)]">{label}</dt>
-      <dd class="text-right font-medium text-[var(--bb-data-fg-primary)]">{value}</dd>
-    </div>
-  );
+function isPassingValidationStatus(status: string | null | undefined): boolean {
+  const normalized = status?.trim().toLowerCase();
+  return normalized === "pass" || normalized === "passed";
 }
 
 function MedianRow({ timing }: { timing: QueryDisplayTiming }) {
