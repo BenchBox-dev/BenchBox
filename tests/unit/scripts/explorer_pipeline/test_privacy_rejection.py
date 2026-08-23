@@ -169,5 +169,8 @@ def test_privacy_rejection_makes_the_publish_command_exit_non_zero(tmp_path: Pat
     )
 
     assert result.exit_code != 0, "a leaking bundle produced a successful publish"
-    assert "privacy check failed" in result.output
+    # Rich wraps at the terminal width, so a long pytest temp path can put a
+    # newline between adjacent words without changing the rendered message.
+    normalized_output = " ".join(result.output.split())
+    assert "privacy check failed" in normalized_output
     assert LEAKING_PATH not in result.output
