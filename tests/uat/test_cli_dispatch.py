@@ -854,14 +854,31 @@ def test_gate_check_rejects_old_evidence_without_digests(tmp_path: Path, capsys)
 
 
 @pytest.mark.slow
+# The pinned sweep runs in about 30 seconds. A generous ceiling so a future
+# widening of the matrix fails in five minutes with a traceback instead of
+# hanging a canary shard for an hour and being killed with no diagnosis.
+@pytest.mark.timeout(300)
 def test_completeness_gate_digest_provenance(tmp_path: Path):
     """End-to-end: a real sweep-produced GateSummary carries cell/sidecar/lifecycle digests."""
     from tests.uat import orchestrator
     from tests.uat.config import validate_config
 
-    cfg = validate_config({"name": "digest-provenance-e2e", "phases": ["execute", "report"]})
     # Minimal execute so cells.jsonl + sidecar + gap_summary are written.
-    # Using 0-scale tpch with local-only platform keeps the sweep cheap.
+    #
+    # The include filters are load-bearing, not decoration. Without them
+    # `platforms.include` is `()` with `include_was_specified=False`, which
+    # means no filter at all -- so `run_sweep` walks the FULL platform matrix
+    # rather than the "local-only platform" this comment used to claim. That
+    # is what hung Release Canary shard 4/6: 53 minutes with no output before
+    # the runner killed it, while the other five shards finished in 13-21.
+    cfg = validate_config(
+        {
+            "name": "digest-provenance-e2e",
+            "phases": ["execute", "report"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+        }
+    )
     log_dir = tmp_path / "logs"
     orchestrator.run_sweep(cfg, log_dir_override=log_dir)
     # The summary written by orchestrator should carry digests.
