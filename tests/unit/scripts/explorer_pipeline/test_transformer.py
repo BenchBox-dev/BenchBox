@@ -1267,3 +1267,103 @@ class TestAppliedReceiptCompanion:
 
         transformer = BundleTransformer()
         assert transformer.to_detail_result(bundle, result_id="r").applied_receipt is None
+
+
+class TestExecutionModeExtraction:
+    """The SQL-vs-DataFrame facet must resolve for every published bundle.
+
+    It read only ``config.execution_mode`` / ``execution.execution_mode``,
+    which no bundle writes, so ``execution_mode`` was NULL for all 207 rows in
+    the shipping snapshot and the facet filtered nothing.
+    """
+
+    def test_reads_the_key_path_current_develop_writes(self) -> None:
+        bundle = {"platform": {"config": {"execution_mode": "sql"}}}
+        assert transformer_module._execution_mode(bundle) == "sql"
+
+    def test_reads_legacy_config_mode(self) -> None:
+        bundle = {"config": {"mode": "dataframe"}}
+        assert transformer_module._execution_mode(bundle) == "dataframe"
+
+    def test_documented_schema_location_wins(self) -> None:
+        bundle = {
+            "config": {"execution_mode": "dataframe", "mode": "sql"},
+            "platform": {"config": {"execution_mode": "sql"}},
+        }
+        assert transformer_module._execution_mode(bundle) == "dataframe"
+
+    def test_execution_mode_field_is_not_consulted(self) -> None:
+        """``execution.mode`` says "sql" for 105 DataFrame runs in the corpus.
+
+        Trusting it would mislabel more than half the published results, so it
+        is deliberately excluded from the key paths.
+        """
+        bundle = {
+            "config": {"mode": "dataframe"},
+            "execution": {"mode": "sql"},
+            "platform": {"config": {"execution_mode": "dataframe"}},
+        }
+        assert transformer_module._execution_mode(bundle) == "dataframe"
+
+    def test_unknown_vocabulary_stays_none(self) -> None:
+        """An invented mode is worse than an honestly empty facet."""
+        assert transformer_module._execution_mode({"config": {"mode": "balanced"}}) is None
+
+    def test_missing_everywhere_stays_none(self) -> None:
+        assert transformer_module._execution_mode({}) is None
+
+    def test_case_is_normalized(self) -> None:
+        assert transformer_module._execution_mode({"config": {"mode": "SQL"}}) == "sql"
+
+    @pytest.mark.parametrize("node", [None, "not-a-dict", 42, []])
+    def test_non_dict_nodes_do_not_raise(self, node: object) -> None:
+        assert transformer_module._execution_mode({"config": node, "platform": node}) is None
+
+
+class TestPublishedCorpusResolvesExecutionMode:
+    """Corpus-level guard: no published bundle may yield a NULL facet.
+
+    The unit cases above pin the key paths; this pins the actual corpus, which
+    is what the public site renders.
+    """
+
+    def test_every_published_bundle_resolves(self) -> None:
+        corpus = Path(__file__).resolve().parents[4] / "results-data" / "bundles"
+        if not corpus.is_dir():
+            pytest.skip("results-data/bundles not present in this checkout")
+
+        unresolved = []
+        total = 0
+        for path in sorted(corpus.rglob("*.json")):
+            if path.name.endswith(".manifest.json"):
+                continue
+            total += 1
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if transformer_module._execution_mode(data) is None:
+                unresolved.append(path.name)
+
+        assert total > 0, "no bundles discovered"
+        assert not unresolved, f"{len(unresolved)} of {total} bundles yield a NULL execution_mode: {unresolved[:5]}"
+
+    def test_resolved_mode_agrees_with_the_filename_suffix(self) -> None:
+        """``_df_`` / ``_sql_`` in the filename is an independent witness."""
+        corpus = Path(__file__).resolve().parents[4] / "results-data" / "bundles"
+        if not corpus.is_dir():
+            pytest.skip("results-data/bundles not present in this checkout")
+
+        mismatches = []
+        for path in sorted(corpus.rglob("*.json")):
+            if path.name.endswith(".manifest.json"):
+                continue
+            if "_df_" in path.name:
+                expected = "dataframe"
+            elif "_sql_" in path.name:
+                expected = "sql"
+            else:
+                continue
+            data = json.loads(path.read_text(encoding="utf-8"))
+            actual = transformer_module._execution_mode(data)
+            if actual != expected:
+                mismatches.append((path.name, expected, actual))
+
+        assert not mismatches, f"filename suffix disagrees with resolved mode: {mismatches[:5]}"
