@@ -132,7 +132,7 @@ test.describe("Query workbench", () => {
       .poll(() => new URL(page.url()).searchParams.get("limit"))
       .toBe("all");
     await expect(page.getByText(/Query limit: all/)).toBeVisible();
-    await expect(page.getByText(/Showing \d+ of \d+ returned rows/)).toBeVisible();
+    await expect(page.getByText(/Showing \d+–\d+ of \d+ filtered rows/)).toBeVisible();
 
     await page.getByRole("button", { name: /^Default$/ }).click();
     await expect
