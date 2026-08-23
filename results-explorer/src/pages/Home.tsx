@@ -62,7 +62,7 @@ export function Home(_: RoutableProps) {
   const [emptyResultsRetryFinished, setEmptyResultsRetryFinished] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { facets, where: facetWhere, setFacet, resetFacets } = useFacetState();
-  const [modeRaw, setModeRaw] = useUrlState<string>("mode", "times", stringSerde);
+  const [modeRaw, setModeRaw] = useUrlState<string>("mode", "speedup", stringSerde);
   const benchmarkFilters = facets.benchmark;
   const scaleFilters = facets.scale_factor;
   const phaseFilter = singleFacetValue(facets.phase, "all");
@@ -259,7 +259,7 @@ export function Home(_: RoutableProps) {
   }
 
   const mode: MetaLeaderboardMode =
-    modeRaw === "ranks" || modeRaw === "speedup" ? modeRaw : "times";
+    modeRaw === "times" || modeRaw === "ranks" ? modeRaw : "speedup";
   const benchmarks = [...new Set(results.map((result) => canonicalBenchmarkSlug(result.benchmark)))].sort();
   const platformIdToName = new Map(
     (metaLeaderboard?.platforms ?? []).map((platform) => [platform.platform_id, platform.platform]),
