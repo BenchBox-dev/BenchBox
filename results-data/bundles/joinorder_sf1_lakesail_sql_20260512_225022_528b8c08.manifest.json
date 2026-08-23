@@ -5,6 +5,7 @@
   "companion_hashes": {},
   "phase": 2,
   "platform": "LakeSail",
+  "result_source": "internal",
   "scale_factor": 1.0,
   "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
