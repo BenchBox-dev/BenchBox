@@ -121,7 +121,7 @@ export function BenchmarkMatrixSkeleton({ message = "Loading matrix..." }: Loadi
 }
 
 export function QueryRowsSkeleton({
-  message = "Querying results.duckdb...",
+  message = "Loading matching results...",
   columns = 7,
 }: LoadingSpinnerProps & { columns?: number }) {
   const visibleColumns = Math.max(1, columns);

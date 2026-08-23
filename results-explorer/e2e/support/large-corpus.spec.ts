@@ -6,7 +6,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { expect, test } from "@playwright/test";
-import { waitForShell } from "./fixtures";
+import { waitForResultRows, waitForShell } from "./fixtures";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const generatorPath = resolve(projectRoot, "scripts", "generate-browser-fixtures.mjs");
@@ -56,28 +56,36 @@ async function waitForServer(url: string, server: ChildProcess, output: () => st
   throw new Error(`large-corpus server did not become ready: ${output()}`);
 }
 
+async function withLargeFixture(run: (baseUrl: string) => Promise<void>) {
+  const outputRoot = mkdtempSync(resolve(tmpdir(), "benchbox-large-browser-fixture-"));
+  let server: ChildProcess | null = null;
+  let serverOutput = "";
+  try {
+    generateLargeFixture(outputRoot);
+    const port = await reservePort();
+    server = spawn(process.execPath, [serverPath, "--host", "127.0.0.1", "--port", String(port)], {
+      cwd: projectRoot,
+      env: { ...process.env, E2E_FIXTURE_DIR: resolve(outputRoot, "data") },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    server.stdout?.on("data", (chunk) => {
+      serverOutput += String(chunk);
+    });
+    server.stderr?.on("data", (chunk) => {
+      serverOutput += String(chunk);
+    });
+    const baseUrl = `http://127.0.0.1:${port}`;
+    await waitForServer(`${baseUrl}/results/`, server, () => serverOutput);
+    await run(baseUrl);
+  } finally {
+    server?.kill("SIGTERM");
+    rmSync(outputRoot, { recursive: true, force: true });
+  }
+}
+
 test.describe("large corpus fixture", () => {
   test("large corpus reproduces an unbounded Compare document at desktop and mobile widths", async ({ browser }) => {
-    const outputRoot = mkdtempSync(resolve(tmpdir(), "benchbox-large-browser-fixture-"));
-    let server: ChildProcess | null = null;
-    let serverOutput = "";
-    try {
-      generateLargeFixture(outputRoot);
-      const port = await reservePort();
-      server = spawn(process.execPath, [serverPath, "--host", "127.0.0.1", "--port", String(port)], {
-        cwd: projectRoot,
-        env: { ...process.env, E2E_FIXTURE_DIR: resolve(outputRoot, "data") },
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      server.stdout?.on("data", (chunk) => {
-        serverOutput += String(chunk);
-      });
-      server.stderr?.on("data", (chunk) => {
-        serverOutput += String(chunk);
-      });
-      const baseUrl = `http://127.0.0.1:${port}`;
-      await waitForServer(`${baseUrl}/results/`, server, () => serverOutput);
-
+    await withLargeFixture(async (baseUrl) => {
       for (const viewport of [
         { width: 1440, height: 900 },
         { width: 390, height: 844 },
@@ -95,9 +103,36 @@ test.describe("large corpus fixture", () => {
 
         await context.close();
       }
-    } finally {
-      server?.kill("SIGTERM");
-      rmSync(outputRoot, { recursive: true, force: true });
-    }
+    });
+  });
+
+  test("query paging scale bounds document height and preserves cross-page selection", async ({ browser }) => {
+    await withLargeFixture(async (baseUrl) => {
+      for (const viewport of [
+        { width: 1440, height: 1000 },
+        { width: 390, height: 844 },
+      ]) {
+        const context = await browser.newContext({ viewport });
+        const page = await context.newPage();
+        await page.goto(`${baseUrl}/results/query`);
+        await waitForShell(page);
+
+        const panel = page.getByTestId("query-results-panel");
+        await waitForResultRows(page, panel, 24);
+        await expect(panel.locator('tbody tr[data-testid^="query-result-row-"]')).toHaveCount(24);
+        await expect(page.getByTestId("query-pagination")).toBeVisible();
+
+        const documentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+        expect(documentHeight).toBeLessThan(viewport.height * 3);
+
+        await panel.locator('input[data-testid^="query-compare-checkbox-"]').first().check();
+        await page.getByRole("button", { name: "Next page" }).click();
+        await expect.poll(() => new URL(page.url()).searchParams.get("page")).toBe("2");
+        await waitForResultRows(page, panel, 24);
+        await expect(page.getByTestId("query-compare-tray")).toContainText("1 result selected");
+
+        await context.close();
+      }
+    });
   });
 });

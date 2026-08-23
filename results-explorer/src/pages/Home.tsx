@@ -53,6 +53,7 @@ interface TuningModeSummary {
 }
 
 export function Home(_: RoutableProps) {
+  const recentResultsScrollerRef = useRef<HTMLDivElement>(null);
   useDocumentTitle("Results · BenchBox");
   const [results, setResults] = useState<ResultRow[] | null>(null);
   const [metaLeaderboard, setMetaLeaderboard] = useState<MetaLeaderboardData | null>(null);
@@ -419,11 +420,8 @@ export function Home(_: RoutableProps) {
                 <CoverageSummary />
               </div>
 
-              <div class="hidden sm:block">
-                <LeaderboardScopeSummary {...leaderboardScopeSummaryProps} />
-              </div>
               <details
-                class="mt-2 border-t border-[var(--bb-border-default)] pt-2 sm:hidden"
+                class="mt-2 border-t border-[var(--bb-border-default)] pt-2"
                 data-testid="leaderboard-scope-summary-mobile"
               >
                 <summary class="cursor-pointer text-xs font-medium text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]">
@@ -535,12 +533,13 @@ export function Home(_: RoutableProps) {
           <h2 class="mb-4 text-xl font-semibold text-[var(--bb-data-fg-primary)]">Recent Results</h2>
           <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
             <TableScrollHint
+              scrollerRef={recentResultsScrollerRef}
               testId="recent-results-scroll-hint"
               label="Scroll table for row actions →"
               wrapperClassName="flex justify-end"
               className="m-2"
             />
-            <div class="overflow-x-auto" data-testid="recent-results-scroll-container">
+            <div ref={recentResultsScrollerRef} class="overflow-x-auto" data-testid="recent-results-scroll-container">
               <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                 <thead class="bg-[var(--bb-surface-data-muted)]">
                   <tr>
@@ -941,7 +940,7 @@ function benchmarkFilterDescription(publicBenchmarksOutsideLeaderboard: readonly
   if (publicBenchmarksOutsideLeaderboard.length === 0) {
     return "Only benchmarks with ranked leaderboards appear here.";
   }
-  return `${formatCountWithVerb(publicBenchmarksOutsideLeaderboard.length, "public benchmark", "has", "have")} results but no ranked leaderboard: ${publicBenchmarksOutsideLeaderboard.map(formatBenchmarkLabel).join(", ")}.`;
+  return "Choose from benchmarks with ranked leaderboards. Other public benchmarks are listed in Leaderboard scope details.";
 }
 
 function formatTuningModeOption(value: string): string {
