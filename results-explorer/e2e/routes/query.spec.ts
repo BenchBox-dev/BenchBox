@@ -80,6 +80,22 @@ test.describe("Query workbench", () => {
     await expect(page.getByRole("cell", { name: "Fixture AWS SQL" })).toHaveCount(0);
   });
 
+  test("shows narrowing facets and clears them when no rows match", async ({ page }) => {
+    await page.goto("/results/query?platform=MissingDB&benchmark=tpch");
+    await waitForShell(page);
+
+    const emptyState = page.getByTestId("query-empty-state");
+    await expect(emptyState.getByRole("status")).toBeVisible();
+    await expect(emptyState).toContainText("No results match these filters");
+    await expect(emptyState).toContainText("Benchmark: TPC-H");
+    await expect(emptyState).toContainText("Platform: MissingDB");
+    await expect(emptyState.getByRole("table")).toHaveCount(0);
+
+    await emptyState.getByRole("button", { name: "Clear all filters" }).click();
+    await expect.poll(() => new URL(page.url()).search).toBe("");
+    await waitForDataLoaded(page, /matching result bundle/);
+  });
+
   test("the explicit trailing-slash query route resolves the same workbench", async ({ page }) => {
     await page.goto("/results/query/");
     await waitForShell(page);

@@ -62,6 +62,11 @@ import { Select } from "@/components/Select";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import {
+  planCompareIds,
+  recoverCompareResults,
+  shouldPreserveMultiSelectionUrl,
+} from "@/lib/compareRecovery";
 
 type PrimaryMetric = "power_score" | "display_geomean_ms";
 interface CompareState {
@@ -83,33 +88,6 @@ function currentCompareUrl(url: string | undefined): string {
 
 function searchParamsFromUrl(url: string): URLSearchParams {
   return new URL(url, "https://benchbox.dev").searchParams;
-}
-
-interface CompareIdPlan {
-  retained: string[];
-  duplicates: string[];
-  overflow: string[];
-}
-
-function planCompareIds(rawIds: string[], limit: number): CompareIdPlan {
-  const unique: string[] = [];
-  const duplicates: string[] = [];
-  const seen = new Set<string>();
-  for (const rawId of rawIds) {
-    const id = rawId.trim();
-    if (!id) continue;
-    if (seen.has(id)) {
-      duplicates.push(id);
-      continue;
-    }
-    seen.add(id);
-    unique.push(id);
-  }
-  return {
-    retained: unique.slice(0, limit),
-    duplicates,
-    overflow: unique.slice(limit),
-  };
 }
 
 function formatIdList(ids: string[]): string {
@@ -215,76 +193,35 @@ export function Compare({ url }: CompareProps) {
       };
     }
 
-    Promise.all(
-      ids.map(async (requestedId) => {
-        try {
-          return { requestedId, resolvedId: await resolveShortId(requestedId), error: null };
-        } catch (error) {
-          return { requestedId, resolvedId: null, error };
-        }
-      }),
-    )
-      .then(async (resolved) => {
-        if (cancelled) return;
+    recoverCompareResults(ids, MAX_COMPARE_SELECTIONS, {
+      resolveId: resolveShortId,
+      loadResult: getDetailResult,
+      isCancelled: () => cancelled,
+    })
+      .then(async (recovery) => {
+        if (cancelled || recovery === null) return;
 
-        const resolvedSeen = new Set<string>();
-        const aliases = resolved.filter(
-          (entry): entry is { requestedId: string; resolvedId: string; error: null } => {
-            if (entry.resolvedId === null || !resolvedSeen.has(entry.resolvedId)) {
-              if (entry.resolvedId !== null) resolvedSeen.add(entry.resolvedId);
-              return false;
-            }
-            return true;
-          },
-        );
-        if (aliases.length > 0) {
-          const aliasNotice = `Ignored duplicate result ID${aliases.length === 1 ? "" : "s"} after alias resolution: ${formatIdList(aliases.map((entry) => entry.requestedId))}.`;
+        if (recovery.aliases.length > 0) {
+          const aliasNotice = `Ignored duplicate result ID${recovery.aliases.length === 1 ? "" : "s"} after alias resolution: ${formatIdList(recovery.aliases)}.`;
           initialNotice = appendCompareNotice(initialNotice, aliasNotice);
           setCompareNotice(initialNotice);
         }
 
-        const deduplicated = resolved.filter(
-          (entry) => !aliases.some((alias) => alias.requestedId === entry.requestedId),
-        );
-        const retained = deduplicated.slice(0, MAX_COMPARE_SELECTIONS);
-        const overflow = deduplicated.slice(MAX_COMPARE_SELECTIONS);
-        if (overflow.length > 0) {
-          const aliasResolutionNote = aliases.length > 0 ? " after alias resolution" : "";
+        if (recovery.overflow.length > 0) {
+          const aliasResolutionNote = recovery.aliases.length > 0 ? " after alias resolution" : "";
           initialNotice = appendCompareNotice(
             initialNotice,
-            `Ignored ${overflow.length} additional result ID${overflow.length === 1 ? "" : "s"}${aliasResolutionNote} (${formatIdList(overflow.map((entry) => entry.requestedId))}); comparisons are limited to ${MAX_COMPARE_SELECTIONS} unique results.`,
+            `Ignored ${recovery.overflow.length} additional result ID${recovery.overflow.length === 1 ? "" : "s"}${aliasResolutionNote} (${formatIdList(recovery.overflow)}); comparisons are limited to ${MAX_COMPARE_SELECTIONS} unique results.`,
           );
           setCompareNotice(initialNotice);
         }
-        const candidates = retained.filter(
-          (entry): entry is { requestedId: string; resolvedId: string; error: null } => entry.resolvedId !== null,
-        );
-        const loaded = await Promise.all(
-          candidates.map(async (entry) => {
-            try {
-              return { ...entry, detail: await getDetailResult(entry.resolvedId), loadError: null };
-            } catch (error) {
-              return { ...entry, detail: null, loadError: error };
-            }
-          }),
-        );
-        if (cancelled) return;
-
-        const missing = loaded.filter((entry) => entry.detail === null && entry.loadError === null);
-        const failed = [
-          ...retained.filter((entry) => entry.error !== null),
-          ...loaded.filter((entry) => entry.loadError !== null),
-        ];
-        const retainedLoaded = loaded;
-        const details = retainedLoaded.flatMap((entry) => (entry.detail ? [entry.detail] : []));
-        if (failed.length > 0) setPreserveRequestedIds(true);
+        const details = recovery.recovered.map((entry) => entry.detail);
+        if (recovery.failed.length > 0) setPreserveRequestedIds(true);
         if (details.length === 0) {
-          if (failed.length > 0) {
-            const firstFailure = failed[0]!;
-            const failureError = firstFailure.error ?? ("loadError" in firstFailure ? firstFailure.loadError : null);
-            setError(errMsg(failureError));
+          if (recovery.failed.length > 0) {
+            setError(errMsg(recovery.failed[0]!.error));
           } else {
-            const missingIds = missing.map((entry) => entry.requestedId);
+            const missingIds = recovery.missing.map((entry) => entry.requestedId);
             setError(
               `No result found for: ${missingIds.join(", ")}. ` +
                 "These results may have been removed from the published dataset.",
@@ -293,13 +230,11 @@ export function Compare({ url }: CompareProps) {
           setLoading(false);
           return;
         }
-        const retainedMissing = retainedLoaded.filter((entry) => entry.detail === null && entry.loadError === null);
-        const retainedFailed = [
-          ...retained.filter((entry) => entry.error !== null),
-          ...retainedLoaded.filter((entry) => entry.loadError !== null),
-        ];
-        if (retainedMissing.length > 0 || retainedFailed.length > 0) {
-          const unavailable = [...retainedMissing, ...retainedFailed].map((entry) => entry.requestedId);
+        if (recovery.missing.length > 0 || recovery.failed.length > 0) {
+          const unavailable = [
+            ...recovery.missing.map((entry) => entry.requestedId),
+            ...recovery.failed.map((entry) => entry.requestedId),
+          ];
           initialNotice = appendCompareNotice(
             initialNotice,
             `Ignored unavailable result ID${unavailable.length === 1 ? "" : "s"}: ${formatIdList(unavailable)}.`,
@@ -340,7 +275,13 @@ export function Compare({ url }: CompareProps) {
     // after stale-ID recovery. Keeping its explicit membership is the only
     // way for a one-result recovery to reload into the same comparison surface
     // instead of being reinterpreted as the single-result builder entrypoint.
-    if (ids.length < 2 && planCompareIds(currentRawIds.split(","), MAX_COMPARE_SELECTIONS).retained.length > 1) {
+    if (
+      shouldPreserveMultiSelectionUrl(
+        currentRawIds.split(","),
+        ids.length,
+        MAX_COMPARE_SELECTIONS,
+      )
+    ) {
       setCompareNotice((current) =>
         appendCompareNotice(current, "The original comparison URL is kept so refresh preserves this recovery state."),
       );

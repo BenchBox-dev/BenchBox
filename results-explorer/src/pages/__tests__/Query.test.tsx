@@ -77,6 +77,7 @@ const BASE_ROWS = [
   },
 ];
 let resultRows: Record<string, unknown>[] = BASE_ROWS;
+let resultQueryError: Error | null = null;
 
 function normalizeSql(sql: string): string {
   return sql.replace(/\s+/g, " ").trim();
@@ -108,6 +109,7 @@ beforeEach(() => {
   clearDuckdbQueryCachesForTests();
   schemaColumns = BASE_SCHEMA_COLUMNS;
   resultRows = BASE_ROWS;
+  resultQueryError = null;
   window.history.replaceState(null, "", "/results/query");
   vi.stubGlobal(
     "fetch",
@@ -206,6 +208,7 @@ beforeEach(() => {
       throw new Error("read-only connection");
     }
     if (isDefaultResultSelect(sql)) {
+      if (resultQueryError) throw resultQueryError;
       return resultRows;
     }
     if (normalized.startsWith("SELECT * FROM bench.results")) {
@@ -222,6 +225,33 @@ beforeEach(() => {
 // develop until restored. See TODO
 // query-test-configure-visible-columns-failures.
 describe("Query", () => {
+  it("shows narrowing facets and clears them when no rows match", async () => {
+    window.history.replaceState(null, "", "/results/query?benchmark=tpch&platform=MissingDB");
+    resultRows = [];
+
+    render(<Query />);
+
+    const emptyState = await screen.findByTestId("query-empty-state");
+    expect(within(emptyState).getByRole("status")).toBeTruthy();
+    expect(emptyState.textContent).toContain("No results match these filters");
+    expect(emptyState.textContent).toContain("Benchmark: TPC-H");
+    expect(emptyState.textContent).toContain("Platform: MissingDB");
+    expect(within(emptyState).queryByRole("table")).toBeNull();
+
+    fireEvent.click(within(emptyState).getByRole("button", { name: "Clear all filters" }));
+    await waitFor(() => expect(window.location.search).toBe(""));
+  });
+
+  it("shows a load error instead of the empty-by-filter state", async () => {
+    resultRows = [];
+    resultQueryError = new Error("simulated result query failure");
+
+    render(<Query />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("simulated result query failure");
+    expect(screen.queryByTestId("query-empty-state")).toBeNull();
+  });
+
   it("renders the compare tray and enables launch only after two compatible selections", async () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));

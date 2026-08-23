@@ -199,6 +199,47 @@ describe("ResultDetail - median-first contract", () => {
     expect(receipt).toHaveTextContent("Download bundle");
   });
 
+  it("suppresses absent primary metrics and empty timing surfaces", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(
+      makeDetail({
+        power_score: null,
+        display_geomean_ms: null,
+        queries: [],
+        display_timings: [],
+        has_display_timing: false,
+        valid_query_count: 0,
+      }),
+    );
+
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    const summary = screen.getByRole("region", { name: "Result summary" });
+    expect(summary).not.toHaveTextContent("Primary metric");
+    expect(summary).not.toHaveTextContent("N/A");
+    expect(screen.queryByRole("heading", { name: /Query Timings/ })).toBeNull();
+    expect(screen.queryByText("Charts")).toBeNull();
+    expect(screen.getByRole("region", { name: "Run receipt" })).toBeTruthy();
+  });
+
+  it("omits a passing title badge but keeps non-passing validation visible", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ validation_status: "passed" }));
+
+    const passing = render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+    expect(
+      screen.getByRole("region", { name: "Result summary" }).querySelector('[data-role="validation"]'),
+    ).toBeNull();
+
+    passing.unmount();
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ validation_status: "failed" }));
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+    expect(
+      screen.getByRole("region", { name: "Result summary" }).querySelector('[data-role="validation"]'),
+    ).toHaveTextContent("failed");
+  });
+
   it("uses scan precision in the primary summary while keeping exact power score available", async () => {
     vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ power_score: 11636.652993864305 }));
 
