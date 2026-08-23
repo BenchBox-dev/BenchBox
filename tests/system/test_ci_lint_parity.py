@@ -310,5 +310,8 @@ def test_delta_baseline_restore_is_keyed_to_the_pr_base_sha() -> None:
     )
     cache_key = step["with"]["key"]
 
-    assert cache_key == "fast-lane-count-develop-${{ github.event.pull_request.base.sha }}"
+    assert (
+        cache_key
+        == "fast-lane-count-develop-${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
+    )
     assert "restore-keys" not in step["with"]
