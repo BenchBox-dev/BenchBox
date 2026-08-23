@@ -110,6 +110,20 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("0.50x")).toBeTruthy();
   });
 
+  it("describes darker heat cells as worse in every mode", () => {
+    const { rerender } = render(<MetaLeaderboard data={DATA} mode="times" onModeChange={vi.fn()} />);
+    expect(screen.getByText(/Heat: darker = worse within each ranking/)).toBeTruthy();
+
+    rerender(<MetaLeaderboard data={DATA} mode="ranks" onModeChange={vi.fn()} />);
+    expect(screen.getByText(/Heat: darker = a worse rank within each ranking/)).toBeTruthy();
+
+    rerender(<MetaLeaderboard data={DATA} mode="speedup" onModeChange={vi.fn()} />);
+    const legend = screen.getByText(/Heat: darker = farther from the ranking best/);
+    expect(legend.textContent).toContain("ranking best (1.00x)");
+    expect(legend.textContent).toContain("Values below 1.00x are worse than the ranking best");
+    expect(legend.textContent).not.toContain("≥1.00x");
+  });
+
   it("formats large power scores for scanning while preserving the exact value in titles", () => {
     const data: MetaLeaderboardData = {
       ...DATA,
@@ -305,7 +319,7 @@ describe("MetaLeaderboard", () => {
   it("speedup mode visibly explains below-1.00x values", () => {
     render(<MetaLeaderboard data={DATA} mode="speedup" onModeChange={vi.fn()} />);
 
-    expect(screen.getByText(/Values < 1\.00x are slower than baseline/)).toBeTruthy();
+    expect(screen.getByText(/Values below 1\.00x are worse than the ranking best/)).toBeTruthy();
     expect(screen.getByText("0.50x")).toBeTruthy();
   });
 
@@ -513,6 +527,49 @@ describe("MetaLeaderboard", () => {
     expect(routeMock).toHaveBeenLastCalledWith("/results/p/sqlite/");
   });
 
+  it("collapses published platforms without ranked evidence and keeps arrow coordinates rectangular", () => {
+    const unrankedResult = {
+      platform_id: "polars",
+      platform: "Polars",
+      result_id: "polars-unranked",
+      rank: null,
+      metric_value: null,
+      speedup_vs_best: null,
+      primary_metric: "display_geomean_ms",
+      primary_order: "asc" as const,
+      ...META_TIMING_ELIGIBLE,
+      ranking_exclusion_reason: "insufficient_query_coverage",
+    };
+    const data: MetaLeaderboardData = {
+      ...DATA,
+      cohorts: [{ ...DATA.cohorts[0]!, platforms: [...(DATA.cohorts[0]!.platforms ?? []), unrankedResult] }],
+      platforms: [
+        ...DATA.platforms,
+        { platform_id: "polars", platform: "Polars", ranks: {}, avg_rank: null, n_cohorts: 0 },
+      ],
+    };
+    render(<MetaLeaderboard data={data} mode="times" onModeChange={vi.fn()} />);
+
+    expect(screen.getAllByRole("gridcell")).toHaveLength(2);
+    expect(screen.queryByText("Polars")).toBeNull();
+    const expander = screen.getByRole("button", {
+      name: "1 more platform has published results but nothing ranked — Show them",
+    });
+    expect(expander).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(expander);
+
+    expect(screen.getAllByRole("gridcell")).toHaveLength(3);
+    const lastRankedCell = document.querySelector<HTMLElement>('[data-cell="1-0"]');
+    const revealedCell = document.querySelector<HTMLElement>('[data-cell="2-0"]');
+    expect(lastRankedCell).not.toBeNull();
+    expect(revealedCell).not.toBeNull();
+    lastRankedCell!.focus();
+    fireEvent.keyDown(lastRankedCell!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(revealedCell);
+    expect(revealedCell!.tabIndex).toBe(0);
+  });
+
   it("labels published but unranked evidence instead of treating it as missing", () => {
     const data: MetaLeaderboardData = {
       ...DATA,
@@ -562,17 +619,21 @@ describe("MetaLeaderboard", () => {
       />,
     );
 
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "1 more platform has published results but nothing ranked — Show them",
+      }),
+    );
     const cell = screen.getByRole("gridcell", {
       name: /Polars has published evidence for TPC-H SF0\.1, but it is excluded: Trust policy excludes this result from ranking\./,
     });
-    expect(cell.textContent).toContain("Excluded");
-    expect(cell.textContent).toContain("Trust policy excludes this result from ranking.");
+    expect(cell.textContent).toBe("Excluded");
+    expect(cell.getAttribute("title")).toContain("Trust policy excludes this result from ranking.");
     expect(cell.textContent).not.toContain("No run");
     expect((cell.querySelector("a") as HTMLAnchorElement | null)?.getAttribute("href")).toBe(
       "/results/r/polars-tpch-r1#run-receipt",
     );
-    expect(cell.textContent).toContain("Community");
-    expect(cell.textContent).not.toContain("passed");
+    expect(cell.querySelector('[data-role="trust"]')).toBeNull();
     expect(cell.querySelector('[data-role="validation"]')).toBeNull();
   });
 
@@ -597,6 +658,71 @@ describe("MetaLeaderboard", () => {
     const passedCell = screen.getByRole("gridcell", { name: "SQLite times for ClickBench SF0.1: 20 ms" });
     expect(passedCell.querySelector('[data-role="validation"]')).toBeNull();
     expect(passedCell.textContent).toContain("Community");
+  });
+
+  it("explains an all-excluded ranking and preserves distinct exclusion reasons", () => {
+    const excludedPlatforms = [
+      {
+        platform_id: "polars",
+        platform: "Polars",
+        result_id: "polars-unranked",
+        rank: null,
+        metric_value: null,
+        speedup_vs_best: null,
+        primary_metric: "display_geomean_ms",
+        primary_order: "asc" as const,
+        ...META_TIMING_ELIGIBLE,
+        ranking_exclusion_reason: "trust_not_rankable",
+      },
+      {
+        platform_id: "sqlite",
+        platform: "SQLite",
+        result_id: "sqlite-unranked",
+        rank: null,
+        metric_value: null,
+        speedup_vs_best: null,
+        primary_metric: "display_geomean_ms",
+        primary_order: "asc" as const,
+        ...META_TIMING_ELIGIBLE,
+        ranking_exclusion_reason: "insufficient_query_coverage",
+      },
+    ];
+    const data: MetaLeaderboardData = {
+      ...DATA,
+      cohorts: [
+        {
+          ...DATA.cohorts[0]!,
+          platform_count: 0,
+          cohort_ranked_count: 0,
+          platforms: excludedPlatforms,
+        },
+      ],
+      platforms: excludedPlatforms.map((platform) => ({
+        platform_id: platform.platform_id,
+        platform: platform.platform,
+        ranks: {},
+        avg_rank: null,
+        n_cohorts: 0,
+      })),
+    };
+    render(<MetaLeaderboard data={data} mode="times" onModeChange={vi.fn()} />);
+
+    const state = screen.getByTestId("all-excluded-ranking-clickbench-sf0.1-power");
+    expect(state).toHaveTextContent("No ranked evidence");
+    expect(state).toHaveTextContent("Trust policy excludes this result from ranking.");
+    expect(state).toHaveTextContent("Result does not have enough valid query coverage.");
+    expect(state).toHaveTextContent("Open ranking for details.");
+    expect(screen.queryAllByRole("gridcell")).toHaveLength(0);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "2 more platforms have published results but nothing ranked — Show them",
+      }),
+    );
+    const cells = screen.getAllByRole("gridcell");
+    expect(cells).toHaveLength(2);
+    expect(cells[0]!.getAttribute("aria-label")).toContain("Trust policy excludes this result from ranking.");
+    expect(cells[1]!.getAttribute("aria-label")).toContain("Result does not have enough valid query coverage.");
   });
 
   it("recovers ranked cells from cohort evidence when the pivot map is stale", () => {

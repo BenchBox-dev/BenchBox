@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import { queryRows } from "@/db";
+import { EmptyState } from "@/components/EmptyState";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { FacetDrawer, FacetRail, type ActiveFacetChip, type FacetGroup } from "@/components/FacetRail";
 import { TableScrollHint } from "@/components/TableScrollHint";
@@ -703,6 +704,24 @@ export function Query(_: RoutableProps) {
                 message="Querying results.duckdb..."
                 columns={visibleColumns.length || DEFAULT_COLUMNS.length}
               />
+            ) : rows.length === 0 ? (
+              <div data-testid="query-empty-state">
+                <EmptyState
+                  title={activeFilterChips.length > 0 ? "No results match these filters" : "No published results"}
+                  description={
+                    activeFilterChips.length > 0
+                      ? `Narrowed by ${activeFilterChips.map((chip) => chip.label).join(", ")}. Clear the filters to widen the query.`
+                      : "The published corpus has no result bundles to show."
+                  }
+                  action={
+                    activeFilterChips.length > 0 ? (
+                      <button type="button" class="btn btn-secondary" onClick={resetQueryFilters}>
+                        Clear all filters
+                      </button>
+                    ) : undefined
+                  }
+                />
+              </div>
             ) : (
               <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
