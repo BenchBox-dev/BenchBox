@@ -57,6 +57,22 @@ The `textcharts-mcp` external visualization server is intentionally a separate-c
 | `_project` scripts, audits, and analysis artifacts | `repo-only` | maintainers | Contributor workflow and project governance aids; not user-facing API. | Repo workflow docs or TODO updates. | Script-specific tests where present. | `_project/` |
 | TODO, DONE, and ADR/future-state docs | `repo-only` | maintainers | Planning and decision records guide implementation but do not themselves create runtime API. | Move accepted decisions into user/developer docs when they become product contracts. | TODO validation and review. | `_project/TODO/`, `_project/DONE/`, `docs/design/future-state/` |
 
+### CLI compatibility note: deprecated `run-official` quiet-path contract
+
+The hidden deprecated `benchbox run-official` command remains inside the
+beta-public CLI surface as a compatibility shim. Its multi-stream throughput
+support still routes through `--streams`, but result-path discovery is no longer
+allowed to infer from filenames, globs, or mtimes.
+
+When `run-official` is invoked with `--quiet`, it reuses the same contract as
+`benchbox run --quiet`: after a successful export, the **final non-empty stdout
+line is the JSON result path**. UAT's official/throughput branch consumes that
+emitted path directly and must fail loudly if it is missing or invalid; callers
+must not reintroduce directory search as a fallback.
+
+Source of truth: `benchbox/cli/commands/run_official.py`, `tests/uat/runner.py`,
+and `tests/uat/throughput.py`.
+
 ## Support Status Taxonomy
 
 `support_status` is a product-support classification for platforms and

@@ -61,6 +61,7 @@ def _forward_requested_streams(streams: int | None) -> Iterator[None]:
 @click.option("--seed", type=int, help="Random seed for reproducible official runs")
 @click.option("--output", "output_dir", type=click.Path(), help="Output directory")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
+@click.option("-q", "--quiet", is_flag=True, help="Emit the exported result path on the final non-empty stdout line")
 @click.option("--validate-results", is_flag=True, help="Enable result validation")
 @click.pass_context
 def run_official(
@@ -74,6 +75,7 @@ def run_official(
     seed,
     output_dir,
     verbose,
+    quiet,
     validate_results,
 ):
     """Run TPC-compliant official benchmark tests. Deprecated; use `benchbox run --official`."""
@@ -84,7 +86,7 @@ def run_official(
         console.print(f"Allowed scale factors: {sorted(TPC_ALLOWED_SCALE_FACTORS)}")
         sys.exit(1)
 
-    if seed is None:
+    if seed is None and not quiet:
         console.print("[yellow]Warning: No seed specified. Official TPC runs require a random seed.[/yellow]")
         console.print("Use --seed <N> for reproducible results")
 
@@ -94,20 +96,21 @@ def run_official(
         console.print(f"[red]Error: {exc}[/red]")
         sys.exit(1)
 
-    console.print("[bold blue]TPC-Compliant Official Benchmark Run[/bold blue]")
-    for label, value in [
-        ("Benchmark", f"TPC-{benchmark.upper()}"),
-        ("Platform", platform),
-        ("Scale Factor", scale),
-        ("Phases", phases),
-        ("Streams", streams),
-        ("Seed", seed),
-    ]:
-        if value is not None:
-            console.print(f"{label}: {value}")
-    console.print("")
-    if streams:
-        console.print(f"[green]Concurrency: {streams} concurrent stream(s) will run the throughput phase[/green]")
+    if not quiet:
+        console.print("[bold blue]TPC-Compliant Official Benchmark Run[/bold blue]")
+        for label, value in [
+            ("Benchmark", f"TPC-{benchmark.upper()}"),
+            ("Platform", platform),
+            ("Scale Factor", scale),
+            ("Phases", phases),
+            ("Streams", streams),
+            ("Seed", seed),
+        ]:
+            if value is not None:
+                console.print(f"{label}: {value}")
+        console.print("")
+        if streams:
+            console.print(f"[green]Concurrency: {streams} concurrent stream(s) will run the throughput phase[/green]")
 
     try:
         # Streams is now a first-class run parameter — forwarded as ``concurrency``
@@ -122,6 +125,7 @@ def run_official(
             seed=seed,
             output=output_dir,
             verbose=verbose,
+            quiet=quiet,
             validation=ValidationConfig.parse("full") if validate_results else None,
             platform_option_pairs=platform_option_pairs,
             concurrency=streams,
