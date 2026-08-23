@@ -633,6 +633,7 @@ databricks|liquid_clustering_columns|Comma-separated Databricks liquid clusterin
 bigquery|staging_root|GCS path for staging data (e.g., gs://bucket/path)|{}
 bigquery|storage_bucket|GCS bucket name for data staging (alternative to staging_root)|{}
 bigquery|storage_prefix|GCS path prefix within bucket for data staging|{}
+bigquery|biglake_connection|BigLake connection for external table modes, as project.region.name|{}
 trino|catalog|Trino catalog to use (e.g., hive, iceberg, memory). Auto-discovered if not specified.|{}
 trino|staging_root|Cloud storage path for staging data (e.g., s3://..., gs://..., abfss://...)|{}
 trino|table_format|Table format for creating tables (memory, hive, iceberg, delta)|{'default': 'memory'}

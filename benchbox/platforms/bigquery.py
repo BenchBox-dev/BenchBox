@@ -135,9 +135,8 @@ class BigQueryAdapter(PlatformAdapter):
             raise ConfigurationError(
                 "BigQuery configuration requires project_id.\n"
                 "Configure with one of:\n"
-                "  1. CLI: benchbox platforms setup --platform bigquery\n"
+                "  1. CLI: benchbox setup --platform bigquery\n"
                 "  2. Environment variable: BIGQUERY_PROJECT\n"
-                "  3. CLI option: --platform-option project_id=<your-project>\n"
                 "Also ensure Google Cloud credentials are configured:\n"
                 "  - Set GOOGLE_APPLICATION_CREDENTIALS to service account JSON path\n"
                 "  - Or run 'gcloud auth application-default login'"

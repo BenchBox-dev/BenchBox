@@ -16,6 +16,18 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 @pytest.mark.parametrize(
     ("relative_path", "forbidden_advice"),
     [
+        (
+            "benchbox/platforms/bigquery.py",
+            ("benchbox platforms setup --platform", "--platform-option project_id="),
+        ),
+        (
+            "benchbox/platforms/databricks/adapter.py",
+            (
+                "benchbox platforms setup --platform",
+                "--platform-option server_hostname=",
+                "--platform-option http_path=",
+            ),
+        ),
         ("benchbox/platforms/snowflake.py", ("benchbox platforms setup --platform", "--platform-option account=")),
         ("benchbox/platforms/redshift.py", ("benchbox platforms setup --platform", "--platform-option host=")),
         (
@@ -40,6 +52,7 @@ def test_connection_guidance_does_not_advertise_unregistered_platform_options(
 @pytest.mark.parametrize(
     ("platform", "option", "value"),
     [
+        ("bigquery", "biglake_connection", "my-project.us.my-connection"),
         ("fabric_dw", "warehouse", "example-warehouse"),
         ("clickhouse-cloud", "host", "example.us-east-2.aws.clickhouse.cloud"),
         ("clickhouse-server", "host", "my-clickhouse.example.com"),
