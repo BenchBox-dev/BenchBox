@@ -73,7 +73,7 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
       </header>
 
       {rows === null && error === null ? (
-        <LoadingSpinner message={`Loading ${kind} from results.duckdb...`} />
+        <LoadingSpinner message={`Loading ${kind}...`} />
       ) : error !== null ? (
         <ErrorMessage title={`Could not load ${kind}`} message={error} />
       ) : entries.length === 0 ? (
