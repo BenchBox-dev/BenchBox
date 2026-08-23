@@ -39,52 +39,28 @@ ADVERTISED = re.compile(r"--platform-option\s+([A-Za-z_][A-Za-z0-9_]*)\s*=")
 #: Generic prose placeholders, not real key names.
 PLACEHOLDERS = frozenset({"key", "K", "name", "value", "option"})
 
-#: The 15 advertised-but-rejected pairs still outstanding as of 2026-08-23.
-#: This list must only ever SHRINK. Each entry is a message that sends a user
-#: to a command the CLI refuses.
+#: Advertised-but-rejected pairs that are knowingly left unfixed. EMPTY, and
+#: it must only ever be re-populated with a recorded reason. Every pair the
+#: original audit found has been resolved, each according to what it is:
 #:
-#: The two BigQuery pairs that motivated this guard are already gone, each
-#: fixed the way its sensitivity calls for:
+#:   Non-secret configuration -- thirteen keys the adapters already read from
+#:   config but had never declared as option specs, so the advertised route
+#:   genuinely did not work. They are declared now, which makes the advice
+#:   true: athena aws_profile / s3_bucket / s3_staging_dir / staging_root,
+#:   motherduck database, pg-duckdb duckdb_db_path, redshift iam_role /
+#:   s3_bucket / staging_root, snowflake iceberg_external_volume /
+#:   staging_root, spark java_home, synapse staging_root.
 #:
-#:   bigquery.project_id -- a connection key, so the message now names
-#:   `benchbox setup --platform bigquery` and BIGQUERY_PROJECT, and no longer
-#:   advertises a `--platform-option` route.
+#:   Secret-bearing -- pg-duckdb motherduck_token, the one key that must never
+#:   be CLI-passable, because options land in shell history and in the process
+#:   list. The message now names MOTHERDUCK_TOKEN and says why.
 #:
-#:   bigquery.biglake_connection -- non-secret table configuration, now a real
-#:   option spec alongside its siblings staging_root / storage_bucket /
-#:   storage_prefix, which makes the advertised advice true. Deleting the
-#:   advice instead would have left external Delta mode with no documented
-#:   route at all.
-#:
-#: Resolving the rest needs a maintainer decision, split by sensitivity:
-#:
-#:   SECRET-BEARING -- must never become CLI-passable (shell history, process
-#:   listings). Fix by correcting the message to `benchbox setup` plus
-#:   environment variables:
-#:       pg-duckdb.motherduck_token, redshift.iam_role
-#:
-#:   NON-SECRET CONFIG -- safe to declare as real option specs, which would
-#:   make the advertised advice true:
-#:       everything else below.
-KNOWN_MISMATCHES: frozenset[tuple[str, str]] = frozenset(
-    {
-        ("athena", "aws_profile"),
-        ("athena", "s3_bucket"),
-        ("athena", "s3_staging_dir"),
-        ("athena", "staging_root"),
-        ("motherduck", "database"),
-        ("pg-duckdb", "duckdb_db_path"),
-        ("pg-duckdb", "motherduck_token"),
-        ("redshift", "iam_role"),
-        ("redshift", "s3_bucket"),
-        ("redshift", "staging_root"),
-        ("snowflake", "iceberg_external_volume"),
-        ("snowflake", "staging_root"),
-        ("spark", "java_home"),
-        ("synapse", "staging_root"),
-        ("velox", "jar"),
-    }
-)
+#: `redshift.iam_role` was classified secret-bearing in the first audit. That
+#: was wrong and is corrected here: it is a role ARN, an identifier, and it
+#: exists precisely so the caller does NOT pass aws_secret_access_key. The
+#: secrets in that adapter are the access-key pair and the session token, and
+#: none of them is advertised as an option.
+KNOWN_MISMATCHES: frozenset[tuple[str, str]] = frozenset()
 
 
 def _module_to_platform_key() -> dict[str, str]:
@@ -98,6 +74,22 @@ def _module_to_platform_key() -> dict[str, str]:
         except Exception:  # pragma: no cover - optional driver not installed
             pass
     return mapping
+
+
+def _accepted_option_names(platform: str) -> set[str]:
+    """Every spelling the CLI accepts for *platform*, aliases included.
+
+    `list_option_specs` returns primary names only. Checking against that
+    alone reported `velox.jar` as rejected when the velox spec has declared
+    `aliases=('jar',)` all along and `--platform-option jar=...` exits 0 -- a
+    false positive in this guard, not a defect in the adapter. A guard that
+    cries wolf gets its allowlist padded, which is exactly how the real
+    mismatches would come back.
+    """
+    names = set(PlatformHookRegistry.list_option_specs(platform))
+    for spec in PlatformHookRegistry._option_specs.get(platform, {}).values():
+        names.update(getattr(spec, "aliases", ()) or ())
+    return names
 
 
 def _owning_platform(module: str, module_to_key: dict[str, str]) -> str | None:
@@ -133,7 +125,7 @@ def _advertised_pairs() -> set[tuple[str, str]]:
         if platform is None:
             # Shared base/helper module with no single owning platform.
             continue
-        allowed = set(PlatformHookRegistry.list_option_specs(platform))
+        allowed = _accepted_option_names(platform)
         pairs |= {(platform, key) for key in keys if key not in allowed}
     return pairs
 

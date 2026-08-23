@@ -697,6 +697,7 @@ pg-duckdb|max_parallel_workers_per_gather|PostgreSQL max_parallel_workers_per_ga
 pg-duckdb|force_execution|Force DuckDB execution engine for all queries|{'parser': 'parse_bool', 'default': True}
 pg-duckdb|postgres_scan_threads|Threads for parallel PostgreSQL table scanning (0 = auto)|{'parser': 'int', 'default': 0}
 pg-duckdb|compare_native|Run native DuckDB comparison for matched queries|{'parser': 'parse_bool', 'default': False}
+pg-duckdb|duckdb_db_path|Path to the DuckDB database file pg_duckdb attaches|{}
 ducklake|metadata_path|DuckLake catalog metadata file path (.ducklake)|{}
 ducklake|data_path|DuckLake Parquet data directory (local path or s3:// URI)|{}
 ducklake|deployment_mode|DuckLake deployment mode: local, local_catalog_s3, postgres_catalog, or postgres_catalog_s3|{'choices': ('local', 'local_catalog_s3', 'postgres_catalog', 'postgres_catalog_s3')}
@@ -746,6 +747,7 @@ synapse|storage_account|Azure storage account for data staging|{}
 synapse|container|Azure blob container name|{}
 synapse|storage_sas_token|SAS token for Azure storage access|{}
 synapse|resource_class|Workload resource class (e.g., staticrc20, staticrc30)|{'default': 'staticrc20'}
+synapse|staging_root|Azure staging path, including the storage account (e.g., abfss://container@account.dfs.core.windows.net/path)|{}
 fabric_dw|server|Fabric warehouse endpoint (e.g., workspace-guid.datawarehouse.fabric.microsoft.com)|{}
 fabric_dw|workspace|Fabric workspace name or GUID|{}
 fabric_dw|warehouse|Fabric warehouse name|{}
@@ -823,6 +825,17 @@ sqlite|database_path|Path to the SQLite database file (auto-generated from --ben
 sqlite|timeout|SQLite connection timeout in seconds|{'parser': 'float', 'default': '30.0'}
 sqlite|check_same_thread|Enforce that connections are used on the creating thread only|{'parser': 'parse_bool', 'default': 'false'}
 spark|adaptive_enabled|Enable or disable Spark Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
+spark|java_home|Path to the JDK Spark should run under|{}
+athena|aws_profile|Named AWS CLI profile to authenticate with|{}
+athena|s3_bucket|S3 bucket for query results and data staging|{}
+athena|s3_staging_dir|S3 URI Athena writes query results to (e.g., s3://bucket/path)|{}
+athena|staging_root|S3 path for staging data (alternative to s3_bucket)|{}
+motherduck|database|MotherDuck database name|{}
+redshift|iam_role|IAM role ARN Redshift COPY assumes to read from S3|{}
+redshift|s3_bucket|S3 bucket for data staging|{}
+redshift|staging_root|S3 path for staging data (e.g., s3://bucket/path)|{}
+snowflake|staging_root|Cloud storage path for staging data|{}
+snowflake|iceberg_external_volume|Snowflake EXTERNAL VOLUME name for Iceberg tables|{}
 velox|deployment|Deployment mode: 'local' (in-process SparkSession, Linux only) or 'remote' (Spark-Connect server)|{'choices': ('local', 'remote'), 'default': 'local'}
 velox|endpoint|Spark-Connect endpoint for remote mode (e.g., sc://localhost:50051)|{'default': 'sc://localhost:50051'}
 velox|gluten_jar_path|Absolute path to the Gluten Velox bundle jar (required for local mode)|{'aliases': ('jar',)}
