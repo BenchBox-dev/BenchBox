@@ -16,7 +16,7 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   return (
-    <div class="flex min-h-screen flex-col">
+    <div class="bb-app-shell flex min-h-screen flex-col" data-testid="app-shell">
       <Header />
       <main class="flex-1">{children}</main>
       <Footer />
