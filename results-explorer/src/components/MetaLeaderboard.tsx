@@ -80,6 +80,7 @@ export function MetaLeaderboard({
 }: MetaLeaderboardProps) {
   const { cohorts = [], platforms = [] } = data ?? {};
   const gridRef = useRef<HTMLTableElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [focusPos, setFocusPos] = useState({ row: 0, col: 0 });
   const [announcement, setAnnouncement] = useState("");
   const [sortKey, setSortKey] = useState<MetaLeaderboardSort>("avg_rank");
@@ -287,12 +288,13 @@ export function MetaLeaderboard({
 
       <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
         <TableScrollHint
+          scrollerRef={scrollContainerRef}
           testId="meta-leaderboard-scroll-hint"
           label="Scroll table for more rankings →"
           wrapperClassName="flex justify-end"
           className="m-2"
         />
-        <div class="overflow-x-auto" data-testid="meta-leaderboard-scroll-container">
+        <div ref={scrollContainerRef} class="overflow-x-auto" data-testid="meta-leaderboard-scroll-container">
           <table
             ref={gridRef}
             role="grid"

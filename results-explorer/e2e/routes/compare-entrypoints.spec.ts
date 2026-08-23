@@ -103,7 +103,7 @@ test.describe("compare entrypoint happy paths", () => {
     await page.goto("/results/compare");
     await waitForShell(page);
     await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText("You never need to edit the URL.")).toBeVisible();
+    await expect(page.getByText(/Your first choice sets the benchmark, scale, and phase/)).toBeVisible();
 
     const filters = page.getByRole("region", { name: "Filters" });
     await filters.getByLabel("Benchmark").selectOption("tpch");

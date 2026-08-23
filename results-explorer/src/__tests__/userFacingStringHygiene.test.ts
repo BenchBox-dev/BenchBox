@@ -21,10 +21,25 @@ const FORBIDDEN_PATTERNS: ReadonlyArray<{ pattern: RegExp; label: string }> = [
   { pattern: /_project\//, label: "_project/" },
   { pattern: /\bAGENTS\.md\b/, label: "AGENTS.md" },
   { pattern: /\bCLAUDE\.md\b/, label: "CLAUDE.md" },
+  { pattern: /\bresults\.duckdb\b/i, label: "results.duckdb" },
+  { pattern: /\blegacy slug\b/i, label: "legacy slug" },
+  { pattern: /\bedit the URL\b/i, label: "edit the URL" },
 ];
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const srcRoot = resolve(here, "..");
+
+const ALLOWED_INTERNAL_FRAGMENTS = new Map<string, ReadonlySet<string>>([
+  [
+    "db.ts",
+    new Set([
+      '"/results/data/results.duckdb"',
+      '"results.duckdb"',
+      '"ATTACH \'results.duckdb\' AS bench (READ_ONLY)"',
+    ]),
+  ],
+  ["lib/duckdbQueries.ts", new Set(['"/results/data/results.duckdb"'])],
+]);
 
 interface Finding {
   file: string;
@@ -37,6 +52,7 @@ function scanSource(file: string, source: string, scriptKind: ts.ScriptKind): Fi
   const findings: Finding[] = [];
 
   function scanFragment(fragment: string): void {
+    if (ALLOWED_INTERNAL_FRAGMENTS.get(file)?.has(fragment)) return;
     for (const { pattern, label } of FORBIDDEN_PATTERNS) {
       if (pattern.test(fragment)) {
         findings.push({
@@ -114,6 +130,7 @@ describe("user-facing string hygiene", () => {
       "// internal note: _project/bar.md (this is a comment, allowed)",
       "<p>See AGENTS.md</p>",
       "{/* JSX maintainer note: CLAUDE.md (this is a comment, allowed) */}",
+      '<p>Inspect results.duckdb, the legacy slug, or edit the URL.</p>',
       'const ok = "ask a maintainer to rebuild the Explorer data";',
     ].join("\n");
     const findings = scanSource("synthetic.tsx", sample, ts.ScriptKind.TSX);
@@ -127,6 +144,21 @@ describe("user-facing string hygiene", () => {
         file: "synthetic.tsx",
         fragment: "See AGENTS.md",
         pattern: "AGENTS.md",
+      },
+      {
+        file: "synthetic.tsx",
+        fragment: "Inspect results.duckdb, the legacy slug, or edit the URL.",
+        pattern: "results.duckdb",
+      },
+      {
+        file: "synthetic.tsx",
+        fragment: "Inspect results.duckdb, the legacy slug, or edit the URL.",
+        pattern: "legacy slug",
+      },
+      {
+        file: "synthetic.tsx",
+        fragment: "Inspect results.duckdb, the legacy slug, or edit the URL.",
+        pattern: "edit the URL",
       },
     ]);
   });

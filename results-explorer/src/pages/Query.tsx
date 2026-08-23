@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import { queryRows } from "@/db";
 import { EmptyState } from "@/components/EmptyState";
@@ -91,6 +91,8 @@ const COMPARE_METADATA_COLUMNS = [
 
 export function Query(_: RoutableProps) {
   useDocumentTitle("Query · BenchBox Results");
+  const resultsScrollerRef = useRef<HTMLDivElement>(null);
+  const sqlScrollerRef = useRef<HTMLDivElement>(null);
   const [benchmarks, setBenchmarks] = useFacetField("benchmark");
   const [platforms, setPlatforms] = useFacetField("platform");
   const [scaleFactors, setScaleFactors] = useFacetField("scale_factor");
@@ -252,8 +254,6 @@ export function Query(_: RoutableProps) {
     return [...compareRowPartition.compatible, ...compareRowPartition.incompatible];
   }, [compareCohortSignature, compareCompatibleOnly, compareRowPartition, rows]);
   const visibleRows = reorderedRows;
-  const displayedResultTotal = reorderedRows.length;
-  const displayedResultLabel = compareIncompatibleHiddenCount > 0 ? "displayed rows" : "returned rows";
   const visibleSqlRows = sqlRows.slice(0, visibleSqlLimit);
 
   useEffect(() => {
@@ -688,8 +688,8 @@ export function Query(_: RoutableProps) {
       <div class="mb-6">
         <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">Results Query Workbench</h1>
         <p class="mt-2 max-w-3xl text-sm text-[var(--bb-data-fg-muted)]">
-          Query the <code class="rounded bg-[var(--bb-surface-app)] px-1 font-mono text-xs">results.duckdb</code> snapshot in-browser
-          with shareable facet state, schema-driven columns, CSV export, and an optional read-only SQL scratchpad.
+          Explore published benchmark runs with shareable filters, configurable columns, CSV and JSON exports, and an optional
+          read-only SQL workspace.
         </p>
       </div>
 
@@ -700,10 +700,11 @@ export function Query(_: RoutableProps) {
             class="order-1 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm"
           >
             <div class="text-sm text-[var(--bb-data-fg-muted)]">
-              {resultTotal.toLocaleString()} matching result bundle(s)
+              Showing {pageStart.toLocaleString()}–{pageEnd.toLocaleString()} of {resultTotal.toLocaleString()} matching result{" "}
+              {resultTotal === 1 ? "bundle" : "bundles"}
               {rowLimitMode === "default" && resultTotal >= DEFAULT_ROW_LIMIT && (
                 <span class="ml-2 text-xs text-[var(--bb-tone-warning-fg)]">
-                  (capped at {DEFAULT_ROW_LIMIT.toLocaleString()} - add more filters to narrow)
+                  The query reached the {DEFAULT_ROW_LIMIT.toLocaleString()}-result cap; add filters to narrow the set.
                 </span>
               )}
             </div>
@@ -768,7 +769,7 @@ export function Query(_: RoutableProps) {
           <div data-testid="query-results-panel" class="order-3">
             {loading ? (
               <QueryRowsSkeleton
-                message="Querying results.duckdb..."
+                message="Loading matching results..."
                 columns={visibleColumns.length || DEFAULT_COLUMNS.length}
               />
             ) : resultTotal === 0 ? (
@@ -795,17 +796,12 @@ export function Query(_: RoutableProps) {
               </div>
             ) : (
               <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
-                  <span>
-                    Showing {pageStart.toLocaleString()}–{pageEnd.toLocaleString()} of {resultTotal.toLocaleString()} filtered rows
-                    {compareIncompatibleHiddenCount > 0 &&
-                      ` (${displayedResultTotal.toLocaleString()} ${displayedResultLabel} on this page)`}
-                  </span>
-                  <span>
-                    Page {currentPage.toLocaleString()} of {pageCount.toLocaleString()} · Query limit:{" "}
-                    {rowLimitMode === "all" ? "all" : DEFAULT_ROW_LIMIT.toLocaleString()}
-                  </span>
-                  <TableScrollHint testId="query-results-scroll-hint" wrapperClassName={null} />
+                <div class="flex flex-wrap items-center justify-end gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
+                  <TableScrollHint
+                    scrollerRef={resultsScrollerRef}
+                    testId="query-results-scroll-hint"
+                    wrapperClassName={null}
+                  />
                 </div>
                 {(() => {
                   const lockReason = (row: ResultRow): string | undefined => {
@@ -910,7 +906,11 @@ export function Query(_: RoutableProps) {
                           </div>
                         </section>
                       )}
-                      <div class="overflow-x-auto">
+                      <div
+                        ref={resultsScrollerRef}
+                        class="overflow-x-auto"
+                        data-testid="query-results-scroll-container"
+                      >
                         <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                           <thead class="bg-[var(--bb-surface-data-muted)]">
                             <tr>
@@ -1061,9 +1061,13 @@ export function Query(_: RoutableProps) {
                 <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)]">
                   <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
                     <span>Showing {visibleSqlRows.length.toLocaleString()} of {sqlRows.length.toLocaleString()} SQL rows</span>
-                    <TableScrollHint testId="query-sql-scroll-hint" wrapperClassName={null} />
+                    <TableScrollHint
+                      scrollerRef={sqlScrollerRef}
+                      testId="query-sql-scroll-hint"
+                      wrapperClassName={null}
+                    />
                   </div>
-                  <div class="overflow-x-auto">
+                  <div ref={sqlScrollerRef} class="overflow-x-auto">
                     <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                       <thead class="bg-[var(--bb-surface-data-muted)]">
                         <tr>

@@ -404,16 +404,17 @@ describe("Query", () => {
 
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB compatible").length).toBeGreaterThan(0));
-    expect(screen.getByText("Showing 1–24 of 61 filtered rows")).toBeTruthy();
+    expect(screen.getByText("Showing 1–24 of 61 matching result bundles")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("query-compare-checkbox-r1"));
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
 
-    await waitFor(() => expect(screen.getByText("Showing 25–48 of 61 filtered rows")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Showing 25–48 of 61 matching result bundles")).toBeTruthy());
     expect(screen.getByTestId("query-compare-tray").textContent).toContain("1 result selected");
     expect(new URL(window.location.href).searchParams.get("page")).toBe("2");
     const latestSelect = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql)).at(-1);
     expect(latestSelect?.[0]).toContain("LIMIT 24 OFFSET 24");
+    expect(screen.queryByRole("button", { name: "Show more results" })).toBeNull();
   });
 
   it("query workbench checkbox aria-labels disambiguate same-platform rows", async () => {
@@ -599,7 +600,7 @@ describe("Query", () => {
 
     const mobileDrawer = screen.getByTestId("query-mobile-filter-drawer");
     expect(within(mobileDrawer).getAllByText("Benchmark: SSB").length).toBeGreaterThan(0);
-    expect(within(mobileDrawer).getAllByText("Benchmark: SSB (legacy slug)").length).toBeGreaterThan(0);
+    expect(within(mobileDrawer).getAllByText("Benchmark: SSB (historical source)").length).toBeGreaterThan(0);
     expect(within(mobileDrawer).getAllByText("Trust: maintainer run").length).toBeGreaterThan(0);
     expect(within(mobileDrawer).getAllByText("Cost status: not applicable (local)").length).toBeGreaterThan(0);
     expect(within(mobileDrawer).queryByText("Trust: maintainer-run")).toBeNull();
@@ -801,8 +802,8 @@ describe("Query", () => {
       );
       expect(countCalls.at(-1)?.[0]).toContain(`LEAST(COUNT(*), ${UNLIMITED_ROW_LIMIT})`);
     });
-    expect(screen.getByText("Showing 1–2 of 2 filtered rows")).toBeTruthy();
-    expect(screen.getByText(/Query limit: all/)).toBeTruthy();
+    expect(screen.getByText("Showing 1–2 of 2 matching result bundles")).toBeTruthy();
+    expect(screen.queryByText(/Query limit:/)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /^Default$/ }));
 
@@ -824,7 +825,7 @@ describe("Query", () => {
       target: { value: "3.49" },
     });
 
-    await waitFor(() => expect(screen.getByText("1 matching result bundle(s)")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Showing 1–1 of 1 matching result bundle")).toBeTruthy());
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("query-compare-checkbox-public-duckdb-1")).toBeNull();
     expect(new URL(window.location.href).searchParams.get("q")).toBe("3.49");
