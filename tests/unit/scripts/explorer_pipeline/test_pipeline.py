@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 import logging
 from pathlib import Path
@@ -766,8 +767,14 @@ class TestExplorerPipelineRun:
         assert trust_by_platform["duckdb"] == "maintainer-run"
         assert trust_by_platform["sqlite"] == COMMUNITY_TRUST_LABEL
 
-    def test_sidecar_detection_emits_debug_log(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-        """Logger.debug fires when a submission-manifest.json sidecar is detected."""
+    def test_sidecar_without_recorded_source_fails_safe_to_community(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A sidecar recording no result_source has unknown provenance.
+
+        Unknown provenance takes the less-trusted label; it is never promoted
+        by assumption.
+        """
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         (bundles_dir / "result.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
@@ -777,7 +784,56 @@ class TestExplorerPipelineRun:
         with caplog.at_level(logging.DEBUG, logger="_project.scripts.explorer_pipeline.pipeline"):
             ExplorerPipeline().run(tmp_path / "data", output, trust_label="maintainer-run")
 
-        assert any("Found submission manifest" in rec.message for rec in caplog.records)
+        assert any("community-submission" in rec.message for rec in caplog.records)
+
+    @pytest.mark.parametrize(
+        ("result_source", "expected"),
+        [
+            ("internal", "maintainer-run"),
+            ("community", "community-submission"),
+            ("vendor", "vendor-supplied"),
+        ],
+    )
+    def test_recorded_result_source_decides_the_trust_label(
+        self, tmp_path: Path, result_source: str, expected: str
+    ) -> None:
+        """The sidecar's recorded source is authoritative, not its mere existence.
+
+        `benchbox submit` writes a sidecar unconditionally, including for a
+        maintainer run. Treating presence alone as proof of community
+        provenance labelled 191 of 207 maintainer-generated bundles
+        `community-submission`, and because those are not ranking-eligible the
+        public leaderboard rendered 15 of 207 results.
+        """
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        (bundles_dir / "result.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+        (bundles_dir / "result.manifest.json").write_text(
+            json.dumps({"result_source": result_source}), encoding="utf-8"
+        )
+
+        pipeline_module = importlib.import_module("_project.scripts.explorer_pipeline.pipeline")
+        assert pipeline_module._manifest_trust_label(bundles_dir / "result.json", "maintainer-run") == expected
+
+    def test_no_sidecar_means_maintainer_committed(self, tmp_path: Path) -> None:
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        (bundles_dir / "result.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+
+        pipeline_module = importlib.import_module("_project.scripts.explorer_pipeline.pipeline")
+        assert pipeline_module._manifest_trust_label(bundles_dir / "result.json", "maintainer-run") == "maintainer-run"
+
+    def test_unreadable_sidecar_fails_safe_to_community(self, tmp_path: Path) -> None:
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        (bundles_dir / "result.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+        (bundles_dir / "result.manifest.json").write_text("{not json", encoding="utf-8")
+
+        pipeline_module = importlib.import_module("_project.scripts.explorer_pipeline.pipeline")
+        assert (
+            pipeline_module._manifest_trust_label(bundles_dir / "result.json", "maintainer-run")
+            == "community-submission"
+        )
 
     def test_sidecar_in_root_bundles_dir_overrides_all_flat_bundles(self, tmp_path: Path) -> None:
         """A sidecar in the top-level bundles/ dir affects all bundles in that directory.
