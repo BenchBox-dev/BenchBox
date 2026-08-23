@@ -18,6 +18,7 @@ from rich.prompt import Confirm, InvalidResponse, Prompt
 from rich.table import Table
 from rich.text import Text
 
+from benchbox.cli.commands.setup import SUPPORTED_SETUP_PLATFORMS
 from benchbox.cli.platform_readiness import (
     PlatformReadinessResult,
     check_platform_readiness,
@@ -999,8 +1000,37 @@ def check_platforms(platforms_to_check: tuple, enabled_only: bool):
 
 @platforms.command("setup")
 @click.option("--interactive/--non-interactive", default=True, help="Interactive setup mode")
-def setup_platforms(interactive: bool):
-    """Interactive platform setup wizard."""
+@click.option(
+    "--platform",
+    "credential_platform",
+    type=click.Choice(SUPPORTED_SETUP_PLATFORMS, case_sensitive=False),
+    help="Configure credentials for one cloud platform (delegates to `benchbox setup`)",
+)
+@click.pass_context
+def setup_platforms(ctx: click.Context, interactive: bool, credential_platform: str | None):
+    """Enable and install local platform adapters, interactively.
+
+    This is about which adapters are available on this machine. For cloud
+    CREDENTIALS -- Databricks, Snowflake, BigQuery, Redshift, Athena,
+    MotherDuck, SingleStore -- use `benchbox setup --platform <name>`.
+
+    The two commands are both spelled "setup", and adapter error messages have
+    repeatedly sent users to `benchbox platforms setup --platform <name>`,
+    which had no such option and exited 2. Rather than leave that a dead end,
+    `--platform` here delegates to `benchbox setup`, which is what the user
+    meant. `benchbox setup` rejects a non-cloud platform with its own list.
+    """
+    if credential_platform is not None:
+        # The Choice above is load-bearing: ctx.invoke skips Click's parameter
+        # processing, so without it an unknown name reached the credential
+        # wizard unvalidated and produced a confident "Nonesuch Credentials
+        # Setup" panel that exited 0. Validating here keeps the delegation
+        # honest and rejects a non-cloud platform with the real list.
+        from benchbox.cli.commands.setup import setup_credentials
+
+        ctx.invoke(setup_credentials, platform=credential_platform)
+        return
+
     manager = get_platform_manager()
     platforms_info = manager.detect_platforms()
 

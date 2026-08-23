@@ -113,3 +113,43 @@ def test_advertised_connection_options_are_accepted_by_the_cli(
     )
 
     assert result.exit_code == 0, result.output
+
+
+def test_platforms_setup_platform_delegates_to_the_credential_wizard() -> None:
+    """`benchbox platforms setup --platform X` must not be a dead end.
+
+    Two commands are spelled "setup": `benchbox setup` configures cloud
+    credentials, `benchbox platforms setup` enables local adapters. Adapter
+    error messages repeatedly sent users to
+    `benchbox platforms setup --platform <name>`, which had no such option and
+    exited 2 with "No such option". Rather than leave years of advice broken,
+    the option exists and delegates.
+    """
+    result = CliRunner().invoke(cli, ["platforms", "setup", "--platform", "snowflake"])
+
+    assert "No such option" not in result.output
+    # It reached the credential wizard, which reports the missing driver.
+    assert "snowflake" in result.output.lower()
+
+
+def test_platforms_setup_platform_rejects_a_non_credential_platform() -> None:
+    """The delegation must stay validated.
+
+    `ctx.invoke` skips Click's parameter processing, so without an explicit
+    Choice an unknown name reached the credential wizard unvalidated and
+    produced a confident "Nonesuch Credentials Setup" panel that exited 0.
+    """
+    result = CliRunner().invoke(cli, ["platforms", "setup", "--platform", "duckdb"])
+
+    assert result.exit_code != 0
+    assert "is not one of" in result.output
+    assert "Credentials Setup" not in result.output
+
+
+def test_the_two_setup_commands_point_at_each_other() -> None:
+    """Whichever one a user lands on should name the other."""
+    credentials = CliRunner().invoke(cli, ["setup", "--help"]).output
+    adapters = CliRunner().invoke(cli, ["platforms", "setup", "--help"]).output
+
+    assert "platforms setup" in credentials
+    assert "benchbox setup" in adapters

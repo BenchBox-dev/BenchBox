@@ -57,6 +57,11 @@ def setup_credentials(ctx, platform, validate_only, list_platforms_flag, show_st
     secure local credential storage; MotherDuck validates MOTHERDUCK_TOKEN
     without storing the token.
 
+    This is about CREDENTIALS. `benchbox platforms setup` is a different
+    command that enables and installs local platform adapters. The two share
+    the word "setup"; this is the one for cloud authentication, and
+    `benchbox platforms setup --platform <name>` delegates here.
+
     \b
     Examples:
         benchbox setup --platform databricks    # Interactive Databricks setup
