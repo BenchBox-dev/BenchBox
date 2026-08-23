@@ -67,9 +67,14 @@ class TestLayering:
 
 class TestResolveRunConfig:
     def test_a_path_object_is_stringified(self):
-        run_config = resolve_run_config(_config(), database_path=Path("/tmp/db.duckdb"), verbosity=SilentVerbosity())
+        # The property under test is "a Path becomes a str", not the separator
+        # the host OS uses. Hardcoding the POSIX spelling failed on Windows,
+        # where str(Path("/tmp/db.duckdb")) is "\\tmp\\db.duckdb" and the
+        # behaviour is correct.
+        database_path = Path("/tmp/db.duckdb")
+        run_config = resolve_run_config(_config(), database_path=database_path, verbosity=SilentVerbosity())
 
-        assert run_config.connection["database_path"] == "/tmp/db.duckdb"
+        assert run_config.connection["database_path"] == str(database_path)
         assert isinstance(run_config.connection["database_path"], str)
 
     def test_defaults_match_the_core_constants(self):

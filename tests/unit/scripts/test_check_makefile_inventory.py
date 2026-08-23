@@ -151,6 +151,10 @@ def test_reserved_include_root_rejects_cli_and_environment_override(
     assert "/definitely/missing" not in result.stderr
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="creating a symlink on Windows requires elevation or developer mode",
+)
 def test_absolute_symlink_makefile_preserves_module_resolution(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
