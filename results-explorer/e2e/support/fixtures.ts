@@ -42,7 +42,8 @@ export type FixtureRole =
   | "duckdbTuned"
   | "gcpServerless"
   | "polars"
-  | "starSchema";
+  | "starSchema"
+  | "zeroTiming";
 
 type FixtureIds = {
   ids: Record<FixtureRole, string>;

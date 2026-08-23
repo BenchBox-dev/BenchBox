@@ -19,7 +19,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readExplorerBuildContract } from "./explorer-build-contract.mjs";
@@ -30,11 +30,24 @@ const repoRoot = resolve(projectRoot, "..");
 
 const sourceRoot = join(projectRoot, "test-fixtures", "source");
 const sourceBundlesDir = join(sourceRoot, "bundles");
-const genRoot = join(projectRoot, "test-fixtures", ".generated");
+const customGenRoot = process.env.E2E_FIXTURE_OUTPUT_ROOT;
+const genRoot = resolve(customGenRoot ?? join(projectRoot, "test-fixtures", ".generated"));
+if (customGenRoot && !basename(genRoot).startsWith("benchbox-large-browser-fixture-")) {
+  throw new Error(
+    "E2E_FIXTURE_OUTPUT_ROOT must name a dedicated benchbox-large-browser-fixture-* temporary directory",
+  );
+}
 const genSourceRoot = join(genRoot, "source");
 const genBundlesDir = join(genSourceRoot, "bundles");
 const genDataDir = join(genRoot, "data");
 
+const FIXTURE_PROFILE = process.env.E2E_FIXTURE_PROFILE ?? "default";
+const LARGE_CORPUS_ADDITIONAL_RESULTS = 280;
+const LARGE_CORPUS_RUN_ID_PREFIX = "9c0925d1-large-corpus-";
+
+if (!new Set(["default", "large"]).has(FIXTURE_PROFILE)) {
+  throw new Error(`unsupported E2E_FIXTURE_PROFILE=${FIXTURE_PROFILE}; expected default or large`);
+}
 
 const assertExplorerBuildContract = () => {
   const contract = readExplorerBuildContract();
@@ -154,6 +167,46 @@ const VARIANTS = [
       if (mutated.run) {
         mutated.run.id = `${mutated.run.id ?? "run"}-partial-query`;
       }
+      return mutated;
+    },
+  },
+  {
+    // Synthetic zero-timing result for ResultDetail's empty-state contract.
+    // This additive browser-only variant never changes the checked-in source
+    // corpus or public results. A distinct platform name keeps it out of
+    // exact-row-count assertions for the canonical DuckDB platform.
+    source: "tpch-duckdb-sf0.01-20260403-7fe93365.json",
+    subdir: "zero-timing",
+    derived: "tpch-fixture-zero-timing-sf0.01-20260403.json",
+    mutate: (bundle) => {
+      const mutated = structuredClone(bundle);
+      mutated.run = {
+        ...(mutated.run ?? {}),
+        id: `${mutated.run?.id ?? "run"}-zero-timing`,
+        query_time_ms: 0,
+      };
+      mutated.platform = {
+        ...(mutated.platform ?? {}),
+        name: "DuckDB Zero Timing",
+      };
+      mutated.queries = [];
+      mutated.summary = {
+        ...(mutated.summary ?? {}),
+        queries: { total: 0, passed: 0, failed: 0 },
+        timing: {
+          total_ms: 0,
+          avg_ms: 0,
+          min_ms: 0,
+          max_ms: 0,
+          geometric_mean_ms: null,
+          stdev_ms: 0,
+          p90_ms: 0,
+          p95_ms: 0,
+          p99_ms: 0,
+        },
+      };
+      delete mutated.summary.tpc_metrics;
+      delete mutated.environment;
       return mutated;
     },
   },
@@ -487,6 +540,32 @@ const writeVariants = () => {
   }
 };
 
+const writeLargeCorpusVariants = () => {
+  if (FIXTURE_PROFILE !== "large") return;
+
+  const sourceName = "tpch-duckdb-sf0.01-20260403-7fe93365.json";
+  const source = JSON.parse(readFileSync(join(sourceBundlesDir, sourceName), "utf8"));
+  const targetDir = join(genBundlesDir, "large-corpus");
+  mkdirSync(targetDir, { recursive: true });
+  for (let index = 1; index <= LARGE_CORPUS_ADDITIONAL_RESULTS; index += 1) {
+    const suffix = String(index).padStart(3, "0");
+    const mutated = withNormalizedEnvironment(structuredClone(source));
+    mutated.run = {
+      ...(mutated.run ?? {}),
+      id: `${LARGE_CORPUS_RUN_ID_PREFIX}${suffix}`,
+    };
+    mutated.platform = {
+      ...(mutated.platform ?? {}),
+      name: `Fixture Large Corpus ${suffix}`,
+    };
+    writeFileSync(
+      join(targetDir, `tpch-large-corpus-${suffix}.json`),
+      JSON.stringify(mutated, null, 2),
+    );
+  }
+  log(`wrote ${LARGE_CORPUS_ADDITIONAL_RESULTS} opt-in large-corpus bundle(s)`);
+};
+
 const runPipeline = (contract) => {
   const args = [...contract.commandArgs, "--data-dir", genSourceRoot, "--output", genDataDir];
   log(`${args.join(" ")} (cwd=${repoRoot})`);
@@ -524,6 +603,7 @@ const FIXTURE_ROLES = {
   "9c0925d1-env-aws-cloud": "awsCloud",
   "9c0925d1-env-container-local": "containerLocal",
   "9c0925d1-env-gcp-serverless": "gcpServerless",
+  "9c0925d1-zero-timing": "zeroTiming",
   c235e698: "datafusion",
   "c235e698-partial-query": "datafusionPartial",
   d4ec318a: "starSchema",
@@ -579,9 +659,13 @@ const writeFixtureIds = () => {
   const byRole = {};
   const unclaimed = [];
   for (const resultId of rows) {
-    const role = FIXTURE_ROLES[runIdOf(resultId)];
+    const runId = runIdOf(resultId);
+    const role = FIXTURE_ROLES[runId];
     if (!role) {
-      unclaimed.push(`${resultId} (run.id=${runIdOf(resultId)})`);
+      if (FIXTURE_PROFILE === "large" && String(runId).startsWith(LARGE_CORPUS_RUN_ID_PREFIX)) {
+        continue;
+      }
+      unclaimed.push(`${resultId} (run.id=${runId})`);
       continue;
     }
     if (byRole[role]) {
@@ -613,10 +697,12 @@ const writeFixtureIds = () => {
 const main = () => {
   log(`sourceRoot=${sourceRoot}`);
   log(`genRoot=${genRoot}`);
+  log(`profile=${FIXTURE_PROFILE}`);
   const contract = assertExplorerBuildContract();
   wipeGenerated();
   copySources();
   writeVariants();
+  writeLargeCorpusVariants();
   runPipeline(contract);
 
   // Sanity: pipeline must have produced at least the DuckDB snapshot.

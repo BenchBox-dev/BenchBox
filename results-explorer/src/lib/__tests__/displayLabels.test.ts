@@ -91,8 +91,8 @@ describe("formatEnumLabel", () => {
 });
 
 describe("formatBenchmarkLabel", () => {
-  it("marks the legacy star_schema slug while keeping ssb canonical", () => {
-    expect(formatBenchmarkLabel("star_schema")).toBe("SSB (legacy slug)");
+  it("marks the historical star_schema source while keeping ssb canonical", () => {
+    expect(formatBenchmarkLabel("star_schema")).toBe("SSB (historical source)");
     expect(formatBenchmarkLabel("ssb")).toBe("SSB");
     // The two slugs MUST yield distinguishable labels; that's the whole
     // point of this helper.

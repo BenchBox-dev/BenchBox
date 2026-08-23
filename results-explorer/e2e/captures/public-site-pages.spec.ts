@@ -30,6 +30,18 @@ const ROUTES = [
     heading: /v0\.3\.0/i,
   },
   { slug: "results", path: "/results/", heading: /results/i, ready: /Recent Results/i },
+  {
+    slug: "results-benchmarks",
+    path: "/results/benchmarks/",
+    heading: /Benchmarks/i,
+    ready: /published benchmark/i,
+  },
+  {
+    slug: "results-platforms",
+    path: "/results/platforms/",
+    heading: /Platforms/i,
+    ready: /published platform/i,
+  },
 ] as const;
 const MANIFEST = path.join(OUTPUT, "manifest.json");
 
@@ -117,13 +129,28 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
   if (process.env.PUBLIC_SITE_VISUAL_BASE_SHA) {
     expect(baseline.source_sha).toBe(process.env.PUBLIC_SITE_VISUAL_BASE_SHA);
   }
-  const { missing, unexpected, changed } = compareVisualManifests(
+  const comparison = compareVisualManifests(
     baseline as VisualManifest,
     manifest as VisualManifest,
+    {
+      approvedHeadSha: process.env.APPROVED_HEAD_SHA,
+      currentHeadSha: process.env.PR_HEAD_SHA,
+      reason: process.env.APPROVAL_REASON,
+    },
   );
+  const { missing, unexpected, changed } = comparison;
   expect(
     { missing, unexpected },
     "visual baseline route/viewport matrix must match exactly",
   ).toEqual({ missing: [], unexpected: [] });
   expect(changed, `visual baseline mismatch; changed captures: ${changed.join(", ")}`).toEqual([]);
+
+  if (comparison.approvalApplied) {
+    console.info(
+      "Exact-head visual approval accepted %d changed and %d unexpected capture(s). Reason: %s",
+      comparison.approvedChanged.length,
+      comparison.approvedUnexpected.length,
+      JSON.stringify(process.env.APPROVAL_REASON?.trim()),
+    );
+  }
 });

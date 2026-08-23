@@ -59,7 +59,8 @@ test.describe("compare entrypoint happy paths", () => {
     await waitForDataLoaded(page, /matching result bundle/);
 
     await facetCheckbox(page, "Benchmark", "TPC-H").check();
-    await expect(page.getByTestId("query-result-summary")).toContainText("10 matching result bundle");
+    // The additive zero-timing ResultDetail fixture is a TPC-H bundle too.
+    await expect(page.getByTestId("query-result-summary")).toContainText("11 matching result bundle");
     await expect(page.getByRole("button", { name: /Download CSV/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Download JSON/ })).toBeVisible();
 
@@ -102,7 +103,7 @@ test.describe("compare entrypoint happy paths", () => {
     await page.goto("/results/compare");
     await waitForShell(page);
     await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText("You never need to edit the URL.")).toBeVisible();
+    await expect(page.getByText(/Your first choice sets the benchmark, scale, and phase/)).toBeVisible();
 
     const filters = page.getByRole("region", { name: "Filters" });
     await filters.getByLabel("Benchmark").selectOption("tpch");

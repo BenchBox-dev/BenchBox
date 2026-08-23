@@ -73,6 +73,7 @@ LITERAL_RE = re.compile(
 ARBITRARY_COLOR_RE = re.compile(r"\b(?:" + "|".join(UTILITIES) + r")-\[(?:#[^\]]+|rgba?\([^\]]+\)|hsla?\([^\]]+\))\]")
 HEX_RE = re.compile(r"(?<![\w-])#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?\b")
 RGB_RE = re.compile(r"\brgba?\([^)]+\)")
+PAGE_LOCAL_SCROLL_HINT_RE = re.compile(r"data-testid=[\"'][^\"']*scroll-hint[^\"']*[\"']")
 
 ALLOW_MARKER_RE = re.compile(r"allow-explorer-token-literal:\s*\S")
 
@@ -106,6 +107,7 @@ def scan_file(path: Path) -> list[tuple[int, str, list[str]]]:
             *ARBITRARY_COLOR_RE.findall(line),
             *HEX_RE.findall(line),
             *RGB_RE.findall(line),
+            *PAGE_LOCAL_SCROLL_HINT_RE.findall(line),
         ]
         if not matches:
             continue

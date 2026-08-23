@@ -281,7 +281,7 @@ describe("Panel / DataCard", () => {
 describe("DataTable", () => {
   it("renders an accessible table with optional caption", () => {
     render(
-      <DataTable ariaLabel="Latency" caption="Latency by platform">
+      <DataTable ariaLabel="Latency" ariaColCount={2} caption="Latency by platform">
         <TableHead>
           <tr>
             <th>Platform</th>
@@ -298,6 +298,7 @@ describe("DataTable", () => {
     );
     const table = screen.getByRole("table", { name: "Latency" });
     expect(table.querySelector("caption")?.textContent).toContain("Latency by platform");
+    expect(table).toHaveAttribute("aria-colcount", "2");
     expect(screen.getByRole("cell", { name: "DuckDB" })).toBeTruthy();
   });
 
