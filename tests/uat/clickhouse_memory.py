@@ -131,6 +131,7 @@ DEFAULT_MEMORY_RUNGS: tuple[MemoryRung, ...] = (
     # memory failure into a false "larger rung" success.
     MemoryRung("baseline-1g", 1.0, 1.0, DEFAULT_DRIVER_TIMEOUT_S),
     MemoryRung("candidate-4g", 4.0, 4.0, DEFAULT_DRIVER_TIMEOUT_S),
+    MemoryRung("candidate-5.25g", 5.25, 5.25, DEFAULT_DRIVER_TIMEOUT_S),
     MemoryRung("candidate-8g", 8.0, 8.0, DEFAULT_DRIVER_TIMEOUT_S),
     MemoryRung("candidate-12g", 12.0, 12.0, DEFAULT_DRIVER_TIMEOUT_S),
 )
@@ -183,20 +184,39 @@ class ClickHouseMemoryTrace:
     samples: list[TraceSample] = field(default_factory=list)
 
     @property
+    def _calibration_samples(self) -> list[TraceSample]:
+        """Return samples after ClickHouse's startup warm-up becomes observable.
+
+        The collector starts before the child command, so early samples can
+        precede the first insert and legitimately lack cumulative event
+        counters. Those samples are not load evidence. Once all required
+        counters appear, later samples must remain complete; a telemetry gap
+        during the measured run still invalidates the trace.
+        """
+        first_complete = next(
+            (
+                index
+                for index, sample in enumerate(self.samples)
+                if _REQUIRED_CLICKHOUSE_METRICS.issubset(sample.clickhouse_metrics)
+            ),
+            None,
+        )
+        return [] if first_complete is None else self.samples[first_complete:]
+
+    @property
     def valid_for_calibration(self) -> bool:
         """Return whether the trace is admissible evidence for rung selection."""
-        if not self.samples or not self.native_streaming:
+        samples = self._calibration_samples
+        if not samples or not self.native_streaming:
             return False
         if self.application_batch_rows is not None:
             return False
         if not self.driver_timeout_source or self.driver_timeout_s != self.rung.driver_timeout_s:
             return False
-        if any(
-            sample.responsiveness_ms is None or not math.isfinite(sample.responsiveness_ms) for sample in self.samples
-        ):
+        if any(sample.responsiveness_ms is None or not math.isfinite(sample.responsiveness_ms) for sample in samples):
             return False
-        engine_samples = [sample.engine for sample in self.samples]
-        for sample in self.samples:
+        engine_samples = [sample.engine for sample in samples]
+        for sample in samples:
             if (
                 sample.host.available_gib is None
                 or not math.isfinite(sample.host.available_gib)
@@ -228,22 +248,30 @@ class ClickHouseMemoryTrace:
 
     @property
     def peak_engine_usage_bytes(self) -> int | None:
-        values = [sample.engine.usage_bytes for sample in self.samples if sample.engine.usage_bytes is not None]
+        values = [
+            sample.engine.usage_bytes for sample in self._calibration_samples if sample.engine.usage_bytes is not None
+        ]
         return max(values) if values else None
 
     @property
     def peak_host_available_gib(self) -> float | None:
-        values = [sample.host.available_gib for sample in self.samples if sample.host.available_gib is not None]
+        values = [
+            sample.host.available_gib for sample in self._calibration_samples if sample.host.available_gib is not None
+        ]
         return min(values) if values else None
 
     @property
     def max_responsiveness_ms(self) -> float | None:
-        values = [sample.responsiveness_ms for sample in self.samples if sample.responsiveness_ms is not None]
+        values = [
+            sample.responsiveness_ms for sample in self._calibration_samples if sample.responsiveness_ms is not None
+        ]
         return max(values) if values else None
 
     @property
     def runtime_memory_limit_bytes(self) -> int | None:
-        values = [sample.engine.limit_bytes for sample in self.samples if sample.engine.limit_bytes is not None]
+        values = [
+            sample.engine.limit_bytes for sample in self._calibration_samples if sample.engine.limit_bytes is not None
+        ]
         return max(values) if values else None
 
     @property
@@ -285,6 +313,7 @@ class ClickHouseMemoryTrace:
             "failure_reason": self.failure_reason,
             "summary": {
                 "sample_count": len(self.samples),
+                "calibration_sample_count": len(self._calibration_samples),
                 "valid_for_calibration": self.valid_for_calibration,
                 "peak_engine_usage_bytes": self.peak_engine_usage_bytes,
                 "runtime_memory_limit_bytes": self.runtime_memory_limit_bytes,

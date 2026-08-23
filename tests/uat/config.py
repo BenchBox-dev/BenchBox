@@ -117,9 +117,9 @@ class PreflightConfig:
     # Calibrated ClickHouse server compose request. This is resolved into
     # CLICKHOUSE_MEMORY_LIMIT for managed starts; it is not a 1 GiB fallback.
     # Operators may override it explicitly for a separately measured rung.
-    # SF1's 4 GiB trace failed with a ClickHouse memory-limit error; the
-    # lowest envelope justified for the certification path is 8 GiB.
-    clickhouse_memory_limit: str = "8g"
+    # SF1 passed at the exploratory 5.25 GiB rung for both TPC-H and the
+    # TPC-DS load path without cgroup/OOM evidence.
+    clickhouse_memory_limit: str = "5.25g"
     # Host memory kept available in addition to requested VM/container bytes.
     docker_memory_reserve_gib: float = 2.0
 
@@ -635,7 +635,7 @@ def _validate_preflight(payload: dict[str, Any] | None) -> PreflightConfig:
         clickhouse_memory_limit=_require_nonempty_string(
             payload,
             "clickhouse_memory_limit",
-            default="8g",
+            default="5.25g",
             section="preflight",
         ),
         docker_memory_reserve_gib=_require_nonnegative_float(
