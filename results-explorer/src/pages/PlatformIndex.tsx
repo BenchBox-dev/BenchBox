@@ -36,6 +36,7 @@ import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 import { TimeSeries } from "@/components/TimeSeries";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { DataTable } from "@/components/DataTable";
+import { CompareTray } from "@/components/CompareTray";
 import type { SortState } from "@/types";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
@@ -834,54 +835,27 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       {selected.size === 1 && <p class="mt-3 text-sm text-[var(--bb-data-fg-muted)]">Select at least one more result to compare.</p>}
 
       {compareUrl && (
-        <div class="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-lg">
-          <div class="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0 flex-1">
-              <div class="text-sm text-[var(--bb-data-fg-primary)]">
-                <strong>{formatCount(selected.size, "result")}</strong> selected for compare
-              </div>
-              <div
-                class="mt-2 flex max-h-32 flex-wrap gap-2 overflow-y-auto pr-1"
-                role="list"
-                aria-label="Selected compare results"
-              >
-                {selectedRows.map((row) => {
-                  return (
-                    <div
-                      key={row.result_id}
-                      data-testid={`compare-tray-row-${row.result_id}`}
-                      role="listitem"
-                      class="flex max-w-full flex-wrap items-center gap-1.5 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-2 py-1 text-xs text-[var(--bb-data-fg-muted)]"
-                    >
-                      <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
-                      <span>{humanizeBenchmark(row.benchmark)}</span>
-                      <span>SF {row.scale_factor}</span>
-                      <span>{row.phase}</span>
-                      <span>{row.run_date}</span>
-                      <TrustBadge trustLabel={row.trust_label} compact />
-                      <FundingChip funding={row.funding} compact />
-                      <span class="font-mono text-[var(--bb-data-fg-muted)]">
-                        Public ID {visibleResultIdForRow(row)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div class="flex shrink-0 items-center gap-3">
-              <button
-                type="button"
-                class="text-sm text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]"
-                onClick={() => setSelected(new Set())}
-              >
-                Clear
-              </button>
-              <a href={compareUrl} class="btn btn-primary text-sm no-underline">
-                Compare {selected.size} selected →
-              </a>
-            </div>
-          </div>
-        </div>
+        <CompareTray
+          summary={
+            <>
+              <strong>{formatCount(selected.size, "result")}</strong> selected for compare
+            </>
+          }
+          items={selectedRows.map((row) => ({
+            id: row.result_id,
+            platform: row.platform,
+            benchmarkLabel: humanizeBenchmark(row.benchmark),
+            scaleFactor: row.scale_factor,
+            phase: row.phase,
+            runDate: row.run_date,
+            trustLabel: row.trust_label,
+            funding: row.funding,
+            visibleResultId: visibleResultIdForRow(row),
+          }))}
+          compareHref={compareUrl}
+          compareLabel={`Compare ${selected.size} selected`}
+          onClear={() => setSelected(new Set())}
+        />
       )}
 
       {platformResultsRaw.length > 0 && (

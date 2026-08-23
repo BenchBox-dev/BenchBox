@@ -24,8 +24,8 @@ describe("loading skeletons", () => {
     expect(matrix.container.querySelectorAll("tbody tr")).toHaveLength(6);
     matrix.unmount();
 
-    const query = render(<QueryRowsSkeleton message="Querying results.duckdb..." columns={3} />);
-    expect(screen.getByRole("status")).toHaveTextContent("Querying results.duckdb...");
+    const query = render(<QueryRowsSkeleton message="Loading matching results..." columns={3} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading matching results...");
     expect(query.container.querySelectorAll("thead th")).toHaveLength(4);
   });
 

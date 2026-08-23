@@ -117,69 +117,8 @@ jobs:
         run: npm run build
         working-directory: results-explorer
 
-      - name: Assemble landing page + docs site
-        run: |
-          rm -rf site
-          mkdir -p site/docs site/blog
-          # Copy landing page if it exists, otherwise docs become the root
-          if [ -d "landing" ]; then
-            cp -R landing/* site/
-            # Copy docs excluding blog/ (blog is served at /blog/ not /docs/blog/)
-            rsync -a --exclude='blog/' docs/_build/html/ site/docs/
-          else
-            cp -R docs/_build/html/* site/
-          fi
-          # Copy blog to root-level /blog/ path (ABlog generates in docs/_build/html/blog/)
-          if [ -d "docs/_build/html/blog" ]; then
-            cp -R docs/_build/html/blog/* site/blog/
-          fi
-          # Copy _static and _images assets to site root for blog pages (they reference ../_static/ and ../_images/)
-          cp -R docs/_build/html/_static site/_static
-          if [ -d "docs/_build/html/_images" ]; then
-            cp -R docs/_build/html/_images site/_images
-          fi
-          # Copy CNAME if it exists
-          [ -f docs/CNAME ] && cp docs/CNAME site/CNAME || true
-          touch site/.nojekyll
-
-      - name: Copy explorer to site
-        if: hashFiles('results-explorer/package.json') != ''
-        run: |
-          mkdir -p site/results
-          cp -r results-explorer/dist/. site/results/
-
-      - name: Add SPA 404 fallback for results-explorer
-        if: hashFiles('results-explorer/package.json') != ''
-        # GitHub Pages only serves a root-level 404.html as the custom error page;
-        # subdirectory 404.html files are treated as regular pages.
-        run: |
-          cat > site/404.html << 'FOUROHFOUR'
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="UTF-8">
-            <title>Page Not Found - BenchBox</title>
-            <script>
-              var redirectKey = 'benchbox.results.redirect';
-
-              if (window.location.pathname.startsWith('/results/')) {
-                var originalPath = window.location.pathname + window.location.search + window.location.hash;
-
-                try {
-                  window.sessionStorage.setItem(redirectKey, originalPath);
-                } catch (error) {
-                  // Ignore sessionStorage failures and still redirect to the SPA entrypoint.
-                }
-
-                window.location.replace('/results/');
-              }
-            </script>
-          </head>
-          <body>
-            <p>Page not found. <a href="/">Return to documentation</a>.</p>
-          </body>
-          </html>
-          FOUROHFOUR
+      - name: Assemble public site
+        run: uv run -- python scripts/assemble_public_site.py --site-dir site
 
       - name: Upload HTML artifacts
         uses: actions/upload-pages-artifact@v3
@@ -267,6 +206,9 @@ jobs:
           PUBLIC_SITE_VISUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PUBLIC_SITE_VISUAL_REQUIRE_BASELINE: ${{ steps.baseline-mode.outputs.require }}
           PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ github.sha }}
+          PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+          APPROVED_HEAD_SHA: ${{ github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA || '' }}
+          APPROVAL_REASON: ${{ github.event_name == 'pull_request' && vars.APPROVAL_REASON || '' }}
         run: npm run test:e2e:public-site
         working-directory: results-explorer
 

@@ -323,10 +323,10 @@ IDs you should read off the Browse view:
 - No in-page primary-metric toggle is expected.
 
 ### S6.5 Bad inputs
-- `?ids=` empty → friendly error.
-- `?ids=does-not-exist` → friendly error.
-- `?ids=valid,does-not-exist` → either render the partial set with a warning, or fail cleanly. Report which.
-- `?ids=` with a single id → either redirect to ResultDetail or show a "need 2+" message.
+- `?ids=` empty → open the Compare builder with no pinned result (`Compare.tsx:94-112,157-182`).
+- `?ids=does-not-exist` → show a friendly "No result found" error (`Compare.tsx:185-215`).
+- `?ids=valid,does-not-exist` → render the available result with an "Ignored unavailable result ID" warning and keep the original multi-selection URL so a refresh preserves the recovery state (`Compare.tsx:273-315,339-348`).
+- `?ids=` with one valid id → open the Compare builder with that result pinned; do not redirect to ResultDetail or show a "need 2+" message (`Compare.tsx:185-205`).
 
 ---
 
