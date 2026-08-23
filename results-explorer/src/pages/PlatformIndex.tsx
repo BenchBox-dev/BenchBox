@@ -35,11 +35,13 @@ import { FundingChip } from "@/components/FundingChip";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 import { TimeSeries } from "@/components/TimeSeries";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
+import { RunIdentityLabel } from "@/components/DataTable";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { DataTable } from "@/components/DataTable";
 import { CompareTray } from "@/components/CompareTray";
 import type { SortState } from "@/types";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 
 interface PlatformIndexProps extends RoutableProps {
   platform?: string;
@@ -53,6 +55,7 @@ const MIN_TREND_OBSERVATIONS = 3;
 const PLATFORM_TABLE_COLUMNS = [
   "compare",
   "compare_state",
+  "run",
   "benchmark",
   "scale",
   "phase",
@@ -125,7 +128,7 @@ function primaryMetricContract(metric: string): string {
 
 function platformTableColumnIndex(column: PlatformTableColumn, showMetricContract: boolean): number {
   const baseIndex = PLATFORM_TABLE_COLUMNS.indexOf(column) + 1;
-  return !showMetricContract && baseIndex > 6 ? baseIndex - 1 : baseIndex;
+  return !showMetricContract && baseIndex > 7 ? baseIndex - 1 : baseIndex;
 }
 
 function selectedCohortDifferences(rows: PlatformIndexRowRow[]): string[] {
@@ -376,6 +379,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     return dir * (av - bv);
   });
   const visiblePlatformResults = platformResults.slice(0, visibleLimit);
+  const runIdentityLabels = formatRunIdentitiesForCohort(platformResults, "table");
 
   function toggleSort(key: PlatformSortKey) {
     setSort((prev) =>
@@ -741,6 +745,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   <span class="sr-only">Compare</span>
                 </th>
                 <th class="table-th" aria-colindex={platformTableColumnIndex("compare_state", showMetricContract)}>Compare state</th>
+                <th class="table-th" aria-colindex={platformTableColumnIndex("run", showMetricContract)}>Run</th>
                 <th class="p-0" scope="col" aria-sort={ariaSort("benchmark")} aria-colindex={platformTableColumnIndex("benchmark", showMetricContract)}>
                   <button
                     type="button"
@@ -806,10 +811,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               </tr>
             </thead>
             <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
-              {visiblePlatformResults.map((r) => (
+              {visiblePlatformResults.map((r, index) => (
                 <PlatformRow
                   key={r.result_id}
                   entry={r}
+                  runIdentityLabel={runIdentityLabels[index] ?? r.platform}
                   checked={selected.has(r.result_id)}
                   onToggle={() => toggleSelect(r.result_id)}
                   showMetricContract={showMetricContract}
@@ -959,6 +965,7 @@ function trendValue(row: PlatformIndexRowRow, metric: TrendMetric): number | nul
 
 interface PlatformRowProps {
   entry: PlatformIndexRowRow;
+  runIdentityLabel: string;
   checked: boolean;
   onToggle: () => void;
   showMetricContract: boolean;
@@ -971,7 +978,7 @@ interface PlatformRowProps {
   disabledReason?: string;
 }
 
-function PlatformRow({ entry, checked, onToggle, showMetricContract, disabledReason }: PlatformRowProps) {
+function PlatformRow({ entry, runIdentityLabel, checked, onToggle, showMetricContract, disabledReason }: PlatformRowProps) {
   const disabledCopy = describeCompareExclusionReason(disabledReason);
   const reasonId = disabledCopy ? `platform-compare-reason-${entry.result_id}` : undefined;
   return (
@@ -998,6 +1005,9 @@ function PlatformRow({ entry, checked, onToggle, showMetricContract, disabledRea
       </td>
       <td class="table-td max-w-[16rem]" aria-colindex={platformTableColumnIndex("compare_state", showMetricContract)}>
         <PlatformCompareReasonStatus id={reasonId} copy={disabledCopy} selected={checked} />
+      </td>
+      <td class="table-td max-w-[24rem]" aria-colindex={platformTableColumnIndex("run", showMetricContract)}>
+        <RunIdentityLabel label={runIdentityLabel} />
       </td>
       <td class="table-td font-medium" aria-colindex={platformTableColumnIndex("benchmark", showMetricContract)}>{humanizeBenchmark(entry.benchmark)}</td>
       <td class="table-td" aria-colindex={platformTableColumnIndex("scale", showMetricContract)}>SF {entry.scale_factor}</td>
