@@ -165,11 +165,14 @@ Test on at least Home and one ResultDetail.
 - Three cards: Results / Benchmarks / Platforms. Numbers match the corpus (11 results, 2 benchmarks, 7 platforms expected — confirmed by running `npm run test:e2e:fixtures` and querying the generated `results.duckdb`; re-verify if the generator's variant list changes).
 
 ### S2.2 MetaLeaderboard mode toggle (`?mode=`)
-- Three modes: **times** (default), **ranks**, **speedup**. Click each.
-- Verify URL updates to `?mode=ranks` / `?mode=speedup`. `mode=times` may or may not appear in the URL — note which.
+- Three modes: **speedup** (default), **times**, **ranks**. Click each.
+- A link with no `?mode=` renders speedup. Verify URL updates to `?mode=times` / `?mode=ranks`; returning to speedup removes
+  the default-valued parameter.
 - Reload after switching: mode persists.
-- Numbers in cells change appropriately between modes: times = ms, ranks = small ints, speedup = best-in-cohort
-  `1.00×` with slower entries below `1.00×`.
+- In the default grid, every ranking column follows one rule: speedup `1.00×` is best and lower values are worse. Each header
+  repeats that rule even when the native metrics disagree on direction. The cell keeps its native metric as secondary text.
+- Numbers in cells change appropriately between modes: times = native metric, ranks = small ints, speedup = best-in-cohort
+  `1.00×` with slower entries below `1.00×` plus the native value.
 
 ### S2.3 Filter chips (multi-select: Benchmark, Scale)
 - Click a chip → row toggles, URL updates (`?bm=tpch` etc., array form).
