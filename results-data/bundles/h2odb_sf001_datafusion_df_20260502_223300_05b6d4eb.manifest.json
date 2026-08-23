@@ -1,10 +1,11 @@
 {
   "benchmark": "H2ODB",
   "bundle_file": "h2odb_sf001_datafusion_df_20260502_223300_05b6d4eb.json",
-  "bundle_hash": "adf88e45f731cc5932c3a57650a4c110a0bacc834f419acd70b4ee676f2de72e",
+  "bundle_hash": "cea4aaffd5a29345e165cda2f8129688a7569ea3b0a2dabbd8c5d90c16957e0b",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",
+  "result_source": "internal",
   "scale_factor": 0.01,
   "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
