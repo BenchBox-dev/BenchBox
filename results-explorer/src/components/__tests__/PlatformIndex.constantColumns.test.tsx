@@ -79,14 +79,14 @@ describe("PlatformIndex route-constant columns", () => {
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
     const table = screen.getByRole("table", { name: "DuckDB results" });
-    expect(table).toHaveAttribute("aria-colcount", "10");
+    expect(table).toHaveAttribute("aria-colcount", "11");
     expect(screen.getByTestId("platform-hoisted-metric-contract")).toHaveTextContent(
       "Route-wide metric contract: Geomean latency (lower is better)",
     );
     expect(within(table).queryByRole("columnheader", { name: "Metric contract" })).toBeNull();
     expect(within(table).getByRole("button", { name: /Power score/ }).closest("th")).toHaveAttribute(
       "aria-colindex",
-      "7",
+      "8",
     );
     expect(within(table).getByText("5,000")).toBeTruthy();
   });
@@ -107,14 +107,14 @@ describe("PlatformIndex route-constant columns", () => {
 
     const table = screen.getByRole("table", { name: "DuckDB results" });
     const powerHeader = within(table).getByRole("button", { name: /Power score/ }).closest("th");
-    expect(table).toHaveAttribute("aria-colcount", "11");
+    expect(table).toHaveAttribute("aria-colcount", "12");
     expect(within(table).getByRole("columnheader", { name: "Metric contract" })).toBeTruthy();
-    expect(powerHeader).toHaveAttribute("aria-colindex", "8");
+    expect(powerHeader).toHaveAttribute("aria-colindex", "9");
 
     fireEvent.change(screen.getByLabelText("Benchmark"), { target: { value: "tpch" } });
     await waitFor(() => expect(rowCount(table)).toBe(13));
     expect(within(table).getByRole("columnheader", { name: "Metric contract" })).toBeTruthy();
-    expect(powerHeader).toHaveAttribute("aria-colindex", "8");
+    expect(powerHeader).toHaveAttribute("aria-colindex", "9");
     expect(within(table).getByText("1,234")).toBeTruthy();
   });
 });

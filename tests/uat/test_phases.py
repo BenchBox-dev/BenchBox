@@ -488,7 +488,7 @@ def _healthy_ps_result(argv: list[str]) -> docker_assets.DockerCommandResult:
     return docker_assets.DockerCommandResult(tuple(argv), 0, healthy_ps_stdout(), "")
 
 
-def _healthy_stats_result(argv: list[str], *, limit: str = "8GB") -> docker_assets.DockerCommandResult:
+def _healthy_stats_result(argv: list[str], *, limit: str = "5.25GB") -> docker_assets.DockerCommandResult:
     """A Docker-compatible stats row exposing the calibrated ClickHouse cap."""
     return docker_assets.DockerCommandResult(
         tuple(argv),

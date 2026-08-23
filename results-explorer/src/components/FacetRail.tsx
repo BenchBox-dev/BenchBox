@@ -342,7 +342,10 @@ function FacetGroupSection({
           {filteredOptions.length === 0 ? (
             <p class="text-sm text-[var(--bb-data-fg-subtle)]">{group.emptyLabel ?? "No facet values"}</p>
           ) : (
-            <div class="space-y-2">
+            <div
+              class="max-h-80 space-y-2 overflow-y-auto pr-1"
+              data-testid={`facet-${group.key}-options`}
+            >
               {filteredOptions.map((option) => {
                 const checked = group.selected.includes(option.value);
                 return (

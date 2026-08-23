@@ -1,4 +1,5 @@
 import type { ComponentChildren } from "preact";
+import { useRef } from "preact/hooks";
 import { TableScrollHint } from "@/components/TableScrollHint";
 
 interface DataTableProps {
@@ -11,7 +12,44 @@ interface DataTableProps {
   children: ComponentChildren;
 }
 
+interface RunIdentityLabelProps {
+  label: string;
+  href?: string;
+  class?: string;
+}
+
+/** A table-sized run label whose text is already resolved by runIdentity. */
+export function RunIdentityLabel({ label, href, class: extraClass = "" }: RunIdentityLabelProps) {
+  const className = `font-medium ${extraClass}`;
+  if (href) {
+    return (
+      <a href={href} class={`${className} no-underline`} data-testid="run-identity-label" title={label}>
+        {label}
+      </a>
+    );
+  }
+  return (
+    <span class={className} data-testid="run-identity-label" title={label}>
+      {label}
+    </span>
+  );
+}
+
+/** Explains the marker used for rows that retain evidence but cannot be ranked. */
+export function RankingEligibilityLegend() {
+  return (
+    <p
+      class="mb-2 text-xs text-[var(--bb-data-fg-muted)]"
+      data-testid="ranking-eligibility-legend"
+    >
+      <span aria-hidden="true" class="font-semibold">*</span>{" "}
+      Not eligible for ranking; hover or focus the marker for the reason.
+    </p>
+  );
+}
+
 export function DataTable({ ariaLabel, ariaColCount, caption, scrollable = false, class: extraClass = "", children }: DataTableProps) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const inner = (
     <table aria-label={ariaLabel} aria-colcount={ariaColCount} class={`w-full text-sm ${extraClass}`}>
       {caption && <caption class="text-left text-xs uppercase tracking-wide text-[var(--bb-data-fg-subtle)] py-2">{caption}</caption>}
@@ -22,11 +60,12 @@ export function DataTable({ ariaLabel, ariaColCount, caption, scrollable = false
   return (
     <div>
       <TableScrollHint
+        scrollerRef={scrollerRef}
         label="Scroll table for more columns →"
         wrapperClassName="flex justify-end"
         className="mb-2"
       />
-      <div class="overflow-x-auto">{inner}</div>
+      <div ref={scrollerRef} class="overflow-x-auto">{inner}</div>
     </div>
   );
 }

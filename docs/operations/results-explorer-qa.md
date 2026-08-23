@@ -165,11 +165,14 @@ Test on at least Home and one ResultDetail.
 - Three cards: Results / Benchmarks / Platforms. Numbers match the corpus (11 results, 2 benchmarks, 7 platforms expected — confirmed by running `npm run test:e2e:fixtures` and querying the generated `results.duckdb`; re-verify if the generator's variant list changes).
 
 ### S2.2 MetaLeaderboard mode toggle (`?mode=`)
-- Three modes: **times** (default), **ranks**, **speedup**. Click each.
-- Verify URL updates to `?mode=ranks` / `?mode=speedup`. `mode=times` may or may not appear in the URL — note which.
+- Three modes: **speedup** (default), **times**, **ranks**. Click each.
+- A link with no `?mode=` renders speedup. Verify URL updates to `?mode=times` / `?mode=ranks`; returning to speedup removes
+  the default-valued parameter.
 - Reload after switching: mode persists.
-- Numbers in cells change appropriately between modes: times = ms, ranks = small ints, speedup = best-in-cohort
-  `1.00×` with slower entries below `1.00×`.
+- In the default grid, every ranking column follows one rule: speedup `1.00×` is best and lower values are worse. Each header
+  repeats that rule even when the native metrics disagree on direction. The cell keeps its native metric as secondary text.
+- Numbers in cells change appropriately between modes: times = native metric, ranks = small ints, speedup = best-in-cohort
+  `1.00×` with slower entries below `1.00×` plus the native value.
 
 ### S2.3 Filter chips (multi-select: Benchmark, Scale)
 - Click a chip → row toggles, URL updates (`?bm=tpch` etc., array form).
@@ -340,6 +343,8 @@ This is the DuckDB-WASM ad-hoc explorer. Heaviest surface — give it the most t
 ### S7.2 Faceted filters
 - Multi-select: benchmark, platform, scale, tuning, trust, validation. Each updates URL (`?benchmark=…&platform=…` array form) and the rows + facet counts.
 - Single-select: `has_cost`, `window` (date). URL round-trip.
+- Free-text search matches platform name, platform version, and public result ID case-insensitively. It round-trips through
+  `?q=` and resets the result page to 1 when changed.
 - Clearing all filters returns to the unfiltered view.
 
 ### S7.3 Schema-aware column picker
@@ -351,7 +356,13 @@ This is the DuckDB-WASM ad-hoc explorer. Heaviest surface — give it the most t
 - Click each visible column header. Sort state (`run_date desc` is the default) updates.
 
 ### S7.5 Row limit
-- The default row limit is `DEFAULT_ROW_LIMIT`. Switch to "unlimited" / `UNLIMITED_ROW_LIMIT` and verify the row count grows. Switch back.
+- The main result table fetches 24 rows at a time with SQL `LIMIT`/`OFFSET`; it must not render the full filtered corpus and
+  hide rows in CSS. Use Previous/Next and confirm `?page=` round-trips, the displayed range changes, and a compare pick made
+  on page 1 remains selected on page 2.
+- The default corpus cap is `DEFAULT_ROW_LIMIT`. Switch to "unlimited" / `UNLIMITED_ROW_LIMIT` and verify the filtered count
+  grows where the corpus exceeds the default cap. Switch back.
+- CSV and JSON export cover every row matching the current facets and free-text search within the selected corpus cap, across
+  all pages, and include only the currently visible columns. Paging never narrows export to the current 24-row page.
 
 ### S7.6 SQL editor
 - Default text: `SELECT * FROM bench.results ORDER BY run_date DESC`. Run it.
@@ -360,6 +371,10 @@ This is the DuckDB-WASM ad-hoc explorer. Heaviest surface — give it the most t
 - Run a query that returns 0 rows. Empty state, not error.
 - Run a query that returns columns the column-picker doesn't know about. Should still render.
 - **Security check:** the read-only guarantee comes from the **read-only attach**, not from `bench.results` being a view. `results-explorer/src/db.ts` attaches the snapshot with `ATTACH 'results.duckdb' AS bench (READ_ONLY)`, so DDL/DML against `bench.*` (`DROP TABLE bench.results`, `INSERT`, `UPDATE`, `DELETE`) is rejected with a read-only error — `bench.results` is a real table, and there is no per-statement SQL filtering. `CREATE TABLE`/`SET` against the default in-memory catalog **succeed**, but they are tab-local and transient and cannot alter the published snapshot (served read-only over HTTP; every visitor gets their own copy). Confirm a `DELETE FROM bench.results` surfaces a read-only/error message (pinned by an e2e test in `results-explorer/e2e/routes/query.spec.ts`), not a silent success.
+- **Scratchpad table treatment:** arbitrary SQL results remain separate from the paged main results table. The scratchpad keeps
+  its 200-row incremental renderer (`Show more SQL rows`) because an arbitrary statement cannot be safely rewritten with the
+  main table's fixed projection, count query, and `LIMIT`/`OFFSET` contract. Any tables created in the default in-memory
+  catalog remain tab-local and transient as described above; they do not enter facets, main-table paging, or exports.
 
 ### S7.7 Starter queries
 - Cycle through every starter category. Each should be one click → SQL pasted into editor → click run → renders without error.
