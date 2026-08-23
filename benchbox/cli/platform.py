@@ -521,8 +521,8 @@ class PlatformManager:
 
         The narrow default table drops columns to stay readable. This is the
         path that loses nothing, so a script never has to parse the table.
-        Printed through ``print`` rather than the Rich console so the output
-        is exactly JSON, with no wrapping or markup.
+        Printed through the quiet-aware console with wrapping and markup
+        disabled so the output remains exactly JSON.
         """
         platforms = self.detect_platforms()
         payload = [
@@ -541,7 +541,7 @@ class PlatformManager:
             }
             for name, info in _platforms_by_support_tier(platforms)
         ]
-        print(json.dumps({"platforms": payload}, indent=2))
+        console.print(json.dumps({"platforms": payload}, indent=2), markup=False, soft_wrap=True)
 
     def display_platform_list(self, show_all: bool = True):
         """Display platform list for 'benchbox platforms list' command.
