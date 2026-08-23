@@ -24,6 +24,7 @@ import {
   SPEEDUP_GRID_STOPS,
   PHASE_COLORS,
 } from "@/lib/chartTheme";
+import { lightnessForCell } from "@/lib/chartMath";
 
 describe("chartTheme", () => {
   it("PALETTE has 4 distinct colors", () => {
@@ -93,6 +94,11 @@ describe("chartTheme", () => {
 
   it("HEAT_MIN_RATIO < HEAT_MAX_RATIO", () => {
     expect(HEAT_MIN_RATIO).toBeLessThan(HEAT_MAX_RATIO);
+  });
+
+  it("maps the ranking best to a lighter cell and worse values to darker cells", () => {
+    expect(lightnessForCell(HEAT_MIN_RATIO, HEAT_MIN_RATIO)).toBe("95%");
+    expect(lightnessForCell(HEAT_MAX_RATIO, HEAT_MIN_RATIO)).toBe("25%");
   });
 
   // -----------------------------------------------------------------------

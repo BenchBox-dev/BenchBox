@@ -4,9 +4,12 @@ on:
   pull_request:
     branches:
       - develop
+  merge_group:
+    branches:
+      - develop
 
 concurrency:
-  group: develop-pr-${{ github.ref }}
+  group: develop-pr-${{ github.event_name == 'merge_group' && github.event.merge_group.head_ref || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -44,7 +47,7 @@ jobs:
         run: python _project/scripts/todo_schema_migration_check.py
 
       - name: Fetch base branch
-        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+        run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
 
       - name: Classify changed paths
         id: classify
@@ -55,7 +58,7 @@ jobs:
           # later develop merge may make this PR BEHIND, but must not change
           # the tree whose paths and manifest structure this run certifies.
           python scripts/path_filter_decision.py \
-            --base-ref "${{ github.event.pull_request.base.sha }}" \
+            --base-ref "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}" \
             --json-out ci-path-decision.json \
             --lists-dir .ci-paths \
             --github-output "$GITHUB_OUTPUT" \
@@ -114,7 +117,7 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch base branch
-        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+        run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -127,7 +130,7 @@ jobs:
         # Bare python is intentional: the classifier is stdlib-only.
         run: |
           python scripts/path_filter_decision.py \
-            --base-ref "${{ github.event.pull_request.base.sha }}" \
+            --base-ref "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}" \
             --json-out ci-path-decision.json \
             --lists-dir .ci-paths
 
@@ -330,7 +333,7 @@ jobs:
 
       - name: Audit instruction authority and PR commit identity
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
           python3 _project/scripts/agent_instruction_audit.py
           python3 _project/scripts/agent_instruction_audit.py --check-commit-range "$BASE_SHA"
@@ -388,7 +391,7 @@ jobs:
         id: guard-uv-lock-revision
         continue-on-error: true
         env:
-          BASE_REF: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: make uv-lock-revision-check
 
       - name: Lint and format check with ruff
@@ -463,7 +466,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: fast-lane-count.txt
-          key: fast-lane-count-develop-${{ github.event.pull_request.base.sha }}
+          key: fast-lane-count-develop-${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
 
       - name: Fast lane ceiling delta vs develop
         # Additive to guard-timing-policy above, never a replacement: that
@@ -540,7 +543,7 @@ jobs:
         id: guard-duplicate-delta
         continue-on-error: true
         env:
-          BASE_REF: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: make duplicate-check-delta
 
       - name: Complexity policy and report
@@ -1048,7 +1051,7 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch base branch
-        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+        run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
 
       - name: Run explorer token scan
         # Bare python is intentional: the scan is stdlib-only so this gate
@@ -1067,7 +1070,7 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch base branch
-        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+        run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
 
       - name: Run public site theme token scan
         # Bare python is intentional: the scan is stdlib-only so this gate
@@ -1254,7 +1257,7 @@ jobs:
 
       - name: Fetch base branch
         env:
-          BASE_REF: ${{ github.base_ref }}
+          BASE_REF: ${{ github.base_ref || 'develop' }}
         run: git fetch --no-tags origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
 
       - name: Install uv
@@ -1264,14 +1267,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git diff --name-only --diff-filter=ACMRT "origin/${{ github.base_ref }}...HEAD" \
+          git diff --name-only --diff-filter=ACMRT "origin/${{ github.base_ref || 'develop' }}...HEAD" \
             | grep -E '^_project/audits/.*\.md$' > /tmp/changed-audits.txt || true
           if [ ! -s /tmp/changed-audits.txt ]; then
             echo "No changed audit Markdown files to validate."
             exit 0
           fi
           while IFS= read -r audit_path; do
-            make audit-sha-check FILE="$audit_path" AUDIT_SHA_TARGET_REF="origin/${{ github.base_ref }}"
+            make audit-sha-check FILE="$audit_path" AUDIT_SHA_TARGET_REF="origin/${{ github.base_ref || 'develop' }}"
           done < /tmp/changed-audits.txt
 
   certification-identity:
@@ -1288,8 +1291,8 @@ jobs:
 
       - name: Record certification identity
         env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
           SYNTHETIC_MERGE_SHA: ${{ github.sha }}
           RUN_ID: ${{ github.run_id }}
           NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
@@ -1528,8 +1531,8 @@ jobs:
           PARITY_CHECK_RESULT: ${{ needs.parity-check.result }}
           NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
           SKILL_INTEGRITY_NEEDED: ${{ needs.ci-paths.outputs.skill-integrity-needed }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
           RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail

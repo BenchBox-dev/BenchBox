@@ -167,7 +167,7 @@ describe("RunReceipt", () => {
     const costSection = within(cost as HTMLElement);
 
     expect(within(receipt).getByText("2 fields not recorded for this run.")).toBeTruthy();
-    expect(costSection.getByText("2 fields not recorded")).toBeTruthy();
+    expect(within(receipt).getAllByText(/\d+ fields? not recorded/)).toHaveLength(1);
     expect(costSection.queryByText("Cost model")).toBeNull();
     expect(costSection.queryByText("Cost scope")).toBeNull();
     expect(costSection.getByText("unavailable")).toBeTruthy();
@@ -221,8 +221,8 @@ describe("RunReceipt", () => {
     // Sparse-metadata fixture: trust + visibility recorded, the entire
     // Platform/Environment surface unrecorded, validation/compliance
     // missing, no normalized cost. The default view should expose
-    // recorded fields plus per-section "N field(s) not recorded"
-    // counters; clicking the global disclosure reveals the actual
+    // recorded fields plus one aggregate missing-metadata count;
+    // clicking the global disclosure reveals the actual
     // Not-recorded rows so audit users can still see them.
     render(
       <RunReceipt
@@ -254,9 +254,8 @@ describe("RunReceipt", () => {
     expect(within(receipt).queryByText("Driver version")).toBeNull();
     expect(within(receipt).queryByText("OS")).toBeNull();
     expect(within(receipt).queryByText("Validation")).toBeNull();
-    // Per-section counters still surface the missing count so users
-    // know there is more behind the disclosure.
-    expect(within(receipt).getAllByText(/\d+ fields? not recorded/).length).toBeGreaterThan(0);
+    // One aggregate count replaces the repeated per-section counters.
+    expect(within(receipt).getAllByText(/\d+ fields? not recorded/)).toHaveLength(1);
 
     // Click the global disclosure — every previously-hidden field
     // becomes visible.
