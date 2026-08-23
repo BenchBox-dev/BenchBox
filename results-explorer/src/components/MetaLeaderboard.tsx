@@ -247,9 +247,10 @@ export function MetaLeaderboard({
           {cohorts.length.toLocaleString()} leaderboard {cohorts.length === 1 ? "ranking" : "rankings"}
         </p>
         <p id="meta-leaderboard-legend" class="text-xs text-[var(--bb-data-fg-subtle)]">
-          {mode === "times" && "Heat: darker = faster within each ranking. "}
-          {mode === "ranks" && "Heat: darker = better rank within ranking. "}
-          {mode === "speedup" && "Heat: darker = closer to ranking best (≥1.00x). Values < 1.00x are slower than baseline. "}
+          {mode === "times" && "Heat: darker = worse within each ranking. "}
+          {mode === "ranks" && "Heat: darker = a worse rank within each ranking. "}
+          {mode === "speedup" &&
+            "Heat: darker = farther from the ranking best (1.00x). Values below 1.00x are worse than the ranking best. "}
           <span class="italic">No run</span> = no published evidence. <span class="font-medium">Excluded</span> or{" "}
           <span class="font-medium">Unranked</span> = published evidence that is not scored.
         </p>
