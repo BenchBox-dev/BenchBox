@@ -913,8 +913,8 @@ function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice:
         <p class="text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Compare</p>
         <h1 class="mt-1 text-2xl font-bold text-[var(--bb-data-fg-primary)]">Pick runs to compare</h1>
         <p class="mt-2 text-sm text-[var(--bb-data-fg-muted)]">
-          Select two to four runs from the same benchmark, scale, and phase. The first selection locks the ranking; runs from
-          other rankings will be disabled with a reason. You never need to edit the URL.
+          Choose two to four compatible runs. Your first choice sets the benchmark, scale, and phase; unavailable runs explain
+          why they cannot be compared.
         </p>
       </section>
 

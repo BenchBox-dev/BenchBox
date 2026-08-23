@@ -89,7 +89,7 @@ describe("corpus section indexes", () => {
 
     renderIndex(kind);
 
-    expect(screen.getByRole("status")).toHaveTextContent(`Loading ${kind} from results.duckdb`);
+    expect(screen.getByRole("status")).toHaveTextContent(`Loading ${kind}...`);
     expect(screen.queryByTestId(listId)).toBeNull();
   });
 

@@ -398,7 +398,7 @@ describe("Query", () => {
     await waitFor(() =>
       expect(screen.getByTestId("query-compare-tray").textContent).toContain("200 incompatible rows hidden"),
     );
-    expect(screen.getByText("Showing 1 of 1 displayed rows")).toBeTruthy();
+    expect(screen.getByText("Showing 1 of 1 matching result bundle")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Show more results" })).toBeNull();
   });
 
@@ -585,7 +585,7 @@ describe("Query", () => {
 
     const mobileDrawer = screen.getByTestId("query-mobile-filter-drawer");
     expect(within(mobileDrawer).getAllByText("Benchmark: SSB").length).toBeGreaterThan(0);
-    expect(within(mobileDrawer).getAllByText("Benchmark: SSB (legacy slug)").length).toBeGreaterThan(0);
+    expect(within(mobileDrawer).getAllByText("Benchmark: SSB (historical source)").length).toBeGreaterThan(0);
     expect(within(mobileDrawer).getAllByText("Trust: maintainer run").length).toBeGreaterThan(0);
     expect(within(mobileDrawer).getAllByText("Cost status: not applicable (local)").length).toBeGreaterThan(0);
     expect(within(mobileDrawer).queryByText("Trust: maintainer-run")).toBeNull();
@@ -781,8 +781,8 @@ describe("Query", () => {
       const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
       expect(selectCalls.at(-1)?.[0]).toContain(`LIMIT ${UNLIMITED_ROW_LIMIT}`);
     });
-    expect(screen.getByText("Showing 2 of 2 returned rows")).toBeTruthy();
-    expect(screen.getByText("Query limit: all")).toBeTruthy();
+    expect(screen.getByText("Showing 2 of 2 matching result bundles")).toBeTruthy();
+    expect(screen.queryByText(/Query limit:/)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /^Default$/ }));
 

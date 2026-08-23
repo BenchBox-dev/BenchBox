@@ -109,6 +109,6 @@ export function canonicalPhase(raw: string | null | undefined): string {
  * when it is encountered in raw evidence or a legacy route.
  */
 export function formatBenchmarkLabel(slug: string): string {
-  if (slug === "star_schema") return "SSB (legacy slug)";
+  if (slug === "star_schema") return "SSB (historical source)";
   return humanizeBenchmark(slug);
 }
