@@ -1,7 +1,9 @@
 import Router from "preact-router";
 import { Layout } from "./components/Layout";
 import { Home } from "./pages/Home";
+import { BenchmarksIndex } from "./pages/BenchmarksIndex";
 import { BenchmarkIndex } from "./pages/BenchmarkIndex";
+import { PlatformsIndex } from "./pages/PlatformsIndex";
 import { PlatformIndex } from "./pages/PlatformIndex";
 import { ResultDetail } from "./pages/ResultDetail";
 import { Compare } from "./pages/Compare";
@@ -17,6 +19,10 @@ export function App() {
         <Compare path="/results/compare/" />
         <Query path="/results/query" />
         <Query path="/results/query/" />
+        <BenchmarksIndex path="/results/benchmarks" />
+        <BenchmarksIndex path="/results/benchmarks/" />
+        <PlatformsIndex path="/results/platforms" />
+        <PlatformsIndex path="/results/platforms/" />
         <PlatformIndex path="/results/p/:platform/" />
         <ResultDetail path="/results/r/:resultId" />
         <BenchmarkIndex path="/results/:benchmark/" />

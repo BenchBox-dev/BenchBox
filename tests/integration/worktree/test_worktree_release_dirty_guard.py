@@ -258,6 +258,79 @@ exec "{real_git}" "$@"
     subprocess.run(["git", "branch", "-D", branch], cwd=repo, text=True, capture_output=True, check=False)
 
 
+def test_worktree_create_refuses_when_lock_directory_cannot_be_created(tmp_path: Path) -> None:
+    repo = init_repo_with_origin(tmp_path / "BenchBox repo")
+    home = tmp_path / "home"
+    env = make_test_env(home)
+    branch = f"fix/test-worktree-perm-{tmp_path.name}"
+    linked = tmp_path / "BenchBox perm wt"
+
+    git_dir = repo / ".git"
+    original_mode = git_dir.stat().st_mode
+    git_dir.chmod(0o555)
+    try:
+        result = make_target(
+            repo,
+            "worktree-create",
+            f"BRANCH={branch}",
+            f"WORKTREE_PATH={linked}",
+            env=env,
+        )
+    finally:
+        git_dir.chmod(original_mode)
+
+    assert result.returncode != 0
+    assert "Could not create worktree-create lock directory" in result.stderr
+    assert "without a live owner" not in result.stderr
+    assert not linked.exists()
+
+
+def test_worktree_create_refuses_stale_lock_without_live_owner(tmp_path: Path) -> None:
+    repo = init_repo_with_origin(tmp_path / "BenchBox repo")
+    home = tmp_path / "home"
+    env = make_test_env(home)
+    branch = f"fix/test-worktree-stale-{tmp_path.name}"
+    linked = tmp_path / "BenchBox stale wt"
+
+    lock_dir = repo / ".git" / "worktree-create.lock"
+    lock_dir.mkdir()
+
+    result = make_target(
+        repo,
+        "worktree-create",
+        f"BRANCH={branch}",
+        f"WORKTREE_PATH={linked}",
+        env=env,
+    )
+
+    assert result.returncode != 0
+    assert "worktree-create lock exists without a live owner" in result.stderr
+    assert not linked.exists()
+
+
+def test_worktree_create_refuses_broken_symlink_lock(tmp_path: Path) -> None:
+    repo = init_repo_with_origin(tmp_path / "BenchBox repo")
+    home = tmp_path / "home"
+    env = make_test_env(home)
+    branch = f"fix/test-worktree-symlink-lock-{tmp_path.name}"
+    linked = tmp_path / "BenchBox symlink lock wt"
+
+    lock_dir = repo / ".git" / "worktree-create.lock"
+    lock_dir.symlink_to(tmp_path / "nonexistent-target")
+
+    result = make_target(
+        repo,
+        "worktree-create",
+        f"BRANCH={branch}",
+        f"WORKTREE_PATH={linked}",
+        env=env,
+    )
+
+    assert result.returncode != 0
+    assert "worktree-create lock exists without a live owner" in result.stderr
+    assert not linked.exists()
+
+
 def test_worktree_create_refuses_protected_branch_before_remote_access(tmp_path: Path) -> None:
     repo = init_repo_with_origin(tmp_path / "BenchBox repo")
     linked = tmp_path / "protected wt"
