@@ -11,6 +11,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 TSBS_DEVOPS_DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
@@ -33,6 +34,10 @@ TSBS_DEVOPS_DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
     "Q17": {"start_time": "2024-01-01 00:00:00", "end_time": "2024-01-01 01:00:00", "region": "us-east-1"},
     "Q18": {"start_time": "2024-01-01 00:00:00", "end_time": "2024-01-01 01:00:00"},
 }
+
+for _params in TSBS_DEVOPS_DEFAULT_PARAMS.values():
+    _params["start_time"] = datetime.fromisoformat(_params["start_time"])
+    _params["end_time"] = datetime.fromisoformat(_params["end_time"])
 
 
 @dataclass
