@@ -10,11 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New
 
 - **Results Explorer (Curated Preview)** - Interactive in-browser analytics over
-  published benchmark runs at [benchbox.dev/results/](https://benchbox.dev/results/),
-  deployed from the `release` branch. Includes multi-platform leaderboards, query
-  waterfalls, hardware disclosures, comparison tools, and an embedded SQL
-  workbench. This is a curated preview of the public corpus, not a certified
-  ranking of every stored bundle.
+  published benchmark runs, prepared for publication at
+  [benchbox.dev/results/](https://benchbox.dev/results/) by the next protected
+  `release` deploy. Includes multi-platform leaderboards, query waterfalls,
+  hardware disclosures, comparison tools, and an embedded SQL workbench. This is
+  a curated preview of the public corpus, not a certified ranking of every
+  stored bundle. The live URL remains unpublished until that deploy completes.
 - **DuckLake platform** - Run benchmarks against DuckLake (DuckDB lakehouse
   format: Parquet table data + SQL-database catalog metadata) via
   `--platform ducklake`. The catalog backend (`--platform-option
@@ -23,20 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PostgreSQL catalog with S3 storage. Existing catalogs are reused across runs
   and `--force` rebuilds them; requires DuckDB >= 1.3, installable as
   `benchbox[ducklake]`. Beta.
-- **Result provenance and funding disclosure** - Canonical result-source →
-  trust-label → visibility mapping in `benchbox.core.results.provenance`,
-  including the `vendor-supplied` publish label, plus a funding vocabulary
-  (`employer` / `personal` / `free-trial` / `vendor-sponsored` / `grant` /
-  `unspecified`). `benchbox run --funding` and `benchbox submit --funding`
-  record that disclosure on new result bundles.
 
 ### Added
 
-- **Isolated query-plan capture** - `--capture-plans` records plans in the
-  result bundle as a dedicated run phase. `--show-plans` prints plans
-  interactively without requiring capture. Parsers now cover additional engines
-  including ClickHouse, the Presto/Trino family, Spark/Databricks, PostgreSQL,
-  Redshift, DataFusion, SQLite, and MotherDuck.
 - **MCP SDK 2 and localhost Streamable HTTP** - The MCP server uses the Python
   MCP SDK 2.x while keeping the existing stdio tool, resource, and prompt
   contract. `benchbox-mcp --transport streamable-http` serves Streamable HTTP on
@@ -78,10 +68,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- **Secrets no longer leak through results or MCP errors** - Exported metadata
-  redacts connection passwords, MotherDuck tokens, `*_key_id` options, service
-  account keys, and connection usernames. MCP error text is scrubbed, including
-  secrets that previously reappeared through chained exception causes.
+- **Secrets no longer leak through exported metadata or selected execution
+  errors** - Result exports redact connection passwords, MotherDuck tokens,
+  `*_key_id` options, service-account keys, and connection usernames.
+  MotherDuck/DuckLake connection failures and MCP benchmark-execution errors
+  are scrubbed, including secrets that previously reappeared through chained
+  exception causes. Other MCP error paths can still echo raw exception text.
 
 ### Removed
 
