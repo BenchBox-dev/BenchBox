@@ -242,6 +242,36 @@ test.describe("responsive explorer assertions", () => {
       await expectScrollAffordance(page, "query-results-scroll-container", "query-results-scroll-hint");
     });
   }
+
+  test("home skeleton and loaded shell keep the same rendered mobile geometry", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    let releaseSnapshot!: () => void;
+    const snapshotGate = new Promise<void>((resolve) => {
+      releaseSnapshot = resolve;
+    });
+    await page.route("**/results/data/results.duckdb", async (route) => {
+      await snapshotGate;
+      await route.continue();
+    });
+
+    await page.goto("/results/");
+    await waitForShell(page);
+    await expect(page.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Active leaderboard filters" })).toHaveCount(0);
+    const skeletonGeometry = await homeSharedGeometry(page);
+
+    releaseSnapshot();
+    await expect(page.getByText("Recent Results")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("region", { name: "Active leaderboard filters" })).toBeVisible();
+    const loadedGeometry = await homeSharedGeometry(page);
+
+    // Loaded-only summaries deliberately make the complete hero taller. The
+    // parity contract covers the geometry-bearing shared shell instead: actual
+    // boxes for stable regions plus computed spacing for regions whose child
+    // sets intentionally differ.
+    expect(loadedGeometry).toEqual(skeletonGeometry);
+  });
 });
 
 async function setViewport(
@@ -249,6 +279,76 @@ async function setViewport(
   viewport: (typeof VIEWPORTS)[number],
 ) {
   await page.setViewportSize({ width: viewport.width, height: viewport.height });
+}
+
+async function homeSharedGeometry(page: Page) {
+  return page.evaluate(() => {
+    const element = (selector: string) => {
+      const match = document.querySelector<HTMLElement>(selector);
+      if (!match) throw new Error(`missing shared Home geometry element: ${selector}`);
+      return match;
+    };
+    const rounded = (value: number) => Math.round(value * 100) / 100;
+    const box = (target: HTMLElement) => {
+      const rect = target.getBoundingClientRect();
+      return {
+        x: rounded(rect.x),
+        y: rounded(rect.y),
+        width: rounded(rect.width),
+        height: rounded(rect.height),
+      };
+    };
+    const horizontalBox = (target: HTMLElement) => {
+      const rect = target.getBoundingClientRect();
+      return { x: rounded(rect.x), width: rounded(rect.width) };
+    };
+    const styles = (target: HTMLElement, properties: string[]) => {
+      const computed = getComputedStyle(target);
+      return Object.fromEntries(properties.map((property) => [property, computed.getPropertyValue(property)]));
+    };
+
+    const wrapper = element('[data-testid="home-hero-wrapper"]');
+    const intro = element('[data-testid="home-hero-intro"]');
+    const headline = element('[data-testid="home-hero-intro"] h1');
+    const subtitle = element('[data-testid="home-hero-intro"] p');
+    const selector = element('[aria-label="Leaderboard ranking selector"]');
+    const grid = element('[data-testid="home-ranking-selector-grid"]');
+    const dataSurface = element('[data-testid="home-data-surface"]');
+
+    return {
+      wrapper: {
+        box: horizontalBox(wrapper),
+        spacing: styles(wrapper, ["padding-top", "padding-right", "padding-bottom", "padding-left"]),
+      },
+      intro: box(intro),
+      headline: {
+        box: box(headline),
+        type: styles(headline, ["font-size", "line-height"]),
+      },
+      subtitle: {
+        box: box(subtitle),
+        typeAndSpacing: styles(subtitle, ["margin-top", "font-size", "line-height"]),
+      },
+      selector: {
+        box: horizontalBox(selector),
+        spacing: styles(selector, [
+          "margin-top",
+          "padding-top",
+          "padding-right",
+          "padding-bottom",
+          "padding-left",
+        ]),
+      },
+      grid: {
+        box: horizontalBox(grid),
+        layout: styles(grid, ["grid-template-columns", "column-gap", "row-gap"]),
+      },
+      dataSurface: {
+        box: horizontalBox(dataSurface),
+        spacing: styles(dataSurface, ["padding-top", "padding-right", "padding-bottom", "padding-left"]),
+      },
+    };
+  });
 }
 
 async function expectScrollAffordance(page: Page, containerTestId: string, hintTestId: string) {

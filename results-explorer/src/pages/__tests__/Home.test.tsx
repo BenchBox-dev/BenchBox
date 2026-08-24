@@ -640,13 +640,10 @@ describe("Home", () => {
     expect(screen.getByTestId("leaderboard-scope-summary-mobile")).toBeTruthy();
   });
 
-  it("keeps every loaded and skeleton shell geometry pair aligned at 390px", async () => {
+  it("routes every loaded and skeleton shell region through the shared geometry source", async () => {
     const resultRows = deferred<typeof RESULT_ROWS>();
     const metaRows = deferred<typeof META_LEADERBOARD_ROWS>();
     const cohortRows = deferred<typeof COHORT_ROWS>();
-    const originalWidth = window.innerWidth;
-    const originalHeight = window.innerHeight;
-
     vi.mocked(queryRows).mockImplementation(async (sql: string) => {
       const s = String(sql).replace(/\s+/g, " ").trim();
       if (s.includes("FROM bench.results")) return resultRows.promise;
@@ -657,11 +654,6 @@ describe("Home", () => {
       return [];
     });
 
-    const setViewport = (width: number, height: number) => {
-      Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
-      Object.defineProperty(window, "innerHeight", { configurable: true, value: height });
-      window.dispatchEvent(new Event("resize"));
-    };
     const expectSharedGeometry = () => {
       const pairs: Array<[HTMLElement, string]> = [
         [screen.getByTestId("home-hero-filter-band"), HOME_SHELL_GEOMETRY_CLASSES.heroSurface],
@@ -690,25 +682,20 @@ describe("Home", () => {
       }
     };
 
-    try {
-      setViewport(390, 844);
-      render(<Home />);
+    render(<Home />);
 
-      expectSharedGeometry();
-      expect(screen.queryByRole("region", { name: "Active leaderboard filters" })).toBeNull();
-      expect(screen.queryByText("Leaderboard scope details")).toBeNull();
+    expectSharedGeometry();
+    expect(screen.queryByRole("region", { name: "Active leaderboard filters" })).toBeNull();
+    expect(screen.queryByText("Leaderboard scope details")).toBeNull();
 
-      resultRows.resolve(RESULT_ROWS);
-      metaRows.resolve(META_LEADERBOARD_ROWS);
-      cohortRows.resolve(COHORT_ROWS);
+    resultRows.resolve(RESULT_ROWS);
+    metaRows.resolve(META_LEADERBOARD_ROWS);
+    cohortRows.resolve(COHORT_ROWS);
 
-      await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
-      expectSharedGeometry();
-      expect(screen.getByRole("region", { name: "Active leaderboard filters" })).toBeTruthy();
-      expect(screen.getByText("Leaderboard scope details")).toBeTruthy();
-    } finally {
-      setViewport(originalWidth, originalHeight);
-    }
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    expectSharedGeometry();
+    expect(screen.getByRole("region", { name: "Active leaderboard filters" })).toBeTruthy();
+    expect(screen.getByText("Leaderboard scope details")).toBeTruthy();
   });
 
   it("keeps the leaderboard region before secondary workflow and recent-result sections", async () => {
