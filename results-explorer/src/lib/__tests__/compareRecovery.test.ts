@@ -54,6 +54,29 @@ describe("recoverCompareResults", () => {
     expect(recovery.missing).toEqual([{ requestedId: "missing", resolvedId: "missing" }]);
   });
 
+  it("starts detail reads for initial positive matches while omissions are confirmed", async () => {
+    let finishConfirmation: ((ids: ReadonlySet<string>) => void) | undefined;
+    const loadResult = vi.fn(async (id: string) => ({ id }));
+    const recoveryPromise = recoverCompareResults(["kept", "missing"], 4, {
+      resolveId: async (id) => id,
+      findExistingIds: async (_ids, onInitialExistingIds) => {
+        onInitialExistingIds?.(new Set(["kept"]));
+        return new Promise<ReadonlySet<string>>((resolve) => {
+          finishConfirmation = resolve;
+        });
+      },
+      loadResult,
+    });
+
+    await vi.waitFor(() => expect(loadResult).toHaveBeenCalledWith("kept"));
+    expect(loadResult).not.toHaveBeenCalledWith("missing");
+    finishConfirmation?.(new Set(["kept"]));
+
+    const recovery = await recoveryPromise;
+    expect(recovery?.recovered.map((entry) => entry.requestedId)).toEqual(["kept"]);
+    expect(recovery?.missing).toEqual([{ requestedId: "missing", resolvedId: "missing" }]);
+  });
+
   it("deduplicates resolved aliases before applying the selection limit", async () => {
     const loadResult = vi.fn(async (id: string) => ({ id }));
     const recovery = await recoverCompareResults(["a", "alias-a", "b", "c"], 2, {
@@ -147,6 +170,23 @@ describe("recoverCompareResults", () => {
         resolveId: async (id) => id,
         loadResult,
         isCancelled: () => true,
+      }),
+    ).resolves.toBeNull();
+    expect(loadResult).not.toHaveBeenCalled();
+  });
+
+  it("does not begin detail reads after cancellation during a failed membership probe", async () => {
+    const loadResult = vi.fn(async (id: string) => ({ id }));
+    let cancelled = false;
+    await expect(
+      recoverCompareResults(["a", "b"], 4, {
+        resolveId: async (id) => id,
+        findExistingIds: async () => {
+          cancelled = true;
+          throw new Error("membership unavailable");
+        },
+        loadResult,
+        isCancelled: () => cancelled,
       }),
     ).resolves.toBeNull();
     expect(loadResult).not.toHaveBeenCalled();

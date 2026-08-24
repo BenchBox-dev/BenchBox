@@ -511,13 +511,36 @@ describe("getMetaLeaderboardData", () => {
 });
 
 describe("resolveShortId", () => {
-  it("batch-probes existing detail IDs", async () => {
-    mockedQueryRows.mockResolvedValueOnce([{ result_id: "known-a" }]);
+  it("individually confirms IDs omitted from the batch probe", async () => {
+    const onInitialExistingIds = vi.fn();
+    mockedQueryRows
+      .mockResolvedValueOnce([{ result_id: "known-a" }])
+      .mockResolvedValueOnce([]);
 
-    await expect(getExistingResultIds(["known-a", "missing-b"])).resolves.toEqual(new Set(["known-a"]));
-    const [sql, params] = mockedQueryRows.mock.calls[0]!;
-    expect(sql).toMatch(/FROM bench\.result_detail_metrics WHERE result_id IN \(\?, \?\)/);
-    expect(params).toEqual(["known-a", "missing-b"]);
+    await expect(
+      getExistingResultIds(["known-a", "missing-b"], onInitialExistingIds),
+    ).resolves.toEqual(new Set(["known-a"]));
+    expect(onInitialExistingIds).toHaveBeenCalledWith(new Set(["known-a"]));
+    expect(mockedQueryRows).toHaveBeenCalledTimes(2);
+    expect(mockedQueryRows.mock.calls).toEqual([
+      ["SELECT result_id FROM bench.result_detail_metrics WHERE result_id IN (?, ?)", ["known-a", "missing-b"]],
+      ["SELECT result_id FROM bench.result_detail_metrics WHERE result_id = ?", ["missing-b"]],
+    ]);
+  });
+
+  it("retains a real ID recovered by an individual confirmation after a partial batch read", async () => {
+    mockedQueryRows
+      .mockResolvedValueOnce([{ result_id: "known-a" }])
+      .mockResolvedValueOnce([{ result_id: "cold-b" }]);
+
+    await expect(getExistingResultIds(["known-a", "cold-b"])).resolves.toEqual(
+      new Set(["known-a", "cold-b"]),
+    );
+    expect(mockedQueryRows).toHaveBeenCalledTimes(2);
+    expect(mockedQueryRows.mock.calls[1]).toEqual([
+      "SELECT result_id FROM bench.result_detail_metrics WHERE result_id = ?",
+      ["cold-b"],
+    ]);
   });
 
   it("does not query existing detail IDs for an empty input", async () => {
