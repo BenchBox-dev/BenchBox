@@ -19,6 +19,7 @@ import {
   getCohort,
   getMetaLeaderboard,
   getMetaLeaderboardData,
+  getExistingResultIds,
   memoizedSnapshotQueryRows,
   resolveShortId,
   toShortIds,
@@ -510,6 +511,20 @@ describe("getMetaLeaderboardData", () => {
 });
 
 describe("resolveShortId", () => {
+  it("batch-probes existing detail IDs", async () => {
+    mockedQueryRows.mockResolvedValueOnce([{ result_id: "known-a" }]);
+
+    await expect(getExistingResultIds(["known-a", "missing-b"])).resolves.toEqual(new Set(["known-a"]));
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.result_detail_metrics WHERE result_id IN \(\?, \?\)/);
+    expect(params).toEqual(["known-a", "missing-b"]);
+  });
+
+  it("does not query existing detail IDs for an empty input", async () => {
+    await expect(getExistingResultIds([])).resolves.toEqual(new Set());
+    expect(mockedQueryRows).not.toHaveBeenCalled();
+  });
+
   it("returns the input unchanged when it is not a short-id-shaped string", async () => {
     // Full result_ids contain hyphens and are never 8+ contiguous hex chars.
     const fullId = "tpch-duckdb-abcdef12";

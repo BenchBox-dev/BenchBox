@@ -36,6 +36,24 @@ describe("recoverCompareResults", () => {
     expect(recovery.unprocessed).toEqual([]);
   });
 
+  it("does not start detail reads for IDs confirmed missing by the batch probe", async () => {
+    const loadResult = vi.fn(async (id: string) => ({ id }));
+    const recovery = await recoverCompareResults(["kept", "missing"], 4, {
+      resolveId: async (id) => id,
+      findExistingIds: async () => new Set(["kept"]),
+      loadResult,
+    });
+    expect(recovery).not.toBeNull();
+    if (recovery === null) throw new Error("recovery was unexpectedly cancelled");
+
+    expect(loadResult).toHaveBeenCalledTimes(1);
+    expect(loadResult).toHaveBeenCalledWith("kept");
+    expect(recovery.recovered).toEqual([
+      { requestedId: "kept", resolvedId: "kept", detail: { id: "kept" } },
+    ]);
+    expect(recovery.missing).toEqual([{ requestedId: "missing", resolvedId: "missing" }]);
+  });
+
   it("deduplicates resolved aliases before applying the selection limit", async () => {
     const loadResult = vi.fn(async (id: string) => ({ id }));
     const recovery = await recoverCompareResults(["a", "alias-a", "b", "c"], 2, {

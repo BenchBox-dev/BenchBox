@@ -5,6 +5,7 @@ import type { RoutableProps } from "preact-router";
 import type { DetailResult } from "@/types";
 import {
   getDetailResult,
+  getExistingResultIds,
   getPrimaryMetricForBenchmark,
   listResults,
   resolveShortId,
@@ -189,6 +190,7 @@ export function Compare({ url }: CompareProps) {
 
     recoverCompareResults(ids, MAX_COMPARE_SELECTIONS, {
       resolveId: resolveShortId,
+      findExistingIds: getExistingResultIds,
       loadResult: getDetailResult,
       isCancelled: () => cancelled,
     })

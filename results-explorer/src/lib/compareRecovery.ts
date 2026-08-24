@@ -32,6 +32,7 @@ export interface CompareRecoveryResult<T> {
 
 interface CompareRecoveryDependencies<T> {
   resolveId: (requestedId: string) => Promise<string>;
+  findExistingIds?: (resolvedIds: string[]) => Promise<ReadonlySet<string>>;
   loadResult: (resolvedId: string) => Promise<T | null>;
   isCancelled?: () => boolean;
 }
@@ -126,8 +127,24 @@ export async function recoverCompareResults<T>(
     (entry): entry is { requestedId: string; resolvedId: string; error: null } =>
       entry.resolvedId !== null,
   );
+  let loadCandidates = candidates;
+  const missing: ConfirmedMissingCompareResult[] = [];
+  if (dependencies.findExistingIds && candidates.length > 0) {
+    try {
+      const existingIds = await dependencies.findExistingIds(candidates.map((entry) => entry.resolvedId));
+      if (dependencies.isCancelled?.()) return null;
+      loadCandidates = candidates.filter((entry) => {
+        if (existingIds.has(entry.resolvedId)) return true;
+        missing.push({ requestedId: entry.requestedId, resolvedId: entry.resolvedId });
+        return false;
+      });
+    } catch {
+      // Preserve the existing per-result recovery path when the optional
+      // membership optimization is unavailable.
+    }
+  }
   const loaded = await Promise.all(
-    candidates.map(async (entry) => {
+    loadCandidates.map(async (entry) => {
       try {
         return { ...entry, detail: await dependencies.loadResult(entry.resolvedId), error: null };
       } catch (error) {
@@ -137,7 +154,6 @@ export async function recoverCompareResults<T>(
   );
 
   const recovered: RecoveredCompareResult<T>[] = [];
-  const missing: ConfirmedMissingCompareResult[] = [];
   for (const entry of loaded) {
     if (entry.error !== null) {
       failed.push({ requestedId: entry.requestedId, error: entry.error });

@@ -1229,6 +1229,16 @@ export async function getPrimaryMetricForBenchmark(benchmark: string): Promise<"
 
 const SHORT_ID_PATTERN = /^[0-9a-f]{8,}$/i;
 
+export async function getExistingResultIds(resultIds: string[]): Promise<ReadonlySet<string>> {
+  if (resultIds.length === 0) return new Set();
+  const placeholders = resultIds.map(() => "?").join(", ");
+  const rows = await queryRows<{ result_id: string }>(
+    `SELECT result_id FROM bench.result_detail_metrics WHERE result_id IN (${placeholders})`,
+    resultIds,
+  );
+  return new Set(rows.map((row) => row.result_id));
+}
+
 export async function resolveShortId(id: string): Promise<string> {
   if (!SHORT_ID_PATTERN.test(id)) return id;
   const rows = await queryRows<{ result_id: string }>("SELECT result_id FROM bench.short_ids WHERE short_id = ?", [id]);
