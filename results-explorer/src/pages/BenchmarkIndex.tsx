@@ -24,7 +24,7 @@ import {
   isComparable,
   isTimingDisplayable,
 } from "@/lib/displayEligibility";
-import { summarizeCompareExclusionReasons } from "@/lib/compareExclusionReasons";
+import { describeCompareExclusionReason, summarizeCompareExclusionReasons } from "@/lib/compareExclusionReasons";
 import { BenchmarkMatrixSkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -42,6 +42,8 @@ import { NotFound } from "@/pages/NotFound";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
+
+const BENCHMARK_SELECTION_LIMIT_REASON_ID = "benchmark-selection-limit";
 
 interface BenchmarkIndexProps extends RoutableProps {
   benchmark?: string;
@@ -453,27 +455,16 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const contextNote = benchmarkContextNote(benchmark);
   const selectedComparableCount = selectedCompareRows.length;
   const compareGuidance = benchmarkCompareGuidanceMessage(selectedComparableCount, title, effectiveSf, effectivePhase);
+  const selectionLimitCopy =
+    selectedIds.size >= MAX_COMPARE_SELECTIONS
+      ? describeCompareExclusionReason(`Up to ${MAX_COMPARE_SELECTIONS} runs can be compared.`)
+      : null;
   const matrixCompareRows = analysisSummary?.platforms ?? [];
   const zeroSelectableCompareRows =
     matrixCompareRows.length > 0 && matrixCompareRows.every((row) => !isComparable(row));
   const zeroSelectableReasons = summarizeCompareExclusionReasons(
     matrixCompareRows.map((row) => row.comparison_exclusion_reason),
   );
-  const matrixSummary = analysisSummary ?? filteredSummary;
-  const selectionAwareMatrixSummary =
-    matrixSummary && selectedIds.size >= MAX_COMPARE_SELECTIONS
-      ? {
-          ...matrixSummary,
-          platforms: matrixSummary.platforms.map((row) =>
-            selectedIds.has(compareIdForRow(row))
-              ? row
-              : {
-                  ...row,
-                  comparison_exclusion_reason: `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared.`,
-                },
-          ),
-        }
-      : matrixSummary;
 
   const updateSelectedIds = (next: Set<string>) => {
     if (next.size <= MAX_COMPARE_SELECTIONS) setSelectedIds(next);
@@ -680,6 +671,15 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           <div>
             <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Compare selected results</h2>
             <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">{compareGuidance}</p>
+            {selectionLimitCopy && (
+              <p
+                id={BENCHMARK_SELECTION_LIMIT_REASON_ID}
+                class="mt-1 text-sm text-[var(--bb-tone-warning-fg)]"
+                data-testid="benchmark-selection-limit"
+              >
+                <span class="font-medium">{selectionLimitCopy.shortText}.</span> {selectionLimitCopy.recoveryHint}
+              </p>
+            )}
           </div>
           {compareUrl ? (
             <span
@@ -741,9 +741,10 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
                 <RankingEligibilityLegend />
               )}
               <QueryHeatmap
-                summary={selectionAwareMatrixSummary ?? filteredSummary}
+                summary={analysisSummary ?? filteredSummary}
                 selectedIds={selectedIds}
                 onSelectionChange={updateSelectedIds}
+                selectionLimitReasonId={selectionLimitCopy ? BENCHMARK_SELECTION_LIMIT_REASON_ID : undefined}
                 highContrast={highContrast}
               />
             </>
