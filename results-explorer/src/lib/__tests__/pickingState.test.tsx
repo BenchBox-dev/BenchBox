@@ -112,6 +112,23 @@ function RestoreHarness() {
 }
 
 describe("Pages fallback picking hop", () => {
+  it("falls back to memory when the browser denies sessionStorage access", () => {
+    const descriptor = Object.getOwnPropertyDescriptor(window, "sessionStorage");
+    Object.defineProperty(window, "sessionStorage", {
+      configurable: true,
+      get() {
+        throw new DOMException("Access denied", "SecurityError");
+      },
+    });
+
+    try {
+      expect(readPagesRestorePickingIds()).toEqual([]);
+    } finally {
+      if (descriptor) Object.defineProperty(window, "sessionStorage", descriptor);
+      else Reflect.deleteProperty(window, "sessionStorage");
+    }
+  });
+
   it("discards a pending unload snapshot on a normal reload or reopened tab", () => {
     const storage = new MemoryStorage();
     storage.setItem(

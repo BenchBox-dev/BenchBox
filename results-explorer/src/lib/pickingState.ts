@@ -55,12 +55,7 @@ function normalizedPickingIds(ids: readonly string[]): string[] {
 }
 
 function browserSessionStorage(): Storage | null {
-  if (
-    typeof window === "undefined" ||
-    typeof window.sessionStorage === "undefined"
-  ) {
-    return null;
-  }
+  if (typeof window === "undefined") return null;
   try {
     return window.sessionStorage;
   } catch {
