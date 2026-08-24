@@ -26,8 +26,11 @@ error instead of silently reporting a clean pass, which is the point.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
+from benchbox.core.dataframe.query import QueryRegistry
 from benchbox.core.dataframe.query_resolution import registry_dataframe_queries
 from benchbox.core.exceptions import ConfigurationError
 from benchbox.core.runner.dataframe_runner import _get_queries_for_benchmark, no_dataframe_queries_message
@@ -59,10 +62,53 @@ def test_resolution_reaches_every_shipped_registry(benchmark_id: str, expected_c
     assert all(getattr(query, "query_id", None) for query in queries)
 
 
+def test_resolution_detects_a_nonstandard_registry_name() -> None:
+    """Registry discovery is type-based because valid constant names are not uniform."""
+    queries = registry_dataframe_queries("tpcds_obt")
+
+    assert [query.query_id for query in queries] == ["Q1", "Q2", "Q3"]
+
+
 def test_the_registry_helper_is_quiet_about_a_benchmark_that_ships_none() -> None:
     """A benchmark with no dataframe_queries package resolves to nothing, not an error."""
-    assert registry_dataframe_queries("tpcds_obt") == []
     assert registry_dataframe_queries("no_such_benchmark") == []
+
+
+def test_nested_module_import_error_is_not_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A broken dependency in an existing query module must fail closed."""
+    from benchbox.core.dataframe import query_resolution
+
+    error = ModuleNotFoundError("No module named 'broken_dependency'", name="broken_dependency")
+
+    def broken_import(_target: str) -> None:
+        raise error
+
+    monkeypatch.setattr(query_resolution.importlib, "import_module", broken_import)
+
+    with pytest.raises(ModuleNotFoundError, match="broken_dependency"):
+        registry_dataframe_queries("broken_benchmark")
+
+
+def test_multiple_registries_are_rejected_as_ambiguous(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A module cannot silently choose one of multiple independent registries."""
+    from benchbox.core.dataframe import query_resolution
+
+    module = SimpleNamespace(first=QueryRegistry("first"), second=QueryRegistry("second"))
+    monkeypatch.setattr(query_resolution.importlib, "import_module", lambda _target: module)
+
+    with pytest.raises(RuntimeError, match="Multiple DataFrame query registries"):
+        registry_dataframe_queries("ambiguous")
+
+
+def test_registry_aliases_do_not_create_false_ambiguity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two exported names for the same registry still resolve deterministically."""
+    from benchbox.core.dataframe import query_resolution
+
+    registry = QueryRegistry("aliased")
+    module = SimpleNamespace(primary=registry, compatibility_alias=registry)
+    monkeypatch.setattr(query_resolution.importlib, "import_module", lambda _target: module)
+
+    assert registry_dataframe_queries("aliased") == []
 
 
 def test_the_message_distinguishes_a_narrow_filter_from_a_missing_source() -> None:
