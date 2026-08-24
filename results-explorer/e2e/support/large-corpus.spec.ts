@@ -84,6 +84,10 @@ async function withLargeFixture(run: (baseUrl: string) => Promise<void>) {
 }
 
 test.describe("large corpus fixture", () => {
+  // CI can need more than the global 90 seconds to generate the 292-result fixture
+  // before the browser assertions begin.
+  test.describe.configure({ timeout: 240_000 });
+
   test("large corpus reproduces an unbounded Compare document at desktop and mobile widths", async ({ browser }) => {
     await withLargeFixture(async (baseUrl) => {
       for (const viewport of [
