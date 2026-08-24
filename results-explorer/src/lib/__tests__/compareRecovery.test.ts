@@ -33,6 +33,7 @@ describe("recoverCompareResults", () => {
     ]);
     expect(recovery.missing).toEqual([{ requestedId: "missing", resolvedId: "missing" }]);
     expect(recovery.failed).toEqual([]);
+    expect(recovery.unprocessed).toEqual([]);
   });
 
   it("deduplicates resolved aliases before applying the selection limit", async () => {
@@ -48,6 +49,54 @@ describe("recoverCompareResults", () => {
     expect(recovery.overflow).toEqual(["c"]);
     expect(recovery.recovered.map((entry) => entry.requestedId)).toEqual(["a", "b"]);
     expect(loadResult).toHaveBeenCalledTimes(2);
+    expect(recovery.unprocessed).toEqual([]);
+  });
+
+  it("bounds resolver work for a long crafted ID list", async () => {
+    const rawIds = Array.from({ length: 50 }, (_, index) => `id-${index + 1}`);
+    const resolveId = vi.fn(async (id: string) => id);
+    const recovery = await recoverCompareResults(rawIds, 4, {
+      resolveId,
+      loadResult: async (id) => ({ id }),
+    });
+    expect(recovery).not.toBeNull();
+    if (recovery === null) throw new Error("recovery was unexpectedly cancelled");
+
+    expect(resolveId).toHaveBeenCalledTimes(8);
+    expect(recovery.recovered.map((entry) => entry.requestedId)).toEqual(rawIds.slice(0, 4));
+    expect(recovery.overflow).toEqual(rawIds.slice(4, 8));
+    expect(recovery.unprocessed).toEqual(rawIds.slice(8));
+  });
+
+  it("does not resolve IDs when the comparison limit is zero", async () => {
+    const resolveId = vi.fn(async (id: string) => id);
+    const recovery = await recoverCompareResults(["a", "b"], 0, {
+      resolveId,
+      loadResult: async (id) => ({ id }),
+    });
+
+    expect(resolveId).not.toHaveBeenCalled();
+    expect(recovery?.unprocessed).toEqual(["a", "b"]);
+  });
+
+  it("retains four canonical IDs when every requested result also has an alias", async () => {
+    const resolveId = vi.fn(async (id: string) => id.replace(/^alias-/, ""));
+    const recovery = await recoverCompareResults(
+      ["a", "alias-a", "b", "alias-b", "c", "alias-c", "d", "alias-d", "e"],
+      4,
+      {
+        resolveId,
+        loadResult: async (id) => ({ id }),
+      },
+    );
+    expect(recovery).not.toBeNull();
+    if (recovery === null) throw new Error("recovery was unexpectedly cancelled");
+
+    expect(resolveId).toHaveBeenCalledTimes(8);
+    expect(recovery.aliases).toEqual(["alias-a", "alias-b", "alias-c", "alias-d"]);
+    expect(recovery.recovered.map((entry) => entry.requestedId)).toEqual(["a", "b", "c", "d"]);
+    expect(recovery.overflow).toEqual([]);
+    expect(recovery.unprocessed).toEqual(["e"]);
   });
 
   it("keeps transient resolution and load failures distinct from missing results", async () => {
