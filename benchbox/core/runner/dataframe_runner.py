@@ -42,6 +42,7 @@ from benchbox.core.dataframe.query_resolution import (
     get_tpcds_dataframe_queries,
     get_tpcds_legacy_queries,
     get_tpch_dataframe_queries,
+    registry_dataframe_queries,
     resolve_tpcds_query_manager,
     resolve_tpcds_stream_queries,
 )
@@ -852,7 +853,7 @@ def _get_queries_for_benchmark(
     if _benchmark_provides_dataframe_queries(benchmark_instance):
         return benchmark_instance.get_dataframe_queries()
 
-    return []
+    return registry_dataframe_queries(benchmark_id)
 
 
 def _get_tpch_dataframe_queries(
