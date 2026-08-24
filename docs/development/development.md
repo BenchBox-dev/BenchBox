@@ -109,6 +109,15 @@ clean registration. See [the disposable worktree guide](../operations/dev-loop-w
 for common commands and recovery scenarios. External contributors working
 from a fork can use the same lifecycle.
 
+## Pull Request Lifecycle & Merge Queue Integration
+
+BenchBox enforces single-commit squash integration into `develop` with strict current-base verification:
+
+- **`make pr-open`**: Pushes the current branch, verifies it is current with `origin/develop`, and creates or reuses the pull request. Auto-merge is withheld by default until the branch is marked final.
+- **`make pr-ready`** (or **`make pr-open READY=1`**): Marks the branch final and arms auto-merge. When a merge queue is active on `develop`, arming automatically enqueues the PR for speculative combined-tree testing.
+- **Soundness Gate**: PRs modifying soundness-critical paths (`benchbox/core/equivalence/`, `benchbox/core/expected_results/`, etc.) cannot be auto-enqueued and require explicit maintainer review.
+- **`make pr-refresh`**: Refreshes a stale PR branch onto `origin/develop` when resolving merge conflicts locally. Run one branch at a time.
+
 ## Release Preparation Workflow
 
 See [the release guide](../operations/release-guide.md) for the full

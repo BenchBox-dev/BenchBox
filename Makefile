@@ -1349,7 +1349,9 @@ pr-content-guard:
 # Push current branch and open a PR against develop. Auto-merge is WITHHELD by
 # default so a follow-up commit cannot race a merge. Arm only when the branch
 # is final: `make pr-ready`, or `make pr-open READY=1` to open and arm in one
-# step. Soundness-path diffs are never armed (see pr-arm-auto-merge).
+# step. When a merge queue is enabled on develop, arming auto-merge enqueues
+# the PR for speculative integration once checks pass. Soundness-path diffs are
+# never armed or auto-enqueued (see pr-arm-auto-merge).
 # Refuses to run from develop/release.
 #
 # Idempotent: safe to rerun. If a PR is already open for the branch, reuses it.
@@ -1403,8 +1405,10 @@ pr-open:
 		$(MAKE) -s pr-arm-auto-merge URL="$$URL"; \
 	fi
 
-# Arms squash auto-merge for an already-open PR. Split out of pr-open so the
-# soundness check has exactly one implementation and both entry points get it.
+# Arms squash auto-merge / queue enrollment for an already-open PR. Split out of
+# pr-open so the soundness check has exactly one implementation and both entry
+# points get it. When a merge queue is active on develop, auto-merge enqueues
+# the PR for speculative combined-tree validation.
 # Honours the durable `no-auto-merge` hold label: before this check, the label
 # was only durable against paths that never arm (workflow + sweep) while the
 # one live arm path ignored it — #1626 was armed 52s after being labeled. See
@@ -1429,7 +1433,7 @@ pr-arm-auto-merge:
 		gh pr merge --auto --squash "$$URL"; \
 	fi
 
-# Declares the branch final and arms auto-merge.
+# Declares the branch final and arms auto-merge / queue enrollment.
 #
 # Auto-merge is NOT armed by `pr-open`, because arming at creation is only
 # correct if nothing more will be pushed - and the usual reason something more
