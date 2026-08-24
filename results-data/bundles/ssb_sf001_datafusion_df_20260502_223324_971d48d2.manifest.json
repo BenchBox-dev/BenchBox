@@ -1,10 +1,11 @@
 {
   "benchmark": "SSB",
   "bundle_file": "ssb_sf001_datafusion_df_20260502_223324_971d48d2.json",
-  "bundle_hash": "e388516c7c4a6055c1fe4cb919ceb17b95f5d7d9a124105cbde5612a13475490",
+  "bundle_hash": "60d938ce0f564598247085ec5a6b2beb81c0d50445633caf3748f9848f05c2c0",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",
+  "result_source": "internal",
   "scale_factor": 0.01,
   "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",

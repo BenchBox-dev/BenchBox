@@ -1,10 +1,11 @@
 {
   "benchmark": "H2ODB",
   "bundle_file": "h2odb_sf1_polars_df_20260502_211228_368e2b57.json",
-  "bundle_hash": "74f23ef87d3ff44e3c767baef4087cad469f781c16dbd48c7d7cce8658f77d28",
+  "bundle_hash": "55350bbf8a652bbcabb1c3dbb333e182cc88cf04fc78beba54f974d269da8685",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",
+  "result_source": "internal",
   "scale_factor": 1.0,
   "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",

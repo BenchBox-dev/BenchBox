@@ -160,6 +160,14 @@ ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     # snapshot can: test_surface_constant_parity.py reads the live Click Choice
     # off the registered command and asserts it equals EXPORT_FORMATS.
     "benchbox/cli/commands/export.py",
+    # platforms-list-unreadable-at-standard-width: `platforms list` gains
+    # --detail and a `json` --format value so the default table fits an
+    # 80-column terminal. That is an intentional customer-facing surface
+    # change, which is exactly what this guard exists to make deliberate
+    # rather than accidental. Temporary, like the run.py entry above: the
+    # guard diffs against the base ref, so once this lands on develop the
+    # baseline already carries the new signature and the entry can go.
+    "benchbox/cli/platform.py",
 }
 ALLOWED_INTERNAL_CLI_FILES = ALLOWED_INTERNAL_CLI_FILES | ALLOWED_HIDDEN_COMPAT_CLI_FILES
 FORBIDDEN_CLI_SURFACE_DECORATORS = {"argument", "command", "group", "option"}

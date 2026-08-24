@@ -501,6 +501,7 @@ def benchbox_run_official_argv(
     seed: int | None = None,
     extra_args: Iterable[str] = (),
     local_managed_platform: bool = False,
+    quiet: bool = True,
 ) -> list[str]:
     """Build the `uv run -- benchbox run-official ...` argv for a throughput cell.
 
@@ -510,10 +511,10 @@ def benchbox_run_official_argv(
     can request N>1 concurrent throughput streams today; see
     `tests.uat.throughput` and the `throughput-stream-count-wiring-defect`
     TODO's `deferred` note. `run-official` requires a TPC-compliant scale
-    factor (`tests.uat.throughput.TPC_ALLOWED_SCALE_FACTORS`) and has no
-    `--quiet`/`--non-interactive` flags of its own, so this does not include
-    them -- see `tests.uat.throughput.resolve_official_result_path` for how
-    the runner locates the result JSON without a parseable stdout line.
+    factor (`tests.uat.throughput.TPC_ALLOWED_SCALE_FACTORS`). UAT uses
+    `--quiet` by default so the deprecated command reuses the same final
+    bare-path stdout contract as `benchbox run`; callers can disable it for
+    a verbose diagnostic rerun.
     """
     argv = uv_run_argv(platform)
     argv += [
@@ -531,6 +532,8 @@ def benchbox_run_official_argv(
     ]
     if seed is not None:
         argv += ["--seed", str(seed)]
+    if quiet:
+        argv += ["--quiet"]
     argv += PLATFORM_CLI_FLAGS.get(platform, [])
     argv += docker_assets.platform_extra_opts(platform)
     if local_managed_platform:

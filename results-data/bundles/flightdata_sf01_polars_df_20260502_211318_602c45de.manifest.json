@@ -1,10 +1,11 @@
 {
   "benchmark": "Flight Data",
   "bundle_file": "flightdata_sf01_polars_df_20260502_211318_602c45de.json",
-  "bundle_hash": "7970bed73f4b353424f0e9234915f1bff102405a25fa69870430e5a4cad10967",
+  "bundle_hash": "6dd5ca200473822781f54f2aee84671a8cbfbf68d92f4311ba0b0d286648f15c",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",
+  "result_source": "internal",
   "scale_factor": 0.1,
   "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",

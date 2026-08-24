@@ -47,6 +47,7 @@ from _project.scripts.explorer_pipeline.transformer import (
 from _project.scripts.results_explorer_snapshot_invariants import check_snapshot
 from benchbox.core.results.anonymization import AnonymizationManager, find_public_path_leaks
 from benchbox.core.results.canonical_json import canonical_json_bytes
+from benchbox.core.results.provenance import SOURCE_TO_TRUST_LABEL
 from benchbox.validation.bundle import COMPANION_SUFFIXES, discover_bundles
 
 logger = logging.getLogger(__name__)
@@ -242,6 +243,38 @@ def _find_submission_manifest(bundle_path: Path) -> Path | None:
     if legacy.is_file():
         return legacy
     return None
+
+
+def _manifest_trust_label(bundle_path: Path, default: str) -> str:
+    """Resolve a bundle's trust label from its recorded provenance.
+
+    Sidecar *presence* used to imply community provenance on its own. That was
+    wrong in the direction that mattered: ``benchbox submit`` writes a sidecar
+    unconditionally, including when a maintainer runs it, so 191 of 207
+    maintainer-generated bundles were labelled ``community-submission`` and,
+    because community submissions are not ranking-eligible, the public
+    leaderboard rendered 15 of 207 results.
+
+    The sidecar's ``result_source`` is authoritative. A sidecar that records no
+    source has unknown provenance and fails safe to ``community-submission`` --
+    never promoted by assumption. No sidecar at all means maintainer-committed.
+
+    This mirrors ``scripts/generate_corpus_inventory.py::_bundle_trust_label``;
+    the two derivations must stay in lockstep.
+    """
+    manifest_path = _find_submission_manifest(bundle_path)
+    if manifest_path is None:
+        return default
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return COMMUNITY_TRUST_LABEL
+    if not isinstance(manifest, dict):
+        return COMMUNITY_TRUST_LABEL
+    source = manifest.get("result_source")
+    if isinstance(source, str) and source in SOURCE_TO_TRUST_LABEL:
+        return SOURCE_TO_TRUST_LABEL[source]
+    return COMMUNITY_TRUST_LABEL
 
 
 def _public_applied_receipt(bundle_path: Path, anonymizer: AnonymizationManager) -> str | None:
@@ -686,13 +719,14 @@ class ExplorerPipeline:
                         logger.debug(
                             "Vendor subtree bundle %s - using trust_label=%r", bundle_path.name, effective_trust
                         )
-                    elif _find_submission_manifest(bundle_path) is not None:
-                        effective_trust = COMMUNITY_TRUST_LABEL
-                        logger.debug(
-                            "Found submission manifest for %s - using trust_label=%r",
-                            bundle_path.name,
-                            effective_trust,
-                        )
+                    else:
+                        effective_trust = _manifest_trust_label(bundle_path, trust_label)
+                        if effective_trust != trust_label:
+                            logger.debug(
+                                "Recorded provenance for %s - using trust_label=%r",
+                                bundle_path.name,
+                                effective_trust,
+                            )
 
                     public_bundle, public_receipt = _public_bundle_data(bundle_path, bundle_data, public_anonymizer)
                     # Publication anonymization can change already-public values

@@ -189,8 +189,9 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
         if not token:
             raise ValueError(
                 "MotherDuck deployment mode requires authentication token.\n"
-                "Provide via --platform-option motherduck_token=<token> or "
-                "set MOTHERDUCK_TOKEN environment variable.\n"
+                "Set the MOTHERDUCK_TOKEN environment variable.\n"
+                "It is deliberately not a --platform-option: options appear in "
+                "shell history and in the process list.\n"
                 "Get your token at https://app.motherduck.com/token"
             )
         config["motherduck_token"] = token

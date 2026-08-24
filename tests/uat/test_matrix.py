@@ -451,6 +451,25 @@ def test_benchbox_run_argv_velox_iterations_one():
     assert iter_idx < opt_idx
 
 
+def test_benchbox_run_official_argv_includes_quiet_by_default():
+    argv = matrix.benchbox_run_official_argv("duckdb", "tpch", 1, phases="throughput", streams=3, seed=42)
+    assert "--quiet" in argv
+    assert "--streams" in argv and argv[argv.index("--streams") + 1] == "3"
+
+
+def test_benchbox_run_official_argv_can_omit_quiet_for_diagnostics():
+    argv = matrix.benchbox_run_official_argv(
+        "duckdb",
+        "tpch",
+        1,
+        phases="throughput",
+        streams=3,
+        seed=42,
+        quiet=False,
+    )
+    assert "--quiet" not in argv
+
+
 # ---------------------------------------------------------------------------
 # w1 (uat-operator-provisioning): every release-gate platform must resolve
 # from the persistent dev venv (`uv sync` dev group) OR have a

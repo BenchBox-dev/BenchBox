@@ -807,7 +807,7 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         statistics are absent for DML.
 
         ANALYZE is also suppressed when ``self.analyze_plans`` is False (e.g. the
-        isolated capture phase or ``--platform-option analyze_plans=false``):
+        isolated capture phase or the top-level ``--no-analyze-plans`` flag):
         plain EXPLAIN (FORMAT JSON) captures the estimated plan structure without
         re-executing the query, so a SELECT is not run a second time.
         """

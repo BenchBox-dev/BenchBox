@@ -819,7 +819,8 @@ The only supported rung order is:
 |---|---:|---:|---:|---|
 | `baseline-1g` | 1 GiB | 1 GiB | 300 s | run first; existing baseline, not a new published limit |
 | `candidate-4g` | 4 GiB | 4 GiB | 300 s | run only after the baseline fails or cannot complete |
-| `candidate-8g` | 8 GiB | 8 GiB | 300 s | run only when the 4 GiB trace justifies escalation |
+| `candidate-5.25g` | 5.25 GiB | 5.25 GiB | 300 s | run after the 4 GiB trace fails; selected by the current TPC-H SF1 evidence |
+| `candidate-8g` | 8 GiB | 8 GiB | 300 s | run only when the 5.25 GiB trace fails or cannot complete |
 | `candidate-12g` | 12 GiB | 12 GiB | 300 s | last resort; requires a trace-backed reason |
 
 Wrap the real ClickHouse server UAT command so sampling covers the whole load
@@ -837,8 +838,10 @@ uv run -- python -m tests.uat.clickhouse_memory \
        --benchmark tpch --scale 0.01 --phases load
 ```
 
-The SF1 certification trace runs on Linux with Docker. A macOS smoke may use
-`--engine mocker`, but it is not SF1 certification evidence.
+The SF1 certification trace may run on Linux with Docker or on macOS with
+Apple Container/Mocker. On macOS, certification evidence must bind the
+runtime-reported limit to the Linux guest cgroup `memory.max`; a generic
+mocker startup result without guest-cgroup evidence is not sufficient.
 
 Run a small smoke cell first. Only if that trace is responsive and free of
 OOM/cgroup-kill/timeout evidence should the same rung be tried at SF1. Advance
@@ -868,7 +871,7 @@ host reserve.
 
 ClickHouse is the exception to the generic "declared limit or engine default"
 diagnostic above. Its managed UAT compose file requires the caller to resolve
-`preflight.clickhouse_memory_limit` (currently configured as the `8g` SF1
+`preflight.clickhouse_memory_limit` (currently configured as the `5.25g` SF1
 candidate) into `CLICKHOUSE_MEMORY_LIMIT`; the compose file has no `:-1g` or
 other fallback. A missing, empty, or malformed request is an admission error
 before `compose up`, never a reason to recreate the historical 1 GiB batch.
@@ -888,40 +891,31 @@ driver batch size. The existing `free_memory_min_gib: 0` setting remains an
 explicit, supervised opt-out of the pre-start floor, but it does not permit
 an unverified ClickHouse runtime limit or post-start reserve shortfall.
 
-#### Why the current candidate is 8 GiB
+#### Why the current candidate is 5.25 GiB
 
-No SF1 rung has been selected yet: `select_lowest_successful_rung()` has no
-valid passing Linux trace to consume. The configured 8 GiB candidate is a
-ceiling with headroom, not a measured demand. The failed
-SF1 4 GiB trace (`clickhouse-memory-sf1-4g.json`, 2026-08-13) recorded
-`peak_engine_usage_bytes = 3.4 GB` and a peak `metric.MemoryTracking` of
-3.21 GB at t=127s of a 142-second load, back down to 589 MB by the final
-sample. That peak is a transient from background MergeTree merges over
-accumulated `lineitem` parts while inserts are still streaming, so it tracks
-concurrent merges, part size, and `max_threads` rather than dataset size --
-SF1 TPC-H is about 1.26 GB of compressed input. ClickHouse also derives its
-own server-wide cap from the RAM it detects, so the 4 GiB run tripped at
-"would use 3.51 GiB" against a 3.73 GiB cgroup, roughly 94% of the cap; a
-larger container raises that internal ceiling while the working peak stays
-put. 8 GiB is simply the next rung above the one that failed; it remains
-pending until a valid passing Linux trace establishes the lowest successful
-rung.
+The failed SF1 4 GiB trace (`clickhouse-memory-sf1-4g.json`, 2026-08-13)
+recorded `peak_engine_usage_bytes = 3.4 GB` and a peak
+`metric.MemoryTracking` of 3.21 GB while inserts and background MergeTree
+merges overlapped. Exploratory full TPC-H SF1 runs then passed at 5.25, 5.5,
+6, and 8 GiB; the 5 GiB run failed three power queries without a cgroup/OOM
+event. The current selected rung is therefore the lowest passing exploratory
+rung, 5.25 GiB, not a limit inferred from total RAM.
 
-Note that on macOS the container runs inside a Linux VM, so the request is
-backed by host RAM plus VM overhead and the effective host cost is roughly
-double the engine's actual need. SF1 certification therefore runs on Linux;
-macOS keeps the SF0.01 smoke at `baseline-1g`. See
-[ADR: `clickhouse-server` Containerization and Linux SF1 Certification](../development/adr/adr-clickhouse-server-containerization.md).
+TPC-DS SF1 at 5.25 GiB completed the load path without a cgroup/OOM event and
+reached about 3.11 GB peak engine usage. Its power phase had query failures,
+so it supports the memory envelope but is not a clean TPC-DS correctness pass.
 
-That placement is a documented requirement, not a gate. Admission checks
-available memory and does not check the platform, so a macOS host with enough
-RAM will pass and produce an SF1 result the ADR does not consider valid. Do not
-treat a darwin SF1 certification as qualified.
+On macOS the container runs inside a Linux VM. The host VM overhead and swap
+pressure remain part of the required telemetry, but Apple Container's guest
+Linux cgroup contract is accepted when `memory.max`, runtime stats, and OOM
+state are captured and bound to the same run. See [ADR:
+`clickhouse-server` Containerization and SF1 Certification on Linux or Apple
+Container](../development/adr/adr-clickhouse-server-containerization.md).
 
 For a direct operator compose check, export the selected rung explicitly:
 
 ```bash
-CLICKHOUSE_MEMORY_LIMIT=8g docker compose -f docker/clickhouse/docker-compose.yml config
+CLICKHOUSE_MEMORY_LIMIT=5.25g docker compose -f docker/clickhouse/docker-compose.yml config
 ```
 
 The UAT harness passes the same environment to `up`, readiness, runtime

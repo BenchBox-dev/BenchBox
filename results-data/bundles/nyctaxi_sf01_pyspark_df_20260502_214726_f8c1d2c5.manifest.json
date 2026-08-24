@@ -1,10 +1,11 @@
 {
   "benchmark": "NYC Taxi",
   "bundle_file": "nyctaxi_sf01_pyspark_df_20260502_214726_f8c1d2c5.json",
-  "bundle_hash": "56559e67cd34476f2256fa0ad654ad0a2b3dc1971748ec078112326d151065ce",
+  "bundle_hash": "1d70708f1461b7ea2ab9a523bb3e0d2aafa241a5c45d240a4bf119bc62483ff4",
   "companion_hashes": {},
   "phase": 2,
   "platform": "PySpark",
+  "result_source": "internal",
   "scale_factor": 0.1,
   "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",

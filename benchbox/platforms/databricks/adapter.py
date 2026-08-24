@@ -154,9 +154,8 @@ class DatabricksAdapter(PlatformAdapter):
             raise ConfigurationError(
                 f"Databricks configuration is incomplete. Missing: {', '.join(missing)}\n"
                 "Configure with one of:\n"
-                "  1. CLI: benchbox platforms setup --platform databricks\n"
-                "  2. Environment variables: DATABRICKS_HOST, DATABRICKS_HTTP_PATH, DATABRICKS_TOKEN\n"
-                "  3. CLI options: --platform-option server_hostname=<host> --platform-option http_path=<path>"
+                "  1. CLI: benchbox setup --platform databricks\n"
+                "  2. Environment variables: DATABRICKS_HOST, DATABRICKS_HTTP_PATH, DATABRICKS_TOKEN"
             )
 
     @property

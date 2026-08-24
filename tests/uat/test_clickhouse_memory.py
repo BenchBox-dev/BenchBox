@@ -110,6 +110,20 @@ def test_trace_rejects_application_batch_rows_even_when_run_passes():
     assert payload["loader_contract"]["legacy_1000_row_fallback"] is True
 
 
+def test_trace_ignores_startup_samples_before_insert_counters():
+    trace = _trace()
+    startup_sample = replace(trace.samples[0], clickhouse_metrics={})
+    trace.samples.insert(0, startup_sample)
+    assert trace.valid_for_calibration is True
+    assert trace.to_dict()["summary"]["calibration_sample_count"] == 1
+
+
+def test_trace_rejects_later_telemetry_gap_after_warmup():
+    trace = _trace()
+    trace.samples.append(replace(trace.samples[0], clickhouse_metrics={}))
+    assert trace.valid_for_calibration is False
+
+
 def test_trace_requires_native_streaming_and_responsive_sample():
     trace = _trace()
     trace.native_streaming = False
@@ -412,6 +426,11 @@ def test_main_leaves_running_artifact_when_child_is_interrupted(monkeypatch, tmp
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["outcome"] == "running"
     assert payload["summary"]["valid_for_calibration"] is False
+
+
+def test_rung_matrix_includes_experimental_525g_candidate():
+    rendered = clickhouse_memory.rung_matrix_text()
+    assert "candidate-5.25g\t5.25\t5.25\t300" in rendered
 
 
 def test_rung_matrix_excludes_1000_row_language():

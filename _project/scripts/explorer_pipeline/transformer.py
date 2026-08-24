@@ -336,18 +336,49 @@ def _platform_version(data: dict[str, Any]) -> str | None:
     return str(val) if val and val != "unknown" else None
 
 
+#: Ordered key paths consulted for a bundle's SQL-vs-DataFrame execution mode.
+#:
+#: Measured against all 207 published bundles on 2026-08-23:
+#:   - ``config.execution_mode`` and ``execution.execution_mode`` are the
+#:     documented schema locations but NO bundle writes either, which is why
+#:     the facet was NULL for 207 of 207 rows.
+#:   - ``platform.config.execution_mode`` is populated on every bundle,
+#:     including ones produced by current develop.
+#:   - ``config.mode`` agrees with it on all 207.
+#:   - Both agree with the filename suffix (``_df_`` / ``_sql_``) wherever one
+#:     exists: 105 df, 95 sql, 7 without a suffix.
+#:
+#: ``execution.mode`` is deliberately NOT consulted: it reads "sql" for 105
+#: DataFrame runs, so using it would label more than half the corpus wrongly.
+_EXECUTION_MODE_KEY_PATHS: tuple[tuple[str, ...], ...] = (
+    ("config", "execution_mode"),
+    ("platform", "config", "execution_mode"),
+    ("config", "mode"),
+    ("execution", "execution_mode"),
+)
+
+#: Values a bundle may legitimately carry for execution mode.
+_EXECUTION_MODES = frozenset({"sql", "dataframe"})
+
+
 def _execution_mode(data: dict[str, Any]) -> str | None:
-    """Extract execution mode (sql/dataframe) from schema-v2 bundle."""
-    config = data.get("config", {})
-    if isinstance(config, dict):
-        val = config.get("execution_mode")
-        if val:
-            return str(val)
-    execution = data.get("execution", {})
-    if isinstance(execution, dict):
-        val = execution.get("execution_mode")
-        if val:
-            return str(val)
+    """Extract execution mode (sql/dataframe) from a schema-v2 bundle.
+
+    Walks :data:`_EXECUTION_MODE_KEY_PATHS` in order and returns the first
+    recognized value. A bundle that records no mode, or records something
+    outside the known vocabulary, stays ``None`` rather than being guessed --
+    an invented mode would label a DataFrame result as SQL, which is worse
+    than an honestly empty facet.
+    """
+    for path in _EXECUTION_MODE_KEY_PATHS:
+        node: Any = data
+        for key in path:
+            if not isinstance(node, dict):
+                node = None
+                break
+            node = node.get(key)
+        if node and str(node).lower() in _EXECUTION_MODES:
+            return str(node).lower()
     return None
 
 

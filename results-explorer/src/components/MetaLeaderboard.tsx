@@ -80,10 +80,12 @@ export function MetaLeaderboard({
 }: MetaLeaderboardProps) {
   const { cohorts = [], platforms = [] } = data ?? {};
   const gridRef = useRef<HTMLTableElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [focusPos, setFocusPos] = useState({ row: 0, col: 0 });
   const [announcement, setAnnouncement] = useState("");
   const [sortKey, setSortKey] = useState<MetaLeaderboardSort>("avg_rank");
   const [visiblePlatformLimit, setVisiblePlatformLimit] = useState(PLATFORM_RENDER_LIMIT);
+  const [showUnrankedPlatforms, setShowUnrankedPlatforms] = useState(false);
 
   const columnMins = useMemo(() => {
     const mins = new Map<string, number | null>();
@@ -107,12 +109,37 @@ export function MetaLeaderboard({
       ),
     [cohorts, platforms, resultMetadataById, sortKey],
   );
-  const visiblePlatforms = sortedPlatforms.slice(0, visiblePlatformLimit);
+  const collapsedPlatforms = useMemo(
+    () =>
+      sortedPlatforms.filter(
+        (platform) => hasPublishedEvidence(platform, cohorts) && !hasRankedEvidence(platform, cohorts),
+      ),
+    [cohorts, sortedPlatforms],
+  );
+  const collapsedPlatformIds = useMemo(
+    () => new Set(collapsedPlatforms.map((platform) => platform.platform_id)),
+    [collapsedPlatforms],
+  );
+  const defaultPlatforms = useMemo(
+    () => sortedPlatforms.filter((platform) => !collapsedPlatformIds.has(platform.platform_id)),
+    [collapsedPlatformIds, sortedPlatforms],
+  );
+  const renderedPlatforms = showUnrankedPlatforms
+    ? [...defaultPlatforms, ...collapsedPlatforms]
+    : defaultPlatforms;
+  const visiblePlatforms = renderedPlatforms.slice(0, visiblePlatformLimit);
+  const allExcludedRankingReasons = useMemo(
+    () =>
+      new Map(
+        cohorts.map((cohort) => [cohort.key, allExcludedRankingReason(cohort, platforms)]),
+      ),
+    [cohorts, platforms],
+  );
 
   useEffect(() => {
     setVisiblePlatformLimit(PLATFORM_RENDER_LIMIT);
     setFocusPos({ row: 0, col: 0 });
-  }, [cohorts, platforms, sortKey]);
+  }, [cohorts, platforms, showUnrankedPlatforms, sortKey]);
 
   useEffect(() => {
     if (platforms.length === 0 || cohorts.length === 0) return;
@@ -243,13 +270,17 @@ export function MetaLeaderboard({
 
       <div class="mb-2 flex flex-wrap items-baseline justify-between gap-3">
         <p class="text-sm text-[var(--bb-data-fg-muted)]">
-          Showing {visiblePlatforms.length.toLocaleString()} of {sortedPlatforms.length.toLocaleString()} ranked-scope platforms across{" "}
+          Showing {visiblePlatforms.length.toLocaleString()} of {renderedPlatforms.length.toLocaleString()} {platformScopeLabel(
+            collapsedPlatforms.length,
+            showUnrankedPlatforms,
+          )} across{" "}
           {cohorts.length.toLocaleString()} leaderboard {cohorts.length === 1 ? "ranking" : "rankings"}
         </p>
         <p id="meta-leaderboard-legend" class="text-xs text-[var(--bb-data-fg-subtle)]">
-          {mode === "times" && "Heat: darker = faster within each ranking. "}
-          {mode === "ranks" && "Heat: darker = better rank within ranking. "}
-          {mode === "speedup" && "Heat: darker = closer to ranking best (≥1.00x). Values < 1.00x are slower than baseline. "}
+          {mode === "times" && "Heat: darker = worse within each ranking. "}
+          {mode === "ranks" && "Heat: darker = a worse rank within each ranking. "}
+          {mode === "speedup" &&
+            "Heat: darker = farther from the ranking best (1.00x). Values below 1.00x are worse than the ranking best. "}
           <span class="italic">No run</span> = no published evidence. <span class="font-medium">Excluded</span> or{" "}
           <span class="font-medium">Unranked</span> = published evidence that is not scored.
         </p>
@@ -257,12 +288,13 @@ export function MetaLeaderboard({
 
       <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
         <TableScrollHint
+          scrollerRef={scrollContainerRef}
           testId="meta-leaderboard-scroll-hint"
           label="Scroll table for more rankings →"
           wrapperClassName="flex justify-end"
           className="m-2"
         />
-        <div class="overflow-x-auto" data-testid="meta-leaderboard-scroll-container">
+        <div ref={scrollContainerRef} class="overflow-x-auto" data-testid="meta-leaderboard-scroll-container">
           <table
             ref={gridRef}
             role="grid"
@@ -275,24 +307,39 @@ export function MetaLeaderboard({
                 <th scope="col" class="table-th sticky left-0 z-10 min-w-40 bg-[var(--bb-surface-data-muted)] py-2">
                   Platform
                 </th>
-                {cohorts.map((cohort) => (
-                  <th
-                    key={cohort.key}
-                    scope="col"
-                    class="table-th whitespace-nowrap py-2"
-                  >
-                    <a
-                      href={cohortHref(cohort)}
-                      title={`${cohort.platform_count} ranked platforms in this ranking`}
-                      class="flex flex-col gap-0.5 no-underline text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-accent-hover)]"
+                {cohorts.map((cohort) => {
+                  const allExcludedReason = allExcludedRankingReasons.get(cohort.key) ?? null;
+                  return (
+                    <th
+                      key={cohort.key}
+                      scope="col"
+                      class="table-th min-w-40 whitespace-normal py-2"
                     >
-                      <span class="font-semibold text-[var(--bb-data-fg-primary)]">{cohort.label}</span>
-                      <span class="text-[10px] font-normal normal-case tracking-normal text-[var(--bb-data-fg-subtle)]">
-                        {cohortMetricSublabel(cohort)}
-                      </span>
-                    </a>
-                  </th>
-                ))}
+                      <a
+                        href={cohortHref(cohort)}
+                        title={
+                          allExcludedReason
+                            ? `No ranked evidence. ${allExcludedReason} Open the ranking for published evidence.`
+                            : `${cohort.platform_count} ranked platforms in this ranking`
+                        }
+                        class="flex flex-col gap-0.5 no-underline text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-accent-hover)]"
+                      >
+                        <span class="font-semibold text-[var(--bb-data-fg-primary)]">{cohort.label}</span>
+                        <span class="text-[10px] font-normal normal-case tracking-normal text-[var(--bb-data-fg-subtle)]">
+                          {cohortMetricSublabel(cohort, mode)}
+                        </span>
+                        {allExcludedReason && (
+                          <span
+                            class="mt-1 max-w-56 text-[10px] font-normal normal-case leading-snug tracking-normal text-[var(--bb-data-fg-muted)]"
+                            data-testid={`all-excluded-ranking-${cohort.key}`}
+                          >
+                            No ranked evidence. {allExcludedReason} Open ranking for details.
+                          </span>
+                        )}
+                      </a>
+                    </th>
+                  );
+                })}
                 <th
                   scope="col"
                   class="table-th whitespace-nowrap py-2 text-[var(--bb-data-fg-primary)]"
@@ -380,6 +427,11 @@ export function MetaLeaderboard({
                         {receiptHref && receiptState ? (
                           <a
                             href={receiptHref}
+                            aria-label={
+                              mode === "speedup" && cellState.kind === "ranked"
+                                ? `${cellText(cellState.rank, cohort, mode)}; ${nativeMetricText(cellState.rank, cohort)}`
+                                : undefined
+                            }
                             class="font-mono no-underline hover:text-[var(--bb-accent-hover)]"
                             onClick={(event) => event.stopPropagation()}
                             title={receiptLinkTitle(receiptState, cohort)}
@@ -389,11 +441,13 @@ export function MetaLeaderboard({
                         ) : (
                           renderCellValue(cellState, cohort, mode)
                         )}
-                        {metadata && (
+                        {metadata && cellState.kind === "ranked" && (
                           <div class="mt-0.5 flex flex-wrap justify-center gap-1">
                             <TrustBadge trustLabel={metadata.trust_label} compact />
                             <FundingChip funding={metadata.funding} compact />
-                            <ValidationBadge validationStatus={metadata.validation_status} showMissing />
+                            {metadata.validation_status?.trim().toLowerCase() !== "passed" && (
+                              <ValidationBadge validationStatus={metadata.validation_status} showMissing />
+                            )}
                           </div>
                         )}
                       </td>
@@ -421,7 +475,21 @@ export function MetaLeaderboard({
             </tbody>
           </table>
         </div>
-        {visiblePlatforms.length < sortedPlatforms.length && (
+        {collapsedPlatforms.length > 0 && (
+          <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
+            <button
+              type="button"
+              class="cursor-pointer border-0 bg-transparent p-0 text-sm font-medium text-[var(--bb-accent-hover)] underline hover:text-[var(--bb-accent)]"
+              aria-expanded={showUnrankedPlatforms}
+              onClick={() => setShowUnrankedPlatforms((shown) => !shown)}
+            >
+              {showUnrankedPlatforms
+                ? `Hide ${collapsedPlatforms.length.toLocaleString()} unranked ${collapsedPlatforms.length === 1 ? "platform" : "platforms"}`
+                : `${collapsedPlatforms.length.toLocaleString()} more ${collapsedPlatforms.length === 1 ? "platform has" : "platforms have"} published results but nothing ranked — Show them`}
+            </button>
+          </div>
+        )}
+        {visiblePlatforms.length < renderedPlatforms.length && (
           <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
             <button
               type="button"
@@ -462,14 +530,21 @@ export function MetaLeaderboard({
  * Surfaces the audit's required "every cohort must clearly state metric, unit,
  * and direction" without relying on tooltip-only disclosure.
  */
-function cohortMetricSublabel(cohort: MetaCohort): string {
+function cohortMetricSublabel(cohort: MetaCohort, mode: MetaLeaderboardMode): string {
   const metric = cohort.primary_metric;
   const direction = cohort.primary_order === "desc" ? "higher is better" : "lower is better";
-  if (metric === "power_score") return `${cohort.phase} · Power score · ${direction}`;
-  if (metric === "display_geomean_ms") return `${cohort.phase} · Geomean latency · ${direction}`;
-  if (metric === "geomean_ms") return `${cohort.phase} · Geomean latency · ${direction}`;
-  if (metric === "total_duration_s") return `${cohort.phase} · Total duration · ${direction}`;
-  return `${cohort.phase} · ${metric} · ${direction}`;
+  const metricLabel = metric === "power_score"
+    ? "Power score"
+    : metric === "display_geomean_ms" || metric === "geomean_ms"
+      ? "Geomean latency"
+      : metric === "total_duration_s"
+        ? "Total duration"
+        : metric;
+  if (mode === "speedup") {
+    return `${cohort.phase} · Speedup vs best · 1.00x is best; lower is worse · Native: ${metricLabel}, ${direction}`;
+  }
+  if (mode === "ranks") return `${cohort.phase} · Rank · 1 is best; higher is worse · Native: ${metricLabel}`;
+  return `${cohort.phase} · ${metricLabel} · ${direction}`;
 }
 
 function cellText(rank: MetaRank, cohort: MetaCohort, mode: MetaLeaderboardMode): string {
@@ -481,6 +556,12 @@ function cellText(rank: MetaRank, cohort: MetaCohort, mode: MetaLeaderboardMode)
   }
   if (rank.metric_value === null || rank.metric_value === undefined) return "-";
   return cohort.primary_order === "desc" ? fmtScoreCompact(rank.metric_value) : fmtGeomean(rank.metric_value);
+}
+
+function nativeMetricText(rank: MetaRank, cohort: MetaCohort): string {
+  if (rank.metric_value === null || rank.metric_value === undefined) return "Native value unavailable";
+  const value = cohort.primary_order === "desc" ? fmtScoreCompact(rank.metric_value) : fmtGeomean(rank.metric_value);
+  return `Native: ${value}`;
 }
 
 function exactMetricTitle(rank: MetaRank | undefined, cohort: MetaCohort): string | null {
@@ -561,10 +642,7 @@ function renderCellValue(
   if (state.kind === "missing") return <span class="text-[var(--bb-data-fg-subtle)]">No run</span>;
   if (state.kind === "unranked") {
     return (
-      <span class="inline-flex max-w-36 flex-col items-center gap-0.5 whitespace-normal text-center leading-tight">
-        <span class="font-semibold text-[var(--bb-tone-warning-fg)]">{state.label}</span>
-        <span class="text-[10px] font-normal text-[var(--bb-data-fg-subtle)]">{state.reason}</span>
-      </span>
+      <span class="text-xs font-normal text-[var(--bb-data-fg-muted)]">{state.label}</span>
     );
   }
   const rank = state.rank;
@@ -572,6 +650,16 @@ function renderCellValue(
   if (mode === "ranks") {
     return (
       <span class={rank.rank === 1 ? "font-semibold text-[var(--bb-tone-success-fg)]" : "text-[var(--bb-data-fg-primary)]"}>{text}</span>
+    );
+  }
+  if (mode === "speedup") {
+    return (
+      <span>
+        <span class="block font-medium text-[var(--bb-data-fg-primary)]">{text}</span>
+        <span class="mt-0.5 block text-[10px] font-normal text-[var(--bb-data-fg-muted)]">
+          {nativeMetricText(rank, cohort)}
+        </span>
+      </span>
     );
   }
   return text;
@@ -610,7 +698,45 @@ function describeCell(
   }
   const rank = state.rank;
   const text = cellText(rank, cohort, mode);
-  return `${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}: ${text}`;
+  const nativeSuffix = mode === "speedup" ? `; ${nativeMetricText(rank, cohort)}` : "";
+  return `${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}: ${text}${nativeSuffix}`;
+}
+
+function hasPublishedEvidence(platform: MetaPlatform, cohorts: MetaCohort[]): boolean {
+  return cohorts.some((cohort) => findCohortPlatform(cohort, platform.platform_id) !== undefined);
+}
+
+function hasRankedEvidence(platform: MetaPlatform, cohorts: MetaCohort[]): boolean {
+  return cohorts.some((cohort) => {
+    const result = findCohortPlatform(cohort, platform.platform_id);
+    return metaLeaderboardCellState(platform.ranks[cohort.key], result, cohort).kind === "ranked";
+  });
+}
+
+function allExcludedRankingReason(cohort: MetaCohort, platforms: MetaPlatform[]): string | null {
+  const results = cohort.platforms ?? [];
+  const hasRankedCell = platforms.some((platform) => {
+    const result = findCohortPlatform(cohort, platform.platform_id);
+    return metaLeaderboardCellState(platform.ranks[cohort.key], result, cohort).kind === "ranked";
+  });
+  if (results.length === 0 || hasRankedCell) return null;
+
+  const reasons = Array.from(
+    new Set(
+      results.map((result) =>
+        formatTimingExclusion(
+          result.ranking_exclusion_reason ?? cohort.cohort_ranking_exclusion_reason,
+          "Published evidence is not rankable.",
+        ),
+      ),
+    ),
+  );
+  return reasons.join(" ");
+}
+
+function platformScopeLabel(collapsedCount: number, showUnrankedPlatforms: boolean): string {
+  if (collapsedCount === 0) return "ranked-scope platforms";
+  return showUnrankedPlatforms ? "published platforms" : "ranked platforms";
 }
 
 function comparePlatforms(

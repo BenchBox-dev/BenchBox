@@ -794,17 +794,24 @@ def test_run_cell_official_downgrades_passed_cell_on_stream_count_mismatch(tmp_p
     assert "throughput stream count mismatch" in (result.throughput_check or "")
 
 
-def test_run_cell_official_threads_scale_into_result_resolution(tmp_path: Path):
-    """w3 wiring guard (C2): run_cell must forward its `scale` to resolve_official_result_path
-    so the resolver can filter candidates by the sf<N> token. Every other official test mocks
-    the resolver without asserting kwargs, so deleting `scale=scale` (runner.py) would otherwise
-    pass silently -- this pins the runner->resolver contract.
+def test_run_cell_official_threads_emitted_path_and_scale_into_result_resolution(tmp_path: Path):
+    """run_cell must forward BOTH the emitted quiet-path line and `scale` into the
+    backward-compatible official resolver wrapper. Otherwise the runner silently falls back to
+    a None result even though the CLI emitted the authoritative path.
     """
     result_path = tmp_path / "benchmark_runs" / "results" / "official.json"
     _write_result_json(result_path)
     fake_argv = [sys.executable, "-c", "pass"]
+    timeout_result = TimeoutResult(
+        exit_code=0,
+        timed_out=False,
+        elapsed_s=0.1,
+        stdout=f"{result_path}\n".encode(),
+        stderr=b"",
+    )
     with (
         patch.object(runner, "benchbox_run_official_argv", return_value=fake_argv),
+        patch.object(runner, "run_with_timeout", return_value=timeout_result),
         patch.object(runner, "resolve_official_result_path", return_value=result_path) as mock_resolve,
     ):
         runner.run_cell(
@@ -818,6 +825,7 @@ def test_run_cell_official_threads_scale_into_result_resolution(tmp_path: Path):
         )
 
     mock_resolve.assert_called_once()
+    assert mock_resolve.call_args.kwargs["emitted_path"] == str(result_path)
     assert mock_resolve.call_args.kwargs["scale"] == 1
     assert mock_resolve.call_args.kwargs["platform"] == "duckdb"
     assert mock_resolve.call_args.kwargs["benchmark"] == "tpch"

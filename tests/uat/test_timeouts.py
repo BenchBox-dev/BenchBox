@@ -287,6 +287,13 @@ def test_timeout_path_drains_using_the_reap_timeout_constant(monkeypatch):
 
     monkeypatch.setattr(timeouts.subprocess, "Popen", lambda *a, **k: FakeProc())
     monkeypatch.setattr(timeouts.os, "killpg", lambda pid, sig: None, raising=False)
+    # Inject the signals too, same technique and same reason as the two tests
+    # above: on win32 `signal.SIGKILL` does not exist, and the ladder evaluates
+    # it as an ARGUMENT to os.killpg, so patching killpg alone still raised
+    # AttributeError before the call. Patching both keeps the POSIX branch --
+    # the thing under test -- reachable on Windows rather than skipping it.
+    monkeypatch.setattr(timeouts.signal, "SIGTERM", object(), raising=False)
+    monkeypatch.setattr(timeouts.signal, "SIGKILL", object(), raising=False)
     # The ladder's real 200 ms grace sleep is left in place: `timeouts` imports
     # `time` inside the function rather than at module scope, so there is no
     # module attribute to patch, and 200 ms is not worth reshaping the module for.

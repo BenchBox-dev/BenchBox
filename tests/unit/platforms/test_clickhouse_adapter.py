@@ -41,6 +41,11 @@ def clickhouse_dependencies():
 class TestClickHouseAdapter:
     """Test ClickHouse platform adapter functionality."""
 
+    def test_tpcds_q35_is_pinned_as_a_local_memory_limitation(self):
+        """Q35's reproducible SF1 chDB failure remains documented and discoverable."""
+        assert 35 in ClickHouseAdapter.KNOWN_INCOMPATIBLE_QUERIES["tpcds"]
+        assert "8 GiB local" in ClickHouseAdapter.__doc__
+
     def test_initialization_success(self):
         """Test successful adapter initialization in server mode."""
         with patch("benchbox.platforms.clickhouse.setup.ClickHouseClient"):

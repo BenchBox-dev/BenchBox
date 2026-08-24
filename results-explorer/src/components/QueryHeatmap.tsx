@@ -24,6 +24,7 @@ import type { JSX } from "preact";
 import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
+import { TableScrollHint } from "@/components/TableScrollHint";
 import { fmtMs as formatDurationMs, fmtGeomean } from "@/utils";
 import { formatLatencyMs, formatPowerScore, formatSpeedup } from "@/lib/metricFormatters";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
@@ -587,12 +588,13 @@ export function QueryHeatmap({
 
       <div class="hidden md:block">
         <div class="mb-2 flex items-center justify-between gap-3 text-xs text-[var(--bb-data-fg-muted)]">
-          <span
-            data-testid="query-heatmap-scroll-hint"
-            class="inline-flex items-center rounded-full border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-2.5 py-1 font-medium shadow-sm"
-          >
-            Query columns →
-          </span>
+          <TableScrollHint
+            scrollerRef={scrollContainerRef}
+            testId="query-heatmap-scroll-hint"
+            label="Query columns →"
+            wrapperClassName={null}
+            className="rounded-full border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-2.5 py-1 font-medium shadow-sm"
+          />
           <span>{sortedQueryIds.length.toLocaleString()} queries</span>
         </div>
         <div

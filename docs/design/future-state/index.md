@@ -41,9 +41,12 @@ implementation-ready.
   extraction is **Blocked on evidence** for demand, install-size benefit, CI
   burden, and release cost.
 
-**Tier 2: Act when prerequisites are met:**
-- **Benchmark family plugin seam**: Classify benchmark APIs and pilot a small
-  family interface before splitting core benchmark packages.
+**Tier 2: Active proposals and evidence gates:**
+- **Benchmark family plugin seam**: **Pilot complete on SSB; further family
+  migration is blocked on evidence.** Do not migrate another family until a
+  runtime consumer of `phases()` / `result_metadata()` or a measured
+  family-migration cost table provides new evidence. See the accepted decision
+  record in `_project/decisions/arch-pilot-evaluation-2026-08-20.md`.
 - **MCP APIs**: Already an optional extra. Formalize 3 internal API refs as public exports. Defer distribution split until post-v1.0.
 - **Monitoring**: **Blocked on evidence**. The current wheel contains five
   monitoring entries and `psutil>=5.9.0` remains a core dependency; no
@@ -61,7 +64,7 @@ Two proposals were discarded during adversarial review:
 - [Architecture contract decision index](contract-index.md) - active planning
   index for public-contract and future-state decisions
 - [Benchmark family plugin seam](benchmark-family-plugin-seam/README.md) -
-  **Medium** priority, gated by API classification and one pilot family
+  **Pilot complete; further family migration blocked on evidence**
 - [Prune publishing](prune-publishing-subsystem/README.md) - **Completed (v0.2.1)**; retained as a historical record (the path now hosts the live bundle-publish subsystem)
 - [Remove release tooling from wheel](remove-release-tooling-from-wheel/README.md) - **Blocked on evidence** for further extraction
 - [Isolate experimental subsystems](isolate-experimental-core-subsystems/README.md) - **Blocked on evidence** for further extraction
