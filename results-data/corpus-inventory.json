@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-08-24T01:17:48.747821+00:00",
+  "generated_at": "2026-08-24T03:57:44.861374+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_datafusion_sql_20260502_182815_88aab2ac.json",
@@ -1641,6 +1641,19 @@
       "bundle_sha256": "aad593edff54b5809e6f5c157b8ded13367668d733f7f198da11be50d8e3359c"
     },
     {
+      "file": "tpcds_sf10_datafusion_sql_20260823_225543_15b41887.json",
+      "benchmark": "tpcds",
+      "benchmark_name": "TPC-DS",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 10.0,
+      "timestamp": "2026-08-23T22:55:43.796571",
+      "query_count": 309,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "ad566ba8dd00ffb0c286a92148d6d1d0bf8335753cc778aad3c30dad05bda286"
+    },
+    {
       "file": "tpcds_sf1_duckdb_sql_20260823_101350_f8fa74b3.json",
       "benchmark": "tpcds",
       "benchmark_name": "TPC-DS",
@@ -1678,6 +1691,19 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "fa34ed33212f9f33b6e1b415f950718383fe5f06714b6248b09c6d64488c1fc4"
+    },
+    {
+      "file": "tpcds_sf10_spark_sql_20260823_233540_e9faf36f.json",
+      "benchmark": "tpcds",
+      "benchmark_name": "TPC-DS",
+      "platform": "Spark",
+      "platform_version": "4.1.1",
+      "scale_factor": 10.0,
+      "timestamp": "2026-08-23T23:35:40.105326",
+      "query_count": 309,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "d5f866d204f3da7d30c8eef5bb58c6cb84efac78671f1dbe8342260c512b5f20"
     },
     {
       "file": "tpcds_obt_sf1_datafusion_sql_20260502_182906_756bc088.json",
@@ -2929,7 +2955,9 @@
       "Spark"
     ],
     "tpcds@sf10.0": [
-      "DuckDB"
+      "DataFusion",
+      "DuckDB",
+      "Spark"
     ],
     "tpcds_obt@sf1.0": [
       "DataFusion",
@@ -3029,7 +3057,7 @@
     ]
   },
   "summary": {
-    "total_bundles": 211,
+    "total_bundles": 213,
     "by_benchmark": {
       "amplab": 16,
       "clickbench": 6,
@@ -3044,7 +3072,7 @@
       "ssb": 20,
       "star_schema": 6,
       "tpcdi": 9,
-      "tpcds": 4,
+      "tpcds": 6,
       "tpcds_obt": 5,
       "tpch": 22,
       "tpch_skew": 19,
@@ -3054,19 +3082,19 @@
     },
     "by_platform": {
       "ClickHouse Local": 1,
-      "DataFusion": 68,
+      "DataFusion": 69,
       "DuckDB": 18,
       "LakeSail": 1,
       "Polars": 38,
       "PySpark": 34,
       "SQLite": 26,
-      "Spark": 25
+      "Spark": 26
     },
     "by_trust_label": {
-      "maintainer-run": 211
+      "maintainer-run": 213
     },
     "by_funding": {
-      "unspecified": 211
+      "unspecified": 213
     }
   }
 }
