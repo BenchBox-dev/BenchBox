@@ -446,6 +446,7 @@ jobs:
           import sys
           import time
           import urllib.error
+          import urllib.parse
           import urllib.request
           from datetime import datetime, timedelta, timezone
           from pathlib import Path
@@ -515,31 +516,69 @@ jobs:
               print(f"::error::GitHub API unreachable after retries for {url}: {last_err}")
               sys.exit(1)
 
-          def workflow_registered_at(workflow_file: str):
-              """When Actions first registered this workflow (~when its file
-              first landed on the default branch), or None if unknown. Used to
-              grace a freshly-added scheduled workflow whose first cron fire is
-              still pending -- it has zero scheduled runs not because it is dead
-              but because it has not had a chance to fire yet."""
-              url = f"{api}/repos/{repo}/actions/workflows/{workflow_file}"
+          def _api_json(url: str):
+              """GET *url* as JSON, or None on any failure.
+
+              Every caller is a grace path: a failure here must never crash the
+              liveness job, only decline to relax it.
+              """
               headers = {
                   "Accept": "application/vnd.github+json",
                   "User-Agent": "benchbox-scheduled-workflow-liveness",
               }
               if token:
                   headers["Authorization"] = f"Bearer {token}"
-              # Any failure here (HTTP error, unreachable, non-JSON body, or an
-              # unparseable timestamp) returns None so the caller falls through
-              # to the normal dead-path: this grace must never crash the liveness
-              # job, only relax it.
               try:
                   with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=30) as resp:
-                      created = json.load(resp).get("created_at")
-                  if not created:
-                      return None
-                  return datetime.fromisoformat(created.replace("Z", "+00:00"))
+                      return json.load(resp)
               except (urllib.error.HTTPError, urllib.error.URLError, ValueError):
                   return None
+
+          def _parse_ts(value):
+              if not value:
+                  return None
+              try:
+                  return datetime.fromisoformat(value.replace("Z", "+00:00"))
+              except ValueError:
+                  return None
+
+          def workflow_registered_at(workflow_file: str):
+              """Anchor date for the activation grace of a never-fired schedule.
+
+              The grace exists for a scheduled workflow whose first cron fire is
+              still pending: it has zero scheduled runs not because it is dead
+              but because it has not had a chance to fire yet.
+
+              This used to read ONLY the Actions API `created_at`, which is when
+              the FILE first registered -- and that is the wrong date for a
+              workflow that gains a cron later. `seed-corpus.yml` registered
+              2026-04-02 as a dispatch-only workflow and gained
+              `cron: "0 7 1 * *"` on 2026-08-21 in #1794. Its first scheduled
+              fire is 1 September, but the grace was measured from April, so it
+              was reported dead and took the whole liveness job red -- and would
+              have stayed red until September no matter what anyone did.
+
+              So take the LATER of file registration and the last commit that
+              touched the workflow file. This path is only reached when a
+              workflow has never had a scheduled run at all, so a recently
+              edited file is far more likely to be newly scheduled than dead.
+              """
+              anchors = []
+
+              payload = _api_json(f"{api}/repos/{repo}/actions/workflows/{workflow_file}")
+              if isinstance(payload, dict):
+                  anchors.append(_parse_ts(payload.get("created_at")))
+
+              path = f".github/workflows/{workflow_file}"
+              commits = _api_json(
+                  f"{api}/repos/{repo}/commits?path={urllib.parse.quote(path)}&per_page=1"
+              )
+              if isinstance(commits, list) and commits:
+                  commit = commits[0].get("commit", {}).get("committer", {})
+                  anchors.append(_parse_ts(commit.get("date")))
+
+              anchors = [a for a in anchors if a is not None]
+              return max(anchors) if anchors else None
 
           dead: list[str] = []
           checked = 0
