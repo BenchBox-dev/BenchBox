@@ -21,9 +21,10 @@ interface CompareTrayProps {
   compareHref: string;
   compareLabel: string;
   onClear: () => void;
+  onRemove?: (item: CompareTrayItem) => void;
 }
 
-export function CompareTray({ summary, items, compareHref, compareLabel, onClear }: CompareTrayProps) {
+export function CompareTray({ summary, items, compareHref, compareLabel, onClear, onRemove }: CompareTrayProps) {
   const trayRef = useRef<HTMLDivElement>(null);
   const [trayHeight, setTrayHeight] = useState(0);
 
@@ -76,6 +77,16 @@ export function CompareTray({ summary, items, compareHref, compareLabel, onClear
                   <TrustBadge trustLabel={item.trustLabel} compact />
                   <FundingChip funding={item.funding} compact />
                   <span class="font-mono text-[var(--bb-data-fg-muted)]">Public ID {item.visibleResultId}</span>
+                  {onRemove && (
+                    <button
+                      type="button"
+                      class="ml-1 rounded px-1 text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data)] hover:text-[var(--bb-data-fg-primary)]"
+                      aria-label={`Remove ${item.platform}, Public ID ${item.visibleResultId}, from comparison`}
+                      onClick={() => onRemove(item)}
+                    >
+                      Remove
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
