@@ -29,6 +29,7 @@ import { fmtMs as formatDurationMs, fmtGeomean } from "@/utils";
 import { formatLatencyMs, formatPowerScore, formatSpeedup } from "@/lib/metricFormatters";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 import { compareSelectionLabel } from "@/lib/compareCohort";
+import { MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import {
   describeCompareExclusionReason,
   type CompareExclusionReasonCopy,
@@ -101,6 +102,8 @@ interface QueryHeatmapProps {
   /** Currently selected result_ids; undefined = selection disabled. */
   selectedIds?: Set<string>;
   onSelectionChange?: (ids: Set<string>) => void;
+  /** ID of the page-level explanation shown when the selection cap is active. */
+  selectionLimitReasonId?: string;
   /**
    * Activates reduced-color (grayscale lightness) mode for color-vision
    * accessibility. Also activates automatically via the CSS
@@ -132,11 +135,13 @@ export function QueryHeatmap({
   summary,
   selectedIds,
   onSelectionChange,
+  selectionLimitReasonId,
   highContrast = false,
 }: QueryHeatmapProps) {
   const { query_ids, platforms, ranking } = summary;
   const sortedQueryIds = useMemo(() => sortQueryIds(query_ids), [query_ids]);
   const hasSelection = onSelectionChange !== undefined;
+  const selectionAtCap = selectedIds !== undefined && selectedIds.size >= MAX_COMPARE_SELECTIONS;
   const gridRef = useRef<HTMLTableElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const pageStickyHeaderRef = useRef<HTMLDivElement>(null);
@@ -239,6 +244,7 @@ export function QueryHeatmap({
     if (!onSelectionChange || !selectedIds) return;
     if (!isComparable(row)) return;
     const key = rowKey(row);
+    if (!selectedIds.has(key) && selectedIds.size >= MAX_COMPARE_SELECTIONS) return;
     const next = new Set(selectedIds);
     if (next.has(key)) next.delete(key);
     else next.add(key);
@@ -472,9 +478,15 @@ export function QueryHeatmap({
         {sorted.map((row) => {
           const isSelected = selectedIds?.has(rowKey(row)) ?? false;
           const comparable = isComparable(row);
+          const capDisabled = selectionAtCap && !isSelected;
+          const selectionDisabled = !comparable || capDisabled;
           const comparisonExclusion = comparable ? null : formatTimingExclusion(row.comparison_exclusion_reason);
           const comparisonCopy = describeCompareExclusionReason(row.comparison_exclusion_reason);
-          const comparisonReasonId = comparisonCopy ? `query-heatmap-mobile-compare-reason-${row.result_id}` : undefined;
+          const comparisonReasonId = comparisonCopy
+            ? `query-heatmap-mobile-compare-reason-${row.result_id}`
+            : capDisabled
+              ? selectionLimitReasonId
+              : undefined;
           const rankingExclusion = isRankable(row) ? null : formatTimingExclusion(row.ranking_exclusion_reason);
           const outliers = queryOutliers(row, sortedQueryIds, colMins);
           return (
@@ -491,7 +503,7 @@ export function QueryHeatmap({
                   <input
                     type="checkbox"
                     checked={isSelected}
-                    disabled={!comparable}
+                    disabled={selectionDisabled}
                     onChange={() => toggleRow(row)}
                     aria-label={compareSelectionLabel({
                       platform: row.platform,
@@ -629,9 +641,15 @@ export function QueryHeatmap({
               {sorted.map((row, rowIdx) => {
                 const isSelected = selectedIds?.has(rowKey(row)) ?? false;
                 const comparable = isComparable(row);
+                const capDisabled = selectionAtCap && !isSelected;
+                const selectionDisabled = !comparable || capDisabled;
                 const comparisonExclusion = comparable ? null : formatTimingExclusion(row.comparison_exclusion_reason);
                 const comparisonCopy = describeCompareExclusionReason(row.comparison_exclusion_reason);
-                const comparisonReasonId = comparisonCopy ? `query-heatmap-compare-reason-${row.result_id}` : undefined;
+                const comparisonReasonId = comparisonCopy
+                  ? `query-heatmap-compare-reason-${row.result_id}`
+                  : capDisabled
+                    ? selectionLimitReasonId
+                    : undefined;
                 const rankingExclusion = isRankable(row) ? null : formatTimingExclusion(row.ranking_exclusion_reason);
                 return (
                   <tr
@@ -652,7 +670,7 @@ export function QueryHeatmap({
                       <input
                         type="checkbox"
                         checked={isSelected}
-                        disabled={!comparable}
+                        disabled={selectionDisabled}
                         onChange={() => toggleRow(row)}
                         aria-label={compareSelectionLabel({
                           platform: row.platform,

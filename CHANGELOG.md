@@ -7,37 +7,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-> **Accounting note (updated 2026-07-09):** `v0.3.1` has now been published to
-> PyPI (tag `v0.3.1`, 2026-07-09) via the `release-recovery-v0-3-1` flow, and
-> its clean install/import succeeds — it is the recovery release for `v0.3.0`,
-> which shipped with a broken clean install (`ModuleNotFoundError: No module
-> named 'pandas'` on `import benchbox`). The authoritative per-version section
-> (`[0.3.1] - 2026-07-09`) is cut on the release branch at release-cut; the
-> `[Unreleased]` entries below on `develop` therefore include changes that
-> shipped in `v0.3.1` alongside newer unreleased work, and are reconciled into
-> a versioned section at the next release-cut. (Earlier revisions of this note
-> stated that no `v0.3.1` release existed — that held only before 2026-07-09.)
-
 ### New
 
-- **Result provenance vocabulary** - Added a canonical
-  `benchbox.core.results.provenance` module defining the result-source →
-  trust-label → visibility mapping (including the new `vendor-supplied` label
-  for vendor-produced results) and a funding-disclosure vocabulary
-  (`employer` / `personal` / `free-trial` / `vendor-sponsored` / `grant` /
-  `unspecified`). `vendor-supplied` is a valid publish label and is
-  ranking-eligible with a distinct badge. Foundation for surfacing vendor vs
-  internal vs community provenance and run funding in the results explorer.
-- **Databricks Liquid Clustering** - Added TPC-H and TPC-DS tuning profiles that
-  apply Databricks Liquid Clustering for more representative runs.
+- **Results Explorer preview** - After this release, browse and compare published
+  benchmark results at
+  [benchbox.dev/results/](https://benchbox.dev/results/). Explore cross-platform
+  leaderboards, per-query timings, hardware details, comparison tools, and SQL
+  queries over the public data. The preview contains a curated set of results,
+  not a complete or certified ranking.
 - **DuckLake platform** - Run benchmarks against DuckLake (DuckDB lakehouse
   format: Parquet table data + SQL-database catalog metadata) via
   `--platform ducklake`. The catalog backend (`--platform-option
   catalog=duckdb|sqlite|postgres`) and the Parquet `data_path` (local or
-  `s3://`) are independent, so any combination works, including a self-hosted
-  PostgreSQL catalog with S3 storage. Existing catalogs are reused across runs
-  and `--force` rebuilds them; requires DuckDB >= 1.3, installable as
-  `benchbox[ducklake]`. Beta.
+  `s3://`) can be selected independently. Four documented deployment modes have
+  passed TPC-H scale-factor-1 correctness validation. Existing catalogs are
+  reused across runs and `--force` rebuilds them; requires DuckDB >= 1.3,
+  installable as `benchbox[ducklake]`. Beta.
+
+### Added
+
+- **Result provenance and funding labels** - Results Explorer now shows whether
+  each published run came from BenchBox maintainers, a community contributor,
+  or a platform vendor, together with any disclosed funding source. These labels
+  appear in rankings, comparisons, and result details, with an in-page
+  explanation of what they mean. Community submissions remain visible but are
+  excluded from ranked tables.
+- **Local MCP connections over HTTP** - Local MCP clients can now connect with
+  `benchbox-mcp --transport streamable-http`; existing stdio integrations
+  continue to work unchanged. Authenticated non-local deployments also provide
+  persistent benchmark jobs, but shared deployment remains deferred and is not
+  supported for production use in this release.
+
+### Changed
+
+- **GitHub repository moved to the `BenchBox-dev` organization** - BenchBox is
+  now hosted at [github.com/BenchBox-dev/BenchBox](https://github.com/BenchBox-dev/BenchBox).
+  Public project links, issue and release tooling, CI, and package metadata now
+  use the organization-owned repository. Existing Git remotes using
+  `github.com/joeharris76/BenchBox.git` continue to redirect; update local
+  remotes to the organization URL when convenient.
+
+### Fixed
+
+- **Correct data volumes for Write and Transaction Primitives** - Reusing
+  benchmark data created for a different scale factor could produce successful
+  results against the wrong amount of staged data. BenchBox now detects and
+  rebuilds that data automatically on the next run; no action is needed.
+- **TPC generators recover from incompatible bundled tools** - The bundled
+  TPC-H generators now support macOS 15. BenchBox also checks bundled TPC-H and
+  TPC-DS generators before use and automatically builds a compatible version
+  when needed.
+- **Correct TPC throughput metrics in newly exported results** - TPC-H and
+  TPC-DS throughput drivers now include every executed query in
+  Throughput@Size, correcting the 22x and 99x understatements produced by
+  earlier result versions. Historical result bundles remain unchanged records.
+- **Removed dead `BENCHBOX_TUNING_ENABLED` env var** - This variable set the
+  `tuning.enabled` config key, which nothing at runtime ever read (only a unit
+  test did); docs incorrectly claimed it "activates tuned runs in CI". Use
+  `--tuning tuned` / `--tuning auto` on `benchbox run` to actually enable
+  tuning; `BENCHBOX_TUNING_CONFIG` still works to point at a default tuning
+  file. If you were setting `BENCHBOX_TUNING_ENABLED`, it had no effect and can
+  simply be removed.
+- **Accurate `--tuning auto` guidance for SQL platforms** - SQL runs now explain
+  that `auto` uses a basic constraints-only configuration: primary-key,
+  foreign-key, unique, and check constraints are enabled, with no other tuning.
+  DataFrame platforms continue to use smart defaults.
+- **DataFusion accepts Python string table paths** - Programmatic DataFusion
+  loads now accept paths supplied as either Python strings or `pathlib.Path`
+  objects.
+
+### Security
+
+- **Expanded secret redaction in result exports and common errors** - Result
+  exports now remove connection credentials, account identifiers, and
+  service-account keys. MotherDuck, DuckLake, and MCP benchmark-execution errors
+  also redact known secrets, including values carried by chained exceptions.
+  Some other MCP errors can still include backend-provided exception text, so
+  avoid credentials in values that a backend might repeat in an error.
+
+### Removed
+
+- **BREAKING: bare `clickhouse` platform alias removed** - The temporary
+  compatibility alias that let `--platform clickhouse` (and `get_adapter(
+  "clickhouse")`) resolve to a first-class platform was added in v0.2.1 as a
+  deprecation shim and is removed in this release (window v0.2.1 → v0.4.0).
+  Use `clickhouse-local` (embedded chDB), `clickhouse-server` (self-hosted), or
+  `clickhouse-cloud` (managed); the explicit `clickhouse:local` /
+  `clickhouse:server` / `clickhouse:cloud` selectors also remain available.
+  Passing bare `clickhouse` now raises a `ValueError` naming these replacements
+  instead of silently defaulting to a deployment mode. The `ch` CLI shorthand
+  now resolves to `clickhouse-local`.
+- **BREAKING: `databricks-connect` install extra removed** - Replace
+  `benchbox[databricks-connect]` with `benchbox[cloud-spark-databricks]`. This
+  renames only the BenchBox install extra; it still installs the upstream
+  `databricks-connect` package. Other DataFrame install extras are unchanged.
+
+## [0.3.1] - 2026-07-09
+
+### New
+
+- **Databricks Liquid Clustering** - Added TPC-H and TPC-DS tuning profiles that
+  apply Databricks Liquid Clustering for more representative runs.
 
 ### Added
 
@@ -50,47 +120,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Stale transactional staging data is now rebuilt, not certified** - The
-  staging provenance manifest that gates `is_setup()` for Transaction
-  Primitives and Write Primitives was written unconditionally at the end of
-  `setup()`, including on the path where `setup(force=False)` skipped
-  repopulation because the staging tables were already non-empty. A staging set
-  left over from a smaller scale factor was therefore detected as stale exactly
-  once, never rebuilt, and then stamped with a manifest asserting it belonged
-  to the new run — so the benchmark still reported timings for the wrong data
-  volume as a PASS. A manifest mismatch now triggers the same rebuild that
-  `force=True` does, and the manifest is written over data that was actually
-  repopulated. Manifest rows written by the previous behaviour cannot be
-  trusted — they are internally consistent (right scale, right spec version,
-  digest of the live source tables) while the staging data they describe is
-  stale — so the manifest moves to a new table generation that those rows
-  cannot satisfy. Any database the previous behaviour already mis-certified
-  therefore takes the missing-manifest path and pays one real staging rebuild
-  on next use; no operator action is required, and the superseded table is
-  dropped during that rebuild.
-- **Unrunnable precompiled TPC binaries now fall back to source compilation** -
-  Binary selection probes that a bundled `dbgen`/`qgen`/`dsdgen`/`dsqgen`
-  actually executes on the host before choosing it over compiling from source.
-  Previously a binary that passed the checksum check but was refused by the OS
-  loader (notably the darwin-arm64 TPC-H tools built against macOS 26, which
-  dyld rejects on macOS 15 and earlier) caused TPC-H data/query generation to
-  fail outright instead of auto-compiling.
-- **Correct TPC throughput metrics in newly exported results** - TPC-H and
-  TPC-DS throughput drivers now include every executed query in
-  Throughput@Size, correcting the 22x and 99x understatements produced by
-  earlier result versions. Historical result bundles remain unchanged records.
-- **Removed dead `BENCHBOX_TUNING_ENABLED` env var** - This variable set the
-  `tuning.enabled` config key, which nothing at runtime ever read (only a unit
-  test did); docs incorrectly claimed it "activates tuned runs in CI". Use
-  `--tuning tuned` / `--tuning auto` on `benchbox run` to actually enable
-  tuning; `BENCHBOX_TUNING_CONFIG` still works to point at a default tuning
-  file. If you were setting `BENCHBOX_TUNING_ENABLED`, it had no effect and can
-  simply be removed.
-- **Honest `--tuning auto` messaging on SQL platforms** - Smart defaults for
-  `--tuning auto` are implemented for DataFrame platforms only today; SQL
-  platform runs now get an explicit warning that they're proceeding with a
-  basic (untuned) configuration instead of a message implying real smart
-  defaults were applied.
 - **`-df` platform names select DataFrame mode** - `benchbox run --platform
   datafusion-df` (and `lakesail-df`) now runs the DataFrame adapter without
   needing `--mode dataframe`; alias normalization previously dropped the
@@ -100,6 +129,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without pulling pandas. Optional engine and DataFrame imports (ClickHouse
   local, DataFrame mode) are now loaded lazily, so the base install stays
   minimal. This resolves the v0.3.0 clean-install failure.
+- **Consistent TPC-H data across platforms** - Bundled Linux and Windows
+  `dbgen` now emit rows without a stray trailing delimiter, matching macOS, so
+  generated TPC-H `.tbl` column counts are consistent on every platform.
 - **Trino table creation** - JoinOrder `CREATE TABLE` no longer emits
   primary-key clauses that Trino rejects.
 - **JoinOrder across engines** - SQLite now indexes JoinOrder tables, Spark
@@ -120,27 +152,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Registry-derived platform lists** - Landing and prompt pages now derive
   their platform and command examples from the live registry, so the lists stay
   in sync with actually supported platforms.
-
-### Removed
-
-- **BREAKING: bare `clickhouse` platform alias removed** - The temporary
-  compatibility alias that let `--platform clickhouse` (and `get_adapter(
-  "clickhouse")`) resolve to a first-class platform was added in v0.2.1 as a
-  deprecation shim and has now been removed after its deprecation window
-  (v0.2.1 → v0.3.1). Use `clickhouse-local` (embedded chDB), `clickhouse-server`
-  (self-hosted), or `clickhouse-cloud` (managed); the explicit `clickhouse:local`
-  / `clickhouse:server` / `clickhouse:cloud` selectors also remain available.
-  Passing bare `clickhouse` now raises a `ValueError` naming these replacements
-  instead of silently defaulting to a deployment mode. The `ch` CLI shorthand
-  now resolves to `clickhouse-local`.
-- **BREAKING: `databricks-connect` install extra removed** - The deprecated
-  `benchbox[databricks-connect]` extra was a legacy alias of
-  `benchbox[cloud-spark-databricks]`. Install Databricks Connect / DataFrame
-  mode via `benchbox[cloud-spark-databricks]` instead. The `databricks-connect`
-  PyPI package itself is unchanged — it remains a dependency of the
-  `cloud-spark-databricks` extra. (The renamed dataframe extras — `pandas`,
-  `polars`, etc. — are unaffected; they are the preferred install names, with
-  `dataframe-*` retained as their aliases.)
 
 ## [0.3.0] - 2026-05-16
 
@@ -756,16 +767,18 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01
 
 ### Links
 
-- **Documentation**: [GitHub Repository](https://github.com/joeharris76/benchbox)
-- **Issues**: [Report bugs and request features](https://github.com/joeharris76/benchbox/issues)
+- **Documentation**: [GitHub Repository](https://github.com/BenchBox-dev/BenchBox)
+- **Issues**: [Report bugs and request features](https://github.com/BenchBox-dev/BenchBox/issues)
 - **PyPI**: [pypi.org/project/benchbox](https://pypi.org/project/benchbox/)
 
-[Unreleased]: https://github.com/joeharris76/benchbox/compare/v0.2.1...HEAD
-[0.2.1]: https://github.com/joeharris76/benchbox/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/joeharris76/benchbox/compare/v0.1.5...v0.2.0
-[0.1.5]: https://github.com/joeharris76/benchbox/compare/v0.1.4...v0.1.5
-[0.1.4]: https://github.com/joeharris76/benchbox/compare/v0.1.3...v0.1.4
-[0.1.3]: https://github.com/joeharris76/benchbox/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/joeharris76/benchbox/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/joeharris76/benchbox/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/joeharris76/benchbox/releases/tag/v0.1.0
+[Unreleased]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/BenchBox-dev/BenchBox/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/BenchBox-dev/BenchBox/compare/v0.1.5...v0.2.0
+[0.1.5]: https://github.com/BenchBox-dev/BenchBox/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/BenchBox-dev/BenchBox/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/BenchBox-dev/BenchBox/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/BenchBox-dev/BenchBox/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/BenchBox-dev/BenchBox/releases/tag/v0.1.0

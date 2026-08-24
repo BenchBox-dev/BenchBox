@@ -28,6 +28,7 @@ vi.mock("@/lib/duckdbQueries", async () => {
   return {
     ...actual,
     getDetailResult: vi.fn(),
+    getExistingResultIds: vi.fn((ids: string[]) => Promise.resolve(new Set(ids))),
     resolveShortId: vi.fn((id: string) => Promise.resolve(id)),
     toShortIds: vi.fn((ids: string[]) => Promise.resolve(ids)),
     getPrimaryMetricForBenchmark: vi.fn().mockResolvedValue("power_score"),
@@ -315,6 +316,34 @@ describe("Compare", () => {
     );
   });
 
+  it("distinguishes unprocessed IDs from resolved overflow", async () => {
+    const ids = Array.from({ length: 12 }, (_, index) => `r${index + 1}`);
+    setupUrl(ids);
+    const details = Object.fromEntries(
+      ids.slice(0, 8).map((id, index) => [
+        id,
+        makeResult({
+          result_id: id,
+          platform: `Platform ${index + 1}`,
+          platform_id: `platform-${index + 1}`,
+        }),
+      ]),
+    );
+    vi.mocked(getDetailResult).mockImplementation((id) => Promise.resolve(details[id] ?? null));
+
+    render(<Compare />);
+
+    await waitFor(() => expect(document.title).toBe("Compare (4) · BenchBox Results"));
+    const notice = screen.getByTestId("compare-url-notice");
+    expect(notice).toHaveTextContent(
+      "Ignored 4 additional result IDs (“r5”, “r6”, “r7”, “r8”); comparisons are limited to 4 unique results.",
+    );
+    expect(notice).toHaveTextContent(
+      "Did not process 4 additional result IDs to keep this page responsive",
+    );
+    expect(notice).not.toHaveTextContent("Ignored 8 additional result IDs");
+  });
+
   it("preserves requested IDs when a detail lookup rejects", async () => {
     setupUrl(["r1", "r2", "r3"]);
     vi.mocked(getDetailResult).mockImplementation((id) => {
@@ -534,6 +563,28 @@ describe("Compare", () => {
     });
     expect(queryByTestId("compare-builder-row-r3")).toBeNull();
     expect(getByTestId("compare-builder-status").textContent).toContain("1 incompatible row hidden");
+  });
+
+  it("names the four-result ceiling in the builder status", async () => {
+    setupUrl([]);
+    vi.mocked(listResults).mockResolvedValue(
+      Array.from({ length: 5 }, (_, index) =>
+        makeResultRow({
+          result_id: `r${index + 1}`,
+          platform: `Platform ${index + 1}`,
+          platform_id: `platform-${index + 1}`,
+        }),
+      ),
+    );
+    const { getByTestId } = render(<Compare />);
+    await waitFor(() => expect(getByTestId("compare-builder-row-r1")).toBeTruthy());
+
+    for (const id of ["r1", "r2", "r3", "r4"]) {
+      const checkbox = within(getByTestId(`compare-builder-row-${id}`)).getByRole("checkbox") as HTMLInputElement;
+      fireEvent.click(checkbox);
+    }
+
+    expect(getByTestId("compare-builder-status").textContent).toContain("4 results selected (maximum)");
   });
 
   it("compare picker disables non-comparable candidates before launch", async () => {

@@ -383,6 +383,11 @@ describe("PlatformIndex - sortable table headers", () => {
     const fifth = screen.getByTestId("platform-compare-checkbox-r-compatible-4") as HTMLInputElement;
     expect(fifth.disabled).toBe(true);
     expect(fifth.title).toContain("Up to 4 runs");
+    expect(screen.getByTestId("platform-compare-guidance").textContent).toContain(
+      "4 results selected (maximum)",
+    );
+    expect(screen.queryByText("Use sticky tray to compare")).toBeNull();
+    expect(screen.getByText("Showing 5 of 5 results").parentElement?.textContent).toBe("Showing 5 of 5 results");
   });
 
   it("disables Platform compare selection for non-comparable rows", async () => {
@@ -449,6 +454,9 @@ describe("PlatformIndex - sortable table headers", () => {
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
     const guidance = screen.getByTestId("platform-compare-guidance");
+    const status = guidance.querySelector('[aria-live="polite"]');
+    expect(status).toHaveAttribute("aria-atomic", "true");
+    expect(status?.textContent).toContain("0 results selected");
     expect(guidance.textContent).toContain("Select two or more DuckDB results");
     expect((screen.getByRole("button", { name: "Select 2 comparable results" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByTestId("platform-table-scroll-hint").textContent).toContain("Scroll table");
@@ -656,6 +664,7 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(tpchRow.textContent).toContain("Public ID r-tpch-fast");
     expect(ssbRow.textContent).toContain("SSB");
     expect(screen.getByTestId("platform-compare-guidance").textContent).toContain("differ by benchmark");
+    expect(screen.queryByText("Use sticky tray to compare")).toBeNull();
 
     const compareLink = screen.getByRole("link", { name: /Compare 2 selected/ }) as HTMLAnchorElement;
     expect(compareLink.getAttribute("href")).toBe("/results/compare?ids=aaaabbbb,ccccdddd");

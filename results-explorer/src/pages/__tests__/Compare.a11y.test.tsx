@@ -12,6 +12,7 @@ vi.mock("@/lib/duckdbQueries", async () => {
   return {
     ...actual,
     getDetailResult: vi.fn(),
+    getExistingResultIds: vi.fn((ids: string[]) => Promise.resolve(new Set(ids))),
     resolveShortId: vi.fn((id: string) => Promise.resolve(id)),
     toShortIds: vi.fn((ids: string[]) => Promise.resolve(ids)),
     getPrimaryMetricForBenchmark: vi.fn().mockResolvedValue("power_score"),

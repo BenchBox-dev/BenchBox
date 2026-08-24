@@ -61,7 +61,7 @@ test.describe("Compare", () => {
 
     await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole("heading", { name: "Pick runs to compare" })).toBeVisible();
-    await expect(page.getByTestId("compare-builder-status")).toContainText("1 selected");
+    await expect(page.getByTestId("compare-builder-status")).toContainText("1 result selected");
     await expect(page.getByTestId(`compare-builder-row-${LONG_DUCKDB}`)).toContainText("(from result detail)");
   });
 

@@ -36,7 +36,7 @@ from benchbox.core.dataframe.query_resolution import (
     get_tpch_dataframe_queries,
 )
 from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
-from benchbox.core.exceptions import InsufficientMemoryError
+from benchbox.core.exceptions import ConfigurationError, InsufficientMemoryError
 from benchbox.core.results import (
     BenchmarkInfoInput,
     ResultBuilder,
@@ -50,6 +50,7 @@ from benchbox.core.results.models import (
 )
 from benchbox.core.results.query_plan_models import QueryPlanDAG
 from benchbox.core.results.schema import compute_plan_capture_stats
+from benchbox.core.runner.dataframe_runner import dataframe_compliance_class, no_dataframe_queries_message
 from benchbox.core.schemas import BenchmarkConfig, SystemProfile
 from benchbox.platforms.base.adapter import DriverIsolationCapability
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -290,6 +291,7 @@ class BenchmarkExecutionMixin:
                 test_type=getattr(benchmark_config, "test_execution_type", "power"),
                 benchmark_id=normalize_benchmark_id(benchmark_config.name),
                 display_name=getattr(benchmark_config, "display_name", benchmark_config.name),
+                compliance_class=dataframe_compliance_class(benchmark, benchmark_config),
             ),
             platform=platform_info,
         )
@@ -890,7 +892,12 @@ class BenchmarkExecutionMixin:
         skipped_results = self._build_skipped_results(filtered_skip_query_ids)
 
         if not initial_queries:
-            return self._handle_no_queries(skipped_results, filtered_skip_query_ids)
+            return self._handle_no_queries(
+                skipped_results,
+                filtered_skip_query_ids,
+                benchmark_id=normalize_benchmark_id(benchmark_config.name),
+                query_filter=query_filter,
+            )
 
         total_queries = len(initial_queries)
         logger.info(f"Executing {total_queries} queries")
@@ -1007,8 +1014,22 @@ class BenchmarkExecutionMixin:
         self,
         skipped_results: list[dict[str, Any]],
         filtered_skip_query_ids: set[str],
+        benchmark_id: str = "",
+        query_filter: set[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Handle the case where no executable queries are found."""
+        """Handle the case where no executable queries are found.
+
+        Two very different situations reach here and only one is legitimate.
+
+        Queries existed and were deliberately skipped as unsupported: that is
+        recorded, with a DF_SKIP_SUMMARY row, and the run continues.
+
+        Nothing was found to run at all: that is a defect, and returning an
+        empty list let the caller mark power_test COMPLETED and emit a bundle
+        reporting 0/0 queries with exit 0 -- a run that executed nothing and
+        looked like a clean pass. Sixty such bundles are in the public corpus,
+        every one from a benchmark family with no DataFrame query source.
+        """
         logger.warning("No queries found for execution")
         if skipped_results:
             skipped_categories = self._count_query_categories(filtered_skip_query_ids)
@@ -1030,7 +1051,7 @@ class BenchmarkExecutionMixin:
                 }
             )
             return skipped_results
-        return []
+        raise ConfigurationError(no_dataframe_queries_message(benchmark_id, query_filter))
 
     def _run_warmup_iterations(
         self,
