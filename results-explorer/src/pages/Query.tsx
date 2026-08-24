@@ -27,7 +27,7 @@ import {
   compareSelectionLabel,
   hiddenIncompatibleSuffix,
 } from "@/lib/compareCohort";
-import { buildCompareUrl, compareIdForRow, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
+import { buildCompareUrl, compareIdForRow, MAX_COMPARE_SELECTIONS, visibleResultIdForRow } from "@/lib/resultLinks";
 import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCategory } from "@/lib/starterQueries";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import {
@@ -153,6 +153,12 @@ export function Query(_: RoutableProps) {
       const next = new Map(prev);
       if (next.has(resultId)) next.delete(resultId);
       else if (next.size < MAX_COMPARE_SELECTIONS && comparisonExclusionReason(row) === undefined) next.set(resultId, row);
+      return next;
+    });
+  const removeCompareSelection = (resultId: string) =>
+    setCompareSelectedRows((prev) => {
+      const next = new Map(prev);
+      next.delete(resultId);
       return next;
     });
   const clearCompareSelection = () => setCompareSelectedRows(new Map());
@@ -719,7 +725,7 @@ export function Query(_: RoutableProps) {
                       type="button"
                       class={`px-3 py-1.5 text-sm ${
                         rowLimitMode === mode
-                          ? "bg-[var(--bb-accent-hover)] text-[var(--bb-fg-primary)]"
+                          ? "bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
                           : "bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data-muted)]"
                       }`}
                       aria-pressed={rowLimitMode === mode}
@@ -829,63 +835,95 @@ export function Query(_: RoutableProps) {
                   return (
                     <>
                       <div
-                        class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-sm text-[var(--bb-data-fg-muted)]"
+                        class="border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] text-sm text-[var(--bb-data-fg-muted)]"
                         data-testid="query-compare-tray"
                       >
-                        <span>
-                          {compareSelectedIds.size === 0
-                            ? `${selectedStatus}. Select two or more rows to compare. The first pick locks the ranking.`
-                            : compareSelectedIds.size === 1
-                              ? `${selectedStatus} — pick a compatible second row to enable Compare.${hiddenIncompatibleSuffix(compareIncompatibleHiddenCount)}`
-                              : `${selectedStatus}.`}
-                        </span>
-                        <span class="flex items-center gap-2">
-                          {compareCohortSignature !== null && (
-                            <label
-                              class="flex items-center gap-1 text-xs"
-                              data-testid="query-compare-compatible-only-label"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={compareCompatibleOnly}
-                                onChange={(e) =>
-                                  setCompareCompatibleOnly((e.target as HTMLInputElement).checked)
-                                }
-                                class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
-                                data-testid="query-compare-compatible-only"
-                              />
-                              Compatible only
-                            </label>
-                          )}
-                          {compareSelectedIds.size > 0 && (
-                            <button
-                              type="button"
-                              class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1 text-xs font-medium hover:bg-[var(--bb-surface-data-muted)]"
-                              onClick={clearCompareSelection}
-                              data-testid="query-compare-clear"
-                            >
-                              Clear selection
-                            </button>
-                          )}
-                          {compareUrl ? (
-                            <a
-                              href={compareUrl}
-                              class="rounded-md bg-[var(--bb-accent)] px-3 py-1 text-xs font-medium text-white shadow-sm"
-                              data-testid="query-compare-launch"
-                            >
-                              Compare {compareSelectedIds.size} selected →
-                            </a>
-                          ) : (
-                            <button
-                              type="button"
-                              disabled
-                              class="rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-3 py-1 text-xs font-medium text-[var(--bb-data-fg-subtle)]"
-                              data-testid="query-compare-launch-disabled"
-                            >
-                              Compare (need 2+)
-                            </button>
-                          )}
-                        </span>
+                        <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
+                          <span>
+                            {compareSelectedIds.size === 0
+                              ? `${selectedStatus}. Select two or more rows to compare. The first pick locks the ranking.`
+                              : compareSelectedIds.size === 1
+                                ? `${selectedStatus} — pick a compatible second row to enable Compare.${hiddenIncompatibleSuffix(compareIncompatibleHiddenCount)}`
+                                : `${selectedStatus}.`}
+                          </span>
+                          <span class="flex items-center gap-2">
+                            {compareCohortSignature !== null && (
+                              <label
+                                class="flex items-center gap-1 text-xs"
+                                data-testid="query-compare-compatible-only-label"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={compareCompatibleOnly}
+                                  onChange={(e) =>
+                                    setCompareCompatibleOnly((e.target as HTMLInputElement).checked)
+                                  }
+                                  class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
+                                  data-testid="query-compare-compatible-only"
+                                />
+                                Compatible only
+                              </label>
+                            )}
+                            {compareSelectedIds.size > 0 && (
+                              <button
+                                type="button"
+                                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1 text-xs font-medium hover:bg-[var(--bb-surface-data-muted)]"
+                                onClick={clearCompareSelection}
+                                data-testid="query-compare-clear"
+                              >
+                                Clear selection
+                              </button>
+                            )}
+                            {compareUrl ? (
+                              <a
+                                href={compareUrl}
+                                class="rounded-md bg-[var(--bb-accent)] px-3 py-1 text-xs font-medium text-white shadow-sm"
+                                data-testid="query-compare-launch"
+                              >
+                                Compare {compareSelectedIds.size} selected →
+                              </a>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled
+                                class="rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-3 py-1 text-xs font-medium text-[var(--bb-data-fg-subtle)]"
+                                data-testid="query-compare-launch-disabled"
+                              >
+                                Compare (need 2+)
+                              </button>
+                            )}
+                          </span>
+                        </div>
+                        {compareSelectedRows.size > 0 && (
+                          <ul
+                            class="flex flex-wrap gap-2 border-t border-[var(--bb-data-border)] px-4 py-2"
+                            aria-label="Selected query compare results"
+                          >
+                            {[...compareSelectedRows.values()].map((row) => {
+                              const resultId = String(row.result_id);
+                              const platform = String(row.platform ?? "Unknown platform");
+                              const publicId = visibleResultIdForRow({ result_id: resultId });
+                              return (
+                                <li
+                                  key={resultId}
+                                  class="flex max-w-full items-center gap-2 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-2 py-1 text-xs"
+                                  data-testid={`query-compare-selected-${resultId}`}
+                                >
+                                  <span class="font-medium text-[var(--bb-data-fg-primary)]">{platform}</span>
+                                  <span class="font-mono">Public ID {publicId}</span>
+                                  <button
+                                    type="button"
+                                    class="rounded px-1 hover:bg-[var(--bb-surface-data-muted)] hover:text-[var(--bb-data-fg-primary)]"
+                                    aria-label={`Remove ${platform}, Public ID ${publicId}, from comparison`}
+                                    onClick={() => removeCompareSelection(resultId)}
+                                  >
+                                    Remove
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
                       </div>
                       {zeroSelectable && (
                         <section
