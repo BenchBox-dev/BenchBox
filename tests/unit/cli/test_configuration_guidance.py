@@ -68,6 +68,7 @@ def test_connection_guidance_does_not_advertise_unregistered_platform_options(
         ("redshift", "staging_root", "s3://benchbox-redshift-staging/data"),
         ("snowflake", "iceberg_external_volume", "benchbox_vol"),
         ("snowflake", "staging_root", "s3://benchbox-snowflake-staging/data"),
+        ("spark", "driver_memory", "8g"),
         ("spark", "java_home", "/usr/lib/jvm/java-17"),
         ("synapse", "staging_root", "abfss://c@a.dfs.core.windows.net/data"),
         # An alias the CLI has always accepted; the guard used to miss it.
