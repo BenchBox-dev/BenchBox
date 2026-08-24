@@ -20,6 +20,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from benchbox.core.exceptions import ConfigurationError
 from benchbox.core.results.models import BenchmarkResults, TableLoadingStats
 from benchbox.core.results.platform_info import PlatformInfoInput
 from benchbox.core.runner.dataframe_runner import (
@@ -414,22 +415,29 @@ class TestExecuteDataframeQueries:
     @patch("benchbox.core.runner.dataframe_runner._clear_parameter_overrides")
     @patch("benchbox.core.runner.dataframe_runner._setup_parameter_overrides_for_stream")
     @patch("benchbox.core.runner.dataframe_runner._get_queries_for_benchmark")
-    def test_empty_query_list_returns_empty(self, mock_get_queries, mock_setup, mock_clear):
-        """When no queries are found, an empty list is returned."""
+    def test_empty_query_list_raises_instead_of_returning_empty(self, mock_get_queries, mock_setup, mock_clear):
+        """No queries discovered is a failure, not an empty success.
+
+        This test previously asserted `results == []`, which pinned the defect
+        rather than the behaviour: the caller goes straight on to mark
+        power_test COMPLETED, so an empty return produced a bundle reporting
+        0/0 queries, validation "passed", and exit 0. Sixty such bundles are in
+        the public corpus, every one from a benchmark family with no DataFrame
+        query source.
+        """
         mock_get_queries.return_value = []
 
         adapter = _make_adapter()
         config = _make_config()
 
-        results = _execute_dataframe_queries(
-            adapter=adapter,
-            ctx=adapter.create_context(),
-            benchmark_config=config,
-            benchmark_instance=None,
-            monitor=None,
-        )
-
-        assert results == []
+        with pytest.raises(ConfigurationError, match="no DataFrame query source"):
+            _execute_dataframe_queries(
+                adapter=adapter,
+                ctx=adapter.create_context(),
+                benchmark_config=config,
+                benchmark_instance=None,
+                monitor=None,
+            )
 
     @patch("benchbox.core.runner.dataframe_runner._clear_parameter_overrides")
     @patch("benchbox.core.runner.dataframe_runner._setup_parameter_overrides_for_stream")

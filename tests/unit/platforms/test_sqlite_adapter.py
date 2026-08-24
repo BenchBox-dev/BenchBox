@@ -611,3 +611,50 @@ class TestSQLiteAdapter:
         # When connection_config has explicit path, should use that
         path = adapter.get_database_path(database_path="/tmp/override.db")
         assert path == "/tmp/override.db"
+
+    def test_execute_query_with_connection_and_cursor(self):
+        """execute_query must accept both sqlite3.Connection and sqlite3.Cursor."""
+        adapter = SQLiteAdapter(database_path=":memory:")
+        conn = adapter.create_connection()
+        try:
+            # Using connection directly
+            res_conn = adapter.execute_query(conn, "SELECT 42 as val", "q_conn")
+            assert res_conn["status"] == "SUCCESS"
+            assert res_conn["rows_returned"] == 1
+            assert res_conn["results"] == [(42,)]
+
+            # Using cursor directly (as in TPC-DS power-test streams)
+            cursor = conn.cursor()
+            res_cursor = adapter.execute_query(cursor, "SELECT 84 as val", "q_cursor")
+            assert res_cursor["status"] == "SUCCESS"
+            assert res_cursor["rows_returned"] == 1
+            assert res_cursor["results"] == [(84,)]
+        finally:
+            conn.close()
+
+    def test_get_query_plan_with_connection_and_cursor(self):
+        """get_query_plan must accept both sqlite3.Connection and sqlite3.Cursor."""
+        adapter = SQLiteAdapter(database_path=":memory:")
+        conn = adapter.create_connection()
+        try:
+            conn.execute("CREATE TABLE t (x INT)")
+            plan_conn = adapter.get_query_plan(conn, "SELECT * FROM t WHERE x = 1")
+            assert plan_conn is not None
+
+            cursor = conn.cursor()
+            plan_cursor = adapter.get_query_plan(cursor, "SELECT * FROM t WHERE x = 1")
+            assert plan_cursor is not None
+        finally:
+            conn.close()
+
+    def test_execute_query_failure_returns_standard_failure_payload(self):
+        """Query syntax error returns standardized FAILED payload."""
+        adapter = SQLiteAdapter(database_path=":memory:")
+        conn = adapter.create_connection()
+        try:
+            res = adapter.execute_query(conn, "SYNTAX ERROR", "q_fail")
+            assert res["status"] == "FAILED"
+            assert res["error"] is not None
+            assert res["rows_returned"] == 0
+        finally:
+            conn.close()
