@@ -18,7 +18,11 @@ import re
 from pathlib import Path
 
 import pytest
-import tomllib
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10: stdlib tomllib is 3.11+
+    import tomli as tomllib  # type: ignore[no-redef]
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
