@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import DEFAULT
 
+from benchbox.core.benchmark_loader import COMPLIANCE_GATED_BENCHMARKS
 from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
@@ -41,11 +42,12 @@ from benchbox.core.dataframe.query_resolution import (
     get_tpcds_dataframe_queries,
     get_tpcds_legacy_queries,
     get_tpch_dataframe_queries,
+    registry_dataframe_queries,
     resolve_tpcds_query_manager,
     resolve_tpcds_stream_queries,
 )
 from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
-from benchbox.core.exceptions import InsufficientMemoryError
+from benchbox.core.exceptions import ConfigurationError, InsufficientMemoryError
 from benchbox.core.results import (
     BenchmarkInfoInput,
     ResultBuilder,
@@ -235,6 +237,7 @@ def run_dataframe_benchmark(
             test_type=test_execution_type if test_execution_type != "standard" else "power",
             benchmark_id=normalize_benchmark_id(benchmark_config.name),
             display_name=getattr(benchmark_config, "display_name", benchmark_config.name),
+            compliance_class=dataframe_compliance_class(benchmark_instance, benchmark_config),
         ),
         platform=platform_info,
     )
@@ -501,8 +504,13 @@ def _execute_dataframe_queries(
             initial_queries = [q for q in initial_queries if q.query_id.upper() in query_filter]
 
         if not initial_queries:
-            logger.warning("No queries found for execution")
-            return []
+            # Never return an empty result set here. The caller goes straight
+            # on to mark power_test COMPLETED, so a silent empty list produced
+            # a bundle reporting 0/0 queries, validation "passed", and exit 0 --
+            # a run that executed nothing and looked like a clean pass. Sixty
+            # such bundles are in the public corpus today, all from seven
+            # benchmark families with no DataFrame query source.
+            raise ConfigurationError(no_dataframe_queries_message(benchmark_id, query_filter))
 
         total_queries = len(initial_queries)
         logger.info(f"Executing {total_queries} queries")
@@ -742,6 +750,69 @@ def _clear_parameter_overrides(benchmark_id: str) -> None:
             pass
 
 
+def dataframe_compliance_class(benchmark_instance: object | None, benchmark_config: object) -> str | None:
+    """Resolve the compliance class a DataFrame result must carry.
+
+    The SQL path gets this for free: `result_factory.build_enhanced_benchmark_result`
+    reads `benchmark.compliance_class` off the benchmark instance. Both DataFrame
+    builders construct `BenchmarkInfoInput` themselves and omitted the field, and
+    they build from the CONFIG rather than the instance, so threading `official`
+    through the config -- as PR #1770 did -- could never reach them.
+
+    The effect was not cosmetic. `benchbox submit` refuses a TPC-DS bundle whose
+    compliance class is unofficial, so no DataFrame result could ever be
+    published, however the user invoked it.
+
+    Prefer the instance, which has already run the classifier. Fall back to
+    classifying from the config so a caller that passes no instance still gets a
+    truthful value rather than silence.
+    """
+    from_instance = getattr(benchmark_instance, "compliance_class", None)
+    if from_instance is not None:
+        return _compliance_value(from_instance)
+
+    name = str(getattr(benchmark_config, "name", "") or "").lower()
+    if name not in COMPLIANCE_GATED_BENCHMARKS:
+        return None
+    from benchbox.core.tpcds.compliance import classify_tpcds_run
+
+    return _compliance_value(
+        classify_tpcds_run(
+            float(getattr(benchmark_config, "scale_factor", 0) or 0),
+            official=bool(getattr(benchmark_config, "official", False)),
+        )
+    )
+
+
+def _compliance_value(compliance_class: object) -> str:
+    """Plain wire string for a compliance class, enum or already-a-string.
+
+    `str()` on the enum yields `TpcdsComplianceClass.UNOFFICIAL_SUBSCALE`, not
+    `unofficial_subscale`, and the submit and admission gates compare against
+    the plain value. The SQL path emits the plain value, so this must too.
+    """
+    return str(getattr(compliance_class, "value", compliance_class))
+
+
+def no_dataframe_queries_message(benchmark_id: str, query_filter: set[str] | None) -> str:
+    """Explain why zero queries were discovered, and what the user can do.
+
+    The two causes need different advice: an over-narrow `--queries` filter is
+    the user's to correct, whereas a benchmark with no DataFrame query source
+    at all is a coverage gap they cannot fix from the command line.
+    """
+    if query_filter:
+        return (
+            f"No DataFrame queries matched {sorted(query_filter)} for benchmark {benchmark_id!r}. "
+            "Check the --queries selection against the benchmark's query IDs."
+        )
+    return (
+        f"Benchmark {benchmark_id!r} has no DataFrame query source, so DataFrame mode would "
+        "execute nothing. Run it in SQL mode instead -- use the platform's plain name rather "
+        "than its -df alias -- or choose a benchmark with DataFrame support."
+    )
+
+
 def _get_queries_for_benchmark(
     benchmark_config: BenchmarkConfig,
     benchmark_instance: Any | None,
@@ -782,7 +853,7 @@ def _get_queries_for_benchmark(
     if _benchmark_provides_dataframe_queries(benchmark_instance):
         return benchmark_instance.get_dataframe_queries()
 
-    return []
+    return registry_dataframe_queries(benchmark_id)
 
 
 def _get_tpch_dataframe_queries(

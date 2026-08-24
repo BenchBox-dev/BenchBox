@@ -31,6 +31,7 @@ from benchbox.core.benchmark_loader import get_benchmark_instance
 from benchbox.core.config import BenchmarkConfig
 from benchbox.core.publishing.admission import publish_admission
 from benchbox.core.results.loader import load_result_file, reconstruct_benchmark_results
+from benchbox.core.results.query_normalizer import normalize_query_result
 from benchbox.core.results.result_factory import build_enhanced_benchmark_result
 from benchbox.core.results.schema import build_result_payload
 
@@ -103,3 +104,94 @@ def test_unofficial_runs_are_refused_for_compliance(official: bool, scale_factor
     assert not decision.allowed
     # Refused for the compliance class, not incidentally for something else.
     assert decision.code == "unofficial_compliance"
+
+
+def _dataframe_platform_input():
+    """The same platform block the DataFrame builders construct."""
+    from benchbox.core.results.result_factory import _build_platform_input
+
+    return _build_platform_input("polars", {"execution_mode": "dataframe"}, {})
+
+
+def _dataframe_compliance(*, official: bool, scale_factor: float = OFFICIAL_SCALE) -> str | None:
+    """What the DataFrame builders will stamp on the bundle, same inputs.
+
+    Both DataFrame result builders construct `BenchmarkInfoInput` themselves
+    rather than going through `build_enhanced_benchmark_result`, so the SQL
+    assertions above say nothing about them. They also build from the CONFIG,
+    not the benchmark instance, which is why threading `official` through the
+    config in PR #1770 could never reach them.
+    """
+    from benchbox.core.runner.dataframe_runner import dataframe_compliance_class
+
+    config = BenchmarkConfig(
+        name="tpcds",
+        display_name="TPC-DS",
+        scale_factor=scale_factor,
+        official=official,
+    )
+    return dataframe_compliance_class(get_benchmark_instance(config, None), config)
+
+
+@pytest.mark.parametrize(
+    ("official", "scale_factor", "expected_class"),
+    [
+        (True, OFFICIAL_SCALE, "official"),
+        (False, OFFICIAL_SCALE, "unofficial_nonstandard"),
+        (True, 0.5, "unofficial_subscale"),
+        (True, 2.0, "unofficial_nonstandard"),
+    ],
+)
+def test_the_dataframe_path_classifies_identically_to_the_sql_path(
+    official: bool, scale_factor: float, expected_class: str
+) -> None:
+    """The two paths must agree. Before this, DataFrame emitted nothing at all.
+
+    An absent `compliance_class` is refused by `benchbox submit` for TPC-DS, so
+    no DataFrame result could ever be published however the user invoked it --
+    roughly half the public corpus is DataFrame mode.
+    """
+    assert _dataframe_compliance(official=official, scale_factor=scale_factor) == expected_class
+
+
+def test_the_dataframe_value_is_the_plain_wire_string_not_an_enum_repr() -> None:
+    """`str(TpcdsComplianceClass.OFFICIAL)` is the repr, not `official`.
+
+    The submit and admission gates compare against the plain value, so an enum
+    repr would be refused just as surely as an absent field -- and would look
+    correct in a diff.
+    """
+    value = _dataframe_compliance(official=True)
+
+    assert value == "official"
+    assert "TpcdsComplianceClass" not in str(value)
+
+
+def test_a_dataframe_official_bundle_passes_publish_admission(tmp_path: Path) -> None:
+    """Carry the DataFrame classification through to the admission decision."""
+    from benchbox.core.results.builder import BenchmarkInfoInput, ResultBuilder
+
+    builder = ResultBuilder(
+        benchmark=BenchmarkInfoInput(
+            name="TPC-DS",
+            scale_factor=OFFICIAL_SCALE,
+            test_type="power",
+            benchmark_id="tpcds",
+            display_name="TPC-DS",
+            compliance_class=_dataframe_compliance(official=True),
+        ),
+        platform=_dataframe_platform_input(),
+    )
+    builder.mark_started()
+    builder.set_validation_status("PASSED", {})
+    for query_result in _clean_query_results():
+        builder.add_query_result(normalize_query_result(query_result))
+    builder.mark_completed()
+
+    bundle = tmp_path / "tpcds_sf1_polars_df_official.json"
+    bundle.write_text(json.dumps(build_result_payload(builder.build()), default=str), encoding="utf-8")
+    loaded, _raw = load_result_file(bundle)
+
+    assert loaded.compliance_class == "official"
+    decision = publish_admission(loaded, PUBLISH_LABEL)
+    assert decision.allowed, f"official DataFrame TPC-DS refused: {decision.code} ({decision.reason})"
