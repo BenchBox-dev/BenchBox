@@ -47,7 +47,7 @@ def test_validate_config_minimal():
     assert cfg.preflight.free_space_min_gib == 5.0
     assert cfg.preflight.free_memory_min_gib == 2.0
     assert cfg.preflight.clickhouse_memory_limit == "5.25g"
-    assert cfg.preflight.docker_memory_reserve_gib == 2.0
+    assert cfg.preflight.docker_memory_reserve_gib == 0.0
     assert cfg.memory_gate_enabled is True
     assert cfg.cleanup.docker_manage_platforms is False
     assert cfg.cleanup.docker_platform_switch == "off"

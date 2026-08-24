@@ -36,9 +36,11 @@ validator, including exact SF1 row counts. TPC-DS SF1 at the same 5.25 GiB
 request loaded 19,557,376 rows without a cgroup/OOM event and reached a
 measured engine peak of about 3.11 GB (`tpcds_sf1_clickhouse_server_sql_20260823_093153_449b1f7e.json`). Its power phase completed but contained query failures; those are separate TPC-DS compatibility/correctness evidence, not a memory-limit failure. The TPC-DS result must not be represented as a clean benchmark pass until those query failures are resolved.
 
-The 2 GiB host reserve remains an independent, conservative host-safety
-policy. It is not a claim about ClickHouse's working-set requirement and must
-not be described as experimentally derived engine demand.
+No default host reserve is assumed. The calibration established the
+5.25 GiB runtime request, but did not validate an additional host margin; the
+former 2 GiB reserve was an unvalidated policy assumption. Operators may set a
+nonzero reserve only when a separate host-headroom measurement justifies it,
+and that policy must remain distinct from ClickHouse working-set demand.
 
 ## Decision
 
@@ -80,8 +82,9 @@ for server-mode certification.
 
 ## Consequences
 
-- The default managed ClickHouse request is `5.25g`; the host reserve remains
-  separately configurable and must be reported as a safety policy, not as
+- The default managed ClickHouse request is `5.25g`; the default additional
+  host reserve is `0.0`. A nonzero reserve remains separately configurable,
+  but requires separate host-headroom evidence and must not be reported as
   measured engine demand.
 - Linux Docker and macOS Apple Container evidence are comparable only at the
   cgroup-contract boundary. Host VM overhead and swap pressure remain required

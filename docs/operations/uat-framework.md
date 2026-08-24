@@ -878,18 +878,20 @@ before `compose up`, never a reason to recreate the historical 1 GiB batch.
 An operator override is allowed only when it names a separately measured
 calibration rung and is recorded with the run evidence.
 
-The host reserve is configured independently as
-`preflight.docker_memory_reserve_gib` (default `2.0`). For ClickHouse the
-pre-start requirement is the selected request plus that reserve, compared
-with the same `virtual_memory().available` metric used by the generic gate.
-After startup UAT also runs a no-stream runtime-stats query, requires an
-explicit container memory limit, and requires it to equal the selected
-request exactly. It then repeats the host-available check. Unknown runtime
-limits or unavailable post-start host memory fail the ClickHouse platform
-closed; UAT does not infer a limit from total RAM, engine defaults, or a
-driver batch size. The existing `free_memory_min_gib: 0` setting remains an
-explicit, supervised opt-out of the pre-start floor, but it does not permit
-an unverified ClickHouse runtime limit or post-start reserve shortfall.
+An additional host reserve is configured independently as
+`preflight.docker_memory_reserve_gib`, but its default is now `0.0`: the
+ClickHouse calibration established the runtime request, not an extra 2 GiB
+host margin. A nonzero reserve is an explicit operator policy and must be
+backed by separate host-headroom evidence. When configured, the pre-start
+requirement is the selected request plus that reserve, compared with the same
+`virtual_memory().available` metric used by the generic gate. After startup
+UAT also runs a no-stream runtime-stats query, requires an explicit container
+memory limit, and requires it to equal the selected request exactly. It then
+repeats the host-available check. Unknown runtime limits or unavailable
+post-start host memory fail the ClickHouse platform closed; UAT does not infer
+a limit from total RAM, engine defaults, or a driver batch size. The existing
+`free_memory_min_gib: 0` setting remains an explicit, supervised opt-out of the
+pre-start floor, but it does not permit an unverified ClickHouse runtime limit.
 
 #### Why the current candidate is 5.25 GiB
 
