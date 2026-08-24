@@ -46,6 +46,7 @@
         --bb-tone-success-bg: #dcfce7;
         --bb-tone-success-fg: #14532d;
         --bb-tone-warning-bg: #fef3c7;
+        --bb-tone-warning-border: #b45309;
         --bb-tone-warning-fg: #78350f;
         --bb-tone-danger-bg: #fee2e2;
         --bb-tone-danger-fg: #7f1d1d;
@@ -147,6 +148,7 @@
         --bb-tone-success-bg: #0f2f1d;
         --bb-tone-success-fg: #bbf7d0;
         --bb-tone-warning-bg: #3a2a08;
+        --bb-tone-warning-border: #d29922;
         --bb-tone-warning-fg: #fde68a;
         --bb-tone-danger-bg: #3b1014;
         --bb-tone-danger-fg: #fecaca;
@@ -566,6 +568,7 @@
         --bb-tone-success-bg: #dcfce7;
         --bb-tone-success-fg: #14532d;
         --bb-tone-warning-bg: #fef3c7;
+        --bb-tone-warning-border: #b45309;
         --bb-tone-warning-fg: #78350f;
         --bb-tone-danger-bg: #fee2e2;
         --bb-tone-danger-fg: #7f1d1d;

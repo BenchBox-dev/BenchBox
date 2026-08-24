@@ -19,6 +19,7 @@ import {
   getCohort,
   getMetaLeaderboard,
   getMetaLeaderboardData,
+  getExistingResultIds,
   memoizedSnapshotQueryRows,
   resolveShortId,
   toShortIds,
@@ -510,6 +511,43 @@ describe("getMetaLeaderboardData", () => {
 });
 
 describe("resolveShortId", () => {
+  it("individually confirms IDs omitted from the batch probe", async () => {
+    const onInitialExistingIds = vi.fn();
+    mockedQueryRows
+      .mockResolvedValueOnce([{ result_id: "known-a" }])
+      .mockResolvedValueOnce([]);
+
+    await expect(
+      getExistingResultIds(["known-a", "missing-b"], onInitialExistingIds),
+    ).resolves.toEqual(new Set(["known-a"]));
+    expect(onInitialExistingIds).toHaveBeenCalledWith(new Set(["known-a"]));
+    expect(mockedQueryRows).toHaveBeenCalledTimes(2);
+    expect(mockedQueryRows.mock.calls).toEqual([
+      ["SELECT result_id FROM bench.result_detail_metrics WHERE result_id IN (?, ?)", ["known-a", "missing-b"]],
+      ["SELECT result_id FROM bench.result_detail_metrics WHERE result_id = ?", ["missing-b"]],
+    ]);
+  });
+
+  it("retains a real ID recovered by an individual confirmation after a partial batch read", async () => {
+    mockedQueryRows
+      .mockResolvedValueOnce([{ result_id: "known-a" }])
+      .mockResolvedValueOnce([{ result_id: "cold-b" }]);
+
+    await expect(getExistingResultIds(["known-a", "cold-b"])).resolves.toEqual(
+      new Set(["known-a", "cold-b"]),
+    );
+    expect(mockedQueryRows).toHaveBeenCalledTimes(2);
+    expect(mockedQueryRows.mock.calls[1]).toEqual([
+      "SELECT result_id FROM bench.result_detail_metrics WHERE result_id = ?",
+      ["cold-b"],
+    ]);
+  });
+
+  it("does not query existing detail IDs for an empty input", async () => {
+    await expect(getExistingResultIds([])).resolves.toEqual(new Set());
+    expect(mockedQueryRows).not.toHaveBeenCalled();
+  });
+
   it("returns the input unchanged when it is not a short-id-shaped string", async () => {
     // Full result_ids contain hyphens and are never 8+ contiguous hex chars.
     const fullId = "tpch-duckdb-abcdef12";

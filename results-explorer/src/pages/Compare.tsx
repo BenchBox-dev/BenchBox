@@ -5,6 +5,7 @@ import type { RoutableProps } from "preact-router";
 import type { DetailResult } from "@/types";
 import {
   getDetailResult,
+  getExistingResultIds,
   getPrimaryMetricForBenchmark,
   listResults,
   resolveShortId,
@@ -142,12 +143,6 @@ export function Compare({ url }: CompareProps) {
     if (plan.duplicates.length > 0) {
       initialNotice = `Ignored duplicate result ID${plan.duplicates.length === 1 ? "" : "s"}: ${formatIdList(plan.duplicates)}.`;
     }
-    if (plan.overflow.length > 0) {
-      initialNotice = appendCompareNotice(
-        initialNotice,
-        `Ignored ${plan.overflow.length} additional result ID${plan.overflow.length === 1 ? "" : "s"} (${formatIdList(plan.overflow)}); comparisons are limited to ${MAX_COMPARE_SELECTIONS} unique results.`,
-      );
-    }
     if (initialNotice) setCompareNotice(initialNotice);
     const ids = plan.retained;
 
@@ -195,6 +190,7 @@ export function Compare({ url }: CompareProps) {
 
     recoverCompareResults(ids, MAX_COMPARE_SELECTIONS, {
       resolveId: resolveShortId,
+      findExistingIds: getExistingResultIds,
       loadResult: getDetailResult,
       isCancelled: () => cancelled,
     })
@@ -212,6 +208,13 @@ export function Compare({ url }: CompareProps) {
           initialNotice = appendCompareNotice(
             initialNotice,
             `Ignored ${recovery.overflow.length} additional result ID${recovery.overflow.length === 1 ? "" : "s"}${aliasResolutionNote} (${formatIdList(recovery.overflow)}); comparisons are limited to ${MAX_COMPARE_SELECTIONS} unique results.`,
+          );
+          setCompareNotice(initialNotice);
+        }
+        if (recovery.unprocessed.length > 0) {
+          initialNotice = appendCompareNotice(
+            initialNotice,
+            `Did not process ${recovery.unprocessed.length} additional result ID${recovery.unprocessed.length === 1 ? "" : "s"} to keep this page responsive; comparisons are limited to ${MAX_COMPARE_SELECTIONS} unique results.`,
           );
           setCompareNotice(initialNotice);
         }
@@ -878,6 +881,7 @@ function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice:
   }
 
   const selectedCount = selectedIds.size;
+  const selectedStatus = formatSelectedCount(selectedCount, "result", MAX_COMPARE_SELECTIONS);
   const selectedRowsForLaunch = candidates?.filter((row) => selectedIds.has(row.result_id)) ?? [];
   const selectedHasComparisonExclusion = selectedRowsForLaunch.some((row) => comparisonExclusionReason(row) !== null);
   const canLaunch = selectedCount >= 2 && selectedCount <= MAX_COMPARE_SELECTIONS && !selectedHasComparisonExclusion;
@@ -982,10 +986,10 @@ function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice:
       <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
         <p class="text-[var(--bb-data-fg-muted)]" data-testid="compare-builder-status">
           {selectedCount === 0
-            ? `${formatCandidateCount(filteredRows.length)}. Select at least 2 to launch a comparison.`
+            ? `${formatCandidateCount(filteredRows.length)}. ${selectedStatus}. Select at least 2 to launch a comparison.`
             : selectedCount < 2
-            ? `1 selected. Select 1 more compatible run to launch.${hiddenIncompatibleSuffix(incompatibleHiddenCount)}`
-            : `${formatSelectedCount(selectedCount)}. ${
+            ? `${selectedStatus}. Select 1 more compatible run to launch.${hiddenIncompatibleSuffix(incompatibleHiddenCount)}`
+            : `${selectedStatus}. ${
                 cohortLock
                   ? `Ranking: ${humanizeBenchmark(cohortLock.benchmark)} · SF ${cohortLock.scale_factor}${
                       cohortLock.test_type ? ` · ${cohortLock.test_type}` : ""

@@ -391,7 +391,7 @@ describe("Query", () => {
     expect(screen.getByTestId("query-compare-tray").textContent).toContain("1 incompatible row hidden");
   });
 
-  it("pages in SQL and preserves compare selection across page changes", async () => {
+  it("removes an off-page selection and selects a replacement without clearing the set", async () => {
     resultRows = [
       { ...BASE_ROWS[0]!, result_id: "r1", platform: "DuckDB compatible" },
       ...Array.from({ length: 60 }, (_, index) => ({
@@ -406,11 +406,27 @@ describe("Query", () => {
     await waitFor(() => expect(screen.getAllByText("DuckDB compatible").length).toBeGreaterThan(0));
     expect(screen.getByText("Showing 1–24 of 61 matching result bundles")).toBeTruthy();
 
-    fireEvent.click(screen.getByTestId("query-compare-checkbox-r1"));
+    for (const id of ["r1", "page-row-0", "page-row-1", "page-row-2"]) {
+      fireEvent.click(screen.getByTestId(`query-compare-checkbox-${id}`));
+    }
+    expect(screen.getByTestId("query-compare-tray").textContent).toContain("4 results selected (maximum)");
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
 
     await waitFor(() => expect(screen.getByText("Showing 25–48 of 61 matching result bundles")).toBeTruthy());
-    expect(screen.getByTestId("query-compare-tray").textContent).toContain("1 result selected");
+    const replacement = screen.getByTestId("query-compare-checkbox-page-row-23") as HTMLInputElement;
+    expect(replacement.disabled).toBe(true);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Remove DuckDB compatible, Public ID r1, from comparison",
+      }),
+    );
+    expect(screen.queryByTestId("query-compare-selected-r1")).toBeNull();
+    expect(replacement.disabled).toBe(false);
+
+    fireEvent.click(replacement);
+    expect(screen.getByTestId("query-compare-selected-page-row-23")).toBeTruthy();
+    expect(screen.getByTestId("query-compare-tray").textContent).toContain("4 results selected (maximum)");
     expect(new URL(window.location.href).searchParams.get("page")).toBe("2");
     const latestSelect = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql)).at(-1);
     expect(latestSelect?.[0]).toContain("LIMIT 24 OFFSET 24");

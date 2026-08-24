@@ -1229,6 +1229,36 @@ export async function getPrimaryMetricForBenchmark(benchmark: string): Promise<"
 
 const SHORT_ID_PATTERN = /^[0-9a-f]{8,}$/i;
 
+export async function getExistingResultIds(
+  resultIds: string[],
+  onInitialExistingIds?: (existingIds: ReadonlySet<string>) => void,
+): Promise<ReadonlySet<string>> {
+  if (resultIds.length === 0) return new Set();
+  const placeholders = resultIds.map(() => "?").join(", ");
+  const batchRows = await queryRows<{ result_id: string }>(
+    `SELECT result_id FROM bench.result_detail_metrics WHERE result_id IN (${placeholders})`,
+    resultIds,
+  );
+  const existing = new Set(batchRows.map((row) => row.result_id));
+  onInitialExistingIds?.(existing);
+  // A non-empty batch is only a positive hint: one readable row can make
+  // `queryRows` return while another requested row group is still cold.
+  // Confirm every omission separately so each zero-row answer gets the normal
+  // cold-read retries. Compare caps this fan-out at four candidate IDs.
+  const confirmedRows = await Promise.all(
+    resultIds.filter((resultId) => !existing.has(resultId)).map((resultId) =>
+      queryRows<{ result_id: string }>(
+        "SELECT result_id FROM bench.result_detail_metrics WHERE result_id = ?",
+        [resultId],
+      ),
+    ),
+  );
+  for (const rows of confirmedRows) {
+    for (const row of rows) existing.add(row.result_id);
+  }
+  return existing;
+}
+
 export async function resolveShortId(id: string): Promise<string> {
   if (!SHORT_ID_PATTERN.test(id)) return id;
   const rows = await queryRows<{ result_id: string }>("SELECT result_id FROM bench.short_ids WHERE short_id = ?", [id]);

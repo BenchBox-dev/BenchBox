@@ -32,8 +32,9 @@ export function formatCandidateCount(count: number): string {
   return formatCount(count, "candidate");
 }
 
-export function formatSelectedCount(count: number, noun = "result"): string {
-  return `${formatCount(count, noun)} selected`;
+export function formatSelectedCount(count: number, noun = "result", maximum?: number): string {
+  const selected = `${formatCount(count, noun)} selected`;
+  return maximum !== undefined && count >= maximum ? `${selected} (maximum)` : selected;
 }
 
 export function ensureSentence(value: string): string {

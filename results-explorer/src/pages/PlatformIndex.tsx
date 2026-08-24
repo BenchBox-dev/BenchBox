@@ -148,21 +148,22 @@ function platformCompareGuidanceMessage(
   selectedCount: number,
   platformName: string,
 ): string {
+  const selectedStatus = formatSelectedCount(selectedCount, "result", MAX_COMPARE_SELECTIONS);
   if (selectedCount === 0) {
-    return `Select two or more ${platformName} results from the same benchmark, scale, phase, and primary metric for a decision-grade comparison.`;
+    return `${selectedStatus}. Select two or more ${platformName} results from the same benchmark, scale, phase, and primary metric for a decision-grade comparison.`;
   }
   if (selectedCount === 1) {
     const row = selectedRows[0];
     const ranking = row ? compareCohortSummary(compareCohortSignatureForRow(row)) : "this ranking";
-    return `1 result selected in ${ranking}. Select one more result from the same comparable ranking.`;
+    return `${selectedStatus} in ${ranking}. Select one more result from the same comparable ranking.`;
   }
   const differences = selectedCohortDifferences(selectedRows);
   if (differences.length > 0) {
-    return `${selectedCount} results selected, but they differ by ${differences.join(", ")}. Compare will keep the receipts visible and may suppress winner claims for mixed rankings.`;
+    return `${selectedStatus}, but they differ by ${differences.join(", ")}. Compare will keep the receipts visible and may suppress winner claims for mixed rankings.`;
   }
   const first = selectedRows[0];
   const ranking = first ? compareCohortSummary(compareCohortSignatureForRow(first)) : "one ranking";
-  return `${selectedCount} results selected in ${ranking}. The sticky tray opens Compare with matching ranking context.`;
+  return `${selectedStatus} in ${ranking}. The sticky tray opens Compare with matching ranking context.`;
 }
 
 export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
@@ -660,16 +661,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Compare selected results</h2>
-            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">{compareGuidance}</p>
+            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]" aria-live="polite" aria-atomic="true">
+              {compareGuidance}
+            </p>
           </div>
-          {compareUrl ? (
-            <span
-              class="shrink-0 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-1.5 text-sm font-medium text-[var(--bb-data-fg-muted)]"
-              aria-live="polite"
-            >
-              Use sticky tray to compare
-            </span>
-          ) : (
+          {!compareUrl && (
             <button type="button" class="btn btn-secondary shrink-0 text-sm" disabled>
               {selected.size === 1 ? "Select 1 more result" : "Select 2 comparable results"}
             </button>
@@ -713,7 +709,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             <span>
               Showing {visiblePlatformResults.length.toLocaleString()} of {platformResults.length.toLocaleString()} results
             </span>
-            {selected.size > 0 && <span>{formatSelectedCount(selected.size)} for compare</span>}
           </div>
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-xs text-[var(--bb-data-fg-muted)]">
             <span>Rows are labelled by comparable ranking: benchmark, scale, phase, and primary metric.</span>
@@ -844,8 +839,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
           )}
         </div>
       )}
-
-      {selected.size === 1 && <p class="mt-3 text-sm text-[var(--bb-data-fg-muted)]">Select at least one more result to compare.</p>}
 
       {compareUrl && (
         <CompareTray
