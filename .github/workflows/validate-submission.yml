@@ -114,13 +114,13 @@ jobs:
         run: |
           # Find new/modified bundle JSONs in this PR (exclude companions and metadata files).
           # Use the base SHA directly rather than a ref name for reliability.
-          CHANGED=$(git diff --no-renames --name-only --diff-filter=ACMR ${{ github.event.pull_request.base.sha }}...HEAD -- 'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
-            | grep -v '\.plans\.json$' \
-            | grep -v '\.tuning\.json$' \
-            | grep -v '\.applied\.json$' \
-            | grep -v 'corpus-inventory\.json$' \
-            | grep -v '\.manifest\.json$' \
-            | grep -v 'submission-manifest\.json$' \
+          CHANGED=$(git diff --no-renames --name-only --diff-filter=ACMR ${{ github.event.pull_request.base.sha }}...HEAD -- ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
+            | grep -vi '\.plans\.json$' \
+            | grep -vi '\.tuning\.json$' \
+            | grep -vi '\.applied\.json$' \
+            | grep -vi 'corpus-inventory\.json$' \
+            | grep -vi '\.manifest\.json$' \
+            | grep -vi 'submission-manifest\.json$' \
             || true)
 
           # Detect changed manifest files separately. A manifest-only PR skips
@@ -134,12 +134,14 @@ jobs:
           # corpus inventory drift check, so a manifest removal cannot bypass it.
           CHANGED_MANIFESTS=$(git diff --no-renames --name-only --diff-filter=ACMRD \
             ${{ github.event.pull_request.base.sha }}...HEAD -- \
-            'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
-            | grep '\.manifest\.json$' \
+            ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
+            | grep -i '\.manifest\.json$' \
             || true)
           if [ -n "$CHANGED_MANIFESTS" ]; then
             while IFS= read -r manifest; do
-              bundle="${manifest%.manifest.json}.json"
+              stem="${manifest:0:${#manifest}-14}"
+              bundle=$(git ls-tree -r --name-only HEAD -- results-data/bundles \
+                | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { print; exit }')
               # Only add if the paired bundle exists and is not already in CHANGED.
               # For a deleted manifest whose bundle remains, the bundle still
               # exists at HEAD and is added; if both were removed, there is no
@@ -159,18 +161,62 @@ jobs:
           # removed companion is still a contract change while its bundle exists.
           CHANGED_APPLIED=$(git diff --no-renames --name-only --diff-filter=ACMRD \
             ${{ github.event.pull_request.base.sha }}...HEAD -- \
-            'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
-            | grep '\.applied\.json$' \
+            ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
+            | grep -i '\.applied\.json$' \
             || true)
           if [ -n "$CHANGED_APPLIED" ]; then
             while IFS= read -r applied; do
-              bundle="${applied%.applied.json}.json"
+              stem="${applied:0:${#applied}-13}"
+              bundle=$(git ls-tree -r --name-only HEAD -- results-data/bundles \
+                | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { print; exit }')
               # Only add if the paired bundle exists and is not already in CHANGED.
               if git cat-file -e "HEAD:${bundle}" 2>/dev/null \
                   && ! printf '%s\n' "$CHANGED" | grep -qxF "$bundle"; then
                 CHANGED="${CHANGED:+${CHANGED}$'\n'}${bundle}"
               fi
             done <<< "$CHANGED_APPLIED"
+          fi
+
+          # Detect changed plans/tuning companions separately. These two
+          # suffixes are filtered out of CHANGED above, so without this block a
+          # companion-only PR leaves CHANGED empty and skips bundle validation,
+          # public path scanning, companion hash validation, and corpus
+          # inventory validation. That is the opposite of what is wanted: the
+          # public privacy scanner in scripts/validate_submission.py explicitly
+          # targets .plans.json and .tuning.json, so those are exactly the files
+          # that must not reach a public branch unscanned. Derive the paired
+          # primary bundle so the existing validation step covers them, matching
+          # the manifest and applied handling above. Include deletions (D): a
+          # removed companion is still a contract change while its bundle
+          # exists.
+          CHANGED_COMPANIONS=$(git diff --no-renames --name-only --diff-filter=ACMRD \
+            ${{ github.event.pull_request.base.sha }}...HEAD -- \
+            ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
+            | grep -iE '\.(plans|tuning)\.json$' \
+            || true)
+          if [ -n "$CHANGED_COMPANIONS" ]; then
+            while IFS= read -r companion; do
+              # Suffix length varies, so pick it from the lowercased name to stay
+              # case-insensitive the way bundle discovery is.
+              lower=$(printf '%s' "$companion" | tr '[:upper:]' '[:lower:]')
+              case "$lower" in
+                *.plans.json) strip=11 ;;
+                *.tuning.json) strip=12 ;;
+                *) continue ;;
+              esac
+              stem="${companion:0:$(( ${#companion} - strip ))}"
+              bundle=$(git ls-tree -r --name-only HEAD -- results-data/bundles \
+                | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { print; exit }')
+              if [ -z "$bundle" ] && git cat-file -e "HEAD:${companion}" 2>/dev/null; then
+                echo "::error file=${companion}::Live companion has no primary bundle at ${stem}.json"
+                exit 1
+              fi
+              # Only add if the paired bundle exists and is not already in CHANGED.
+              if git cat-file -e "HEAD:${bundle}" 2>/dev/null \
+                  && ! printf '%s\n' "$CHANGED" | grep -qxF "$bundle"; then
+                CHANGED="${CHANGED:+${CHANGED}$'\n'}${bundle}"
+              fi
+            done <<< "$CHANGED_COMPANIONS"
           fi
 
           if [ -z "$CHANGED" ]; then
@@ -208,6 +254,18 @@ jobs:
           IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
           HEAD_REF: ${{ github.head_ref }}
         run: |
+          # `pipefail` is load-bearing, not hygiene. The validator's exit code is
+          # this gate: it is piped into `tee` below, and a bash pipeline returns
+          # the status of its LAST command. GitHub's default shell is
+          # `bash -e {0}` -- `-e` but NOT `-o pipefail` -- so without this line
+          # `tee`'s zero masked a failing validator entirely. Observed on PR
+          # #1629: the validator reported "Submission Validation: FAILED" with
+          # 105/105 bundles failing, this step still exited 0, and the required
+          # check went green. It also silently disarmed the corpus-inventory step
+          # below, which is gated on `steps.validate.outcome == 'success'`.
+          # Do not remove `| tee` without keeping the exit code, and do not
+          # remove this line while the pipe exists.
+          set -euo pipefail
           REQUIRE_MANIFEST="--require-manifest"
           if [ "$IS_FORK" = "false" ]; then
             case "$HEAD_REF" in
@@ -215,7 +273,9 @@ jobs:
             esac
           fi
           # Validate and generate PR comment in a single invocation.
-          # --pr-comment writes the Markdown file; exit code reflects validation result.
+          # --pr-comment writes the Markdown file; exit code reflects validation
+          # result -- which reaches this step's outcome only because of the
+          # `set -o pipefail` above.
           xargs -d '\n' uv run --no-project --python 3.11 -- python scripts/validate_submission.py $REQUIRE_MANIFEST --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt \
             | tee /tmp/validation_output.txt
 
