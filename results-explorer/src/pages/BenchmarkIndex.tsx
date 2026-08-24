@@ -602,7 +602,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
                       class={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
                         active
                           ? "bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
-                          : "bg-[var(--bb-surface-app)] text-[var(--bb-data-fg-subtle)] hover:bg-[var(--bb-data-border)]"
+                          : "bg-[var(--bb-surface-app)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-data-border)]"
                       }`}
                       aria-pressed={active}
                       onClick={() => {
