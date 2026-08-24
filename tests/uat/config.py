@@ -120,8 +120,10 @@ class PreflightConfig:
     # SF1 passed at the exploratory 5.25 GiB rung for both TPC-H and the
     # TPC-DS load path without cgroup/OOM evidence.
     clickhouse_memory_limit: str = "5.25g"
-    # Host memory kept available in addition to requested VM/container bytes.
-    docker_memory_reserve_gib: float = 2.0
+    # No unvalidated host reserve is added to the measured ClickHouse request.
+    # Operators may set an explicit reserve when a separate host-headroom
+    # measurement justifies it and the run records that policy.
+    docker_memory_reserve_gib: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -641,7 +643,7 @@ def _validate_preflight(payload: dict[str, Any] | None) -> PreflightConfig:
         docker_memory_reserve_gib=_require_nonnegative_float(
             payload,
             "docker_memory_reserve_gib",
-            default=2.0,
+            default=0.0,
             section="preflight",
         ),
     )

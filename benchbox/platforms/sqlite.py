@@ -490,7 +490,15 @@ class SQLiteAdapter(PlatformAdapter):
         Reconstructs the tree-formatted text that SQLiteQueryPlanParser expects
         from the raw (id, parent, notused, detail) rows SQLite returns.
         """
-        cursor = connection.cursor()
+        if callable(getattr(connection, "cursor", None)):
+            cursor = connection.cursor()
+            _owns_cursor = True
+        elif hasattr(connection, "connection") and callable(getattr(connection.connection, "cursor", None)):
+            cursor = connection.connection.cursor()
+            _owns_cursor = True
+        else:
+            cursor = connection
+            _owns_cursor = False
         try:
             cursor.execute(f"EXPLAIN QUERY PLAN {query}")
             rows = cursor.fetchall()
@@ -499,7 +507,8 @@ class SQLiteAdapter(PlatformAdapter):
             self.logger.debug(f"Failed to get SQLite query plan: {e}")
             return None
         finally:
-            cursor.close()
+            if _owns_cursor and cursor is not None:
+                cursor.close()
 
     def get_query_plan_parser(self):
         """Get SQLite query plan parser."""
@@ -523,11 +532,10 @@ class SQLiteAdapter(PlatformAdapter):
         self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
 
         cursor = None
+        _owns_cursor = False
         try:
-            # Acquire the cursor inside the try: a broken/closed connection raises here,
-            # and that setup failure must be recorded as a FAILED query result (below)
-            # rather than aborting the whole benchmark run.
-            cursor = connection.cursor()
+            _owns_cursor = callable(getattr(connection, "cursor", None))
+            cursor = connection.cursor() if _owns_cursor else connection
             cursor.execute(query)
             results = cursor.fetchall()
 
@@ -573,16 +581,9 @@ class SQLiteAdapter(PlatformAdapter):
             result["results"] = results
 
         except Exception as e:
-            execution_time = elapsed_seconds(start_time)
-            return {
-                "query_id": query_id,
-                "status": "FAILED",
-                "execution_time_seconds": execution_time,
-                "rows_returned": 0,
-                "error": str(e),
-            }
+            return self._build_query_failure_result(query_id, start_time, e)
         finally:
-            if cursor is not None:
+            if _owns_cursor and cursor is not None:
                 cursor.close()
 
         # Display plan in console when --show-query-plans is active.

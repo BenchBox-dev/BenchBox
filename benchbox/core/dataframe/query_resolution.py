@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import logging
 from dataclasses import replace
 from typing import Any
@@ -95,7 +96,37 @@ def get_dataframe_queries_for_benchmark(
             type(benchmark_queries).__name__,
         )
 
-    return []
+    return registry_dataframe_queries(benchmark_id)
+
+
+def registry_dataframe_queries(benchmark_id: str) -> list[Any]:
+    """Resolve DataFrame queries from the benchmark's own query registry.
+
+    Eleven benchmarks ship a ``benchbox/core/<id>/dataframe_queries/`` package
+    that registers ``DataFrameQuery`` objects at import, and the cross-surface
+    equivalence gates execute them. Query resolution reached none of them: it
+    named only tpch, tpcds and clickbench, and the ``get_dataframe_queries``
+    instance hook is defined by almost no benchmark class.
+
+    So seven families -- amplab, coffeeshop, h2odb, nyctaxi, ssb, tpch_skew,
+    tsbs_devops -- resolved to zero queries and emitted bundles reporting 0/0
+    with exit 0, while their queries sat registered and gate-tested. Sixty such
+    bundles are in the public corpus.
+
+    Only the three named benchmarks need bespoke resolvers, because their
+    queries are permuted per stream for TPC compliance. Everything else is a
+    plain ordered list.
+    """
+    try:
+        module = importlib.import_module(f"benchbox.core.{benchmark_id}.dataframe_queries")
+    except ModuleNotFoundError:
+        return []
+
+    registry = getattr(module, f"{benchmark_id.upper()}_DATAFRAME_QUERIES", None)
+    lister = getattr(registry, "list_queries", None)
+    if not callable(lister):
+        return []
+    return list(lister())
 
 
 def get_tpch_dataframe_queries(stream_id: int) -> list[Any]:

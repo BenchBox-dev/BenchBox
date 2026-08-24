@@ -1223,6 +1223,27 @@ def test_execute_memory_floor_passes_when_host_has_headroom(tmp_path):
     assert any(r.platform == "clickhouse-server" and r.status == "passed" for r in outcome.results)
 
 
+def test_execute_clickhouse_default_admission_uses_measured_request_without_unvalidated_reserve(tmp_path):
+    cfg = _managed_docker_cfg("memory request only")
+    assert cfg.preflight.docker_memory_reserve_gib == 0.0
+
+    with platform_reachability(True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=_healthy_fake_docker,
+            # 5 GiB available exceeds the 5.25g request's binary equivalent
+            # while remaining below the old request-plus-2 GiB policy.
+            memory_reader=_memory_reader(5.0),
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    assert any(r.platform == "clickhouse-server" and r.status == "passed" for r in outcome.results)
+
+
 def test_execute_memory_floor_disabled_by_zero_never_aborts(tmp_path):
     """0-disables convention: `free_memory_min_gib: 0` turns the gate off even
     on a host with essentially no free memory."""
@@ -1269,8 +1290,8 @@ def test_execute_memory_floor_unmeasurable_clickhouse_host_fails_closed(tmp_path
     assert "could not be measured" in lifecycle
 
 
-def test_execute_clickhouse_runtime_memory_rejects_host_below_request_plus_reserve(tmp_path):
-    cfg = _managed_docker_cfg("runtime memory shortfall")
+def test_execute_clickhouse_runtime_memory_rejects_host_below_explicit_request_plus_reserve(tmp_path):
+    cfg = _managed_docker_cfg("runtime memory shortfall", preflight={"docker_memory_reserve_gib": 2.0})
     readings = iter([16.0, 5.0])
     with platform_reachability(True):
         outcome = exec_phase.run_execute(
