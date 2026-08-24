@@ -5,7 +5,7 @@
 ```{tags} beginner, quickstart, cli, duckdb
 ```
 
-Follow these four steps to install BenchBox, verify your environment, and run a reproducible benchmark. Everything below works on macOS, Linux, and Windows with Python 3.10+.
+Follow these steps to install BenchBox, verify your environment, and run a reproducible benchmark. Everything below works on macOS, Linux, and Windows with Python 3.10+.
 
 ## Step 0 - Prerequisites
 
@@ -17,15 +17,27 @@ Follow these four steps to install BenchBox, verify your environment, and run a 
 mkdir benchbox-demo && cd benchbox-demo
 ```
 
-## Step 1 - Install BenchBox
+## Step 1 - Install BenchBox with DuckDB
 
-If you have not installed BenchBox yet, follow the dedicated [installation guide](installation.md). It covers `uv`, `pip`, extras, and dependency checks.
+Install the `duckdb` extra. **DuckDB is an optional dependency** - a plain
+`uv add benchbox` installs the core package with SQLite only, and every command
+in this guide uses DuckDB.
 
-Already installed? Verify the CLI is on your PATH:
+```bash
+uv add benchbox --extra duckdb
+```
+
+Prefer pip? `python -m pip install "benchbox[duckdb]"` (quote the brackets so
+your shell does not expand them).
+
+Verify the CLI is on your PATH:
 
 ```bash
 uv run -- benchbox --version
 ```
+
+For other platforms, extras, and dependency checks, see the dedicated
+[installation guide](installation.md).
 
 ## Step 2 - Profile Your Environment
 
@@ -35,7 +47,7 @@ The profile command confirms CPU, memory, and available adapters. BenchBox uses 
 uv run -- benchbox profile
 ```
 
-Look for the *Available Databases* table,`duckdb` should be **Ready** immediately. If you plan to use cloud platforms later, run `uv run -- benchbox check-deps --platform <name>` or use the guided `benchbox platforms setup` wizard once you have credentials handy.
+Look for the *Available Databases* table. `duckdb` should be **Ready** because Step 1 installed the `duckdb` extra; if it is not, re-run the Step 1 install command. If you plan to use cloud platforms later, run `uv run -- benchbox check-deps --platform <name>`, or use the guided `benchbox setup --platform <name>` wizard once you have credentials handy.
 
 ## Step 3 - Run Your First Benchmark
 
