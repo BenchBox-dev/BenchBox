@@ -211,3 +211,13 @@ def test_chromium_typechecks_e2e_harness_before_playwright(workflow: dict[str, A
     playwright_index = next(index for index, step in enumerate(steps) if "playwright install" in step.get("run", ""))
     assert typecheck_index < playwright_index
     assert steps[typecheck_index]["working-directory"] == "results-explorer"
+
+
+def test_browser_lane_path_filtering_supports_merge_group(workflow: dict[str, Any]) -> None:
+    """The explorer-changes job must path-filter on merge_group events using fallback base SHA."""
+    detect_step = next(step for step in workflow["jobs"]["explorer-changes"]["steps"] if step.get("id") == "detect")
+    assert (
+        detect_step["env"]["BASE_SHA"]
+        == "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
+    )
+    assert 'github.event_name }}" != "merge_group"' in detect_step["run"]
