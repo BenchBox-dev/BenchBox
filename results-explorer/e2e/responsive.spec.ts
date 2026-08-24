@@ -243,35 +243,44 @@ test.describe("responsive explorer assertions", () => {
     });
   }
 
-  test("home skeleton and loaded shell keep the same rendered mobile geometry", async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+  for (const homeRoute of [
+    { name: "default", path: "/results/" },
+    {
+      name: "filtered deep link",
+      path: "/results/?bm=clickbench&scale_factor=0.1&trust_tier=maintainer-run",
+    },
+  ]) {
+    test(`home skeleton and loaded shell keep the same rendered mobile geometry for the ${homeRoute.name} route`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
 
-    let releaseSnapshot!: () => void;
-    const snapshotGate = new Promise<void>((resolve) => {
-      releaseSnapshot = resolve;
+      let releaseSnapshot!: () => void;
+      const snapshotGate = new Promise<void>((resolve) => {
+        releaseSnapshot = resolve;
+      });
+      await page.route("**/results/data/results.duckdb", async (route) => {
+        await snapshotGate;
+        await route.continue();
+      });
+
+      await page.goto(homeRoute.path);
+      await waitForShell(page);
+      await expect(page.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Active leaderboard filters" })).toHaveCount(0);
+      const skeletonGeometry = await homeSharedGeometry(page);
+
+      releaseSnapshot();
+      await expect(page.getByText("Recent Results")).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole("region", { name: "Active leaderboard filters" })).toBeVisible();
+      const loadedGeometry = await homeSharedGeometry(page);
+
+      // The skeleton deliberately uses fewer, inert children, but reserves the
+      // loaded-only rows so every shared shell anchor stays fixed while data
+      // arrives.
+      expect(loadedGeometry).toEqual(skeletonGeometry);
     });
-    await page.route("**/results/data/results.duckdb", async (route) => {
-      await snapshotGate;
-      await route.continue();
-    });
-
-    await page.goto("/results/");
-    await waitForShell(page);
-    await expect(page.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Active leaderboard filters" })).toHaveCount(0);
-    const skeletonGeometry = await homeSharedGeometry(page);
-
-    releaseSnapshot();
-    await expect(page.getByText("Recent Results")).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("region", { name: "Active leaderboard filters" })).toBeVisible();
-    const loadedGeometry = await homeSharedGeometry(page);
-
-    // Loaded-only summaries deliberately make the complete hero taller. The
-    // parity contract covers the geometry-bearing shared shell instead: actual
-    // boxes for stable regions plus computed spacing for regions whose child
-    // sets intentionally differ.
-    expect(loadedGeometry).toEqual(skeletonGeometry);
-  });
+  }
 });
 
 async function setViewport(
@@ -298,9 +307,9 @@ async function homeSharedGeometry(page: Page) {
         height: rounded(rect.height),
       };
     };
-    const horizontalBox = (target: HTMLElement) => {
+    const anchoredBox = (target: HTMLElement) => {
       const rect = target.getBoundingClientRect();
-      return { x: rounded(rect.x), width: rounded(rect.width) };
+      return { x: rounded(rect.x), y: rounded(rect.y), width: rounded(rect.width) };
     };
     const styles = (target: HTMLElement, properties: string[]) => {
       const computed = getComputedStyle(target);
@@ -317,7 +326,7 @@ async function homeSharedGeometry(page: Page) {
 
     return {
       wrapper: {
-        box: horizontalBox(wrapper),
+        box: box(wrapper),
         spacing: styles(wrapper, ["padding-top", "padding-right", "padding-bottom", "padding-left"]),
       },
       intro: box(intro),
@@ -330,7 +339,7 @@ async function homeSharedGeometry(page: Page) {
         typeAndSpacing: styles(subtitle, ["margin-top", "font-size", "line-height"]),
       },
       selector: {
-        box: horizontalBox(selector),
+        box: box(selector),
         spacing: styles(selector, [
           "margin-top",
           "padding-top",
@@ -340,11 +349,11 @@ async function homeSharedGeometry(page: Page) {
         ]),
       },
       grid: {
-        box: horizontalBox(grid),
+        box: box(grid),
         layout: styles(grid, ["grid-template-columns", "column-gap", "row-gap"]),
       },
       dataSurface: {
-        box: horizontalBox(dataSurface),
+        box: anchoredBox(dataSurface),
         spacing: styles(dataSurface, ["padding-top", "padding-right", "padding-bottom", "padding-left"]),
       },
     };

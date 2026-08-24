@@ -655,6 +655,14 @@ describe("Home", () => {
     });
 
     const expectSharedGeometry = () => {
+      const loadedActiveSummary = screen.queryByRole("region", { name: "Active leaderboard filters" });
+      const activeSummary = loadedActiveSummary ?? screen.getByTestId("home-loading-active-summary-reserve");
+      const scopeDetails =
+        screen.queryByTestId("leaderboard-scope-summary-mobile") ??
+        screen.getByTestId("home-loading-scope-details-reserve");
+      const advancedDetails =
+        screen.queryByTestId("leaderboard-advanced-filters") ??
+        screen.getByTestId("home-loading-advanced-details-reserve");
       const pairs: Array<[HTMLElement, string]> = [
         [screen.getByTestId("home-hero-filter-band"), HOME_SHELL_GEOMETRY_CLASSES.heroSurface],
         [screen.getByTestId("home-hero-wrapper"), HOME_SHELL_GEOMETRY_CLASSES.heroWrapper],
@@ -662,6 +670,10 @@ describe("Home", () => {
         [
           screen.getByRole("heading", { level: 1, name: "BenchBox Curated Results Preview" }),
           HOME_SHELL_GEOMETRY_CLASSES.headline,
+        ],
+        [
+          activeSummary,
+          `${HOME_SHELL_GEOMETRY_CLASSES.activeSummary}${loadedActiveSummary ? "" : " sm:hidden"}`,
         ],
         [
           screen.getByText(
@@ -674,6 +686,8 @@ describe("Home", () => {
           HOME_SHELL_GEOMETRY_CLASSES.rankingSelector,
         ],
         [screen.getByTestId("home-ranking-selector-grid"), HOME_SHELL_GEOMETRY_CLASSES.rankingGrid],
+        [scopeDetails, HOME_SHELL_GEOMETRY_CLASSES.scopeDetails],
+        [advancedDetails, HOME_SHELL_GEOMETRY_CLASSES.advancedDetails],
         [screen.getByTestId("home-data-surface"), HOME_SHELL_GEOMETRY_CLASSES.dataSurface],
       ];
 
