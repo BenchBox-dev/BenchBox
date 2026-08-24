@@ -143,6 +143,32 @@ def test_published_results_base_mirror_pr_status_reflects_real_validation() -> N
     )
 
 
+def test_published_results_base_and_pr_validation_share_trusted_partial_policy() -> None:
+    """Creator status and a human-rerun PR check must judge mirror partials alike."""
+    creator_run = _step(VALIDATE_STEP_NAME).get("run", "")
+    assert "--allow-partial-validation" in creator_run
+
+    submission = _load(WORKFLOWS / "validate-submission.yml")
+    submission_steps = submission["jobs"]["validate"]["steps"]
+    pr_run = next(step.get("run", "") for step in submission_steps if step.get("name") == "Validate bundles")
+    assert 'ALLOW_PARTIAL_VALIDATION=""' in pr_run
+    assert '[ "$PR_AUTHOR" = "github-actions[bot]" ]' in pr_run
+    trusted_block = pr_run.split("auto/results-mirror-*)", maxsplit=1)[1].split(";;", maxsplit=1)[0]
+    assert 'ALLOW_PARTIAL_VALIDATION="--allow-partial-validation"' in trusted_block
+    assert "$REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION" in pr_run
+
+
+def test_submission_self_green_guard_covers_shared_query_status_policy() -> None:
+    submission = _load(WORKFLOWS / "validate-submission.yml")
+    steps = submission["jobs"]["validate"]["steps"]
+    guard = next(
+        step.get("run", "")
+        for step in steps
+        if step.get("name") == "Reject validator or workflow changes in a submission PR"
+    )
+    assert "benchbox/core/results/query_status.py" in guard
+
+
 def test_published_results_base_mirror_validation_runs_before_the_pr_is_opened() -> None:
     """Validation must happen before the PR exists, matching the chosen design.
 

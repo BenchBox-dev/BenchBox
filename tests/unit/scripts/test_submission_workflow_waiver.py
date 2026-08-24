@@ -8,9 +8,9 @@ with no sidecar). The waiver MUST gate on an unforgeable signal.
 waiver (`case $HEAD_REF in auto/results-mirror-*`) is spoofable: anyone could
 open a fork PR from a branch so named and drop the sidecar requirement,
 laundering a community bundle into a maintainer-run (ranking-eligible) stamp.
-The load-bearing check is `github.event.pull_request.head.repo.fork == false`,
-which a fork PR cannot forge. This test fails closed if the fork gate is ever
-dropped from the waiver.
+The load-bearing checks are `github.event.pull_request.head.repo.fork == false`,
+which a fork PR cannot forge, and the exact `github-actions[bot]` PR author.
+This test fails closed if either signal is ever dropped from the waiver.
 """
 
 from __future__ import annotations
@@ -55,6 +55,11 @@ def test_waiver_gates_manifest_skip_on_fork_check() -> None:
         None,
     )
     assert fork_var is not None, "no env var bound to head.repo.fork"
+    author_var = next(
+        (k for k, v in env.items() if "pull_request.user.login" in str(v)),
+        None,
+    )
+    assert author_var is not None, "no env var bound to pull_request.user.login"
 
     # The block that clears REQUIRE_MANIFEST (the sidecar waiver) must be
     # guarded by the fork variable resolving to the same-repo ("false") case.
@@ -73,13 +78,14 @@ def test_waiver_gates_manifest_skip_on_fork_check() -> None:
     # branch pattern and the empty-REQUIRE_MANIFEST assignment to be inside
     # it, not just present anywhere in the step.
     guard_match = re.search(
-        rf'\[\s*"\${fork_var}"\s*=\s*"false"\s*\]\s*;\s*then\n(.*?)\nfi\b',
+        rf'\[\s*"\${fork_var}"\s*=\s*"false"\s*\]\s*&&\s*'
+        rf'\[\s*"\${author_var}"\s*=\s*"github-actions\[bot\]"\s*\]\s*;\s*then\n(.*?)\nfi\b',
         run,
         re.DOTALL,
     )
     assert guard_match is not None, (
-        f'Could not find a `if [ "${fork_var}" = "false" ]; then ... fi` block to inspect - '
-        "the fork guard must wrap a then/fi body, not just appear in a condition."
+        "Could not find a trust guard requiring both a same-repository head and "
+        "the exact github-actions[bot] PR author."
     )
     guarded_body = guard_match.group(1)
     assert "auto/results-mirror-*" in guarded_body, (

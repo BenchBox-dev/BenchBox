@@ -32,6 +32,8 @@ except ImportError:  # pragma: no cover - slim published-results branch mirror.
     FUNDING_SOURCES = ("employer", "personal", "free-trial", "vendor-sponsored", "grant", "unspecified")
     RESULT_SOURCES = ("internal", "community", "vendor")
 
+from benchbox.core.results.query_status import bundle_failed_query_count
+
 # Max length for the optional free-text submission_notes manifest field.
 SUBMISSION_NOTES_MAX_LEN = 500
 
@@ -304,7 +306,7 @@ def _validate_summary_section(
     if isinstance(queries_summary, dict):
         total_q = queries_summary.get("total", 0)
         if isinstance(total_q, (int, float)) and total_q == 0:
-            vr.warn("summary.queries.total is 0 - empty result?")
+            vr.error("summary.queries.total must be greater than 0 for a public result")
 
     validation_status = _normalize_status(summary.get("validation"))
     allowed = (
@@ -549,16 +551,35 @@ def _validate_queries_section(queries: Any, vr: ValidationResult) -> None:
         vr.error("'queries' must be a list")
         return
     if len(queries) == 0:
-        vr.warn("queries array is empty")
+        vr.error("queries array must not be empty for a public result")
         return
 
     any_nonzero = False
+    any_nonzero_measurement = False
     for i, q in enumerate(queries):
-        if _validate_single_query(i, q, vr):
+        is_nonzero = _validate_single_query(i, q, vr)
+        if is_nonzero:
             any_nonzero = True
+            run_type = str(q.get("run_type") or "measurement").lower() if isinstance(q, dict) else ""
+            if run_type == "measurement":
+                any_nonzero_measurement = True
 
     if not any_nonzero:
         vr.error("All query timings are 0ms - likely invalid data")
+    elif not any_nonzero_measurement:
+        vr.error("queries must contain at least one positive measurement timing")
+
+
+def _validate_execution_consistency(data: dict[str, Any], vr: ValidationResult) -> None:
+    """Reject a clean validation claim that contradicts measurement evidence."""
+    summary = data.get("summary")
+    if not isinstance(summary, dict) or _normalize_status(summary.get("validation")) != PUBLIC_CLEAN_VALIDATION_STATUS:
+        return
+
+    failed = bundle_failed_query_count(data)
+    if failed > 0:
+        noun = "query" if failed == 1 else "queries"
+        vr.error(f"summary.validation='passed' contradicts {failed} failed measurement {noun}")
 
 
 def _validate_bundle(
@@ -587,6 +608,7 @@ def _validate_bundle(
     _validate_translation_section(data, vr)
     _validate_public_cost_section(data, vr)
     _validate_queries_section(data.get("queries", []), vr)
+    _validate_execution_consistency(data, vr)
 
 
 def _hash_file(file_path: Path) -> str:

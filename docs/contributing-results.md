@@ -95,6 +95,11 @@ When your PR is opened, the **Validate Submission** workflow runs automatically.
 - **Sanity checks** - no all-zero timings, no negative durations, valid platform/benchmark names
 - **Metadata extraction** - a summary comment is posted on the PR showing what the submission adds
 
+Community submissions must include a manifest, execute at least one query, and
+report `summary.validation=passed` with no failed measurement evidence.
+Truthful partial results are accepted only from the trusted maintainer mirror
+path and remain excluded from rankings.
+
 If validation fails, the PR comment will explain what to fix. The workflow also
 checks that `results-data/corpus-inventory.json` matches the submitted bundles.
 If that check fails, rerun:
@@ -105,7 +110,10 @@ uv run -- python scripts/generate_corpus_inventory.py --write
 
 ### 5. Review and merge
 
-A maintainer reviews the submission for quality and environment consistency. Once approved and merged into `published-results`, the bundle enters the public corpus.
+A maintainer reviews the submission for quality and environment consistency.
+Once approved and merged into `published-results`, the bundle enters the
+complete Phase 2 archive. It does not automatically enter `develop` or the
+curated static Explorer snapshot.
 
 Maintainer-run refreshes are monthly via `.github/workflows/seed-corpus.yml`
 (see [`docs/operations/corpus-refresh.md`](operations/corpus-refresh.md)). That

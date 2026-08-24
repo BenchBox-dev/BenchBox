@@ -110,8 +110,8 @@ def _minimal_bundle() -> dict:
             "queries": {"total": 2, "passed": 2, "failed": 0},
         },
         "queries": [
-            {"id": "Q1", "ms": 100, "status": "pass"},
-            {"id": "Q2", "ms": 200, "status": "pass"},
+            {"id": "Q1", "ms": 100, "status": "SUCCESS"},
+            {"id": "Q2", "ms": 200, "status": "SUCCESS"},
         ],
     }
 
@@ -152,6 +152,16 @@ def bundle_dir(tmp_path: Path) -> Path:
     d.mkdir()
     (d / "tpch_result.json").write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
     return d
+
+
+def test_checked_in_corpus_satisfies_public_integrity_policy() -> None:
+    """Policy and checked-in corpus must change together, never drift apart."""
+    repo_root = Path(__file__).resolve().parents[3]
+    paths = discover_bundles(repo_root / "results-data" / "bundles")
+    results = validate_bundles(paths, allow_partial_validation=True)
+    failures = {result.path: result.errors for result in results if not result.ok}
+
+    assert not failures
 
 
 # ---------------------------------------------------------------------------
@@ -300,6 +310,61 @@ class TestValidateBundle:
         _validate_bundle(data_failed, failed, allow_partial_validation=True)
         assert not failed.ok
 
+    def test_passed_validation_rejects_summary_failed_measurements(self):
+        data = _minimal_bundle()
+        data["summary"]["queries"] = {"total": 2, "passed": 1, "failed": 1}
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("contradicts 1 failed measurement query" in error for error in vr.errors)
+
+    def test_passed_validation_rejects_failed_measurement_row(self):
+        data = _minimal_bundle()
+        data["queries"][0]["status"] = "FAILED"
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("contradicts 1 failed measurement query" in error for error in vr.errors)
+
+    def test_failed_warmup_does_not_contradict_successful_measurements(self):
+        data = _minimal_bundle()
+        data["summary"]["queries"] = {"total": 1, "passed": 1, "failed": 0}
+        data["queries"] = [
+            {"id": "Q1", "ms": 0, "status": "FAILED", "run_type": "warmup"},
+            {"id": "Q1", "ms": 100, "status": "SUCCESS", "run_type": "measurement"},
+        ]
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert vr.ok, vr.errors
+
+    def test_warmup_only_bundle_is_not_a_public_measurement(self):
+        data = _minimal_bundle()
+        data["summary"]["queries"] = {"total": 1, "passed": 1, "failed": 0}
+        data["queries"] = [{"id": "Q1", "ms": 100, "status": "SUCCESS", "run_type": "warmup"}]
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("at least one positive measurement timing" in error for error in vr.errors)
+
+    def test_trusted_partial_allows_failed_measurements(self):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        data["summary"]["queries"] = {"total": 2, "passed": 1, "failed": 1}
+        data["queries"][0]["status"] = "FAILED"
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr, allow_partial_validation=True)
+
+        assert vr.ok, vr.errors
+
     def test_translation_fallback_fails_public_submission(self):
         data = _minimal_bundle()
         data["execution"] = {"translation": {"status": "fallback", "strict_mode": False}}
@@ -311,8 +376,8 @@ class TestValidateBundle:
     def test_all_zero_timings_fails(self):
         data = _minimal_bundle()
         data["queries"] = [
-            {"id": "Q1", "ms": 0, "status": "pass"},
-            {"id": "Q2", "ms": 0, "status": "pass"},
+            {"id": "Q1", "ms": 0, "status": "SUCCESS"},
+            {"id": "Q2", "ms": 0, "status": "SUCCESS"},
         ]
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
@@ -334,7 +399,7 @@ class TestValidateBundle:
 
     def test_positive_sub_millisecond_timing_passes(self):
         data = _minimal_bundle()
-        data["queries"] = [{"id": "Q1", "ms": 0.04, "status": "pass"}]
+        data["queries"] = [{"id": "Q1", "ms": 0.04, "status": "SUCCESS"}]
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert vr.ok
@@ -355,13 +420,15 @@ class TestValidateBundle:
         assert not vr.ok
         assert any("missing keys" in e for e in vr.errors)
 
-    def test_empty_queries_warns(self):
+    def test_empty_queries_fail(self):
         data = _minimal_bundle()
+        data["summary"]["queries"] = {"total": 0, "passed": 0, "failed": 0}
         data["queries"] = []
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
-        assert vr.ok  # warning, not error
-        assert any("queries array is empty" in w for w in vr.warnings)
+        assert not vr.ok
+        assert any("queries array must not be empty" in error for error in vr.errors)
+        assert any("summary.queries.total must be greater than 0" in error for error in vr.errors)
 
     def test_user_supplied_cost_total_without_normalized_provenance_fails(self):
         data = _minimal_bundle()
