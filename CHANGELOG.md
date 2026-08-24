@@ -33,6 +33,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   localhost. An authenticated remote server adds durable job tools; exposing a
   non-loopback endpoint is not a production-readiness claim.
 
+### Changed
+
+- **GitHub repository moved to the `BenchBox-dev` organization** - BenchBox is
+  now hosted at [github.com/BenchBox-dev/BenchBox](https://github.com/BenchBox-dev/BenchBox).
+  Public project links, issue and release tooling, CI, and package metadata now
+  use the organization-owned repository. Existing Git remotes using
+  `github.com/joeharris76/BenchBox.git` continue to redirect; update local
+  remotes to the organization URL when convenient.
+
 ### Fixed
 
 - **Stale write/transaction staging is rebuilt, not certified** - A leftover
