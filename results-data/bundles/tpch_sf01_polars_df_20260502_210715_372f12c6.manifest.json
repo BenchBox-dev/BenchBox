@@ -1,10 +1,11 @@
 {
   "benchmark": "TPC-H",
   "bundle_file": "tpch_sf01_polars_df_20260502_210715_372f12c6.json",
-  "bundle_hash": "ca3d779b115dca3b03df41fa1534d6bcac3e6045230fb04be251187ab0708adc",
+  "bundle_hash": "106127504c2e1483302ed83c6f62743bb02d9c68e323fd96986b24278b9f881d",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",
+  "result_source": "internal",
   "scale_factor": 0.1,
   "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
