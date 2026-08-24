@@ -725,7 +725,7 @@ export function Query(_: RoutableProps) {
                       type="button"
                       class={`px-3 py-1.5 text-sm ${
                         rowLimitMode === mode
-                          ? "bg-[var(--bb-accent-hover)] text-[var(--bb-fg-primary)]"
+                          ? "bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
                           : "bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data-muted)]"
                       }`}
                       aria-pressed={rowLimitMode === mode}

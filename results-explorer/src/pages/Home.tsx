@@ -1162,7 +1162,7 @@ function SingleFilterGroup({
               key={value}
               class={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                 active
-                  ? "bg-[var(--bb-accent-hover)] text-[var(--bb-fg-primary)]"
+                  ? "bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
                   : "bg-[var(--bb-bg-elevated)] text-[var(--bb-fg-muted)] hover:bg-[var(--bb-border-default)]"
               }`}
               onClick={() => onSelect(value)}
