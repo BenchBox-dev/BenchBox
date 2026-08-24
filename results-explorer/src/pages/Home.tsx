@@ -289,7 +289,6 @@ export function Home(_: RoutableProps) {
         scaleFactor={summarizeSelection(scaleFilters, "All scales", (value) => `SF ${value}`)}
         phase={phaseFilter === "all" ? "All phases" : phaseFilter}
         activeFacets={summarizeActiveFacets(facets, new Map())}
-        showLeaderboardShell={!metaLeaderboardLoaded || metaLeaderboard !== null}
       />
     );
   }
@@ -641,13 +640,11 @@ function HomeLoadingSkeleton({
   scaleFactor,
   phase,
   activeFacets,
-  showLeaderboardShell,
 }: {
   benchmark: string;
   scaleFactor: string;
   phase: string;
   activeFacets: ActiveFacetSummary[];
-  showLeaderboardShell: boolean;
 }) {
   return (
     <div>
@@ -665,66 +662,62 @@ function HomeLoadingSkeleton({
             </p>
           </div>
 
-          {showLeaderboardShell && (
-            <>
-              <div
-                aria-hidden="true"
-                class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummary} sm:hidden`}
-                data-testid="home-loading-active-summary-reserve"
-              >
-                <div class={HOME_SHELL_GEOMETRY_CLASSES.activeSummaryItems}>
-                  {[
-                    ["Benchmark", benchmark],
-                    ["Scale", scaleFactor],
-                    ["Phase", phase],
-                  ].map(([label, value]) => (
-                    <div key={label} class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummaryChip} bb-skeleton-dark`}>
-                      <span class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummaryLabel} invisible`}>{label}</span>
-                      <span class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummaryValue} invisible`}>{value}</span>
-                    </div>
-                  ))}
+          <div
+            aria-hidden="true"
+            class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummary} sm:hidden`}
+            data-testid="home-loading-active-summary-reserve"
+          >
+            <div class={HOME_SHELL_GEOMETRY_CLASSES.activeSummaryItems}>
+              {[
+                ["Benchmark", benchmark],
+                ["Scale", scaleFactor],
+                ["Phase", phase],
+              ].map(([label, value]) => (
+                <div key={label} class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummaryChip} bb-skeleton-dark`}>
+                  <span class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummaryLabel} invisible`}>{label}</span>
+                  <span class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummaryValue} invisible`}>{value}</span>
                 </div>
-                {activeFacets.length > 0 && (
-                  <div class={HOME_SHELL_GEOMETRY_CLASSES.activeFacetList}>
-                    {activeFacets.map((facet) => (
-                      <span
-                        key={facet.key}
-                        class={`${HOME_SHELL_GEOMETRY_CLASSES.activeFacetChip} bb-skeleton-dark`}
-                      >
-                        <span class="invisible">{facet.label}: {facet.value}</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
+              ))}
+            </div>
+            {activeFacets.length > 0 && (
+              <div class={HOME_SHELL_GEOMETRY_CLASSES.activeFacetList}>
+                {activeFacets.map((facet) => (
+                  <span
+                    key={facet.key}
+                    class={`${HOME_SHELL_GEOMETRY_CLASSES.activeFacetChip} bb-skeleton-dark`}
+                  >
+                    <span class="invisible">{facet.label}: {facet.value}</span>
+                  </span>
+                ))}
               </div>
+            )}
+          </div>
 
-              <section
-                aria-label="Leaderboard ranking selector"
-                class={HOME_SHELL_GEOMETRY_CLASSES.rankingSelector}
+          <section
+            aria-label="Leaderboard ranking selector"
+            class={HOME_SHELL_GEOMETRY_CLASSES.rankingSelector}
+          >
+            <div class={HOME_SHELL_GEOMETRY_CLASSES.rankingGrid} data-testid="home-ranking-selector-grid">
+              <SkeletonSelect label="Benchmark" />
+              <SkeletonSelect label="Scale" />
+              <SkeletonSelect label="Phase" />
+              <CoverageSummary />
+            </div>
+            <div aria-hidden="true" class="sm:hidden">
+              <div
+                class={HOME_SHELL_GEOMETRY_CLASSES.scopeDetails}
+                data-testid="home-loading-scope-details-reserve"
               >
-                <div class={HOME_SHELL_GEOMETRY_CLASSES.rankingGrid} data-testid="home-ranking-selector-grid">
-                  <SkeletonSelect label="Benchmark" />
-                  <SkeletonSelect label="Scale" />
-                  <SkeletonSelect label="Phase" />
-                  <CoverageSummary />
-                </div>
-                <div aria-hidden="true" class="sm:hidden">
-                  <div
-                    class={HOME_SHELL_GEOMETRY_CLASSES.scopeDetails}
-                    data-testid="home-loading-scope-details-reserve"
-                  >
-                    <SkeletonBlock className="h-4 w-40 bb-skeleton-dark" />
-                  </div>
-                  <div
-                    class={HOME_SHELL_GEOMETRY_CLASSES.advancedDetails}
-                    data-testid="home-loading-advanced-details-reserve"
-                  >
-                    <SkeletonBlock className="h-5 w-32 bb-skeleton-dark" />
-                  </div>
-                </div>
-              </section>
-            </>
-          )}
+                <SkeletonBlock className="h-4 w-40 bb-skeleton-dark" />
+              </div>
+              <div
+                class={HOME_SHELL_GEOMETRY_CLASSES.advancedDetails}
+                data-testid="home-loading-advanced-details-reserve"
+              >
+                <SkeletonBlock className="h-5 w-32 bb-skeleton-dark" />
+              </div>
+            </div>
+          </section>
         </div>
       </section>
 

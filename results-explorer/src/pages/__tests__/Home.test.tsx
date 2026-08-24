@@ -316,7 +316,7 @@ beforeEach(() => {
 });
 
 describe("Home", () => {
-  it("uses the compact loading shell when no meta leaderboard cohorts are available", async () => {
+  it("keeps the leaderboard shell stable until a no-leaderboard snapshot finishes loading", async () => {
     const resultRows = deferred<typeof RESULT_ROWS>();
     vi.mocked(queryRows).mockImplementation(async (sql: string) => {
       const s = String(sql).replace(/\s+/g, " ").trim();
@@ -328,8 +328,12 @@ describe("Home", () => {
 
     render(<Home />);
 
-    await waitFor(() => expect(screen.queryByTestId("home-loading-active-summary-reserve")).toBeNull());
-    expect(screen.queryByRole("region", { name: "Leaderboard ranking selector" })).toBeNull();
+    await waitFor(() => {
+      expect(performance.getEntriesByName(EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_READY, "mark"))
+        .toHaveLength(1);
+    });
+    expect(screen.getByTestId("home-loading-active-summary-reserve")).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Leaderboard ranking selector" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toHaveAttribute(
       "aria-busy",
       "true",
