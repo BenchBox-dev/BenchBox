@@ -136,13 +136,23 @@ def test_platforms_install_help():
 
 @pytest.mark.integration
 def test_platforms_setup_help():
-    """Test that platforms setup shows help correctly."""
+    """Test that platforms setup shows help correctly.
+
+    The summary line moved from "Interactive platform setup wizard" to one
+    that says what the command actually does, when `--platform` was added to
+    delegate credential setup to `benchbox setup` (#1844). Assert on the
+    options and on the cross-reference the two same-named commands rely on,
+    rather than on prose that is expected to be edited.
+    """
     result = run_cli_command(["platforms", "setup", "--help"])
 
     assert result.returncode == 0
-    assert "Interactive platform setup wizard" in result.stdout
     assert "--interactive" in result.stdout
     assert "--non-interactive" in result.stdout
+    assert "--platform" in result.stdout
+    # `benchbox setup` is the other command spelled "setup"; each help text
+    # must name the other so a user who lands on one can find the right one.
+    assert "benchbox setup" in result.stdout
 
 
 @pytest.mark.integration
