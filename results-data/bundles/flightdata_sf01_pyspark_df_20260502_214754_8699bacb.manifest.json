@@ -1,10 +1,11 @@
 {
   "benchmark": "Flight Data",
   "bundle_file": "flightdata_sf01_pyspark_df_20260502_214754_8699bacb.json",
-  "bundle_hash": "9a998724901a596578781b9e0fe21ccc5be94e8a8adb16675562d6f9305db97b",
+  "bundle_hash": "981877ab3092642772d0278f51e0cf95c81d419bf3dd063a330fab48af848d18",
   "companion_hashes": {},
   "phase": 2,
   "platform": "PySpark",
+  "result_source": "internal",
   "scale_factor": 0.1,
   "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
