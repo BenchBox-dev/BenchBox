@@ -783,6 +783,7 @@ class TestRunDataframeBenchmarkLifecycle:
             "query_id": "Q1",
             "status": "SUCCESS",
             "execution_time_seconds": 0.05,
+            "rows_returned": 4,
         }
 
         config = _make_config(
@@ -913,7 +914,7 @@ class TestRunDataframeBenchmarkLifecycle:
             )
             mem_check.assert_not_called()
 
-        assert result.validation_status == "PASSED"
+        assert result.validation_status == "NOT_RUN"
 
     def test_options_dict_converted_to_dataclass(self, tmp_path: Path):
         """A plain dict passed as options is converted to DataFrameRunOptions."""

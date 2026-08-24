@@ -275,7 +275,7 @@ def test_export_preserves_content(tmp_path):
 
     # Verify key fields are preserved (v2.x schema structure)
     # Note: Schema v2.x shortens benchmark names by stripping " Benchmark" suffix
-    assert exported_data["version"] in ("2.0", "2.1")
+    assert exported_data["version"] in ("2.0", "2.1", "2.2")
     assert exported_data["benchmark"]["name"] == "TPC-H"  # Shortened from "TPC-H Benchmark"
     assert exported_data["run"]["id"] == "preserve_test"
     assert exported_data["benchmark"]["scale_factor"] == 10.0

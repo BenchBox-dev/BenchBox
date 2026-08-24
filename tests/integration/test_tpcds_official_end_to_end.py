@@ -167,8 +167,8 @@ def test_the_dataframe_value_is_the_plain_wire_string_not_an_enum_repr() -> None
     assert "TpcdsComplianceClass" not in str(value)
 
 
-def test_a_dataframe_official_bundle_passes_publish_admission(tmp_path: Path) -> None:
-    """Carry the DataFrame classification through to the admission decision."""
+def test_a_dataframe_official_bundle_is_not_refused_for_compliance(tmp_path: Path) -> None:
+    """Classification is official while absent validation remains non-clean."""
     from benchbox.core.results.builder import BenchmarkInfoInput, ResultBuilder
 
     builder = ResultBuilder(
@@ -183,7 +183,7 @@ def test_a_dataframe_official_bundle_passes_publish_admission(tmp_path: Path) ->
         platform=_dataframe_platform_input(),
     )
     builder.mark_started()
-    builder.set_validation_status("PASSED", {})
+    builder.set_validation_status("NOT_RUN")
     for query_result in _clean_query_results():
         builder.add_query_result(normalize_query_result(query_result))
     builder.mark_completed()
@@ -194,4 +194,6 @@ def test_a_dataframe_official_bundle_passes_publish_admission(tmp_path: Path) ->
 
     assert loaded.compliance_class == "official"
     decision = publish_admission(loaded, PUBLISH_LABEL)
-    assert decision.allowed, f"official DataFrame TPC-DS refused: {decision.code} ({decision.reason})"
+    assert not decision.allowed
+    assert decision.code == "non_clean"
+    assert decision.reason == "validation_status=not_run"

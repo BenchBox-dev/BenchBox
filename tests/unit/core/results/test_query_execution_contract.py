@@ -218,6 +218,66 @@ def test_compact_property_round_trip_preserves_values_and_units() -> None:
         assert restored.dataframe_skip_summary == {}
 
 
+def test_compact_round_trip_preserves_row_count_validation_evidence() -> None:
+    evidence = {"status": "PASSED", "expected": 4, "actual": 4}
+    execution = QueryExecution(
+        query_id="Q1",
+        execution_time_ms=100.0,
+        rows_returned=4,
+        status="SUCCESS",
+        row_count_validation=evidence,
+    )
+
+    compact = query_execution_to_compact_v2(execution)
+    restored = query_execution_from_compact_v2(compact)
+
+    assert compact["row_count_validation"] == evidence
+    assert restored.row_count_validation == evidence
+
+
+@pytest.mark.parametrize(
+    ("evidence", "message"),
+    [
+        ([], "must be an object"),
+        ({"status": "PASSED", "expected": 4}, "missing fields"),
+        ({"status": "UNKNOWN", "expected": 4, "actual": 4}, "Unknown row_count_validation.status"),
+        ({"status": "PASSED", "expected": -1, "actual": 4}, "must be non-negative"),
+        ({"status": "PASSED", "expected": 4.5, "actual": 4}, "must be an integer"),
+        ({"status": "PASSED", "expected": True, "actual": 4}, "must be an integer"),
+        ({"status": "PASSED", "expected": 4, "actual": 3}, "must match rows_returned"),
+        ({"status": "PASSED", "expected": 5, "actual": 4}, "requires equal integer expected and actual"),
+        (
+            {"status": "PASSED", "expected": 4, "actual": 4, "warning": "x" * 501},
+            "exceeds 500 characters",
+        ),
+    ],
+)
+def test_compact_serializer_rejects_malformed_row_count_validation(evidence: Any, message: str) -> None:
+    execution = QueryExecution(
+        query_id="Q1",
+        execution_time_ms=100.0,
+        rows_returned=4,
+        status="SUCCESS",
+        row_count_validation=evidence,
+    )
+
+    with pytest.raises(QueryExecutionContractError, match=message):
+        query_execution_to_compact_v2(execution)
+
+
+def test_compact_parser_rejects_row_count_validation_that_disagrees_with_rows() -> None:
+    compact = {
+        "id": "Q1",
+        "ms": 100.0,
+        "rows": 4,
+        "status": "SUCCESS",
+        "row_count_validation": {"status": "PASSED", "expected": 3, "actual": 3},
+    }
+
+    with pytest.raises(QueryExecutionContractError, match="must match rows_returned"):
+        query_execution_from_compact_v2(compact)
+
+
 @pytest.mark.parametrize(
     "legacy",
     [

@@ -21,6 +21,7 @@ stream query position      position (operational)    (not serialized)
 role / phase               run_type, runType /        run_type / test_type
                             test_type
 digest                     result_digest, digest      digest
+row-count evidence         row_count_validation      row_count_validation
 error                      error_message, error,      errors[] companion
                             message / error_type
 plan                       query_plan and plan fields .plans.json companion
@@ -99,6 +100,10 @@ if TYPE_CHECKING:
     from benchbox.core.results.models import QueryExecution
 
 DURATION_CONSISTENCY_TOLERANCE_MS = 1.0
+ROW_COUNT_VALIDATION_MESSAGE_MAX_CHARS = 500
+ROW_COUNT_VALIDATION_STATUSES = frozenset({"PASSED", "FAILED", "SKIPPED", "ERROR"})
+ROW_COUNT_VALIDATION_FIELDS = frozenset({"status", "expected", "actual", "error", "warning"})
+ROW_COUNT_VALIDATION_REQUIRED_FIELDS = frozenset({"status", "expected", "actual"})
 
 COMPACT_V2_QUERY_FIELDS = frozenset(
     {
@@ -111,6 +116,7 @@ COMPACT_V2_QUERY_FIELDS = frozenset(
         "test_type",
         "status",
         "digest",
+        "row_count_validation",
         "dataframe_skip_summary",
         "plan_capture_error",
     }
@@ -418,6 +424,58 @@ def normalize_non_negative_integer(field: str, raw_value: Any) -> int:
     return value
 
 
+def normalize_row_count_validation(value: Any, *, rows_returned: int | None) -> dict[str, Any] | None:
+    """Validate and normalize public per-query row-count evidence."""
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise QueryExecutionContractError("row_count_validation must be an object")
+
+    unknown = set(value) - ROW_COUNT_VALIDATION_FIELDS
+    if unknown:
+        raise QueryExecutionContractError(f"Unknown row_count_validation fields: {sorted(unknown)!r}")
+    missing = ROW_COUNT_VALIDATION_REQUIRED_FIELDS - set(value)
+    if missing:
+        raise QueryExecutionContractError(f"row_count_validation missing fields: {sorted(missing)!r}")
+
+    raw_status = value.get("status")
+    if not isinstance(raw_status, str):
+        raise QueryExecutionContractError("row_count_validation.status must be a string")
+    status = raw_status.strip().upper()
+    if status not in ROW_COUNT_VALIDATION_STATUSES:
+        raise QueryExecutionContractError(f"Unknown row_count_validation.status: {raw_status!r}")
+
+    counts: dict[str, int | None] = {}
+    for field in ("expected", "actual"):
+        raw_count = value.get(field)
+        counts[field] = (
+            None if raw_count is None else normalize_non_negative_integer(f"row_count_validation.{field}", raw_count)
+        )
+
+    if counts["actual"] != rows_returned:
+        raise QueryExecutionContractError(
+            f"row_count_validation.actual ({counts['actual']!r}) must match rows_returned ({rows_returned!r})"
+        )
+    if status == "PASSED" and (counts["expected"] is None or counts["actual"] != counts["expected"]):
+        raise QueryExecutionContractError(
+            "PASSED row_count_validation requires equal integer expected and actual counts"
+        )
+
+    normalized: dict[str, Any] = {"status": status, **counts}
+    for field in ("error", "warning"):
+        if field not in value:
+            continue
+        message = value[field]
+        if not isinstance(message, str):
+            raise QueryExecutionContractError(f"row_count_validation.{field} must be a string")
+        if len(message) > ROW_COUNT_VALIDATION_MESSAGE_MAX_CHARS:
+            raise QueryExecutionContractError(
+                f"row_count_validation.{field} exceeds {ROW_COUNT_VALIDATION_MESSAGE_MAX_CHARS} characters"
+            )
+        normalized[field] = message
+    return normalized
+
+
 def normalize_status(raw_status: Any) -> str:
     """Normalize status aliases identically for typed and dictionary construction."""
     if raw_status is None:
@@ -723,7 +781,12 @@ def query_execution_from_compact_v2(value: Mapping[str, Any]) -> QueryExecution:
     # Historical v2 rows omitted status because queries[] contained successes
     # only.  The loader's errors[] reconciliation handles failures separately.
     source.setdefault("status", "SUCCESS")
-    return query_execution_from_legacy_dict(source)
+    execution = query_execution_from_legacy_dict(source)
+    execution.row_count_validation = normalize_row_count_validation(
+        execution.row_count_validation,
+        rows_returned=execution.rows_returned,
+    )
+    return execution
 
 
 def query_execution_to_compact_v2(execution: QueryExecution) -> dict[str, Any]:
@@ -745,6 +808,12 @@ def query_execution_to_compact_v2(execution: QueryExecution) -> dict[str, Any]:
     result["status"] = execution.status
     if execution.result_digest is not None:
         result["digest"] = execution.result_digest
+    row_count_validation = normalize_row_count_validation(
+        execution.row_count_validation,
+        rows_returned=execution.rows_returned,
+    )
+    if row_count_validation is not None:
+        result["row_count_validation"] = row_count_validation
     if execution.dataframe_skip_summary is not None:
         result["dataframe_skip_summary"] = execution.dataframe_skip_summary
     if execution.plan_capture_error is not None:
@@ -761,6 +830,7 @@ __all__ = [
     "legacy_query_execution_mapping",
     "normalize_duration_ms",
     "normalize_non_negative_integer",
+    "normalize_row_count_validation",
     "normalize_status",
     "normalize_stream_id",
     "query_duration_ms_from_legacy",

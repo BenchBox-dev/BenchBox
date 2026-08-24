@@ -176,6 +176,61 @@ class TestValidateBundle:
         assert vr.ok
         assert len(vr.errors) == 0
 
+    def test_valid_schema_2_2_row_count_validation_passes(self):
+        data = _minimal_bundle()
+        data["version"] = "2.2"
+        data["queries"][0].update(
+            {
+                "rows": 4,
+                "row_count_validation": {"status": "PASSED", "expected": 4, "actual": 4},
+            }
+        )
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert vr.ok, vr.errors
+
+    def test_row_count_validation_requires_schema_2_2(self):
+        data = _minimal_bundle()
+        data["queries"][0].update(
+            {
+                "rows": 4,
+                "row_count_validation": {"status": "PASSED", "expected": 4, "actual": 4},
+            }
+        )
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("row_count_validation requires schema version 2.2" in error for error in vr.errors)
+
+    @pytest.mark.parametrize(
+        "evidence",
+        [
+            [],
+            {"status": "PASSED", "expected": 4},
+            {"status": "PASSED", "expected": 4, "actual": 4, "unexpected": True},
+            {"status": "UNKNOWN", "expected": 4, "actual": 4},
+            {"status": "PASSED", "expected": -1, "actual": 4},
+            {"status": "PASSED", "expected": 4.0, "actual": 4},
+            {"status": "PASSED", "expected": 4, "actual": 3},
+            {"status": "PASSED", "expected": 5, "actual": 4},
+            {"status": "PASSED", "expected": 4, "actual": 4, "warning": "x" * 501},
+        ],
+    )
+    def test_malformed_row_count_validation_is_rejected(self, evidence):
+        data = _minimal_bundle()
+        data["version"] = "2.2"
+        data["queries"][0].update({"rows": 4, "row_count_validation": evidence})
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("row_count_validation" in error for error in vr.errors)
+
     def test_public_private_path_is_rejected_by_cli_boundary(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
         bundle_path = tmp_path / "tpch_result.json"
         payload = _minimal_bundle()

@@ -470,7 +470,7 @@ The CLI packages a **submission bundle** consisting of:
 #### Result bundle schema policy
 
 The canonical bundle is schema-v2 JSON. The current BenchBox producer writes
-top-level `"version": "2.1"`. Public PR submission validation accepts numeric
+top-level `"version": "2.2"`. Public PR submission validation accepts numeric
 schema version family `2.x` so a future producer minor can be submitted before
 the hosted contract document is updated, but it rejects missing or malformed
 versions.
