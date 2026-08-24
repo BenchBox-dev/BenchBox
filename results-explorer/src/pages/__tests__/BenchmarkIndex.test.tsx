@@ -698,10 +698,11 @@ describe("BenchmarkIndex", () => {
     await waitFor(() => expect(fifth.disabled).toBe(true));
     expect(fifth.checked).toBe(false);
     expect(fifth.getAttribute("aria-label")).not.toContain("Selection limit");
-    const reasonId = fifth.getAttribute("aria-describedby");
-    expect(reasonId).toBeTruthy();
-    expect(document.getElementById(reasonId!)?.textContent).toContain("Selection limit reached");
-    expect(document.getElementById(reasonId!)?.textContent).toContain("Clear one selected run");
+    const selectionLimit = screen.getByTestId("benchmark-selection-limit");
+    expect(selectionLimit.id).toBe("benchmark-selection-limit");
+    expect(fifth.getAttribute("aria-describedby")).toBe(selectionLimit.id);
+    expect(selectionLimit.textContent).toContain("Selection limit reached");
+    expect(selectionLimit.textContent).toContain("Clear one selected run before adding another");
     expect(screen.getByRole("link", { name: /Compare 4 selected/ })).toBeTruthy();
   });
 
