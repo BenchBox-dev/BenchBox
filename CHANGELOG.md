@@ -9,29 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New
 
-- **Results Explorer (Curated Preview)** - Interactive in-browser analytics over
-  published benchmark runs, prepared for publication at
-  [benchbox.dev/results/](https://benchbox.dev/results/) by the next protected
-  `release` deploy. Includes multi-platform leaderboards, query waterfalls,
-  hardware disclosures, comparison tools, and an embedded SQL workbench. This is
-  a curated preview of the public corpus, not a certified ranking of every
-  stored bundle. The live URL remains unpublished until that deploy completes.
+- **Results Explorer preview** - After this release, browse and compare published
+  benchmark results at
+  [benchbox.dev/results/](https://benchbox.dev/results/). Explore cross-platform
+  leaderboards, per-query timings, hardware details, comparison tools, and SQL
+  queries over the public data. The preview contains a curated set of results,
+  not a complete or certified ranking.
 - **DuckLake platform** - Run benchmarks against DuckLake (DuckDB lakehouse
   format: Parquet table data + SQL-database catalog metadata) via
   `--platform ducklake`. The catalog backend (`--platform-option
   catalog=duckdb|sqlite|postgres`) and the Parquet `data_path` (local or
-  `s3://`) are independent, so any combination works, including a self-hosted
-  PostgreSQL catalog with S3 storage. Existing catalogs are reused across runs
-  and `--force` rebuilds them; requires DuckDB >= 1.3, installable as
-  `benchbox[ducklake]`. Beta.
+  `s3://`) can be selected independently. Four documented deployment modes have
+  passed TPC-H scale-factor-1 correctness validation. Existing catalogs are
+  reused across runs and `--force` rebuilds them; requires DuckDB >= 1.3,
+  installable as `benchbox[ducklake]`. Beta.
 
 ### Added
 
-- **MCP SDK 2 and localhost Streamable HTTP** - The MCP server uses the Python
-  MCP SDK 2.x while keeping the existing stdio tool, resource, and prompt
-  contract. `benchbox-mcp --transport streamable-http` serves Streamable HTTP on
-  localhost. An authenticated remote server adds durable job tools; exposing a
-  non-loopback endpoint is not a production-readiness claim.
+- **Result provenance and funding labels** - Results Explorer now shows whether
+  each published run came from BenchBox maintainers, a community contributor,
+  or a platform vendor, together with any disclosed funding source. These labels
+  appear in rankings, comparisons, and result details, with an in-page
+  explanation of what they mean. Community submissions remain visible but are
+  excluded from ranked tables.
+- **Local MCP connections over HTTP** - Local MCP clients can now connect with
+  `benchbox-mcp --transport streamable-http`; existing stdio integrations
+  continue to work unchanged. Authenticated non-local deployments also provide
+  persistent benchmark jobs, but shared deployment remains deferred and is not
+  supported for production use in this release.
 
 ### Changed
 
@@ -44,17 +49,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Stale write/transaction staging is rebuilt, not certified** - A leftover
-  staging set (for example from a smaller scale factor) is rebuilt instead of
-  being stamped with a new-scale manifest and reported as a PASS. Databases
-  already in that state take the missing-manifest path and rebuild staging
-  once; no operator action is required.
-- **Unrunnable precompiled TPC binaries fall back to source compilation** -
-  Binary selection probes that a bundled `dbgen`/`qgen`/`dsdgen`/`dsqgen`
-  actually executes on the host before choosing it over compiling from source.
-  Bundled darwin-arm64 and darwin-x86_64 TPC-H tools were also rebuilt with a
-  macOS 15 deployment target, so macOS 15 hosts no longer depend on that
-  fallback for the previous macOS 26-minos binaries.
+- **Correct data volumes for Write and Transaction Primitives** - Reusing
+  benchmark data created for a different scale factor could produce successful
+  results against the wrong amount of staged data. BenchBox now detects and
+  rebuilds that data automatically on the next run; no action is needed.
+- **TPC generators recover from incompatible bundled tools** - The bundled
+  TPC-H generators now support macOS 15. BenchBox also checks bundled TPC-H and
+  TPC-DS generators before use and automatically builds a compatible version
+  when needed.
 - **Correct TPC throughput metrics in newly exported results** - TPC-H and
   TPC-DS throughput drivers now include every executed query in
   Throughput@Size, correcting the 22x and 99x understatements produced by
@@ -66,23 +68,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tuning; `BENCHBOX_TUNING_CONFIG` still works to point at a default tuning
   file. If you were setting `BENCHBOX_TUNING_ENABLED`, it had no effect and can
   simply be removed.
-- **Honest `--tuning auto` messaging on SQL platforms** - Smart defaults for
-  `--tuning auto` are implemented for DataFrame platforms only today; SQL
-  platform runs now get an explicit warning that they're proceeding with a
-  basic (untuned) configuration instead of a message implying real smart
-  defaults were applied.
-- **DataFusion `load_data` accepts string table paths** - String paths are
-  coerced to `Path`, so DataFusion loads no longer fail when callers pass a
-  str where a path object was required.
+- **Accurate `--tuning auto` guidance for SQL platforms** - SQL runs now explain
+  that `auto` uses a basic constraints-only configuration: primary-key,
+  foreign-key, unique, and check constraints are enabled, with no other tuning.
+  DataFrame platforms continue to use smart defaults.
+- **DataFusion accepts Python string table paths** - Programmatic DataFusion
+  loads now accept paths supplied as either Python strings or `pathlib.Path`
+  objects.
 
 ### Security
 
-- **Secrets no longer leak through exported metadata or selected execution
-  errors** - Result exports redact connection passwords, MotherDuck tokens,
-  `*_key_id` options, service-account keys, and connection usernames.
-  MotherDuck/DuckLake connection failures and MCP benchmark-execution errors
-  are scrubbed, including secrets that previously reappeared through chained
-  exception causes. Other MCP error paths can still echo raw exception text.
+- **Expanded secret redaction in result exports and common errors** - Result
+  exports now remove connection credentials, account identifiers, and
+  service-account keys. MotherDuck, DuckLake, and MCP benchmark-execution errors
+  also redact known secrets, including values carried by chained exceptions.
+  Some other MCP errors can still include backend-provided exception text, so
+  avoid credentials in values that a backend might repeat in an error.
 
 ### Removed
 
@@ -96,14 +97,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Passing bare `clickhouse` now raises a `ValueError` naming these replacements
   instead of silently defaulting to a deployment mode. The `ch` CLI shorthand
   now resolves to `clickhouse-local`.
-- **BREAKING: `databricks-connect` install extra removed** - The deprecated
-  `benchbox[databricks-connect]` extra was a legacy alias of
-  `benchbox[cloud-spark-databricks]`. Install Databricks Connect / DataFrame
-  mode via `benchbox[cloud-spark-databricks]` instead. The `databricks-connect`
-  PyPI package itself is unchanged — it remains a dependency of the
-  `cloud-spark-databricks` extra. (The renamed dataframe extras — `pandas`,
-  `polars`, etc. — are unaffected; they are the preferred install names, with
-  `dataframe-*` retained as their aliases.)
+- **BREAKING: `databricks-connect` install extra removed** - Replace
+  `benchbox[databricks-connect]` with `benchbox[cloud-spark-databricks]`. This
+  renames only the BenchBox install extra; it still installs the upstream
+  `databricks-connect` package. Other DataFrame install extras are unchanged.
 
 ## [0.3.1] - 2026-07-09
 
