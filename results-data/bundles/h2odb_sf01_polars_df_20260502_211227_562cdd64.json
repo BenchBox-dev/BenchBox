@@ -21,7 +21,6 @@
     "total_usd": 0
   },
   "environment": {
-    "client_host": {},
     "platform_runtime": {
       "collection_status": "partial",
       "runtime_type": "dataframe_process",

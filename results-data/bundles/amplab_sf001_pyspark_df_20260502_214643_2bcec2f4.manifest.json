@@ -1,10 +1,11 @@
 {
   "benchmark": "AMPLab",
   "bundle_file": "amplab_sf001_pyspark_df_20260502_214643_2bcec2f4.json",
-  "bundle_hash": "59566ed897122feed2b1b276d64eddda2a8dac8d34c332d886af31de06837a8b",
+  "bundle_hash": "000cf42333c68ff1febc06b51962fa27a4f37c909b6f0af1dc2af3f75a100d9f",
   "companion_hashes": {},
   "phase": 2,
   "platform": "PySpark",
+  "result_source": "internal",
   "scale_factor": 0.01,
   "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",

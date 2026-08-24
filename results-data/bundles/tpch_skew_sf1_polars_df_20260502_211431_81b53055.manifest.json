@@ -1,10 +1,11 @@
 {
   "benchmark": "TPC-H Skew",
   "bundle_file": "tpch_skew_sf1_polars_df_20260502_211431_81b53055.json",
-  "bundle_hash": "2872b350a503ed0082888ead143549d7639fbe6ca4f7211c92526ec517bd45f3",
+  "bundle_hash": "21d529061054517981abb1532a5d6b5a7eb04dd99ff774a76f94e538b9c7661e",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",
+  "result_source": "internal",
   "scale_factor": 1.0,
   "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
