@@ -566,6 +566,12 @@ class TestRunOfficialCommand:
         # May show deprecation warning but should still work
         assert "TPC-compliant" in result.output or "DEPRECATED" in result.output
 
+    def test_run_official_help_mentions_quiet(self):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["run-official", "--help"])
+        assert result.exit_code == 0
+        assert "--quiet" in result.output
+
     def test_run_official_shows_deprecation_warning(self):
         """Test run-official shows deprecation warning when executed."""
         runner = CliRunner()

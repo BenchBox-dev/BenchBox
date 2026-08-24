@@ -14,9 +14,9 @@ import json
 import logging
 import math
 import statistics
-import time
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Protocol
 
 from benchbox.core.comparison.types import (
     PlatformType,
@@ -28,6 +28,38 @@ from benchbox.core.comparison.types import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+#: Sentinel query id recorded when a platform fails before running any query.
+FAILED_PLATFORM_QUERY_ID = "ALL"
+
+
+class PlatformRunner(Protocol):
+    """Runs one benchmark on one platform and returns its BenchmarkResults.
+
+    Implemented by the surface (see ``benchbox.cli.commands.compare``) so
+    ``benchbox.core`` stays free of a ``benchbox.cli`` import.
+    """
+
+    def __call__(
+        self,
+        *,
+        platform: str,
+        benchmark: str,
+        scale_factor: float,
+        query_ids: list[str] | None,
+        iterations: int,
+        data_dir: str | Path | None,
+    ) -> Any: ...
+
+
+def _query_sort_key(query_id: str) -> tuple[int, float, str]:
+    """Sort query ids numerically when possible, alphabetically otherwise."""
+    text = query_id[1:] if query_id[:1].upper() == "Q" else query_id
+    try:
+        return (0, float(text), "")
+    except ValueError:
+        return (1, 0.0, query_id)
 
 
 class UnifiedBenchmarkSuite:
@@ -59,13 +91,25 @@ class UnifiedBenchmarkSuite:
         emit(f"Fastest: {summary.fastest_platform}")
     """
 
-    def __init__(self, config: UnifiedBenchmarkConfig | None = None):
+    def __init__(
+        self,
+        config: UnifiedBenchmarkConfig | None = None,
+        platform_runner: PlatformRunner | None = None,
+    ):
         """Initialize the unified benchmark suite.
 
         Args:
             config: Benchmark configuration. Defaults to standard config.
+            platform_runner: Callable that runs one benchmark on one platform
+                and returns its ``BenchmarkResults``. The surface injects this
+                -- ``benchbox.core`` must not import ``benchbox.cli``, so the
+                orchestrator wiring lives in the CLI, mirroring the
+                ``execute_run(adapter_factory=...)`` contract in
+                ``benchbox.core.run_service``. Without it, SQL run mode cannot
+                execute and raises rather than reporting an empty success.
         """
         self.config = config or UnifiedBenchmarkConfig()
+        self._platform_runner = platform_runner
 
     def get_available_platforms(self, platform_type: PlatformType | None = None) -> list[str]:
         """Get available platforms of the specified type.
@@ -155,13 +199,17 @@ class UnifiedBenchmarkSuite:
                 results.append(result)
             except Exception as e:
                 logger.error(f"Failed to benchmark {platform}: {e}")
+                # Build through _build_platform_result so the aggregates match
+                # the failure: success_rate 0, no geomean, no total time. A
+                # directly-constructed result kept the dataclass default and
+                # reported a failed platform as 100% successful.
                 results.append(
-                    UnifiedPlatformResult(
-                        platform=platform,
-                        platform_type=PlatformType.SQL,
-                        query_results=[
+                    self._build_platform_result(
+                        platform,
+                        PlatformType.SQL,
+                        [
                             UnifiedQueryResult(
-                                query_id="ALL",
+                                query_id=FAILED_PLATFORM_QUERY_ID,
                                 platform=platform,
                                 platform_type=PlatformType.SQL,
                                 status="ERROR",
@@ -178,157 +226,132 @@ class UnifiedBenchmarkSuite:
         platform: str,
         data_dir: str | Path | None = None,
     ) -> UnifiedPlatformResult:
-        """Benchmark a single SQL platform.
+        """Benchmark a single SQL platform through the canonical run path.
+
+        Delegates to :meth:`benchbox.cli.orchestrator.BenchmarkOrchestrator.execute_benchmark`
+        -- the same entry point ``benchbox run`` uses -- so data generation,
+        schema creation, loading, adapter configuration and phase handling are
+        shared with the single-platform command rather than reimplemented here.
+
+        The previous implementation was a hardcoded TPC-H path that required
+        pre-generated data at a guessed directory, never generated data, and
+        never reached a real runner, so the documented
+        ``benchbox compare -p duckdb -p sqlite`` invocation could not work.
 
         Args:
             platform: Platform name
-            data_dir: Data directory for embedded platforms
+            data_dir: Optional pre-existing data directory. When given it is
+                passed through as the benchmark output root.
 
         Returns:
-            UnifiedPlatformResult with query results
+            UnifiedPlatformResult with real per-query timings
+
+        Raises:
+            Exception: Any failure from the run path, so the caller records the
+                platform as failed rather than silently successful.
         """
-        from benchbox.platforms import get_adapter
-
-        # Determine query IDs (default to TPC-H Q1-Q22)
-        query_ids = self.config.query_ids or [f"Q{i}" for i in range(1, 23)]
-
-        query_results = []
-
-        # Get adapter for the platform
-        adapter = get_adapter(platform)
-
-        # Handle embedded platforms that need data loading
-        if platform in ("duckdb", "sqlite", "datafusion"):
-            if data_dir is None:
-                sf_str = f"sf{self.config.scale_factor}".replace(".", "")
-                data_dir = Path(f"benchmark_runs/tpch/{sf_str}/data")
-
-            data_path = Path(data_dir)
-            if not data_path.exists():
-                raise ValueError(f"Data directory not found: {data_dir}")
-
-            conn = self._setup_embedded_sql(platform, data_path)
-        else:
-            # For remote platforms, assume data is already loaded
-            conn = adapter.connect()
-
-        try:
-            for query_id in query_ids:
-                logger.info(f"  Running {query_id}...")
-                result = self._run_sql_query(query_id, platform, conn)
-                query_results.append(result)
-        finally:
-            if hasattr(conn, "close"):
-                conn.close()
-
-        # Calculate aggregates
+        results = self._execute_platform_run(platform, data_dir)
+        query_results = self._to_unified_query_results(results, platform)
         return self._build_platform_result(platform, PlatformType.SQL, query_results)
 
-    def _setup_embedded_sql(self, platform: str, data_path: Path):
-        """Set up embedded SQL platform with data.
+    def _execute_platform_run(self, platform: str, data_dir: str | Path | None):
+        """Run one benchmark on one platform through the injected runner.
 
-        Args:
-            platform: Platform name
-            data_path: Path to data directory
-
-        Returns:
-            Database connection
+        Raises:
+            RuntimeError: When no runner was injected. The caller records the
+                platform as failed rather than reporting a vacuous success.
         """
-        parquet_dir = data_path / "parquet"
-        if not parquet_dir.exists():
-            parquet_dir = data_path
+        if self._platform_runner is None:
+            raise RuntimeError(
+                "No platform runner configured for SQL comparison. "
+                "Construct UnifiedBenchmarkSuite with platform_runner=... "
+                "(the CLI supplies one via benchbox.cli.commands.compare)."
+            )
+        return self._platform_runner(
+            platform=platform,
+            benchmark=self.config.benchmark,
+            scale_factor=self.config.scale_factor,
+            query_ids=self._normalized_query_ids(),
+            iterations=self.config.benchmark_iterations,
+            data_dir=data_dir,
+        )
 
-        tables = ["lineitem", "orders", "customer", "supplier", "part", "partsupp", "nation", "region"]
+    def _normalized_query_ids(self) -> list[str] | None:
+        """Return configured query ids in the form the run path expects.
 
-        if platform == "duckdb":
-            import duckdb
-
-            conn = duckdb.connect()
-            for table in tables:
-                table_path = parquet_dir / f"{table}.parquet"
-                if table_path.exists():
-                    conn.execute(f"CREATE TABLE {table} AS SELECT * FROM read_parquet('{table_path}')")
-            return conn
-
-        elif platform == "sqlite":
-            import sqlite3
-
-            import pandas as pd
-
-            conn = sqlite3.connect(":memory:")
-            for table in tables:
-                table_path = parquet_dir / f"{table}.parquet"
-                if table_path.exists():
-                    df = pd.read_parquet(str(table_path))
-                    df.to_sql(table, conn, index=False)
-            return conn
-
-        else:
-            raise ValueError(f"Unsupported embedded SQL platform: {platform}")
-
-    def _run_sql_query(
-        self,
-        query_id: str,
-        platform: str,
-        conn,
-    ) -> UnifiedQueryResult:
-        """Run a single SQL query benchmark.
-
-        Args:
-            query_id: Query identifier
-            platform: Platform name
-            conn: Database connection
-
-        Returns:
-            UnifiedQueryResult with timing data
+        The comparison surface accepts ``Q1`` style ids; the run path expects
+        bare ids (``1``). ``None`` means every query in the benchmark.
         """
-        from benchbox.core.tpch.queries import TPCHQuery
+        if not self.config.query_ids:
+            return None
+        normalized = []
+        for qid in self.config.query_ids:
+            text = str(qid).strip()
+            normalized.append(text[1:] if text[:1].upper() == "Q" and text[1:] else text)
+        return normalized
 
-        try:
-            # Get query SQL
-            query_num = int(query_id.replace("Q", ""))
-            tpch_query = TPCHQuery.get_query(query_num, dialect=platform)
+    @staticmethod
+    def _to_unified_query_results(results: Any, platform: str) -> list[UnifiedQueryResult]:
+        """Convert a BenchmarkResults into per-query comparison records.
 
-            execution_times = []
-            rows_returned = 0
+        Measurement iterations for one query id are folded into a single
+        :class:`UnifiedQueryResult`. Warmup rows are excluded so they cannot
+        distort the comparison. A query whose every iteration failed is kept
+        with ``status="ERROR"`` so it counts against the success rate instead
+        of vanishing from the denominator.
+        """
+        by_query: dict[str, dict[str, Any]] = {}
+        for row in getattr(results, "query_results", None) or []:
+            if not isinstance(row, dict):
+                continue
+            if row.get("run_type") == "warmup":
+                continue
+            query_id = str(row.get("query_id") or row.get("id") or "")
+            if not query_id:
+                continue
+            bucket = by_query.setdefault(query_id, {"times": [], "rows": 0, "errors": []})
+            if row.get("status") == "SUCCESS":
+                seconds = row.get("execution_time_seconds")
+                if seconds is None:
+                    seconds = row.get("execution_time")
+                if seconds is not None:
+                    bucket["times"].append(float(seconds) * 1000.0)
+                elif row.get("execution_time_ms") is not None:
+                    bucket["times"].append(float(row["execution_time_ms"]))
+                bucket["rows"] = bucket["rows"] or int(row.get("rows_returned") or 0)
+            else:
+                bucket["errors"].append(str(row.get("error") or row.get("error_message") or "query failed"))
 
-            # Warmup
-            for _ in range(self.config.warmup_iterations):
-                conn.execute(tpch_query.sql).fetchall()
-
-            # Benchmark iterations
-            for i in range(self.config.benchmark_iterations):
-                start = time.perf_counter()
-                result = conn.execute(tpch_query.sql).fetchall()
-                elapsed_ms = (time.perf_counter() - start) * 1000
-                execution_times.append(elapsed_ms)
-
-                if i == 0:
-                    rows_returned = len(result)
-
-            return UnifiedQueryResult(
-                query_id=query_id,
-                platform=platform,
-                platform_type=PlatformType.SQL,
-                iterations=len(execution_times),
-                execution_times_ms=execution_times,
-                mean_time_ms=statistics.mean(execution_times) if execution_times else 0,
-                std_time_ms=statistics.stdev(execution_times) if len(execution_times) > 1 else 0,
-                min_time_ms=min(execution_times) if execution_times else 0,
-                max_time_ms=max(execution_times) if execution_times else 0,
-                rows_returned=rows_returned,
-                status="SUCCESS",
+        query_results: list[UnifiedQueryResult] = []
+        for query_id, bucket in sorted(by_query.items(), key=lambda kv: _query_sort_key(kv[0])):
+            times = bucket["times"]
+            if not times:
+                query_results.append(
+                    UnifiedQueryResult(
+                        query_id=query_id,
+                        platform=platform,
+                        platform_type=PlatformType.SQL,
+                        status="ERROR",
+                        error_message=bucket["errors"][0] if bucket["errors"] else "no measurement iteration",
+                    )
+                )
+                continue
+            query_results.append(
+                UnifiedQueryResult(
+                    query_id=query_id,
+                    platform=platform,
+                    platform_type=PlatformType.SQL,
+                    iterations=len(times),
+                    execution_times_ms=times,
+                    mean_time_ms=statistics.mean(times),
+                    std_time_ms=statistics.stdev(times) if len(times) > 1 else 0.0,
+                    min_time_ms=min(times),
+                    max_time_ms=max(times),
+                    rows_returned=bucket["rows"],
+                    status="SUCCESS",
+                )
             )
-
-        except Exception as e:
-            logger.error(f"Error running {query_id} on {platform}: {e}")
-            return UnifiedQueryResult(
-                query_id=query_id,
-                platform=platform,
-                platform_type=PlatformType.SQL,
-                status="ERROR",
-                error_message=str(e),
-            )
+        return query_results
 
     def _run_dataframe_comparison(
         self,
@@ -465,25 +488,38 @@ class UnifiedBenchmarkSuite:
         geomeans = {r.platform: r.geometric_mean_ms for r in results if r.geometric_mean_ms > 0}
 
         if not geomeans:
+            # Nothing timed successfully, so there is no ranking to report.
+            # Naming platforms[0] as both fastest and slowest with a 1.00x
+            # speedup presented total failure as a valid comparison.
             return UnifiedComparisonSummary(
                 platforms=platforms,
                 platform_type=platform_type,
-                fastest_platform=platforms[0],
-                slowest_platform=platforms[0],
-                speedup_ratio=1.0,
+                fastest_platform=None,
+                slowest_platform=None,
+                speedup_ratio=None,
                 query_winners={},
                 total_queries=0,
             )
 
         fastest = min(geomeans, key=geomeans.get)
         slowest = max(geomeans, key=geomeans.get)
-        speedup_ratio = geomeans[slowest] / geomeans[fastest] if geomeans[fastest] > 0 else 1.0
+        if len(geomeans) < 2:
+            # Only one platform produced timings. It is not faster than
+            # anything, so there is no ratio to report.
+            slowest = None
+            speedup_ratio = None
+        else:
+            speedup_ratio = geomeans[slowest] / geomeans[fastest] if geomeans[fastest] > 0 else None
 
         # Find query winners
         query_winners: dict[str, str] = {}
         all_query_ids = set()
         for result in results:
             for qr in result.query_results:
+                # ALL is the sentinel for "this platform failed before running
+                # any query"; counting it would inflate the query total.
+                if qr.query_id == FAILED_PLATFORM_QUERY_ID:
+                    continue
                 all_query_ids.add(qr.query_id)
 
         for query_id in all_query_ids:
@@ -572,9 +608,18 @@ class UnifiedBenchmarkSuite:
 
         lines.append("## Summary")
         lines.append("")
-        lines.append(f"**Fastest Platform:** {summary.fastest_platform}")
-        lines.append(f"**Slowest Platform:** {summary.slowest_platform}")
-        lines.append(f"**Speedup Ratio:** {summary.speedup_ratio:.2f}x")
+        if summary.speedup_ratio is not None:
+            lines.append(f"**Fastest Platform:** {summary.fastest_platform}")
+            lines.append(f"**Slowest Platform:** {summary.slowest_platform}")
+            lines.append(f"**Speedup Ratio:** {summary.speedup_ratio:.2f}x")
+        elif summary.is_comparable:
+            lines.append(f"**Fastest Platform:** {summary.fastest_platform} (only platform with timings)")
+            lines.append("**Slowest Platform:** n/a")
+            lines.append("**Speedup Ratio:** n/a - nothing to compare against")
+        else:
+            lines.append("**Fastest Platform:** n/a - no platform produced a usable timing")
+            lines.append("**Slowest Platform:** n/a")
+            lines.append("**Speedup Ratio:** n/a")
         lines.append("")
 
         lines.append("## Platform Results")
@@ -614,9 +659,18 @@ class UnifiedBenchmarkSuite:
         lines.append(f"Total Queries: {summary.total_queries}")
         lines.append("")
 
-        lines.append(f"Fastest: {summary.fastest_platform}")
-        lines.append(f"Slowest: {summary.slowest_platform}")
-        lines.append(f"Speedup: {summary.speedup_ratio:.2f}x")
+        if summary.speedup_ratio is not None:
+            lines.append(f"Fastest: {summary.fastest_platform}")
+            lines.append(f"Slowest: {summary.slowest_platform}")
+            lines.append(f"Speedup: {summary.speedup_ratio:.2f}x")
+        elif summary.is_comparable:
+            lines.append(f"Fastest: {summary.fastest_platform} (only platform with timings)")
+            lines.append("Slowest: n/a")
+            lines.append("Speedup: n/a - nothing to compare against")
+        else:
+            lines.append("Fastest: n/a - no platform produced a usable timing")
+            lines.append("Slowest: n/a")
+            lines.append("Speedup: n/a")
         lines.append("")
 
         lines.append(f"{'Platform':15s} {'Geomean (ms)':>15s} {'Total (ms)':>15s} {'Success':>10s}")
@@ -641,6 +695,7 @@ def run_unified_comparison(
     benchmark: str = "tpch",
     query_ids: list[str] | None = None,
     data_dir: str | Path | None = None,
+    platform_runner: PlatformRunner | None = None,
 ) -> list[UnifiedPlatformResult]:
     """Run a unified cross-platform comparison.
 
@@ -663,12 +718,14 @@ def run_unified_comparison(
             scale_factor=scale_factor,
             benchmark=benchmark,
             query_ids=query_ids,
-        )
+        ),
+        platform_runner=platform_runner,
     )
     return suite.run_comparison(platforms=platforms, data_dir=data_dir)
 
 
 __all__ = [
+    "PlatformRunner",
     "UnifiedBenchmarkSuite",
     "run_unified_comparison",
 ]

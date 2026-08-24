@@ -14,6 +14,7 @@ corpus regress while the gate stayed green.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -191,6 +192,103 @@ def test_rederived_corpus_publishes_byte_identically_to_what_is_stored() -> None
         f"{len(drifted)} bundle(s) are not stored at the publication fixed point; "
         "publishing would rewrite them:\n" + "\n".join(drifted[:20])
     )
+
+
+def _manifest_hash_mismatches(bundles_dir: Path) -> tuple[list[str], int]:
+    """Return (mismatch descriptions, number of manifests actually checked).
+
+    Shared by the corpus gate and its negative control so the control
+    exercises the real comparison rather than a restatement of it.
+    """
+    mismatched: list[str] = []
+    scanned = 0
+
+    for manifest_path in sorted(bundles_dir.rglob("*.manifest.json")):
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        bundle_file = manifest.get("bundle_file")
+        if not isinstance(bundle_file, str) or not bundle_file:
+            # Migration ledgers live beside the bundles and declare no bundle.
+            continue
+        bundle_path = manifest_path.parent / bundle_file
+        if not bundle_path.is_file():
+            mismatched.append(f"{manifest_path.name}: declares missing bundle {bundle_file}")
+            continue
+        scanned += 1
+        actual = hashlib.sha256(bundle_path.read_bytes()).hexdigest()
+        recorded = manifest.get("bundle_hash")
+        if actual != recorded:
+            mismatched.append(f"{manifest_path.name}: manifest {str(recorded)[:16]}..., bundle {actual[:16]}...")
+
+    return mismatched, scanned
+
+
+def test_every_manifest_bundle_hash_matches_its_bundle() -> None:
+    """A sidecar manifest must record the hash of the bundle sitting next to it.
+
+    This is the gate that was missing. `benchbox/validation/bundle.py` checks
+    it, but only on the files a submission PR touched, so a maintainer-side
+    edit to an already-committed bundle never reached it. On 2026-08-05 the
+    residual-client_host strip rewrote 105 bundles without rerunning
+    `_project/scripts/results_explorer_corpus_migrate.py`, which is what
+    updates the sidecar hashes alongside the bytes.
+
+    Nothing failed on develop. What failed was the mirror to
+    `published-results`, which validates the content it is about to propose:
+    every one of the 105 came back `Bundle hash mismatch`, the mirror refused
+    to open, and the public corpus stayed frozen at 2026-08-05 for eighteen
+    days. Corpus Drift Check reported it accurately every night; the report
+    just had no gate behind it.
+
+    So this belongs here, in the whole-corpus lane that runs on every PR,
+    rather than only at the submission boundary.
+    """
+    mismatched, scanned = _manifest_hash_mismatches(RESULTS_DATA / "bundles")
+
+    assert scanned, "no sidecar manifests scanned - this gate would be vacuous"
+    assert not mismatched, (
+        f"{len(mismatched)} sidecar manifest(s) do not match their bundle, so the mirror to "
+        "published-results will refuse to open. Rerun "
+        "`_project/scripts/results_explorer_corpus_migrate.py --write --manifest <new-ledger>`:\n"
+        + "\n".join(mismatched[:20])
+    )
+
+
+def test_the_manifest_hash_gate_still_catches_a_stale_hash(tmp_path: Path) -> None:
+    """Negative control for the gate above, run against synthetic files.
+
+    Asserting against a real stale manifest would stop being a control the
+    moment the corpus is correct, which is the state this change puts it in.
+    So plant the exact defect the corpus had -- a manifest whose bundle_hash
+    no longer matches the bundle beside it -- and check the same helper the
+    real gate uses reports it.
+    """
+    bundle = tmp_path / "result.json"
+    bundle.write_text('{"benchmark": {}}\n', encoding="utf-8")
+    fresh = tmp_path / "fresh.manifest.json"
+    fresh.write_text(
+        json.dumps({"bundle_file": "result.json", "bundle_hash": hashlib.sha256(bundle.read_bytes()).hexdigest()}),
+        encoding="utf-8",
+    )
+
+    mismatched, scanned = _manifest_hash_mismatches(tmp_path)
+    assert (mismatched, scanned) == ([], 1), "a correct manifest must not be flagged"
+
+    bundle.write_text('{"benchmark": {"edited": true}}\n', encoding="utf-8")
+
+    mismatched, scanned = _manifest_hash_mismatches(tmp_path)
+    assert scanned == 1
+    assert len(mismatched) == 1 and fresh.name in mismatched[0]
+
+
+def test_the_manifest_hash_gate_flags_a_manifest_whose_bundle_is_gone(tmp_path: Path) -> None:
+    (tmp_path / "orphan.manifest.json").write_text(
+        json.dumps({"bundle_file": "missing.json", "bundle_hash": "0" * 64}), encoding="utf-8"
+    )
+
+    mismatched, scanned = _manifest_hash_mismatches(tmp_path)
+
+    assert scanned == 0
+    assert len(mismatched) == 1 and "missing.json" in mismatched[0]
 
 
 def test_primary_rederivation_discovery_uses_canonical_case_insensitive_rules(tmp_path: Path) -> None:

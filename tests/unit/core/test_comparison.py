@@ -167,7 +167,10 @@ class TestUnifiedPlatformResult:
         pr = UnifiedPlatformResult(platform="duckdb", platform_type=PlatformType.SQL)
         assert pr.query_results == []
         assert pr.total_time_ms == 0.0
-        assert pr.success_rate == 100.0
+        # 0.0, not 100.0: a result that has not been aggregated has not
+        # demonstrated a single successful query. The old 100.0 default let a
+        # platform that failed outright be reported as fully successful.
+        assert pr.success_rate == 0.0
 
     def test_to_dict(self):
         qr = UnifiedQueryResult(query_id="Q1", platform="duckdb", platform_type=PlatformType.SQL)
@@ -293,9 +296,13 @@ class TestUnifiedBenchmarkSuiteGetSummary:
             self.suite.get_summary([])
 
     def test_get_summary_no_geomeans(self):
+        """Nothing timed successfully, so there is nothing to rank."""
         r1 = UnifiedPlatformResult(platform="p1", platform_type=PlatformType.SQL, geometric_mean_ms=0.0)
         summary = self.suite.get_summary([r1])
-        assert summary.speedup_ratio == 1.0
+        assert summary.speedup_ratio is None
+        assert summary.fastest_platform is None
+        assert summary.slowest_platform is None
+        assert summary.is_comparable is False
 
     def test_run_comparison_empty_raises(self):
         with pytest.raises(ValueError, match="At least one"):

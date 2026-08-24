@@ -311,7 +311,7 @@ def test_interrupt_mid_cell_still_tears_down_docker_stack(tmp_path: Path):
         stdout = (
             healthy_ps_stdout()
             if action == "ps"
-            else json.dumps({"Name": "clickhouse", "MemUsage": "512MB / 8GB"})
+            else json.dumps({"Name": "clickhouse", "MemUsage": "512MB / 5.25GB"})
             if action == "stats"
             else ""
         )

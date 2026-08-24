@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -13,6 +14,21 @@ import pytest
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.fast,
+    # These drive `make worktree-create` / `make worktree-remove`, which are
+    # maintainer and agent tooling: they run on the maintainer's machine and in
+    # Linux CI, and no Windows support is claimed for them. On Windows CI they
+    # fail in the tooling rather than in the behaviour under test -- `awk:
+    # escape sequence \U treated as plain U`, `fatal: could not create leading
+    # directories` -- so 11 of the 18 have failed every nightly run, taking
+    # Nightly Validation red with them.
+    #
+    # This does drop the 7 that currently pass on Windows. That is the trade,
+    # stated rather than hidden: a module whose subject is a POSIX make target
+    # was not meaningfully covering Windows with the other 11 broken.
+    pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="make worktree-* targets are POSIX shell tooling; not supported on Windows",
+    ),
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]

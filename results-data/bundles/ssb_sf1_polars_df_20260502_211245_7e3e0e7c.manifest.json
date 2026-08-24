@@ -1,10 +1,11 @@
 {
   "benchmark": "SSB",
   "bundle_file": "ssb_sf1_polars_df_20260502_211245_7e3e0e7c.json",
-  "bundle_hash": "9bf40356e1c40f44af85be94bf699724be4d022d1e4b558395ca6909b14c33f2",
+  "bundle_hash": "c4ddbf6bfca5ba3aa8b420138baad506fd540dabe9ef050587ed0d2b315f0a4c",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",
+  "result_source": "internal",
   "scale_factor": 1.0,
   "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",

@@ -913,6 +913,61 @@ def _list_available_platforms():
     console.print("  benchbox compare                               # Interactive wizard")
 
 
+def _build_platform_runner():
+    """Build the runner that executes one benchmark on one platform.
+
+    Lives in the CLI because it wires the orchestrator, the database manager
+    and the system profiler -- ``benchbox.core`` is not allowed to import
+    ``benchbox.cli`` (import-linter contract "utils < core < platforms < cli"),
+    so the surface injects this into the comparison suite the same way
+    ``execute_run`` takes an ``adapter_factory``.
+    """
+    from benchbox.cli.database import DatabaseManager
+    from benchbox.cli.orchestrator import BenchmarkOrchestrator
+    from benchbox.cli.system import SystemProfiler
+    from benchbox.core.benchmark_registry import get_benchmark_metadata
+    from benchbox.core.schemas import BenchmarkConfig
+
+    def run_one_platform(
+        *,
+        platform: str,
+        benchmark: str,
+        scale_factor: float,
+        query_ids: list[str] | None,
+        iterations: int,
+        data_dir,
+    ):
+        try:
+            info = get_benchmark_metadata(benchmark) or {}
+        except Exception:  # pragma: no cover - registry lookup is advisory only
+            info = {}
+
+        options: dict[str, Any] = {}
+        if iterations:
+            options["power_iterations"] = iterations
+
+        benchmark_config = BenchmarkConfig(
+            name=benchmark,
+            display_name=info.get("display_name", benchmark.upper()),
+            scale_factor=scale_factor,
+            queries=query_ids,
+            options=options,
+        )
+
+        orchestrator = BenchmarkOrchestrator()
+        if data_dir is not None:
+            orchestrator.set_custom_output_dir(str(data_dir))
+
+        return orchestrator.execute_benchmark(
+            benchmark_config,
+            SystemProfiler().get_system_profile(),
+            DatabaseManager().create_config(platform),
+            ["data", "schema", "load", "power"],
+        )
+
+    return run_one_platform
+
+
 def _run_platform_comparison(
     platforms: list[str],
     platform_type: str,
@@ -971,7 +1026,7 @@ def _run_platform_comparison(
         benchmark_iterations=iterations,
     )
 
-    suite = UnifiedBenchmarkSuite(config=config)
+    suite = UnifiedBenchmarkSuite(config=config, platform_runner=_build_platform_runner())
 
     # Display header
     console.print("\n[bold]Cross-Platform Benchmark Comparison[/bold]")
@@ -1002,6 +1057,35 @@ def _run_platform_comparison(
     # Generate charts if requested
     if generate_charts and output_file:
         _generate_comparison_charts(output_file, results, theme, UnifiedComparisonPlotter)
+
+    _exit_on_comparison_failure(results, summary)
+
+
+def _exit_on_comparison_failure(results: list, summary: Any) -> None:
+    """Exit non-zero when the comparison did not actually compare anything.
+
+    A run in which every platform failed used to print a table claiming 100%
+    success and a 1.00x speedup and then exit 0, so callers and CI wrappers
+    could not tell a total failure from a real result.
+    """
+    failed = [r for r in results if r.success_rate <= 0]
+
+    if not summary.is_comparable:
+        console.print(
+            "[red]Comparison failed: no platform produced a usable timing, so there is nothing to compare.[/red]"
+        )
+        for result in failed:
+            reason = next(
+                (q.error_message for q in result.query_results if q.error_message),
+                "no successful queries",
+            )
+            console.print(f"  [red]{result.platform}[/red]: {reason}")
+        sys.exit(1)
+
+    if failed:
+        names = ", ".join(r.platform for r in failed)
+        console.print(f"[yellow]Warning: no successful queries on {names}.[/yellow]")
+        sys.exit(1)
 
 
 def _output_comparison_results(

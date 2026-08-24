@@ -51,6 +51,114 @@ Registry-backed count claims are checked by unit tests so README and platform do
 
 <!-- benchbox-registry-counts:end -->
 
+## Quick Start
+
+Get started with BenchBox in 3 steps:
+
+### 1. Install BenchBox
+
+Choose the installation that matches your target platform:
+
+**Recommended (using uv):**
+```bash
+# For local development — this is what the rest of the Quick Start uses
+uv add benchbox --extra duckdb
+
+# For cloud platforms
+uv add benchbox --extra cloud
+
+# For everything (all platforms + ClickHouse)
+uv add benchbox --extra all
+```
+
+`uv add benchbox` on its own installs the core package, which ships SQLite
+only. DuckDB is an extra, so the `--extra duckdb` above is what makes step 3
+work. See [Installation Matrix](#installation-matrix) for the full set.
+
+**Alternative (pip-compatible):**
+```bash
+uv pip install "benchbox[duckdb]"
+uv pip install "benchbox[cloud]"
+uv pip install "benchbox[all]"
+```
+
+### 2. Verify Installation
+
+Check that everything is working:
+
+```bash
+# Verify BenchBox is installed
+benchbox --version
+
+# Check available platforms
+benchbox check-deps --matrix
+```
+
+### 3. Run Your First Benchmark
+
+Start with a simple local benchmark:
+
+```python
+from benchbox import TPCH
+
+# Create a small TPC-H benchmark for testing
+tpch = TPCH(scale_factor=0.01)  # ~10MB dataset for quick testing
+
+# Generate sample data
+print("Generating data...")
+data_paths = tpch.generate_data()
+print(f"✅ Generated {len(data_paths)} data files")
+
+# Get a sample query
+query1 = tpch.get_query(1, seed=42)  # Reproducible parameters
+print(f"✅ Generated TPC-H Query 1")
+
+# Run on embedded DuckDB (no setup required)
+import duckdb
+conn = duckdb.connect(":memory:")
+
+# Create schema and load data
+conn.execute(tpch.get_create_tables_sql())
+for table_file in data_paths:
+    table_name = table_file.split('/')[-1].replace('.csv', '')
+    conn.execute(f"COPY {table_name} FROM '{table_file}' WITH (DELIMITER '|', HEADER false)")
+
+# Execute the query
+result = conn.execute(query1).fetchdf()
+print(f"✅ Query executed successfully, returned {len(result)} rows")
+```
+
+### Run a DataFrame Benchmark
+
+Compare SQL vs DataFrame execution paradigms:
+
+```bash
+# SQL mode - queries executed via SQL
+benchbox run --platform duckdb --benchmark tpch --scale 0.01
+
+# DataFrame mode - queries executed via native Polars API
+benchbox run --platform polars-df --benchmark tpch --scale 0.01
+```
+
+Same benchmark, same scale factor, different execution paradigm.
+
+### Next Steps
+
+**For Cloud Platforms:**
+- See [Platform Documentation](docs/platforms/index.md) for platform-specific setup
+- Start with `examples/getting_started/` for zero-config DuckDB runs and credential-ready cloud samples
+- Explore `examples/features/` for capability-specific examples (query subsets, tuning, result analysis, etc.)
+- Check `examples/use_cases/` for real-world patterns (CI/CD regression testing, platform evaluation, cost optimization)
+- See `examples/programmatic/` for Python API usage and integration patterns
+- Use `--dry-run OUTPUT_DIR` on the CLI or example scripts to export a JSON/YAML plan and per-query SQL files before executing benchmarks
+- Use `benchbox run` CLI for full benchmark execution
+
+**For Advanced Usage:**
+- Explore the full benchmark suite: TPC-H, TPC-DS, TPC-DI, ClickBench, H2ODB, NYC Taxi, Flight Data, Vector Search, and more
+- Scale up with larger datasets (scale factors 1.0, 10.0, 100.0+)
+- Compare performance across different platforms
+- See [examples/INDEX.md](examples/INDEX.md) for complete examples navigation
+- See [examples/PATTERNS.md](examples/PATTERNS.md) for common workflow patterns
 ## Features
 
 - **Embedded Benchmarks**: Self-contained benchmark data and queries
@@ -387,110 +495,6 @@ These extras add connectivity to specific platforms and are installed only when 
 - **Reduced conflicts**: Platform-specific dependencies are isolated
 - **Easy maintenance**: Update cloud SDKs independently of core functionality
 
-## Quick Start
-
-Get started with BenchBox in 3 steps:
-
-### 1. Install BenchBox
-
-Choose the installation that matches your target platform:
-
-**Recommended (using uv):**
-```bash
-# For local development (DuckDB only)
-uv add benchbox
-
-# For cloud platforms (recommended)
-uv add benchbox --extra cloud
-
-# For everything (all platforms + ClickHouse)
-uv add benchbox --extra all
-```
-
-**Alternative (pip-compatible):**
-```bash
-uv pip install benchbox
-uv pip install "benchbox[cloud]"
-uv pip install "benchbox[all]"
-```
-
-### 2. Verify Installation
-
-Check that everything is working:
-
-```bash
-# Verify BenchBox is installed
-benchbox --version
-
-# Check available platforms
-benchbox check-deps --matrix
-```
-
-### 3. Run Your First Benchmark
-
-Start with a simple local benchmark:
-
-```python
-from benchbox import TPCH
-
-# Create a small TPC-H benchmark for testing
-tpch = TPCH(scale_factor=0.01)  # ~10MB dataset for quick testing
-
-# Generate sample data
-print("Generating data...")
-data_paths = tpch.generate_data()
-print(f"✅ Generated {len(data_paths)} data files")
-
-# Get a sample query
-query1 = tpch.get_query(1, seed=42)  # Reproducible parameters
-print(f"✅ Generated TPC-H Query 1")
-
-# Run on embedded DuckDB (no setup required)
-import duckdb
-conn = duckdb.connect(":memory:")
-
-# Create schema and load data
-conn.execute(tpch.get_create_tables_sql())
-for table_file in data_paths:
-    table_name = table_file.split('/')[-1].replace('.csv', '')
-    conn.execute(f"COPY {table_name} FROM '{table_file}' WITH (DELIMITER '|', HEADER false)")
-
-# Execute the query
-result = conn.execute(query1).fetchdf()
-print(f"✅ Query executed successfully, returned {len(result)} rows")
-```
-
-### Run a DataFrame Benchmark
-
-Compare SQL vs DataFrame execution paradigms:
-
-```bash
-# SQL mode - queries executed via SQL
-benchbox run --platform duckdb --benchmark tpch --scale 0.01
-
-# DataFrame mode - queries executed via native Polars API
-benchbox run --platform polars-df --benchmark tpch --scale 0.01
-```
-
-Same benchmark, same scale factor, different execution paradigm.
-
-### Next Steps
-
-**For Cloud Platforms:**
-- See [Platform Documentation](docs/platforms/index.md) for platform-specific setup
-- Start with `examples/getting_started/` for zero-config DuckDB runs and credential-ready cloud samples
-- Explore `examples/features/` for capability-specific examples (query subsets, tuning, result analysis, etc.)
-- Check `examples/use_cases/` for real-world patterns (CI/CD regression testing, platform evaluation, cost optimization)
-- See `examples/programmatic/` for Python API usage and integration patterns
-- Use `--dry-run OUTPUT_DIR` on the CLI or example scripts to export a JSON/YAML plan and per-query SQL files before executing benchmarks
-- Use `benchbox run` CLI for full benchmark execution
-
-**For Advanced Usage:**
-- Explore the full benchmark suite: TPC-H, TPC-DS, TPC-DI, ClickBench, H2ODB, NYC Taxi, Flight Data, Vector Search, and more
-- Scale up with larger datasets (scale factors 1.0, 10.0, 100.0+)
-- Compare performance across different platforms
-- See [examples/INDEX.md](examples/INDEX.md) for complete examples navigation
-- See [examples/PATTERNS.md](examples/PATTERNS.md) for common workflow patterns
 ## Command-Line Interface (CLI)
 
 BenchBox provides a comprehensive command-line interface (CLI) for all benchmarking operations, from data generation to result analysis.
