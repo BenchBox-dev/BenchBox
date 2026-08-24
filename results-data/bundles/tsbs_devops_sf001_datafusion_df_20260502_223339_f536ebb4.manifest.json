@@ -1,10 +1,11 @@
 {
   "benchmark": "TSBS DevOps",
   "bundle_file": "tsbs_devops_sf001_datafusion_df_20260502_223339_f536ebb4.json",
-  "bundle_hash": "ac4efcee86ce618d0828c384fe7bce82b7b674f482d06d46b423af2f1e87e2e0",
+  "bundle_hash": "0e9d5e5dcedb30fc3b2a04314f8a64bc928c0013ccc748d4549cb5bb868f5252",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",
+  "result_source": "internal",
   "scale_factor": 0.01,
   "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",

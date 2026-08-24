@@ -1,10 +1,11 @@
 {
   "benchmark": "Read Primitives",
   "bundle_file": "read_primitives_sf01_pyspark_df_20260502_214131_e2b3c755.json",
-  "bundle_hash": "a6007b419fd05aa97b7cc13d0dda6240b487b3bf2c80f15f2b37cf79863af825",
+  "bundle_hash": "00d508a76792689aee1290757ba9763be91c191446186b68c2292d379a69f58e",
   "companion_hashes": {},
   "phase": 2,
   "platform": "PySpark",
+  "result_source": "internal",
   "scale_factor": 0.1,
   "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
