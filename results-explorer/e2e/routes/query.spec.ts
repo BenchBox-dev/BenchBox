@@ -85,7 +85,9 @@ test.describe("Query workbench", () => {
     await waitForShell(page);
 
     const emptyState = page.getByTestId("query-empty-state");
-    await expect(emptyState.getByRole("status")).toBeVisible();
+    // Keep one navigation alive while the cold DuckDB page and facet queries settle.
+    // The shared retry helper re-navigates after 10s, which restarts this empty-result path.
+    await expect(emptyState.getByRole("status")).toBeVisible({ timeout: 20_000 });
     await expect(emptyState).toContainText("No results match these filters");
     await expect(emptyState).toContainText("Benchmark: TPC-H");
     await expect(emptyState).toContainText("Platform: MissingDB");

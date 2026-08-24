@@ -69,7 +69,7 @@ test.describe("ResultDetail", () => {
     await page.getByRole("link", { name: /Compare this result/i }).click();
     await expect(page).toHaveURL(new RegExp(`/results/compare\\?ids=${TPCH_DUCKDB_ID}$`));
     await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId("compare-builder-status")).toContainText("1 selected");
+    await expect(page.getByTestId("compare-builder-status")).toContainText("1 result selected");
     await expect(page.getByTestId(`compare-builder-row-${TPCH_DUCKDB_ID}`)).toContainText("(from result detail)");
   });
 

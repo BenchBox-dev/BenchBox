@@ -486,6 +486,9 @@ describe("BenchmarkIndex", () => {
     await waitFor(() => expect(screen.getByTestId("benchmark-compare-guidance")).toBeTruthy());
 
     const guidance = screen.getByTestId("benchmark-compare-guidance");
+    const status = guidance.querySelector('[aria-live="polite"]');
+    expect(status).toHaveAttribute("aria-atomic", "true");
+    expect(status?.textContent).toContain("0 results selected");
     expect(guidance.textContent).toContain("Select two or more platforms");
     const disabledAction = screen.getByRole("button", { name: "Select 2 comparable results" }) as HTMLButtonElement;
     expect(disabledAction.disabled).toBe(true);
@@ -703,6 +706,10 @@ describe("BenchmarkIndex", () => {
     expect(fifth.getAttribute("aria-describedby")).toBe(selectionLimit.id);
     expect(selectionLimit.textContent).toContain("Selection limit reached");
     expect(selectionLimit.textContent).toContain("Clear one selected run before adding another");
+    expect(screen.getByTestId("benchmark-compare-guidance").textContent).toContain(
+      "4 results selected (maximum)",
+    );
+    expect(screen.queryByText("Use sticky tray to compare")).toBeNull();
     expect(screen.getByRole("link", { name: /Compare 4 selected/ })).toBeTruthy();
   });
 
@@ -961,6 +968,22 @@ describe("BenchmarkIndex", () => {
 
     // No additional queryRows calls - client-side filtering only.
     expect(vi.mocked(queryRows).mock.calls.length).toBe(callsBefore);
+  });
+
+  it("keeps filtered-out selections in the status and compare tray", async () => {
+    render(<BenchmarkIndex benchmark="tpch" />);
+    const grid = await screen.findByRole("grid", { name: /tpch SF0\.1 power results/ });
+    const checkboxes = within(grid).getAllByRole("checkbox") as HTMLInputElement[];
+    fireEvent.click(checkboxes[0]!);
+    fireEvent.click(checkboxes[1]!);
+
+    await waitFor(() => expect(screen.getByRole("link", { name: /Compare 2 selected/ })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /community/i }));
+
+    await waitFor(() => expect(within(grid).queryByText("SQLite")).toBeNull());
+    expect(screen.getByTestId("benchmark-compare-guidance").textContent).toContain("2 results selected");
+    expect(screen.getByTestId("compare-tray-row-bbbbbbbb").textContent).toContain("SQLite");
+    expect(screen.getByRole("link", { name: /Compare 2 selected/ })).toBeTruthy();
   });
 
   // -----------------------------------------------------------------------

@@ -32,6 +32,10 @@ export interface CompareRecoveryResult<T> {
 
 interface CompareRecoveryDependencies<T> {
   resolveId: (requestedId: string) => Promise<string>;
+  findExistingIds?: (
+    resolvedIds: string[],
+    onInitialExistingIds?: (existingIds: ReadonlySet<string>) => void,
+  ) => Promise<ReadonlySet<string>>;
   loadResult: (resolvedId: string) => Promise<T | null>;
   isCancelled?: () => boolean;
 }
@@ -126,18 +130,64 @@ export async function recoverCompareResults<T>(
     (entry): entry is { requestedId: string; resolvedId: string; error: null } =>
       entry.resolvedId !== null,
   );
-  const loaded = await Promise.all(
-    candidates.map(async (entry) => {
+  type LoadedCandidate = {
+    requestedId: string;
+    resolvedId: string;
+    detail: T | null;
+    error: unknown | null;
+  };
+  const pendingLoads = new Map<string, Promise<LoadedCandidate>>();
+  const startLoad = (entry: (typeof candidates)[number]): Promise<LoadedCandidate> => {
+    const pending = pendingLoads.get(entry.resolvedId);
+    if (pending) return pending;
+    const load = (async (): Promise<LoadedCandidate> => {
       try {
-        return { ...entry, detail: await dependencies.loadResult(entry.resolvedId), error: null };
+        return {
+          requestedId: entry.requestedId,
+          resolvedId: entry.resolvedId,
+          detail: await dependencies.loadResult(entry.resolvedId),
+          error: null,
+        };
       } catch (error) {
-        return { ...entry, detail: null, error };
+        return {
+          requestedId: entry.requestedId,
+          resolvedId: entry.resolvedId,
+          detail: null,
+          error,
+        };
       }
-    }),
-  );
+    })();
+    pendingLoads.set(entry.resolvedId, load);
+    return load;
+  };
+  let loadCandidates = candidates;
+  const missing: ConfirmedMissingCompareResult[] = [];
+  if (dependencies.findExistingIds && candidates.length > 0) {
+    try {
+      const existingIds = await dependencies.findExistingIds(
+        candidates.map((entry) => entry.resolvedId),
+        (initialExistingIds) => {
+          if (dependencies.isCancelled?.()) return;
+          for (const entry of candidates) {
+            if (initialExistingIds.has(entry.resolvedId)) void startLoad(entry);
+          }
+        },
+      );
+      if (dependencies.isCancelled?.()) return null;
+      loadCandidates = candidates.filter((entry) => {
+        if (existingIds.has(entry.resolvedId)) return true;
+        missing.push({ requestedId: entry.requestedId, resolvedId: entry.resolvedId });
+        return false;
+      });
+    } catch {
+      // Preserve the existing per-result recovery path when the optional
+      // membership optimization is unavailable.
+      if (dependencies.isCancelled?.()) return null;
+    }
+  }
+  const loaded = await Promise.all(loadCandidates.map(startLoad));
 
   const recovered: RecoveredCompareResult<T>[] = [];
-  const missing: ConfirmedMissingCompareResult[] = [];
   for (const entry of loaded) {
     if (entry.error !== null) {
       failed.push({ requestedId: entry.requestedId, error: entry.error });
