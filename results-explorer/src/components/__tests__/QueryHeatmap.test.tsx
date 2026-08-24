@@ -432,6 +432,45 @@ describe("QueryHeatmap rendering", () => {
     expect(selected).toBeNull();
   });
 
+  it("refuses a fifth comparison selection independently of row eligibility", () => {
+    let selected: Set<string> | null = null;
+    const baseRow = makeSummary().platforms[0]!;
+    const summary = makeSummary({
+      platforms: Array.from({ length: 5 }, (_, index) => ({
+        ...baseRow,
+        result_id: `r${index + 1}`,
+        short_id: "",
+        platform_id: `platform-${index + 1}`,
+        platform: `Platform ${index + 1}`,
+      })),
+    });
+    render(
+      <QueryHeatmap
+        summary={summary}
+        selectedIds={new Set(["r1", "r2", "r3", "r4"])}
+        selectionLimitReasonId="selection-limit-reason"
+        onSelectionChange={(ids) => {
+          selected = ids;
+        }}
+      />,
+    );
+
+    const grid = screen.getByRole("grid");
+    const fifth = within(grid).getAllByRole("checkbox")[4] as HTMLInputElement;
+    expect(fifth.disabled).toBe(true);
+    expect(fifth.getAttribute("aria-describedby")).toBe("selection-limit-reason");
+    const fifthMobileCard = screen.getByTestId("query-heatmap-mobile-card-r5");
+    const fifthMobile = within(fifthMobileCard).getByRole("checkbox") as HTMLInputElement;
+    expect(fifthMobile.disabled).toBe(true);
+    expect(fifthMobile.getAttribute("aria-describedby")).toBe("selection-limit-reason");
+    // Negative control: even if a future render regression exposes the input,
+    // the handler remains the authoritative cap guard.
+    fifth.disabled = false;
+    fireEvent.click(fifth);
+
+    expect(selected).toBeNull();
+  });
+
   // -----------------------------------------------------------------------
   // (b) Null cells render "No run"
   // -----------------------------------------------------------------------
