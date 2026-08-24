@@ -433,7 +433,8 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   });
 
   const selectedCompareRowsById = new Map(
-    (analysisSummary?.platforms ?? [])
+    (summaryWithResultMetadata?.platforms ?? [])
+      .filter(isTimingDisplayable)
       .filter(isComparable)
       .map((row) => [compareIdForRow(row), row]),
   );

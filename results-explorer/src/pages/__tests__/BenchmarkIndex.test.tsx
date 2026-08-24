@@ -970,6 +970,22 @@ describe("BenchmarkIndex", () => {
     expect(vi.mocked(queryRows).mock.calls.length).toBe(callsBefore);
   });
 
+  it("keeps filtered-out selections in the status and compare tray", async () => {
+    render(<BenchmarkIndex benchmark="tpch" />);
+    const grid = await screen.findByRole("grid", { name: /tpch SF0\.1 power results/ });
+    const checkboxes = within(grid).getAllByRole("checkbox") as HTMLInputElement[];
+    fireEvent.click(checkboxes[0]!);
+    fireEvent.click(checkboxes[1]!);
+
+    await waitFor(() => expect(screen.getByRole("link", { name: /Compare 2 selected/ })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /community/i }));
+
+    await waitFor(() => expect(within(grid).queryByText("SQLite")).toBeNull());
+    expect(screen.getByTestId("benchmark-compare-guidance").textContent).toContain("2 results selected");
+    expect(screen.getByTestId("compare-tray-row-bbbbbbbb").textContent).toContain("SQLite");
+    expect(screen.getByRole("link", { name: /Compare 2 selected/ })).toBeTruthy();
+  });
+
   // -----------------------------------------------------------------------
   // (d) Empty ranking cohort shows the informational empty state
   // -----------------------------------------------------------------------
