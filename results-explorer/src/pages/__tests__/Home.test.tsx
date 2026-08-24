@@ -316,10 +316,11 @@ beforeEach(() => {
 });
 
 describe("Home", () => {
-  it("renders the results shell when no meta leaderboard cohorts are available", async () => {
+  it("uses the compact loading shell when no meta leaderboard cohorts are available", async () => {
+    const resultRows = deferred<typeof RESULT_ROWS>();
     vi.mocked(queryRows).mockImplementation(async (sql: string) => {
       const s = String(sql).replace(/\s+/g, " ").trim();
-      if (s.includes("FROM bench.results")) return RESULT_ROWS;
+      if (s.includes("FROM bench.results")) return resultRows.promise;
       if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) return [];
       if (s.includes("FROM bench.cohort_metadata")) return [];
       return [];
@@ -327,6 +328,14 @@ describe("Home", () => {
 
     render(<Home />);
 
+    await waitFor(() => expect(screen.queryByTestId("home-loading-active-summary-reserve")).toBeNull());
+    expect(screen.queryByRole("region", { name: "Leaderboard ranking selector" })).toBeNull();
+    expect(screen.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+
+    resultRows.resolve(RESULT_ROWS);
     await waitFor(() => expect(screen.getByText("Recent Results")).toBeTruthy());
     expect(document.title).toBe("Results · BenchBox");
     expect(screen.queryByText("Initializing static DuckDB snapshot...")).toBeNull();
