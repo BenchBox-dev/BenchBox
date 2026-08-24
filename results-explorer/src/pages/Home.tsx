@@ -45,6 +45,34 @@ import {
 const SUPPORTED_BENCHMARK_COUNT = new Set(Object.values(BENCHMARK_LABELS)).size;
 const UNLABELLED_TUNING_VALUE = "untuned";
 
+export const HOME_SHELL_GEOMETRY_CLASSES = {
+  heroSurface: "surface-hero border-b border-[var(--bb-border-default)]",
+  heroWrapper: "mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-7 lg:px-8 lg:py-4",
+  heroIntro: "max-w-4xl",
+  headline: "text-2xl font-bold sm:text-4xl",
+  subtitle: "mt-2 max-w-3xl text-sm text-[var(--bb-fg-muted)] sm:mt-3 sm:text-lg",
+  activeSummary:
+    "mt-4 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-2 sm:mt-5 sm:p-3",
+  activeSummaryItems: "flex flex-wrap gap-2",
+  activeSummaryChip:
+    "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-primary)] px-2.5 py-1 text-xs",
+  activeSummaryLabel: "shrink-0 font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]",
+  activeSummaryValue: "truncate font-medium text-[var(--bb-fg-primary)]",
+  activeFacetList: "mt-3 grid gap-2 sm:flex sm:flex-wrap",
+  activeFacetChip:
+    "block min-w-0 truncate rounded-full bg-[var(--bb-bg-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--bb-fg-muted)]",
+  rankingSelector:
+    "mt-3 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-2 sm:mt-5 sm:p-3",
+  rankingGrid: "grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-4",
+  scopeDetails: "mt-2 border-t border-[var(--bb-border-default)] pt-2",
+  scopeSummary:
+    "cursor-pointer text-xs font-medium text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]",
+  advancedDetails: "mt-3 border-t border-[var(--bb-border-default)] pt-3",
+  advancedSummary:
+    "cursor-pointer text-sm font-medium text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]",
+  dataSurface: "surface-app mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-8 lg:px-8",
+} as const;
+
 interface TuningModeSummary {
   labelledOptions: string[];
   unlabelledCount: number;
@@ -255,7 +283,14 @@ export function Home(_: RoutableProps) {
     );
   }
   if (!results || !metaLeaderboardLoaded || hasInconsistentEmptySnapshot) {
-    return <HomeLoadingSkeleton />;
+    return (
+      <HomeLoadingSkeleton
+        benchmark={summarizeSelection(benchmarkFilters, "All benchmarks", humanizeBenchmark)}
+        scaleFactor={summarizeSelection(scaleFilters, "All scales", (value) => `SF ${value}`)}
+        phase={phaseFilter === "all" ? "All phases" : phaseFilter}
+        activeFacets={summarizeActiveFacets(facets, new Map())}
+      />
+    );
   }
 
   const mode: MetaLeaderboardMode =
@@ -349,7 +384,7 @@ export function Home(_: RoutableProps) {
   return (
     <div>
       <section
-        class="surface-hero border-b border-[var(--bb-border-default)]"
+        class={HOME_SHELL_GEOMETRY_CLASSES.heroSurface}
         data-testid="home-hero-filter-band"
         data-surface="hero"
       >
@@ -357,10 +392,10 @@ export function Home(_: RoutableProps) {
             viewports budget the fold at 900px, and the taller hero pushed the
             second leaderboard row past it (see responsive.spec.ts). Tablet and
             mobile keep the roomier padding; their fold budget is 1200px. */}
-        <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-7 lg:px-8 lg:py-4">
-          <div class="max-w-4xl">
-            <h1 class="text-2xl font-bold sm:text-4xl">BenchBox Curated Results Preview</h1>
-            <p class="mt-2 max-w-3xl text-sm text-[var(--bb-fg-muted)] sm:mt-3 sm:text-lg">
+        <div class={HOME_SHELL_GEOMETRY_CLASSES.heroWrapper} data-testid="home-hero-wrapper">
+          <div class={HOME_SHELL_GEOMETRY_CLASSES.heroIntro} data-testid="home-hero-intro">
+            <h1 class={HOME_SHELL_GEOMETRY_CLASSES.headline}>BenchBox Curated Results Preview</h1>
+            <p class={HOME_SHELL_GEOMETRY_CLASSES.subtitle}>
               Reproducible OLAP benchmark evidence with explicitly scoped rankings and public corpus browse below.
             </p>
           </div>
@@ -380,9 +415,9 @@ export function Home(_: RoutableProps) {
           {filteredMetaLeaderboard && (
             <section
               aria-label="Leaderboard ranking selector"
-              class="mt-3 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-2 sm:mt-5 sm:p-3"
+              class={HOME_SHELL_GEOMETRY_CLASSES.rankingSelector}
             >
-              <div class="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div class={HOME_SHELL_GEOMETRY_CLASSES.rankingGrid} data-testid="home-ranking-selector-grid">
                 <MultiSelectFilter
                   label="Benchmark"
                   allLabel="All benchmarks"
@@ -421,17 +456,20 @@ export function Home(_: RoutableProps) {
               </div>
 
               <details
-                class="mt-2 border-t border-[var(--bb-border-default)] pt-2"
+                class={HOME_SHELL_GEOMETRY_CLASSES.scopeDetails}
                 data-testid="leaderboard-scope-summary-mobile"
               >
-                <summary class="cursor-pointer text-xs font-medium text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]">
+                <summary class={HOME_SHELL_GEOMETRY_CLASSES.scopeSummary}>
                   Leaderboard scope details
                 </summary>
                 <LeaderboardScopeSummary {...leaderboardScopeSummaryProps} />
               </details>
 
-              <details class="mt-3 border-t border-[var(--bb-border-default)] pt-3">
-                <summary class="cursor-pointer text-sm font-medium text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]">
+              <details
+                class={HOME_SHELL_GEOMETRY_CLASSES.advancedDetails}
+                data-testid="leaderboard-advanced-filters"
+              >
+                <summary class={HOME_SHELL_GEOMETRY_CLASSES.advancedSummary}>
                   Advanced filters
                 </summary>
                 <div class="mt-3 grid gap-3 md:grid-cols-3">
@@ -475,7 +513,7 @@ export function Home(_: RoutableProps) {
       </section>
 
       <div
-        class="surface-app mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-8 lg:px-8"
+        class={HOME_SHELL_GEOMETRY_CLASSES.dataSurface}
         data-testid="home-data-surface"
         data-surface="app"
       >
@@ -597,41 +635,97 @@ export function Home(_: RoutableProps) {
   );
 }
 
-function HomeLoadingSkeleton() {
+function HomeLoadingSkeleton({
+  benchmark,
+  scaleFactor,
+  phase,
+  activeFacets,
+}: {
+  benchmark: string;
+  scaleFactor: string;
+  phase: string;
+  activeFacets: ActiveFacetSummary[];
+}) {
   return (
     <div>
-      <section class="surface-hero border-b border-[var(--bb-border-default)]">
-        {/* Mirrors the loaded hero's lg:py-4 exactly. If these diverge the hero
-            visibly jumps when data arrives, which is the same skeleton-vs-loaded
-            drift that made heading assertions timing-dependent. */}
-        <div class="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 lg:py-4">
-          <div class="max-w-4xl">
-            <h1 class="text-3xl font-bold sm:text-4xl">BenchBox Curated Results Preview</h1>
-            {/* Copy AND classes mirror the loaded hero subtitle exactly. The
-                classes matter as much as the words: mt-3/text-base here against
-                mt-2/text-sm sm:mt-3/sm:text-lg there made the subtitle shift and
-                reflow the moment data arrived, the same skeleton-vs-loaded drift
-                as the headline and the hero padding above. */}
-            <p class="mt-2 max-w-3xl text-sm text-[var(--bb-fg-muted)] sm:mt-3 sm:text-lg">
+      <section
+        class={HOME_SHELL_GEOMETRY_CLASSES.heroSurface}
+        data-testid="home-hero-filter-band"
+        data-surface="hero"
+      >
+        {/* Loaded/skeleton geometry is owned by HOME_SHELL_GEOMETRY_CLASSES. */}
+        <div class={HOME_SHELL_GEOMETRY_CLASSES.heroWrapper} data-testid="home-hero-wrapper">
+          <div class={HOME_SHELL_GEOMETRY_CLASSES.heroIntro} data-testid="home-hero-intro">
+            <h1 class={HOME_SHELL_GEOMETRY_CLASSES.headline}>BenchBox Curated Results Preview</h1>
+            <p class={HOME_SHELL_GEOMETRY_CLASSES.subtitle}>
               Reproducible OLAP benchmark evidence with explicitly scoped rankings and public corpus browse below.
             </p>
           </div>
 
+          <div
+            aria-hidden="true"
+            class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummary} sm:hidden`}
+            data-testid="home-loading-active-summary-reserve"
+          >
+            <div class={HOME_SHELL_GEOMETRY_CLASSES.activeSummaryItems}>
+              {[
+                ["Benchmark", benchmark],
+                ["Scale", scaleFactor],
+                ["Phase", phase],
+              ].map(([label, value]) => (
+                <div key={label} class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummaryChip} bb-skeleton-dark`}>
+                  <span class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummaryLabel} invisible`}>{label}</span>
+                  <span class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummaryValue} invisible`}>{value}</span>
+                </div>
+              ))}
+            </div>
+            {activeFacets.length > 0 && (
+              <div class={HOME_SHELL_GEOMETRY_CLASSES.activeFacetList}>
+                {activeFacets.map((facet) => (
+                  <span
+                    key={facet.key}
+                    class={`${HOME_SHELL_GEOMETRY_CLASSES.activeFacetChip} bb-skeleton-dark`}
+                  >
+                    <span class="invisible">{facet.label}: {facet.value}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
           <section
             aria-label="Leaderboard ranking selector"
-            class="mt-5 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
+            class={HOME_SHELL_GEOMETRY_CLASSES.rankingSelector}
           >
-            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div class={HOME_SHELL_GEOMETRY_CLASSES.rankingGrid} data-testid="home-ranking-selector-grid">
               <SkeletonSelect label="Benchmark" />
               <SkeletonSelect label="Scale" />
               <SkeletonSelect label="Phase" />
               <CoverageSummary />
             </div>
+            <div aria-hidden="true" class="sm:hidden">
+              <div
+                class={HOME_SHELL_GEOMETRY_CLASSES.scopeDetails}
+                data-testid="home-loading-scope-details-reserve"
+              >
+                <SkeletonBlock className="h-4 w-40 bb-skeleton-dark" />
+              </div>
+              <div
+                class={HOME_SHELL_GEOMETRY_CLASSES.advancedDetails}
+                data-testid="home-loading-advanced-details-reserve"
+              >
+                <SkeletonBlock className="h-5 w-32 bb-skeleton-dark" />
+              </div>
+            </div>
           </section>
         </div>
       </section>
 
-      <div class="surface-app mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div
+        class={HOME_SHELL_GEOMETRY_CLASSES.dataSurface}
+        data-testid="home-data-surface"
+        data-surface="app"
+      >
         <MetaLeaderboardSkeleton />
       </div>
     </div>
@@ -691,26 +785,26 @@ function ActiveLeaderboardSummary({
   return (
     <section
       aria-label="Active leaderboard filters"
-      class="mt-4 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-2 sm:mt-5 sm:p-3"
+      class={HOME_SHELL_GEOMETRY_CLASSES.activeSummary}
     >
-      <dl class="flex flex-wrap gap-2">
+      <dl class={HOME_SHELL_GEOMETRY_CLASSES.activeSummaryItems}>
         {items.map((item) => (
           <div
             key={item.label}
-            class="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-primary)] px-2.5 py-1 text-xs"
+            class={HOME_SHELL_GEOMETRY_CLASSES.activeSummaryChip}
             title={`${item.label}: ${item.value}`}
           >
-            <dt class="shrink-0 font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">{item.label}</dt>
-            <dd class="truncate font-medium text-[var(--bb-fg-primary)]">{item.value}</dd>
+            <dt class={HOME_SHELL_GEOMETRY_CLASSES.activeSummaryLabel}>{item.label}</dt>
+            <dd class={HOME_SHELL_GEOMETRY_CLASSES.activeSummaryValue}>{item.value}</dd>
           </div>
         ))}
       </dl>
       {activeFacets.length > 0 && (
-        <div aria-label="Active filter chips" class="mt-3 flex flex-wrap gap-2">
+        <div aria-label="Active filter chips" class={HOME_SHELL_GEOMETRY_CLASSES.activeFacetList}>
           {activeFacets.map((facet) => (
             <span
               key={facet.key}
-              class="rounded-full bg-[var(--bb-bg-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--bb-fg-muted)]"
+              class={HOME_SHELL_GEOMETRY_CLASSES.activeFacetChip}
             >
               {facet.label}: {facet.value}
             </span>

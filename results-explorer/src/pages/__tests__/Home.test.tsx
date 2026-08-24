@@ -13,7 +13,7 @@ import {
   clearExplorerPerformanceEntriesForTests,
 } from "@/lib/performanceMarks";
 import { toggleFacetValue } from "@/lib/facetMatching";
-import { Home } from "@/pages/Home";
+import { HOME_SHELL_GEOMETRY_CLASSES, Home } from "@/pages/Home";
 
 const TIMING_ELIGIBLE = {
   has_display_timing: true,
@@ -316,10 +316,11 @@ beforeEach(() => {
 });
 
 describe("Home", () => {
-  it("renders the results shell when no meta leaderboard cohorts are available", async () => {
+  it("keeps the leaderboard shell stable until a no-leaderboard snapshot finishes loading", async () => {
+    const resultRows = deferred<typeof RESULT_ROWS>();
     vi.mocked(queryRows).mockImplementation(async (sql: string) => {
       const s = String(sql).replace(/\s+/g, " ").trim();
-      if (s.includes("FROM bench.results")) return RESULT_ROWS;
+      if (s.includes("FROM bench.results")) return resultRows.promise;
       if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) return [];
       if (s.includes("FROM bench.cohort_metadata")) return [];
       return [];
@@ -327,6 +328,18 @@ describe("Home", () => {
 
     render(<Home />);
 
+    await waitFor(() => {
+      expect(performance.getEntriesByName(EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_READY, "mark"))
+        .toHaveLength(1);
+    });
+    expect(screen.getByTestId("home-loading-active-summary-reserve")).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Leaderboard ranking selector" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+
+    resultRows.resolve(RESULT_ROWS);
     await waitFor(() => expect(screen.getByText("Recent Results")).toBeTruthy());
     expect(document.title).toBe("Results · BenchBox");
     expect(screen.queryByText("Initializing static DuckDB snapshot...")).toBeNull();
@@ -387,10 +400,7 @@ describe("Home", () => {
 
     await waitFor(() => expect(resultCalls).toBe(1));
     await waitFor(() => expect(screen.getByText("Initializing static DuckDB snapshot...")).toBeTruthy());
-    // The skeleton and the loaded hero deliberately share one headline, so this
-    // assertion is time-invariant. Loading state is still pinned by the
-    // snapshot-init text above, the aria-busy region below, and the absence of
-    // "Recent Results" - none of which survive into the loaded page.
+    // Headline stability is enforced by HOME_SHELL_GEOMETRY_CLASSES.
     expect(screen.getByRole("heading", { level: 1, name: "BenchBox Curated Results Preview" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toHaveAttribute(
       "aria-busy",
@@ -641,6 +651,78 @@ describe("Home", () => {
     expect(dataSurface).toHaveAttribute("data-surface", "app");
     expect(dataSurface.contains(selector)).toBe(false);
     expect(screen.getByTestId("leaderboard-scope-summary-mobile")).toBeTruthy();
+  });
+
+  it("routes every loaded and skeleton shell region through the shared geometry source", async () => {
+    const resultRows = deferred<typeof RESULT_ROWS>();
+    const metaRows = deferred<typeof META_LEADERBOARD_ROWS>();
+    const cohortRows = deferred<typeof COHORT_ROWS>();
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.includes("FROM bench.results")) return resultRows.promise;
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        return metaRows.promise;
+      }
+      if (s.includes("FROM bench.cohort_metadata")) return cohortRows.promise;
+      return [];
+    });
+
+    const expectSharedGeometry = () => {
+      const loadedActiveSummary = screen.queryByRole("region", { name: "Active leaderboard filters" });
+      const activeSummary = loadedActiveSummary ?? screen.getByTestId("home-loading-active-summary-reserve");
+      const scopeDetails =
+        screen.queryByTestId("leaderboard-scope-summary-mobile") ??
+        screen.getByTestId("home-loading-scope-details-reserve");
+      const advancedDetails =
+        screen.queryByTestId("leaderboard-advanced-filters") ??
+        screen.getByTestId("home-loading-advanced-details-reserve");
+      const pairs: Array<[HTMLElement, string]> = [
+        [screen.getByTestId("home-hero-filter-band"), HOME_SHELL_GEOMETRY_CLASSES.heroSurface],
+        [screen.getByTestId("home-hero-wrapper"), HOME_SHELL_GEOMETRY_CLASSES.heroWrapper],
+        [screen.getByTestId("home-hero-intro"), HOME_SHELL_GEOMETRY_CLASSES.heroIntro],
+        [
+          screen.getByRole("heading", { level: 1, name: "BenchBox Curated Results Preview" }),
+          HOME_SHELL_GEOMETRY_CLASSES.headline,
+        ],
+        [
+          activeSummary,
+          `${HOME_SHELL_GEOMETRY_CLASSES.activeSummary}${loadedActiveSummary ? "" : " sm:hidden"}`,
+        ],
+        [
+          screen.getByText(
+            "Reproducible OLAP benchmark evidence with explicitly scoped rankings and public corpus browse below.",
+          ),
+          HOME_SHELL_GEOMETRY_CLASSES.subtitle,
+        ],
+        [
+          screen.getByRole("region", { name: "Leaderboard ranking selector" }),
+          HOME_SHELL_GEOMETRY_CLASSES.rankingSelector,
+        ],
+        [screen.getByTestId("home-ranking-selector-grid"), HOME_SHELL_GEOMETRY_CLASSES.rankingGrid],
+        [scopeDetails, HOME_SHELL_GEOMETRY_CLASSES.scopeDetails],
+        [advancedDetails, HOME_SHELL_GEOMETRY_CLASSES.advancedDetails],
+        [screen.getByTestId("home-data-surface"), HOME_SHELL_GEOMETRY_CLASSES.dataSurface],
+      ];
+
+      for (const [element, expectedClasses] of pairs) {
+        expect(element.className).toBe(expectedClasses);
+      }
+    };
+
+    render(<Home />);
+
+    expectSharedGeometry();
+    expect(screen.queryByRole("region", { name: "Active leaderboard filters" })).toBeNull();
+    expect(screen.queryByText("Leaderboard scope details")).toBeNull();
+
+    resultRows.resolve(RESULT_ROWS);
+    metaRows.resolve(META_LEADERBOARD_ROWS);
+    cohortRows.resolve(COHORT_ROWS);
+
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    expectSharedGeometry();
+    expect(screen.getByRole("region", { name: "Active leaderboard filters" })).toBeTruthy();
+    expect(screen.getByText("Leaderboard scope details")).toBeTruthy();
   });
 
   it("keeps the leaderboard region before secondary workflow and recent-result sections", async () => {
