@@ -315,6 +315,34 @@ describe("Compare", () => {
     );
   });
 
+  it("distinguishes unprocessed IDs from resolved overflow", async () => {
+    const ids = Array.from({ length: 12 }, (_, index) => `r${index + 1}`);
+    setupUrl(ids);
+    const details = Object.fromEntries(
+      ids.slice(0, 8).map((id, index) => [
+        id,
+        makeResult({
+          result_id: id,
+          platform: `Platform ${index + 1}`,
+          platform_id: `platform-${index + 1}`,
+        }),
+      ]),
+    );
+    vi.mocked(getDetailResult).mockImplementation((id) => Promise.resolve(details[id] ?? null));
+
+    render(<Compare />);
+
+    await waitFor(() => expect(document.title).toBe("Compare (4) · BenchBox Results"));
+    const notice = screen.getByTestId("compare-url-notice");
+    expect(notice).toHaveTextContent(
+      "Ignored 4 additional result IDs (“r5”, “r6”, “r7”, “r8”); comparisons are limited to 4 unique results.",
+    );
+    expect(notice).toHaveTextContent(
+      "Did not process 4 additional result IDs to keep this page responsive",
+    );
+    expect(notice).not.toHaveTextContent("Ignored 8 additional result IDs");
+  });
+
   it("preserves requested IDs when a detail lookup rejects", async () => {
     setupUrl(["r1", "r2", "r3"]);
     vi.mocked(getDetailResult).mockImplementation((id) => {
