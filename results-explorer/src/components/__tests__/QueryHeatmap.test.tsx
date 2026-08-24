@@ -448,6 +448,7 @@ describe("QueryHeatmap rendering", () => {
       <QueryHeatmap
         summary={summary}
         selectedIds={new Set(["r1", "r2", "r3", "r4"])}
+        selectionLimitReasonId="selection-limit-reason"
         onSelectionChange={(ids) => {
           selected = ids;
         }}
@@ -457,6 +458,11 @@ describe("QueryHeatmap rendering", () => {
     const grid = screen.getByRole("grid");
     const fifth = within(grid).getAllByRole("checkbox")[4] as HTMLInputElement;
     expect(fifth.disabled).toBe(true);
+    expect(fifth.getAttribute("aria-describedby")).toBe("selection-limit-reason");
+    const fifthMobileCard = screen.getByTestId("query-heatmap-mobile-card-r5");
+    const fifthMobile = within(fifthMobileCard).getByRole("checkbox") as HTMLInputElement;
+    expect(fifthMobile.disabled).toBe(true);
+    expect(fifthMobile.getAttribute("aria-describedby")).toBe("selection-limit-reason");
     // Negative control: even if a future render regression exposes the input,
     // the handler remains the authoritative cap guard.
     fifth.disabled = false;

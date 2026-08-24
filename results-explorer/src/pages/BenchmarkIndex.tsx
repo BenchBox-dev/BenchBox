@@ -43,6 +43,8 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 
+const BENCHMARK_SELECTION_LIMIT_REASON_ID = "benchmark-selection-limit";
+
 interface BenchmarkIndexProps extends RoutableProps {
   benchmark?: string;
 }
@@ -671,6 +673,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">{compareGuidance}</p>
             {selectionLimitCopy && (
               <p
+                id={BENCHMARK_SELECTION_LIMIT_REASON_ID}
                 class="mt-1 text-sm text-[var(--bb-tone-warning-fg)]"
                 data-testid="benchmark-selection-limit"
               >
@@ -741,6 +744,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
                 summary={analysisSummary ?? filteredSummary}
                 selectedIds={selectedIds}
                 onSelectionChange={updateSelectedIds}
+                selectionLimitReasonId={selectionLimitCopy ? BENCHMARK_SELECTION_LIMIT_REASON_ID : undefined}
                 highContrast={highContrast}
               />
             </>

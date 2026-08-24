@@ -102,6 +102,8 @@ interface QueryHeatmapProps {
   /** Currently selected result_ids; undefined = selection disabled. */
   selectedIds?: Set<string>;
   onSelectionChange?: (ids: Set<string>) => void;
+  /** ID of the page-level explanation shown when the selection cap is active. */
+  selectionLimitReasonId?: string;
   /**
    * Activates reduced-color (grayscale lightness) mode for color-vision
    * accessibility. Also activates automatically via the CSS
@@ -133,6 +135,7 @@ export function QueryHeatmap({
   summary,
   selectedIds,
   onSelectionChange,
+  selectionLimitReasonId,
   highContrast = false,
 }: QueryHeatmapProps) {
   const { query_ids, platforms, ranking } = summary;
@@ -475,10 +478,15 @@ export function QueryHeatmap({
         {sorted.map((row) => {
           const isSelected = selectedIds?.has(rowKey(row)) ?? false;
           const comparable = isComparable(row);
-          const selectionDisabled = !comparable || (selectionAtCap && !isSelected);
+          const capDisabled = selectionAtCap && !isSelected;
+          const selectionDisabled = !comparable || capDisabled;
           const comparisonExclusion = comparable ? null : formatTimingExclusion(row.comparison_exclusion_reason);
           const comparisonCopy = describeCompareExclusionReason(row.comparison_exclusion_reason);
-          const comparisonReasonId = comparisonCopy ? `query-heatmap-mobile-compare-reason-${row.result_id}` : undefined;
+          const comparisonReasonId = comparisonCopy
+            ? `query-heatmap-mobile-compare-reason-${row.result_id}`
+            : capDisabled
+              ? selectionLimitReasonId
+              : undefined;
           const rankingExclusion = isRankable(row) ? null : formatTimingExclusion(row.ranking_exclusion_reason);
           const outliers = queryOutliers(row, sortedQueryIds, colMins);
           return (
@@ -633,10 +641,15 @@ export function QueryHeatmap({
               {sorted.map((row, rowIdx) => {
                 const isSelected = selectedIds?.has(rowKey(row)) ?? false;
                 const comparable = isComparable(row);
-                const selectionDisabled = !comparable || (selectionAtCap && !isSelected);
+                const capDisabled = selectionAtCap && !isSelected;
+                const selectionDisabled = !comparable || capDisabled;
                 const comparisonExclusion = comparable ? null : formatTimingExclusion(row.comparison_exclusion_reason);
                 const comparisonCopy = describeCompareExclusionReason(row.comparison_exclusion_reason);
-                const comparisonReasonId = comparisonCopy ? `query-heatmap-compare-reason-${row.result_id}` : undefined;
+                const comparisonReasonId = comparisonCopy
+                  ? `query-heatmap-compare-reason-${row.result_id}`
+                  : capDisabled
+                    ? selectionLimitReasonId
+                    : undefined;
                 const rankingExclusion = isRankable(row) ? null : formatTimingExclusion(row.ranking_exclusion_reason);
                 return (
                   <tr
