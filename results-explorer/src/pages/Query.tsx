@@ -57,6 +57,7 @@ import {
   summarizeCompareExclusionReasons,
   type CompareExclusionReasonCopy,
 } from "@/lib/compareExclusionReasons";
+import { formatSelectedCount } from "@/lib/copyFormatters";
 
 const EMPTY_STRING_ARRAY: string[] = [];
 
@@ -819,6 +820,11 @@ export function Query(_: RoutableProps) {
                   const selectedCompareIds = [...compareSelectedRows.values()].map((row) =>
                     compareIdForRow(row as Parameters<typeof compareIdForRow>[0]),
                   );
+                  const selectedStatus = formatSelectedCount(
+                    compareSelectedIds.size,
+                    "result",
+                    MAX_COMPARE_SELECTIONS,
+                  );
                   const compareUrl = compareSelectedIds.size >= 2 ? buildCompareUrl(selectedCompareIds) : null;
                   return (
                     <>
@@ -828,12 +834,10 @@ export function Query(_: RoutableProps) {
                       >
                         <span>
                           {compareSelectedIds.size === 0
-                            ? "Select two or more rows to compare. The first pick locks the ranking."
+                            ? `${selectedStatus}. Select two or more rows to compare. The first pick locks the ranking.`
                             : compareSelectedIds.size === 1
-                              ? `1 result selected — pick a compatible second row to enable Compare.${hiddenIncompatibleSuffix(compareIncompatibleHiddenCount)}`
-                              : compareSelectedIds.size >= MAX_COMPARE_SELECTIONS
-                                ? `${compareSelectedIds.size} results selected (maximum).`
-                                : `${compareSelectedIds.size} results selected.`}
+                              ? `${selectedStatus} — pick a compatible second row to enable Compare.${hiddenIncompatibleSuffix(compareIncompatibleHiddenCount)}`
+                              : `${selectedStatus}.`}
                         </span>
                         <span class="flex items-center gap-2">
                           {compareCohortSignature !== null && (

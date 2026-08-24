@@ -27,6 +27,8 @@ describe("copyFormatters", () => {
     expect(formatSelectedCount(1)).toBe("1 result selected");
     expect(formatSelectedCount(2)).toBe("2 results selected");
     expect(formatSelectedCount(3, "run")).toBe("3 runs selected");
+    expect(formatSelectedCount(3, "result", 4)).toBe("3 results selected");
+    expect(formatSelectedCount(4, "result", 4)).toBe("4 results selected (maximum)");
   });
 
   it("normalizes sentence punctuation", () => {

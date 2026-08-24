@@ -42,6 +42,7 @@ import { NotFound } from "@/pages/NotFound";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
+import { formatSelectedCount } from "@/lib/copyFormatters";
 
 const BENCHMARK_SELECTION_LIMIT_REASON_ID = "benchmark-selection-limit";
 
@@ -127,13 +128,14 @@ function benchmarkCompareGuidanceMessage(
   phase: string,
 ): string {
   const ranking = `${title} SF ${scaleFactor} ${phase}`;
+  const selectedStatus = formatSelectedCount(selectedCount, "result", MAX_COMPARE_SELECTIONS);
   if (selectedCount === 0) {
-    return `Select two or more platforms from the same ${ranking} ranking to compare. Benchmark, scale, phase, metric, and unit stay fixed on this page.`;
+    return `${selectedStatus}. Select two or more platforms from the same ${ranking} ranking to compare. Benchmark, scale, phase, metric, and unit stay fixed on this page.`;
   }
   if (selectedCount === 1) {
-    return `1 result selected in ${ranking}. Select one more result from this ranking to enable Compare.`;
+    return `${selectedStatus} in ${ranking}. Select one more result from this ranking to enable Compare.`;
   }
-  return `${selectedCount} results selected in ${ranking}. The sticky tray opens Compare with the same benchmark, scale, and phase contract.`;
+  return `${selectedStatus} in ${ranking}. The sticky tray opens Compare with the same benchmark, scale, and phase contract.`;
 }
 
 function isResultTimingDisplayable(row: ResultRow): boolean {
@@ -670,7 +672,9 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Compare selected results</h2>
-            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">{compareGuidance}</p>
+            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]" aria-live="polite" aria-atomic="true">
+              {compareGuidance}
+            </p>
             {selectionLimitCopy && (
               <p
                 id={BENCHMARK_SELECTION_LIMIT_REASON_ID}
@@ -681,14 +685,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               </p>
             )}
           </div>
-          {compareUrl ? (
-            <span
-              class="shrink-0 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-1.5 text-sm font-medium text-[var(--bb-data-fg-muted)]"
-              aria-live="polite"
-            >
-              Use sticky tray to compare
-            </span>
-          ) : (
+          {!compareUrl && (
             <button type="button" class="btn btn-secondary shrink-0 text-sm" disabled>
               {selectedIds.size === 1 ? "Select 1 more result" : "Select 2 comparable results"}
             </button>

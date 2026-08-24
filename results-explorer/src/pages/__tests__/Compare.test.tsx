@@ -536,6 +536,28 @@ describe("Compare", () => {
     expect(getByTestId("compare-builder-status").textContent).toContain("1 incompatible row hidden");
   });
 
+  it("names the four-result ceiling in the builder status", async () => {
+    setupUrl([]);
+    vi.mocked(listResults).mockResolvedValue(
+      Array.from({ length: 5 }, (_, index) =>
+        makeResultRow({
+          result_id: `r${index + 1}`,
+          platform: `Platform ${index + 1}`,
+          platform_id: `platform-${index + 1}`,
+        }),
+      ),
+    );
+    const { getByTestId } = render(<Compare />);
+    await waitFor(() => expect(getByTestId("compare-builder-row-r1")).toBeTruthy());
+
+    for (const id of ["r1", "r2", "r3", "r4"]) {
+      const checkbox = within(getByTestId(`compare-builder-row-${id}`)).getByRole("checkbox") as HTMLInputElement;
+      fireEvent.click(checkbox);
+    }
+
+    expect(getByTestId("compare-builder-status").textContent).toContain("4 results selected (maximum)");
+  });
+
   it("compare picker disables non-comparable candidates before launch", async () => {
     setupUrl([]);
     vi.mocked(listResults).mockResolvedValue([
