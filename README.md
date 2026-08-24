@@ -5,6 +5,12 @@ This is the **slim, corpus-only branch** of
 only the files needed to receive, validate, and host the public results
 corpus consumed by the BenchBox results explorer.
 
+This branch is authoritative for the complete accepted Phase 2 archive,
+including operator and community submissions that do not belong in the
+curated maintainer seed on `develop`. Inventory files are generated from this
+branch's union corpus. Code, validators, generators, and the curated seed stay
+authoritative on `develop` and are ported here through reviewed mirror PRs.
+
 For the BenchBox project itself — the benchmark engine, platform adapters,
 documentation, blog, results explorer source — see the
 [`develop`](https://github.com/joeharris76/BenchBox/tree/develop) and
@@ -21,6 +27,7 @@ documentation, blog, results explorer source — see the
 | `results-data/SEED_CORPUS_SPEC.md` | Maintainer-run seed lane spec. |
 | `results-data/validate_corpus.py` | The cohort-depth gate (≥3 platforms per cohort). |
 | `scripts/validate_submission.py` | Per-bundle schema, hash, and contract validator (vendored from develop). |
+| `benchbox/validation/bundle.py` and `benchbox/core/results/query_status.py` | Vendored validator implementation and failed-query policy. |
 | `scripts/generate_corpus_inventory.py` | Inventory generator (vendored from develop). |
 | `.github/workflows/validate-submission.yml` | The submission CI gate. |
 | `LICENSE`, `COPYRIGHT.md`, `DISCLAIMER.md` | Standard public-repo legal docs. |
