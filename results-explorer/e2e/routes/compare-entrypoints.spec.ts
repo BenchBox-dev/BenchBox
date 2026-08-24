@@ -84,7 +84,7 @@ test.describe("compare entrypoint happy paths", () => {
 
     const pinnedRow = page.getByTestId(`compare-builder-row-${DUCKDB.id}`);
     await expect(pinnedRow).toContainText("(from result detail)");
-    await expect(page.getByTestId("compare-builder-status")).toContainText("1 selected");
+    await expect(page.getByTestId("compare-builder-status")).toContainText("1 result selected");
 
     const filters = page.getByRole("region", { name: "Filters" });
     await filters.getByLabel("Scale").selectOption("0.1");
