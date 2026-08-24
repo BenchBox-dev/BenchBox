@@ -1223,6 +1223,7 @@ def test_interactive_cloud_platform_stops_when_credentials_are_missing():
         stack.enter_context(patch.object(_run_module, "DatabaseManager", return_value=db_manager))
         stack.enter_context(patch.object(_run_module, "BenchmarkManager", return_value=bench_manager))
         stack.enter_context(patch.object(_run_module, "display_system_recommendations"))
+        stack.enter_context(patch.object(_benchmarks_module, "prompt_platform_options", return_value={}))
         mock_caps = stack.enter_context(patch.object(_run_module.PlatformRegistry, "get_platform_capabilities"))
         stack.enter_context(patch.object(_run_module.PlatformRegistry, "requires_cloud_storage", return_value=True))
         stack.enter_context(patch.object(_run_module, "check_and_setup_platform_credentials", return_value=False))
