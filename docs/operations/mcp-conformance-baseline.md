@@ -24,6 +24,14 @@ the diagnostic tool, the stability of tool and prompt listings, and the
 Any future dynamic registration path must add its own notification behavior,
 tests, and a new revision-bound baseline review.
 
+## MVP and production use
+
+A current pass is one of the two MCP MVP modernization release checks; the
+other is DuckDB execution from a clean install of the built wheel's `mcp`
+extra. This loopback proof does not require an external deployment. A future
+shared service must rerun and bind the same gate to its exact deployed artifact
+under the deferred post-release production-publication matrix.
+
 ## Rerun and retirement policy
 
 Run:
@@ -37,5 +45,5 @@ The exact two expected-failure IDs are declared individually in
 scenario, or “known failures” bucket. Unexpected warnings are fail-closed too.
 When upstream removes a fixture gap or BenchBox adds a dynamic mutation path,
 rerun the pinned gate, remove the resolved entry, and update this document in
-the same change. A stale or unexpected result keeps the production-readiness
-gate closed.
+the same change. A stale or unexpected result blocks the MCP MVP conformance
+claim and keeps future production publication closed.
