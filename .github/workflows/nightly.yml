@@ -702,16 +702,12 @@ jobs:
           from datetime import timezone
           from pathlib import Path
           from tests.uat.throughput import (
-              resolve_official_result_path,
               validate_stream_count,
               validate_stream_success,
           )
 
           # Narrow window: the timestamp captured immediately before the sweep
           # step above, not a full-hour lookback -- see that step's comment.
-          # scale=1 matches uat-throughput-duckdb-nightly.yaml's rung and
-          # tightens filename resolution alongside the exact platform-token
-          # match (both landed together; see tests/uat/throughput.py).
           # The capture step writes UTC (date -u); strptime yields a naive
           # datetime whose .timestamp() would otherwise be read as LOCAL, so
           # anchor it to UTC explicitly -- correct on any runner TZ, not just
@@ -720,13 +716,13 @@ jobs:
               os.environ['THROUGHPUT_UAT_STARTED_AT'], '%Y-%m-%dT%H:%M:%S'
           ).replace(tzinfo=timezone.utc)
           results_dir = Path.home() / 'Developer' / 'benchmark_runs' / 'results'
-          result_path = resolve_official_result_path(
-              results_dir,
-              platform='duckdb',
-              benchmark='tpch',
-              started_after=started_after,
-              scale=1,
-          )
+          candidates = [
+              p for p in results_dir.glob('tpch_sf1_duckdb_*.json')
+              if not p.name.endswith('.applied.json')
+              and not p.name.endswith('.plans.json')
+              and p.stat().st_mtime >= (started_after.timestamp() - 5)
+          ]
+          result_path = max(candidates, key=lambda p: (p.stat().st_mtime, p.name)) if candidates else None
           if result_path is None:
               print('::error::No throughput UAT result JSON found for duckdb/tpch')
               sys.exit(1)
