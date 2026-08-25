@@ -123,9 +123,10 @@ Trusted same-repository mirror branches may carry truthful
 Community submissions stay stricter: a manifest is required, the query list
 must be non-empty, and `summary.validation` must be `passed` with no failed
 measurement evidence. The independently rerunnable submission workflow uses
-the same three-signal mirror trust gate (same repository, the
-`auto/results-mirror-*` branch pattern, and `github-actions[bot]` as the PR
-author) before allowing partial validation or a vendor-subtree addition.
+the same four-signal mirror trust gate (base `published-results`, same
+repository, the `auto/results-mirror-*` branch pattern, and
+`github-actions[bot]` as the PR author) before allowing partial validation or
+a vendor-subtree addition.
 
 A separate, narrower gap remains and is **not** fixed by the above:
 `published-results` carries exactly one workflow file
