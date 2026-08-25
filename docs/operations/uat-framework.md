@@ -621,7 +621,7 @@ for loading alone. The table has no indexes, primary keys, or foreign keys;
 the observed limit is SQLite parameter binding and single-transaction WAL
 growth, with external readers seeing no rows until the loader commits. The
 probe and original killed-run evidence were captured outside the repository
-under `BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs` and `/tmp`.
+under `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs` and `/tmp`.
 
 This exclusion is represented by
 `uat.compat.sqlite.tpcds_obt.release_gate_runtime_envelope`. It prunes the

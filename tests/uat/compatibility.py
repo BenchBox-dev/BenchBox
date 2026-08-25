@@ -129,7 +129,7 @@ _SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_REASON = (
 )
 _SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_EVIDENCE = (
     "PR #1904 2026-08-25 bounded native probe; original killed-run evidence under "
-    "BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs; docs/operations/uat-framework.md"
+    "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs; docs/operations/uat-framework.md"
 )
 
 _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES = (
