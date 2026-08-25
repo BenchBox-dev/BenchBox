@@ -170,7 +170,14 @@ def test_enumerate_records_datafusion_clickhouse_pruned_benchmark_gates():
     raw = {
         "platforms": {"include": ["datafusion", "clickhouse-local"]},
         "benchmarks": {
-            "include": ["write_primitives", "transaction_primitives", "ai_primitives", "vector_search", "tpch"]
+            "include": [
+                "write_primitives",
+                "transaction_primitives",
+                "ai_primitives",
+                "metadata_primitives",
+                "vector_search",
+                "tpch",
+            ]
         },
         "scales": {"rungs": [0.01]},
     }
@@ -180,6 +187,7 @@ def test_enumerate_records_datafusion_clickhouse_pruned_benchmark_gates():
     assert {(c.platform, c.benchmark) for c in result.cells} == {
         ("clickhouse-local", "vector_search"),
         ("clickhouse-local", "tpch"),
+        ("datafusion", "metadata_primitives"),
         ("datafusion", "tpch"),
     }
     pruned = {(c.platform, c.benchmark): c for c in result.compatibility_pruned}
@@ -191,6 +199,7 @@ def test_enumerate_records_datafusion_clickhouse_pruned_benchmark_gates():
         ("clickhouse-local", "write_primitives"),
         ("clickhouse-local", "transaction_primitives"),
         ("clickhouse-local", "ai_primitives"),
+        ("clickhouse-local", "metadata_primitives"),
     }
     assert set(pruned) == expected_pruned
     for platform, benchmark in expected_pruned:
@@ -198,6 +207,7 @@ def test_enumerate_records_datafusion_clickhouse_pruned_benchmark_gates():
         assert pruned[(platform, benchmark)].status == "blocked"
     assert "DataFusion" in pruned[("datafusion", "transaction_primitives")].reason
     assert "AI primitives" in pruned[("clickhouse-local", "ai_primitives")].reason
+    assert "SHOW USERS" in pruned[("clickhouse-local", "metadata_primitives")].reason
     assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
 
 

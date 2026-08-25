@@ -41,10 +41,10 @@ def clickhouse_dependencies():
 class TestClickHouseAdapter:
     """Test ClickHouse platform adapter functionality."""
 
-    def test_tpcds_q35_is_pinned_as_a_local_memory_limitation(self):
-        """Q35's reproducible SF1 chDB failure remains documented and discoverable."""
-        assert 35 in ClickHouseAdapter.KNOWN_INCOMPATIBLE_QUERIES["tpcds"]
-        assert "8 GiB local" in ClickHouseAdapter.__doc__
+    def test_tpcds_q35_is_removed_from_local_memory_incompatibilities(self):
+        """Q35's ClickHouse semi-join rewrite removes its known local memory failure."""
+        assert 35 not in ClickHouseAdapter.KNOWN_INCOMPATIBLE_QUERIES["tpcds"]
+        assert "Query 35" not in ClickHouseAdapter.__doc__
 
     def test_initialization_success(self):
         """Test successful adapter initialization in server mode."""
@@ -1411,6 +1411,36 @@ class TestClickHouseWorkloadCoverage:
         adapter.log_very_verbose = Mock()
         return adapter
 
+    def test_local_tpchavoc_resource_variants_get_statement_level_grace_hash(self):
+        """Local Havoc Q5 variants use the bounded join policy without changing the session."""
+        adapter = self._adapter(deployment_mode="local")
+        connection = Mock()
+        connection.execute.return_value = [(1,)]
+
+        result = adapter.execute_query(
+            connection,
+            "SELECT 1",
+            "5_v8",
+            benchmark_type="tpchavoc",
+            validate_row_count=False,
+        )
+
+        assert result["status"] == "SUCCESS"
+        statement = connection.execute.call_args.args[0]
+        assert "join_algorithm = 'grace_hash'" in statement
+        assert "grace_hash_join_initial_buckets = 8" in statement
+
+    def test_server_tpchavoc_resource_variants_keep_session_policy_unchanged(self):
+        """The ClickHouse Local resource guard must not alter server execution."""
+        adapter = self._adapter(deployment_mode="server")
+        connection = Mock()
+        connection.execute.return_value = [(1,)]
+
+        adapter.execute_query(connection, "SELECT 1", "5_v7", benchmark_type="tpchavoc", validate_row_count=False)
+
+        statement = connection.execute.call_args.args[0]
+        assert "join_algorithm" not in statement
+
     def test_extract_primary_key_columns_handles_inline_and_composite_keys(self):
         adapter = self._adapter()
 
@@ -1698,6 +1728,18 @@ class TestClickHouseQueryTransformerSettings:
         t = self._transformer()
         result = t.add_query_settings("SELECT 1")
         assert "joined_subquery_requires_alias = 0" in result
+
+    def test_additional_settings_share_the_statement_settings_clause(self):
+        """Query-specific policies must not append a second SETTINGS clause."""
+        t = self._transformer()
+        result = t.add_query_settings(
+            "SELECT 1",
+            (("join_algorithm", "grace_hash"), ("grace_hash_join_initial_buckets", 8)),
+        )
+
+        assert result.count(" SETTINGS ") == 1
+        assert "join_algorithm = 'grace_hash'" in result
+        assert "grace_hash_join_initial_buckets = 8" in result
 
     def test_enable_analyzer_not_added_for_plain_select(self):
         """Simple queries must NOT get enable_analyzer = 0 (uses new analyzer by default)."""

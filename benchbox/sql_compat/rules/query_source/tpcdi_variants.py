@@ -4,6 +4,12 @@ AQ6 uses SUM(SUM(x)) OVER () which ClickHouse does not support; replaced with
 a CROSS JOIN pre-computed grand total.  CLICKHOUSE_AQ6_SQL is a TEMPLATE -
 callers must apply parameters via .format(**params) before executing.
 
+AQ7/AQ8 use SQLite Julian-day expressions and EQ7 cross-references sibling
+subquery aliases. AQ10 also needs an explicit derived-table join key. The
+ClickHouse variants below keep the benchmark semantics while using native
+dateDiff/today expressions and a derived-table projection that ClickHouse can
+resolve.
+
 EQ7 cross-references sibling subquery aliases which StarRocks (MySQL-compatible)
 rejects; replaced by wrapping the UNION ALL in a derived table.
 STARROCKS_EQ7_SQL and DORIS_EQ7_SQL are complete SQL strings with no format
@@ -11,6 +17,8 @@ placeholders.
 """
 
 from __future__ import annotations
+
+from typing import Any
 
 from benchbox.sql_compat.actions import CompatAction
 from benchbox.sql_compat.context import Phase
@@ -24,6 +32,75 @@ from benchbox.sql_compat.registry import REGISTRY
 
 _B = "tpcdi"
 _P = Phase.QUERY_SOURCE
+
+
+def _clickhouse_metric_query(query_id: str, params: dict[str, Any] | None = None) -> str:
+    """Build a ClickHouse-safe TPC-DI metric query from its canonical source."""
+    from benchbox.core.tpcdi.queries import TPCDIQueryManager
+
+    manager = TPCDIQueryManager().analytical_queries
+    query = manager._queries[query_id]
+    query = query.replace(
+        "JULIANDAY(DATE('now')) - JULIANDAY(MIN(d.DateValue))",
+        "dateDiff('day', MIN(d.DateValue), today())",
+    )
+    query = query.replace(
+        "JULIANDAY(MAX(d.DateValue)) - JULIANDAY(MIN(d.DateValue))",
+        "dateDiff('day', MIN(d.DateValue), MAX(d.DateValue))",
+    )
+    query = query.replace(
+        "JULIANDAY(sell_date.DateValue) - JULIANDAY(buy_date.DateValue)",
+        "dateDiff('day', buy_date.DateValue, sell_date.DateValue)",
+    )
+    query = query.replace(
+        "JULIANDAY(t1_date.DateValue) - JULIANDAY(t2_date.DateValue)",
+        "dateDiff('day', t2_date.DateValue, t1_date.DateValue)",
+    )
+    query = query.replace("JULIANDAY(DATE('now', '-90 days'))", "today() - INTERVAL 90 DAY")
+    query = query.replace("DATE('now', '-90 days')", "today() - INTERVAL 90 DAY")
+    query = query.replace("current_date", "today()")
+
+    if query_id == "AQ10":
+        query = query.replace("t1.TradeID,\n        CASE", "t1.TradeID AS trade_id,\n        CASE")
+        query = query.replace(
+            "wash_sales ON t.TradeID = wash_sales.TradeID", "wash_sales ON t.TradeID = wash_sales.trade_id"
+        )
+        query = query.replace(
+            "COUNT(CASE WHEN t.Quantity * t.TradePrice > {large_trade_threshold} THEN 1 END)",
+            "countIf(t.Quantity * t.TradePrice > {large_trade_threshold})",
+        )
+        query = query.replace(
+            "COUNT(CASE WHEN d.DateValue = today() THEN 1 END)",
+            "countIf(d.DateValue = today())",
+        )
+        query = query.replace(
+            "COUNT(CASE WHEN wash_sales.wash_sale_flag = 1 THEN 1 END)",
+            "countIf(wash_sales.wash_sale_flag = 1)",
+        )
+
+    if query_id == "AQ7":
+        query = query.replace("c.SK_CustomerID,\n            MIN", "c.SK_CustomerID AS customer_id,\n            MIN")
+        query = query.replace("customer_metrics.SK_CustomerID", "customer_metrics.customer_id")
+
+    if query_id == "AQ8":
+        query = query.replace(
+            "GREATEST(dateDiff('day', MIN(d.DateValue), MAX(d.DateValue)), 1)",
+            "greatest(dateDiff('day', MIN(d.DateValue), MAX(d.DateValue)), 1)",
+        )
+    query_params = manager._generate_default_params(query_id)
+    if params:
+        query_params.update(params)
+    return query.format(**query_params)
+
+
+def build_clickhouse_metric_query(query_id: str, params: dict[str, Any] | None = None) -> str:
+    """Build a parameter-rendered ClickHouse variant for an analytical query."""
+    return _clickhouse_metric_query(query_id, params)
+
+
+CLICKHOUSE_AQ7_SQL = _clickhouse_metric_query("AQ7")
+CLICKHOUSE_AQ8_SQL = _clickhouse_metric_query("AQ8")
+CLICKHOUSE_AQ10_SQL = _clickhouse_metric_query("AQ10")
 
 # AQ6: SUM(SUM(x)) OVER () nested window aggregate is unsupported in ClickHouse.
 # Replaced with a CROSS JOIN subquery that pre-computes the grand total.
@@ -139,9 +216,193 @@ FROM (
 ) AS quality_metrics
 ORDER BY (completeness_score * 0.4 + validity_score * 0.3 + consistency_score * 0.3) DESC"""
 
+# DataFusion's optimizer can fail physical planning when repeated aggregate
+# expressions are commoned across a projection. Compute the repeated metrics
+# once in an aggregate subquery and derive the presentation fields outside it.
+DATAFUSION_AQ9_SQL = """\
+SELECT
+    'Market Maker and Liquidity Analysis' AS analysis_name,
+    Symbol,
+    security_name,
+    market_makers,
+    total_sell_orders,
+    total_buy_orders,
+    avg_sell_price,
+    avg_buy_price,
+    bid_ask_spread,
+    bid_ask_spread / avg_trade_price * 100 AS bid_ask_spread_pct,
+    total_volume,
+    avg_daily_volume,
+    market_share_of_volume,
+    price_volatility,
+    price_volatility / avg_trade_price * 100 AS coefficient_of_variation
+FROM (
+    SELECT
+        Symbol,
+        security_name,
+        market_makers,
+        total_sell_orders,
+        total_buy_orders,
+        avg_sell_price,
+        avg_buy_price,
+        avg_sell_price - avg_buy_price AS bid_ask_spread,
+        avg_trade_price,
+        total_volume,
+        avg_daily_volume,
+        total_volume / avg_daily_volume AS market_share_of_volume,
+        price_volatility
+    FROM (
+        SELECT
+            trade_rows.Symbol,
+            trade_rows.Name AS security_name,
+            COUNT(*) AS total_trades,
+            COUNT(DISTINCT trade_rows.SK_BrokerID) AS market_makers,
+            SUM(trade_rows.sell_order) AS total_sell_orders,
+            SUM(trade_rows.buy_order) AS total_buy_orders,
+            AVG(trade_rows.sell_price) AS avg_sell_price,
+            AVG(trade_rows.buy_price) AS avg_buy_price,
+            AVG(trade_rows.TradePrice) AS avg_trade_price,
+            SUM(trade_rows.Quantity) AS total_volume,
+            AVG(trade_rows.Volume) AS avg_daily_volume,
+            STDDEV(trade_rows.TradePrice) AS price_volatility
+        FROM (
+            SELECT
+                s.Symbol,
+                s.Name,
+                t.SK_BrokerID,
+                t.TradePrice,
+                t.Quantity,
+                mh.Volume,
+                CASE WHEN tt.TT_IS_SELL IS TRUE THEN 1 ELSE 0 END AS sell_order,
+                CASE WHEN tt.TT_IS_SELL IS FALSE THEN 1 ELSE 0 END AS buy_order,
+                CASE WHEN tt.TT_IS_SELL IS TRUE THEN t.TradePrice END AS sell_price,
+                CASE WHEN tt.TT_IS_SELL IS FALSE THEN t.TradePrice END AS buy_price
+            FROM DimSecurity s
+            JOIN FactTrade t ON s.SK_SecurityID = t.SK_SecurityID
+            JOIN TradeType tt ON t.Type = tt.TT_ID
+            JOIN FactMarketHistory mh ON s.SK_SecurityID = mh.SK_SecurityID
+            JOIN DimDate d ON t.SK_CreateDateID = d.SK_DateID
+            WHERE s.IsCurrent IS TRUE
+              AND t.Status = 'Completed'
+              AND d.CalendarYearID >= 2015
+              AND d.CalendarYearID <= 2019
+        ) trade_rows
+        GROUP BY trade_rows.Symbol, trade_rows.Name
+    ) metrics
+    WHERE total_trades > 10
+      AND total_sell_orders > 0
+      AND total_buy_orders > 0
+) derived_metrics
+ORDER BY market_share_of_volume DESC, bid_ask_spread_pct ASC
+LIMIT 50;"""
+
+# VQ6 has the same optimizer issue when its grouped CASE expression is
+# repeated to calculate both net_position and position_discrepancy. Separate
+# the aggregate, arithmetic, and filter projections.
+DATAFUSION_VQ6_SQL = """\
+SELECT
+    'Trade-Holdings Consistency Validation' AS validation_name,
+    customer_id,
+    security_id,
+    total_buy_quantity,
+    total_sell_quantity,
+    net_position,
+    current_holdings,
+    position_discrepancy,
+    CASE WHEN ABS(position_discrepancy) <= 100 THEN 'PASS' ELSE 'FAIL' END AS status
+FROM (
+    SELECT
+        customer_id,
+        security_id,
+        total_buy_quantity,
+        total_sell_quantity,
+        net_position,
+        current_holdings,
+        net_position - current_holdings AS position_discrepancy
+    FROM (
+        SELECT
+            trade_rows.SK_CustomerID AS customer_id,
+            trade_rows.SK_SecurityID AS security_id,
+            SUM(trade_rows.buy_quantity) AS total_buy_quantity,
+            SUM(trade_rows.sell_quantity) AS total_sell_quantity,
+            SUM(trade_rows.signed_quantity) AS net_position,
+            COALESCE(fh.CurrentHolding, 0) AS current_holdings
+        FROM (
+            SELECT
+                ft.SK_CustomerID,
+                ft.SK_SecurityID,
+                CASE WHEN tt.TT_IS_SELL IS FALSE THEN ft.Quantity ELSE 0 END AS buy_quantity,
+                CASE WHEN tt.TT_IS_SELL IS TRUE THEN ft.Quantity ELSE 0 END AS sell_quantity,
+                CASE WHEN tt.TT_IS_SELL IS FALSE THEN ft.Quantity ELSE -ft.Quantity END AS signed_quantity
+            FROM FactTrade ft
+            JOIN TradeType tt ON ft.Type = tt.TT_ID
+            WHERE ft.Status = 'Completed'
+        ) trade_rows
+        LEFT JOIN FactHoldings fh ON trade_rows.SK_CustomerID = fh.SK_CustomerID
+                                  AND trade_rows.SK_SecurityID = fh.SK_SecurityID
+        GROUP BY trade_rows.SK_CustomerID, trade_rows.SK_SecurityID, fh.CurrentHolding
+    ) grouped_positions
+) position_check
+WHERE ABS(position_discrepancy) > 0
+ORDER BY ABS(position_discrepancy) DESC
+LIMIT 100;"""
+
+# DataFusion uses the same derived-table EQ7 rewrite, with boolean literals
+# rendered for its native BOOLEAN columns.
+DATAFUSION_EQ7_SQL = STARROCKS_EQ7_SQL.replace("IsCurrent = 1", "IsCurrent IS TRUE")
+
 # Doris currently uses the same MySQL-compatible EQ7 rewrite as StarRocks.
 # Keep a Doris-named alias so future dialect drift becomes an explicit edit.
 DORIS_EQ7_SQL = STARROCKS_EQ7_SQL
+CLICKHOUSE_EQ7_SQL = STARROCKS_EQ7_SQL
+
+for _query_id, _variant_sql, _reason in (
+    (
+        "AQ9",
+        DATAFUSION_AQ9_SQL,
+        "DataFusion physical planning fails when repeated conditional aggregates are commoned across AQ9 projections",
+    ),
+    (
+        "VQ6",
+        DATAFUSION_VQ6_SQL,
+        "DataFusion physical planning fails when VQ6 repeats a grouped CASE expression across projections",
+    ),
+):
+    REGISTRY.register(
+        CompatibilityDecision(
+            rule_id=f"query_source.datafusion.tpcdi.{_query_id.lower()}_projection_variant",
+            action=CompatAction.SELECT_VARIANT,
+            support_level=SupportLevel.REWRITTEN,
+            failure_mode=FailureMode.UNSUPPORTED_FEATURE,
+            payload=SelectVariantPayload(
+                variant_key="datafusion",
+                variant_sql=_variant_sql,
+            ),
+            reason=_reason,
+        ),
+        _P,
+        "datafusion",
+        benchmark=_B,
+        query_id=_query_id,
+    )
+
+REGISTRY.register(
+    CompatibilityDecision(
+        rule_id="query_source.datafusion.tpcdi.eq7_derived_table_variant",
+        action=CompatAction.SELECT_VARIANT,
+        support_level=SupportLevel.REWRITTEN,
+        failure_mode=FailureMode.UNSUPPORTED_FEATURE,
+        payload=SelectVariantPayload(
+            variant_key="datafusion",
+            variant_sql=DATAFUSION_EQ7_SQL,
+        ),
+        reason="DataFusion cannot cross-reference sibling subquery aliases; wrap EQ7 metrics in a derived table",
+    ),
+    _P,
+    "datafusion",
+    benchmark=_B,
+    query_id="EQ7",
+)
 
 REGISTRY.register(
     CompatibilityDecision(
@@ -160,6 +421,27 @@ REGISTRY.register(
     benchmark=_B,
     query_id="AQ6",
 )
+
+for _query_id, _variant_sql, _description in (
+    ("AQ7", CLICKHOUSE_AQ7_SQL, "replace SQLite Julian-day date arithmetic with ClickHouse dateDiff"),
+    ("AQ8", CLICKHOUSE_AQ8_SQL, "replace SQLite Julian-day date arithmetic with ClickHouse dateDiff"),
+    ("AQ10", CLICKHOUSE_AQ10_SQL, "project the ClickHouse wash-sales join key explicitly"),
+    ("EQ7", CLICKHOUSE_EQ7_SQL, "compute the quality score from the UNION-derived columns"),
+):
+    REGISTRY.register(
+        CompatibilityDecision(
+            rule_id=f"query_source.clickhouse.tpcdi.{_query_id.lower()}_variant",
+            action=CompatAction.SELECT_VARIANT,
+            support_level=SupportLevel.REWRITTEN,
+            failure_mode=FailureMode.UNSUPPORTED_FEATURE,
+            payload=SelectVariantPayload(variant_key="clickhouse", variant_sql=_variant_sql),
+            reason=f"ClickHouse TPC-DI compatibility rewrite: {_description}",
+        ),
+        _P,
+        "clickhouse",
+        benchmark=_B,
+        query_id=_query_id,
+    )
 
 REGISTRY.register(
     CompatibilityDecision(

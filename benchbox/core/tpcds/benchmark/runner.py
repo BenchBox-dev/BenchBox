@@ -29,6 +29,7 @@ from ..compliance import validate_tpcds_scale
 from ..generator import TPCDSDataGenerator
 from ..queries import TPCDSQueryManager
 from ..schema import TABLES
+from .clickhouse_overrides import rewrite_q35_for_clickhouse
 from .config import MaintenanceTestConfig, ThroughputTestConfig
 from .results import (
     MaintenanceTestResult,
@@ -288,16 +289,23 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         tgt = (dialect or src).lower()
         query = self._generate_tpcds_query(query_id, variant, actual_seed, actual_scale_factor, src)
         translated = self.translate_query_text(query, src, tgt)
-        return self._apply_target_dialect_overrides(query_id, translated, tgt)
+        return self._apply_target_dialect_overrides(query_id, translated, tgt, variant=variant)
 
-    def _apply_target_dialect_overrides(self, query_id: int, query: str, target_dialect: str) -> str:
+    def _apply_target_dialect_overrides(
+        self,
+        query_id: int,
+        query: str,
+        target_dialect: str,
+        *,
+        variant: str | None = None,
+    ) -> str:
         """Apply benchmark-local overrides after dialect translation."""
         target = target_dialect.lower()
 
         if query_id in {36, 70, 86} and target == "postgres":
             return self._rewrite_postgres_rollup_order_aliases(query_id, query)
 
-        if query_id == 90 and target == "postgres":
+        if query_id == 90 and target in {"postgres", "datafusion"}:
             return self._rewrite_postgres_q90_zero_denominator(query)
 
         if query_id == 90 and target in {"spark", "lakesail"}:
@@ -308,6 +316,8 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         if query_id in (47, 57):
             return self._rewrite_clickhouse_monthly_avg_query(query_id, query)
+        if query_id == 35 and variant is None:
+            return rewrite_q35_for_clickhouse(query)
         if query_id == 66:
             return self._rewrite_clickhouse_q66(query)
         return query
@@ -360,7 +370,8 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             flags=re.IGNORECASE,
         )
 
-    def _rewrite_clickhouse_monthly_avg_query(self, query_id: int, query: str) -> str:
+    @classmethod
+    def _rewrite_clickhouse_monthly_avg_query(cls, query_id: int, query: str) -> str:
         """Rewrite Q47/Q57 to avoid AVG(SUM(...)) OVER (...) under the new analyzer."""
         if "AVG(SUM(" not in query.upper():
             return query
@@ -370,9 +381,9 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             raise ValueError(f"Unsupported ClickHouse Q{query_id} shape: expected leading v1 CTE")
 
         open_index = len(prefix) - 1
-        close_index = self._find_matching_parenthesis(query, open_index)
+        close_index = cls._find_matching_parenthesis(query, open_index)
         v1_body = query[open_index + 1 : close_index]
-        suffix = self._alias_clickhouse_rank_neighbor_projections(query[close_index + 1 :])
+        suffix = cls._alias_clickhouse_rank_neighbor_projections(query[close_index + 1 :])
 
         pattern = re.compile(
             r"SELECT (?P<select_dims>.+), SUM\((?P<sum_expr>.+)\) AS sum_sales, "
@@ -417,7 +428,8 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         return re.sub(pattern, alias_projection, suffix, flags=re.IGNORECASE | re.DOTALL)
 
-    def _rewrite_clickhouse_q66(self, query: str) -> str:
+    @classmethod
+    def _rewrite_clickhouse_q66(cls, query: str) -> str:
         """Rewrite Q66 to aggregate once over a stable UNION ALL relation."""
         if "SUM(jan_sales)" not in query and "SUM(jan_net)" not in query:
             return query
@@ -432,7 +444,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if subquery_open == -1:
             raise ValueError("Unsupported ClickHouse Q66 shape: missing derived table body")
 
-        subquery_close = self._find_matching_parenthesis(query, subquery_open)
+        subquery_close = cls._find_matching_parenthesis(query, subquery_open)
         union_body = query[subquery_open + 1 : subquery_close]
         suffix = query[subquery_close + 1 :]
 
@@ -452,9 +464,9 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if suffix_match is None:
             raise ValueError("Unsupported ClickHouse Q66 shape: missing outer GROUP BY / ORDER BY / LIMIT")
 
-        branch_a, branch_b = self._split_top_level_union_all(union_body)
-        parsed_a = self._parse_clickhouse_q66_branch(branch_a)
-        parsed_b = self._parse_clickhouse_q66_branch(branch_b)
+        branch_a, branch_b = cls._split_top_level_union_all(union_body)
+        parsed_a = cls._parse_clickhouse_q66_branch(branch_a)
+        parsed_b = cls._parse_clickhouse_q66_branch(branch_b)
 
         dimensions = outer_match.group("dimensions")
         grouped_columns = suffix_match.group("group_by")
@@ -463,16 +475,16 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         monthly_sales = ", ".join(
             f"SUM(CASE WHEN d_moy = {month_num} THEN sales_amount ELSE 0 END) AS {month_name}_sales"
-            for month_name, month_num in self._MONTH_ALIASES
+            for month_name, month_num in cls._MONTH_ALIASES
         )
         monthly_sales_per_sq_foot = ", ".join(
             f"SUM(CASE WHEN d_moy = {month_num} THEN sales_amount / w_warehouse_sq_ft ELSE 0 END) "
             f"AS {month_name}_sales_per_sq_foot"
-            for month_name, month_num in self._MONTH_ALIASES
+            for month_name, month_num in cls._MONTH_ALIASES
         )
         monthly_net = ", ".join(
             f"SUM(CASE WHEN d_moy = {month_num} THEN net_amount ELSE 0 END) AS {month_name}_net"
-            for month_name, month_num in self._MONTH_ALIASES
+            for month_name, month_num in cls._MONTH_ALIASES
         )
 
         rewritten = (
@@ -490,11 +502,12 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             raise ValueError("ClickHouse Q66 rewrite still contains analyzer-hostile alias aggregation")
         return rewritten
 
-    def _parse_clickhouse_q66_branch(self, branch: str) -> dict[str, str]:
+    @classmethod
+    def _parse_clickhouse_q66_branch(cls, branch: str) -> dict[str, str]:
         """Parse one side of the Q66 UNION ALL into reusable row-level pieces."""
         sales_patterns = []
         net_patterns = []
-        for month_name, month_num in self._MONTH_ALIASES:
+        for month_name, month_num in cls._MONTH_ALIASES:
             if month_num == 1:
                 sales_patterns.append(
                     rf"SUM\(CASE WHEN d_moy = {month_num} THEN (?P<sales_expr>.+?) ELSE 0 END\) AS {month_name}_sales"
