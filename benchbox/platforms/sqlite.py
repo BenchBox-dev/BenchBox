@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import re
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -376,6 +377,11 @@ class SQLiteAdapter(PlatformAdapter):
 
         db_path = self.get_database_path(**connection_config)
         self.log_very_verbose(f"SQLite database path: {db_path}")
+
+        # SQLite's DB-API driver does not bind Decimal instances returned by
+        # PyArrow's decimal Parquet columns. SQLite's NUMERIC affinity stores
+        # the adapted real value using its native numeric representation.
+        sqlite3.register_adapter(Decimal, float)
 
         # Create connection
         conn = sqlite3.connect(db_path, timeout=self.timeout, check_same_thread=self.check_same_thread)

@@ -43,27 +43,27 @@ benchbox run --platform duckdb --benchmark tpch --output ./my_results/
 benchbox run --platform snowflake --benchmark tpch --output s3://bucket/results/
 ```
 
-## JSON Format (Schema v2.1)
+## JSON Format (Schema v2.2)
 
 The JSON export is the canonical schema-v2 result bundle containing complete
-benchmark details. BenchBox currently writes schema version `"2.1"` in the
+benchmark details. BenchBox currently writes schema version `"2.2"` in the
 top-level `version` field.
 
 Consumer policy is intentionally split by use case:
 
 | Consumer | Accepted versions | Behavior |
 |---|---|---|
-| Producer/exporter | `"2.1"` | New bundles are written with the current producer version. |
-| Runtime loader and exporter listing | `"2.0"`, `"2.1"` | Unknown versions fail closed and should be re-exported. |
-| Normalizer | `"2.0"`, `"2.1"` as v2; other shapes as legacy | Known v2 bundles use exact v2 field mapping; v1.x and unknown shapes use legacy best-effort extraction. |
+| Producer/exporter | `"2.2"` | New bundles are written with the current producer version. |
+| Runtime loader and exporter listing | `"2.0"`, `"2.1"`, `"2.2"` | Unknown versions fail closed and should be re-exported. |
+| Normalizer | `"2.0"`, `"2.1"`, `"2.2"` as v2; other shapes as legacy | Known v2 bundles use exact v2 field mapping; v1.x and unknown shapes use legacy best-effort extraction. |
 | Public submission validator | Numeric `2.x` | Forward-compatible for schema-v2 minor versions, but missing or malformed versions are rejected. |
-| Explorer pipeline input | `"2.0"`, `"2.1"` | Unsupported bundles are rejected before explorer read-model projection. |
+| Explorer pipeline input | `"2.0"`, `"2.1"`, `"2.2"` | Unsupported bundles are rejected before explorer read-model projection. |
 
 ### Schema Structure
 
 ```json
 {
-  "version": "2.1",
+  "version": "2.2",
   "run": {
     "id": "tpch-duckdb-20260521",
     "timestamp": "2026-05-21T14:30:21.123456Z",
@@ -126,7 +126,7 @@ Consumer policy is intentionally split by use case:
 #### Version
 | Field | Type | Description |
 |-------|------|-------------|
-| `version` | string | Result bundle schema version. Current producer version is `"2.1"`. |
+| `version` | string | Result bundle schema version. Current producer version is `"2.2"`. |
 
 #### Benchmark Block
 | Field | Type | Description |
@@ -237,9 +237,18 @@ Each query execution record contains:
   "iter": 1,
   "stream": 0,
   "run_type": "measurement",
-  "status": "SUCCESS"
+  "status": "SUCCESS",
+  "row_count_validation": {
+    "status": "PASSED",
+    "expected": 1,
+    "actual": 1
+  }
 }
 ```
+
+`row_count_validation` was introduced in schema 2.2 and is optional. When present, it records the bounded
+per-query evidence behind the run-level validation status; `SKIPPED` or
+`ERROR` evidence cannot support a clean validation pass.
 
 ## CSV Format
 
@@ -405,15 +414,15 @@ export_ascii(
 
 ## Schema Versioning
 
-### Current Version: 2.1
+### Current Version: 2.2
 
-Schema v2.1 is the current producer version for BenchBox result bundles. It
+Schema v2.2 is the current producer version for BenchBox result bundles. It
 uses top-level `version`, `run`, `benchmark`, `platform`, `summary`, `queries`,
 and optional companion blocks such as `phases`, `environment`,
 `normalized_cost`, `validation`, and `comparisons`.
 
 Runtime loading and explorer generation intentionally accept only known v2
-minor versions (`"2.0"` and `"2.1"`). The public submission validator accepts
+minor versions (`"2.0"`, `"2.1"`, and `"2.2"`). The public submission validator accepts
 numeric `2.x` versions to allow forward-compatible submissions, but it rejects
 missing values and malformed strings such as `"2.x"`. Legacy v1.x result shapes
 are not runtime-loadable; they are handled only by the normalizer's best-effort
@@ -423,7 +432,8 @@ compatibility path.
 
 | Version | Changes |
 |---------|---------|
-| 2.1 | Current producer schema for result bundles |
+| 2.2 | Added bounded per-query `row_count_validation` evidence |
+| 2.1 | Added typed result and companion metadata used by the previous producer |
 | 2.0 | First schema-v2 bundle contract consumed by loader, submissions, and explorer |
 | 1.x | Legacy shape supported only by normalization helpers |
 

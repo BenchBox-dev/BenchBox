@@ -278,7 +278,7 @@ class TestRunDataframeBenchmark:
             )
 
         load_fn.assert_not_called()
-        assert result.validation_status == "PASSED"
+        assert result.validation_status == "NOT_RUN"
         assert result.total_queries == 0
 
     def test_load_phase_uses_data_loader_preparation_pipeline(self, tmp_path):
@@ -315,7 +315,7 @@ class TestRunDataframeBenchmark:
                 benchmark_instance=benchmark_instance,
             )
 
-        assert result.validation_status == "PASSED"
+        assert result.validation_status == "NOT_RUN"
         loader.prepare_benchmark_data.assert_called_once_with(
             benchmark=benchmark_instance,
             scale_factor=1.0,
@@ -496,12 +496,8 @@ class TestMaintenancePhaseValidation:
         )
 
         assert result is not None
-        # Mocked adapter raises nothing and DataFramePhases(load=False, execute=False)
-        # means the runner's except branch never runs (no "FAILED" overwrite) and there
-        # are no query results to demote status to "PARTIAL" - "PASSED" is the only
-        # reachable outcome (see builder.py's default and dataframe_runner.py's except
-        # branch).
-        assert result.validation_status == "PASSED"
+        # A load/execute-free DataFrame result carries no correctness evidence.
+        assert result.validation_status == "NOT_RUN"
 
     def test_power_phase_does_not_raise(self):
         """Test that power execution type works normally (queries only)."""

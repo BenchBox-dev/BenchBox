@@ -175,7 +175,7 @@ def test_exporter_serializes_execution_phases(tmp_path):
         payload = json.load(f)
 
     # v2.0 schema has version, run, benchmark, platform, summary, queries
-    assert payload["version"] == "2.1"
+    assert payload["version"] == "2.2"
     assert payload["run"]["id"] == "test-run"
     assert payload["benchmark"]["id"] == "tpch"
     assert payload["platform"]["name"] == "duckdb"

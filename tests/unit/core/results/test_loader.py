@@ -368,11 +368,38 @@ class TestLoadResultFile:
             load_result_file(result_file)
 
         assert message in str(exc_info.value)
-        assert "schema versions 2.0 and 2.1" in str(exc_info.value)
+        assert "schema versions 2.0, 2.1, and 2.2" in str(exc_info.value)
 
 
 class TestReconstructBenchmarkResults:
     """Tests for reconstruct_benchmark_results() function."""
+
+    def test_rejects_row_count_validation_before_schema_2_2(self):
+        data = make_v2_result_dict(
+            version="2.1",
+            queries=[
+                {
+                    "id": "1",
+                    "ms": 100.0,
+                    "rows": 4,
+                    "row_count_validation": {"status": "PASSED", "expected": 4, "actual": 4},
+                }
+            ],
+        )
+
+        with pytest.raises(ValueError, match="row_count_validation requires schema version 2.2"):
+            reconstruct_benchmark_results(data)
+
+    def test_accepts_valid_row_count_validation_in_schema_2_2(self):
+        evidence = {"status": "PASSED", "expected": 4, "actual": 4}
+        data = make_v2_result_dict(
+            version="2.2",
+            queries=[{"id": "1", "ms": 100.0, "rows": 4, "row_count_validation": evidence}],
+        )
+
+        result = reconstruct_benchmark_results(data)
+
+        assert result.query_results[0]["row_count_validation"] == evidence
 
     def test_reconstruct_minimal_result(self):
         """Test reconstructing result with minimal required fields."""

@@ -13,7 +13,7 @@ Schema Differences:
         - execution.platform, execution.timestamp, execution.id
         - cost_summary or results.cost_summary
 
-    v2.x Schema (2.0, 2.1):
+    v2.x Schema (2.0, 2.1, 2.2):
         - summary.timing.total_ms, summary.timing.avg_ms
         - queries[] (top-level) with ms, id fields
         - platform.name, run.timestamp, run.id
@@ -55,7 +55,7 @@ class NormalizedResultDict:
     of whether the source JSON uses v1.x or v2.x schema.
 
     Attributes:
-        schema_version: Detected schema version ("1.x", "2.0", "2.1")
+        schema_version: Detected schema version ("1.x", "2.0", "2.1", "2.2")
         benchmark: Benchmark name (e.g., "TPC-H", "TPC-DS")
         benchmark_id: Benchmark identifier (e.g., "tpch", "tpcds")
         platform: Platform name (e.g., "DuckDB", "Snowflake")
@@ -122,7 +122,7 @@ def detect_schema_version(data: dict[str, Any]) -> str:
         data: Result JSON as a dictionary
 
     Returns:
-        Schema version string: "2.0", "2.1", or "1.x"
+        Schema version string: "2.0", "2.1", "2.2", or "1.x"
     """
     return detect_normalizer_schema_version(data)
 

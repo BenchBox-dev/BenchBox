@@ -1,10 +1,10 @@
-"""Schema v2.0 utilities for benchmark result export.
+"""Schema v2.x utilities for benchmark result export.
 
 This module provides construction and validation of the BenchBox result export format
-(schema version 2.0). All exporters and downstream tooling should rely on these helpers
+(schema version 2.x). All exporters and downstream tooling should rely on these helpers
 to ensure the canonical layout stays consistent.
 
-Schema v2.0 Design Principles:
+Schema v2 Design Principles:
 1. Single Source of Truth - No duplication
 2. Progressive Detail - Summary first, then details
 3. Omit Empty - No null placeholders, no unused sections
@@ -33,11 +33,17 @@ from benchbox.core.results.environment import (
 from benchbox.core.results.metrics import percentile_ms
 from benchbox.core.results.platform_options import sanitize_platform_options
 from benchbox.core.results.query_execution import (
+    QueryExecutionContractError,
+    normalize_row_count_validation,
     query_execution_from_legacy_dict,
     query_execution_to_compact_v2,
 )
 from benchbox.core.results.query_normalizer import normalize_query_id
-from benchbox.core.results.schema_policy import CURRENT_SCHEMA_VERSION, RUNTIME_SCHEMA_POLICY
+from benchbox.core.results.schema_policy import (
+    CURRENT_SCHEMA_VERSION,
+    ROW_COUNT_VALIDATION_SCHEMA_VERSION,
+    RUNTIME_SCHEMA_POLICY,
+)
 from benchbox.validation.bundle import REQUIRED_TOP_KEYS
 
 if TYPE_CHECKING:
@@ -91,11 +97,11 @@ def _round_duration_ms_for_export(value: float) -> float:
 
 
 class SchemaV2ValidationError(ValueError):
-    """Raised when schema v2.0 validation fails."""
+    """Raised when schema-v2 validation fails."""
 
 
 class SchemaV2Validator:
-    """Validates schema v2.0 structure.
+    """Validates schema-v2 structure.
 
     Required keys: version, run, benchmark, platform, summary, queries
     Optional keys: environment, tables, errors, cost, export
@@ -170,6 +176,18 @@ class SchemaV2Validator:
         queries = payload.get("queries")
         if not isinstance(queries, list):
             raise SchemaV2ValidationError("queries must be a list")
+        for index, query in enumerate(queries):
+            if not isinstance(query, Mapping) or "row_count_validation" not in query:
+                continue
+            if payload.get("version") != ROW_COUNT_VALIDATION_SCHEMA_VERSION:
+                raise SchemaV2ValidationError(
+                    f"queries[{index}].row_count_validation requires schema version "
+                    f"{ROW_COUNT_VALIDATION_SCHEMA_VERSION}"
+                )
+            try:
+                normalize_row_count_validation(query.get("row_count_validation"), rows_returned=query.get("rows"))
+            except QueryExecutionContractError as exc:
+                raise SchemaV2ValidationError(f"queries[{index}].row_count_validation is invalid: {exc}") from exc
 
         # Check for unexpected top-level keys
         unexpected = set(payload.keys()) - set(self.REQUIRED_KEYS) - set(self.OPTIONAL_KEYS)
@@ -178,7 +196,7 @@ class SchemaV2Validator:
 
 
 def build_result_payload(result: BenchmarkResults, *, sanitize_platform_secrets: bool = True) -> dict[str, Any]:
-    """Build v2.0 result payload from BenchmarkResults.
+    """Build the current schema-v2 result payload from BenchmarkResults.
 
     Args:
         result: A BenchmarkResults instance from the lifecycle runner.
