@@ -7,6 +7,7 @@ import logging
 import os
 import shutil
 import sqlite3
+import sys
 import uuid
 from collections.abc import Callable, Mapping
 from contextlib import asynccontextmanager
@@ -828,7 +829,14 @@ class DurableJobWorker:
 
     @staticmethod
     def _sync_path(path: Path) -> None:
-        """Flush a file or directory before a durable state transition."""
+        """Flush a file or directory before a durable state transition.
+
+        Directory metadata is flushed where supported (POSIX); on Windows
+        directory ``fsync`` is skipped because opening directories with
+        ``os.open`` is not supported.
+        """
+        if path.is_dir() and sys.platform == "win32":
+            return
         descriptor = os.open(path, os.O_RDONLY)
         try:
             os.fsync(descriptor)
