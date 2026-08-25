@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
+
+from tests.utilities.posix_shell import run_posix_shell, skip_without_posix_shell
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -114,11 +115,15 @@ def _evaluate_mirror_trust_gate(*, is_fork: str, base_ref: str, head_ref: str, p
     gate = run[run.index('TRUSTED_MIRROR="false"') : run.index('case "$AUTHOR_ASSOCIATION"')]
     env = os.environ.copy()
     env.update({"IS_FORK": is_fork, "BASE_REF": base_ref, "HEAD_REF": head_ref, "PR_AUTHOR": pr_author})
-    return subprocess.check_output(
-        ["bash", "-c", gate + '\nprintf "%s\\n" "$TRUSTED_MIRROR"'],
+    skip_without_posix_shell()
+    result = run_posix_shell(
+        gate + '\nprintf "%s\\n" "$TRUSTED_MIRROR"',
+        capture_output=True,
+        check=True,
         env=env,
         text=True,
-    ).strip()
+    )
+    return result.stdout.strip()
 
 
 @pytest.mark.parametrize(

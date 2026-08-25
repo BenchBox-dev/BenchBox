@@ -9,11 +9,12 @@ bundles even when privacy was clean. The mirror workflow must pass
 from __future__ import annotations
 
 import os
-import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
+
+from tests.utilities.posix_shell import run_posix_shell, skip_without_posix_shell
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -46,11 +47,15 @@ def _evaluate_trust_gate(*, is_fork: str, base_ref: str | None, head_ref: str, p
         env["BASE_REF"] = base_ref
     else:
         env.pop("BASE_REF", None)
-    output = subprocess.check_output(
-        ["bash", "-c", prefix + '\nprintf "%s|%s\\n" "$REQUIRE_MANIFEST" "$ALLOW_PARTIAL_VALIDATION"'],
+    skip_without_posix_shell()
+    result = run_posix_shell(
+        prefix + '\nprintf "%s|%s\\n" "$REQUIRE_MANIFEST" "$ALLOW_PARTIAL_VALIDATION"',
+        capture_output=True,
+        check=True,
         env=env,
         text=True,
-    ).strip()
+    )
+    output = result.stdout.strip()
     require_manifest, allow_partial = output.split("|", maxsplit=1)
     return require_manifest, allow_partial
 
