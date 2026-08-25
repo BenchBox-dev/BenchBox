@@ -1,4 +1,5 @@
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -195,3 +196,24 @@ def test_spark_dialect_translates_space_containing_aliases() -> None:
 
     assert 'AS "order count"' not in query
     assert "AS `order count`" in query
+
+
+@pytest.mark.parametrize("query_id", [47, 57])
+def test_clickhouse_monthly_queries_materialize_nested_aggregates(query_id: int) -> None:
+    benchmark = TPCDSOBTBenchmark(scale_factor=1.0)
+
+    query = benchmark.get_query(query_id, dialect="clickhouse-local")
+
+    assert "AVG(SUM(" not in query.upper()
+    assert "SELECT v2.* FROM v2 AS v2" in query
+
+
+def test_clickhouse_q66_materializes_monthly_aliases() -> None:
+    benchmark = TPCDSOBTBenchmark(scale_factor=1.0)
+
+    query = benchmark.get_query(66, dialect="clickhouse-local")
+
+    assert "SUM(jan_sales)" not in query
+    assert "SUM(jan_net)" not in query
+    assert "WITH channel_sales AS (" in query
+    assert re.search(r"\bw_warehouse_sq_ft\b", query) is None

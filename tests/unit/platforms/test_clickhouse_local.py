@@ -7,6 +7,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import sys
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
 from unittest.mock import patch
 
@@ -102,6 +103,13 @@ class TestClickHouseLocalClient:
         client = ClickHouseLocalClient()
         result = client.execute("SELECT * FROM (SELECT 1 WHERE 0)")
         assert result == []
+
+    def test_query_result_is_a_materialized_sequence(self):
+        """Result validation must not mistake a ClickHouse result for a row factory."""
+        result = ClickHouseLocalClient().execute("SELECT 1")
+
+        assert isinstance(result, Sequence)
+        assert result[0] == (1,)
 
     def test_multi_column_query_result(self):
         """Test handling of multi-column query results."""

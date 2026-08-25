@@ -285,7 +285,13 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 # For higher numbers, try analytical queries
                 query_id = f"AQ{numeric_id - 12}"
 
-        return self.query_manager.get_query(str(query_id), params, dialect)
+        query_id = str(query_id)
+        query = self.query_manager.get_query(query_id, params, dialect=None)
+        if not dialect or dialect == "standard":
+            return query
+
+        translated_query = self.translate_query_text(query, dialect)
+        return self._apply_query_source_variant(query_id, translated_query, dialect, params=params)
 
     def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
         """Get all available TPC-DI queries (30 total).
@@ -312,51 +318,11 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             for query_id, query_sql in queries.items():
                 translated_queries[query_id] = self.translate_query_text(query_sql, dialect)
 
-            # Apply post-translation platform variants via the compat registry.
-            import benchbox.sql_compat.rules.query_source.tpcdi_variants  # noqa: F401
-            from benchbox.sql_compat.actions import CompatAction
-            from benchbox.sql_compat.context import CompatibilityContext, Phase
-            from benchbox.sql_compat.registry import REGISTRY
-            from benchbox.sql_compat.rules.query_source.tpcdi_variants import (
-                CLICKHOUSE_AQ6_SQL,
-                DORIS_EQ7_SQL,
-                STARROCKS_EQ7_SQL,
-            )
-
             d = dialect.lower()
-            _variants: dict[str, dict[str, str]] = {
-                "clickhouse": {"AQ6": CLICKHOUSE_AQ6_SQL},
-                "starrocks": {"EQ7": STARROCKS_EQ7_SQL},
-                "doris": {"EQ7": DORIS_EQ7_SQL},
+            translated_queries = {
+                query_id: self._apply_query_source_variant(query_id, query_sql, dialect)
+                for query_id, query_sql in translated_queries.items()
             }
-            for platform, platform_variants in _variants.items():
-                if platform not in d:
-                    continue
-                for query_id, legacy_sql in platform_variants.items():
-                    if query_id not in translated_queries:
-                        continue
-                    ctx = CompatibilityContext(
-                        platform=platform,
-                        platform_version=None,
-                        benchmark="tpcdi",
-                        query_id=query_id,
-                        phase=Phase.QUERY_SOURCE,
-                        mode="sql",
-                        dialect=dialect,
-                    )
-                    registry_decision = REGISTRY.resolve(ctx)
-                    if registry_decision is not None:
-                        if registry_decision.action is CompatAction.SELECT_VARIANT:
-                            variant_sql = registry_decision.payload.variant_sql  # type: ignore[union-attr]
-                        else:
-                            continue  # registry says NATIVE - keep translated SQL
-                    else:
-                        variant_sql = legacy_sql  # no rule: use legacy SQL
-                    if query_id == "AQ6":  # AQ6 is a template; EQ7 is complete SQL with no placeholders
-                        params = self.query_manager._generate_default_params(query_id)
-                        translated_queries[query_id] = variant_sql.format(**params)
-                    else:
-                        translated_queries[query_id] = variant_sql
 
             if d in {"postgres", "postgresql"}:
                 translated_queries = {
@@ -367,6 +333,91 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             return translated_queries
 
         return queries
+
+    def _apply_query_source_variant(
+        self,
+        query_id: str,
+        query_sql: str,
+        dialect: str,
+        *,
+        params: Optional[dict[str, Any]] = None,
+    ) -> str:
+        """Apply a registry-selected query-source variant after dialect translation."""
+        import benchbox.sql_compat.rules.query_source.tpcdi_variants  # noqa: F401
+        from benchbox.sql_compat.actions import CompatAction
+        from benchbox.sql_compat.context import CompatibilityContext, Phase
+        from benchbox.sql_compat.registry import REGISTRY
+        from benchbox.sql_compat.rules.query_source.tpcdi_variants import (
+            CLICKHOUSE_AQ6_SQL,
+            CLICKHOUSE_AQ7_SQL,
+            CLICKHOUSE_AQ8_SQL,
+            CLICKHOUSE_AQ10_SQL,
+            CLICKHOUSE_EQ7_SQL,
+            DORIS_EQ7_SQL,
+            STARROCKS_EQ7_SQL,
+        )
+
+        variants: dict[str, dict[str, str]] = {
+            "clickhouse": {
+                "AQ6": CLICKHOUSE_AQ6_SQL,
+                "AQ7": CLICKHOUSE_AQ7_SQL,
+                "AQ8": CLICKHOUSE_AQ8_SQL,
+                "AQ10": CLICKHOUSE_AQ10_SQL,
+                "EQ7": CLICKHOUSE_EQ7_SQL,
+            },
+            "starrocks": {"EQ7": STARROCKS_EQ7_SQL},
+            "doris": {"EQ7": DORIS_EQ7_SQL},
+        }
+        dialect_lower = dialect.lower()
+        for platform, platform_variants in variants.items():
+            if platform not in dialect_lower or query_id not in platform_variants:
+                continue
+
+            ctx = CompatibilityContext(
+                platform=platform,
+                platform_version=None,
+                benchmark="tpcdi",
+                query_id=query_id,
+                phase=Phase.QUERY_SOURCE,
+                mode="sql",
+                dialect=dialect,
+            )
+            registry_decision = REGISTRY.resolve(ctx)
+            if registry_decision is not None:
+                if registry_decision.action is not CompatAction.SELECT_VARIANT:
+                    return query_sql
+                variant_sql = registry_decision.payload.variant_sql  # type: ignore[union-attr]
+            else:
+                variant_sql = platform_variants[query_id]
+
+            if platform == "clickhouse" and params is not None and query_id in {"AQ7", "AQ8", "AQ10"}:
+                from benchbox.sql_compat.rules.query_source.tpcdi_variants import build_clickhouse_metric_query
+
+                return build_clickhouse_metric_query(query_id, params)
+
+            if query_id == "AQ6":
+                query_params = self.query_manager._generate_default_params(query_id)
+                if params:
+                    query_params.update(params)
+                return variant_sql.format(**query_params)
+
+            if platform == "clickhouse" and query_id == "EQ7" and params is not None:
+                query_params = self.query_manager.etl_queries._generate_default_params(query_id)
+                query_params.update(params)
+                default_params = self.query_manager.etl_queries._generate_default_params(query_id)
+                for parameter in (
+                    "excellent_quality_threshold",
+                    "good_quality_threshold",
+                    "acceptable_quality_threshold",
+                ):
+                    variant_sql = variant_sql.replace(
+                        f") >= {default_params[parameter]} THEN",
+                        f") >= {query_params[parameter]} THEN",
+                    )
+
+            return variant_sql
+
+        return query_sql
 
     def _apply_postgres_query_overrides(self, query_id: str, query_sql: str) -> str:
         """Apply PostgreSQL-specific TPC-DI query rewrites after SQLGlot rendering."""
