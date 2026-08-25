@@ -50,7 +50,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
-          # Same three-signal trust check as the "Validate bundles" step below
+          # Same four-signal trust check as the "Validate bundles" step below
           # (see its comment for the full reasoning): a maintainer adding a
           # vendor bundle on develop is published through a same-repo
           # auto/results-mirror-* PR opened by sync-results-data-to-published.yml
@@ -62,6 +62,7 @@ jobs:
           # would be spoofable, and a same-repository integration must not be
           # able to impersonate the sync bot.
           IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
           HEAD_REF: ${{ github.head_ref }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
@@ -81,7 +82,7 @@ jobs:
             'results-data/bundles/vendor/**' || true)
           if [ -n "$VENDOR_CHANGES" ]; then
             TRUSTED_MIRROR="false"
-            if [ "$IS_FORK" = "false" ] && [ "$PR_AUTHOR" = "github-actions[bot]" ]; then
+            if [ "$BASE_REF" = "published-results" ] && [ "$IS_FORK" = "false" ] && [ "$PR_AUTHOR" = "github-actions[bot]" ]; then
               case "$HEAD_REF" in
                 auto/results-mirror-*) TRUSTED_MIRROR="true" ;;
               esac
@@ -244,7 +245,7 @@ jobs:
           # the community-submission trust signal). Require the sidecar unless
           # this is a maintainer mirror PR.
           #
-          # The waiver gates on three signals. `github.head_ref` is attacker-controlled
+          # The waiver gates on four signals. `github.head_ref` is attacker-controlled
           # on fork PRs, so a branch
           # name alone (`auto/results-mirror-*`) is spoofable — anyone could open a
           # fork PR from a branch so named and drop `--require-manifest`, laundering
@@ -253,8 +254,11 @@ jobs:
           # `head.repo.fork == false` check is unforgeable by a fork, and the PR
           # author must be GitHub Actions itself. Together they confine the waiver
           # to the trusted sync bot, whose mirror branches live on this repo. If all aren't
-          # satisfied we fail closed and require the sidecar.
+          # satisfied we fail closed and require the sidecar. The base-ref check
+          # keeps this predicate exact even if the workflow is ever reused on a
+          # different pull-request target.
           IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
           HEAD_REF: ${{ github.head_ref }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
@@ -272,7 +276,7 @@ jobs:
           set -euo pipefail
           REQUIRE_MANIFEST="--require-manifest"
           ALLOW_PARTIAL_VALIDATION=""
-          if [ "$IS_FORK" = "false" ] && [ "$PR_AUTHOR" = "github-actions[bot]" ]; then
+          if [ "$BASE_REF" = "published-results" ] && [ "$IS_FORK" = "false" ] && [ "$PR_AUTHOR" = "github-actions[bot]" ]; then
             case "$HEAD_REF" in
               auto/results-mirror-*)
                 REQUIRE_MANIFEST=""
