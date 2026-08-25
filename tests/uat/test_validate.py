@@ -31,6 +31,7 @@ def _minimal_bundle(
         "benchmark": benchmark_payload,
         "platform": {"name": platform},
         "summary": {"validation": "passed", "queries": {"total": 1, "passed": 1, "failed": 0}},
+        "phases": {"validation": {"status": "PASSED"}},
         "queries": [{"id": "Q1", "ms": 1.0}],
     }
 

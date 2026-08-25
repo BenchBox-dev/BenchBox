@@ -48,6 +48,7 @@ def _valid_submission_bundle() -> dict:
         "benchmark": {"id": "tpch", "name": "TPC-H", "scale_factor": 0.01},
         "platform": {"name": "duckdb", "version": "1.3.0"},
         "summary": {"validation": "passed", "queries": {"total": 1, "passed": 1, "failed": 0}},
+        "phases": {"validation": {"status": "PASSED"}},
         "queries": [{"id": "Q1", "ms": 123, "status": "SUCCESS"}],
     }
 

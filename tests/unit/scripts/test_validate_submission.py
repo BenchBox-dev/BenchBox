@@ -109,6 +109,7 @@ def _minimal_bundle() -> dict:
             "validation": "passed",
             "queries": {"total": 2, "passed": 2, "failed": 0},
         },
+        "phases": {"validation": {"status": "PASSED"}},
         "queries": [
             {"id": "Q1", "ms": 100, "status": "SUCCESS"},
             {"id": "Q2", "ms": 200, "status": "SUCCESS"},
@@ -350,6 +351,32 @@ class TestValidateBundle:
         assert not vr.ok
         assert any(
             "summary.validation='passed' contradicts phases.validation.status='not_run'" in error for error in vr.errors
+        )
+
+    def test_validation_claim_rejects_missing_validation_phase(self):
+        data = _minimal_bundle()
+        del data["phases"]
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any(
+            "summary.validation='passed' contradicts phases.validation.status='unknown'" in error for error in vr.errors
+        )
+
+    def test_partial_claim_rejects_non_dict_validation_phase_on_trusted_mirror(self):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        data["phases"]["validation"] = "NOT_RUN"
+        vr = ValidationResult("mirror")
+
+        _validate_bundle(data, vr, allow_partial_validation=True)
+
+        assert not vr.ok
+        assert any(
+            "summary.validation='partial' contradicts phases.validation.status='unknown'" in error
+            for error in vr.errors
         )
 
     def test_partial_claim_rejects_unrun_validation_phase_on_trusted_mirror(self):
