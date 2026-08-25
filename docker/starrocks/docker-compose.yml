@@ -20,7 +20,7 @@ services:
     # StarRocks' all-in-one FE+BE image needs the measured 4 GB Docker
     # envelope for the SF0.01 managed-UAT smoke. Keep the request explicit so
     # Docker and the UAT Mocker adapter cannot silently fall back to 1 GB.
-    mem_limit: ${STARROCKS_MEMORY_LIMIT}
+    mem_limit: ${STARROCKS_MEMORY_LIMIT:-4g}
     ports:
       - "${STARROCKS_HOST_PORT:-19030}:9030"
       - "${STARROCKS_HTTP_PORT:-18040}:8040"
