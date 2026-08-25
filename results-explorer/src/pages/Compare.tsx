@@ -7,6 +7,8 @@ import {
   getDetailResult,
   getExistingResultIds,
   getPrimaryMetricForBenchmark,
+  // listResults retired: loading unbounded bench.results bypassed (rx-19)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   listResults,
   resolveShortId,
   toShortIds,
@@ -721,8 +723,9 @@ function severeCohortMismatchReason(results: DetailResult[]) {
 }
 
 function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice: string | null }) {
-  const [candidates, setCandidates] = useState<ResultRow[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // candidates retained for parity but not fetched (rx-19); table is hidden
+  const [candidates] = useState<ResultRow[] | null>(null);
+  const [_loadError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(pinnedId ? [pinnedId] : []),
   );
@@ -733,29 +736,9 @@ function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice:
   useDocumentTitle("Compare · BenchBox Results");
 
   useEffect(() => {
-    let cancelled = false;
-    listResults()
-      .then((rows) => {
-        if (cancelled) return;
-        setCandidates(rows);
-        // If a run is pinned and filters are still empty, lock the cohort to
-        // its benchmark/scale/phase so the candidate list is immediately
-        // useful.
-        if (pinnedId) {
-          const pinned = rows.find((row) => row.result_id === pinnedId);
-          if (pinned) {
-            setBenchmarkFilter(canonicalBenchmarkSlug(pinned.benchmark));
-            setScaleFilter(String(pinned.scale_factor));
-            setPhaseFilter(canonicalPhase(pinned.test_type));
-          }
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setLoadError(errMsg(err));
-      });
-    return () => {
-      cancelled = true;
-    };
+    void listResults;
+    // rx-19: Candidate table retired; picking lives in Query. Do not load unbounded bench.results.
+    return;
   }, [pinnedId]);
 
   // First selected run sets the comparable cohort: benchmark + scale + phase
@@ -922,7 +905,7 @@ function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice:
         </p>
       </section>
 
-      {loadError && <ErrorMessage title="Could not load candidate runs" message={loadError} />}
+      {_loadError && <ErrorMessage title="Could not load candidate runs" message={_loadError} />}
 
       <section class="mb-4 panel p-4" aria-label="Filters">
         <div class="flex flex-wrap gap-3">
@@ -991,7 +974,7 @@ function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice:
             ? `${selectedStatus}. Select 1 more compatible run to launch.${hiddenIncompatibleSuffix(incompatibleHiddenCount)}`
             : `${selectedStatus}. ${
                 cohortLock
-                  ? `Ranking: ${humanizeBenchmark(cohortLock.benchmark)} · SF ${cohortLock.scale_factor}${
+                  ? `Ranking: ${humanizeBenchmark(cohortLock!.benchmark)} · SF ${cohortLock!.scale_factor}${
                       cohortLock.test_type ? ` · ${cohortLock.test_type}` : ""
                     }`
                   : ""
@@ -1047,8 +1030,9 @@ function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice:
         <p class="mt-1 text-[var(--bb-data-fg-muted)]">
           Candidate picking now lives in the paged Query Workbench. Use Query to find the second run and return via the generated compare link. The builder below is limited to the pinned result from ResultDetail or the empty state.
         </p>
-        <div class="mt-3">
+        <div class="mt-3 flex flex-wrap items-center gap-3">
           <a href="/results/query" class="btn btn-primary" data-testid="compare-builder-query-link">Open Query</a>
+
         </div>
       </section>
       {false && (

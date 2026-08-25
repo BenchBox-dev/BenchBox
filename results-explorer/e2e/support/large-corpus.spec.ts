@@ -88,7 +88,7 @@ test.describe("large corpus fixture", () => {
   // before the browser assertions begin.
   test.describe.configure({ timeout: 240_000 });
 
-  test("large corpus reproduces an unbounded Compare document at desktop and mobile widths", async ({ browser }) => {
+  test("large corpus Compare builder is bounded after retirement (no unbounded candidate table)", async ({ browser }) => {
     await withLargeFixture(async (baseUrl) => {
       for (const viewport of [
         { width: 1440, height: 900 },
@@ -99,11 +99,11 @@ test.describe("large corpus fixture", () => {
         await page.goto(`${baseUrl}/results/compare`);
         await waitForShell(page);
 
-        const rows = page.locator('[data-testid^="compare-builder-row-"]');
-        await expect.poll(() => rows.count(), { timeout: 30_000 }).toBeGreaterThanOrEqual(250);
+        await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
+        await expect(page.locator("table")).toHaveCount(0);
         const documentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
-        expect(documentHeight).toBeGreaterThan(17_441);
-        expect(documentHeight).toBeGreaterThan(viewport.height * 8);
+        expect(documentHeight).toBeLessThan(6000);
+        expect(documentHeight).toBeLessThan(viewport.height * 8);
 
         await context.close();
       }

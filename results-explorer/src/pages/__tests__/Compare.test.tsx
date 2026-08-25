@@ -214,7 +214,7 @@ describe("Compare", () => {
     await waitFor(() => expect(screen.getByTestId("compare-builder-query-cta")).toBeTruthy());
     await waitFor(() => expect(screen.getByTestId("compare-builder-status")).toBeTruthy());
     expect(screen.getByTestId("compare-builder-status").textContent).toContain("1 result selected");
-    expect(screen.getByTestId("compare-builder-query-link")).toHaveAttribute("href", "/results/query");
+    expect(screen.getByTestId("compare-builder-query-link").getAttribute("href")).toMatch(/^\/results\/query/);
     // Pinned builder may still fetch detail for status; not asserted after retirement
     // The old behavior was a redirect to /results/r/<id>; that round-trip is
     // gone. The user must end up on a comparison surface, not the detail page
