@@ -379,7 +379,11 @@ class ClickHouseQueryTransformer:
         """
         return self.transformations_applied
 
-    def add_query_settings(self, query: str) -> str:
+    def add_query_settings(
+        self,
+        query: str,
+        additional_settings: tuple[tuple[str, str | int], ...] = (),
+    ) -> str:
         """Append ClickHouse SETTINGS clause for TPC-DS/TPC-H SQL compatibility.
 
         Fixes for known ClickHouse incompatibilities with standard TPC SQL:
@@ -387,8 +391,16 @@ class ClickHouseQueryTransformer:
             Allows unaliased subqueries in FROM/JOIN (Q14a INTERSECT subquery,
             Q23a/b unaliased inner subquery, Q87 EXCEPT set op subquery).
 
+        ``additional_settings`` is reserved for a narrow query-adapter policy
+        when a ClickHouse Local query needs an engine-supported execution
+        setting. It is appended to this statement-level clause rather than
+        changing the session, so baseline and tuned session contracts remain
+        distinct.
+
         Args:
             query: Transformed SQL query string
+            additional_settings: Optional statement-level settings for a
+                narrow query-adapter policy.
 
         Returns:
             Query with SETTINGS clause appended (only for SELECT statements)
@@ -400,7 +412,14 @@ class ClickHouseQueryTransformer:
         # Strip trailing `;` so the appended SETTINGS clause stays inside the
         # statement; otherwise chDB parses `...; SETTINGS ...` as a syntax error.
         cleaned = stripped.rstrip(";").rstrip()
-        return f"{cleaned} SETTINGS joined_subquery_requires_alias = 0"
+        settings = ["joined_subquery_requires_alias = 0"]
+        for name, value in additional_settings:
+            if isinstance(value, str):
+                formatted = f"'{value.replace(chr(39), chr(39) * 2)}'"
+            else:
+                formatted = str(value)
+            settings.append(f"{name} = {formatted}")
+        return f"{cleaned} SETTINGS {', '.join(settings)}"
 
 
 def transform_query_for_clickhouse(query: str, verbose: bool = False) -> str:

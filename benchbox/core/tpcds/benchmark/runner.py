@@ -29,6 +29,7 @@ from ..compliance import validate_tpcds_scale
 from ..generator import TPCDSDataGenerator
 from ..queries import TPCDSQueryManager
 from ..schema import TABLES
+from .clickhouse_overrides import rewrite_q35_for_clickhouse
 from .config import MaintenanceTestConfig, ThroughputTestConfig
 from .results import (
     MaintenanceTestResult,
@@ -288,9 +289,16 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         tgt = (dialect or src).lower()
         query = self._generate_tpcds_query(query_id, variant, actual_seed, actual_scale_factor, src)
         translated = self.translate_query_text(query, src, tgt)
-        return self._apply_target_dialect_overrides(query_id, translated, tgt)
+        return self._apply_target_dialect_overrides(query_id, translated, tgt, variant=variant)
 
-    def _apply_target_dialect_overrides(self, query_id: int, query: str, target_dialect: str) -> str:
+    def _apply_target_dialect_overrides(
+        self,
+        query_id: int,
+        query: str,
+        target_dialect: str,
+        *,
+        variant: str | None = None,
+    ) -> str:
         """Apply benchmark-local overrides after dialect translation."""
         target = target_dialect.lower()
 
@@ -308,6 +316,8 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         if query_id in (47, 57):
             return self._rewrite_clickhouse_monthly_avg_query(query_id, query)
+        if query_id == 35 and variant is None:
+            return rewrite_q35_for_clickhouse(query)
         if query_id == 66:
             return self._rewrite_clickhouse_q66(query)
         return query

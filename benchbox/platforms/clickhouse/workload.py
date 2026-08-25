@@ -779,8 +779,22 @@ class ClickHouseWorkloadMixin:
             # Apply ClickHouse-specific query transformations for SQL compatibility
             transformer = ClickHouseQueryTransformer(verbose=self.very_verbose)
             transformed_query = transformer.transform(query)
+            # Keep the OLAP tuning pack out of baseline sessions. These two
+            # ClickHouse Local Havoc variants instead need a statement-level
+            # grace-hash join policy: the default hash build exceeds the 8 GiB
+            # local ceiling, while chDB supports grace_hash for both queries.
+            additional_settings: tuple[tuple[str, str | int], ...] = ()
+            if (
+                self.deployment_mode == "local"
+                and (benchmark_type or "").lower() == "tpchavoc"
+                and str(query_id).lower() in {"5_v7", "5_v8"}
+            ):
+                additional_settings = (
+                    ("join_algorithm", "grace_hash"),
+                    ("grace_hash_join_initial_buckets", 8),
+                )
             # Session settings stay generic; analyzer-sensitive query rewrites live in the benchmark.
-            transformed_query = transformer.add_query_settings(transformed_query)
+            transformed_query = transformer.add_query_settings(transformed_query, additional_settings)
 
             # Log transformations if any were applied
             if transformer.get_transformations_applied() and self.verbose_enabled:
