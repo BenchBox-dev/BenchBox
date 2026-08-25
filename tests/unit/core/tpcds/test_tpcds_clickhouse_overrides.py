@@ -11,7 +11,7 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-SEEDED_QUERY_IDS = (47, 57, 66)
+SEEDED_QUERY_IDS = (35, 47, 57, 66)
 SEEDS = (1, 2, 3)
 
 
@@ -41,6 +41,39 @@ def _extract_q66_filters(query: str) -> tuple[list[str], list[str]]:
     carriers = re.findall(r"sm_carrier IN \([^)]+\)", query)
     time_windows = re.findall(r"t_time BETWEEN \d+ AND \d+ \+ 28800", query)
     return carriers, time_windows
+
+
+def test_clickhouse_q35_rewrites_correlated_exists_to_semijoins_across_seeds():
+    """Q35's existence predicates must use ClickHouse's bounded semi-join plan."""
+    bench = _bench()
+
+    for seed in SEEDS:
+        base = bench.get_query(35, seed=seed)
+        clickhouse = bench.get_query(35, seed=seed, dialect="clickhouse")
+
+        assert base.count("EXISTS(SELECT * FROM") == 3
+        assert "EXISTS(SELECT * FROM" not in clickhouse
+        assert clickhouse.count("c.c_customer_sk IN (SELECT") == 3
+        assert "d_year = " in clickhouse
+        assert "d_qoy < 4" in clickhouse
+
+
+def test_clickhouse_q35_rewrite_fails_closed_on_unexpected_shape():
+    """A changed generator shape must not silently restore Q35's high-memory plan."""
+    with pytest.raises(ValueError, match="expected 3 semi-join predicates"):
+        from benchbox.core.tpcds.benchmark.clickhouse_overrides import rewrite_q35_for_clickhouse
+
+        rewrite_q35_for_clickhouse("SELECT * FROM store_sales")
+
+
+def test_non_clickhouse_q35_keeps_original_exists_shape():
+    """The memory-safe rendering is ClickHouse-specific."""
+    bench = _bench()
+
+    query = bench.get_query(35, seed=SEEDS[0])
+
+    assert "EXISTS(SELECT * FROM" in query
+    assert "c.c_customer_sk IN (SELECT" not in query
 
 
 def test_clickhouse_q47_q57_seeded_queries_preserve_dsqgen_tail_across_seeds():

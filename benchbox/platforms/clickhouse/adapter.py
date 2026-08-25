@@ -31,9 +31,6 @@ class ClickHouseAdapter(
         TPC-DS queries with known incompatibilities:
         - Query 14: INTERSECT DISTINCT requires manual alias addition
         - Query 30: Query plan cloning not implemented for aggregation steps (Code: 48)
-        - Query 35 (ClickHouse Local at TPC-DS SF1): the generated query
-          translates successfully but can exceed chDB's configured 8 GiB local
-          memory ceiling while joining customer and store_sales.
         - Query 81: Query plan cloning not implemented for aggregation steps (Code: 48)
 
         These queries may fail even with transformations applied and require
@@ -45,9 +42,9 @@ class ClickHouseAdapter(
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
-    # Known incompatible queries that may fail despite transformations
+    # Known incompatible queries that may fail despite transformations.
     KNOWN_INCOMPATIBLE_QUERIES = {
-        "tpcds": [14, 30, 35, 81],
+        "tpcds": [14, 30, 81],
     }
 
     def __init__(self, **config):

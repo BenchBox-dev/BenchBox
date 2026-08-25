@@ -29,6 +29,7 @@ from ..compliance import validate_tpcds_scale
 from ..generator import TPCDSDataGenerator
 from ..queries import TPCDSQueryManager
 from ..schema import TABLES
+from .clickhouse_overrides import rewrite_q35_for_clickhouse
 from .config import MaintenanceTestConfig, ThroughputTestConfig
 from .results import (
     MaintenanceTestResult,
@@ -308,6 +309,8 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         if query_id in (47, 57):
             return self._rewrite_clickhouse_monthly_avg_query(query_id, query)
+        if query_id == 35:
+            return rewrite_q35_for_clickhouse(query)
         if query_id == 66:
             return self._rewrite_clickhouse_q66(query)
         return query
