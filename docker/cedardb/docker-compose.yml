@@ -6,24 +6,28 @@
 #   docker compose -f docker-compose.yml up -d
 #   benchbox run --platform cedardb --benchmark tpch --scale 0.01 \
 #     --platform-option host=localhost --platform-option port=5435 \
-#     --platform-option username=benchbox --platform-option password=benchbox
+#     --platform-option username=benchbox --platform-option password=Benchbox1!
 #
 # Ports:
 #   5435 - PostgreSQL wire protocol (host port; avoids conflict with postgresql/pg-duckdb on 5432)
 #
 # Default credentials:
 #   Username: benchbox (CEDAR_USER)
-#   Password: benchbox (CEDAR_PASSWORD)
+#   Password: Benchbox1! (CEDAR_PASSWORD)
 #   Database: benchbox_test (created at startup)
 
 services:
   cedardb:
     image: cedardb/cedardb:latest
+    # CedarDB's startup io_uring buffers cannot be allocated in Mocker's
+    # default 1 GiB cgroup. Keep the measured 2 GiB minimum explicit so the
+    # UAT memory gate can admit or reject the platform before startup.
+    mem_limit: 2g
     ports:
       - "5435:5432"
     environment:
       CEDAR_USER: benchbox
-      CEDAR_PASSWORD: benchbox
+      CEDAR_PASSWORD: Benchbox1!
       CEDAR_DB: benchbox_test
     volumes:
       - cedardb-data:/var/lib/cedardb/data
