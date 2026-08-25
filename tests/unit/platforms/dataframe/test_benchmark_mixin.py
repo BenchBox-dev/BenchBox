@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from benchbox.core.dataframe.query import DataFrameQuery, QueryRegistry
+from benchbox.core.results.schema import build_result_payload
 from benchbox.core.schemas import BenchmarkConfig
 from benchbox.platforms.dataframe.benchmark_mixin import (
     BenchmarkExecutionMixin,
@@ -391,6 +392,8 @@ def test_tpch_reference_run_records_query_and_run_validation_evidence() -> None:
         "skipped": 0,
         "errors": 0,
     }
+    assert result.execution_metadata["phase_status"]["validation"] == {"status": "PASSED"}
+    assert build_result_payload(result)["phases"]["validation"] == {"status": "PASSED"}
     assert result.query_results[0]["row_count_validation"] == {
         "expected": 4,
         "actual": 4,
