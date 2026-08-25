@@ -268,6 +268,33 @@ class TestNYCTaxiParameters:
 
         assert result.collect().height == 1
 
+    def test_production_date_bounds_filter_polars_raw_csv_timestamp_column(self, tmp_path):
+        pl = pytest.importorskip("polars")
+
+        from benchbox.core.nyctaxi.dataframe_queries.queries import _expression_window
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        class Benchmark:
+            def get_schema(self):
+                return {"trips": {"columns": {"pickup_datetime": {"type": "TIMESTAMP"}}}}
+
+        csv_path = tmp_path / "trips.csv"
+        csv_path.write_text("pickup_datetime\n2019-01-01 00:00:00\n2020-01-01 00:00:00\n")
+        adapter = PolarsDataFrameAdapter()
+        ctx = adapter.create_context()
+        adapter.load_table(
+            ctx,
+            "trips",
+            [csv_path],
+            column_names=["pickup_datetime"],
+            benchmark=Benchmark(),
+        )
+
+        result, _, _ = _expression_window(ctx, "Q1", "2000-01-01", "2000-01-02")
+
+        assert ctx.get_table("trips").native.collect_schema()["pickup_datetime"] == pl.Datetime("us")
+        assert result.collect().height == 1
+
 
 class TestNYCTaxiBenchmarkRegistry:
     """Tests for NYC Taxi DataFrame support in benchmark registry."""

@@ -74,25 +74,23 @@ def resolve_dataframe_csv_dialect(
     return ("" if format_type == "tbl" else None), default_has_header
 
 
-def declared_string_columns(
+def _declared_column_types(
     benchmark: Any | None,
     table_name: str,
     column_names: list[str] | None,
-) -> list[str]:
-    """Return declared string/text columns for a benchmark table."""
+) -> dict[str, str]:
+    """Return declared SQL types keyed by the requested column names."""
     if benchmark is None or not column_names:
-        return []
+        return {}
 
     try:
         schema = get_benchmark_schema_columns(benchmark)
     except Exception:  # noqa: BLE001 - schema hooks are heterogeneous across benchmarks
-        return []
+        return {}
 
     table_schema = schema.get(table_name.lower()) or schema.get(table_name)
     if not table_schema:
-        return []
-
-    from benchbox.core.dataframe.data_loader import SchemaMapper
+        return {}
 
     types_by_name: dict[str, str] = {}
     columns = list(table_schema) if isinstance(table_schema, (list, tuple)) else iter_schema_columns(table_schema)
@@ -100,13 +98,38 @@ def declared_string_columns(
         name = column_name(column)
         if name:
             types_by_name[name.lower()] = column_sql_type(column, default="")
+    return {name: sql_type for name in column_names if (sql_type := types_by_name.get(name.lower()))}
 
-    string_columns: list[str] = []
-    for name in column_names:
-        sql_type = types_by_name.get(name.lower())
-        if sql_type and SchemaMapper.sql_type_to_pyarrow(sql_type) == "string":
-            string_columns.append(name)
-    return string_columns
+
+def declared_string_columns(
+    benchmark: Any | None,
+    table_name: str,
+    column_names: list[str] | None,
+) -> list[str]:
+    """Return declared string/text columns for a benchmark table."""
+    from benchbox.core.dataframe.data_loader import SchemaMapper
+
+    return [
+        name
+        for name, sql_type in _declared_column_types(benchmark, table_name, column_names).items()
+        if SchemaMapper.sql_type_to_pyarrow(sql_type) == "string"
+    ]
+
+
+def declared_temporal_columns(
+    benchmark: Any | None,
+    table_name: str,
+    column_names: list[str] | None,
+) -> dict[str, str]:
+    """Return declared date/timestamp columns and their normalized Arrow types."""
+    from benchbox.core.dataframe.data_loader import SchemaMapper
+
+    temporal_columns: dict[str, str] = {}
+    for name, sql_type in _declared_column_types(benchmark, table_name, column_names).items():
+        normalized_type = SchemaMapper.sql_type_to_pyarrow(sql_type)
+        if normalized_type in {"date32", "timestamp[us]"}:
+            temporal_columns[name] = normalized_type
+    return temporal_columns
 
 
 def resolve_empty_string_restore_columns(

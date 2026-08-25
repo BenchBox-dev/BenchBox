@@ -502,6 +502,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         column_names: list[str] | None = None,
         null_marker: str | None = None,
         string_columns: list[str] | None = None,
+        temporal_columns: dict[str, str] | None = None,
     ) -> DataFusionLazyDF:
         """Read a CSV file into a DataFusion DataFrame.
 
@@ -514,6 +515,8 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
                 string columns; non-``None`` preserves NULL semantics.
             string_columns: Declared string columns whose empty CSV fields must
                 stay ``""`` when ``null_marker`` is ``None``.
+            temporal_columns: Declared temporal columns; accepted for expression-family
+                loading parity. DataFusion currently retains its native inference.
 
         Returns:
             DataFusion DataFrame with the file contents
