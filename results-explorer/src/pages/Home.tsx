@@ -35,6 +35,7 @@ import { normalizedCostLabel, normalizedCostValue } from "@/lib/costDisplay";
 import { formatFacetDisplayValue } from "@/lib/facetDisplay";
 import { stringSerde, useUrlState } from "@/lib/useUrlState";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { usePickingState } from "@/lib/pickingState";
 import {
   EXPLORER_PERFORMANCE_MARKS,
   EXPLORER_PERFORMANCE_MEASURES,
@@ -1173,6 +1174,23 @@ function SelectFilter({
 }
 
 function CoverageSummary() {
+  let pickedCount = 0;
+  let compareHref: string | null = null;
+  let pickedIds: readonly string[] = [];
+  try {
+    const picking = usePickingState();
+    pickedCount = picking.pickedIds.length;
+    pickedIds = picking.pickedIds;
+    compareHref = picking.compareHref;
+  } catch {
+    // Unit tests may render Home without the provider; fall back to empty state.
+  }
+  const pickingLabel =
+    pickedCount === 0 ? "Compare →" : pickedCount === 1 ? "Compare 1 selected →" : `Compare ${pickedCount} selected →`;
+  // At single pick, compareHref is null (needs 2 for comparison), but builder still benefits from ?ids=<one> pinned entry.
+  if (!compareHref && pickedIds.length === 1) {
+    compareHref = `/results/compare?ids=${encodeURIComponent(pickedIds[0]!)}`;
+  }
   return (
     <div>
       <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">Leaderboard scope</div>
@@ -1184,11 +1202,11 @@ function CoverageSummary() {
             into the in-page Compare builder. The builder handles the empty
             state itself, so no ?ids= prefilling is needed. */}
         <a
-          href="/results/compare/"
+          href={compareHref ?? "/results/compare/"}
           data-testid="home-compare-entrypoint"
           class="rounded-full border border-[var(--bb-border-default)] bg-[var(--bb-bg-primary)] px-3 py-1.5 text-xs font-medium text-[var(--bb-fg-primary)] no-underline shadow-sm hover:bg-[var(--bb-bg-elevated)]"
         >
-          Compare →
+          {pickingLabel}
         </a>
       </div>
     </div>

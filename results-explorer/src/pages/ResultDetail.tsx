@@ -20,6 +20,7 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
 import { formatDurationSeconds, formatLatencyMs } from "@/lib/metricFormatters";
 import { visibleResultIdForRow } from "@/lib/resultLinks";
+import { usePickingState } from "@/lib/pickingState";
 
 interface ResultDetailProps extends RoutableProps {
   resultId?: string;
@@ -147,6 +148,16 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   }
   if (!detail || !chartContext) return <LoadingSpinner message="Loading result..." />;
 
+  let picking: ReturnType<typeof usePickingState> | null = null;
+  try {
+    picking = usePickingState();
+  } catch {
+    // Unit tests may not wrap with provider.
+  }
+  const isPicked = detail && picking ? picking.pickedIds.includes(detail.result_id) : false;
+  const pickingFull = picking ? picking.pickedIds.length >= 4 && !isPicked : false;
+  const resultPickingCompareHref = picking?.compareHref ?? null;
+  const resultPickingCount = picking?.pickedIds.length ?? 0;
   const benchmarkLabel = humanizeBenchmark(detail.benchmark);
 
   function toggleSort(key: MedianSortKey) {
@@ -260,9 +271,29 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             </p>
           </div>
           <div class="flex flex-wrap gap-2">
-            <a href={`/results/compare?ids=${detail.result_id}`} class="btn btn-primary">
+            <a href={`/results/compare?ids=${detail.result_id}`} class="btn btn-primary" data-testid="result-detail-compare-link">
               Compare this result
             </a>
+            <button
+              type="button"
+              class={`btn ${isPicked ? "btn-secondary" : "btn-secondary"}`}
+              aria-pressed={isPicked ? "true" : "false"}
+              aria-describedby={pickingFull ? "result-detail-picking-full" : undefined}
+              title={pickingFull ? "Up to 4 runs can be compared." : undefined}
+              disabled={pickingFull}
+              data-testid="result-detail-picking-toggle"
+              onClick={() => picking?.toggle(detail.result_id)}
+            >
+              {isPicked ? "Remove from comparison" : "Add to comparison"}
+            </button>
+            {pickingFull && (
+              <span id="result-detail-picking-full" class="text-xs text-[var(--bb-tone-warning-fg)]">Up to 4 runs can be compared.</span>
+            )}
+            {resultPickingCompareHref && resultPickingCount >= 2 && (
+              <a href={resultPickingCompareHref} class="btn btn-primary" data-testid="result-detail-compare-picked">
+                Compare {resultPickingCount} selected →
+              </a>
+            )}
             <a href={detail.bundle_download_url} class="btn btn-secondary" download>
               Download bundle
             </a>
