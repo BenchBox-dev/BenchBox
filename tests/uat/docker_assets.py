@@ -994,6 +994,7 @@ def compose_environment(
     *,
     benchmark_runs_dir: Path | str | None = None,
     memory_limit: str | None = None,
+    starrocks_memory_limit: str | None = "4g",
 ) -> dict[str, str]:
     """Return environment overrides needed by a compose spec.
 
@@ -1026,6 +1027,8 @@ def compose_environment(
     if spec.platform == "clickhouse-server":
         resolved, _ = resolve_clickhouse_memory_limit(memory_limit)
         environment[CLICKHOUSE_MEMORY_LIMIT_ENV_VAR] = resolved
+    if spec.platform == "starrocks":
+        environment["STARROCKS_MEMORY_LIMIT"] = os.environ.get("STARROCKS_MEMORY_LIMIT", starrocks_memory_limit or "4g")
     if spec.platform not in {"lakesail", "velox"}:
         return environment
     if benchmark_runs_dir is None:

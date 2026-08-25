@@ -288,6 +288,40 @@ class TestSQLiteAdapter:
         assert connection.execute.call_count == len(sqlite_platform._JOINORDER_HELPER_INDEXES) + 1
         connection.commit.assert_called_once()
 
+    def test_tpch_helper_indexes_cover_stage_one_query_access_paths(self):
+        """TPC-H helper indexes must cover the joins and filters in slow Stage 1 queries."""
+        from benchbox.platforms import sqlite as sqlite_platform
+
+        indexes = "\n".join(sqlite_platform._TPCH_HELPER_INDEXES)
+
+        assert "ON customer (c_nationkey, c_custkey)" in indexes
+        assert "ON orders (o_orderdate, o_orderkey, o_custkey)" in indexes
+        assert "ON orders (o_custkey, o_orderdate, o_orderkey)" in indexes
+        assert "ON lineitem (l_partkey, l_suppkey, l_shipdate, l_quantity)" in indexes
+        assert "ON partsupp (ps_partkey, ps_suppkey, ps_supplycost)" in indexes
+
+    def test_create_connection_registers_sqlite_compatibility_functions(self):
+        """SQLite connections expose the aggregates/functions used by Stage 1 queries."""
+        adapter = SQLiteAdapter(database_path=":memory:")
+        connection = adapter.create_connection()
+        try:
+            connection.execute("CREATE TABLE values_table (value REAL)")
+            connection.executemany("INSERT INTO values_table VALUES (?)", [(1.0,), (2.0,), (3.0,), (4.0,)])
+            connection.commit()
+
+            assert connection.execute("SELECT STDDEV(value) FROM values_table").fetchone()[0] == pytest.approx(1.290994)
+            assert (
+                connection.execute(
+                    "SELECT REGEXP_REPLACE('https://www.example.com/path', '^https?://(?:www\\.)?([^/]+)/.*$', '\\1')"
+                ).fetchone()[0]
+                == "example.com"
+            )
+            assert connection.execute("SELECT PERCENTILE_CONT(0.5, value) FROM values_table").fetchone()[
+                0
+            ] == pytest.approx(2.5)
+        finally:
+            connection.close()
+
     @patch("benchbox.platforms.sqlite.sqlite3")
     def test_execute_query_success(self, mock_sqlite3):
         """Test successful query execution."""
