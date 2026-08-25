@@ -542,28 +542,42 @@ ORDER BY nation, o_year DESC
         # Q10: Returned Item Reporting
         # Parameters: :date
         10: """
+WITH lineitem_revenue_by_order AS (
+    SELECT
+        ll.hk_order,
+        SUM(sl.l_extendedprice * (1 - sl.l_discount)) AS line_revenue
+    FROM link_lineitem ll
+    JOIN sat_lineitem sl ON ll.hk_lineitem_link = sl.hk_lineitem_link AND sl.load_end_dts IS NULL
+    WHERE sl.l_returnflag = 'R'
+    GROUP BY ll.hk_order
+),
+customer_revenue AS (
+    SELECT
+        loc.hk_customer,
+        SUM(lr.line_revenue) AS customer_revenue
+    FROM link_order_customer loc
+    JOIN hub_order ho ON loc.hk_order = ho.hk_order
+    JOIN sat_order so ON ho.hk_order = so.hk_order AND so.load_end_dts IS NULL
+    JOIN lineitem_revenue_by_order lr ON ho.hk_order = lr.hk_order
+    WHERE so.o_orderdate >= DATE ':date'
+      AND so.o_orderdate < DATE ':date' + INTERVAL '3' MONTH
+    GROUP BY loc.hk_customer
+)
 SELECT
     hc.c_custkey,
     sc.c_name,
-    SUM(sl.l_extendedprice * (1 - sl.l_discount)) AS revenue,
+    SUM(cr.customer_revenue) AS revenue,
     sc.c_acctbal,
     sn.n_name,
     sc.c_address,
     sc.c_phone,
     sc.c_comment
-FROM hub_customer hc
+FROM customer_revenue cr
+JOIN hub_customer hc ON cr.hk_customer = hc.hk_customer
 JOIN sat_customer sc ON hc.hk_customer = sc.hk_customer AND sc.load_end_dts IS NULL
-JOIN link_order_customer loc ON hc.hk_customer = loc.hk_customer
-JOIN hub_order ho ON loc.hk_order = ho.hk_order
-JOIN sat_order so ON ho.hk_order = so.hk_order AND so.load_end_dts IS NULL
-JOIN link_lineitem ll ON ho.hk_order = ll.hk_order
-JOIN sat_lineitem sl ON ll.hk_lineitem_link = sl.hk_lineitem_link AND sl.load_end_dts IS NULL
 JOIN link_customer_nation lcn ON hc.hk_customer = lcn.hk_customer
 JOIN hub_nation hn ON lcn.hk_nation = hn.hk_nation
 JOIN sat_nation sn ON hn.hk_nation = sn.hk_nation AND sn.load_end_dts IS NULL
-WHERE so.o_orderdate >= DATE ':date'
-  AND so.o_orderdate < DATE ':date' + INTERVAL '3' MONTH
-  AND sl.l_returnflag = 'R'
 GROUP BY hc.c_custkey, sc.c_name, sc.c_acctbal, sc.c_phone, sn.n_name, sc.c_address, sc.c_comment
 ORDER BY revenue DESC
 LIMIT 20
