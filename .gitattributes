@@ -13,6 +13,8 @@
 # green on Linux. The tree is entirely text (400 .json, 4 .md, 1 .py), so
 # pinning it wholesale is safe.
 /results-data/** text eol=lf
+/_binaries/**/tpcds.dst -text
+/_binaries/**/dists.dss -text
 
 # >>> skill-sync managed (do not edit) >>>
 /.claude/skills/** -text

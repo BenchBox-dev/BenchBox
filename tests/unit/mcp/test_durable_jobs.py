@@ -357,3 +357,74 @@ def test_retention_removes_artifact_before_terminal_metadata(tmp_path: Path) -> 
     assert [job.execution_id for job in repository.expired_terminal()] == [submitted.execution_id]
     worker.purge_expired()
     assert repository.get(submitted.execution_id) is None
+
+
+class TestDurableJobWindowsDirectoryFsync:
+    """Windows cannot open directories with ``os.open``; file durability must remain."""
+
+    def test_windows_directories_are_not_opened(self, tmp_path: Path, monkeypatch) -> None:
+        directory = tmp_path / "stage"
+        directory.mkdir()
+        (directory / "file.txt").write_text("payload", encoding="utf-8")
+        monkeypatch.setattr("benchbox.mcp.jobs.sys.platform", "win32")
+        calls: list[Path] = []
+
+        original_open = __import__("os").open
+
+        def tracking_open(path, *args, **kwargs):
+            calls.append(Path(path))
+            return original_open(path, *args, **kwargs)
+
+        monkeypatch.setattr("benchbox.mcp.jobs.os.open", tracking_open)
+        DurableJobWorker._sync_tree(directory)
+
+        assert directory not in calls
+        assert (directory / "file.txt") in calls
+
+    def test_windows_regular_files_still_fsync_and_close(self, tmp_path: Path, monkeypatch) -> None:
+        regular = tmp_path / "response.json"
+        regular.write_text("{}", encoding="utf-8")
+        directory = tmp_path / "stage"
+        directory.mkdir()
+        (directory / "nested.txt").write_text("x", encoding="utf-8")
+        monkeypatch.setattr("benchbox.mcp.jobs.sys.platform", "win32")
+        monkeypatch.setattr("benchbox.mcp.jobs.os.fsync", lambda fd: None)
+        closes: list[int] = []
+        original_close = __import__("os").close
+        monkeypatch.setattr("benchbox.mcp.jobs.os.close", lambda fd: closes.append(fd) or original_close(fd))
+
+        DurableJobWorker._sync_path(regular)
+        DurableJobWorker._sync_tree(directory)
+
+        assert closes, "regular files must still be opened and closed on Windows"
+
+    def test_posix_directories_are_still_flushed(self, tmp_path: Path, monkeypatch) -> None:
+        directory = tmp_path / "stage-posix"
+        directory.mkdir()
+        monkeypatch.setattr("benchbox.mcp.jobs.sys.platform", "linux")
+        opened: list[Path] = []
+        original_open = __import__("os").open
+
+        def tracking_open(path, *args, **kwargs):
+            opened.append(Path(path))
+            return original_open(path, *args, **kwargs)
+
+        monkeypatch.setattr("benchbox.mcp.jobs.os.open", tracking_open)
+        DurableJobWorker._sync_tree(directory)
+
+        assert directory in opened
+
+    def test_regular_file_oserror_propagates(self, tmp_path: Path, monkeypatch) -> None:
+        regular = tmp_path / "failure.json"
+        regular.write_text("{}", encoding="utf-8")
+        monkeypatch.setattr("benchbox.mcp.jobs.sys.platform", "win32")
+
+        def failing_fsync(_fd: int) -> None:
+            raise OSError("simulated fsync failure")
+
+        monkeypatch.setattr("benchbox.mcp.jobs.os.fsync", failing_fsync)
+        try:
+            DurableJobWorker._sync_path(regular)
+            raise AssertionError("OSError must propagate")
+        except OSError as exc:
+            assert "simulated" in str(exc)

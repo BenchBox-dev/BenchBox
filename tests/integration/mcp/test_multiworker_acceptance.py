@@ -105,6 +105,11 @@ def test_remote_contract_survives_alternating_workers(tmp_path: Path, monkeypatc
     async def wait_for(client: Client, execution_id: str, state: str) -> dict[str, Any]:
         for _ in range(200):
             status = _content(await client.call_tool("get_benchmark_status", {"execution_id": execution_id}))
+            if status["status"] in ("failed", "cancelled") and state == "completed":
+                pytest.fail(
+                    f"job {execution_id} terminally {status['status']} "
+                    f"(error_code={status.get('error_code')!r}) instead of completed"
+                )
             if status["status"] == state:
                 return status
             await anyio.sleep(0.01)
