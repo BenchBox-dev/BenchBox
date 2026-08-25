@@ -70,7 +70,7 @@ test.describe("ResultDetail", () => {
     await expect(page).toHaveURL(new RegExp(`/results/compare\\?ids=${TPCH_DUCKDB_ID}$`));
     await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("compare-builder-status")).toContainText("1 result selected");
-    await expect(page.getByTestId(`compare-builder-row-${TPCH_DUCKDB_ID}`)).toContainText("(from result detail)");
+    await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
   });
 
   test("a missing result_id surfaces a user-visible error rather than a blank screen", async ({ page }) => {

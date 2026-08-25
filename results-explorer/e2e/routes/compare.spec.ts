@@ -62,7 +62,8 @@ test.describe("Compare", () => {
     await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole("heading", { name: "Pick runs to compare" })).toBeVisible();
     await expect(page.getByTestId("compare-builder-status")).toContainText("1 result selected");
-    await expect(page.getByTestId(`compare-builder-row-${LONG_DUCKDB}`)).toContainText("(from result detail)");
+    await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
+    await expect(page.getByTestId("compare-builder-query-link")).toHaveAttribute("href", "/results/query");
   });
 
   test("Share URL button copies the current URL and updates its label", async ({
