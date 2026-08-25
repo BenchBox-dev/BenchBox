@@ -52,9 +52,23 @@ export function CompareTray({ summary, items, compareHref, compareLabel, onClear
       setExpanded((prev) => (prev ? false : prev));
       requestAnimationFrame(() => {
         const active = document.activeElement as HTMLElement | null;
-        if (!active || !document.contains(active)) {
+        const activeHidden =
+          active instanceof HTMLElement &&
+          (active.hidden ||
+            active.getAttribute("aria-hidden") === "true" ||
+            getComputedStyle(active).display === "none" ||
+            (active as HTMLElement).offsetParent === null);
+        const focusInCollapsedDetails =
+          active instanceof HTMLElement &&
+          !!document.getElementById("compare-tray-details")?.contains(active) &&
+          !!document.querySelector("[data-testid='compare-tray'][data-collapsed='true']");
+        if (!active || !document.contains(active) || active === document.body || activeHidden || focusInCollapsedDetails) {
           const toggle = document.querySelector("[data-testid='compare-tray-toggle']") as HTMLElement | null;
           toggle?.focus();
+          if (document.activeElement === document.body) {
+            const compareLink = document.querySelector("[data-testid='compare-tray-compare-link']") as HTMLElement | null;
+            compareLink?.focus();
+          }
         }
       });
     };

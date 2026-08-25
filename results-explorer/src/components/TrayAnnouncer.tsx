@@ -8,7 +8,13 @@ export function TrayAnnouncer({ count }: TrayAnnouncerProps) {
   const [announcement, setAnnouncement] = useState("");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const isInitialMount = useRef(true);
+
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      if (count === 0) return;
+    }
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       if (count === 0) setAnnouncement("No results selected");
