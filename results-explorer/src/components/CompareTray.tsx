@@ -27,6 +27,19 @@ interface CompareTrayProps {
 export function CompareTray({ summary, items, compareHref, compareLabel, onClear, onRemove }: CompareTrayProps) {
   const trayRef = useRef<HTMLDivElement>(null);
   const [trayHeight, setTrayHeight] = useState(0);
+  const [expanded, setExpanded] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mql = window.matchMedia("(max-width: 639px)");
+    const update = () => setIsMobile(mql.matches);
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
+
+  const collapsed = isMobile && !expanded;
 
   useEffect(() => {
     const tray = trayRef.current;
@@ -39,7 +52,7 @@ export function CompareTray({ summary, items, compareHref, compareLabel, onClear
     const observer = new ResizeObserver(measure);
     observer.observe(tray);
     return () => observer.disconnect();
-  }, []);
+  }, [collapsed, expanded, isMobile, items.length]);
 
   return (
     <>
@@ -53,14 +66,33 @@ export function CompareTray({ summary, items, compareHref, compareLabel, onClear
         ref={trayRef}
         class="bb-compare-tray fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 pt-3 shadow-lg"
         data-testid="compare-tray"
+        data-collapsed={collapsed ? "true" : "false"}
       >
         <div class="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="min-w-0 flex-1">
-            <div class="text-sm text-[var(--bb-data-fg-primary)]">{summary}</div>
+            <div class="flex items-center gap-2 text-sm text-[var(--bb-data-fg-primary)]">
+              <span class="flex-1">{summary}</span>
+              {isMobile && (
+                <button
+                  type="button"
+                  data-testid="compare-tray-toggle"
+                  aria-expanded={expanded ? "true" : "false"}
+                  aria-controls="compare-tray-details"
+                  aria-label={expanded ? "Collapse selection tray" : "Expand selection tray"}
+                  class="bb-compare-tray-toggle inline-flex h-8 items-center rounded-md border border-[var(--bb-data-border)] px-2 text-xs font-medium sm:hidden"
+                  onClick={() => setExpanded((v) => !v)}
+                >
+                  {expanded ? "Collapse" : "Expand"}
+                </button>
+              )}
+            </div>
             <div
-              class="mt-2 flex max-h-32 flex-wrap gap-2 overflow-y-auto pr-1"
+              id="compare-tray-details"
+              class={`mt-2 flex max-h-32 flex-wrap gap-2 overflow-y-auto pr-1 ${collapsed ? "hidden sm:flex" : ""}`}
               role="list"
               aria-label="Selected compare results"
+              hidden={collapsed ? true : undefined}
+              data-testid="compare-tray-details"
             >
               {items.map((item) => (
                 <div
@@ -92,14 +124,28 @@ export function CompareTray({ summary, items, compareHref, compareLabel, onClear
             </div>
           </div>
           <div class="flex shrink-0 items-center gap-3">
-            <button
-              type="button"
-              class="text-sm text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]"
-              onClick={onClear}
-            >
-              Clear
-            </button>
-            <a href={compareHref} class="btn btn-primary text-sm no-underline">
+            {!collapsed && (
+              <button
+                type="button"
+                class="text-sm text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]"
+                onClick={onClear}
+                data-testid="compare-tray-clear"
+              >
+                Clear
+              </button>
+            )}
+            {isMobile && expanded && (
+              <button
+                type="button"
+                class="text-sm text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]"
+                data-testid="compare-tray-dismiss"
+                aria-label="Dismiss selection tray"
+                onClick={() => setExpanded(false)}
+              >
+                Dismiss
+              </button>
+            )}
+            <a href={compareHref} class="btn btn-primary text-sm no-underline" data-testid="compare-tray-compare-link">
               {compareLabel} →
             </a>
           </div>
