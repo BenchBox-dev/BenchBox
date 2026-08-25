@@ -263,6 +263,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         column_names: list[str] | None = None,
         null_marker: str | None = None,
         string_columns: list[str] | None = None,
+        temporal_columns: dict[str, str] | None = None,
     ) -> PolarsLazyDF:
         """Read a CSV file into a Polars LazyFrame.
 
@@ -277,6 +278,8 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
                 truncate_ragged_lines.)
             string_columns: Accepted for expression-family parity; Polars applies
                 this via ``missing_utf8_is_empty_string`` for UTF-8 columns.
+            temporal_columns: Declared date/timestamp columns keyed by normalized
+                Arrow type. These override CSV string inference.
 
         Returns:
             Polars LazyFrame with the file contents
@@ -312,6 +315,11 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         # Handle column names
         if column_names:
             scan_kwargs["new_columns"] = column_names
+        if temporal_columns:
+            scan_kwargs["schema_overrides"] = {
+                name: pl.Date if normalized_type == "date32" else pl.Datetime("us")
+                for name, normalized_type in temporal_columns.items()
+            }
 
         # Scan the file(s)
         lf = pl.scan_csv(path, **scan_kwargs)

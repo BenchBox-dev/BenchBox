@@ -445,6 +445,7 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
         column_names: list[str] | None = None,
         null_marker: str | None = None,
         string_columns: list[str] | None = None,
+        temporal_columns: dict[str, str] | None = None,
     ) -> PySparkLazyDF:
         """Read a CSV file into a PySpark DataFrame.
 
@@ -456,6 +457,8 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
             null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
             string_columns: Declared string columns whose empty CSV fields must
                 stay ``""`` when ``null_marker`` is ``None``.
+            temporal_columns: Declared temporal columns; accepted for expression-family
+                loading parity. PySpark currently retains its existing schema behavior.
 
         Returns:
             PySpark DataFrame with the file contents

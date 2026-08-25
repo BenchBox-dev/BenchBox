@@ -206,6 +206,40 @@ class TestTSBSDevOpsParameters:
 
         assert result.collect().height == 1
 
+    def test_production_time_bounds_filter_polars_raw_csv_timestamp_column(self, tmp_path):
+        pl = pytest.importorskip("polars")
+
+        from benchbox.core.tsbs_devops.dataframe_queries.queries import _expr_window
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        class Benchmark:
+            def get_schema(self):
+                return {
+                    "cpu": {
+                        "columns": {
+                            "time": {"type": "TIMESTAMP"},
+                            "hostname": {"type": "VARCHAR(255)"},
+                        }
+                    }
+                }
+
+        csv_path = tmp_path / "cpu.csv"
+        csv_path.write_text("time,hostname\n2024-01-01 00:00:00,host_0\n2025-01-01 00:00:00,host_0\n")
+        adapter = PolarsDataFrameAdapter()
+        ctx = adapter.create_context()
+        adapter.load_table(
+            ctx,
+            "cpu",
+            [csv_path],
+            column_names=["time", "hostname"],
+            benchmark=Benchmark(),
+        )
+
+        result, _, _ = _expr_window(ctx, "Q1", "cpu", host=True)
+
+        assert ctx.get_table("cpu").native.collect_schema()["time"] == pl.Datetime("us")
+        assert result.collect().height == 1
+
 
 class TestTSBSDevOpsBenchmarkRegistry:
     """Tests for TSBS DevOps DataFrame support in benchmark registry."""
