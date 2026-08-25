@@ -1021,7 +1021,7 @@
     "tpc_metrics": {
       "power_at_size": 93788.68206569245
     },
-    "validation": "passed"
+    "validation": "not_run"
   },
   "tables": {
     "customer": {

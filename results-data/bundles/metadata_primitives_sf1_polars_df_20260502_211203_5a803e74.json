@@ -652,7 +652,7 @@
       "stdev_ms": 0.3,
       "total_ms": 2
     },
-    "validation": "passed"
+    "validation": "not_run"
   },
   "version": "2.1"
 }

@@ -5636,7 +5636,7 @@
       "stdev_ms": 5.6,
       "total_ms": 1734
     },
-    "validation": "passed"
+    "validation": "not_run"
   },
   "tables": {
     "customer": {

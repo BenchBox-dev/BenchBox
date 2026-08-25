@@ -1,7 +1,7 @@
 {
   "benchmark": "Read Primitives",
   "bundle_file": "read_primitives_sf01_polars_df_20260502_210844_1cb50efa.json",
-  "bundle_hash": "7b5a64c8dc66073da261dec0ae73ae77e6fec27efdc542b2a00f3a1f8649f046",
+  "bundle_hash": "c0f90031da52571117769c61f239a3751f4be8a7f4fc761b8d71ad9702b401dc",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",
