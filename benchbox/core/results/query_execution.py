@@ -456,7 +456,9 @@ def normalize_row_count_validation(value: Any, *, rows_returned: int | None) -> 
         raise QueryExecutionContractError(
             f"row_count_validation.actual ({counts['actual']!r}) must match rows_returned ({rows_returned!r})"
         )
-    if status == "PASSED" and (counts["expected"] is None or counts["actual"] != counts["expected"]):
+    if status == "PASSED" and counts["expected"] is None:
+        status = "SKIPPED"
+    elif status == "PASSED" and counts["actual"] != counts["expected"]:
         raise QueryExecutionContractError(
             "PASSED row_count_validation requires equal integer expected and actual counts"
         )

@@ -231,6 +231,24 @@ class TestValidateBundle:
         assert not vr.ok
         assert any("row_count_validation" in error for error in vr.errors)
 
+    @pytest.mark.parametrize("status", ["FAILED", "SKIPPED", "ERROR"])
+    def test_non_passed_row_count_validation_rejected_when_summary_validation_passed(self, status: str):
+        data = _minimal_bundle()
+        data["version"] = "2.2"
+        data["summary"]["validation"] = "passed"
+        data["queries"][0].update(
+            {
+                "rows": 4,
+                "row_count_validation": {"status": status, "expected": None, "actual": 4},
+            }
+        )
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("summary.validation='passed' contradicts" in error for error in vr.errors)
+
     def test_public_private_path_is_rejected_by_cli_boundary(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
         bundle_path = tmp_path / "tpch_result.json"
         payload = _minimal_bundle()

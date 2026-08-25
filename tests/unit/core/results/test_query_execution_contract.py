@@ -576,3 +576,27 @@ def test_failed_query_error_round_trip_remains_attached_to_same_execution() -> N
             "error_message": "deadline exceeded",
         }
     ]
+
+
+def test_warning_only_row_count_validation_without_expected_count_normalizes_to_skipped() -> None:
+    result = _benchmark_result(
+        {
+            "query_id": "Q1",
+            "execution_time_seconds": 0.25,
+            "rows_returned": 42,
+            "status": "SUCCESS",
+            "row_count_validation": {
+                "expected": None,
+                "actual": 42,
+                "status": "PASSED",
+                "warning": "Verification skipped: reference results unavailable",
+            },
+        }
+    )
+    payload = build_result_payload(result)
+    assert payload["queries"][0]["row_count_validation"] == {
+        "status": "SKIPPED",
+        "expected": None,
+        "actual": 42,
+        "warning": "Verification skipped: reference results unavailable",
+    }

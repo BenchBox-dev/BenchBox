@@ -479,9 +479,9 @@ Downstream consumers are stricter than public ingest:
 
 | Consumer | Accepted versions | Failure behavior |
 |---|---|---|
-| Runtime loader | `"2.0"`, `"2.1"` | Rejects with the runtime loader schema policy and asks for re-export. |
-| Explorer static pipeline | `"2.0"`, `"2.1"` | Rejects before manifest/detail projection to avoid silent field drops. |
-| Normalizer | `"2.0"`, `"2.1"` as v2; other shapes as legacy | Uses best-effort legacy extraction for v1.x and unknown shapes. |
+| Runtime loader | `"2.0"`, `"2.1"`, `"2.2"` | Rejects with the runtime loader schema policy and asks for re-export. |
+| Explorer static pipeline | `"2.0"`, `"2.1"`, `"2.2"` | Rejects before manifest/detail projection to avoid silent field drops. |
+| Normalizer | `"2.0"`, `"2.1"`, `"2.2"` as v2; other shapes as legacy | Uses best-effort legacy extraction for v1.x and unknown shapes. |
 
 Any change to accepted versions or field semantics must update
 `benchbox.core.results.schema_policy`, this contract, and the public contract

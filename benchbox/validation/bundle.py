@@ -665,6 +665,19 @@ def _validate_execution_consistency(data: dict[str, Any], vr: ValidationResult) 
         noun = "query" if failed == 1 else "queries"
         vr.error(f"summary.validation='passed' contradicts {failed} failed measurement {noun}")
 
+    queries = data.get("queries")
+    if isinstance(queries, list):
+        for i, q in enumerate(queries):
+            if not isinstance(q, dict):
+                continue
+            rcv = q.get("row_count_validation")
+            if isinstance(rcv, dict):
+                rcv_status = rcv.get("status")
+                if rcv_status is not None and rcv_status != "PASSED":
+                    vr.error(
+                        f"summary.validation='passed' contradicts queries[{i}].row_count_validation.status={rcv_status!r}"
+                    )
+
 
 def _validate_bundle(
     data: dict,
