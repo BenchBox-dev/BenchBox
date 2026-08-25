@@ -155,6 +155,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
     // Unit tests may not wrap with provider.
   }
   const isPicked = detail && picking ? picking.pickedIds.includes(detail.result_id) : false;
+  const pickingFull = picking ? picking.pickedIds.length >= 4 && !isPicked : false;
   const resultPickingCompareHref = picking?.compareHref ?? null;
   const resultPickingCount = picking?.pickedIds.length ?? 0;
   const benchmarkLabel = humanizeBenchmark(detail.benchmark);
@@ -277,11 +278,17 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
               type="button"
               class={`btn ${isPicked ? "btn-secondary" : "btn-secondary"}`}
               aria-pressed={isPicked ? "true" : "false"}
+              aria-describedby={pickingFull ? "result-detail-picking-full" : undefined}
+              title={pickingFull ? "Up to 4 runs can be compared." : undefined}
+              disabled={pickingFull}
               data-testid="result-detail-picking-toggle"
               onClick={() => picking?.toggle(detail.result_id)}
             >
               {isPicked ? "Remove from comparison" : "Add to comparison"}
             </button>
+            {pickingFull && (
+              <span id="result-detail-picking-full" class="text-xs text-[var(--bb-tone-warning-fg)]">Up to 4 runs can be compared.</span>
+            )}
             {resultPickingCompareHref && resultPickingCount >= 2 && (
               <a href={resultPickingCompareHref} class="btn btn-primary" data-testid="result-detail-compare-picked">
                 Compare {resultPickingCount} selected →

@@ -1176,15 +1176,21 @@ function SelectFilter({
 function CoverageSummary() {
   let pickedCount = 0;
   let compareHref: string | null = null;
+  let pickedIds: readonly string[] = [];
   try {
     const picking = usePickingState();
     pickedCount = picking.pickedIds.length;
+    pickedIds = picking.pickedIds;
     compareHref = picking.compareHref;
   } catch {
     // Unit tests may render Home without the provider; fall back to empty state.
   }
   const pickingLabel =
     pickedCount === 0 ? "Compare →" : pickedCount === 1 ? "Compare 1 selected →" : `Compare ${pickedCount} selected →`;
+  // At single pick, compareHref is null (needs 2 for comparison), but builder still benefits from ?ids=<one> pinned entry.
+  if (!compareHref && pickedIds.length === 1) {
+    compareHref = `/results/compare?ids=${encodeURIComponent(pickedIds[0]!)}`;
+  }
   return (
     <div>
       <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">Leaderboard scope</div>
