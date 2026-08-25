@@ -35,6 +35,7 @@ from benchbox.core.dataframe.query_resolution import (
     get_tpcds_dataframe_queries,
     get_tpch_dataframe_queries,
 )
+from benchbox.core.dataframe.query_validation import validate_dataframe_query_results
 from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
 from benchbox.core.exceptions import ConfigurationError, InsufficientMemoryError
 from benchbox.core.results import (
@@ -296,6 +297,7 @@ class BenchmarkExecutionMixin:
             platform=platform_info,
         )
         builder.mark_started()
+        builder.set_validation_status("NOT_RUN")
 
         # Reset per-run plan-capture failure state (qpc-05 / F4.4 follow-up):
         # ExpressionFamilyAdapter doesn't inherit the SQL mixin's
@@ -401,6 +403,15 @@ class BenchmarkExecutionMixin:
                     monitor=monitor,
                     run_options=options,
                 )
+
+                validation_summary = validate_dataframe_query_results(
+                    query_results,
+                    benchmark_name=benchmark_config.name,
+                    scale_factor=scale_factor,
+                    validation_mode=options_map.get("validation_mode"),
+                    seed=options_map.get("seed"),
+                )
+                builder.set_validation_status(validation_summary.status, validation_summary.details)
 
                 # Add query results to builder
                 for qr in query_results:

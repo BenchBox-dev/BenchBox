@@ -12,8 +12,9 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-CURRENT_SCHEMA_VERSION = "2.1"
-KNOWN_SCHEMA_V2_VERSIONS = ("2.0", "2.1")
+CURRENT_SCHEMA_VERSION = "2.2"
+KNOWN_SCHEMA_V2_VERSIONS = ("2.0", "2.1", "2.2")
+ROW_COUNT_VALIDATION_SCHEMA_VERSION = "2.2"
 LEGACY_NORMALIZED_SCHEMA_VERSION = "1.x"
 
 _NUMERIC_SCHEMA_VERSION_RE = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
@@ -150,21 +151,21 @@ PRODUCER_SCHEMA_POLICY = SchemaVersionPolicy(
 RUNTIME_SCHEMA_POLICY = SchemaVersionPolicy(
     policy_name="runtime result schema policy",
     accepted_versions=KNOWN_SCHEMA_V2_VERSIONS,
-    accepted_versions_description="schema versions 2.0 and 2.1",
+    accepted_versions_description="schema versions 2.0, 2.1, and 2.2",
     remediation="Re-export the result using a BenchBox version that writes a supported schema.",
 )
 
 LOADER_SCHEMA_POLICY = SchemaVersionPolicy(
     policy_name="runtime loader schema policy",
     accepted_versions=KNOWN_SCHEMA_V2_VERSIONS,
-    accepted_versions_description="schema versions 2.0 and 2.1",
+    accepted_versions_description="schema versions 2.0, 2.1, and 2.2",
     remediation="Re-export the result using a BenchBox version that writes a supported schema.",
 )
 
 NORMALIZER_SCHEMA_POLICY = SchemaVersionPolicy(
     policy_name="normalizer schema policy",
     accepted_versions=KNOWN_SCHEMA_V2_VERSIONS,
-    accepted_versions_description="known v2 schema versions 2.0 and 2.1; all other shapes use legacy fallback",
+    accepted_versions_description="known v2 schema versions 2.0, 2.1, and 2.2; all other shapes use legacy fallback",
     remediation="Use a known v2 result bundle for exact field mapping, or rely on legacy best-effort extraction.",
     legacy_fallback_version=LEGACY_NORMALIZED_SCHEMA_VERSION,
 )
@@ -182,7 +183,7 @@ PUBLIC_SUBMISSION_SCHEMA_POLICY = SchemaVersionPolicy(
 EXPLORER_INPUT_SCHEMA_POLICY = SchemaVersionPolicy(
     policy_name="explorer input schema policy",
     accepted_versions=KNOWN_SCHEMA_V2_VERSIONS,
-    accepted_versions_description="schema versions 2.0 and 2.1",
+    accepted_versions_description="schema versions 2.0, 2.1, and 2.2",
     remediation="Re-export or normalize the bundle before building explorer data.",
 )
 

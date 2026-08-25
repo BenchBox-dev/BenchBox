@@ -46,6 +46,7 @@ from benchbox.core.dataframe.query_resolution import (
     resolve_tpcds_query_manager,
     resolve_tpcds_stream_queries,
 )
+from benchbox.core.dataframe.query_validation import validate_dataframe_query_results
 from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
 from benchbox.core.exceptions import ConfigurationError, InsufficientMemoryError
 from benchbox.core.results import (
@@ -242,6 +243,7 @@ def run_dataframe_benchmark(
         platform=platform_info,
     )
     builder.mark_started()
+    builder.set_validation_status("NOT_RUN")
 
     options_map = getattr(benchmark_config, "options", {}) or {}
     builder.set_run_config(
@@ -322,6 +324,15 @@ def run_dataframe_benchmark(
                 benchmark_instance=benchmark_instance,
                 monitor=monitor,
             )
+
+            validation_summary = validate_dataframe_query_results(
+                query_results,
+                benchmark_name=benchmark_config.name,
+                scale_factor=scale_factor,
+                validation_mode=options_map.get("validation_mode"),
+                seed=options_map.get("seed"),
+            )
+            builder.set_validation_status(validation_summary.status, validation_summary.details)
 
             # Add query results to builder
             for qr in query_results:

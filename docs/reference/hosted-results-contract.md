@@ -470,7 +470,7 @@ The CLI packages a **submission bundle** consisting of:
 #### Result bundle schema policy
 
 The canonical bundle is schema-v2 JSON. The current BenchBox producer writes
-top-level `"version": "2.1"`. Public PR submission validation accepts numeric
+top-level `"version": "2.2"`. Public PR submission validation accepts numeric
 schema version family `2.x` so a future producer minor can be submitted before
 the hosted contract document is updated, but it rejects missing or malformed
 versions.
@@ -479,9 +479,9 @@ Downstream consumers are stricter than public ingest:
 
 | Consumer | Accepted versions | Failure behavior |
 |---|---|---|
-| Runtime loader | `"2.0"`, `"2.1"` | Rejects with the runtime loader schema policy and asks for re-export. |
-| Explorer static pipeline | `"2.0"`, `"2.1"` | Rejects before manifest/detail projection to avoid silent field drops. |
-| Normalizer | `"2.0"`, `"2.1"` as v2; other shapes as legacy | Uses best-effort legacy extraction for v1.x and unknown shapes. |
+| Runtime loader | `"2.0"`, `"2.1"`, `"2.2"` | Rejects with the runtime loader schema policy and asks for re-export. |
+| Explorer static pipeline | `"2.0"`, `"2.1"`, `"2.2"` | Rejects before manifest/detail projection to avoid silent field drops. |
+| Normalizer | `"2.0"`, `"2.1"`, `"2.2"` as v2; other shapes as legacy | Uses best-effort legacy extraction for v1.x and unknown shapes. |
 
 Any change to accepted versions or field semantics must update
 `benchbox.core.results.schema_policy`, this contract, and the public contract

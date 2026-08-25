@@ -202,7 +202,7 @@ class TestSchemaV2ExportWithPlans:
         payload = build_result_payload(results)
 
         # v2.x schema version
-        assert payload["version"] == "2.1"
+        assert payload["version"] == "2.2"
         # Should have compact queries array
         assert len(payload["queries"]) == 1
         assert payload["queries"][0]["id"] == "01"
@@ -268,7 +268,7 @@ class TestSchemaV2ExportWithPlans:
 
         # Should have plans payload
         assert plans_payload is not None
-        assert plans_payload["version"] == "2.1"
+        assert plans_payload["version"] == "2.2"
         assert plans_payload["run_id"] == "test_006"
         assert plans_payload["plans_captured"] == 1
         assert "q01" in plans_payload["queries"]
@@ -564,7 +564,7 @@ class TestSchemaV2ExportWithPlans:
 
         # Main payload should have compact queries
         payload = build_result_payload(results)
-        assert payload["version"] == "2.1"
+        assert payload["version"] == "2.2"
         assert len(payload["queries"]) == 1
         assert payload["queries"][0]["id"] == "01"
         assert payload["queries"][0]["ms"] == 350.0
@@ -620,7 +620,7 @@ class TestBackwardCompatibility:
         )
 
         payload_no_plans = build_result_payload(results_no_plans)
-        assert payload_no_plans["version"] == "2.1"
+        assert payload_no_plans["version"] == "2.2"
         plans_payload_none = build_plans_payload(results_no_plans)
         assert plans_payload_none is None
 
@@ -654,7 +654,7 @@ class TestBackwardCompatibility:
         )
 
         payload_with_plans = build_result_payload(results_with_plans)
-        assert payload_with_plans["version"] == "2.1"
+        assert payload_with_plans["version"] == "2.2"
         plans_payload = build_plans_payload(results_with_plans)
         assert plans_payload is not None
 
@@ -705,7 +705,7 @@ class TestSchemaV2Validation:
         with pytest.raises(SchemaV2ValidationError) as exc:
             validator.validate(payload)
         assert "runtime result schema policy" in str(exc.value)
-        assert "schema versions 2.0 and 2.1" in str(exc.value)
+        assert "schema versions 2.0, 2.1, and 2.2" in str(exc.value)
 
     def test_validator_rejects_missing_run_fields(self) -> None:
         """Test that validator rejects payload with missing run block fields."""
@@ -784,7 +784,7 @@ class TestSchemaV2Validation:
 
         payload = build_result_payload(results)
 
-        assert payload["version"] == "2.1"
+        assert payload["version"] == "2.2"
         assert payload["summary"]["queries"]["total"] == 0
         assert payload["summary"]["queries"]["passed"] == 0
         assert payload["summary"]["queries"]["failed"] == 0
@@ -865,7 +865,7 @@ class TestSchemaV2Validation:
 
         payload = build_result_payload(results)
 
-        assert payload["version"] == "2.1"
+        assert payload["version"] == "2.2"
         assert payload["platform"]["name"] == "duckdb"
         assert payload["platform"]["version"] == "1.0.1"
         assert payload["platform"]["driver_package"] == "duckdb"

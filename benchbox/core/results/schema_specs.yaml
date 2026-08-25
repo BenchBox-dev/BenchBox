@@ -27,6 +27,7 @@ query_key_order:
 - test_type
 - status
 - digest
+- row_count_validation
 - dataframe_skip_summary
 - plan_capture_error
 config_key_order:
