@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-08-25T17:07:51.199682+00:00",
+  "generated_at": "2026-08-25T22:56:17.506648+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_datafusion_sql_20260502_182815_88aab2ac.json",
@@ -1238,6 +1238,19 @@
       "bundle_sha256": "60416a0755ccb5401ca53732abd04b62668ff669e6f10f9a424c6c52ea3e3daa"
     },
     {
+      "file": "tpch_sf1_polars_df_20260825_184959_8ef4d6e2.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "Polars",
+      "platform_version": "1.40.0",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-25T18:49:55.411027",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "22bf606cb2f9a53e44baddf61f4f5bd3ede43d9d47800053b3cb84e7969b1b8b"
+    },
+    {
       "file": "tpch_sf001_pyspark_df_20260502_212950_2dbda97e.json",
       "benchmark": "tpch",
       "benchmark_name": "TPC-H",
@@ -1275,6 +1288,19 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "67fe258210dfd51f6f3436d2619a5fc3ebf078ae7a3665425022a331b8e70121"
+    },
+    {
+      "file": "tpch_sf1_pyspark_df_20260825_185531_14cd3451.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "PySpark",
+      "platform_version": "4.1.1",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-25T18:51:54.779786",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "86b7aa836c76b3b20ae6184cf49b998b5031abbb925c004dfd571f7b107fd27d"
     },
     {
       "file": "tpch_sf001_sqlite_sql_20260502_191208_1df8890c.json",
@@ -1961,7 +1987,7 @@
     ]
   },
   "summary": {
-    "total_bundles": 136,
+    "total_bundles": 138,
     "by_benchmark": {
       "amplab": 3,
       "clickbench": 6,
@@ -1977,7 +2003,7 @@
       "tpcdi": 9,
       "tpcds": 6,
       "tpcds_obt": 5,
-      "tpch": 22,
+      "tpch": 24,
       "tpch_skew": 10,
       "tpchavoc": 10,
       "write_primitives": 14
@@ -1987,16 +2013,16 @@
       "DataFusion": 48,
       "DuckDB": 18,
       "LakeSail": 1,
-      "Polars": 17,
-      "PySpark": 16,
+      "Polars": 18,
+      "PySpark": 17,
       "SQLite": 16,
       "Spark": 19
     },
     "by_trust_label": {
-      "maintainer-run": 136
+      "maintainer-run": 138
     },
     "by_funding": {
-      "unspecified": 136
+      "unspecified": 138
     }
   }
 }
