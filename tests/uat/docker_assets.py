@@ -450,6 +450,7 @@ _PLATFORM_SECONDARY_PORTS: dict[str, dict[str, int]] = {
 # Platform -> Compose environment key whose value is the adapter password.
 _PLATFORM_PASSWORD_ENV_KEYS: dict[str, str] = {
     "clickhouse-server": "CLICKHOUSE_PASSWORD",
+    "cedardb": "CEDAR_PASSWORD",
     "pg-duckdb": "POSTGRES_PASSWORD",
     "pg-mooncake": "POSTGRES_PASSWORD",
     "timescaledb": "POSTGRES_PASSWORD",
@@ -479,6 +480,7 @@ _PLATFORM_INJECT_SPARK_CONNECT_ENDPOINT_OPT: frozenset[str] = frozenset({"lakesa
 # alongside `password=benchbox` for any docker-managed postgresql cell (e.g.
 # the throughput UAT cell) to connect at all.
 _PLATFORM_LOCAL_MANAGED_STATIC_OPTS: dict[str, list[str]] = {
+    "cedardb": ["--platform-option", "username=benchbox", "--platform-option", "database=benchbox_test"],
     "postgresql": ["--platform-option", "username=benchbox"],
 }
 
