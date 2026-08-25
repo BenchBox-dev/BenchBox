@@ -319,13 +319,23 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             from benchbox.sql_compat.registry import REGISTRY
             from benchbox.sql_compat.rules.query_source.tpcdi_variants import (
                 CLICKHOUSE_AQ6_SQL,
+                CLICKHOUSE_AQ7_SQL,
+                CLICKHOUSE_AQ8_SQL,
+                CLICKHOUSE_AQ10_SQL,
+                CLICKHOUSE_EQ7_SQL,
                 DORIS_EQ7_SQL,
                 STARROCKS_EQ7_SQL,
             )
 
             d = dialect.lower()
             _variants: dict[str, dict[str, str]] = {
-                "clickhouse": {"AQ6": CLICKHOUSE_AQ6_SQL},
+                "clickhouse": {
+                    "AQ6": CLICKHOUSE_AQ6_SQL,
+                    "AQ7": CLICKHOUSE_AQ7_SQL,
+                    "AQ8": CLICKHOUSE_AQ8_SQL,
+                    "AQ10": CLICKHOUSE_AQ10_SQL,
+                    "EQ7": CLICKHOUSE_EQ7_SQL,
+                },
                 "starrocks": {"EQ7": STARROCKS_EQ7_SQL},
                 "doris": {"EQ7": DORIS_EQ7_SQL},
             }
@@ -352,7 +362,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                             continue  # registry says NATIVE - keep translated SQL
                     else:
                         variant_sql = legacy_sql  # no rule: use legacy SQL
-                    if query_id == "AQ6":  # AQ6 is a template; EQ7 is complete SQL with no placeholders
+                    if query_id == "AQ6":  # AQ6 is a template; other variants are complete SQL strings
                         params = self.query_manager._generate_default_params(query_id)
                         translated_queries[query_id] = variant_sql.format(**params)
                     else:

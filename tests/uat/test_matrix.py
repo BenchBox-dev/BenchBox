@@ -88,6 +88,19 @@ def test_native_model_compatibility_rules_cover_fast_native_targets():
             assert rule.rule_id == f"uat.compat.{platform}.{benchmark}.benchmark_gate"
 
 
+def test_clickhouse_local_metadata_acl_is_fail_closed():
+    benchmarks = matrix.load_benchmarks()
+
+    rule = compatibility.compatibility_rule_for(
+        "clickhouse-local", "metadata_primitives", benchmarks["metadata_primitives"]
+    )
+
+    assert rule is not None
+    assert rule.rule_id == "uat.compat.clickhouse-local.metadata_primitives.benchmark_gate"
+    assert "SHOW USERS" in rule.reason
+    assert "clickhouse-local-mode.md" in rule.evidence or "benchmark_gate" in rule.evidence
+
+
 def test_postgresql_write_primitives_is_a_supported_uat_cell():
     """postgresql x write_primitives must stay an enumerable (un-pruned) UAT cell.
 

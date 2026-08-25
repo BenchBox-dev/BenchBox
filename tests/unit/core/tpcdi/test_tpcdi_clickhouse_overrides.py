@@ -3,7 +3,7 @@
 Verifies that:
 - AQ6 replaces the nested window aggregate SUM(SUM()) OVER () with a CROSS JOIN total
 - AQ7, AQ8, AQ10 replace JULIANDAY() with dateDiff() and DATE('now') with today()
-- EQ7 replaces FROM (VALUES (0)) with FROM (SELECT 0)
+- EQ7 computes the quality score from a derived UNION relation instead of sibling aliases
 - EQ3 flattens the spurious double-nested COUNT scalar subquery
 """
 
@@ -81,17 +81,18 @@ def test_aq10_clickhouse_replaces_julianday():
 
 
 # ---------------------------------------------------------------------------
-# EQ7: VALUES (0) → SELECT 0
+# EQ7: sibling aliases → derived UNION relation
 # ---------------------------------------------------------------------------
 
 
-def test_eq7_clickhouse_replaces_values_dummy():
-    """EQ7 for ClickHouse must replace FROM (VALUES (0)) with FROM (SELECT 0)."""
+def test_eq7_clickhouse_uses_derived_quality_relation():
+    """EQ7 for ClickHouse must compute its score from projected derived columns."""
     import re
 
     q = _bench().get_queries(dialect="clickhouse")["EQ7"]
-    assert not re.search(r"FROM\s+VALUES", q, re.IGNORECASE), f"EQ7 must not use FROM VALUES for ClickHouse:\n{q}"
-    assert "SELECT 0" in q, f"EQ7 must use SELECT 0 dummy row for ClickHouse:\n{q}"
+    assert "quality_metrics" in q
+    assert not re.search(r"FROM\s+VALUES", q, re.IGNORECASE)
+    assert "overall_quality_score" in q
 
 
 def test_eq7_base_dialect_retains_values():
