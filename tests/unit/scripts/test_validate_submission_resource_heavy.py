@@ -53,9 +53,11 @@ def _uv_executable() -> str:
     return uv
 
 
-def _env_without_pythonpath() -> dict[str, str]:
+def _standalone_env() -> dict[str, str]:
+    """Remove environment paths that could expose installed project dependencies."""
     env = os.environ.copy()
     env.pop("PYTHONPATH", None)
+    env.pop("VIRTUAL_ENV", None)
     return env
 
 
@@ -93,11 +95,13 @@ def test_cli_runs_from_develop_checkout_without_project_install(valid_bundle_fil
             "--no-project",
             "--",
             "python",
+            # Ignore the checkout's .venv so this proves the stdlib-only path.
+            "-S",
             "scripts/validate_submission.py",
             str(valid_bundle_file),
         ],
         cwd=repo_root,
-        env=_env_without_pythonpath(),
+        env=_standalone_env(),
         text=True,
         capture_output=True,
         timeout=30,
@@ -128,7 +132,7 @@ def test_cli_runs_in_slim_no_project_checkout(tmp_path: Path) -> None:
             str(bundle.relative_to(slim_root)),
         ],
         cwd=slim_root,
-        env=_env_without_pythonpath(),
+        env=_standalone_env(),
         text=True,
         capture_output=True,
         timeout=30,
@@ -161,7 +165,7 @@ def test_slim_no_project_checkout_rejects_empty_public_result(tmp_path: Path) ->
             str(bundle.relative_to(slim_root)),
         ],
         cwd=slim_root,
-        env=_env_without_pythonpath(),
+        env=_standalone_env(),
         text=True,
         capture_output=True,
         timeout=30,
@@ -193,7 +197,7 @@ def test_slim_no_project_checkout_rejects_false_clean_measurement(tmp_path: Path
             str(bundle.relative_to(slim_root)),
         ],
         cwd=slim_root,
-        env=_env_without_pythonpath(),
+        env=_standalone_env(),
         text=True,
         capture_output=True,
         timeout=30,
