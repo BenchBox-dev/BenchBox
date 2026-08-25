@@ -4,9 +4,9 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 448
+**Total registered rules:** 449
 
-**Platforms covered:** 33
+**Platforms covered:** 34
 
 ## Phase coverage by platform
 
@@ -38,6 +38,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | singlestore | - | - | - | - | 4 | - | 4 |
 | snowflake | - | 6 | - | 2 | 1 | - | 9 |
 | spark | - | 6 | - | 2 | 1 | - | 9 |
+| sqlite | - | 1 | - | - | - | - | 1 |
 | starrocks | - | 14 | 1 | 2 | 1 | - | 18 |
 | synapse | - | - | - | - | 1 | - | 1 |
 | timescale | - | - | - | 3 | - | - | 3 |
@@ -575,6 +576,12 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.spark.transaction_primitives.pk_not_enforced` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.spark.write_primitives.pk_not_enforced` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.spark.all.optimize_table_definition` |
+
+### sqlite
+
+| phase | scope | action | support | failure mode | rule_id |
+|---|---|---|---|---|---|
+| query_source | benchmark=h2odb, query=Q9 | select_variant | REWRITTEN | SYNTAX_ERROR | `query_source.sqlite.h2odb.q9_percentile_cont_variant` |
 
 ### starrocks
 

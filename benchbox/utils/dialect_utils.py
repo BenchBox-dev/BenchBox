@@ -179,6 +179,9 @@ def _fix_sqlite_unsupported_syntax(query: str) -> str:
         "DAY": "%d",
         "MONTH": "%m",
         "YEAR": "%Y",
+        "HOUR": "%H",
+        "MINUTE": "%M",
+        "SECOND": "%S",
     }
 
     def replace_extract(match: re.Match[str]) -> str:
@@ -186,9 +189,32 @@ def _fix_sqlite_unsupported_syntax(query: str) -> str:
         expression = match.group("expression").strip()
         return f"CAST(STRFTIME('{date_parts[part]}', {expression}) AS INTEGER)"
 
-    return re.sub(
-        r"\bEXTRACT\s*\(\s*(?P<part>DAY|MONTH|YEAR)\s+FROM\s+(?P<expression>[^()]+?)\s*\)",
+    query = re.sub(
+        r"\bEXTRACT\s*\(\s*(?P<part>DAY|MONTH|YEAR|HOUR|MINUTE|SECOND)\s+FROM\s+"
+        r"(?P<expression>[^()]+?)\s*\)",
         replace_extract,
+        query,
+        flags=re.IGNORECASE,
+    )
+
+    trunc_formats = {
+        "YEAR": "%Y-01-01 00:00:00",
+        "MONTH": "%Y-%m-01 00:00:00",
+        "DAY": "%Y-%m-%d 00:00:00",
+        "HOUR": "%Y-%m-%d %H:00:00",
+        "MINUTE": "%Y-%m-%d %H:%M:00",
+        "SECOND": "%Y-%m-%d %H:%M:%S",
+    }
+
+    def replace_date_trunc(match: re.Match[str]) -> str:
+        unit = match.group("unit").upper()
+        expression = match.group("expression").strip()
+        return f"STRFTIME('{trunc_formats[unit]}', {expression})"
+
+    return re.sub(
+        r"\bDATE_TRUNC\s*\(\s*['\"](?P<unit>YEAR|MONTH|DAY|HOUR|MINUTE|SECOND)['\"]\s*,\s*"
+        r"(?P<expression>[^(),]+?)\s*\)",
+        replace_date_trunc,
         query,
         flags=re.IGNORECASE,
     )

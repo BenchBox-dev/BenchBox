@@ -43,6 +43,16 @@ def test_h2odb_q9_base_dialect_retains_percentile_cont():
     assert "PERCENTILE_CONT" in q9.upper(), f"Base Q9 must use PERCENTILE_CONT, got:\n{q9}"
 
 
+def test_h2odb_q9_sqlite_uses_registered_two_argument_percentile():
+    """SQLite Q9 must use the adapter's two-argument percentile aggregate."""
+    from benchbox.core.h2odb.benchmark import H2OBenchmark
+
+    q9 = H2OBenchmark().get_queries(dialect="sqlite")["Q9"]
+
+    assert 'PERCENTILE_CONT(0.5, "fare_amount")' in q9
+    assert "WITHIN GROUP" not in q9.upper()
+
+
 def test_h2odb_q9_clickhouse_preserves_column_names():
     """ClickHouse Q9 override must return median_fare_amount and p90_fare_amount columns."""
     from benchbox.core.h2odb.benchmark import H2OBenchmark
