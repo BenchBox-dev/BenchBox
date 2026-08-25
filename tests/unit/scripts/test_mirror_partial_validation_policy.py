@@ -36,12 +36,15 @@ def _submission_validation_run() -> str:
     return next(step["run"] for step in steps if step.get("name") == "Validate bundles")
 
 
-def _evaluate_trust_gate(*, is_fork: str, head_ref: str, pr_author: str) -> tuple[str, str]:
+def _evaluate_trust_gate(*, is_fork: str, base_ref: str | None, head_ref: str, pr_author: str) -> tuple[str, str]:
     run = _submission_validation_run()
     prefix = run.split("# Trusted bot-created same-repo mirrors", maxsplit=1)[0]
+    env = {"IS_FORK": is_fork, "HEAD_REF": head_ref, "PR_AUTHOR": pr_author}
+    if base_ref is not None:
+        env["BASE_REF"] = base_ref
     output = subprocess.check_output(
         ["bash", "-c", prefix + '\nprintf "%s|%s\\n" "$REQUIRE_MANIFEST" "$ALLOW_PARTIAL_VALIDATION"'],
-        env={"IS_FORK": is_fork, "HEAD_REF": head_ref, "PR_AUTHOR": pr_author},
+        env=env,
         text=True,
     ).strip()
     require_manifest, allow_partial = output.split("|", maxsplit=1)
@@ -56,16 +59,27 @@ def test_community_validate_submission_defaults_strict() -> None:
     assert "$REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION" in run
 
 
+def test_partial_waiver_binds_to_published_results_base() -> None:
+    workflow = yaml.safe_load(COMMUNITY_WORKFLOW.read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["validate"]["steps"]
+    validate_step = next(step for step in steps if step.get("name") == "Validate bundles")
+    assert validate_step["env"]["BASE_REF"] == "${{ github.event.pull_request.base.ref }}"
+    assert '"${BASE_REF:-}" = "published-results"' in validate_step["run"]
+
+
 @pytest.mark.parametrize(
-    ("is_fork", "head_ref", "pr_author"),
+    ("is_fork", "base_ref", "head_ref", "pr_author"),
     [
-        ("true", "auto/results-mirror-deadbeef", "github-actions[bot]"),
-        ("false", "feature/community-result", "github-actions[bot]"),
-        ("false", "auto/results-mirror-deadbeef", "maintainer"),
+        ("true", "published-results", "auto/results-mirror-deadbeef", "github-actions[bot]"),
+        ("false", "develop", "auto/results-mirror-deadbeef", "github-actions[bot]"),
+        ("false", "published-results", "feature/community-result", "github-actions[bot]"),
+        ("false", "published-results", "auto/results-mirror-deadbeef", "maintainer"),
     ],
 )
-def test_partial_waiver_rejects_untrusted_mirror_shapes(is_fork: str, head_ref: str, pr_author: str) -> None:
-    assert _evaluate_trust_gate(is_fork=is_fork, head_ref=head_ref, pr_author=pr_author) == (
+def test_partial_waiver_rejects_untrusted_mirror_shapes(
+    is_fork: str, base_ref: str, head_ref: str, pr_author: str
+) -> None:
+    assert _evaluate_trust_gate(is_fork=is_fork, base_ref=base_ref, head_ref=head_ref, pr_author=pr_author) == (
         "--require-manifest",
         "",
     )
@@ -74,9 +88,19 @@ def test_partial_waiver_rejects_untrusted_mirror_shapes(is_fork: str, head_ref: 
 def test_partial_waiver_accepts_exact_bot_created_same_repo_mirror() -> None:
     assert _evaluate_trust_gate(
         is_fork="false",
+        base_ref="published-results",
         head_ref="auto/results-mirror-deadbeef",
         pr_author="github-actions[bot]",
     ) == ("", "--allow-partial-validation")
+
+
+def test_partial_waiver_missing_base_fails_closed() -> None:
+    assert _evaluate_trust_gate(
+        is_fork="false",
+        base_ref=None,
+        head_ref="auto/results-mirror-deadbeef",
+        pr_author="github-actions[bot]",
+    ) == ("--require-manifest", "")
 
 
 def test_community_message_string_still_requires_passed() -> None:
