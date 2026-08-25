@@ -662,7 +662,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Compare selected results</h2>
-            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
+            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]" aria-live="polite" aria-atomic="true">
               {compareGuidance}
             </p>
           </div>
@@ -895,7 +895,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   class="rounded-lg border border-dashed border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-3"
                 >
                   <h3 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">{cohort.label}</h3>
-                  <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
+                  <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]" aria-live="polite" aria-atomic="true">
                     {`Limited observations: ${cohort.observationCount} published ${
                       cohort.observationCount === 1 ? "run" : "runs"
                     } in this comparable ranking. Trend chart hidden until at least ${MIN_TREND_OBSERVATIONS} observations exist.`}
