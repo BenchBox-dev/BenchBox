@@ -34,6 +34,7 @@ jobs:
           CHANGED_GUARD=$(git diff --name-only "$BASE_SHA"...HEAD -- \
             scripts/validate_submission.py \
             benchbox/validation/bundle.py \
+            benchbox/core/results/query_status.py \
             scripts/generate_corpus_inventory.py \
             .github/workflows/validate-submission.yml \
             || true)
@@ -49,7 +50,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
-          # Same two-signal trust check as the "Validate bundles" step below
+          # Same three-signal trust check as the "Validate bundles" step below
           # (see its comment for the full reasoning): a maintainer adding a
           # vendor bundle on develop is published through a same-repo
           # auto/results-mirror-* PR opened by sync-results-data-to-published.yml
@@ -58,9 +59,11 @@ jobs:
           # PR falls through to the else branch and blocks legitimate
           # maintainer vendor bundles. head.repo.fork is the load-bearing
           # signal (unforgeable from a fork); the branch-name pattern alone
-          # would be spoofable.
+          # would be spoofable, and a same-repository integration must not be
+          # able to impersonate the sync bot.
           IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
           HEAD_REF: ${{ github.head_ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           # The vendor-supplied trust label is RANKING-ELIGIBLE and is granted
           # purely by a bundle living under results-data/bundles/vendor/ (see
@@ -78,7 +81,7 @@ jobs:
             'results-data/bundles/vendor/**' || true)
           if [ -n "$VENDOR_CHANGES" ]; then
             TRUSTED_MIRROR="false"
-            if [ "$IS_FORK" = "false" ]; then
+            if [ "$IS_FORK" = "false" ] && [ "$PR_AUTHOR" = "github-actions[bot]" ]; then
               case "$HEAD_REF" in
                 auto/results-mirror-*) TRUSTED_MIRROR="true" ;;
               esac
@@ -89,7 +92,7 @@ jobs:
                 ;;
               *)
                 if [ "$TRUSTED_MIRROR" = "true" ]; then
-                  echo "Trusted same-repo mirror PR ($HEAD_REF) vendor/ addition - allowed."
+                  echo "Trusted bot-created same-repo mirror PR ($HEAD_REF) vendor/ addition - allowed."
                 else
                   echo "::error::This PR adds or modifies files under results-data/bundles/vendor/, which grants the ranking-eligible vendor-supplied label. Only maintainers may do this:"
                   printf '%s\n' "$VENDOR_CHANGES"
@@ -241,18 +244,19 @@ jobs:
           # the community-submission trust signal). Require the sidecar unless
           # this is a maintainer mirror PR.
           #
-          # The waiver gates on TWO signals, and `head.repo.fork` is the load-bearing
-          # one: `github.head_ref` is attacker-controlled on fork PRs, so a branch
+          # The waiver gates on three signals. `github.head_ref` is attacker-controlled
+          # on fork PRs, so a branch
           # name alone (`auto/results-mirror-*`) is spoofable — anyone could open a
           # fork PR from a branch so named and drop `--require-manifest`, laundering
           # a community bundle into a maintainer-run (ranking-eligible) stamp. The
           # branch pattern only narrows *which* same-repo PRs qualify; the
-          # `head.repo.fork == false` check (unforgeable — a fork PR cannot present
-          # itself as same-repo) is what actually confines the waiver to the trusted
-          # sync bot, whose mirror branches live on this repo. If both aren't
+          # `head.repo.fork == false` check is unforgeable by a fork, and the PR
+          # author must be GitHub Actions itself. Together they confine the waiver
+          # to the trusted sync bot, whose mirror branches live on this repo. If all aren't
           # satisfied we fail closed and require the sidecar.
           IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
           HEAD_REF: ${{ github.head_ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           # `pipefail` is load-bearing, not hygiene. The validator's exit code is
           # this gate: it is piped into `tee` below, and a bash pipeline returns
@@ -267,16 +271,23 @@ jobs:
           # remove this line while the pipe exists.
           set -euo pipefail
           REQUIRE_MANIFEST="--require-manifest"
-          if [ "$IS_FORK" = "false" ]; then
+          ALLOW_PARTIAL_VALIDATION=""
+          if [ "$IS_FORK" = "false" ] && [ "$PR_AUTHOR" = "github-actions[bot]" ]; then
             case "$HEAD_REF" in
-              auto/results-mirror-*) REQUIRE_MANIFEST="" ;;
+              auto/results-mirror-*)
+                REQUIRE_MANIFEST=""
+                ALLOW_PARTIAL_VALIDATION="--allow-partial-validation"
+                ;;
             esac
           fi
+          # Trusted bot-created same-repo mirrors preserve truthful partial maintainer seed
+          # results as non-ranking capability evidence. Community submissions
+          # remain strict: manifest required, non-empty, and validation=passed.
           # Validate and generate PR comment in a single invocation.
           # --pr-comment writes the Markdown file; exit code reflects validation
           # result -- which reaches this step's outcome only because of the
           # `set -o pipefail` above.
-          xargs -d '\n' uv run -- python scripts/validate_submission.py $REQUIRE_MANIFEST --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt \
+          xargs -d '\n' uv run -- python scripts/validate_submission.py $REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt \
             | tee /tmp/validation_output.txt
 
       - name: Check corpus inventory

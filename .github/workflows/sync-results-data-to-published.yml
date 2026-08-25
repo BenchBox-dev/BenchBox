@@ -6,8 +6,8 @@ name: Sync results-data to published-results
 # `published-results` branch is intentionally slim (corpus + a small set of
 # vendored validators) per
 # `docs/development/adr/adr-published-results-slim-corpus-branch.md`, so this
-# workflow keeps it in sync with develop's authoritative `results-data/`
-# without forcing maintainers to mirror by hand.
+# workflow refreshes develop's curated maintainer subset and shared tooling
+# without deleting accepted published-only archive content.
 #
 # Publication fixed-point precondition: develop's corpus must already be at
 # the publication fixed point before any mirror branch is built or PR opened.
@@ -25,13 +25,15 @@ name: Sync results-data to published-results
 # review and flip ready when the develop-side change is ready to be visible
 # on the public corpus branch. Validator changes mirror both the thin
 # `scripts/validate_submission.py` entrypoint and its shared
-# `benchbox/validation/bundle.py` implementation.
+# `benchbox/validation/bundle.py` implementation plus the stdlib-only
+# `benchbox/core/results/query_status.py` failure policy.
 #
 # The mirror PR's author is this workflow's own GITHUB_TOKEN identity
-# (github-actions[bot]). GitHub never starts `pull_request`-triggered workflow
-# runs for events raised by GITHUB_TOKEN — documented recursion prevention,
-# not something a trigger filter can work around — so `validate-submission.yml`
-# never fires on this PR even though its `paths:` filter matches every file
+# (github-actions[bot]). GitHub does not start `pull_request`-triggered workflow
+# runs unattended for events raised by GITHUB_TOKEN — documented recursion
+# prevention, not something a trigger filter can work around — so the creator
+# status below is the mirror's automatic evidence even if a maintainer later
+# approves or reruns `validate-submission.yml`
 # the PR touches. Left alone, the PR's statusCheckRollup is empty: not zero
 # failures, zero checks. See #1542 and
 # `docs/operations/results-phase-2-runbook.md` §1.2. The "Validate mirrored
@@ -55,6 +57,7 @@ on:
       - "results-data/validate_corpus.py"
       - "scripts/validate_submission.py"
       - "benchbox/validation/bundle.py"
+      - "benchbox/core/results/query_status.py"
       - "scripts/generate_corpus_inventory.py"
   workflow_dispatch:
 
@@ -110,6 +113,7 @@ jobs:
             'results-data/CORPUS_NOTES.md' 'results-data/SEED_CORPUS_SPEC.md' \
             'results-data/README.md' 'results-data/validate_corpus.py' \
             'benchbox/validation/bundle.py' \
+            'benchbox/core/results/query_status.py' \
             'scripts/validate_submission.py' 'scripts/generate_corpus_inventory.py')
 
           if [[ ${#DIFFED[@]} -eq 0 ]]; then
@@ -244,6 +248,7 @@ jobs:
             'results-data/README.md'
             'results-data/validate_corpus.py'
             'benchbox/validation/bundle.py'
+            'benchbox/core/results/query_status.py'
             'scripts/validate_submission.py'
             'scripts/generate_corpus_inventory.py'
           )
@@ -281,7 +286,7 @@ jobs:
             exit 0
           fi
 
-          git add results-data scripts benchbox/validation || true
+          git add results-data scripts benchbox/validation benchbox/core/results/query_status.py || true
 
           # The heredoc body inherits the YAML block-scalar's 10-space
           # indentation — strip it before using the file as a commit message.
@@ -295,7 +300,8 @@ jobs:
           This is an auto-generated mirror PR. The develop-side push at
           ${GITHUB_SHA} changed paths under the slim-branch allowlist. This
           commit replays those changes against published-results so the slim
-          branch tracks develop's authoritative results-data/.
+          branch refreshes develop's curated maintainer subset while preserving
+          accepted published-only archive content.
 
           Maintainer review the diff and flip the PR ready to merge.
           MSG

@@ -37,6 +37,31 @@ def test_bundle_skipped_queries_are_not_failures() -> None:
     assert bundle_is_clean_pass(data) is True
 
 
+def test_bundle_explicit_failed_count_takes_precedence_over_rows() -> None:
+    data = {
+        "summary": {"queries": {"total": 3, "passed": 2, "failed": 1}},
+        "queries": [
+            {"status": "FAILED", "run_type": "measurement"},
+            {"status": "FAILED", "run_type": "measurement"},
+        ],
+    }
+
+    assert bundle_failed_query_count(data) == 1
+
+
+@pytest.mark.parametrize(
+    ("failed", "expected"),
+    [(1.5, 1), (True, 1), ("2", 2)],
+)
+def test_bundle_failed_count_numeric_contract(failed: object, expected: int) -> None:
+    data = {
+        "summary": {"queries": {"total": 1, "passed": 1, "failed": failed}},
+        "queries": [{"status": "FAILED", "run_type": "measurement"}],
+    }
+
+    assert bundle_failed_query_count(data) == expected
+
+
 def test_result_failed_query_count_trusts_explicit_zero_failed_count() -> None:
     result = SimpleNamespace(total_queries=2, successful_queries=1, failed_queries=0, validation_status="PASSED")
 

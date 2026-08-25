@@ -1,8 +1,15 @@
 # results-data/
 
-This directory contains the public results corpus for the BenchBox results explorer
-(`benchbox.dev/results/`). All bundles here are in canonical schema-v2 format and are
-used directly by the static build pipeline to generate the explorer's read models.
+This directory contains canonical schema-v2 BenchBox result bundles. Its role
+depends on the branch:
+
+- On `develop`, it is the curated maintainer seed and release-preview source
+  used by the static Results Explorer build.
+- On `published-results`, it is the complete accepted Phase 2 archive,
+  including direct operator and community submissions.
+
+Published-only archive bundles are expected. They do not appear in the static
+Explorer until a separate reviewed promotion adds them to `develop`.
 
 ## Directory Structure
 

@@ -30,7 +30,9 @@ credentials are confirmed.
 
 TPC-H SF10 / SF100 and extra TPC-DS platforms stay operator-run (too large
 for a GitHub-hosted monthly job). They still publish through
-`benchbox submit` onto `published-results`, as in PR #1786.
+`benchbox submit` onto `published-results`, as in PR #1786. Those direct
+operator submissions remain archive-only unless a separate reviewed PR
+promotes them into `develop`'s curated release-preview corpus.
 
 ## Operator trigger
 
