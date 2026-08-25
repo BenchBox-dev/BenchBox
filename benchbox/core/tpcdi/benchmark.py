@@ -353,6 +353,9 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             CLICKHOUSE_AQ8_SQL,
             CLICKHOUSE_AQ10_SQL,
             CLICKHOUSE_EQ7_SQL,
+            DATAFUSION_AQ9_SQL,
+            DATAFUSION_EQ7_SQL,
+            DATAFUSION_VQ6_SQL,
             DORIS_EQ7_SQL,
             STARROCKS_EQ7_SQL,
         )
@@ -364,6 +367,11 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "AQ8": CLICKHOUSE_AQ8_SQL,
                 "AQ10": CLICKHOUSE_AQ10_SQL,
                 "EQ7": CLICKHOUSE_EQ7_SQL,
+            },
+            "datafusion": {
+                "AQ9": DATAFUSION_AQ9_SQL,
+                "EQ7": DATAFUSION_EQ7_SQL,
+                "VQ6": DATAFUSION_VQ6_SQL,
             },
             "starrocks": {"EQ7": STARROCKS_EQ7_SQL},
             "doris": {"EQ7": DORIS_EQ7_SQL},
@@ -472,6 +480,20 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 query_text,
             )
 
+        elif target_dialect.lower() == "datafusion":
+            # DataFusion has a native BOOLEAN type and does not expose SQLite's
+            # JULIANDAY function. Render the shared TPC-DI SQL in DataFusion's
+            # supported forms before SQLGlot performs the remaining translation.
+            query_text = _DATE_INTERVAL_RE.sub(
+                lambda m: f"(CURRENT_DATE - INTERVAL '{m.group(1)} days')",
+                query_text,
+            )
+            query_text = _DATE_NOW_RE.sub("CURRENT_DATE", query_text)
+            query_text = _POSTGRES_BOOLEAN_NUMBER_RE.sub(
+                lambda m: f"{m.group('column')} IS {'TRUE' if m.group('value') == '1' else 'FALSE'}",
+                query_text,
+            )
+
         elif (
             "clickhouse" in target_dialect.lower()
             or "starrocks" in target_dialect.lower()
@@ -520,6 +542,15 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 query_text,
             )
             query_text = _DATE_NOW_RE.sub("CURDATE()", query_text)
+
+        elif target_dialect.lower() == "datafusion":
+            # SQLGlot preserves the source JULIANDAY subtraction for DataFusion;
+            # rewrite it after transpilation so SQLGlot cannot reinterpret the
+            # DataFusion date expression as its Netezza AGE expression.
+            query_text = _JULIANDAY_DIFF_RE.sub(
+                lambda m: f"({m.group(1).strip()} - {m.group(2).strip()})",
+                query_text,
+            )
 
         elif target_dialect in {"postgres", "postgresql"}:
             query_text = _POSTGRES_BOOLEAN_NUMBER_RE.sub(

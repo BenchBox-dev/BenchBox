@@ -92,6 +92,14 @@ def test_postgres_q90_rewrite_guards_zero_denominator(tpcds_benchmark):
     assert "/ NULLIF(CAST(pmc AS DECIMAL(15, 4)), 0)" in rewritten
 
 
+def test_datafusion_q90_rewrite_guards_zero_denominator(tpcds_benchmark):
+    query = "SELECT CAST(amc AS DECIMAL(15, 4)) / CAST(pmc AS DECIMAL(15, 4)) AS am_pm_ratio FROM counts"
+
+    rewritten = tpcds_benchmark._apply_target_dialect_overrides(90, query, "datafusion")
+
+    assert "/ NULLIF(CAST(pmc AS DECIMAL(15, 4)), 0)" in rewritten
+
+
 def test_postgres_rollup_order_alias_rewrite_repeats_grouping_expression(tpcds_benchmark):
     query = (
         "SELECT GROUPING(i_category) + GROUPING(i_class) AS lochierarchy "

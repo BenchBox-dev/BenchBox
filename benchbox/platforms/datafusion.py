@@ -37,6 +37,7 @@ from benchbox.platforms.base.data_loading import (
     NO_BENCHMARK,
     DataSource,
     normalize_table_paths,
+    prepare_local_load_file,
     resolve_csv_dialect,
 )
 from benchbox.platforms.base.no_constraint_mixin import NoConstraintEnforcementMixin
@@ -885,13 +886,6 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         uses glob patterns for multiple files.
         """
         # Detect delimiter (manifest metadata > format hint > file extension)
-        delimiter = self._detect_csv_format(
-            file_paths,
-            csv_format=csv_format,
-            data_source=data_source,
-            table_name=table_name,
-            benchmark=benchmark,
-        )
         dialect = resolve_csv_dialect(
             data_source or DataSource(source_type="datafusion_csv", tables={}),
             table_name,
@@ -1402,13 +1396,10 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             file_paths[0],
             benchmark if benchmark is not None else NO_BENCHMARK,
         )
-        delimiter = self._detect_csv_format(
-            file_paths,
-            csv_format=csv_format,
-            data_source=data_source,
-            table_name=table_name,
-            benchmark=benchmark,
-        )
+        # ``resolve_csv_dialect`` applies manifest metadata before format hints;
+        # this matters for CSV payloads stored under a manifest's historical
+        # ``tbl`` format label (for example TSBS and NYC Taxi).
+        delimiter = dialect.delimiter
         column_names, column_types = self._build_pyarrow_columns(table_name, pa)
 
         self.log_very_verbose(f"Converting {len(file_paths)} CSV file(s) to Parquet for {table_name}")
@@ -1471,9 +1462,15 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         total_rows = 0
         try:
             for file_path in file_paths:
-                total_rows += self._write_csv_file_to_parquet(
-                    file_path, parquet_file, writer_ref, read_opts, parse_opts, conv_opts, pq, csv, table_name
-                )
+                # PyArrow's CSV reader does not infer compression from .zst/.gz
+                # suffixes. Use the shared loader preparation path so compressed
+                # benchmark CSVs are decompressed before parsing. Keep trailing
+                # delimiter handling here: raw TPC files need the dummy column
+                # configured above, so they must not be stripped in preparation.
+                with prepare_local_load_file(file_path, dialect=dialect, strip_trailing_delim=False) as load_path:
+                    total_rows += self._write_csv_file_to_parquet(
+                        load_path, parquet_file, writer_ref, read_opts, parse_opts, conv_opts, pq, csv, table_name
+                    )
         finally:
             if writer_ref[0] is not None:
                 writer_ref[0].close()
@@ -1536,15 +1533,19 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         self.log_verbose(f"Executing query {query_id}")
         self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
 
-        # Apply DataFusion-specific query transformations for SQL compatibility
-        from benchbox.platforms.datafusion_query_transformer import DataFusionQueryTransformer
+        # Apply TPC-H-only DataFusion rewrites. The rewrites are selected by
+        # numeric query ID, so applying them to another benchmark with a Q20
+        # query would silently replace that benchmark's SQL and table names.
+        benchmark_slug = (benchmark_type or "").lower().replace("-", "")
+        if not benchmark_type or benchmark_slug == "tpch":
+            from benchbox.platforms.datafusion_query_transformer import DataFusionQueryTransformer
 
-        transformer = DataFusionQueryTransformer(verbose=getattr(self, "very_verbose", False))
-        query = transformer.transform(query, query_id=query_id)
-        if transformer.get_transformations_applied():
-            self.log_verbose(
-                f"Query {query_id}: Applied transformations: {', '.join(transformer.get_transformations_applied())}"
-            )
+            transformer = DataFusionQueryTransformer(verbose=getattr(self, "very_verbose", False))
+            query = transformer.transform(query, query_id=query_id)
+            if transformer.get_transformations_applied():
+                self.log_verbose(
+                    f"Query {query_id}: Applied transformations: {', '.join(transformer.get_transformations_applied())}"
+                )
 
         # In dry-run mode we intentionally capture transformed SQL so output
         # reflects what DataFusion would execute after compatibility rewrites.

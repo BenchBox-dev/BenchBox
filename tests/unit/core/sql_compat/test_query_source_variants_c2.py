@@ -2,7 +2,7 @@
 
 Verifies that:
 1. nyctaxi_variants.py registers exactly 8 rules (4 StarRocks + 4 ClickHouse).
-2. tpcdi_variants.py registers exactly 7 rules (ClickHouse AQ6/AQ7/AQ8/AQ10/EQ7 + starrocks EQ7 + doris EQ7).
+2. tpcdi_variants.py registers exactly 10 rules (five ClickHouse + three DataFusion + StarRocks/Doris EQ7).
 3. Each rule has SELECT_VARIANT action and a SelectVariantPayload.
 4. Shadow-mode: no divergence (legacy already selects the variant SQL).
 5. Registry is silent for platforms with no rule (duckdb).
@@ -122,9 +122,9 @@ def test_nyctaxi_clickhouse_has_trip_duration_variant():
 
 
 def test_tpcdi_variant_rules_registered():
-    """Exactly 7 query_source rules registered for tpcdi (five ClickHouse + StarRocks + Doris)."""
+    """TPC-DI query-source rules cover ClickHouse, DataFusion, StarRocks, and Doris."""
     rules = [(key, entry) for key, entry in REGISTRY.all_rules() if key[0] is Phase.QUERY_SOURCE and key[2] == "tpcdi"]
-    assert len(rules) == 7, f"Expected 7 tpcdi rules, got {len(rules)}: {[e.rule_id for _, e in rules]}"
+    assert len(rules) == 10, f"Expected 10 tpcdi rules, got {len(rules)}: {[e.rule_id for _, e in rules]}"
     rule_ids = {entry.rule_id for _, entry in rules}
     for rule_id in (
         "query_source.clickhouse.tpcdi.aq6_cross_join_variant",
@@ -134,6 +134,9 @@ def test_tpcdi_variant_rules_registered():
         "query_source.clickhouse.tpcdi.eq7_variant",
     ):
         assert rule_id in rule_ids
+    assert "query_source.datafusion.tpcdi.aq9_projection_variant" in rule_ids
+    assert "query_source.datafusion.tpcdi.eq7_derived_table_variant" in rule_ids
+    assert "query_source.datafusion.tpcdi.vq6_projection_variant" in rule_ids
     assert "query_source.starrocks.tpcdi.eq7_derived_table_variant" in rule_ids
     assert "query_source.doris.tpcdi.eq7_derived_table_variant" in rule_ids
 
@@ -146,6 +149,9 @@ def test_tpcdi_variant_rules_registered():
         ("clickhouse", "AQ8", "dateDiff"),
         ("clickhouse", "AQ10", "dateDiff"),
         ("clickhouse", "EQ7", "quality_metrics"),
+        ("datafusion", "AQ9", "avg_sell_price"),
+        ("datafusion", "EQ7", "quality_metrics"),
+        ("datafusion", "VQ6", "grouped_positions"),
         ("starrocks", "EQ7", "quality_metrics"),
         ("doris", "EQ7", "quality_metrics"),
     ],
@@ -167,7 +173,7 @@ def test_tpcdi_rule_action_and_payload(platform: str, query_id: str, expected_sn
     assert expected_snippet in decision.payload.variant_sql
 
 
-@pytest.mark.parametrize("query_id", ["AQ6", "EQ7"])
+@pytest.mark.parametrize("query_id", ["AQ6", "AQ9", "EQ7", "VQ6"])
 def test_tpcdi_duckdb_has_no_rule(query_id: str):
     """duckdb has no tpcdi variant rules."""
     ctx = CompatibilityContext(
@@ -183,15 +189,22 @@ def test_tpcdi_duckdb_has_no_rule(query_id: str):
 
 
 def test_tpcdi_eq7_sql_has_no_format_placeholders():
-    """EQ7 variant SQL is complete for both StarRocks and Doris."""
+    """EQ7 variant SQL is complete for DataFusion, StarRocks, and Doris."""
     from benchbox.sql_compat.rules.query_source.tpcdi_variants import (
+        DATAFUSION_AQ9_SQL,
+        DATAFUSION_EQ7_SQL,
+        DATAFUSION_VQ6_SQL,
         DORIS_EQ7_SQL,
         STARROCKS_EQ7_SQL,
     )
 
+    assert "{" not in DATAFUSION_AQ9_SQL, "DATAFUSION_AQ9_SQL should not contain format placeholders"
+    assert "{" not in DATAFUSION_EQ7_SQL, "DATAFUSION_EQ7_SQL should not contain format placeholders"
+    assert "{" not in DATAFUSION_VQ6_SQL, "DATAFUSION_VQ6_SQL should not contain format placeholders"
     assert "{" not in STARROCKS_EQ7_SQL, "STARROCKS_EQ7_SQL should not contain format placeholders"
     assert "{" not in DORIS_EQ7_SQL, "DORIS_EQ7_SQL should not contain format placeholders"
     assert DORIS_EQ7_SQL == STARROCKS_EQ7_SQL
+    assert "IsCurrent IS TRUE" in DATAFUSION_EQ7_SQL
 
 
 def test_tpcdi_aq6_sql_has_format_placeholders():
