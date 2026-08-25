@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -17,8 +18,10 @@ from benchbox.platforms.base.data_loading import (
     ClickHouseNativeHandler,
     DataSource,
     DataSourceResolver,
+    ParquetFileHandler,
     resolve_adapter_data_source,
 )
+from benchbox.platforms.sqlite import SQLiteAdapter
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -205,6 +208,124 @@ def test_clickhouse_native_handler_uses_csv_with_names_for_headered_csv(tmp_path
     load_queries = [query for query in connection.queries if "file(" in query]
     assert load_queries
     assert "CSVWithNames" in load_queries[0]
+
+
+def test_parquet_handler_streams_record_batches(monkeypatch, tmp_path: Path) -> None:
+    """Generic Parquet loading must not materialize the complete source table."""
+    pa = pytest.importorskip("pyarrow")
+    import pyarrow.parquet as pq
+
+    source = tmp_path / "events.parquet"
+    pq.write_table(
+        pa.table(
+            {
+                "id": [1, 2, 3],
+                "name": ["alpha", "beta", "gamma"],
+                "amount": pa.array([Decimal("1.25"), None, Decimal("3.75")], type=pa.decimal128(15, 2)),
+            }
+        ),
+        source,
+        row_group_size=2,
+    )
+
+    def fail_if_materialized(*args, **kwargs):
+        raise AssertionError("Parquet loading must use record batches, not read_table")
+
+    monkeypatch.setattr(pq, "read_table", fail_if_materialized)
+    connection = SQLiteAdapter(database_path=":memory:").create_connection()
+    try:
+        connection.execute("CREATE TABLE events (id INTEGER, name TEXT, amount DECIMAL(15, 2))")
+        row_count = ParquetFileHandler().load_table("events", source, connection, object(), logging.getLogger(__name__))
+
+        assert row_count == 3
+        assert connection.execute("SELECT * FROM events ORDER BY id").fetchall() == [
+            (1, "alpha", 1.25),
+            (2, "beta", None),
+            (3, "gamma", 3.75),
+        ]
+    finally:
+        connection.close()
+
+
+class _FailingParquetBatchConnection:
+    """SQLite connection proxy that fails before inserting a selected batch."""
+
+    def __init__(self, connection, failing_batch: int = 2) -> None:
+        self._connection = connection
+        self._failing_batch = failing_batch
+        self._batch_calls = 0
+
+    def executemany(self, sql, rows):
+        self._batch_calls += 1
+        if self._batch_calls == self._failing_batch:
+            raise RuntimeError("simulated Parquet batch insert failure")
+        return self._connection.executemany(sql, rows)
+
+    def __getattr__(self, name):
+        return getattr(self._connection, name)
+
+
+def _write_batched_parquet(path: Path) -> None:
+    pa = pytest.importorskip("pyarrow")
+    import pyarrow.parquet as pq
+
+    pq.write_table(pa.table({"id": list(range(2001))}), path, row_group_size=1000)
+
+
+def test_parquet_handler_rolls_back_prior_batches_when_insert_fails(tmp_path: Path) -> None:
+    """A later batch failure must not leave the file partially loaded."""
+    source = tmp_path / "events.parquet"
+    _write_batched_parquet(source)
+    raw_connection = SQLiteAdapter(database_path=":memory:").create_connection()
+    connection = _FailingParquetBatchConnection(raw_connection)
+    try:
+        connection.execute("CREATE TABLE events (id INTEGER)")
+
+        with pytest.raises(RuntimeError, match="simulated Parquet batch insert failure"):
+            ParquetFileHandler().load_table("events", source, connection, object(), logging.getLogger(__name__))
+
+        # This is the same commit DataLoader performs after handling a load
+        # exception; the savepoint must make it safe for the table to commit.
+        connection.commit()
+        assert connection.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 0
+    finally:
+        connection.close()
+
+
+def test_parquet_handler_rolls_back_prior_batches_when_read_fails(monkeypatch, tmp_path: Path) -> None:
+    """A later Parquet read failure must not leave the file partially loaded."""
+    pytest.importorskip("pyarrow")
+    import pyarrow.parquet as pq
+
+    source = tmp_path / "events.parquet"
+    _write_batched_parquet(source)
+    real_parquet_file = pq.ParquetFile
+
+    class _FailingParquetFile:
+        def __init__(self, path):
+            self._parquet_file = real_parquet_file(path)
+
+        @property
+        def schema_arrow(self):
+            return self._parquet_file.schema_arrow
+
+        def iter_batches(self, **kwargs):
+            batches = self._parquet_file.iter_batches(**kwargs)
+            yield next(batches)
+            raise RuntimeError("simulated Parquet read failure")
+
+    monkeypatch.setattr(pq, "ParquetFile", _FailingParquetFile)
+    raw_connection = SQLiteAdapter(database_path=":memory:").create_connection()
+    try:
+        raw_connection.execute("CREATE TABLE events (id INTEGER)")
+
+        with pytest.raises(RuntimeError, match="simulated Parquet read failure"):
+            ParquetFileHandler().load_table("events", source, raw_connection, object(), logging.getLogger(__name__))
+
+        raw_connection.commit()
+        assert raw_connection.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 0
+    finally:
+        raw_connection.close()
 
 
 class _FakeClickHouseConnection:
