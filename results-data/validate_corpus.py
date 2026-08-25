@@ -1,44 +1,105 @@
 #!/usr/bin/env python3
-"""Validate the seed corpus meets depth and schema requirements."""
+"""Validate the seed corpus meets depth and schema requirements.
+
+`SEED_CORPUS_SPEC.md` states the hard requirement this enforces: every
+committed cohort must have at least 3 platforms. A one-platform cohort is not
+a comparison, so publishing it would put a row on the public leaderboard that
+nothing can be read against.
+
+Structured into functions so `tests/unit/scripts/test_corpus_cohort_depth.py`
+can import and assert the same rule instead of restating it. Before that, the
+script ran in no CI lane at all -- every workflow reference to it is a path
+list for mirroring -- so a corpus PR could violate the requirement, pass
+pr-preflight green, and merge. That is exactly what PR #1854 did.
+
+Kept deliberately stdlib-only and free of `benchbox` imports: this file is
+vendored onto the slim `published-results` branch, where the package is not
+installed.
+"""
+
+from __future__ import annotations
 
 import collections
 import json
 import pathlib
 import sys
 
-bundles_dir = pathlib.Path(__file__).parent / "bundles"
-bundles = [
-    path
-    for path in bundles_dir.rglob("*.json")
-    if path.name != "submission-manifest.json"
-    and not path.name.endswith(".manifest.json")
-    and not path.name.endswith(".plans.json")
-    and not path.name.endswith(".tuning.json")
-    and not path.name.endswith(".applied.json")
-]
-print(f"Found {len(bundles)} bundles")
+#: Companion suffixes that are not primary result bundles.
+COMPANION_SUFFIXES = (".manifest.json", ".plans.json", ".tuning.json", ".applied.json")
+LEGACY_MANIFEST_NAME = "submission-manifest.json"
 
-cohorts: collections.defaultdict[tuple[str, str], set[str]] = collections.defaultdict(set)
-for b in bundles:
-    try:
-        with open(b, encoding="utf-8") as fh:
-            d = json.load(fh)
-        benchmark_id = d["benchmark"]["id"]
-        scale_factor = str(d["benchmark"].get("scale_factor", ""))
-        platform = d["platform"]["name"]
+#: A cohort below this many distinct platforms is not a comparison.
+MINIMUM_PLATFORMS_PER_COHORT = 3
+
+CohortKey = tuple[str, str]
+
+
+class CorpusReadError(Exception):
+    """A bundle could not be read or lacks the fields a cohort key needs."""
+
+
+def discover_bundles(bundles_dir: pathlib.Path) -> list[pathlib.Path]:
+    """Primary result bundles under *bundles_dir*, companions excluded."""
+    return sorted(
+        path
+        for path in bundles_dir.rglob("*.json")
+        if path.name != LEGACY_MANIFEST_NAME and not path.name.endswith(COMPANION_SUFFIXES)
+    )
+
+
+def cohort_platforms(bundles: list[pathlib.Path]) -> dict[CohortKey, set[str]]:
+    """Map (benchmark id, scale factor) to the distinct platforms present.
+
+    Raises:
+        CorpusReadError: if any bundle is unreadable or missing a key field.
+            Fail closed -- an unparseable bundle is exactly the state a
+            truncated or unreviewed one would be in, and skipping it would let
+            the corpus regress while this gate stayed green.
+    """
+    cohorts: collections.defaultdict[CohortKey, set[str]] = collections.defaultdict(set)
+    for bundle in bundles:
+        try:
+            with open(bundle, encoding="utf-8") as handle:
+                payload = json.load(handle)
+            benchmark_id = payload["benchmark"]["id"]
+            scale_factor = str(payload["benchmark"].get("scale_factor", ""))
+            platform = payload["platform"]["name"]
+        except Exception as exc:  # noqa: BLE001 - any read failure is fatal here
+            raise CorpusReadError(f"ERROR reading {bundle}: {exc}") from exc
         cohorts[(benchmark_id, scale_factor)].add(platform)
-    except Exception as e:
-        print(f"ERROR reading {b}: {e}")
-        sys.exit(1)
+    return dict(cohorts)
 
-print("\nCohorts:")
-for k, platforms in sorted(cohorts.items()):
-    status = "OK" if len(platforms) >= 3 else "WARN (<3 platforms)"
-    print(f"  {k[0]} SF={k[1]}: {len(platforms)} platforms ({sorted(platforms)}) [{status}]")
 
-low = {k: v for k, v in cohorts.items() if len(v) < 3}
-if low:
-    print(f"\nWARN: {len(low)} cohort(s) have <3 platforms: { {k: len(v) for k, v in low.items()} }")
-    sys.exit(1)
-else:
-    print(f"\nAll {len(cohorts)} cohort(s) meet the >=3-platform depth criterion.")
+def shallow_cohorts(cohorts: dict[CohortKey, set[str]]) -> dict[CohortKey, set[str]]:
+    """Cohorts with fewer than the required number of platforms."""
+    return {key: platforms for key, platforms in cohorts.items() if len(platforms) < MINIMUM_PLATFORMS_PER_COHORT}
+
+
+def main(bundles_dir: pathlib.Path | None = None) -> int:
+    """Print the cohort report and return the process exit code."""
+    bundles_dir = bundles_dir or pathlib.Path(__file__).parent / "bundles"
+    bundles = discover_bundles(bundles_dir)
+    print(f"Found {len(bundles)} bundles")
+
+    try:
+        cohorts = cohort_platforms(bundles)
+    except CorpusReadError as exc:
+        print(exc)
+        return 1
+
+    print("\nCohorts:")
+    for key, platforms in sorted(cohorts.items()):
+        status = "OK" if len(platforms) >= MINIMUM_PLATFORMS_PER_COHORT else "WARN (<3 platforms)"
+        print(f"  {key[0]} SF={key[1]}: {len(platforms)} platforms ({sorted(platforms)}) [{status}]")
+
+    low = shallow_cohorts(cohorts)
+    if low:
+        print(f"\nWARN: {len(low)} cohort(s) have <3 platforms: { {k: len(v) for k, v in low.items()} }")
+        return 1
+
+    print(f"\nAll {len(cohorts)} cohort(s) meet the >={MINIMUM_PLATFORMS_PER_COHORT}-platform depth criterion.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
