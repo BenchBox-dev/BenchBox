@@ -1132,6 +1132,186 @@ def _healthy_fake_docker(argv, **kwargs):
     return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
 
+def test_execute_starrocks_requires_backend_liveness_and_runtime_memory(monkeypatch, tmp_path):
+    """A StarRocks TCP listener is insufficient: FE and BE must both be alive."""
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
+    docker_assets.resolve_container_cli.cache_clear()
+    calls: list[tuple[str, ...]] = []
+    first_application_probe = True
+
+    def fake_docker(argv, **kwargs):
+        nonlocal first_application_probe
+        call = tuple(argv)
+        calls.append(call)
+        if "ps" in call:
+            return _healthy_ps_result(argv)
+        if "exec" in call and first_application_probe:
+            first_application_probe = False
+            return docker_assets.DockerCommandResult(call, 1, "", "BE heartbeat pending")
+        if "stats" in call:
+            return _healthy_stats_result(argv, limit="4GB")
+        return docker_assets.DockerCommandResult(call, 0, "", "")
+
+    cfg = _managed_docker_cfg(
+        "starrocks readiness",
+        platforms={"include": ["starrocks"]},
+        preflight={"starrocks_memory_limit": "4g"},
+    )
+    with platform_reachability(True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=fake_docker,
+            memory_reader=_memory_reader(16.0),
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    assert not outcome.startup_failed
+    assert not any("update" in call and "--memory" in call for call in calls)
+    assert any(
+        event.action == "resource-reconcile" and "already matches" in event.message for event in outcome.docker_events
+    )
+    readiness_call = next(call for call in calls if "exec" in call)
+    assert "SHOW BACKENDS\\G" in readiness_call[-1]
+    assert any(event.action == "application-readiness" and event.status == "ok" for event in outcome.docker_events)
+    assert any(event.action == "memory-admission" and event.status == "ok" for event in outcome.docker_events)
+
+
+def test_execute_starrocks_reconciles_mismatched_mocker_runtime(monkeypatch, tmp_path):
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
+    docker_assets.resolve_container_cli.cache_clear()
+    stats_calls = 0
+    calls: list[tuple[str, ...]] = []
+
+    def fake_docker(argv, **kwargs):
+        nonlocal stats_calls
+        call = tuple(argv)
+        calls.append(call)
+        if "ps" in call or "exec" in call:
+            return _healthy_ps_result(argv) if "ps" in call else docker_assets.DockerCommandResult(call, 0, "", "")
+        if "stats" in call:
+            stats_calls += 1
+            return _healthy_stats_result(argv, limit="1GB" if stats_calls == 1 else "4GB")
+        return docker_assets.DockerCommandResult(call, 0, "", "")
+
+    cfg = _managed_docker_cfg(
+        "starrocks resource reconcile",
+        platforms={"include": ["starrocks"]},
+        preflight={"starrocks_memory_limit": "4g"},
+    )
+    with platform_reachability(True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=fake_docker,
+            memory_reader=_memory_reader(16.0),
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    assert any("update" in call and "--memory" in call for call in calls)
+    assert any(event.action == "resource-reconcile" and event.status == "ok" for event in outcome.docker_events)
+
+
+def test_execute_starrocks_readiness_failure_is_startup_failure(monkeypatch, tmp_path):
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
+    docker_assets.resolve_container_cli.cache_clear()
+
+    def fake_docker(argv, **kwargs):
+        call = tuple(argv)
+        if "ps" in call:
+            return _healthy_ps_result(argv)
+        if "exec" in call:
+            return docker_assets.DockerCommandResult(call, 1, "", "Current available backends: []")
+        if "stats" in call:
+            raise AssertionError(f"runtime stats must not run after failed application readiness: {call}")
+        return docker_assets.DockerCommandResult(call, 0, "", "")
+
+    cfg = _managed_docker_cfg("starrocks backend race", platforms={"include": ["starrocks"]})
+    with platform_reachability(True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=fake_docker,
+            memory_reader=_memory_reader(16.0),
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    assert any(cell.platform == "starrocks" for cell in outcome.startup_failed)
+    assert any(event.action == "application-readiness" and event.status == "failed" for event in outcome.docker_events)
+    assert "Current available backends" in (outcome.abort_reason or "") or any(
+        "Current available backends" in event.message for event in outcome.docker_events
+    )
+
+
+def test_execute_starrocks_application_liveness_stops_after_runtime_wedge(monkeypatch, tmp_path):
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
+    docker_assets.resolve_container_cli.cache_clear()
+    application_calls = 0
+
+    def fake_docker(argv, **kwargs):
+        nonlocal application_calls
+        call = tuple(argv)
+        if "ps" in call:
+            return _healthy_ps_result(argv)
+        if "exec" in call:
+            application_calls += 1
+            if application_calls >= 3:
+                return docker_assets.DockerCommandResult(call, 1, "", "SQL listener wedged")
+        if "stats" in call:
+            return _healthy_stats_result(argv, limit="4GB")
+        return docker_assets.DockerCommandResult(call, 0, "", "")
+
+    cfg = _managed_docker_cfg(
+        "starrocks application liveness",
+        platforms={"include": ["starrocks"]},
+        scales={"rungs": [0.01, 0.1]},
+    )
+    with platform_reachability(True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0, 0.1: 1.0}, {0.01: True, 0.1: True}),
+            docker_runner=fake_docker,
+            memory_reader=_memory_reader(16.0),
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.results and outcome.results[0].scale == 0.01
+    assert [(cell.platform, cell.scale) for cell in outcome.died_mid_platform] == [("starrocks", 0.1)]
+    assert any(event.action == "application-liveness" and event.status == "failed" for event in outcome.docker_events)
+
+
+def test_execute_starrocks_memory_admission_uses_measured_request(tmp_path):
+    cfg = _managed_docker_cfg(
+        "starrocks memory floor",
+        platforms={"include": ["starrocks"]},
+        preflight={"starrocks_memory_limit": "4g"},
+    )
+    outcome = exec_phase.run_execute(
+        cfg,
+        log_dir=tmp_path,
+        databases_root=tmp_path / "databases",
+        runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+        docker_runner=_healthy_fake_docker,
+        memory_reader=_memory_reader(3.5),
+        sleep_fn=lambda _s: None,
+    )
+
+    assert outcome.aborted is True
+    assert outcome.abort_kind == "memory_floor"
+    assert "starrocks=3.725 GiB" in (outcome.abort_reason or "")
+
+
 def test_execute_memory_floor_aborts_the_platform_before_starting_it(tmp_path):
     """End-to-end: a host below the free-memory floor aborts the sweep at the
     platform boundary, with abort_kind="memory_floor".
