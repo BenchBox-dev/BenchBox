@@ -71,6 +71,11 @@ REQUIRED_QUERY_KEYS = {"id", "ms"}
 # without the full BenchBox package.
 ACCEPTED_VERSION_PREFIX = "2."
 NUMERIC_SCHEMA_VERSION_RE = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
+ROW_COUNT_VALIDATION_SCHEMA_VERSION = (2, 2)
+ROW_COUNT_VALIDATION_MESSAGE_MAX_CHARS = 500
+ROW_COUNT_VALIDATION_STATUSES = frozenset({"PASSED", "FAILED", "SKIPPED", "ERROR"})
+ROW_COUNT_VALIDATION_FIELDS = frozenset({"status", "expected", "actual", "error", "warning"})
+ROW_COUNT_VALIDATION_REQUIRED_FIELDS = frozenset({"status", "expected", "actual"})
 
 # Companion file suffixes - skipped during bundle discovery, and copied
 # alongside their result bundle by publish/submit. `.applied.json` carries the
@@ -533,7 +538,72 @@ def _validate_public_cost_section(data: dict[str, Any], vr: ValidationResult) ->
             )
 
 
-def _validate_single_query(index: int, q: Any, vr: ValidationResult) -> bool:
+def _schema_version_tuple(version: Any) -> tuple[int, ...] | None:
+    if not isinstance(version, str) or not NUMERIC_SCHEMA_VERSION_RE.fullmatch(version.strip()):
+        return None
+    return tuple(int(part) for part in version.strip().split("."))
+
+
+def _validate_row_count_validation(index: int, q: dict[str, Any], version: Any, vr: ValidationResult) -> None:
+    if "row_count_validation" not in q:
+        return
+
+    version_tuple = _schema_version_tuple(version)
+    if version_tuple is None or version_tuple < ROW_COUNT_VALIDATION_SCHEMA_VERSION:
+        vr.error(f"queries[{index}].row_count_validation requires schema version 2.2 or later")
+
+    evidence = q.get("row_count_validation")
+    if not isinstance(evidence, dict):
+        vr.error(f"queries[{index}].row_count_validation must be an object")
+        return
+
+    unknown = set(evidence) - ROW_COUNT_VALIDATION_FIELDS
+    if unknown:
+        vr.error(f"queries[{index}].row_count_validation has unknown fields: {sorted(unknown)}")
+    missing = ROW_COUNT_VALIDATION_REQUIRED_FIELDS - set(evidence)
+    if missing:
+        vr.error(f"queries[{index}].row_count_validation missing fields: {sorted(missing)}")
+
+    status = evidence.get("status")
+    if not isinstance(status, str) or status not in ROW_COUNT_VALIDATION_STATUSES:
+        vr.error(f"queries[{index}].row_count_validation.status is invalid: {status!r}")
+
+    normalized_counts: dict[str, int | None] = {}
+    for field in ("expected", "actual"):
+        value = evidence.get(field)
+        if value is None:
+            normalized_counts[field] = None
+        elif isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            vr.error(f"queries[{index}].row_count_validation.{field} must be a non-negative integer or null")
+            normalized_counts[field] = None
+        else:
+            normalized_counts[field] = value
+
+    rows = q.get("rows")
+    if rows is not None and (isinstance(rows, bool) or not isinstance(rows, int) or rows < 0):
+        vr.error(f"queries[{index}].rows must be a non-negative integer or null when row-count evidence is present")
+        rows = None
+    if normalized_counts["actual"] != rows:
+        vr.error(f"queries[{index}].row_count_validation.actual must match queries[{index}].rows")
+    if status == "PASSED" and (
+        normalized_counts["expected"] is None or normalized_counts["actual"] != normalized_counts["expected"]
+    ):
+        vr.error(f"queries[{index}].row_count_validation PASSED requires equal integer expected and actual counts")
+
+    for field in ("error", "warning"):
+        if field not in evidence:
+            continue
+        message = evidence[field]
+        if not isinstance(message, str):
+            vr.error(f"queries[{index}].row_count_validation.{field} must be a string")
+        elif len(message) > ROW_COUNT_VALIDATION_MESSAGE_MAX_CHARS:
+            vr.error(
+                f"queries[{index}].row_count_validation.{field} exceeds "
+                f"{ROW_COUNT_VALIDATION_MESSAGE_MAX_CHARS} characters"
+            )
+
+
+def _validate_single_query(index: int, q: Any, version: Any, vr: ValidationResult) -> bool:
     """Validate one queries[i] entry. Returns True if ms>0 was seen (non-zero signal)."""
     if not isinstance(q, dict):
         vr.error(f"queries[{index}] is not a dict")
@@ -543,6 +613,8 @@ def _validate_single_query(index: int, q: Any, vr: ValidationResult) -> bool:
     if missing_qk:
         vr.error(f"queries[{index}] missing keys: {sorted(missing_qk)}")
         return False
+
+    _validate_row_count_validation(index, q, version, vr)
 
     ms = q.get("ms")
     if ms is None:
@@ -559,7 +631,7 @@ def _validate_single_query(index: int, q: Any, vr: ValidationResult) -> bool:
     return ms_f > 0
 
 
-def _validate_queries_section(queries: Any, vr: ValidationResult) -> None:
+def _validate_queries_section(queries: Any, version: Any, vr: ValidationResult) -> None:
     if not isinstance(queries, list):
         vr.error("'queries' must be a list")
         return
@@ -570,8 +642,7 @@ def _validate_queries_section(queries: Any, vr: ValidationResult) -> None:
     any_nonzero = False
     any_nonzero_measurement = False
     for i, q in enumerate(queries):
-        is_nonzero = _validate_single_query(i, q, vr)
-        if is_nonzero:
+        if _validate_single_query(i, q, version, vr):
             any_nonzero = True
             run_type = str(q.get("run_type") or "measurement").lower() if isinstance(q, dict) else ""
             if run_type == "measurement":
@@ -593,6 +664,19 @@ def _validate_execution_consistency(data: dict[str, Any], vr: ValidationResult) 
     if failed > 0:
         noun = "query" if failed == 1 else "queries"
         vr.error(f"summary.validation='passed' contradicts {failed} failed measurement {noun}")
+
+    queries = data.get("queries")
+    if isinstance(queries, list):
+        for i, q in enumerate(queries):
+            if not isinstance(q, dict):
+                continue
+            rcv = q.get("row_count_validation")
+            if isinstance(rcv, dict):
+                rcv_status = rcv.get("status")
+                if rcv_status is not None and rcv_status != "PASSED":
+                    vr.error(
+                        f"summary.validation='passed' contradicts queries[{i}].row_count_validation.status={rcv_status!r}"
+                    )
 
 
 def _validate_bundle(
@@ -620,7 +704,7 @@ def _validate_bundle(
     )
     _validate_translation_section(data, vr)
     _validate_public_cost_section(data, vr)
-    _validate_queries_section(data.get("queries", []), vr)
+    _validate_queries_section(data.get("queries", []), data.get("version"), vr)
     _validate_execution_consistency(data, vr)
 
 

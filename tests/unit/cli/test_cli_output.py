@@ -537,7 +537,7 @@ class TestResultExporter:
         with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
-        assert data["version"] == "2.1"
+        assert data["version"] == "2.2"
         assert data["benchmark"]["id"] == "tpch"
         assert data["benchmark"]["name"] == "TPC-H"
 
@@ -568,7 +568,7 @@ class TestResultExporter:
         with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
-        assert data["version"] == "2.1"
+        assert data["version"] == "2.2"
         assert data["benchmark"]["name"] == "TPC-H"
         assert data["platform"]["name"] == "duckdb"
 
@@ -795,7 +795,7 @@ class TestResultExporter:
         loaded = self.exporter.load_result_from_file(exported["json"])
 
         assert loaded is not None
-        assert loaded["version"] == "2.1"
+        assert loaded["version"] == "2.2"
         assert loaded["data"]["benchmark"]["id"] == "tpch"
 
     def test_load_result_from_file_not_found(self):
@@ -889,7 +889,7 @@ class TestResultExporter:
 
         # Comparison proceeds but reports missing canonical version as unknown
         assert comparison["baseline_version"] == "unknown"
-        assert comparison["current_version"] == "2.1"
+        assert comparison["current_version"] == "2.2"
 
     def test_export_comparison_report(self):
         """Test exporting comparison report."""
