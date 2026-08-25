@@ -640,7 +640,7 @@ def live_cedardb_adapter():
         host=host,
         port=port,
         username=os.getenv("CEDARDB_USER", "benchbox"),
-        password=os.getenv("CEDARDB_PASSWORD", "benchbox"),
+        password=os.getenv("CEDARDB_PASSWORD", "Benchbox1!"),
         database=os.getenv("CEDARDB_DATABASE", "benchbox_test"),
     )
     yield adapter
