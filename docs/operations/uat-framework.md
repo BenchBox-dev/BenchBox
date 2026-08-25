@@ -667,8 +667,9 @@ running afterwards. Live-observed 2026-08-04: `mocker compose up --wait`
 reported CedarDB `Started`, and `mocker compose ps` showed
 `diag-net-cedardb-1 Exited` roughly **29 seconds** later — the container's
 own log showed why (`Running under cgroup memory limit: 1024 MB`, then
-`FATAL: unable to register fixed io_uring buffer`, a host-memory-exhaustion
-failure, see "Memory headroom gate" below). Because nothing re-checked the
+`FATAL: unable to register fixed io_uring buffer`, because CedarDB's measured
+minimum container request was not declared, see "Memory headroom gate" below).
+Because nothing re-checked the
 stack after `up --wait` returned, UAT ran all 171 remaining cells against
 the dead stack and recorded every one as a **cell failure** — hiding the
 real cause behind 171 misleading rows.
@@ -790,9 +791,8 @@ floor, swap-used percentage alongside (telemetry only — it never gates the
 decision by itself), and the platform's declared VM/container memory
 request (from the compose file's `mem_limit` or
 `deploy.resources.limits.memory`, or "no declared memory limit (engine
-default)" when neither is set — most UAT compose files, including
-CedarDB's, declare none, so the 1024 MB cgroup limit above came from the
-engine's own default sizing, not this repo's compose files).
+default)" when neither is set — most UAT compose files declare none; CedarDB
+explicitly declares a 2 GiB request based on its io_uring startup calibration).
 
 Free memory is measured with `psutil.virtual_memory().available` (`psutil`
 is a hard project dependency) on macOS, Linux, and Windows alike. If the

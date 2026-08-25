@@ -426,6 +426,25 @@ def test_local_managed_clickhouse_compose_password_matches_uat_argv():
     assert "password=benchbox" in argv
 
 
+def test_local_managed_cedardb_compose_credentials_match_uat_argv():
+    spec = docker_assets.docker_platform_spec("cedardb")
+    compose_text = "\n".join(path.read_text() for path in spec.compose_files)
+    argv = matrix.benchbox_run_argv("cedardb", "tpch", 0.01, local_managed_platform=True)
+
+    assert "CEDAR_USER: benchbox" in compose_text
+    assert "CEDAR_PASSWORD: Benchbox1!" in compose_text
+    assert "mem_limit: 2g" in compose_text
+    assert "CEDAR_DB: benchbox_test" in compose_text
+    assert argv[-6:] == [
+        "--platform-option",
+        "username=benchbox",
+        "--platform-option",
+        "database=benchbox_test",
+        "--platform-option",
+        "password=Benchbox1!",
+    ]
+
+
 def test_secondary_ports_follow_compose_mappings(monkeypatch, tmp_path):
     compose = tmp_path / "compose.yml"
     compose.write_text(
