@@ -211,14 +211,11 @@ describe("Compare", () => {
     render(<Compare />);
 
     await waitFor(() => expect(screen.getByTestId("compare-builder")).toBeTruthy());
-    await waitFor(() =>
-      expect(screen.getByTestId("compare-builder-row-tpch-duckdb-sf0.01-20260403-7fe93365")).toBeTruthy(),
-    );
-    const pinnedRow = screen.getByTestId("compare-builder-row-tpch-duckdb-sf0.01-20260403-7fe93365");
-    expect(pinnedRow.textContent).toContain("Public ID 7fe93365");
-    expect(within(pinnedRow).getByText(/\(from result detail\)/)).toBeTruthy();
-    expect(pinnedRow.textContent).not.toContain("DuckDB(from result detail)");
-    expect(getDetailResult).toHaveBeenCalledWith("tpch-duckdb-sf0.01-20260403-7fe93365");
+    await waitFor(() => expect(screen.getByTestId("compare-builder-query-cta")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("compare-builder-status")).toBeTruthy());
+    expect(screen.getByTestId("compare-builder-status").textContent).toContain("1 result selected");
+    expect(screen.getByTestId("compare-builder-query-link")).toHaveAttribute("href", "/results/query");
+    // Pinned builder may still fetch detail for status; not asserted after retirement
     // The old behavior was a redirect to /results/r/<id>; that round-trip is
     // gone. The user must end up on a comparison surface, not the detail page
     // they came from.
@@ -368,7 +365,7 @@ describe("Compare", () => {
     expect(route).not.toHaveBeenCalled();
   });
 
-  it("compare builder enforces same-cohort selection and launches with two compatible runs", async () => {
+  it.skip("compare builder enforces same-cohort selection and launches with two compatible runs [retired: candidate table moved to Query]", async () => {
     setupUrl([]);
     // Two compatible (same benchmark/scale/phase) and one incompatible (different benchmark)
     vi.mocked(listResults).mockResolvedValue([
@@ -529,7 +526,7 @@ describe("Compare", () => {
     });
   });
 
-  it("compare picker hides incompatible candidates by default and surfaces the hidden count", async () => {
+  it.skip("compare picker hides incompatible candidates by default and surfaces the hidden count [retired: candidate table moved to Query]", async () => {
     setupUrl([]);
     vi.mocked(listResults).mockResolvedValue([
       makeResultRow({ result_id: "r1", platform: "DuckDB", platform_id: "duckdb" }),
@@ -565,7 +562,7 @@ describe("Compare", () => {
     expect(getByTestId("compare-builder-status").textContent).toContain("1 incompatible row hidden");
   });
 
-  it("names the four-result ceiling in the builder status", async () => {
+  it.skip("names the four-result ceiling in the builder status [retired: candidate table moved to Query]", async () => {
     setupUrl([]);
     vi.mocked(listResults).mockResolvedValue(
       Array.from({ length: 5 }, (_, index) =>
@@ -587,7 +584,7 @@ describe("Compare", () => {
     expect(getByTestId("compare-builder-status").textContent).toContain("4 results selected (maximum)");
   });
 
-  it("compare picker disables non-comparable candidates before launch", async () => {
+  it.skip("compare picker disables non-comparable candidates before launch [retired: candidate table moved to Query]", async () => {
     setupUrl([]);
     vi.mocked(listResults).mockResolvedValue([
       makeResultRow({ result_id: "r1", platform: "DuckDB", platform_id: "duckdb" }),
@@ -613,7 +610,7 @@ describe("Compare", () => {
     expect((getByTestId("compare-builder-launch") as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("compare picker shows a zero-selectable recovery callout when every filtered row is disabled", async () => {
+  it.skip("compare picker shows a zero-selectable recovery callout when every filtered row is disabled [retired: candidate table moved to Query]", async () => {
     setupUrl([]);
     vi.mocked(listResults).mockResolvedValue([
       makeResultRow({
@@ -640,7 +637,7 @@ describe("Compare", () => {
     );
   });
 
-  it("compare picker uses disambiguated aria-labels for same-platform rows", async () => {
+  it.skip("compare picker uses disambiguated aria-labels for same-platform rows [retired: candidate table moved to Query]", async () => {
     setupUrl([]);
     vi.mocked(listResults).mockResolvedValue([
       makeResultRow({
@@ -669,7 +666,7 @@ describe("Compare", () => {
     expect(labels.some((label) => label.includes("bbbb2222"))).toBe(true);
   });
 
-  it("loads selected runs after builder navigation changes only the compare query string", async () => {
+  it.skip("loads selected runs after builder navigation changes only the compare query string [retired: candidate table moved to Query]", async () => {
     setupUrl([]);
     vi.mocked(listResults).mockResolvedValue([
       makeResultRow({ result_id: "r1", platform: "DuckDB", platform_id: "duckdb" }),

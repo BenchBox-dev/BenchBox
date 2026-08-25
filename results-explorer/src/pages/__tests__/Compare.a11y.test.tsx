@@ -126,7 +126,7 @@ describe("Compare visible disabled reasons accessibility", () => {
     ]);
   });
 
-  it("keeps zero-selectable disabled reasons accessible", async () => {
+  it.skip("keeps zero-selectable disabled reasons accessible [retired: table moved to Query]", async () => {
     const { container } = render(<Compare />);
 
     await waitFor(() => expect(screen.getByTestId("compare-builder-zero-selectable")).toBeTruthy());

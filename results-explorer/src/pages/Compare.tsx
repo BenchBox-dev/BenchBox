@@ -1042,6 +1042,16 @@ function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice:
         </section>
       )}
 
+      <section class="rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] p-4 text-sm" data-testid="compare-builder-query-cta">
+        <p class="font-medium text-[var(--bb-data-fg-primary)]">Pick the second run in Query</p>
+        <p class="mt-1 text-[var(--bb-data-fg-muted)]">
+          Candidate picking now lives in the paged Query Workbench. Use Query to find the second run and return via the generated compare link. The builder below is limited to the pinned result from ResultDetail or the empty state.
+        </p>
+        <div class="mt-3">
+          <a href="/results/query" class="btn btn-primary" data-testid="compare-builder-query-link">Open Query</a>
+        </div>
+      </section>
+      {false && (
       <div class="overflow-x-auto rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
         <table class="min-w-full divide-y divide-[var(--bb-data-border)] text-sm">
           <thead class="bg-[var(--bb-surface-data-muted)]">
@@ -1157,6 +1167,7 @@ function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice:
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }
