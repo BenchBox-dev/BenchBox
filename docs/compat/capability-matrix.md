@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 446
+**Total registered rules:** 452
 
 **Platforms covered:** 34
 
@@ -14,9 +14,9 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 |---|---|---|---|---|---|---|---|
 | athena | - | - | - | - | 1 | - | 1 |
 | bigquery | - | - | - | 2 | 1 | - | 3 |
-| clickhouse | - | 13 | 3 | 4 | 1 | - | 21 |
+| clickhouse | - | 18 | 3 | 4 | 1 | - | 26 |
 | clickhouse-cloud | - | - | - | - | - | 23 | 23 |
-| clickhouse-local | - | - | - | - | - | 23 | 23 |
+| clickhouse-local | 1 | - | - | - | - | 23 | 24 |
 | clickhouse-server | - | - | - | - | - | 23 | 23 |
 | databend | - | - | - | - | 1 | - | 1 |
 | databricks | - | - | - | 2 | 1 | - | 3 |
@@ -71,9 +71,14 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_source | benchmark=coffeeshop, query=TM1 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.coffeeshop.tm1_todatetime_variant` |
 | query_source | benchmark=h2odb, query=Q9 | select_variant | REWRITTEN | SYNTAX_ERROR | `query_source.clickhouse.h2odb.q9_quantile_variant` |
 | query_source | benchmark=nyctaxi, query=rush-hour-analysis | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.rush_hour_datediff_variant` |
+| query_source | benchmark=nyctaxi, query=trip-duration-analysis | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.trip_duration_datediff_variant` |
 | query_source | benchmark=nyctaxi, query=trips-by-day-of-week | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.trips_by_dow_todayofweek_variant` |
 | query_source | benchmark=nyctaxi, query=weekday-weekend-comparison | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.weekday_weekend_tohour_variant` |
+| query_source | benchmark=tpcdi, query=AQ10 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.tpcdi.aq10_variant` |
 | query_source | benchmark=tpcdi, query=AQ6 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.tpcdi.aq6_cross_join_variant` |
+| query_source | benchmark=tpcdi, query=AQ7 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.tpcdi.aq7_variant` |
+| query_source | benchmark=tpcdi, query=AQ8 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.tpcdi.aq8_variant` |
+| query_source | benchmark=tpcdi, query=EQ7 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.tpcdi.eq7_variant` |
 | query_source | benchmark=vector_search, query=Q1 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.vector_search.q1_variant` |
 | query_source | benchmark=vector_search, query=Q2 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.vector_search.q2_variant` |
 | query_source | benchmark=vector_search, query=Q3 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.vector_search.q3_variant` |
@@ -121,6 +126,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
+| benchmark_gate | benchmark=metadata_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.clickhouse-local.metadata_primitives.unsupported` |
 | execution_filter | benchmark=tpchavoc, query=10_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.10_v1` |
 | execution_filter | benchmark=tpchavoc, query=11_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.11_v4` |
 | execution_filter | benchmark=tpchavoc, query=12_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.12_v7` |

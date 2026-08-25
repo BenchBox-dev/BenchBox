@@ -4,7 +4,7 @@
 
 Rules the registry applies to queries, benchmarks, and DDL statements. Split into two sections based on whether the outcome is user-visible in result counts. Each entry names the platform, the scope the rule applies to, the registered reason, and the rule_id you can grep for in `benchbox/sql_compat/rules/`.
 
-**Total rules:** 349
+**Total rules:** 350
 
 **Platforms with rules:** 21
 
@@ -44,6 +44,7 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 
 | support | scope | phase | reason | rule_id |
 |---|---|---|---|---|
+| BLOCKED | benchmark=metadata_primitives | benchmark_gate | Embedded ClickHouse Local has no privileged ACL introspection contract. | `benchmark_gate.clickhouse-local.metadata_primitives.unsupported` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=10_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.10_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=11_v4 | execution_filter | ClickHouse rejects an aggregate over a select-list-alias aggregate (nested aggregate, Code 184 ILLEGAL_AGGREGATION). | `execution_filter.clickhouse-local.tpchavoc.11_v4` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=12_v7 | execution_filter | ClickHouse rejects DuckDB FILTER clauses on COUNT aggregates (Code 42, COUNT requires zero or one argument). | `execution_filter.clickhouse-local.tpchavoc.12_v7` |

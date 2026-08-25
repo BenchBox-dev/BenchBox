@@ -170,7 +170,14 @@ def test_enumerate_records_datafusion_clickhouse_pruned_benchmark_gates():
     raw = {
         "platforms": {"include": ["datafusion", "clickhouse-local"]},
         "benchmarks": {
-            "include": ["write_primitives", "transaction_primitives", "ai_primitives", "vector_search", "tpch"]
+            "include": [
+                "write_primitives",
+                "transaction_primitives",
+                "ai_primitives",
+                "metadata_primitives",
+                "vector_search",
+                "tpch",
+            ]
         },
         "scales": {"rungs": [0.01]},
     }
@@ -180,6 +187,7 @@ def test_enumerate_records_datafusion_clickhouse_pruned_benchmark_gates():
     assert {(c.platform, c.benchmark) for c in result.cells} == {
         ("clickhouse-local", "vector_search"),
         ("clickhouse-local", "tpch"),
+        ("datafusion", "metadata_primitives"),
         ("datafusion", "tpch"),
     }
     pruned = {(c.platform, c.benchmark): c for c in result.compatibility_pruned}
@@ -191,6 +199,7 @@ def test_enumerate_records_datafusion_clickhouse_pruned_benchmark_gates():
         ("clickhouse-local", "write_primitives"),
         ("clickhouse-local", "transaction_primitives"),
         ("clickhouse-local", "ai_primitives"),
+        ("clickhouse-local", "metadata_primitives"),
     }
     assert set(pruned) == expected_pruned
     for platform, benchmark in expected_pruned:
@@ -198,6 +207,7 @@ def test_enumerate_records_datafusion_clickhouse_pruned_benchmark_gates():
         assert pruned[(platform, benchmark)].status == "blocked"
     assert "DataFusion" in pruned[("datafusion", "transaction_primitives")].reason
     assert "AI primitives" in pruned[("clickhouse-local", "ai_primitives")].reason
+    assert "SHOW USERS" in pruned[("clickhouse-local", "metadata_primitives")].reason
     assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
 
 
@@ -320,6 +330,45 @@ def test_enumerate_records_pg_family_release_gate_compatibility_pruning():
     timescaledb_caps = PlatformRegistry.get_platform_capabilities("timescaledb")
     assert timescaledb_caps is not None
     assert "datavault" not in timescaledb_caps.unsupported_benchmarks
+
+
+def test_enumerate_prunes_sqlite_tpcds_obt_release_gate_scale_ladder():
+    raw = {
+        "platforms": {"include": ["sqlite"]},
+        "benchmarks": {"include": ["tpcds_obt"]},
+        "compatibility": {"release_gate_runtime_envelopes": True},
+        "scales": {"rungs": [0.01, 0.1, 1.0]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
+
+    assert result.cells == ()
+    assert [(cell.platform, cell.benchmark, cell.scale) for cell in result.compatibility_pruned] == [
+        ("sqlite", "tpcds_obt", 0.01),
+        ("sqlite", "tpcds_obt", 0.1),
+        ("sqlite", "tpcds_obt", 1.0),
+    ]
+    for cell in result.compatibility_pruned:
+        assert cell.rule_id == "uat.compat.sqlite.tpcds_obt.release_gate_runtime_envelope"
+        assert cell.status == "blocked"
+        assert "1200s" in cell.reason
+        assert "518-column" in cell.reason
+        assert "PR #1904" in cell.evidence
+
+
+def test_enumerate_keeps_sqlite_tpcds_obt_without_release_gate_runtime_envelopes():
+    raw = {
+        "platforms": {"include": ["sqlite"]},
+        "benchmarks": {"include": ["tpcds_obt"]},
+        "scales": {"rungs": [0.01]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
+
+    assert [(cell.platform, cell.benchmark, cell.scale) for cell in result.cells] == [
+        ("sqlite", "tpcds_obt", 1.0),
+    ]
+    assert result.compatibility_pruned == ()
 
 
 def test_enumerate_preserves_explicit_empty_include_as_default_suppression():

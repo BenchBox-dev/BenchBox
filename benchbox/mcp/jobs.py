@@ -837,7 +837,10 @@ class DurableJobWorker:
         """
         if path.is_dir() and sys.platform == "win32":
             return
-        descriptor = os.open(path, os.O_RDONLY)
+        # Windows' ``FlushFileBuffers`` requires a write-capable handle.  Keep
+        # read-only handles on POSIX so directory metadata remains flushable.
+        flags = os.O_RDWR if sys.platform == "win32" else os.O_RDONLY
+        descriptor = os.open(path, flags)
         try:
             os.fsync(descriptor)
         finally:

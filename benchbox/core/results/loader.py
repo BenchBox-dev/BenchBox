@@ -1,10 +1,10 @@
-"""Result file loading and discovery utilities for schema v2.0.
+"""Result file loading and discovery utilities for schema v2.x.
 
 This module provides functionality to load and reconstruct BenchmarkResults
 from exported JSON files, enabling result re-export and analysis without
 re-running benchmarks.
 
-IMPORTANT: Only schema v2.0 files are supported. Legacy v1.x files are rejected.
+IMPORTANT: Only supported schema v2.x files are accepted. Legacy v1.x files are rejected.
 """
 
 from __future__ import annotations
@@ -30,7 +30,11 @@ from benchbox.core.results.query_execution import (
 )
 from benchbox.core.results.query_normalizer import normalize_query_id
 from benchbox.core.results.query_plan_models import QueryPlanDAG
-from benchbox.core.results.schema_policy import LOADER_SCHEMA_POLICY, is_loader_supported_result_schema
+from benchbox.core.results.schema_policy import (
+    LOADER_SCHEMA_POLICY,
+    ROW_COUNT_VALIDATION_SCHEMA_VERSION,
+    is_loader_supported_result_schema,
+)
 from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
@@ -207,13 +211,27 @@ def _load_companion_file(main_file: Path, suffix: str) -> tuple[dict[str, Any] |
         return None, f"{companion_path.name}: {e}"
 
 
+def _validate_versioned_query_extensions(data: dict[str, Any]) -> None:
+    """Reject query extensions that predate their schema contract."""
+    version = str(data.get("version", ""))
+    if version == ROW_COUNT_VALIDATION_SCHEMA_VERSION:
+        return
+
+    for index, query in enumerate(data.get("queries", [])):
+        if isinstance(query, dict) and "row_count_validation" in query:
+            raise ValueError(
+                f"queries[{index}].row_count_validation requires schema version "
+                f"{ROW_COUNT_VALIDATION_SCHEMA_VERSION}, got {version!r}"
+            )
+
+
 def reconstruct_benchmark_results(
     data: dict[str, Any],
     plans_data: dict[str, Any] | None = None,
     tuning_data: dict[str, Any] | None = None,
     applied_data: dict[str, Any] | None = None,
 ) -> BenchmarkResults:
-    """Reconstruct a BenchmarkResults object from v2.0 JSON schema.
+    """Reconstruct a BenchmarkResults object from a supported v2.x JSON schema.
 
     This function reverses the transformation performed by build_result_payload()
     in the schema module, mapping JSON keys back to BenchmarkResults dataclass
@@ -233,6 +251,7 @@ def reconstruct_benchmark_results(
         KeyError: If required fields are missing.
         ValueError: If data cannot be parsed correctly.
     """
+    _validate_versioned_query_extensions(data)
     run_section = data.get("run", {})
     benchmark_section = data.get("benchmark", {})
     platform_section = data.get("platform", {})

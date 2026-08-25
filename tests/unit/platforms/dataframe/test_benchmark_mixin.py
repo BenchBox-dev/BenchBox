@@ -89,6 +89,19 @@ class DummyDataFusionAdapter(DummyAdapter):
     family = "expression"
 
 
+class TpchRowCountAdapter(DummyAdapter):
+    """Adapter stub whose Q1 row count matches the SF1 TPC-H answer set."""
+
+    def __init__(self, rows_returned: int = 4) -> None:
+        super().__init__()
+        self.rows_returned = rows_returned
+
+    def execute_query(self, ctx, query, query_id=None):
+        result = super().execute_query(ctx, query, query_id)
+        result["rows_returned"] = self.rows_returned
+        return result
+
+
 class DummyBenchmarkWithPlatformSkips:
     """Benchmark that vends platform-specific skip lists via get_platform_skip_queries."""
 
@@ -263,7 +276,7 @@ def test_sharded_tables_use_prepared_paths_when_prefer_parquet(tmp_path):
             options=DataFrameRunOptions(prefer_parquet=True),
         )
 
-    assert result.validation_status == "PASSED"
+    assert result.validation_status == "NOT_RUN"
     prep.assert_called_once()
     assert adapter.loaded_paths["lineitem"] == [prepared]
 
@@ -311,7 +324,7 @@ def test_magicmock_benchmark_does_not_false_positive_skip_loader(tmp_path):
         options=DataFrameRunOptions(prefer_parquet=False),
     )
 
-    assert result.validation_status == "PASSED"
+    assert result.validation_status == "NOT_RUN"
     assert adapter.loaded_paths["customer"] == [tbl_path]
 
 
@@ -345,9 +358,67 @@ def test_magicmock_benchmark_does_not_false_positive_execute_workload():
         options=DataFrameRunOptions(prefer_parquet=False),
     )
 
-    assert result.validation_status == "PASSED"
+    assert result.validation_status == "NOT_RUN"
     assert benchmark.execute_dataframe_workload.called is False
     assert adapter.executed_query_ids == ["Q1"]
+
+
+def test_tpch_reference_run_records_query_and_run_validation_evidence() -> None:
+    adapter = TpchRowCountAdapter()
+    benchmark = DummyBenchmark({})
+    config = BenchmarkConfig(
+        name="tpch",
+        display_name="TPC-H",
+        scale_factor=1.0,
+        queries=["1"],
+        options={"power_warmup_iterations": 0, "power_iterations": 1},
+    )
+
+    result = adapter.run_benchmark(
+        benchmark,
+        benchmark_config=config,
+        phases=DataFramePhases(load=False, execute=True),
+        options=DataFrameRunOptions(prefer_parquet=False),
+    )
+
+    assert result.validation_status == "PASSED"
+    assert result.validation_details == {
+        "provider": "tpc_expected_row_counts",
+        "benchmark": "tpch",
+        "checked": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0,
+    }
+    assert result.query_results[0]["row_count_validation"] == {
+        "expected": 4,
+        "actual": 4,
+        "status": "PASSED",
+    }
+
+
+def test_tpch_reference_mismatch_fails_the_query_and_run() -> None:
+    adapter = TpchRowCountAdapter(rows_returned=3)
+    benchmark = DummyBenchmark({})
+    config = BenchmarkConfig(
+        name="tpch",
+        display_name="TPC-H",
+        scale_factor=1.0,
+        queries=["1"],
+        options={"power_warmup_iterations": 0, "power_iterations": 1},
+    )
+
+    result = adapter.run_benchmark(
+        benchmark,
+        benchmark_config=config,
+        phases=DataFramePhases(load=False, execute=True),
+        options=DataFrameRunOptions(prefer_parquet=False),
+    )
+
+    assert result.validation_status == "FAILED"
+    assert result.failed_queries == 1
+    assert result.query_results[0]["row_count_validation"]["status"] == "FAILED"
 
 
 def test_capture_plans_uses_profiled_execution_without_capture_plan_kw(tmp_path):
@@ -370,7 +441,7 @@ def test_capture_plans_uses_profiled_execution_without_capture_plan_kw(tmp_path)
         options=DataFrameRunOptions(prefer_parquet=False),
     )
 
-    assert result.validation_status == "PASSED"
+    assert result.validation_status == "NOT_RUN"
     assert adapter.profiled_called is True
     assert result.query_plans_captured == 1
     assert result.plan_capture_failures == 0
@@ -396,7 +467,7 @@ def test_capture_plans_counts_missing_plan_as_failure(tmp_path):
         options=DataFrameRunOptions(prefer_parquet=False),
     )
 
-    assert result.validation_status == "PASSED"
+    assert result.validation_status == "NOT_RUN"
     assert result.query_plans_captured == 0
     assert result.plan_capture_failures == 1
     assert result.plan_capture_errors

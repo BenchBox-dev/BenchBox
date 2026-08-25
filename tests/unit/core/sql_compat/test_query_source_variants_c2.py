@@ -1,8 +1,8 @@
 """Parity tests for W11 query_source variant rules - NYC Taxi and TPC-DI.
 
 Verifies that:
-1. nyctaxi_variants.py registers exactly 7 rules (4 StarRocks + 3 ClickHouse).
-2. tpcdi_variants.py registers exactly 6 rules (clickhouse AQ6 + three DataFusion + StarRocks/Doris EQ7).
+1. nyctaxi_variants.py registers exactly 8 rules (4 StarRocks + 4 ClickHouse).
+2. tpcdi_variants.py registers exactly 10 rules (five ClickHouse + three DataFusion + StarRocks/Doris EQ7).
 3. Each rule has SELECT_VARIANT action and a SelectVariantPayload.
 4. Shadow-mode: no divergence (legacy already selects the variant SQL).
 5. Registry is silent for platforms with no rule (duckdb).
@@ -40,15 +40,16 @@ _NYCTAXI_CLICKHOUSE_RULES = [
     ("query_source.clickhouse.nyctaxi.trips_by_dow_todayofweek_variant", "trips-by-day-of-week"),
     ("query_source.clickhouse.nyctaxi.weekday_weekend_tohour_variant", "weekday-weekend-comparison"),
     ("query_source.clickhouse.nyctaxi.rush_hour_datediff_variant", "rush-hour-analysis"),
+    ("query_source.clickhouse.nyctaxi.trip_duration_datediff_variant", "trip-duration-analysis"),
 ]
 
 
 def test_nyctaxi_variant_rules_registered():
-    """Exactly 7 query_source rules registered for nyctaxi (4 StarRocks + 3 ClickHouse)."""
+    """Exactly 8 query_source rules registered for nyctaxi (4 StarRocks + 4 ClickHouse)."""
     rules = [
         (key, entry) for key, entry in REGISTRY.all_rules() if key[0] is Phase.QUERY_SOURCE and key[2] == "nyctaxi"
     ]
-    assert len(rules) == 7, f"Expected 7 nyctaxi rules, got {len(rules)}: {[e.rule_id for _, e in rules]}"
+    assert len(rules) == 8, f"Expected 8 nyctaxi rules, got {len(rules)}: {[e.rule_id for _, e in rules]}"
     rule_ids = {entry.rule_id for _, entry in rules}
     for rule_id, _ in _NYCTAXI_STARROCKS_RULES + _NYCTAXI_CLICKHOUSE_RULES:
         assert rule_id in rule_ids, f"Missing rule: {rule_id}"
@@ -64,6 +65,7 @@ def test_nyctaxi_variant_rules_registered():
         ("clickhouse", "trips-by-day-of-week", "toDayOfWeek"),
         ("clickhouse", "weekday-weekend-comparison", "toHour"),
         ("clickhouse", "rush-hour-analysis", "dateDiff"),
+        ("clickhouse", "trip-duration-analysis", "dateDiff"),
     ],
 )
 def test_nyctaxi_rule_action_and_payload(platform: str, query_id: str, expected_snippet: str):
@@ -98,8 +100,8 @@ def test_nyctaxi_duckdb_has_no_rule(query_id: str):
     assert REGISTRY.resolve(ctx) is None, f"Unexpected rule for duckdb/nyctaxi/{query_id}"
 
 
-def test_nyctaxi_starrocks_has_no_trip_duration_for_clickhouse():
-    """trip-duration-analysis is only in StarRocks - ClickHouse has no rule for it."""
+def test_nyctaxi_clickhouse_has_trip_duration_variant():
+    """ClickHouse needs a native duration expression for trip-duration-analysis."""
     ctx = CompatibilityContext(
         platform="clickhouse",
         platform_version=None,
@@ -109,7 +111,9 @@ def test_nyctaxi_starrocks_has_no_trip_duration_for_clickhouse():
         mode="sql",
         dialect="clickhouse",
     )
-    assert REGISTRY.resolve(ctx) is None
+    decision = REGISTRY.resolve(ctx)
+    assert decision is not None
+    assert "dateDiff('second'" in decision.payload.variant_sql
 
 
 # ---------------------------------------------------------------------------
@@ -120,9 +124,16 @@ def test_nyctaxi_starrocks_has_no_trip_duration_for_clickhouse():
 def test_tpcdi_variant_rules_registered():
     """TPC-DI query-source rules cover ClickHouse, DataFusion, StarRocks, and Doris."""
     rules = [(key, entry) for key, entry in REGISTRY.all_rules() if key[0] is Phase.QUERY_SOURCE and key[2] == "tpcdi"]
-    assert len(rules) == 6, f"Expected 6 tpcdi rules, got {len(rules)}: {[e.rule_id for _, e in rules]}"
+    assert len(rules) == 10, f"Expected 10 tpcdi rules, got {len(rules)}: {[e.rule_id for _, e in rules]}"
     rule_ids = {entry.rule_id for _, entry in rules}
-    assert "query_source.clickhouse.tpcdi.aq6_cross_join_variant" in rule_ids
+    for rule_id in (
+        "query_source.clickhouse.tpcdi.aq6_cross_join_variant",
+        "query_source.clickhouse.tpcdi.aq7_variant",
+        "query_source.clickhouse.tpcdi.aq8_variant",
+        "query_source.clickhouse.tpcdi.aq10_variant",
+        "query_source.clickhouse.tpcdi.eq7_variant",
+    ):
+        assert rule_id in rule_ids
     assert "query_source.datafusion.tpcdi.aq9_projection_variant" in rule_ids
     assert "query_source.datafusion.tpcdi.eq7_derived_table_variant" in rule_ids
     assert "query_source.datafusion.tpcdi.vq6_projection_variant" in rule_ids
@@ -134,6 +145,10 @@ def test_tpcdi_variant_rules_registered():
     "platform,query_id,expected_snippet",
     [
         ("clickhouse", "AQ6", "CROSS JOIN"),
+        ("clickhouse", "AQ7", "dateDiff"),
+        ("clickhouse", "AQ8", "dateDiff"),
+        ("clickhouse", "AQ10", "dateDiff"),
+        ("clickhouse", "EQ7", "quality_metrics"),
         ("datafusion", "AQ9", "avg_sell_price"),
         ("datafusion", "EQ7", "quality_metrics"),
         ("datafusion", "VQ6", "grouped_positions"),
@@ -215,6 +230,7 @@ def test_tpcdi_aq6_sql_has_format_placeholders():
         ("clickhouse", "trips-by-day-of-week"),
         ("clickhouse", "weekday-weekend-comparison"),
         ("clickhouse", "rush-hour-analysis"),
+        ("clickhouse", "trip-duration-analysis"),
     ],
 )
 def test_nyctaxi_registry_returns_variant(platform: str, query_id: str):

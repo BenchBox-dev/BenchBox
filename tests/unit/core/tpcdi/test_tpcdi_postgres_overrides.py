@@ -69,3 +69,11 @@ def test_datafusion_renders_boolean_dates_and_eq7_aliases() -> None:
     assert "FROM (VALUES (0)) AS dummy" not in queries["EQ7"]
     assert "FROM (\n    SELECT" in queries["EQ7"]
     assert "IsCurrent IS TRUE" in queries["EQ7"]
+
+
+@pytest.mark.parametrize("query_id", ["AQ9", "EQ7", "VQ6"])
+def test_get_query_datafusion_matches_bulk_variant(query_id: str) -> None:
+    """Single-query DataFusion retrieval must use the same variant as bulk retrieval."""
+    bench = _bench()
+
+    assert bench.get_query(query_id, dialect="datafusion") == bench.get_queries(dialect="datafusion")[query_id]

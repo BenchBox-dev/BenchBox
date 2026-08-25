@@ -8,11 +8,13 @@ bundles even when privacy was clean. The mirror workflow must pass
 
 from __future__ import annotations
 
-import subprocess
+import os
 from pathlib import Path
 
 import pytest
 import yaml
+
+from tests.utilities.posix_shell import run_posix_shell, skip_without_posix_shell
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -39,14 +41,21 @@ def _submission_validation_run() -> str:
 def _evaluate_trust_gate(*, is_fork: str, base_ref: str | None, head_ref: str, pr_author: str) -> tuple[str, str]:
     run = _submission_validation_run()
     prefix = run.split("# Trusted bot-created same-repo mirrors", maxsplit=1)[0]
-    env = {"IS_FORK": is_fork, "HEAD_REF": head_ref, "PR_AUTHOR": pr_author}
+    env = os.environ.copy()
+    env.update({"IS_FORK": is_fork, "HEAD_REF": head_ref, "PR_AUTHOR": pr_author})
     if base_ref is not None:
         env["BASE_REF"] = base_ref
-    output = subprocess.check_output(
-        ["bash", "-c", prefix + '\nprintf "%s|%s\\n" "$REQUIRE_MANIFEST" "$ALLOW_PARTIAL_VALIDATION"'],
+    else:
+        env.pop("BASE_REF", None)
+    skip_without_posix_shell()
+    result = run_posix_shell(
+        prefix + '\nprintf "%s|%s\\n" "$REQUIRE_MANIFEST" "$ALLOW_PARTIAL_VALIDATION"',
+        capture_output=True,
+        check=True,
         env=env,
         text=True,
-    ).strip()
+    )
+    output = result.stdout.strip()
     require_manifest, allow_partial = output.split("|", maxsplit=1)
     return require_manifest, allow_partial
 

@@ -4,6 +4,12 @@ AQ6 uses SUM(SUM(x)) OVER () which ClickHouse does not support; replaced with
 a CROSS JOIN pre-computed grand total.  CLICKHOUSE_AQ6_SQL is a TEMPLATE -
 callers must apply parameters via .format(**params) before executing.
 
+AQ7/AQ8 use SQLite Julian-day expressions and EQ7 cross-references sibling
+subquery aliases. AQ10 also needs an explicit derived-table join key. The
+ClickHouse variants below keep the benchmark semantics while using native
+dateDiff/today expressions and a derived-table projection that ClickHouse can
+resolve.
+
 EQ7 cross-references sibling subquery aliases which StarRocks (MySQL-compatible)
 rejects; replaced by wrapping the UNION ALL in a derived table.
 STARROCKS_EQ7_SQL and DORIS_EQ7_SQL are complete SQL strings with no format
@@ -11,6 +17,8 @@ placeholders.
 """
 
 from __future__ import annotations
+
+from typing import Any
 
 from benchbox.sql_compat.actions import CompatAction
 from benchbox.sql_compat.context import Phase
@@ -24,6 +32,75 @@ from benchbox.sql_compat.registry import REGISTRY
 
 _B = "tpcdi"
 _P = Phase.QUERY_SOURCE
+
+
+def _clickhouse_metric_query(query_id: str, params: dict[str, Any] | None = None) -> str:
+    """Build a ClickHouse-safe TPC-DI metric query from its canonical source."""
+    from benchbox.core.tpcdi.queries import TPCDIQueryManager
+
+    manager = TPCDIQueryManager().analytical_queries
+    query = manager._queries[query_id]
+    query = query.replace(
+        "JULIANDAY(DATE('now')) - JULIANDAY(MIN(d.DateValue))",
+        "dateDiff('day', MIN(d.DateValue), today())",
+    )
+    query = query.replace(
+        "JULIANDAY(MAX(d.DateValue)) - JULIANDAY(MIN(d.DateValue))",
+        "dateDiff('day', MIN(d.DateValue), MAX(d.DateValue))",
+    )
+    query = query.replace(
+        "JULIANDAY(sell_date.DateValue) - JULIANDAY(buy_date.DateValue)",
+        "dateDiff('day', buy_date.DateValue, sell_date.DateValue)",
+    )
+    query = query.replace(
+        "JULIANDAY(t1_date.DateValue) - JULIANDAY(t2_date.DateValue)",
+        "dateDiff('day', t2_date.DateValue, t1_date.DateValue)",
+    )
+    query = query.replace("JULIANDAY(DATE('now', '-90 days'))", "today() - INTERVAL 90 DAY")
+    query = query.replace("DATE('now', '-90 days')", "today() - INTERVAL 90 DAY")
+    query = query.replace("current_date", "today()")
+
+    if query_id == "AQ10":
+        query = query.replace("t1.TradeID,\n        CASE", "t1.TradeID AS trade_id,\n        CASE")
+        query = query.replace(
+            "wash_sales ON t.TradeID = wash_sales.TradeID", "wash_sales ON t.TradeID = wash_sales.trade_id"
+        )
+        query = query.replace(
+            "COUNT(CASE WHEN t.Quantity * t.TradePrice > {large_trade_threshold} THEN 1 END)",
+            "countIf(t.Quantity * t.TradePrice > {large_trade_threshold})",
+        )
+        query = query.replace(
+            "COUNT(CASE WHEN d.DateValue = today() THEN 1 END)",
+            "countIf(d.DateValue = today())",
+        )
+        query = query.replace(
+            "COUNT(CASE WHEN wash_sales.wash_sale_flag = 1 THEN 1 END)",
+            "countIf(wash_sales.wash_sale_flag = 1)",
+        )
+
+    if query_id == "AQ7":
+        query = query.replace("c.SK_CustomerID,\n            MIN", "c.SK_CustomerID AS customer_id,\n            MIN")
+        query = query.replace("customer_metrics.SK_CustomerID", "customer_metrics.customer_id")
+
+    if query_id == "AQ8":
+        query = query.replace(
+            "GREATEST(dateDiff('day', MIN(d.DateValue), MAX(d.DateValue)), 1)",
+            "greatest(dateDiff('day', MIN(d.DateValue), MAX(d.DateValue)), 1)",
+        )
+    query_params = manager._generate_default_params(query_id)
+    if params:
+        query_params.update(params)
+    return query.format(**query_params)
+
+
+def build_clickhouse_metric_query(query_id: str, params: dict[str, Any] | None = None) -> str:
+    """Build a parameter-rendered ClickHouse variant for an analytical query."""
+    return _clickhouse_metric_query(query_id, params)
+
+
+CLICKHOUSE_AQ7_SQL = _clickhouse_metric_query("AQ7")
+CLICKHOUSE_AQ8_SQL = _clickhouse_metric_query("AQ8")
+CLICKHOUSE_AQ10_SQL = _clickhouse_metric_query("AQ10")
 
 # AQ6: SUM(SUM(x)) OVER () nested window aggregate is unsupported in ClickHouse.
 # Replaced with a CROSS JOIN subquery that pre-computes the grand total.
@@ -277,6 +354,7 @@ DATAFUSION_EQ7_SQL = STARROCKS_EQ7_SQL.replace("IsCurrent = 1", "IsCurrent IS TR
 # Doris currently uses the same MySQL-compatible EQ7 rewrite as StarRocks.
 # Keep a Doris-named alias so future dialect drift becomes an explicit edit.
 DORIS_EQ7_SQL = STARROCKS_EQ7_SQL
+CLICKHOUSE_EQ7_SQL = STARROCKS_EQ7_SQL
 
 for _query_id, _variant_sql, _reason in (
     (
@@ -343,6 +421,27 @@ REGISTRY.register(
     benchmark=_B,
     query_id="AQ6",
 )
+
+for _query_id, _variant_sql, _description in (
+    ("AQ7", CLICKHOUSE_AQ7_SQL, "replace SQLite Julian-day date arithmetic with ClickHouse dateDiff"),
+    ("AQ8", CLICKHOUSE_AQ8_SQL, "replace SQLite Julian-day date arithmetic with ClickHouse dateDiff"),
+    ("AQ10", CLICKHOUSE_AQ10_SQL, "project the ClickHouse wash-sales join key explicitly"),
+    ("EQ7", CLICKHOUSE_EQ7_SQL, "compute the quality score from the UNION-derived columns"),
+):
+    REGISTRY.register(
+        CompatibilityDecision(
+            rule_id=f"query_source.clickhouse.tpcdi.{_query_id.lower()}_variant",
+            action=CompatAction.SELECT_VARIANT,
+            support_level=SupportLevel.REWRITTEN,
+            failure_mode=FailureMode.UNSUPPORTED_FEATURE,
+            payload=SelectVariantPayload(variant_key="clickhouse", variant_sql=_variant_sql),
+            reason=f"ClickHouse TPC-DI compatibility rewrite: {_description}",
+        ),
+        _P,
+        "clickhouse",
+        benchmark=_B,
+        query_id=_query_id,
+    )
 
 REGISTRY.register(
     CompatibilityDecision(
