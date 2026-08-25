@@ -38,6 +38,7 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { RankingEligibilityLegend, RunIdentityLabel } from "@/components/DataTable";
 import { CompareTray } from "@/components/CompareTray";
+import { TrayAnnouncer } from "@/components/TrayAnnouncer";
 import { NotFound } from "@/pages/NotFound";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
@@ -803,6 +804,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         </div>
       )}
 
+      <TrayAnnouncer count={selectedComparableCount} />
       {/* Sticky Compare bar */}
       {compareUrl && (
         <CompareTray

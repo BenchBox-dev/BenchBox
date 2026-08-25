@@ -39,6 +39,7 @@ import { RunIdentityLabel } from "@/components/DataTable";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { DataTable } from "@/components/DataTable";
 import { CompareTray } from "@/components/CompareTray";
+import { TrayAnnouncer } from "@/components/TrayAnnouncer";
 import type { SortState } from "@/types";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
@@ -840,6 +841,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         </div>
       )}
 
+      <TrayAnnouncer count={selected.size} />
       {compareUrl && (
         <CompareTray
           summary={

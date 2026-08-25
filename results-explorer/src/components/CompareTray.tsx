@@ -40,21 +40,6 @@ export function CompareTray({ summary, items, compareHref, compareLabel, onClear
   }, []);
 
   const collapsed = isMobile && !expanded;
-  const [announcement, setAnnouncement] = useState("");
-  const announcementTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Debounced polite announcement when selection changes.
-  useEffect(() => {
-    if (announcementTimer.current) clearTimeout(announcementTimer.current);
-    announcementTimer.current = setTimeout(() => {
-      const count = items.length;
-      if (count === 0) setAnnouncement("No results selected");
-      else if (count === 1) setAnnouncement("1 result selected. Select one more to compare.");
-      else setAnnouncement(`${count} results selected. Ready to compare.`);
-    }, 180);
-    return () => {
-      if (announcementTimer.current) clearTimeout(announcementTimer.current);
-    };
-  }, [items.length]);
 
   // Focus must not be stolen when the tray appears; only Escape return-focus.
   useEffect(() => {
@@ -98,9 +83,6 @@ export function CompareTray({ summary, items, compareHref, compareLabel, onClear
         aria-hidden="true"
         style={{ height: `${trayHeight}px` }}
       />
-      <div aria-live="polite" aria-atomic="true" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap" data-testid="compare-tray-announcer" role="status">
-        {announcement}
-      </div>
       <div
         ref={trayRef}
         class="bb-compare-tray fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 pt-3 shadow-lg"
