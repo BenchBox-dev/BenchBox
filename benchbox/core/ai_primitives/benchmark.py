@@ -167,6 +167,26 @@ class AIPrimitivesBenchmark(BaseBenchmark):
         """AI Primitives benchmark shares TPC-H data."""
         return "tpch"
 
+    def get_schema(self) -> dict[str, dict[str, Any]]:
+        """Return the TPC-H schema used by the AI query workload."""
+        from benchbox.core.tpch.benchmark import TPCHBenchmark
+
+        return TPCHBenchmark(scale_factor=self.scale_factor, output_dir=self.output_dir).get_schema()
+
+    def get_create_tables_sql(self, dialect: str = "standard", tuning_config: Any | None = None) -> str:
+        """Return CREATE TABLE SQL for the shared TPC-H data source.
+
+        AI Primitives does not define a separate relational schema. It reuses
+        TPC-H data, but still must expose the standard benchmark schema contract
+        so platform adapters can create those tables before loading data.
+        """
+        from benchbox.core.tpch.benchmark import TPCHBenchmark
+
+        return TPCHBenchmark(scale_factor=self.scale_factor, output_dir=self.output_dir).get_create_tables_sql(
+            dialect=dialect,
+            tuning_config=tuning_config,
+        )
+
     def generate_data(self) -> list[Union[str, Path]]:
         """Generate benchmark data.
 
