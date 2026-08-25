@@ -76,6 +76,18 @@ def test_non_clickhouse_q35_keeps_original_exists_shape():
     assert "c.c_customer_sk IN (SELECT" not in query
 
 
+def test_clickhouse_q35a_keeps_supported_variant_shape():
+    """Q35a is already bounded and must not enter the base-Q35 shape rewrite."""
+    bench = _bench()
+
+    query = bench.get_query(35, variant="a", seed=SEEDS[0], dialect="clickhouse")
+
+    assert "store_sales" in query
+    assert "web_sales" in query
+    assert "catalog_sales" in query
+    assert "c.c_customer_sk IN (SELECT" not in query
+
+
 def test_clickhouse_q47_q57_seeded_queries_preserve_dsqgen_tail_across_seeds():
     """Seeded ClickHouse Q47/Q57 rewrites must preserve the dsqgen-selected v2 tail."""
     bench = _bench()
