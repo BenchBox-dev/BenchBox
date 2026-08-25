@@ -47,6 +47,7 @@ def test_validate_config_minimal():
     assert cfg.preflight.free_space_min_gib == 5.0
     assert cfg.preflight.free_memory_min_gib == 2.0
     assert cfg.preflight.clickhouse_memory_limit == "5.25g"
+    assert cfg.preflight.starrocks_memory_limit == "4g"
     assert cfg.preflight.docker_memory_reserve_gib == 0.0
     assert cfg.memory_gate_enabled is True
     assert cfg.cleanup.docker_manage_platforms is False
@@ -216,10 +217,21 @@ def test_validate_config_accepts_clickhouse_memory_admission_settings():
     assert cfg.preflight.docker_memory_reserve_gib == 3.5
 
 
+def test_validate_config_accepts_starrocks_memory_admission_settings():
+    cfg = config.validate_config({"name": "smoke", "preflight": {"starrocks_memory_limit": "6g"}})
+    assert cfg.preflight.starrocks_memory_limit == "6g"
+
+
 @pytest.mark.parametrize("value", ["", None, 4])
 def test_validate_config_rejects_invalid_clickhouse_memory_limit(value):
     with pytest.raises(config.ConfigError, match="clickhouse_memory_limit"):
         config.validate_config({"name": "smoke", "preflight": {"clickhouse_memory_limit": value}})
+
+
+@pytest.mark.parametrize("value", ["", None, 4])
+def test_validate_config_rejects_invalid_starrocks_memory_limit(value):
+    with pytest.raises(config.ConfigError, match="starrocks_memory_limit"):
+        config.validate_config({"name": "smoke", "preflight": {"starrocks_memory_limit": value}})
 
 
 def test_validate_config_rejects_negative_docker_memory_reserve():

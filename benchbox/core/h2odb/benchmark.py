@@ -116,6 +116,7 @@ class H2OBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, DataGenerati
         from benchbox.sql_compat.registry import REGISTRY
         from benchbox.sql_compat.rules.query_source.h2odb_variants import (
             CLICKHOUSE_Q9_SQL,
+            SQLITE_Q9_SQL,
             STARROCKS_Q9_SQL,
         )
 
@@ -127,6 +128,7 @@ class H2OBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, DataGenerati
         # Q9 variant platforms: map platform substring → legacy SQL
         _q9_variants: dict[str, str] = {
             "clickhouse": CLICKHOUSE_Q9_SQL,
+            "sqlite": SQLITE_Q9_SQL,
             "starrocks": STARROCKS_Q9_SQL,
         }
         for platform, legacy_sql in _q9_variants.items():
