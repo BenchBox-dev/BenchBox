@@ -55,6 +55,15 @@ class TestAIPrimitivesBenchmark:
         """Test data source is TPC-H."""
         assert ai_benchmark.get_data_source_benchmark() == "tpch"
 
+    def test_shared_tpch_schema_contract(self, ai_benchmark):
+        """AI Primitives exposes the schema contract required by SQL adapters."""
+        schema = ai_benchmark.get_schema()
+        sql = ai_benchmark.get_create_tables_sql(dialect="duckdb")
+
+        assert set(schema) == {"region", "nation", "customer", "supplier", "part", "partsupp", "orders", "lineitem"}
+        assert "CREATE TABLE orders" in sql
+        assert "CREATE TABLE lineitem" in sql
+
     def test_generate_data_preserves_sharded_tpch_table_mapping(self, monkeypatch, tmp_path):
         """AI primitives must keep TPC-H table names when TPC-H returns sharded files."""
 
