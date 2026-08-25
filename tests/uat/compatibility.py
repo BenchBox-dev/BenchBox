@@ -116,6 +116,22 @@ _TIMESCALEDB_DATAVAULT_RUNTIME_ENVELOPE_REASON = (
     "TimescaleDB-specific runtime envelope failure for the current release gate."
 )
 
+_SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_REASON = (
+    "SQLite TPC-DS OBT SF1 cannot meet the 1200s release-gate cell contract on the native UAT host. "
+    "The 2026-08-25 bounded probe used the canonical ParquetFileHandler against the 5,041,336-row, "
+    "518-column OBT artifact: it inserted 1,325,000 rows in 304.9s without committing, with 4,345 "
+    "rows/s overall and 2,350 rows/s in the final 25,000-row interval. The last 625,000-row linear "
+    "projection is 1,391s for loading alone, before validation and power queries. The source table has "
+    "no indexes, primary keys, or foreign keys, and the second SQLite connection saw zero rows until "
+    "commit; this is the SQLite bind/WAL growth path, not schema/indexing or SQL compatibility. Keep "
+    "the cell pruned until a bounded atomic SQLite bulk-loader change has measured evidence within the "
+    "declared budget."
+)
+_SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_EVIDENCE = (
+    "PR #1904 2026-08-25 bounded native probe; original killed-run evidence under "
+    "BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs; docs/operations/uat-framework.md"
+)
+
 _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES = (
     {
         (platform, "joinorder"): _JOINORDER_RUNTIME_ENVELOPE_REASON
@@ -127,6 +143,10 @@ _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES = (
     }
     | {("timescaledb", "datavault"): _TIMESCALEDB_DATAVAULT_RUNTIME_ENVELOPE_REASON}
 )
+
+_RELEASE_GATE_RUNTIME_ENVELOPES = _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES | {
+    ("sqlite", "tpcds_obt"): _SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_REASON,
+}
 
 
 def compatibility_rule_for(
@@ -164,13 +184,18 @@ def compatibility_rule_for(
                 evidence=_DATAFRAME_WRITE_MANAGER_EVIDENCE,
             )
     if include_release_gate_runtime_envelopes:
-        runtime_envelope_reason = _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES.get((platform, benchmark))
+        runtime_envelope_reason = _RELEASE_GATE_RUNTIME_ENVELOPES.get((platform, benchmark))
         if runtime_envelope_reason:
+            runtime_envelope_evidence = (
+                _SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_EVIDENCE
+                if (platform, benchmark) == ("sqlite", "tpcds_obt")
+                else "2026-05-14 enabled-platform UAT release-gate audit; not a runtime compatibility gate"
+            )
             return CompatibilityRule(
                 rule_id=f"uat.compat.{platform}.{benchmark}.release_gate_runtime_envelope",
                 status="blocked",
                 reason=runtime_envelope_reason,
-                evidence="2026-05-14 enabled-platform UAT release-gate audit; not a runtime compatibility gate",
+                evidence=runtime_envelope_evidence,
             )
     caps = PlatformRegistry.get_platform_capabilities(platform)
     unsupported_benchmarks = getattr(caps, "unsupported_benchmarks", {}) if caps else {}

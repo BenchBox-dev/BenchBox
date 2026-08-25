@@ -605,6 +605,31 @@ and timed-out counts, followed by a run-status/source-provenance footer.
 Early-stop pruning is separate from compatibility pruning and must not be
 treated as a pass or a compatibility exclusion.
 
+### Measured release-gate runtime envelope exclusions
+
+The release-gate runtime-envelope switch records measured, platform-specific
+cell exclusions in the same compatibility-pruning stream. It does not change
+the benchmark registry's declared scale ladder or affect ordinary diagnostic
+runs.
+
+As of 2026-08-25, SQLite `tpcds_obt` is excluded from the 1200-second native
+release-gate cell. The canonical SF1 artifact contains 5,041,336 rows and 518
+columns. A bounded native probe through `ParquetFileHandler` inserted 1,325,000
+rows in 304.9 seconds, with 4,345 rows/s overall and 2,350 rows/s in the final
+25,000-row interval. A projection from the final 625,000 rows is 1,391 seconds
+for loading alone. The table has no indexes, primary keys, or foreign keys;
+the observed limit is SQLite parameter binding and single-transaction WAL
+growth, with external readers seeing no rows until the loader commits. The
+probe and original killed-run evidence were captured outside the repository
+under `BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs` and `/tmp`.
+
+This exclusion is represented by
+`uat.compat.sqlite.tpcds_obt.release_gate_runtime_envelope`. It prunes the
+requested `0.01`, `0.1`, and `1.0` ladder entries before the existing TPC-DS OBT
+minimum-scale fallback can substitute `1.0`; it is not a blanket skip or a
+timeout increase. A future atomic SQLite bulk-loader optimization must replace
+the rule only after a bounded native measurement fits the same contract.
+
 ## Config lifecycle (three classes)
 
 Every file under `tests/uat/configs/` has one of three lifecycle classes. The
