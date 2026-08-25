@@ -1271,11 +1271,9 @@ class DuckDBNativeHandler(FileFormatHandler):
 
 
 class ParquetFileHandler(FileFormatHandler):
-    """Handler for Parquet files using PyArrow.
+    """Handler for Parquet files using bounded PyArrow record batches."""
 
-    This is a generic handler that works across platforms by converting
-    Parquet to in-memory data and loading via INSERT statements.
-    """
+    _LOAD_SAVEPOINT = "benchbox_parquet_load"
 
     def get_delimiter(self) -> str:
         """Parquet is columnar format, not delimited."""
@@ -1302,36 +1300,39 @@ class ParquetFileHandler(FileFormatHandler):
         except ImportError as e:
             raise RuntimeError("pyarrow is required for Parquet loading") from e
 
-        # Read Parquet file
-        table = pq.read_table(file_path)
-        row_count = table.num_rows
+        # Keep all inserts for this file isolated from the caller's larger load
+        # transaction. DataLoader commits after every table; without a savepoint,
+        # a later batch/read failure would leave earlier batches committed as a
+        # silently truncated table when DataLoader handles the exception.
+        connection.execute(f"SAVEPOINT {self._LOAD_SAVEPOINT}")
+        savepoint_active = True
+        try:
+            parquet_file = pq.ParquetFile(file_path)
+            column_names = parquet_file.schema_arrow.names
+            validated_columns = [validate_sql_identifier(col, "column name") for col in column_names]
+            placeholders = ",".join(["?" for _ in validated_columns])
+            columns_str = ",".join(validated_columns)
 
-        if row_count == 0:
-            return 0
+            # Prepare INSERT statement
+            insert_sql = f"INSERT INTO {validated_table} ({columns_str}) VALUES ({placeholders})"
 
-        # Convert to Python data for insertion
-        # PyArrow's to_pylist() gives us list of dicts
-        data = table.to_pylist()
+            # Keep only one bounded record batch and its Python conversion in memory.
+            batch_size = 1000
+            row_count = 0
+            for batch in parquet_file.iter_batches(batch_size=batch_size):
+                data_tuples = [tuple(row[col] for col in column_names) for row in batch.to_pylist()]
+                if data_tuples:
+                    connection.executemany(insert_sql, data_tuples)
+                    row_count += len(data_tuples)
 
-        # Get column names from schema and validate each one
-        column_names = table.schema.names
-        validated_columns = [validate_sql_identifier(col, "column name") for col in column_names]
-        placeholders = ",".join(["?" for _ in validated_columns])
-        columns_str = ",".join(validated_columns)
-
-        # Prepare INSERT statement
-        insert_sql = f"INSERT INTO {validated_table} ({columns_str}) VALUES ({placeholders})"
-
-        # Convert dicts to tuples in correct column order
-        data_tuples = [tuple(row[col] for col in column_names) for row in data]
-
-        # Insert in batches for better performance
-        batch_size = 1000
-        for i in range(0, len(data_tuples), batch_size):
-            batch = data_tuples[i : i + batch_size]
-            connection.executemany(insert_sql, batch)
-
-        return row_count
+            connection.execute(f"RELEASE SAVEPOINT {self._LOAD_SAVEPOINT}")
+            savepoint_active = False
+            return row_count
+        except Exception:
+            if savepoint_active:
+                connection.execute(f"ROLLBACK TO SAVEPOINT {self._LOAD_SAVEPOINT}")
+                connection.execute(f"RELEASE SAVEPOINT {self._LOAD_SAVEPOINT}")
+            raise
 
 
 class DuckDBParquetHandler(FileFormatHandler):

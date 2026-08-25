@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import threading
 import time
@@ -367,19 +368,20 @@ class TestDurableJobWindowsDirectoryFsync:
         directory.mkdir()
         (directory / "file.txt").write_text("payload", encoding="utf-8")
         monkeypatch.setattr("benchbox.mcp.jobs.sys.platform", "win32")
-        calls: list[Path] = []
+        calls: list[tuple[Path, int]] = []
 
         original_open = __import__("os").open
 
         def tracking_open(path, *args, **kwargs):
-            calls.append(Path(path))
+            calls.append((Path(path), args[0]))
             return original_open(path, *args, **kwargs)
 
         monkeypatch.setattr("benchbox.mcp.jobs.os.open", tracking_open)
         DurableJobWorker._sync_tree(directory)
 
-        assert directory not in calls
-        assert (directory / "file.txt") in calls
+        assert directory not in [path for path, _flags in calls]
+        file_calls = [flags for path, flags in calls if path == directory / "file.txt"]
+        assert file_calls == [__import__("os").O_RDWR]
 
     def test_windows_regular_files_still_fsync_and_close(self, tmp_path: Path, monkeypatch) -> None:
         regular = tmp_path / "response.json"
@@ -402,17 +404,22 @@ class TestDurableJobWindowsDirectoryFsync:
         directory = tmp_path / "stage-posix"
         directory.mkdir()
         monkeypatch.setattr("benchbox.mcp.jobs.sys.platform", "linux")
-        opened: list[Path] = []
-        original_open = __import__("os").open
+        opened: list[tuple[Path, int]] = []
+        fsynced: list[int] = []
+        closed: list[int] = []
 
-        def tracking_open(path, *args, **kwargs):
-            opened.append(Path(path))
-            return original_open(path, *args, **kwargs)
+        def fake_open(path, flags, *args, **kwargs):
+            opened.append((Path(path), flags))
+            return 41
 
-        monkeypatch.setattr("benchbox.mcp.jobs.os.open", tracking_open)
+        monkeypatch.setattr("benchbox.mcp.jobs.os.open", fake_open)
+        monkeypatch.setattr("benchbox.mcp.jobs.os.fsync", fsynced.append)
+        monkeypatch.setattr("benchbox.mcp.jobs.os.close", closed.append)
         DurableJobWorker._sync_tree(directory)
 
-        assert directory in opened
+        assert opened == [(directory, os.O_RDONLY)]
+        assert fsynced == [41]
+        assert closed == [41]
 
     def test_regular_file_oserror_propagates(self, tmp_path: Path, monkeypatch) -> None:
         regular = tmp_path / "failure.json"

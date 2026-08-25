@@ -7,13 +7,14 @@ import csv
 import io
 import logging
 import re
+from collections.abc import Sequence
 
 import pyarrow as pa
 
 logger = logging.getLogger(__name__)
 
 
-class _ResultProxy:
+class _ResultProxy(Sequence):
     """Cursor-like wrapper around a result returned by chDB.
 
     Accepts either a list of row tuples or a pandas DataFrame. When backed by a

@@ -3,7 +3,7 @@
 Verifies that:
 - AQ6 replaces the nested window aggregate SUM(SUM()) OVER () with a CROSS JOIN total
 - AQ7, AQ8, AQ10 replace JULIANDAY() with dateDiff() and DATE('now') with today()
-- EQ7 replaces FROM (VALUES (0)) with FROM (SELECT 0)
+- EQ7 computes the quality score from a derived UNION relation instead of sibling aliases
 - EQ3 flattens the spurious double-nested COUNT scalar subquery
 """
 
@@ -80,18 +80,65 @@ def test_aq10_clickhouse_replaces_julianday():
     assert "dateDiff(" in q, f"AQ10 must use dateDiff() for ClickHouse:\n{q}"
 
 
+@pytest.mark.parametrize("query_id", ["AQ7", "AQ8", "AQ10", "EQ7"])
+def test_get_query_clickhouse_matches_bulk_variant(query_id):
+    """Single-query ClickHouse retrieval must use the same variant as bulk retrieval."""
+    bench = _bench()
+
+    assert bench.get_query(query_id, dialect="clickhouse") == bench.get_queries(dialect="clickhouse")[query_id]
+
+
+def test_get_query_clickhouse_preserves_parameter_substitution():
+    """Single-query ClickHouse variants must retain caller-supplied parameters."""
+    q = _bench().get_query(
+        "AQ10",
+        params={
+            "start_year": 2020,
+            "large_trade_threshold": 1234.5,
+            "large_trade_count_threshold": 7,
+            "same_day_trade_threshold": 2,
+            "limit_rows": 11,
+        },
+        dialect="clickhouse",
+    )
+
+    assert "2020" in q
+    assert "1234.5" in q
+    assert "> 7 THEN" in q
+    assert "> 2 THEN" in q
+    assert "LIMIT 11" in q
+
+
+def test_get_query_clickhouse_eq7_preserves_parameter_substitution():
+    """The derived EQ7 variant must retain caller-supplied quality thresholds."""
+    q = _bench().get_query(
+        "EQ7",
+        params={
+            "excellent_quality_threshold": 99.0,
+            "good_quality_threshold": 88.0,
+            "acceptable_quality_threshold": 77.0,
+        },
+        dialect="clickhouse",
+    )
+
+    assert ") >= 99.0 THEN" in q
+    assert ") >= 88.0 THEN" in q
+    assert ") >= 77.0 THEN" in q
+
+
 # ---------------------------------------------------------------------------
-# EQ7: VALUES (0) → SELECT 0
+# EQ7: sibling aliases → derived UNION relation
 # ---------------------------------------------------------------------------
 
 
-def test_eq7_clickhouse_replaces_values_dummy():
-    """EQ7 for ClickHouse must replace FROM (VALUES (0)) with FROM (SELECT 0)."""
+def test_eq7_clickhouse_uses_derived_quality_relation():
+    """EQ7 for ClickHouse must compute its score from projected derived columns."""
     import re
 
     q = _bench().get_queries(dialect="clickhouse")["EQ7"]
-    assert not re.search(r"FROM\s+VALUES", q, re.IGNORECASE), f"EQ7 must not use FROM VALUES for ClickHouse:\n{q}"
-    assert "SELECT 0" in q, f"EQ7 must use SELECT 0 dummy row for ClickHouse:\n{q}"
+    assert "quality_metrics" in q
+    assert not re.search(r"FROM\s+VALUES", q, re.IGNORECASE)
+    assert "overall_quality_score" in q
 
 
 def test_eq7_base_dialect_retains_values():

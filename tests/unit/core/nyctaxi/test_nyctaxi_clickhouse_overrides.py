@@ -1,6 +1,6 @@
 """Unit tests for NYC Taxi ClickHouse dialect overrides.
 
-Verifies that the three queries using EXTRACT(DOW/EPOCH/HOUR …) are replaced
+Verifies that the four queries using EXTRACT(DOW/EPOCH/HOUR …) are replaced
 with native ClickHouse functions when dialect='clickhouse' is requested.
 """
 
@@ -13,7 +13,12 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-OVERRIDDEN_QUERIES = ["trips-by-day-of-week", "weekday-weekend-comparison", "rush-hour-analysis"]
+OVERRIDDEN_QUERIES = [
+    "trips-by-day-of-week",
+    "weekday-weekend-comparison",
+    "rush-hour-analysis",
+    "trip-duration-analysis",
+]
 
 
 def _bench():
@@ -78,6 +83,12 @@ def test_rush_hour_clickhouse_preserves_period_categories():
     assert "morning_rush" in q, f"Must categorize morning_rush, got:\n{q}"
     assert "evening_rush" in q, f"Must categorize evening_rush, got:\n{q}"
     assert "avg_duration_min" in q, f"Must compute avg_duration_min column, got:\n{q}"
+
+
+def test_trip_duration_clickhouse_uses_datediff():
+    q = _bench().get_queries(dialect="clickhouse")["trip-duration-analysis"]
+    assert "dateDiff('second'" in q, f"Expected dateDiff('second', ...), got:\n{q}"
+    assert "EXTRACT" not in q.upper(), f"Must not use EXTRACT for ClickHouse, got:\n{q}"
 
 
 # ---------------------------------------------------------------------------
