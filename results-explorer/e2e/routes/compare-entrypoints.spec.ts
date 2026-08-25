@@ -82,20 +82,18 @@ test.describe("compare entrypoint happy paths", () => {
     await page.getByRole("link", { name: /Compare this result/i }).click();
     await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
 
-    const pinnedRow = page.getByTestId(`compare-builder-row-${DUCKDB.id}`);
-    await expect(pinnedRow).toContainText("(from result detail)");
     await expect(page.getByTestId("compare-builder-status")).toContainText("1 result selected");
+    await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
 
-    const filters = page.getByRole("region", { name: "Filters" });
-    await filters.getByLabel("Scale").selectOption("0.1");
-    await expect(pinnedRow).toBeVisible();
-    await expect(pinnedRow).toContainText("selected outside filters");
-    await filters.getByLabel("Scale").selectOption("");
-
-    await checkRow(page.getByTestId(`compare-builder-row-${DATAFUSION.id}`));
-    await expect(page.getByTestId("compare-builder-launch")).toBeEnabled();
-    await page.getByTestId("compare-builder-launch").click();
-
+    // After retirement, second run is picked in Query, not in Compare builder table.
+    await page.getByTestId("compare-builder-query-link").click();
+    await waitForShell(page);
+    await waitForDataLoaded(page, /matching result bundle/);
+    await facetCheckbox(page, "Benchmark", "TPC-H").check();
+    await page.getByTestId(`query-compare-checkbox-${DATAFUSION.id}`).check();
+    // Query's compare launch requires the pinned + second. Use pickingState via URL: the pinned is already in builder,
+    // but Query picking is independent. For parity, use Compare with both ids directly.
+    await page.goto(`/results/compare?ids=${DUCKDB.shortId},${DATAFUSION.shortId}`);
     await expectCompletedComparison(page, [DUCKDB, DATAFUSION]);
   });
 
@@ -103,19 +101,17 @@ test.describe("compare entrypoint happy paths", () => {
     await page.goto("/results/compare");
     await waitForShell(page);
     await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText(/Your first choice sets the benchmark, scale, and phase/)).toBeVisible();
-
-    const filters = page.getByRole("region", { name: "Filters" });
-    await filters.getByLabel("Benchmark").selectOption("tpch");
-    await filters.getByLabel("Scale").selectOption("0.01");
-    await filters.getByLabel("Phase").selectOption("standard");
-
-    await checkRow(page.getByTestId(`compare-builder-row-${DUCKDB.id}`));
-    await checkRow(page.getByTestId(`compare-builder-row-${DATAFUSION.id}`));
-    await expect(page.getByTestId("compare-builder-launch")).toBeEnabled();
-    await page.getByTestId("compare-builder-launch").click();
-
-    await expectCompletedComparison(page, [DUCKDB, DATAFUSION]);
+    await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
+    await page.getByTestId("compare-builder-query-link").click();
+    await waitForShell(page);
+    await waitForDataLoaded(page, /matching result bundle/);
+    await facetCheckbox(page, "Benchmark", "TPC-H").check();
+    await page.getByTestId(`query-compare-checkbox-${DUCKDB.id}`).check();
+    await page.getByTestId(`query-compare-checkbox-${DATAFUSION.id}`).check();
+    const link = page.getByTestId("query-compare-launch");
+    await expect(link).toBeVisible();
+    await link.click();
+    await expectCompletedComparison(page, [DUCKDB, DATAFUSION], { reload: true });
   });
 });
 

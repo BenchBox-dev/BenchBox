@@ -307,7 +307,9 @@ IDs you should read off the Browse view:
 
 ---
 
-## S6 — Compare (`/results/compare?ids=…`)
+## S6 — Compare (`/results/compare?ids=…`) — comparison renderer; candidate picking is in Query (rx-19, rx-27)
+
+Candidate picking no longer renders at `/results/compare`. The builder shows the pinned result (when `?ids=<one>`) and a link to Query. Selecting the second run happens in Query's paged, searchable table; `/results/compare?ids=<a,b>` remains the comparison renderer only. Document height assertions use the large fixture (rx-13), not the default 11-result fixture.
 
 ### S6.1 Two-result compare (same benchmark + SF)
 - Use two sample IDs from above. Renders charts, comparison table, and a comparability receipt with no differences.
@@ -325,11 +327,12 @@ IDs you should read off the Browse view:
 - `?metric=` is **not** a supported URL contract and must not switch Compare chart semantics.
 - No in-page primary-metric toggle is expected.
 
-### S6.5 Bad inputs
+### S6.5 Bad inputs and builder parity (rx-19)
 - `?ids=` empty → open the Compare builder with no pinned result (`Compare.tsx:94-112,157-182`).
 - `?ids=does-not-exist` → show a friendly "No result found" error (`Compare.tsx:185-215`).
 - `?ids=valid,does-not-exist` → render the available result with an "Ignored unavailable result ID" warning and keep the original multi-selection URL so a refresh preserves the recovery state (`Compare.tsx:273-315,339-348`).
 - `?ids=` with one valid id → open the Compare builder with that result pinned; do not redirect to ResultDetail or show a "need 2+" message (`Compare.tsx:185-205`).
+- Duplicate/stale ids, reload, shared-link copy, and the Pages 404 redirect round trip are covered by `compare-parity.spec.ts`.
 
 ---
 
