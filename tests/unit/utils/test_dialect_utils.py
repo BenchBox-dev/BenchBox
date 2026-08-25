@@ -222,6 +222,24 @@ class TestSQLTranslation:
         assert "DATE('1994-01-01', '+1 year')" in result
         assert "STRFTIME('%Y'," in result
 
+    def test_translate_sqlite_rewrites_time_extract_and_date_trunc(self):
+        """SQLite translation should cover time parts used by ClickBench queries."""
+        query = """
+            SELECT
+                EXTRACT(HOUR FROM EventTime),
+                EXTRACT(MINUTE FROM EventTime),
+                DATE_TRUNC('MINUTE', EventTime)
+            FROM hits
+        """
+
+        result = translate_sql_query(query, target_dialect="sqlite", source_dialect="clickhouse")
+
+        assert "EXTRACT" not in result.upper()
+        assert "DATE_TRUNC" not in result.upper()
+        assert "STRFTIME('%H'," in result
+        assert "STRFTIME('%M'," in result
+        assert "STRFTIME('%Y-%m-%d %H:%M:00'," in result
+
     def test_translation_context_records_success_metadata(self):
         """Successful translation records structured outcome metadata."""
         query = "SELECT * FROM orders"
