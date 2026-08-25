@@ -212,3 +212,11 @@ def test_build_mirror_regenerates_inventory_after_union_overlay() -> None:
     assert "FILE_PATHS=" in build
     file_paths_block = build.split("FILE_PATHS=", 1)[1].split(")", 1)[0]
     assert "corpus-inventory.json" not in file_paths_block
+
+
+def test_build_mirror_carries_shared_query_status_policy() -> None:
+    """The slim validator's shared failure policy must move with bundle.py."""
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert '"benchbox/core/results/query_status.py"' in workflow
+    build = workflow.split("name: Build mirror branch", 1)[1].split("name: ", 1)[0]
+    assert "'benchbox/core/results/query_status.py'" in build

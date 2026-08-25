@@ -41,7 +41,7 @@ WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "validate-submission.yml"
 # `| tee` pipe, the manifest-waiver branch -- is executed verbatim.
 _VALIDATOR_CALL = (
     "xargs -d '\\n' uv run -- python scripts/validate_submission.py "
-    "$REQUIRE_MANIFEST --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt"
+    "$REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt"
 )
 
 
@@ -71,7 +71,12 @@ def _run_step_with_validator_exiting(status: int, tmp_path: Path):
         capture_output=True,
         text=True,
         cwd=tmp_path,
-        env={"IS_FORK": "false", "HEAD_REF": "auto/results-mirror-deadbeef", "PATH": "/usr/bin:/bin:/usr/local/bin"},
+        env={
+            "IS_FORK": "false",
+            "HEAD_REF": "auto/results-mirror-deadbeef",
+            "PR_AUTHOR": "github-actions[bot]",
+            "PATH": "/usr/bin:/bin:/usr/local/bin",
+        },
     )
 
 
