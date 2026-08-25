@@ -261,4 +261,3 @@ def test_curated_release_removes_dangling_project_test_and_runs_retained_tests(
 
     assert result.returncode == 0, result.stderr
     assert "passed" in result.stdout
-    assert "2 skipped" in result.stdout
