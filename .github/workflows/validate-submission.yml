@@ -276,7 +276,7 @@ jobs:
           set -euo pipefail
           REQUIRE_MANIFEST="--require-manifest"
           ALLOW_PARTIAL_VALIDATION=""
-          if [ "$BASE_REF" = "published-results" ] && [ "$IS_FORK" = "false" ] && [ "$PR_AUTHOR" = "github-actions[bot]" ]; then
+          if [ "${BASE_REF:-}" = "published-results" ] && [ "$IS_FORK" = "false" ] && [ "$PR_AUTHOR" = "github-actions[bot]" ]; then
             case "$HEAD_REF" in
               auto/results-mirror-*)
                 REQUIRE_MANIFEST=""
