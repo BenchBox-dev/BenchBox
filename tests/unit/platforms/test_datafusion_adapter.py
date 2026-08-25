@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from benchbox.platforms.base.data_loading import DataSource
 from benchbox.platforms.datafusion import DataFusionAdapter, DataFusionConnectionCompat
 
 pytestmark = [
@@ -343,6 +344,41 @@ class TestDataFusionAdapter:
             # Verify table was registered
             mock_conn.register_parquet.assert_called_once()
 
+    @patch("benchbox.platforms.datafusion.SessionContext")
+    @patch("pyarrow.csv.read_csv")
+    @patch("pyarrow.parquet.ParquetWriter")
+    def test_parquet_conversion_honors_manifest_delimiter_over_format_hint(
+        self, mock_parquet_writer, mock_read_csv, mock_session_context
+    ):
+        """CSV metadata wins when a manifest labels the file with a legacy tbl format."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_file = Path(tmpdir) / "tags.csv"
+            csv_file.write_text("host,region\nhost_0,us-east-1\n")
+
+            adapter = DataFusionAdapter(working_dir=tmpdir, data_format="parquet")
+            mock_table = Mock()
+            mock_table.num_rows = 1
+            mock_table.schema = Mock()
+            mock_read_csv.return_value = mock_table
+            data_source = DataSource(
+                source_type="manifest_v2",
+                tables={"tags": [csv_file]},
+                table_formats={"tags": "tbl"},
+                table_metadata={"tags": {"csv_delimiter": ",", "csv_has_header": True}},
+            )
+
+            adapter._load_table_parquet(
+                Mock(),
+                "tags",
+                [csv_file],
+                Path(tmpdir),
+                csv_format="tbl",
+                data_source=data_source,
+                benchmark=Mock(csv_delimiter=None, csv_has_header=True),
+            )
+
+            assert mock_read_csv.call_args.kwargs["parse_options"].delimiter == ","
+
     def test_is_parquet_file(self):
         """Test Parquet file detection by extension."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -575,6 +611,37 @@ class TestDataFusionAdapter:
             assert result["status"] == "SUCCESS"
             assert result["rows_returned"] == 10
             assert result["execution_time_seconds"] >= 0
+
+    @patch("benchbox.platforms.datafusion.SessionContext")
+    def test_q20_rewrite_is_scoped_to_tpch(self, mock_session_context):
+        """The TPC-H Q20 rewrite must not replace Data Vault query 20 SQL."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            adapter = DataFusionAdapter(working_dir=tmpdir)
+            mock_conn = Mock()
+            mock_df = Mock()
+            mock_batch = Mock()
+            mock_batch.num_rows = 0
+            mock_batch.num_columns = 0
+            mock_df.collect.return_value = [mock_batch]
+            mock_conn.sql.return_value = mock_df
+            query = """SELECT ss.s_name
+FROM hub_supplier hs
+JOIN sat_supplier ss ON hs.hk_supplier = ss.hk_supplier
+JOIN sat_part sp ON sp.p_name LIKE 'forest%'
+JOIN sat_nation sn ON sn.n_name = 'CANADA'
+JOIN sat_lineitem sl ON sl.l_shipdate >= DATE '1994-01-01'
+WHERE DATE '1994-01-01' <= DATE '1995-01-01'"""
+
+            result = adapter.execute_query(
+                mock_conn,
+                query,
+                "20",
+                benchmark_type="datavault",
+                validate_row_count=False,
+            )
+
+            assert result["status"] == "SUCCESS"
+            assert mock_conn.sql.call_args.args[0] == query
 
     @patch("benchbox.platforms.datafusion.SessionContext")
     def test_execute_query_failure(self, mock_session_context):

@@ -254,14 +254,15 @@ QUERIES:
     description: Most recent metrics for each host
     category: lastpoint
     sql: |
-      SELECT hostname, time, usage_user, usage_system, usage_idle
-      FROM cpu
-      WHERE (hostname, time) IN (
-          SELECT hostname, MAX(time)
+      SELECT c.hostname, c.time, c.usage_user, c.usage_system, c.usage_idle
+      FROM cpu c
+      JOIN (
+          SELECT hostname, MAX(time) AS max_time
           FROM cpu
           WHERE time >= '{start_time}'
           GROUP BY hostname
-      )
+      ) latest ON c.hostname = latest.hostname AND c.time = latest.max_time
+      WHERE c.time >= '{start_time}'
       ORDER BY hostname
     params:
       duration_hours: 24

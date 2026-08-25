@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 442
+**Total registered rules:** 445
 
 **Platforms covered:** 33
 
@@ -20,7 +20,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | clickhouse-server | - | - | - | - | - | 23 | 23 |
 | databend | - | - | - | - | 1 | - | 1 |
 | databricks | - | - | - | 2 | 1 | - | 3 |
-| datafusion | - | - | 4 | 2 | - | 14 | 20 |
+| datafusion | - | 3 | 4 | 2 | - | 14 | 23 |
 | doris | - | 7 | - | 2 | 1 | - | 10 |
 | duckdb | - | - | - | - | - | 26 | 26 |
 | fabric_dw | - | - | - | - | 1 | - | 1 |
@@ -190,6 +190,9 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
+| query_source | benchmark=tpcdi, query=AQ9 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.datafusion.tpcdi.aq9_projection_variant` |
+| query_source | benchmark=tpcdi, query=EQ7 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.datafusion.tpcdi.eq7_derived_table_variant` |
+| query_source | benchmark=tpcdi, query=VQ6 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.datafusion.tpcdi.vq6_projection_variant` |
 | query_adapter | benchmark=tpch, query=11 | rewrite_query | REWRITTEN | SILENT_CORRUPTION | `query_adapter.datafusion.tpch.q11_having_threshold_cte` |
 | query_adapter | benchmark=tpch, query=16 | rewrite_query | REWRITTEN | SILENT_CORRUPTION | `query_adapter.datafusion.tpch.q16_not_in_to_not_exists` |
 | query_adapter | benchmark=tpch, query=18 | rewrite_query | REWRITTEN | SILENT_CORRUPTION | `query_adapter.datafusion.tpch.q18_in_having_to_exists` |

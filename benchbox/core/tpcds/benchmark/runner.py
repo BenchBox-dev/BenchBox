@@ -297,7 +297,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if query_id in {36, 70, 86} and target == "postgres":
             return self._rewrite_postgres_rollup_order_aliases(query_id, query)
 
-        if query_id == 90 and target == "postgres":
+        if query_id == 90 and target in {"postgres", "datafusion"}:
             return self._rewrite_postgres_q90_zero_denominator(query)
 
         if query_id == 90 and target in {"spark", "lakesail"}:

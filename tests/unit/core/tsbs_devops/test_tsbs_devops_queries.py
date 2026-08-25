@@ -131,6 +131,13 @@ class TestTSBSDevOpsQueryManager:
         # Should have actual values
         assert "2024-01-01" in query  # start date
 
+    def test_lastpoint_uses_joined_latest_rows(self, manager):
+        """Last-point lookup must not use DataFusion's unsupported row-value IN form."""
+        query = manager.get_query("lastpoint")
+        assert "JOIN (" in query
+        assert "MAX(time) AS max_time" in query
+        assert "(hostname, time) IN" not in query
+
     def test_get_query_with_param_override(self, manager):
         """get_query should accept parameter overrides."""
         query = manager.get_query("single-host-12-hr", params={"hostname": "custom_host"})
