@@ -829,6 +829,18 @@ class TestDuckDBAdapter:
         mock_connection.execute.assert_any_call("SET enable_profiling = 'query_tree'")
 
     @patch("benchbox.platforms.duckdb.duckdb")
+    def test_configure_for_benchmark_transaction_primitives_serializes_execution(self, mock_duckdb):
+        """Transaction primitives avoid DuckDB's parallel DML invalidation path."""
+        mock_connection = Mock()
+        mock_duckdb.connect.return_value = mock_connection
+
+        adapter = DuckDBAdapter(thread_limit=8)
+
+        adapter.configure_for_benchmark(mock_connection, "transaction_primitives")
+
+        mock_connection.execute.assert_called_once_with("SET threads TO 1")
+
+    @patch("benchbox.platforms.duckdb.duckdb")
     def test_execute_query_success(self, mock_duckdb):
         """Test successful query execution."""
         mock_connection = Mock()

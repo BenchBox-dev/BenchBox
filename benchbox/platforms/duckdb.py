@@ -1067,6 +1067,18 @@ class DuckDBAdapter(PlatformAdapter):
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Apply DuckDB-specific optimizations based on benchmark type."""
+        benchmark = getattr(self, "benchmark", None)
+        transaction_benchmark = getattr(benchmark, "_benchmark_label", "").lower() == "transaction primitives"
+        if benchmark_type.lower() == "transaction_primitives" or transaction_benchmark:
+            # DuckDB 1.3.x can produce duplicate rows for a read-after-write
+            # scalar subquery when parallel operators are enabled. The following
+            # INSERT...SELECT can then hit DuckDB's batch-index assertion and
+            # invalidate the database. Transaction Primitives measures transaction
+            # semantics, not intra-query parallelism, so keep its execution path
+            # single-threaded while preserving the caller's setting for all other
+            # benchmarks.
+            connection.execute("SET threads TO 1")
+
         # Enable profiling only when displaying plans; skip when capture_plans is active.
         if self.show_query_plans and not self.capture_plans:
             connection.execute("SET enable_profiling = 'query_tree'")
