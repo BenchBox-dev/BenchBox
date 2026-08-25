@@ -18,6 +18,8 @@ placeholders.
 
 from __future__ import annotations
 
+from typing import Any
+
 from benchbox.sql_compat.actions import CompatAction
 from benchbox.sql_compat.context import Phase
 from benchbox.sql_compat.decision import (
@@ -32,11 +34,12 @@ _B = "tpcdi"
 _P = Phase.QUERY_SOURCE
 
 
-def _clickhouse_metric_query(query_id: str) -> str:
+def _clickhouse_metric_query(query_id: str, params: dict[str, Any] | None = None) -> str:
     """Build a ClickHouse-safe TPC-DI metric query from its canonical source."""
     from benchbox.core.tpcdi.queries import TPCDIQueryManager
 
-    query = TPCDIQueryManager().get_query(query_id)
+    manager = TPCDIQueryManager().analytical_queries
+    query = manager._queries[query_id]
     query = query.replace(
         "JULIANDAY(DATE('now')) - JULIANDAY(MIN(d.DateValue))",
         "dateDiff('day', MIN(d.DateValue), today())",
@@ -63,8 +66,8 @@ def _clickhouse_metric_query(query_id: str) -> str:
             "wash_sales ON t.TradeID = wash_sales.TradeID", "wash_sales ON t.TradeID = wash_sales.trade_id"
         )
         query = query.replace(
-            "COUNT(CASE WHEN t.Quantity * t.TradePrice > 100000.0 THEN 1 END)",
-            "countIf(t.Quantity * t.TradePrice > 100000.0)",
+            "COUNT(CASE WHEN t.Quantity * t.TradePrice > {large_trade_threshold} THEN 1 END)",
+            "countIf(t.Quantity * t.TradePrice > {large_trade_threshold})",
         )
         query = query.replace(
             "COUNT(CASE WHEN d.DateValue = today() THEN 1 END)",
@@ -84,7 +87,15 @@ def _clickhouse_metric_query(query_id: str) -> str:
             "GREATEST(dateDiff('day', MIN(d.DateValue), MAX(d.DateValue)), 1)",
             "greatest(dateDiff('day', MIN(d.DateValue), MAX(d.DateValue)), 1)",
         )
-    return query
+    query_params = manager._generate_default_params(query_id)
+    if params:
+        query_params.update(params)
+    return query.format(**query_params)
+
+
+def build_clickhouse_metric_query(query_id: str, params: dict[str, Any] | None = None) -> str:
+    """Build a parameter-rendered ClickHouse variant for an analytical query."""
+    return _clickhouse_metric_query(query_id, params)
 
 
 CLICKHOUSE_AQ7_SQL = _clickhouse_metric_query("AQ7")
