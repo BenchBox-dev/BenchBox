@@ -268,7 +268,7 @@ def test_live_orphan_companion_is_rejected(tmp_path: Path, companion_suffix: str
     )
 
     assert result.returncode != 0
-    assert str(companion.relative_to(tmp_path)) in result.stdout
+    assert companion.relative_to(tmp_path).as_posix() in result.stdout
     assert "has no primary bundle" in result.stdout
 
 
