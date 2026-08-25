@@ -11,6 +11,7 @@ branch.
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import re
 from decimal import Decimal, InvalidOperation
@@ -32,7 +33,19 @@ except ImportError:  # pragma: no cover - slim published-results branch mirror.
     FUNDING_SOURCES = ("employer", "personal", "free-trial", "vendor-sponsored", "grant", "unspecified")
     RESULT_SOURCES = ("internal", "community", "vendor")
 
-from benchbox.core.results.query_status import bundle_failed_query_count
+
+def _load_bundle_failed_query_count():
+    """Load the stdlib-only helper without running results package initializers."""
+    helper_path = Path(__file__).resolve().parents[1] / "core" / "results" / "query_status.py"
+    spec = importlib.util.spec_from_file_location("_benchbox_query_status", helper_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load failed-query policy from {helper_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.bundle_failed_query_count
+
+
+bundle_failed_query_count = _load_bundle_failed_query_count()
 
 # Max length for the optional free-text submission_notes manifest field.
 SUBMISSION_NOTES_MAX_LEN = 500
