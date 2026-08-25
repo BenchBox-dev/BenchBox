@@ -86,7 +86,11 @@ def test_vendor_gate_allows_trusted_same_repo_mirror() -> None:
     author_var = next((k for k, v in env.items() if "pull_request.user.login" in str(v)), None)
     assert author_var is not None, "The vendor gate must bind the PR author's GitHub login."
 
+    base_var = next((k for k, v in env.items() if "pull_request.base.ref" in str(v)), None)
+    assert base_var is not None, "The vendor gate must bind the PR base branch."
+
     guard_match = re.search(
+        rf'\[\s*"\${base_var}"\s*=\s*"published-results"\s*\]\s*&&\s*'
         rf'\[\s*"\${fork_var}"\s*=\s*"false"\s*\]\s*&&\s*'
         rf'\[\s*"\${author_var}"\s*=\s*"github-actions\[bot\]"\s*\]\s*;\s*then\n(.*?)\nfi\b',
         run,
@@ -104,28 +108,32 @@ def test_vendor_gate_allows_trusted_same_repo_mirror() -> None:
     )
 
 
-def _evaluate_mirror_trust_gate(*, is_fork: str, head_ref: str, pr_author: str) -> str:
+def _evaluate_mirror_trust_gate(*, is_fork: str, base_ref: str, head_ref: str, pr_author: str) -> str:
     run = _vendor_gate_step()["run"]
     gate = run[run.index('TRUSTED_MIRROR="false"') : run.index('case "$AUTHOR_ASSOCIATION"')]
     return subprocess.check_output(
         ["bash", "-c", gate + '\nprintf "%s\\n" "$TRUSTED_MIRROR"'],
-        env={"IS_FORK": is_fork, "HEAD_REF": head_ref, "PR_AUTHOR": pr_author},
+        env={"IS_FORK": is_fork, "BASE_REF": base_ref, "HEAD_REF": head_ref, "PR_AUTHOR": pr_author},
         text=True,
     ).strip()
 
 
 @pytest.mark.parametrize(
-    ("is_fork", "head_ref", "pr_author"),
+    ("is_fork", "base_ref", "head_ref", "pr_author"),
     [
-        ("true", "auto/results-mirror-deadbeef", "github-actions[bot]"),
-        ("false", "feature/community-result", "github-actions[bot]"),
-        ("false", "auto/results-mirror-deadbeef", "maintainer"),
+        ("true", "published-results", "auto/results-mirror-deadbeef", "github-actions[bot]"),
+        ("false", "develop", "auto/results-mirror-deadbeef", "github-actions[bot]"),
+        ("false", "published-results", "feature/community-result", "github-actions[bot]"),
+        ("false", "published-results", "auto/results-mirror-deadbeef", "maintainer"),
     ],
 )
-def test_vendor_waiver_rejects_untrusted_mirror_shapes(is_fork: str, head_ref: str, pr_author: str) -> None:
+def test_vendor_waiver_rejects_untrusted_mirror_shapes(
+    is_fork: str, base_ref: str, head_ref: str, pr_author: str
+) -> None:
     assert (
         _evaluate_mirror_trust_gate(
             is_fork=is_fork,
+            base_ref=base_ref,
             head_ref=head_ref,
             pr_author=pr_author,
         )
@@ -137,6 +145,7 @@ def test_vendor_waiver_accepts_exact_bot_created_same_repo_mirror() -> None:
     assert (
         _evaluate_mirror_trust_gate(
             is_fork="false",
+            base_ref="published-results",
             head_ref="auto/results-mirror-deadbeef",
             pr_author="github-actions[bot]",
         )
