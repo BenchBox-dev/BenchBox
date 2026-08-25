@@ -41,6 +41,41 @@ export function CompareTray({ summary, items, compareHref, compareLabel, onClear
 
   const collapsed = isMobile && !expanded;
 
+  // Focus must not be stolen when the tray appears; only Escape return-focus.
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      const target = event.target as HTMLElement | null;
+      const insideTray = target ? trayRef.current?.contains(target) : false;
+      if (!insideTray) return;
+      event.preventDefault();
+      setExpanded((prev) => (prev ? false : prev));
+      requestAnimationFrame(() => {
+        const active = document.activeElement as HTMLElement | null;
+        const activeHidden =
+          active instanceof HTMLElement &&
+          (active.hidden ||
+            active.getAttribute("aria-hidden") === "true" ||
+            getComputedStyle(active).display === "none" ||
+            (active as HTMLElement).offsetParent === null);
+        const focusInCollapsedDetails =
+          active instanceof HTMLElement &&
+          !!document.getElementById("compare-tray-details")?.contains(active) &&
+          !!document.querySelector("[data-testid='compare-tray'][data-collapsed='true']");
+        if (!active || !document.contains(active) || active === document.body || activeHidden || focusInCollapsedDetails) {
+          const toggle = document.querySelector("[data-testid='compare-tray-toggle']") as HTMLElement | null;
+          toggle?.focus();
+          if (document.activeElement === document.body) {
+            const compareLink = document.querySelector("[data-testid='compare-tray-compare-link']") as HTMLElement | null;
+            compareLink?.focus();
+          }
+        }
+      });
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
   useEffect(() => {
     const tray = trayRef.current;
     if (!tray) return;
@@ -67,6 +102,8 @@ export function CompareTray({ summary, items, compareHref, compareLabel, onClear
         class="bb-compare-tray fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 pt-3 shadow-lg"
         data-testid="compare-tray"
         data-collapsed={collapsed ? "true" : "false"}
+        role="region"
+        aria-label="Comparison selection"
       >
         <div class="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="min-w-0 flex-1">

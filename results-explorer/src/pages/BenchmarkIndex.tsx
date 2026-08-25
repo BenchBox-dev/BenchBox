@@ -38,6 +38,7 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { RankingEligibilityLegend, RunIdentityLabel } from "@/components/DataTable";
 import { CompareTray } from "@/components/CompareTray";
+import { TrayAnnouncer } from "@/components/TrayAnnouncer";
 import { NotFound } from "@/pages/NotFound";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
@@ -673,7 +674,10 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Compare selected results</h2>
-            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]" aria-live="polite" aria-atomic="true">
+            <p
+              class="mt-1 text-sm text-[var(--bb-data-fg-muted)]"
+              {...(selectedComparableCount < 2 ? { "aria-live": "polite" as const, "aria-atomic": "true" as const } : {})}
+            >
               {compareGuidance}
             </p>
             {selectionLimitCopy && (
@@ -803,6 +807,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         </div>
       )}
 
+      <TrayAnnouncer count={selectedComparableCount} />
       {/* Sticky Compare bar */}
       {compareUrl && (
         <CompareTray
