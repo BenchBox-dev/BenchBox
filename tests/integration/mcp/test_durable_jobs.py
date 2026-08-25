@@ -251,7 +251,12 @@ def test_tenant_job_tools_are_remote_only_and_cross_tenant_fail_closed(tmp_path:
             for _ in range(100):
                 current = await client_a.call_tool("get_benchmark_status", {"execution_id": execution_id})
                 assert isinstance(current.content[0], TextContent)
-                if json.loads(current.content[0].text)["status"] == "completed":
+                payload = json.loads(current.content[0].text)
+                if payload["status"] in ("failed", "cancelled"):
+                    pytest.fail(
+                        f"durable benchmark terminally {payload['status']} (error_code={payload.get('error_code')!r})"
+                    )
+                if payload["status"] == "completed":
                     break
                 await anyio.sleep(0.01)
             else:

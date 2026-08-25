@@ -36,6 +36,31 @@ Both cohorts meet the >=3-platform depth criterion required for the Compare view
 - `tpch SF=0.01`: DuckDB, DataFusion, Polars
 - `star_schema SF=0.01`: DuckDB, DataFusion, SQLite
 
+## Zero-query DataFrame withdrawal (2026-08-24)
+
+Sixty legacy DataFrame bundles were withdrawn because they reported
+`summary.validation=passed` after executing zero queries. They are
+non-measurements, not truthful partial results. Each bundle's manifest was
+removed with it.
+
+Removing only those bundles would have left ten represented cohorts below the
+three-platform corpus floor. Because truthful replacements were not yet
+available, the remaining 17 SQL bundles in those cohorts were temporarily
+withdrawn too; those 17 were not classified as invalid. This preserves the
+cohort invariant without counting empty results as coverage:
+
+- AMPLab SF 0.1 and 1.0
+- CoffeeShop SF 0.1 and 1.0
+- H2O-DB SF 0.1 and 1.0
+- SSB SF 1.0
+- TSBS DevOps SF 0.01, 0.1, and 1.0
+
+The removal commit contains the exact 77-bundle and 77-manifest path list.
+Restore a cohort only with at least three truthful platform results. Fresh
+DataFrame results additionally require real validation evidence; execution
+success alone is not a validation pass. NYC Taxi and TSBS DevOps regeneration
+also waits for their native temporal-literal fix.
+
 ## Public-path single-pass status (2026-08-05)
 
 Verified with `results_explorer_corpus_migrate.py` dry-run: 0/207 bundles changed under the current public anonymization pass. The `test_rederiv_fresh_public_pass_equals_curated_for_all_fields` gate pins the fixed point.
@@ -84,4 +109,3 @@ policy was not expanded beyond empty optional map omission.
   `client_host` objects remain in primary bundles).
 - Spot check: `rg -n '"client_host": \{\}' results-data/bundles` should not
   match residual hollow maps in primary result JSON.
-

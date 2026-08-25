@@ -48,7 +48,7 @@ def test_connection_guidance_does_not_advertise_unregistered_platform_options(
     relative_path: str, forbidden_advice: tuple[str, ...]
 ) -> None:
     """Connection keys must not be presented as ``--platform-option`` unless registered."""
-    source = (REPO_ROOT / relative_path).read_text()
+    source = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
     for advice in forbidden_advice:
         assert advice not in source
 

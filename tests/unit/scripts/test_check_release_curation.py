@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import shutil
 import subprocess
 import sys
@@ -244,12 +245,18 @@ def test_curated_release_removes_dangling_project_test_and_runs_retained_tests(
         shutil.copy2(REPO_ROOT / relative, retained_test)
         retained_tests.append(str(retained_test))
 
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith(("PYTEST_XDIST", "COV_CORE")) and key != "PYTEST_CURRENT_TEST"
+    }
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", "-q", *retained_tests],
+        [sys.executable, "-m", "pytest", "-q", "-n", "0", "-p", "no:cacheprovider", *retained_tests],
         cwd=tmp_path,
         check=False,
         capture_output=True,
         text=True,
+        env=env,
     )
 
     assert result.returncode == 0, result.stderr

@@ -8,6 +8,13 @@ This runbook documents the current operating model only: contributor PRs target
 release workflow is the only path that can rebuild and deploy the static Explorer;
 no hosted API is involved.
 
+Authority is split by surface: `develop` owns code, validators, generators,
+the recurring maintainer seed, and the curated release-preview corpus;
+`published-results` owns the complete accepted Phase 2 archive. Each branch
+generates its inventory from its own tree. Published-only submissions are
+expected and are not automatically backported into the curated Explorer
+source.
+
 ## 1. Submission Lifecycle
 
 ### 1.1 Community submission (Phase 2)
@@ -48,8 +55,9 @@ manual gate.
 
 For `results-data/bundles/`, the apply is a **union overlay**, not a wipe:
 develop's files overwrite matching paths on `published-results`, and paths
-that exist only on `published-results` (community submissions not
-back-ported) are left intact. A previous wipe-then-checkout strategy deleted
+that exist only on `published-results` (accepted archive submissions that were
+not separately curated onto `develop`) are left intact. A previous
+wipe-then-checkout strategy deleted
 those published-only submissions whenever develop was also ahead.
 Develop-side *path deletions* do not auto-propagate (a deleted seed path that
 still exists only on published-results becomes published-only and is kept).
@@ -94,12 +102,11 @@ needed outside the trigger conditions), trigger it manually via
 #### Why the mirror PR needs its own check, and what still doesn't run there
 
 The mirror PR is opened by `sync-results-data-to-published.yml` using its own
-`GITHUB_TOKEN`, so its author is `github-actions[bot]`. GitHub never starts
-`pull_request`-triggered workflow runs for events raised by `GITHUB_TOKEN`
-(documented recursion prevention) — so `validate-submission.yml`, despite
-being wired to fire on exactly this PR's base and paths, never actually runs
-on it. #1542 shipped with an empty `statusCheckRollup` for exactly this
-reason: not zero failures, zero checks.
+`GITHUB_TOKEN`, so its author is `github-actions[bot]`. GitHub does not start
+the `pull_request` workflow unattended for that bot-created event. A maintainer
+may explicitly approve or rerun an `action_required` check, but that is a human
+action and not the mirror's automatic evidence. #1542 shipped with an empty
+`statusCheckRollup` for exactly this reason: not zero failures, zero checks.
 
 The sync workflow now closes that gap itself: before opening or updating the
 PR, it runs the same two corpus gates `validate-submission.yml` would have
@@ -110,6 +117,15 @@ commit status on the mirror branch's head SHA. A commit status is a plain
 Statuses-API write, not a workflow trigger, so it is unaffected by the
 GITHUB_TOKEN recursion rule above and needed no new credential — only a
 `statuses: write` permission grant on the token this workflow already holds.
+
+Trusted same-repository mirror branches may carry truthful
+`summary.validation=partial` maintainer results; they remain non-ranking.
+Community submissions stay stricter: a manifest is required, the query list
+must be non-empty, and `summary.validation` must be `passed` with no failed
+measurement evidence. The independently rerunnable submission workflow uses
+the same three-signal mirror trust gate (same repository, the
+`auto/results-mirror-*` branch pattern, and `github-actions[bot]` as the PR
+author) before allowing partial validation or a vendor-subtree addition.
 
 A separate, narrower gap remains and is **not** fixed by the above:
 `published-results` carries exactly one workflow file
@@ -187,9 +203,14 @@ corpus-archive branch that contributor PRs target and that mirrors develop's
 
 ## 2. Maintainer Review Checklist
 
-- Accept only complete benchmark runs with plausible metadata and timings.
-- Reject bundles that fail CI, omit required schema-v2 fields, or obviously misstate environment details.
-- Reject partial cohorts that would mislead the compare view.
+- For community PRs, accept only complete, non-empty benchmark runs with
+  `summary.validation=passed`, plausible metadata, and timings.
+- For trusted maintainer mirror PRs, truthful partial results may be retained
+  as non-ranking capability evidence when the limitation is documented.
+- Reject any bundle that fails its applicable CI policy, omits required
+  schema-v2 fields, or obviously misstates environment details.
+- Reject or quarantine partial results whose cause is unknown or whose metadata
+  would make them ranking-eligible.
 - Confirm the bundle path and filenames are coherent with the existing corpus naming.
 - Close stale contributor PRs after 14 days without response, with a short thank-you note.
 

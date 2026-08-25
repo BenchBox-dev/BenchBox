@@ -126,8 +126,10 @@ def test_reads_identity_from_global_includes(fixture_repo, conditional: bool) ->
         f"[user]\n\tname = {HUMAN_NAME}\n\temail = {HUMAN_EMAIL}\n",
         encoding="utf-8",
     )
+    # Use a relative (or POSIX) path so Windows backslashes do not become escapes.
+    include_path = included.relative_to(home).as_posix()
     section = '[includeIf "onbranch:work"]' if conditional else "[include]"
-    (home / ".gitconfig").write_text(f"{section}\n\tpath = {included}\n", encoding="utf-8")
+    (home / ".gitconfig").write_text(f"{section}\n\tpath = {include_path}\n", encoding="utf-8")
 
     result = _run_helper(linked, home)
 
@@ -142,7 +144,8 @@ def test_refuses_agent_identity_from_global_include(fixture_repo) -> None:
         f"[user]\n\tname = {AGENT_NAME}\n\temail = {AGENT_EMAIL}\n",
         encoding="utf-8",
     )
-    (home / ".gitconfig").write_text(f"[include]\n\tpath = {included}\n", encoding="utf-8")
+    include_path = included.relative_to(home).as_posix()
+    (home / ".gitconfig").write_text(f"[include]\n\tpath = {include_path}\n", encoding="utf-8")
 
     result = _run_helper(linked, home)
 

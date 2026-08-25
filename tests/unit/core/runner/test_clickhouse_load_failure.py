@@ -15,10 +15,13 @@ from benchbox.platforms.base.data_loading import ClickHouseServerLoadError
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
-def _failure() -> ClickHouseServerLoadError:
+def _failure(
+    database_path: Path | None = None,
+) -> ClickHouseServerLoadError:
+    base = database_path or Path("/tmp/lineitem.tbl.1")
     return ClickHouseServerLoadError(
         "lineitem",
-        [Path("/tmp/lineitem.tbl.1"), Path("/tmp/lineitem.tbl.2")],
+        [base.parent / "lineitem.tbl.1", base.parent / "lineitem.tbl.2"],
         65_536,
         RuntimeError("server closed the connection after memory limit"),
     )
@@ -33,15 +36,17 @@ def test_clickhouse_load_failure_details_preserve_streaming_and_memory_settings(
         insert_block_size=65_536,
         send_receive_timeout=900,
     )
+    database_path = Path("/tmp/lineitem.tbl.1")
+    failure = _failure(database_path)
     details = _clickhouse_load_failure_details(
-        _failure(),
+        failure,
         adapter=adapter,
         platform_config={"max_memory_usage": "24GB", "send_receive_timeout": 1200},
     )
 
     assert details == {
         "table": "lineitem",
-        "source_files": ["/tmp/lineitem.tbl.1", "/tmp/lineitem.tbl.2"],
+        "source_files": [str(database_path), str(database_path.parent / "lineitem.tbl.2")],
         "rows_attempted": 65_536,
         "memory_settings": {
             "max_memory_usage": "24GB",

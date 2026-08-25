@@ -52,6 +52,24 @@ practically usable instead of inheriting develop drift.
 `published-results` is a **slim corpus-only branch**. Its tracked
 contents are fixed by allowlist; everything else is excluded.
 
+### Authority by surface
+
+The branches have deliberately different authority. This is not bidirectional
+replication:
+
+| Surface | Authoritative branch |
+| --- | --- |
+| BenchBox code, validators, and corpus generators | `develop` |
+| Recurring maintainer seed and curated release-preview corpus | `develop` |
+| Complete accepted Phase 2 archive, including direct operator and community submissions | `published-results` |
+| Corpus inventory | Generated independently from each branch's own bundle tree |
+| Current static Results Explorer | Curated `release` snapshot sourced from `develop`, not the complete Phase 2 archive |
+
+Published-only bundles are therefore expected archive growth, not missing
+backports. There is no automatic `published-results` to `develop` sync. A
+bundle enters the curated release preview only through a separate, reviewed
+promotion onto `develop`.
+
 ### Allowlist
 
 | Path | Why it lives on `published-results` |
@@ -64,7 +82,8 @@ contents are fixed by allowlist; everything else is excluded.
 | `results-data/validate_corpus.py` | The cohort-depth gate enforced by CI. |
 | `results-data/.gitignore` | Local-clone hygiene for the corpus directory. |
 | `scripts/validate_submission.py` | Per-bundle validator entrypoint — a thin CLI wrapper that must run inside the submission CI without shipping the rest of `benchbox/`. Imports the shared implementation from `benchbox/validation/bundle.py` (with an `importlib` file-loader fallback). |
-| `benchbox/validation/bundle.py` | The shared validator implementation used by both develop and this branch. Mirrored here (the single `benchbox/` file on the branch) so `validate_submission.py` runs without installing BenchBox; kept in sync by `sync-results-data-to-published.yml`. |
+| `benchbox/validation/bundle.py` | The shared validator implementation used by both develop and this branch. Mirrored here so `validate_submission.py` runs without installing BenchBox; kept in sync by `sync-results-data-to-published.yml`. |
+| `benchbox/core/results/query_status.py` | Stdlib-only failed-query policy shared by publication, ranking, and the slim validator so both branches judge measurement failures identically. |
 | `scripts/generate_corpus_inventory.py` | Inventory generator — same rationale as above. |
 | `.github/workflows/validate-submission.yml` | The submission CI gate. |
 | `.gitignore` | Repository-root ignore — kept minimal. |
@@ -78,8 +97,8 @@ in the slim-down.
 
 ### Explicit exclusions (deleted in the slim-down)
 
-- `benchbox/` (the package source) — **except** the single mirrored file
-  `benchbox/validation/bundle.py` (see the allowlist above). The rest of the
+- `benchbox/` (the package source) — **except** the two mirrored validation
+  files listed above. The rest of the
   package is not needed to validate or display bundles; `validate_submission.py`
   is a thin wrapper over that one shared module.
 - `tests/` — the develop-side test suite. The corpus depth and
@@ -171,16 +190,18 @@ in the open-PR list against `published-results`.
 
 If the workflow itself ever misfires (e.g. detects no drift when there
 is one), the manual recovery is to trigger it via `workflow_dispatch`
-from the develop branch. In the absence of any sync at all, develop
-remains authoritative — `published-results` copies are treated as
-read-only mirrors, and any develop-side bug fix in the validators is
-the canonical fix.
+from the develop branch. In the absence of any sync at all, `develop`
+remains authoritative for these vendored implementation files —
+`published-results` copies are treated as read-only mirrors, and any
+develop-side validator or generator bug fix is the canonical fix. This does
+not make `develop` authoritative for published-only archive bundles.
 
 ### The workflow file itself is NOT auto-mirrored — this is permanent, not a gap to close
 
 `sync-results-data-to-published.yml`'s automated mirror only covers
-`scripts/validate_submission.py`, `benchbox/validation/bundle.py`, and
-`scripts/generate_corpus_inventory.py` (the vendored *scripts*). It
+`scripts/validate_submission.py`, `benchbox/validation/bundle.py`,
+`benchbox/core/results/query_status.py`, and
+`scripts/generate_corpus_inventory.py` (the vendored validation surface). It
 deliberately does **not** include
 `.github/workflows/validate-submission.yml` itself, and never will:
 `GITHUB_TOKEN` cannot push changes under `.github/workflows/` regardless
@@ -224,7 +245,7 @@ published-results by hand" follow-up.
   on `develop`, and in the runbook before the force-push.
 - Vendoring `validate_submission.py` and `generate_corpus_inventory.py`
   introduces a sync surface. Mitigated by W4 of the parent TODO and by
-  treating develop as authoritative.
+  treating `develop` as authoritative for vendored validation tooling.
 - The branch loses the May-1 history. Project history overall is
   preserved on `develop` and `main`; `published-results`'s own log is
   intentionally short and corpus-focused.

@@ -96,8 +96,7 @@ test.describe("tray accessibility: announcements, focus, escape", () => {
     // Use BenchmarkIndex matrix: check multiple platform checkboxes to reach cap
     // Simpler: check the compare-tray selection cap via query heatmap checkboxes
     // But Platform checkboxes are the canonical cap test
-    const checkboxes = page.getByRole("checkbox", { name: /Select .* for comparison/i });
-    const count = await checkboxes.count();
+    await expect(page.getByRole("checkbox", { name: /Select .* for comparison/i }).first()).toBeVisible();
     // Just verify at least one checkbox has aria-describedby when disabled or that tray exists
     // This test documents the existing pattern is preserved: aria-describedby not name suffix.
     await waitForDataElement(page, page.getByTestId(fixtureIds.ids.duckdb).first());

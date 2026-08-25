@@ -38,6 +38,7 @@ def _run_make(root: Path, *arguments: str, env: dict[str, str] | None = None) ->
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         env=env,
     )
 
@@ -170,6 +171,7 @@ def test_absolute_symlink_makefile_preserves_module_resolution(tmp_path: Path) -
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
 
     assert result.returncode == 0, result.stderr
