@@ -25,9 +25,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from tests.uat import docker_assets
+from tests.uat import docker_assets, managed_runtime
 from tests.uat.cleanup import CellKey, can_prune, prune_database_dir, source_reuse_graph
-from tests.uat.clickhouse_memory import runtime_limit_matches_rung
 from tests.uat.config import OutputConfig, UATConfig
 from tests.uat.ladder import LadderRung, plan_ladder
 from tests.uat.matrix import (
@@ -355,6 +354,8 @@ def run_execute(
                         databases_root=databases_root,
                         cleanup_enabled=cleanup_enabled,
                         runner=runner,
+                        docker_runner=docker_runner,
+                        docker_events=docker_events,
                         log_dir=log_dir,
                         benchmark_runs_dir=benchmark_runs_dir,
                     )
@@ -471,11 +472,7 @@ def _start_docker_platform_if_needed(
         # abort-worthy handling below (uat-fail-advance-consistency:
         # pre-flight config errors abort, runtime compose-up failures
         # advance-past).
-        compose_env = docker_assets.compose_environment(
-            spec,
-            benchmark_runs_dir=benchmark_runs_dir,
-            memory_limit=config.preflight.clickhouse_memory_limit,
-        )
+        compose_env = managed_runtime.compose_environment(config, spec, benchmark_runs_dir)
     except docker_assets.DockerAssetError as exc:
         return _DockerPlatformState(spec=spec, project_name=project_name), str(exc)
 
@@ -623,11 +620,7 @@ def _check_docker_platform_readiness(
         dry_run=False,
         timeout_s=config.cleanup.docker_start_timeout_s,
         cwd=docker_assets.REPO_ROOT,
-        env=docker_assets.compose_environment(
-            spec,
-            benchmark_runs_dir=benchmark_runs_dir,
-            memory_limit=config.preflight.clickhouse_memory_limit,
-        ),
+        env=managed_runtime.compose_environment(config, spec, benchmark_runs_dir),
     )
     _record_docker_event(
         docker_events,
@@ -672,100 +665,44 @@ def _check_docker_platform_readiness(
             f"UAT-managed Docker readiness check failed for {platform} project {project_name}: "
             f"reachability probe to {endpoint} failed {config.cleanup.docker_settle_s}s after `up --wait` reported success"
         )
-    return _check_clickhouse_runtime_memory(
+    application_reason = managed_runtime.check_application_readiness(
+        config,
+        spec=spec,
+        project_name=project_name,
+        docker_runner=docker_runner,
+        docker_events=docker_events,
+        record_event=_record_docker_event,
+        log_dir=log_dir,
+        benchmark_runs_dir=benchmark_runs_dir,
+        retry_window_s=max(0.0, config.cleanup.docker_start_timeout_s - config.cleanup.docker_settle_s),
+        retry_interval_s=config.cleanup.docker_settle_s,
+        sleep_fn=sleep_fn,
+    )
+    if application_reason is not None:
+        return application_reason
+    if platform == "starrocks" and not config.dry_run:
+        resource_reason = managed_runtime.reconcile_starrocks_resources(
+            config,
+            spec=spec,
+            project_name=project_name,
+            docker_runner=docker_runner,
+            docker_events=docker_events,
+            record_event=_record_docker_event,
+            log_dir=log_dir,
+        )
+        if resource_reason is not None:
+            return resource_reason
+    return managed_runtime.check_memory_admission(
         config,
         spec=spec,
         project_name=project_name,
         platform=platform,
         docker_runner=docker_runner,
         docker_events=docker_events,
+        record_event=_record_docker_event,
         log_dir=log_dir,
         memory_reader=memory_reader,
     )
-
-
-def _check_clickhouse_runtime_memory(
-    config: UATConfig,
-    *,
-    spec: docker_assets.DockerPlatformSpec,
-    project_name: str,
-    platform: str,
-    docker_runner: DockerRunner,
-    docker_events: list[DockerLifecycleEvent],
-    log_dir: Path | None,
-    memory_reader: FreeMemoryReader,
-) -> str | None:
-    """Verify the selected ClickHouse limit and reserve after startup."""
-    if platform != "clickhouse-server":
-        return None
-    try:
-        selected_value, selected_bytes = docker_assets.resolve_clickhouse_memory_limit(
-            config.preflight.clickhouse_memory_limit
-        )
-    except docker_assets.DockerAssetError as exc:
-        return f"ClickHouse runtime memory admission could not resolve the selected request: {exc}"
-    stats_result = docker_runner(
-        docker_assets.compose_stats_command(spec, project_name),
-        dry_run=False,
-        timeout_s=config.cleanup.docker_start_timeout_s,
-        cwd=docker_assets.REPO_ROOT,
-        env=docker_assets.compose_environment(
-            spec,
-            benchmark_runs_dir=None,
-            memory_limit=config.preflight.clickhouse_memory_limit,
-        ),
-    )
-    runtime_limit = docker_assets.parse_runtime_memory_limit(stats_result.stdout)
-    _record_docker_event(
-        docker_events,
-        log_dir=log_dir,
-        platform=platform,
-        action="memory-admission",
-        status="ok" if stats_result.succeeded and runtime_limit is not None else "failed",
-        project_name=project_name,
-        message=(
-            f"requested={selected_value} requested_bytes={selected_bytes} "
-            f"runtime_limit_bytes={runtime_limit} reserve_gib={config.preflight.docker_memory_reserve_gib:.2f}"
-        )
-        if stats_result.succeeded
-        else _docker_result_message(stats_result),
-        result=stats_result,
-    )
-    if not stats_result.succeeded:
-        return (
-            f"ClickHouse runtime memory admission failed for {project_name}: stats could not be read: "
-            f"{_docker_result_message(stats_result)}"
-        )
-    if runtime_limit is None:
-        return (
-            f"ClickHouse runtime memory admission failed for {project_name}: stats did not report a memory limit; "
-            "refusing to infer one from host RAM or an engine default"
-        )
-    if not runtime_limit_matches_rung(runtime_limit, selected_bytes / (1024**3), requested_bytes=selected_bytes):
-        return (
-            f"ClickHouse runtime memory admission failed for {project_name}: requested {selected_value} "
-            f"({selected_bytes} bytes), runtime reported {runtime_limit} bytes"
-        )
-    snapshot = memory_reader()
-    required_gib = selected_bytes / (1024**3) + config.preflight.docker_memory_reserve_gib
-    append_lifecycle_log(
-        log_dir,
-        f"[memory-runtime] platform={platform} project={project_name} available_gib={snapshot.free_gib} "
-        f"request_gib={selected_bytes / (1024**3):.3f} reserve_gib={config.preflight.docker_memory_reserve_gib:.3f} "
-        f"required_gib={required_gib:.3f} swap_used_percent={snapshot.swap_used_percent}",
-    )
-    if snapshot.free_gib is None:
-        return (
-            f"ClickHouse runtime memory admission failed for {project_name}: host available memory could not be "
-            "measured after startup; refusing to continue without request plus reserve evidence"
-        )
-    if snapshot.free_gib < required_gib:
-        return (
-            f"ClickHouse runtime memory admission failed for {project_name}: {snapshot.free_gib:.2f} GiB available "
-            f"< {required_gib:.2f} GiB required ({selected_value} request + "
-            f"{config.preflight.docker_memory_reserve_gib:.2f} GiB reserve)"
-        )
-    return None
 
 
 def _teardown_docker_platform_if_needed(
@@ -867,11 +804,7 @@ def _run_docker_teardown(
         return "off", None
 
     try:
-        compose_env = docker_assets.compose_environment(
-            docker_state.spec,
-            benchmark_runs_dir=benchmark_runs_dir,
-            memory_limit=config.preflight.clickhouse_memory_limit,
-        )
+        compose_env = managed_runtime.compose_environment(config, docker_state.spec, benchmark_runs_dir)
     except docker_assets.DockerAssetError:
         # Teardown must never fail (or worse, raise out of run_execute's
         # `finally`) just because BENCHBOX_DATA_DIR is unset or relative --
@@ -961,6 +894,8 @@ def _run_or_skip_platform(
     databases_root: Path | None,
     cleanup_enabled: bool,
     runner,
+    docker_runner: DockerRunner,
+    docker_events: list[DockerLifecycleEvent],
     log_dir: Path | None,
     benchmark_runs_dir: Path,
 ) -> None:
@@ -980,6 +915,13 @@ def _run_or_skip_platform(
         and not config.dry_run
         and probe_platform_reachability(platform, timeout_s=config.execute.liveness_probe_timeout_s)
     )
+    application_liveness_project_name = None
+    if config.cleanup.docker_manage_platforms and docker_assets.is_docker_platform(platform):
+        application_liveness_project_name = docker_assets.compose_project_name(
+            config.name,
+            platform,
+            config.cleanup.docker_project_prefix,
+        )
     for index, (benchmark, pb_cells) in enumerate(platform_pairs):
         try:
             _run_platform_benchmark(
@@ -995,9 +937,12 @@ def _run_or_skip_platform(
                 databases_root=databases_root,
                 cleanup_enabled=cleanup_enabled,
                 runner=runner,
+                docker_runner=docker_runner,
+                docker_events=docker_events,
                 log_dir=log_dir,
                 benchmark_runs_dir=benchmark_runs_dir,
                 liveness_armed=liveness_armed,
+                application_liveness_project_name=application_liveness_project_name,
             )
         except _PlatformDiedMidRun as died:
             # Everything this platform still owed: the rest of the benchmark
@@ -1025,9 +970,12 @@ def _run_platform_benchmark(
     databases_root: Path | None,
     cleanup_enabled: bool,
     runner,
+    docker_runner: DockerRunner,
+    docker_events: list[DockerLifecycleEvent],
     log_dir: Path | None,
     benchmark_runs_dir: Path,
     liveness_armed: bool,
+    application_liveness_project_name: str | None,
 ) -> None:
     ladder_rungs = [c.scale for c in pb_cells]
     observed: list[LadderRung] = []
@@ -1057,6 +1005,26 @@ def _run_platform_benchmark(
                 f"Recording this and every remaining {platform} cell as died-mid-platform.",
             )
             raise _PlatformDiedMidRun(platform=platform, remaining_cells=list(pb_cells[index:]))
+        if liveness_armed and application_liveness_project_name is not None:
+            application_reason = managed_runtime.check_application_readiness(
+                config,
+                spec=docker_assets.docker_platform_spec(platform),
+                project_name=application_liveness_project_name,
+                docker_runner=docker_runner,
+                docker_events=docker_events,
+                record_event=_record_docker_event,
+                log_dir=log_dir,
+                benchmark_runs_dir=benchmark_runs_dir,
+                action="application-liveness",
+            )
+            if application_reason is not None:
+                append_lifecycle_log(
+                    log_dir,
+                    f"[liveness] {platform}/{benchmark}: application probe failed before cell "
+                    f"scale={cell.scale}; stack was reachable when the platform started. "
+                    f"Recording this and every remaining {platform} cell as died-mid-platform: {application_reason}",
+                )
+                raise _PlatformDiedMidRun(platform=platform, remaining_cells=list(pb_cells[index:]))
         cell_result = runner(
             cell.platform,
             cell.benchmark,
@@ -1436,6 +1404,13 @@ def _free_memory_abort_reason(
             return f"ClickHouse memory request is not admissible {context}: {exc}"
         request_gib = request_bytes / (1024**3)
         vm_request = f"clickhouse-server={request_gib:.3f} GiB"
+    elif platform == "starrocks":
+        try:
+            _, request_bytes = managed_runtime.resolve_starrocks_memory_limit(config.preflight.starrocks_memory_limit)
+        except docker_assets.DockerAssetError as exc:
+            return f"StarRocks memory request is not admissible {context}: {exc}"
+        request_gib = request_bytes / (1024**3)
+        vm_request = f"starrocks={request_gib:.3f} GiB"
 
     snapshot = reader()
     required_gib = min_gib

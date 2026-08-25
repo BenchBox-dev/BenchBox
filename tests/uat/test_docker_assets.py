@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tests.uat import config, docker_assets, matrix
+from tests.uat import config, docker_assets, managed_runtime, matrix
 from tests.uat.docker_path_helpers import compose_path_ends_with
 
 pytestmark = pytest.mark.fast
@@ -344,6 +344,17 @@ def test_compose_environment_ignores_relative_dir_for_non_path_mirroring_platfor
     assert (
         docker_assets.compose_environment(spec, benchmark_runs_dir=Path("relative_runs"), memory_limit="4g") == expected
     )
+
+
+def test_starrocks_compose_environment_sets_explicit_memory_request(monkeypatch):
+    spec = docker_assets.docker_platform_spec("starrocks")
+    monkeypatch.delenv(managed_runtime.STARROCKS_MEMORY_LIMIT_ENV_VAR, raising=False)
+    assert docker_assets.compose_environment(spec) == {managed_runtime.STARROCKS_MEMORY_LIMIT_ENV_VAR: "4g"}
+
+    monkeypatch.setenv(managed_runtime.STARROCKS_MEMORY_LIMIT_ENV_VAR, "6g")
+    assert docker_assets.compose_environment(spec, starrocks_memory_limit="4g") == {
+        managed_runtime.STARROCKS_MEMORY_LIMIT_ENV_VAR: "6g"
+    }
 
 
 @pytest.mark.parametrize("platform", ["lakesail", "velox"])
@@ -894,6 +905,26 @@ def test_resolve_clickhouse_memory_limit_does_not_replace_empty_environment_with
     monkeypatch.setenv(docker_assets.CLICKHOUSE_MEMORY_LIMIT_ENV_VAR, "")
     with pytest.raises(docker_assets.DockerAssetError, match="required"):
         docker_assets.resolve_clickhouse_memory_limit("4g")
+
+
+def test_resolve_starrocks_memory_limit_validates_config_and_environment():
+    assert managed_runtime.resolve_starrocks_memory_limit("4g", env={}) == ("4g", 4_000_000_000)
+    assert managed_runtime.resolve_starrocks_memory_limit("4g", env={"STARROCKS_MEMORY_LIMIT": "6g"}) == (
+        "6g",
+        6_000_000_000,
+    )
+    with pytest.raises(docker_assets.DockerAssetError, match="non-empty"):
+        managed_runtime.resolve_starrocks_memory_limit("4g", env={"STARROCKS_MEMORY_LIMIT": ""})
+
+
+def test_starrocks_readiness_command_requires_alive_frontend_and_backend():
+    spec = docker_assets.docker_platform_spec("starrocks")
+    argv = managed_runtime._readiness_command(spec, "benchbox-uat-starrocks")
+    assert argv is not None
+    assert argv[-4] == "starrocks"
+    assert "SHOW FRONTENDS\\G" in argv[-1]
+    assert "SHOW BACKENDS\\G" in argv[-1]
+    assert "Alive: true" in argv[-1]
 
 
 @pytest.mark.parametrize(
