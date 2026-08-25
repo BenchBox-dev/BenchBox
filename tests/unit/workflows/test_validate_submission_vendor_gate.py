@@ -10,6 +10,7 @@ This test pins that step so it cannot silently regress.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -111,9 +112,11 @@ def test_vendor_gate_allows_trusted_same_repo_mirror() -> None:
 def _evaluate_mirror_trust_gate(*, is_fork: str, base_ref: str, head_ref: str, pr_author: str) -> str:
     run = _vendor_gate_step()["run"]
     gate = run[run.index('TRUSTED_MIRROR="false"') : run.index('case "$AUTHOR_ASSOCIATION"')]
+    env = os.environ.copy()
+    env.update({"IS_FORK": is_fork, "BASE_REF": base_ref, "HEAD_REF": head_ref, "PR_AUTHOR": pr_author})
     return subprocess.check_output(
         ["bash", "-c", gate + '\nprintf "%s\\n" "$TRUSTED_MIRROR"'],
-        env={"IS_FORK": is_fork, "BASE_REF": base_ref, "HEAD_REF": head_ref, "PR_AUTHOR": pr_author},
+        env=env,
         text=True,
     ).strip()
 
