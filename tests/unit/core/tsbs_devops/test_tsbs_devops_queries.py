@@ -136,6 +136,7 @@ class TestTSBSDevOpsQueryManager:
         query = manager.get_query("lastpoint")
         assert "JOIN (" in query
         assert "MAX(time) AS max_time" in query
+        assert "ORDER BY c.hostname" in query
         assert "(hostname, time) IN" not in query
 
     def test_get_query_with_param_override(self, manager):

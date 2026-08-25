@@ -263,7 +263,7 @@ QUERIES:
           GROUP BY hostname
       ) latest ON c.hostname = latest.hostname AND c.time = latest.max_time
       WHERE c.time >= '{start_time}'
-      ORDER BY hostname
+      ORDER BY c.hostname
     params:
       duration_hours: 24
   by-region:
