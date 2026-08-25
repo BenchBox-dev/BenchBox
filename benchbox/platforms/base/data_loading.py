@@ -1271,11 +1271,7 @@ class DuckDBNativeHandler(FileFormatHandler):
 
 
 class ParquetFileHandler(FileFormatHandler):
-    """Handler for Parquet files using PyArrow.
-
-    This is a generic handler that works across platforms by converting
-    Parquet to in-memory data and loading via INSERT statements.
-    """
+    """Handler for Parquet files using bounded PyArrow record batches."""
 
     def get_delimiter(self) -> str:
         """Parquet is columnar format, not delimited."""
@@ -1302,19 +1298,8 @@ class ParquetFileHandler(FileFormatHandler):
         except ImportError as e:
             raise RuntimeError("pyarrow is required for Parquet loading") from e
 
-        # Read Parquet file
-        table = pq.read_table(file_path)
-        row_count = table.num_rows
-
-        if row_count == 0:
-            return 0
-
-        # Convert to Python data for insertion
-        # PyArrow's to_pylist() gives us list of dicts
-        data = table.to_pylist()
-
-        # Get column names from schema and validate each one
-        column_names = table.schema.names
+        parquet_file = pq.ParquetFile(file_path)
+        column_names = parquet_file.schema_arrow.names
         validated_columns = [validate_sql_identifier(col, "column name") for col in column_names]
         placeholders = ",".join(["?" for _ in validated_columns])
         columns_str = ",".join(validated_columns)
@@ -1322,14 +1307,14 @@ class ParquetFileHandler(FileFormatHandler):
         # Prepare INSERT statement
         insert_sql = f"INSERT INTO {validated_table} ({columns_str}) VALUES ({placeholders})"
 
-        # Convert dicts to tuples in correct column order
-        data_tuples = [tuple(row[col] for col in column_names) for row in data]
-
-        # Insert in batches for better performance
+        # Keep only one bounded record batch and its Python conversion in memory.
         batch_size = 1000
-        for i in range(0, len(data_tuples), batch_size):
-            batch = data_tuples[i : i + batch_size]
-            connection.executemany(insert_sql, batch)
+        row_count = 0
+        for batch in parquet_file.iter_batches(batch_size=batch_size):
+            data_tuples = [tuple(row[col] for col in column_names) for row in batch.to_pylist()]
+            if data_tuples:
+                connection.executemany(insert_sql, data_tuples)
+                row_count += len(data_tuples)
 
         return row_count
 

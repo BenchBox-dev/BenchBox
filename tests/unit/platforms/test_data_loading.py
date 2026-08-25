@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -17,8 +18,10 @@ from benchbox.platforms.base.data_loading import (
     ClickHouseNativeHandler,
     DataSource,
     DataSourceResolver,
+    ParquetFileHandler,
     resolve_adapter_data_source,
 )
+from benchbox.platforms.sqlite import SQLiteAdapter
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -205,6 +208,43 @@ def test_clickhouse_native_handler_uses_csv_with_names_for_headered_csv(tmp_path
     load_queries = [query for query in connection.queries if "file(" in query]
     assert load_queries
     assert "CSVWithNames" in load_queries[0]
+
+
+def test_parquet_handler_streams_record_batches(monkeypatch, tmp_path: Path) -> None:
+    """Generic Parquet loading must not materialize the complete source table."""
+    pa = pytest.importorskip("pyarrow")
+    import pyarrow.parquet as pq
+
+    source = tmp_path / "events.parquet"
+    pq.write_table(
+        pa.table(
+            {
+                "id": [1, 2, 3],
+                "name": ["alpha", "beta", "gamma"],
+                "amount": pa.array([Decimal("1.25"), None, Decimal("3.75")], type=pa.decimal128(15, 2)),
+            }
+        ),
+        source,
+        row_group_size=2,
+    )
+
+    def fail_if_materialized(*args, **kwargs):
+        raise AssertionError("Parquet loading must use record batches, not read_table")
+
+    monkeypatch.setattr(pq, "read_table", fail_if_materialized)
+    connection = SQLiteAdapter(database_path=":memory:").create_connection()
+    try:
+        connection.execute("CREATE TABLE events (id INTEGER, name TEXT, amount DECIMAL(15, 2))")
+        row_count = ParquetFileHandler().load_table("events", source, connection, object(), logging.getLogger(__name__))
+
+        assert row_count == 3
+        assert connection.execute("SELECT * FROM events ORDER BY id").fetchall() == [
+            (1, "alpha", 1.25),
+            (2, "beta", None),
+            (3, "gamma", 3.75),
+        ]
+    finally:
+        connection.close()
 
 
 class _FakeClickHouseConnection:
