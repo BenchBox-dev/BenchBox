@@ -674,7 +674,10 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Compare selected results</h2>
-            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]" aria-live="polite" aria-atomic="true">
+            <p
+              class="mt-1 text-sm text-[var(--bb-data-fg-muted)]"
+              {...(selectedComparableCount < 2 ? { "aria-live": "polite" as const, "aria-atomic": "true" as const } : {})}
+            >
               {compareGuidance}
             </p>
             {selectionLimitCopy && (
