@@ -1,7 +1,7 @@
 {
   "benchmark": "Metadata",
   "bundle_file": "metadata_primitives_sf1_polars_df_20260502_211203_5a803e74.json",
-  "bundle_hash": "f9363b1d8029ba968a0f5cc6c1ac3b016b3944a90d14f428e0e5c1764e5ae411",
+  "bundle_hash": "ba4b814b761f6cdbf4c7a7d86707d38e7fee557efb5da9e6909a2d510ac35aed",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",

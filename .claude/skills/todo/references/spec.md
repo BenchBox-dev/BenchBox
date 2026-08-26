@@ -2,7 +2,7 @@
 
 State assumptions, objective, commands, structure, style, tests, boundaries,
 success criteria, and review gate. Before finalizing, apply Layer 3 of
-`SHARED/review-protocol/SKILL.md`. Include a reframe only if it changes the
+`shared-review-protocol/SKILL.md`. Include a reframe only if it changes the
 specification. Save only after the user confirms.
 
 ## Prior art

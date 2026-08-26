@@ -23,8 +23,8 @@ personas. Fall back to repo docs config and the Makefile.
 | `create` | create/add documentation | `references/create.md` |
 | `build` | build/validate docs | `references/build.md` |
 | `review` | review/check docs | `references/review.md` |
-| `compare` | compare documents | `SHARED/investigation-framework/SKILL.md` (Compare section) |
-| `shrink` | compress/shrink docs | `SHARED/investigation-framework/SKILL.md` (Shrink section) |
+| `compare` | compare documents | `shared-investigation-framework/SKILL.md` (Compare section) |
+| `shrink` | compress/shrink docs | `shared-investigation-framework/SKILL.md` (Shrink section) |
 | `adversarial` | adversarial/user-perspective review | `references/adversarial.md` |
 | `commit` | commit documentation | `references/commit.md` |
 | `help` | help/list actions | this table |
@@ -32,7 +32,7 @@ personas. Fall back to repo docs config and the Makefile.
 ## Global rules
 
 - `review`, `adversarial`, and `compare` are read-only under
-  `SHARED/review-protocol/SKILL.md`.
+  `shared-review-protocol/SKILL.md`.
 - Repository write actions use the shared change framework's named branch,
   verification, commit, and approved-plan PR workflow. The `commit` action
   handles existing documentation changes; it is not required for other writes.

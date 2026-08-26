@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-Havoc",
   "bundle_file": "tpchavoc_sf001_polars_df_20260502_211328_5ac5485d.json",
-  "bundle_hash": "afaad9eb2ed3c8f289cedd5463942b8441aa974ae90d44c80498ffd95896bbeb",
+  "bundle_hash": "1b38a1eda29c39e4064309795f2369305b060492b72579330555b34874910aea",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",

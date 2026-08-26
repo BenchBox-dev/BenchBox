@@ -96,7 +96,7 @@ def test_audit_entrypoint_is_stdlib_only() -> None:
     [
         "AGENTS.md",
         ".claude/settings.json",
-        ".claude/skills/SHARED/investigation-framework/SKILL.md",
+        ".claude/skills/shared-investigation-framework/SKILL.md",
         "_project/evals/agent-instructions/scenarios.json",
         "docs/agent/review-protocol.md",
         "skill-sync.lock",

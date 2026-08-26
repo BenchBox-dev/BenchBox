@@ -40,7 +40,7 @@ Review-shaped actions must not:
 - Chain into write-shaped skills without authorization in a later turn.
 
 A later request to fix review findings is a repository write action. Follow
-`SHARED/change-framework/SKILL.md`, including its branch, commit, push, and
+`shared-change-framework/SKILL.md`, including its branch, commit, push, and
 draft-PR workflow unless the user requires local-only work or another
 publication mode.
 

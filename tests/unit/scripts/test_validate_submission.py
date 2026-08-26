@@ -109,6 +109,7 @@ def _minimal_bundle() -> dict:
             "validation": "passed",
             "queries": {"total": 2, "passed": 2, "failed": 0},
         },
+        "phases": {"validation": {"status": "PASSED"}},
         "queries": [
             {"id": "Q1", "ms": 100, "status": "SUCCESS"},
             {"id": "Q2", "ms": 200, "status": "SUCCESS"},
@@ -383,6 +384,16 @@ class TestValidateBundle:
         _validate_bundle(data_failed, failed, allow_partial_validation=True)
         assert not failed.ok
 
+    def test_not_run_validation_allowed_only_for_trusted_mirror(self):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "not_run"
+        community = ValidationResult("community")
+        _validate_bundle(data, community)
+        assert not community.ok
+        mirror = ValidationResult("mirror")
+        _validate_bundle(data, mirror, allow_partial_validation=True)
+        assert mirror.ok, mirror.errors
+
     def test_passed_validation_rejects_summary_failed_measurements(self):
         data = _minimal_bundle()
         data["summary"]["queries"] = {"total": 2, "passed": 1, "failed": 1}
@@ -402,6 +413,58 @@ class TestValidateBundle:
 
         assert not vr.ok
         assert any("contradicts 1 failed measurement query" in error for error in vr.errors)
+
+    def test_validation_claim_rejects_unrun_validation_phase(self):
+        data = _minimal_bundle()
+        data["phases"] = {"validation": {"status": "NOT_RUN"}}
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any(
+            "summary.validation='passed' contradicts phases.validation.status='not_run'" in error for error in vr.errors
+        )
+
+    def test_validation_claim_rejects_missing_validation_phase(self):
+        data = _minimal_bundle()
+        del data["phases"]
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any(
+            "summary.validation='passed' contradicts phases.validation.status='unknown'" in error for error in vr.errors
+        )
+
+    def test_partial_claim_rejects_non_dict_validation_phase_on_trusted_mirror(self):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        data["phases"]["validation"] = "NOT_RUN"
+        vr = ValidationResult("mirror")
+
+        _validate_bundle(data, vr, allow_partial_validation=True)
+
+        assert not vr.ok
+        assert any(
+            "summary.validation='partial' contradicts phases.validation.status='unknown'" in error
+            for error in vr.errors
+        )
+
+    def test_partial_claim_rejects_unrun_validation_phase_on_trusted_mirror(self):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        data["phases"] = {"validation": {"status": "not_run"}}
+        vr = ValidationResult("mirror")
+
+        _validate_bundle(data, vr, allow_partial_validation=True)
+
+        assert not vr.ok
+        assert any(
+            "summary.validation='partial' contradicts phases.validation.status='not_run'" in error
+            for error in vr.errors
+        )
 
     def test_failed_warmup_does_not_contradict_successful_measurements(self):
         data = _minimal_bundle()

@@ -26,7 +26,7 @@ requires a human audience that belongs on benchbox.dev. A new
 
 | File | Role |
 |---|---|
-| `review-protocol.md` | Active BenchBox binding of `SHARED/review-protocol` |
+| `review-protocol.md` | Active BenchBox binding of `shared-review-protocol` |
 | `review-protocol-legacy.md` | Superseded rationale; do not bind new surfaces to it |
 | `identity-instruction-boundary.md` | Why an external “set agent git identity” instruction is destructive |
 | `attribution-surfaces.md` | No standing agent footers on owner-posted GitHub surfaces |

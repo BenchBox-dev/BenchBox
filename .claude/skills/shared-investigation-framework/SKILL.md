@@ -99,7 +99,7 @@ and fix the root cause, add a guard, verify, then resume.
 
 ### Pre-Triage
 
-Apply `SHARED/review-protocol/SKILL.md` Section 3, Layer 3. Confirm that the
+Apply `shared-review-protocol/SKILL.md` Section 3, Layer 3. Confirm that the
 stated bug is the constraint rather than an upstream symptom. Record any
 reframe.
 

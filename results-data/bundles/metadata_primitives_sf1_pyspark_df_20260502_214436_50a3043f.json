@@ -660,7 +660,7 @@
       "stdev_ms": 243.5,
       "total_ms": 4994
     },
-    "validation": "passed"
+    "validation": "not_run"
   },
   "version": "2.1"
 }
