@@ -70,7 +70,7 @@ time.sleep(30)
     assert result.timed_out is True
     assert result.exit_code == timeouts.EXIT_TIMEOUT
     grandchild_pid = int(pid_file.read_text(encoding="utf-8"))
-    assert _await_process_state(grandchild_pid, {_PROC_GONE}) == _PROC_GONE
+    _assert_process_terminated(grandchild_pid, role="grandchild")
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX timeout semantics")
@@ -363,13 +363,16 @@ def test_cancellation_kills_trapping_child_and_grandchild(tmp_path):
     * a child that TRAPS SIGTERM, like the database servers a real cell
       spawns, so the group survives the grace window and the SIGKILL rung is
       actually exercised rather than skipped;
-    * a "gone" check that cannot be satisfied by a zombie or by CPython's
-      `Popen` finalizer -- see `_process_state`.
+    * a "terminated" check that rejects a live process. On Linux, a killed
+      descendant can remain a zombie until its parent or the system reaper
+      waits for it; `run_with_timeout` owns and reaps only its direct child,
+      so requiring an arbitrary descendant to be `gone` is not portable.
+      See `_process_state`.
     """
     probe = _run_cancelled_probe(tmp_path, timeout_s=_PRODUCTION_LIKE_TIMEOUT_S)
 
     assert probe.sigterm_path.exists(), "SIGTERM rung never reached the child"
-    assert _await_process_state(probe.grandchild_pid, {_PROC_GONE}) == _PROC_GONE
+    _assert_process_terminated(probe.grandchild_pid, role="grandchild")
     assert _await_process_state(probe.child_pid, {_PROC_GONE}) == _PROC_GONE
 
 
@@ -387,7 +390,7 @@ def test_zero_timeout_cancellation_kills_trapping_child_and_grandchild(tmp_path)
     probe = _run_cancelled_probe(tmp_path, timeout_s=0)
 
     assert probe.sigterm_path.exists(), "SIGTERM rung never reached the child"
-    assert _await_process_state(probe.grandchild_pid, {_PROC_GONE}) == _PROC_GONE
+    _assert_process_terminated(probe.grandchild_pid, role="grandchild")
     assert _await_process_state(probe.child_pid, {_PROC_GONE}) == _PROC_GONE
 
 
@@ -411,7 +414,7 @@ def test_kill_ladder_completes_sigkill_when_interrupted_during_grace(tmp_path):
     """
     probe = _run_cancelled_probe(tmp_path, timeout_s=_PRODUCTION_LIKE_TIMEOUT_S, deliveries=2)
 
-    assert _await_process_state(probe.grandchild_pid, {_PROC_GONE}) == _PROC_GONE
+    _assert_process_terminated(probe.grandchild_pid, role="grandchild")
     status = _reap(probe.child_pid)
     assert status is not None, "child was never reaped -- it outlived the interrupted ladder"
     assert os.WIFSIGNALED(status), f"child exited normally (status={status}) instead of being killed"
@@ -429,6 +432,7 @@ def test_kill_ladder_completes_sigkill_when_interrupted_during_grace(tmp_path):
 _PROC_GONE = "gone"
 _PROC_ZOMBIE = "zombie"
 _PROC_LIVE = "live"
+_PROC_TERMINATED = {_PROC_GONE, _PROC_ZOMBIE}
 
 # Any positive value takes the same timed branch as the 600 s
 # `execute.per_cell_timeout_s` default; small enough that a wedged probe
@@ -597,7 +601,8 @@ def _process_state(pid: int) -> str:
     for a `<defunct>` zombie, so it measures *reaping* rather than killing,
     and the reaper is often CPython's `Popen` finalizer rather than
     `timeouts.py`. Reading the state makes "terminated" and "still
-    scheduled" distinguishable and makes a zombie an explicit third answer.
+    scheduled" distinguishable. A zombie is terminated but unreaped, and is
+    therefore a valid dead state when the process is an unowned descendant.
     """
     try:
         os.kill(pid, 0)
@@ -643,6 +648,12 @@ def _await_process_state(pid: int, accepted: set[str], *, timeout_s: float = _ST
         time.sleep(0.02)
         state = _process_state(pid)
     return state
+
+
+def _assert_process_terminated(pid: int, *, role: str) -> None:
+    """Reject a live process while allowing an unreaped descendant zombie."""
+    state = _await_process_state(pid, _PROC_TERMINATED)
+    assert state != _PROC_LIVE, f"{role} remained live after teardown (state={state})"
 
 
 def _reap(pid: int, *, timeout_s: float = _STATE_TIMEOUT_S) -> int | None:
