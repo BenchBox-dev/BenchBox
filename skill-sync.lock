@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lockedAt": "2026-08-26T14:21:31.440Z",
+  "lockedAt": "2026-08-26T14:37:57.002Z",
   "skills": {
     "blog": {
       "source": {
@@ -165,15 +165,15 @@
         "type": "git",
         "name": "todo-context-efficiency",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "77ab905fe66cc86a8d8a11fdc4b3500e28d8e0d0",
+        "ref": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
         "subdir": "skills",
-        "revision": "77ab905fe66cc86a8d8a11fdc4b3500e28d8e0d0",
-        "fetchedAt": "2026-08-25T16:24:54.268Z"
+        "revision": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
+        "fetchedAt": "2026-08-26T14:37:48.685Z"
       },
       "installMode": "mirror",
       "files": {
         "references/batch.md": {
-          "sha256": "25a1a8ae5b9d70d4644a1ad87ff7b47f0d2426afcf532d2aa498195bd590a4ee",
+          "sha256": "fe178cbc2f64cca2764335e8f27f1d06878ff3e057e209334d939ac70750bcc2",
           "size": 6430
         },
         "references/bootstrap.md": {
@@ -189,11 +189,11 @@
           "size": 1657
         },
         "references/ideate.md": {
-          "sha256": "119d827f10d4978518265dbf37fafbe57ae5830518f25b083913ed25ff6a8f5e",
+          "sha256": "8078255dd9835de869ccc33147f188db12ca8bfb21553766b11bf93eb3b2ab0d",
           "size": 419
         },
         "references/implement.md": {
-          "sha256": "5c3fa90df411bd52d82238e1734a4ea1d8aa2783b76d7071be73a54ff75cf5bd",
+          "sha256": "8fdeecf8ed57cc4f5ba355604610baad7ab66801087b53b940efc3a6b0ed45c2",
           "size": 1166
         },
         "references/prioritize.md": {
@@ -205,19 +205,19 @@
           "size": 1829
         },
         "references/review.md": {
-          "sha256": "939b1e48cb66346f929d3d538362b252f0f00f689ca4299c64733c22f2621b0a",
-          "size": 347
+          "sha256": "7e50646a87a8f53fadacff14eff843562f67daa717d554b5cd88b465487e2533",
+          "size": 756
         },
         "references/spec.md": {
-          "sha256": "3f0e3bd1c1a061c399bdd75b51cdde2c90c9f9fbc3394a0d0aeff14258c12474",
+          "sha256": "53ec542be038fa52dc4f6e2728a21f6e4fe58b2da45573261ecf185f7422d234",
           "size": 463
         },
         "SKILL.md": {
-          "sha256": "b2fae7c4bea44a0a6e9605f44ad480924ec0a20821e079a398585c5d1ed62589",
+          "sha256": "6376a93e53b1879fd052414fd5549a504cdb0d5d894335e83575894c2b0f0cad",
           "size": 3942
         },
         "skill.yaml": {
-          "sha256": "e2c0b40d9935492621e6d21ab216a6227f4bae8f3808ed004d995d0f1b5bbff3",
+          "sha256": "3889fddb52b746c118ba4aab8b83780e89642efd519f8bc708e030964c6440fd",
           "size": 213
         }
       }
