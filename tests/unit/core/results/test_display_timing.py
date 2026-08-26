@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from threading import Barrier, Thread
 
 import pytest
 
@@ -160,6 +161,30 @@ def test_query_timing_and_collector(monkeypatch):
     collector.clear_completed_timings()
     assert collector.get_completed_timings() == []
     assert collector.get_timing_summary() == {}
+
+
+def test_timing_collector_isolates_concurrent_repeated_query_ids():
+    collector = TimingCollector()
+    barrier = Barrier(2)
+    errors = []
+
+    def worker(label: str) -> None:
+        try:
+            with collector.time_query("Q1"):
+                barrier.wait(timeout=5)
+                collector.record_metric("Q1", "thread_id", label)
+        except Exception as exc:  # pragma: no cover - assertion below reports failures
+            errors.append((label, exc))
+
+    threads = [Thread(target=worker, args=(label,)) for label in ("first", "second")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
+    completed = collector.get_completed_timings()
+    assert sorted(t.thread_id for t in completed) == ["first", "second"]
 
 
 def test_timing_analyzer_statistics_outliers_and_comparison():
