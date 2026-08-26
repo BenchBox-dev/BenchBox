@@ -173,6 +173,76 @@ class TestDataFusionAdapter:
             mock_config.with_parquet_pruning.assert_called_once_with(False)
             mock_config.with_repartition_joins.assert_called_once_with(False)
 
+    def test_create_connection_configures_runtime_builder_without_build_method(self):
+        """DataFusion 53 builders must receive memory and spill settings directly."""
+
+        class RuntimeEnvBuilderV53:
+            def __init__(self):
+                self.memory_bytes = None
+                self.disk_manager_enabled = False
+
+            def with_fair_spill_pool(self, size):
+                self.memory_bytes = size
+                return self
+
+            def with_disk_manager_os(self):
+                self.disk_manager_enabled = True
+                return self
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("benchbox.platforms.datafusion.RuntimeEnv", RuntimeEnvBuilderV53):
+                with patch("benchbox.platforms.datafusion.SessionContext") as session_context:
+                    adapter = DataFusionAdapter(working_dir=tmpdir, memory_limit="8G")
+
+                    with patch.object(adapter, "handle_existing_database"):
+                        adapter.create_connection()
+
+            runtime = session_context.call_args.args[1]
+            assert runtime.memory_bytes == 8 * 1024 * 1024 * 1024
+            assert runtime.disk_manager_enabled is True
+
+    def test_create_connection_does_not_report_unavailable_runtime_settings(self):
+        """Legacy runtime fallback metadata must not claim memory or spill configuration."""
+
+        class LegacyRuntimeEnv:
+            pass
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("benchbox.platforms.datafusion.RuntimeEnv", LegacyRuntimeEnv):
+                with patch("benchbox.platforms.datafusion.SessionContext"):
+                    adapter = DataFusionAdapter(working_dir=tmpdir, memory_limit="8G")
+
+                    with patch.object(adapter, "handle_existing_database"):
+                        with patch.object(adapter, "log_operation_complete") as operation_complete:
+                            adapter.create_connection()
+
+            details = operation_complete.call_args.kwargs["details"]
+            assert "memory_pool=" not in details
+            assert "disk_spilling=" not in details
+
+    def test_create_connection_does_not_report_runtime_rejected_by_context(self):
+        """Context fallback must not report settings from a rejected runtime builder."""
+
+        class RuntimeEnvBuilderV53:
+            def with_fair_spill_pool(self, _size):
+                return self
+
+            def with_disk_manager_os(self):
+                return self
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("benchbox.platforms.datafusion.RuntimeEnv", RuntimeEnvBuilderV53):
+                with patch("benchbox.platforms.datafusion.SessionContext", side_effect=[TypeError, Mock()]):
+                    adapter = DataFusionAdapter(working_dir=tmpdir, memory_limit="8G")
+
+                    with patch.object(adapter, "handle_existing_database"):
+                        with patch.object(adapter, "log_operation_complete") as operation_complete:
+                            adapter.create_connection()
+
+            details = operation_complete.call_args.kwargs["details"]
+            assert "memory_pool=" not in details
+            assert "disk_spilling=" not in details
+
     def test_from_config_forwards_optimization_flags(self, tmp_path):
         """Unified configuration must preserve DataFusion optimization flags."""
         with patch.object(DataFusionAdapter, "__init__", return_value=None) as init:

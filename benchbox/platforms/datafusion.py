@@ -381,37 +381,45 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         # Configure runtime environment for disk spilling and memory management
         # Note: RuntimeEnv/RuntimeEnvBuilder API varies by version
         runtime = None
+        runtime_memory_configured = False
+        runtime_disk_spilling_configured = False
         if RuntimeEnv is not None:
             try:
-                # Check if this is RuntimeEnvBuilder (newer API)
-                if hasattr(RuntimeEnv, "build"):
-                    # RuntimeEnvBuilder API
-                    builder = RuntimeEnv()
+                runtime_candidate = RuntimeEnv()
+                is_runtime_builder = hasattr(runtime_candidate, "with_fair_spill_pool") and hasattr(
+                    runtime_candidate, "with_disk_manager_os"
+                )
+                if is_runtime_builder:
+                    builder = runtime_candidate
 
                     # Configure memory pool using fair spill pool
                     # This replaces the invalid config.set("memory_pool_size") approach
                     if self.memory_limit:
                         memory_bytes = int(self._parse_memory_limit(self.memory_limit))
                         builder = builder.with_fair_spill_pool(memory_bytes)
+                        runtime_memory_configured = True
                         self.log_very_verbose(
                             f"Configured fair spill pool: {self.memory_limit} ({memory_bytes:,} bytes)"
                         )
 
                     # Configure disk manager for spilling
                     builder = builder.with_disk_manager_os()
+                    runtime_disk_spilling_configured = True
                     if self.temp_dir:
                         self.log_very_verbose(f"Enabled disk spilling (temp dir: {self.temp_dir})")
                     else:
                         self.log_very_verbose("Enabled disk spilling (using system temp dir)")
 
-                    runtime = builder.build()
+                    runtime = builder.build() if hasattr(builder, "build") else builder
                 else:
                     # Old RuntimeEnv API (fallback)
-                    runtime = RuntimeEnv()
+                    runtime = runtime_candidate
                     self.log_very_verbose("Using default RuntimeEnv (memory configuration not available in old API)")
             except Exception as e:
                 self.log_very_verbose(f"Could not configure RuntimeEnv: {e}, using defaults")
                 runtime = None
+                runtime_memory_configured = False
+                runtime_disk_spilling_configured = False
 
         # Create session configuration
         config = SessionConfig()
@@ -437,12 +445,6 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             f"repartition_joins={'enabled' if self.repartition_joins else 'disabled'}",
         ]
 
-        # Add runtime configuration to tracking
-        if runtime is not None:
-            if self.memory_limit:
-                config_applied.append(f"memory_pool={self.memory_limit}")
-            config_applied.append("disk_spilling=enabled")
-
         # Note: Memory configuration now handled via RuntimeEnvBuilder above
         # The invalid config.set("memory_pool_size") approach has been removed
 
@@ -457,9 +459,17 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             except TypeError:
                 # Older versions may not accept runtime parameter
                 ctx = SessionContext(config)
+                runtime_memory_configured = False
+                runtime_disk_spilling_configured = False
                 self.log_very_verbose("SessionContext created without RuntimeEnv (not supported in this version)")
         else:
             ctx = SessionContext(config)
+
+        # Report runtime settings only when the configured runtime reached the context.
+        if runtime_memory_configured:
+            config_applied.append(f"memory_pool={self.memory_limit}")
+        if runtime_disk_spilling_configured:
+            config_applied.append("disk_spilling=enabled")
 
         self.log_operation_complete("DataFusion connection", details=f"Applied: {', '.join(config_applied)}")
 
