@@ -146,7 +146,7 @@ jobs:
           retention-days: 30
 
   publish:
-    needs: build
+    needs: [build, test-installation]
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.event.inputs.test_pypi == 'true' && 'test-pypi' || 'pypi' }}
@@ -213,9 +213,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Verify installation works across platforms after publishing
+  # Verify installation works across platforms before publishing. Installing
+  # the uploaded wheel avoids PyPI propagation races and makes this a real
+  # publication gate rather than a post-publication smoke test.
   test-installation:
-    needs: [build, publish]
+    needs: build
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -229,38 +231,27 @@ jobs:
           - os: macos-latest
             python-version: '3.13'
     steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-dist
+          path: dist/
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Wait for package availability
+      - name: Test installation from built wheel
         shell: bash
-        run: sleep 60
-
-      - name: Test installation from PyPI
-        if: github.event.inputs.test_pypi != 'true'
-        shell: bash
-        env:
-          BENCHBOX_VERSION: ${{ needs.build.outputs.version }}
         run: |
-          pip install "benchbox==${BENCHBOX_VERSION}"
-          python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'published core wheel must not pull pandas'; print(f'BenchBox {benchbox.__version__} installed successfully (minimal import surface)')"
-          benchbox --help
-
-      - name: Test installation from Test PyPI
-        if: github.event.inputs.test_pypi == 'true'
-        shell: bash
-        env:
-          BENCHBOX_VERSION: ${{ needs.build.outputs.version }}
-        run: |
-          pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ "benchbox==${BENCHBOX_VERSION}"
+          python -m pip install dist/*.whl
           python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'published core wheel must not pull pandas'; print(f'BenchBox {benchbox.__version__} installed successfully (minimal import surface)')"
           benchbox --help
 
   # Delete old workflow artifacts to prevent confusion
   cleanup-artifacts:
-    needs: test-installation
+    needs: [publish, test-installation]
     runs-on: ubuntu-latest
     permissions:
       actions: write

@@ -248,32 +248,30 @@ class TestReleaseInfrastructure:
         assert "id-token" in publish_job["permissions"]
         assert publish_job["permissions"]["id-token"] == "write"
 
-    def test_release_smoke_test_pins_installed_version(self):
-        """#1072 review: the post-publish smoke test must install the exact
-        version this workflow run just built, not an unqualified `benchbox`
-        - PyPI/Test PyPI propagation lag or a pre-existing Test PyPI version
-        could otherwise mask a broken current wheel."""
+    def test_release_smoke_test_runs_before_publication_from_built_wheel(self):
+        """Installation validation must gate publication using the built wheel."""
         jobs = _workflow("release.yml")["jobs"]
         test_installation_job = jobs["test-installation"]
 
         needs = test_installation_job["needs"]
         needs = [needs] if isinstance(needs, str) else needs
         assert "build" in needs, "test-installation must depend on build to reach needs.build.outputs.version"
+        assert "publish" not in needs, "pre-publication installation validation must not depend on publish"
+        publish_needs = jobs["publish"]["needs"]
+        publish_needs = [publish_needs] if isinstance(publish_needs, str) else publish_needs
+        assert "test-installation" in publish_needs
 
         release_workflow_text = (REPO_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
         assert "pip install benchbox" not in release_workflow_text, "smoke test must not install an unpinned benchbox"
-        assert release_workflow_text.count("needs.build.outputs.version") >= 3, (
-            "the build/publish version pin, plus both PyPI and Test PyPI install steps, must reference it"
-        )
+        assert "python -m pip install dist/*.whl" in release_workflow_text
+        assert "Download build artifacts" in release_workflow_text
 
         steps = test_installation_job["steps"]
         install_steps = [s for s in steps if s.get("name", "").startswith("Test installation from")]
-        assert len(install_steps) == 2, "expected exactly the PyPI and Test PyPI install steps"
+        assert len(install_steps) == 1, "expected exactly one pre-publication built-wheel install step"
         for step in install_steps:
             assert step.get("shell") == "bash", (
-                f"{step['name']!r} must pin shell: bash - the matrix includes windows-latest, whose "
-                "default runner shell is PowerShell and does not understand ${BENCHBOX_VERSION} bash "
-                "syntax, so the Windows leg would silently install an unversioned/empty package name"
+                f"{step['name']!r} must pin shell: bash - the matrix includes windows-latest"
             )
 
     def test_release_required_result_contract(self):
