@@ -77,8 +77,23 @@ def test_write_file_disables_local_newline_translation(monkeypatch, tmp_path):
     monkeypatch.setattr("builtins.open", open_without_translation)
 
     ResultExporter(output_dir=tmp_path, anonymize=False)._write_file(destination, "{\n}\n")
-
     assert destination.read_bytes() == b"{\n}\n"
+
+
+def test_write_file_is_atomic_when_replace_fails(monkeypatch, tmp_path):
+    destination = tmp_path / "result.json"
+    destination.write_text("old\n", encoding="utf-8")
+
+    def fail_replace(_temporary, _destination):
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(exporter_module.os, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="replace failed"):
+        ResultExporter(output_dir=tmp_path, anonymize=False)._write_file(destination, "new\n")
+
+    assert destination.read_text(encoding="utf-8") == "old\n"
+    assert not list(tmp_path.glob(".result.json.*.tmp"))
 
 
 def test_write_file_prefers_canonical_cloud_bytes(tmp_path):
@@ -567,18 +582,15 @@ def test_exporter_preserves_local_zero_total_with_normalized_provenance(tmp_path
 
 
 def test_exporter_rejects_unsupported_type(tmp_path, caplog) -> None:
-    """Exporter should handle unsupported types gracefully by logging error."""
+    """Exporter should reject unsupported result types with an actionable error."""
 
     exporter = ResultExporter(output_dir=tmp_path, anonymize=False)
 
     class LegacyResult:
         timestamp = datetime.now()
 
-    # Exporter catches exceptions and logs them instead of raising
-    result = exporter.export_result(LegacyResult(), formats=["json"])  # type: ignore[arg-type]
-
-    # Should return empty dict (no files exported)
-    assert result == {}
+    with pytest.raises(RuntimeError, match="Failed to export json"):
+        exporter.export_result(LegacyResult(), formats=["json"])  # type: ignore[arg-type]
 
     # Error should be logged - check for any error message indicating failure
     assert any("Failed to export" in record.message or "Error" in record.levelname for record in caplog.records)

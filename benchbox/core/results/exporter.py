@@ -19,6 +19,7 @@ import io
 import json
 import logging
 import os
+import tempfile
 from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
@@ -58,6 +59,10 @@ logger = logging.getLogger(__name__)
 
 ResultLike = BenchmarkResults
 QueryResultLike = "QueryResult | dict[str, Any]"
+
+
+class ResultExportError(RuntimeError):
+    """Raised when one or more requested result artifacts cannot be exported."""
 
 
 def _redact_usernames(value: Any) -> Any:
@@ -151,8 +156,22 @@ class ResultExporter:
             # does not yet expose pathlib's newline keyword.
             file_path.write_text(content, encoding="utf-8")
         else:
-            with open(file_path, mode, encoding="utf-8", newline="") as handle:
-                handle.write(content)
+            destination = Path(file_path)
+            temporary_path: Path | None = None
+            file_descriptor, temporary_name = tempfile.mkstemp(
+                prefix=f".{destination.name}.",
+                suffix=".tmp",
+                dir=destination.parent,
+            )
+            temporary_path = Path(temporary_name)
+            try:
+                with os.fdopen(file_descriptor, mode, encoding="utf-8", newline="") as handle:
+                    handle.write(content)
+                os.replace(temporary_path, destination)
+                temporary_path = None
+            finally:
+                if temporary_path is not None:
+                    temporary_path.unlink(missing_ok=True)
 
     def _create_file_path(self, filename: str):
         """Create file path, ensuring parent directory exists."""
@@ -189,6 +208,7 @@ class ResultExporter:
             formats = ["json"]
 
         exported_files: dict[str, Path] = {}
+        failures: list[str] = []
 
         timestamp = (
             result.timestamp.strftime("%Y%m%d_%H%M%S")
@@ -208,8 +228,7 @@ class ResultExporter:
                 elif format_name == "html":
                     filepath = self._export_html_detailed(result, filename_base)
                 else:
-                    self.console.print(f"[yellow]Unknown export format: {format_name}[/yellow]")
-                    continue
+                    raise ResultExportError(f"Unknown export format: {format_name}")
 
                 exported_files[format_name] = filepath
                 self.console.print(f"[green]Exported {format_name.upper()}:[/green] {filepath}")
@@ -223,6 +242,10 @@ class ResultExporter:
                 # so failure diagnostics are still observable via caplog.
                 logging.critical(message)
                 self.console.print(f"[red]Failed to export {format_name}: {exc}[/red]")
+                failures.append(message)
+
+        if failures:
+            raise ResultExportError("; ".join(failures))
 
         return exported_files
 
@@ -280,7 +303,7 @@ class ResultExporter:
         try:
             self._validator.validate(payload)
         except SchemaV2ValidationError as e:
-            logger.warning(f"Schema validation warning: {e}")
+            raise ResultExportError(f"Schema validation failed: {e}") from e
 
         # Write primary result file
         filepath = self._create_file_path(f"{filename_base}.json")

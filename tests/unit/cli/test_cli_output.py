@@ -989,15 +989,15 @@ class TestResultExporterErrorHandling:
             validation_status="PASSED",
         )
 
-        exported = self.exporter.export_result(result, formats=["invalid_format"])
+        with pytest.raises(RuntimeError, match="Unknown export format"):
+            self.exporter.export_result(result, formats=["invalid_format"])
 
-        # Should not include the invalid format
-        assert "invalid_format" not in exported
-
-        # Should print warning message
+        # Should print an actionable error message
         assert mock_console.print.called
         calls = [str(call) for call in mock_console.print.call_args_list]
-        assert any("Unknown export format" in call for call in calls)
+        assert any("Unknown export format" in call for call in calls) or any(
+            "Failed to export" in call for call in calls
+        )
 
     @pytest.mark.skipif(sys.platform == "win32", reason="Path handling differs on Windows")
     def test_export_with_invalid_output_dir(self):

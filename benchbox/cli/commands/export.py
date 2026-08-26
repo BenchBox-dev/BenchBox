@@ -106,6 +106,7 @@ def export(ctx, result_file, formats, output_dir, last, benchmark, platform, for
         _print_export_summary(exported, output_directory)
     except Exception as e:
         console.print(f"\n[red]Export failed: {e}[/red]")
+        raise click.ClickException(f"Export failed: {e}") from e
 
 
 def _resolve_export_source(result_file, last, benchmark, platform):
