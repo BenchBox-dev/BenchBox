@@ -1135,7 +1135,7 @@ def _output_comparison_results(
 
     elif output_format == "html":
         content = suite._generate_text_report(results)
-        html_content = f"<pre>{content}</pre>" if output_file else content
+        html_content = f"<pre>{_escape_html(content)}</pre>" if output_file else content
         _write_or_print(html_content if output_file else content, output_file, "comparison.html")
         if not output_file:
             console.print(content)

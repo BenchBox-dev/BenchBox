@@ -355,6 +355,28 @@ def test_run_platform_comparison_formats(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert html.exists()
 
 
+def test_run_platform_comparison_html_escapes_platform_labels(tmp_path: Path) -> None:
+    malicious = '"><img src=x onerror=alert(1)>'
+    output = tmp_path / "comparison.html"
+
+    class _Suite:
+        def _generate_text_report(self, _results):
+            return f"Platforms: {malicious}"
+
+    mod._output_comparison_results(
+        output_format="html",
+        output_file=str(output),
+        suite=_Suite(),
+        config=SimpleNamespace(),
+        results=[],
+        summary=SimpleNamespace(),
+    )
+
+    content = output.read_text(encoding="utf-8")
+    assert malicious not in content
+    assert "&quot;&gt;&lt;img src=x onerror=alert(1)&gt;" in content
+
+
 def test_run_file_comparison_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     b = tmp_path / "b.json"
     c = tmp_path / "c.json"
