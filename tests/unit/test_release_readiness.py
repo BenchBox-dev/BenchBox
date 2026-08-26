@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import urllib.error
+import urllib.request
 import zipfile
 from datetime import datetime, timedelta, timezone
 
@@ -107,6 +108,50 @@ def test_canary_artifact_sha_is_used_for_ancestor_check() -> None:
     assert result.ok
     assert checked == [("develop-tested-sha", "release-head")]
     assert any("checked_sha: develop-tested-sha" in line for line in result.summary)
+
+
+def test_artifact_redirect_strips_credentials_cross_origin() -> None:
+    request = urllib.request.Request(
+        "https://api.github.com/repos/example/actions/artifacts/1/zip",
+        headers={
+            "Authorization": "Bearer secret",
+            "Cookie": "session=secret",
+            "Proxy-Authorization": "Basic secret",
+        },
+    )
+
+    redirected = release_readiness_check._SafeArtifactRedirectHandler().redirect_request(
+        request,
+        None,
+        302,
+        "Found",
+        {},
+        "https://objects.example.test/artifact.zip?signature=redacted",
+    )
+
+    assert redirected is not None
+    assert not redirected.has_header("Authorization")
+    assert not redirected.has_header("Cookie")
+    assert not redirected.has_header("Proxy-Authorization")
+
+
+def test_artifact_redirect_preserves_credentials_same_origin() -> None:
+    request = urllib.request.Request(
+        "https://api.github.com/repos/example/actions/artifacts/1/zip",
+        headers={"Authorization": "Bearer secret"},
+    )
+
+    redirected = release_readiness_check._SafeArtifactRedirectHandler().redirect_request(
+        request,
+        None,
+        302,
+        "Found",
+        {},
+        "https://api.github.com/repos/example/actions/artifacts/1/zip?download=1",
+    )
+
+    assert redirected is not None
+    assert redirected.get_header("Authorization") == "Bearer secret"
 
 
 def test_release_canary_commit_sha_reads_summary_artifact(monkeypatch: pytest.MonkeyPatch) -> None:
