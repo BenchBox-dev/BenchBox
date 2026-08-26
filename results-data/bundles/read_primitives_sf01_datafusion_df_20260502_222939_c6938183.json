@@ -5702,7 +5702,7 @@
       "stdev_ms": 5.7,
       "total_ms": 2020
     },
-    "validation": "partial"
+    "validation": "not_run"
   },
   "tables": {
     "customer": {

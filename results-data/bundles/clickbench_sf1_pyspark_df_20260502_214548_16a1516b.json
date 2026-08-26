@@ -1938,7 +1938,7 @@
       "stdev_ms": 365.1,
       "total_ms": 44486
     },
-    "validation": "partial"
+    "validation": "not_run"
   },
   "tables": {
     "hits": {

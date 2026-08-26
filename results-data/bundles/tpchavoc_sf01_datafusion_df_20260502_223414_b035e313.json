@@ -8149,7 +8149,7 @@
       "stdev_ms": 6.7,
       "total_ms": 7042
     },
-    "validation": "partial"
+    "validation": "not_run"
   },
   "tables": {
     "customer": {
