@@ -213,30 +213,29 @@ def run_with_timeout(
 
 
 def _kill_and_reap_process_group(proc: subprocess.Popen) -> None:
-    """Run the kill ladder, then reap, so an unwinding caller leaves no zombie.
+    """Kill the group and reap its direct child, surviving follow-up signals.
 
-    `_kill_process_group` only *signals*; nothing on the cancellation path
-    ever calls `wait()`, so without this the killed child lingers as
-    `<defunct>` until CPython's `Popen` finalizer happens to collect it.
-    Harmless in production (the sweep process is on its way out and the
-    zombie dies with it) but it makes "the pid disappeared" an untrustworthy
-    teardown assertion, because the disappearance is then attributable to
-    garbage collection rather than to this module.
-
-    Bounded and non-fatal: SIGKILL has already been delivered, so a child
-    still unreaped after `_REAP_TIMEOUT_S` is a kernel-level anomaly, not
-    something an unwinding sweep should block on.
-
-    Not reached when a *second* signal lands inside the ladder's grace
-    window -- that unwinds out of `_kill_process_group` after its `finally`
-    has delivered SIGKILL, skipping this reap. Accepted residue: the group
-    is dead either way, only the `<defunct>` entry survives.
+    `_kill_process_group` delivers SIGKILL from `finally`; an interrupt can
+    still skip its return or interrupt `wait()`, so suppress cleanup-time
+    unwinds and retry the bounded wait. The outer handler re-raises the
+    original cancellation unchanged.
     """
-    _kill_process_group(proc)
+    import time
+
     try:
-        proc.wait(timeout=_REAP_TIMEOUT_S)
-    except subprocess.TimeoutExpired:
+        _kill_process_group(proc)
+    except BaseException:
         pass
+
+    deadline = time.monotonic() + _REAP_TIMEOUT_S
+    while time.monotonic() < deadline:
+        try:
+            proc.wait(timeout=deadline - time.monotonic())
+        except subprocess.TimeoutExpired:
+            return
+        except BaseException:
+            continue
+        return
 
 
 def _kill_process_group(proc: subprocess.Popen) -> None:
