@@ -935,6 +935,30 @@ class TestResultExporter:
         assert "Q1" in html_content
         assert "Improved" in html_content
 
+    def test_export_comparison_report_escapes_untrusted_labels(self):
+        """Comparison reports must not render result-controlled labels as markup."""
+        untrusted = '"><script>alert(1)</script>'
+        comparison = {
+            "performance_changes": {
+                untrusted: {"change_percent": 1.0, "improved": False},
+            },
+            "query_comparisons": [
+                {
+                    "query_id": untrusted,
+                    "baseline_time_ms": 1.0,
+                    "current_time_ms": 2.0,
+                    "change_percent": 100.0,
+                    "improved": False,
+                }
+            ],
+        }
+
+        report_path = self.exporter.export_comparison_report(comparison)
+        html_content = report_path.read_text(encoding="utf-8")
+
+        assert untrusted not in html_content
+        assert "&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;" in html_content
+
     def test_assess_performance_change(self):
         """Test performance change assessment."""
         # Significant improvement

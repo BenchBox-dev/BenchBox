@@ -1130,7 +1130,7 @@ class ResultExporter:
         <ul>
             {
             "".join(
-                f"<li>{metric.replace('_', ' ').title()}: {vals['change_percent']:+.1f}% "
+                f"<li>{html_escape(str(metric).replace('_', ' ').title(), quote=True)}: {vals['change_percent']:+.1f}% "
                 f"({'Improved' if vals['improved'] else 'Regressed'})</li>"
                 for metric, vals in performance_changes.items()
             )
@@ -1141,7 +1141,7 @@ class ResultExporter:
             <tr><th>Query</th><th>Baseline (ms)</th><th>Current (ms)</th><th>Change</th><th>Status</th></tr>
             {
             "".join(
-                f"<tr><td>{q['query_id']}</td><td>{q['baseline_time_ms']:.1f}</td>"
+                f"<tr><td>{html_escape(str(q['query_id']), quote=True)}</td><td>{q['baseline_time_ms']:.1f}</td>"
                 f"<td>{q['current_time_ms']:.1f}</td><td>{q['change_percent']:+.1f}%</td>"
                 f"<td>{'Improved' if q['improved'] else 'Regressed'}</td></tr>"
                 for q in query_comparisons
