@@ -149,7 +149,7 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 
 # skill-sync mirrors (regenerate locally via `make skill-sync`). The `claude`
 # target is a TRACKED snapshot — committed for cloud/CI, managed by the
-# skill-sync block below. codex/gemini/antigravity stay untracked local mirrors.
+# skill-sync block below. the shared agents mirror stays untracked locally.
 .codex/skills/
 .codex/shared-skills/
 .codex/shared-skills.lock.json
