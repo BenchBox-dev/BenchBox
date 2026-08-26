@@ -20,6 +20,7 @@ import json
 import statistics
 import sys
 import warnings
+from html import escape as html_escape
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,11 @@ from benchbox.core.results.loader import (
 )
 from benchbox.core.results.regression_policy import is_regression
 from benchbox.validation.bundle import COMPANION_SUFFIXES
+
+
+def _escape_html(value: Any) -> str:
+    """Escape arbitrary comparison data before placing it in HTML text."""
+    return html_escape(str(value), quote=True)
 
 
 class ResultFileMetadata:
@@ -1751,10 +1757,12 @@ def _append_html_header(html: list[str]) -> None:
 def _append_html_metadata(html: list[str], comparison: dict[str, Any], baseline: Any) -> None:
     """Append HTML metadata section (title, file paths, benchmark info)."""
     html.append("<h1>Benchmark Comparison Report</h1>")
-    html.append(f"<p><strong>Baseline:</strong> {comparison['baseline_file']}</p>")
-    html.append(f"<p><strong>Current:</strong> {comparison['current_file']}</p>")
+    html.append(f"<p><strong>Baseline:</strong> {_escape_html(comparison['baseline_file'])}</p>")
+    html.append(f"<p><strong>Current:</strong> {_escape_html(comparison['current_file'])}</p>")
     html.append(
-        f"<p><strong>Benchmark:</strong> {baseline.benchmark_name} | <strong>Platform:</strong> {baseline.platform} | <strong>Scale:</strong> {baseline.scale_factor}</p>"
+        f"<p><strong>Benchmark:</strong> {_escape_html(baseline.benchmark_name)} | "
+        f"<strong>Platform:</strong> {_escape_html(baseline.platform)} | "
+        f"<strong>Scale:</strong> {_escape_html(baseline.scale_factor)}</p>"
     )
 
 
@@ -1766,10 +1774,14 @@ def _append_html_summary_table(html: list[str], comparison: dict[str, Any]) -> N
     html.append("<h2>Summary</h2>")
     html.append("<table>")
     html.append("<tr><th>Metric</th><th>Value</th></tr>")
-    html.append(f"<tr><td>Total Queries</td><td>{summary.get('total_queries_compared', 0)}</td></tr>")
-    html.append(f"<tr><td>Improved</td><td class='improved'>{summary.get('improved_queries', 0)}</td></tr>")
-    html.append(f"<tr><td>Regressed</td><td class='regressed'>{summary.get('regressed_queries', 0)}</td></tr>")
-    html.append(f"<tr><td>Unchanged</td><td>{summary.get('unchanged_queries', 0)}</td></tr>")
+    html.append(f"<tr><td>Total Queries</td><td>{_escape_html(summary.get('total_queries_compared', 0))}</td></tr>")
+    html.append(
+        f"<tr><td>Improved</td><td class='improved'>{_escape_html(summary.get('improved_queries', 0))}</td></tr>"
+    )
+    html.append(
+        f"<tr><td>Regressed</td><td class='regressed'>{_escape_html(summary.get('regressed_queries', 0))}</td></tr>"
+    )
+    html.append(f"<tr><td>Unchanged</td><td>{_escape_html(summary.get('unchanged_queries', 0))}</td></tr>")
     html.append("</table>")
 
 
@@ -1802,7 +1814,7 @@ def _append_html_query_comparison(html: list[str], comparison: dict[str, Any]) -
         row_class, severity = _html_query_row_class_and_severity(query["improved"], query["change_percent"])
         change_str = f"{query['change_percent']:+.2f}%"
         html.append(f"<tr{row_class}>")
-        html.append(f"<td>{query['query_id']}</td>")
+        html.append(f"<td>{_escape_html(query['query_id'])}</td>")
         html.append(f"<td>{query['baseline_time_ms']:.2f}</td>")
         html.append(f"<td>{query['current_time_ms']:.2f}</td>")
         html.append(f"<td>{change_str}</td>")
@@ -1842,17 +1854,17 @@ def _append_html_plan_section(html: list[str], comparison: dict[str, Any]) -> No
     # Summary cards
     html.append("<div style='display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0;'>")
     html.append(
-        f"<div style='background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;'><strong>{plans_compared}</strong><br>Plans Compared</div>"
+        f"<div style='background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;'><strong>{_escape_html(plans_compared)}</strong><br>Plans Compared</div>"
     )
     html.append(
-        f"<div style='background: #d4edda; padding: 15px; border-radius: 8px; text-align: center;'><strong>{plans_unchanged}</strong><br>Unchanged</div>"
+        f"<div style='background: #d4edda; padding: 15px; border-radius: 8px; text-align: center;'><strong>{_escape_html(plans_unchanged)}</strong><br>Unchanged</div>"
     )
     html.append(
-        f"<div style='background: #fff3cd; padding: 15px; border-radius: 8px; text-align: center;'><strong>{plans_changed}</strong><br>Changed</div>"
+        f"<div style='background: #fff3cd; padding: 15px; border-radius: 8px; text-align: center;'><strong>{_escape_html(plans_changed)}</strong><br>Changed</div>"
     )
     regression_style = "background: #f8d7da;" if regressions_detected > 0 else "background: #d4edda;"
     html.append(
-        f"<div style='{regression_style} padding: 15px; border-radius: 8px; text-align: center;'><strong>{regressions_detected}</strong><br>Regressions</div>"
+        f"<div style='{regression_style} padding: 15px; border-radius: 8px; text-align: center;'><strong>{_escape_html(regressions_detected)}</strong><br>Regressions</div>"
     )
     html.append("</div>")
 
@@ -1872,7 +1884,7 @@ def _append_html_plan_section(html: list[str], comparison: dict[str, Any]) -> No
             prop_diff = plan.get("property_mismatches", 0)
             perf_change = plan.get("perf_change_pct", 0.0)
             html.append(f"<tr{row_class}>")
-            html.append(f"<td>{plan.get('query_id', '?')}</td>")
+            html.append(f"<td>{_escape_html(plan.get('query_id', '?'))}</td>")
             html.append(f"<td>{plan.get('similarity', 1.0):.1%}</td>")
             html.append(f"<td>{type_diff if type_diff > 0 else '-'}</td>")
             html.append(f"<td>{prop_diff if prop_diff > 0 else '-'}</td>")
@@ -1893,7 +1905,7 @@ def _append_html_plan_section(html: list[str], comparison: dict[str, Any]) -> No
         html.append("<ul>")
         for reg in regressions:
             html.append(
-                f"<li><strong>{reg.get('query_id', '?')}</strong>: plan similarity {reg.get('similarity', 0.0):.0%}, performance {reg.get('perf_change_pct', 0.0):+.1f}%</li>"
+                f"<li><strong>{_escape_html(reg.get('query_id', '?'))}</strong>: plan similarity {reg.get('similarity', 0.0):.0%}, performance {reg.get('perf_change_pct', 0.0):+.1f}%</li>"
             )
         html.append("</ul>")
         html.append("</div>")

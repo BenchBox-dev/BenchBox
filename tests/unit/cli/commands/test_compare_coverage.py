@@ -118,6 +118,28 @@ def test_format_text_and_html_comparison() -> None:
     assert "Query Plan Analysis" in html
 
 
+def test_format_html_comparison_escapes_all_result_derived_labels() -> None:
+    malicious = '"><img src=x onerror=alert(1)>'
+    comparison = _comparison_payload()
+    comparison["baseline_file"] = malicious
+    comparison["current_file"] = malicious
+    for key in ("total_queries_compared", "improved_queries", "regressed_queries", "unchanged_queries"):
+        comparison["summary"][key] = malicious
+    for query in comparison["query_comparisons"]:
+        query["query_id"] = malicious
+    plan_comparison = comparison["plan_comparison"]
+    for plan in plan_comparison["query_plans"]:
+        plan["query_id"] = malicious
+    for regression in plan_comparison["regressions"]:
+        regression["query_id"] = malicious
+
+    baseline = SimpleNamespace(benchmark_name=malicious, platform=malicious, scale_factor=malicious)
+    html = mod._format_html_comparison(comparison, baseline, SimpleNamespace())
+
+    assert malicious not in html
+    assert "&quot;&gt;&lt;img src=x onerror=alert(1)&gt;" in html
+
+
 def test_discover_metadata_and_table_render(tmp_path: Path) -> None:
     good = tmp_path / "good.json"
     bad = tmp_path / "bad.json"
