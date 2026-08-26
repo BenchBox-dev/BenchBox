@@ -429,6 +429,7 @@ def test_release_gate_configs_load_and_encode_stage_ordering():
     assert set(stage1_platforms).isdisjoint(matrix.DOCKER_PLATFORMS)
     assert stage1.cleanup.docker_manage_platforms is False
     assert stage1.scales.rungs == (0.01, 0.1, 1.0)
+    assert stage1.compatibility.release_gate_runtime_envelopes is True
 
     # Stages 2 and 3 are the Docker tiers, managed lifecycle, serialized.
     assert stage2.platforms.groups == ("docker-fast",)
@@ -443,6 +444,20 @@ def test_release_gate_configs_load_and_encode_stage_ordering():
         assert "report" in stage.phases
         assert stage.report.cross_scale_coverage_min_pairs is not None
         assert stage.execute.parallel_platforms is False
+
+
+def test_release_gate_stage1_prunes_sqlite_tpcds_runtime_envelope():
+    from tests.uat.phases.enumerate import enumerate_cells_with_pruning
+
+    stage1 = config.load_config(_RELEASE_GATE_CONFIGS_DIR / "release-gate-01-native-dataframe.yaml")
+    result = enumerate_cells_with_pruning(stage1)
+
+    assert not any(cell.platform == "sqlite" and cell.benchmark == "tpcds" for cell in result.cells)
+    sqlite_tpcds = [
+        cell for cell in result.compatibility_pruned if cell.platform == "sqlite" and cell.benchmark == "tpcds"
+    ]
+    assert [cell.scale for cell in sqlite_tpcds] == [0.01, 0.1, 1.0]
+    assert {cell.rule_id for cell in sqlite_tpcds} == {"uat.compat.sqlite.tpcds.release_gate_runtime_envelope"}
 
 
 def test_release_gate_cross_scale_floors_are_tuned_and_achievable():
