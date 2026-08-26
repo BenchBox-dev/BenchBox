@@ -597,6 +597,19 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         """
         return f"c_name || '|' || c_address || '|' || CAST({acctbal_expr} AS VARCHAR) || '|' || c_mktsegment"
 
+    def _date_literal(self, value: str) -> str:
+        """Return a date literal accepted by the active setup dialect.
+
+        SQLite accepts date values through scalar functions such as ``DATE()``
+        but does not parse the SQL-standard ``DATE 'YYYY-MM-DD'`` literal.
+        Staging population runs directly on the connection, before the normal
+        operation SQL translation path, so this dialect-specific spelling must
+        be applied here.
+        """
+        if self._setup_dialect.lower() == "sqlite":
+            return f"DATE('{value}')"
+        return f"DATE '{value}'"
+
     def _get_population_sql(self, table_name: str, source_table: str) -> str:
         """Get the INSERT SQL to populate a staging table from its source.
 
@@ -637,11 +650,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             # valid_to is the open-ended sentinel. Built from the full customer
             # table so it scales with the scale factor.
             fingerprint = self._scd2_row_hash_expr("c_acctbal")
+            valid_from = self._date_literal("1990-01-01")
+            valid_to = self._date_literal("9999-12-31")
             return (
                 f"INSERT INTO {quoted_table} "
                 f"SELECT c_custkey AS sk, c_custkey, c_name, c_address, c_acctbal, c_mktsegment, "
                 f"{fingerprint} AS row_hash, true AS is_current, "
-                f"DATE '1990-01-01' AS valid_from, DATE '9999-12-31' AS valid_to "
+                f"{valid_from} AS valid_from, {valid_to} AS valid_to "
                 f"FROM {quoted_source}"
             )
         elif table_name == "scd2_ops_stage_customer":
@@ -656,7 +671,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             #               current max) that have no current version yet.
             fp_changed = self._scd2_row_hash_expr("c_acctbal + 100")
             fp_same = self._scd2_row_hash_expr("c_acctbal")
-            effective = "DATE '2026-01-01'"
+            effective = self._date_literal("2026-01-01")
             return (
                 f"INSERT INTO {quoted_table} "
                 f"SELECT c_custkey, c_name, c_address, c_acctbal + 100, c_mktsegment, "
@@ -678,6 +693,21 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         else:
             # Full copy for other tables
             return f"INSERT INTO {quoted_table} SELECT * FROM {quoted_source}"
+
+    def _execute_population_sql(self, connection: DatabaseConnection, sql: str) -> None:
+        """Execute staging population SQL using the active dialect's statement contract.
+
+        SQLite's DB-API ``execute`` accepts only one statement, while the SCD2
+        stage population is intentionally a three-statement batch. The other
+        adapters accept the batch as-is, so split only for SQLite and keep the
+        existing execution path unchanged elsewhere.
+        """
+        if self._setup_dialect.lower() == "sqlite":
+            for statement in sql.split(";"):
+                if statement.strip():
+                    connection.execute(statement)
+            return
+        connection.execute(sql)
 
     def _populate_staging_tables(self, connection: DatabaseConnection, tables: dict[str, str]) -> dict[str, int]:
         """Populate staging tables from source tables.
@@ -740,7 +770,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 # Table is empty - populate it
                 self.log_verbose(f"Populating {table_name} from {source_table} ({source_count} rows)...")
                 populate_sql = self._get_population_sql(table_name, source_table)
-                connection.execute(populate_sql)
+                self._execute_population_sql(connection, populate_sql)
 
                 result = connection.execute(f"SELECT COUNT(*) FROM {quoted_table}").fetchone()
                 status[table_name] = result[0] if result else 0
