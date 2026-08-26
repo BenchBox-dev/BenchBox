@@ -58,8 +58,35 @@ def test_validate_command_reports_success_and_failure() -> None:
     with patch("benchbox.cli.commands.config.console.print") as console_print:
         result = runner.invoke(validate, obj={"config": config_manager})
 
-    assert result.exit_code == 0
-    console_print.assert_called_once_with("[red]❌ Configuration validation failed[/red]")
+    assert result.exit_code != 0
+    assert "Configuration validation failed" in result.output
+    console_print.assert_not_called()
+
+
+def test_validate_command_uses_explicit_config_path_and_fails_closed(tmp_path) -> None:
+    runner = CliRunner()
+    malformed = tmp_path / "malformed.yaml"
+    malformed.write_text("database: [unclosed\n", encoding="utf-8")
+
+    with patch("benchbox.cli.commands.config.ConfigManager") as manager_cls:
+        manager_cls.side_effect = ValueError("invalid YAML")
+        result = runner.invoke(validate, ["--config", str(malformed)], obj={"config": MagicMock()})
+
+    assert result.exit_code != 0
+    assert "Configuration is valid" not in result.output
+    manager_cls.assert_called_once()
+    assert manager_cls.call_args.kwargs["config_path"] == malformed
+    assert manager_cls.call_args.kwargs["strict"] is True
+
+
+def test_validate_command_rejects_missing_explicit_config(tmp_path) -> None:
+    runner = CliRunner()
+    missing = tmp_path / "missing.yaml"
+
+    result = runner.invoke(validate, ["--config", str(missing)], obj={"config": MagicMock()})
+
+    assert result.exit_code != 0
+    assert "Configuration is valid" not in result.output
 
 
 def test_profile_command_renders_panel_and_uses_system_profiler() -> None:
