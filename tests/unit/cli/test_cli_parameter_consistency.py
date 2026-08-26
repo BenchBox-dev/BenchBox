@@ -77,7 +77,7 @@ class TestCLIParameterConsistency:
             patch.object(_run_module, "BenchmarkManager") as mock_bench,
             patch.object(_run_module, "SystemProfiler") as mock_system,
             patch.object(_run_module, "get_platform_manager") as mock_platform,
-            patch("benchbox.cli.main.ResultExporter") as mock_exporter,
+            patch.object(_run_module, "ResultExporter") as mock_exporter,
         ):
             # Setup database manager
             mock_db_instance = MagicMock()
@@ -434,11 +434,12 @@ class TestGlobalCacheCLIFlag:
             patch.object(_run_module, "BenchmarkManager") as mock_bench,
             patch.object(_run_module, "SystemProfiler"),
             patch.object(_run_module, "get_platform_manager"),
-            patch("benchbox.cli.main.ResultExporter"),
+            patch.object(_run_module, "ResultExporter") as mock_exporter,
         ):
             mock_bench_instance = MagicMock()
             mock_bench_instance.benchmarks = {"tpch": {"display_name": "TPC-H", "estimated_time_range": "1-5min"}}
             mock_bench.return_value = mock_bench_instance
+            mock_exporter.return_value.export_result.return_value = {"json": "test.json"}
 
             mock_orch_instance = MagicMock()
             mock_orch_instance.execute_benchmark.return_value = mock_result
