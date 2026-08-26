@@ -232,6 +232,10 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
 
         from benchbox.utils.database_naming import generate_database_filename
 
+        nested_options = config.get("options")
+        if isinstance(nested_options, dict):
+            config = nested_options | config
+
         # Extract DataFusion-specific configuration
         adapter_config = {}
 
