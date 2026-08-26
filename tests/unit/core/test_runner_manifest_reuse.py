@@ -285,6 +285,24 @@ def test_populated_tables_must_match_manifest_before_reuse(tmp_path: Path, bench
     dummy.generate_data.assert_called_once()
 
 
+def test_external_populated_tables_without_manifest_are_reused(tmp_path: Path, benchmark_config: BenchmarkConfig):
+    """External caller-provided tables must not require a local datagen manifest."""
+    benchmark_config.options["table_mode"] = "external"
+
+    class DummyBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = tmp_path
+            self.tables = {"orders": "s3://bucket/benchbox/orders"}
+            self.generate_data = Mock()
+
+    dummy = DummyBenchmark()
+
+    result = _ensure_data_generated(dummy, benchmark_config)
+
+    assert result is False
+    dummy.generate_data.assert_not_called()
+
+
 def test_invalid_manifest_regenerates(tmp_path: Path, benchmark_config: BenchmarkConfig):
     manifest = _write_manifest(tmp_path, table_names=["orders"])
     # Corrupt manifest by altering file size expectation

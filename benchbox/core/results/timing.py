@@ -270,21 +270,24 @@ class TimingCollector:
 
     def get_timing_summary(self) -> dict[str, Any]:
         """Get a summary of all collected timings."""
-        if not self._completed_timings:
+        with self._lock:
+            completed_timings = self._completed_timings.copy()
+
+        if not completed_timings:
             return {}
 
-        execution_times = [t.execution_time for t in self._completed_timings if t.status == "SUCCESS"]
+        execution_times = [t.execution_time for t in completed_timings if t.status == "SUCCESS"]
 
         if not execution_times:
             return {
-                "total_queries": len(self._completed_timings),
+                "total_queries": len(completed_timings),
                 "successful_queries": 0,
             }
 
         return {
-            "total_queries": len(self._completed_timings),
+            "total_queries": len(completed_timings),
             "successful_queries": len(execution_times),
-            "failed_queries": len(self._completed_timings) - len(execution_times),
+            "failed_queries": len(completed_timings) - len(execution_times),
             "total_execution_time": sum(execution_times),
             "average_execution_time": statistics.mean(execution_times),
             "median_execution_time": statistics.median(execution_times),

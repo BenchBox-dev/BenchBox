@@ -144,20 +144,20 @@ def _load_export_result(source_path):
     """Load a result JSON, printing user-facing errors and returning None on failure."""
     try:
         result, _raw_data = load_result_file(source_path)
-    except FileNotFoundError:
+    except FileNotFoundError as e:
         console.print(f"[red]Error: Result file not found: {source_path}[/red]")
-        return None
+        raise click.ClickException(f"Result file not found: {source_path}") from e
     except UnsupportedSchemaError as e:
         console.print(f"[red]Error: {e}[/red]")
         console.print("[dim]Only schema version 1.0 is currently supported[/dim]")
-        return None
+        raise click.ClickException(str(e)) from e
     except ResultLoadError as e:
         console.print(f"[red]Error loading result file: {e}[/red]")
         console.print("[dim]The file may be corrupted or in an invalid format[/dim]")
-        return None
+        raise click.ClickException(f"Error loading result file: {e}") from e
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
-        return None
+        raise click.ClickException(f"Unexpected error: {e}") from e
 
     console.print(f"[green]✓[/green] Loaded: {result.benchmark_name} ({result.platform})")
     console.print(

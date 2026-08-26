@@ -71,7 +71,7 @@ from benchbox.platforms.base.runtime_metadata import (
     collect_normalized_result_metadata,
 )
 from benchbox.platforms.dataframe.benchmark_mixin import DataFramePhases, DataFrameRunOptions
-from benchbox.utils.cloud_storage import CloudStagingPath, create_path_handler
+from benchbox.utils.cloud_storage import CloudStagingPath, create_path_handler, is_cloud_path
 from benchbox.utils.dialect_utils import (
     SqlTranslationOutcome,
     sql_translation_context,
@@ -1596,8 +1596,16 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
 def _populated_tables_are_valid(benchmark: Any, config: BenchmarkConfig) -> bool:
     """Return whether caller-provided table mappings are safe to reuse."""
     tables = getattr(benchmark, "tables", None)
-    if not tables or not _table_mapping_paths_exist(tables):
+    table_mode = str((getattr(config, "options", {}) or {}).get("table_mode", "native") or "native").lower()
+    if not tables or not _table_mapping_paths_exist(tables, allow_cloud_uris=table_mode == "external"):
         return False
+
+    if table_mode == "external":
+        # External table mappings are supplied by the caller and may not have a
+        # local datagen manifest. Their paths are validated at the adapter
+        # boundary, so local manifest comparison would incorrectly regenerate
+        # otherwise usable external data.
+        return True
 
     output_dir = getattr(benchmark, "output_dir", None)
     if not output_dir:
@@ -1615,13 +1623,19 @@ def _populated_tables_are_valid(benchmark: Any, config: BenchmarkConfig) -> bool
     return _normalize_table_mapping(tables) == _normalize_table_mapping(getattr(manifest_benchmark, "tables", None))
 
 
-def _table_mapping_paths_exist(value: Any) -> bool:
+def _table_mapping_paths_exist(value: Any, *, allow_cloud_uris: bool = False) -> bool:
     """Recursively verify that every path in a table mapping exists."""
     if isinstance(value, Mapping):
-        return bool(value) and all(_table_mapping_paths_exist(child) for child in value.values())
+        return bool(value) and all(
+            _table_mapping_paths_exist(child, allow_cloud_uris=allow_cloud_uris) for child in value.values()
+        )
     if isinstance(value, (list, tuple, set)):
-        return bool(value) and all(_table_mapping_paths_exist(child) for child in value)
+        return bool(value) and all(
+            _table_mapping_paths_exist(child, allow_cloud_uris=allow_cloud_uris) for child in value
+        )
     if isinstance(value, (str, Path)):
+        if allow_cloud_uris and is_cloud_path(value):
+            return True
         return Path(value).exists()
     exists = getattr(value, "exists", None)
     return bool(exists and exists()) if callable(exists) else False

@@ -187,6 +187,18 @@ def test_timing_collector_isolates_concurrent_repeated_query_ids():
     assert sorted(t.thread_id for t in completed) == ["first", "second"]
 
 
+def test_timing_summary_uses_a_consistent_completed_snapshot():
+    collector = TimingCollector()
+    with collector.time_query("Q1"):
+        pass
+
+    summary = collector.get_timing_summary()
+
+    assert summary["total_queries"] == 1
+    assert summary["successful_queries"] == 1
+    assert summary["failed_queries"] == 0
+
+
 def test_timing_analyzer_statistics_outliers_and_comparison():
     timings = [
         QueryTiming(query_id="Q1", execution_time=1.0, rows_returned=100),
