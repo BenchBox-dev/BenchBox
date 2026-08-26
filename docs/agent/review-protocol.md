@@ -1,6 +1,6 @@
 # Agent review protocol
 
-BenchBox bindings for `SHARED/review-protocol`. The canonical skill governs
+BenchBox bindings for `shared-review-protocol`. The canonical skill governs
 behavior; this file records project-specific storage, evidence, and review axes.
 It supersedes `docs/agent/review-protocol-legacy.md`.
 
@@ -9,7 +9,7 @@ It supersedes `docs/agent/review-protocol-legacy.md`.
 - `[REVIEW-AUTH-001]`, `[REVIEW-DEFECT-001]`, `[REVIEW-DEPTH-001]` and
   `[REVIEW-L2-001]` are governed verbatim by the canonical skill. Named here to
   satisfy `[REVIEW-PARITY-001]` without restating behavior, which
-  `SHARED/review-protocol` section 5 forbids this file from doing.
+  `shared-review-protocol` section 5 forbids this file from doing.
 - `[REVIEW-CAPTURE-001]` Finding drafts live under `~/.benchbox/finding-drafts/`;
   tracker operations use `_project/scripts/todo`.
 - `[REVIEW-PARITY-001]` The canonical skill governs behavior; this file contains

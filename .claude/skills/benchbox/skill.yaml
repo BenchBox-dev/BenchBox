@@ -1,5 +1,5 @@
 depends:
-  - SHARED/change-framework
+  - shared-change-framework
 tags:
   - benchmarking
   - domain

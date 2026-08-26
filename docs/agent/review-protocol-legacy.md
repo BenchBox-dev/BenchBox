@@ -1,6 +1,6 @@
 # Review Protocol (historical)
 
-> **Historical, non-authoritative.** The canonical `SHARED/review-protocol`
+> **Historical, non-authoritative.** The canonical `shared-review-protocol`
 > skill governs behavior; `docs/agent/review-protocol.md` records BenchBox
 > bindings. This text is retained only as rationale. Do not bind new commands,
 > skills, or tests to it.
@@ -78,7 +78,7 @@ directory loses its signal).
 
 ## Section 3 - L2 audit scope
 
-The Layer 2 question from `SHARED/review-protocol` (Section 3, Planning-Depth Layers):
+The Layer 2 question from `shared-review-protocol` (Section 3, Planning-Depth Layers):
 
 > *What class of issue does my framework fail to catch for this type
 > of change/bug/decision?*

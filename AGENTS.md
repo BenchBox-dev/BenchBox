@@ -136,8 +136,8 @@ local-only, never CI: databend's `minio` was observed to exit under it; doris/st
 
 Stable wrappers are `code`, `test`, `todo`, `docs`, `blog`, `benchbox`, `skill-sync`, and `tidy-perms`.
 `todo` authors ideas/specs and owns tracker actions. Skill source is `/Users/joe/.skill-sync/skills`;
-only `.claude/skills` is tracked. `.codex/skills`, `.gemini/skills`, and `.antigravity/skills` are gitignored
-local materializations. Regenerate mirrors with `make skill-sync` in a write worktree; never hand-edit one.
+only `.claude/skills` is tracked. `.agents/skills` is the shared, gitignored local materialization for Codex,
+Gemini, and Antigravity. Regenerate mirrors with `make skill-sync` in a write worktree; never hand-edit one.
 `scripts/check_untracked_skill_mirrors.sh` guards tracking state, not content parity.
 
 ## Operational references

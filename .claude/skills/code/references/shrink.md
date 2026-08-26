@@ -1,6 +1,6 @@
 # Code Shrink Reference
 
-Use the Shrink workflow in `SHARED/investigation-framework/SKILL.md`.
+Use the Shrink workflow in `shared-investigation-framework/SKILL.md`.
 
 ## Preserve
 

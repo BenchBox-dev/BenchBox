@@ -8,7 +8,7 @@
    `todo finding triage <id> ...` before choosing new work. Findings are not
    claimable items.
 2. For each work unit: run `todo start <id> <wid>` (optional), apply
-   `SHARED/change-framework/SKILL.md` Section 1 before source-code edits,
+   `shared-change-framework/SKILL.md` Section 1 before source-code edits,
    implement the unit, then run `todo done <id> <wid> --evidence "<command or commit or PR>"`.
 3. Defer out-of-scope work immediately with
    `todo defer <id> --summary "..." --reason "..."`.
