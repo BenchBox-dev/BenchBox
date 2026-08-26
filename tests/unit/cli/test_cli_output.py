@@ -939,6 +939,12 @@ class TestResultExporter:
         """Comparison reports must not render result-controlled labels as markup."""
         untrusted = '"><script>alert(1)</script>'
         comparison = {
+            "summary": {
+                "total_queries_compared": untrusted,
+                "improved_queries": untrusted,
+                "regressed_queries": untrusted,
+                "unchanged_queries": untrusted,
+            },
             "performance_changes": {
                 untrusted: {"change_percent": 1.0, "improved": False},
             },

@@ -1081,6 +1081,10 @@ class ResultExporter:
         summary = comparison.get("summary", {})
         performance_changes = comparison.get("performance_changes", {})
         query_comparisons = comparison.get("query_comparisons", [])
+        total_queries_compared = html_escape(str(summary.get("total_queries_compared", 0)), quote=True)
+        improved_queries = html_escape(str(summary.get("improved_queries", 0)), quote=True)
+        regressed_queries = html_escape(str(summary.get("regressed_queries", 0)), quote=True)
+        unchanged_queries = html_escape(str(summary.get("unchanged_queries", 0)), quote=True)
 
         html_content = f"""<!DOCTYPE html>
 <html>
@@ -1111,19 +1115,19 @@ class ResultExporter:
         <div class="summary">
             <div class="metric neutral">
                 <h3>Queries Compared</h3>
-                <p>{summary.get("total_queries_compared", 0)}</p>
+                <p>{total_queries_compared}</p>
             </div>
             <div class="metric improved">
                 <h3>Improved</h3>
-                <p>{summary.get("improved_queries", 0)}</p>
+                <p>{improved_queries}</p>
             </div>
             <div class="metric regressed">
                 <h3>Regressed</h3>
-                <p>{summary.get("regressed_queries", 0)}</p>
+                <p>{regressed_queries}</p>
             </div>
             <div class="metric neutral">
                 <h3>Unchanged</h3>
-                <p>{summary.get("unchanged_queries", 0)}</p>
+                <p>{unchanged_queries}</p>
             </div>
         </div>
         <h2>Performance Changes</h2>
