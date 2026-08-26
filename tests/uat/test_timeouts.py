@@ -70,7 +70,7 @@ time.sleep(30)
     assert result.timed_out is True
     assert result.exit_code == timeouts.EXIT_TIMEOUT
     grandchild_pid = int(pid_file.read_text(encoding="utf-8"))
-    _assert_process_terminated(grandchild_pid, role="grandchild")
+    assert _await_process_state(grandchild_pid, {_PROC_GONE}) == _PROC_GONE
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX timeout semantics")
@@ -307,6 +307,30 @@ def test_timeout_path_drains_using_the_reap_timeout_constant(monkeypatch):
     )
 
 
+def test_cancellation_cleanup_retries_wait_when_interrupted(monkeypatch):
+    """A follow-up BaseException during reap must not leave the child zombie."""
+
+    class _Interrupted(BaseException):
+        pass
+
+    class FakeProc:
+        def __init__(self) -> None:
+            self.wait_calls = 0
+
+        def wait(self, timeout=None):
+            self.wait_calls += 1
+            if self.wait_calls == 1:
+                raise _Interrupted("simulated signal during wait")
+            return 0
+
+    proc = FakeProc()
+    monkeypatch.setattr(timeouts, "_kill_process_group", lambda _proc: None)
+
+    timeouts._kill_and_reap_process_group(proc)
+
+    assert proc.wait_calls == 2
+
+
 def test_run_with_timeout_zero_timeout_kills_group_on_base_exception(monkeypatch):
     """The timeout_s == 0 branch must use the same guarded-kill Popen path as
     the timed branch, not the old bare subprocess.run with no teardown."""
@@ -363,16 +387,13 @@ def test_cancellation_kills_trapping_child_and_grandchild(tmp_path):
     * a child that TRAPS SIGTERM, like the database servers a real cell
       spawns, so the group survives the grace window and the SIGKILL rung is
       actually exercised rather than skipped;
-    * a "terminated" check that rejects a live process. On Linux, a killed
-      descendant can remain a zombie until its parent or the system reaper
-      waits for it; `run_with_timeout` owns and reaps only its direct child,
-      so requiring an arbitrary descendant to be `gone` is not portable.
-      See `_process_state`.
+    * a "gone" check that cannot be satisfied by a zombie or by CPython's
+      `Popen` finalizer -- see `_process_state`.
     """
     probe = _run_cancelled_probe(tmp_path, timeout_s=_PRODUCTION_LIKE_TIMEOUT_S)
 
     assert probe.sigterm_path.exists(), "SIGTERM rung never reached the child"
-    _assert_process_terminated(probe.grandchild_pid, role="grandchild")
+    assert _await_process_state(probe.grandchild_pid, {_PROC_GONE}) == _PROC_GONE
     assert _await_process_state(probe.child_pid, {_PROC_GONE}) == _PROC_GONE
 
 
@@ -390,7 +411,7 @@ def test_zero_timeout_cancellation_kills_trapping_child_and_grandchild(tmp_path)
     probe = _run_cancelled_probe(tmp_path, timeout_s=0)
 
     assert probe.sigterm_path.exists(), "SIGTERM rung never reached the child"
-    _assert_process_terminated(probe.grandchild_pid, role="grandchild")
+    assert _await_process_state(probe.grandchild_pid, {_PROC_GONE}) == _PROC_GONE
     assert _await_process_state(probe.child_pid, {_PROC_GONE}) == _PROC_GONE
 
 
@@ -406,19 +427,15 @@ def test_kill_ladder_completes_sigkill_when_interrupted_during_grace(tmp_path):
     shutdown) that means nothing dies. Exactly the operator sequence that
     produces it: `kill` the sweep, see nothing exit, `kill` it again.
 
-    The child is reaped here rather than polled for disappearance: this
-    path deliberately skips `_kill_and_reap_process_group`'s `wait()` (the
-    second signal unwinds through it), so the child is a zombie and
-    `waitpid` can report *how* it died. `WTERMSIG == SIGKILL` is the direct
-    assertion that the second rung ran.
+    The cleanup path must absorb that follow-up signal and still reap the
+    direct child. Because this child traps SIGTERM and loops forever, its
+    disappearance proves that the SIGKILL rung ran; the strict `gone` check
+    also proves the wrapper, rather than garbage collection, reaped it.
     """
     probe = _run_cancelled_probe(tmp_path, timeout_s=_PRODUCTION_LIKE_TIMEOUT_S, deliveries=2)
 
-    _assert_process_terminated(probe.grandchild_pid, role="grandchild")
-    status = _reap(probe.child_pid)
-    assert status is not None, "child was never reaped -- it outlived the interrupted ladder"
-    assert os.WIFSIGNALED(status), f"child exited normally (status={status}) instead of being killed"
-    assert os.WTERMSIG(status) == signal.SIGKILL
+    assert _await_process_state(probe.grandchild_pid, {_PROC_GONE}) == _PROC_GONE
+    assert _await_process_state(probe.child_pid, {_PROC_GONE}) == _PROC_GONE
 
 
 # ---------------------------------------------------------------------------
@@ -432,7 +449,6 @@ def test_kill_ladder_completes_sigkill_when_interrupted_during_grace(tmp_path):
 _PROC_GONE = "gone"
 _PROC_ZOMBIE = "zombie"
 _PROC_LIVE = "live"
-_PROC_TERMINATED = {_PROC_GONE, _PROC_ZOMBIE}
 
 # Any positive value takes the same timed branch as the 600 s
 # `execute.per_cell_timeout_s` default; small enough that a wedged probe
@@ -600,9 +616,8 @@ def _process_state(pid: int) -> str:
     `os.kill(pid, 0)` on its own is not a teardown predicate: it succeeds
     for a `<defunct>` zombie, so it measures *reaping* rather than killing,
     and the reaper is often CPython's `Popen` finalizer rather than
-    `timeouts.py`. Reading the state makes "terminated" and "still
-    scheduled" distinguishable. A zombie is terminated but unreaped, and is
-    therefore a valid dead state when the process is an unowned descendant.
+    `timeouts.py`. Reading the state makes "terminated" and "still scheduled"
+    distinguishable and makes a zombie an explicit third answer.
     """
     try:
         os.kill(pid, 0)
@@ -648,23 +663,3 @@ def _await_process_state(pid: int, accepted: set[str], *, timeout_s: float = _ST
         time.sleep(0.02)
         state = _process_state(pid)
     return state
-
-
-def _assert_process_terminated(pid: int, *, role: str) -> None:
-    """Reject a live process while allowing an unreaped descendant zombie."""
-    state = _await_process_state(pid, _PROC_TERMINATED)
-    assert state != _PROC_LIVE, f"{role} remained live after teardown (state={state})"
-
-
-def _reap(pid: int, *, timeout_s: float = _STATE_TIMEOUT_S) -> int | None:
-    """`waitpid(WNOHANG)` until `pid` is collected; None if it never is."""
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        try:
-            reaped, status = os.waitpid(pid, os.WNOHANG)
-        except ChildProcessError:
-            return None
-        if reaped == pid:
-            return status
-        time.sleep(0.02)
-    return None
