@@ -69,12 +69,13 @@ jobs:
             exit 2
           fi
 
-          # Same path set the sync workflow mirrors for the corpus tip.
+          # Compare the shared corpus content, not the derived inventory.
           # Two-tree compare (no dots): published-results is an orphan branch
-          # with no merge-base with develop.
+          # with no merge-base with develop. Each branch regenerates its own
+          # inventory, and published-results intentionally retains archive-only
+          # bundles, so the inventory is expected to differ after a union overlay.
           PATHSPECS=(
             'results-data/bundles'
-            'results-data/corpus-inventory.json'
             'results-data/CORPUS_NOTES.md'
             'results-data/SEED_CORPUS_SPEC.md'
             'results-data/README.md'
