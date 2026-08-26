@@ -75,7 +75,7 @@ reasoning-effort control is unavailable.
 ## 4. Branch, commit, and PR workflow
 
 Use for every authorized action that changes repository content. Review-only
-capture remains local under `SHARED/review-protocol/SKILL.md`.
+capture remains local under `shared-review-protocol/SKILL.md`.
 
 ### Inputs
 

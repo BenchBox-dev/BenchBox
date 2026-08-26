@@ -11,7 +11,7 @@ Git, PR service, CI, artifacts, and human decisions remain authoritative.
 ## Before you start
 
 1. Read repository instructions, `references/implement.md`,
-   `SHARED/change-framework/SKILL.md`, and `SHARED/review-protocol/SKILL.md` as
+   `shared-change-framework/SKILL.md`, and `shared-review-protocol/SKILL.md` as
    required for the next action; do not copy their rules into the ledger.
 2. Run required tracker `--help` checks and `todo doctor`, using the wrapper and
    global-flag ordering from `SKILL.md`. Fix or report any failure and stop

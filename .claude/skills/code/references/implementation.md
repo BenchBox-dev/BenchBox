@@ -18,11 +18,11 @@ make a conventional commit, and push through the commit framework.
 ## Debug
 
 Use the Debug and Context Guide sections of
-`SHARED/investigation-framework/SKILL.md`.
+`shared-investigation-framework/SKILL.md`.
 
 ## Perf
 
 Measure a baseline, profile, optimize, and remeasure. State the performance
 budget. Before optimizing, apply Layer 3 of
-`SHARED/review-protocol/SKILL.md` to confirm the measured bottleneck is the
+`shared-review-protocol/SKILL.md` to confirm the measured bottleneck is the
 real constraint.

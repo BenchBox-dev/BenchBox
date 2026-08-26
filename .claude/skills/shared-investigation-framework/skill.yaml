@@ -1,5 +1,5 @@
 depends:
-  - SHARED/review-protocol
+  - shared-review-protocol
 tags:
   - framework
 category: framework

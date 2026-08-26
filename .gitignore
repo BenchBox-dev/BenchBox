@@ -238,6 +238,4 @@ node_modules/
 # >>> skill-sync managed (do not edit) >>>
 /.agents/skills/
 /.claude/skills/blog/
-/.codex/skills/
-/.gemini/skills/
 # <<< skill-sync managed <<<

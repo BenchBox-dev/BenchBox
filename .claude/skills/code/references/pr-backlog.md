@@ -58,7 +58,7 @@ Classify each open PR into one of three execution paths:
 - **Condition:** All required CI checks green on current `head.sha`, no open
   unresolved review threads, approvals met, no merge conflicts.
 - **Action:**
-  1. Validate commit identity against `SHARED/change-framework/SKILL.md
+  1. Validate commit identity against `shared-change-framework/SKILL.md
      [COMMIT-IDENTITY-001]`.
   2. Merge the PR using the pinned `head.sha` via the merge API (e.g. `gh api
      -X PUT /repos/{owner}/{repo}/pulls/{number}/merge -f sha=<head.sha>`) to
@@ -94,14 +94,14 @@ Classify each open PR into one of three execution paths:
   2. Create an isolated working copy or worktree following repository rules.
   3. Rebase onto the integration branch and resolve conflicts cleanly.
   4. Validate commit author and committer identity per
-     `SHARED/change-framework/SKILL.md [COMMIT-IDENTITY-001]`. Preserve original
+     `shared-change-framework/SKILL.md [COMMIT-IDENTITY-001]`. Preserve original
      contributor attribution on multi-author or external PRs; do not blindly
      re-author commits.
   5. Fix failing tests and address open review comments in the branch. Cap
      automated push/fix iterations at 3 attempts per PR to prevent unbounded
      cycles on flaky checks.
   6. Run repository-configured verification (`code.verify`, `code.fast_test`, or
-     the repository test suite) per `SHARED/change-framework/SKILL.md`.
+     the repository test suite) per `shared-change-framework/SKILL.md`.
   7. Push to the PR branch with `--force-with-lease` and `--force-if-includes`
      where supported.
   8. Post durable replies citing the newly pushed commit SHA to all addressed

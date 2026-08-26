@@ -1,6 +1,6 @@
 depends:
-  - SHARED/change-framework
-  - SHARED/investigation-framework
+  - shared-change-framework
+  - shared-investigation-framework
 config_inputs:
   - key: test.runner
     type: string

@@ -77,11 +77,11 @@ For a read-only request, stop after the inventory and classification.
 
 When the user authorizes fixes:
 
-1. Apply `SHARED/change-framework/SKILL.md` before edits.
+1. Apply `shared-change-framework/SKILL.md` before edits.
 2. Group fixes by cohesive concern and repository review limits. Do not require
    one PR or one PR per finding unless the repository does.
 3. Validate commit identity before creating commits per
-   `SHARED/change-framework/SKILL.md [COMMIT-IDENTITY-001]`.
+   `shared-change-framework/SKILL.md [COMMIT-IDENTITY-001]`.
 4. Run targeted checks, then the repository's required preflight.
 5. Use the repository tracker or finding-capture flow for deferrals. If none
    exists, report the deferred work without inventing a tracker.
