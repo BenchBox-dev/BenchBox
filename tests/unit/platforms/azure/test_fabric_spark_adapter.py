@@ -318,6 +318,27 @@ class TestFabricSparkAdapterConnection:
 class TestFabricSparkAdapterDataLoading:
     """Test data loading functionality."""
 
+    def test_load_data_propagates_table_creation_failure(self, tmp_path):
+        """A failed table creation must not produce a successful load result."""
+        with (
+            patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            staging = MagicMock()
+            staging.tables_exist.return_value = True
+            mock_staging.from_uri.return_value = staging
+
+            from benchbox.platforms.azure import FabricSparkAdapter
+
+            adapter = FabricSparkAdapter(workspace_id="workspace", lakehouse_id="lakehouse")
+            adapter._execute_statement = MagicMock(side_effect=RuntimeError("table create failed"))
+            benchmark = MagicMock(tables={"orders": None})
+
+            with pytest.raises(RuntimeError, match="Failed to create Fabric Spark table orders"):
+                adapter.load_data(benchmark, None, tmp_path)
+
     def test_load_data_skips_when_exists(self):
         """Test that load_data skips upload when tables already exist."""
         with (
@@ -367,7 +388,8 @@ class TestFabricSparkAdapterDataLoading:
                 with tempfile.TemporaryDirectory() as tmpdir:
                     from pathlib import Path
 
-                    adapter.load_data(mock_benchmark, None, Path(tmpdir))
+                    with patch.object(adapter, "_execute_statement", return_value={}):
+                        adapter.load_data(mock_benchmark, None, Path(tmpdir))
 
                     # Should not call upload_tables since tables exist
                     mock_staging_instance.upload_tables.assert_not_called()
@@ -418,7 +440,8 @@ class TestFabricSparkAdapterDataLoading:
                 with tempfile.TemporaryDirectory() as tmpdir:
                     from pathlib import Path
 
-                    adapter.load_data(mock_benchmark, None, Path(tmpdir))
+                    with patch.object(adapter, "_execute_statement", return_value={}):
+                        adapter.load_data(mock_benchmark, None, Path(tmpdir))
 
                     mock_staging_instance.upload_tables.assert_called_once_with(
                         tables=["lineitem", "orders"],
