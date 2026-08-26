@@ -54,6 +54,29 @@ class TestCsvHtmlAnonymization:
         path = exporter._export_csv_detailed(_result_with_error(), "run1")
         assert SENTINEL_ERROR in path.read_text(encoding="utf-8")
 
+    def test_html_escapes_untrusted_metadata_and_query_values(self, tmp_path):
+        untrusted = '"><script>alert(1)</script>'
+        result = SimpleNamespace(
+            benchmark_name=untrusted,
+            execution_id=untrusted,
+            platform=untrusted,
+            query_results=[
+                {
+                    "query_id": untrusted,
+                    "status": untrusted,
+                    "execution_time_ms": 1.0,
+                    "rows_returned": untrusted,
+                    "error_message": untrusted,
+                }
+            ],
+        )
+
+        path = ResultExporter(output_dir=tmp_path)._export_html_detailed(result, "run1")
+        content = path.read_text(encoding="utf-8")
+
+        assert untrusted not in content
+        assert "&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;" in content
+
     def test_html_row_shape_preserved(self, tmp_path):
         exporter = ResultExporter(output_dir=tmp_path, anonymize=True)
         row = exporter._render_query_row(

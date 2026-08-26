@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -41,6 +42,14 @@ _RANKING_METRIC_CONFIG = {
     "power_at_size": ("power_at_size", "DESC"),
     "cost_efficiency": ("total_cost / NULLIF(successful_queries, 0)", "ASC"),
 }
+_BACKUP_TABLE_NAME_PATTERN = re.compile(r"^queries_orphan_backup_\d{20}$")
+
+
+def _validate_backup_table_name(table_name: str) -> str:
+    """Validate a generated orphan-backup table name before SQL interpolation."""
+    if _BACKUP_TABLE_NAME_PATTERN.fullmatch(table_name) is None:
+        raise ValueError(f"Unsafe SQLite backup table name: {table_name!r}")
+    return table_name
 
 
 @dataclass
@@ -720,7 +729,9 @@ class ResultDatabase:
             if dry_run or orphan_count == 0:
                 return orphan_count
 
-            backup_table = f"queries_orphan_backup_{datetime.now(timezone.utc):%Y%m%d%H%M%S%f}"
+            backup_table = _validate_backup_table_name(
+                f"queries_orphan_backup_{datetime.now(timezone.utc):%Y%m%d%H%M%S%f}"
+            )
             conn.execute(
                 f"""
                 CREATE TABLE {backup_table} AS

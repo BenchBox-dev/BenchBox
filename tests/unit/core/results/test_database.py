@@ -18,6 +18,7 @@ from benchbox.core.results.database import (
     ResultDatabase,
     StoredQuery,
     StoredResult,
+    _validate_backup_table_name,
 )
 from benchbox.core.results.models import (
     BenchmarkResults,
@@ -159,6 +160,13 @@ class TestResultDatabase:
         assert len(db.get_queries(result_id)) == 2
         assert db.delete_result("cascade") is True
         assert db.get_queries(result_id) == []
+
+    def test_backup_table_identifier_validation_rejects_sql(self):
+        valid_name = "queries_orphan_backup_20260826215959123456"
+        assert _validate_backup_table_name(valid_name) == valid_name
+
+        with pytest.raises(ValueError, match="Unsafe SQLite backup table name"):
+            _validate_backup_table_name("queries_orphan_backup_20260826215959123456; DROP TABLE results")
 
     def test_orphan_repair_is_dry_run_by_default_and_backed_up_when_applied(self, tmp_path):
         """Legacy orphan rows require explicit repair and retain a backup."""

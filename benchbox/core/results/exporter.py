@@ -22,6 +22,7 @@ import os
 import tempfile
 from collections.abc import Iterable
 from datetime import datetime
+from html import escape as html_escape
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
@@ -648,12 +649,13 @@ class ResultExporter:
         """Export result to HTML format."""
         filepath = self._create_file_path(f"{filename_base}.html")
 
-        benchmark_name = getattr(result, "benchmark_name", "Unknown Benchmark")
-        execution_id = getattr(result, "execution_id", "")
+        benchmark_name = html_escape(str(getattr(result, "benchmark_name", "Unknown Benchmark")), quote=True)
+        execution_id = html_escape(str(getattr(result, "execution_id", "")), quote=True)
         timestamp = getattr(result, "timestamp", datetime.now())
+        timestamp_text = html_escape(timestamp.isoformat() if timestamp else "N/A", quote=True)
         duration = getattr(result, "duration_seconds", 0.0)
-        scale_factor = getattr(result, "scale_factor", 1.0)
-        platform = getattr(result, "platform", "Unknown")
+        scale_factor = html_escape(str(getattr(result, "scale_factor", 1.0)), quote=True)
+        platform = html_escape(str(getattr(result, "platform", "Unknown")), quote=True)
 
         total_queries, successful_queries = self._count_queries(result)
         failed_queries = max(total_queries - successful_queries, 0)
@@ -706,7 +708,7 @@ class ResultExporter:
             <strong>Platform:</strong> {platform} |
             <strong>Scale:</strong> {scale_factor} |
             <strong>Run:</strong> {execution_id} |
-            <strong>Time:</strong> {timestamp.isoformat() if timestamp else "N/A"}
+            <strong>Time:</strong> {timestamp_text}
         </div>
         <div class="stats">
             <div class="stat">
@@ -769,14 +771,18 @@ class ResultExporter:
             exec_time_ms = float(exec_time_seconds) * 1000.0
 
         time_display = f"{exec_time_ms:.1f}" if exec_time_ms is not None else ""
+        query_id = html_escape(str(query.get("query_id", "")), quote=True)
+        rows_returned = html_escape(str(query.get("rows_returned", "")), quote=True)
+        status_text = html_escape(str(status), quote=True)
+        error_text = html_escape(str(query.get("error") or query.get("error_message", "") or ""), quote=True)
 
         return (
             "<tr>"
-            f"<td>{query.get('query_id', '')}</td>"
-            f"<td>{time_display}</td>"
-            f"<td>{query.get('rows_returned', '')}</td>"
-            f"<td class='{status_class}'>{status}</td>"
-            f"<td>{query.get('error') or query.get('error_message', '')}</td>"
+            f"<td>{query_id}</td>"
+            f"<td>{html_escape(time_display, quote=True)}</td>"
+            f"<td>{rows_returned}</td>"
+            f"<td class='{status_class}'>{status_text}</td>"
+            f"<td>{error_text}</td>"
             "</tr>"
         )
 
