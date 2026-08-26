@@ -1762,6 +1762,56 @@ def test_get_population_sql_default_full_copy(fast_bench):
     assert "SELECT *" in sql
 
 
+def test_get_population_sql_scd2_uses_sqlite_date_functions(fast_bench):
+    """SQLite staging population must not emit SQL-standard date literals."""
+    fast_bench._setup_dialect = "sqlite"
+
+    dimension_sql = fast_bench._get_population_sql("scd2_ops_dim_customer", "customer")
+    stage_sql = fast_bench._get_population_sql("scd2_ops_stage_customer", "customer")
+
+    assert "DATE '" not in dimension_sql
+    assert "DATE '" not in stage_sql
+    assert "DATE('1990-01-01')" in dimension_sql
+    assert "DATE('9999-12-31')" in dimension_sql
+    assert "DATE('2026-01-01')" in stage_sql
+
+
+def test_populate_scd2_staging_table_succeeds_on_sqlite(fast_bench):
+    """Regression test for SQLite's direct execution of SCD2 population SQL."""
+    import sqlite3
+
+    from benchbox.core.write_primitives.schema import get_create_table_sql
+
+    fast_bench._setup_dialect = "sqlite"
+    connection = sqlite3.connect(":memory:")
+    try:
+        connection.execute(
+            "CREATE TABLE customer (c_custkey INTEGER, c_name TEXT, c_address TEXT, c_acctbal REAL, c_mktsegment TEXT)"
+        )
+        connection.execute("INSERT INTO customer VALUES (1, 'Customer#1', 'Address', 100.0, 'BUILDING')")
+        connection.execute(get_create_table_sql("scd2_ops_dim_customer", dialect="sqlite"))
+        connection.execute(get_create_table_sql("scd2_ops_stage_customer", dialect="sqlite"))
+
+        status = fast_bench._populate_staging_tables(
+            connection,
+            {
+                "scd2_ops_dim_customer": "customer",
+                "scd2_ops_stage_customer": "customer",
+            },
+        )
+
+        assert status == {"scd2_ops_dim_customer": 1, "scd2_ops_stage_customer": 2}
+        assert connection.execute("SELECT valid_from, valid_to FROM scd2_ops_dim_customer").fetchone() == (
+            "1990-01-01",
+            "9999-12-31",
+        )
+        assert connection.execute(
+            "SELECT effective_ts, change_type FROM scd2_ops_stage_customer ORDER BY c_custkey"
+        ).fetchall() == [("2026-01-01", "changed"), ("2026-01-01", "new")]
+    finally:
+        connection.close()
+
+
 # ---------------------------------------------------------------------------
 # get_create_tables_sql() (line 878)
 # ---------------------------------------------------------------------------
