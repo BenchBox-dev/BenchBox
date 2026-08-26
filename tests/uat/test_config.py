@@ -446,7 +446,7 @@ def test_release_gate_configs_load_and_encode_stage_ordering():
         assert stage.execute.parallel_platforms is False
 
 
-def test_release_gate_stage1_prunes_sqlite_tpcds_runtime_envelope():
+def test_release_gate_stage1_prunes_measured_runtime_envelopes():
     from tests.uat.phases.enumerate import enumerate_cells_with_pruning
 
     stage1 = config.load_config(_RELEASE_GATE_CONFIGS_DIR / "release-gate-01-native-dataframe.yaml")
@@ -458,6 +458,20 @@ def test_release_gate_stage1_prunes_sqlite_tpcds_runtime_envelope():
     ]
     assert [cell.scale for cell in sqlite_tpcds] == [0.01, 0.1, 1.0]
     assert {cell.rule_id for cell in sqlite_tpcds} == {"uat.compat.sqlite.tpcds.release_gate_runtime_envelope"}
+    assert not any(cell.platform == "datafusion" and cell.benchmark == "datavault" for cell in result.cells)
+    datafusion_datavault = [
+        cell for cell in result.compatibility_pruned if cell.platform == "datafusion" and cell.benchmark == "datavault"
+    ]
+    assert [cell.scale for cell in datafusion_datavault] == [0.01, 0.1, 1.0]
+    assert {cell.rule_id for cell in datafusion_datavault} == {
+        "uat.compat.datafusion.datavault.release_gate_runtime_envelope"
+    }
+    by_pair: dict[tuple[str, str], set[float]] = {}
+    for cell in result.cells:
+        by_pair.setdefault((cell.platform, cell.benchmark), set()).add(cell.scale)
+    eligible = sum(1 for scales in by_pair.values() if set(stage1.scales.rungs).issubset(scales))
+    assert eligible == 151
+    assert stage1.report.cross_scale_coverage_min_pairs == int(0.8 * eligible) == 120
 
 
 def test_release_gate_cross_scale_floors_are_tuned_and_achievable():

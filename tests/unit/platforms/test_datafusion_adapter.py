@@ -1030,6 +1030,20 @@ WHERE DATE '1994-01-01' <= DATE '1995-01-01'"""
             assert adapter.target_partitions == 7
 
     @patch("benchbox.platforms.datafusion.SessionContext")
+    def test_from_config_reads_nested_options_with_top_level_precedence(self, mock_session_context):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = {
+                "working_dir": tmpdir,
+                "memory_limit": "8G",
+                "options": {"memory_limit": "4G", "target_partitions": 2},
+            }
+
+            adapter = DataFusionAdapter.from_config(config)
+
+            assert adapter.memory_limit == "8G"
+            assert adapter.target_partitions == 2
+
+    @patch("benchbox.platforms.datafusion.SessionContext")
     def test_add_cli_arguments(self, mock_session_context):
         """Test CLI argument addition."""
         import argparse

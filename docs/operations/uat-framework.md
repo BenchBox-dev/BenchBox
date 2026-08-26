@@ -610,10 +610,39 @@ treated as a pass or a compatibility exclusion.
 The release-gate runtime-envelope switch records measured, platform-specific
 cell exclusions in the same compatibility-pruning stream. It does not change
 the benchmark registry's declared scale ladder or affect ordinary diagnostic
-runs.
+runs. For v0.4.0, the native release gate uses the measured 16 GiB host-class
+envelope. A larger host does not silently widen this comparable matrix; use it
+for a diagnostic certification run, then remove an exclusion in a reviewed
+change only after that evidence is recorded.
 
-As of 2026-08-25, SQLite `tpcds` and `tpcds_obt` are excluded from the
-1200-second native release-gate cell.
+As of 2026-08-25, DataFusion `datavault` and SQLite `tpcds` and `tpcds_obt`
+are excluded from the 1200-second native release-gate cell.
+
+For DataFusion DataVault, the clean Stage 1 sweep passed SF0.01 and SF0.1, but
+the SF1 process was killed while running query 18 after 145.9 seconds. PR #1914
+corrected the DataFusion spill-pool construction; a clean post-fix replay
+confirmed that a 12 GiB fair spill pool was active, but the host still killed
+query 18. This is the largest pool the 16 GiB release-host envelope can admit.
+Because compatibility rules are platform/benchmark scoped, the release gate
+prunes the full scale ladder under
+`uat.compat.datafusion.datavault.release_gate_runtime_envelope`; ordinary
+diagnostic sweeps still enumerate every scale.
+
+| Probe | Source commit | Result | Artifact SHA-256 |
+| --- | --- | --- | --- |
+| Stage 1 native UAT | `1d86c31845e1293d2e6bf8adeeab6da2ce4e433a` | SF0.01 and SF0.1 passed; SF1 query 18 was killed | `cells.jsonl`: `b82e3cd019515bd4be57e0f53cf45a9ff2546819599bf0844da8fdbfe5b44cce` |
+| Post-PR #1914 SF1 replay | `f27fa6363517616e3573dd385ab75734207bb0a2` | 12 GiB fair spill pool applied; process killed | `1558c7ee5cd5d9561bc8e76b1d2ccceb527a4fa5f7e6950805aef8ea5de997f7` |
+
+Replay the focused SF1 cell from a clean worktree at
+`f27fa6363517616e3573dd385ab75734207bb0a2`:
+
+```bash
+BENCHBOX_OUTPUT_DIR="$HOME/Developer/benchmark_runs" \
+  uv run --no-sync -- benchbox run --platform datafusion \
+  --benchmark datavault --scale 1.0 --queries 18 --iterations 1 -vv \
+  --non-interactive --phases power \
+  --output "$HOME/Developer/benchmark_runs/datagen"
+```
 
 For canonical TPC-DS, the native UAT sweep timed out at about 1200 seconds at
 each requested scale: 0.01, 0.1, and 1.0. A bounded SF0.01 replay processed
