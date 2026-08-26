@@ -35,7 +35,11 @@ targets:
     ignore: [blog]
   codex: .codex/skills
   gemini: .gemini/skills
-  antigravity: .antigravity/skills
+  # Antigravity discovers workspace skills only under a customization root
+  # (.agents/, .agent/, _agents/, _agent/). Skills under .antigravity/ are
+  # never loaded. Nested SHARED/* packages still land here for reference but
+  # sit below Antigravity's one-level discovery depth.
+  antigravity: .agents/skills
 install_mode: mirror
 overrides:
   skill-sync:

@@ -154,7 +154,6 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 .codex/shared-skills/
 .codex/shared-skills.lock.json
 .gemini/skills/
-.antigravity/skills/
 .agents/
 .antigravitycli/
 
@@ -237,7 +236,7 @@ ci-log.txt
 node_modules/
 
 # >>> skill-sync managed (do not edit) >>>
-/.antigravity/skills/
+/.agents/skills/
 /.claude/skills/blog/
 /.codex/skills/
 /.gemini/skills/
