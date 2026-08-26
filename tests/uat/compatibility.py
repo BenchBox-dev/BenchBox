@@ -132,6 +132,16 @@ _SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_EVIDENCE = (
     "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs; docs/operations/uat-framework.md"
 )
 
+_SQLITE_TPCDS_RUNTIME_ENVELOPE_REASON = (
+    "SQLite TPC-DS missed the 1200s release-gate contract at all three scales on 2026-08-25. "
+    "Bounded SF0.01 probes found query 13 and query 48 still running after 300s each. Eleven generated "
+    "queries also require unsupported ROLLUP semantics; four require GROUPING. Keep the cells pruned "
+    "until bounded query rewrites or planner improvements fit the declared budget."
+)
+_SQLITE_TPCDS_RUNTIME_ENVELOPE_EVIDENCE = (
+    "docs/operations/uat-framework.md: SHA-bound SQLite TPC-DS evidence (2026-08-25)"
+)
+
 _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES = (
     {
         (platform, "joinorder"): _JOINORDER_RUNTIME_ENVELOPE_REASON
@@ -145,7 +155,13 @@ _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES = (
 )
 
 _RELEASE_GATE_RUNTIME_ENVELOPES = _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES | {
+    ("sqlite", "tpcds"): _SQLITE_TPCDS_RUNTIME_ENVELOPE_REASON,
     ("sqlite", "tpcds_obt"): _SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_REASON,
+}
+
+_RELEASE_GATE_RUNTIME_ENVELOPE_EVIDENCE = {
+    ("sqlite", "tpcds"): _SQLITE_TPCDS_RUNTIME_ENVELOPE_EVIDENCE,
+    ("sqlite", "tpcds_obt"): _SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_EVIDENCE,
 }
 
 
@@ -186,10 +202,9 @@ def compatibility_rule_for(
     if include_release_gate_runtime_envelopes:
         runtime_envelope_reason = _RELEASE_GATE_RUNTIME_ENVELOPES.get((platform, benchmark))
         if runtime_envelope_reason:
-            runtime_envelope_evidence = (
-                _SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_EVIDENCE
-                if (platform, benchmark) == ("sqlite", "tpcds_obt")
-                else "2026-05-14 enabled-platform UAT release-gate audit; not a runtime compatibility gate"
+            runtime_envelope_evidence = _RELEASE_GATE_RUNTIME_ENVELOPE_EVIDENCE.get(
+                (platform, benchmark),
+                "2026-05-14 enabled-platform UAT release-gate audit; not a runtime compatibility gate",
             )
             return CompatibilityRule(
                 rule_id=f"uat.compat.{platform}.{benchmark}.release_gate_runtime_envelope",
