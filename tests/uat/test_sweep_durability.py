@@ -423,7 +423,7 @@ def test_sweep_cancel_reaps_orphaned_child_no_survivor(tmp_path: Path):
 
     child_pid = int(child_pid_path.read_text(encoding="utf-8"))
     grandchild_pid = int(grandchild_pid_path.read_text(encoding="utf-8"))
-    assert timeouts_test._await_process_state(grandchild_pid, {timeouts_test._PROC_GONE}) == timeouts_test._PROC_GONE
+    timeouts_test._assert_process_terminated(grandchild_pid, role="grandchild")
     assert timeouts_test._await_process_state(child_pid, {timeouts_test._PROC_GONE}) == timeouts_test._PROC_GONE
     # Keeps run_with_timeout's `proc` local reachable through the traceback
     # for the duration of the assertions above; see _run_cancelled_probe.
