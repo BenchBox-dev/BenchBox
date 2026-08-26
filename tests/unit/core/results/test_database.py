@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -142,6 +143,44 @@ class TestResultDatabase:
             cursor.execute("SELECT version FROM schema_version")
             version = cursor.fetchone()[0]
             assert version == SCHEMA_VERSION
+
+    def test_foreign_keys_enabled_on_every_connection(self, tmp_path):
+        """SQLite cascade enforcement must be enabled per connection."""
+        db = ResultDatabase(tmp_path / "test.db")
+
+        with db._connection() as conn:
+            assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+
+    def test_delete_result_cascades_queries(self, tmp_path):
+        """Deleting a result removes its child query rows."""
+        db = ResultDatabase(tmp_path / "test.db")
+        result_id = db.store_result(create_test_result(execution_id="cascade", include_queries=True))
+
+        assert len(db.get_queries(result_id)) == 2
+        assert db.delete_result("cascade") is True
+        assert db.get_queries(result_id) == []
+
+    def test_orphan_repair_is_dry_run_by_default_and_backed_up_when_applied(self, tmp_path):
+        """Legacy orphan rows require explicit repair and retain a backup."""
+        db_path = tmp_path / "test.db"
+        db = ResultDatabase(db_path)
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """INSERT INTO queries
+                    (result_id, query_id, execution_order, execution_time_ms, status)
+                    VALUES (999999, 'orphan', 1, 1.0, 'ERROR')"""
+            )
+            conn.commit()
+
+        assert db.repair_orphaned_queries() == 1
+        assert db.count_orphaned_queries() == 1
+        assert db.repair_orphaned_queries(dry_run=False) == 1
+        assert db.count_orphaned_queries() == 0
+        with db._connection() as conn:
+            backup_tables = conn.execute(
+                "SELECT name FROM sqlite_master WHERE name LIKE 'queries_orphan_backup_%'"
+            ).fetchall()
+            assert len(backup_tables) == 1
 
 
 class TestStoreAndRetrieve:

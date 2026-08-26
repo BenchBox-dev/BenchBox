@@ -196,6 +196,7 @@ class ResultDatabase:
         """Get a database connection with row factory."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
         try:
             yield conn
         finally:
@@ -680,6 +681,67 @@ class ResultDatabase:
             if deleted:
                 logger.info(f"Deleted result {execution_id}")
             return deleted
+
+    def count_orphaned_queries(self) -> int:
+        """Count query rows whose parent result no longer exists."""
+        with self._connection() as conn:
+            row = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM queries AS q
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM results AS r WHERE r.id = q.result_id
+                )
+                """
+            ).fetchone()
+            return int(row[0])
+
+    def repair_orphaned_queries(self, *, dry_run: bool = True) -> int:
+        """Back up and remove orphaned query rows when explicitly requested.
+
+        Args:
+            dry_run: Return the orphan count without changing the database.
+
+        Returns:
+            Number of orphaned query rows found (and removed when ``dry_run`` is
+            false). A timestamped backup table is created before deletion.
+        """
+        with self._connection() as conn:
+            row = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM queries AS q
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM results AS r WHERE r.id = q.result_id
+                )
+                """
+            ).fetchone()
+            orphan_count = int(row[0])
+            if dry_run or orphan_count == 0:
+                return orphan_count
+
+            backup_table = f"queries_orphan_backup_{datetime.now(timezone.utc):%Y%m%d%H%M%S%f}"
+            conn.execute(
+                f"""
+                CREATE TABLE {backup_table} AS
+                SELECT q.*
+                FROM queries AS q
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM results AS r WHERE r.id = q.result_id
+                )
+                """
+            )
+            conn.execute(
+                """
+                DELETE FROM queries
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM results AS r WHERE r.id = queries.result_id
+                )
+                """
+            )
+            conn.commit()
+            logger.warning("Removed %d orphaned query rows; backup table: %s", orphan_count, backup_table)
+            return orphan_count
 
     def calculate_rankings(
         self,
