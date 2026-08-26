@@ -16,6 +16,10 @@
 # docs/operations/ci-local-parity.md for the parity invariant this guard is
 # part of.
 #
+# The consolidated `.agents/skills` path is checked explicitly even though the
+# broader `.agents/` rule also ignores it, so a force-added mirror is visible
+# to this guard rather than hidden by the parent rule.
+#
 # Run locally:
 #   scripts/check_untracked_skill_mirrors.sh
 set -eu
