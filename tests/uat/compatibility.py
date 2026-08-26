@@ -118,28 +118,21 @@ _TIMESCALEDB_DATAVAULT_RUNTIME_ENVELOPE_REASON = (
 
 _SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_REASON = (
     "SQLite TPC-DS OBT SF1 cannot meet the 1200s release-gate cell contract on the native UAT host. "
-    "The 2026-08-25 bounded probe used the canonical ParquetFileHandler against the 5,041,336-row, "
-    "518-column OBT artifact: it inserted 1,325,000 rows in 304.9s without committing, with 4,345 "
-    "rows/s overall and 2,350 rows/s in the final 25,000-row interval. The last 625,000-row linear "
-    "projection is 1,391s for loading alone, before validation and power queries. The source table has "
-    "no indexes, primary keys, or foreign keys, and the second SQLite connection saw zero rows until "
-    "commit; this is the SQLite bind/WAL growth path, not schema/indexing or SQL compatibility. Keep "
-    "the cell pruned until a bounded atomic SQLite bulk-loader change has measured evidence within the "
-    "declared budget."
-)
-_SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_EVIDENCE = (
-    "PR #1904 2026-08-25 bounded native probe; original killed-run evidence under "
-    "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs; docs/operations/uat-framework.md"
+    "The 2026-08-25 probe loaded 1,325,000 of 5,041,336 rows from the 518-column artifact in 304.9s, "
+    "projecting 1,391s for loading alone. This is the SQLite bind/WAL path, not an index or SQL-compatibility "
+    "issue. Keep it pruned until a bounded atomic bulk loader fits the declared budget."
 )
 
 _SQLITE_TPCDS_RUNTIME_ENVELOPE_REASON = (
     "SQLite TPC-DS missed the 1200s release-gate contract at all three scales on 2026-08-25. "
-    "Bounded SF0.01 probes found query 13 and query 48 still running after 300s each. Eleven generated "
-    "queries also require unsupported ROLLUP semantics; four require GROUPING. Keep the cells pruned "
-    "until bounded query rewrites or planner improvements fit the declared budget."
+    "At SF0.01, query 13 and query 48 exceeded 300s; eleven queries also need unsupported ROLLUP semantics. "
+    "Keep the cells pruned until bounded query rewrites or planner improvements fit the budget."
 )
-_SQLITE_TPCDS_RUNTIME_ENVELOPE_EVIDENCE = (
-    "docs/operations/uat-framework.md: SHA-bound SQLite TPC-DS evidence (2026-08-25)"
+
+_DATAFUSION_DATAVAULT_RUNTIME_ENVELOPE_REASON = (
+    "DataFusion DataVault query 18 at SF1 is outside the 16 GiB release-host envelope measured on 2026-08-25. "
+    "Stage 1 passed SF0.01 and SF0.1, but SF1 was killed; with PR #1914 spilling active, a 12 GiB pool "
+    "was also host-killed. Diagnostic runs retain every scale."
 )
 
 _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES = (
@@ -155,13 +148,15 @@ _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES = (
 )
 
 _RELEASE_GATE_RUNTIME_ENVELOPES = _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES | {
+    ("datafusion", "datavault"): _DATAFUSION_DATAVAULT_RUNTIME_ENVELOPE_REASON,
     ("sqlite", "tpcds"): _SQLITE_TPCDS_RUNTIME_ENVELOPE_REASON,
     ("sqlite", "tpcds_obt"): _SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_REASON,
 }
 
 _RELEASE_GATE_RUNTIME_ENVELOPE_EVIDENCE = {
-    ("sqlite", "tpcds"): _SQLITE_TPCDS_RUNTIME_ENVELOPE_EVIDENCE,
-    ("sqlite", "tpcds_obt"): _SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_EVIDENCE,
+    ("datafusion", "datavault"): "docs/operations/uat-framework.md: DataVault evidence (2026-08-25)",
+    ("sqlite", "tpcds"): "docs/operations/uat-framework.md: SQLite TPC-DS evidence (2026-08-25)",
+    ("sqlite", "tpcds_obt"): "PR #1904; docs/operations/uat-framework.md: SQLite OBT evidence (2026-08-25)",
 }
 
 
