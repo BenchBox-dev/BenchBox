@@ -1315,7 +1315,7 @@
       "stdev_ms": 31.3,
       "total_ms": 2410
     },
-    "validation": "partial"
+    "validation": "not_run"
   },
   "tables": {
     "airlines": {

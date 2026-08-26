@@ -1445,7 +1445,7 @@
       "min_ms": 0,
       "total_ms": 0
     },
-    "validation": "partial"
+    "validation": "not_run"
   },
   "tables": {
     "hub_customer": {

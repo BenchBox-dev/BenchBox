@@ -48,6 +48,8 @@ _DATAFRAME_OPTION_CASES = [
     ("modin-df", "engine", "dask", "dask"),
     ("cudf-df", "device_id", "1", 1),
     ("dask-df", "n_workers", "8", 8),
+    ("pyspark-df", "driver_memory", "8g", "8g"),
+    ("pyspark-df", "shuffle_partitions", "8", 8),
 ]
 
 

@@ -827,6 +827,8 @@ sqlite|check_same_thread|Enforce that connections are used on the creating threa
 spark|adaptive_enabled|Enable or disable Spark Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
 spark|java_home|Path to the JDK Spark should run under|{}
 spark|driver_memory|Spark driver JVM heap, e.g. 4g or 8g (default 4g)|{}
+pyspark|driver_memory|PySpark driver JVM heap, e.g. 4g or 8g (default 4g)|{}
+pyspark|shuffle_partitions|Number of PySpark shuffle partitions|{'parser': 'int'}
 athena|aws_profile|Named AWS CLI profile to authenticate with|{}
 athena|s3_bucket|S3 bucket for query results and data staging|{}
 athena|s3_staging_dir|S3 URI Athena writes query results to (e.g., s3://bucket/path)|{}

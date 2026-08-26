@@ -548,6 +548,9 @@ def test_exporter_omits_direct_total_for_unavailable_normalized_cost(tmp_path):
     assert payload["normalized_cost"]["cost_status"] == "unavailable"
     assert payload["normalized_cost"]["normalized_cost_usd"] is None
     assert "total_usd" not in payload.get("cost", {})
+    # The synthetic result has a validation claim; provide matching phase evidence
+    # before exercising public-submission admission.
+    payload["phases"]["validation"]["status"] = "PASSED"
     _assert_submission_valid(payload)
 
 
@@ -557,6 +560,9 @@ def test_exporter_preserves_local_zero_total_with_normalized_provenance(tmp_path
     assert payload["normalized_cost"]["cost_status"] == "not_applicable_local"
     assert payload["normalized_cost"]["normalized_cost_usd"] == "0"
     assert payload["cost"]["total_usd"] == 0
+    # The synthetic result has a validation claim; provide matching phase evidence
+    # before exercising public-submission admission.
+    payload["phases"]["validation"]["status"] = "PASSED"
     _assert_submission_valid(payload)
 
 

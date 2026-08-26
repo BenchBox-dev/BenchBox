@@ -2007,7 +2007,7 @@
       "stdev_ms": 16.8,
       "total_ms": 2543
     },
-    "validation": "partial"
+    "validation": "not_run"
   },
   "tables": {
     "hits": {
