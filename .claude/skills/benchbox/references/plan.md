@@ -6,7 +6,7 @@ Use for benchmark/platform features that need research, implementation, and veri
 
 1. Research current benchmark/platform patterns, tests, docs, and TODOs.
 2. State goal, scope, constraints, public interfaces, and success criteria.
-3. Apply `SHARED/change-framework/SKILL.md` Section 1 before source-code edits,
+3. Apply `shared-change-framework/SKILL.md` Section 1 before source-code edits,
    then slice vertically, implement one working path, test, verify, commit, and
    submit the approved plan as a draft PR.
 4. Preserve phase propagation, validation, timing policy, artifact paths, and lazy optional deps.

@@ -1,7 +1,7 @@
 # Adversarial Review
 
 Review completed work skeptically and use evidence for every conclusion.
-This is read-only under `SHARED/review-protocol/SKILL.md`
+This is read-only under `shared-review-protocol/SKILL.md`
 [REVIEW-AUTH-001]. Report findings without editing files, closing tracker
 items, committing, or publishing. A later user message must authorize fixes.
 

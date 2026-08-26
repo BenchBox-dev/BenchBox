@@ -86,9 +86,11 @@ COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json")
 SUBMISSION_MANIFEST_FILENAME = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 PUBLIC_CLEAN_VALIDATION_STATUS = "passed"
-# Maintainer seed corpus includes partial cohorts by design. Trusted mirror
-# validation may accept these; community submissions may not.
-PUBLIC_MIRROR_ALLOWED_VALIDATION_STATUSES = frozenset({"passed", "partial"})
+# Maintainer seed corpus includes partial and historically unvalidated cohorts
+# by design. Trusted mirror validation may retain these explicit non-clean
+# states; community submissions may not. Explorer ranking still excludes every
+# non-clean state, including ``not_run``.
+PUBLIC_MIRROR_ALLOWED_VALIDATION_STATUSES = frozenset({"passed", "partial", "not_run"})
 PUBLIC_NON_CLEAN_TRANSLATION_STATUSES = {"fallback", "failed"}
 CLI_REFUSED_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
 
@@ -679,6 +681,22 @@ def _validate_execution_consistency(data: dict[str, Any], vr: ValidationResult) 
                     )
 
 
+def _validate_validation_phase_consistency(data: dict[str, Any], vr: ValidationResult) -> None:
+    """Reject validation claims with no corresponding validation-phase evidence."""
+    summary = data.get("summary")
+    if not isinstance(summary, dict):
+        return
+    summary_status = _normalize_status(summary.get("validation"))
+    if summary_status not in {"passed", "partial"}:
+        return
+
+    phases = data.get("phases")
+    validation_phase = phases.get("validation") if isinstance(phases, dict) else None
+    phase_status = _normalize_status(validation_phase) if isinstance(validation_phase, dict) else "unknown"
+    if phase_status in {"not_run", "not_validated", "unknown"}:
+        vr.error(f"summary.validation={summary_status!r} contradicts phases.validation.status={phase_status!r}")
+
+
 def _validate_bundle(
     data: dict,
     vr: ValidationResult,
@@ -706,6 +724,7 @@ def _validate_bundle(
     _validate_public_cost_section(data, vr)
     _validate_queries_section(data.get("queries", []), data.get("version"), vr)
     _validate_execution_consistency(data, vr)
+    _validate_validation_phase_consistency(data, vr)
 
 
 def _hash_file(file_path: Path) -> str:
@@ -972,9 +991,10 @@ def validate_bundles(
     then inherit the ``maintainer-run`` trust label (and ranking eligibility).
 
     When ``allow_partial_validation`` is True, ``summary.validation`` may be
-    ``passed`` or ``partial``. That is for the trusted maintainer mirror path
-    only: the seed corpus intentionally includes partial cohorts. Community
-    submissions must leave the flag off so partial remains refused.
+    ``passed``, ``partial``, or the explicit ``not_run`` state. That is for
+    the trusted maintainer mirror path only: the seed corpus intentionally
+    retains partial and legacy unvalidated evidence. Community submissions
+    must leave the flag off so every non-clean status remains refused.
     """
     results = []
     for bundle_path in paths:

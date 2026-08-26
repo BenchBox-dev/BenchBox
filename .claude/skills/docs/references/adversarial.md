@@ -1,6 +1,6 @@
 # Adversarial Documentation Review
 
-Apply `SHARED/review-protocol/references/adversarial-review.md` with the
+Apply `shared-review-protocol/references/adversarial-review.md` with the
 requested scope. This file adds the documentation-specific rubric.
 
 Use the configured persona, or `new-user`, `developer`, `ops`, or

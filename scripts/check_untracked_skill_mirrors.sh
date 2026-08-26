@@ -1,8 +1,8 @@
 #!/bin/sh
 # Untracked skill-mirror drift guard (cloud parity).
 #
-# The codex/gemini/antigravity mirrors and the curated-out `blog` skill are
-# deliberately untracked: cloud is Claude-only and `blog` is published
+# The shared agents mirror and the curated-out `blog` skill are deliberately
+# untracked: cloud is Claude-only and `blog` is published
 # separately. `skill-sync verify` only inspects the tracked `claude` target
 # (it skips untracked targets and `ignore`d paths), so it cannot catch these
 # being force-added. Fail the build if any become git-tracked.
@@ -16,11 +16,16 @@
 # docs/operations/ci-local-parity.md for the parity invariant this guard is
 # part of.
 #
+# The consolidated `.agents/skills` path is checked explicitly even though the
+# broader `.agents/` rule also ignores it, so a force-added mirror is visible
+# to this guard rather than hidden by the parent rule.
+#
 # Run locally:
 #   scripts/check_untracked_skill_mirrors.sh
 set -eu
 
 tracked=$(git ls-files -- \
+  '.agents/skills' \
   '.codex/skills' '.codex/shared-skills' '.codex/shared-skills.lock.json' \
   '.gemini/skills' '.antigravity/skills' \
   '.claude/skills/blog')

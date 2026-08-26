@@ -12,7 +12,7 @@ Compare behavioral contracts, not formatting.
 
 ## Compare
 
-Use the Compare scoring in `SHARED/investigation-framework/SKILL.md`. Mark a
+Use the Compare scoring in `shared-investigation-framework/SKILL.md`. Mark a
 change as breaking if it alters a public contract, error behavior, persistence
 format, security property, or required dependency. Missing relationships or
 registration paths are high risk.

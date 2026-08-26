@@ -47,7 +47,7 @@ the design does not silently contradict a settled decision:
    cross-session consistency contract and are landed later through the
    separately authorized `todo finding sync` step, never queued into the primary.
 2. **`docs/agent/review-protocol.md` `[REVIEW-CAPTURE-001]`**
-   (with its `SHARED/review-protocol` skill mirror; unabridged rationale in
+   (with its `shared-review-protocol` skill mirror; unabridged rationale in
    the historical `docs/agent/review-protocol-legacy.md` §4) names the
    append-only draft file under
    `~/.benchbox/finding-drafts/` as the **sole** in-review finding write.

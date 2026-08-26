@@ -5698,7 +5698,7 @@
       "stdev_ms": 1.8,
       "total_ms": 888
     },
-    "validation": "partial"
+    "validation": "not_run"
   },
   "tables": {
     "customer": {

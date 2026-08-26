@@ -412,6 +412,8 @@ class BenchmarkExecutionMixin:
                     seed=options_map.get("seed"),
                 )
                 builder.set_validation_status(validation_summary.status, validation_summary.details)
+                if validation_summary.details.get("checked") or validation_summary.details.get("errors"):
+                    builder.set_phase_status("validation", validation_summary.status)
 
                 # Add query results to builder
                 for qr in query_results:

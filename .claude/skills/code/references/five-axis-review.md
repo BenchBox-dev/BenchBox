@@ -1,7 +1,7 @@
 # Five-Axis Code Review Reference
 
 Evaluate code on five axes and classify findings by severity. This file adds a
-code rubric only; `SHARED/review-protocol/SKILL.md` controls authorization,
+code rubric only; `shared-review-protocol/SKILL.md` controls authorization,
 planning depth, defect handling, capture, and remediation.
 
 ## Router-specific checks
@@ -33,7 +33,7 @@ planning depth, defect handling, capture, and remediation.
 - Does each abstraction justify its complexity?
 - Can dead code, compatibility shims, or stale comments be removed?
 
-**Deletion checks:** Apply `SHARED/change-framework/SKILL.md` Section 1.
+**Deletion checks:** Apply `shared-change-framework/SKILL.md` Section 1.
 - For each finding, report `file:line`, what to cut, and its replacement.
 
 ### 3. Architecture

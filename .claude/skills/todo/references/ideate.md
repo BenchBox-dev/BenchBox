@@ -9,5 +9,5 @@ Use this guide to refine a rough idea.
 5. Recommend a minimal viable scope, what you will not do, and open questions.
 
 Before recommending, apply Layers 2 and 3 of
-`SHARED/review-protocol/SKILL.md`. Record any reframe and save only after the
+`shared-review-protocol/SKILL.md`. Record any reframe and save only after the
 user confirms.

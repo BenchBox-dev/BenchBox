@@ -321,7 +321,7 @@
       "stdev_ms": 48.6,
       "total_ms": 2381
     },
-    "validation": "passed"
+    "validation": "not_run"
   },
   "tables": {
     "tpcds_sales_returns_obt": {

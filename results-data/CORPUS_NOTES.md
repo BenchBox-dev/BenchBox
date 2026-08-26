@@ -61,6 +61,20 @@ DataFrame results additionally require real validation evidence; execution
 success alone is not a validation pass. NYC Taxi and TSBS DevOps regeneration
 also waits for their native temporal-literal fix.
 
+## Legacy validation-claim normalization (2026-08-25)
+
+The 136-bundle develop corpus contained 52 legacy bundles whose
+`phases.validation.status` was `NOT_RUN` while `summary.validation` claimed
+`passed` (23 bundles) or `partial` (29 bundles). These are historical claims,
+not rerun evidence. Their summary status is now `not_run`; their query timing
+and failure records remain unchanged.
+
+This preserves truthful partial measurements as non-ranking capability
+evidence. It does not promote failed queries or infer validation results. A
+future rerun may replace the `not_run` claim only when the validation phase
+records actual evidence. Submission admission also rejects a `passed` or
+`partial` summary claim paired with an unrun validation phase.
+
 ## Public-path single-pass status (2026-08-05)
 
 Verified with `results_explorer_corpus_migrate.py` dry-run: 0/207 bundles changed under the current public anonymization pass. The `test_rederiv_fresh_public_pass_equals_curated_for_all_fields` gate pins the fixed point.
