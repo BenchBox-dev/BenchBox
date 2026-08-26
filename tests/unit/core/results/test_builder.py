@@ -195,6 +195,20 @@ class TestResultBuilder:
         assert result.failed_queries == 1
         assert result.validation_status == "PARTIAL"
 
+    @pytest.mark.parametrize("status", ["ERROR", "TIMEOUT", "SKIPPED", "UNKNOWN"])
+    def test_build_counts_every_non_success_status_as_failed(self, status: str) -> None:
+        """Non-success statuses must not disappear from aggregate accounting."""
+        builder = self.create_builder()
+        builder.add_query_result(self.create_query_result("1", 1.0, 100, "SUCCESS"))
+        builder.add_query_result(self.create_query_result("2", 0.0, 0, status))
+
+        result = builder.build()
+
+        assert result.successful_queries == 1
+        assert result.failed_queries == 1
+        assert result.validation_status == "PARTIAL"
+        assert result.power_at_size is None
+
     def test_build_calculates_tpc_metrics(self) -> None:
         """Test that TPC metrics are calculated."""
         builder = self.create_builder(scale_factor=1.0)
