@@ -140,6 +140,20 @@ def test_format_html_comparison_escapes_all_result_derived_labels() -> None:
     assert "&quot;&gt;&lt;img src=x onerror=alert(1)&gt;" in html
 
 
+def test_format_markdown_comparison_returns_markdown(tmp_path: Path) -> None:
+    comparison = _comparison_payload()
+    baseline = SimpleNamespace(benchmark_name="tpch", platform="duckdb", scale_factor=1)
+    current = SimpleNamespace(benchmark_name="tpch", platform="duckdb", scale_factor=1)
+    output = tmp_path / "comparison.md"
+
+    mod._output_file_comparison(comparison, baseline, current, "markdown", str(output), show_all_queries=True)
+
+    content = output.read_text(encoding="utf-8")
+    assert content.startswith("# Benchmark Comparison Report")
+    assert "| Metric | Value |" in content
+    assert "<!DOCTYPE html>" not in content
+
+
 def test_discover_metadata_and_table_render(tmp_path: Path) -> None:
     good = tmp_path / "good.json"
     bad = tmp_path / "bad.json"

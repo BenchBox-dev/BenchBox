@@ -1288,7 +1288,7 @@ def _output_file_comparison(
         "text": lambda: _format_text_comparison(comparison, baseline, current, show_all_queries),
         "json": lambda: json.dumps(comparison, indent=2),
         "html": lambda: _format_html_comparison(comparison, baseline, current),
-        "markdown": lambda: _format_html_comparison(comparison, baseline, current),
+        "markdown": lambda: _format_markdown_comparison(comparison, baseline, current, show_all_queries),
     }
 
     formatter = format_dispatch.get(output_format)
@@ -1470,6 +1470,124 @@ def _check_regression(comparison: dict[str, Any], threshold: float) -> bool:
             return True
 
     return False
+
+
+def _markdown_cell(value: Any) -> str:
+    """Make arbitrary comparison data safe for a Markdown table cell."""
+    return str(value).replace("\\", "\\\\").replace("|", "\\|").replace("\n", " ")
+
+
+def _format_markdown_comparison(comparison: dict[str, Any], baseline: Any, current: Any, show_all: bool) -> str:
+    """Format a file comparison as a Markdown report."""
+    lines = [
+        "# Benchmark Comparison Report",
+        "",
+        f"- **Baseline:** {_markdown_cell(comparison['baseline_file'])}",
+        f"- **Current:** {_markdown_cell(comparison['current_file'])}",
+        f"- **Benchmark:** {_markdown_cell(baseline.benchmark_name)}",
+        f"- **Platform:** {_markdown_cell(baseline.platform)}",
+        f"- **Scale:** {_markdown_cell(baseline.scale_factor)}",
+        "",
+    ]
+
+    summary = comparison.get("summary", {})
+    if summary:
+        lines.extend(
+            [
+                "## Summary",
+                "",
+                "| Metric | Value |",
+                "| --- | ---: |",
+                f"| Total Queries | {_markdown_cell(summary.get('total_queries_compared', 0))} |",
+                f"| Improved | {_markdown_cell(summary.get('improved_queries', 0))} |",
+                f"| Regressed | {_markdown_cell(summary.get('regressed_queries', 0))} |",
+                f"| Unchanged | {_markdown_cell(summary.get('unchanged_queries', 0))} |",
+                f"| Assessment | {_markdown_cell(summary.get('overall_assessment', 'unknown'))} |",
+                "",
+            ]
+        )
+
+    performance_changes = comparison.get("performance_changes", {})
+    if performance_changes:
+        lines.extend(
+            ["## Performance Metrics", "", "| Metric | Baseline | Current | Change |", "| --- | ---: | ---: | ---: |"]
+        )
+        for metric, values in performance_changes.items():
+            if not isinstance(values, dict):
+                continue
+            lines.append(
+                f"| {_markdown_cell(str(metric).replace('_', ' ').title())} | "
+                f"{values.get('baseline', 0):.3f} | {values.get('current', 0):.3f} | "
+                f"{values.get('change_percent', 0):+.2f}% |"
+            )
+        lines.append("")
+
+    query_comparisons = comparison.get("query_comparisons", [])
+    if query_comparisons:
+        lines.extend(
+            [
+                "## Query Comparison",
+                "",
+                "| Query | Baseline (ms) | Current (ms) | Change | Severity |",
+                "| --- | ---: | ---: | ---: | --- |",
+            ]
+        )
+        for query in sorted(query_comparisons, key=lambda item: item.get("change_percent", 0), reverse=True):
+            change_pct = query["change_percent"]
+            if not show_all and abs(change_pct) < 1.0:
+                continue
+            severity, change_str = _query_severity_and_change(query["improved"], change_pct)
+            lines.append(
+                f"| {_markdown_cell(query['query_id'])} | {query['baseline_time_ms']:.2f} | "
+                f"{query['current_time_ms']:.2f} | {change_str} | {_markdown_cell(severity)} |"
+            )
+        lines.append("")
+
+    plan_comparison = comparison.get("plan_comparison")
+    if plan_comparison:
+        lines.extend(
+            [
+                "## Query Plan Analysis",
+                "",
+                f"- Plans compared: {_markdown_cell(plan_comparison.get('plans_compared', 0))}",
+                f"- Unchanged: {_markdown_cell(plan_comparison.get('plans_unchanged', 0))}",
+                f"- Changed: {_markdown_cell(plan_comparison.get('plans_changed', 0))}",
+                "",
+            ]
+        )
+        query_plans = plan_comparison.get("query_plans", [])
+        if query_plans:
+            lines.extend(
+                [
+                    "| Query | Similarity | Type Δ | Prop Δ | Perf Δ | Status |",
+                    "| --- | ---: | ---: | ---: | ---: | --- |",
+                ]
+            )
+            for plan in sorted(query_plans, key=lambda item: item.get("similarity", 1.0)):
+                status = _plan_status_label(
+                    plan.get("plans_identical", False),
+                    plan.get("similarity", 1.0),
+                    plan.get("is_regression", False),
+                )
+                lines.append(
+                    f"| {_markdown_cell(plan.get('query_id', '?'))} | {plan.get('similarity', 1.0):.1%} | "
+                    f"{plan.get('type_mismatches', 0)} | {plan.get('property_mismatches', 0)} | "
+                    f"{plan.get('perf_change_pct', 0.0):+.1f}% | {_markdown_cell(status)} |"
+                )
+            lines.append("")
+
+        regressions = plan_comparison.get("regressions", [])
+        if regressions:
+            lines.extend(["### Plan-Correlated Regressions", ""])
+            for regression in regressions:
+                lines.append(
+                    f"- **{_markdown_cell(regression.get('query_id', '?'))}**: "
+                    f"plan similarity {regression.get('similarity', 0.0):.0%}, "
+                    f"performance {regression.get('perf_change_pct', 0.0):+.1f}%"
+                )
+            lines.append("")
+
+    return "\n".join(lines)
 
 
 def _format_text_comparison(comparison: dict[str, Any], baseline: Any, current: Any, show_all: bool) -> str:
