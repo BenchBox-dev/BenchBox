@@ -356,6 +356,47 @@ def test_enumerate_prunes_sqlite_tpcds_obt_release_gate_scale_ladder():
         assert "PR #1904" in cell.evidence
 
 
+def test_enumerate_prunes_sqlite_tpcds_release_gate_scale_ladder():
+    raw = {
+        "platforms": {"include": ["sqlite"]},
+        "benchmarks": {"include": ["tpcds"]},
+        "compatibility": {"release_gate_runtime_envelopes": True},
+        "scales": {"rungs": [0.01, 0.1, 1.0]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
+
+    assert result.cells == ()
+    assert [(cell.platform, cell.benchmark, cell.scale) for cell in result.compatibility_pruned] == [
+        ("sqlite", "tpcds", 0.01),
+        ("sqlite", "tpcds", 0.1),
+        ("sqlite", "tpcds", 1.0),
+    ]
+    for cell in result.compatibility_pruned:
+        assert cell.rule_id == "uat.compat.sqlite.tpcds.release_gate_runtime_envelope"
+        assert cell.status == "blocked"
+        assert "1200s" in cell.reason
+        assert "query 13" in cell.reason
+        assert "2026-08-25" in cell.evidence
+
+
+def test_enumerate_keeps_sqlite_tpcds_without_release_gate_runtime_envelopes():
+    raw = {
+        "platforms": {"include": ["sqlite"]},
+        "benchmarks": {"include": ["tpcds"]},
+        "scales": {"rungs": [0.01, 0.1, 1.0]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
+
+    assert [(cell.platform, cell.benchmark, cell.scale) for cell in result.cells] == [
+        ("sqlite", "tpcds", 0.01),
+        ("sqlite", "tpcds", 0.1),
+        ("sqlite", "tpcds", 1.0),
+    ]
+    assert result.compatibility_pruned == ()
+
+
 def test_enumerate_keeps_sqlite_tpcds_obt_without_release_gate_runtime_envelopes():
     raw = {
         "platforms": {"include": ["sqlite"]},

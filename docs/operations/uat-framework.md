@@ -612,8 +612,65 @@ cell exclusions in the same compatibility-pruning stream. It does not change
 the benchmark registry's declared scale ladder or affect ordinary diagnostic
 runs.
 
-As of 2026-08-25, SQLite `tpcds_obt` is excluded from the 1200-second native
-release-gate cell. The canonical SF1 artifact contains 5,041,336 rows and 518
+As of 2026-08-25, SQLite `tpcds` and `tpcds_obt` are excluded from the
+1200-second native release-gate cell.
+
+For canonical TPC-DS, the native UAT sweep timed out at about 1200 seconds at
+each requested scale: 0.01, 0.1, and 1.0. A bounded SF0.01 replay processed
+queries 2 through 12; successful queries completed in at most 0.60 seconds and
+query 5 failed immediately on unsupported `ROLLUP`, then query 13 ran for more
+than 300 seconds without completing. A second bounded replay processed queries
+14 through 47 quickly apart from immediate SQL-compatibility failures, then
+query 48 also ran for more than 300 seconds without completing. The generated
+SQLite stream also contains eleven queries that require unsupported `ROLLUP`
+semantics, four of which additionally require `GROUPING`. The release gate
+therefore prunes the complete platform/benchmark scale ladder under
+`uat.compat.sqlite.tpcds.release_gate_runtime_envelope`; diagnostic sweeps still
+enumerate and run it.
+
+The durable evidence record is SHA-bound below. The UAT output root was
+`/Users/joe/Developer/benchmark_runs`; its run logs are in the `logs/`
+subdirectory. The bounded-probe logs were temporary local files, so their
+digests and replay commands are recorded here rather than treating `/tmp` as
+durable storage.
+
+| Probe | Source commit | Result | Artifact SHA-256 |
+| --- | --- | --- | --- |
+| Stage 1 native UAT | `1d86c31845e1293d2e6bf8adeeab6da2ce4e433a` | SQLite TPC-DS SF0.01, SF0.1, and SF1 each timed out after 1200.2s | `cells.jsonl`: `b82e3cd019515bd4be57e0f53cf45a9ff2546819599bf0844da8fdbfe5b44cce` |
+| Q2-Q25 bounded replay | `20a2dc36b21607a7d1242bc5c456c4011a3df30d` | Q13 still running at 300s cutoff | `40116787be6d5e493f1f20478b467d65b25ff4dfd797fdf02c52aab2f54141e7` |
+| Q14-Q50 bounded replay | `20a2dc36b21607a7d1242bc5c456c4011a3df30d` | Q48 still running at 300s cutoff | `638854cb5367739e0935f7743550be123fe8d0db124fbeec17ae95c685953fae` |
+
+Run the release-gate reproduction in a clean linked worktree at
+`1d86c31845e1293d2e6bf8adeeab6da2ce4e433a`:
+
+```bash
+BENCHBOX_OUTPUT_DIR="$HOME/Developer/benchmark_runs" \
+  make uat-sweep CONFIG=tests/uat/configs/release-gate-01-native-dataframe.yaml
+```
+
+Run the bounded query reproductions in a clean linked worktree at
+`20a2dc36b21607a7d1242bc5c456c4011a3df30d`. They use the same output
+root, scale, one iteration, and five-minute alarm:
+
+```bash
+BENCHBOX_OUTPUT_DIR="$HOME/Developer/benchmark_runs" \
+  /usr/bin/time -l perl -e 'alarm shift; exec @ARGV' 300 \
+  uv run --no-sync -- benchbox run --platform sqlite --benchmark tpcds \
+  --scale 0.01 \
+  --queries 2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25 \
+  --iterations 1 -vv --non-interactive --phases power \
+  --output "$HOME/Developer/benchmark_runs/datagen"
+
+BENCHBOX_OUTPUT_DIR="$HOME/Developer/benchmark_runs" \
+  /usr/bin/time -l perl -e 'alarm shift; exec @ARGV' 300 \
+  uv run --no-sync -- benchbox run --platform sqlite --benchmark tpcds \
+  --scale 0.01 \
+  --queries 14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50 \
+  --iterations 1 -vv --non-interactive \
+  --phases power --output "$HOME/Developer/benchmark_runs/datagen"
+```
+
+For TPC-DS OBT, the canonical SF1 artifact contains 5,041,336 rows and 518
 columns. A bounded native probe through `ParquetFileHandler` inserted 1,325,000
 rows in 304.9 seconds, with 4,345 rows/s overall and 2,350 rows/s in the final
 25,000-row interval. A projection from the final 625,000 rows is 1,391 seconds
