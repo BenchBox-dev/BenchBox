@@ -66,6 +66,30 @@ def _api_json(url: str, token: str) -> dict[str, Any]:
         return json.loads(response.read().decode("utf-8"))
 
 
+class _SafeArtifactRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Prevent GitHub API credentials from following artifact redirects."""
+
+    @staticmethod
+    def _origin(url: str) -> tuple[str, str, int | None]:
+        parsed = urllib.parse.urlsplit(url)
+        return (parsed.scheme.lower(), (parsed.hostname or "").lower(), parsed.port)
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if redirected is not None and self._origin(req.full_url) != self._origin(redirected.full_url):
+            for header in ("Authorization", "Cookie", "Proxy-Authorization"):
+                redirected.remove_header(header)
+        return redirected
+
+
 def _api_bytes(url: str, token: str) -> bytes:
     request = urllib.request.Request(
         url,
@@ -75,7 +99,8 @@ def _api_bytes(url: str, token: str) -> bytes:
             "X-GitHub-Api-Version": "2022-11-28",
         },
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
+    opener = urllib.request.build_opener(_SafeArtifactRedirectHandler())
+    with opener.open(request, timeout=30) as response:
         return response.read()
 
 
