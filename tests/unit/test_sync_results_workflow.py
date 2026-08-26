@@ -17,6 +17,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "sync-results-data-to-published.yml"
+DRIFT_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "corpus-drift-check.yml"
 BUNDLES_DIR = "results-data/bundles"
 
 
@@ -220,3 +221,15 @@ def test_build_mirror_carries_shared_query_status_policy() -> None:
     assert '"benchbox/core/results/query_status.py"' in workflow
     build = workflow.split("name: Build mirror branch", 1)[1].split("name: ", 1)[0]
     assert "'benchbox/core/results/query_status.py'" in build
+
+
+def test_drift_check_ignores_derived_inventory_difference() -> None:
+    """A union mirror's archive-only bundles necessarily change its inventory."""
+    workflow = yaml.safe_load(DRIFT_WORKFLOW_PATH.read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["corpus-drift"]["steps"]
+    compare = next(step for step in steps if step.get("name") == "Compare the mirrored corpus paths (directional)")
+    run = compare["run"]
+    path_specs = run.split("PATHSPECS=(", 1)[1].split(")", 1)[0]
+    assert "results-data/bundles" in path_specs
+    assert "results-data/corpus-inventory.json" not in path_specs
+    assert "each branch regenerates its own" in run.lower()
