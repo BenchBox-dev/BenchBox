@@ -1,16 +1,16 @@
 {
   "version": 1,
-  "lockedAt": "2026-08-26T14:37:57.002Z",
+  "lockedAt": "2026-08-27T17:32:29.861Z",
   "skills": {
     "blog": {
       "source": {
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
+        "ref": "104150cffcb2fbfc610c1993803912f42a9b25ed",
         "subdir": "skills",
-        "revision": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
-        "fetchedAt": "2026-08-26T14:21:09.060Z"
+        "revision": "104150cffcb2fbfc610c1993803912f42a9b25ed",
+        "fetchedAt": "2026-08-27T17:31:43.733Z"
       },
       "installMode": "mirror",
       "files": {
@@ -61,10 +61,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
+        "ref": "104150cffcb2fbfc610c1993803912f42a9b25ed",
         "subdir": "skills",
-        "revision": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
-        "fetchedAt": "2026-08-26T14:21:09.838Z"
+        "revision": "104150cffcb2fbfc610c1993803912f42a9b25ed",
+        "fetchedAt": "2026-08-27T17:31:44.614Z"
       },
       "installMode": "mirror",
       "files": {
@@ -77,8 +77,8 @@
           "size": 785
         },
         "references/five-axis-review.md": {
-          "sha256": "6bfd5918208056365a313316b67e6966d3483916ed6666eaf50d08483190c83b",
-          "size": 5045
+          "sha256": "f77aa52688d1b2309da9829261ef36e79e13604a79b398beac947eca2a369e49",
+          "size": 5283
         },
         "references/handoff.md": {
           "sha256": "37ecdbe8e88662d8bda26b8b87412081750ba1e23fb804a68e0803fe7cf7e8c2",
@@ -119,10 +119,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
+        "ref": "104150cffcb2fbfc610c1993803912f42a9b25ed",
         "subdir": "skills",
-        "revision": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
-        "fetchedAt": "2026-08-26T14:21:10.619Z"
+        "revision": "104150cffcb2fbfc610c1993803912f42a9b25ed",
+        "fetchedAt": "2026-08-27T17:31:45.461Z"
       },
       "installMode": "mirror",
       "files": {
@@ -165,15 +165,15 @@
         "type": "git",
         "name": "todo-context-efficiency",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
+        "ref": "77ab905fe66cc86a8d8a11fdc4b3500e28d8e0d0",
         "subdir": "skills",
-        "revision": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
-        "fetchedAt": "2026-08-26T14:37:48.685Z"
+        "revision": "77ab905fe66cc86a8d8a11fdc4b3500e28d8e0d0",
+        "fetchedAt": "2026-08-27T17:31:47.152Z"
       },
       "installMode": "mirror",
       "files": {
         "references/batch.md": {
-          "sha256": "fe178cbc2f64cca2764335e8f27f1d06878ff3e057e209334d939ac70750bcc2",
+          "sha256": "25a1a8ae5b9d70d4644a1ad87ff7b47f0d2426afcf532d2aa498195bd590a4ee",
           "size": 6430
         },
         "references/bootstrap.md": {
@@ -189,11 +189,11 @@
           "size": 1657
         },
         "references/ideate.md": {
-          "sha256": "8078255dd9835de869ccc33147f188db12ca8bfb21553766b11bf93eb3b2ab0d",
+          "sha256": "119d827f10d4978518265dbf37fafbe57ae5830518f25b083913ed25ff6a8f5e",
           "size": 419
         },
         "references/implement.md": {
-          "sha256": "8fdeecf8ed57cc4f5ba355604610baad7ab66801087b53b940efc3a6b0ed45c2",
+          "sha256": "5c3fa90df411bd52d82238e1734a4ea1d8aa2783b76d7071be73a54ff75cf5bd",
           "size": 1166
         },
         "references/prioritize.md": {
@@ -205,19 +205,19 @@
           "size": 1829
         },
         "references/review.md": {
-          "sha256": "7e50646a87a8f53fadacff14eff843562f67daa717d554b5cd88b465487e2533",
-          "size": 756
+          "sha256": "939b1e48cb66346f929d3d538362b252f0f00f689ca4299c64733c22f2621b0a",
+          "size": 347
         },
         "references/spec.md": {
-          "sha256": "53ec542be038fa52dc4f6e2728a21f6e4fe58b2da45573261ecf185f7422d234",
+          "sha256": "3f0e3bd1c1a061c399bdd75b51cdde2c90c9f9fbc3394a0d0aeff14258c12474",
           "size": 463
         },
         "SKILL.md": {
-          "sha256": "6376a93e53b1879fd052414fd5549a504cdb0d5d894335e83575894c2b0f0cad",
+          "sha256": "b2fae7c4bea44a0a6e9605f44ad480924ec0a20821e079a398585c5d1ed62589",
           "size": 3942
         },
         "skill.yaml": {
-          "sha256": "3889fddb52b746c118ba4aab8b83780e89642efd519f8bc708e030964c6440fd",
+          "sha256": "e2c0b40d9935492621e6d21ab216a6227f4bae8f3808ed004d995d0f1b5bbff3",
           "size": 213
         }
       }
@@ -227,10 +227,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
+        "ref": "104150cffcb2fbfc610c1993803912f42a9b25ed",
         "subdir": "skills",
-        "revision": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
-        "fetchedAt": "2026-08-26T14:21:12.847Z"
+        "revision": "104150cffcb2fbfc610c1993803912f42a9b25ed",
+        "fetchedAt": "2026-08-27T17:31:47.997Z"
       },
       "installMode": "mirror",
       "files": {
@@ -289,10 +289,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
+        "ref": "104150cffcb2fbfc610c1993803912f42a9b25ed",
         "subdir": "skills",
-        "revision": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
-        "fetchedAt": "2026-08-26T14:21:16.423Z"
+        "revision": "104150cffcb2fbfc610c1993803912f42a9b25ed",
+        "fetchedAt": "2026-08-27T17:31:53.452Z"
       },
       "installMode": "mirror",
       "files": {
@@ -326,7 +326,7 @@
         "ref": "6139085a35455fe90c8d6c94d7567e131a24db96",
         "subdir": "skills",
         "revision": "6139085a35455fe90c8d6c94d7567e131a24db96",
-        "fetchedAt": "2026-08-25T16:24:58.058Z"
+        "fetchedAt": "2026-08-27T17:31:52.344Z"
       },
       "installMode": "mirror",
       "files": {
@@ -349,10 +349,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
+        "ref": "104150cffcb2fbfc610c1993803912f42a9b25ed",
         "subdir": "skills",
-        "revision": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
-        "fetchedAt": "2026-08-26T14:21:11.358Z"
+        "revision": "104150cffcb2fbfc610c1993803912f42a9b25ed",
+        "fetchedAt": "2026-08-27T17:31:46.303Z"
       },
       "installMode": "mirror",
       "files": {
@@ -391,16 +391,16 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
+        "ref": "104150cffcb2fbfc610c1993803912f42a9b25ed",
         "subdir": "skills",
-        "revision": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
-        "fetchedAt": "2026-08-26T14:21:08.101Z"
+        "revision": "104150cffcb2fbfc610c1993803912f42a9b25ed",
+        "fetchedAt": "2026-08-27T17:31:42.907Z"
       },
       "installMode": "mirror",
       "files": {
         "SKILL.md": {
-          "sha256": "3c18182b8df2d6041ba20e8774e2b9381f8eea5a62af4949c69332b7ebb231c4",
-          "size": 10293
+          "sha256": "cd5bcbf1274cf385a277fc6ab1d89046e3833d7f27bb57b0a4841431742a1ec3",
+          "size": 12615
         },
         "skill.yaml": {
           "sha256": "6ceb8ac77a646a81d17370124ddbce8b931b5784c97a81f0027ba26354307763",
@@ -413,10 +413,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
+        "ref": "104150cffcb2fbfc610c1993803912f42a9b25ed",
         "subdir": "skills",
-        "revision": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
-        "fetchedAt": "2026-08-26T14:21:13.566Z"
+        "revision": "104150cffcb2fbfc610c1993803912f42a9b25ed",
+        "fetchedAt": "2026-08-27T17:31:48.795Z"
       },
       "installMode": "mirror",
       "files": {
@@ -425,8 +425,8 @@
           "size": 1852
         },
         "SKILL.md": {
-          "sha256": "154638bb02efc14129c0b34c69a6cd33c2064fa99d158d8f0f525c2be7b24f54",
-          "size": 5396
+          "sha256": "132b4671ed45210a5ec8d5a4e6e881aa4bdaebc6fcf891fce7f6b1336697edb6",
+          "size": 6140
         },
         "skill.yaml": {
           "sha256": "8ba7fbc70f4982b16da1f7220244aa801ad482ebb4ecd88e73b50b6a95adfa6d",
@@ -439,10 +439,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
+        "ref": "104150cffcb2fbfc610c1993803912f42a9b25ed",
         "subdir": "skills",
-        "revision": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
-        "fetchedAt": "2026-08-26T14:21:14.320Z"
+        "revision": "104150cffcb2fbfc610c1993803912f42a9b25ed",
+        "fetchedAt": "2026-08-27T17:31:49.641Z"
       },
       "installMode": "mirror",
       "files": {
@@ -461,10 +461,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
+        "ref": "104150cffcb2fbfc610c1993803912f42a9b25ed",
         "subdir": "skills",
-        "revision": "66a77d2f3dfd4dee9dc2f6cfad2a8836c1f7c8e2",
-        "fetchedAt": "2026-08-26T14:21:15.040Z"
+        "revision": "104150cffcb2fbfc610c1993803912f42a9b25ed",
+        "fetchedAt": "2026-08-27T17:31:50.587Z"
       },
       "installMode": "mirror",
       "files": {
@@ -475,6 +475,76 @@
         "skill.yaml": {
           "sha256": "075f937dd1704549766b9be6216aa7bc0bc757fb3e24f504ab732e68f8920ca1",
           "size": 114
+        }
+      }
+    },
+    "SHARED/change-framework": {
+      "source": {
+        "type": "git",
+        "name": "todo-context-efficiency",
+        "url": "https://github.com/joeharris76/skill-sync-skills.git",
+        "ref": "77ab905fe66cc86a8d8a11fdc4b3500e28d8e0d0",
+        "subdir": "skills",
+        "revision": "77ab905fe66cc86a8d8a11fdc4b3500e28d8e0d0",
+        "fetchedAt": "2026-08-27T17:32:24.771Z"
+      },
+      "installMode": "mirror",
+      "files": {
+        "SKILL.md": {
+          "sha256": "45785958e49d7d8954cdedc8f55f7bd332993344d519de3ebe05b9fadbce7e19",
+          "size": 6091
+        },
+        "skill.yaml": {
+          "sha256": "39b007a53d9126d3fe4e8938a67d616a52be210a82ba211753afa92a073d06bd",
+          "size": 78
+        }
+      }
+    },
+    "SHARED/investigation-framework": {
+      "source": {
+        "type": "git",
+        "name": "todo-context-efficiency",
+        "url": "https://github.com/joeharris76/skill-sync-skills.git",
+        "ref": "77ab905fe66cc86a8d8a11fdc4b3500e28d8e0d0",
+        "subdir": "skills",
+        "revision": "77ab905fe66cc86a8d8a11fdc4b3500e28d8e0d0",
+        "fetchedAt": "2026-08-27T17:32:27.292Z"
+      },
+      "installMode": "mirror",
+      "files": {
+        "SKILL.md": {
+          "sha256": "12e219c5c9863dfb4a2dfb60307b517df43b03b756e31009cfb90781f402813e",
+          "size": 6912
+        },
+        "skill.yaml": {
+          "sha256": "cf2949bf1f6abaf42f3a7aef998fe86e89c07856b69636286a1c0ef66ac22b0e",
+          "size": 114
+        }
+      }
+    },
+    "SHARED/review-protocol": {
+      "source": {
+        "type": "git",
+        "name": "todo-context-efficiency",
+        "url": "https://github.com/joeharris76/skill-sync-skills.git",
+        "ref": "77ab905fe66cc86a8d8a11fdc4b3500e28d8e0d0",
+        "subdir": "skills",
+        "revision": "77ab905fe66cc86a8d8a11fdc4b3500e28d8e0d0",
+        "fetchedAt": "2026-08-27T17:32:29.822Z"
+      },
+      "installMode": "mirror",
+      "files": {
+        "references/adversarial-review.md": {
+          "sha256": "923ea419ffa1244a15faabc0f5f3dd2a03b7db2fe0dae40f508e81d78063b2ce",
+          "size": 1852
+        },
+        "SKILL.md": {
+          "sha256": "1f38dd77091eca646434d5205b50bb5a0acfac246880457cab9b2ca14fffd794",
+          "size": 4768
+        },
+        "skill.yaml": {
+          "sha256": "8ba7fbc70f4982b16da1f7220244aa801ad482ebb4ecd88e73b50b6a95adfa6d",
+          "size": 219
         }
       }
     }

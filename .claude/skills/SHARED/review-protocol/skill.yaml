@@ -1,0 +1,11 @@
+tags:
+  - framework
+  - review
+category: framework
+targets:
+  claude: true
+  codex: true
+  gemini: true
+# Documentary fallback, not a runtime dependency.
+portability_allow:
+  - "~/.todo-db/finding-drafts/<project-id>/"

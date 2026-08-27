@@ -18,7 +18,7 @@ After bootstrap, use `_project/scripts/todo` for every tracker command.
 Skill-only actions: `prioritize`, `batch`, `handoff`, and `closeout`; follow their guides, not the CLI.
 
 If one request combines review or validation with close-out, perform the read-only review and stop at findings under
-`shared-review-protocol/SKILL.md`. A later user message may authorize `closeout`.
+`SHARED/review-protocol/SKILL.md`. A later user message may authorize `closeout`.
 
 ### Failures and claims
 
@@ -33,7 +33,7 @@ If one request combines review or validation with close-out, perform the read-on
 - Read the selected action guide before acting.
 - After specification approval, track it with `todo create` or the supported create-from-spec command.
 - Store tracker state only in the database; do not create tracker files by hand.
-- Commit through `shared-change-framework/SKILL.md`.
+- Commit through `SHARED/change-framework/SKILL.md`.
 - `TODO_DB_URL` may select the hosted database; the CLI never prints its connection string.
 
 ## Actions
