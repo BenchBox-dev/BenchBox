@@ -29,6 +29,10 @@ DATAFRAME_SQL_ONLY_RULE = CompatibilityRule(
 )
 
 _NATIVE_MODEL_BENCHMARK_GATES = {
+    ("sqlite", "vector_search"): (
+        "SQLite lacks vector similarity/ANN support; vector_search has no SQLite query variant and uses "
+        "DuckDB-specific array syntax."
+    ),
     ("datafusion", "write_primitives"): (
         "DataFusion UAT runs through the in-memory SessionContext adapter; the adapter only rewrites "
         "write_primitives bulk-load operations and does not expose the durable row-level DML contract "
@@ -63,7 +67,8 @@ _NATIVE_MODEL_BENCHMARK_GATES = {
 _NATIVE_MODEL_BENCHMARK_EVIDENCE = (
     "benchbox/core/ai_primitives/specs.yaml unsupported_platforms; "
     "benchbox/platforms/datafusion.py DataFusionConnectionCompat; "
-    "benchbox/platforms/clickhouse_local.py embedded chDB local adapter"
+    "benchbox/platforms/clickhouse_local.py embedded chDB local adapter; "
+    "benchbox/core/vector_search/queries.py and schema_specs.yaml"
 )
 
 _DATAFRAME_TRANSACTIONAL_BENCHMARK_GATES = {

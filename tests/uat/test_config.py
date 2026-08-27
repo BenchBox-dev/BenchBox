@@ -470,7 +470,9 @@ def test_release_gate_stage1_prunes_measured_runtime_envelopes():
     for cell in result.cells:
         by_pair.setdefault((cell.platform, cell.benchmark), set()).add(cell.scale)
     eligible = sum(1 for scales in by_pair.values() if set(stage1.scales.rungs).issubset(scales))
-    assert eligible == 151
+    # SQLite vector_search is explicitly pruned by the benchmark capability
+    # gate above, reducing the current all-rungs set by one pair.
+    assert eligible == 150
     assert stage1.report.cross_scale_coverage_min_pairs == int(0.8 * eligible) == 120
 
 

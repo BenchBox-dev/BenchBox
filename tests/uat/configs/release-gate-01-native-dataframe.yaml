@@ -72,14 +72,15 @@ report:
   # to be passed AND validator-clean across all three rungs; a breach forces a
   # non-zero report exit so the gate cannot be APPROVED on a partial/regressed
   # sweep.
-  # Derivation (uat-release-gate-enforcement w4, 2026-07-12, develop @ acfb89922):
-  # enumerate_cells_with_pruning over this config yields 151 pairs with every
+  # Derivation (uat-release-gate-enforcement w4, 2026-07-12, updated for the
+  # SQLite vector_search benchmark capability gate): enumerate_cells_with_pruning
+  # over this config yields 150 pairs with every
   # rung (0.01/0.1/1.0) enumerable -- the only pairs the cross-scale check can
   # ever count (208 raw pairs minus 55 whose registry scale ladder omits a
   # rung, e.g. clickbench/joinorder 1.0-only and read_primitives 0.01/0.1-only,
-  # and two measured runtime-envelope exclusions: SQLite TPC-DS and DataFusion
-  # DataVault).
-  # floor = max(8, floor(0.8 * 151)) = 120. The 0.8 slack absorbs legitimate
+  # three measured runtime-envelope exclusions, and the SQLite vector_search
+  # capability exclusion).
+  # floor = max(8, floor(0.8 * 150)) = 120. The 0.8 slack absorbs legitimate
   # environment variance without letting a mass regression sign off; never set
   # this to the eligible count exactly.
   cross_scale_coverage_min_pairs: 120
