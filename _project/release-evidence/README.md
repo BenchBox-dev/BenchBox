@@ -1,18 +1,17 @@
-# Release evidence
+# Historical UAT campaign evidence
 
-Committed, machine-readable release-gate evidence. One file per release
-cycle: `uat-gate-summary.json`, written by `make uat-gate-check` from the
-three release-gate stage sweeps (see `docs/operations/uat-framework.md`
-"Release-gate re-run" and `docs/operations/release-guide.md`).
+Committed, machine-readable UAT campaign evidence. One file per campaign:
+`uat-gate-summary.json`, written by `make uat-gate-check` from the
+three-stage campaign sweeps (see `docs/operations/uat-framework.md`
+"Three-stage UAT campaign" and `docs/operations/release-guide.md`).
 
 Conventions:
 
-- The **operator** reviews and commits the evidence file deliberately after
+- The **operator** may review and commit the evidence file deliberately after
   `make uat-gate-check` exits 0 — sweeps and the gate-check never write to
   the git tree themselves.
-- `scripts/release_readiness_check.py` reads this file (green verdict,
-  clean tree, ancestor-of-release-head, ≤21 days old, artifact-digest
-  provenance) as a required release gate on release PRs.
+- `scripts/release_readiness_check.py` reports this file when it exists. It is
+  historical campaign evidence, not a release input and not a release-PR gate.
 - Like the rest of `_project/`, this directory lives on `develop` only and
   is curated out of release branches by `make release-cut`.
 - Each release cycle overwrites the file; history is the git log.
@@ -29,9 +28,8 @@ directories passed on the command line** and rejects a mismatch (edited
 artifact), an absent digest on old evidence ("regenerate evidence" HOLD),
 or `source_commit_sha='unknown'` (git failure swallowed at sweep start).
 The combined evidence (`uat-gate-summary.json`) preserves
-`stage_artifact_digests` per stage, and `scripts/release_readiness_check.py`
-additionally rejects a `green` combined evidence that carries no digests
-with the same regenerate message (fail-closed but non-crash).
+`stage_artifact_digests` per stage. `scripts/release_readiness_check.py`
+reports missing digests as an advisory campaign-quality issue.
 
 **Threat model:** digests are recomputed on the operator machine, so they
 prove the committed summary matches the stage directories the operator

@@ -514,9 +514,9 @@ blocking_suite: (slow or resource_heavy) and not (stress or live_integration)
 advisory_suites: stress, live_integration, live cloud credentials
 ```
 
-Long-running UAT is no longer advisory: release readiness also requires
-committed UAT release-gate evidence — see `docs/operations/release-guide.md`
-"UAT release-gate evidence (required)".
+Long-running UAT is an advisory campaign. Release readiness requires the
+blocking release canary; see `docs/operations/release-guide.md` "UAT matrix
+campaign evidence (advisory)" for the optional UAT report.
 
 `validate-release-pr.yml` keeps the required context name `validate-base`, but
 that job now also runs `scripts/release_readiness_check.py` for release PRs.

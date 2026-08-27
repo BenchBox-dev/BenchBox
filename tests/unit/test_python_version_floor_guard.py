@@ -5,8 +5,9 @@ enforced that against the source. `tests/uat/clickhouse_memory.py` used
 `datetime.UTC` (3.11+), which made every test in
 `tests/uat/test_clickhouse_memory.py` fail on the ubuntu-latest/3.10 nightly
 lane with `AttributeError: module 'datetime' has no attribute 'UTC'`. That
-lane was red every scheduled run for at least five days, and a green nightly
-is a precondition for the UAT release-gate evidence `validate-base` requires.
+lane was red every scheduled run for at least five days. A green nightly is a
+useful CI signal, but UAT release-gate evidence is not a `validate-base`
+requirement.
 
 The test is deliberately AST-based: a textual grep would flag the symbol
 inside docstrings, comments and this file's own explanatory text.

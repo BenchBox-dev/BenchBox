@@ -15,6 +15,7 @@ developer guide for hacking on the framework itself is
 
 | Goal | Command |
 |---|---|
+| Native TPCH smoke loop (SF 0.01, no Docker) | `make uat-smoke` |
 | Smoke a single cell | `make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01` |
 | Stress preset (one scale, no validate/package/explorer) | `make uat-stress` |
 | Stress, single platform / benchmark | `make uat-stress PLATFORM=duckdb BENCHMARK=tpch` |
@@ -612,10 +613,11 @@ treated as a pass or a compatibility exclusion.
 
 ### Measured release-gate runtime envelope exclusions
 
-The release-gate runtime-envelope switch records measured, platform-specific
-cell exclusions in the same compatibility-pruning stream. It does not change
-the benchmark registry's declared scale ladder or affect ordinary diagnostic
-runs. For v0.4.0, the native release gate uses the measured 16 GiB host-class
+When enabled, the release-gate runtime-envelope switch applies measured,
+platform-specific cell exclusions in the same compatibility-pruning stream.
+When disabled, those cells remain enumerable for ordinary diagnostic runs. It
+does not change the benchmark registry's declared scale ladder. For v0.4.0,
+the native release campaign uses the measured 16 GiB host-class
 envelope. A larger host does not silently widen this comparable matrix; use it
 for a diagnostic certification run, then remove an exclusion in a reviewed
 change only after that evidence is recorded.
@@ -660,7 +662,10 @@ SQLite stream also contains eleven queries that require unsupported `ROLLUP`
 semantics, four of which additionally require `GROUPING`. The release gate
 therefore prunes the complete platform/benchmark scale ladder under
 `uat.compat.sqlite.tpcds.release_gate_runtime_envelope`; diagnostic sweeps still
-enumerate and run it.
+enumerate and run it. The timeout evidence is provisional: the open
+`sqlite-tpcds-fails-every-query-cursor-passed-as-connection` adapter item from
+the 2026-08-24 handoff describes immediate cursor/connection failures, not a
+300s timeout, so it does not settle this runtime envelope.
 
 The durable evidence record is SHA-bound below. The UAT output root was
 `/Users/joe/Developer/benchmark_runs`; its run logs are in the `logs/`
@@ -1084,10 +1089,10 @@ and query gates can be considered complete.
 | Validator clean rate breaches floor | bundle quality regression | run `make uat-validate` standalone; it validates via `benchbox.validation.bundle` and writes the rollup TSV |
 | Make target missing | new release not synced | `make help` to check the available Make targets |
 
-## Release-gate re-run
+## Three-stage UAT campaign
 
-A release-gate sweep produces the sign-off evidence (a COMPLETED report per
-config with a commit SHA). It runs in four stages, in this order, so that all
+A UAT campaign produces a report (a COMPLETED report per config with a commit
+SHA). It runs in three stages, in this order, so that all
 native and dataframe platforms finish before any Docker stack starts — the
 ordering the 2026-05-28/29 evidence violated. First time on a machine: work
 through `docs/operations/uat-local-provisioning.md` "Fresh machine checklist"
@@ -1130,27 +1135,29 @@ make uat-gate-check STAGE1=<stage1-run-dir> STAGE2=<stage2-run-dir> STAGE3=<stag
 reads the three stage summaries, verifies from their machine-recorded
 `completed_at` timestamps that no Docker `action=up` in stages 2/3 preceded
 stage-1 completion (nor stage 3 before stage-2 completion), enforces the
-mechanized APPROVE items below, and writes the combined evidence file to
-`_project/release-evidence/uat-gate-summary.json`. Exit 0 means APPROVE:
-review the evidence file and commit it — `scripts/release_readiness_check.py`
-requires it on the release PR (see `docs/operations/release-guide.md`).
+mechanized campaign-report items below, and writes the combined evidence file
+to `_project/release-evidence/uat-gate-summary.json`. Exit 0 means the
+campaign report is complete. The report may be reviewed or committed as
+historical evidence; `scripts/release_readiness_check.py` does not require it
+for `validate-base` (see `docs/operations/release-guide.md`).
 
 `cross_scale_coverage_min_pairs` in each config is the report-phase teeth: a
 breach forces a non-zero report exit, so a partial or regressed sweep cannot
-be APPROVED. The values are derived, not hand-picked: floor =
+be reported as complete. The values are derived, not hand-picked: floor =
 max(stage minimum, floor(0.8 × cross-scale-eligible pairs from
 `enumerate_cells_with_pruning`)) — each config carries its derivation comment,
 and `tests/uat/test_config.py` pins the sound band.
 
-### APPROVE / HOLD gate
+### Campaign report: COMPLETE / HOLD
 
-`make uat-gate-check` mechanizes this checklist: all stages verdict-green
+`make uat-gate-check` classifies this report: all stages verdict-green
 (every phase exit 0, incl. validator and cross-scale floors), accounting
 sidecar present (`unreachable_is_estimated=false`), explorer smoke actually
 ran for stages that configure it, one clean `source_commit_sha` across
-stages (`source_dirty=false`), and no ordering violations. Exit 0 = APPROVE;
-any HOLD reason is printed and lands in the evidence file's `reasons`.
+stages (`source_dirty=false`), and no ordering violations. Exit 0 = COMPLETE;
+any HOLD reason is printed and lands in the evidence file's `reasons`. It is a
+campaign report, not a release-cut precondition.
 
-Still manual before committing the evidence: DuckDB (the reference) is green
-or its cells are explicitly pruned, and no `NO_JSON` cell lacks captured
-error text.
+Still useful before recording the report: DuckDB (the reference) is green or
+its cells are explicitly pruned, and no `NO_JSON` cell lacks captured error
+text.

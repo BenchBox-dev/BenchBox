@@ -1502,7 +1502,7 @@ class TestPrConflictScan:
 
 
 class TestUATGateReleaseEvidence:
-    """uat-release-gate-enforcement w5: committed UAT evidence gates release readiness."""
+    """UAT evidence is evaluated for campaign reporting, not release readiness."""
 
     @staticmethod
     def _payload(**overrides) -> dict:
@@ -1537,28 +1537,28 @@ class TestUATGateReleaseEvidence:
             is_ancestor=is_ancestor,
         )
 
-    def test_missing_evidence_blocks_release(self):
+    def test_missing_evidence_marks_campaign_report_incomplete(self):
         result = self._evaluate(None)
         assert not result.ok
         assert "No committed UAT gate evidence" in result.message
         assert "- uat_gate: missing" in result.summary
 
-    def test_red_verdict_blocks_release(self):
+    def test_red_verdict_marks_campaign_report_incomplete(self):
         result = self._evaluate(self._payload(verdict="red"))
         assert not result.ok
         assert "verdict is 'red'" in result.message
 
-    def test_dry_run_verdict_blocks_release(self):
+    def test_dry_run_verdict_marks_campaign_report_incomplete(self):
         result = self._evaluate(self._payload(verdict="dry_run"))
         assert not result.ok
         assert "verdict is 'dry_run'" in result.message
 
-    def test_dirty_source_tree_blocks_release(self):
+    def test_dirty_source_tree_marks_advisory_evidence_quality_failed(self):
         result = self._evaluate(self._payload(source_dirty=True))
         assert not result.ok
         assert "dirty source tree" in result.message
 
-    def test_stale_evidence_blocks_release(self):
+    def test_stale_evidence_marks_campaign_report_incomplete(self):
         from datetime import datetime, timezone
 
         result = self._evaluate(
@@ -1568,7 +1568,7 @@ class TestUATGateReleaseEvidence:
         assert not result.ok
         assert "stale" in result.message
 
-    def test_non_ancestor_evidence_blocks_release(self):
+    def test_non_ancestor_evidence_marks_campaign_report_incomplete(self):
         result = self._evaluate(self._payload(), is_ancestor=lambda _a, _h: False)
         assert not result.ok
         assert "not an ancestor" in result.message
@@ -1585,7 +1585,7 @@ class TestUATGateReleaseEvidence:
         assert "green, fresh, and applicable" in result.message
         assert checked == [("uat-tested-sha", "release-head")]
 
-    def test_missing_completed_at_blocks_release(self):
+    def test_missing_completed_at_marks_campaign_report_incomplete(self):
         result = self._evaluate(self._payload(completed_at=""))
         assert not result.ok
         assert "no completed_at" in result.message
@@ -1628,8 +1628,8 @@ class TestUATGateReleaseEvidence:
         assert len(set(oks.values())) == 1, oks
         assert len(set(ages.values())) == 1, ages
 
-    def test_uat_failure_blocks_after_green_canary(self, monkeypatch, capsys):
-        """main() combines a green canary with UAT evidence; missing UAT blocks."""
+    def test_missing_uat_is_advisory_after_green_canary(self, monkeypatch, capsys):
+        """A green canary passes even when the optional UAT report is absent."""
         from datetime import datetime, timezone
 
         from scripts import release_readiness_check
@@ -1660,10 +1660,51 @@ class TestUATGateReleaseEvidence:
 
         rc = release_readiness_check.main(["--head-sha", "release-head", "--no-ancestor-check"])
 
-        assert rc == 1
-        assert "No committed UAT gate evidence" in capsys.readouterr().err
+        assert rc == 0
+        assert "UAT evidence advisory: No committed UAT gate evidence" in capsys.readouterr().out
 
-    def test_green_canary_plus_green_uat_passes(self, monkeypatch):
+    def test_red_uat_is_advisory_after_green_canary(self, monkeypatch, capsys):
+        """A green canary still exits 0 when committed UAT evidence is red."""
+        from datetime import datetime, timedelta, timezone
+
+        from scripts import release_readiness_check
+
+        now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+        def _fake_api_json(url: str, _token: str) -> dict:
+            return {
+                "workflow_runs": [
+                    {
+                        "status": "completed",
+                        "conclusion": "success",
+                        "updated_at": now_iso,
+                        "head_sha": "canary-sha",
+                        "html_url": "https://example.test/run",
+                        "display_title": "Release Canary",
+                    }
+                ]
+            }
+
+        payload = self._payload(
+            verdict="red",
+            completed_at=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+        )
+        monkeypatch.setattr(release_readiness_check, "_api_json", _fake_api_json)
+        monkeypatch.setattr(release_readiness_check, "_is_ancestor_with_git", lambda _a, _h: True)
+        monkeypatch.setattr(release_readiness_check, "_load_uat_gate_evidence", lambda _p, _r: payload)
+        monkeypatch.setenv("GITHUB_TOKEN", "token")
+        monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+        monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_SHA", raising=False)
+        monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_REASON", raising=False)
+
+        rc = release_readiness_check.main(["--head-sha", "release-head", "--no-ancestor-check"])
+
+        captured = capsys.readouterr()
+        assert rc == 0
+        assert "UAT evidence advisory:" in captured.out
+        assert "verdict is 'red'" in captured.out
+
+    def test_green_canary_plus_green_uat_prints_campaign_report(self, monkeypatch, capsys):
         from datetime import datetime, timedelta, timezone
 
         from scripts import release_readiness_check
@@ -1696,9 +1737,45 @@ class TestUATGateReleaseEvidence:
         rc = release_readiness_check.main(["--head-sha", "release-head", "--no-ancestor-check"])
 
         assert rc == 0
+        assert "UAT campaign report: UAT gate evidence is green" in capsys.readouterr().out
+
+    def test_red_canary_blocks_even_with_green_uat(self, monkeypatch, capsys):
+        from datetime import datetime, timedelta, timezone
+
+        from scripts import release_readiness_check
+
+        now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        payload = self._payload(completed_at=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat())
+        monkeypatch.setattr(
+            release_readiness_check,
+            "_api_json",
+            lambda _url, _token: {
+                "workflow_runs": [
+                    {
+                        "status": "completed",
+                        "conclusion": "failure",
+                        "updated_at": now_iso,
+                        "head_sha": "canary-sha",
+                        "html_url": "https://example.test/run",
+                        "display_title": "Release Canary",
+                    }
+                ]
+            },
+        )
+        monkeypatch.setattr(release_readiness_check, "_is_ancestor_with_git", lambda _a, _h: True)
+        monkeypatch.setattr(release_readiness_check, "_load_uat_gate_evidence", lambda _p, _r: payload)
+        monkeypatch.setenv("GITHUB_TOKEN", "token")
+        monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+        monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_SHA", raising=False)
+        monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_REASON", raising=False)
+
+        rc = release_readiness_check.main(["--head-sha", "release-head", "--no-ancestor-check"])
+
+        assert rc == 1
+        assert "Latest release canary is failure" in capsys.readouterr().err
 
     def test_override_bypasses_uat_check_too(self, monkeypatch):
-        """The existing admin override covers the UAT evidence requirement as well."""
+        """The existing admin override short-circuits the advisory UAT report as well."""
         from scripts import release_readiness_check
 
         monkeypatch.setenv("RELEASE_READINESS_OVERRIDE_SHA", "release-head")

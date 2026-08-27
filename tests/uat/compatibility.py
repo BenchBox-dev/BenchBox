@@ -133,7 +133,6 @@ _SQLITE_TPCDS_RUNTIME_ENVELOPE_REASON = (
     "At SF0.01, query 13 and query 48 exceeded 300s; eleven queries also need unsupported ROLLUP semantics. "
     "Keep the cells pruned until bounded query rewrites or planner improvements fit the budget."
 )
-
 _DATAFUSION_DATAVAULT_RUNTIME_ENVELOPE_REASON = (
     "DataFusion DataVault query 18 at SF1 is outside the 16 GiB release-host envelope measured on 2026-08-25. "
     "Stage 1 passed SF0.01 and SF0.1, but SF1 was killed; with PR #1914 spilling active, a 12 GiB pool "
@@ -157,6 +156,8 @@ _RELEASE_GATE_RUNTIME_ENVELOPES = _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES | {
     ("sqlite", "tpcds"): _SQLITE_TPCDS_RUNTIME_ENVELOPE_REASON,
     ("sqlite", "tpcds_obt"): _SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_REASON,
 }
+
+_RELEASE_GATE_STAGES_UNUSED_RUNTIME_ENVELOPES = frozenset(_PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES)
 
 _RELEASE_GATE_RUNTIME_ENVELOPE_EVIDENCE = {
     ("datafusion", "datavault"): "docs/operations/uat-framework.md: DataVault evidence (2026-08-25)",

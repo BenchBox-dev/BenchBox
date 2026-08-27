@@ -468,14 +468,12 @@ report:
 # Compatibility phase ----------------------------------------------------
 compatibility:
   release_gate_runtime_envelopes: false  # optional, bool, default false.
-                                         # When true, includes cells that
-                                         # `tests/uat/compatibility.py`
-                                         # would otherwise prune purely for
-                                         # runtime-envelope reasons (e.g. a
-                                         # slow-but-correct PostgreSQL-family
-                                         # cell) -- used by the diagnostic
-                                         # `uat-enabled-platforms-full`-style
-                                         # sweeps, not the default matrix.
+                                         # When true, applies the runtime-
+                                         # envelope prunes in
+                                         # `tests/uat/compatibility.py` (for
+                                         # example, a slow PostgreSQL-family
+                                         # cell). When false, those cells stay
+                                         # enumerable for diagnostics.
 
 # Output paths ----------------------------------------------------------
 output:
@@ -954,7 +952,7 @@ workflow. It does not replace deeper benchmark-correctness suites.
 > vocabulary for the operations surface; do **not** charter a standing
 > cert-operations surface beyond the named evidence artifacts. The mechanical
 > rename landed in the UAT runbook, staged configs, ordering helper, and tests:
-> `docs/operations/uat-framework.md` "Release-gate re-run",
+> `docs/operations/uat-framework.md` "Three-stage UAT campaign",
 > `tests/uat/configs/release-gate-0{1,2,3}-*.yaml`, and
 > `tests/uat/phases/report.py:release_gate_ordering_violations`.
 

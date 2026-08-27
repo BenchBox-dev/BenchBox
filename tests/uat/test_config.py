@@ -432,8 +432,12 @@ def test_release_gate_configs_load_and_encode_stage_ordering():
     assert stage1.compatibility.release_gate_runtime_envelopes is True
 
     # Stages 2 and 3 are the Docker tiers, managed lifecycle, serialized.
+    # Keep the envelope flag off so PG-family runtime envelopes stay unused
+    # by the three-stage campaign (diagnostic configs may still apply them).
     assert stage2.platforms.groups == ("docker-fast",)
     assert stage3.platforms.groups == ("docker-slow",)
+    assert stage2.compatibility.release_gate_runtime_envelopes is False
+    assert stage3.compatibility.release_gate_runtime_envelopes is False
     for stage in (stage2, stage3):
         assert stage.cleanup.docker_manage_platforms is True
         assert stage.execute.parallel_platforms is False
@@ -708,6 +712,75 @@ def test_corpus_config_paths_cover_generated_rerun_shards():
     assert shards == _glob_configs(shard_dir, recursive=False)
 
 
+def test_uat_smoke_config_is_native_tpch_sf001_loop():
+    """The routine smoke loop stays bounded and avoids Docker-only phases."""
+    from tests.uat.matrix import load_benchmarks
+    from tests.uat.phases.enumerate import enumerate_cells_with_pruning
+
+    cfg = config.load_config(_CORPUS_CONFIGS_ROOT / "uat-smoke.yaml")
+
+    assert cfg.platforms.include == (
+        "duckdb",
+        "datafusion",
+        "clickhouse-local",
+        "sqlite",
+        "polars-df",
+        "pandas-df",
+    )
+    assert cfg.benchmarks.include == ("tpch",)
+    assert cfg.scales.rungs == (0.01,)
+    assert cfg.phases == ("preflight", "execute", "report")
+    assert "package" not in cfg.phases
+    assert "explorer_smoke" not in cfg.phases
+    assert not cfg.cleanup.docker_manage_platforms
+    assert cfg.cleanup.docker_platform_switch == "off"
+
+    enumerated = enumerate_cells_with_pruning(cfg, benchmarks=load_benchmarks())
+    assert {(cell.platform, cell.benchmark, cell.scale) for cell in enumerated.cells} == {
+        (platform, "tpch", 0.01) for platform in cfg.platforms.include
+    }
+
+
+def test_release_gate_runtime_envelopes_are_enabled_or_unused_by_stages():
+    """Every envelope key is applied by a flag-on release-gate stage or unused by those stages.
+
+    Unused-by-stages is not "never applied": uat-enabled-platforms-full.yaml
+    still prunes the PG-family pairs. SQLite TPC-DS #1915 remains provisional
+    beside the open cursor/connection adapter failure (2026-08-24).
+    """
+    from tests.uat.compatibility import (
+        _RELEASE_GATE_RUNTIME_ENVELOPES,
+        _RELEASE_GATE_STAGES_UNUSED_RUNTIME_ENVELOPES,
+    )
+    from tests.uat.phases.enumerate import enumerate_cells_with_pruning
+
+    stage_cfgs = [
+        config.load_config(_CORPUS_CONFIGS_ROOT / name)
+        for name in (
+            "release-gate-01-native-dataframe.yaml",
+            "release-gate-02-docker-nonoltp.yaml",
+            "release-gate-03-docker-oltp.yaml",
+        )
+    ]
+    assert stage_cfgs[0].compatibility.release_gate_runtime_envelopes is True
+    assert stage_cfgs[1].compatibility.release_gate_runtime_envelopes is False
+    assert stage_cfgs[2].compatibility.release_gate_runtime_envelopes is False
+
+    applied: set[tuple[str, str]] = set()
+    for cfg in stage_cfgs:
+        if not cfg.compatibility.release_gate_runtime_envelopes:
+            continue
+        enumerated = enumerate_cells_with_pruning(cfg)
+        applied.update(
+            (cell.platform, cell.benchmark)
+            for cell in enumerated.compatibility_pruned
+            if "release_gate_runtime_envelope" in cell.rule_id
+        )
+    unused = _RELEASE_GATE_STAGES_UNUSED_RUNTIME_ENVELOPES
+    assert applied.isdisjoint(unused)
+    assert set(_RELEASE_GATE_RUNTIME_ENVELOPES) == applied | unused
+
+
 # ---------------------------------------------------------------------------
 # w4 lifecycle headers (uat-config-schema-spec-realignment): every top-level
 # config under tests/uat/configs/ (excluding generated-rerun-shards/, which
@@ -738,4 +811,4 @@ def test_top_level_config_paths_exclude_generated_rerun_shards():
     this parametrized set."""
     shard_dir = _CORPUS_CONFIGS_ROOT / "generated-rerun-shards"
     assert all(shard_dir not in p.parents for p in _top_level_config_paths())
-    assert len(_top_level_config_paths()) == 16
+    assert len(_top_level_config_paths()) == 17
