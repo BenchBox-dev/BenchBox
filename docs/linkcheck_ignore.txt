@@ -41,6 +41,11 @@ https://docs\.aws\.amazon\.com/(redshift|s3)/.*
 # H2O documentation rejects automated CI requests with HTTP 403.
 https://docs\.h2o\.ai/.*
 
+# AMPLab pages reject automated CI requests with HTTP 403. Develop's last
+# successful linkcheck still saw 200; the same URLs 403 from GitHub runners
+# later the same day. Links remain in the rendered docs.
+https://amplab\.cs\.berkeley\.edu/.*
+
 # HammerDB site intermittently returns 502 / connect timeouts
 https://www\.hammerdb\.com/.*
 
