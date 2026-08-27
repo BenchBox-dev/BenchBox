@@ -1663,6 +1663,47 @@ class TestUATGateReleaseEvidence:
         assert rc == 0
         assert "UAT evidence advisory: No committed UAT gate evidence" in capsys.readouterr().out
 
+    def test_red_uat_is_advisory_after_green_canary(self, monkeypatch, capsys):
+        """A green canary still exits 0 when committed UAT evidence is red."""
+        from datetime import datetime, timedelta, timezone
+
+        from scripts import release_readiness_check
+
+        now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+        def _fake_api_json(url: str, _token: str) -> dict:
+            return {
+                "workflow_runs": [
+                    {
+                        "status": "completed",
+                        "conclusion": "success",
+                        "updated_at": now_iso,
+                        "head_sha": "canary-sha",
+                        "html_url": "https://example.test/run",
+                        "display_title": "Release Canary",
+                    }
+                ]
+            }
+
+        payload = self._payload(
+            verdict="red",
+            completed_at=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+        )
+        monkeypatch.setattr(release_readiness_check, "_api_json", _fake_api_json)
+        monkeypatch.setattr(release_readiness_check, "_is_ancestor_with_git", lambda _a, _h: True)
+        monkeypatch.setattr(release_readiness_check, "_load_uat_gate_evidence", lambda _p, _r: payload)
+        monkeypatch.setenv("GITHUB_TOKEN", "token")
+        monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+        monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_SHA", raising=False)
+        monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_REASON", raising=False)
+
+        rc = release_readiness_check.main(["--head-sha", "release-head", "--no-ancestor-check"])
+
+        captured = capsys.readouterr()
+        assert rc == 0
+        assert "UAT evidence advisory:" in captured.out
+        assert "verdict is 'red'" in captured.out
+
     def test_green_canary_plus_green_uat_prints_campaign_report(self, monkeypatch, capsys):
         from datetime import datetime, timedelta, timezone
 
