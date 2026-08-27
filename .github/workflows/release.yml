@@ -41,6 +41,21 @@ jobs:
           fi
           echo "OK: $target_sha is origin/release or an ancestor of it."
 
+      - name: Assert tag matches package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          package_version=$(grep -E '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+          expected_tag="v${package_version}"
+          if [[ "$RELEASE_TAG" != "$expected_tag" ]]; then
+            echo "::error::Release tag '$RELEASE_TAG' does not match package version '$package_version' (expected '$expected_tag')."
+            exit 1
+          fi
+          echo "OK: release tag $RELEASE_TAG matches package version $package_version."
+
   verify-uat-charter:
     needs: verify-tag-on-release
     runs-on: ubuntu-latest
