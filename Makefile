@@ -1632,7 +1632,7 @@ include $(BENCHBOX_MAKEFILE_ROOT)make/worktree-maintenance.mk
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
 # project-developer concern, benchbox is a project-user concern.
 # ----------------------------------------------------------------------
-.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up uat-prepull uat-docker-cleanup uat-artifact-hygiene uat-gate-check
+.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-smoke uat-stress uat-bring-up uat-prepull uat-docker-cleanup uat-artifact-hygiene uat-gate-check
 
 # Local-artifact hygiene gate. No-op unless an external output root is
 # configured (BENCHBOX_OUTPUT_DIR or OUTPUT=); when it is, fails if the
@@ -1760,6 +1760,11 @@ uat-sweep:
 	fi
 	@uv run --no-sync -- python -m tests.uat._cli sweep --config "$(CONFIG)" \
 		$(if $(DRY_RUN),--dry-run,)
+
+# make uat-smoke
+# Native TPCH SF 0.01 smoke loop; no Docker, package, or explorer phase.
+uat-smoke:
+	@uv run --no-sync -- python -m tests.uat._cli sweep --config tests/uat/configs/uat-smoke.yaml
 
 # make uat-stress [PLATFORM=] [BENCHMARK=] [SCALE=] [CONFIG=]
 # Canned stress preset using the UAT framework matrix runner.

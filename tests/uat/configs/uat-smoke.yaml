@@ -1,0 +1,32 @@
+# TEMPLATE — bounded native-only UAT matrix loop for routine operator feedback.
+# Target wall clock: <= 2 hours on the native UAT host; keep this TPCH-only
+# SF 0.01 matrix small enough to remain a smoke loop rather than a campaign.
+name: "uat-smoke"
+description: "Native TPCH smoke loop: six local platforms at SF 0.01"
+
+phases:
+  - preflight
+  - execute
+  - report
+
+platforms:
+  include: ["duckdb", "datafusion", "clickhouse-local", "sqlite", "polars-df", "pandas-df"]
+
+benchmarks:
+  include: ["tpch"]
+
+scales:
+  rungs: [0.01]
+
+execute:
+  per_cell_timeout_s: 1200
+  early_stop_on_failure: true
+
+cleanup:
+  preserve_datagen: true
+  prune_databases: true
+  docker_manage_platforms: false
+  docker_platform_switch: "off"
+
+report:
+  matrix_summary_tsv: "matrix_summary.tsv"

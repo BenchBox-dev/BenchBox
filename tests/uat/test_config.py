@@ -708,6 +708,35 @@ def test_corpus_config_paths_cover_generated_rerun_shards():
     assert shards == _glob_configs(shard_dir, recursive=False)
 
 
+def test_uat_smoke_config_is_native_tpch_sf001_loop():
+    """The routine smoke loop stays bounded and avoids Docker-only phases."""
+    from tests.uat.matrix import load_benchmarks
+    from tests.uat.phases.enumerate import enumerate_cells_with_pruning
+
+    cfg = config.load_config(_CORPUS_CONFIGS_ROOT / "uat-smoke.yaml")
+
+    assert cfg.platforms.include == (
+        "duckdb",
+        "datafusion",
+        "clickhouse-local",
+        "sqlite",
+        "polars-df",
+        "pandas-df",
+    )
+    assert cfg.benchmarks.include == ("tpch",)
+    assert cfg.scales.rungs == (0.01,)
+    assert cfg.phases == ("preflight", "execute", "report")
+    assert "package" not in cfg.phases
+    assert "explorer_smoke" not in cfg.phases
+    assert not cfg.cleanup.docker_manage_platforms
+    assert cfg.cleanup.docker_platform_switch == "off"
+
+    enumerated = enumerate_cells_with_pruning(cfg, benchmarks=load_benchmarks())
+    assert {(cell.platform, cell.benchmark, cell.scale) for cell in enumerated.cells} == {
+        (platform, "tpch", 0.01) for platform in cfg.platforms.include
+    }
+
+
 # ---------------------------------------------------------------------------
 # w4 lifecycle headers (uat-config-schema-spec-realignment): every top-level
 # config under tests/uat/configs/ (excluding generated-rerun-shards/, which
@@ -738,4 +767,4 @@ def test_top_level_config_paths_exclude_generated_rerun_shards():
     this parametrized set."""
     shard_dir = _CORPUS_CONFIGS_ROOT / "generated-rerun-shards"
     assert all(shard_dir not in p.parents for p in _top_level_config_paths())
-    assert len(_top_level_config_paths()) == 16
+    assert len(_top_level_config_paths()) == 17

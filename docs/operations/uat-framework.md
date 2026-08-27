@@ -15,6 +15,7 @@ developer guide for hacking on the framework itself is
 
 | Goal | Command |
 |---|---|
+| Native TPCH smoke loop (SF 0.01, no Docker) | `make uat-smoke` |
 | Smoke a single cell | `make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01` |
 | Stress preset (one scale, no validate/package/explorer) | `make uat-stress` |
 | Stress, single platform / benchmark | `make uat-stress PLATFORM=duckdb BENCHMARK=tpch` |

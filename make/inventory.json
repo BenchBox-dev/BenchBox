@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "3e9650c48144c4de139919c814097ea365aa43d514f113339477ab52ee6322d3",
+  "contract_sha256": "5f2cf352abacce9a1c917e4239475b736bd32a2a586e29479080f1cf48cb9819",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -154,6 +154,7 @@
     "uat-package",
     "uat-prepull",
     "uat-report",
+    "uat-smoke",
     "uat-stress",
     "uat-sweep",
     "uat-validate",
@@ -164,7 +165,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 185,
+  "public_target_count": 186,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -342,6 +343,7 @@
     "uat-package",
     "uat-prepull",
     "uat-report",
+    "uat-smoke",
     "uat-stress",
     "uat-sweep",
     "uat-validate",
@@ -1807,6 +1809,13 @@
         "recipe_sha256": "f94a4a684227f6ad0eb26f164f95df8650c818d452af221f71fecd634d0ce61f"
       }
     ],
+    "uat-smoke": [
+      {
+        "header": "uat-smoke:",
+        "recipe": "\t@uv run --no-sync -- python -m tests.uat._cli sweep --config tests/uat/configs/uat-smoke.yaml",
+        "recipe_sha256": "1b7f7da62f8cbe7a09b49b7d49a6a7f36427978937ef00a78b7ed9c39f9c4dc2"
+      }
+    ],
     "uat-stress": [
       {
         "header": "uat-stress:",
@@ -1892,7 +1901,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "c3d8b9b1f5819354a3450b9d738707b55f3f74e6e09c2b070c39261401c50ee7",
+  "semantic_sha256": "d134e0ff88d67356af2009db6bb34146f81999d4b6e5a780e7240b623279b14c",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3681,9 +3690,9 @@
       ]
     },
     {
-      "body": ".PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up uat-prepull uat-docker-cleanup uat-artifact-hygiene uat-gate-check",
+      "body": ".PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-smoke uat-stress uat-bring-up uat-prepull uat-docker-cleanup uat-artifact-hygiene uat-gate-check",
       "kind": "rule",
-      "sha256": "10c5492c96dcce2067c7d6f7857a0a985af380a485f161c39aae4c5c24cd7cb9",
+      "sha256": "f1a41f289e6bc1645a605ce109fb7dd94d60c3c9d259f32bd346236cce10429e",
       "targets": [
         ".PHONY"
       ]
@@ -3775,6 +3784,14 @@
       ]
     },
     {
+      "body": "uat-smoke:\n\t@uv run --no-sync -- python -m tests.uat._cli sweep --config tests/uat/configs/uat-smoke.yaml",
+      "kind": "rule",
+      "sha256": "af3ca72b8a923ae00ca4940ea865b5953548ffcc7e06bdbdddcd4ce9b25e2fa9",
+      "targets": [
+        "uat-smoke"
+      ]
+    },
+    {
       "body": "uat-stress:\n\t@uv run --no-sync -- python -m tests.uat._cli stress \\\n\t\t$(if $(CONFIG),--config \"$(CONFIG)\",) \\\n\t\t$(if $(PLATFORM),--platform \"$(PLATFORM)\",) \\\n\t\t$(if $(BENCHMARK),--benchmark \"$(BENCHMARK)\",) \\\n\t\t$(if $(SCALE),--scale \"$(SCALE)\",)",
       "kind": "rule",
       "sha256": "9aa18101c7c1d17062e9efb4fdc2b4ecde0e68460015f994830c55cbbf5c33ec",
@@ -3807,7 +3824,7 @@
       ]
     }
   ],
-  "target_count": 191,
+  "target_count": 192,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -3991,6 +4008,7 @@
     "uat-package",
     "uat-prepull",
     "uat-report",
+    "uat-smoke",
     "uat-stress",
     "uat-sweep",
     "uat-validate",
