@@ -702,10 +702,13 @@ def _validate_validation_phase_consistency(data: dict[str, Any], vr: ValidationR
         phase_status = "unknown"
     else:
         validation_phase = phases["validation"]
+        raw_phase_status = validation_phase.get("status") if isinstance(validation_phase, dict) else None
         phase_status = (
-            _normalize_status(validation_phase) if isinstance(validation_phase, dict) else None
-        ) or "unknown"
-    if phase_status in {"not_run", "not_validated", "unknown"}:
+            (_normalize_status(raw_phase_status) or "unknown") if isinstance(raw_phase_status, str) else "unknown"
+        )
+
+    compatible_phase_statuses = {"passed"} if summary_status == "passed" else {"passed", "partial"}
+    if phase_status not in compatible_phase_statuses:
         vr.error(f"summary.validation={summary_status!r} contradicts phases.validation.status={phase_status!r}")
 
 

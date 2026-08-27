@@ -437,8 +437,8 @@ class TestValidateBundle:
 
     @pytest.mark.parametrize(
         "phases",
-        [None, {}, {"validation": {}}, {"validation": "NOT_RUN"}],
-        ids=["non_dict", "missing_validation", "missing_status", "non_dict_validation"],
+        [None, {}, {"validation": {}}, {"validation": "NOT_RUN"}, {"validation": {"status": []}}],
+        ids=["non_dict", "missing_validation", "missing_status", "non_dict_validation", "non_string_status"],
     )
     def test_validation_claim_rejects_malformed_or_incomplete_phases(self, phases):
         data = _minimal_bundle()
@@ -451,6 +451,35 @@ class TestValidateBundle:
         assert any(
             "summary.validation='passed' contradicts phases.validation.status='unknown'" in error for error in vr.errors
         )
+
+    @pytest.mark.parametrize(
+        "phase_status",
+        ["FAILED", "PARTIAL", "COMPLETED"],
+        ids=["failed", "incompatible_partial", "unrecognized"],
+    )
+    def test_passed_validation_claim_rejects_non_clean_phase_status(self, phase_status: str):
+        data = _minimal_bundle()
+        data["phases"]["validation"]["status"] = phase_status
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any(
+            f"summary.validation='passed' contradicts phases.validation.status={phase_status.lower()!r}" in error
+            for error in vr.errors
+        )
+
+    @pytest.mark.parametrize("phase_status", ["PASSED", "PARTIAL"])
+    def test_partial_claim_accepts_compatible_validation_phase_on_trusted_mirror(self, phase_status: str):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        data["phases"]["validation"]["status"] = phase_status
+        vr = ValidationResult("mirror")
+
+        _validate_bundle(data, vr, allow_partial_validation=True)
+
+        assert vr.ok, vr.errors
 
     def test_partial_claim_rejects_non_dict_validation_phase_on_trusted_mirror(self):
         data = _minimal_bundle()
