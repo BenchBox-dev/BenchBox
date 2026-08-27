@@ -9,6 +9,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import itertools
+import os
 import re
 import shlex
 import subprocess
@@ -273,6 +274,73 @@ class TestReleaseInfrastructure:
             assert step.get("shell") == "bash", (
                 f"{step['name']!r} must pin shell: bash - the matrix includes windows-latest"
             )
+
+    def test_release_tag_must_match_package_version_before_build_or_publish(self):
+        """A v* ref must bind to pyproject metadata before any release artifact is built."""
+        jobs = _workflow("release.yml")["jobs"]
+        verify_steps = jobs["verify-tag-on-release"]["steps"]
+        step_names = [step.get("name") for step in verify_steps]
+        assertion_index = step_names.index("Assert tag matches package version")
+        assertion = verify_steps[assertion_index]
+
+        assert assertion["if"] == "startsWith(github.ref, 'refs/tags/v')"
+        assert assertion["shell"] == "bash"
+        assert assertion["env"]["RELEASE_TAG"] == "${{ github.ref_name }}"
+        run = assertion["run"]
+        assert "pyproject.toml" in run
+        assert 'expected_tag="v${package_version}"' in run
+        assert 'if [[ "$RELEASE_TAG" != "$expected_tag" ]]' in run
+        assert "::error::Release tag" in run
+        assert "exit 1" in run
+        assert step_names.index("Assert release ref is release or an ancestor of release") < assertion_index
+
+        build_needs = jobs["build"]["needs"]
+        build_needs = [build_needs] if isinstance(build_needs, str) else build_needs
+        assert "verify-tag-on-release" in build_needs
+
+    def test_release_tag_version_assertion_accepts_match_and_rejects_mismatch(self):
+        """Execute the workflow guard to prove mismatch is fail-closed."""
+        workflow = _workflow("release.yml")
+        assertion = next(
+            step
+            for step in workflow["jobs"]["verify-tag-on-release"]["steps"]
+            if step.get("name") == "Assert tag matches package version"
+        )
+        with open(REPO_ROOT / "pyproject.toml", "rb") as pyproject_file:
+            package_version = tomllib.load(pyproject_file)["project"]["version"]
+
+        skip_without_posix_shell()
+        matching = run_posix_shell(
+            assertion["run"],
+            cwd=REPO_ROOT,
+            env={**os.environ, "RELEASE_TAG": f"v{package_version}"},
+            capture_output=True,
+            text=True,
+        )
+        assert matching.returncode == 0, matching.stdout + matching.stderr
+
+        mismatched = run_posix_shell(
+            assertion["run"],
+            cwd=REPO_ROOT,
+            env={**os.environ, "RELEASE_TAG": f"v{package_version}-wrong"},
+            capture_output=True,
+            text=True,
+        )
+        assert mismatched.returncode != 0
+        assert "::error::Release tag" in mismatched.stdout
+
+    def test_test_pypi_workflow_dispatch_remains_available_from_branch_refs(self):
+        """The tag assertion must not block the intentional branch-dispatch TestPyPI path."""
+        jobs = _workflow("release.yml")["jobs"]
+        verify_steps = jobs["verify-tag-on-release"]["steps"]
+        assertion = next(step for step in verify_steps if step.get("name") == "Assert tag matches package version")
+        publish_steps = jobs["publish"]["steps"]
+        test_pypi = next(step for step in publish_steps if step.get("name") == "Publish to Test PyPI")
+        pypi = next(step for step in publish_steps if step.get("name") == "Publish to PyPI")
+
+        assert assertion["if"] == "startsWith(github.ref, 'refs/tags/v')"
+        assert test_pypi["if"] == "github.event.inputs.test_pypi == 'true'"
+        assert pypi["if"] == "github.event.inputs.test_pypi != 'true' && startsWith(github.ref, 'refs/tags/v')"
 
     def test_release_required_result_contract(self):
         """Test the main-PR release-required umbrella check shape."""
@@ -539,7 +607,10 @@ class TestReleaseInfrastructure:
         assert recipe.index("no open PR found for v$(VERSION)") < recipe.index("gh pr checks")
         assert recipe.index("gh pr checks") < recipe.index("gh pr merge --squash")
         assert recipe.index("gh pr merge --squash") < recipe.index("git fetch origin --tags")
-        assert recipe.index("git tag v$(VERSION)") < recipe.index("git push origin v$(VERSION)")
+        explicit_tag_refspec = "git push origin refs/tags/v$(VERSION):refs/tags/v$(VERSION)"
+        assert explicit_tag_refspec in recipe
+        assert "git push origin v$(VERSION)" not in recipe
+        assert recipe.index("git tag v$(VERSION)") < recipe.index(explicit_tag_refspec)
 
     def test_release_finalize_blocks_pending_required_check_exit_code(self):
         """gh pr checks exit 8 means at least one required check is still pending."""

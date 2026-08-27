@@ -1231,7 +1231,10 @@ release-finalize:
 	git checkout release
 	git pull --ff-only origin release
 	git tag v$(VERSION)
-	git push origin v$(VERSION)
+	@# release-cut intentionally leaves the local v$(VERSION) branch in place.
+	@# Name both sides of the tag refspec so Git cannot resolve the short name to
+	@# both refs/heads/v$(VERSION) and refs/tags/v$(VERSION).
+	git push origin refs/tags/v$(VERSION):refs/tags/v$(VERSION)
 	@echo
 	@echo "Tag v$(VERSION) pushed; release.yml will publish to PyPI."
 	@echo "Push-to-release jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS)."
