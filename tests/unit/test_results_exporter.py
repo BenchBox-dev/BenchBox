@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import stat
 from datetime import datetime
 from pathlib import Path
 
@@ -94,6 +95,17 @@ def test_write_file_is_atomic_when_replace_fails(monkeypatch, tmp_path):
 
     assert destination.read_text(encoding="utf-8") == "old\n"
     assert not list(tmp_path.glob(".result.json.*.tmp"))
+
+
+def test_write_file_preserves_existing_permissions(tmp_path):
+    destination = tmp_path / "result.json"
+    destination.write_text("old\n", encoding="utf-8")
+    destination.chmod(0o640)
+
+    ResultExporter(output_dir=tmp_path, anonymize=False)._write_file(destination, "new\n")
+
+    assert destination.read_text(encoding="utf-8") == "new\n"
+    assert stat.S_IMODE(destination.stat().st_mode) == 0o640
 
 
 def test_write_file_prefers_canonical_cloud_bytes(tmp_path):

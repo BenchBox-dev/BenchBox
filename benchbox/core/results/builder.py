@@ -595,10 +595,10 @@ class ResultBuilder:
         measurement_results = [r for r in self._query_results if r.run_type == "measurement" and r.iteration > 0]
         results_for_stats = measurement_results if measurement_results else self._query_results
         successful_queries = [r for r in results_for_stats if r.status == "SUCCESS"]
-        # Only SUCCESS is eligible for aggregate metrics. Treat every other
-        # status as failed accounting so newly introduced statuses cannot
-        # silently disappear from the result summary or publication gates.
-        failed_queries = [r for r in results_for_stats if r.status != "SUCCESS"]
+        # Only successful or intentionally skipped queries are non-failures.
+        # Keep SKIPPED out of failure accounting so optional unsupported
+        # operations remain separately represented in the exported query rows.
+        failed_queries = [r for r in results_for_stats if r.status not in ("SUCCESS", "SKIPPED")]
 
         # Use measurement execution times for aggregate timing metrics when possible
         exec_times_all = [

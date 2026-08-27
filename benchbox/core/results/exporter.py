@@ -19,7 +19,8 @@ import io
 import json
 import logging
 import os
-import tempfile
+import stat
+import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from html import escape as html_escape
@@ -159,18 +160,36 @@ class ResultExporter:
         else:
             destination = Path(file_path)
             temporary_path: Path | None = None
-            file_descriptor, temporary_name = tempfile.mkstemp(
-                prefix=f".{destination.name}.",
-                suffix=".tmp",
-                dir=destination.parent,
-            )
-            temporary_path = Path(temporary_name)
+            file_descriptor: int | None = None
+            for _ in range(10):
+                candidate = destination.parent / f".{destination.name}.{uuid.uuid4().hex}.tmp"
+                try:
+                    # 0o666 preserves the normal open(..., "w") behavior because
+                    # the process umask is applied by os.open at creation time.
+                    file_descriptor = os.open(
+                        candidate,
+                        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                        0o666,
+                    )
+                    temporary_path = candidate
+                    break
+                except FileExistsError:
+                    continue
+            if file_descriptor is None or temporary_path is None:
+                raise FileExistsError(f"Unable to allocate a unique temporary export path for {destination}")
+
             try:
+                existing_mode = stat.S_IMODE(destination.stat().st_mode) if destination.exists() else None
+                if existing_mode is not None:
+                    os.fchmod(file_descriptor, existing_mode)
                 with os.fdopen(file_descriptor, mode, encoding="utf-8", newline="") as handle:
+                    file_descriptor = None
                     handle.write(content)
                 os.replace(temporary_path, destination)
                 temporary_path = None
             finally:
+                if file_descriptor is not None:
+                    os.close(file_descriptor)
                 if temporary_path is not None:
                     temporary_path.unlink(missing_ok=True)
 
