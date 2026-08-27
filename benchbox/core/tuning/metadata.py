@@ -1094,6 +1094,12 @@ class TuningMetadataManager:
         Returns:
             List of result tuples
         """
+        # Execute-only clients such as ClickHouse Local/chDB do not expose a
+        # DBAPI cursor. Prefer their native execute() result before falling
+        # back to the cursor contract used by DBAPI adapters.
+        if not hasattr(connection, "cursor") and hasattr(connection, "execute"):
+            return list(connection.execute(sql))
+
         cursor = connection.cursor()
         cursor.execute(sql)
         return cursor.fetchall()
@@ -1108,6 +1114,10 @@ class TuningMetadataManager:
         Returns:
             Single result tuple or None
         """
+        if not hasattr(connection, "cursor") and hasattr(connection, "execute"):
+            rows = list(connection.execute(sql))
+            return rows[0] if rows else None
+
         cursor = connection.cursor()
         cursor.execute(sql)
         return cursor.fetchone()

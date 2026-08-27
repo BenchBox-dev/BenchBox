@@ -52,6 +52,16 @@ class _Conn:
         self.committed = True
 
 
+class _ExecuteOnlyConn:
+    def __init__(self, rows):
+        self.rows = rows
+        self.executed: list[str] = []
+
+    def execute(self, sql):
+        self.executed.append(sql)
+        return self.rows
+
+
 class _Adapter:
     def __init__(self, platform_name: str = "duckdb"):
         self.platform_name = platform_name
@@ -96,6 +106,16 @@ def test_metadata_validation_result_helpers():
     assert result.has_issues() is True
     assert result.errors == ["err"]
     assert result.warnings == ["warn"]
+
+
+def test_fetch_helpers_support_execute_only_connections():
+    """ClickHouse Local/chDB exposes execute() but intentionally has no cursor()."""
+    manager = TuningMetadataManager(_Adapter(platform_name="clickhouse-local"))
+    connection = _ExecuteOnlyConn([("orders", "sorting")])
+
+    assert manager._fetch_all(connection, "SELECT ...") == [("orders", "sorting")]
+    assert manager._fetch_one(connection, "SELECT ...") == ("orders", "sorting")
+    assert connection.executed == ["SELECT ...", "SELECT ..."]
 
 
 @pytest.mark.parametrize(

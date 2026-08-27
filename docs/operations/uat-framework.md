@@ -598,6 +598,11 @@ in `tests/uat/compatibility.py` and carry a `rule_id`, `status`, reason, and
 source evidence. Runtime SQL rewrite rules stay in `benchbox/sql_compat/`;
 UAT rules only explain why a platform/benchmark cell is not attempted.
 
+SQLite `vector_search` is explicitly pruned because the benchmark has no
+SQLite query variant and its default embedding type targets DuckDB-style array
+syntax. This is a benchmark capability boundary, not a claim that SQLite's
+general SQL execution path is unavailable.
+
 When a rule blocks a cell, the execute phase records it in
 `compatibility_pruned.jsonl` with the rule metadata. The report footer includes
 candidate, executed, compatibility-pruned, early-stop-pruned, passed, failed,

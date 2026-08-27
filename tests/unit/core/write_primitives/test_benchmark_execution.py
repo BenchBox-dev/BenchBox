@@ -783,6 +783,10 @@ class TestDataFrameSqlParity:
         for op_id in operation_ids:
             assert seen_status[op_id] == {expected_status[op_id]}
 
+        ddl_rows = [row for row in dataframe_rows if row["query_id"] == "ddl_create_table_simple"]
+        assert ddl_rows
+        assert all(row["rows_returned"] == 0 for row in ddl_rows)
+
     def test_dataframe_workload_query_filter_keeps_sql_subset(self, wp_benchmark, monkeypatch):
         """Query filter should constrain DataFrame parity execution to SQL-equivalent subset."""
         monkeypatch.setattr("benchbox.platforms.duckdb.DuckDBAdapter.create_connection", lambda self, **_: object())

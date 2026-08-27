@@ -1594,7 +1594,12 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                         "query_id": op_id,
                         "status": status,
                         "execution_time_seconds": op_result.write_duration_ms / 1000.0,
-                        "rows_returned": op_result.rows_affected,
+                        # DBAPI reports -1 when a statement has no meaningful
+                        # rowcount (for example DDL). The public result schema
+                        # requires a non-negative integer, so preserve the
+                        # operation status while representing unknown count as
+                        # zero at this boundary.
+                        "rows_returned": max(0, op_result.rows_affected),
                         **({"error": error} if error else {}),
                     }
                 )

@@ -88,6 +88,16 @@ def test_native_model_compatibility_rules_cover_fast_native_targets():
             assert rule.rule_id == f"uat.compat.{platform}.{benchmark}.benchmark_gate"
 
 
+def test_sqlite_vector_search_is_explicitly_pruned():
+    benchmarks = matrix.load_benchmarks()
+
+    rule = compatibility.compatibility_rule_for("sqlite", "vector_search", benchmarks["vector_search"])
+
+    assert rule is not None
+    assert rule.rule_id == "uat.compat.sqlite.vector_search.benchmark_gate"
+    assert "no SQLite query variant" in rule.reason
+
+
 def test_clickhouse_local_metadata_acl_is_fail_closed():
     benchmarks = matrix.load_benchmarks()
 
