@@ -207,6 +207,26 @@ def test_validator_rejects_malformed_schema_v2_family(tmp_path: Path) -> None:
     assert "numeric schema version family 2.x" in proc.stdout
 
 
+@pytest.mark.parametrize(
+    ("phase_status", "reported_status"),
+    [("unknown", "unknown"), ("FAILED", "failed"), ([], "unknown"), ("COMPLETED", "completed")],
+    ids=["unknown", "failed", "non_string", "unrecognized"],
+)
+def test_validator_rejects_explicit_invalid_validation_phase(
+    tmp_path: Path, phase_status: object, reported_status: str
+) -> None:
+    """Explicit invalid validation-phase evidence contradicts a clean claim."""
+    source_dir = tmp_path / "fresh"
+    source_dir.mkdir()
+    payload = {**_FAKE_BUNDLE, "phases": {"validation": {"status": phase_status}}}
+    bundle = _write_payload(source_dir, f"tpch_sf001_duckdb_{reported_status}_phase", payload)
+
+    proc = _run_validator([bundle])
+
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert f"phases.validation.status={reported_status!r}" in proc.stdout
+
+
 @pytest.mark.parametrize("validation_status", ["not_run", "uncertain"])
 def test_validator_rejects_non_clean_public_validation_status(tmp_path: Path, validation_status: str) -> None:
     source_dir = tmp_path / "fresh"
