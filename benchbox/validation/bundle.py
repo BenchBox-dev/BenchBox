@@ -690,8 +690,15 @@ def _validate_validation_phase_consistency(data: dict[str, Any], vr: ValidationR
     if summary_status not in {"passed", "partial"}:
         return
 
+    # ``phases`` is an optional extension to schema-v2. Older valid bundles do
+    # not carry phase evidence, so absence of the extension is not evidence of
+    # a failed validation claim. When the extension is present, however, keep
+    # the consistency check fail-closed for an explicitly missing/unknown
+    # validation phase.
     phases = data.get("phases")
-    validation_phase = phases.get("validation") if isinstance(phases, dict) else None
+    if not isinstance(phases, dict) or "validation" not in phases:
+        return
+    validation_phase = phases["validation"]
     phase_status = _normalize_status(validation_phase) if isinstance(validation_phase, dict) else "unknown"
     if phase_status in {"not_run", "not_validated", "unknown"}:
         vr.error(f"summary.validation={summary_status!r} contradicts phases.validation.status={phase_status!r}")
