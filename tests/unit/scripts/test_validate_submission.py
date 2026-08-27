@@ -426,9 +426,23 @@ class TestValidateBundle:
             "summary.validation='passed' contradicts phases.validation.status='not_run'" in error for error in vr.errors
         )
 
-    def test_validation_claim_rejects_missing_validation_phase(self):
+    def test_validation_claim_allows_absent_optional_phases(self):
         data = _minimal_bundle()
         del data["phases"]
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert vr.ok, vr.errors
+
+    @pytest.mark.parametrize(
+        "phases",
+        [None, {}, {"validation": {}}, {"validation": "NOT_RUN"}],
+        ids=["non_dict", "missing_validation", "missing_status", "non_dict_validation"],
+    )
+    def test_validation_claim_rejects_malformed_or_incomplete_phases(self, phases):
+        data = _minimal_bundle()
+        data["phases"] = phases
         vr = ValidationResult("test")
 
         _validate_bundle(data, vr)

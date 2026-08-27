@@ -682,7 +682,7 @@ def _validate_execution_consistency(data: dict[str, Any], vr: ValidationResult) 
 
 
 def _validate_validation_phase_consistency(data: dict[str, Any], vr: ValidationResult) -> None:
-    """Reject validation claims with no corresponding validation-phase evidence."""
+    """Reject validation claims contradicted by supplied validation-phase evidence."""
     summary = data.get("summary")
     if not isinstance(summary, dict):
         return
@@ -695,11 +695,16 @@ def _validate_validation_phase_consistency(data: dict[str, Any], vr: ValidationR
     # a failed validation claim. When the extension is present, however, keep
     # the consistency check fail-closed for an explicitly missing/unknown
     # validation phase.
-    phases = data.get("phases")
-    if not isinstance(phases, dict) or "validation" not in phases:
+    if "phases" not in data:
         return
-    validation_phase = phases["validation"]
-    phase_status = _normalize_status(validation_phase) if isinstance(validation_phase, dict) else "unknown"
+    phases = data["phases"]
+    if not isinstance(phases, dict) or "validation" not in phases:
+        phase_status = "unknown"
+    else:
+        validation_phase = phases["validation"]
+        phase_status = (
+            _normalize_status(validation_phase) if isinstance(validation_phase, dict) else None
+        ) or "unknown"
     if phase_status in {"not_run", "not_validated", "unknown"}:
         vr.error(f"summary.validation={summary_status!r} contradicts phases.validation.status={phase_status!r}")
 
