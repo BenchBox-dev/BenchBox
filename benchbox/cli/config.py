@@ -181,8 +181,9 @@ class BenchBoxConfig(BaseModel):
 class ConfigManager:
     """Configuration file and settings management."""
 
-    def __init__(self, config_path: Optional[Path] = None):
+    def __init__(self, config_path: Optional[Path] = None, *, strict: bool = False):
         self.console = quiet_console
+        self.strict = strict
         self.config_path = config_path or self._get_default_config_path()
         self.config = self._load_config()
         # Apply environment variable overrides for tuning settings
@@ -202,6 +203,9 @@ class ConfigManager:
     def _load_config(self) -> BenchBoxConfig:
         """Load configuration from file or create default."""
         try:
+            if self.strict and not self.config_path.exists():
+                raise FileNotFoundError(f"Configuration file not found: {self.config_path}")
+
             if self.config_path.exists():
                 try:
                     with open(self.config_path, encoding="utf-8") as f:
@@ -209,16 +213,24 @@ class ConfigManager:
 
                     # If config file is empty or doesn't have any of our main sections,
                     # return default config
-                    if not config_data or not any(
-                        key in config_data
-                        for key in [
-                            "system",
-                            "database",
-                            "benchmarks",
-                            "output",
-                            "execution",
-                        ]
+                    if (
+                        not config_data
+                        or not isinstance(config_data, dict)
+                        or not any(
+                            key in config_data
+                            for key in [
+                                "system",
+                                "database",
+                                "benchmarks",
+                                "output",
+                                "execution",
+                            ]
+                        )
                     ):
+                        if self.strict:
+                            raise ValueError(
+                                f"Configuration file {self.config_path} is empty or has no recognized sections"
+                            )
                         return self._get_default_config()
 
                     # Merge with defaults to ensure all required fields exist
@@ -226,11 +238,15 @@ class ConfigManager:
                     merged_config = deep_merge_dicts(default_config.model_dump(), config_data)
                     return BenchBoxConfig(**merged_config)
                 except Exception as e:
+                    if self.strict:
+                        raise ValueError(f"Failed to load config from {self.config_path}: {e}") from e
                     console.print(f"[yellow]Warning: Failed to load config from {self.config_path}: {e}[/yellow]")
                     return self._get_default_config()
             else:
                 return self._get_default_config()
         except (PermissionError, OSError) as e:
+            if self.strict:
+                raise ValueError(f"Failed to access config from {self.config_path}: {e}") from e
             console.print(f"[yellow]Warning: Permission denied accessing {self.config_path}: {e}[/yellow]")
             return self._get_default_config()
 

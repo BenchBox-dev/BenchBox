@@ -10,8 +10,10 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import logging
 import statistics
+import threading
 import time
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
@@ -112,7 +114,25 @@ class TimingCollector:
         """
         self.enable_detailed_timing = enable_detailed_timing
         self._active_timings: dict[str, dict[str, Any]] = {}
+        self._active_query_tokens: dict[str, list[str]] = {}
         self._completed_timings: list[QueryTiming] = []
+        self._lock = threading.RLock()
+        self._current_timing_token: ContextVar[str | None] = ContextVar(
+            "benchbox_current_timing_token",
+            default=None,
+        )
+
+    def _resolve_timing_token(self, query_id: str) -> str | None:
+        """Resolve a query ID to the current execution, preferring context scope."""
+        current_token = self._current_timing_token.get()
+        with self._lock:
+            if current_token is not None:
+                timing_data = self._active_timings.get(current_token)
+                if timing_data is not None and timing_data["query_id"] == query_id:
+                    return current_token
+
+            query_tokens = self._active_query_tokens.get(query_id)
+            return query_tokens[-1] if query_tokens else None
 
     @contextmanager
     def time_query(self, query_id: str, query_name: Optional[str] = None):
@@ -136,7 +156,11 @@ class TimingCollector:
             "metrics": {},
         }
 
-        self._active_timings[query_id] = timing_data
+        execution_token = f"{query_id}:{id(timing_data)}"
+        with self._lock:
+            self._active_timings[execution_token] = timing_data
+            self._active_query_tokens.setdefault(query_id, []).append(execution_token)
+        context_token = self._current_timing_token.set(execution_token)
 
         try:
             yield timing_data
@@ -151,10 +175,18 @@ class TimingCollector:
 
             # Create QueryTiming object
             query_timing = self._create_query_timing(timing_data)
-            self._completed_timings.append(query_timing)
+            with self._lock:
+                self._completed_timings.append(query_timing)
 
             # Clean up active timing
-            self._active_timings.pop(query_id, None)
+            with self._lock:
+                self._active_timings.pop(execution_token, None)
+                query_tokens = self._active_query_tokens.get(query_id)
+                if query_tokens is not None:
+                    query_tokens.remove(execution_token)
+                    if not query_tokens:
+                        self._active_query_tokens.pop(query_id, None)
+            self._current_timing_token.reset(context_token)
 
     @contextmanager
     def time_phase(self, query_id: str, phase_name: str):
@@ -164,7 +196,12 @@ class TimingCollector:
             query_id: Query identifier this phase belongs to
             phase_name: Name of the execution phase (e.g., 'parse', 'optimize', 'execute')
         """
-        if not self.enable_detailed_timing or query_id not in self._active_timings:
+        if not self.enable_detailed_timing:
+            yield
+            return
+
+        execution_token = self._resolve_timing_token(query_id)
+        if execution_token is None:
             yield
             return
 
@@ -176,8 +213,10 @@ class TimingCollector:
             end_time = time.perf_counter()
             phase_duration = end_time - start_time
 
-            timing_data = self._active_timings[query_id]
-            timing_data["timing_breakdown"][phase_name] = phase_duration
+            with self._lock:
+                timing_data = self._active_timings.get(execution_token)
+                if timing_data is not None:
+                    timing_data["timing_breakdown"][phase_name] = phase_duration
 
     def record_metric(self, query_id: str, metric_name: str, value: Any):
         """Record a metric for a query execution.
@@ -187,8 +226,12 @@ class TimingCollector:
             metric_name: Name of the metric
             value: Metric value
         """
-        if query_id in self._active_timings:
-            self._active_timings[query_id]["metrics"][metric_name] = value
+        execution_token = self._resolve_timing_token(query_id)
+        if execution_token is not None:
+            with self._lock:
+                timing_data = self._active_timings.get(execution_token)
+                if timing_data is not None:
+                    timing_data["metrics"][metric_name] = value
 
     def _create_query_timing(self, timing_data: dict[str, Any]) -> QueryTiming:
         """Create a QueryTiming object from collected timing data."""
@@ -217,29 +260,34 @@ class TimingCollector:
 
     def get_completed_timings(self) -> list[QueryTiming]:
         """Get all completed query timings."""
-        return self._completed_timings.copy()
+        with self._lock:
+            return self._completed_timings.copy()
 
     def clear_completed_timings(self):
         """Clear the completed timings cache."""
-        self._completed_timings.clear()
+        with self._lock:
+            self._completed_timings.clear()
 
     def get_timing_summary(self) -> dict[str, Any]:
         """Get a summary of all collected timings."""
-        if not self._completed_timings:
+        with self._lock:
+            completed_timings = self._completed_timings.copy()
+
+        if not completed_timings:
             return {}
 
-        execution_times = [t.execution_time for t in self._completed_timings if t.status == "SUCCESS"]
+        execution_times = [t.execution_time for t in completed_timings if t.status == "SUCCESS"]
 
         if not execution_times:
             return {
-                "total_queries": len(self._completed_timings),
+                "total_queries": len(completed_timings),
                 "successful_queries": 0,
             }
 
         return {
-            "total_queries": len(self._completed_timings),
+            "total_queries": len(completed_timings),
             "successful_queries": len(execution_times),
-            "failed_queries": len(self._completed_timings) - len(execution_times),
+            "failed_queries": len(completed_timings) - len(execution_times),
             "total_execution_time": sum(execution_times),
             "average_execution_time": statistics.mean(execution_times),
             "median_execution_time": statistics.median(execution_times),

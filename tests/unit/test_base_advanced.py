@@ -1037,6 +1037,7 @@ class TestMockBaseBenchmarkResultHelpers:
                     "execution_time_seconds": 1.25,
                     "row_count": 3,
                     "query_text": "select 1",
+                    "status": "SUCCESS",
                 }
             ],
             execution_metadata={

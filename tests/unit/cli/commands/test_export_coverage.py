@@ -59,7 +59,7 @@ def test_export_load_errors(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     src.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(ex, "load_result_file", lambda *_a, **_k: (_ for _ in ()).throw(ex.ResultLoadError("bad")))
     result = CliRunner().invoke(ex.export, [str(src)])
-    assert result.exit_code == 0
+    assert result.exit_code != 0
     assert "Error loading result file" in result.output
 
 

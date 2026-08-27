@@ -19,8 +19,11 @@ import io
 import json
 import logging
 import os
+import stat
+import uuid
 from collections.abc import Iterable
 from datetime import datetime
+from html import escape as html_escape
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
@@ -58,6 +61,10 @@ logger = logging.getLogger(__name__)
 
 ResultLike = BenchmarkResults
 QueryResultLike = "QueryResult | dict[str, Any]"
+
+
+class ResultExportError(RuntimeError):
+    """Raised when one or more requested result artifacts cannot be exported."""
 
 
 def _redact_usernames(value: Any) -> Any:
@@ -151,8 +158,40 @@ class ResultExporter:
             # does not yet expose pathlib's newline keyword.
             file_path.write_text(content, encoding="utf-8")
         else:
-            with open(file_path, mode, encoding="utf-8", newline="") as handle:
-                handle.write(content)
+            destination = Path(file_path)
+            temporary_path: Path | None = None
+            file_descriptor: int | None = None
+            for _ in range(10):
+                candidate = destination.parent / f".{destination.name}.{uuid.uuid4().hex}.tmp"
+                try:
+                    # 0o666 preserves the normal open(..., "w") behavior because
+                    # the process umask is applied by os.open at creation time.
+                    file_descriptor = os.open(
+                        candidate,
+                        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                        0o666,
+                    )
+                    temporary_path = candidate
+                    break
+                except FileExistsError:
+                    continue
+            if file_descriptor is None or temporary_path is None:
+                raise FileExistsError(f"Unable to allocate a unique temporary export path for {destination}")
+
+            try:
+                existing_mode = stat.S_IMODE(destination.stat().st_mode) if destination.exists() else None
+                if existing_mode is not None:
+                    os.fchmod(file_descriptor, existing_mode)
+                with os.fdopen(file_descriptor, mode, encoding="utf-8", newline="") as handle:
+                    file_descriptor = None
+                    handle.write(content)
+                os.replace(temporary_path, destination)
+                temporary_path = None
+            finally:
+                if file_descriptor is not None:
+                    os.close(file_descriptor)
+                if temporary_path is not None:
+                    temporary_path.unlink(missing_ok=True)
 
     def _create_file_path(self, filename: str):
         """Create file path, ensuring parent directory exists."""
@@ -189,6 +228,7 @@ class ResultExporter:
             formats = ["json"]
 
         exported_files: dict[str, Path] = {}
+        failures: list[str] = []
 
         timestamp = (
             result.timestamp.strftime("%Y%m%d_%H%M%S")
@@ -208,8 +248,7 @@ class ResultExporter:
                 elif format_name == "html":
                     filepath = self._export_html_detailed(result, filename_base)
                 else:
-                    self.console.print(f"[yellow]Unknown export format: {format_name}[/yellow]")
-                    continue
+                    raise ResultExportError(f"Unknown export format: {format_name}")
 
                 exported_files[format_name] = filepath
                 self.console.print(f"[green]Exported {format_name.upper()}:[/green] {filepath}")
@@ -223,6 +262,10 @@ class ResultExporter:
                 # so failure diagnostics are still observable via caplog.
                 logging.critical(message)
                 self.console.print(f"[red]Failed to export {format_name}: {exc}[/red]")
+                failures.append(message)
+
+        if failures:
+            raise ResultExportError("; ".join(failures))
 
         return exported_files
 
@@ -280,7 +323,7 @@ class ResultExporter:
         try:
             self._validator.validate(payload)
         except SchemaV2ValidationError as e:
-            logger.warning(f"Schema validation warning: {e}")
+            raise ResultExportError(f"Schema validation failed: {e}") from e
 
         # Write primary result file
         filepath = self._create_file_path(f"{filename_base}.json")
@@ -625,12 +668,13 @@ class ResultExporter:
         """Export result to HTML format."""
         filepath = self._create_file_path(f"{filename_base}.html")
 
-        benchmark_name = getattr(result, "benchmark_name", "Unknown Benchmark")
-        execution_id = getattr(result, "execution_id", "")
+        benchmark_name = html_escape(str(getattr(result, "benchmark_name", "Unknown Benchmark")), quote=True)
+        execution_id = html_escape(str(getattr(result, "execution_id", "")), quote=True)
         timestamp = getattr(result, "timestamp", datetime.now())
+        timestamp_text = html_escape(timestamp.isoformat() if timestamp else "N/A", quote=True)
         duration = getattr(result, "duration_seconds", 0.0)
-        scale_factor = getattr(result, "scale_factor", 1.0)
-        platform = getattr(result, "platform", "Unknown")
+        scale_factor = html_escape(str(getattr(result, "scale_factor", 1.0)), quote=True)
+        platform = html_escape(str(getattr(result, "platform", "Unknown")), quote=True)
 
         total_queries, successful_queries = self._count_queries(result)
         failed_queries = max(total_queries - successful_queries, 0)
@@ -683,7 +727,7 @@ class ResultExporter:
             <strong>Platform:</strong> {platform} |
             <strong>Scale:</strong> {scale_factor} |
             <strong>Run:</strong> {execution_id} |
-            <strong>Time:</strong> {timestamp.isoformat() if timestamp else "N/A"}
+            <strong>Time:</strong> {timestamp_text}
         </div>
         <div class="stats">
             <div class="stat">
@@ -746,14 +790,18 @@ class ResultExporter:
             exec_time_ms = float(exec_time_seconds) * 1000.0
 
         time_display = f"{exec_time_ms:.1f}" if exec_time_ms is not None else ""
+        query_id = html_escape(str(query.get("query_id", "")), quote=True)
+        rows_returned = html_escape(str(query.get("rows_returned", "")), quote=True)
+        status_text = html_escape(str(status), quote=True)
+        error_text = html_escape(str(query.get("error") or query.get("error_message", "") or ""), quote=True)
 
         return (
             "<tr>"
-            f"<td>{query.get('query_id', '')}</td>"
-            f"<td>{time_display}</td>"
-            f"<td>{query.get('rows_returned', '')}</td>"
-            f"<td class='{status_class}'>{status}</td>"
-            f"<td>{query.get('error') or query.get('error_message', '')}</td>"
+            f"<td>{query_id}</td>"
+            f"<td>{html_escape(time_display, quote=True)}</td>"
+            f"<td>{rows_returned}</td>"
+            f"<td class='{status_class}'>{status_text}</td>"
+            f"<td>{error_text}</td>"
             "</tr>"
         )
 
@@ -1052,6 +1100,10 @@ class ResultExporter:
         summary = comparison.get("summary", {})
         performance_changes = comparison.get("performance_changes", {})
         query_comparisons = comparison.get("query_comparisons", [])
+        total_queries_compared = html_escape(str(summary.get("total_queries_compared", 0)), quote=True)
+        improved_queries = html_escape(str(summary.get("improved_queries", 0)), quote=True)
+        regressed_queries = html_escape(str(summary.get("regressed_queries", 0)), quote=True)
+        unchanged_queries = html_escape(str(summary.get("unchanged_queries", 0)), quote=True)
 
         html_content = f"""<!DOCTYPE html>
 <html>
@@ -1082,26 +1134,26 @@ class ResultExporter:
         <div class="summary">
             <div class="metric neutral">
                 <h3>Queries Compared</h3>
-                <p>{summary.get("total_queries_compared", 0)}</p>
+                <p>{total_queries_compared}</p>
             </div>
             <div class="metric improved">
                 <h3>Improved</h3>
-                <p>{summary.get("improved_queries", 0)}</p>
+                <p>{improved_queries}</p>
             </div>
             <div class="metric regressed">
                 <h3>Regressed</h3>
-                <p>{summary.get("regressed_queries", 0)}</p>
+                <p>{regressed_queries}</p>
             </div>
             <div class="metric neutral">
                 <h3>Unchanged</h3>
-                <p>{summary.get("unchanged_queries", 0)}</p>
+                <p>{unchanged_queries}</p>
             </div>
         </div>
         <h2>Performance Changes</h2>
         <ul>
             {
             "".join(
-                f"<li>{metric.replace('_', ' ').title()}: {vals['change_percent']:+.1f}% "
+                f"<li>{html_escape(str(metric).replace('_', ' ').title(), quote=True)}: {vals['change_percent']:+.1f}% "
                 f"({'Improved' if vals['improved'] else 'Regressed'})</li>"
                 for metric, vals in performance_changes.items()
             )
@@ -1112,7 +1164,7 @@ class ResultExporter:
             <tr><th>Query</th><th>Baseline (ms)</th><th>Current (ms)</th><th>Change</th><th>Status</th></tr>
             {
             "".join(
-                f"<tr><td>{q['query_id']}</td><td>{q['baseline_time_ms']:.1f}</td>"
+                f"<tr><td>{html_escape(str(q['query_id']), quote=True)}</td><td>{q['baseline_time_ms']:.1f}</td>"
                 f"<td>{q['current_time_ms']:.1f}</td><td>{q['change_percent']:+.1f}%</td>"
                 f"<td>{'Improved' if q['improved'] else 'Regressed'}</td></tr>"
                 for q in query_comparisons

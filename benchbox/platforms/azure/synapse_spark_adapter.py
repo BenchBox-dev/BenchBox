@@ -525,7 +525,7 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
                 self._execute_statement(create_sql, kind="sql")
                 logger.debug(f"Created table: {table}")
             except Exception as e:
-                logger.warning(f"Failed to create table {table}: {e}")
+                raise RuntimeError(f"Failed to create Synapse Spark table {table}: {e}") from e
 
         return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
 

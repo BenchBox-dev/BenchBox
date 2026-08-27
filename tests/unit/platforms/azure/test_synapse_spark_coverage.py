@@ -91,7 +91,7 @@ def test_load_data_validates_source_dir_and_builds_table_uris(tmp_path: Path) ->
     adapter = _adapter()
     adapter._staging = MagicMock()
     adapter._staging.tables_exist.return_value = False
-    adapter._execute_statement = MagicMock(side_effect=[None, RuntimeError("table create failed")])
+    adapter._execute_statement = MagicMock(side_effect=[None, None])
 
     with pytest.raises(ConfigurationError, match="Source directory not found"):
         adapter.load_data(_benchmark("lineitem"), None, tmp_path / "missing")

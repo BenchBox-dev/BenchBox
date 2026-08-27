@@ -118,6 +118,42 @@ def test_format_text_and_html_comparison() -> None:
     assert "Query Plan Analysis" in html
 
 
+def test_format_html_comparison_escapes_all_result_derived_labels() -> None:
+    malicious = '"><img src=x onerror=alert(1)>'
+    comparison = _comparison_payload()
+    comparison["baseline_file"] = malicious
+    comparison["current_file"] = malicious
+    for key in ("total_queries_compared", "improved_queries", "regressed_queries", "unchanged_queries"):
+        comparison["summary"][key] = malicious
+    for query in comparison["query_comparisons"]:
+        query["query_id"] = malicious
+    plan_comparison = comparison["plan_comparison"]
+    for plan in plan_comparison["query_plans"]:
+        plan["query_id"] = malicious
+    for regression in plan_comparison["regressions"]:
+        regression["query_id"] = malicious
+
+    baseline = SimpleNamespace(benchmark_name=malicious, platform=malicious, scale_factor=malicious)
+    html = mod._format_html_comparison(comparison, baseline, SimpleNamespace())
+
+    assert malicious not in html
+    assert "&quot;&gt;&lt;img src=x onerror=alert(1)&gt;" in html
+
+
+def test_format_markdown_comparison_returns_markdown(tmp_path: Path) -> None:
+    comparison = _comparison_payload()
+    baseline = SimpleNamespace(benchmark_name="tpch", platform="duckdb", scale_factor=1)
+    current = SimpleNamespace(benchmark_name="tpch", platform="duckdb", scale_factor=1)
+    output = tmp_path / "comparison.md"
+
+    mod._output_file_comparison(comparison, baseline, current, "markdown", str(output), show_all_queries=True)
+
+    content = output.read_text(encoding="utf-8")
+    assert content.startswith("# Benchmark Comparison Report")
+    assert "| Metric | Value |" in content
+    assert "<!DOCTYPE html>" not in content
+
+
 def test_discover_metadata_and_table_render(tmp_path: Path) -> None:
     good = tmp_path / "good.json"
     bad = tmp_path / "bad.json"
@@ -317,6 +353,28 @@ def test_run_platform_comparison_formats(monkeypatch: pytest.MonkeyPatch, tmp_pa
         theme="light",
     )
     assert html.exists()
+
+
+def test_run_platform_comparison_html_escapes_platform_labels(tmp_path: Path) -> None:
+    malicious = '"><img src=x onerror=alert(1)>'
+    output = tmp_path / "comparison.html"
+
+    class _Suite:
+        def _generate_text_report(self, _results):
+            return f"Platforms: {malicious}"
+
+    mod._output_comparison_results(
+        output_format="html",
+        output_file=str(output),
+        suite=_Suite(),
+        config=SimpleNamespace(),
+        results=[],
+        summary=SimpleNamespace(),
+    )
+
+    content = output.read_text(encoding="utf-8")
+    assert malicious not in content
+    assert "&quot;&gt;&lt;img src=x onerror=alert(1)&gt;" in content
 
 
 def test_run_file_comparison_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
