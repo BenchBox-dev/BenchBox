@@ -613,10 +613,11 @@ treated as a pass or a compatibility exclusion.
 
 ### Measured release-gate runtime envelope exclusions
 
-The release-gate runtime-envelope switch records measured, platform-specific
-cell exclusions in the same compatibility-pruning stream. It does not change
-the benchmark registry's declared scale ladder or affect ordinary diagnostic
-runs. For v0.4.0, the native release gate uses the measured 16 GiB host-class
+When enabled, the release-gate runtime-envelope switch applies measured,
+platform-specific cell exclusions in the same compatibility-pruning stream.
+When disabled, those cells remain enumerable for ordinary diagnostic runs. It
+does not change the benchmark registry's declared scale ladder. For v0.4.0,
+the native release campaign uses the measured 16 GiB host-class
 envelope. A larger host does not silently widen this comparable matrix; use it
 for a diagnostic certification run, then remove an exclusion in a reviewed
 change only after that evidence is recorded.
@@ -661,7 +662,10 @@ SQLite stream also contains eleven queries that require unsupported `ROLLUP`
 semantics, four of which additionally require `GROUPING`. The release gate
 therefore prunes the complete platform/benchmark scale ladder under
 `uat.compat.sqlite.tpcds.release_gate_runtime_envelope`; diagnostic sweeps still
-enumerate and run it.
+enumerate and run it. The timeout evidence is provisional: the open
+`sqlite-tpcds-fails-every-query-cursor-passed-as-connection` adapter item from
+the 2026-08-24 handoff describes immediate cursor/connection failures, not a
+300s timeout, so it does not settle this runtime envelope.
 
 The durable evidence record is SHA-bound below. The UAT output root was
 `/Users/joe/Developer/benchmark_runs`; its run logs are in the `logs/`

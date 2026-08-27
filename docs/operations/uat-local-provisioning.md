@@ -74,7 +74,7 @@ startup instructions.
 ## Fresh machine checklist
 
 Provisioning order for a second operator running the release-gate sweep
-(`docs/operations/uat-framework.md` "Release-gate re-run") from scratch. Each
+(`docs/operations/uat-framework.md` "Three-stage UAT campaign") from scratch. Each
 item names the failure symptom if skipped. Evidenced on macOS only — Linux is
 untested territory (see the `uat-operator-provisioning` TODO).
 

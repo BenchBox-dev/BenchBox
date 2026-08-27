@@ -737,6 +737,30 @@ def test_uat_smoke_config_is_native_tpch_sf001_loop():
     }
 
 
+def test_release_gate_runtime_envelopes_are_enabled_or_diagnostic_only():
+    """SQLite TPC-DS #1915 remains provisional beside the open cursor/connection adapter failure (2026-08-24)."""
+    from tests.uat.compatibility import (
+        _DIAGNOSTIC_ONLY_RELEASE_GATE_RUNTIME_ENVELOPES,
+        _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES,
+        _RELEASE_GATE_RUNTIME_ENVELOPES,
+    )
+    from tests.uat.phases.enumerate import enumerate_cells_with_pruning
+
+    release_gate_paths = sorted(_CORPUS_CONFIGS_ROOT.glob("release-gate-*.yaml"))
+    applied: set[tuple[str, str]] = set()
+    for path in release_gate_paths:
+        cfg = config.load_config(path)
+        if cfg.compatibility.release_gate_runtime_envelopes:
+            enumerated = enumerate_cells_with_pruning(cfg)
+            applied.update(
+                (cell.platform, cell.benchmark)
+                for cell in enumerated.compatibility_pruned
+                if "release_gate_runtime_envelope" in cell.rule_id
+            )
+    assert set(_PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES) == _DIAGNOSTIC_ONLY_RELEASE_GATE_RUNTIME_ENVELOPES
+    assert not set(_RELEASE_GATE_RUNTIME_ENVELOPES) - applied - _DIAGNOSTIC_ONLY_RELEASE_GATE_RUNTIME_ENVELOPES
+
+
 # ---------------------------------------------------------------------------
 # w4 lifecycle headers (uat-config-schema-spec-realignment): every top-level
 # config under tests/uat/configs/ (excluding generated-rerun-shards/, which
