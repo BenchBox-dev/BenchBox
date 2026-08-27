@@ -935,6 +935,36 @@ class TestResultExporter:
         assert "Q1" in html_content
         assert "Improved" in html_content
 
+    def test_export_comparison_report_escapes_untrusted_labels(self):
+        """Comparison reports must not render result-controlled labels as markup."""
+        untrusted = '"><script>alert(1)</script>'
+        comparison = {
+            "summary": {
+                "total_queries_compared": untrusted,
+                "improved_queries": untrusted,
+                "regressed_queries": untrusted,
+                "unchanged_queries": untrusted,
+            },
+            "performance_changes": {
+                untrusted: {"change_percent": 1.0, "improved": False},
+            },
+            "query_comparisons": [
+                {
+                    "query_id": untrusted,
+                    "baseline_time_ms": 1.0,
+                    "current_time_ms": 2.0,
+                    "change_percent": 100.0,
+                    "improved": False,
+                }
+            ],
+        }
+
+        report_path = self.exporter.export_comparison_report(comparison)
+        html_content = report_path.read_text(encoding="utf-8")
+
+        assert untrusted not in html_content
+        assert "&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;" in html_content
+
     def test_assess_performance_change(self):
         """Test performance change assessment."""
         # Significant improvement
@@ -989,15 +1019,15 @@ class TestResultExporterErrorHandling:
             validation_status="PASSED",
         )
 
-        exported = self.exporter.export_result(result, formats=["invalid_format"])
+        with pytest.raises(RuntimeError, match="Unknown export format"):
+            self.exporter.export_result(result, formats=["invalid_format"])
 
-        # Should not include the invalid format
-        assert "invalid_format" not in exported
-
-        # Should print warning message
+        # Should print an actionable error message
         assert mock_console.print.called
         calls = [str(call) for call in mock_console.print.call_args_list]
-        assert any("Unknown export format" in call for call in calls)
+        assert any("Unknown export format" in call for call in calls) or any(
+            "Failed to export" in call for call in calls
+        )
 
     @pytest.mark.skipif(sys.platform == "win32", reason="Path handling differs on Windows")
     def test_export_with_invalid_output_dir(self):

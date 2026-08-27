@@ -17,6 +17,33 @@ pytestmark = [
 ]
 
 
+def test_synapse_spark_load_data_propagates_table_creation_failure(tmp_path):
+    """A failed table creation must not be reported as a successful load."""
+    with (
+        patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+        patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
+        patch("benchbox.platforms.azure.synapse_spark_adapter.REQUESTS_AVAILABLE", True),
+        patch("benchbox.platforms.azure.synapse_spark_adapter.CloudSparkStaging") as mock_staging,
+    ):
+        staging = MagicMock()
+        staging.tables_exist.return_value = True
+        mock_staging.from_uri.return_value = staging
+
+        from benchbox.platforms.azure import SynapseSparkAdapter
+
+        adapter = SynapseSparkAdapter(
+            workspace_name="workspace",
+            spark_pool_name="pool",
+            storage_account="account",
+            storage_container="container",
+        )
+        adapter._execute_statement = MagicMock(side_effect=RuntimeError("table create failed"))
+        benchmark = MagicMock(tables={"orders": None})
+
+        with pytest.raises(RuntimeError, match="Failed to create Synapse Spark table orders"):
+            adapter.load_data(benchmark, None, tmp_path)
+
+
 class TestSynapseSparkAdapterInitialization:
     """Test SynapseSparkAdapter initialization."""
 

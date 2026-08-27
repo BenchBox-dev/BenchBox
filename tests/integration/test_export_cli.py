@@ -205,8 +205,12 @@ def test_export_invalid_schema_version(tmp_path):
 
     result = run_cli_command(["export", str(result_file), "--format", "csv"])
 
-    assert result.returncode == 0  # Command completes but shows error
-    assert "Unsupported schema version" in result.stdout or "Error" in result.stdout
+    assert result.returncode == 1  # Invalid input must fail closed
+    assert (
+        "Unsupported schema version" in result.stdout
+        or "Error" in result.stdout
+        or "unsupported" in result.stderr.lower()
+    )
 
 
 @pytest.mark.integration
@@ -219,8 +223,8 @@ def test_export_corrupted_json(tmp_path):
 
     result = run_cli_command(["export", str(result_file), "--format", "csv"])
 
-    assert result.returncode == 0  # Command completes but shows error
-    assert "Error" in result.stdout or "Invalid" in result.stdout
+    assert result.returncode == 1  # Invalid input must fail closed
+    assert "Error" in result.stdout or "Invalid" in result.stdout or "invalid" in result.stderr.lower()
 
 
 @pytest.mark.integration

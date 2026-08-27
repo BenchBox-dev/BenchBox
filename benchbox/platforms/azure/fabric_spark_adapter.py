@@ -539,7 +539,7 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
                 per_table_timings[table] = {"total_ms": elapsed_seconds(tbl_start) * 1000}
                 logger.debug("Created %s table: %s", self.table_format, table)
             except Exception as e:
-                logger.warning("Failed to create table %s: %s", table, e)
+                raise RuntimeError(f"Failed to create Fabric Spark table {table}: {e}") from e
 
         return {}, elapsed_seconds(start_time), per_table_timings or None
 

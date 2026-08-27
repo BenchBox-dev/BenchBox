@@ -13,8 +13,10 @@ import logging
 import time
 import uuid
 from collections.abc import Mapping
+from copy import copy
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from benchbox.core.benchmark_loader import (
@@ -69,7 +71,7 @@ from benchbox.platforms.base.runtime_metadata import (
     collect_normalized_result_metadata,
 )
 from benchbox.platforms.dataframe.benchmark_mixin import DataFramePhases, DataFrameRunOptions
-from benchbox.utils.cloud_storage import CloudStagingPath, create_path_handler
+from benchbox.utils.cloud_storage import CloudStagingPath, create_path_handler, is_cloud_path
 from benchbox.utils.dialect_utils import (
     SqlTranslationOutcome,
     sql_translation_context,
@@ -1522,17 +1524,24 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
     options = getattr(config, "options", {}) or {}
     force_regenerate_flag = bool(options.get("force_regenerate"))
     no_regenerate_flag = bool(options.get("no_regenerate"))
+    populated_tables_invalid = False
 
-    # If tables already present, assume generation done (unless force requested)
+    # Validate populated tables too. Callers may provide stale or incomplete
+    # mappings, so truthiness alone must not bypass manifest and file checks.
     if getattr(benchmark, "tables", None) and not force_regenerate_flag:
-        return False
+        if _populated_tables_are_valid(benchmark, config):
+            return False
+        populated_tables_invalid = True
+        if no_regenerate_flag:
+            raise RuntimeError("no_regenerate is set but populated benchmark tables are missing or stale")
+        emit("⚠️ Populated benchmark tables are missing or stale; regenerating benchmark data")
 
     output_dir = getattr(benchmark, "output_dir", None)
     manifest_valid = False
     manifest_found = False
     manifest_data: dict | None = None
 
-    if output_dir and not force_regenerate_flag:
+    if output_dir and not force_regenerate_flag and not populated_tables_invalid:
         manifest_valid, manifest_data, manifest_found = _validate_manifest_if_present(benchmark, config)
         if manifest_valid:
             summary = _populate_tables_from_manifest(benchmark, manifest_data)
@@ -1582,6 +1591,63 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
     benchmark.generate_data()
     emit(f"✅ Data generation completed in {time.monotonic() - _gen_start:.2f}s")
     return True
+
+
+def _populated_tables_are_valid(benchmark: Any, config: BenchmarkConfig) -> bool:
+    """Return whether caller-provided table mappings are safe to reuse."""
+    tables = getattr(benchmark, "tables", None)
+    table_mode = str((getattr(config, "options", {}) or {}).get("table_mode", "native") or "native").lower()
+    if not tables or not _table_mapping_paths_exist(tables, allow_cloud_uris=table_mode == "external"):
+        return False
+
+    if table_mode == "external":
+        # External table mappings are supplied by the caller and may not have a
+        # local datagen manifest. Their paths are validated at the adapter
+        # boundary, so local manifest comparison would incorrectly regenerate
+        # otherwise usable external data.
+        return True
+
+    output_dir = getattr(benchmark, "output_dir", None)
+    if not output_dir:
+        # External table mappings have no local manifest to compare against;
+        # existence is the strongest validation available at this boundary.
+        return True
+
+    manifest_valid, manifest_data, _manifest_found = _validate_manifest_if_present(benchmark, config)
+    if not manifest_valid or manifest_data is None:
+        return False
+
+    manifest_benchmark = copy(benchmark)
+    manifest_benchmark.tables = None
+    _populate_tables_from_manifest(manifest_benchmark, manifest_data)
+    return _normalize_table_mapping(tables) == _normalize_table_mapping(getattr(manifest_benchmark, "tables", None))
+
+
+def _table_mapping_paths_exist(value: Any, *, allow_cloud_uris: bool = False) -> bool:
+    """Recursively verify that every path in a table mapping exists."""
+    if isinstance(value, Mapping):
+        return bool(value) and all(
+            _table_mapping_paths_exist(child, allow_cloud_uris=allow_cloud_uris) for child in value.values()
+        )
+    if isinstance(value, (list, tuple, set)):
+        return bool(value) and all(
+            _table_mapping_paths_exist(child, allow_cloud_uris=allow_cloud_uris) for child in value
+        )
+    if isinstance(value, (str, Path)):
+        if allow_cloud_uris and is_cloud_path(value):
+            return True
+        return Path(value).exists()
+    exists = getattr(value, "exists", None)
+    return bool(exists and exists()) if callable(exists) else False
+
+
+def _normalize_table_mapping(value: Any) -> Any:
+    """Normalize table mapping containers for stable path comparisons."""
+    if isinstance(value, Mapping):
+        return {str(key): _normalize_table_mapping(child) for key, child in sorted(value.items())}
+    if isinstance(value, (list, tuple, set)):
+        return [_normalize_table_mapping(child) for child in value]
+    return str(value)
 
 
 def _populate_tables_from_manifest(benchmark: Any, manifest: dict | None = None) -> dict[str, Any] | None:

@@ -24,6 +24,7 @@ import csv
 import statistics
 from dataclasses import dataclass, field
 from datetime import datetime
+from html import escape as html_escape
 from pathlib import Path
 from typing import Optional, Union
 
@@ -505,11 +506,12 @@ class TPCHReportGenerator:
         include_certification_info: bool,
     ) -> str:
         """Generate HTML report content."""
+        safe_title = html_escape(str(title), quote=True)
         html = f"""
 <!DOCTYPE html>
 <html>
 <head>
-    <title>{title}</title>
+    <title>{safe_title}</title>
     <style>
         body {{ font-family: Arial, sans-serif; margin: 20px; }}
         .header {{ background-color: #f0f0f0; padding: 20px; border-radius: 5px; }}
@@ -526,7 +528,7 @@ class TPCHReportGenerator:
 </head>
 <body>
     <div class="header">
-        <h1>{title}</h1>
+        <h1>{safe_title}</h1>
         <p>Generated on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
     </div>
 
@@ -582,7 +584,10 @@ class TPCHReportGenerator:
 
             for query_id, query_time in sorted(result.power_test.query_times.items()):
                 relative_perf = query_time / metrics.average_query_time if metrics.average_query_time > 0 else 0
-                html += f"<tr><td>{query_id}</td><td>{query_time:.3f}</td><td>{relative_perf:.2f}</td></tr>"
+                html += (
+                    f"<tr><td>{html_escape(str(query_id), quote=True)}</td>"
+                    f"<td>{query_time:.3f}</td><td>{relative_perf:.2f}</td></tr>"
+                )
 
             html += "</table></div>"
 
@@ -599,13 +604,13 @@ class TPCHReportGenerator:
             if validation.issues:
                 html += "<h3>Issues</h3><ul>"
                 for issue in validation.issues:
-                    html += f"<li class='error'>{issue}</li>"
+                    html += f"<li class='error'>{html_escape(str(issue), quote=True)}</li>"
                 html += "</ul>"
 
             if validation.warnings:
                 html += "<h3>Warnings</h3><ul>"
                 for warning in validation.warnings:
-                    html += f"<li class='warning'>{warning}</li>"
+                    html += f"<li class='warning'>{html_escape(str(warning), quote=True)}</li>"
                 html += "</ul>"
 
             html += "</div>"
@@ -624,13 +629,14 @@ class TPCHReportGenerator:
         title: str,
     ) -> str:
         """Generate HTML comparison report."""
+        safe_title = html_escape(str(title), quote=True)
         change_class = "success" if comparison.relative_change > 0 else "error"
 
         html = f"""
 <!DOCTYPE html>
 <html>
 <head>
-    <title>{title}</title>
+    <title>{safe_title}</title>
     <style>
         body {{ font-family: Arial, sans-serif; margin: 20px; }}
         .header {{ background-color: #f0f0f0; padding: 20px; border-radius: 5px; }}
@@ -647,7 +653,7 @@ class TPCHReportGenerator:
 </head>
 <body>
     <div class="header">
-        <h1>{title}</h1>
+        <h1>{safe_title}</h1>
         <p>Generated on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
     </div>
 
