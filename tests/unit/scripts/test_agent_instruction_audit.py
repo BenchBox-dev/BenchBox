@@ -295,11 +295,26 @@ def test_command_bound_to_superseded_review_doc_fails(tmp_path: Path) -> None:
 def test_canonical_review_policy_semantic_drift_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     canonical = project / CANONICAL_REVIEW_SKILL
-    canonical.write_text(
-        canonical.read_text().replace("read-only except for local capture", "may modify reviewed code")
-    )
+    canonical.write_text(canonical.read_text().replace("review-only", "may modify reviewed code"))
     _, errors = audit(project, CORPUS)
     assert any("canonical REVIEW-AUTH-001 semantics drifted" in error for error in errors)
+
+
+def test_canonical_review_legacy_wording_passes(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    canonical = project / CANONICAL_REVIEW_SKILL
+    content = canonical.read_text()
+    content = content.replace(
+        "Review-shaped actions are read-only except for local capture. They may inspect\nartifacts, run analyses, report findings, and write only to designated TODO,\nblind-spot, audit, decision, or handoff locations.",
+        "Review-shaped actions are read-only except for local capture.",
+    )
+    content = content.replace(
+        "A user request that combines review with fixing or remediation\nremains review-only. Report the findings and stop without changing tracked\nworktree content. Remediation requires a later user message, sent after the\nfindings, that explicitly authorizes it.",
+        "A user request that combines review and remediation remains review-only.\nReport the findings and stop without changing tracked worktree content.\nRemediation requires authorization in a later turn.",
+    )
+    canonical.write_text(content)
+    _, errors = audit(project, CORPUS)
+    assert errors == []
 
 
 def test_agents_bundled_review_zero_mutation_drift_fails(tmp_path: Path) -> None:

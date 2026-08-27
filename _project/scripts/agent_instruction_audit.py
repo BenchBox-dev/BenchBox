@@ -44,13 +44,12 @@ CANONICAL_REVIEW_POLICY_IDS = {
 }
 CANONICAL_REVIEW_ANCHORS = {
     "REVIEW-AUTH-001": (
-        "read-only except for local capture",
-        "Commit any file.",
-        "Push to a remote.",
-        "Open PRs",
-        "authorization in a later turn",
-        "without changing tracked worktree content",
-        "combines review and remediation remains review-only",
+        # Keep these as stable semantic fragments rather than sentence-level
+        # wording. The shared skill has both legacy and streamlined mirrors.
+        "read-only",
+        "local capture",
+        "review-only",
+        "tracked worktree content",
     ),
     "REVIEW-DEFECT-001": ("classify it as a defect", "never in blind-spots"),
     "REVIEW-DEPTH-001": ("Obvious answer", "Blind-spot audit", "Problem reframe"),
