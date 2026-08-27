@@ -13,9 +13,9 @@ make release-cut VERSION=X.Y.Z
 make release-finalize VERSION=X.Y.Z
 ```
 
-That's the entire flow. The two Make targets do the rest. Precondition:
-fresh committed UAT release-gate evidence (≤21 days; see "UAT release-gate
-evidence" below) — without it `validate-base` fails the release PR.
+That's the entire flow. The two Make targets do the rest. Wheel install,
+release canary, and correctness remain the blocking gates; UAT is a
+non-blocking matrix campaign.
 
 ## Pre-merge release-required contract
 
@@ -45,8 +45,9 @@ Before a release PR can merge, the `release-only` ruleset must require:
 
 It does **not** rerun the full stress matrix, live cloud integrations, or
 long-running UAT on the release PR itself. Slow/resource-heavy coverage is
-enforced through the freshness-based release canary below; long-running UAT
-is enforced through committed release-gate evidence (next sections).
+enforced through the freshness-based release canary below. Wheel install,
+canary, and correctness gates remain blocking; long-running UAT is a
+non-blocking matrix campaign.
 
 ## Release canary and ruleset drift
 
@@ -72,39 +73,31 @@ must use `RULESET_DRIFT_TOKEN`, a repository secret with enough ruleset
 visibility to expose bypass actors; the default `GITHUB_TOKEN` is insufficient
 for that part of the contract.
 
-Stress tests and live cloud integrations remain advisory until their
-credential, cost, and flake policies are stable enough to make them
-release-blocking. Long-running UAT is **not** advisory: see the UAT
-release-gate evidence requirement below.
+Stress tests, live cloud integrations, and long-running UAT remain advisory
+until their credential, cost, and flake policies are stable enough to make them
+release-blocking.
 
-## UAT release-gate evidence (required)
+## UAT matrix campaign evidence (advisory)
 
-`scripts/release_readiness_check.py` also requires committed UAT evidence:
-`_project/release-evidence/uat-gate-summary.json` must have a `green`
-verdict, `source_dirty: false`, a `source_commit_sha` that is an ancestor of
-the release PR head, and be at most **21 days** old (vs the canary's 48h: a
-full 3-stage sweep costs an operator-day and releases are cut every few
-weeks, so a 48h window would force redundant sweeps). Missing, red, stale,
-non-ancestor, or dirty evidence fails `validate-base` on the release PR.
-Because release trees curate `_project/` away, CI reads the evidence from
-the fetched `origin/develop` ref. The gate activates on the first release
-whose base branch already carries this script version — i.e. the release
-after the one that ships it; commit evidence to `develop` before that
-second release.
+`scripts/release_readiness_check.py` reports committed UAT evidence when it
+exists. A green verdict, clean source tree, ancestor source SHA, and recent
+completion remain useful campaign-quality signals, but missing, red, stale,
+non-ancestor, or dirty evidence does not fail `validate-base`. Producing the
+three-stage evidence is not a release-cut precondition.
 
-Producing the evidence before cutting a release:
+Running the optional campaign:
 
 ```bash
 make uat-sweep CONFIG=tests/uat/configs/release-gate-01-native-dataframe.yaml
 make uat-sweep CONFIG=tests/uat/configs/release-gate-02-docker-nonoltp.yaml   # after stage 1 completes
 make uat-sweep CONFIG=tests/uat/configs/release-gate-03-docker-oltp.yaml     # after stage 2 completes
 make uat-gate-check STAGE1=<run-dir> STAGE2=<run-dir> STAGE3=<run-dir>
-# review, then commit _project/release-evidence/uat-gate-summary.json to develop
+# review the campaign report; it is historical evidence, not a release input
 ```
 
-See `docs/operations/uat-framework.md` "Release-gate re-run" for stage
-ordering and the mechanized APPROVE/HOLD checklist. The same emergency
-override below covers this check.
+See `docs/operations/uat-framework.md` "Three-stage UAT campaign" for campaign
+ordering and its report checklist. The emergency override below applies only
+to the blocking canary check.
 
 Emergency override is admin-only: set repository variables
 `RELEASE_READINESS_OVERRIDE_SHA` to the exact release PR head SHA and
@@ -227,11 +220,10 @@ release as if it had been blocked.
   for GitHub Actions or fix on a feature branch off `develop`, PR back to
   `develop`, then re-run `make release-cut` (the option-c sweep will delete
   the stale `vX.Y.Z` branch automatically).
-- **UAT gate evidence is missing, stale, red, dirty, or non-ancestor**: run
-  the 3-stage release-gate sweep, `make uat-gate-check`, and commit the
-  evidence file to `develop` (see "UAT release-gate evidence"). Use the
-  emergency override variables only with an explicit incident/approval
-  record.
+- **UAT campaign evidence is missing, stale, red, dirty, or non-ancestor**:
+  follow up with the optional three-stage campaign and review its report (see
+  "UAT matrix campaign evidence"). This does not block `release-finalize` and
+  does not use the emergency override.
 - **Release canary is missing, stale, or red**: inspect the latest
   `release-canary.yml` run. If the non-fast canary failed, fix through
   `develop`; if ruleset drift failed, update the live GitHub ruleset or this
