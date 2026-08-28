@@ -31,7 +31,8 @@ coverage fails; shows recorded differences as warnings; and leaves missing evide
 
 - UI and eligibility behavior: `refs/tags/v0.4.0` source.
 - Corpus corrections: tagged `results-data/CORPUS_NOTES.md`.
-- Current figures: deployed snapshot read on August 28, 2026.
+- Current figures: deployed snapshot read on August 28, 2026, captured as SHA-256
+  `83cf3c7ffe56ad6f89c53944e66d9c18aa794d3985c89ae87588fb57a2398863`.
 - Architecture: released static build and public DuckDB snapshot.
 - Avoid calling warnings hard comparability gates. Benchmark, scale, phase, and timing coverage
   suppress winner claims; version, environment, validation, tuning, and cost differences are
@@ -45,20 +46,23 @@ Target: 1,800-2,200 words.
 
 - Open with two plausible timings and the questions they omit.
 - Introduce the Explorer as a v0.4.0 curated preview.
-- State the thesis and non-certification boundary.
+- State the thesis and non-certification boundary. Make clear that execution mode, environment,
+  validation, and funding context do not all act as hard gates.
 
 ### 2. The launch snapshot, 220 words
 
 - 138 results: 134 displayable, 105 comparable, 55 rankable.
 - Validation: 56 passed, 30 partial, 52 not run.
-- Evidence gaps: 11 complete environment records, no recorded driver versions, 8 tuning modes.
+- Evidence gaps: 11 complete environment records and no recorded driver versions. Eight rows record
+  `notuning`, 130 record no tuning mode, and none records a tuned configuration.
 - All rows are maintainer-run with unspecified funding.
 - Uneven platform coverage. These figures are a dated snapshot, not permanent product claims.
 
 ### 3. Four decisions, 320 words
 
 Explain admission, display, comparison, and ranking as distinct layers. Include named exclusion
-reasons and one concrete example for each.
+reasons, a compact decision diagram, and an implementation excerpt for the query-coverage floor.
+State that the rule does not guarantee identical query sets or identical geomean inputs.
 
 ### 4. Hard gates and visible warnings, 360 words
 
@@ -67,11 +71,12 @@ reasons and one concrete example for each.
 | Canonical benchmark, scale factor, phase | A mismatch suppresses winner and ranking claims |
 | Shared valid timings and minimum coverage | Insufficient overlap suppresses the comparison claim |
 | Platform or driver version | Difference is shown in the Comparability Receipt |
-| Validation, environment, execution mode, tuning, cost | Recorded differences are warnings, not automatic blockers |
+| Validation, environment, execution mode, tuning, physical mechanisms, tuning-policy generation, cost | Recorded differences are warnings, not automatic blockers |
 | Missing values | Shown as not recorded; missing-only fields do not add a warning count |
 
 State explicitly that warnings may coexist with winner claims. The receipt helps readers judge a
-comparison; it is not certification.
+comparison; it is not certification. Use the mixed SQL/DataFrame TPC-H SF1 ranking as a concrete
+example of a warning class that does not suppress winner language.
 
 ### 5. A static read path, 260 words
 
@@ -82,12 +87,15 @@ comparison; it is not certification.
 - Static hosting, CDN, build, and publication controls still matter.
 - Browser SQL is the main payoff; an attach failure appears as an error rather than an empty table.
 - Describe CI performance budgets as test thresholds, not production latency measurements.
+- Include the static-build-to-DuckDB-WASM and JSON-download architecture diagram.
 
 ### 6. Corrections to the corpus, 360 words
 
 - August 24: withdraw 60 zero-query DataFrame non-measurements.
 - Withdraw 17 additional truthful SQL bundles to preserve the raw three-platform cohort floor;
   do not call those 17 invalid.
+- List the exact affected scales. Do not imply that AMPLab, CoffeeShop, H2O-DB, or SSB disappeared
+  entirely when lower-scale groups remain.
 - August 25: normalize 52 retained bundles whose summary claimed passed or partial while the
   validation phase was not run. Preserve timings and failure records; mark validation `not_run`.
 - Admission now rejects the same contradictory validation shape.
@@ -99,7 +107,9 @@ comparison; it is not certification.
 - Run a SQL count by `validation_status` and `is_ranking_eligible`.
 - Open a result detail, inspect methodology and provenance, then download its bundle.
 - Explain that rerunning provides independent corroboration, not guaranteed timing reproduction.
-- Keep the CTA browse-only; invite corrections and discussion through GitHub issues.
+- Keep the CTA browse-first; explain that the public submission guide and Explorer invite pull
+  requests while the corpus README says contributions are not yet open and the public guide names
+  the old repository.
 
 ### 8. What the preview does not establish, 140 words
 
@@ -117,4 +127,5 @@ comparison; it is not certification.
 - Do not describe the static architecture as a security guarantee.
 - Do not claim the 17 cohort-floor withdrawals were invalid.
 - Do not infer an exact implementation root cause for the zero-query validation issue.
-- Do not invite submissions until public instructions are open and consistent.
+- Do not describe the public instructions as closed. Describe the conflicting submission surfaces
+  and avoid promising that a submission automatically enters the Explorer.
