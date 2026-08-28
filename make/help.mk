@@ -132,6 +132,7 @@ help:
 	@echo "  make worktree-create BRANCH=name WORKTREE_PATH=path  Create from origin/develop; verify local/remote branch collisions"
 	@echo "  make worktree-remove WORKTREE_PATH=path              Remove an exact clean, attached, unlocked worktree"
 	@echo "  make worktree-list                                   List registered worktrees"
+	@echo "  make worktree-audit [FORMAT=json]                    Read-only inventory and lifecycle audit of worktrees and branches"
 	@echo ""
 	@echo "Blind-Spot Findings (see _project/blind-spots/README.md):"
 	@echo "  make blind-spots-list   List open findings (one row each)"
