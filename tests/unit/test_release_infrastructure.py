@@ -768,6 +768,60 @@ class TestReleaseInfrastructure:
             f"extra in guard: {sorted(guard_paths - rm_paths)}"
         )
 
+    def test_release_cut_covers_v040_release_pr_test_curation(self):
+        """The next cut must curate every development-only test found by the v0.4.0 release PR."""
+        recipe = _make_target_recipe("release-cut")
+        curated_paths: set[str] = set()
+        for line in recipe.splitlines():
+            rm_match = re.search(r"git rm (?:-rf|-f) --ignore-unmatch (.+?)$", line.strip())
+            if rm_match:
+                curated_paths.update(shlex.split(rm_match.group(1)))
+
+        v040_missed_paths = {
+            "tests/integration/test_todo_db_standalone_compat_real.py",
+            "tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py",
+            "tests/unit/docs/test_architecture_decision_surfaces.py",
+            "tests/unit/scripts/test_agent_instruction_audit.py",
+            "tests/unit/scripts/test_audit_sha_check.py",
+            "tests/unit/scripts/test_browser_gate_aggregate.py",
+            "tests/unit/scripts/test_check_release_curation.py",
+            "tests/unit/scripts/test_check_uv_lock_revision.py",
+            "tests/unit/scripts/test_ci_lint_environment_boundary.py",
+            "tests/unit/scripts/test_corpus_privacy_invariant.py",
+            "tests/unit/scripts/test_dev_loop_pr_metrics.py",
+            "tests/unit/scripts/test_fast_lane_ratchet_check.py",
+            "tests/unit/scripts/test_green_unmerged_sweep.py",
+            "tests/unit/scripts/test_guard_messages.py",
+            "tests/unit/scripts/test_mirror_partial_validation_policy.py",
+            "tests/unit/scripts/test_path_filter_decision.py",
+            "tests/unit/scripts/test_results_explorer_corpus_migrate.py",
+            "tests/unit/scripts/test_results_explorer_snapshot_invariants.py",
+            "tests/unit/scripts/test_skill_sync_ci_policy.py",
+            "tests/unit/scripts/test_soundness_drain_report.py",
+            "tests/unit/scripts/test_timing_policy_modes.py",
+            "tests/unit/scripts/test_todo_db_shadow.py",
+            "tests/unit/scripts/test_todo_db_standalone_compat.py",
+            "tests/unit/scripts/test_todo_schema_migration_check.py",
+            "tests/unit/scripts/test_todo_verification_lint.py",
+            "tests/unit/scripts/test_todo_wrapper.py",
+            "tests/unit/test_auto_merge_hold_is_durable.py",
+            "tests/unit/test_release_infrastructure.py",
+            "tests/unit/workflows/test_auto_merge_partial_stack_race.py",
+            "tests/unit/workflows/test_develop_post_merge_gaps.py",
+            "tests/unit/workflows/test_merge_group_triggers.py",
+            "tests/unit/workflows/test_published_results_base_ci.py",
+            "tests/unit/workflows/test_results_explorer_browser_gate.py",
+            "tests/unit/workflows/test_results_explorer_dependency_audit.py",
+            "tests/unit/workflows/test_seed_corpus_pr_base.py",
+            "tests/unit/workflows/test_validate_submission_changed_bundles.py",
+            "tests/unit/workflows/test_validate_submission_fail_open.py",
+        }
+        assert len(v040_missed_paths) == 37
+        assert v040_missed_paths <= curated_paths, (
+            "release-cut is missing tests that had to be curated manually in the v0.4.0 release PR: "
+            f"{sorted(v040_missed_paths - curated_paths)}"
+        )
+
     def test_release_cut_refreshes_and_stages_uv_lock(self):
         """release-cut must regenerate uv.lock after the version bump and stage it.
 
@@ -795,6 +849,21 @@ class TestReleaseInfrastructure:
         assert "--no-verify" in commit_match.group(1).split(), (
             f"release commit must skip hooks (curation already deleted the hook config): {commit_match.group(1)}"
         )
+
+    def test_release_pushes_allow_the_intentionally_missing_precommit_config(self):
+        """Every post-curation push must allow the release tree's intentionally absent hook config."""
+        for target in ("release-cut", "release-finalize"):
+            recipe = _make_target_recipe(target)
+            push_lines = [
+                line.strip()
+                for line in recipe.splitlines()
+                if "git push" in line and not line.lstrip().startswith("@#") and not line.strip().startswith("echo ")
+            ]
+            assert push_lines, f"expected at least one git push in {target}"
+            for line in push_lines:
+                assert "PRE_COMMIT_ALLOW_NO_CONFIG=1 git push" in line, (
+                    f"{target} push must allow the intentionally missing .pre-commit-config.yaml: {line}"
+                )
 
     def test_release_cut_aligns_release_histories_before_pushing(self):
         """release-cut must merge `origin/release` with `-s ours` before it pushes.
@@ -836,7 +905,9 @@ class TestReleaseInfrastructure:
         # non-ancestor; the merge must land on top of the release commit; and the
         # push must carry the merge, or the PR is born CONFLICTING again.
         commit_match = re.search(r"^\tgit commit .*Release v\$\(VERSION\)", recipe, re.MULTILINE)
-        push_match = re.search(r"^\tgit push -u origin v\$\(VERSION\)", recipe, re.MULTILINE)
+        push_match = re.search(
+            r"^\tPRE_COMMIT_ALLOW_NO_CONFIG=1 git push -u origin v\$\(VERSION\)", recipe, re.MULTILINE
+        )
         assert commit_match, "expected the `Release v$(VERSION)` commit line in release-cut"
         assert push_match, "expected `git push -u origin v$(VERSION)` in release-cut"
         changelog_idx = recipe.index("generate_changelog_entry.py")
