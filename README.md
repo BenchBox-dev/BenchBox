@@ -30,7 +30,7 @@ BenchBox _loosely_ follows [Semantic Versioning](https://semver.org/) using the 
 
 Current release: v0.4.0. This marker mirrors `pyproject.toml` on `develop`, which is kept in sync with the latest published release (bumped to match after each release), and is checked for internal consistency by `benchbox --version`.
 
-**The current PyPI-latest release is `v0.3.1`** (published 2026-07-09; see [PyPI's release history](https://pypi.org/project/benchbox/#history) or `pip index versions benchbox` for the authoritative answer), and its clean install works — `pip install benchbox` followed by `import benchbox` succeeds. (The earlier `v0.3.0` shipped a broken clean install that failed with `ModuleNotFoundError: No module named 'pandas'`; `v0.3.1` is the recovery release that fixes it — see `CHANGELOG.md`.) Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
+**The current PyPI-latest release is `v0.4.0`** (published 2026-08-27; see [PyPI's release history](https://pypi.org/project/benchbox/#history) or `pip index versions benchbox` for the authoritative answer). Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
 
 **For Developers**: See [Release Automation Guide](release/RELEASE_AUTOMATION.md) for the automated release process with reproducible builds and timestamp normalization.
 

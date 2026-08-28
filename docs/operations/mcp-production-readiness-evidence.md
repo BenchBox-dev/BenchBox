@@ -108,6 +108,11 @@ a blocker to the local MCP MVP.
 
 ## Current MVP evidence
 
+> **Evidence scope:** The package-execution proof below is historical pre-release evidence from
+> source revision `b8ba98f6d72702fdd31ceeea260ebad68e37cba1` and used the then-current v0.3.1
+> wheel. It validates the local MCP MVP at that revision; it does not replace the v0.4.0 release
+> workflow's exact-wheel installation checks or certify deferred shared-endpoint publication.
+
 Both MVP checks passed on source revision
 `b8ba98f6d72702fdd31ceeea260ebad68e37cba1` on 2026-08-23 UTC.
 
