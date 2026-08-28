@@ -7,10 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-27
+
+> **Post-publication accounting correction:** This section was reconciled on
+> `develop` after v0.4.0 was published. It records shipped changes omitted from
+> the immutable tag's changelog. The tag and PyPI artifacts were not modified.
+
+### Removed
+
+- **BREAKING: bare `clickhouse` platform alias removed** - The temporary
+  compatibility alias that let `--platform clickhouse` (and `get_adapter(
+  "clickhouse")`) resolve to a first-class platform was added in v0.2.1 as a
+  deprecation shim and is removed in this release (window v0.2.1 → v0.4.0).
+  Use `clickhouse-local` (embedded chDB), `clickhouse-server` (self-hosted), or
+  `clickhouse-cloud` (managed); the explicit `clickhouse:local` /
+  `clickhouse:server` / `clickhouse:cloud` selectors also remain available.
+  Passing bare `clickhouse` now raises a `ValueError` naming these replacements
+  instead of silently defaulting to a deployment mode. The `ch` CLI shorthand
+  now resolves to `clickhouse-local`.
+- **BREAKING: `databricks-connect` install extra removed** - Replace
+  `benchbox[databricks-connect]` with `benchbox[cloud-spark-databricks]`. This
+  renames only the BenchBox install extra; it still installs the upstream
+  `databricks-connect` package. Other DataFrame install extras are unchanged.
+
 ### New
 
-- **Results Explorer preview** - After this release, browse and compare published
-  benchmark results at
+- **Results Explorer preview** - Browse and compare published benchmark results at
   [benchbox.dev/results/](https://benchbox.dev/results/). Explore cross-platform
   leaderboards, per-query timings, hardware details, comparison tools, and SQL
   queries over the public data. The preview contains a curated set of results,
@@ -84,23 +106,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   also redact known secrets, including values carried by chained exceptions.
   Some other MCP errors can still include backend-provided exception text, so
   avoid credentials in values that a backend might repeat in an error.
-
-### Removed
-
-- **BREAKING: bare `clickhouse` platform alias removed** - The temporary
-  compatibility alias that let `--platform clickhouse` (and `get_adapter(
-  "clickhouse")`) resolve to a first-class platform was added in v0.2.1 as a
-  deprecation shim and is removed in this release (window v0.2.1 → v0.4.0).
-  Use `clickhouse-local` (embedded chDB), `clickhouse-server` (self-hosted), or
-  `clickhouse-cloud` (managed); the explicit `clickhouse:local` /
-  `clickhouse:server` / `clickhouse:cloud` selectors also remain available.
-  Passing bare `clickhouse` now raises a `ValueError` naming these replacements
-  instead of silently defaulting to a deployment mode. The `ch` CLI shorthand
-  now resolves to `clickhouse-local`.
-- **BREAKING: `databricks-connect` install extra removed** - Replace
-  `benchbox[databricks-connect]` with `benchbox[cloud-spark-databricks]`. This
-  renames only the BenchBox install extra; it still installs the upstream
-  `databricks-connect` package. Other DataFrame install extras are unchanged.
 
 ## [0.3.1] - 2026-07-09
 
@@ -771,7 +776,8 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01
 - **Issues**: [Report bugs and request features](https://github.com/BenchBox-dev/BenchBox/issues)
 - **PyPI**: [pypi.org/project/benchbox](https://pypi.org/project/benchbox/)
 
-[Unreleased]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/BenchBox-dev/BenchBox/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.2.0...v0.2.1

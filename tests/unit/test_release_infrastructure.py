@@ -243,6 +243,22 @@ class TestReleaseInfrastructure:
         for invocation in forbidden_pytest_invocations:
             assert invocation not in release_workflow_text, "release.yml publishes from tags and does not run pytest"
 
+        github_release_steps = jobs["github-release"]["steps"]
+        extract_steps = [step for step in github_release_steps if step.get("name") == "Extract curated release notes"]
+        assert len(extract_steps) == 1
+        assert "generate_changelog_entry.py" in extract_steps[0]["run"]
+        assert "--print-section" in extract_steps[0]["run"]
+        create_steps = [step for step in github_release_steps if step.get("name") == "Create or update GitHub Release"]
+        assert len(create_steps) == 1
+        release_step = create_steps[0]["run"]
+        assert "gh release view" in release_step
+        assert "gh release create" in release_step
+        assert "gh release upload" in release_step
+        assert "gh release edit" in release_step
+        assert "--clobber" in release_step
+        assert "--notes-file release-notes.md" in release_step
+        assert "--generate-notes" not in release_step
+
         # Check that publish job uses trusted publishing
         publish_job = jobs["publish"]
         assert "permissions" in publish_job
