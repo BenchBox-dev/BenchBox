@@ -219,12 +219,25 @@ jobs:
           name: release-dist
           path: dist/
 
-      - name: Create GitHub Release
+      - name: Extract curated release notes
         run: >
-          gh release create "${{ github.ref_name }}"
-          dist/*
-          --title "BenchBox ${{ needs.build.outputs.version }}"
-          --generate-notes
+          python3 scripts/generate_changelog_entry.py
+          --version "${{ needs.build.outputs.version }}"
+          --print-section
+          > release-notes.md
+
+      - name: Create or update GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ github.ref_name }}"
+          title="BenchBox ${{ needs.build.outputs.version }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/* --clobber
+            gh release edit "$tag" --title "$title" --notes-file release-notes.md
+          else
+            gh release create "$tag" dist/* --title "$title" --notes-file release-notes.md
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

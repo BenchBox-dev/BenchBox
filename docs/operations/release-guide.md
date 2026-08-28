@@ -189,6 +189,9 @@ raw commit subjects, which step 3 requires you to curate anyway.
    `dependency-bounds` → `build` (with `SOURCE_DATE_EPOCH` from the tag
    commit) → `publish` (PyPI trusted publisher) → `github-release` →
    `test-installation` (cross-platform pip install verification).
+   The GitHub Release step extracts a non-empty, curated changelog section and
+   creates or updates the release idempotently, including its attached build
+   artifacts.
 6. Leaves `develop` untouched. Dev-only paths persist on develop by
    design (per A3 in `_project/decisions/single-repo-migration.md`); the
    release squash on `release` does not need to be replayed onto develop.
@@ -203,6 +206,25 @@ then PR back to `develop`. This realigns all six version sources
 (`benchbox/__init__.py`, `pyproject.toml`, the three `Current release:` doc
 markers, and the `landing/index.html` badge) with the latest published release,
 so `develop` no longer trails PyPI.
+
+After the synchronization PR is prepared, verify it against PyPI's live
+publication state rather than assuming the newest git tag was published:
+
+```bash
+uv run -- python scripts/generate_changelog_entry.py --check-release-accounting
+```
+
+If an existing GitHub Release has missing or generic notes, replace only its
+body from the validated changelog section. This command is idempotent and
+refuses empty, placeholder, or raw commit-subject notes:
+
+```bash
+uv run -- python scripts/generate_changelog_entry.py \
+  --version X.Y.Z --sync-github-release-notes
+```
+
+The notes-only recovery does not retag, republish to PyPI, or replace release
+assets.
 
 Push-to-release jobs are post-merge signals. They may still start when `release`
 advances, but they are not pre-publish evidence: the tag push follows the

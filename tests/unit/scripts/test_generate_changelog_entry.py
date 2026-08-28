@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import importlib.util
+import io
+import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -33,6 +36,92 @@ def _commit(repo: Path, message: str, filename: str, content: str) -> None:
     path.write_text(content, encoding="utf-8")
     _git(repo, "add", filename)
     _git(repo, "commit", "-m", message)
+
+
+def test_section_body_returns_only_requested_release_notes() -> None:
+    changelog = """\
+# Changelog
+
+## [Unreleased]
+
+## [0.4.0] - 2026-08-27
+
+### Added
+
+- shipped feature
+
+## [0.3.1] - 2026-07-09
+
+### Fixed
+
+- older fix
+"""
+    assert generate_changelog_entry.section_body(changelog, "0.4.0").strip() == "### Added\n\n- shipped feature"
+    assert generate_changelog_entry.section_body(changelog, "9.9.9") is None
+
+
+def test_curated_section_body_rejects_empty_and_raw_sections(tmp_path: Path) -> None:
+    changelog = tmp_path / "CHANGELOG.md"
+    changelog.write_text(
+        "# Changelog\n\n## [0.4.0] - 2026-08-27\n\n## [0.3.1] - 2026-07-09\n",
+        encoding="utf-8",
+    )
+    body, problems = generate_changelog_entry.curated_section_body(tmp_path, "0.4.0")
+    assert body is None
+    assert "section contains no bullets" in problems
+
+    changelog.write_text(
+        "# Changelog\n\n## [0.4.0] - 2026-08-27\n\n### Added\n\n- raw commit subject (#1933)\n",
+        encoding="utf-8",
+    )
+    body, problems = generate_changelog_entry.curated_section_body(tmp_path, "0.4.0")
+    assert body is None
+    assert any("verbatim commit subjects" in problem for problem in problems)
+
+
+def test_print_section_cli_refuses_uncurated_notes(tmp_path: Path, monkeypatch, capsys) -> None:
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "CHANGELOG.md").write_text(
+        "# Changelog\n\n## [0.4.0] - 2026-08-27\n\n### Added\n\n- raw subject (#1933)\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "generate_changelog_entry.py",
+            "--source",
+            str(tmp_path),
+            "--version",
+            "0.4.0",
+            "--print-section",
+        ],
+    )
+    assert generate_changelog_entry.main() == 1
+    assert "is not publishable" in capsys.readouterr().err
+
+
+def test_latest_published_version_uses_pypi_metadata(monkeypatch) -> None:
+    response = io.BytesIO(json.dumps({"info": {"version": "0.4.0"}}).encode())
+    monkeypatch.setattr(generate_changelog_entry.urllib.request, "urlopen", lambda *_args, **_kwargs: response)
+    assert generate_changelog_entry.latest_published_version() == "0.4.0"
+
+
+def test_update_github_release_notes_edits_existing_release_idempotently(tmp_path: Path, monkeypatch) -> None:
+    observed: dict[str, object] = {}
+
+    def fake_run(args, *, cwd, capture_output, text):
+        notes_path = Path(args[-1])
+        observed.update(args=args, cwd=cwd, notes=notes_path.read_text(encoding="utf-8"), path=notes_path)
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(generate_changelog_entry.subprocess, "run", fake_run)
+    generate_changelog_entry.update_github_release_notes(tmp_path, "0.4.0", "### Added\n\n- shipped")
+
+    assert observed["args"][:4] == ["gh", "release", "edit", "v0.4.0"]
+    assert observed["cwd"] == tmp_path
+    assert observed["notes"] == "### Added\n\n- shipped\n"
+    assert not observed["path"].exists()
 
 
 def test_since_ref_limits_release_changelog_to_main_delta(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
