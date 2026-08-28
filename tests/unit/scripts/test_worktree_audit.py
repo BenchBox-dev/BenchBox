@@ -312,7 +312,7 @@ def test_repo_identity_error_resolution(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         mod,
         "_github_api_request",
-        lambda url, token: ({"message": "Not Found"}, None),
+        lambda url, token: ({"message": "Not Found"}, {}, None),
     )
     repo_id, full_name, err = mod.resolve_repository_identity("BenchBox-dev", "BenchBox", token=None)
     assert repo_id is None
@@ -350,7 +350,7 @@ def test_audit_worktrees_repo_identity_error(tmp_path: Path, monkeypatch: pytest
     monkeypatch.setattr(
         mod,
         "resolve_repository_identity",
-        lambda owner, repo, token: (None, None, "Could not resolve repository"),
+        lambda owner, repo, token, remote_slug=None: (None, None, "Could not resolve repository"),
     )
     wt_info = mod.WorktreeInfo(
         path=str(tmp_path / "wt1"),
@@ -363,7 +363,7 @@ def test_audit_worktrees_repo_identity_error(tmp_path: Path, monkeypatch: pytest
         branch="fix/test-branch",
         head_sha="abc",
     )
-    monkeypatch.setattr(mod, "get_git_worktrees", lambda root: [wt_info])
+    monkeypatch.setattr(mod, "get_git_worktrees", lambda root: ([wt_info], None))
     monkeypatch.setattr(mod, "get_local_branches", lambda root: [])
 
     report = mod.audit_worktrees(repo_root=tmp_path)
@@ -379,7 +379,7 @@ def test_url_encoding_resolve_repository_identity(monkeypatch: pytest.MonkeyPatc
 
     def mock_request(url: str, token: Any):
         captured_urls.append(url)
-        return {"id": 123, "full_name": "owner/repo"}, None
+        return {"id": 123, "full_name": "owner/repo"}, {}, None
 
     monkeypatch.setattr(mod, "_github_api_request", mock_request)
     mod.resolve_repository_identity("owner/with-slash", "repo with spaces", token=None)
@@ -393,7 +393,7 @@ def test_url_encoding_fetch_prs_for_branch(monkeypatch: pytest.MonkeyPatch):
 
     def mock_request(url: str, token: Any):
         captured_urls.append(url)
-        return [], None
+        return [], {}, None
 
     monkeypatch.setattr(mod, "_github_api_request", mock_request)
     mod.fetch_prs_for_branch("my-owner", "repo/special", "feature/awesome#1", expected_repo_id=None, token=None)
@@ -401,7 +401,7 @@ def test_url_encoding_fetch_prs_for_branch(monkeypatch: pytest.MonkeyPatch):
     assert len(captured_urls) == 1
     expected_url = (
         "https://api.github.com/repos/my-owner/repo%2Fspecial/pulls?"
-        + "head=my-owner%3Afeature%2Fawesome%231&state=all&per_page=100"
+        + "head=my-owner%3Afeature%2Fawesome%231&state=all&per_page=100&page=1"
     )
     assert captured_urls[0] == expected_url
 
@@ -429,7 +429,7 @@ def test_fetch_prs_for_branch_base_repo_id_validation(monkeypatch: pytest.Monkey
             "head": {"repo": {"id": 88888}},
         },
     ]
-    monkeypatch.setattr(mod, "_github_api_request", lambda url, token: (fake_prs, None))
+    monkeypatch.setattr(mod, "_github_api_request", lambda url, token: (fake_prs, {}, None))
 
     validated, err = mod.fetch_prs_for_branch("owner", "repo", "branch", expected_repo_id=12345, token=None)
     assert err is None
@@ -549,6 +549,12 @@ def test_resolve_github_token_from_env(monkeypatch: pytest.MonkeyPatch):
     assert mod.resolve_github_token() == "token-from-gh-token"
 
 
+def test_resolve_github_token_precedence(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("GH_TOKEN", "token-from-gh-token")
+    monkeypatch.setenv("GITHUB_TOKEN", "token-from-github-token")
+    assert mod.resolve_github_token() == "token-from-gh-token"
+
+
 def test_resolve_github_token_fallback_gh_cli(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     monkeypatch.delenv("GH_TOKEN", raising=False)
@@ -571,3 +577,135 @@ def test_resolve_github_token_failure(monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr(mod.subprocess, "run", mock_run_fail)
     assert mod.resolve_github_token() is None
+
+
+def test_git_worktrees_enumeration_failure_resolves_unavailable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(mod, "resolve_repository_identity", lambda *a, **kw: (123, "BenchBox-dev/BenchBox", None))
+    monkeypatch.setattr(mod, "_run_git", lambda args, cwd, **kwargs: (128, "", "fatal: not a git repository"))
+
+    report = mod.audit_worktrees(repo_root=tmp_path)
+    assert report["summary"]["unavailable"] == 1
+    assert len(report["worktrees"]) == 1
+    rec = report["worktrees"][0]
+    assert rec["classification"]["state"] == "unavailable"
+    assert rec["classification"]["item_classification"] == "Git error"
+    assert "Git worktree enumeration failed" in rec["classification"]["reason"]
+
+
+def test_pagination_and_truncation_resolves_unavailable(monkeypatch: pytest.MonkeyPatch):
+    # Simulate pagination returning 100 items per page with link header
+    page_calls = []
+
+    def mock_paginated_request(url: str, token: Any):
+        page_calls.append(url)
+        # return 100 items and a Link next header
+        return (
+            [{"number": len(page_calls) * 100 + i, "base": {"repo": {"id": 123}}} for i in range(100)],
+            {"link": '<https://api.github.com/next>; rel="next"'},
+            None,
+        )
+
+    monkeypatch.setattr(mod, "_github_api_request", mock_paginated_request)
+    prs, err = mod.fetch_prs_for_branch("owner", "repo", "branch", expected_repo_id=123, token=None, max_pages=3)
+    assert prs == []
+    assert err is not None
+    assert "PR listing pagination truncated" in err
+
+
+def test_repo_id_validation_all_mismatched_fails_fetch(monkeypatch: pytest.MonkeyPatch):
+    foreign_prs = [
+        {"number": 1, "base": {"repo": {"id": 99999}}},
+        {"number": 2, "base": {"repo": {"id": 88888}}},
+    ]
+    monkeypatch.setattr(mod, "_github_api_request", lambda url, token: (foreign_prs, {}, None))
+    prs, err = mod.fetch_prs_for_branch("owner", "repo", "branch", expected_repo_id=12345, token=None)
+    assert prs == []
+    assert err is not None
+    assert "failed repository identity validation" in err
+
+
+def test_remote_plausibility_cross_check(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        mod,
+        "_github_api_request",
+        lambda url, token: ({"id": 123, "full_name": "BenchBox-dev/BenchBox"}, {}, None),
+    )
+    # Matching repo name (e.g. transfer from joeharris76/BenchBox to BenchBox-dev/BenchBox) passes
+    repo_id, full_name, err = mod.resolve_repository_identity(
+        "BenchBox-dev", "BenchBox", token=None, remote_slug="joeharris76/BenchBox"
+    )
+    assert err is None
+    assert repo_id == 123
+
+    # Completely different repo fails plausibility
+    repo_id, full_name, err = mod.resolve_repository_identity(
+        "BenchBox-dev", "BenchBox", token=None, remote_slug="unrelated/other-project"
+    )
+    assert repo_id is None
+    assert "Repository plausibility mismatch" in (err or "")
+
+
+def test_list_api_schema_without_merged_boolean_evaluates_verified_integrated(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    wt = mod.WorktreeInfo(
+        path=str(tmp_path),
+        registered=True,
+        path_exists=True,
+        is_detached=False,
+        is_locked=False,
+        lock_reason=None,
+        is_dirty=False,
+        branch="fix/list-api-schema",
+        head_sha="head_sha_123",
+    )
+    # GitHub LIST API payload: 'merged' boolean is absent, 'merged_at' is present
+    canned_prs = [
+        {
+            "number": 1937,
+            "state": "closed",
+            # 'merged' key is intentionally omitted
+            "merged_at": "2026-08-28T18:17:34Z",
+            "merge_commit_sha": "merge_sha_123",
+            "head": {"sha": "head_sha_123"},
+            "base": {"ref": "develop"},
+        }
+    ]
+    monkeypatch.setattr(mod, "get_ref_commit_sha", lambda ref, repo: "target_tip_sha")
+    monkeypatch.setattr(mod, "get_reflog_shas", lambda branch, repo: {"head_sha_123"})
+    monkeypatch.setattr(mod, "are_descendants_integrated", lambda pr_sha, head_sha, tip, repo: True)
+    monkeypatch.setattr(mod, "is_ancestor", lambda ancestor_sha, descendant_sha, repo: True)
+
+    cls, evidence = mod.evaluate_and_classify_worktree(
+        wt=wt,
+        repo_owner="BenchBox-dev",
+        repo_name="BenchBox",
+        expected_repo_id=123,
+        token=None,
+        repo_root=tmp_path,
+        canned_prs=canned_prs,
+    )
+    assert cls.state == "verified-integrated"
+    assert cls.item_classification == "finish candidate"
+    assert len(evidence) == 1
+    assert evidence[0].pr_merged is True
+
+
+def test_snapshot_file_persistence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(mod, "resolve_repository_identity", lambda *a, **kw: (123, "BenchBox-dev/BenchBox", None))
+    monkeypatch.setattr(mod, "get_git_worktrees", lambda root: ([], None))
+    monkeypatch.setattr(mod, "get_local_branches", lambda root: [])
+
+    report = mod.audit_worktrees(repo_root=tmp_path)
+    assert report.get("snapshot_path") is not None
+    snapshot_path = Path(report["snapshot_path"])
+    assert snapshot_path.exists()
+    assert snapshot_path.is_file()
+    assert "_project/reports/worktree-lifecycle" in str(snapshot_path)
+
+
+def test_git_run_timeout():
+    # Verify timeout handling in _run_git
+    code, stdout, stderr = mod._run_git(["sleep", "2"], cwd=Path.cwd(), timeout=0.01)
+    assert code == 124
+    assert "timed out" in stderr

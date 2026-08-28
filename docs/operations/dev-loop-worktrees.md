@@ -63,7 +63,9 @@ git -C /absolute/path/to/worktree status --short
 
 `make worktree-audit` performs a bounded, fail-closed inventory combining live
 Git structure, exact GitHub PR evidence, and structural-branch policies. It
-never mutates Git state, never prunes, and never unlocks.
+records point-in-time snapshot files under `_project/reports/worktree-lifecycle/`
+(gitignored), never mutates Git state, never prunes, and never unlocks.
+Per Spec §9, audit reports carry zero deletion authority; removal requires manual verification.
 
 Existing registrations created by the retired workflow are not automatically
 reset or removed by this workflow. Review and remove them separately,
