@@ -52,12 +52,18 @@ container.
 
 ## Inspection
 
-Use native Git for read-only inspection:
+Use native Git and the read-only audit tool for inspection:
 
 ```bash
 make worktree-list
+make worktree-audit
+make worktree-audit FORMAT=json
 git -C /absolute/path/to/worktree status --short
 ```
+
+`make worktree-audit` performs a bounded, fail-closed inventory combining live
+Git structure, exact GitHub PR evidence, and structural-branch policies. It
+never mutates Git state, never prunes, and never unlocks.
 
 Existing registrations created by the retired workflow are not automatically
 reset or removed by this workflow. Review and remove them separately,
