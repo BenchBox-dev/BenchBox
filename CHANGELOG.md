@@ -9,86 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **TPC-DS benchmark cohort published** - First TPC-DS results for DuckDB, DataFusion, and Spark at
-  SF1, plus an SF10 scale point so the corpus has a proper scale ladder.
-- **Cross-surface SQL↔DataFrame equivalence gates** - Enforced result-parity gates between the SQL
-  and DataFrame surfaces across ClickBench, H2O-DB, CoffeeShop, read_primitives, joinorder_synthetic,
-  and other generator-backed benchmarks, with tie-aware and order-aware comparators and a
-  value-digest oracle.
-- **Hosted backend and database-backed tracker** - Turso/libsql embedded-replica hosted backend for
-  results, plus a DB-backed TODO tracker that replaces the YAML workflow, with head-to-head eval
-  records and schema v2 (resume metadata, shared worktree DB).
-- **Remote benchmark server** - Stateless HTTP transport migrated to SDK v2, durable remote benchmark
-  jobs, secured remote HTTP access, and a Content-Security-Policy that closes the remote-fetch
-  channel.
-- **Applied-tuning ledger and honest validation status** - Per-statement applied-tuning receipts,
-  requested/applied config hashes carried through bundles, tuning-policy generation provenance, and a
-  verified state that only holds when every tuned key clause corroborates.
-- **DuckLake benchmark platform** - Added DuckLake as a runnable platform, alongside a new antigravity
-  target and selectable catalog backends with S3 storage.
-- **Results Explorer redesign** - Shared theme tokens and UI primitives, Compare and Rank flows with
-  cohort-aware run identity, collapsible query facets, benchmark/platform switchers, a print layout,
-  device safe-area support, section index routes, and a responsive accessibility pass.
-- **Capability registry consolidation** - Single renderer driven by the capability registry, ADR-002
-  mode vocabulary and facet semantics, ADR-003 baseline policy, and registry coverage extended to all
-  generator-backed platforms.
-- **Result provenance and funding disclosure** - Vendor-supplied provenance labels enforced by the
-  published-results submission gate, funding disclosure on the card surfaces, and deployment backing
-  recorded in result metadata.
-- **Approximate-aggregate and sketch coverage** - DataFrame `approx_count_distinct` and sketch-backed
-  quantile coverage brought to the HLL ceiling, with PySpark sketch persist/merge ops wired to the
-  CLI.
-- Platform options promoted to real `--platform-option` inputs (including `driver_memory`), with a
-  contract matrix and policy-safe option handling.
-- Canonical IMDB dataset cutover with a foundation archive and a canonical restore pipeline.
-- Launched `/prompts/` with navigation, docs CI, and an accessibility checklist.
-- Isolated concurrent stream sessions, each with an independent DB session via a platform capability.
-- Platform support status shown separately from driver availability, with platform diagnostics.
+- **Results Explorer (Curated Preview)** - Interactive in-browser analytics over benchmark runs at
+  [benchbox.dev/results/](https://benchbox.dev/results/), including multi-platform leaderboards,
+  query waterfalls, hardware disclosures, comparison tools, and an embedded SQL workbench.
+- **DuckLake platform (Beta)** - Run benchmarks against DuckLake with independently selectable
+  DuckDB, SQLite, or PostgreSQL catalogs and local or S3-backed Parquet storage. Install with
+  `benchbox[ducklake]`.
+- **Result provenance and funding disclosure** - Canonical result-source, trust-label, and funding
+  vocabulary, `benchbox run --funding`, optional provenance in result bundles, and the
+  `vendor-supplied` trust label.
 
 ### Fixed
 
-- **Public anonymization reaches a fixed point** - Credential and private-path scrubbing across every
-  export boundary, covering URI userinfo, `dsn`/`connection_string`/`private_key`/`sas`/`pat`,
-  `api_key`/`account_key`, `service_account`, and pseudonymized user/tenant/workspace identifiers,
-  with the build failing closed on a privacy rejection instead of dropping the bundle.
-- **Honest run and status reporting** - Run mode executes the real benchmark instead of fabricating
-  success, a run that executed nothing no longer reports a clean pass, incomplete stream runs fail,
-  and status-taxonomy and exit-code soundness were corrected.
-- **Stage 1 UAT remediation** - Fixed Stage 1 benchmark failures for ClickHouse Local, StarRocks,
-  CedarDB, DataFusion, and SQLite TPC-DS, including memory-plan calibration and readiness/memory
-  contracts.
-- **Delimiter and CSV loading** - CRLF-safe trailing-delimiter detection for TBL files, headered-CSV
-  header rows skipped rather than ingested as data, nullable and empty CSV values preserved, and
-  FK-aware table load ordering for TPC-H, SSB, and CoffeeShop.
-- **ClickHouse DDL and types** - Fixed ClickHouse DDL corruption, TIME string remapping, and MergeTree
-  `ORDER BY` handling, and corroborate wrapped ClickHouse keys before verification.
-- **Python 3.10 compatibility** - Restored 3.10-compatible UTC handling and unbroke the 3.10 CI lane
-  so the nightly lane stays green.
-- **Windows** - Fixed three Windows failure groups (one scoped to POSIX), preserved environment for
-  Windows trust gates, and added retries for transient Windows data-generation overruns.
-- **Prebuilt binaries** - Rebuilt darwin-arm64 and darwin-x86_64 `dbgen`/`qgen` against macOS 15.0
-  with GNU checksums, with fallback to source compilation when a precompiled binary cannot execute on
-  the host.
-- **Disk-headroom gating** - Per-platform disk-demand modeling, a conservative pre-cell predictive
-  disk floor, chunked execute, and an always-on disk-headroom gate that hard-fails on estimator
-  crashes.
-- Bumped transitive dependencies to resolve 33 known CVEs.
-- Closed the ClickHouse port and TLS security boundary, and reject unsupported engines at the adapter
-  boundary.
-- Enforced human commit authorship at claim, commit, and merge time.
-- Made schema migrations and snapshot publication atomic.
-- Reused-database drift and incomplete tuning application now fail closed.
-- Corrected throughput-at-size formulas and preserved precise throughput durations.
-- Pre-generate query streams outside the timed concurrent window and report truthful row counts
-  without GIL-serialized materialization.
-- Pinned the public corpus to LF so byte identity is platform-independent.
+- **Correct TPC throughput metrics in newly exported results** - TPC-H and TPC-DS throughput drivers
+  now include every executed query in Throughput@Size, correcting the previous 22x and 99x
+  understatements. Historical bundles remain unchanged.
+- **Unrunnable precompiled TPC binaries fall back to source compilation** - BenchBox probes bundled
+  dbgen, qgen, dsdgen, and dsqgen binaries before selecting them and compiles a compatible tool when
+  the bundled executable cannot run on the host.
+- **Secret redaction** - DuckLake PostgreSQL-catalog errors no longer echo connection passwords,
+  MotherDuck tokens no longer leak through chained exception causes, and `*_key_id` platform options
+  are redacted from exported metadata.
+- **Honest tuning configuration** - Removed the unused `BENCHBOX_TUNING_ENABLED` environment variable
+  and corrected `--tuning auto` guidance for SQL platforms.
+- **DataFusion path compatibility** - Programmatic `load_data` calls now accept table paths supplied
+  as either strings or `pathlib.Path` objects.
 
-### Changed
+### Removed
 
-- Promoted the framework from experimental to beta.
-- Adopted todo-db as the production tracker and retired the todo YAML workflow.
-- Removed the bare `clickhouse` alias.
-- Avoid metadata copies for platform names.
+- **BREAKING: bare `clickhouse` platform alias removed** - Use `clickhouse-local`,
+  `clickhouse-server`, or `clickhouse-cloud`. The `ch` shorthand now resolves to
+  `clickhouse-local`.
+- **BREAKING: `databricks-connect` install extra removed** - Use
+  `benchbox[cloud-spark-databricks]`; it continues to install the upstream `databricks-connect`
+  package.
 
 ## [Unreleased]
 
