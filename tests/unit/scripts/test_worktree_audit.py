@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
@@ -704,8 +705,12 @@ def test_snapshot_file_persistence(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert "_project/reports/worktree-lifecycle" in str(snapshot_path)
 
 
-def test_git_run_timeout():
+def test_git_run_timeout(monkeypatch: pytest.MonkeyPatch):
     # Verify timeout handling in _run_git
-    code, stdout, stderr = mod._run_git(["sleep", "2"], cwd=Path.cwd(), timeout=0.01)
+    def mock_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=["git", "status"], timeout=0.01)
+
+    monkeypatch.setattr(mod.subprocess, "run", mock_run)
+    code, stdout, stderr = mod._run_git(["status"], cwd=Path.cwd(), timeout=0.01)
     assert code == 124
-    assert "timed out" in stderr
+    assert "timed out after 0.01s" in stderr
