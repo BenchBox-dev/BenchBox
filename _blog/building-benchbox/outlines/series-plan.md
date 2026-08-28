@@ -41,6 +41,8 @@
 | 12  | Splitting approximate analytics across BenchBox read and write benchmarks | PUBLISHED | Approximate analytics is split across `read_primitives` one-shot aggregate queries and `write_primitives` persisted sketch-state workflows |
 | 13  | BenchBox v0.3.0: JoinOrder fix, approximate analytics, and agent prompt composer | PUBLISHED | Release announcement: `/prompts/`, the JoinOrder data-contract fix, and deeper approximate/sketch coverage |
 | 14  | Reworking JoinOrder around the IMDb 2013 dataset | PUBLISHED | A user-raised benchmark bug drives the post: `joinorder` now means the full IMDb 2013 JOB dataset at SF=1, with 113 query IDs, manifest-backed data identity, provenance notes, and generated data renamed |
+| 15  | BenchBox v0.4.0: new home, DuckLake, provenance | DRAFTED | Upgrade-focused release notes covering the organization move, Results Explorer preview, DuckLake beta, breaking migrations, and throughput correction |
+| 16  | How the Results Explorer qualifies comparisons | DRAFTED | The Explorer separates display, comparison, and ranking, suppresses unsupported winner claims, and keeps missing evidence visible |
 
 ---
 
