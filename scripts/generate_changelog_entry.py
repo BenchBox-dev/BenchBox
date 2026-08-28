@@ -364,16 +364,37 @@ def curated_section_body(source: Path, version: str) -> tuple[str | None, list[s
 
 
 def existing_tags(source: Path) -> set[str]:
-    """Return local ``v*`` tags, failing when git cannot inspect the checkout.
+    """Return ``v*`` tags available locally or from ``origin``.
 
-    Release accounting does not assume this set is complete. It independently
-    obtains the latest published PyPI version and requires that exact tag to be
-    visible, so a partial or tag-less checkout fails closed.
+    Complete local checkouts avoid a network dependency. Shallow or tag-less
+    checkouts query ``origin`` and union its tags with any local subset so the
+    fast-suite repository guards work after the default shallow Actions
+    checkout. Discovery failures raise instead of silently passing.
     """
     local = _run_git(source, "tag", "-l", "v*")
     if local.returncode != 0:
         raise RuntimeError(f"could not inspect local release tags: {local.stderr.strip() or 'git tag failed'}")
-    return {line.strip() for line in local.stdout.splitlines() if line.strip()}
+    tags = {line.strip() for line in local.stdout.splitlines() if line.strip()}
+
+    shallow = _run_git(source, "rev-parse", "--is-shallow-repository")
+    if shallow.returncode != 0:
+        raise RuntimeError(f"could not inspect checkout depth: {shallow.stderr.strip() or 'git rev-parse failed'}")
+    is_shallow = shallow.stdout.strip() == "true"
+    if tags and not is_shallow:
+        return tags
+
+    remote = _run_git(source, "ls-remote", "--tags", "origin", "refs/tags/v*")
+    if remote.returncode != 0:
+        reason = remote.stderr.strip() or "git ls-remote failed"
+        raise RuntimeError(f"could not discover release tags from origin: {reason}")
+    for line in remote.stdout.splitlines():
+        ref = line.strip().rsplit("\t", 1)[-1]
+        name = ref.rsplit("/", 1)[-1]
+        if name and not name.endswith("^{}"):
+            tags.add(name)
+    if not tags:
+        raise RuntimeError("no release tags were discovered locally or on origin")
+    return tags
 
 
 def find_untagged_changelog_versions(

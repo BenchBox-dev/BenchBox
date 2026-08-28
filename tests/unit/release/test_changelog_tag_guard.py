@@ -113,13 +113,41 @@ def test_fully_tagged_changelog_has_no_untagged_versions():
     assert gce.find_untagged_changelog_versions(FIXTURE_CHANGELOG, tags, current_branch="develop") == []
 
 
-def test_existing_tags_returns_only_tags_visible_to_the_checkout(tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        gce,
-        "_run_git",
-        lambda _source, *args, **_kwargs: subprocess.CompletedProcess([], 0, stdout="v0.3.1\n", stderr=""),
-    )
+def test_existing_tags_uses_complete_non_shallow_local_tags(tmp_path, monkeypatch):
+    responses = {
+        ("tag", "-l", "v*"): subprocess.CompletedProcess([], 0, stdout="v0.3.1\n", stderr=""),
+        ("rev-parse", "--is-shallow-repository"): subprocess.CompletedProcess([], 0, stdout="false\n", stderr=""),
+    }
+    monkeypatch.setattr(gce, "_run_git", lambda _source, *args, **_kwargs: responses[args])
     assert gce.existing_tags(tmp_path) == {"v0.3.1"}
+
+
+def test_existing_tags_unions_remote_tags_for_shallow_checkout(tmp_path, monkeypatch):
+    responses = {
+        ("tag", "-l", "v*"): subprocess.CompletedProcess([], 0, stdout="v0.3.1\n", stderr=""),
+        ("rev-parse", "--is-shallow-repository"): subprocess.CompletedProcess([], 0, stdout="true\n", stderr=""),
+        ("ls-remote", "--tags", "origin", "refs/tags/v*"): subprocess.CompletedProcess(
+            [],
+            0,
+            stdout="abc\trefs/tags/v0.3.1\ndef\trefs/tags/v0.4.0\ndef\trefs/tags/v0.4.0^{}\n",
+            stderr="",
+        ),
+    }
+    monkeypatch.setattr(gce, "_run_git", lambda _source, *args, **_kwargs: responses[args])
+    assert gce.existing_tags(tmp_path) == {"v0.3.1", "v0.4.0"}
+
+
+def test_existing_tags_fails_closed_when_shallow_remote_lookup_fails(tmp_path, monkeypatch):
+    responses = {
+        ("tag", "-l", "v*"): subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+        ("rev-parse", "--is-shallow-repository"): subprocess.CompletedProcess([], 0, stdout="true\n", stderr=""),
+        ("ls-remote", "--tags", "origin", "refs/tags/v*"): subprocess.CompletedProcess(
+            [], 2, stdout="", stderr="origin unavailable"
+        ),
+    }
+    monkeypatch.setattr(gce, "_run_git", lambda _source, *args, **_kwargs: responses[args])
+    with pytest.raises(RuntimeError, match="origin unavailable"):
+        gce.existing_tags(tmp_path)
 
 
 def test_existing_tags_fails_closed_when_local_tag_inspection_fails(tmp_path, monkeypatch):
