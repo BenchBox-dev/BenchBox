@@ -23,6 +23,7 @@ For more information, see:
 """
 
 from .benchmark import SSBBenchmark
+from .family import SSBFamily
 from .generator import SSBDataGenerator
 from .queries import SSBQueryManager
 from .schema import (
@@ -38,6 +39,7 @@ from .schema import (
 
 __all__ = [
     "SSBBenchmark",
+    "SSBFamily",
     "SSBDataGenerator",
     "SSBQueryManager",
     "DATE",

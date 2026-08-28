@@ -17,7 +17,7 @@ BenchBox is a benchmarking toolbox that makes it simple to benchmark analytical 
 
 BenchBox is currently **Beta software**. Core functionality is stable (TPC-H, TPC-DS with DuckDB and major cloud platforms). APIs may still change before 1.0. We recommend thorough testing before using BenchBox in production. See the main README for details on Beta status.
 
-The default wheel includes a `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, concurrency). This namespace is **not part of the supported Beta surface** - it has no stability guarantees and is not integrated with the benchmark registry or CLI. Use it at your own risk.
+The default wheel includes a `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, load_testing). This namespace is **not part of the supported Beta surface** - it has no stability guarantees and is not integrated with the benchmark registry or CLI. Use it at your own risk. `load_testing` in particular is unsupported load-testing/workload-analysis research code, not a supported concurrency-testing feature.
 
 ### Which databases does BenchBox support?
 
@@ -43,7 +43,7 @@ BenchBox is MIT-licensed open-source software. When citing BenchBox in academic 
 
 ```
 Harris, Joe. (2025). BenchBox: A Benchmarking Toolbox for Analytical Databases.
-GitHub repository: https://github.com/joeharris76/benchbox
+GitHub repository: https://github.com/BenchBox-dev/benchbox
 ```
 
 Please also cite the underlying benchmark specifications (TPC-H, TPC-DS, etc.) when reporting results.
@@ -219,7 +219,7 @@ See [Performance Optimization](../advanced/performance-optimization.md) for tuni
 ### Can I use BenchBox with self-hosted databases?
 
 Yes! BenchBox currently supports:
-- **ClickHouse**: Fully supported via `--platform clickhouse` (local or remote)
+- **ClickHouse**: Fully supported via `--platform clickhouse-server` (local or remote)
 - **DuckDB**: Fully supported for local/embedded use via `--platform duckdb`
 - **SQLite**: Fully supported for local/embedded use via `--platform sqlite`
 
@@ -320,12 +320,16 @@ This is a limitation of the upstream TPC-DS tools, not BenchBox.
 
 ### Can I run benchmarks in parallel?
 
-Yes! Some benchmarks support throughput tests with concurrent queries:
+Yes! Some benchmarks support throughput tests with concurrent queries. Set the
+stream count with `--concurrency` (a hidden option on `run`, shown by
+`benchbox run --help-topic all`):
 
 ```bash
-benchbox run --platform duckdb --benchmark tpch --scale 1 --phases throughput --streams 4
+benchbox run --official --benchmark tpch --platform duckdb --scale 1 \
+  --phases throughput --concurrency 4 --seed 42
 ```
 
+The throughput driver floors the stream count at the TPC minimum of 2.
 See [Power Run & Concurrent Queries](../advanced/power-run-concurrent-queries.md).
 
 ### How do I compare results across runs?
@@ -342,7 +346,7 @@ See [Result Schema](../reference/result-schema-v1.md) and [API Reference](../ref
 Yes! BenchBox provides APIs for creating custom benchmarks:
 
 ```python
-from benchbox.core.base import BaseBenchmark
+from benchbox.base import BaseBenchmark
 
 class MyCustomBenchmark(BaseBenchmark):
     # Implement required methods
@@ -377,7 +381,7 @@ You can also contribute by:
 
 ### Where do I report bugs?
 
-[Create an issue on GitHub](https://github.com/joeharris76/benchbox/issues/new) with:
+[Create an issue on GitHub](https://github.com/BenchBox-dev/benchbox/issues/new) with:
 - BenchBox version (`benchbox --version`)
 - Platform and benchmark being used
 - Complete error messages and logs
@@ -385,7 +389,7 @@ You can also contribute by:
 
 ### How do I request new features?
 
-[Open a feature request](https://github.com/joeharris76/benchbox/issues/new) on GitHub describing:
+[Open a feature request](https://github.com/BenchBox-dev/benchbox/issues/new) on GitHub describing:
 - The use case and motivation
 - Proposed behavior or API
 - Alternative solutions you've considered
@@ -394,7 +398,7 @@ You can also contribute by:
 ### Where can I ask questions?
 
 For questions not covered in the documentation:
-1. Check existing [GitHub issues and discussions](https://github.com/joeharris76/benchbox/issues)
+1. Check existing [GitHub issues and discussions](https://github.com/BenchBox-dev/benchbox/issues)
 2. Open a new discussion or issue
 3. Provide context and specific details
 

@@ -582,34 +582,6 @@ def validate_table_name(name: str, allow_schema_prefix: bool = False) -> str:
     return validate_sql_identifier(name, "table name", MAX_TABLE_NAME_LENGTH, allow_dots=allow_schema_prefix)
 
 
-def sanitize_error_message(message: str, redact_identifiers: bool = True) -> str:
-    """Sanitize error messages to prevent information disclosure.
-
-    Args:
-        message: The error message to sanitize
-        redact_identifiers: Whether to redact table/column names
-
-    Returns:
-        The sanitized error message
-    """
-    if not redact_identifiers:
-        return message
-
-    # Redact potential table/column names in common error patterns
-    patterns = [
-        (r"table '([^']+)'", "table '[REDACTED]'"),
-        (r"column '([^']+)'", "column '[REDACTED]'"),
-        (r"database '([^']+)'", "database '[REDACTED]'"),
-        (r"schema '([^']+)'", "schema '[REDACTED]'"),
-    ]
-
-    result = message
-    for pattern, replacement in patterns:
-        result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
-
-    return result
-
-
 # ============================================================================
 # Convenience Functions
 # ============================================================================

@@ -2,7 +2,7 @@ name: Cross-Platform Validation
 
 # Nightly matrix: DuckDB × {DataFusion, Polars-DF, ClickHouse-local} at TPC-H SF=0.01.
 #
-# Purpose: detect silent cross-platform divergences before they land on main.
+# Purpose: detect silent cross-platform divergences before they land on release.
 # Scope:   credential-free tier only.  Snowflake/Databricks join when the
 #          nightly lane gains secrets (separate follow-up TODO).
 #

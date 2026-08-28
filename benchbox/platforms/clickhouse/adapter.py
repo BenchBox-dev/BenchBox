@@ -34,14 +34,15 @@ class ClickHouseAdapter(
         - Query 81: Query plan cloning not implemented for aggregation steps (Code: 48)
 
         These queries may fail even with transformations applied and require
-        manual query rewriting or ClickHouse engine improvements.
+        manual query rewriting, a larger local memory envelope, or ClickHouse
+        engine improvements.
     """
 
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
-    # Known incompatible queries that may fail despite transformations
+    # Known incompatible queries that may fail despite transformations.
     KNOWN_INCOMPATIBLE_QUERIES = {
         "tpcds": [14, 30, 81],
     }
@@ -133,6 +134,20 @@ class ClickHouseAdapter(
         from benchbox.core.query_plans.parsers.clickhouse import ClickHouseQueryPlanParser
 
         return ClickHouseQueryPlanParser()
+
+    def get_tuning_introspector(self):
+        """Read ``system.tables`` keys to corroborate the applied ledger.
+
+        Surfaces ClickHouse ``sorting_key`` / ``partition_key`` as receipt
+        evidence (see ``benchbox.platforms.clickhouse.introspection``).
+        ClickHouse's key-bearing DDL runs at ``CREATE TABLE`` time outside the
+        recording connection, so ``create_schema`` records the tuned statement
+        onto the ledger itself; every tuned clause it carries must corroborate
+        here before the run reaches ``applied_verified``.
+        """
+        from benchbox.platforms.clickhouse.introspection import ClickHouseTuningIntrospector
+
+        return ClickHouseTuningIntrospector()
 
 
 __all__ = ["ClickHouseAdapter"]

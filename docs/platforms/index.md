@@ -102,6 +102,7 @@ These platforms are included in the base BenchBox installation with no additiona
 - [**Google BigQuery**](bigquery.md) - Serverless data warehouse
 - [**Amazon Redshift**](redshift.md) - Columnar data warehouse
 - [**MotherDuck**](motherduck.md) - Serverless DuckDB cloud (inherits DuckDB dialect)
+- [**DuckLake**](ducklake.md) - DuckDB lakehouse format (Parquet data + SQL catalog; inherits DuckDB dialect)
 - [**Starburst**](starburst.md) - Managed Trino / Starburst Galaxy (inherits Trino dialect)
 - [Amazon Athena](athena.md) - Serverless query service for S3
 - [Firebolt](firebolt.md) - High-performance cloud analytics (Core + Cloud modes)
@@ -223,6 +224,7 @@ databricks
 bigquery
 redshift
 motherduck
+ducklake
 starburst
 quanton
 athena

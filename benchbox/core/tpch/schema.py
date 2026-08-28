@@ -6,7 +6,7 @@ from typing import Any, NamedTuple, Optional
 
 import yaml
 
-from benchbox.core.schema_primitives import BaseSchemaTable
+from benchbox.core.schema_primitives import BaseSchemaTable, get_fk_ordered_table_names
 from benchbox.core.tuning import BenchmarkTunings, TableTuning, TuningColumn
 
 
@@ -110,6 +110,21 @@ def get_table(name: str) -> Table:
     if name_lower not in TABLES_BY_NAME:
         raise ValueError(f"Invalid table name: {name}")
     return TABLES_BY_NAME[name_lower]
+
+
+def get_table_loading_order() -> list[str]:
+    """Get the FK-safe table load order for the full TPC-H schema.
+
+    Derived from the schema's own foreign-key metadata (``Column.foreign_key``
+    on each ``Table`` in ``TABLES``) via a stable topological sort, rather
+    than a hand-maintained constant, so it stays correct if the schema
+    definitions ever change.
+
+    Returns:
+        All TPC-H table names (lowercase), ordered so a table referenced by
+        a foreign key always precedes the table that references it.
+    """
+    return get_fk_ordered_table_names(TABLES)
 
 
 def get_create_all_tables_sql(enable_primary_keys: bool = True, enable_foreign_keys: bool = True) -> str:

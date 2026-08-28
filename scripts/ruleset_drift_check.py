@@ -30,21 +30,20 @@ from ruleset_review_enforcement import (  # noqa: E402
 
 # Findings with this prefix are surfaced (rendered, included in the JSON
 # `findings` list) exactly like any other drift finding, but do NOT flip the
-# exit code / `status` field to failed. Used for the develop review-rule gap
-# below while it is still a pending admin action.
+# exit code / `status` field to failed. They are reserved for explicit
+# migration overrides and human-confirmation advisories (see
+# `tag_creation_findings`).
 WARNING_PREFIX = "WARNING (non-blocking): "
 
-# Decision (ruleset-drift-check-review-rule-coverage, w1): WARN-until-enforced.
-# The live develop ruleset does not yet require a code-owner review
-# (docs/operations/repo-admin-settings.md's "Soundness-path review
-# enforcement" section - deferred admin action tracked by
-# auto-merge-review-gate-admin-enforcement). Flipping this straight to a
-# blocking check would make the daily release-canary.yml run (and the
-# validate-main-pr.yml bootstrap invocation) permanently red until that
-# admin PUT lands. Flip this constant to True once that TODO's w3 confirms
-# the PUT has landed - this is the one-line change referenced by that
-# decision; no other code here needs to change.
-DEVELOP_REVIEW_RULE_ENFORCED = False
+# The develop-squash-only ruleset (id 15611785) requires current-base status
+# checks and code-owner review. The runbook parser and comparison below enforce
+# both policies; the explicit review override remains available for fixtures.
+DEVELOP_REVIEW_RULE_ENFORCED = True
+
+PYPI_ENVIRONMENT = "pypi"
+PYPI_REQUIRED_REVIEWERS = (("User", 57046, "joeharris76"),)
+PYPI_CAN_ADMINS_BYPASS = True
+PYPI_PREVENT_SELF_REVIEW = False
 
 
 @dataclass(frozen=True)
@@ -57,6 +56,52 @@ class ExpectedRuleset:
     non_fast_forward: bool
     deletion: bool
     bypass_actors_none: bool
+
+
+def environment_protection_findings(live: dict[str, Any]) -> list[str]:
+    """Return blocking drift findings for the real-PyPI environment gate."""
+    findings: list[str] = []
+    if live.get("name") != PYPI_ENVIRONMENT:
+        findings.append(f"pypi environment: name is {live.get('name')!r}, expected {PYPI_ENVIRONMENT!r}")
+    if live.get("can_admins_bypass") is not PYPI_CAN_ADMINS_BYPASS:
+        findings.append(
+            "pypi environment: can_admins_bypass is "
+            f"{live.get('can_admins_bypass')!r}, expected {PYPI_CAN_ADMINS_BYPASS!r}"
+        )
+
+    protection_rules = live.get("protection_rules")
+    if not isinstance(protection_rules, list):
+        findings.append("pypi environment: protection_rules is missing or malformed")
+        return findings
+    reviewer_rules = [
+        rule for rule in protection_rules if isinstance(rule, dict) and rule.get("type") == "required_reviewers"
+    ]
+    if len(reviewer_rules) != 1:
+        findings.append(f"pypi environment: found {len(reviewer_rules)} required_reviewers rules, expected exactly one")
+        return findings
+
+    rule = reviewer_rules[0]
+    if rule.get("prevent_self_review") is not PYPI_PREVENT_SELF_REVIEW:
+        findings.append(
+            "pypi environment: prevent_self_review is "
+            f"{rule.get('prevent_self_review')!r}, expected {PYPI_PREVENT_SELF_REVIEW!r}"
+        )
+    raw_reviewers = rule.get("reviewers")
+    if not isinstance(raw_reviewers, list):
+        findings.append("pypi environment: reviewers is missing or malformed")
+        return findings
+    reviewers: list[tuple[Any, Any, Any]] = []
+    for reviewer in raw_reviewers:
+        if not isinstance(reviewer, dict):
+            reviewers.append((None, None, None))
+            continue
+        principal = reviewer.get("reviewer")
+        if not isinstance(principal, dict):
+            principal = {}
+        reviewers.append((reviewer.get("type"), principal.get("id"), principal.get("login")))
+    if tuple(reviewers) != PYPI_REQUIRED_REVIEWERS:
+        findings.append(f"pypi environment: required reviewers are {reviewers!r}, expected {PYPI_REQUIRED_REVIEWERS!r}")
+    return findings
 
 
 def _api_json(url: str, token: str) -> Any:
@@ -116,7 +161,7 @@ def _other_properties(section: str, name: str) -> dict[str, str]:
 def parse_expected_rulesets(runbook_text: str) -> dict[str, ExpectedRuleset]:
     """Extract expected ruleset state from docs/operations/repo-admin-settings.md."""
     expected: dict[str, ExpectedRuleset] = {}
-    for name in ("develop-squash-only", "main-release-only"):
+    for name in ("develop-squash-only", "release-only"):
         section = _section_for_ruleset(runbook_text, name)
         ref_match = re.search(r"targets?\s+`([^`]+)`", section)
         if not ref_match:
@@ -171,17 +216,10 @@ def compare_ruleset(
 ) -> list[str]:
     """Return human-readable drift findings for one ruleset.
 
-    For ``develop-squash-only`` only (``main-release-only`` has no equivalent
-    documented requirement), also runs the shared
-    ``ruleset_review_enforcement.review_enforcement_findings`` predicate
-    against the already-fetched live payload (via ``extract_rules`` - no
-    second API fetch) so a missing code-owner-review rule surfaces here too.
-    While ``enforce_review_rule`` is ``False`` (the default, driven by
-    ``DEVELOP_REVIEW_RULE_ENFORCED``), those findings are prefixed with
-    ``WARNING_PREFIX``: they render in the same findings list / JSON output
-    as any other drift finding, but the caller (``main``) excludes
-    ``WARNING_PREFIX``-prefixed entries when deciding the exit code, so the
-    canary does not go red for a gap that is still a pending admin action.
+    For ``develop-squash-only`` only, applies the shared
+    ``review_enforcement_findings`` predicate to the already-fetched live
+    payload. The live default is blocking; callers may explicitly pass
+    ``enforce_review_rule=False`` for migration fixtures.
     """
     findings: list[str] = []
     if live.get("enforcement") != "active":
@@ -237,6 +275,7 @@ def tag_creation_findings(
     all_live_rulesets: list[dict[str, Any]],
     *,
     enforce_tag_rule: bool = TAG_RULESET_ENFORCED,
+    require_bypass_actor_visibility: bool = False,
 ) -> list[str]:
     """Findings for the ``v*`` tag-creation ruleset (release-flow hardening).
 
@@ -248,14 +287,16 @@ def tag_creation_findings(
     fixed expected name — any ruleset with ``target: "tag"`` that covers
     ``refs/tags/v*`` with a ``creation`` rule counts.
 
-    Mirrors the ``DEVELOP_REVIEW_RULE_ENFORCED`` WARN-until-applied pattern:
-    while ``enforce_tag_rule`` is ``False`` (the default, driven by
-    ``TAG_RULESET_ENFORCED``), a missing/incomplete tag ruleset is a
-    ``WARNING_PREFIX``-prefixed finding — visible, non-blocking — until the
-    admin POST lands and the flag is flipped.
+    ``enforce_tag_rule`` defaults to the live-enforced ``TAG_RULESET_ENFORCED``
+    setting, so a missing or incomplete tag ruleset is blocking in normal
+    canary execution. Callers may explicitly pass ``False`` for a migration
+    fixture that must retain the former warning-only behavior.
     """
     findings: list[str] = []
-    protection_findings = tag_protection_findings(all_live_rulesets)
+    protection_findings = tag_protection_findings(
+        all_live_rulesets,
+        require_bypass_actor_visibility=require_bypass_actor_visibility,
+    )
     if protection_findings:
         if enforce_tag_rule:
             findings.extend(protection_findings)
@@ -290,6 +331,10 @@ def _fetch_live_rulesets(repo: str, token: str) -> dict[str, dict[str, Any]]:
     return by_name
 
 
+def _fetch_environment(repo: str, token: str, name: str = PYPI_ENVIRONMENT) -> dict[str, Any]:
+    return _api_json(f"https://api.github.com/repos/{repo}/environments/{name}", token)
+
+
 def blocking_findings(findings: list[str]) -> list[str]:
     """Findings that should fail the check (excludes WARNING_PREFIX entries)."""
     return [finding for finding in findings if not finding.startswith(WARNING_PREFIX)]
@@ -304,6 +349,7 @@ def render_summary(findings: list[str], expected: dict[str, ExpectedRuleset]) ->
         lines = ["# Ruleset Drift - OK", ""]
         for ruleset in expected.values():
             lines.append(f"- {ruleset.name}: required checks {', '.join(ruleset.required_checks)}")
+        lines.append("- pypi environment: required reviewer joeharris76 (User id 57046)")
     if warnings:
         lines += ["", "## Non-blocking warnings", "", *[f"- {finding}" for finding in warnings]]
     return "\n".join(lines) + "\n"
@@ -312,7 +358,7 @@ def render_summary(findings: list[str], expected: dict[str, ExpectedRuleset]) ->
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runbook", type=Path, default=DEFAULT_RUNBOOK)
-    parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "joeharris76/BenchBox"))
+    parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox"))
     parser.add_argument("--token", default=os.environ.get("GITHUB_TOKEN", ""))
     parser.add_argument("--output", type=Path)
     parser.add_argument(
@@ -340,13 +386,14 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         live_by_name = _fetch_live_rulesets(args.repo, args.token)
+        live_pypi_environment = _fetch_environment(args.repo, args.token)
     except Exception as exc:
         if args.output:
             args.output.write_text(
                 json.dumps({"status": "error", "error": str(exc)}, indent=2) + "\n",
                 encoding="utf-8",
             )
-        print(f"ERROR: ruleset drift check failed while querying GitHub: {exc}", file=sys.stderr)
+        print(f"ERROR: governance drift check failed while querying GitHub: {exc}", file=sys.stderr)
         return 1
 
     findings: list[str] = []
@@ -362,7 +409,13 @@ def main(argv: list[str] | None = None) -> int:
                 require_bypass_actor_visibility=args.require_bypass_actor_visibility,
             )
         )
-    findings.extend(tag_creation_findings(list(live_by_name.values())))
+    findings.extend(
+        tag_creation_findings(
+            list(live_by_name.values()),
+            require_bypass_actor_visibility=args.require_bypass_actor_visibility,
+        )
+    )
+    findings.extend(environment_protection_findings(live_pypi_environment))
 
     blocking = blocking_findings(findings)
     summary = render_summary(findings, expected)

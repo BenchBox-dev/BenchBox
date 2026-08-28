@@ -18,7 +18,7 @@ from benchbox.core.benchmark_registry import (
     get_benchmark_default_scale,
     get_public_benchmark_class,
 )
-from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
+from benchbox.utils.path_utils import get_benchmark_runs_datagen_path, resolve_benchmark_runs_dir
 
 pytestmark = [
     pytest.mark.unit,
@@ -68,13 +68,13 @@ def test_mcp_data_only_datagen_path_honors_env_output_root(tmp_path, monkeypatch
     assert Path.cwd() not in data_dir.parents, data_dir
 
 
-def test_mcp_default_without_env_uses_cwd(monkeypatch):
-    """Without an output-root override the MCP datagen path stays cwd-local."""
+def test_mcp_default_without_env_uses_resolved_default_root(monkeypatch):
+    """Without an output-root override the MCP datagen path uses the default root."""
     monkeypatch.delenv("BENCHBOX_OUTPUT_DIR", raising=False)
 
     data_dir = get_benchmark_runs_datagen_path("tpch", 0.01)
 
-    assert data_dir == Path.cwd() / "benchmark_runs" / "datagen" / "tpch_sf001"
+    assert data_dir == resolve_benchmark_runs_dir() / "datagen" / "tpch_sf001"
 
 
 # ---------------------------------------------------------------------------

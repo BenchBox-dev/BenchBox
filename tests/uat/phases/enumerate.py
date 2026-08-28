@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from tests.uat.compatibility import CompatibilityRule, compatibility_rule_for
@@ -11,6 +12,7 @@ from tests.uat.matrix import (
     filter_scales_by_registry,
     load_benchmarks,
     missing_benchmarks_from_include,
+    missing_platforms_from_include,
     resolve_benchmarks,
     resolve_platforms,
 )
@@ -23,6 +25,7 @@ from tests.uat.matrix import (
 # shaped accounting file for registry-derived drops.
 REGISTRY_PRUNE_STATUS = "pruned-registry"
 BENCHMARK_NOT_IN_REGISTRY_RULE_ID = "benchmark-not-in-registry"
+PLATFORM_NOT_IN_REGISTRY_RULE_ID = "platform-not-in-registry"
 
 
 @dataclass(frozen=True)
@@ -51,6 +54,26 @@ class EnumerationResult:
     @property
     def candidate_count(self) -> int:
         return len(self.cells) + len(self.compatibility_pruned)
+
+
+def is_registry_prune(cell: CompatibilityPrunedCell) -> bool:
+    """True when a pruned row is a registry/ladder-derived drop (``pruned-registry``).
+
+    Registry drops (a benchmark/platform id absent from the registry, or a
+    scale outside a benchmark's declared ``scale_options``) share the
+    ``CompatibilityPrunedCell`` shape with platform/benchmark compatibility-RULE
+    prunes, but must be accounted separately: `write_report` carries a distinct
+    ``registry_pruned_count`` bucket, and lumping registry rows into
+    ``compatibility_pruned_count`` mislabels them (uat-report-regen-prune-accounting w2).
+    """
+    return cell.status == REGISTRY_PRUNE_STATUS
+
+
+def count_pruned_by_kind(pruned: Iterable[CompatibilityPrunedCell]) -> tuple[int, int]:
+    """Split a mixed pruned-row stream into (compatibility_rule_count, registry_count)."""
+    rows = tuple(pruned)
+    registry = sum(1 for cell in rows if is_registry_prune(cell))
+    return len(rows) - registry, registry
 
 
 def enumerate_cells(
@@ -95,25 +118,44 @@ def enumerate_cells_with_pruning(
         benchmarks=benchmarks,
     )
 
-    if config.scales.override is not None:
-        requested = [config.scales.override]
-    else:
-        requested = list(config.scales.rungs)
+    # `requested_rungs` centralizes the effective values from
+    # `config.scales.rungs` and `config.scales.override` for every consumer.
+    requested = list(config.scales.requested_rungs)
 
     cells: list[Cell] = []
     compatibility_pruned: list[CompatibilityPrunedCell] = []
     include_release_gate_runtime_envelopes = config.compatibility.release_gate_runtime_envelopes
 
+    missing_benchmarks = missing_benchmarks_from_include(config.benchmarks.include, benchmarks)
+    missing_platforms = missing_platforms_from_include(config.platforms.include)
     # `resolve_benchmarks` silently drops `benchmarks.include` entries absent
     # from the registry (see `missing_benchmarks_from_include`'s docstring) -
     # so a typo'd/removed benchmark id never reaches `benchmark_list` below.
     # Surface it here as a visible accounting row instead of a zero-signal
     # drop, one row per platform x requested scale (mirrors the shape
     # `_pruned_rows_for_rule` already uses for compatibility-rule prunes).
-    for missing_benchmark in missing_benchmarks_from_include(config.benchmarks.include, benchmarks):
-        for platform in platform_list:
+    # Include missing ids as accounting dimensions too. This preserves a
+    # diagnostic row when both explicit include lists contain only unknown
+    # ids, rather than letting each side's empty resolved list hide the other.
+    accounting_platforms = [*platform_list, *missing_platforms]
+    accounting_benchmarks = [*benchmark_list, *missing_benchmarks]
+    for missing_benchmark in missing_benchmarks:
+        for platform in accounting_platforms:
             compatibility_pruned.extend(
                 _registry_absent_rows(platform=platform, benchmark=missing_benchmark, requested=requested)
+            )
+
+    # Mirror of the missing-benchmark accounting above (w2,
+    # uat-config-schema-spec-realignment): `resolve_platforms` silently drops
+    # `platforms.include` entries absent from the registry (see
+    # `missing_platforms_from_include`'s docstring), so a typo'd/removed
+    # platform id never reaches `platform_list`. Surface it as a visible
+    # accounting row per missing platform x resolved benchmark, instead of an
+    # execute-time surprise.
+    for missing_platform in missing_platforms:
+        for benchmark in accounting_benchmarks:
+            compatibility_pruned.extend(
+                _registry_absent_platform_rows(platform=missing_platform, benchmark=benchmark, requested=requested)
             )
 
     for platform in platform_list:
@@ -180,6 +222,30 @@ def _registry_absent_rows(
                 "benchmark registry (typo'd or removed benchmark id)."
             ),
             evidence="tests.uat.matrix.load_benchmarks() BENCHMARK_METADATA keys",
+        )
+        for scale in requested
+    ]
+
+
+def _registry_absent_platform_rows(
+    *,
+    platform: str,
+    benchmark: str,
+    requested: list[float],
+) -> list[CompatibilityPrunedCell]:
+    """Accounting rows for a platform id absent from the registry entirely."""
+    return [
+        CompatibilityPrunedCell(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            rule_id=PLATFORM_NOT_IN_REGISTRY_RULE_ID,
+            status=REGISTRY_PRUNE_STATUS,
+            reason=(
+                f"Platform {platform!r} was requested in the config but is not present in the "
+                "platform registry (typo'd or removed platform id)."
+            ),
+            evidence="tests.uat.matrix.known_platform_ids() PlatformRegistry SQL/dataframe platforms",
         )
         for scale in requested
     ]

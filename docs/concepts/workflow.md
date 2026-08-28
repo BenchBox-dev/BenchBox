@@ -42,13 +42,13 @@ benchbox datagen --benchmark tpch --scale 0.01 --output ./data/tpch_0.01
 
 # 2. Run specific queries during development
 benchbox run --benchmark tpch --platform duckdb --scale 0.01 \
-  --data-dir ./data/tpch_0.01 \
-  --query-subset q1,q3,q7 \
+  --output ./data/tpch_0.01 \
+  --queries Q1,Q3,Q7 \
   --verbose
 
 # 3. Run full suite when ready
 benchbox run --benchmark tpch --platform duckdb --scale 0.01 \
-  --data-dir ./data/tpch_0.01
+  --output ./data/tpch_0.01
 ```
 
 **Benefits**:
@@ -70,16 +70,15 @@ Compare performance across different database platforms:
 benchbox datagen --benchmark tpch --scale 1 --output ./data/tpch_1
 
 # Run on multiple platforms
-for platform in duckdb clickhouse; do
+for platform in duckdb clickhouse-local; do
   benchbox run --benchmark tpch --platform $platform --scale 1 \
-    --data-dir ./data/tpch_1 \
     --output benchmark_runs/tpch_1_${platform}
 done
 
 # Compare results
 benchbox compare \
   benchmark_runs/tpch_1_duckdb/results.json \
-  benchmark_runs/tpch_1_clickhouse/results.json
+  benchmark_runs/tpch_1_clickhouse-local/results.json
 ```
 
 **Output**:
@@ -214,23 +213,29 @@ Running benchmarks according to TPC specifications for official results:
 
 ```bash
 # 1. Power Test (single query stream)
-benchbox run-official tpch --platform snowflake --scale 100 \
-  --test-type power \
+benchbox run --official --benchmark tpch --platform snowflake --scale 100 \
+  --phases power \
   --seed 42 \
   --output results/power/
 
 # 2. Throughput Test (concurrent streams)
-benchbox run-official tpch --platform snowflake --scale 100 \
-  --test-type throughput \
-  --streams 4 \
+benchbox run --official --benchmark tpch --platform snowflake --scale 100 \
+  --phases throughput \
+  --concurrency 4 \
   --seed 42 \
   --output results/throughput/
 
 # 3. Calculate composite metric
-benchbox calculate-qphh \
+benchbox metrics qphh \
   --power-results results/power/results.json \
   --throughput-results results/throughput/results.json
 ```
+
+`run-official` is deprecated (kept for backward compatibility) in favor of
+`benchbox run --official`; see
+[CLI Reference → Deprecated: `run-official`](../reference/cli/run.md#deprecated-run-official)
+for the full accepted option list (`--test-type` was never a real option —
+official test selection is via `--phases`).
 
 **Requirements**:
 - Specific scale factors (1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000)
@@ -249,11 +254,11 @@ Optimizing query performance with platform-specific tunings:
 
 ```bash
 # 1. Baseline run (no tunings)
-benchbox run --benchmark tpcds --platform clickhouse --scale 10 \
+benchbox run --benchmark tpcds --platform clickhouse-local --scale 10 \
   --output baseline/
 
 # 2. Apply tunings (partitioning, sorting, indexes)
-benchbox run --benchmark tpcds --platform clickhouse --scale 10 \
+benchbox run --benchmark tpcds --platform clickhouse-local --scale 10 \
   --tuning tunings/clickhouse_tpcds.yaml \
   --output tuned/
 
@@ -292,7 +297,7 @@ tar -czf tpch_data.tar.gz ./data/
 
 # Later: use pre-generated data
 benchbox run --benchmark tpch --platform duckdb --scale 1 \
-  --data-dir ./data/tpch_1
+  --output ./data/tpch_1
 ```
 
 **Benefits**:
@@ -310,8 +315,7 @@ Verifying benchmark results for correctness:
 ```bash
 # Run with validation enabled
 benchbox run --benchmark tpch --platform duckdb --scale 0.1 \
-  --validate-results \
-  --validation-mode strict
+  --validation strict
 
 # Validation checks:
 # - Row count verification
@@ -360,16 +364,15 @@ See: [Performance Monitoring](../advanced/performance.md)
 Troubleshooting benchmark issues:
 
 ```bash
-# 1. Enable verbose logging
+# 1. Enable debug logging (redirect to a file with the shell)
 benchbox run --benchmark tpch --platform duckdb --scale 0.01 \
-  --verbose \
-  --log-file debug.log
+  -vv > debug.log 2>&1
 
 # 2. Run single query with maximum detail
 benchbox run --benchmark tpch --platform duckdb --scale 0.01 \
-  --query-subset q1 \
+  --queries Q1 \
   --verbose \
-  --explain  # Shows query plan
+  --show-plans  # Shows query plan
 
 # 3. Inspect database state
 benchbox shell --platform duckdb --database benchmark.duckdb

@@ -125,7 +125,7 @@ For best performance, use Parquet with Snappy compression:
 ```bash
 benchbox run --platform athena --benchmark tpch \
   --table-format parquet \
-  --compression-type snappy
+  --compression snappy
 ```
 
 ## Cost Optimization

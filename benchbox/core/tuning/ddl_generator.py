@@ -622,6 +622,21 @@ class NoOpDDLGenerator(BaseDDLGenerator):
 # Type alias for type hints
 DDLGeneratorType = DDLGenerator | BaseDDLGenerator
 
+# Platforms known to have no physical tuning surface (no partitioning, clustering,
+# distribution, or sort-key clauses to emit) - the NoOp fallback for these is
+# expected and permanent, so get_ddl_generator() does not warn for them.
+_TUNING_FREE_PLATFORMS: frozenset[str] = frozenset(
+    {
+        "sqlite",
+        "sqlite3",
+        "pandas",
+        "modin",
+        "cudf",
+        "dask",
+        "polars",
+    }
+)
+
 
 def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
     """Get the appropriate DDL generator for a platform.
@@ -642,10 +657,14 @@ def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
     from benchbox.core.tuning.generators.doris import DorisDDLGenerator
     from benchbox.core.tuning.generators.duckdb import DuckDBDDLGenerator
     from benchbox.core.tuning.generators.firebolt import FireboltDDLGenerator
+    from benchbox.core.tuning.generators.pg_duckdb import PgDuckDBDDLGenerator
+    from benchbox.core.tuning.generators.pg_mooncake import PgMooncakeDDLGenerator
     from benchbox.core.tuning.generators.postgresql import PostgreSQLDDLGenerator
+    from benchbox.core.tuning.generators.questdb import QuestDBDDLGenerator
     from benchbox.core.tuning.generators.redshift import RedshiftDDLGenerator
     from benchbox.core.tuning.generators.snowflake import SnowflakeDDLGenerator
     from benchbox.core.tuning.generators.spark_family import DeltaDDLGenerator
+    from benchbox.core.tuning.generators.starrocks import StarRocksDDLGenerator
     from benchbox.core.tuning.generators.timescaledb import TimescaleDBDDLGenerator
     from benchbox.core.tuning.generators.trino import AthenaDDLGenerator, TrinoDDLGenerator
 
@@ -659,10 +678,17 @@ def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
         "redshift": RedshiftDDLGenerator,
         "postgresql": PostgreSQLDDLGenerator,
         "timescaledb": TimescaleDBDDLGenerator,
-        # ClickHouse (all three first-class platform names map to the shared generator)
+        # StarRocks (MPP; DISTRIBUTED BY HASH is engine-mandatory). Both the
+        # dry-run preview and the workload's schema-creation path render tuned
+        # PARTITION BY / DISTRIBUTED BY / ORDER BY through this one generator.
+        "starrocks": StarRocksDDLGenerator,
+        # ClickHouse (all first-class platform names map to the shared generator,
+        # matching workload.py's execution path, which always renders tuned DDL
+        # via the "clickhouse" generator regardless of variant)
         "clickhouse": ClickHouseDDLGenerator,
         "clickhouse-local": ClickHouseDDLGenerator,
         "clickhouse-server": ClickHouseDDLGenerator,
+        "clickhouse-cloud": ClickHouseDDLGenerator,
         "chdb": ClickHouseDDLGenerator,
         # Firebolt
         "firebolt": FireboltDDLGenerator,
@@ -678,12 +704,38 @@ def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
         "spark": DeltaDDLGenerator,
         "delta": DeltaDDLGenerator,
         "fabric_warehouse": DeltaDDLGenerator,  # Fabric uses Delta Lake tables
+        # QuestDB
+        "questdb": QuestDBDDLGenerator,
+        # pg_duckdb / pg_mooncake (PostgreSQL extensions). Both the hyphenated CLI
+        # platform key from PlatformRegistry (e.g. "pg-duckdb") and the underscored
+        # form used by the adapters' own platform_name/platform_type (e.g.
+        # "pg_duckdb") are registered so callers using either convention resolve
+        # to the real generator instead of falling through to NoOp.
+        "pg-duckdb": PgDuckDBDDLGenerator,
+        "pg_duckdb": PgDuckDBDDLGenerator,
+        "pg-mooncake": PgMooncakeDDLGenerator,
+        "pg_mooncake": PgMooncakeDDLGenerator,
     }
 
     platform_lower = platform_type.lower()
 
     if platform_lower in generators:
         return generators[platform_lower]()
+
+    # Platforms with no physical tuning surface at all (in-memory/embedded engines
+    # with no indexes, partitioning, or clustering clauses to emit). NoOp is the
+    # correct, permanent answer for these, so the fallback stays silent. Anything
+    # else falling through here is either a platform that should get a real
+    # generator eventually or a typo'd platform string - both are worth a
+    # warning since dry-run/tuning preview would otherwise go silently empty.
+    if platform_lower not in _TUNING_FREE_PLATFORMS:
+        logger.warning(
+            "No DDL generator registered for platform %r; tuning clauses will be "
+            "empty (NoOp fallback). If %r supports physical tuning, register it "
+            "in get_ddl_generator().",
+            platform_type,
+            platform_type,
+        )
 
     # Return NoOp generator for platforms without tuning support
     return NoOpDDLGenerator(platform_type)

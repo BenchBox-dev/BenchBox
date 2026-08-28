@@ -5,6 +5,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import json
 import sys
 from pathlib import Path
 from typing import Any, Optional
@@ -17,64 +18,91 @@ from rich.prompt import Confirm, InvalidResponse, Prompt
 from rich.table import Table
 from rich.text import Text
 
+from benchbox.cli.commands.setup import SUPPORTED_SETUP_PLATFORMS
 from benchbox.cli.platform_readiness import (
     PlatformReadinessResult,
     check_platform_readiness,
     has_readiness_failures,
 )
+from benchbox.core.platform_manifest import DefaultMode, get_platform_alias_modes, get_platform_aliases
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.schemas import LibraryInfo, PlatformInfo
 from benchbox.utils.printing import quiet_console
 
 console = quiet_console
 
-# Platform name aliases - maps common variations to canonical names
-PLATFORM_ALIASES: dict[str, str] = {
-    # PostgreSQL variations
-    "postgres": "postgresql",
-    "pg": "postgresql",
-    "pgsql": "postgresql",
-    # Trino/Presto ecosystem
-    "trinodb": "trino",
-    "prestodb": "presto",
-    # ClickHouse
-    "ch": "clickhouse",
-    # BigQuery
-    "bq": "bigquery",
-    "gbq": "bigquery",
-    # Databricks
-    "dbx": "databricks",
-    # Snowflake
-    "snow": "snowflake",
-    # Redshift
-    "rs": "redshift",
-    # DuckDB
-    "duck": "duckdb",
-    # DataFusion
-    "fusion": "datafusion",
-    # DataFrame CLI aliases. Mapping -df names to the base platform erases the
-    # DataFrame-mode request the suffix carries; `benchbox run` re-applies it
-    # via _apply_dataframe_suffix_mode before this normalization runs.
-    "polars-df": "polars",
-    "pandas-df": "pandas",
-    "pyspark-df": "pyspark",
-    "datafusion-df": "datafusion",
-    "dask-df": "dask",
-    "modin-df": "modin",
-    "cudf-df": "cudf",
-    "lakesail-df": "lakesail",
-    # Azure Synapse
-    "azure-synapse": "synapse",
-    "azuresynapse": "synapse",
-    # Microsoft Fabric Warehouse (hyphen form is preferred; underscore form is legacy)
-    "fabric-dw": "fabric_dw",
-}
+# CLI spellings are a scoped platform-manifest projection. DataFrame ``-df``
+# aliases carry explicit mode semantics in the manifest; ``benchbox run``
+# captures that suffix before calling this normalizer.
+PLATFORM_ALIASES: dict[str, str] = get_platform_aliases("cli")
+PLATFORM_ALIAS_MODES: dict[str, DefaultMode] = get_platform_alias_modes("cli")
 
 
 def normalize_platform_name(name: str) -> str:
     """Normalize platform name: lowercase and resolve aliases."""
     normalized = name.lower()
     return PLATFORM_ALIASES.get(normalized, normalized)
+
+
+def get_platform_alias_mode(name: str) -> DefaultMode | None:
+    """Return an execution mode explicitly implied by a scoped CLI alias."""
+    return PLATFORM_ALIAS_MODES.get(name.lower())
+
+
+_SUPPORT_STATUS_STYLES = {
+    "stable": "green",
+    "beta": "cyan",
+    "experimental": "yellow",
+    "deprecated": "red",
+}
+
+
+#: Tier order for display: the tiers a user can rely on come first, and an
+#: unrecognised status sorts last rather than being folded into a known tier.
+_SUPPORT_STATUS_ORDER = ("stable", "beta", "experimental", "deprecated")
+
+
+def _support_tier_rank(support_status: str | None) -> tuple[int, str]:
+    if not support_status or support_status not in _SUPPORT_STATUS_ORDER:
+        return (len(_SUPPORT_STATUS_ORDER), support_status or "")
+    return (_SUPPORT_STATUS_ORDER.index(support_status), "")
+
+
+def _platforms_by_support_tier(platforms: dict) -> list[tuple[str, Any]]:
+    """Order platforms by support tier, then by display name within a tier.
+
+    Stable rows first answers "which of these actually work" without the user
+    reading all 51. Ordering is stable within a tier so the table does not
+    reshuffle between runs.
+    """
+    return sorted(
+        platforms.items(),
+        key=lambda item: (_support_tier_rank(item[1].support_status), item[1].display_name.lower()),
+    )
+
+
+def _support_tier_counts(platforms: dict) -> dict[str, int]:
+    """Count platforms per support tier, in display order."""
+    counts: dict[str, int] = {}
+    for _name, info in _platforms_by_support_tier(platforms):
+        tier = info.support_status if info.support_status else "unknown"
+        counts[tier] = counts.get(tier, 0) + 1
+    return counts
+
+
+def _format_support_status(support_status: str | None) -> str:
+    """Render a platform's product support tier for display.
+
+    This is the registry's `support_status`, not local driver availability. An
+    unrecognised or absent status renders as "unknown" rather than defaulting to
+    a tier, so the CLI never invents a support promise the registry did not make.
+    """
+    if not support_status:
+        return "[dim]unknown[/dim]"
+    style = _SUPPORT_STATUS_STYLES.get(support_status)
+    if style is None:
+        return f"[dim]{support_status}[/dim]"
+    return f"[{style}]{support_status}[/{style}]"
 
 
 class NumberedSelectPrompt(Prompt):
@@ -309,14 +337,14 @@ class PlatformManager:
     def _load_config(self) -> dict[str, Any]:
         """Load platform configuration from file."""
         if not self.config_path.exists():
-            return {"enabled_platforms": list(PlatformRegistry.get_all_platform_metadata().keys())}
+            return {"enabled_platforms": PlatformRegistry.get_platform_names()}
 
         try:
             with open(self.config_path, encoding="utf-8") as f:
                 return yaml.safe_load(f) or {}
         except Exception as e:
             console.print(f"[yellow]Warning: Failed to load platform config: {e}[/yellow]")
-            return {"enabled_platforms": list(PlatformRegistry.get_all_platform_metadata().keys())}
+            return {"enabled_platforms": PlatformRegistry.get_platform_names()}
 
     def _save_config(self):
         """Save platform configuration to file."""
@@ -410,57 +438,68 @@ class PlatformManager:
             "category": platform_info.category,
         }
 
-    def display_platform_status(self):
-        """Display comprehensive platform status table."""
+    def display_platform_status(self, detail: bool = False):
+        """Display the platform status table.
+
+        The default view is deliberately narrow. With 51 platforms, the full
+        table does not fit an 80-column terminal: Rich truncates every
+        informative header to an ellipsis and wraps Description into six rows
+        of single-word fragments per platform, which destroys exactly the
+        answer the user came for -- which of these platforms actually work.
+
+        So Category and Description move behind ``--detail``, and rows are
+        ordered by support tier with a per-tier count in the summary. Nothing
+        is hidden or gated: every platform still appears, and every row still
+        carries its tier, per
+        ``_project/decisions/architecture-support-tier-commitment.md``.
+
+        Args:
+            detail: Restore the Category and Description columns.
+        """
         platforms = self.detect_platforms()
 
         table = Table(title="BenchBox Platform Status")
         table.add_column("Platform", style="cyan", no_wrap=True)
-        table.add_column("Status", style="bold")
+        # "Driver" is local dependency availability; "Support" is the product
+        # support tier from the registry. They are independent: a stable platform
+        # can be Missing locally, and an installed driver implies nothing about
+        # the tier. See docs/reference/public-contracts.md ("Support Status
+        # Taxonomy"), which states the two must not be conflated.
+        table.add_column("Driver", style="bold")
+        table.add_column("Support", style="bold")
         table.add_column("Libraries", style="dim")
-        table.add_column("Category", style="magenta")
-        table.add_column("Description", style="dim")
+        if detail:
+            table.add_column("Category", style="magenta")
+            table.add_column("Description", style="dim")
 
-        # Group by category
-        categories = {"analytical": [], "cloud": [], "traditional": [], "embedded": []}
+        for name, info in _platforms_by_support_tier(platforms):
+            # Driver column - is the local dependency installed?
+            if info.enabled:
+                status = "[green]✅ Enabled[/green]"
+            elif info.available:
+                status = "[yellow]○ Available[/yellow]"
+            else:
+                status = "[red]❌ Missing[/red]"
 
-        for name, info in platforms.items():
-            category = info.category if info.category in categories else "database"
-            if category not in categories:
-                categories[category] = []
-            categories[category].append((name, info))
+            # Support column - product support tier, independent of the above
+            support = _format_support_status(info.support_status)
 
-        for category_name, platform_list in categories.items():
-            if not platform_list:
-                continue
-
-            for name, info in platform_list:
-                # Status column
-                if info.enabled:
-                    status = "[green]✅ Enabled[/green]"
-                elif info.available:
-                    status = "[yellow]○ Available[/yellow]"
+            # Libraries column
+            lib_statuses = []
+            for lib in info.libraries:
+                if lib.installed:
+                    version_str = f" ({lib.version})" if lib.version else ""
+                    lib_statuses.append(f"[green]{lib.name}{version_str}[/green]")
                 else:
-                    status = "[red]❌ Missing[/red]"
+                    lib_statuses.append(f"[red]{lib.name}[/red]")
 
-                # Libraries column
-                lib_statuses = []
-                for lib in info.libraries:
-                    if lib.installed:
-                        version_str = f" ({lib.version})" if lib.version else ""
-                        lib_statuses.append(f"[green]{lib.name}{version_str}[/green]")
-                    else:
-                        lib_statuses.append(f"[red]{lib.name}[/red]")
+            libraries = ", ".join(lib_statuses)
 
-                libraries = ", ".join(lib_statuses)
-
-                table.add_row(
-                    info.display_name,
-                    status,
-                    libraries,
-                    category_name.title(),
-                    info.description,
-                )
+            row = [info.display_name, status, support, libraries]
+            if detail:
+                category = info.category if info.category else "database"
+                row.extend([category.title(), info.description])
+            table.add_row(*row)
 
         self.console.print(table)
 
@@ -471,6 +510,39 @@ class PlatformManager:
 
         summary = f"[bold]Summary:[/bold] {enabled_count} enabled, {available_count} available, {total_platforms} total"
         self.console.print(f"\n{summary}")
+        tier_counts = _support_tier_counts(platforms)
+        if tier_counts:
+            tiers = ", ".join(f"{count} {tier}" for tier, count in tier_counts.items())
+            self.console.print(f"[bold]By support tier:[/bold] {tiers}")
+        if not detail:
+            self.console.print("[dim]Run with --detail for category and description.[/dim]")
+
+    def emit_platform_json(self) -> None:
+        """Emit the full platform record as JSON on stdout.
+
+        The narrow default table drops columns to stay readable. This is the
+        path that loses nothing, so a script never has to parse the table.
+        Printed through the quiet-aware console with wrapping and markup
+        disabled so the output remains exactly JSON.
+        """
+        platforms = self.detect_platforms()
+        payload = [
+            {
+                "name": name,
+                "display_name": info.display_name,
+                "support_status": info.support_status,
+                "category": info.category,
+                "description": info.description,
+                "enabled": info.enabled,
+                "available": info.available,
+                "installation_command": info.installation_command,
+                "libraries": [
+                    {"name": lib.name, "installed": lib.installed, "version": lib.version} for lib in info.libraries
+                ],
+            }
+            for name, info in _platforms_by_support_tier(platforms)
+        ]
+        console.print(json.dumps({"platforms": payload}, indent=2), markup=False, soft_wrap=True)
 
     def display_platform_list(self, show_all: bool = True):
         """Display platform list for 'benchbox platforms list' command.
@@ -488,7 +560,10 @@ class PlatformManager:
             status_icon = "✅" if info.enabled else ("○" if info.available else "❌")
             status_color = "green" if info.enabled else ("yellow" if info.available else "red")
 
-            self.console.print(f"[{status_color}]{status_icon}[/{status_color}] {info.display_name} ({name})")
+            support = _format_support_status(info.support_status)
+            self.console.print(
+                f"[{status_color}]{status_icon}[/{status_color}] {info.display_name} ({name}) - {support}"
+            )
             self.console.print(f"   {info.description}")
 
             if not info.available:
@@ -621,17 +696,32 @@ def platforms():
 )
 @click.option(
     "--format",
-    type=click.Choice(["table", "simple"]),
+    type=click.Choice(["table", "simple", "json"]),
     default="table",
     help="Output format",
+)
+@click.option(
+    "--json",
+    "json_output",
+    is_flag=True,
+    help="Emit the full platform records as JSON",
+)
+@click.option(
+    "--detail",
+    is_flag=True,
+    help="Add the category and description columns (needs a wide terminal)",
 )
 @click.option(
     "--show-deployments",
     is_flag=True,
     help="Show available deployment modes (local, server, cloud) per platform",
 )
-def list_platforms(show_all: bool, format: str, show_deployments: bool):
+def list_platforms(show_all: bool, format: str, json_output: bool, detail: bool, show_deployments: bool):
     """List all available platforms and their status.
+
+    The default table is ordered by support tier and omits category and
+    description so it stays readable at 80 columns. Use --detail to add them
+    back, or --json/--format json for the full record.
 
     Use --show-deployments to see available deployment modes for platforms
     that support multiple deployment targets (e.g., clickhouse-local, clickhouse-server).
@@ -640,8 +730,10 @@ def list_platforms(show_all: bool, format: str, show_deployments: bool):
 
     if show_deployments:
         manager.display_platform_deployments()
+    elif json_output or format == "json":
+        manager.emit_platform_json()
     elif format == "table":
-        manager.display_platform_status()
+        manager.display_platform_status(detail=detail)
     else:
         manager.display_platform_list(show_all=show_all)
 
@@ -908,8 +1000,37 @@ def check_platforms(platforms_to_check: tuple, enabled_only: bool):
 
 @platforms.command("setup")
 @click.option("--interactive/--non-interactive", default=True, help="Interactive setup mode")
-def setup_platforms(interactive: bool):
-    """Interactive platform setup wizard."""
+@click.option(
+    "--platform",
+    "credential_platform",
+    type=click.Choice(SUPPORTED_SETUP_PLATFORMS, case_sensitive=False),
+    help="Configure credentials for one cloud platform (delegates to `benchbox setup`)",
+)
+@click.pass_context
+def setup_platforms(ctx: click.Context, interactive: bool, credential_platform: str | None):
+    """Enable and install local platform adapters, interactively.
+
+    This is about which adapters are available on this machine. For cloud
+    CREDENTIALS -- Databricks, Snowflake, BigQuery, Redshift, Athena,
+    MotherDuck, SingleStore -- use `benchbox setup --platform <name>`.
+
+    The two commands are both spelled "setup", and adapter error messages have
+    repeatedly sent users to `benchbox platforms setup --platform <name>`,
+    which had no such option and exited 2. Rather than leave that a dead end,
+    `--platform` here delegates to `benchbox setup`, which is what the user
+    meant. `benchbox setup` rejects a non-cloud platform with its own list.
+    """
+    if credential_platform is not None:
+        # The Choice above is load-bearing: ctx.invoke skips Click's parameter
+        # processing, so without it an unknown name reached the credential
+        # wizard unvalidated and produced a confident "Nonesuch Credentials
+        # Setup" panel that exited 0. Validating here keeps the delegation
+        # honest and rejects a non-cloud platform with the real list.
+        from benchbox.cli.commands.setup import setup_credentials
+
+        ctx.invoke(setup_credentials, platform=credential_platform)
+        return
+
     manager = get_platform_manager()
     platforms_info = manager.detect_platforms()
 

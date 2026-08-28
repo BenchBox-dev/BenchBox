@@ -432,7 +432,9 @@ def test_exported_sql_and_dataframe_bundles_share_cross_mode_contract(tmp_path):
 
     assert [query["id"] for query in sql_payload["queries"]] == [query["id"] for query in df_payload["queries"]]
     assert sql_payload["queries"][0]["rows"] == df_payload["queries"][0]["rows"] == 1
-    assert sql_payload["summary"]["validation"] == df_payload["summary"]["validation"] == "passed"
+    assert sql_payload["summary"]["validation"] == "passed"
+    assert df_payload["summary"]["validation"] == "uncertain"
+    assert df_payload["queries"][0]["row_count_validation"]["status"] == "SKIPPED"
     assert sql_payload.get("errors", []) == df_payload.get("errors", []) == []
 
     assert set(sql_payload["execution"]) == set(df_payload["execution"]) == {"mode"}

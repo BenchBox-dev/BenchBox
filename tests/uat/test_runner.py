@@ -32,9 +32,18 @@ def _isolate_cwd(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
 
-def _write_result_json(path: Path, *, failed: int = 0, compliance_class: str | None = None) -> None:
+def _write_result_json(
+    path: Path,
+    *,
+    failed: int = 0,
+    compliance_class: str | None = None,
+    validation: str | None = None,
+    translation_status: str | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     passed = 1 if failed == 0 else 0
+    if validation is None:
+        validation = "passed" if failed == 0 else "failed"
     payload = {
         "version": "2.1",
         "run": {
@@ -54,13 +63,15 @@ def _write_result_json(path: Path, *, failed: int = 0, compliance_class: str | N
         "platform": {"name": "DuckDB"},
         "summary": {
             "queries": {"total": 1, "passed": passed, "failed": failed},
-            "validation": {"status": "passed" if failed == 0 else "failed"},
+            "validation": {"status": validation},
         },
-        "queries": [{"id": "Q1", "status": "SUCCESS" if failed == 0 else "ERROR", "execution_time_ms": 1}],
+        "queries": [{"id": "Q1", "status": "SUCCESS" if failed == 0 else "ERROR", "ms": 1}],
         "phases": {},
     }
     if compliance_class is not None:
         payload["benchmark"]["compliance_class"] = compliance_class
+    if translation_status is not None:
+        payload["execution"] = {"translation": {"status": translation_status}}
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
@@ -117,8 +128,11 @@ def test_run_cell_writes_log_and_returns_result(tmp_path: Path):
     assert result.result_path is not None
     assert str(result.result_path).endswith("duckdb_tpch_smoke.json")
     assert result.log_path.exists()
-    log_text = result.log_path.read_text()
-    assert "benchmark_runs/results/" in log_text
+    log_text = result.log_path.read_text(encoding="utf-8")
+    # Derive the expectation from the same path the stub echoed: str(Path) uses the
+    # platform separator, so a hardcoded "benchmark_runs/results/" fails on Windows
+    # ("benchmark_runs\\results\\"). Asserting the directory is at least as strong.
+    assert str(result_path.parent) in log_text
 
 
 def test_run_cell_sets_benchbox_output_dir_for_subprocess(tmp_path: Path):
@@ -217,6 +231,81 @@ def test_run_cell_marks_failure(tmp_path: Path):
     assert result.status == "failed"
     assert result.exit_code == 2
     assert result.result_path is None
+
+
+def test_run_cell_preserves_result_path_when_failed_child_exports_json(tmp_path: Path):
+    """A nonzero query run with a result bundle remains classifiable as a query failure."""
+    result_path = tmp_path / "benchmark_runs" / "results" / "failed-query.json"
+    _write_result_json(result_path, failed=1)
+    fake_argv = [sys.executable, "-c", f"print({str(result_path)!r}); raise SystemExit(2)"]
+
+    with patch.object(runner, "benchbox_run_argv", return_value=fake_argv):
+        result = runner.run_cell("clickhouse-server", "read_primitives", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert result.status == "failed"
+    assert result.exit_code == 2
+    assert result.result_path == result_path
+    assert result.submit_terminal_state == "query_failure"
+
+
+def test_run_cell_writes_clickhouse_load_failure_sidecar(tmp_path: Path):
+    payload = {
+        "table": "lineitem",
+        "source_files": ["/tmp/lineitem.tbl"],
+        "rows_attempted": 65536,
+        "memory_settings": {"max_memory_usage": "8GB", "insert_block_size": 65536},
+        "driver_timeout_s": 300,
+        "exception": {"type": "RuntimeError", "message": "memory limit exceeded"},
+        "result_json": None,
+    }
+    fake_argv = [
+        sys.executable,
+        "-c",
+        f"print({(runner.LOAD_FAILURE_MARKER + json.dumps(payload, separators=(',', ':')))!r}); raise SystemExit(1)",
+    ]
+
+    with patch.object(runner, "benchbox_run_argv", return_value=fake_argv):
+        result = runner.run_cell(
+            "clickhouse-server",
+            "tpch",
+            1.0,
+            timeout_s=10,
+            log_dir=tmp_path,
+            now=_dt.datetime(2026, 8, 12, 12, 0, 0),
+        )
+
+    assert result.status == "failed"
+    assert result.result_path is None
+    assert result.load_failure_path is not None
+    assert result.load_failure_path == result.log_path.with_suffix(".load_failure.json")
+    artifact = json.loads(result.load_failure_path.read_text(encoding="utf-8"))
+    assert artifact["table"] == "lineitem"
+    assert artifact["rows_attempted"] == 65536
+    assert artifact["result_json"] is None
+    assert artifact["log_path"] == str(result.log_path)
+
+
+def test_load_failure_sidecar_scans_large_log_incrementally(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    log_path = tmp_path / "cell.log"
+    payload = {"table": "lineitem", "rows_attempted": 1, "result_json": None}
+    log_path.write_text("noise\n" * 10_000 + runner.LOAD_FAILURE_MARKER + json.dumps(payload) + "\n", encoding="utf-8")
+
+    def fail_full_read(*_args, **_kwargs):
+        raise AssertionError("load-failure extraction must not read the complete log")
+
+    monkeypatch.setattr(Path, "read_text", fail_full_read)
+    _result_path, sidecar = runner._materialize_load_failure_sidecar(
+        log_path=log_path,
+        platform="clickhouse-server",
+        benchmark="tpch",
+        scale=1.0,
+        runs_dir=tmp_path,
+        result_path=None,
+    )
+
+    assert sidecar is not None
+    monkeypatch.undo()
+    assert json.loads(sidecar.read_text(encoding="utf-8"))["table"] == "lineitem"
 
 
 def test_run_cell_diagnostic_rerun_fires_for_empty_stdout_failure(tmp_path: Path):
@@ -480,8 +569,20 @@ def test_classify_for_submit_vocabulary_and_clean_result(tmp_path: Path):
         "unofficial",
         "query_failure",
         "schema_violation",
+        "bundle_load_error",
+        "unvalidated",
         "missing_manifest",
     }
+
+
+def test_submit_state_is_cell_failure_excludes_unvalidated() -> None:
+    """Unvalidated cells stay PASSED; only integrity failures downgrade the cell."""
+    assert not runner.submit_state_is_cell_failure("unvalidated")
+    assert not runner.submit_state_is_cell_failure(runner.SubmitTerminalState.unvalidated)
+    assert runner.submit_state_is_cell_failure("schema_violation")
+    assert runner.submit_state_is_cell_failure("bundle_load_error")
+    assert runner.submit_state_is_cell_failure("query_failure")
+    assert runner.submit_state_is_cell_failure("missing_manifest")
 
 
 def test_classify_for_submit_marks_query_failure_and_run_cell_failed(tmp_path: Path):
@@ -509,3 +610,222 @@ def test_classify_for_submit_keeps_unofficial_as_passed_cell(tmp_path: Path):
     assert runner.classify_for_submit(result_path) is runner.SubmitTerminalState.unofficial
     assert result.status == "passed"
     assert result.submit_terminal_state == "unofficial"
+
+
+def test_classify_for_submit_keeps_unvalidated_as_passed_cell(tmp_path: Path):
+    """Never-validated results must not flip UAT cells to FAILED (DataFrame false 0%)."""
+    result_path = tmp_path / "benchmark_runs" / "results" / "unvalidated.json"
+    _write_result_json(result_path, validation="not_validated")
+    fake_argv = [sys.executable, "-c", f"print({str(result_path)!r})"]
+
+    with patch.object(runner, "benchbox_run_argv", return_value=fake_argv):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert runner.classify_for_submit(result_path) is runner.SubmitTerminalState.unvalidated
+    assert result.status == "passed"
+    assert result.exit_code == 0
+    assert result.submit_terminal_state == "unvalidated"
+
+
+def test_classify_for_submit_prefers_unofficial_over_unvalidated(tmp_path: Path):
+    """Compliance refusal still wins when a result is both unofficial and unvalidated."""
+    result_path = tmp_path / "benchmark_runs" / "results" / "unofficial-unvalidated.json"
+    _write_result_json(result_path, compliance_class="unofficial_subscale", validation="not_validated")
+    assert runner.classify_for_submit(result_path) is runner.SubmitTerminalState.unofficial
+
+
+def test_classify_for_submit_keeps_uncertain_with_translation_fallback_as_passed_cell(tmp_path: Path):
+    """Uncertain+fallback stays unvalidated (not a cell failure); unvalidated excludes cell FAIL."""
+    result_path = tmp_path / "benchmark_runs" / "results" / "uncertain-fallback.json"
+    _write_result_json(result_path, validation="uncertain", translation_status="fallback")
+    fake_argv = [sys.executable, "-c", f"print({str(result_path)!r})"]
+
+    with patch.object(runner, "benchbox_run_argv", return_value=fake_argv):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert runner.classify_for_submit(result_path) is runner.SubmitTerminalState.unvalidated
+    assert not runner.submit_state_is_cell_failure(runner.SubmitTerminalState.unvalidated)
+    assert result.status == "passed"
+    assert result.exit_code == 0
+    assert result.submit_terminal_state == "unvalidated"
+
+
+def test_classify_for_submit_marks_translation_fallback_as_cell_failure(tmp_path: Path):
+    """Translation fallback alone is non-clean schema_violation and fails the UAT cell."""
+    result_path = tmp_path / "benchmark_runs" / "results" / "translation-fallback.json"
+    _write_result_json(result_path, validation="passed", translation_status="fallback")
+    fake_argv = [sys.executable, "-c", f"print({str(result_path)!r})"]
+
+    with patch.object(runner, "benchbox_run_argv", return_value=fake_argv):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert runner.classify_for_submit(result_path) is runner.SubmitTerminalState.schema_violation
+    assert runner.submit_state_is_cell_failure(runner.SubmitTerminalState.schema_violation)
+    assert result.status == "failed"
+    assert result.submit_terminal_state == "schema_violation"
+
+
+# ---------------------------------------------------------------------------
+# w1: official/throughput status guard (uat-status-taxonomy-exit-code-fixes).
+#
+# Regression coverage for finding 1: the throughput validation block used to
+# set status="failed" unconditionally whenever no result JSON was resolved,
+# silently overwriting a "timed-out" classification and corrupting
+# downstream terminal_state()/cells.jsonl accounting. The fix mirrors the
+# existing `if status == "passed"` guard on the submit-classification
+# downgrade a few lines above (runner.py:258).
+# ---------------------------------------------------------------------------
+
+
+def _fake_run_with_timeout_factory(*, exit_code: int, timed_out: bool):
+    """Fabricate a TimeoutResult so the fast lane never spawns a real subprocess.
+
+    The three w1 guard tests only exercise post-subprocess classification
+    logic; a live `sleep 3` against a 1s cap would cost ~1s of wall time and
+    add flake surface for nothing.
+    """
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        return TimeoutResult(exit_code=exit_code, timed_out=timed_out, elapsed_s=0.1, stdout=b"", stderr=b"")
+
+    return fake_run_with_timeout
+
+
+def test_run_cell_official_timeout_preserves_timed_out_status(tmp_path: Path):
+    """A timed-out official cell must stay 'timed-out', not be overwritten to 'failed'."""
+    fake_argv = [sys.executable, "-c", "print('unused')"]
+    with (
+        patch.object(runner, "benchbox_run_official_argv", return_value=fake_argv),
+        patch.object(
+            runner, "run_with_timeout", side_effect=_fake_run_with_timeout_factory(exit_code=124, timed_out=True)
+        ),
+        patch.object(runner, "resolve_official_result_path", return_value=None),
+    ):
+        result = runner.run_cell(
+            "duckdb",
+            "tpch",
+            0.01,
+            timeout_s=1,
+            log_dir=tmp_path,
+            official=True,
+            streams=3,
+        )
+
+    assert result.status == "timed-out"
+    assert result.exit_code == 124
+    assert result.result_path is None
+    # The reason explains the skip instead of the generic "no result JSON
+    # resolved" message, so the artifact self-explains without implying a
+    # throughput check ran and failed.
+    assert result.throughput_check == "not validated: cell timed out"
+
+
+def test_run_cell_official_missing_result_downgrades_passed_cell(tmp_path: Path):
+    """A clean-exit official cell that resolved no result JSON is still a genuine failure."""
+    fake_argv = [sys.executable, "-c", "print('unused')"]
+    with (
+        patch.object(runner, "benchbox_run_official_argv", return_value=fake_argv),
+        patch.object(
+            runner, "run_with_timeout", side_effect=_fake_run_with_timeout_factory(exit_code=0, timed_out=False)
+        ),
+        patch.object(runner, "resolve_official_result_path", return_value=None),
+    ):
+        result = runner.run_cell(
+            "duckdb",
+            "tpch",
+            0.01,
+            timeout_s=10,
+            log_dir=tmp_path,
+            official=True,
+            streams=3,
+        )
+
+    assert result.status == "failed"
+    assert result.exit_code == 1
+    assert result.throughput_check == "no result JSON resolved for throughput validation"
+
+
+def test_run_cell_official_failed_exit_with_missing_result_keeps_original_exit_code(tmp_path: Path):
+    """A cell that already failed (nonzero exit, no timeout) keeps its own exit code."""
+    fake_argv = [sys.executable, "-c", "print('unused')"]
+    with (
+        patch.object(runner, "benchbox_run_official_argv", return_value=fake_argv),
+        patch.object(
+            runner, "run_with_timeout", side_effect=_fake_run_with_timeout_factory(exit_code=2, timed_out=False)
+        ),
+        patch.object(runner, "resolve_official_result_path", return_value=None),
+    ):
+        result = runner.run_cell(
+            "duckdb",
+            "tpch",
+            0.01,
+            timeout_s=10,
+            log_dir=tmp_path,
+            official=True,
+            streams=3,
+        )
+
+    assert result.status == "failed"
+    assert result.exit_code == 2
+    assert result.throughput_check == "no result JSON resolved for throughput validation"
+
+
+def test_run_cell_official_downgrades_passed_cell_on_stream_count_mismatch(tmp_path: Path):
+    """Existing behavior is preserved: a passed cell still downgrades on a real throughput failure."""
+    result_path = tmp_path / "benchmark_runs" / "results" / "official.json"
+    _write_result_json(result_path)  # no "stream" keys on the queries -> stream-count mismatch
+    fake_argv = [sys.executable, "-c", "pass"]
+    with (
+        patch.object(runner, "benchbox_run_official_argv", return_value=fake_argv),
+        patch.object(runner, "resolve_official_result_path", return_value=result_path),
+    ):
+        result = runner.run_cell(
+            "duckdb",
+            "tpch",
+            0.01,
+            timeout_s=10,
+            log_dir=tmp_path,
+            official=True,
+            streams=3,
+        )
+
+    assert result.status == "failed"
+    assert result.exit_code == 1
+    assert "throughput stream count mismatch" in (result.throughput_check or "")
+
+
+def test_run_cell_official_threads_emitted_path_and_scale_into_result_resolution(tmp_path: Path):
+    """run_cell must forward BOTH the emitted quiet-path line and `scale` into the
+    backward-compatible official resolver wrapper. Otherwise the runner silently falls back to
+    a None result even though the CLI emitted the authoritative path.
+    """
+    result_path = tmp_path / "benchmark_runs" / "results" / "official.json"
+    _write_result_json(result_path)
+    fake_argv = [sys.executable, "-c", "pass"]
+    timeout_result = TimeoutResult(
+        exit_code=0,
+        timed_out=False,
+        elapsed_s=0.1,
+        stdout=f"{result_path}\n".encode(),
+        stderr=b"",
+    )
+    with (
+        patch.object(runner, "benchbox_run_official_argv", return_value=fake_argv),
+        patch.object(runner, "run_with_timeout", return_value=timeout_result),
+        patch.object(runner, "resolve_official_result_path", return_value=result_path) as mock_resolve,
+    ):
+        runner.run_cell(
+            "duckdb",
+            "tpch",
+            1,
+            timeout_s=10,
+            log_dir=tmp_path,
+            official=True,
+            streams=3,
+        )
+
+    mock_resolve.assert_called_once()
+    assert mock_resolve.call_args.kwargs["emitted_path"] == str(result_path)
+    assert mock_resolve.call_args.kwargs["scale"] == 1
+    assert mock_resolve.call_args.kwargs["platform"] == "duckdb"
+    assert mock_resolve.call_args.kwargs["benchmark"] == "tpch"

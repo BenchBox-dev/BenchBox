@@ -56,7 +56,7 @@ If a specific seed cannot generate all queries at a tiny scale, the CLI prefligh
 from benchbox.cli.dryrun import DryRunExecutor
 from benchbox.cli.system import SystemProfiler
 from benchbox.cli.database import DatabaseConfig
-from benchbox.cli.types import BenchmarkConfig
+from benchbox.core.config import BenchmarkConfig
 from pathlib import Path
 
 # Setup dry run
@@ -337,7 +337,7 @@ Compare configurations across multiple platforms:
 
 ```bash
 # Preview for multiple platforms
-for platform in duckdb clickhouse databricks; do
+for platform in duckdb clickhouse-local databricks; do
   benchbox run --dry-run ./preview_${platform} \
     --platform ${platform} \
     --benchmark tpch \
@@ -345,7 +345,7 @@ for platform in duckdb clickhouse databricks; do
 done
 
 # Compare extracted queries
-diff ./preview_duckdb/queries/query_1.sql ./preview_clickhouse/queries/query_1.sql
+diff ./preview_duckdb/queries/query_1.sql ./preview_clickhouse-local/queries/query_1.sql
 ```
 
 ### Resource Scaling Analysis
@@ -553,7 +553,7 @@ done
 ```bash
 # Test platform-specific configurations
 benchbox run --dry-run ./platform_test \
-  --platform clickhouse \
+  --platform clickhouse-local \
   --benchmark tpch \
   --scale 0.01
 

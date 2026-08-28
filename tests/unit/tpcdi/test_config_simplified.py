@@ -37,6 +37,7 @@ from benchbox.core.tpcdi.config import (
     get_safe_config,
     get_simple_config,
 )
+from benchbox.utils.path_utils import resolve_benchmark_runs_dir
 
 
 @pytest.mark.unit
@@ -89,7 +90,7 @@ class TestTPCDIConfig:
         # Test default output directory creation - should use benchmark_runs structure
         config = TPCDIConfig()
         # Default output dir is now benchmark_runs/datagen/tpcdi_sf{scale_factor}
-        assert config.output_dir == Path.cwd() / "benchmark_runs" / "datagen" / "tpcdi_sf1"
+        assert config.output_dir == resolve_benchmark_runs_dir() / "datagen" / "tpcdi_sf1"
 
         # Test max_workers validation
         config = TPCDIConfig(max_workers=0)

@@ -101,6 +101,8 @@ keep this map in sync when adding or auditing deps.
 | `pytest-benchmark` | `pytest_benchmark` |
 | `pytest-timeout` | `pytest_timeout` |
 | `codespell` | `codespell_lib` |
+| `opentelemetry-exporter-otlp-proto-http` | `opentelemetry.exporter.otlp.proto.http` |
+| `opentelemetry-sdk` | `opentelemetry.sdk` |
 
 ---
 
@@ -130,7 +132,7 @@ or declaration appears unused.
 | `pyyaml` | C | `benchbox/cli/**`, `benchbox/core/**`, `scripts/`, `benchbox/security/**`, tests | 23 | KEEP |
 | `rich` | CL | `benchbox/cli/**`, `benchbox/core/**`, `benchbox/platforms/**`, `benchbox/utils/**` | 146 | KEEP |
 | `sqlglot` | C | `benchbox/base.py`, `benchbox/core/**`, `benchbox/platforms/**`, `benchbox/utils/**`, tests | 16 | KEEP |
-| `textcharts` | C | `benchbox/core/visualization/ascii/**`, `benchbox/monitoring/**` | 20 | KEEP |
+| `textcharts` | C | `benchbox/core/visualization/ascii/**`, `benchbox/monitoring/**` | 20 | KEEP — retained by ADR follow-up; removing it would break supported ASCII shims and monitoring imports |
 | `tomli` | C | `benchbox/utils/dependency_validation.py`, `benchbox/utils/version.py`, `scripts/`, tests | 9 | KEEP - guarded by `python_version < '3.11'`; stdlib `tomllib` covers 3.11+ |
 | `zstandard` | C | `benchbox/core/primitives/**`, `benchbox/utils/**`, tests | 9 | KEEP |
 | `azure-identity` | CSP | `benchbox/platforms/azure/**` | 9 | KEEP |
@@ -188,7 +190,7 @@ or declaration appears unused.
 | `cloudpathlib[s3,gs,azure]` | DEV | tests use `cloudpathlib` core | covered above | KEEP - extras pin S3/GCS/Azure providers for live tests |
 | `pyiceberg[sql-sqlite,pyarrow]` | DEV | tests use `pyiceberg` core | covered above | KEEP - extras pin SQL-SQLite catalog for tests |
 | `ruamel-yaml` | DEV | `_project/scripts/todo_cli.py` | 0 (runtime); 1 (tooling) | KEEP - used by TODO tooling. (Distinct from `jsonschema` because `ruamel-yaml` is dev-only, not declared as a *core* runtime dep.) |
-| `sphinx` | DOC | `tests/conftest.py`, `tests/unit/docs/test_docs_build.py` | 2 | KEEP - drives docs build via `make docs` |
+| `sphinx` | DOC | `tests/conftest.py`, `tests/unit/docs/test_docs_build.py` | 2 | KEEP - drives docs build via `make docs-build` |
 | `sphinx-tags` | DOC | (config in `docs/conf.py:66`) | 0 | KEEP - registered in `extensions` list |
 | `sphinx-design` | DOC | (config in `docs/conf.py:68`) | 0 | KEEP |
 | `sphinxcontrib-mermaid` | DOC | (config in `docs/conf.py:65`) | 1 | KEEP |

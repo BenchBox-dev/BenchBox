@@ -20,12 +20,26 @@ from typing import Any
 
 from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
 from benchbox.core.results.schema import compute_plan_capture_stats
+from benchbox.core.tuning.applied_ledger import (
+    APPLIED_UNVERIFIED,
+    APPLIED_VERIFIED,
+    EXECUTED,
+    PHASE_DDL,
+    PHASE_POST_LOAD,
+    PHASE_SESSION,
+    STATEMENT_FAILED,
+    AppliedTuningLedger,
+    is_schema_tuning_statement,
+    recording_connection,
+)
+from benchbox.core.tuning.introspection import Introspector, corroborate
 from benchbox.platforms.base.connection_lifecycle import ConnectionLifecycleMixin
 from benchbox.platforms.base.connection_wrappers import (
     DriverIsolationCapability,
     PlatformAdapterConnection,  # noqa: F401 - re-exported for external imports
     PlatformAdapterCursor,  # noqa: F401 - re-exported for external imports
-    _make_stream_cursor,  # noqa: F401 - re-exported for external imports
+    StreamConnectionCapability,
+    _make_stream_cursor,
     _NoCloseProxy,  # noqa: F401 - re-exported for external imports
     check_isolation_capability,  # noqa: F401 - re-exported for external imports
 )
@@ -107,6 +121,16 @@ class PlatformAdapter(
     # Subclasses should override this class variable to declare their capability.
     # Default is NOT_APPLICABLE - adapters that support isolation must opt in.
     driver_isolation_capability: DriverIsolationCapability = DriverIsolationCapability.NOT_APPLICABLE
+    # Per-stream connection capability for concurrent throughput/pool-test streams
+    # (see StreamConnectionCapability docstring). Default is SHARED_CURSOR, which
+    # preserves today's behavior for every adapter that does not opt in: streams
+    # share one cursor per connection, correct for embedded engines like DuckDB.
+    # Server-style (client/server) adapters that need one independent connection
+    # per stream must set this to INDEPENDENT_CONNECTION *and* override
+    # new_stream_connection() below - declaring the capability alone is not
+    # enough, since the base new_stream_connection() raises for that value to
+    # fail fast instead of silently falling back to cursor sharing.
+    stream_connection_capability: StreamConnectionCapability = StreamConnectionCapability.SHARED_CURSOR
     # External table mode capability declaration.
     # Subclasses that implement external table/view registration should set this to True.
     supports_external_tables: bool = False
@@ -186,8 +210,27 @@ class PlatformAdapter(
         self.driver_runtime_python_executable = config.get("driver_runtime_python_executable")
         self.driver_auto_install_used = bool(config.get("driver_auto_install_used", False))
 
-        # Unified tuning configuration support
-        self.unified_tuning_configuration = config.get("unified_tuning_configuration")
+        # Unified tuning configuration support. ``tuning_config`` is the reliable
+        # channel: get_platform_config() always passes it through as a live object
+        # reference (never round-tripped through DatabaseConfig.model_dump(), which
+        # would serialize a dataclass-valued extra field to a plain dict). Prefer it,
+        # falling back to ``unified_tuning_configuration`` only when that key already
+        # holds a real object rather than such a serialized dict.
+        _legacy_tuning_config = config.get("unified_tuning_configuration")
+        if isinstance(_legacy_tuning_config, dict):
+            _legacy_tuning_config = None
+        self.unified_tuning_configuration = config.get("tuning_config") or _legacy_tuning_config
+        # Provenance for the requested tuning config: raw TuningSource enum value
+        # (e.g. "auto_discovered") and a repo-relative/content-hash template
+        # reference (never a raw local path). Threaded from run.py through the
+        # DatabaseConfig/platform_config channel; see _promote_tuning_to_database_config.
+        self.tuning_source: str | None = config.get("tuning_source")
+        self.tuning_source_file: str | None = config.get("tuning_source_file")
+        # Applied-tuning ledger: populated BY the execution path (schema/data +
+        # session phases) during run_enhanced_benchmark, read back once at result
+        # construction for the honest status, the physical-identity hash, and the
+        # .applied.json companion. Reset per run; None-safe on non-tuned paths.
+        self._applied_tuning_ledger: AppliedTuningLedger | None = None
 
         # Verbose logging configuration
         self.apply_verbosity(VerbositySettings.from_mapping(config))
@@ -258,6 +301,53 @@ class PlatformAdapter(
         can rely on this default when no custom name is required.
         """
         return self.__class__.__name__
+
+    @property
+    def canonical_platform_type(self) -> str:
+        """Return the canonical, machine-readable platform type key.
+
+        Tuning-capability lookups and metadata persistence must key off a
+        stable identifier (e.g. ``"clickhouse-local"``, ``"duckdb"``) -- not
+        `platform_name`, which is a human-facing display string (e.g.
+        ``"ClickHouse Local"``, ``"StarRocks"``) that varies by adapter and is
+        never guaranteed to match the lowercase, single-word keys used by
+        capability maps such as `TuningType`'s compatibility map.
+
+        Sourced from the ``type`` key in `platform_config` when present.
+        Upstream config plumbing (core/platform_config.py) strips ``type``
+        from DatabaseConfig before adapter construction, so the key does NOT
+        survive that path on its own -- ``get_platform_adapter`` in
+        `benchbox.platforms` re-injects the resolved canonical registry name
+        (`PlatformRegistry.resolve_platform_name`) into the constructor
+        config, which is what this property reads on every factory-built
+        adapter.
+
+        Falls back to a normalized form of `platform_name` (lowercased,
+        spaces collapsed to hyphens) when no config type is available -- e.g.
+        an adapter constructed directly, bypassing the factory, as many unit
+        tests do. This fallback is best-effort only: it does not guarantee a
+        match against any capability map key (a parenthesized display name
+        like ``"ClickHouse (Local)"`` normalizes to ``"clickhouse-(local)"``),
+        it just avoids crashing on multi-word display strings.
+        """
+        platform_config = getattr(self, "platform_config", None)
+        config_type = platform_config.get("type") if isinstance(platform_config, dict) else None
+        if config_type:
+            return str(config_type).strip().lower()
+        return self.platform_name.strip().lower().replace(" ", "-")
+
+    def get_tuning_introspector(self) -> Introspector | None:
+        """Return a post-load schema introspector for this platform, or None.
+
+        An introspector corroborates the applied-tuning ledger against the real
+        database catalog, letting an ``applied_unverified`` run be upgraded to
+        ``applied_verified`` -- but only when every catalog-backed tuning
+        statement is corroborated (see
+        ``benchbox.core.tuning.introspection``). Platforms with a structured
+        catalog (DuckDB, ClickHouse) override this; the base returns None, so a
+        platform without an introspector keeps the honest ledger-derived status.
+        """
+        return None
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get platform information for results traceability.
@@ -579,6 +669,58 @@ class PlatformAdapter(
         if connection and hasattr(connection, "close"):
             connection.close()
 
+    def new_stream_connection(self, connection: Any) -> Any:
+        """Return a per-stream execution handle for one concurrent throughput
+        (or connection-pool test) stream.
+
+        This is the capability seam for ``throughput-independent-sessions-per-stream``:
+        the throughput drivers' ``connection_factory`` closures
+        (``benchbox/platforms/base/execution.py``,
+        ``_execute_tpch_throughput_test`` / ``_execute_tpcds_throughput_test``)
+        call this once per stream instead of unconditionally sharing one
+        cursor, so the behavior is now a declared, overridable platform
+        capability rather than an implicit one-size-fits-all default.
+
+        Dispatches on ``stream_connection_capability``:
+
+        - ``SHARED_CURSOR`` (default): returns ``_make_stream_cursor(connection)``
+          - a cursor of (or ``_NoCloseProxy`` over) the single shared
+          ``connection`` passed in. This is the existing, unchanged fast path:
+          correct for embedded engines whose client is documented thread-safe
+          at cursor level against one process-local database (e.g. DuckDB -
+          see docs/benchmarks/tpc-h.md). No new connections are opened, and
+          closing the returned handle never closes the shared connection
+          (``_NoCloseProxy.close()`` is a no-op; a real cursor's ``close()``
+          only closes the cursor).
+        - ``INDEPENDENT_CONNECTION``: server-style adapters (client/server
+          engines whose driver does not support true concurrent statement
+          execution across cursors of one connection) MUST override this
+          method to open and return a brand-new connection/session, typically
+          ignoring the ``connection`` argument entirely. The base
+          implementation deliberately raises ``NotImplementedError`` for this
+          capability value instead of falling back to cursor sharing, so a
+          subclass that declares ``INDEPENDENT_CONNECTION`` without overriding
+          fails loudly rather than silently reproducing the shared-session bug
+          this capability exists to fix.
+
+        Args:
+            connection: The adapter's shared platform connection (as created by
+                ``create_connection``). Used as-is for ``SHARED_CURSOR``;
+                available for reference (e.g. to read connection parameters)
+                but not required for ``INDEPENDENT_CONNECTION`` overrides.
+
+        Returns:
+            A connection-like object suitable for one stream: either a cursor/
+            proxy over the shared connection, or an independent connection.
+        """
+        if self.stream_connection_capability is StreamConnectionCapability.INDEPENDENT_CONNECTION:
+            raise NotImplementedError(
+                f"{self.platform_name} declares stream_connection_capability="
+                "StreamConnectionCapability.INDEPENDENT_CONNECTION but does not override "
+                "new_stream_connection() to open an independent per-stream connection/session."
+            )
+        return _make_stream_cursor(connection)
+
     def validate_platform_capabilities(self, benchmark_type: str) -> ValidationResult:
         """Validate platform-specific capabilities for the benchmark.
 
@@ -640,6 +782,17 @@ class PlatformAdapter(
             quiet_console.print(f"Connecting to {self.platform_name}...")
             self.log_very_verbose(f"database_was_reused flag BEFORE connection: {self.database_was_reused}")
             self.benchmark = benchmark  # Store for handle_existing_database() to access
+            # Reset the rerun drift-validation stash BEFORE connecting. For a reused
+            # database the drift check is captured *during* create_connection() ->
+            # handle_existing_database() -> DatabaseValidator/TuningValidator ->
+            # _validate_database_tunings, NOT during the later validation phase
+            # (_create_enhanced_validation_phase only runs row-count/schema/integrity
+            # checks). The reset must therefore precede that capture: resetting it
+            # afterwards discards the only captured result before
+            # _build_drift_check_payload() can route it into the .applied.json
+            # companion. Resetting here still clears any prior run's drift on a
+            # reused adapter instance (ADR-001 addendum).
+            self._drift_validation_result = None
             connection = self.create_connection(**run_config.get("connection", {}))
             self.connection = connection
             self.log_very_verbose(f"database_was_reused flag AFTER connection: {self.database_was_reused}")
@@ -648,12 +801,28 @@ class PlatformAdapter(
             effective_tuning_config = self.get_effective_tuning_configuration()
             if self.tuning_enabled and effective_tuning_config:
                 quiet_console.print("Validating unified tuning configuration...")
-                tuning_errors = effective_tuning_config.validate_for_platform(self.platform_name)
+                tuning_errors, tuning_warnings = effective_tuning_config.validate_for_platform_detailed(
+                    self.canonical_platform_type
+                )
+                for warning in tuning_warnings:
+                    self.logger.warning(f"Tuning configuration warning: {warning}")
                 if tuning_errors:
                     raise ValueError(f"Invalid tuning configuration: {'; '.join(tuning_errors)}")
                 quiet_console.print("✅ Unified tuning configuration validated")
 
             # Step 4: Schema creation and data loading
+            # Fresh applied-tuning ledger for this run. Populated as the schema/
+            # data phases (DDL, post-load) and the session-configuration phase
+            # actually execute tuning-relevant statements against the wrapped
+            # connection; read back once at result construction. Reset here so a
+            # reused adapter instance never carries a prior run's statements.
+            self._applied_tuning_ledger = AppliedTuningLedger()
+            # Fresh post-load layout-op accumulator for the same reason: adapters
+            # that record post-load layout statements here (DuckDB sort-index
+            # re-creation, ClickHouse tuned sort-key DDL, Databricks OPTIMIZE/
+            # ZORDER) must not fold a prior run's ops into this run's ledger.
+            self._applied_layout_operations = []
+
             self.log_verbose(f"Checking database_was_reused flag before schema creation: {self.database_was_reused}")
             if self.database_was_reused:
                 (
@@ -677,14 +846,43 @@ class PlatformAdapter(
             quiet_console.print("Validating benchmark data...")
             validation_phase = self._create_enhanced_validation_phase(benchmark, connection, table_stats)
 
+            # Requested-config export is unchanged (ADR-1 additive contract): the
+            # requested tunings + requested_config_hash still come straight from
+            # the effective configuration, independent of what actually executed.
             tunings_applied_dict = None
-            tuning_validation_status = "NOT_APPLICABLE"
+            requested_config_hash = None
             if self.tuning_enabled and effective_tuning_config:
                 tunings_applied_dict = effective_tuning_config.to_dict()
-                tuning_validation_status = "APPLIED" if tuning_metadata_saved else "FAILED_TO_SAVE"
+                # requested_config_hash (ADR-1): canonical hash of the requested
+                # config, independent of whether every clause actually applied.
+                requested_config_hash = effective_tuning_config.get_configuration_hash()
+
+            # Surface requested-but-not-rendered intents at run time (w4) so the
+            # author sees them; they are also carried in the ledger payload.
+            for _dropped in self._applied_tuning_ledger.dropped:
+                self.logger.warning(
+                    "Requested tuning intent not applied: %s (%s)",
+                    _dropped.intent,
+                    _dropped.reason,
+                )
+
+            # Honest tuning_validation_status derived from what the execution
+            # path actually ran (apply-phase statements only at this point;
+            # session SETs at line ~827 run later and are folded in before the
+            # success result is built). tuning_metadata_saved is a separate
+            # persistence note, fully decoupled from this status.
+            tuning_validation_status = self._applied_tuning_ledger.overall_status(
+                tuning_enabled=self.tuning_enabled,
+                has_config=bool(effective_tuning_config),
+            )
 
             if self._check_validation_failure(validation_phase):
-                return self._create_failed_benchmark_result(
+                # Data validation failed before session SETs ran, so the ledger
+                # holds only apply-phase statements. _create_failed_benchmark_result
+                # lives in the CODEOWNERS-locked result_capture.py, so the ledger
+                # payload/hash are attached here (adapter-side) rather than by
+                # extending that method's signature.
+                failed_result = self._create_failed_benchmark_result(
                     benchmark,
                     validation_phase,
                     table_stats,
@@ -694,12 +892,32 @@ class PlatformAdapter(
                     tunings_applied_dict,
                     tuning_validation_status,
                     tuning_metadata_saved,
+                    requested_config_hash,
                 )
+                self._attach_applied_ledger_payload(failed_result, tuning_validation_status)
+                return failed_result
 
             quiet_console.print("✅ Data validation passed")
 
+            # Fold post-load layout ops (e.g. Databricks OPTIMIZE/ZORDER recorded
+            # on self._applied_layout_operations) into the ledger HERE: they
+            # physically execute during data loading, so recording them before the
+            # session SETs below keeps the ledger - and the order-sensitive
+            # applied_ledger_hash - in true execution chronology (ddl -> post_load
+            # -> session). Internally guarded; a no-op when the attribute is empty.
+            self._fold_layout_operations_into_ledger()
+
             benchmark_type = run_config.get("benchmark_type", "olap")
-            self.configure_for_benchmark(connection, benchmark_type)
+            # Wrap the connection so session-configuration SETs are captured into
+            # the ledger (PHASE_SESSION) for every mode, including baseline. Only
+            # the argument handed to configure_for_benchmark is wrapped; the raw
+            # connection continues to drive statistics/query execution so timed
+            # query statements are never recorded. recording_connection degrades
+            # to the raw connection if the ledger is missing or wrapping fails.
+            self.configure_for_benchmark(
+                recording_connection(connection, self._applied_tuning_ledger, PHASE_SESSION),
+                benchmark_type,
+            )
 
             # Opt-in statistics phase: load -> statistics -> query, so
             # stats-build wall-clock is attributed to neither load nor query.
@@ -785,6 +1003,53 @@ class PlatformAdapter(
                 existing_errors=list(self.plan_capture_errors),
             )
 
+            # Final honest status now includes the session SETs captured at the
+            # configure_for_benchmark wrap above (post-load layout ops were folded
+            # before it). The ledger payload + physical-identity hash are the
+            # ADR-1 additive companion; the requested-config export
+            # (tunings_applied / requested_config_hash) is unchanged. Guarded
+            # end-to-end: capture must never break an otherwise-successful run, so
+            # any derive/serialize failure degrades the companion to None and the
+            # status falls back to the apply-phase value computed above.
+            final_tuning_status = tuning_validation_status
+            applied_ledger_payload = None
+            applied_ledger_hash = None
+            applied_receipt_payload = None
+            try:
+                final_tuning_status = self._applied_tuning_ledger.overall_status(
+                    tuning_enabled=self.tuning_enabled,
+                    has_config=bool(effective_tuning_config),
+                )
+                # Post-load introspection receipt (tuning-introspection-receipts):
+                # corroborate the ledger against the live catalog (connection is
+                # still open here) and upgrade applied_unverified ->
+                # applied_verified ONLY when every catalog-backed tuning statement
+                # is corroborated. applied_verified is emitted HERE and *only* via
+                # corroboration -- overall_status never returns it. Bounded +
+                # fully guarded (see _corroborate_applied_ledger): any
+                # introspection error leaves the honest applied_unverified status
+                # and records why in the receipt. A no-op unless the derived
+                # status is applied_unverified (see _corroborate_applied_ledger).
+                final_tuning_status, applied_receipt_payload = self._corroborate_applied_ledger(
+                    connection, final_tuning_status
+                )
+                # Carry the companion when something was captured (executed
+                # statements or dropped intents) OR a reused-DB drift check was
+                # computed -- a reused DB re-applies no tuning DDL so its ledger
+                # is empty, but its drift_check must still reach the bundle
+                # (ADR-001 addendum). A non-tuned run with no session SETs and no
+                # drift remains a no-op (no .applied.json).
+                drift_check_payload = self._build_drift_check_payload()
+                if not self._applied_tuning_ledger.is_empty() or drift_check_payload is not None:
+                    applied_ledger_payload = self._applied_tuning_ledger.to_payload(
+                        status=final_tuning_status,
+                        receipt=applied_receipt_payload,
+                        drift_check=drift_check_payload,
+                    )
+                    applied_ledger_hash = self._applied_tuning_ledger.applied_ledger_hash()
+            except Exception as exc:  # capture must never break a successful run
+                self.logger.debug("applied-ledger read-back degraded: %s", exc)
+
             return benchmark.create_enhanced_benchmark_result(
                 platform=self.platform_name,
                 query_results=query_results,
@@ -805,8 +1070,13 @@ class PlatformAdapter(
                 platform_info=platform_info,
                 **normalized_metadata,
                 tunings_applied=tunings_applied_dict,
-                tuning_validation_status=tuning_validation_status,
+                tuning_validation_status=final_tuning_status,
                 tuning_metadata_saved=tuning_metadata_saved,
+                tuning_config_hash=requested_config_hash,
+                applied_tuning_ledger=applied_ledger_payload,
+                applied_ledger_hash=applied_ledger_hash,
+                tuning_source_file=self.tuning_source_file,
+                tuning_source=self.tuning_source,
                 system_profile=system_profile,
                 anonymous_machine_id=anonymous_machine_id,
                 validation_status=self._determine_overall_validation_status(validation_phase),
@@ -825,6 +1095,188 @@ class PlatformAdapter(
             if hasattr(self, "connection") and self.connection:
                 self.close_connection(self.connection)
                 self.connection = None
+
+    def _corroborate_applied_ledger(self, connection: Any, status: str) -> tuple[str, dict[str, Any] | None]:
+        """Corroborate the applied ledger against the live catalog.
+
+        Returns ``(status, receipt_payload)``. When this platform exposes a
+        tuning introspector (``get_tuning_introspector``), runs bounded catalog
+        reads, corroborates, and upgrades ``applied_unverified`` ->
+        ``applied_verified`` iff every catalog-backed tuning statement is
+        corroborated (``benchbox.core.tuning.introspection.corroborate``).
+
+        Must-preserve invariants: introspection NEVER breaks or materially slows
+        a run (the introspector is bounded and returns an errored state rather
+        than raising; this method is additionally wrapped), and
+        ``applied_verified`` is claimable ONLY via corroboration here -- on any
+        introspector, no-introspector, or corroboration miss, ``status`` is
+        returned unchanged (staying ``applied_unverified``) and the receipt (when
+        one was produced) records why.
+        """
+        # applied_verified is reachable ONLY from applied_unverified via
+        # corroboration; every other status (noop/failed/not_applicable) is left
+        # exactly as the ledger derived it.
+        if status != APPLIED_UNVERIFIED:
+            return status, None
+        introspector = None
+        try:
+            introspector = self.get_tuning_introspector()
+        except Exception as exc:  # pragma: no cover - defensive
+            self.logger.debug("tuning introspector lookup degraded: %s", exc)
+        if introspector is None:
+            return status, None
+        try:
+            state = introspector.introspect(connection, self._applied_tuning_ledger)
+            receipt = corroborate(self._applied_tuning_ledger, state)
+            if receipt.corroborated:
+                status = APPLIED_VERIFIED
+            return status, receipt.to_payload()
+        except Exception as exc:  # introspection must never break a run
+            self.logger.debug("applied-ledger corroboration degraded: %s", exc)
+            return status, None
+
+    def _attach_applied_ledger_payload(self, result: Any, status: str) -> None:
+        """Attach the applied-tuning ledger payload + hash onto a built result.
+
+        Used on the validation-failure path, where the result is built by
+        ``_create_failed_benchmark_result`` (defined in the CODEOWNERS-locked
+        ``result_capture.py``): the ledger companion is attached adapter-side
+        rather than by threading extra parameters through that method. Capture
+        never breaks a run - failures degrade to a debug log.
+        """
+        ledger = getattr(self, "_applied_tuning_ledger", None)
+        if ledger is None or result is None:
+            return
+        drift_check_payload = self._build_drift_check_payload()
+        if ledger.is_empty() and drift_check_payload is None:
+            return
+        try:
+            result.applied_tuning_ledger = ledger.to_payload(status=status, drift_check=drift_check_payload)
+            result.applied_ledger_hash = ledger.applied_ledger_hash()
+        except Exception as exc:  # capture must never break a run
+            self.logger.debug("applied-ledger attach degraded: %s", exc)
+
+    def _build_drift_check_payload(self) -> dict[str, Any] | None:
+        """Build the ``.applied.json`` companion ``drift_check`` section.
+
+        Routes the rerun drift-validation result (the
+        ``MetadataValidationResult`` from ``_validate_database_tunings``, stashed
+        on ``self._drift_validation_result`` during connection-time reuse
+        validation) into the bundle per the ADR-001 addendum (drift-validation
+        bundle routing).
+        Scoped to reused tuned databases -- a fresh DB just persisted its
+        metadata, so nothing could have drifted, and an untuned run has no
+        expected tuning to compare. Guarded: ``None`` when not a reused tuned
+        run or nothing was captured; never raises.
+        """
+        try:
+            if not (self.tuning_enabled and getattr(self, "database_was_reused", False)):
+                return None
+            result = getattr(self, "_drift_validation_result", None)
+            if result is None:
+                return None
+            return result.to_payload()
+        except Exception as exc:  # capture must never break a run
+            self.logger.debug("drift-check payload build degraded: %s", exc)
+            return None
+
+    def _fold_layout_operations_into_ledger(self) -> None:
+        """Fold platform-recorded post-load layout ops into the applied ledger.
+
+        Some platforms (Databricks) accumulate post-load layout statements
+        (OPTIMIZE / ZORDER) on ``self._applied_layout_operations`` rather than
+        executing them through the wrapped tuning connection. Fold each into the
+        ledger as a PHASE_POST_LOAD statement so they show up in the companion.
+        Generic + guarded: a no-op when the attribute is absent or empty.
+        """
+        ledger = getattr(self, "_applied_tuning_ledger", None)
+        layout_ops = getattr(self, "_applied_layout_operations", None)
+        if ledger is None or not layout_ops:
+            return
+        for op in layout_ops:
+            try:
+                op_status = EXECUTED if op.get("status") == "applied" else STATEMENT_FAILED
+                ledger.record(
+                    op.get("statement", ""),
+                    op.get("phase") or PHASE_POST_LOAD,
+                    status=op_status,
+                    mechanism=op.get("mechanism"),
+                    table=op.get("table"),
+                    error=op.get("error_message"),
+                )
+            except Exception as exc:  # capture must never break a run
+                self.logger.debug("applied-ledger layout fold degraded: %s", exc)
+
+    def _setup_fresh_database_phases(self, benchmark, connection: Any, effective_tuning_config) -> tuple:
+        """Run fresh-database setup while capturing schema-phase tuning DDL.
+
+        The adapter owns the setup implementation because schema creation is an
+        adapter lifecycle seam: platform adapters render
+        tuning clauses while creating tables. Keep the wrapper limited to that
+        call so data loading and the subsequent tuning/session wrappers retain
+        their existing ledger boundaries.
+
+        ClickHouse and StarRocks already record their rendered schema clauses at
+        their platform-specific render points. Passing those adapters another
+        recording connection would append the same physical DDL twice and change
+        the order-sensitive ledger hash.
+        """
+        data_dir = Path(benchmark.output_dir) if hasattr(benchmark, "output_dir") else Path(".")
+
+        if self.table_mode == "external":
+            if not self.supports_external_tables:
+                raise RuntimeError(f"Platform '{self.platform_name}' does not support --table-mode external")
+            validate_fn = getattr(self, "validate_external_table_requirements", None)
+            if callable(validate_fn):
+                validate_fn()
+
+            schema_time = 0.0
+            schema_creation_phase = self._create_enhanced_schema_creation_phase(benchmark, connection, 0.0)
+            schema_creation_phase.status = "SKIPPED"
+
+            quiet_console.print("Creating external tables...")
+            table_stats, loading_time, per_table_timings = self.create_external_tables(benchmark, connection, data_dir)
+            _fmt_tag = f" [{self.external_format}]" if self.external_format else ""
+            quiet_console.print(f"✅ External tables created in {loading_time:.2f}s{_fmt_tag}")
+            data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
+            return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, False
+
+        quiet_console.print("Creating database schema...")
+        schema_records_ddl = bool(self.tuning_enabled and effective_tuning_config) and not any(
+            callable(getattr(self, method_name, None))
+            for method_name in ("_record_tuned_sort_key_op", "_record_starrocks_tuning_to_ledger")
+        )
+        schema_connection = (
+            recording_connection(
+                connection,
+                getattr(self, "_applied_tuning_ledger", None),
+                PHASE_DDL,
+                statement_filter=is_schema_tuning_statement,
+            )
+            if schema_records_ddl
+            else connection
+        )
+        schema_time = self.create_schema(benchmark, schema_connection)
+        schema_creation_phase = self._create_enhanced_schema_creation_phase(benchmark, connection, schema_time)
+
+        tuning_metadata_saved = False
+        if self.tuning_enabled and effective_tuning_config:
+            quiet_console.print("Applying unified tuning configuration...")
+            self.apply_unified_tuning(effective_tuning_config, connection)
+            quiet_console.print("✅ Unified tuning configuration applied")
+
+            quiet_console.print("Saving tuning metadata...")
+            tuning_metadata_saved = self.save_tuning_metadata(connection)
+            if tuning_metadata_saved:
+                quiet_console.print("✅ Tuning metadata saved")
+            else:
+                quiet_console.print("⚠️ Failed to save tuning metadata")
+
+        quiet_console.print("Loading benchmark data...")
+        table_stats, loading_time, per_table_timings = self.load_data(benchmark, connection, data_dir)
+        quiet_console.print(f"✅ Data loading completed in {loading_time:.2f}s")
+        data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
+        return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, tuning_metadata_saved
 
     def run_benchmark(self, benchmark, **run_config) -> EnhancedBenchmarkResults:
         """Run complete benchmark with enhanced phase tracking.

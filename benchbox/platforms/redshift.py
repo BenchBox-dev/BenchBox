@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from benchbox.core.benchmark_mixins import CursorValidationQueryExecutionMixin
 from benchbox.core.sql_utils import normalize_table_name_in_sql
 from benchbox.platforms.base.tuning import make_informational_constraint_applier
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -67,7 +68,7 @@ def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
     return {str(key): value for key, value in payload.items() if value not in (None, "", {}, [], ())}
 
 
-class RedshiftAdapter(PlatformAdapter):
+class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     """Amazon Redshift platform adapter with S3 integration."""
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
@@ -195,9 +196,8 @@ class RedshiftAdapter(PlatformAdapter):
             raise ConfigurationError(
                 f"Redshift configuration is incomplete. Missing: {', '.join(missing)}\n"
                 "Configure with one of:\n"
-                "  1. CLI: benchbox platforms setup --platform redshift\n"
-                "  2. Environment variables: REDSHIFT_HOST, REDSHIFT_USER, REDSHIFT_PASSWORD\n"
-                "  3. CLI options: --platform-option host=<cluster>.redshift.amazonaws.com"
+                "  1. CLI: benchbox setup --platform redshift\n"
+                "  2. Environment variables: REDSHIFT_HOST, REDSHIFT_USER, REDSHIFT_PASSWORD"
             )
 
     @property
@@ -2043,6 +2043,29 @@ class RedshiftAdapter(PlatformAdapter):
             adapter_logger=self.logger,
         )
 
+    def _build_query_stats(
+        self,
+        execution_time: float,
+        *,
+        connection: Any = None,
+        query_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Attach Redshift STL/SYS telemetry while the execute cursor is still open.
+
+        ``pg_last_query_id()`` must run before any later EXPLAIN/plan-capture
+        SQL on this session. The core mixin calls this hook immediately after
+        ``fetchall()`` and before validation, which preserves that order.
+        """
+        stats = {"execution_time_seconds": execution_time}
+        if connection is None:
+            return stats
+        try:
+            redshift_stats = self._get_query_statistics(connection, query_id or "")
+            redshift_stats["execution_time_seconds"] = execution_time
+            return redshift_stats
+        except Exception:
+            return stats
+
     def execute_query(
         self,
         connection: Any,
@@ -2053,100 +2076,32 @@ class RedshiftAdapter(PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute query with detailed timing and performance tracking."""
-        start_time = mono_time()
+        """Execute via the core cursor primitive, then attach Redshift plan fields.
 
-        cursor = connection.cursor()
+        Enumerated deltas vs ``CursorValidationQueryExecutionMixin`` (all hooks):
+        query tags: none; statistics: ``_get_query_statistics`` / ``pg_last_query_id``;
+        plan capture: post-execute ``_merge_plan_capture_into_result``;
+        rollback: none; result digest: none; cursor ownership: mixin-owned;
+        query rewrite: base adapter; job APIs: none.
+        """
+        result = super().execute_query(
+            connection,
+            query,
+            query_id,
+            benchmark_type=benchmark_type,
+            scale_factor=scale_factor,
+            validate_row_count=validate_row_count,
+            stream_id=stream_id,
+        )
+        if result.get("status") == "FAILED":
+            return result
 
-        try:
-            # Execute the query
-            # Note: Query dialect translation is now handled automatically by the base adapter
-            cursor.execute(query)
-            result = cursor.fetchall()
-
-            execution_time = elapsed_seconds(start_time)
-            actual_row_count = len(result) if result else 0
-
-            # Get query statistics
-            try:
-                query_stats = self._get_query_statistics(connection, query_id)
-                # Add execution time for cost calculation
-                query_stats["execution_time_seconds"] = execution_time
-            except Exception:
-                query_stats = {"execution_time_seconds": execution_time}
-
-            # Validate row count if enabled and benchmark type is provided
-            validation_result = None
-            if validate_row_count and benchmark_type:
-                from benchbox.core.validation.query_validation import QueryValidator
-
-                validator = QueryValidator()
-                validation_result = validator.validate_query_result(
-                    benchmark_type=benchmark_type,
-                    query_id=query_id,
-                    actual_row_count=actual_row_count,
-                    scale_factor=scale_factor,
-                    stream_id=stream_id,
-                )
-
-                # Log validation result
-                if validation_result.warning_message:
-                    self.log_verbose(f"Row count validation: {validation_result.warning_message}")
-                elif not validation_result.is_valid:
-                    self.log_verbose(f"Row count validation FAILED: {validation_result.error_message}")
-                else:
-                    self.log_very_verbose(
-                        f"Row count validation PASSED: {actual_row_count} rows "
-                        f"(expected: {validation_result.expected_row_count})"
-                    )
-
-            # Use base helper to build result with consistent validation field mapping
-            result_dict = self._build_query_result_with_validation(
-                query_id=query_id,
-                execution_time=execution_time,
-                actual_row_count=actual_row_count,
-                first_row=result[0] if result else None,
-                validation_result=validation_result,
-            )
-
-            # Include Redshift-specific fields
-            result_dict["translated_query"] = None  # Translation handled by base adapter
-            result_dict["query_statistics"] = query_stats
-            # Map query_statistics to resource_usage for cost calculation
-            result_dict["resource_usage"] = query_stats
-
-        except Exception as e:
-            execution_time = elapsed_seconds(start_time)
-            error_type = type(e).__name__
-            # Always populate `error` with a non-empty string - some driver
-            # exceptions raise with no message and yield an empty str(e).
-            error_message = str(e) or repr(e) or error_type
-
-            return {
-                "query_id": query_id,
-                "status": "FAILED",
-                "execution_time_seconds": execution_time,
-                "rows_returned": 0,
-                "error": error_message,
-                "error_type": error_type,
-            }
-        finally:
-            cursor.close()
-
-        # Display plan in console when --show-query-plans is active.
-        # Skip here when --capture-plans is also active: capture_query_plan below
-        # already calls get_query_plan (running EXPLAIN); calling
-        # display_query_plan_if_enabled separately would issue EXPLAIN a second time.
+        result["translated_query"] = None
+        # Skip live display when capture is on: capture_query_plan already runs EXPLAIN.
         if not self.capture_plans:
             self.display_query_plan_if_enabled(connection, query, query_id)
-
-        # Capture and merge structured query plan (SUCCESS-guarded in the helper).
-        # Deliberately outside the try: with strict_plan_capture=True a capture
-        # failure raises PlanCaptureError, which must propagate instead of being
-        # swallowed by the broad except and mislabeling the successful query FAILED.
-        self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
-
-        return result_dict
+        self._merge_plan_capture_into_result(result, connection, query, query_id)
+        return result
 
     def _extract_table_name(self, statement: str) -> str | None:
         """Extract table name from CREATE TABLE statement."""

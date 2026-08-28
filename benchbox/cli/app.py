@@ -21,12 +21,12 @@ SQL dialect translation, and performance measurement.
 
 \b
 Quick start:
-  benchbox run                   Interactive benchmark runner
-  benchbox run -p duckdb -b tpch  Direct execution
-  benchbox check-deps            Check platform dependencies
-  benchbox platforms list        View available platforms
+  benchbox run                                     Interactive benchmark runner
+  benchbox run --platform duckdb --benchmark tpch  Direct execution
+  benchbox check-deps                              Check platform dependencies
+  benchbox platforms list                          View available platforms
 
-For complete documentation: https://docs.benchbox.dev
+For complete documentation: https://benchbox.dev/docs/
 """
 
 
@@ -86,7 +86,14 @@ def cli(ctx: click.Context) -> None:
     import importlib
 
     _cli_main = importlib.import_module("benchbox.cli.main")
-    ctx.obj["config"] = _cli_main.get_config_manager()
+    config_manager = _cli_main.get_config_manager()
+    ctx.obj["config"] = config_manager
+
+    # Push the CLI's configuration down to the utils-level seam. utils must not
+    # reach up for it; see benchbox.utils.config_interface.
+    from benchbox.cli.config import install_cli_config_provider
+
+    install_cli_config_provider(config_manager)
 
 
 register_commands(cli)

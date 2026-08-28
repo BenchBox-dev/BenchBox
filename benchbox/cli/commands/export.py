@@ -8,6 +8,7 @@ import click
 
 from benchbox.cli.output import ResultExporter
 from benchbox.cli.shared import console
+from benchbox.core.constants import EXPORT_FORMATS
 from benchbox.core.results.loader import (
     ResultLoadError,
     UnsupportedSchemaError,
@@ -22,7 +23,7 @@ from benchbox.core.results.loader import (
     "--format",
     "formats",
     multiple=True,
-    type=click.Choice(["json", "csv", "html"], case_sensitive=False),
+    type=click.Choice(list(EXPORT_FORMATS), case_sensitive=False),
     help="Export format(s) - can specify multiple (default: json)",
 )
 @click.option(
@@ -60,19 +61,24 @@ def export(ctx, result_file, formats, output_dir, last, benchmark, platform, for
 
     RESULT_FILE: Path to result JSON file to export (optional)
 
+    \b
     Examples:
         # Export specific result to CSV
         benchbox export results/tpch_sf1_duckdb.json --format csv
 
+    \b
         # Export to multiple formats
         benchbox export results/tpcds_sf10.json --format csv --format html
 
+    \b
         # Export most recent result
         benchbox export --last --format html
 
+    \b
         # Export latest TPC-H result to all formats
         benchbox export --last --benchmark tpc_h --format json --format csv --format html
 
+    \b
         # Export to custom directory
         benchbox export --last --format csv --output-dir ./reports/
     """
@@ -100,6 +106,7 @@ def export(ctx, result_file, formats, output_dir, last, benchmark, platform, for
         _print_export_summary(exported, output_directory)
     except Exception as e:
         console.print(f"\n[red]Export failed: {e}[/red]")
+        raise click.ClickException(f"Export failed: {e}") from e
 
 
 def _resolve_export_source(result_file, last, benchmark, platform):
@@ -137,20 +144,20 @@ def _load_export_result(source_path):
     """Load a result JSON, printing user-facing errors and returning None on failure."""
     try:
         result, _raw_data = load_result_file(source_path)
-    except FileNotFoundError:
+    except FileNotFoundError as e:
         console.print(f"[red]Error: Result file not found: {source_path}[/red]")
-        return None
+        raise click.ClickException(f"Result file not found: {source_path}") from e
     except UnsupportedSchemaError as e:
         console.print(f"[red]Error: {e}[/red]")
         console.print("[dim]Only schema version 1.0 is currently supported[/dim]")
-        return None
+        raise click.ClickException(str(e)) from e
     except ResultLoadError as e:
         console.print(f"[red]Error loading result file: {e}[/red]")
         console.print("[dim]The file may be corrupted or in an invalid format[/dim]")
-        return None
+        raise click.ClickException(f"Error loading result file: {e}") from e
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
-        return None
+        raise click.ClickException(f"Unexpected error: {e}") from e
 
     console.print(f"[green]✓[/green] Loaded: {result.benchmark_name} ({result.platform})")
     console.print(

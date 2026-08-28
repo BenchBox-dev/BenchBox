@@ -33,7 +33,13 @@ except ImportError:
 from benchbox.core.dataframe.schema_utils import extract_schema_columns
 from benchbox.core.errors import PlanCaptureError
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
-from benchbox.platforms.base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
+from benchbox.platforms.base.data_loading import (
+    NO_BENCHMARK,
+    DataSource,
+    normalize_table_paths,
+    prepare_local_load_file,
+    resolve_csv_dialect,
+)
 from benchbox.platforms.base.no_constraint_mixin import NoConstraintEnforcementMixin
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.file_format import (
@@ -226,6 +232,10 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
 
         from benchbox.utils.database_naming import generate_database_filename
 
+        nested_options = config.get("options")
+        if isinstance(nested_options, dict):
+            config = nested_options | config
+
         # Extract DataFusion-specific configuration
         adapter_config = {}
 
@@ -262,7 +272,9 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         adapter_config["memory_limit"] = config.get("memory_limit", "16G")
 
         # Parallelism (default to CPU count)
-        adapter_config["target_partitions"] = config.get("partitions") or os.cpu_count()
+        adapter_config["target_partitions"] = (
+            config.get("target_partitions") or config.get("partitions") or os.cpu_count()
+        )
 
         # Data format
         adapter_config["data_format"] = config.get("format", "parquet")
@@ -277,7 +289,17 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         adapter_config["force_recreate"] = config.get("force", False)
 
         # Pass through other relevant config
-        for key in ["tuning_config", "verbose_enabled", "very_verbose"]:
+        for key in [
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+            "verbose_enabled",
+            "very_verbose",
+            "parquet_pushdown",
+            "repartition_joins",
+        ]:
             if key in config:
                 adapter_config[key] = config[key]
 
@@ -295,6 +317,8 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         self.data_format = config.get("data_format", "parquet")
         self.temp_dir = config.get("temp_dir")
         self.batch_size = config.get("batch_size", 8192)
+        self.parquet_pushdown = bool(config.get("parquet_pushdown", True))
+        self.repartition_joins = bool(config.get("repartition_joins", True))
 
         # Schema tracking (populated during create_schema)
         self._table_schemas = {}
@@ -361,37 +385,45 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         # Configure runtime environment for disk spilling and memory management
         # Note: RuntimeEnv/RuntimeEnvBuilder API varies by version
         runtime = None
+        runtime_memory_configured = False
+        runtime_disk_spilling_configured = False
         if RuntimeEnv is not None:
             try:
-                # Check if this is RuntimeEnvBuilder (newer API)
-                if hasattr(RuntimeEnv, "build"):
-                    # RuntimeEnvBuilder API
-                    builder = RuntimeEnv()
+                runtime_candidate = RuntimeEnv()
+                is_runtime_builder = hasattr(runtime_candidate, "with_fair_spill_pool") and hasattr(
+                    runtime_candidate, "with_disk_manager_os"
+                )
+                if is_runtime_builder:
+                    builder = runtime_candidate
 
                     # Configure memory pool using fair spill pool
                     # This replaces the invalid config.set("memory_pool_size") approach
                     if self.memory_limit:
                         memory_bytes = int(self._parse_memory_limit(self.memory_limit))
                         builder = builder.with_fair_spill_pool(memory_bytes)
+                        runtime_memory_configured = True
                         self.log_very_verbose(
                             f"Configured fair spill pool: {self.memory_limit} ({memory_bytes:,} bytes)"
                         )
 
                     # Configure disk manager for spilling
                     builder = builder.with_disk_manager_os()
+                    runtime_disk_spilling_configured = True
                     if self.temp_dir:
                         self.log_very_verbose(f"Enabled disk spilling (temp dir: {self.temp_dir})")
                     else:
                         self.log_very_verbose("Enabled disk spilling (using system temp dir)")
 
-                    runtime = builder.build()
+                    runtime = builder.build() if hasattr(builder, "build") else builder
                 else:
                     # Old RuntimeEnv API (fallback)
-                    runtime = RuntimeEnv()
+                    runtime = runtime_candidate
                     self.log_very_verbose("Using default RuntimeEnv (memory configuration not available in old API)")
             except Exception as e:
                 self.log_very_verbose(f"Could not configure RuntimeEnv: {e}, using defaults")
                 runtime = None
+                runtime_memory_configured = False
+                runtime_disk_spilling_configured = False
 
         # Create session configuration
         config = SessionConfig()
@@ -400,8 +432,8 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         config = config.with_target_partitions(self.target_partitions)
 
         # Enable optimizations
-        config = config.with_parquet_pruning(True)
-        config = config.with_repartition_joins(True)
+        config = config.with_parquet_pruning(self.parquet_pushdown)
+        config = config.with_repartition_joins(self.repartition_joins)
         config = config.with_repartition_aggregations(True)
         config = config.with_repartition_windows(True)
         config = config.with_information_schema(True)
@@ -413,15 +445,9 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         config_applied = [
             f"target_partitions={self.target_partitions}",
             f"batch_size={self.batch_size}",
-            "parquet_pruning=enabled",
-            "repartitioning=enabled",
+            f"parquet_pruning={'enabled' if self.parquet_pushdown else 'disabled'}",
+            f"repartition_joins={'enabled' if self.repartition_joins else 'disabled'}",
         ]
-
-        # Add runtime configuration to tracking
-        if runtime is not None:
-            if self.memory_limit:
-                config_applied.append(f"memory_pool={self.memory_limit}")
-            config_applied.append("disk_spilling=enabled")
 
         # Note: Memory configuration now handled via RuntimeEnvBuilder above
         # The invalid config.set("memory_pool_size") approach has been removed
@@ -437,9 +463,17 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             except TypeError:
                 # Older versions may not accept runtime parameter
                 ctx = SessionContext(config)
+                runtime_memory_configured = False
+                runtime_disk_spilling_configured = False
                 self.log_very_verbose("SessionContext created without RuntimeEnv (not supported in this version)")
         else:
             ctx = SessionContext(config)
+
+        # Report runtime settings only when the configured runtime reached the context.
+        if runtime_memory_configured:
+            config_applied.append(f"memory_pool={self.memory_limit}")
+        if runtime_disk_spilling_configured:
+            config_applied.append("disk_spilling=enabled")
 
         self.log_operation_complete("DataFusion connection", details=f"Applied: {', '.join(config_applied)}")
 
@@ -745,9 +779,10 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         for table_name, file_paths in data_source.tables.items():
             table_start = mono_time()
 
-            # Ensure file_paths is a list
-            if not isinstance(file_paths, list):
-                file_paths = [file_paths]
+            # Normalize to a list of Paths. Generator-supplied `tables` values may be
+            # plain strings (fresh generate -> load in the same run), while the manifest
+            # source yields Paths, so downstream Path-only calls need the coercion here.
+            file_paths = normalize_table_paths(file_paths)
 
             # Normalize table name to lowercase
             table_name_lower = table_name.lower()
@@ -865,13 +900,6 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         uses glob patterns for multiple files.
         """
         # Detect delimiter (manifest metadata > format hint > file extension)
-        delimiter = self._detect_csv_format(
-            file_paths,
-            csv_format=csv_format,
-            data_source=data_source,
-            table_name=table_name,
-            benchmark=benchmark,
-        )
         dialect = resolve_csv_dialect(
             data_source or DataSource(source_type="datafusion_csv", tables={}),
             table_name,
@@ -1382,13 +1410,10 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             file_paths[0],
             benchmark if benchmark is not None else NO_BENCHMARK,
         )
-        delimiter = self._detect_csv_format(
-            file_paths,
-            csv_format=csv_format,
-            data_source=data_source,
-            table_name=table_name,
-            benchmark=benchmark,
-        )
+        # ``resolve_csv_dialect`` applies manifest metadata before format hints;
+        # this matters for CSV payloads stored under a manifest's historical
+        # ``tbl`` format label (for example TSBS and NYC Taxi).
+        delimiter = dialect.delimiter
         column_names, column_types = self._build_pyarrow_columns(table_name, pa)
 
         self.log_very_verbose(f"Converting {len(file_paths)} CSV file(s) to Parquet for {table_name}")
@@ -1451,9 +1476,15 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         total_rows = 0
         try:
             for file_path in file_paths:
-                total_rows += self._write_csv_file_to_parquet(
-                    file_path, parquet_file, writer_ref, read_opts, parse_opts, conv_opts, pq, csv, table_name
-                )
+                # PyArrow's CSV reader does not infer compression from .zst/.gz
+                # suffixes. Use the shared loader preparation path so compressed
+                # benchmark CSVs are decompressed before parsing. Keep trailing
+                # delimiter handling here: raw TPC files need the dummy column
+                # configured above, so they must not be stripped in preparation.
+                with prepare_local_load_file(file_path, dialect=dialect, strip_trailing_delim=False) as load_path:
+                    total_rows += self._write_csv_file_to_parquet(
+                        load_path, parquet_file, writer_ref, read_opts, parse_opts, conv_opts, pq, csv, table_name
+                    )
         finally:
             if writer_ref[0] is not None:
                 writer_ref[0].close()
@@ -1516,15 +1547,19 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         self.log_verbose(f"Executing query {query_id}")
         self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
 
-        # Apply DataFusion-specific query transformations for SQL compatibility
-        from benchbox.platforms.datafusion_query_transformer import DataFusionQueryTransformer
+        # Apply TPC-H-only DataFusion rewrites. The rewrites are selected by
+        # numeric query ID, so applying them to another benchmark with a Q20
+        # query would silently replace that benchmark's SQL and table names.
+        benchmark_slug = (benchmark_type or "").lower().replace("-", "")
+        if not benchmark_type or benchmark_slug == "tpch":
+            from benchbox.platforms.datafusion_query_transformer import DataFusionQueryTransformer
 
-        transformer = DataFusionQueryTransformer(verbose=getattr(self, "very_verbose", False))
-        query = transformer.transform(query, query_id=query_id)
-        if transformer.get_transformations_applied():
-            self.log_verbose(
-                f"Query {query_id}: Applied transformations: {', '.join(transformer.get_transformations_applied())}"
-            )
+            transformer = DataFusionQueryTransformer(verbose=getattr(self, "very_verbose", False))
+            query = transformer.transform(query, query_id=query_id)
+            if transformer.get_transformations_applied():
+                self.log_verbose(
+                    f"Query {query_id}: Applied transformations: {', '.join(transformer.get_transformations_applied())}"
+                )
 
         # In dry-run mode we intentionally capture transformed SQL so output
         # reflects what DataFusion would execute after compatibility rewrites.
@@ -1601,6 +1636,16 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
                 actual_row_count=actual_row_count,
                 first_row=first_row,
                 validation_result=validation_result,
+                materialized_rows=lambda: [
+                    tuple(
+                        batch.column(column_index)[row_index].as_py()
+                        if hasattr(batch.column(column_index)[row_index], "as_py")
+                        else batch.column(column_index)[row_index]
+                        for column_index in range(batch.num_columns)
+                    )
+                    for batch in result_batches
+                    for row_index in range(batch.num_rows)
+                ],
             )
 
             # Display plan in console when --show-query-plans is active.

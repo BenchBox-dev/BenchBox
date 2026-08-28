@@ -138,6 +138,21 @@ def test_configured_external_root_skips_default_local_runs(monkeypatch, tmp_path
     assert configured_external_root(cwd=worktree) is None
 
 
+def test_nested_worktree_cwd_uses_the_enclosing_worktree_boundary():
+    """A UAT launch from docs/ must still guard the repository root."""
+    repo_root = Path(__file__).resolve().parents[2]
+    nested = repo_root / "docs"
+
+    assert local_runs_root(nested) == repo_root / "benchmark_runs"
+    assert (
+        configured_external_root(
+            {"BENCHBOX_OUTPUT_DIR": str(repo_root / "benchmark_runs")},
+            cwd=nested,
+        )
+        is None
+    )
+
+
 def test_audit_local_datagen_is_noop_without_external_root(monkeypatch, tmp_path):
     """The preflight gate must never block ordinary default local runs."""
     worktree, _external = _isolated_roots(tmp_path)

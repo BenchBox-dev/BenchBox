@@ -15,9 +15,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlparse
 
 from benchbox.core.results.loader import load_result_file
 from benchbox.core.results.provenance import SOURCE_TO_TRUST_LABEL
@@ -123,12 +125,12 @@ class BundlePublisher:
                 errors=[f"Source bundle not found: {source_bundle}"],
             )
 
-        if bundle_path.suffix != ".json" or bundle_path.name.endswith((".plans.json", ".tuning.json")):
+        if bundle_path.suffix != ".json" or bundle_path.name.endswith(COMPANION_SUFFIXES):
             return BundlePublishResult(
                 success=False,
                 errors=[
                     f"Expected a primary .json result bundle, got: {bundle_path.name}. "
-                    "Companion files (.plans.json, .tuning.json) are published automatically."
+                    f"Companion files ({', '.join(COMPANION_SUFFIXES)}) are published automatically."
                 ],
             )
 
@@ -294,11 +296,46 @@ def _copy_to_local(files: list[Path], destination: str) -> None:
 def _copy_to_cloud(files: list[Path], destination: str) -> None:
     """Copy files to a cloud storage path using benchbox.utils.cloud_storage."""
     try:
-        from benchbox.utils.cloud_storage import create_path_handler
+        from benchbox.utils.cloud_storage import create_path_handler, is_adls_path
     except ImportError as exc:
         raise RuntimeError("Cloud storage is not available. Install cloudpathlib for cloud support.") from exc
+
+    if is_adls_path(destination):
+        _copy_to_adls(files, destination)
+        return
 
     base = destination.rstrip("/")
     for file in files:
         cloud_path = create_path_handler(f"{base}/{file.name}")
+        if not hasattr(cloud_path, "write_bytes"):
+            raise RuntimeError(f"Cloud destination does not support direct writes: {destination}")
         cloud_path.write_bytes(file.read_bytes())  # type: ignore[attr-defined]
+
+
+def _copy_to_adls(files: list[Path], destination: str) -> None:
+    """Upload published files directly to an ADLS Gen2 filesystem."""
+    parsed = urlparse(destination)
+    if "@" not in parsed.netloc:
+        raise ValueError("ADLS publishing requires a container@account authority")
+    container, account_host = parsed.netloc.split("@", 1)
+    prefix = parsed.path.strip("/")
+
+    try:
+        from azure.identity import DefaultAzureCredential
+        from azure.storage.filedatalake import DataLakeServiceClient
+    except ImportError as exc:
+        raise RuntimeError("ADLS publishing requires azure-identity and azure-storage-file-datalake") from exc
+
+    account_name = os.environ.get("AZURE_STORAGE_ACCOUNT_NAME")
+    account_key = os.environ.get("AZURE_STORAGE_ACCOUNT_KEY")
+    if account_name and account_key:
+        from azure.core.credentials import AzureNamedKeyCredential
+
+        credential = AzureNamedKeyCredential(account_name, account_key)
+    else:
+        credential = DefaultAzureCredential()
+    service = DataLakeServiceClient(account_url=f"https://{account_host}", credential=credential)
+    filesystem = service.get_file_system_client(container)
+    for file in files:
+        remote_path = "/".join(part for part in (prefix, file.name) if part)
+        filesystem.get_file_client(remote_path).upload_data(file.read_bytes(), overwrite=True)

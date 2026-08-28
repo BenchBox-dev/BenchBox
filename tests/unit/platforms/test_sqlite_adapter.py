@@ -10,6 +10,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
+from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+from benchbox.platforms.base.result_capture import ResultCaptureMixin
 from benchbox.platforms.sqlite import SQLiteAdapter
 
 pytestmark = [
@@ -29,6 +32,43 @@ class TestSQLiteAdapter:
         assert adapter.database_path == ":memory:"
         assert adapter.timeout == 30.0
         assert adapter.check_same_thread is False
+
+    def test_tuned_schema_executescript_captures_constraint_ddl_only(self, tmp_path):
+        config = UnifiedTuningConfiguration()
+        adapter = SQLiteAdapter(
+            database_path=":memory:",
+            tuning_enabled=True,
+            unified_tuning_configuration=config,
+        )
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
+        connection = adapter.create_connection()
+        benchmark = Mock()
+        benchmark.output_dir = tmp_path
+        benchmark.get_create_tables_sql.return_value = (
+            "CREATE TABLE baseline (id INTEGER);\nCREATE TABLE tuned (id INTEGER PRIMARY KEY);\n"
+        )
+        adapter.apply_unified_tuning = Mock()
+        adapter.save_tuning_metadata = Mock(return_value=True)
+        adapter.load_data = Mock(return_value=({}, 0.0, None))
+
+        adapter._setup_fresh_database_phases(benchmark, connection, config)
+
+        assert [statement.statement for statement in adapter._applied_tuning_ledger.executed_statements] == [
+            'CREATE TABLE "tuned" ("id" INTEGER PRIMARY KEY);'
+        ]
+        assert adapter._applied_tuning_ledger.applied_ledger_hash() is not None
+        assert (
+            adapter._applied_tuning_ledger.overall_status(tuning_enabled=True, has_config=True) == "applied_unverified"
+        )
+        assert connection.execute("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").fetchall() == [
+            ("baseline",),
+            ("tuned",),
+        ]
+
+    def test_fresh_setup_is_adapter_owned_not_mixin_owned(self):
+        """The deleted mixin fork must stay gone so ledger capture cannot be shadowed."""
+        assert not hasattr(ResultCaptureMixin, "_setup_fresh_database_phases")
+        assert hasattr(SQLiteAdapter, "_setup_fresh_database_phases")
 
     def test_initialization_with_defaults(self):
         """Test initialization with default configuration."""
@@ -247,6 +287,40 @@ class TestSQLiteAdapter:
         connection.execute.assert_any_call("ANALYZE")
         assert connection.execute.call_count == len(sqlite_platform._JOINORDER_HELPER_INDEXES) + 1
         connection.commit.assert_called_once()
+
+    def test_tpch_helper_indexes_cover_stage_one_query_access_paths(self):
+        """TPC-H helper indexes must cover the joins and filters in slow Stage 1 queries."""
+        from benchbox.platforms import sqlite as sqlite_platform
+
+        indexes = "\n".join(sqlite_platform._TPCH_HELPER_INDEXES)
+
+        assert "ON customer (c_nationkey, c_custkey)" in indexes
+        assert "ON orders (o_orderdate, o_orderkey, o_custkey)" in indexes
+        assert "ON orders (o_custkey, o_orderdate, o_orderkey)" in indexes
+        assert "ON lineitem (l_partkey, l_suppkey, l_shipdate, l_quantity)" in indexes
+        assert "ON partsupp (ps_partkey, ps_suppkey, ps_supplycost)" in indexes
+
+    def test_create_connection_registers_sqlite_compatibility_functions(self):
+        """SQLite connections expose the aggregates/functions used by Stage 1 queries."""
+        adapter = SQLiteAdapter(database_path=":memory:")
+        connection = adapter.create_connection()
+        try:
+            connection.execute("CREATE TABLE values_table (value REAL)")
+            connection.executemany("INSERT INTO values_table VALUES (?)", [(1.0,), (2.0,), (3.0,), (4.0,)])
+            connection.commit()
+
+            assert connection.execute("SELECT STDDEV(value) FROM values_table").fetchone()[0] == pytest.approx(1.290994)
+            assert (
+                connection.execute(
+                    "SELECT REGEXP_REPLACE('https://www.example.com/path', '^https?://(?:www\\.)?([^/]+)/.*$', '\\1')"
+                ).fetchone()[0]
+                == "example.com"
+            )
+            assert connection.execute("SELECT PERCENTILE_CONT(0.5, value) FROM values_table").fetchone()[
+                0
+            ] == pytest.approx(2.5)
+        finally:
+            connection.close()
 
     @patch("benchbox.platforms.sqlite.sqlite3")
     def test_execute_query_success(self, mock_sqlite3):
@@ -571,3 +645,50 @@ class TestSQLiteAdapter:
         # When connection_config has explicit path, should use that
         path = adapter.get_database_path(database_path="/tmp/override.db")
         assert path == "/tmp/override.db"
+
+    def test_execute_query_with_connection_and_cursor(self):
+        """execute_query must accept both sqlite3.Connection and sqlite3.Cursor."""
+        adapter = SQLiteAdapter(database_path=":memory:")
+        conn = adapter.create_connection()
+        try:
+            # Using connection directly
+            res_conn = adapter.execute_query(conn, "SELECT 42 as val", "q_conn")
+            assert res_conn["status"] == "SUCCESS"
+            assert res_conn["rows_returned"] == 1
+            assert res_conn["results"] == [(42,)]
+
+            # Using cursor directly (as in TPC-DS power-test streams)
+            cursor = conn.cursor()
+            res_cursor = adapter.execute_query(cursor, "SELECT 84 as val", "q_cursor")
+            assert res_cursor["status"] == "SUCCESS"
+            assert res_cursor["rows_returned"] == 1
+            assert res_cursor["results"] == [(84,)]
+        finally:
+            conn.close()
+
+    def test_get_query_plan_with_connection_and_cursor(self):
+        """get_query_plan must accept both sqlite3.Connection and sqlite3.Cursor."""
+        adapter = SQLiteAdapter(database_path=":memory:")
+        conn = adapter.create_connection()
+        try:
+            conn.execute("CREATE TABLE t (x INT)")
+            plan_conn = adapter.get_query_plan(conn, "SELECT * FROM t WHERE x = 1")
+            assert plan_conn is not None
+
+            cursor = conn.cursor()
+            plan_cursor = adapter.get_query_plan(cursor, "SELECT * FROM t WHERE x = 1")
+            assert plan_cursor is not None
+        finally:
+            conn.close()
+
+    def test_execute_query_failure_returns_standard_failure_payload(self):
+        """Query syntax error returns standardized FAILED payload."""
+        adapter = SQLiteAdapter(database_path=":memory:")
+        conn = adapter.create_connection()
+        try:
+            res = adapter.execute_query(conn, "SYNTAX ERROR", "q_fail")
+            assert res["status"] == "FAILED"
+            assert res["error"] is not None
+            assert res["rows_returned"] == 0
+        finally:
+            conn.close()

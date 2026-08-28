@@ -9,6 +9,8 @@ but silently misbehave or fail on Windows:
   2. Unguarded Unix-only signals (SIGTERM, SIGKILL, SIGHUP, SIGUSR1/2,
      SIGCHLD, SIGPIPE) - these don't exist on Windows; guard with
      `if hasattr(signal, ...)`.
+  3. pathlib-style read_text() calls without an explicit encoding - these use
+     the locale encoding and can fail on non-UTF-8 Windows installations.
 
 Usage:
     uv run -- python scripts/check_windows_antipatterns.py
@@ -68,7 +70,28 @@ class WindowsAntipatternsVisitor(ast.NodeVisitor):
     def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
         self._check_os_access(node)
         self._check_getattr_signal(node)
+        self._check_read_text_encoding(node)
         self.generic_visit(node)
+
+    def _check_read_text_encoding(self, node: ast.Call) -> None:
+        """Flag read_text() calls that leave encoding at the locale default."""
+        encoding: ast.expr | None = None
+        if not (isinstance(node.func, ast.Attribute) and node.func.attr == "read_text"):
+            return
+        if node.args and not isinstance(node.args[0], ast.Starred):
+            encoding = node.args[0]
+        for keyword in node.keywords:
+            if keyword.arg == "encoding":
+                encoding = keyword.value
+                break
+        if encoding is not None and not (isinstance(encoding, ast.Constant) and encoding.value is None):
+            return
+        self._add(
+            node,
+            "WA003",
+            "read_text() without an explicit encoding uses the locale default - pass encoding='utf-8' "
+            "or the file format's required encoding",
+        )
 
     def _check_os_access(self, node: ast.Call) -> None:
         """Flag os.access(_, os.X_OK) - a no-op on Windows (always True)."""

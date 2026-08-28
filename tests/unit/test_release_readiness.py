@@ -5,8 +5,9 @@ from __future__ import annotations
 import io
 import json
 import urllib.error
+import urllib.request
 import zipfile
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -28,7 +29,7 @@ def _run(*, conclusion: str, updated_at: datetime, sha: str = "abc123") -> dict[
 
 
 def test_latest_red_canary_blocks_even_with_older_success() -> None:
-    now = datetime(2026, 5, 25, 12, tzinfo=UTC)
+    now = datetime(2026, 5, 25, 12, tzinfo=timezone.utc)
     result = evaluate_canary_runs(
         [
             _run(conclusion="success", updated_at=now - timedelta(hours=2), sha="oldgreen"),
@@ -46,7 +47,7 @@ def test_latest_red_canary_blocks_even_with_older_success() -> None:
 
 
 def test_stale_canary_blocks_release_readiness() -> None:
-    now = datetime(2026, 5, 25, 12, tzinfo=UTC)
+    now = datetime(2026, 5, 25, 12, tzinfo=timezone.utc)
     result = evaluate_canary_runs(
         [_run(conclusion="success", updated_at=now - timedelta(hours=49), sha="stalesha")],
         now=now,
@@ -60,7 +61,7 @@ def test_stale_canary_blocks_release_readiness() -> None:
 
 
 def test_non_ancestor_canary_blocks_release_readiness() -> None:
-    now = datetime(2026, 5, 25, 12, tzinfo=UTC)
+    now = datetime(2026, 5, 25, 12, tzinfo=timezone.utc)
     result = evaluate_canary_runs(
         [_run(conclusion="success", updated_at=now - timedelta(hours=1), sha="not-ancestor")],
         now=now,
@@ -74,7 +75,7 @@ def test_non_ancestor_canary_blocks_release_readiness() -> None:
 
 
 def test_green_fresh_ancestor_canary_passes() -> None:
-    now = datetime(2026, 5, 25, 12, tzinfo=UTC)
+    now = datetime(2026, 5, 25, 12, tzinfo=timezone.utc)
     result = evaluate_canary_runs(
         [_run(conclusion="success", updated_at=now - timedelta(hours=1), sha="goodsha")],
         now=now,
@@ -88,7 +89,7 @@ def test_green_fresh_ancestor_canary_passes() -> None:
 
 
 def test_canary_artifact_sha_is_used_for_ancestor_check() -> None:
-    now = datetime(2026, 5, 25, 12, tzinfo=UTC)
+    now = datetime(2026, 5, 25, 12, tzinfo=timezone.utc)
     checked: list[tuple[str, str]] = []
 
     def _is_ancestor(ancestor: str, head: str) -> bool:
@@ -107,6 +108,50 @@ def test_canary_artifact_sha_is_used_for_ancestor_check() -> None:
     assert result.ok
     assert checked == [("develop-tested-sha", "release-head")]
     assert any("checked_sha: develop-tested-sha" in line for line in result.summary)
+
+
+def test_artifact_redirect_strips_credentials_cross_origin() -> None:
+    request = urllib.request.Request(
+        "https://api.github.com/repos/example/actions/artifacts/1/zip",
+        headers={
+            "Authorization": "Bearer secret",
+            "Cookie": "session=secret",
+            "Proxy-Authorization": "Basic secret",
+        },
+    )
+
+    redirected = release_readiness_check._SafeArtifactRedirectHandler().redirect_request(
+        request,
+        None,
+        302,
+        "Found",
+        {},
+        "https://objects.example.test/artifact.zip?signature=redacted",
+    )
+
+    assert redirected is not None
+    assert not redirected.has_header("Authorization")
+    assert not redirected.has_header("Cookie")
+    assert not redirected.has_header("Proxy-Authorization")
+
+
+def test_artifact_redirect_preserves_credentials_same_origin() -> None:
+    request = urllib.request.Request(
+        "https://api.github.com/repos/example/actions/artifacts/1/zip",
+        headers={"Authorization": "Bearer secret"},
+    )
+
+    redirected = release_readiness_check._SafeArtifactRedirectHandler().redirect_request(
+        request,
+        None,
+        302,
+        "Found",
+        {},
+        "https://api.github.com/repos/example/actions/artifacts/1/zip?download=1",
+    )
+
+    assert redirected is not None
+    assert redirected.get_header("Authorization") == "Bearer secret"
 
 
 def test_release_canary_commit_sha_reads_summary_artifact(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -194,17 +239,18 @@ def test_main_queries_trusted_default_branch(monkeypatch: pytest.MonkeyPatch) ->
 
     monkeypatch.setattr(release_readiness_check, "_api_json", _fake_api_json)
     monkeypatch.setenv("GITHUB_TOKEN", "token")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox")
     monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
     monkeypatch.delenv("RELEASE_CANARY_BRANCH", raising=False)
     monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_SHA", raising=False)
     monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_REASON", raising=False)
 
-    rc = release_readiness_check.main(["--head-sha", "release-head"])
+    rc = release_readiness_check.main(["--head-sha", "release-head", "--repo", "BenchBox-dev/BenchBox"])
 
     assert rc == 1
     assert captured_urls == [
-        "https://api.github.com/repos/joeharris76/BenchBox/actions/workflows/release-canary.yml/runs?"
-        "branch=main&status=completed&per_page=20"
+        "https://api.github.com/repos/BenchBox-dev/BenchBox/actions/workflows/release-canary.yml/runs?"
+        "branch=develop&status=completed&per_page=20"
     ]
 
 
@@ -248,7 +294,7 @@ def test_missing_workflow_can_request_bootstrap(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_artifact_lookup_404_does_not_request_bootstrap(monkeypatch: pytest.MonkeyPatch) -> None:
-    now = datetime(2026, 5, 25, 12, tzinfo=UTC)
+    now = datetime(2026, 5, 25, 12, tzinfo=timezone.utc)
 
     def _fake_api_json(url: str, _token: str) -> dict:
         if url.startswith("https://api.github.com/repos/"):

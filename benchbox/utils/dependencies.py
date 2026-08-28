@@ -34,7 +34,9 @@ def is_development_install() -> bool:
     if (project_root / "pyproject.toml").exists():
         # Verify it's actually the benchbox project
         try:
-            content = (project_root / "pyproject.toml").read_text()
+            # pyproject.toml is UTF-8 by specification (PEP 518); the read_text
+            # default is locale-dependent and cp1252 on Windows.
+            content = (project_root / "pyproject.toml").read_text(encoding="utf-8")
             if 'name = "benchbox"' in content:
                 return True
         except Exception:
@@ -136,13 +138,31 @@ class DependencyInfo:
         self.use_cases = use_cases
         self.platforms = platforms
 
+    @property
+    def extra_name(self) -> str:
+        """The pip/uv extra this group actually installs.
+
+        Usually equal to ``name``, but a retained-alias group (e.g.
+        ``databricks-connect``, kept for backward-compatible dependency
+        lookups after its own extra was removed) points at a different
+        extra. Every catalog entry's ``install_command`` follows
+        ``uv add benchbox --extra <extra-name>``, so that is the source of
+        truth -- deriving from ``name`` instead silently recommends a
+        nonexistent extra whenever the two diverge.
+        """
+        marker = "--extra "
+        index = self.install_command.find(marker)
+        if index == -1:
+            return self.name
+        return self.install_command[index + len(marker) :].split()[0]
+
     def get_install_message(self) -> str:
         """Get a context-aware install message with both standalone and project options.
 
         Returns:
             Multi-line install message showing both installation options.
         """
-        return get_extra_install_message(self.name)
+        return get_extra_install_message(self.extra_name)
 
 
 # Structured installation guidance for documentation and CLI matrix output

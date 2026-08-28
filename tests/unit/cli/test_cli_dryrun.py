@@ -328,11 +328,12 @@ class TestDryRunExecutor:
         """Clean up test fixtures."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_dry_run_executor_initialization(self):
+    def test_dry_run_executor_initialization(self, tmp_path: Path):
         """Test DryRunExecutor initialization."""
         # Test with output directory
-        executor = DryRunExecutor(output_dir="/tmp/test")
-        assert executor.output_dir == Path("/tmp/test")
+        output_dir = tmp_path / "output"
+        executor = DryRunExecutor(output_dir=output_dir)
+        assert executor.output_dir == output_dir
 
         # Test without output directory (should use temp)
         executor_temp = DryRunExecutor()
@@ -773,13 +774,15 @@ class TestDryRunErrorHandling:
             assert "Unknown benchmark: invalid" in str(result.warnings)
 
     @pytest.mark.skipif(sys.platform == "win32", reason="Path handling differs on Windows")
-    def test_dry_run_with_missing_output_dir(self):
+    def test_dry_run_with_missing_output_dir(self, tmp_path):
         """Test dry run when output directory cannot be created."""
-        # Should handle missing directory gracefully - but our current implementation fails fast
-        # This is expected behavior, so we expect an exception
+        # Fail-fast is the expected behavior. The invalid path sits under a
+        # regular FILE so creation fails for every uid - root can mkdir
+        # /invalid, which made the old absolute-path probe root-sensitive.
+        blocker = tmp_path / "blocker"
+        blocker.write_text("")
         with pytest.raises(OSError):
-            # Try to create executor with invalid path - should raise OSError
-            DryRunExecutor(output_dir="/invalid")
+            DryRunExecutor(output_dir=str(blocker / "sub"))
 
     @patch("benchbox.cli.dryrun.console")
     def test_dry_run_with_empty_query_list(self, mock_console):
@@ -1345,6 +1348,9 @@ class TestGenerateCliCommandCompleteness:
     """Introspection test: assert generate_cli_command covers all behavior-affecting CLI params."""
 
     # Params that are cosmetic/output-only and intentionally excluded from generate_cli_command
+    # ``concurrency`` is a hidden internal forwarding param for ``run-official``
+    # (``--streams`` -> ``--concurrency``) and intentionally not surfaced in
+    # ``generate_cli_command``.
     COSMETIC_PARAMS = frozenset(
         {
             "dry_run",
@@ -1356,6 +1362,7 @@ class TestGenerateCliCommandCompleteness:
             "ignore_memory_warnings",
             "help",
             "help_topic",
+            "concurrency",
         }
     )
 

@@ -25,6 +25,7 @@ from benchbox.core.benchmark_registry import (
     get_benchmark_surface,
     validate_scale_factor as core_validate_scale_factor,
 )
+from benchbox.core.constants import VALID_PHASES
 from benchbox.core.schemas import BenchmarkConfig
 from benchbox.utils.printing import quiet_console
 from benchbox.utils.verbosity import VerbositySettings
@@ -919,7 +920,7 @@ def prompt_phases(default_phases: list[str] | None = None) -> list[str]:
         return selected_phases
 
     # Custom selection
-    valid_phases = ["generate", "load", "statistics", "warmup", "power", "throughput", "maintenance"]
+    valid_phases = list(VALID_PHASES)
     unique_phases = _prompt_custom_phases(valid_phases)
 
     console.print(f"[green]✓ Selected phases: {', '.join(unique_phases)}[/green]")

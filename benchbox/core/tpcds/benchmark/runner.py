@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.connection import DatabaseConnection as _DatabaseConnection
+from benchbox.core.results.metrics import TPCMetricsCalculator
 from benchbox.core.validation import (
     DatabaseValidationEngine,
     DataValidationEngine,
@@ -28,6 +29,7 @@ from ..compliance import validate_tpcds_scale
 from ..generator import TPCDSDataGenerator
 from ..queries import TPCDSQueryManager
 from ..schema import TABLES
+from .clickhouse_overrides import rewrite_q35_for_clickhouse
 from .config import MaintenanceTestConfig, ThroughputTestConfig
 from .results import (
     MaintenanceTestResult,
@@ -36,47 +38,24 @@ from .results import (
 
 
 def _execute_single_stream(stream_id: int, stream_file: Path) -> dict[str, Any]:
-    """Execute a single TPC-DS stream file and return result metrics."""
-    import time
+    """Execute a single TPC-DS stream file and return result metrics.
 
-    stream_start = time.time()
-    result: dict[str, Any] = {
-        "stream_id": stream_id,
-        "stream_file": str(stream_file),
-        "start_time": stream_start,
-        "end_time": 0.0,
-        "duration": 0.0,
-        "queries_executed": 0,
-        "queries_successful": 0,
-        "queries_failed": 0,
-        "success": False,
-        "error": None,
-    }
-
-    try:
-        if not stream_file.exists():
-            raise FileNotFoundError(f"Stream file {stream_file} not found")
-
-        with open(stream_file, encoding="utf-8") as f:
-            stream_content = f.read()
-
-        query_lines = [
-            line for line in stream_content.split("\n") if line.strip().startswith("-- Query") and "Position" in line
-        ]
-
-        result["queries_executed"] = len(query_lines)
-        result["queries_successful"] = len(query_lines)
-        result["queries_failed"] = 0
-        result["success"] = True
-
-    except Exception as e:
-        result["error"] = str(e)
-
-    finally:
-        result["end_time"] = time.time()
-        result["duration"] = result["end_time"] - result["start_time"]
-
-    return result
+    Raises:
+        NotImplementedError: Always. This function never executed SQL against
+            a database -- it only counted ``-- Query`` comment lines in
+            ``stream_file`` and reported every query as successful, regardless
+            of the file's actual contents or any database connection. Use
+            :meth:`TPCDSBenchmark.run_throughput_test` for the production,
+            spec-compliant TPC-DS Throughput Test, which executes real
+            concurrent query streams against a real connection.
+    """
+    raise NotImplementedError(
+        f"_execute_single_stream (stream {stream_id}, {stream_file}) does not "
+        "execute SQL. It previously faked success by counting '-- Query' "
+        "comment lines in the stream file without running anything against a "
+        "database. Use TPCDSBenchmark.run_throughput_test() for real TPC-DS "
+        "Throughput Test execution."
+    )
 
 
 def _aggregate_stream_results(stream_results: list[dict[str, Any]], start_time: float) -> dict[str, Any]:
@@ -137,6 +116,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         verbose: Union[int, bool] = 0,
         parallel: int = 1,
         force_regenerate: bool = False,
+        official: bool = False,
         **kwargs: Any,
     ) -> None:
         """Initialize a TPC-DS benchmark instance.
@@ -147,6 +127,9 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             verbose: Whether to print verbose output during operations
             parallel: Number of parallel processes for data generation
             force_regenerate: Force data regeneration even if valid data exists
+            official: True for a ``--official`` run. Required for the run to
+                classify as ``official`` and therefore to be submittable; see
+                :func:`benchbox.core.tpcds.compliance.classify_tpcds_run`.
             **kwargs: Additional implementation-specific options
 
         Raises:
@@ -158,7 +141,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             raise TypeError(f"scale_factor must be a number, got {type(scale_factor).__name__}")
 
         # Single shared validator - no silent rounding.
-        self.compliance_class = validate_tpcds_scale(scale_factor)
+        self.compliance_class = validate_tpcds_scale(scale_factor, official=official)
 
         # Validate parallel parameter
         if not isinstance(parallel, int):
@@ -306,16 +289,23 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         tgt = (dialect or src).lower()
         query = self._generate_tpcds_query(query_id, variant, actual_seed, actual_scale_factor, src)
         translated = self.translate_query_text(query, src, tgt)
-        return self._apply_target_dialect_overrides(query_id, translated, tgt)
+        return self._apply_target_dialect_overrides(query_id, translated, tgt, variant=variant)
 
-    def _apply_target_dialect_overrides(self, query_id: int, query: str, target_dialect: str) -> str:
+    def _apply_target_dialect_overrides(
+        self,
+        query_id: int,
+        query: str,
+        target_dialect: str,
+        *,
+        variant: str | None = None,
+    ) -> str:
         """Apply benchmark-local overrides after dialect translation."""
         target = target_dialect.lower()
 
         if query_id in {36, 70, 86} and target == "postgres":
             return self._rewrite_postgres_rollup_order_aliases(query_id, query)
 
-        if query_id == 90 and target == "postgres":
+        if query_id == 90 and target in {"postgres", "datafusion"}:
             return self._rewrite_postgres_q90_zero_denominator(query)
 
         if query_id == 90 and target in {"spark", "lakesail"}:
@@ -326,6 +316,8 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         if query_id in (47, 57):
             return self._rewrite_clickhouse_monthly_avg_query(query_id, query)
+        if query_id == 35 and variant is None:
+            return rewrite_q35_for_clickhouse(query)
         if query_id == 66:
             return self._rewrite_clickhouse_q66(query)
         return query
@@ -378,7 +370,8 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             flags=re.IGNORECASE,
         )
 
-    def _rewrite_clickhouse_monthly_avg_query(self, query_id: int, query: str) -> str:
+    @classmethod
+    def _rewrite_clickhouse_monthly_avg_query(cls, query_id: int, query: str) -> str:
         """Rewrite Q47/Q57 to avoid AVG(SUM(...)) OVER (...) under the new analyzer."""
         if "AVG(SUM(" not in query.upper():
             return query
@@ -388,9 +381,9 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             raise ValueError(f"Unsupported ClickHouse Q{query_id} shape: expected leading v1 CTE")
 
         open_index = len(prefix) - 1
-        close_index = self._find_matching_parenthesis(query, open_index)
+        close_index = cls._find_matching_parenthesis(query, open_index)
         v1_body = query[open_index + 1 : close_index]
-        suffix = self._alias_clickhouse_rank_neighbor_projections(query[close_index + 1 :])
+        suffix = cls._alias_clickhouse_rank_neighbor_projections(query[close_index + 1 :])
 
         pattern = re.compile(
             r"SELECT (?P<select_dims>.+), SUM\((?P<sum_expr>.+)\) AS sum_sales, "
@@ -435,7 +428,8 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         return re.sub(pattern, alias_projection, suffix, flags=re.IGNORECASE | re.DOTALL)
 
-    def _rewrite_clickhouse_q66(self, query: str) -> str:
+    @classmethod
+    def _rewrite_clickhouse_q66(cls, query: str) -> str:
         """Rewrite Q66 to aggregate once over a stable UNION ALL relation."""
         if "SUM(jan_sales)" not in query and "SUM(jan_net)" not in query:
             return query
@@ -450,7 +444,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if subquery_open == -1:
             raise ValueError("Unsupported ClickHouse Q66 shape: missing derived table body")
 
-        subquery_close = self._find_matching_parenthesis(query, subquery_open)
+        subquery_close = cls._find_matching_parenthesis(query, subquery_open)
         union_body = query[subquery_open + 1 : subquery_close]
         suffix = query[subquery_close + 1 :]
 
@@ -470,9 +464,9 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if suffix_match is None:
             raise ValueError("Unsupported ClickHouse Q66 shape: missing outer GROUP BY / ORDER BY / LIMIT")
 
-        branch_a, branch_b = self._split_top_level_union_all(union_body)
-        parsed_a = self._parse_clickhouse_q66_branch(branch_a)
-        parsed_b = self._parse_clickhouse_q66_branch(branch_b)
+        branch_a, branch_b = cls._split_top_level_union_all(union_body)
+        parsed_a = cls._parse_clickhouse_q66_branch(branch_a)
+        parsed_b = cls._parse_clickhouse_q66_branch(branch_b)
 
         dimensions = outer_match.group("dimensions")
         grouped_columns = suffix_match.group("group_by")
@@ -481,16 +475,16 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         monthly_sales = ", ".join(
             f"SUM(CASE WHEN d_moy = {month_num} THEN sales_amount ELSE 0 END) AS {month_name}_sales"
-            for month_name, month_num in self._MONTH_ALIASES
+            for month_name, month_num in cls._MONTH_ALIASES
         )
         monthly_sales_per_sq_foot = ", ".join(
             f"SUM(CASE WHEN d_moy = {month_num} THEN sales_amount / w_warehouse_sq_ft ELSE 0 END) "
             f"AS {month_name}_sales_per_sq_foot"
-            for month_name, month_num in self._MONTH_ALIASES
+            for month_name, month_num in cls._MONTH_ALIASES
         )
         monthly_net = ", ".join(
             f"SUM(CASE WHEN d_moy = {month_num} THEN net_amount ELSE 0 END) AS {month_name}_net"
-            for month_name, month_num in self._MONTH_ALIASES
+            for month_name, month_num in cls._MONTH_ALIASES
         )
 
         rewritten = (
@@ -508,11 +502,12 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             raise ValueError("ClickHouse Q66 rewrite still contains analyzer-hostile alias aggregation")
         return rewritten
 
-    def _parse_clickhouse_q66_branch(self, branch: str) -> dict[str, str]:
+    @classmethod
+    def _parse_clickhouse_q66_branch(cls, branch: str) -> dict[str, str]:
         """Parse one side of the Q66 UNION ALL into reusable row-level pieces."""
         sales_patterns = []
         net_patterns = []
-        for month_name, month_num in self._MONTH_ALIASES:
+        for month_name, month_num in cls._MONTH_ALIASES:
             if month_num == 1:
                 sales_patterns.append(
                     rf"SUM\(CASE WHEN d_moy = {month_num} THEN (?P<sales_expr>.+?) ELSE 0 END\) AS {month_name}_sales"
@@ -980,62 +975,24 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             concurrent: Whether to run streams concurrently or sequentially
             dialect: SQL dialect (standard, postgres, mysql, etc.)
 
-        Returns:
-            Dictionary with execution results and timing information
+        Raises:
+            NotImplementedError: Always. This method never executed real SQL
+                against ``connection`` -- both its "concurrent" branch (via a
+                now-retired ``ConcurrentQueryExecutor`` wrapper) and its
+                sequential branch bottomed out in ``_execute_single_stream``,
+                which only counted ``-- Query`` comment lines in each stream
+                file and reported every stream as successful. Use
+                :meth:`run_throughput_test` for the production, spec-compliant
+                TPC-DS Throughput Test, which executes real concurrent query
+                streams against a real connection.
         """
-        import time
-
-        from benchbox.utils.execution_manager import ConcurrentQueryExecutor
-
-        start_time = time.time()
-
-        # If no stream files provided, generate them
-        if stream_files is None:
-            stream_files = self.generate_streams(num_streams=2)
-
-        if concurrent and len(stream_files) > 1:
-            # Use existing concurrent execution infrastructure
-            concurrent_executor = ConcurrentQueryExecutor()
-
-            files = stream_files
-
-            def stream_executor_factory(stream_id: int) -> Any:
-                class StreamExecutor:
-                    def __init__(self, stream_file):
-                        self.stream_file = stream_file
-
-                    def run(self):
-                        return _execute_single_stream(stream_id, self.stream_file)
-
-                idx = stream_id if stream_id < len(files) else 0
-                return StreamExecutor(files[idx])
-
-            if concurrent_executor.config.get("enabled", False):
-                concurrent_result = concurrent_executor.execute_concurrent_queries(
-                    query_executor_factory=stream_executor_factory,
-                    num_streams=len(stream_files),
-                )
-                end_time = time.time()
-                return {
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "total_duration": end_time - start_time,
-                    "num_streams": len(stream_files),
-                    "streams_executed": len(stream_files),
-                    "streams_successful": len([r for r in concurrent_result.stream_results if r.get("success", False)]),
-                    "streams_failed": len([r for r in concurrent_result.stream_results if not r.get("success", False)]),
-                    "total_queries_executed": concurrent_result.queries_executed,
-                    "total_queries_successful": concurrent_result.queries_successful,
-                    "total_queries_failed": concurrent_result.queries_failed,
-                    "success": concurrent_result.success,
-                    "errors": concurrent_result.errors,
-                    "stream_results": concurrent_result.stream_results,
-                }
-
-        # Sequential execution or single stream
-        stream_results = [_execute_single_stream(i, sf) for i, sf in enumerate(stream_files)]
-
-        return _aggregate_stream_results(stream_results, start_time)
+        raise NotImplementedError(
+            "TPCDSBenchmark.run_streams does not execute SQL against "
+            "`connection`. It previously faked success by counting "
+            "'-- Query' comment lines in stream files without running "
+            "anything. Use TPCDSBenchmark.run_throughput_test() for the "
+            "production, spec-compliant TPC-DS Throughput Test."
+        )
 
     def _load_data(self, connection: _DatabaseConnection) -> None:
         """Load TPC-DS data into the database.
@@ -1486,7 +1443,13 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         # Calculate Throughput@Size metric
         throughput_at_size = 0.0
         if total_duration > 0:
-            throughput_at_size = (num_streams * 3600.0 * self.scale_factor) / total_duration
+            total_queries = sum(stream_result["queries_executed"] for stream_result in stream_results)
+            throughput_at_size = TPCMetricsCalculator.calculate_throughput_at_size(
+                total_queries=total_queries,
+                total_time_seconds=total_duration,
+                scale_factor=self.scale_factor,
+                num_streams=num_streams,
+            )
 
         # Create result object
         result = ThroughputTestResult(

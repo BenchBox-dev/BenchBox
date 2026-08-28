@@ -24,6 +24,10 @@ from benchbox.cli.submit_service import (
     HostedSubmitUnauthorized,
     submit_hosted_bundle,
 )
+from benchbox.core.results.anonymization import (
+    MissingPublicPseudonymSaltError,
+    require_public_pseudonym_salt,
+)
 from benchbox.core.results.canonical_json import canonical_json_file_bytes, canonical_json_text
 from benchbox.core.results.loader import (
     ResultLoadError,
@@ -32,7 +36,7 @@ from benchbox.core.results.loader import (
     load_result_file,
 )
 from benchbox.core.results.provenance import FUNDING_SOURCES, normalize_funding
-from benchbox.core.results.status import result_non_clean_reason
+from benchbox.core.results.status import result_non_clean_reason, result_unvalidated_reason
 from benchbox.core.results.submission_history import record_hosted_submission
 from benchbox.core.results.submit_classification import (
     SubmitTerminalState,
@@ -64,11 +68,11 @@ _CONTRIBUTING_TEXT = """\
 Thank you for contributing to the BenchBox community results dataset!
 
 This is a packaged checklist. The full guide lives at:
-https://docs.benchbox.dev/contributing-results
+https://benchbox.dev/docs/contributing-results.html
 
 ## Quick checklist
 
-1. Fork https://github.com/joeharris76/BenchBox (or use your existing fork).
+1. Fork https://github.com/BenchBox-dev/BenchBox (or use your existing fork).
 2. Copy the contents of `bundle/` into `results-data/bundles/` in your fork.
 3. Copy the generated `<result>.manifest.json` alongside the bundle files.
 4. Regenerate the corpus inventory before you commit:
@@ -88,10 +92,10 @@ https://docs.benchbox.dev/contributing-results
 ## Questions?
 
 Open an issue or start a discussion at
-https://github.com/joeharris76/BenchBox.
+https://github.com/BenchBox-dev/BenchBox.
 
 For the full guide (trust labels, quality expectations, troubleshooting),
-see https://docs.benchbox.dev/contributing-results.
+see https://benchbox.dev/docs/contributing-results.html.
 """
 
 
@@ -185,6 +189,54 @@ def _build_submission_manifest(
     if submission_notes:
         manifest["submission_notes"] = submission_notes
     return manifest
+
+
+def _refuse_missing_public_pseudonym_salt(ctx: click.Context) -> None:
+    """Hard-refuse community submit when the deployment salt is unset."""
+    try:
+        require_public_pseudonym_salt()
+    except MissingPublicPseudonymSaltError as exc:
+        console.print(f"\n[red]❌ Submission refused: {exc}[/red]")
+        ctx.exit(1)
+
+
+def _refuse_non_submittable_result(ctx: click.Context, result: object, submit_state: SubmitTerminalState) -> None:
+    """Print a state-specific refusal message and exit non-zero.
+
+    Unvalidated results get distinct wording so operators do not confuse
+    never-validated runs with schema/integrity failures.
+    """
+    if submit_state is SubmitTerminalState.unvalidated:
+        unvalidated_reason = result_unvalidated_reason(result) or result_non_clean_reason(result)
+        # Branch copy on the concrete status: "never executed" is wrong for
+        # uncertain (validation ran but the correctness claim is weakened).
+        status = None
+        if unvalidated_reason and unvalidated_reason.startswith("validation_status="):
+            status = unvalidated_reason.split("=", 1)[1]
+        if status == "uncertain":
+            detail = (
+                "   Validation completed with an uncertain correctness claim; the result is\n"
+                "   not eligible for public submission until validation produces a clean pass."
+            )
+        elif status in {"not_run", "not_validated", "unknown"}:
+            detail = (
+                "   Validation never executed (or was skipped); the result is not eligible\n"
+                "   for public submission until validation produces a clean pass."
+            )
+        else:
+            detail = (
+                "   The result is not a clean validation pass and is not eligible for public\n"
+                "   submission until validation produces a clean pass."
+            )
+        console.print(f"\n[red]❌ Submission refused: result is unvalidated ({unvalidated_reason})[/red]\n{detail}")
+    else:
+        non_clean_reason = result_non_clean_reason(result)
+        console.print(
+            f"\n[red]❌ Submission refused: result is not a clean pass ({non_clean_reason})[/red]\n"
+            "   Query-level failures remain visible in the result artifact, but\n"
+            "   partial runs are not eligible for public submission or leaderboard display."
+        )
+    ctx.exit(1)
 
 
 def _validate_submission_bundle_for_dry_run(ctx: click.Context, source_path: Path) -> None:
@@ -419,7 +471,7 @@ def _print_submission_summary(
     console.print(f"  3. uv run -- python scripts/validate_submission.py {bundle_target}")
     console.print(f"  4. PR title:  [cyan]{pr_title}[/cyan]")
     console.print("     PR target: [cyan]published-results[/cyan]")
-    console.print("[dim]Full guide: https://docs.benchbox.dev/contributing-results[/dim]")
+    console.print("[dim]Full guide: https://benchbox.dev/docs/contributing-results.html[/dim]")
 
     if dry_run:
         console.print("\n[yellow](dry run; no files written)[/yellow]")
@@ -545,20 +597,25 @@ def submit(
     RESULT_FILE: Path to result JSON file (optional; with --last, picked
     from history).
 
+    \b
     Examples:
         # Package most recent result for PR contribution (Phase 2; default)
         benchbox submit --last
 
+    \b
         # Print exact result paths, then package one for PR contribution
         benchbox results --paths
         benchbox submit benchmark_runs/results/tpch_sf001_duckdb_20260401_120000.json --output ./submission
 
+    \b
         # Submit most recent result to the hosted platform (Phase 3)
         benchbox submit --last --service
 
+    \b
         # Submit a specific bundle to a non-default service URL
         benchbox submit results/tpch_sf01_duckdb.json --service https://staging.benchbox.dev/v1
 
+    \b
         # Preview what would be uploaded without sending bytes
         benchbox submit --last --service --dry-run
 
@@ -632,6 +689,11 @@ def submit(
         ctx.exit(1)
         return
 
+    # Community publish requires a deployment-private public pseudonym salt.
+    # Empty OSS default remains for private/local export; submit is the
+    # community-facing gate (retained-field salt decision 2026-08-05).
+    _refuse_missing_public_pseudonym_salt(ctx)
+
     # Submit-classification policy is shared with UAT via
     # benchbox.core.results.submit_classification so the two surfaces cannot
     # drift. The CLI maps the terminal state to its own exit codes + messages.
@@ -653,13 +715,7 @@ def submit(
         return
 
     if submit_state is not SubmitTerminalState.submittable:
-        non_clean_reason = result_non_clean_reason(result)
-        console.print(
-            f"\n[red]❌ Submission refused: result is not a clean pass ({non_clean_reason})[/red]\n"
-            "   Query-level failures remain visible in the result artifact, but\n"
-            "   partial runs are not eligible for public submission or leaderboard display."
-        )
-        ctx.exit(1)
+        _refuse_non_submittable_result(ctx, result, submit_state)
         return
 
     companions = [

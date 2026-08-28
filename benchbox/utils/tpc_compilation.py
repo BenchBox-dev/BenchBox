@@ -28,6 +28,7 @@ import os
 import platform
 import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -43,6 +44,13 @@ _discovered_paths: dict[str, Optional[Path]] = {}
 
 # Cached checksum verification results (shared across all TPCCompiler instances)
 _checksum_cache: dict[Path, bool] = {}
+
+# Cached exec-probe results (shared across all TPCCompiler instances). A binary
+# can be present, executable-flagged, and checksum-valid yet still refused by
+# the OS loader — e.g. a darwin-arm64 binary built with a deployment target
+# newer than the host macOS. Probing catches that before the binary is chosen
+# over source compilation.
+_exec_probe_cache: dict[Path, bool] = {}
 
 
 def _discover_tpc_paths() -> dict[str, Optional[Path]]:
@@ -164,8 +172,8 @@ class BinaryInfo:
     """Information about a TPC binary."""
 
     name: str
-    source_dir: Path
-    binary_path: Path
+    source_dir: Optional[Path]
+    binary_path: Optional[Path]
     precompiled_path: Optional[Path] = None
     makefile_path: Optional[Path] = None
     dependencies: list[str] = None
@@ -255,8 +263,8 @@ class TPCCompiler:
         if self.tpc_h_source or self.precompiled_base:
             self.binaries["dbgen"] = BinaryInfo(
                 name="dbgen",
-                source_dir=self.tpc_h_source or Path(),
-                binary_path=(self.tpc_h_source / f"dbgen{exe_suffix}") if self.tpc_h_source else Path(),
+                source_dir=self.tpc_h_source,
+                binary_path=(self.tpc_h_source / f"dbgen{exe_suffix}") if self.tpc_h_source else None,
                 precompiled_path=get_precompiled_path("tpc-h", "dbgen"),
                 makefile_path=(self.tpc_h_source / "makefile.suite") if self.tpc_h_source else None,
                 dependencies=["gcc", "make"],
@@ -264,8 +272,8 @@ class TPCCompiler:
 
             self.binaries["qgen"] = BinaryInfo(
                 name="qgen",
-                source_dir=self.tpc_h_source or Path(),
-                binary_path=(self.tpc_h_source / f"qgen{exe_suffix}") if self.tpc_h_source else Path(),
+                source_dir=self.tpc_h_source,
+                binary_path=(self.tpc_h_source / f"qgen{exe_suffix}") if self.tpc_h_source else None,
                 precompiled_path=get_precompiled_path("tpc-h", "qgen"),
                 makefile_path=(self.tpc_h_source / "makefile.suite") if self.tpc_h_source else None,
                 dependencies=["gcc", "make"],
@@ -275,8 +283,8 @@ class TPCCompiler:
         if self.tpc_ds_source or self.precompiled_base:
             self.binaries["dsdgen"] = BinaryInfo(
                 name="dsdgen",
-                source_dir=self.tpc_ds_source or Path(),
-                binary_path=(self.tpc_ds_source / f"dsdgen{exe_suffix}") if self.tpc_ds_source else Path(),
+                source_dir=self.tpc_ds_source,
+                binary_path=(self.tpc_ds_source / f"dsdgen{exe_suffix}") if self.tpc_ds_source else None,
                 precompiled_path=get_precompiled_path("tpc-ds", "dsdgen"),
                 makefile_path=(self.tpc_ds_source / "makefile") if self.tpc_ds_source else None,
                 dependencies=["gcc", "make", "yacc"],
@@ -284,8 +292,8 @@ class TPCCompiler:
 
             self.binaries["dsqgen"] = BinaryInfo(
                 name="dsqgen",
-                source_dir=self.tpc_ds_source or Path(),
-                binary_path=(self.tpc_ds_source / f"dsqgen{exe_suffix}") if self.tpc_ds_source else Path(),
+                source_dir=self.tpc_ds_source,
+                binary_path=(self.tpc_ds_source / f"dsqgen{exe_suffix}") if self.tpc_ds_source else None,
                 precompiled_path=get_precompiled_path("tpc-ds", "dsqgen"),
                 makefile_path=(self.tpc_ds_source / "makefile") if self.tpc_ds_source else None,
                 dependencies=["gcc", "make", "yacc"],
@@ -332,32 +340,54 @@ class TPCCompiler:
             with open(binary_path, "rb") as f:
                 binary_hash = hashlib.md5(f.read()).hexdigest()
 
-            # Read and parse checksums.md5 file
+            # Read and parse checksums.md5 file. Formats:
+            #   GNU: "hash  filename" (two columns, also used without the type prefix)
+            #   BSD: "MD5 (filename) = hash"  (darwin-x86_64, darwin tpc-ds x86, ...)
+            def _parse_manifest_line(raw: str) -> tuple[str, str] | None:
+                s = raw.strip()
+                if not s:
+                    return None
+                # BSD: MD5 (filename) = hash  — may also carry ./ prefix
+                if s.startswith("MD5") and "(" in s and ")" in s and "=" in s:
+                    try:
+                        lpar = s.index("(")
+                        rpar = s.index(")", lpar)
+                        eq = s.index("=", rpar)
+                        filename = s[lpar + 1 : rpar].strip().lstrip("./")
+                        digest_fields = s[eq + 1 :].strip().split()
+                        expected_hash = digest_fields[0] if digest_fields else ""
+                        if filename and expected_hash:
+                            return expected_hash, filename
+                    except ValueError:
+                        pass
+                # GNU: hash<space>filename (the manifest may also include the
+                # optional file-type indicator: "hash *filename" or "hash  filename")
+                parts = s.split()
+                if len(parts) >= 2:
+                    expected_hash = parts[0]
+                    filename = parts[-1].lstrip("*./")
+                    # A lone hash with no plausible filename (e.g. hash-only line)
+                    # is not a valid entry for a named binary.
+                    if expected_hash and filename:
+                        return expected_hash, filename
+                return None
+
             with open(checksum_file, encoding="utf-8") as f:
                 for line in f:
-                    line = line.strip()
-                    if not line:
+                    parsed = _parse_manifest_line(line)
+                    if parsed is None:
                         continue
-
-                    # Handle both formats: "hash filename" and "hash  filename"
-                    parts = line.split()
-                    if len(parts) >= 2:
-                        expected_hash = parts[0]
-                        filename = parts[-1]  # Take last part as filename
-
-                        # Normalize filenames - remove ./ prefix if present
-                        normalized_filename = filename.lstrip("./")
-                        if normalized_filename == binary_path.name:
-                            if binary_hash == expected_hash:
-                                logger.debug(f"Checksum verified for {binary_path.name}")
-                                _checksum_cache[binary_path] = True
-                                return True
-                            else:
-                                logger.warning(
-                                    f"Checksum mismatch for {binary_path.name}: expected {expected_hash}, got {binary_hash}"
-                                )
-                                _checksum_cache[binary_path] = False
-                                return False
+                    expected_hash, filename = parsed
+                    if filename == binary_path.name:
+                        if binary_hash == expected_hash:
+                            logger.debug(f"Checksum verified for {binary_path.name}")
+                            _checksum_cache[binary_path] = True
+                            return True
+                        logger.warning(
+                            f"Checksum mismatch for {binary_path.name}: expected {expected_hash}, got {binary_hash}"
+                        )
+                        _checksum_cache[binary_path] = False
+                        return False
 
             logger.warning(f"No checksum entry found for {binary_path.name}")
             _checksum_cache[binary_path] = True
@@ -367,6 +397,51 @@ class TPCCompiler:
             logger.warning(f"Failed to verify checksum for {binary_path}: {e}")
             _checksum_cache[binary_path] = True
             return True  # Assume valid on verification error
+
+    def _verify_executable(self, binary_path: Path) -> bool:
+        """Verify the OS can actually execute *binary_path* (cached globally).
+
+        File-mode and checksum checks cannot detect a binary the loader
+        refuses to run — the known case is the darwin-arm64 TPC-H tools built
+        with LC_BUILD_VERSION minos 26.0, which dyld rejects on macOS <= 15
+        even though the bytes match checksums.md5. Spawn the binary once with
+        an option that only prints usage; any launch failure (OSError from
+        exec, or death by signal such as a dyld abort) marks it unrunnable so
+        callers fall back to source compilation.
+        """
+        if binary_path in _exec_probe_cache:
+            return _exec_probe_cache[binary_path]
+
+        runnable = True
+        try:
+            with tempfile.TemporaryDirectory(prefix="benchbox-exec-probe-") as probe_cwd:
+                proc = subprocess.run(
+                    [str(binary_path), "-h"],
+                    cwd=probe_cwd,
+                    stdin=subprocess.DEVNULL,
+                    capture_output=True,
+                    timeout=15,
+                )
+            # A usage/error exit is fine — the binary ran. Death by signal
+            # (negative returncode) means the process never got past launch.
+            if proc.returncode < 0:
+                runnable = False
+                logger.warning(
+                    f"Precompiled binary {binary_path} died with signal {-proc.returncode} during exec probe; "
+                    "treating it as unrunnable on this host and falling back to source compilation"
+                )
+        except subprocess.TimeoutExpired:
+            # It launched and kept running; that is all the probe needs to know.
+            runnable = True
+        except OSError as e:
+            runnable = False
+            logger.warning(
+                f"Precompiled binary {binary_path} cannot be executed on this host ({e}); "
+                "it was likely built for a different or newer OS - falling back to source compilation"
+            )
+
+        _exec_probe_cache[binary_path] = runnable
+        return runnable
 
     def is_precompiled_available(self, binary_name: str) -> bool:
         """Check if pre-compiled binary is available and valid."""
@@ -384,7 +459,12 @@ class TPCCompiler:
             return False
 
         # Verify checksum if available
-        return self._verify_checksum(precompiled_path)
+        if not self._verify_checksum(precompiled_path):
+            return False
+
+        # Verify the loader will actually run it (deployment-target mismatches
+        # pass every check above but fail at exec time)
+        return self._verify_executable(precompiled_path)
 
     def is_binary_available(self, binary_name: str) -> bool:
         """Check if binary is already compiled and available.
@@ -428,7 +508,7 @@ class TPCCompiler:
         binary_info = self.binaries[binary_name]
 
         # Check if source directory exists
-        if not binary_info.source_dir.exists():
+        if binary_info.source_dir is None or not binary_info.source_dir.exists():
             return False
 
         # Check if binary is already available

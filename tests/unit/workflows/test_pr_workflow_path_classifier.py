@@ -6,10 +6,14 @@ import importlib.util
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
+
+from tests.utilities.posix_shell import run_posix_shell, skip_without_posix_shell
 
 pytestmark = [
     pytest.mark.unit,
@@ -31,7 +35,7 @@ CI_PATHS_OUTPUT_REFERENCE_RE = (
 )
 
 
-def _load_path_filter_decision():
+def _load_path_filter_decision() -> Any:
     """Load scripts/path_filter_decision.py the way the workflow uses it.
 
     tests/unit/scripts/ has a conftest sys.path shim; here we load by file
@@ -39,6 +43,9 @@ def _load_path_filter_decision():
     `load_rules` + `extra_group_keys` logic the classify step runs (output
     naming additionally mirrors write_github_output's `_`→`-` mapping).
     """
+    scripts_dir = str(REPO_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
     script = REPO_ROOT / "scripts" / "path_filter_decision.py"
     spec = importlib.util.spec_from_file_location("path_filter_decision_lockstep", script)
     assert spec is not None and spec.loader is not None
@@ -57,26 +64,35 @@ def _ci_required_result_script() -> str:
 
 
 def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess[str]:
+    # Only the shell-executing tests in this module skip; the YAML/regex ones
+    # alongside them need no shell and must keep running everywhere.
+    skip_without_posix_shell()
     env = {
         **os.environ,
         "CI_PATHS_RESULT": "success",
+        "TPCH_BINARY_FRAMING_RESULT": "success",
         "CONTENT_RESULT": "skipped",
+        "SKILL_INTEGRITY_RESULT": "skipped",
         "LINT_RESULT": "skipped",
         "TEST_RESULT": "skipped",
         "CORRECTNESS_RESULT": "skipped",
         "PLAN_CAPTURE_RESULT": "skipped",
+        "MEDIUM_TEST_RESULT": "skipped",
         "EXPLORER_TOKENS_RESULT": "skipped",
+        "SITE_THEME_TOKENS_RESULT": "skipped",
         "AUDIT_SHA_RESULT": "skipped",
         "PACKAGE_SMOKE_RESULT": "skipped",
         "DEPENDENCY_AUDIT_RESULT": "skipped",
         "PARITY_CHECK_RESULT": "skipped",
+        "EXPLORER_VITEST_RESULT": "skipped",
         "CONTENT_GUARD_NEEDED": "false",
+        "SKILL_INTEGRITY_NEEDED": "false",
         "NEEDS_CODE_CI": "false",
         "SAFE_CONTENT_ONLY": "true",
         **env_overrides,
     }
-    return subprocess.run(
-        ["bash", "-c", _ci_required_result_script()],
+    return run_posix_shell(
+        _ci_required_result_script(),
         check=False,
         capture_output=True,
         env=env,
@@ -86,16 +102,17 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
 
 def test_pr_path_classifier_fetches_base_history_for_merge_base() -> None:
     workflow = (REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8")
-    base_fetch = 'git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"'
+    base_fetch = "git fetch --no-tags origin \"${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}\""
 
     # The classifier uses `git diff origin/develop...HEAD`; a depth-1 base fetch
     # on GitHub's synthetic PR merge ref can leave no merge base available.
     # Three consumers of the full base history today:
     #   - ci-paths (path classifier)
     #   - content-guard (recreates path lists for content validators)
-    #   - explorer-tokens (greps the diff for results-explorer/src changes)
+    #   - explorer-tokens and site-theme-tokens (each greps the diff for its
+    #     own source changes)
     assert '--depth=1 origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"' not in workflow
-    assert workflow.count(base_fetch) == 3
+    assert workflow.count(base_fetch) == 4
 
 
 def test_ci_required_result_preserves_content_guard_failure() -> None:
@@ -121,11 +138,118 @@ def test_ci_required_result_fails_on_explorer_tokens_failure() -> None:
         TEST_RESULT="success",
         CORRECTNESS_RESULT="success",
         PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
         EXPLORER_TOKENS_RESULT="failure",
     )
 
     assert result.returncode == 1
     assert "explorer-tokens=failure" in result.stdout
+
+
+def test_ci_required_result_requires_selected_skill_integrity_success() -> None:
+    result = _run_ci_required_result(
+        SKILL_INTEGRITY_NEEDED="true",
+        SKILL_INTEGRITY_RESULT="skipped",
+        SAFE_CONTENT_ONLY="false",
+    )
+
+    assert result.returncode == 1
+    assert "skill-integrity=skipped" in result.stdout
+
+
+def test_ci_required_result_accepts_skill_integrity_only_success() -> None:
+    result = _run_ci_required_result(
+        SKILL_INTEGRITY_NEEDED="true",
+        SKILL_INTEGRITY_RESULT="success",
+        SAFE_CONTENT_ONLY="false",
+    )
+
+    assert result.returncode == 0
+    assert "Skill-integrity-only PR" in result.stdout
+
+
+def test_ci_required_result_requires_skill_and_product_for_mixed_diff() -> None:
+    result = _run_ci_required_result(
+        SKILL_INTEGRITY_NEEDED="true",
+        SKILL_INTEGRITY_RESULT="failure",
+        NEEDS_CODE_CI="true",
+        SAFE_CONTENT_ONLY="false",
+        LINT_RESULT="success",
+        TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
+        EXPLORER_TOKENS_RESULT="success",
+    )
+
+    assert result.returncode == 1
+    assert "skill-integrity=failure" in result.stdout
+
+
+def test_ci_required_result_fails_on_tpch_binary_framing_failure() -> None:
+    result = _run_ci_required_result(
+        NEEDS_CODE_CI="true",
+        SAFE_CONTENT_ONLY="false",
+        TPCH_BINARY_FRAMING_RESULT="failure",
+        LINT_RESULT="success",
+        TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
+        EXPLORER_TOKENS_RESULT="success",
+    )
+
+    assert result.returncode == 1
+    assert "tpch-binary-framing=failure" in result.stdout
+
+
+def test_ci_required_result_accepts_tpch_binary_framing_success() -> None:
+    result = _run_ci_required_result(
+        NEEDS_CODE_CI="true",
+        SAFE_CONTENT_ONLY="false",
+        TPCH_BINARY_FRAMING_RESULT="success",
+        LINT_RESULT="success",
+        TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
+        EXPLORER_TOKENS_RESULT="success",
+    )
+
+    assert result.returncode == 0
+
+
+def test_ci_required_result_fails_on_explorer_vitest_failure() -> None:
+    result = _run_ci_required_result(
+        NEEDS_CODE_CI="true",
+        SAFE_CONTENT_ONLY="false",
+        LINT_RESULT="success",
+        TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
+        EXPLORER_TOKENS_RESULT="success",
+        EXPLORER_VITEST_RESULT="failure",
+    )
+
+    assert result.returncode == 1
+    assert "explorer-vitest=failure" in result.stdout
+
+
+def test_ci_required_result_treats_explorer_vitest_skipped_as_success() -> None:
+    result = _run_ci_required_result(
+        NEEDS_CODE_CI="true",
+        SAFE_CONTENT_ONLY="false",
+        LINT_RESULT="success",
+        TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
+        EXPLORER_TOKENS_RESULT="success",
+        EXPLORER_VITEST_RESULT="skipped",
+    )
+
+    assert result.returncode == 0
 
 
 def test_ci_required_result_treats_explorer_tokens_skipped_as_success() -> None:
@@ -148,11 +272,14 @@ def test_ci_required_result_treats_explorer_tokens_skipped_as_success() -> None:
         TEST_RESULT="success",
         CORRECTNESS_RESULT="success",
         PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
         EXPLORER_TOKENS_RESULT="skipped",
     )
 
     assert result.returncode == 0
-    assert "Code/infra PR; lint, fast tests, correctness gate, and plan-capture gate passed." in result.stdout
+    assert (
+        "Code/infra PR; lint, fast tests, correctness gate, plan-capture gate, and medium tier passed." in result.stdout
+    )
 
 
 def test_ci_required_result_passes_on_explorer_tokens_success() -> None:
@@ -165,11 +292,14 @@ def test_ci_required_result_passes_on_explorer_tokens_success() -> None:
         TEST_RESULT="success",
         CORRECTNESS_RESULT="success",
         PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
         EXPLORER_TOKENS_RESULT="success",
     )
 
     assert result.returncode == 0
-    assert "Code/infra PR; lint, fast tests, correctness gate, and plan-capture gate passed." in result.stdout
+    assert (
+        "Code/infra PR; lint, fast tests, correctness gate, plan-capture gate, and medium tier passed." in result.stdout
+    )
 
 
 def test_ci_required_result_fails_on_plan_capture_gate_failure() -> None:
@@ -187,6 +317,22 @@ def test_ci_required_result_fails_on_plan_capture_gate_failure() -> None:
     assert "plan-capture-gate=failure" in result.stdout
 
 
+def test_ci_required_result_fails_on_medium_test_failure() -> None:
+    result = _run_ci_required_result(
+        NEEDS_CODE_CI="true",
+        SAFE_CONTENT_ONLY="false",
+        LINT_RESULT="success",
+        TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="failure",
+        EXPLORER_TOKENS_RESULT="success",
+    )
+
+    assert result.returncode == 1
+    assert "medium-test=failure" in result.stdout
+
+
 def test_ci_required_result_required_jobs_in_needs() -> None:
     # If a future cleanup drops `explorer-tokens` from the
     # `ci-required-result.needs:` list, the aggregator wouldn't observe its
@@ -195,6 +341,7 @@ def test_ci_required_result_required_jobs_in_needs() -> None:
     workflow_yaml = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
     needs = workflow_yaml["jobs"]["ci-required-result"]["needs"]
     assert "explorer-tokens" in needs
+    assert "skill-integrity" in needs
     assert "correctness-gate" in needs
     assert "plan-capture-gate" in needs
     # Path-filtered packaging promotion (pr-gate-package-and-audit-promotion):
@@ -202,6 +349,120 @@ def test_ci_required_result_required_jobs_in_needs() -> None:
     # result silently disappears from the gate.
     assert "package-smoke" in needs
     assert "dependency-audit" in needs
+    assert "explorer-vitest" in needs
+
+
+def test_skill_integrity_job_is_required_read_only_and_pinned() -> None:
+    workflow_text = (REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8")
+    workflow = yaml.safe_load(workflow_text)
+    job = workflow["jobs"]["skill-integrity"]
+
+    assert job["needs"] == "ci-paths"
+    assert job["if"] == "${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }}"
+    assert job["timeout-minutes"] == 10
+    assert "permissions" not in job  # inherits workflow-level contents: read
+    assert "6d09682dabe2ff0d68f400d60f8ba8b87f8c02aa" in workflow_text
+    assert "scripts/skill_sync_ci_policy.py validate" in workflow_text
+    assert 'verify --project "$GITHUB_WORKSPACE"' in workflow_text
+    assert "test_todo_wrapper.py::TestSkillThinness" in workflow_text
+    assert '--check-commit-range "$BASE_SHA"' in workflow_text
+
+
+def test_classifier_and_certification_bind_to_pull_request_event_base() -> None:
+    workflow = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+    classify = next(step for step in workflow["jobs"]["ci-paths"]["steps"] if step.get("id") == "classify")
+    certification = workflow["jobs"]["certification-identity"]
+
+    assert (
+        '--base-ref "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"' in classify["run"]
+    )
+    assert "origin/${{ github.base_ref }}" not in classify["run"]
+    assert certification["needs"] == "ci-paths"
+    record = next(step for step in certification["steps"] if step.get("name") == "Record certification identity")
+    assert record["env"]["BASE_SHA"] == "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
+    assert record["env"]["SKILL_INTEGRITY_NEEDED"] == ("${{ needs.ci-paths.outputs.skill-integrity-needed }}")
+    assert 'certification_kind = "skill_integrity"' in record["run"]
+    assert 'certification_kind = "full"' in record["run"]
+
+
+def test_explorer_vitest_job_uses_contract_filter_and_exact_command() -> None:
+    workflow_yaml = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+    job = workflow_yaml["jobs"]["explorer-vitest"]
+    assert job["if"] == "${{ needs.ci-paths.outputs.explorer-vitest-needed == 'true' }}"
+    run_steps = [step for step in job["steps"] if step.get("name") == "Run Explorer Vitest suite"]
+    assert len(run_steps) == 1
+    assert run_steps[0]["run"] == "npm test -- --run"
+    assert run_steps[0]["working-directory"] == "results-explorer"
+    aggregate = next(
+        step
+        for step in workflow_yaml["jobs"]["ci-required-result"]["steps"]
+        if step.get("name") == "Aggregate required result"
+    )
+    assert aggregate["env"]["EXPLORER_VITEST_RESULT"] == "${{ needs.explorer-vitest.result }}"
+
+
+@pytest.mark.parametrize(
+    "changed_path",
+    [
+        ".github/workflows/pr.yml",
+        ".github/path-filters.yml",
+        "tests/unit/core/tuning/fixtures/tuning_mode_vocabulary.yaml",
+        "tests/parity/fixtures/chart_ids.json",
+    ],
+)
+def test_explorer_vitest_filter_covers_each_non_local_contract_input(changed_path: str) -> None:
+    pfd = _load_path_filter_decision()
+    rules = pfd.load_rules(REPO_ROOT / ".github" / "path-filters.yml")
+
+    decision = pfd.classify_paths([changed_path], rules)
+
+    assert decision["explorer_vitest_needed"] is True
+    assert decision["explorer_vitest_paths"] == [changed_path]
+
+
+def test_explorer_vitest_filter_skips_unrelated_python_changes() -> None:
+    pfd = _load_path_filter_decision()
+    rules = pfd.load_rules(REPO_ROOT / ".github" / "path-filters.yml")
+
+    decision = pfd.classify_paths(["benchbox/cli/run.py"], rules)
+
+    assert decision["explorer_vitest_needed"] is False
+    assert decision["explorer_vitest_paths"] == []
+
+
+def test_explorer_vitest_job_declares_clean_runner_python_and_uv_setup() -> None:
+    workflow_yaml = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+    job = workflow_yaml["jobs"]["explorer-vitest"]
+    steps = job["steps"]
+
+    setup_python = next(step for step in steps if step.get("name") == "Set up Python")
+    assert setup_python["uses"] == "actions/setup-python@v5"
+    assert setup_python["with"]["python-version"] == "3.12"
+
+    setup_uv = next(step for step in steps if step.get("name") == "Install uv")
+    assert setup_uv["uses"] == "astral-sh/setup-uv@v4"
+
+    install_python = next(step for step in steps if step.get("name") == "Install Python dependencies")
+    assert install_python["run"] == "uv sync --group dev"
+
+    npm_install_index = next(i for i, step in enumerate(steps) if step.get("name") == "Install explorer dependencies")
+    vitest_index = next(i for i, step in enumerate(steps) if step.get("name") == "Run Explorer Vitest suite")
+    prerequisite_indexes = [
+        i
+        for i, step in enumerate(steps)
+        if step.get("name") in {"Set up Python", "Install uv", "Install Python dependencies"}
+    ]
+    assert len(prerequisite_indexes) == 3
+
+    # Anchor the ordering to the Vitest step, not just to `npm ci`. Specs such as
+    # db-remediation-pin.test.ts and tuningModeVocabulary.test.ts spawn `uv`, so
+    # moving the suite ahead of the Python/uv setup group breaks a clean runner
+    # even while `npm ci` still trails it - which the npm-only guard below, and
+    # the exact-command test above, would both still wave through.
+    assert all(i < vitest_index for i in prerequisite_indexes)
+    assert all(i < npm_install_index for i in prerequisite_indexes)
+    assert npm_install_index < vitest_index
+    assert all("continue-on-error" not in step for step in steps)
 
 
 def test_ci_paths_job_outputs_declare_every_path_filter_group() -> None:
@@ -345,6 +606,7 @@ def test_ci_required_result_passes_when_packaging_jobs_skip() -> None:
         TEST_RESULT="success",
         CORRECTNESS_RESULT="success",
         PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
         EXPLORER_TOKENS_RESULT="success",
     )
     assert result.returncode == 0
@@ -360,6 +622,7 @@ def test_ci_required_result_fails_on_parity_check_failure() -> None:
         TEST_RESULT="success",
         CORRECTNESS_RESULT="success",
         PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
         EXPLORER_TOKENS_RESULT="success",
         PARITY_CHECK_RESULT="failure",
     )
@@ -376,6 +639,7 @@ def test_ci_required_result_passes_when_parity_check_skips() -> None:
         TEST_RESULT="success",
         CORRECTNESS_RESULT="success",
         PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
         EXPLORER_TOKENS_RESULT="success",
         PARITY_CHECK_RESULT="skipped",
     )

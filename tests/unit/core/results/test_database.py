@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from benchbox.core.results.database import (
     ResultDatabase,
     StoredQuery,
     StoredResult,
+    _validate_backup_table_name,
 )
 from benchbox.core.results.models import (
     BenchmarkResults,
@@ -142,6 +144,51 @@ class TestResultDatabase:
             cursor.execute("SELECT version FROM schema_version")
             version = cursor.fetchone()[0]
             assert version == SCHEMA_VERSION
+
+    def test_foreign_keys_enabled_on_every_connection(self, tmp_path):
+        """SQLite cascade enforcement must be enabled per connection."""
+        db = ResultDatabase(tmp_path / "test.db")
+
+        with db._connection() as conn:
+            assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+
+    def test_delete_result_cascades_queries(self, tmp_path):
+        """Deleting a result removes its child query rows."""
+        db = ResultDatabase(tmp_path / "test.db")
+        result_id = db.store_result(create_test_result(execution_id="cascade", include_queries=True))
+
+        assert len(db.get_queries(result_id)) == 2
+        assert db.delete_result("cascade") is True
+        assert db.get_queries(result_id) == []
+
+    def test_backup_table_identifier_validation_rejects_sql(self):
+        valid_name = "queries_orphan_backup_20260826215959123456"
+        assert _validate_backup_table_name(valid_name) == valid_name
+
+        with pytest.raises(ValueError, match="Unsafe SQLite backup table name"):
+            _validate_backup_table_name("queries_orphan_backup_20260826215959123456; DROP TABLE results")
+
+    def test_orphan_repair_is_dry_run_by_default_and_backed_up_when_applied(self, tmp_path):
+        """Legacy orphan rows require explicit repair and retain a backup."""
+        db_path = tmp_path / "test.db"
+        db = ResultDatabase(db_path)
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """INSERT INTO queries
+                    (result_id, query_id, execution_order, execution_time_ms, status)
+                    VALUES (999999, 'orphan', 1, 1.0, 'ERROR')"""
+            )
+            conn.commit()
+
+        assert db.repair_orphaned_queries() == 1
+        assert db.count_orphaned_queries() == 1
+        assert db.repair_orphaned_queries(dry_run=False) == 1
+        assert db.count_orphaned_queries() == 0
+        with db._connection() as conn:
+            backup_tables = conn.execute(
+                "SELECT name FROM sqlite_master WHERE name LIKE 'queries_orphan_backup_%'"
+            ).fetchall()
+            assert len(backup_tables) == 1
 
 
 class TestStoreAndRetrieve:
@@ -840,6 +887,48 @@ class TestSummaryStats:
         assert stats["total_results"] == 0
         assert stats["total_queries"] == 0
         assert stats["unique_platforms"] == 0
+
+
+class TestPlatformMetadataCredentialBoundary:
+    """results.db must not persist credential-shaped platform metadata values."""
+
+    def test_store_result_filters_all_platform_metadata_sources(self, tmp_path):
+        gates = (
+            "RAW_CONFIG_GATE",
+            "RAW_METADATA_GATE",
+            "DEPLOYMENT_GATE",
+            "CLOUD_GATE",
+            "COMPUTE_GATE",
+            "STORAGE_GATE",
+        )
+        result = create_test_result(execution_id="platform-meta-db")
+        result.platform_raw_config = {"password": "RAW_CONFIG_GATE", "threads": 4, "sort_key": "o_orderkey"}
+        result.platform_raw_metadata = {"password": "RAW_METADATA_GATE", "partition_key": "l_orderkey"}
+        result.platform_deployment = {"token": "DEPLOYMENT_GATE", "connection_mode": "embedded"}
+        result.platform_cloud = {"access_key": "CLOUD_GATE", "region": "us-east-1"}
+        result.platform_compute = {"connection_string": "COMPUTE_GATE", "warehouse": "BENCH_WH"}
+        result.platform_storage = {"secret": "STORAGE_GATE", "bucket": "bench-bucket"}
+
+        db = ResultDatabase(tmp_path / "test.db")
+        db.store_result(result)
+        raw = (tmp_path / "test.db").read_bytes()
+        for gate in gates:
+            assert gate.encode() not in raw, f"results.db leaked {gate}"
+
+        stored = db.get_result("platform-meta-db")
+        assert stored is not None
+        platform = stored.metadata["platform"]
+        assert platform["raw_config"]["password"] == "<redacted>"
+        assert platform["raw_config"]["threads"] == 4
+        assert platform["raw_config"]["sort_key"] == "o_orderkey"
+        assert platform["raw_metadata"]["password"] == "<redacted>"
+        assert platform["raw_metadata"]["partition_key"] == "l_orderkey"
+        assert platform["deployment"]["token"] == "<redacted>"
+        assert platform["cloud"]["access_key"] == "<redacted>"
+        assert platform["compute"]["connection_string"] == "<redacted>"
+        assert platform["compute"]["warehouse"] == "BENCH_WH"
+        assert platform["storage"]["secret"] == "<redacted>"
+        assert platform["storage"]["bucket"] == "bench-bucket"
 
 
 class TestImportResults:

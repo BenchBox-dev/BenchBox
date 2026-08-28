@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import benchbox.validation.bundle as bundle_module
 from benchbox.validation.bundle import (
     SUBMISSION_NOTES_MAX_LEN,
     ValidationResult,
@@ -108,9 +109,10 @@ def _minimal_bundle() -> dict:
             "validation": "passed",
             "queries": {"total": 2, "passed": 2, "failed": 0},
         },
+        "phases": {"validation": {"status": "PASSED"}},
         "queries": [
-            {"id": "Q1", "ms": 100, "status": "pass"},
-            {"id": "Q2", "ms": 200, "status": "pass"},
+            {"id": "Q1", "ms": 100, "status": "SUCCESS"},
+            {"id": "Q2", "ms": 200, "status": "SUCCESS"},
         ],
     }
 
@@ -153,6 +155,16 @@ def bundle_dir(tmp_path: Path) -> Path:
     return d
 
 
+def test_checked_in_corpus_satisfies_public_integrity_policy() -> None:
+    """Policy and checked-in corpus must change together, never drift apart."""
+    repo_root = Path(__file__).resolve().parents[3]
+    paths = discover_bundles(repo_root / "results-data" / "bundles")
+    results = validate_bundles(paths, allow_partial_validation=True)
+    failures = {result.path: result.errors for result in results if not result.ok}
+
+    assert not failures
+
+
 # ---------------------------------------------------------------------------
 # _validate_bundle
 # ---------------------------------------------------------------------------
@@ -164,6 +176,91 @@ class TestValidateBundle:
         _validate_bundle(_minimal_bundle(), vr)
         assert vr.ok
         assert len(vr.errors) == 0
+
+    def test_valid_schema_2_2_row_count_validation_passes(self):
+        data = _minimal_bundle()
+        data["version"] = "2.2"
+        data["queries"][0].update(
+            {
+                "rows": 4,
+                "row_count_validation": {"status": "PASSED", "expected": 4, "actual": 4},
+            }
+        )
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert vr.ok, vr.errors
+
+    def test_row_count_validation_requires_schema_2_2(self):
+        data = _minimal_bundle()
+        data["queries"][0].update(
+            {
+                "rows": 4,
+                "row_count_validation": {"status": "PASSED", "expected": 4, "actual": 4},
+            }
+        )
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("row_count_validation requires schema version 2.2" in error for error in vr.errors)
+
+    @pytest.mark.parametrize(
+        "evidence",
+        [
+            [],
+            {"status": "PASSED", "expected": 4},
+            {"status": "PASSED", "expected": 4, "actual": 4, "unexpected": True},
+            {"status": "UNKNOWN", "expected": 4, "actual": 4},
+            {"status": "PASSED", "expected": -1, "actual": 4},
+            {"status": "PASSED", "expected": 4.0, "actual": 4},
+            {"status": "PASSED", "expected": 4, "actual": 3},
+            {"status": "PASSED", "expected": 5, "actual": 4},
+            {"status": "PASSED", "expected": 4, "actual": 4, "warning": "x" * 501},
+        ],
+    )
+    def test_malformed_row_count_validation_is_rejected(self, evidence):
+        data = _minimal_bundle()
+        data["version"] = "2.2"
+        data["queries"][0].update({"rows": 4, "row_count_validation": evidence})
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("row_count_validation" in error for error in vr.errors)
+
+    @pytest.mark.parametrize("status", ["FAILED", "SKIPPED", "ERROR"])
+    def test_non_passed_row_count_validation_rejected_when_summary_validation_passed(self, status: str):
+        data = _minimal_bundle()
+        data["version"] = "2.2"
+        data["summary"]["validation"] = "passed"
+        data["queries"][0].update(
+            {
+                "rows": 4,
+                "row_count_validation": {"status": status, "expected": None, "actual": 4},
+            }
+        )
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("summary.validation='passed' contradicts" in error for error in vr.errors)
+
+    def test_public_private_path_is_rejected_by_cli_boundary(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+        bundle_path = tmp_path / "tpch_result.json"
+        payload = _minimal_bundle()
+        payload["platform"]["working_dir"] = "/Users/alice/private-run"
+        bundle_path.write_text(json.dumps(payload), encoding="utf-8")
+
+        assert main([str(bundle_path)]) == 1
+        output = capsys.readouterr().out
+        assert "FAIL" in output
+        assert "Users/alice" not in output
+        assert "working_dir" in output
 
     def test_missing_top_level_keys(self):
         data = {"version": "2.1"}  # Missing everything else
@@ -262,7 +359,7 @@ class TestValidateBundle:
         assert not vr.ok
         assert any("summary.validation is required" in e for e in vr.errors)
 
-    @pytest.mark.parametrize("status", ["not_run", "uncertain", "unknown"])
+    @pytest.mark.parametrize("status", ["not_run", "uncertain", "unknown", "partial"])
     def test_non_clean_public_validation_status_fails(self, status: str):
         data = _minimal_bundle()
         data["summary"]["validation"] = status
@@ -270,6 +367,182 @@ class TestValidateBundle:
         _validate_bundle(data, vr)
         assert not vr.ok
         assert any("summary.validation must be 'passed'" in e for e in vr.errors)
+
+    def test_partial_validation_allowed_only_when_flagged(self):
+        """Trusted mirror path may accept seed partials; community path may not."""
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        community = ValidationResult("community")
+        _validate_bundle(data, community)
+        assert not community.ok
+        mirror = ValidationResult("mirror")
+        _validate_bundle(data, mirror, allow_partial_validation=True)
+        assert mirror.ok, mirror.errors
+        failed = ValidationResult("failed")
+        data_failed = _minimal_bundle()
+        data_failed["summary"]["validation"] = "failed"
+        _validate_bundle(data_failed, failed, allow_partial_validation=True)
+        assert not failed.ok
+
+    def test_not_run_validation_allowed_only_for_trusted_mirror(self):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "not_run"
+        community = ValidationResult("community")
+        _validate_bundle(data, community)
+        assert not community.ok
+        mirror = ValidationResult("mirror")
+        _validate_bundle(data, mirror, allow_partial_validation=True)
+        assert mirror.ok, mirror.errors
+
+    def test_passed_validation_rejects_summary_failed_measurements(self):
+        data = _minimal_bundle()
+        data["summary"]["queries"] = {"total": 2, "passed": 1, "failed": 1}
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("contradicts 1 failed measurement query" in error for error in vr.errors)
+
+    def test_passed_validation_rejects_failed_measurement_row(self):
+        data = _minimal_bundle()
+        data["queries"][0]["status"] = "FAILED"
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("contradicts 1 failed measurement query" in error for error in vr.errors)
+
+    def test_validation_claim_rejects_unrun_validation_phase(self):
+        data = _minimal_bundle()
+        data["phases"] = {"validation": {"status": "NOT_RUN"}}
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any(
+            "summary.validation='passed' contradicts phases.validation.status='not_run'" in error for error in vr.errors
+        )
+
+    def test_validation_claim_allows_absent_optional_phases(self):
+        data = _minimal_bundle()
+        del data["phases"]
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert vr.ok, vr.errors
+
+    @pytest.mark.parametrize(
+        "phases",
+        [None, {}, {"validation": {}}, {"validation": "NOT_RUN"}, {"validation": {"status": []}}],
+        ids=["non_dict", "missing_validation", "missing_status", "non_dict_validation", "non_string_status"],
+    )
+    def test_validation_claim_rejects_malformed_or_incomplete_phases(self, phases):
+        data = _minimal_bundle()
+        data["phases"] = phases
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any(
+            "summary.validation='passed' contradicts phases.validation.status='unknown'" in error for error in vr.errors
+        )
+
+    @pytest.mark.parametrize(
+        "phase_status",
+        ["FAILED", "PARTIAL", "COMPLETED"],
+        ids=["failed", "incompatible_partial", "unrecognized"],
+    )
+    def test_passed_validation_claim_rejects_non_clean_phase_status(self, phase_status: str):
+        data = _minimal_bundle()
+        data["phases"]["validation"]["status"] = phase_status
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any(
+            f"summary.validation='passed' contradicts phases.validation.status={phase_status.lower()!r}" in error
+            for error in vr.errors
+        )
+
+    @pytest.mark.parametrize("phase_status", ["PASSED", "PARTIAL"])
+    def test_partial_claim_accepts_compatible_validation_phase_on_trusted_mirror(self, phase_status: str):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        data["phases"]["validation"]["status"] = phase_status
+        vr = ValidationResult("mirror")
+
+        _validate_bundle(data, vr, allow_partial_validation=True)
+
+        assert vr.ok, vr.errors
+
+    def test_partial_claim_rejects_non_dict_validation_phase_on_trusted_mirror(self):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        data["phases"]["validation"] = "NOT_RUN"
+        vr = ValidationResult("mirror")
+
+        _validate_bundle(data, vr, allow_partial_validation=True)
+
+        assert not vr.ok
+        assert any(
+            "summary.validation='partial' contradicts phases.validation.status='unknown'" in error
+            for error in vr.errors
+        )
+
+    def test_partial_claim_rejects_unrun_validation_phase_on_trusted_mirror(self):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        data["phases"] = {"validation": {"status": "not_run"}}
+        vr = ValidationResult("mirror")
+
+        _validate_bundle(data, vr, allow_partial_validation=True)
+
+        assert not vr.ok
+        assert any(
+            "summary.validation='partial' contradicts phases.validation.status='not_run'" in error
+            for error in vr.errors
+        )
+
+    def test_failed_warmup_does_not_contradict_successful_measurements(self):
+        data = _minimal_bundle()
+        data["summary"]["queries"] = {"total": 1, "passed": 1, "failed": 0}
+        data["queries"] = [
+            {"id": "Q1", "ms": 0, "status": "FAILED", "run_type": "warmup"},
+            {"id": "Q1", "ms": 100, "status": "SUCCESS", "run_type": "measurement"},
+        ]
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert vr.ok, vr.errors
+
+    def test_warmup_only_bundle_is_not_a_public_measurement(self):
+        data = _minimal_bundle()
+        data["summary"]["queries"] = {"total": 1, "passed": 1, "failed": 0}
+        data["queries"] = [{"id": "Q1", "ms": 100, "status": "SUCCESS", "run_type": "warmup"}]
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("at least one positive measurement timing" in error for error in vr.errors)
+
+    def test_trusted_partial_allows_failed_measurements(self):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        data["summary"]["queries"] = {"total": 2, "passed": 1, "failed": 1}
+        data["queries"][0]["status"] = "FAILED"
+        vr = ValidationResult("test")
+
+        _validate_bundle(data, vr, allow_partial_validation=True)
+
+        assert vr.ok, vr.errors
 
     def test_translation_fallback_fails_public_submission(self):
         data = _minimal_bundle()
@@ -282,8 +555,8 @@ class TestValidateBundle:
     def test_all_zero_timings_fails(self):
         data = _minimal_bundle()
         data["queries"] = [
-            {"id": "Q1", "ms": 0, "status": "pass"},
-            {"id": "Q2", "ms": 0, "status": "pass"},
+            {"id": "Q1", "ms": 0, "status": "SUCCESS"},
+            {"id": "Q2", "ms": 0, "status": "SUCCESS"},
         ]
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
@@ -305,7 +578,7 @@ class TestValidateBundle:
 
     def test_positive_sub_millisecond_timing_passes(self):
         data = _minimal_bundle()
-        data["queries"] = [{"id": "Q1", "ms": 0.04, "status": "pass"}]
+        data["queries"] = [{"id": "Q1", "ms": 0.04, "status": "SUCCESS"}]
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert vr.ok
@@ -326,13 +599,15 @@ class TestValidateBundle:
         assert not vr.ok
         assert any("missing keys" in e for e in vr.errors)
 
-    def test_empty_queries_warns(self):
+    def test_empty_queries_fail(self):
         data = _minimal_bundle()
+        data["summary"]["queries"] = {"total": 0, "passed": 0, "failed": 0}
         data["queries"] = []
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
-        assert vr.ok  # warning, not error
-        assert any("queries array is empty" in w for w in vr.warnings)
+        assert not vr.ok
+        assert any("queries array must not be empty" in error for error in vr.errors)
+        assert any("summary.queries.total must be greater than 0" in error for error in vr.errors)
 
     def test_user_supplied_cost_total_without_normalized_provenance_fails(self):
         data = _minimal_bundle()
@@ -438,6 +713,52 @@ class TestValidateManifestHash:
         vr = ValidationResult("test")
         _validate_manifest_hash(manifest, bundle_dir, vr)
         assert vr.ok
+
+    def test_oversized_applied_companion_bytes_are_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(bundle_module, "APPLIED_COMPANION_MAX_BYTES", 32)
+        bundle_file = tmp_path / "result.json"
+        bundle_file.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        companion = tmp_path / "result.applied.json"
+        companion.write_text(json.dumps({"receipt": {"entries": [], "padding": "x" * 64}}), encoding="utf-8")
+        manifest = tmp_path / "submission-manifest.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "bundle_file": bundle_file.name,
+                    "bundle_hash": self._hash_of(bundle_file),
+                    "companion_hashes": {companion.name: self._hash_of(companion)},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        vr = ValidationResult("test")
+        _validate_manifest_hash(manifest, tmp_path, vr)
+
+        assert any("byte limit" in error for error in vr.errors)
+
+    def test_oversized_applied_receipt_entry_count_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(bundle_module, "APPLIED_RECEIPT_MAX_ENTRIES", 1)
+        bundle_file = tmp_path / "result.json"
+        bundle_file.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        companion = tmp_path / "result.applied.json"
+        companion.write_text(json.dumps({"receipt": {"entries": [{}, {}]}}), encoding="utf-8")
+        manifest = tmp_path / "submission-manifest.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "bundle_file": bundle_file.name,
+                    "bundle_hash": self._hash_of(bundle_file),
+                    "companion_hashes": {companion.name: self._hash_of(companion)},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        vr = ValidationResult("test")
+        _validate_manifest_hash(manifest, tmp_path, vr)
+
+        assert any("entry limit" in error for error in vr.errors)
 
     def test_mismatched_hash_fails(self, tmp_path: Path):
         bundle_dir = tmp_path / "bundle"
@@ -604,6 +925,7 @@ class TestDiscoverBundles:
         (tmp_path / "result.json").write_text("{}", encoding="utf-8")
         (tmp_path / "result.plans.json").write_text("{}", encoding="utf-8")
         (tmp_path / "result.tuning.json").write_text("{}", encoding="utf-8")
+        (tmp_path / "result.applied.json").write_text("{}", encoding="utf-8")
         (tmp_path / "result.manifest.json").write_text("{}", encoding="utf-8")
         (tmp_path / "corpus-inventory.json").write_text("{}", encoding="utf-8")
         (tmp_path / "submission-manifest.json").write_text("{}", encoding="utf-8")
@@ -611,6 +933,13 @@ class TestDiscoverBundles:
         found = discover_bundles(tmp_path)
         assert len(found) == 1
         assert found[0].name == "result.json"
+
+    def test_ignores_json_named_directories_and_companions_case_insensitively(self, tmp_path: Path):
+        (tmp_path / "directory.json").mkdir()
+        (tmp_path / "result.JSON").write_text("{}", encoding="utf-8")
+        (tmp_path / "result.APPLIED.JSON").write_text("{}", encoding="utf-8")
+
+        assert discover_bundles(tmp_path) == [tmp_path / "result.JSON"]
 
 
 # ---------------------------------------------------------------------------
@@ -637,6 +966,30 @@ class TestValidateBundles:
         results = validate_bundles([missing])
         assert len(results) == 1
         assert not results[0].ok
+
+    def test_json_named_directory_returns_clean_validation_error(self, tmp_path: Path):
+        directory = tmp_path / "not-a-bundle.json"
+        directory.mkdir()
+
+        results = validate_bundles([directory])
+
+        assert not results[0].ok
+        assert any("regular file" in error for error in results[0].errors)
+
+    def test_unlisted_adjacent_applied_companion_still_obeys_caps(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(bundle_module, "APPLIED_COMPANION_MAX_BYTES", 32)
+        bundle = tmp_path / "result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        (tmp_path / "result.applied.json").write_text(
+            json.dumps({"receipt": {"entries": [], "padding": "x" * 64}}), encoding="utf-8"
+        )
+
+        results = validate_bundles([bundle])
+
+        assert not results[0].ok
+        assert any("byte limit" in error for error in results[0].errors)
 
     def test_non_object_json(self, tmp_path: Path):
         f = tmp_path / "array.json"
@@ -723,6 +1076,33 @@ class TestRequireManifestCli:
         assert rc == 0
 
 
+class TestAllowPartialValidation:
+    def test_cli_community_default_rejects_partial(self, tmp_path: Path, capsys):
+        bundle = tmp_path / "partial.json"
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+        assert main([str(bundle)]) == 1
+        captured = capsys.readouterr()
+        assert "must be 'passed'" in captured.out or "must be 'passed'" in captured.err
+
+    def test_cli_allow_partial_accepts_seed_shaped_partial(self, tmp_path: Path, capsys):
+        bundle = tmp_path / "partial.json"
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+        assert main([str(bundle), "--allow-partial-validation"]) == 0
+
+    def test_allow_partial_still_rejects_private_path_leaks(self, tmp_path: Path, capsys):
+        """Privacy fail-closed is independent of the partial waiver."""
+        bundle = tmp_path / "leaky-partial.json"
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        data["platform"]["config"] = {"working_dir": "/Users/alice/private"}
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+        assert main([str(bundle), "--allow-partial-validation"]) == 1
+
+
 # ---------------------------------------------------------------------------
 # format_summary / format_pr_comment
 # ---------------------------------------------------------------------------
@@ -759,3 +1139,29 @@ class TestMain:
         bad = tmp_path / "bad.json"
         bad.write_text(json.dumps({"version": "1.0"}), encoding="utf-8")
         assert main([str(bad)]) == 1
+
+    def test_malformed_public_companion_fails_closed(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+        bundle = tmp_path / "tpch_result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        bundle.with_name("tpch_result.plans.json").write_text(
+            '{"plan": "/Users/alice/private" not-json',
+            encoding="utf-8",
+        )
+
+        assert main([str(bundle)]) == 1
+        assert "Malformed public companion JSON" in capsys.readouterr().out
+
+    def test_case_insensitive_companion_name_is_privacy_scanned(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ):
+        bundle = tmp_path / "tpch_result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        bundle.with_name("tpch_result.PLANS.JSON").write_text(
+            json.dumps({"path": "/Users/alice/private"}),
+            encoding="utf-8",
+        )
+
+        assert main([str(bundle)]) == 1
+        output = capsys.readouterr().out
+        assert "PLANS.JSON" in output
+        assert "private absolute paths" in output

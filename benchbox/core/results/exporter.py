@@ -19,8 +19,11 @@ import io
 import json
 import logging
 import os
+import stat
+import uuid
 from collections.abc import Iterable
 from datetime import datetime
+from html import escape as html_escape
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
@@ -40,9 +43,11 @@ from benchbox.core.results.anonymization import (
 from benchbox.core.results.canonical_json import canonical_json_text
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.normalizer import get_query_map, normalize_result_dict
+from benchbox.core.results.platform_options import REDACTED_VALUE, _is_username_key
 from benchbox.core.results.schema import (
     SchemaV2ValidationError,
     SchemaV2Validator,
+    build_applied_ledger_payload,
     build_plans_payload,
     build_result_payload,
     build_tuning_payload,
@@ -50,11 +55,28 @@ from benchbox.core.results.schema import (
 from benchbox.core.results.schema_policy import is_loader_supported_result_schema
 from benchbox.core.runtime_paths import resolve_results_dir
 from benchbox.utils.cloud_storage import create_path_handler, is_cloud_path
+from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
 
 ResultLike = BenchmarkResults
 QueryResultLike = "QueryResult | dict[str, Any]"
+
+
+class ResultExportError(RuntimeError):
+    """Raised when one or more requested result artifacts cannot be exported."""
+
+
+def _redact_usernames(value: Any) -> Any:
+    """Redact connection-identity keys for a non-anonymized export."""
+    if isinstance(value, dict):
+        return {
+            str(key): REDACTED_VALUE if _is_username_key(str(key)) else _redact_usernames(child)
+            for key, child in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_usernames(item) for item in value]
+    return value
 
 
 class ResultExporter:
@@ -81,7 +103,9 @@ class ResultExporter:
         Args:
             output_dir: Output directory for results. Defaults to benchmark_runs/results.
             anonymize: Whether to anonymize system information. Defaults to True.
-            anonymization_config: Configuration for anonymization.
+            anonymization_config: Configuration for anonymization. When omitted and
+                ``anonymize`` is true, soft-reads ``BENCHBOX_MACHINE_ID_SALT`` via
+                :meth:`AnonymizationConfig.from_public_environ` (empty salt if unset).
             console: Rich console for output. Creates new one if not provided.
             plan_history_dir: Opt-in directory to record this run's plan
                 fingerprints into via ``PlanHistory.add_run`` (see
@@ -107,23 +131,67 @@ class ResultExporter:
 
         self.console = console or Console()
         self.anonymize = anonymize
-        self.anonymization_manager = (
-            AnonymizationManager(anonymization_config or AnonymizationConfig()) if anonymize else None
-        )
+        # Soft-read BENCHBOX_MACHINE_ID_SALT when present so public-shaped
+        # exports mint salted tokens at export time. Empty/unset remains the
+        # OSS default (private/local export still works). Community submit is
+        # the hard-require gate; this path must not refuse without salt.
+        if anonymize:
+            default_config = anonymization_config or AnonymizationConfig.from_public_environ()
+            self.anonymization_manager = AnonymizationManager(default_config)
+        else:
+            self.anonymization_manager = None
         self._validator = SchemaV2Validator()
 
         resolved_plan_history_dir = plan_history_dir or os.environ.get("BENCHBOX_PLAN_HISTORY_DIR")
         self.plan_history_dir = Path(resolved_plan_history_dir) if resolved_plan_history_dir else None
 
     def _write_file(self, file_path: Path, content: str, mode: str = "w") -> None:
-        """Write content to file, handling both local and cloud paths."""
-        if self.is_cloud_output and hasattr(file_path, "write_text"):
-            file_path.write_text(content, encoding="utf-8")
-        elif self.is_cloud_output and hasattr(file_path, "write_bytes"):
+        """Write content to file, handling both local and cloud paths.
+
+        Result bundles are byte-defined, so text writes must not translate LF
+        characters to the host platform's native newline sequence.
+        """
+        if self.is_cloud_output and hasattr(file_path, "write_bytes"):
             file_path.write_bytes(content.encode("utf-8"))
+        elif self.is_cloud_output and hasattr(file_path, "write_text"):
+            # Keep compatibility with cloudpathlib 0.15, whose write_text()
+            # does not yet expose pathlib's newline keyword.
+            file_path.write_text(content, encoding="utf-8")
         else:
-            with open(file_path, mode, encoding="utf-8") as handle:
-                handle.write(content)
+            destination = Path(file_path)
+            temporary_path: Path | None = None
+            file_descriptor: int | None = None
+            for _ in range(10):
+                candidate = destination.parent / f".{destination.name}.{uuid.uuid4().hex}.tmp"
+                try:
+                    # 0o666 preserves the normal open(..., "w") behavior because
+                    # the process umask is applied by os.open at creation time.
+                    file_descriptor = os.open(
+                        candidate,
+                        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                        0o666,
+                    )
+                    temporary_path = candidate
+                    break
+                except FileExistsError:
+                    continue
+            if file_descriptor is None or temporary_path is None:
+                raise FileExistsError(f"Unable to allocate a unique temporary export path for {destination}")
+
+            try:
+                existing_mode = stat.S_IMODE(destination.stat().st_mode) if destination.exists() else None
+                if existing_mode is not None:
+                    os.fchmod(file_descriptor, existing_mode)
+                with os.fdopen(file_descriptor, mode, encoding="utf-8", newline="") as handle:
+                    file_descriptor = None
+                    handle.write(content)
+                os.replace(temporary_path, destination)
+                temporary_path = None
+            finally:
+                if file_descriptor is not None:
+                    os.close(file_descriptor)
+                if temporary_path is not None:
+                    temporary_path.unlink(missing_ok=True)
 
     def _create_file_path(self, filename: str):
         """Create file path, ensuring parent directory exists."""
@@ -160,6 +228,7 @@ class ResultExporter:
             formats = ["json"]
 
         exported_files: dict[str, Path] = {}
+        failures: list[str] = []
 
         timestamp = (
             result.timestamp.strftime("%Y%m%d_%H%M%S")
@@ -179,8 +248,7 @@ class ResultExporter:
                 elif format_name == "html":
                     filepath = self._export_html_detailed(result, filename_base)
                 else:
-                    self.console.print(f"[yellow]Unknown export format: {format_name}[/yellow]")
-                    continue
+                    raise ResultExportError(f"Unknown export format: {format_name}")
 
                 exported_files[format_name] = filepath
                 self.console.print(f"[green]Exported {format_name.upper()}:[/green] {filepath}")
@@ -194,6 +262,10 @@ class ResultExporter:
                 # so failure diagnostics are still observable via caplog.
                 logging.critical(message)
                 self.console.print(f"[red]Failed to export {format_name}: {exc}[/red]")
+                failures.append(message)
+
+        if failures:
+            raise ResultExportError("; ".join(failures))
 
         return exported_files
 
@@ -227,13 +299,17 @@ class ResultExporter:
     def _export_json_v2(self, result: ResultLike, filename_base: str) -> Path:
         """Export result to JSON using schema v2.0 with companion files."""
         # Build primary payload
-        payload = build_result_payload(result)
+        payload = build_result_payload(result, sanitize_platform_secrets=self.anonymize)
 
         # Apply anonymization if enabled
         if self.anonymize and self.anonymization_manager:
             self._apply_anonymization(payload)
             anonymized = True
         else:
+            # Capture retains usernames until the public anonymizer can assign
+            # stable per-value pseudonyms. Private exports still must not carry
+            # connection identities verbatim, so redact them at this boundary.
+            payload = _redact_usernames(payload)
             anonymized = False
 
         # Add export metadata
@@ -247,7 +323,7 @@ class ResultExporter:
         try:
             self._validator.validate(payload)
         except SchemaV2ValidationError as e:
-            logger.warning(f"Schema validation warning: {e}")
+            raise ResultExportError(f"Schema validation failed: {e}") from e
 
         # Write primary result file
         filepath = self._create_file_path(f"{filename_base}.json")
@@ -275,10 +351,22 @@ class ResultExporter:
 
         # Tuning companion file
         tuning_payload = build_tuning_payload(result)
+        if tuning_payload and self.anonymize and self.anonymization_manager:
+            tuning_payload = self.anonymization_manager.anonymize_tuning_payload(tuning_payload)
         if tuning_payload:
             tuning_path = self._create_file_path(f"{filename_base}.tuning.json")
             self._write_file(tuning_path, canonical_json_text(tuning_payload))
             self.console.print(f"[dim]Exported tuning: {tuning_path}[/dim]")
+
+        # Applied-tuning ledger companion file (ADR-1): what the execution path
+        # actually ran, additive to the requested-config .tuning.json above.
+        applied_payload = build_applied_ledger_payload(result)
+        if applied_payload:
+            if self.anonymize and self.anonymization_manager:
+                applied_payload = self._anonymize_applied_payload(applied_payload)
+            applied_path = self._create_file_path(f"{filename_base}.applied.json")
+            self._write_file(applied_path, canonical_json_text(applied_payload))
+            self.console.print(f"[dim]Exported applied ledger: {applied_path}[/dim]")
 
     def _record_plan_history(self, result: ResultLike) -> None:
         """Opt-in: append this run's plan fingerprints to a PlanHistory store.
@@ -301,39 +389,19 @@ class ResultExporter:
             logger.warning(f"Failed to record plan history: {exc}")
 
     def _apply_anonymization(self, payload: dict[str, Any]) -> None:
-        """Apply public-export anonymization to environment, platform, config, and execution metadata."""
+        """Apply public-export anonymization to environment, platform, config, and execution metadata.
+
+        Unread identifier fields (including ``machine_id``) are omitted by the
+        public walker - see ``adr-published-identifier-field-set``. Do not
+        re-inject capture-side machine ids after the walk: that would publish
+        the internal 16-hex token and undo the drop.
+        """
         if not self.anonymization_manager:
             return
 
         anonymized_payload = self.anonymization_manager.anonymize_result_payload(payload)
         payload.clear()
         payload.update(anonymized_payload)
-
-        # Ensure public exports have a stable grouping key without replacing
-        # any captured client-host or platform-runtime metadata.
-        machine_id = self.anonymization_manager.get_anonymous_machine_id()
-        if not machine_id:
-            return
-
-        env_block = payload.get("environment")
-        if not isinstance(env_block, dict):
-            env_block = {}
-            payload["environment"] = env_block
-
-        client_host = env_block.get("client_host")
-        client_host_block = client_host if isinstance(client_host, dict) else None
-        captured_machine_id = env_block.get("machine_id")
-        if captured_machine_id in (None, "") and client_host_block is not None:
-            captured_machine_id = client_host_block.get("machine_id")
-
-        effective_machine_id = captured_machine_id or machine_id
-        if env_block.get("machine_id") in (None, ""):
-            env_block["machine_id"] = effective_machine_id
-        if client_host_block is not None:
-            if client_host_block.get("machine_id") in (None, ""):
-                client_host_block["machine_id"] = effective_machine_id
-        elif not captured_machine_id:
-            env_block["client_host"] = {"machine_id": effective_machine_id}
 
     def _anonymize_plans_payload(self, plans_payload: dict[str, Any]) -> dict[str, Any]:
         """Strip raw EXPLAIN text from the plans companion for anonymized exports.
@@ -395,6 +463,133 @@ class ResultExporter:
         for child in node.get("children") or []:
             self._strip_operator_platform_metadata(child)
 
+    def _anonymize_applied_payload(self, applied_payload: dict[str, Any]) -> dict[str, Any]:
+        """Drop raw statement/error text from the applied-ledger companion for
+        anonymized exports.
+
+        Like ``.plans.json`` (see ``_anonymize_plans_payload``), the
+        ``.applied.json`` companion is written outside ``_apply_anonymization``.
+        Its per-statement ``statement`` text is captured verbatim from the
+        execution path and can embed absolute paths, buckets, or hostnames -- a
+        Spark session config records ``SET spark.sql.warehouse.dir=/abs/path``,
+        an object-store path, etc. No structured scrubber can safely redact
+        arbitrary per-platform SQL/config text, so the free-text ``statement``
+        and ``error`` fields are dropped outright, mirroring the plans policy.
+
+        The structural fields (``phase``, ``status``, ``mechanism``) and the
+        top-level ``status`` / ``applied_ledger_hash`` are retained. Dropped
+        intent/reason text is redacted because ``record_dropped`` accepts
+        adapter-provided strings and cannot enforce that they are free of
+        exception detail. The hash still certifies the real executed statements
+        for cross-run comparison, and the honest status is preserved. Operates
+        on a deep copy; the caller's payload and the in-memory result are never
+        mutated.
+        """
+        sanitized = copy.deepcopy(applied_payload)
+        statements = sanitized.get("statements")
+        if isinstance(statements, list):
+            for entry in statements:
+                if not isinstance(entry, dict):
+                    continue
+                entry.pop("statement", None)
+                entry.pop("error", None)
+                # `table` can be a fully-qualified catalog.schema.table for a
+                # folded Databricks layout op, embedding a user-chosen catalog
+                # name that the main payload separately anonymizes as
+                # database_name - drop it here for the same reason.
+                entry.pop("table", None)
+                entry["statement_redacted"] = True
+        self._sanitize_applied_dropped(sanitized)
+        # The post-load introspection receipt (tuning-introspection-receipts)
+        # rides inside this companion and echoes the same free-text statement /
+        # identifier fields (plus catalog evidence), so it is scrubbed by the
+        # same policy: keep the structural verdict/kind/summary, drop everything
+        # that could embed a path, catalog, or user-chosen identifier.
+        self._sanitize_applied_receipt(sanitized.get("receipt"))
+        # The reused-DB drift check (ADR-001 addendum) rides in this companion and
+        # its free-text errors/identifiers can embed a path/DSN or user-chosen
+        # catalog/table name, so it follows the same drop-free-text policy.
+        self._sanitize_applied_drift_check(sanitized.get("drift_check"))
+        return sanitized
+
+    @staticmethod
+    def _sanitize_applied_dropped(payload: Any) -> None:
+        """Replace adapter-provided dropped-intent text with count-preserving markers."""
+        if not isinstance(payload, dict) or "dropped" not in payload:
+            return
+        dropped = payload.get("dropped")
+        if not dropped:
+            return
+        count = len(dropped) if isinstance(dropped, list) else 1
+        payload["dropped"] = [{"redacted": True} for _ in range(count)]
+
+    @staticmethod
+    def _sanitize_applied_drift_check(drift_check: Any) -> None:
+        """Drop free-text / identifier fields from an embedded drift_check, in place.
+
+        Mirrors the companion statement-redaction policy: drift ``errors`` can
+        embed an exception's path/DSN, and ``warnings`` /
+        ``configuration_mismatches`` / ``missing_tables`` / ``extra_tables`` can
+        embed user-chosen catalog or table identifiers, so they are dropped for
+        anonymized exports. The structural ``is_valid`` and the coarse
+        ``drifted_sections`` (code-controlled section names) are retained so drift
+        is still visible without free text.
+        """
+        if not isinstance(drift_check, dict):
+            return
+        dropped = False
+        for key in ("errors", "warnings", "configuration_mismatches", "missing_tables", "extra_tables"):
+            if key in drift_check:
+                drift_check.pop(key, None)
+                dropped = True
+        if dropped:
+            drift_check["drift_redacted"] = True
+
+    @staticmethod
+    def _sanitize_applied_receipt(receipt: Any) -> None:
+        """Drop free-text / identifier fields from an embedded receipt, in place.
+
+        Mirrors the ``.applied.json`` statement-redaction policy: the receipt's
+        per-statement ``statement`` / ``diff`` / ``evidence`` and the ``table`` /
+        column / index-name identifiers can embed paths or user-chosen catalog
+        names, so they are dropped outright for anonymized exports. The
+        structural ``verdict`` / ``kind`` / ``phase`` and the top-level
+        ``corroborated`` / ``summary`` are retained. Free-text ``error``,
+        ``detail``, and ``reason`` fields are removed with additive redaction
+        markers.
+        """
+        if not isinstance(receipt, dict):
+            return
+        if "error" in receipt:
+            receipt.pop("error", None)
+            receipt["error_redacted"] = True
+        _drop = (
+            "statement",
+            "diff",
+            "detail",
+            "evidence",
+            "table",
+            "name",
+            "expected_columns",
+            "observed_columns",
+        )
+        for entry in receipt.get("entries") or []:
+            if isinstance(entry, dict):
+                for key in _drop:
+                    entry.pop(key, None)
+                if "reason" in entry:
+                    entry.pop("reason", None)
+                    entry["reason_redacted"] = True
+                entry["statement_redacted"] = True
+        for obj in receipt.get("observed") or []:
+            if isinstance(obj, dict):
+                obj.pop("table", None)
+                obj.pop("name", None)
+                obj.pop("columns", None)
+                obj.pop("evidence", None)
+                obj["redacted"] = True
+        ResultExporter._sanitize_applied_dropped(receipt)
+
     def _convert_datetimes_to_iso(self, obj: Any) -> Any:
         """Convert datetime objects to ISO format strings."""
         if isinstance(obj, datetime):
@@ -440,7 +635,7 @@ class ResultExporter:
                         _query_exec_time_ms(query),
                         query.get("rows_returned", 0),
                         query.get("status", "UNKNOWN"),
-                        query.get("error_message", ""),
+                        self._anonymize_free_text(query.get("error_message", "")),
                         query.get("iteration", ""),
                         query.get("stream_id", ""),
                     ]
@@ -461,7 +656,7 @@ class ResultExporter:
                         _query_exec_time_ms(query),
                         query.get("rows_returned", 0),
                         query.get("status", "UNKNOWN"),
-                        query.get("error") or query.get("error_message", ""),
+                        self._anonymize_free_text(query.get("error") or query.get("error_message", "")),
                         query.get("iteration", ""),
                         query.get("stream_id", ""),
                     ]
@@ -473,12 +668,13 @@ class ResultExporter:
         """Export result to HTML format."""
         filepath = self._create_file_path(f"{filename_base}.html")
 
-        benchmark_name = getattr(result, "benchmark_name", "Unknown Benchmark")
-        execution_id = getattr(result, "execution_id", "")
+        benchmark_name = html_escape(str(getattr(result, "benchmark_name", "Unknown Benchmark")), quote=True)
+        execution_id = html_escape(str(getattr(result, "execution_id", "")), quote=True)
         timestamp = getattr(result, "timestamp", datetime.now())
+        timestamp_text = html_escape(timestamp.isoformat() if timestamp else "N/A", quote=True)
         duration = getattr(result, "duration_seconds", 0.0)
-        scale_factor = getattr(result, "scale_factor", 1.0)
-        platform = getattr(result, "platform", "Unknown")
+        scale_factor = html_escape(str(getattr(result, "scale_factor", 1.0)), quote=True)
+        platform = html_escape(str(getattr(result, "platform", "Unknown")), quote=True)
 
         total_queries, successful_queries = self._count_queries(result)
         failed_queries = max(total_queries - successful_queries, 0)
@@ -531,7 +727,7 @@ class ResultExporter:
             <strong>Platform:</strong> {platform} |
             <strong>Scale:</strong> {scale_factor} |
             <strong>Run:</strong> {execution_id} |
-            <strong>Time:</strong> {timestamp.isoformat() if timestamp else "N/A"}
+            <strong>Time:</strong> {timestamp_text}
         </div>
         <div class="stats">
             <div class="stat">
@@ -562,7 +758,7 @@ class ResultExporter:
         <h2>Query Results</h2>
         <table>
             <tr><th>Query</th><th>Time (ms)</th><th>Rows</th><th>Status</th><th>Error</th></tr>
-            {"".join(self._render_query_row(query) for query in self._iter_query_results(result))}
+            {"".join(self._render_query_row(self._anonymize_query_row(query)) for query in self._iter_query_results(result))}
         </table>
         <p style="margin-top: 24px; color: #666; font-size: 0.85em;">
             Generated by BenchBox v2.0 at {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
@@ -594,16 +790,42 @@ class ResultExporter:
             exec_time_ms = float(exec_time_seconds) * 1000.0
 
         time_display = f"{exec_time_ms:.1f}" if exec_time_ms is not None else ""
+        query_id = html_escape(str(query.get("query_id", "")), quote=True)
+        rows_returned = html_escape(str(query.get("rows_returned", "")), quote=True)
+        status_text = html_escape(str(status), quote=True)
+        error_text = html_escape(str(query.get("error") or query.get("error_message", "") or ""), quote=True)
 
         return (
             "<tr>"
-            f"<td>{query.get('query_id', '')}</td>"
-            f"<td>{time_display}</td>"
-            f"<td>{query.get('rows_returned', '')}</td>"
-            f"<td class='{status_class}'>{status}</td>"
-            f"<td>{query.get('error') or query.get('error_message', '')}</td>"
+            f"<td>{query_id}</td>"
+            f"<td>{html_escape(time_display, quote=True)}</td>"
+            f"<td>{rows_returned}</td>"
+            f"<td class='{status_class}'>{status_text}</td>"
+            f"<td>{error_text}</td>"
             "</tr>"
         )
+
+    def _anonymize_query_row(self, query: dict[str, Any]) -> dict[str, Any]:
+        """Copy a query row with its free-text error fields anonymized."""
+        if not (self.anonymize and self.anonymization_manager):
+            return query
+        scrubbed = dict(query)
+        for key in ("error", "error_message"):
+            if scrubbed.get(key):
+                scrubbed[key] = self._anonymize_free_text(scrubbed[key])
+        return scrubbed
+
+    def _anonymize_free_text(self, value: Any) -> Any:
+        """Route a free-text export field through the public message policy.
+
+        CSV/HTML rows are built from the result object directly, not from the
+        anonymized JSON payload, so error text (which echoes driver strings -
+        DSNs, hostnames, paths) must pass the same scrubbing on its way out.
+        No-op when the exporter is not anonymizing.
+        """
+        if not (self.anonymize and self.anonymization_manager) or not value:
+            return value
+        return self.anonymization_manager.anonymize_result_payload({"error_message": value})["error_message"]
 
     def _iter_query_results(self, result: ResultLike) -> Iterable[dict[str, Any]]:
         """Iterate over query results, normalizing format."""
@@ -625,11 +847,7 @@ class ResultExporter:
 
         for json_file in self.output_dir.glob("*.json"):
             # Skip companion files
-            if (
-                json_file.name.endswith(".plans.json")
-                or json_file.name.endswith(".tuning.json")
-                or json_file.name.endswith(".submission.json")
-            ):
+            if json_file.name.endswith(COMPANION_SUFFIXES) or json_file.name.endswith(".submission.json"):
                 continue
 
             try:
@@ -748,8 +966,8 @@ class ResultExporter:
         perf_current = self._extract_performance_metrics(current_data)
 
         comparison: dict[str, Any] = {
-            "baseline_file": str(baseline_path),
-            "current_file": str(current_path),
+            "baseline_file": baseline_path.name if self.anonymize else str(baseline_path),
+            "current_file": current_path.name if self.anonymize else str(current_path),
             "baseline_version": baseline_version,
             "current_version": current_version,
             "performance_changes": {},
@@ -882,6 +1100,10 @@ class ResultExporter:
         summary = comparison.get("summary", {})
         performance_changes = comparison.get("performance_changes", {})
         query_comparisons = comparison.get("query_comparisons", [])
+        total_queries_compared = html_escape(str(summary.get("total_queries_compared", 0)), quote=True)
+        improved_queries = html_escape(str(summary.get("improved_queries", 0)), quote=True)
+        regressed_queries = html_escape(str(summary.get("regressed_queries", 0)), quote=True)
+        unchanged_queries = html_escape(str(summary.get("unchanged_queries", 0)), quote=True)
 
         html_content = f"""<!DOCTYPE html>
 <html>
@@ -912,26 +1134,26 @@ class ResultExporter:
         <div class="summary">
             <div class="metric neutral">
                 <h3>Queries Compared</h3>
-                <p>{summary.get("total_queries_compared", 0)}</p>
+                <p>{total_queries_compared}</p>
             </div>
             <div class="metric improved">
                 <h3>Improved</h3>
-                <p>{summary.get("improved_queries", 0)}</p>
+                <p>{improved_queries}</p>
             </div>
             <div class="metric regressed">
                 <h3>Regressed</h3>
-                <p>{summary.get("regressed_queries", 0)}</p>
+                <p>{regressed_queries}</p>
             </div>
             <div class="metric neutral">
                 <h3>Unchanged</h3>
-                <p>{summary.get("unchanged_queries", 0)}</p>
+                <p>{unchanged_queries}</p>
             </div>
         </div>
         <h2>Performance Changes</h2>
         <ul>
             {
             "".join(
-                f"<li>{metric.replace('_', ' ').title()}: {vals['change_percent']:+.1f}% "
+                f"<li>{html_escape(str(metric).replace('_', ' ').title(), quote=True)}: {vals['change_percent']:+.1f}% "
                 f"({'Improved' if vals['improved'] else 'Regressed'})</li>"
                 for metric, vals in performance_changes.items()
             )
@@ -942,7 +1164,7 @@ class ResultExporter:
             <tr><th>Query</th><th>Baseline (ms)</th><th>Current (ms)</th><th>Change</th><th>Status</th></tr>
             {
             "".join(
-                f"<tr><td>{q['query_id']}</td><td>{q['baseline_time_ms']:.1f}</td>"
+                f"<tr><td>{html_escape(str(q['query_id']), quote=True)}</td><td>{q['baseline_time_ms']:.1f}</td>"
                 f"<td>{q['current_time_ms']:.1f}</td><td>{q['change_percent']:+.1f}%</td>"
                 f"<td>{'Improved' if q['improved'] else 'Regressed'}</td></tr>"
                 for q in query_comparisons

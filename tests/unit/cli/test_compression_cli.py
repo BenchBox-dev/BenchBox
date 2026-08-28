@@ -81,23 +81,27 @@ class TestCompressionCLI:
         mock_orchestrator.return_value = mock_orchestrator_instance
         mock_result = MagicMock()
         mock_result.validation_status = "PASSED"
+        mock_result.query_results = []
+        mock_result.execution_id = "test-123"
         mock_orchestrator_instance.execute_benchmark.return_value = mock_result
 
         # Test CLI with compression options
-        result = self.runner.invoke(
-            cli,
-            [
-                "run",
-                "--platform",
-                "duckdb",
-                "--benchmark",
-                "ssb",
-                "--scale",
-                "0.01",
-                "--compression",
-                "zstd:5",
-            ],
-        )
+        with patch.object(_run_module, "ResultExporter") as mock_exporter:
+            mock_exporter.return_value.export_result.return_value = {"json": "test.json"}
+            result = self.runner.invoke(
+                cli,
+                [
+                    "run",
+                    "--platform",
+                    "duckdb",
+                    "--benchmark",
+                    "ssb",
+                    "--scale",
+                    "0.01",
+                    "--compression",
+                    "zstd:5",
+                ],
+            )
 
         # Check that command executed without errors
         assert result.exit_code == 0
@@ -159,13 +163,17 @@ class TestCompressionCLI:
         mock_orchestrator.return_value = mock_orchestrator_instance
         mock_result = MagicMock()
         mock_result.validation_status = "PASSED"
+        mock_result.query_results = []
+        mock_result.execution_id = "test-123"
         mock_orchestrator_instance.execute_benchmark.return_value = mock_result
 
         # Test CLI without compression options
-        result = self.runner.invoke(
-            cli,
-            ["run", "--platform", "duckdb", "--benchmark", "ssb", "--scale", "0.01"],
-        )
+        with patch.object(_run_module, "ResultExporter") as mock_exporter:
+            mock_exporter.return_value.export_result.return_value = {"json": "test.json"}
+            result = self.runner.invoke(
+                cli,
+                ["run", "--platform", "duckdb", "--benchmark", "ssb", "--scale", "0.01"],
+            )
 
         # Check that command executed without errors
         assert result.exit_code == 0

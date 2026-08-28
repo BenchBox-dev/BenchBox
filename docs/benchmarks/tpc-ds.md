@@ -329,17 +329,48 @@ Implementation: `benchbox/core/tpcds/reporting.py` (surfacing) and
 
 ### Throughput Permutation
 
-Throughput streams are generated with a configurable permutation mode
-(`benchbox/core/tpcds/streams.py::PermutationMode`):
+The Throughput Test's default stream generation calls the official
+`dsqgen -STREAMS N` batch mode (`benchbox/core/tpcds/streams.py::generate_dsqgen_streams`,
+`-INPUT templates.lst`) once per run. This single invocation produces the
+**official per-stream query ORDERING and the official per-stream substitution
+PARAMETERS** for every stream, exactly as the reference TPC-DS kit would --
+superseding a previous home-grown Python permutation and RNG-based parameter
+jitter that did not reproduce dsqgen's ordering or parameters. Streams are
+reproducible for a fixed `(num_streams, base_seed)` pair: ordering is fully
+deterministic, and 98 of the 99 query templates' substitution parameters are
+byte-stable. The one exception is query46, whose 5-city `IN` list comes from a
+dsqgen-internal `ulist(random(1, rowcount("active_cities","store"), uniform), 5)`
+substitution that the bundled reference binary does not reproduce even for a
+fixed `-RNGSEED` (a property of the binary, not of BenchBox); its ordering slot
+is unaffected.
 
-| Mode | Behaviour |
-|------|-----------|
-| `sequential` | Queries run in ID order (1, 2, 3, …). Useful for debugging. |
-| `random` | Uniform random permutation, seeded for reproducibility. |
-| `tpcds` | TPC-DS standard permutation algorithm (default for compliance runs). |
+`PermutationMode` (`sequential` / `random` / `tpcds`) and
+`create_standard_streams`/`TPCDSStreamManager` remain in the codebase and are
+still used by the single-query `get_query()` path (power test, dry-run,
+dataframe query resolution) and as an inline fallback for direct/unit callers
+that bypass the throughput test's `run()` pre-generation step
+(`enable_preflight=False`). They are **not** the throughput default, and their
+ordering does not match the official dsqgen permutation.
 
-Per-stream ordering is emitted via `TPCDSStreamManager` so runs are reproducible
-with a fixed `base_seed`.
+### GIL / Result-Materialization Note
+
+For embedded engines (DuckDB, SQLite, DataFusion, ...) that release the GIL
+during native query execution but not while converting result rows into
+Python objects, fetching a query's full result set (`cursor.fetchall()`)
+re-acquires the GIL for the duration of that conversion. Every concurrent
+stream that materializes a result at the same time serializes on this step,
+so larger result sets and higher stream counts inflate
+`execution_time_seconds` (and therefore depress `Throughput@Size`)
+independently of the engine's actual query-execution concurrency - an
+artifact of Python result handling, not of the platform under test.
+`benchbox/core/tpcds/throughput_test.py` avoids forcing this materialization
+to compute `result_count`: it reads the platform adapter's already-computed
+row count directly
+(`benchbox.platforms.base.connection_wrappers.count_query_rows`) instead of
+calling `fetchall()` a second time and discarding the rows. If you build a
+custom harness that calls `fetchall()` per stream to inspect or log results,
+be aware that under this GIL constraint doing so measures Python object
+materialization throughput as much as it measures the database engine.
 
 ### Maintenance Operations
 

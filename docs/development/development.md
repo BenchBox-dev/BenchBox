@@ -12,7 +12,12 @@ This guide provides information for developers who want to contribute to BenchBo
 ### Prerequisites
 
 - Python 3.10+
-- [`uv`](https://docs.astral.sh/uv/) (recommended for environment management)
+- [`uv`](https://docs.astral.sh/uv/) **0.8 or newer** (recommended for environment
+  management). The committed `uv.lock` uses lockfile `revision = 3`; an older uv
+  silently rewrites it to revision 2 as a side effect of any `uv add`/`uv lock`
+  run. A pre-commit guard (`_project/scripts/check_uv_lock_revision.py`, also
+  runnable via `make uv-lock-revision-check`) rejects such a downgrade — if it
+  fires, upgrade uv (`uv self update`) and regenerate the lock.
 - `git`
 
 ### Setting up the Development Environment
@@ -20,7 +25,7 @@ This guide provides information for developers who want to contribute to BenchBo
 1.  **Clone the repository:**
 
     ```bash
-    git clone https://github.com/joeharris76/benchbox.git
+    git clone https://github.com/BenchBox-dev/benchbox.git
     cd BenchBox
     ```
 
@@ -98,12 +103,20 @@ We welcome contributions! Please see the `CONTRIBUTING.md` file in the root of t
 
 ## Maintainer Dev Loop
 
-Maintainers (and AI agents working in this repo) use a retained pool
-of 10 git worktrees for parallel branch work. New work claims a free
-slot, runs there until merge, then releases it back. See
-[the worktree-pool guide](../operations/dev-loop-worktree-pool.md) for
-common commands, slot states, and recovery scenarios. External
-contributors working from a fork do not need the pool.
+Maintainers and AI agents use one disposable linked worktree per task. Create
+it for the branch, work there until the PR merges, then remove that exact
+clean registration. See [the disposable worktree guide](../operations/dev-loop-worktrees.md)
+for common commands and recovery scenarios. External contributors working
+from a fork can use the same lifecycle.
+
+## Pull Request Lifecycle & Merge Queue Integration
+
+BenchBox enforces single-commit squash integration into `develop` with strict current-base verification:
+
+- **`make pr-open`**: Pushes the current branch, verifies it is current with `origin/develop`, and creates or reuses the pull request. Auto-merge is withheld by default until the branch is marked final.
+- **`make pr-ready`** (or **`make pr-open READY=1`**): Marks the branch final and arms auto-merge. When a merge queue is active on `develop`, arming automatically enqueues the PR for speculative combined-tree testing.
+- **Soundness Gate**: PRs modifying soundness-critical paths (`benchbox/core/equivalence/`, `benchbox/core/expected_results/`, etc.) cannot be auto-enqueued and require explicit maintainer review.
+- **`make pr-refresh`**: Refreshes a stale PR branch onto `origin/develop` when resolving merge conflicts locally. Run one branch at a time.
 
 ## Release Preparation Workflow
 

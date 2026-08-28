@@ -537,7 +537,7 @@ class TestResultExporter:
         with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
-        assert data["version"] == "2.1"
+        assert data["version"] == "2.2"
         assert data["benchmark"]["id"] == "tpch"
         assert data["benchmark"]["name"] == "TPC-H"
 
@@ -568,7 +568,7 @@ class TestResultExporter:
         with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
-        assert data["version"] == "2.1"
+        assert data["version"] == "2.2"
         assert data["benchmark"]["name"] == "TPC-H"
         assert data["platform"]["name"] == "duckdb"
 
@@ -717,25 +717,30 @@ class TestResultExporter:
 
     @patch("benchbox.cli.output.console")
     def test_export_with_anonymization(self, mock_console):
-        """Test export with anonymization enabled."""
-        # Create exporter with anonymization
+        """Test export with anonymization enabled.
+
+        Runs the real anonymizer. This used to patch anonymize_execution_metadata
+        and validate_anonymization, but the exporter never called either -- they
+        were part of a legacy API with no production caller, since removed -- so
+        the mocks asserted nothing and only masked which code path ran.
+        """
         anon_exporter = ResultExporter(output_dir=Path(self.temp_dir), anonymize=True)
         result = self.create_cli_result()
 
-        with patch.object(anon_exporter.anonymization_manager, "anonymize_execution_metadata") as mock_anonymize:
-            with patch.object(anon_exporter.anonymization_manager, "validate_anonymization") as mock_validate:
-                mock_anonymize.return_value = {"anonymized": "data"}
-                mock_validate.return_value = {"is_valid": True, "warnings": []}
-
-                exported = anon_exporter.export_result(result, formats=["json"])
+        exported = anon_exporter.export_result(result, formats=["json"])
 
         json_path = exported["json"]
         with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["export"]["anonymized"] is True
-        # v2.0 schema puts machine_id in environment block
-        assert data.get("environment", {}).get("machine_id")
+        # Unread identifier fields (including machine_id) are omitted at the
+        # public anonymization boundary — see adr-published-identifier-field-set.
+        environment = data.get("environment") or {}
+        assert "machine_id" not in environment
+        client_host = environment.get("client_host")
+        if isinstance(client_host, dict):
+            assert "machine_id" not in client_host
 
     def test_list_results_empty(self):
         """Test listing results when no results exist."""
@@ -790,7 +795,7 @@ class TestResultExporter:
         loaded = self.exporter.load_result_from_file(exported["json"])
 
         assert loaded is not None
-        assert loaded["version"] == "2.1"
+        assert loaded["version"] == "2.2"
         assert loaded["data"]["benchmark"]["id"] == "tpch"
 
     def test_load_result_from_file_not_found(self):
@@ -806,14 +811,18 @@ class TestResultExporter:
         # Create baseline result
         baseline_result = self.create_cli_result()
         baseline_result.query_results[0].execution_time_ms = 1000.0  # Q1: 1000ms
+        baseline_result.query_results[0].execution_time_seconds = 1.0
         baseline_result.query_results[1].execution_time_ms = 2000.0  # Q2: 2000ms
+        baseline_result.query_results[1].execution_time_seconds = 2.0
         baseline_exported = self.exporter.export_result(baseline_result, formats=["json"])
 
         # Create current result with different timings and execution_id
         current_result = self.create_cli_result()
         current_result.execution_id = "exec_456"  # Different execution_id to avoid filename collision
         current_result.query_results[0].execution_time_ms = 800.0  # Q1: 800ms (improved)
+        current_result.query_results[0].execution_time_seconds = 0.8
         current_result.query_results[1].execution_time_ms = 2500.0  # Q2: 2500ms (regressed)
+        current_result.query_results[1].execution_time_seconds = 2.5
         current_exported = self.exporter.export_result(current_result, formats=["json"])
 
         comparison = self.exporter.compare_results(baseline_exported["json"], current_exported["json"])
@@ -830,6 +839,26 @@ class TestResultExporter:
         assert query_comparisons["1"]["change_percent"] == -20.0  # 800 vs 1000 = -20%
         assert query_comparisons["2"]["improved"] is False
         assert query_comparisons["2"]["change_percent"] == 25.0  # 2500 vs 2000 = +25%
+
+    def test_compare_results_anonymizes_source_paths(self):
+        baseline_result = self.create_cli_result()
+        baseline_path = self.exporter.export_result(baseline_result, formats=["json"])["json"]
+        current_result = self.create_cli_result()
+        current_result.execution_id = "exec_private_current"
+        current_path = self.exporter.export_result(current_result, formats=["json"])["json"]
+
+        anonymous = ResultExporter(output_dir=Path(self.temp_dir), anonymize=True).compare_results(
+            baseline_path, current_path
+        )
+        private_root = str(Path(self.temp_dir))
+
+        assert anonymous["baseline_file"] == baseline_path.name
+        assert anonymous["current_file"] == current_path.name
+        assert private_root not in json.dumps(anonymous)
+
+        local = self.exporter.compare_results(baseline_path, current_path)
+        assert local["baseline_file"] == str(baseline_path)
+        assert local["current_file"] == str(current_path)
 
     def test_compare_results_file_not_found(self):
         """Test comparison with non-existent files."""
@@ -860,7 +889,7 @@ class TestResultExporter:
 
         # Comparison proceeds but reports missing canonical version as unknown
         assert comparison["baseline_version"] == "unknown"
-        assert comparison["current_version"] == "2.1"
+        assert comparison["current_version"] == "2.2"
 
     def test_export_comparison_report(self):
         """Test exporting comparison report."""
@@ -905,6 +934,36 @@ class TestResultExporter:
         assert "Performance Comparison Report" in html_content
         assert "Q1" in html_content
         assert "Improved" in html_content
+
+    def test_export_comparison_report_escapes_untrusted_labels(self):
+        """Comparison reports must not render result-controlled labels as markup."""
+        untrusted = '"><script>alert(1)</script>'
+        comparison = {
+            "summary": {
+                "total_queries_compared": untrusted,
+                "improved_queries": untrusted,
+                "regressed_queries": untrusted,
+                "unchanged_queries": untrusted,
+            },
+            "performance_changes": {
+                untrusted: {"change_percent": 1.0, "improved": False},
+            },
+            "query_comparisons": [
+                {
+                    "query_id": untrusted,
+                    "baseline_time_ms": 1.0,
+                    "current_time_ms": 2.0,
+                    "change_percent": 100.0,
+                    "improved": False,
+                }
+            ],
+        }
+
+        report_path = self.exporter.export_comparison_report(comparison)
+        html_content = report_path.read_text(encoding="utf-8")
+
+        assert untrusted not in html_content
+        assert "&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;" in html_content
 
     def test_assess_performance_change(self):
         """Test performance change assessment."""
@@ -960,21 +1019,27 @@ class TestResultExporterErrorHandling:
             validation_status="PASSED",
         )
 
-        exported = self.exporter.export_result(result, formats=["invalid_format"])
+        with pytest.raises(RuntimeError, match="Unknown export format"):
+            self.exporter.export_result(result, formats=["invalid_format"])
 
-        # Should not include the invalid format
-        assert "invalid_format" not in exported
-
-        # Should print warning message
+        # Should print an actionable error message
         assert mock_console.print.called
         calls = [str(call) for call in mock_console.print.call_args_list]
-        assert any("Unknown export format" in call for call in calls)
+        assert any("Unknown export format" in call for call in calls) or any(
+            "Failed to export" in call for call in calls
+        )
 
     @pytest.mark.skipif(sys.platform == "win32", reason="Path handling differs on Windows")
     def test_export_with_invalid_output_dir(self):
-        """Test export with invalid output directory."""
+        """Test export with invalid output directory.
+
+        A path under a regular file is uncreatable for every uid,
+        including root (mkdir raises NotADirectoryError, converted to
+        FileNotFoundError by the exporter)."""
+        blocker = Path(self.temp_dir) / "blocker"
+        blocker.write_text("")
         with pytest.raises(FileNotFoundError):
-            ResultExporter(output_dir=Path("/invalid/path/that/cannot/be/created"))
+            ResultExporter(output_dir=blocker / "sub")
 
     def test_list_results_with_corrupted_json(self):
         """Test listing results with corrupted JSON files."""

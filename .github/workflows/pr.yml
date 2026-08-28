@@ -4,9 +4,12 @@ on:
   pull_request:
     branches:
       - develop
+  merge_group:
+    branches:
+      - develop
 
 concurrency:
-  group: develop-pr-${{ github.ref }}
+  group: develop-pr-${{ github.event_name == 'merge_group' && github.event.merge_group.head_ref || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -20,28 +23,42 @@ jobs:
       safe-content-only: ${{ steps.classify.outputs.safe-content-only }}
       needs-code-ci: ${{ steps.classify.outputs.needs-code-ci }}
       content-guard-needed: ${{ steps.classify.outputs.content-guard-needed }}
+      skill-integrity-needed: ${{ steps.classify.outputs.skill-integrity-needed }}
+      skill-integrity-only: ${{ steps.classify.outputs.skill-integrity-only }}
       changed-paths: ${{ steps.classify.outputs.changed-paths }}
       code-paths: ${{ steps.classify.outputs.code-paths }}
       unknown-paths: ${{ steps.classify.outputs.unknown-paths }}
       estimated-runner-minutes-saved: ${{ steps.classify.outputs.estimated-runner-minutes-saved }}
       packaging-needed: ${{ steps.classify.outputs.packaging-needed }}
       viz-needed: ${{ steps.classify.outputs.viz-needed }}
+      explorer-vitest-needed: ${{ steps.classify.outputs.explorer-vitest-needed }}
+      explorer-paths-needed: ${{ steps.classify.outputs.explorer-paths-needed }}
+      explorer-tokens-needed: ${{ steps.classify.outputs.explorer-tokens-needed }}
+      site-theme-needed: ${{ steps.classify.outputs.site-theme-needed }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Validate TODO schema migration contract
+        # Bare python is intentional: this static guard is stdlib-only and
+        # must run for every PR without tracker credentials or dependencies.
+        run: python _project/scripts/todo_schema_migration_check.py
+
       - name: Fetch base branch
-        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+        run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
 
       - name: Classify changed paths
         id: classify
         # Bare python is intentional: the classifier is stdlib-only so
         # content-only PRs do not pay a dependency-sync cost before deciding.
         run: |
+          # Bind classification to the immutable pull-request event base. A
+          # later develop merge may make this PR BEHIND, but must not change
+          # the tree whose paths and manifest structure this run certifies.
           python scripts/path_filter_decision.py \
-            --base-ref "origin/${{ github.base_ref }}" \
+            --base-ref "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}" \
             --json-out ci-path-decision.json \
             --lists-dir .ci-paths \
             --github-output "$GITHUB_OUTPUT" \
@@ -53,6 +70,40 @@ jobs:
           name: ci-path-decision
           path: ci-path-decision.json
           retention-days: 30
+
+  # Pre-merge foreign-platform smoke coverage for the bundled TPC-H binaries.
+  # Every code PR gets direct macOS and Windows execution before merge, while
+  # nightly retains the complete three-platform matrix.
+  tpch-binary-framing:
+    name: TPC-H binary framing (${{ matrix.os }})
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Verify bundled dbgen binaries emit clean framing
+        run: uv run -- python -m pytest tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py -m 'unit or slow' -v
 
   content-guard:
     name: content-guard
@@ -66,7 +117,7 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch base branch
-        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+        run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -79,7 +130,7 @@ jobs:
         # Bare python is intentional: the classifier is stdlib-only.
         run: |
           python scripts/path_filter_decision.py \
-            --base-ref "origin/${{ github.base_ref }}" \
+            --base-ref "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}" \
             --json-out ci-path-decision.json \
             --lists-dir .ci-paths
 
@@ -134,31 +185,6 @@ jobs:
             exit 0
           fi
           uv run -- pre-commit run markdownlint --files "${existing_markdown_paths[@]}"
-
-      - name: Validate TODO graph
-        shell: bash
-        run: |
-          if [ ! -s .ci-paths/todo.txt ]; then
-            echo "No TODO/DONE YAML paths changed."
-            exit 0
-          fi
-          while IFS= read -r todo_path; do
-            if [ ! -e "$todo_path" ]; then
-              echo "Skipping deleted TODO/DONE path: $todo_path"
-              continue
-            fi
-            uv run --project _project/scripts -- python _project/scripts/validate_todo.py "$todo_path"
-          done < .ci-paths/todo.txt
-          uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph
-
-      - name: Validate executable TODO docs
-        shell: bash
-        run: |
-          if [ ! -s .ci-paths/todo.txt ]; then
-            echo "No TODO/DONE YAML paths changed."
-            exit 0
-          fi
-          uv run -- python -m pytest tests/unit/test_todo_executable_docs.py -q
 
       - name: Validate docs references
         shell: bash
@@ -257,6 +283,77 @@ jobs:
               raise SystemExit(f"public-contracts.md source-derived claims are stale: {missing_fragments}")
           PY
 
+  skill-integrity:
+    name: skill-integrity
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate skill source and target trust policy
+        run: python3 scripts/skill_sync_ci_policy.py validate --manifest skill-sync.yaml
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build independently pinned skill-sync verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --quiet --filter=blob:none \
+            https://github.com/joeharris76/skill-sync.git \
+            "$RUNNER_TEMP/skill-sync-verifier"
+          git -C "$RUNNER_TEMP/skill-sync-verifier" checkout --quiet \
+            6d09682dabe2ff0d68f400d60f8ba8b87f8c02aa
+          (
+            cd "$RUNNER_TEMP/skill-sync-verifier"
+            npm ci --ignore-scripts
+            npm run build
+          )
+
+      - name: Verify tracked skill mirror and lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/empty-home"
+          HOME="$RUNNER_TEMP/empty-home" node \
+            "$RUNNER_TEMP/skill-sync-verifier/dist/cli/index.js" \
+            verify --project "$GITHUB_WORKSPACE"
+
+      - name: Enforce untracked mirror boundary
+        run: sh scripts/check_untracked_skill_mirrors.sh
+
+      - name: Audit instruction authority and PR commit identity
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: |
+          python3 _project/scripts/agent_instruction_audit.py
+          python3 _project/scripts/agent_instruction_audit.py --check-commit-range "$BASE_SHA"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install focused test dependencies
+        run: uv sync --group dev
+
+      - name: Run skill wrapper and instruction audit contracts
+        run: |
+          uv run -- python -m pytest \
+            tests/unit/scripts/test_todo_wrapper.py::TestSkillThinness \
+            tests/unit/scripts/test_agent_instruction_audit.py \
+            -q
+
+      - name: Validate tracked artifact hygiene
+        run: uv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked
+
   code-lint:
     name: lint
     needs: ci-paths
@@ -265,6 +362,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -278,95 +377,153 @@ jobs:
         run: |
           uv sync --group dev
 
+      # --- Lint guards ------------------------------------------------
+      # Every guard below is independent: `id: guard-*` (the naming
+      # convention the `lint-guard-summary` step and
+      # tests/system/test_ci_lint_parity.py both key off of) plus
+      # `continue-on-error: true` so one guard's failure doesn't hide the
+      # others' results behind a stopped job. The job as a whole still
+      # fails iff any guard failed -- see the `lint-guard-summary` step,
+      # which is what `ci-required-result` actually gates on. Setup steps
+      # above (checkout/setup-python/setup-uv/install deps) are not
+      # guards and carry neither `id: guard-*` nor `continue-on-error`.
+      - name: Validate uv.lock revision against the PR base
+        id: guard-uv-lock-revision
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: make uv-lock-revision-check
+
       - name: Lint and format check with ruff
+        id: guard-ruff
+        continue-on-error: true
         run: |
           uv run ruff check .
           uv run ruff format --check .
 
       - name: Type check with ty
+        id: guard-ty
+        continue-on-error: true
         run: uv run ty check
 
+      - name: Strict type check for quality-governance island
+        id: guard-quality-governance-typecheck
+        continue-on-error: true
+        run: make quality-governance-typecheck
+
       - name: Validate test marker annotations
+        id: guard-lint-markers
+        continue-on-error: true
         run: make lint-markers
 
       - name: Validate import layering
+        id: guard-lint-imports
+        continue-on-error: true
         run: make lint-imports
 
+      - name: Validate Windows antipatterns
+        id: guard-windows-antipatterns
+        continue-on-error: true
+        run: make windows-antipatterns-check
+
       - name: Validate artifact hygiene
+        id: guard-artifact-hygiene
+        continue-on-error: true
         run: make artifact-hygiene
 
+      - name: Validate agent instruction authority and efficiency
+        id: guard-agent-instructions
+        continue-on-error: true
+        run: make agent-instructions-check
+
+      # There is deliberately no CI counterpart to `make agent-identity-check`
+      # (which ci-lint still runs locally). That target resolves identity from
+      # git config, and on an ephemeral runner the config is the runner's own,
+      # so the check can say nothing about what the branch carries. Supplying a
+      # known-good identity to make it runnable only made it incapable of
+      # failing, and a guard that cannot fail is worse than an absent one --
+      # lint-guard-summary reports it as coverage. The commit-range guard below
+      # is the real merge-time control: it reads the commits themselves.
+      # Locally the identity IS the developer's or the agent's, so ci-lint and
+      # the pre-commit hook keep enforcing it where the answer is meaningful.
+      - name: Validate no agent authorship or attribution in PR commits
+        id: guard-agent-commit-range
+        continue-on-error: true
+        run: make agent-commit-range-check
+
       - name: Timing policy (wall-clock allowlist)
+        id: guard-timing-policy
+        continue-on-error: true
         run: uv run -- python _project/scripts/timing_policy_check.py --strict
 
+      - name: Restore fast-lane develop baseline count
+        # Not a guard itself (no `id: guard-*`/`continue-on-error` -- see the
+        # naming-convention comment above): a cache miss here is not a
+        # failure, it's the normal "no exact baseline yet" state that the delta
+        # guard below fails open on. The key is the PR event's actual develop
+        # base SHA; a prefix restore would compare the PR against an unrelated
+        # develop tip when merges or baseline jobs complete out of order.
+        uses: actions/cache/restore@v4
+        with:
+          path: fast-lane-count.txt
+          key: fast-lane-count-develop-${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+
+      - name: Fast lane ceiling delta vs develop
+        # Additive to guard-timing-policy above, never a replacement: that
+        # step enforces the absolute max_fast_tests ceiling unconditionally.
+        # This guard fails open (exit 0, DELTA_CHECK_SKIPPED) when the cache
+        # restore above found no baseline -- see
+        # docs/operations/fast-lane-budget.md and the EXCLUDED_STEPS entry
+        # in tests/system/test_ci_lint_parity.py (the restored cache has no
+        # local equivalent).
+        id: guard-fast-lane-delta
+        continue-on-error: true
+        run: uv run -- python _project/scripts/timing_policy_check.py --delta-check --develop-count-file fast-lane-count.txt
+
+      - name: UAT spec LOC table drift check
+        # Mirrors the release-branch Lint gate (.github/workflows/lint.yml). The
+        # develop PR path is the routine dev-flow gate, so without this a UAT
+        # LOC/table doc that drifts from source could merge through a normal
+        # develop PR, leaving the drift guard dependent on the local pre-commit
+        # hook alone.
+        id: guard-uat-loc-table
+        continue-on-error: true
+        run: uv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check
+
       - name: Compatibility governance drift check
+        id: guard-compat-docs
+        continue-on-error: true
         run: make compat-docs-check
 
+      - name: Platform manifest drift check
+        id: guard-platform-manifest
+        continue-on-error: true
+        run: make platform-manifest-check
+
       - name: Oracle coverage map drift check
+        id: guard-oracle-coverage-map
+        continue-on-error: true
         run: make oracle-coverage-map-check
 
       - name: Public contract drift check
-        run: |
-          uv run -- python - <<'PY'
-          from pathlib import Path
-          from benchbox.core.benchmark_registry import list_benchmark_ids, list_loader_benchmark_ids
-          from benchbox.core.platform_registry import PlatformRegistry
-          from benchbox.core.results.schema import SCHEMA_VERSION
-
-          contract = Path("docs/reference/public-contracts.md").read_text(encoding="utf-8")
-          readme = Path("README.md").read_text(encoding="utf-8")
-
-          forbidden_readme_count_claims = [
-              "Twenty-Two Benchmarks",
-              "SQL Platforms (",
-              "DataFrame Platforms (",
-          ]
-          offenders = [phrase for phrase in forbidden_readme_count_claims if phrase in readme]
-          if offenders:
-              raise SystemExit(
-                  "README.md has exact hand-maintained count claims; use registry-derived checks "
-                  f"or mark them non-authoritative: {offenders}"
-              )
-
-          platforms = PlatformRegistry.get_all_platform_metadata()
-          sql_capable = sum(1 for item in platforms.values() if item.get("capabilities", {}).get("supports_sql"))
-          dataframe_capable = sum(
-              1 for item in platforms.values() if item.get("capabilities", {}).get("supports_dataframe")
-          )
-          dual_mode = sum(
-              1
-              for item in platforms.values()
-              if item.get("capabilities", {}).get("supports_sql")
-              and item.get("capabilities", {}).get("supports_dataframe")
-          )
-
-          source_fragments = [
-              f"{len(list_benchmark_ids())} benchmark metadata entries",
-              f"{len(list_loader_benchmark_ids())} loader-resolved IDs",
-              f"{len(platforms)} platform metadata entries",
-              f"{sql_capable} SQL-capable",
-              f"{dataframe_capable} DataFrame-capable",
-              f"{dual_mode} dual-mode",
-              f"Current result schema version: `{SCHEMA_VERSION}`",
-          ]
-          missing_fragments = [fragment for fragment in source_fragments if fragment not in contract]
-          if missing_fragments:
-              raise SystemExit(f"public-contracts.md source-derived claims are stale: {missing_fragments}")
-          PY
+        id: guard-public-contract-drift
+        continue-on-error: true
+        run: uv run -- python scripts/check_public_contract_drift.py
 
       - name: Dependency audit (no unused declarations)
+        id: guard-audit-deps
+        continue-on-error: true
         run: make audit-deps
 
       - name: Dependency inventory drift check
+        id: guard-audit-raw
+        continue-on-error: true
         run: make audit-raw-check
 
       - name: Release curation list drift check
+        id: guard-release-curation
+        continue-on-error: true
         run: uv run -- python scripts/check_release_curation.py
-
-      - name: skill-sync tracked snapshot verify (cloud/CI integrity gate)
-        # Public tool, pinned by sha (no token). Proves .claude/skills matches
-        # skill-sync.lock + the regenerated config — fails on any hand-edit or
-        # stale snapshot. Switch to `npx -y skill-sync@<ver>` once published.
-        run: npx -y github:joeharris76/skill-sync#d3c9c45 verify --project .
 
       - name: Untracked skill-mirror drift guard (cloud parity)
         # The codex/gemini/antigravity mirrors and the curated-out `blog` skill are
@@ -375,17 +532,81 @@ jobs:
         # (it skips untracked targets and `ignore`d paths), so it cannot catch these
         # being force-added. Fail the build if any become git-tracked.
         # Rationale: _project/decisions/claude-settings-cloud-ownership-2026-06-29.md
+        id: guard-skill-mirror-drift
+        continue-on-error: true
+        run: sh scripts/check_untracked_skill_mirrors.sh
+
+      - name: Duplicate code delta vs PR base
+        # Fail only when this PR increases AST Type-2 duplicated lines vs the
+        # merge-base with the PR base (not an absolute repo-wide ceiling).
+        # Absolute ceiling remains `make duplicate-check` / pyproject threshold.
+        id: guard-duplicate-delta
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: make duplicate-check-delta
+
+      - name: Complexity policy and report
+        # Keeps CC >=12 visible and fails stale/expired exception metadata or
+        # unexcepted CC >20. Configured Ruff above remains the stricter
+        # production-scope C901 gate (it fails CC >18); the mechanisms do not
+        # share exceptions or silently weaken one another.
+        id: guard-complexity-policy
+        continue-on-error: true
+        run: make complexity-check
+
+      # --- Aggregator ---------------------------------------------------
+      # Reports every guard's pass/fail in one CI cycle instead of stopping
+      # at the first failure. Derives the guard set programmatically from
+      # the `guard-*` id prefix (never hand-list ids here -- a guard added
+      # above without the prefix silently escapes aggregation, which is
+      # exactly what tests/system/test_ci_lint_parity.py now checks for).
+      - name: lint-guard-summary
+        id: lint-guard-summary
+        if: always()
+        env:
+          STEPS_CONTEXT: ${{ toJSON(steps) }}
         run: |
-          tracked=$(git ls-files -- \
-            '.codex/skills' '.codex/shared-skills' '.codex/shared-skills.lock.json' \
-            '.gemini/skills' '.antigravity/skills' \
-            '.claude/skills/blog')
-          if [ -n "$tracked" ]; then
-            echo "ERROR: deliberately-untracked skill mirrors are now git-tracked:" >&2
-            echo "$tracked" >&2
-            echo "Untrack them with 'git rm --cached -r <path>' (regenerate locally via 'make skill-sync')." >&2
+          set -euo pipefail
+          printf '%s\n' "$STEPS_CONTEXT" > "$RUNNER_TEMP/steps_context.json"
+
+          # FAIL CLOSED: the whole gate rests on this step's exit code, so a
+          # jq parse failure or an empty guard set must fail the job -- never
+          # fall through to "all passed" with zero guards inspected.
+          ids=$(jq -r 'keys[] | select(startswith("guard-"))' "$RUNNER_TEMP/steps_context.json" | sort) || {
+            echo "aggregator: jq failed to parse the steps context" >&2
+            exit 1
+          }
+          if [ -z "$ids" ]; then
+            echo "aggregator: no guard-* steps found in the steps context" >&2
             exit 1
           fi
+
+          {
+            echo "## Lint guard summary"
+            echo
+            echo "| Guard | Outcome |"
+            echo "| --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          failed=0
+          for id in $ids; do
+            outcome=$(jq -r --arg id "$id" '.[$id].outcome' "$RUNNER_TEMP/steps_context.json")
+            if [ "$outcome" = "success" ]; then
+              echo "| $id | ✅ success |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "| $id | ⚠️ $outcome |" >> "$GITHUB_STEP_SUMMARY"
+              echo "FAILED: $id ($outcome)"
+              failed=1
+            fi
+          done
+
+          if [ "$failed" -eq 1 ]; then
+            echo "One or more lint guards failed -- see the table above and the" \
+              "per-step logs for details." >&2
+            exit 1
+          fi
+          echo "All lint guards passed."
 
   code-test:
     name: test (ubuntu-latest, 3.12)
@@ -449,6 +670,69 @@ jobs:
             tests/integration/test_plan_capture_phase.py \
             -m "medium" -n 0 --tb=short -q
 
+      - name: Run promoted TPC-DS power-test drain-before-commit reproducer
+        run: |
+          # This file is 100% slow-marked and otherwise never runs in ANY CI
+          # workflow (make test-slow/test-stress are invoked by no workflow).
+          # The TPC-H side of this exact fix (#1137/#1144: draining a raw
+          # DB-API cursor must happen BEFORE commit(), some drivers reject/
+          # invalidate commit() on unread SELECT results) is already required
+          # via the fast-marked test_tpc_power_tests.py, but TPC-DS has a
+          # separate, parallel implementation (benchbox/core/tpcds/power_test.py
+          # _execute_one_query - the only call site TPCDSPowerTest.run() uses)
+          # with no coverage anywhere. Bounded: the single reproducer node.
+          uv run -- python -m pytest \
+            tests/integration/test_tpcds_power_test.py \
+            -m "slow" -n 0 -k "test_execute_one_query_drains_raw_cursor_before_commit" --tb=short -q
+
+      - name: Run DuckLake in-process adapter integration tests
+        run: |
+          # ducklake-post-merge-review-followups w3: this module is
+          # [integration, slow], so no PR-lane marker expression selects it -
+          # core adapter behaviour (cursor catalog scoping, ATTACH, catalog
+          # reuse, sqlite catalog end-to-end) was gated only by the release-time
+          # non-fast lane. The service-dependent Postgres/S3 classes keep
+          # live_integration and are excluded here; what remains needs nothing
+          # but a real DuckDB, and skips cleanly - loudly, via the probe's
+          # warning - when the ducklake extension cannot be installed.
+          # Bounded: one file, 7 tests at SF=0.01.
+          uv run -- python -m pytest \
+            tests/integration/test_ducklake_integration.py \
+            -m "slow and not live_integration" -n 0 --tb=short -q
+
+      - name: Run promoted DuckDB FK tuning load-ordering reproducers
+        run: |
+          # tuning-fk-load-ordering-fix-20260716: TPCHBenchmark.get_table_loading_order
+          # derives a FK-topological load order so a tuned run with
+          # foreign_keys.enabled really loads under real FK enforcement; without
+          # it, DataLoader falls back to alphabetical order, which zeros out
+          # every FK-dependent table under DuckDB constraint enforcement. This
+          # file is 100% slow-marked and otherwise never runs in ANY CI
+          # workflow. Bounded: one small (SF=0.01) file, 3 tests, ~5s.
+          uv run -- python -m pytest \
+            tests/integration/tuning/test_duckdb_fk_load_ordering.py \
+            -m "slow" -n 0 --tb=short -q
+
+      - name: Run promoted TPC-H power/throughput boundary-query (w0 defect) reproducers
+        run: |
+          # The w0 defect: with a custom (non-reference) seed at SF=1.0, TPC-H's
+          # answer-set-boundary queries (Q11/16/18/20) came back falsely FAILED.
+          # The shared validator exclusion is already unit-tested in the
+          # required fast lane (test_validation_engine.py), but the
+          # set_reference_seed_context() WIRING at each call site
+          # (benchbox/core/tpch/power_test.py and .../throughput_test.py - two
+          # separate production code paths) is not: breaking either site's
+          # wiring is invisible to the unit test and only caught here. Both
+          # files are 100% slow-marked and otherwise never run in ANY CI
+          # workflow. Bounded: the single boundary_query reproducer node(s) in
+          # each file, not the surrounding slow suites.
+          uv run -- python -m pytest \
+            tests/integration/test_tpch_power_test.py \
+            -m "slow" -n 0 -k "boundary_query" --tb=short -q
+          uv run -- python -m pytest \
+            tests/integration/test_tpch_throughput_test.py \
+            -m "slow" -n 0 -k "boundary_query" --tb=short -q
+
       - name: Run fast tests
         run: |
           # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
@@ -460,6 +744,36 @@ jobs:
           file: ./coverage.xml
           fail_ci_if_error: false  # Don't fail CI if Codecov upload fails (token may not be configured)
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  medium-test:
+    name: medium-test
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ubuntu-latest
+    # Sized to observed p95 + >=30% headroom, not to a value that never needs
+    # thinking about: this timeout is the only backstop against a hung medium
+    # tier. 2026-07-25: p95 29.9 min over the last 20 runs (8 of 19 within 48s
+    # of the old 30 cap) -> 29.9 * 1.3 = 38.9 -> 40.
+    # `make dev-loop-metrics` warns at 75% of this value.
+    # Rule, censoring caveat and resize history: docs/operations/fast-lane-budget.md
+    timeout-minutes: 40
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run medium speed tier
+        run: make test-medium
 
   correctness-gate:
     name: correctness-gate
@@ -728,7 +1042,7 @@ jobs:
   explorer-tokens:
     name: explorer-tokens
     needs: ci-paths
-    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    if: ${{ needs.ci-paths.outputs.explorer-paths-needed == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -737,25 +1051,26 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch base branch
-        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
-
-      - name: Detect results-explorer/src changes
-        id: scope
-        shell: bash
-        run: |
-          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" \
-              | grep -qE '^results-explorer/src/'; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "No results-explorer/src paths changed; skipping token scan."
-          fi
+        run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
 
       - name: Run explorer token scan
-        if: ${{ steps.scope.outputs.run == 'true' }}
         # Bare python is intentional: the scan is stdlib-only so this gate
         # does not pay a dependency-sync cost before deciding.
         run: make lint-explorer-tokens
+
+  site-theme-tokens:
+    name: site-theme-tokens
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.site-theme-needed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
 
       - name: Run public site theme token scan
         # Bare python is intentional: the scan is stdlib-only so this gate
@@ -818,8 +1133,8 @@ jobs:
       # Keep empty unless triage is documented in the TODO item.
       # PYSEC-2026-87 (lxml): redshift-connector==2.1.13 pins lxml<=6.0.2, so
       # the fixed lxml 6.1.0 can't be resolved until upstream relaxes that
-      # bound. See _project/TODO/main/planning/lxml-cve-pysec-2026-87-blocked-by-redshift-connector.yaml
-      PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-87"
+      # PYSEC-2026-3696..3699 (sqlparse): firebolt-sdk==1.18.5 requires sqlparse<0.6.0.
+      PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-87,PYSEC-2026-3696,PYSEC-2026-3697,PYSEC-2026-3698,PYSEC-2026-3699"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -850,11 +1165,51 @@ jobs:
             uv run --with pip-audit -- pip-audit
           fi
 
+  explorer-vitest:
+    name: explorer-vitest
+    needs: ci-paths
+    # The Explorer contract includes frontend source/tests, package metadata,
+    # read-model/build-contract code, curated inputs, and the fixture/publish
+    # scripts. The path-filter group keeps unrelated Python-only PRs from
+    # installing Node while ensuring every input Vitest can exercise is gated.
+    if: ${{ needs.ci-paths.outputs.explorer-vitest-needed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: results-explorer/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install Python dependencies
+        run: uv sync --group dev
+
+      - name: Install explorer dependencies
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Run Explorer Vitest suite
+        run: npm test -- --run
+        working-directory: results-explorer
+
   parity-check:
     name: parity-check
     needs: ci-paths
     # Path-filtered on results-explorer/viz source changes (see
-    # _project/DONE/main/parity-check-develop-ring.yaml). `make parity-check`
+    # tracker item `parity-check-develop-ring`). `make parity-check`
     # is Python-only (no npm/vitest install), measured at well under a second
     # locally, so it is cheap enough to block develop PRs.
     #
@@ -902,7 +1257,7 @@ jobs:
 
       - name: Fetch base branch
         env:
-          BASE_REF: ${{ github.base_ref }}
+          BASE_REF: ${{ github.base_ref || 'develop' }}
         run: git fetch --no-tags origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
 
       - name: Install uv
@@ -912,36 +1267,132 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git diff --name-only --diff-filter=ACMRT "origin/${{ github.base_ref }}...HEAD" \
+          git diff --name-only --diff-filter=ACMRT "origin/${{ github.base_ref || 'develop' }}...HEAD" \
             | grep -E '^_project/audits/.*\.md$' > /tmp/changed-audits.txt || true
           if [ ! -s /tmp/changed-audits.txt ]; then
             echo "No changed audit Markdown files to validate."
             exit 0
           fi
           while IFS= read -r audit_path; do
-            make audit-sha-check FILE="$audit_path" AUDIT_SHA_TARGET_REF="origin/${{ github.base_ref }}"
+            make audit-sha-check FILE="$audit_path" AUDIT_SHA_TARGET_REF="origin/${{ github.base_ref || 'develop' }}"
           done < /tmp/changed-audits.txt
+
+  certification-identity:
+    name: certification-identity
+    needs: ci-paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Record certification identity
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          SYNTHETIC_MERGE_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
+          SKILL_INTEGRITY_NEEDED: ${{ needs.ci-paths.outputs.skill-integrity-needed }}
+          CONTENT_GUARD_NEEDED: ${{ needs.ci-paths.outputs.content-guard-needed }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          def git(*args: str) -> str:
+              return subprocess.check_output(["git", *args], text=True).strip()
+
+          head = os.environ["HEAD_SHA"]
+          base = os.environ["BASE_SHA"]
+          merge = os.environ["SYNTHETIC_MERGE_SHA"]
+          files = [
+              ".github/workflows/pr.yml",
+              ".github/workflows/results-explorer-browser.yml",
+              ".github/workflows/develop-ruleset-drift.yml",
+          ]
+          entries = {}
+          for path in files:
+              data = Path(path).read_bytes() if Path(path).is_file() else b""
+              entries[path] = hashlib.sha256(data).hexdigest()
+          fingerprint = hashlib.sha256(
+              "\n".join(f"{path}={entries[path]}" for path in sorted(entries)).encode()
+          ).hexdigest()
+          needs_code_ci = os.environ["NEEDS_CODE_CI"] == "true"
+          skill_integrity_needed = os.environ["SKILL_INTEGRITY_NEEDED"] == "true"
+          content_guard_needed = os.environ["CONTENT_GUARD_NEEDED"] == "true"
+          if needs_code_ci:
+              certification_kind = "full"
+          elif skill_integrity_needed:
+              certification_kind = "skill_integrity"
+          else:
+              certification_kind = "content"
+          selected_lanes = [
+              lane
+              for lane, selected in (
+                  ("content", content_guard_needed),
+                  ("product-code", needs_code_ci),
+                  ("skill-integrity", skill_integrity_needed),
+              )
+              if selected
+          ]
+          record = {
+              "pr_head_sha": head,
+              "base_sha": base,
+              "synthetic_merge_sha": merge,
+              "synthetic_merge_tree": git("rev-parse", "HEAD^{tree}"),
+              "workflow_fingerprint": fingerprint,
+              "run_id": int(os.environ["RUN_ID"]),
+              "certification_kind": certification_kind,
+              "selected_lanes": selected_lanes,
+          }
+          Path("pr-certification-identity.json").write_text(
+              json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          PY
+
+      - name: Upload certification identity
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-certification-identity
+          path: pr-certification-identity.json
+          if-no-files-found: warn
+          retention-days: 30
 
   ci-required-result:
     name: ci-required-result
-    needs: [ci-paths, content-guard, code-lint, code-test, correctness-gate, plan-capture-gate, explorer-tokens, audit-sha, package-smoke, dependency-audit, parity-check]
+    needs: [ci-paths, tpch-binary-framing, content-guard, skill-integrity, code-lint, code-test, correctness-gate, plan-capture-gate, medium-test, explorer-tokens, site-theme-tokens, explorer-vitest, audit-sha, package-smoke, dependency-audit, parity-check]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate required result
         env:
           CI_PATHS_RESULT: ${{ needs.ci-paths.result }}
+          TPCH_BINARY_FRAMING_RESULT: ${{ needs.tpch-binary-framing.result }}
           CONTENT_RESULT: ${{ needs.content-guard.result }}
+          SKILL_INTEGRITY_RESULT: ${{ needs.skill-integrity.result }}
           LINT_RESULT: ${{ needs.code-lint.result }}
           TEST_RESULT: ${{ needs.code-test.result }}
           CORRECTNESS_RESULT: ${{ needs.correctness-gate.result }}
           PLAN_CAPTURE_RESULT: ${{ needs.plan-capture-gate.result }}
+          MEDIUM_TEST_RESULT: ${{ needs.medium-test.result }}
           EXPLORER_TOKENS_RESULT: ${{ needs.explorer-tokens.result }}
+          SITE_THEME_TOKENS_RESULT: ${{ needs.site-theme-tokens.result }}
+          EXPLORER_VITEST_RESULT: ${{ needs.explorer-vitest.result }}
           AUDIT_SHA_RESULT: ${{ needs.audit-sha.result }}
           PACKAGE_SMOKE_RESULT: ${{ needs.package-smoke.result }}
           DEPENDENCY_AUDIT_RESULT: ${{ needs.dependency-audit.result }}
           PARITY_CHECK_RESULT: ${{ needs.parity-check.result }}
           CONTENT_GUARD_NEEDED: ${{ needs.ci-paths.outputs.content-guard-needed }}
+          SKILL_INTEGRITY_NEEDED: ${{ needs.ci-paths.outputs.skill-integrity-needed }}
           NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
           SAFE_CONTENT_ONLY: ${{ needs.ci-paths.outputs.safe-content-only }}
         run: |
@@ -952,8 +1403,24 @@ jobs:
             exit 1
           fi
 
+          if [ "$NEEDS_CODE_CI" = "true" ] && [ "$TPCH_BINARY_FRAMING_RESULT" != "success" ]; then
+            echo "tpch-binary-framing=$TPCH_BINARY_FRAMING_RESULT"
+            exit 1
+          fi
+
           if [ "$CONTENT_GUARD_NEEDED" = "true" ] && [ "$CONTENT_RESULT" != "success" ]; then
             echo "content-guard=$CONTENT_RESULT"
+            exit 1
+          fi
+
+          if [ "$SKILL_INTEGRITY_NEEDED" = "true" ]; then
+            if [ "$SKILL_INTEGRITY_RESULT" != "success" ]; then
+              echo "skill-integrity=$SKILL_INTEGRITY_RESULT"
+              exit 1
+            fi
+          elif [ "$SKILL_INTEGRITY_RESULT" != "skipped" ] \
+              && [ "$SKILL_INTEGRITY_RESULT" != "success" ]; then
+            echo "unexpected skill-integrity result=$SKILL_INTEGRITY_RESULT"
             exit 1
           fi
 
@@ -994,27 +1461,122 @@ jobs:
           fi
 
           if [ "$NEEDS_CODE_CI" = "false" ]; then
-            echo "Content-only PR; skipped Python code CI."
+            if [ "$SKILL_INTEGRITY_NEEDED" = "true" ]; then
+              echo "Skill-integrity-only PR; required skill checks passed and product CI was skipped."
+            else
+              echo "Content-only PR; applicable content checks passed and product CI was skipped."
+            fi
             echo "safe-content-only=$SAFE_CONTENT_ONLY"
             exit 0
           fi
 
-          # explorer-tokens is gated on needs-code-ci; when it runs it must
-          # pass. A "skipped" result (no results-explorer/src changes within
-          # the code-CI tier) counts as success here.
+          # explorer-tokens is gated on explorer-paths-needed; when it runs it
+          # must pass. A "skipped" result is still accepted defensively for a
+          # path-filtered job that did not need to run.
           if [ "$EXPLORER_TOKENS_RESULT" != "success" ] \
               && [ "$EXPLORER_TOKENS_RESULT" != "skipped" ]; then
             echo "explorer-tokens=$EXPLORER_TOKENS_RESULT"
             exit 1
           fi
 
+          # The public site theme scan has its own path group because its
+          # inputs are broader than results-explorer/src/**. A matched group
+          # must produce a real successful result before the required context
+          # can pass.
+          if [ "$SITE_THEME_TOKENS_RESULT" != "success" ] \
+              && [ "$SITE_THEME_TOKENS_RESULT" != "skipped" ]; then
+            echo "site-theme-tokens=$SITE_THEME_TOKENS_RESULT"
+            exit 1
+          fi
+
+          # Explorer Vitest is path-filtered on the complete frontend/read-model
+          # contract. A skipped result is intentional only when the contract
+          # group did not match; a real failure must block the required context.
+          if [ "$EXPLORER_VITEST_RESULT" != "success" ] \
+              && [ "$EXPLORER_VITEST_RESULT" != "skipped" ]; then
+            echo "explorer-vitest=$EXPLORER_VITEST_RESULT"
+            exit 1
+          fi
+
           if [ "$LINT_RESULT" = "success" ] \
               && [ "$TEST_RESULT" = "success" ] \
               && [ "$CORRECTNESS_RESULT" = "success" ] \
-              && [ "$PLAN_CAPTURE_RESULT" = "success" ]; then
-            echo "Code/infra PR; lint, fast tests, correctness gate, and plan-capture gate passed."
+              && [ "$PLAN_CAPTURE_RESULT" = "success" ] \
+              && [ "$MEDIUM_TEST_RESULT" = "success" ]; then
+            echo "Code/infra PR; lint, fast tests, correctness gate, plan-capture gate, and medium tier passed."
             exit 0
           fi
 
-          echo "code-lint=$LINT_RESULT code-test=$TEST_RESULT correctness-gate=$CORRECTNESS_RESULT plan-capture-gate=$PLAN_CAPTURE_RESULT"
+          echo "code-lint=$LINT_RESULT code-test=$TEST_RESULT correctness-gate=$CORRECTNESS_RESULT plan-capture-gate=$PLAN_CAPTURE_RESULT medium-test=$MEDIUM_TEST_RESULT"
           exit 1
+
+      - name: Record certification lane evidence
+        if: always()
+        env:
+          CI_PATHS_RESULT: ${{ needs.ci-paths.result }}
+          TPCH_BINARY_FRAMING_RESULT: ${{ needs.tpch-binary-framing.result }}
+          CONTENT_RESULT: ${{ needs.content-guard.result }}
+          SKILL_INTEGRITY_RESULT: ${{ needs.skill-integrity.result }}
+          LINT_RESULT: ${{ needs.code-lint.result }}
+          TEST_RESULT: ${{ needs.code-test.result }}
+          CORRECTNESS_RESULT: ${{ needs.correctness-gate.result }}
+          PLAN_CAPTURE_RESULT: ${{ needs.plan-capture-gate.result }}
+          MEDIUM_TEST_RESULT: ${{ needs.medium-test.result }}
+          EXPLORER_TOKENS_RESULT: ${{ needs.explorer-tokens.result }}
+          SITE_THEME_TOKENS_RESULT: ${{ needs.site-theme-tokens.result }}
+          EXPLORER_VITEST_RESULT: ${{ needs.explorer-vitest.result }}
+          AUDIT_SHA_RESULT: ${{ needs.audit-sha.result }}
+          PACKAGE_SMOKE_RESULT: ${{ needs.package-smoke.result }}
+          DEPENDENCY_AUDIT_RESULT: ${{ needs.dependency-audit.result }}
+          PARITY_CHECK_RESULT: ${{ needs.parity-check.result }}
+          NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
+          SKILL_INTEGRITY_NEEDED: ${{ needs.ci-paths.outputs.skill-integrity-needed }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          record = {
+              "run_id": int(os.environ["RUN_ID"]),
+              "pr_head_sha": os.environ.get("HEAD_SHA") or "",
+              "base_sha": os.environ.get("BASE_SHA") or "",
+              "needs_code_ci": os.environ.get("NEEDS_CODE_CI") or "",
+              "skill_integrity_needed": os.environ.get("SKILL_INTEGRITY_NEEDED") or "",
+              "lanes": {
+                  "ci-paths": os.environ.get("CI_PATHS_RESULT") or "",
+                  "tpch-binary-framing": os.environ.get("TPCH_BINARY_FRAMING_RESULT") or "",
+                  "content-guard": os.environ.get("CONTENT_RESULT") or "",
+                  "skill-integrity": os.environ.get("SKILL_INTEGRITY_RESULT") or "",
+                  "code-lint": os.environ.get("LINT_RESULT") or "",
+                  "code-test": os.environ.get("TEST_RESULT") or "",
+                  "correctness-gate": os.environ.get("CORRECTNESS_RESULT") or "",
+                  "plan-capture-gate": os.environ.get("PLAN_CAPTURE_RESULT") or "",
+                  "medium-test": os.environ.get("MEDIUM_TEST_RESULT") or "",
+                  "explorer-tokens": os.environ.get("EXPLORER_TOKENS_RESULT") or "",
+                  "site-theme-tokens": os.environ.get("SITE_THEME_TOKENS_RESULT") or "",
+                  "explorer-vitest": os.environ.get("EXPLORER_VITEST_RESULT") or "",
+                  "audit-sha": os.environ.get("AUDIT_SHA_RESULT") or "",
+                  "package-smoke": os.environ.get("PACKAGE_SMOKE_RESULT") or "",
+                  "dependency-audit": os.environ.get("DEPENDENCY_AUDIT_RESULT") or "",
+                  "parity-check": os.environ.get("PARITY_CHECK_RESULT") or "",
+              },
+          }
+          Path("pr-certification-lanes.json").write_text(
+              json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          PY
+
+      - name: Upload certification lane evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-certification-lanes
+          path: pr-certification-lanes.json
+          if-no-files-found: warn
+          retention-days: 30

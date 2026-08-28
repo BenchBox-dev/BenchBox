@@ -1,5 +1,12 @@
 """SingleStore credentials setup and validation.
 
+Persistence contract (deliberate, shared with athena/redshift/snowflake):
+credentials are saved to the 0600-permission store even when validation
+FAILS, marked CredentialStatus.INVALID, so the user can fix the reported
+problem and re-run ``--validate-only`` without re-entering every field.
+The password prompt never displays a stored value (``****SET****``).
+MotherDuck is the intentional exception: its token is never persisted.
+
 Copyright 2026 Joe Harris / BenchBox Project
 
 Licensed under the MIT License. See LICENSE file in the project root for details.

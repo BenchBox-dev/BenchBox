@@ -142,26 +142,31 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         if config.parallelism.thread_count is not None:
             os.environ["POLARS_MAX_THREADS"] = str(config.parallelism.thread_count)
             self._log_verbose(f"Set POLARS_MAX_THREADS={config.parallelism.thread_count}")
+            self._record_runtime_tuning(f"POLARS_MAX_THREADS={config.parallelism.thread_count}")
 
         # Apply streaming mode only if explicitly enabled in tuning config
         if config.execution.streaming_mode:
             self.streaming = True
             self._log_verbose("Enabled streaming mode from tuning configuration")
+            self._record_runtime_tuning("streaming_mode=on")
 
         # Apply rechunk only if explicitly disabled in tuning config (default is True)
         if not config.memory.rechunk_after_filter:
             self.rechunk = False
             self._log_verbose("Disabled rechunk from tuning configuration")
+            self._record_runtime_tuning("rechunk_after_filter=off")
 
         # Configure streaming chunk size if specified (None is default)
         if config.memory.chunk_size is not None:
             pl.Config.set_streaming_chunk_size(config.memory.chunk_size)
             self._log_verbose(f"Set streaming chunk size={config.memory.chunk_size}")
+            self._record_runtime_tuning(f"streaming_chunk_size={config.memory.chunk_size}")
 
         # Configure engine affinity (affects .collect() behavior)
         if config.execution.engine_affinity == "streaming":
             self.streaming = True
             self._log_verbose("Set streaming mode from engine_affinity='streaming'")
+            self._record_runtime_tuning("engine_affinity=streaming")
 
     @property
     def platform_name(self) -> str:
@@ -258,6 +263,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         column_names: list[str] | None = None,
         null_marker: str | None = None,
         string_columns: list[str] | None = None,
+        temporal_columns: dict[str, str] | None = None,
     ) -> PolarsLazyDF:
         """Read a CSV file into a Polars LazyFrame.
 
@@ -272,6 +278,8 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
                 truncate_ragged_lines.)
             string_columns: Accepted for expression-family parity; Polars applies
                 this via ``missing_utf8_is_empty_string`` for UTF-8 columns.
+            temporal_columns: Declared date/timestamp columns keyed by normalized
+                Arrow type. These override CSV string inference.
 
         Returns:
             Polars LazyFrame with the file contents
@@ -292,6 +300,11 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             # empty->null. Without this, a prefer_parquet=False load reintroduces the
             # empty-string->null divergence (the cross-surface Q6/Q17/Q18 bug) on the
             # Polars surface. Numeric columns always treat an empty field as null.
+            # This is the same null_marker-is-None decision that
+            # shared_loading.resolve_empty_string_restore_columns makes for every
+            # other adapter; Polars applies it natively as a single scan_csv flag
+            # (over all UTF-8 columns) instead of a per-column post-read restore, so
+            # there is no post-hoc coercion step here to consolidate.
             "missing_utf8_is_empty_string": null_marker is None,
         }
 
@@ -302,6 +315,11 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         # Handle column names
         if column_names:
             scan_kwargs["new_columns"] = column_names
+        if temporal_columns:
+            scan_kwargs["schema_overrides"] = {
+                name: pl.Date if normalized_type == "date32" else pl.Datetime("us")
+                for name, normalized_type in temporal_columns.items()
+            }
 
         # Scan the file(s)
         lf = pl.scan_csv(path, **scan_kwargs)

@@ -248,9 +248,9 @@ class TestToolRegistration:
 
         server = create_benchbox_server()
 
-        # Get registered tools
-        # FastMCP stores tools internally
-        assert server is not None
+        from tests.unit.mcp.public_api import list_tool_names
+
+        assert {"suggest_charts", "generate_chart"} <= list_tool_names(server)
 
     def test_suggest_charts_tool_registered(self):
         """Test that suggest_charts tool is registered."""
@@ -479,8 +479,9 @@ def _get_viz_tool_functions(*, results_dir=None, charts_dir=None):
 
 
 def _get_viz_tool_objects(*, results_dir=None, charts_dir=None):
-    """Create a fresh MCP server and extract visualization tool objects."""
+    """Create a fresh MCP server and expose public visualization tools."""
     from benchbox.mcp import create_server
+    from tests.unit.mcp.public_api import get_tool, list_tool_names
 
     kwargs = {}
     if results_dir is not None:
@@ -488,13 +489,9 @@ def _get_viz_tool_objects(*, results_dir=None, charts_dir=None):
     if charts_dir is not None:
         kwargs["charts_dir"] = charts_dir
     server = create_server(**kwargs)
-    tools = {}
-    if hasattr(server, "_tool_manager"):
-        tool_dict = getattr(server._tool_manager, "_tools", {})
-        for name in ("suggest_charts", "generate_chart"):
-            if name in tool_dict:
-                tools[name] = tool_dict[name]
-    return tools
+    return {
+        name: get_tool(server, name) for name in ("suggest_charts", "generate_chart") if name in list_tool_names(server)
+    }
 
 
 class TestGenerateChartIntegration:
@@ -529,6 +526,23 @@ class TestGenerateChartIntegration:
         assert result["chart_type"] == "performance_bar"
         assert result["format"] == "ascii"
         assert "content" in result
+
+    def test_file_output_is_explicitly_rejected(self, tmp_path):
+        tools = _get_viz_tool_functions(results_dir=tmp_path / "results")
+        result = tools["generate_chart"](result_files="missing.json", output_dir="../escape")
+
+        assert result["error"] is True
+        assert result["error_code"] == "VALIDATION_ERROR"
+        assert result["details"]["output_mode"] == "inline"
+        assert "escape" not in str(result)
+
+    def test_non_ascii_formats_are_explicitly_rejected(self, tmp_path):
+        tools = _get_viz_tool_functions(results_dir=tmp_path / "results")
+        result = tools["generate_chart"](result_files="missing.json", format="png")
+
+        assert result["error"] is True
+        assert result["error_code"] == "VALIDATION_INVALID_FORMAT"
+        assert result["details"]["supported_formats"] == ["ascii"]
 
     def test_rejects_invalid_chart_type(self, tmp_path):
         """Test that invalid chart type is rejected."""

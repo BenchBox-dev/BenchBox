@@ -322,8 +322,8 @@ We built BenchBox to make workflow guarantees explicit. We would love to hear ho
 
 1. [DuckDB TPC-H extension docs](https://duckdb.org/docs/stable/core_extensions/tpch)
 2. [DuckDB benchmarking guide](https://duckdb.org/docs/stable/guides/performance/benchmarks)
-3. [BenchBox TPC-H benchmark core](https://github.com/joeharris76/BenchBox/blob/main/benchbox/core/tpch/benchmark.py)
-4. [BenchBox TPC-H generator](https://github.com/joeharris76/BenchBox/blob/main/benchbox/core/tpch/generator.py)
-5. [BenchBox TPC-H query manager](https://github.com/joeharris76/BenchBox/blob/main/benchbox/core/tpch/queries.py)
-6. [BenchBox TPC-H maintenance implementation](https://github.com/joeharris76/BenchBox/blob/main/benchbox/core/tpch/maintenance_test.py)
-7. [BenchBox official benchmark flow](https://github.com/joeharris76/BenchBox/blob/main/benchbox/core/tpch/official_benchmark.py)
+3. [BenchBox TPC-H benchmark core](https://github.com/joeharris76/BenchBox/blob/v0.1.4/benchbox/core/tpch/benchmark.py)
+4. [BenchBox TPC-H generator](https://github.com/joeharris76/BenchBox/blob/v0.1.4/benchbox/core/tpch/generator.py)
+5. [BenchBox TPC-H query manager](https://github.com/joeharris76/BenchBox/blob/v0.1.4/benchbox/core/tpch/queries.py)
+6. [BenchBox TPC-H maintenance implementation](https://github.com/joeharris76/BenchBox/blob/v0.1.4/benchbox/core/tpch/maintenance_test.py)
+7. [BenchBox official benchmark flow](https://github.com/joeharris76/BenchBox/blob/v0.1.4/benchbox/core/tpch/official_benchmark.py)

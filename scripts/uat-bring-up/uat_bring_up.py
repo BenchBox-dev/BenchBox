@@ -55,6 +55,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--dry-run", action="store_true", help="Print/run command construction without Docker execution"
     )
+    parser.add_argument(
+        "--prepull-only",
+        action="store_true",
+        help=(
+            "Run `compose pull --ignore-buildable` + `compose build` instead of `compose "
+            "up` -- no health probe. Fetches images/builds ahead of a sweep so first-run "
+            "downloads don't eat into cleanup.docker_start_timeout_s (make uat-prepull)."
+        ),
+    )
+    parser.add_argument(
+        "--prepull-timeout-s",
+        type=int,
+        default=900,
+        help="Timeout for each prepull command (pull, then build); image pulls can be large (default: 900)",
+    )
     args = parser.parse_args(argv)
 
     platform = args.platform.strip()
@@ -74,19 +89,60 @@ def main(argv: list[str] | None = None) -> int:
     spec = docker_assets.docker_platform_spec(platform)
     try:
         docker_assets.validate_managed_start_allowed(spec)
+        # Resolved once, up front, so the operator sees which engine ran this
+        # bring-up before any compose output -- and a missing binary fails
+        # here with a clear message instead of a raw traceback out of
+        # compose_up_command() below (uat-container-engine-routing w1).
+        print(f"resolved container CLI: {docker_assets.resolve_container_cli()}")
     except docker_assets.DockerAssetError as exc:
         print(f"platform {platform!r} cannot be UAT-managed: {exc}", file=sys.stderr)
         return 2
 
     project_name = args.project_name or docker_assets.compose_project_name("manual", platform)
-    argv_up = docker_assets.compose_up_command(spec, project_name, start_timeout_s=args.timeout_s)
     benchmark_runs_dir = _benchmark_runs_dir(args.benchmark_runs_dir)
+    try:
+        compose_env = docker_assets.compose_environment(spec, benchmark_runs_dir=benchmark_runs_dir)
+    except docker_assets.DockerAssetError as exc:
+        print(f"UAT bring-up failed for {platform}: {exc}", file=sys.stderr)
+        return 2
+
+    # An operator-supplied `--project-name` bypasses compose_project_name()'s budget
+    # entirely, so validate it up front -- a clear, actionable error here beats an
+    # oversized-container-id failure minutes into `compose up`/`pull`/`build`.
+    try:
+        docker_assets.validate_project_name_budget(spec, project_name)
+    except docker_assets.DockerAssetError as exc:
+        print(f"platform {platform!r} project name {project_name!r} is invalid: {exc}", file=sys.stderr)
+        return 2
+
+    if args.prepull_only:
+        prepull_steps = (
+            ("pull", docker_assets.compose_pull_command(spec, project_name)),
+            ("build", docker_assets.compose_build_command(spec, project_name)),
+        )
+        for label, argv_cmd in prepull_steps:
+            result = docker_assets.run_docker_command(
+                argv_cmd,
+                dry_run=args.dry_run,
+                timeout_s=args.prepull_timeout_s,
+                cwd=docker_assets.REPO_ROOT,
+                env=compose_env,
+            )
+            print(result.command)
+            if not result.succeeded:
+                details = result.error or result.stderr or result.stdout or f"exit {result.returncode}"
+                print(f"UAT prepull ({label}) failed for {platform}: {details}", file=sys.stderr)
+                return result.returncode or 1
+        print(f"UAT prepull OK for {platform} (project={project_name})")
+        return 0
+
+    argv_up = docker_assets.compose_up_command(spec, project_name, start_timeout_s=args.timeout_s)
     result = docker_assets.run_docker_command(
         argv_up,
         dry_run=args.dry_run,
         timeout_s=args.timeout_s,
         cwd=docker_assets.REPO_ROOT,
-        env=docker_assets.compose_environment(spec, benchmark_runs_dir=benchmark_runs_dir),
+        env=compose_env,
     )
     print(result.command)
     if not result.succeeded:

@@ -1,0 +1,14 @@
+{
+  "benchmark": "Flight Data",
+  "bundle_file": "flightdata_sf01_datafusion_df_20260502_223350_9310d61f.json",
+  "bundle_hash": "4ac2480194cb9aa63303ac6be23b65a23bd5591d0bd4594846926da818de5ecc",
+  "companion_hashes": {},
+  "phase": 2,
+  "platform": "DataFusion",
+  "result_source": "internal",
+  "scale_factor": 0.1,
+  "submission_path": "path_30338255ec33",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:48:10.192656+00:00",
+  "submitted_by": "BenchBox UAT"
+}

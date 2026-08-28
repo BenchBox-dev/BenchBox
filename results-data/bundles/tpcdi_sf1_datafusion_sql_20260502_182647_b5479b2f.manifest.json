@@ -1,0 +1,14 @@
+{
+  "benchmark": "TPC-DI",
+  "bundle_file": "tpcdi_sf1_datafusion_sql_20260502_182647_b5479b2f.json",
+  "bundle_hash": "44d7d05c4e64b0e213f17a8565e927f22d5ea5880e1d6d9ebd55d5ce28d81570",
+  "companion_hashes": {},
+  "phase": 2,
+  "platform": "DataFusion",
+  "result_source": "internal",
+  "scale_factor": 1.0,
+  "submission_path": "path_30338255ec33",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:50:43.729714+00:00",
+  "submitted_by": "BenchBox UAT"
+}

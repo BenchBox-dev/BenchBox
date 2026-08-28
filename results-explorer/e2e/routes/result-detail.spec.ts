@@ -1,0 +1,104 @@
+import { expect, test } from "@playwright/test";
+import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures";
+
+// Stable full-form result IDs from the deterministic generated fixture corpus.
+const TPCH_DUCKDB_ID = fixtureIds.ids.duckdb;
+const TPCH_DATAFUSION_ID = fixtureIds.ids.datafusion;
+const TPCH_ZERO_TIMING_ID = fixtureIds.ids.zeroTiming;
+
+test.describe("ResultDetail", () => {
+  test("@smoke loads /results/r/<id> and renders the run header, badges, and timings table", async ({ page }) => {
+    await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
+    await waitForShell(page);
+
+    // The page heading is `<Benchmark> - <Platform>` once DuckDB-WASM has
+    // attached and the detail metrics query resolves.
+    await waitForDataLoaded(page, /TPC-H\s+-\s+DuckDB/);
+
+    // Trust badge and SF row are rendered synchronously beside the heading.
+    const main = page.getByRole("main");
+    await expect(
+      main.getByRole("region", { name: "Result summary" }).getByText("SF 0.01", { exact: true }),
+    ).toBeVisible();
+
+    // Query Timings header is the stable landmark for the medians table.
+    await expect(main.getByRole("heading", { name: /Query Timings/ })).toBeVisible();
+  });
+
+  test("sorting the median table toggles the indicator arrow", async ({ page }) => {
+    await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
+    await waitForDataLoaded(page, /Query Timings/);
+
+    const header = page.getByRole("columnheader", { name: /Median latency/ });
+    // First click sorts ascending; second click flips to descending. We
+    // assert on the arrow indicator because row-order comparison is noisy
+    // across browsers.
+    await header.click();
+    await expect(header).toContainText("↑");
+    await header.click();
+    await expect(header).toContainText("↓");
+  });
+
+  test("sortable headers expose state and native Space activation does not scroll", async ({ page }) => {
+    await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
+    await waitForDataLoaded(page, /Query Timings/);
+
+    const medianHeader = page.locator('th[aria-sort]').filter({ hasText: "Median latency" }).first();
+    await expect(medianHeader).toHaveAttribute("aria-sort", "none");
+    const medianButton = medianHeader.getByRole("button");
+    await medianButton.click();
+    await expect(medianHeader).toHaveAttribute("aria-sort", "ascending");
+
+    const scrollBeforeSpace = await page.evaluate(() => window.scrollY);
+    await medianButton.press("Space");
+    await expect(medianHeader).toHaveAttribute("aria-sort", "descending");
+    expect(await page.evaluate(() => window.scrollY)).toBe(scrollBeforeSpace);
+
+    await page.getByText(/Individual samples \(/).click();
+    const durationHeader = page.locator('th[aria-sort]').filter({ hasText: "Duration" }).first();
+    await expect(durationHeader.locator('[role="button"]')).toHaveCount(0);
+    await expect(durationHeader).toHaveAttribute("aria-sort", "none");
+    await durationHeader.getByRole("button").click();
+    await expect(durationHeader).toHaveAttribute("aria-sort", "ascending");
+  });
+
+  test("'Compare this result' opens the compare builder with the result pinned", async ({ page }) => {
+    await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
+    await waitForDataLoaded(page, /Query Timings/);
+
+    await page.getByRole("link", { name: /Compare this result/i }).click();
+    await expect(page).toHaveURL(new RegExp(`/results/compare\\?ids=${TPCH_DUCKDB_ID}$`));
+    await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("compare-builder-status")).toContainText("1 result selected");
+    await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
+  });
+
+  test("a missing result_id surfaces a user-visible error rather than a blank screen", async ({ page }) => {
+    await page.goto("/results/r/does-not-exist");
+    await waitForShell(page);
+    // ErrorMessage renders the "No result found for..." string. This is a
+    // happy-path slice for route coverage - the failure-injection suite
+    // (w7) extends this to snapshot-missing / range-read cases.
+    await expect(page.getByText(/No result found for/i)).toBeVisible({ timeout: 20_000 });
+  });
+
+  test("result detail zero timing omits absent metric and timing surfaces", async ({ page }) => {
+    await page.goto(`/results/r/${TPCH_ZERO_TIMING_ID}`);
+    await waitForShell(page);
+    await waitForDataLoaded(page, /TPC-H\s+-\s+DuckDB Zero Timing/);
+
+    const main = page.getByRole("main");
+    const summary = main.getByRole("region", { name: "Result summary" });
+    await expect(summary).not.toContainText("N/A");
+    await expect(summary.getByText(/Primary metric/)).toHaveCount(0);
+    await expect(summary.locator('[data-role="validation"]')).toHaveCount(0);
+    await expect(main.getByRole("heading", { name: /Query Timings/ })).toHaveCount(0);
+    await expect(main.getByText("Charts", { exact: true })).toHaveCount(0);
+    await expect(main.getByText(/\d+ fields? not recorded for this run\./)).toHaveCount(1);
+    await expect(main.getByRole("region", { name: "Run receipt" })).toBeVisible();
+  });
+});
+
+// Export constants so compare.spec.ts can share the same IDs without
+// duplicating the contract-with-the-fixture-generator.
+export { TPCH_DUCKDB_ID, TPCH_DATAFUSION_ID };

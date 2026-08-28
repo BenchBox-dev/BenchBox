@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from tests.uat.phases import report
+from tests.uat.phases import execute, report
 from tests.uat.runner import CellResult
 
 pytestmark = pytest.mark.fast
 
 
-def _cell(platform, benchmark, scale, status="passed", elapsed=1.0, result=None):
+def _cell(platform, benchmark, scale, status="passed", elapsed=1.0, result=None, throughput_check=None):
     return CellResult(
         platform=platform,
         benchmark=benchmark,
@@ -23,6 +23,7 @@ def _cell(platform, benchmark, scale, status="passed", elapsed=1.0, result=None)
         elapsed_s=elapsed,
         log_path=Path(f"/tmp/{platform}_{benchmark}_{scale}.log"),
         result_path=Path(result) if result else None,
+        throughput_check=throughput_check,
     )
 
 
@@ -32,6 +33,46 @@ def test_render_row_matches_header_columns():
     fields = row.split("\t")
     expected_cols = report.REPORT_HEADER.split("\t")
     assert len(fields) == len(expected_cols)
+
+
+def test_report_header_appends_throughput_check_last():
+    """w5: the new column must be appended, not inserted -- existing positional
+    TSV consumers rely on the pre-existing column order (spec Section 6)."""
+    columns = report.REPORT_HEADER.split("\t")
+    assert columns[-1] == "throughput_check"
+    assert columns[:-1] == [
+        "platform",
+        "benchmark",
+        "scale",
+        "status",
+        "terminal_state",
+        "elapsed_s",
+        "log_path",
+        "result_path",
+        "submit_terminal_state",
+        "validator_status",
+        "source_commit_sha",
+        "source_dirty",
+    ]
+
+
+def test_render_row_includes_throughput_check_as_last_column():
+    cell = _cell(
+        "duckdb",
+        "tpch",
+        0.01,
+        status="failed",
+        result="/tmp/r.json",
+        throughput_check="throughput stream count mismatch: requested 3, executed 1",
+    )
+    row = report.render_row(cell, validator_status="clean")
+    assert row.split("\t")[-1] == "throughput stream count mismatch: requested 3, executed 1"
+
+
+def test_render_row_throughput_check_defaults_to_empty_string():
+    cell = _cell("duckdb", "tpch", 0.01, status="passed", result="/tmp/r.json")
+    row = report.render_row(cell, validator_status="clean")
+    assert row.split("\t")[-1] == ""
 
 
 def test_write_report_counts(tmp_path: Path):
@@ -83,6 +124,54 @@ def test_write_report_records_terminal_state_and_source_footer(tmp_path: Path):
     assert "abort_phase=execute" in text
     assert "abort_reason=free space floor" in text
     assert summary.exit_code() == 2
+
+
+# ---------------------------------------------------------------------------
+# w3: failed cells must not read as submission-ready.
+#
+# terminal_state() used to fall through to `cell.submit_terminal_state`
+# (default "submittable") for any failed cell with a resolved result_path,
+# which reads identically to a genuinely submission-ready cell. Give failed
+# cells an explicit "failed:<submit_state>" token instead -- it preserves the
+# submit-classification detail and cannot be confused with a real
+# submit-ready state.
+# ---------------------------------------------------------------------------
+
+
+def test_terminal_state_failed_cell_with_result_path_is_not_submittable():
+    cell = _cell("duckdb", "tpch", 0.01, status="failed", result="/tmp/r.json")
+    # No submit-refusal fired -- submit_terminal_state defaults to "submittable".
+    assert cell.submit_terminal_state == "submittable"
+    assert report.terminal_state(cell) == "failed:submittable"
+
+
+def test_terminal_state_failed_cell_preserves_submit_refusal_reason():
+    from dataclasses import replace
+
+    cell = replace(
+        _cell("duckdb", "tpch", 0.01, status="failed", result="/tmp/r.json"),
+        submit_terminal_state="query_failure",
+    )
+    assert report.terminal_state(cell) == "failed:query_failure"
+
+
+def test_terminal_state_timed_out_cell_with_result_path_stays_timeout():
+    """A timed-out cell that happens to have a resolved result_path is still 'timeout'."""
+    cell = _cell("duckdb", "tpch", 0.01, status="timed-out", result="/tmp/r.json")
+    assert report.terminal_state(cell) == "timeout"
+
+
+def test_terminal_state_failed_cell_without_result_path_is_unchanged():
+    """The pre-existing no_json_nonzero/no_json_exit_0 tokens are untouched by w3."""
+    cell = _cell("duckdb", "tpch", 0.01, status="failed")
+    assert report.terminal_state(cell) == "no_json_nonzero"
+
+
+def test_write_report_row_uses_failed_prefix_for_failed_cell_with_result(tmp_path: Path):
+    cell = _cell("duckdb", "tpch", 0.01, status="failed", result="/tmp/r.json")
+    report.write_report([cell], output_path=tmp_path / "out.tsv")
+    lines = (tmp_path / "out.tsv").read_text(encoding="utf-8").splitlines()
+    assert "failed\tfailed:submittable\t" in lines[1]
 
 
 def test_cross_scale_clean_counts_full_ladder():
@@ -203,3 +292,81 @@ def test_release_gate_ordering_flags_docker_up_before_native_completion():
     assert len(violations) == 1
     assert "cedardb" in violations[0]
     assert "at/before native+dataframe stage completion" in violations[0]
+
+
+def test_release_gate_ordering_does_not_raise_against_offset_aware_boundary():
+    """orchestrator.py's completed_at is offset-aware (datetime.now().astimezone(),
+    #1162). ``_DOCKER_LOG_OK``/``_DOCKER_LOG_EARLY`` above use naive timestamps
+    to exercise the legacy-log fallback path (pre-#1202-follow-up
+    append_lifecycle_log() output, or any hand-written fixture); comparing a
+    naive timestamp against an aware boundary used to raise TypeError, so
+    parse_docker_up_events must normalize the naive side and the comparison
+    (and any real violation) must still work.
+    """
+    aware_boundary = _dt.datetime(2026, 5, 30, 1, 0, 0).astimezone()
+
+    no_violation = report.release_gate_ordering_violations([_DOCKER_LOG_OK], native_stage_completed_at=aware_boundary)
+    assert no_violation == []
+
+    violations = report.release_gate_ordering_violations(
+        [_DOCKER_LOG_EARLY, _DOCKER_LOG_OK], native_stage_completed_at=aware_boundary
+    )
+    assert len(violations) == 1
+    assert "cedardb" in violations[0]
+
+
+def test_release_gate_ordering_uses_boundary_offset_for_naive_docker_timestamps():
+    """Regression for #1179: a valid PDT run must not be flagged as a violation
+    just because the checker process runs under a different timezone (e.g.
+    UTC). astimezone() previously attached the *checker process's* current
+    local offset to the naive Docker timestamp instead of the producer's --
+    for a boundary completed at 2026-05-30T01:00:00-07:00 (PDT) and a Docker
+    naive timestamp of 2026-05-30T02:00:00 (also PDT wall-clock, i.e.
+    genuinely after the boundary), a checker running under UTC would wrongly
+    attach +00:00 to the naive timestamp instead of -07:00, making it appear
+    to be hours *before* the boundary instant and firing a false violation.
+    """
+    pdt = _dt.timezone(_dt.timedelta(hours=-7))
+    boundary = _dt.datetime(2026, 5, 30, 1, 0, 0, tzinfo=pdt)
+
+    violations = report.release_gate_ordering_violations([_DOCKER_LOG_OK], native_stage_completed_at=boundary)
+
+    assert violations == []
+
+
+def test_release_gate_ordering_respects_each_events_own_offset_across_dst():
+    """A boundary and a later Docker event can carry genuinely different UTC
+    offsets when a sweep straddles a DST transition (fall-back: PDT -07:00 ->
+    PST -08:00). Once each event carries its own real offset (#1202
+    follow-up: append_lifecycle_log() now writes datetime.now().astimezone()
+    instead of naive datetime.now()), the comparison must use that offset
+    directly rather than reusing the boundary's -- the boundary's fixed
+    offset would misread the later, different-offset event's wall-clock time
+    (2026-11-01T01:15:00-08:00, genuinely after the boundary) as 45 minutes
+    *before* a boundary of 2026-11-01T01:30:00-07:00, a false violation.
+    """
+    pdt = _dt.timezone(_dt.timedelta(hours=-7))
+    boundary = _dt.datetime(2026, 11, 1, 1, 30, 0, tzinfo=pdt)
+    docker_log = (
+        "2026-11-01T01:15:00-08:00 [docker] platform=lakesail action=up status=ok "
+        "project=benchbox-uat-gate-lakesail command=['docker'] message=started\n"
+    )
+
+    violations = report.release_gate_ordering_violations([docker_log], native_stage_completed_at=boundary)
+
+    assert violations == []
+
+
+def test_append_lifecycle_log_writes_offset_aware_timestamp(tmp_path: Path):
+    """Regression for the #1202 follow-up: append_lifecycle_log() must write
+    an offset-aware timestamp (parseable straight through by
+    parse_docker_up_events with no naive-timestamp fallback needed), not
+    plain datetime.now().
+    """
+    execute.append_lifecycle_log(tmp_path, "[docker] platform=duckdb action=up status=ok")
+
+    line = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8").strip()
+    timestamp_token = line.split(" ", 1)[0]
+    parsed = _dt.datetime.fromisoformat(timestamp_token)
+
+    assert parsed.tzinfo is not None

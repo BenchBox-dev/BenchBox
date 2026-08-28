@@ -1,0 +1,14 @@
+{
+  "benchmark": "TPC-Havoc",
+  "bundle_file": "tpchavoc_sf001_polars_df_20260502_211328_5ac5485d.json",
+  "bundle_hash": "1b38a1eda29c39e4064309795f2369305b060492b72579330555b34874910aea",
+  "companion_hashes": {},
+  "phase": 2,
+  "platform": "Polars",
+  "result_source": "internal",
+  "scale_factor": 0.01,
+  "submission_path": "path_30338255ec33",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:52:30.770446+00:00",
+  "submitted_by": "BenchBox UAT"
+}

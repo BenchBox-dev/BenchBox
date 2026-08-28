@@ -66,7 +66,7 @@ behavior and are standard practice for OLAP workloads with long-running queries.
 - ClickHouse - experimental correlated subqueries on by default and aggressive OLAP join/spill tuning
   (`benchbox/platforms/clickhouse/tuning.py:52-118`). Impact if removed: plans revert to safer
   defaults; correlated-subquery TPC-H cases may fail or change results. Tests to confirm: quick TPC-H
-  smoke `benchbox run --platform clickhouse --benchmark tpch --scale 0.01 --phases power --non-interactive`
+  smoke `benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01 --phases power --non-interactive`
   and targeted query validation for Q2/4/17/20/21/22.
 - DataFusion - memory_limit=16G default and identifier normalization flag
   (`benchbox/platforms/datafusion.py:101-169,213-299`). Impact if removed: risk of OOM on large data
@@ -107,9 +107,9 @@ behavior and are standard practice for OLAP workloads with long-running queries.
   `modify_warehouse_settings=False` (default). Set to `True` via config or CLI to opt-in to warehouse
   modifications. Query tag (`QUERY_TAG='BenchBox_optimization'`) still applied.
 
-  **CLI usage**: `benchbox run --platform snowflake --modify-warehouse-settings ...` to enable warehouse
-  modifications. Use `--suppress-nondeterministic-errors` for workloads with MERGE/UPDATE operations.
-  Use `--no-disable-result-cache` to enable query result caching (disabled by default for benchmarking).
+  These are adapter configuration keys, not `benchbox run` options: set
+  `modify_warehouse_settings`, `suppress_nondeterministic_errors`, and
+  `disable_result_cache` when constructing the adapter.
 
   **Config usage**: Set `modify_warehouse_settings: true` in your platform config to enable warehouse
   modifications. Set `suppress_nondeterministic_errors: true` for nondeterministic workloads.

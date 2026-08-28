@@ -110,6 +110,27 @@ class TestVeloxAdapterInit:
         adapter = VeloxAdapter(deployment_mode="remote")
         assert adapter.deployment == "remote"
 
+    @pytest.mark.parametrize("key", ["deployment", "deployment_mode"])
+    def test_constructor_rejects_docker_through_either_spelling(self, mock_pyspark, key):
+        """The factory, not just the validator, must fail closed."""
+        from benchbox.platforms.velox import VeloxAdapter
+
+        with pytest.raises(ValueError, match="Unsupported Velox deployment 'docker'"):
+            VeloxAdapter(**{key: "docker"})
+
+    def test_supported_deployments_still_select_their_own_endpoints(self, mock_pyspark):
+        """Enumerating must not disturb the modes the adapter does implement."""
+        from benchbox.platforms.velox import VeloxAdapter
+
+        local = VeloxAdapter(deployment="local")
+        assert local.deployment == "local"
+        assert local._df_caching_supported is True
+
+        remote = VeloxAdapter(deployment="remote", endpoint="sc://remote:50051")
+        assert remote.deployment == "remote"
+        assert remote.endpoint == "sc://remote:50051"
+        assert remote._df_caching_supported is False
+
     def test_get_target_dialect(self, mock_pyspark):
         from benchbox.platforms.velox import VeloxAdapter
 
@@ -651,3 +672,55 @@ class TestVeloxRegistration:
         assert "velox" in PLATFORM_TO_EXTRA
         assert PLATFORM_TO_EXTRA["velox"] == "velox"
         assert PLATFORM_TO_EXTRA.get("gluten-velox") == "velox"
+
+
+class TestDeploymentContractIsEnumerated:
+    """Any non-'local' value used to mean 'remote'. It must mean 'rejected'."""
+
+    def test_docker_is_rejected_rather_than_silently_becoming_remote(self):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        with pytest.raises(ValueError, match="Unsupported Velox deployment 'docker'"):
+            VeloxAdapter._validate_deployment("docker")
+
+    def test_the_docker_rejection_points_at_the_real_workflow(self):
+        """Docker is packaging infrastructure, not a deployment mode."""
+        from benchbox.platforms.velox import VeloxAdapter
+
+        with pytest.raises(ValueError, match="packaging infrastructure"):
+            VeloxAdapter._validate_deployment("docker")
+
+    @pytest.mark.parametrize("deployment", ["kubernetes", "k8s", "cluster", "", "sc://evil:50051", "Remote-ish"])
+    def test_unknown_values_are_rejected_not_routed_to_an_endpoint(self, deployment):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        with pytest.raises(ValueError, match="Unsupported Velox deployment"):
+            VeloxAdapter._validate_deployment(deployment)
+
+    @pytest.mark.parametrize(
+        ("deployment", "expected"),
+        [("local", "local"), ("remote", "remote"), ("LOCAL", "local"), (" remote ", "remote")],
+    )
+    def test_supported_deployments_are_accepted_and_normalized(self, deployment, expected):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        assert VeloxAdapter._validate_deployment(deployment) == expected
+
+    def test_the_supported_set_matches_the_mcp_contract(self):
+        """Velox deployment is deliberately not in the MCP allow-list (security boundary)."""
+        import pytest
+
+        from benchbox.mcp.schemas import MCP_PLATFORM_OPTION_ALLOWLIST, MCPValidationError, validate_platform_options
+        from benchbox.platforms.velox import SUPPORTED_VELOX_DEPLOYMENTS, VeloxAdapter
+
+        # Direct Velox adapter deployment validation remains supported
+        assert VeloxAdapter._validate_deployment("local") == "local"
+        assert VeloxAdapter._validate_deployment("remote") == "remote"
+        assert set(SUPPORTED_VELOX_DEPLOYMENTS) == {"local", "remote"}
+
+        # MCP has no velox.deployment option (security boundary: remote would need server-owned endpoint)
+        assert "deployment" not in MCP_PLATFORM_OPTION_ALLOWLIST.get("velox", {})
+
+        # MCP fails closed for any velox.deployment value
+        with pytest.raises(MCPValidationError, match="not authorized"):
+            validate_platform_options("velox", {"deployment": "remote"})

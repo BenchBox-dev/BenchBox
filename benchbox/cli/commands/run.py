@@ -41,32 +41,48 @@ from benchbox.cli.exceptions import (
     create_error_handler,
 )
 from benchbox.cli.help import BenchBoxCommand, advanced_option
-from benchbox.cli.orchestrator import BenchmarkOrchestrator
+from benchbox.cli.orchestrator import BenchmarkOrchestrator, resolved_deployment_mode
 from benchbox.cli.output import ResultExporter
-from benchbox.cli.platform import get_platform_manager, normalize_platform_name
+from benchbox.cli.platform import get_platform_alias_mode, get_platform_manager, normalize_platform_name
 from benchbox.cli.platform_checks import check_and_setup_platform_credentials
 from benchbox.cli.platform_hooks import PlatformHookRegistry, PlatformOptionError
 from benchbox.cli.presentation.system import display_system_recommendations
 from benchbox.cli.progress import BenchmarkProgress, should_show_progress
+from benchbox.cli.run_resolution import (
+    ResolvedRunPlan,
+    capture_resolved_run_plan,
+    current_run_request as _current_run_request,
+    resolve_quick_restart_atomically,
+)
 from benchbox.cli.shared import console, set_quiet_output, silence_output
 from benchbox.cli.system import SystemProfiler
 from benchbox.cli.tuning_resolver import (
     TuningMode,
+    TuningResolution,
     TuningSource,
     display_tuning_resolution,
+    promote_tuning_provenance,
+    resolve_template_reference,
     resolve_tuning,
+    warn_sql_auto_mode,
 )
 from benchbox.cli.tuning_runtime import (
     build_baseline_unified_config,
     infer_runtime_tuning_mode,
     resolve_dataframe_tuning_config,
 )
-from benchbox.core.benchmark_registry import get_benchmark_default_scale
+from benchbox.core.benchmark_registry import (
+    get_benchmark_default_scale,
+    get_presort_table_configs,
+    presort_capable_benchmarks,
+)
 from benchbox.core.config import DatabaseConfig
+from benchbox.core.constants import RUN_MODES, VALID_PHASES
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.results.provenance import FUNDING_SOURCES, RESULT_SOURCES
 from benchbox.core.results.status import result_cli_failure_reason, result_non_clean_reason
 from benchbox.core.schemas import ExecutionContext
+from benchbox.core.tuning import modes as tuning_modes
 from benchbox.platforms import is_dataframe_platform, list_available_dataframe_platforms
 from benchbox.utils.cloud_storage import is_cloud_path
 from benchbox.utils.compression import CompressionManager
@@ -76,6 +92,9 @@ from benchbox.utils.verbosity import VerbositySettings
 
 logger = logging.getLogger(__name__)
 DATA_ORGANIZATION_ENV = "BENCHBOX_DATA_ORGANIZATION_CONFIG_JSON"
+_GUIDED_CREDENTIAL_PLATFORMS = frozenset(
+    {"athena", "bigquery", "databricks", "motherduck", "redshift", "singlestore", "snowflake"}
+)
 
 # Benchmark name aliases - maps common variations to canonical names
 BENCHMARK_ALIASES: dict[str, str] = {
@@ -106,12 +125,50 @@ def normalize_benchmark_name(name: str) -> str:
 
 
 def _reject_external_tuned(console: Any, logger: logging.Logger | None, ctx: click.Context) -> None:
-    """Exit with error when --table-mode external is combined with --tuning tuned."""
-    console.print("[red]❌ Error: --table-mode external is incompatible with --tuning tuned[/red]")
-    console.print("[yellow]Use --table-mode native or choose a non-tuned mode[/yellow]")
+    """Exit with error when --table-mode external is combined with a tuning-bearing --tuning value."""
+    console.print("[red]❌ Error: --table-mode external is incompatible with tuning enabled[/red]")
+    console.print("[yellow]Use --table-mode native, or --tuning notuning[/yellow]")
     if logger:
-        logger.error("Invalid flag combination: --table-mode external with --tuning tuned")
+        logger.error("Invalid flag combination: --table-mode external with tuning enabled")
     ctx.exit(1)
+
+
+def _tuning_arg_is_tuning_bearing(tuning_arg: str | None) -> bool:
+    """Whether a raw `--tuning` argument selects a tuning-bearing resolution.
+
+    Mirrors the outcomes `TuningResolution` can produce without requiring
+    resolution to have already run: `notuning` is the only raw keyword that
+    resolves to a disabled configuration. `tuned` (which may still resolve to
+    either a curated template or `tuned-fallback` -- both tuning-bearing per
+    ADR-2), `auto` (smart defaults, always enabled), and any other value (a
+    custom tuning file path, recorded as `custom`) are all tuning-bearing.
+    """
+    if not tuning_arg:
+        return False
+    return tuning_arg.strip().lower() != "notuning"
+
+
+def _reject_official_fallback(s: types.SimpleNamespace, resolution: TuningResolution) -> None:
+    """Refuse `tuned-fallback` resolutions under `--official` (ADR-2 §1).
+
+    A `--tuning tuned` run that could not find a template resolves to the
+    distinct `tuned-fallback` mode (see `TuningResolution.canonical_mode`)
+    rather than silently recording `tuned`. Official/TPC-compliant runs must
+    either find a real template or explicitly choose `notuning`/a custom
+    file -- they must never submit an unoptimized fallback config labeled as
+    if it were a genuine tuned run.
+    """
+    if not s.official or resolution.canonical_mode != tuning_modes.TUNED_FALLBACK:
+        return
+    console.print("[red]❌ Error: --official runs cannot use a 'tuned-fallback' configuration[/red]")
+    console.print(
+        "[yellow]No tuning template was found for this platform/benchmark. "
+        "Add one under examples/tunings/, or rerun with --tuning notuning "
+        "or an explicit --tuning <file>.[/yellow]"
+    )
+    if s.logger:
+        s.logger.error("Official run refused: tuning resolved to tuned-fallback under --official")
+    s.ctx.exit(1)
 
 
 def _apply_platform_optimization_overrides(
@@ -225,19 +282,16 @@ def _resolve_data_organization_payload(
         "iceberg-sorted": "iceberg",
     }
     output_format = output_format_map[presort]
-    if benchmark_key == "tpch":
-        return {
-            "table_configs": {"lineitem": [{"name": "l_shipdate", "order": "asc"}]},
-            "output_format": output_format,
-        }
-    if benchmark_key == "tpcds":
-        return {
-            "table_configs": {"store_sales": [{"name": "ss_sold_date_sk", "order": "asc"}]},
-            "output_format": output_format,
-        }
+
+    # Sort keys are benchmark knowledge: a benchmark supports --presort exactly
+    # when it declares presort_table_configs in the registry.
+    table_configs = get_presort_table_configs(benchmark_key) if benchmark_key else None
+    if table_configs:
+        return {"table_configs": table_configs, "output_format": output_format}
 
     if benchmark_key:
-        raise ValueError("--presort sorted modes are currently supported for tpch and tpcds benchmarks")
+        supported = ", ".join(sorted(presort_capable_benchmarks()))
+        raise ValueError(f"--presort sorted modes are currently supported for {supported} benchmarks")
     return tuning_payload
 
 
@@ -287,7 +341,11 @@ def _build_execution_context(
         capture_plans: Whether to capture query plans
         strict_plan_capture: Strict plan capture mode
         non_interactive: Non-interactive mode flag
-        tuning: Tuning mode/path
+        tuning: The already-resolved canonical `tuning_mode` (see
+            `_canonical_tuning_mode` / `TuningResolution.canonical_mode`) --
+            one of the ADR-2 pinned vocabulary values (tuned, tuned-fallback,
+            notuning, auto, custom), never a raw `--tuning` CLI argument or
+            local file path (ADR-2 §2 forbids raw paths as a recorded mode).
 
     Returns:
         ExecutionContext populated from CLI parameters
@@ -308,8 +366,33 @@ def _build_execution_context(
         capture_plans=capture_plans,
         strict_plan_capture=strict_plan_capture,
         non_interactive=non_interactive,
-        tuning_mode=tuning if tuning and tuning != "notuning" else None,
+        tuning_mode=tuning_modes.NOTUNING if tuning == tuning_modes.NOTUNING else tuning,
     )
+
+
+def _canonical_tuning_mode(s: types.SimpleNamespace) -> str | None:
+    """Read the ADR-2 canonical `tuning_mode` off `s` for recording, not raw `s.tuning`.
+
+    `s.tuning` is the raw `--tuning` CLI value (a keyword or a local file
+    path) and must never reach a result bundle verbatim (ADR-2 §2). Every
+    dispatch path sets `s.tuning_resolution` before calling
+    `_build_execution_context` (`_resolve_tuning`, the fallback-wizard branch
+    of `_load_unified_tuning_config`, `_interactive_tuning_step`, and the
+    quick-restart re-resolution all keep it current), so this always prefers
+    `TuningResolution.canonical_mode`. The raw-string fallback only guards
+    against a future dispatch path that forgets to set a resolution; it
+    intentionally excludes anything that looks like a file path so a bug
+    upstream fails closed (falls back to `custom`) rather than leaking a path.
+    """
+    resolution = getattr(s, "tuning_resolution", None)
+    if resolution is not None:
+        return resolution.canonical_mode
+    raw = s.tuning
+    if not raw or raw.strip().lower() == "notuning":
+        return None
+    if raw.strip().lower() in {"tuned", "auto"}:
+        return raw.strip().lower()
+    return tuning_modes.CUSTOM
 
 
 def _execute_orchestrated_run(
@@ -352,6 +435,19 @@ def _execute_orchestrated_run(
             progress=None,
             execution_context=execution_context,
         )
+
+
+LOAD_FAILURE_MARKER = "BENCHBOX_LOAD_FAILURE_JSON="
+
+
+def _emit_load_failure_marker(result: Any) -> None:
+    """Emit one machine-readable line for UAT's durable load-failure sidecar."""
+
+    details = getattr(result, "validation_details", None)
+    payload = details.get("load_failure") if isinstance(details, dict) else None
+    if not isinstance(payload, dict):
+        return
+    click.echo(f"{LOAD_FAILURE_MARKER}{json.dumps(payload, sort_keys=True, separators=(',', ':'))}")
 
 
 def _export_orchestrated_result(
@@ -428,26 +524,10 @@ class BenchmarkOptionParamType(click.ParamType):
 
 
 def _derive_execution_type(phases: list[str]) -> str:
-    """Derive benchmark execution type from the requested phase list."""
-    query_phases = {"power", "throughput", "maintenance"}
-    selected_query_phases = set(phases) & query_phases
-    if selected_query_phases:
-        # Any mixed query-phase request should use combined mode so the adapter
-        # can execute exactly the requested subset of query phases.
-        if len(selected_query_phases) > 1:
-            return "combined"
-        if "power" in selected_query_phases:
-            return "power"
-        if "throughput" in selected_query_phases:
-            return "throughput"
-        if "maintenance" in selected_query_phases:
-            return "maintenance"
-        return "standard"
-    if phases == ["load"] or ("load" in phases and not (set(phases) & query_phases)):
-        return "load_only"
-    if phases == ["generate"] or ("generate" in phases and not (set(phases) & ({"load"} | query_phases))):
-        return "data_only"
-    return "standard"
+    """Derive benchmark execution type through the shared core service."""
+    from benchbox.core.run_service import map_phases_to_execution_type
+
+    return map_phases_to_execution_type(phases)
 
 
 def _describe_platform_options(platform_names: Iterable[str]) -> None:
@@ -550,8 +630,22 @@ def _apply_dataframe_suffix_mode(s: types.SimpleNamespace) -> None:
     the SQL adapter. An explicit --mode flag still wins, matching adapter-factory
     precedence (explicit mode > -df suffix > platform default).
     """
-    if s.mode is None and s.platform and s.platform.lower().endswith("-df"):
-        s.mode = "dataframe"
+    if s.mode is None and s.platform:
+        s.mode = get_platform_alias_mode(s.platform)
+
+
+def _apply_ducklake_deployment_suffix(s: types.SimpleNamespace) -> None:
+    """Turn ``ducklake:<mode>`` shorthand into an explicit platform option."""
+    if not s.platform or not s.platform.lower().startswith("ducklake:"):
+        return
+    platform, mode = s.platform.split(":", 1)
+    if mode not in ("local", "local_catalog_s3", "postgres_catalog", "postgres_catalog_s3"):
+        return
+    s.platform = platform
+    pairs = list(s.platform_option_pairs or ())
+    if not any(key.casefold() == "deployment_mode" for key, _value in pairs):
+        pairs.insert(0, ("deployment_mode", mode))
+    s.platform_option_pairs = tuple(pairs)
 
 
 def _parse_plat_bench_options(s: types.SimpleNamespace) -> None:
@@ -562,6 +656,7 @@ def _parse_plat_bench_options(s: types.SimpleNamespace) -> None:
     s.verbosity_payload = s.verbosity_settings.to_config()
 
     _apply_dataframe_suffix_mode(s)
+    _apply_ducklake_deployment_suffix(s)
     s.platform_key = normalize_platform_name(s.platform) if s.platform else None
     s.benchmark = normalize_benchmark_name(s.benchmark) if s.benchmark else None
     s.table_mode = (s.table_mode or "native").lower()
@@ -614,7 +709,7 @@ def _parse_plat_bench_options(s: types.SimpleNamespace) -> None:
             f"Arguments: platform={s.platform}, benchmark={s.benchmark}, scale={s.scale}, verbose={s.verbose}"
         )
 
-    if s.table_mode == "external" and s.tuning.strip().lower() == "tuned":
+    if s.table_mode == "external" and _tuning_arg_is_tuning_bearing(s.tuning):
         _reject_external_tuned(console, s.logger, s.ctx)
 
 
@@ -691,6 +786,16 @@ def _plan_capture_override_entries(s: types.SimpleNamespace) -> dict[str, Any]:
     }
 
 
+def _tuning_override_entries(s: types.SimpleNamespace) -> dict[str, Any]:
+    entries: dict[str, Any] = {"tuning_enabled": s.tuning_enabled, "force_upload": bool(s.force_upload)}
+    entries.update(_plan_capture_override_entries(s))
+    if s.loaded_unified_config:
+        entries["unified_tuning_configuration"] = s.loaded_unified_config
+    if s.df_tuning_config:
+        entries["df_tuning_config"] = s.df_tuning_config
+    return entries
+
+
 def _validate_non_interactive(s: types.SimpleNamespace) -> None:
     """Set env flag and validate required args for non-interactive mode."""
     if not s.non_interactive:
@@ -722,7 +827,7 @@ def _validate_non_interactive(s: types.SimpleNamespace) -> None:
 
 def _parse_phases_list(s: types.SimpleNamespace) -> None:
     """Parse and validate the --phases list into phases_to_run."""
-    valid_phases = {"generate", "load", "statistics", "warmup", "power", "throughput", "maintenance"}
+    valid_phases = set(VALID_PHASES)
     phase_list = [p.strip() for p in s.phases.split(",") if p.strip()]
 
     invalid_phases = set(phase_list) - valid_phases
@@ -935,7 +1040,7 @@ def _check_benchmark_platform_compatibility(s: types.SimpleNamespace) -> None:
     s.ctx.exit(1)
 
 
-def _resolve_tuning(s: types.SimpleNamespace) -> None:
+def _resolve_tuning(s: types.SimpleNamespace, *, non_interactive_override: bool | None = None) -> None:
     """Resolve tuning mode and load unified tuning configuration."""
     s.config = s.ctx.obj["config"]
     if s.logger:
@@ -951,7 +1056,7 @@ def _resolve_tuning(s: types.SimpleNamespace) -> None:
             console=console,
             logger=s.logger,
             quiet=bool(s.quiet),
-            non_interactive=s.non_interactive,
+            non_interactive=s.non_interactive if non_interactive_override is None else non_interactive_override,
         )
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -964,6 +1069,8 @@ def _resolve_tuning(s: types.SimpleNamespace) -> None:
     s.tuning_config_file = str(tuning_resolution.config_file) if tuning_resolution.config_file else None
     s.use_auto_tuning = tuning_resolution.mode == TuningMode.AUTO
 
+    _reject_official_fallback(s, tuning_resolution)
+
     if not s.quiet:
         display_tuning_resolution(tuning_resolution, console, verbose=bool(s.verbose))
 
@@ -973,10 +1080,10 @@ def _resolve_tuning(s: types.SimpleNamespace) -> None:
             f"source={tuning_resolution.source.value}, enabled={s.tuning_enabled}"
         )
 
-    _load_unified_tuning_config(s)
+    _load_unified_tuning_config(s, non_interactive_override=non_interactive_override)
 
 
-def _load_unified_tuning_config(s: types.SimpleNamespace) -> None:
+def _load_unified_tuning_config(s: types.SimpleNamespace, *, non_interactive_override: bool | None = None) -> None:
     """Load unified tuning configuration into s.loaded_unified_config."""
     s.loaded_unified_config = None
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
@@ -997,7 +1104,8 @@ def _load_unified_tuning_config(s: types.SimpleNamespace) -> None:
         if s.logger:
             s.logger.debug("No tuning mode: all constraints disabled for baseline")
     elif tuning_resolution.source == TuningSource.FALLBACK:
-        if not s.non_interactive:
+        effective_non_interactive = s.non_interactive if non_interactive_override is None else non_interactive_override
+        if not effective_non_interactive:
             console.print("\n[bold cyan]Tuning Configuration[/bold cyan]")
             if Confirm.ask("Would you like to configure tuning options?", default=False):
                 from benchbox.cli.tuning import run_tuning_wizard
@@ -1011,6 +1119,16 @@ def _load_unified_tuning_config(s: types.SimpleNamespace) -> None:
                     interactive=True,
                 )
                 s.tuning_enabled, s.tuning = infer_runtime_tuning_mode(s.loaded_unified_config)
+                # A wizard-produced config is no longer the barebones fallback
+                # constraints -- record it with `wizard` provenance (ADR-2 §1)
+                # so `canonical_mode` reports plain `tuned`, not
+                # `tuned-fallback`, for the run the user just configured.
+                if s.tuning_enabled:
+                    tuning_resolution.mode = TuningMode.TUNED
+                    tuning_resolution.source = TuningSource.INTERACTIVE_WIZARD
+                else:
+                    tuning_resolution.mode = TuningMode.NOTUNING
+                    tuning_resolution.source = TuningSource.BASELINE
                 console.print("[green]✅ Tuning configuration completed[/green]")
             else:
                 s.loaded_unified_config = UnifiedTuningConfiguration()
@@ -1020,11 +1138,13 @@ def _load_unified_tuning_config(s: types.SimpleNamespace) -> None:
             s.logger.debug("Using basic constraints-only configuration (fallback)")
     else:
         s.loaded_unified_config = UnifiedTuningConfiguration()
-        if s.logger:
-            s.logger.debug(f"Using basic unified config for mode: {tuning_resolution.mode.value}")
+        warn_sql_auto_mode(tuning_resolution, s.resolved_mode, console, s.logger, quiet=bool(s.quiet))
+
+    s.tuning_source_value = tuning_resolution.source.value
+    s.tuning_template_ref = resolve_template_reference(tuning_resolution.config_file)
 
 
-def _resolve_data_organization(s: types.SimpleNamespace) -> None:
+def _resolve_data_organization(s: types.SimpleNamespace, *, resolve_dataframe: bool = True) -> None:
     """Apply platform optimizations, build data organization payload, resolve DF tuning config."""
     try:
         _apply_platform_optimization_overrides(
@@ -1050,6 +1170,9 @@ def _resolve_data_organization(s: types.SimpleNamespace) -> None:
         os.environ.pop(DATA_ORGANIZATION_ENV, None)
     else:
         os.environ[DATA_ORGANIZATION_ENV] = json.dumps(data_organization_payload)
+
+    if not resolve_dataframe:
+        return
 
     try:
         s.df_tuning_config = resolve_dataframe_tuning_config(
@@ -1123,12 +1246,45 @@ def _resolve_compression_settings(s: types.SimpleNamespace) -> None:
         s.compression_level = None
 
 
+def _capture_resolved_run_plan(s: types.SimpleNamespace) -> ResolvedRunPlan:
+    """Take one immutable snapshot after all run-resolution stages succeed."""
+    return capture_resolved_run_plan(s, canonical_tuning_mode=_canonical_tuning_mode(s))
+
+
+def _resolve_run_request(
+    s: types.SimpleNamespace,
+    *,
+    apply_default_scale: bool,
+    tuning_non_interactive: bool | None = None,
+) -> None:
+    """Resolve current request fields through the canonical pre-execution pipeline."""
+    _apply_cli_adapter(s)
+    if apply_default_scale:
+        _apply_benchmark_default_scale(s)
+    _validate_initial_flags(s)
+    _parse_plat_bench_options(s)
+    _validate_non_interactive(s)
+    _parse_phases_list(s)
+    _parse_queries_list(s)
+    _derive_exec_type_and_banner(s)
+
+    s.platform_manager = get_platform_manager()
+    _check_platforms_status(s)
+    _resolve_platform_mode(s)
+    _check_benchmark_platform_compatibility(s)
+    _resolve_tuning(s, non_interactive_override=tuning_non_interactive)
+    _resolve_data_organization(s)
+    _resolve_compression_settings(s)
+    _validate_output_dir(s)
+    s.resolved_run_plan = _capture_resolved_run_plan(s)
+
+
 def _validate_output_dir(s: types.SimpleNamespace) -> None:
     """Validate --output directory (including cloud storage)."""
     if not s.output:
         return
     try:
-        ValidationRules.validate_output_directory(s.output)
+        ValidationRules.validate_output_directory(s.output, table_mode=s.table_mode)
         if is_cloud_path(s.output):
             console.print(f"\n[green]✅[/green] Cloud storage output validated: {s.output}")
         else:
@@ -1146,23 +1302,8 @@ def _validate_output_dir(s: types.SimpleNamespace) -> None:
 
 def _prepare_run_state(s: types.SimpleNamespace) -> None:
     """Run the full preamble: normalize CLI params, validate, resolve configs."""
-    _apply_cli_adapter(s)
-    _apply_benchmark_default_scale(s)
-    _validate_initial_flags(s)
-    _parse_plat_bench_options(s)
-    _validate_non_interactive(s)
-    _parse_phases_list(s)
-    _parse_queries_list(s)
-    _derive_exec_type_and_banner(s)
-
-    s.platform_manager = get_platform_manager()
-    _check_platforms_status(s)
-    _resolve_platform_mode(s)
-    _check_benchmark_platform_compatibility(s)
-    _resolve_tuning(s)
-    _resolve_data_organization(s)
-    _resolve_compression_settings(s)
-    _validate_output_dir(s)
+    s.run_request = _current_run_request(s)
+    _resolve_run_request(s, apply_default_scale=True)
 
     # Initialize configs - assigned in all live-run paths below; asserted non-None before use.
     s.database_config = None
@@ -1172,6 +1313,86 @@ def _prepare_run_state(s: types.SimpleNamespace) -> None:
 # ---------------------------------------------------------------------------
 # Branch helpers - one per mutually-exclusive execution path.
 # ---------------------------------------------------------------------------
+
+
+def _build_benchmark_config(
+    s: types.SimpleNamespace,
+    benchmark_info: dict[str, Any],
+) -> BenchmarkConfig:
+    """Build the canonical BenchmarkConfig from one resolved plan."""
+    plan: ResolvedRunPlan = s.resolved_run_plan
+    assert plan.benchmark is not None
+    options: dict[str, Any] = {
+        **s.verbosity_payload,
+        "estimated_time_range": benchmark_info.get("estimated_time_range", (0, 60)),
+        "complexity": benchmark_info.get("complexity", "medium"),
+        "tuning_enabled": plan.tuning_enabled,
+        "table_mode": plan.table_mode,
+        "unified_tuning_configuration": plan.loaded_unified_config,
+        "force_regenerate": s.force_regenerate,
+        "enable_preflight_validation": s.enable_preflight_validation,
+        "enable_postgen_manifest_validation": s.enable_postgen_manifest_validation,
+        "enable_postload_validation": s.enable_postload_validation,
+        "ignore_memory_warnings": s.ignore_memory_warnings,
+        **({"df_tuning_config": plan.dataframe_tuning_config} if plan.dataframe_tuning_config else {}),
+        **({"data_organization": dict(plan.data_organization)} if plan.data_organization is not None else {}),
+        **({"seed": plan.seed} if plan.seed is not None else {}),
+        **({"power_iterations": plan.iterations} if plan.iterations is not None else {}),
+        **({"validation_mode": s.validation_mode} if s.validation_mode is not None else {}),
+        **({"cache_dir": str(Path.home() / ".benchbox" / "datagen")} if s.global_cache else {}),
+        **({"table_format": s.table_format_value} if s.table_format_value is not None else {}),
+        **({"table_format_compression": s.table_format_compression} if s.table_format_compression is not None else {}),
+        **(
+            {"table_format_partition_cols": list(s.table_format_partition_cols)}
+            if s.table_format_partition_cols
+            else {}
+        ),
+        **({"presort": s.presort} if s.presort is not None else {}),
+        **_strict_translation_config_entry(s),
+        **_platform_option_config_entries(s),
+        **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
+    }
+    return BenchmarkConfig(
+        name=plan.benchmark,
+        display_name=benchmark_info.get("display_name", plan.benchmark.upper()),
+        scale_factor=plan.scale,
+        queries=list(plan.queries) if plan.queries is not None else None,
+        concurrency=plan.concurrency,
+        compress_data=plan.compression_enabled,
+        compression_type=plan.compression_type,
+        compression_level=plan.compression_level,
+        test_execution_type=plan.test_execution_type,
+        capture_plans=s.capture_plans,
+        analyze_plans=s.analyze_plans,
+        strict_plan_capture=s.strict_plan_capture,
+        stats_reset=s.stats_reset,
+        stats_per_table_timing=s.stats_per_table_timing,
+        official=s.official,
+        options=options,
+    )
+
+
+def _build_execution_context_from_plan(s: types.SimpleNamespace) -> ExecutionContext:
+    """Build canonical result metadata from the same plan used for execution."""
+    plan: ResolvedRunPlan = s.resolved_run_plan
+    return _build_execution_context(
+        phases_to_run=list(plan.phases),
+        seed=plan.seed,
+        compression=CompressionConfig(
+            enabled=plan.compression_enabled,
+            type=plan.compression_type,
+            level=plan.compression_level,
+        ),
+        mode=plan.resolved_mode,
+        official=s.official,
+        validation=s.val_config,
+        force=s.force_config,
+        queries_to_run=list(plan.queries) if plan.queries is not None else None,
+        capture_plans=s.capture_plans,
+        strict_plan_capture=s.strict_plan_capture,
+        non_interactive=s.non_interactive,
+        tuning=plan.canonical_tuning_mode,
+    )
 
 
 def _dry_run_validate_inputs(s: types.SimpleNamespace) -> None:
@@ -1260,53 +1481,7 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
 
     _warn_tpcds_subscale(s)
 
-    benchmark_config = BenchmarkConfig(
-        name=s.benchmark,
-        display_name=benchmark_info["display_name"],
-        scale_factor=s.scale,
-        queries=s.queries_to_run,
-        compress_data=s.compress_data,
-        compression_type=s.compression_type,
-        compression_level=s.compression_level,
-        test_execution_type=s.test_execution_type,
-        capture_plans=s.capture_plans,
-        analyze_plans=s.analyze_plans,
-        strict_plan_capture=s.strict_plan_capture,
-        stats_reset=s.stats_reset,
-        stats_per_table_timing=s.stats_per_table_timing,
-        options={
-            **s.verbosity_payload,
-            "estimated_time_range": benchmark_info["estimated_time_range"],
-            "tuning_enabled": s.tuning_enabled,
-            "table_mode": s.table_mode,
-            "unified_tuning_configuration": s.loaded_unified_config,
-            **({"data_organization": s.data_organization_payload} if s.data_organization_payload is not None else {}),
-            "force_regenerate": s.force_regenerate,
-            "enable_preflight_validation": s.enable_preflight_validation,
-            "enable_postgen_manifest_validation": s.enable_postgen_manifest_validation,
-            "enable_postload_validation": s.enable_postload_validation,
-            "ignore_memory_warnings": s.ignore_memory_warnings,
-            **({"cache_dir": str(Path.home() / ".benchbox" / "datagen")} if s.global_cache else {}),
-            **({"seed": s.seed} if s.seed is not None else {}),
-            **({"power_iterations": s.iterations} if s.iterations is not None else {}),
-            **({"validation_mode": s.validation_mode} if s.validation_mode is not None else {}),
-            **({"table_format": s.table_format_value} if s.table_format_value is not None else {}),
-            **(
-                {"table_format_compression": s.table_format_compression}
-                if s.table_format_compression is not None
-                else {}
-            ),
-            **(
-                {"table_format_partition_cols": list(s.table_format_partition_cols)}
-                if s.table_format_partition_cols
-                else {}
-            ),
-            **({"presort": s.presort} if s.presort is not None else {}),
-            **_strict_translation_config_entry(s),
-            **_platform_option_config_entries(s),
-            **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
-        },
-    )
+    benchmark_config = _build_benchmark_config(s, benchmark_info)
 
     if logger:
         logger.debug(f"Benchmark config created: {benchmark_config}")
@@ -1356,16 +1531,7 @@ def _dry_run_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManag
     if logger:
         logger.debug(f"Creating database configuration for: {s.platform}")
     assert s.platform_key is not None
-    overrides = {
-        **s.verbosity_payload,
-        "tuning_enabled": s.tuning_enabled,
-        "force_upload": bool(s.force_upload),
-        **_plan_capture_override_entries(s),
-    }
-    if s.loaded_unified_config:
-        overrides["unified_tuning_configuration"] = s.loaded_unified_config
-    if s.df_tuning_config:
-        overrides["df_tuning_config"] = s.df_tuning_config
+    overrides = {**s.verbosity_payload, **_tuning_override_entries(s)}
     database_config: DatabaseConfig | None = None
     try:
         database_config = db_manager.create_config(
@@ -1382,6 +1548,7 @@ def _dry_run_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManag
         if logger:
             logger.debug(f"Driver not installed, using minimal config for dry run: {exc}")
         database_config = None
+    promote_tuning_provenance(database_config, s.tuning_enabled, s.tuning_source_value, s.tuning_template_ref)
     if logger:
         logger.debug("Database configuration created for dry run")
     return database_config
@@ -1415,14 +1582,8 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         **s.verbosity_payload,
         "force_recreate": s.force_regenerate,
         "show_query_plans": s.show_query_plans,
-        "tuning_enabled": s.tuning_enabled,
-        "force_upload": bool(s.force_upload),
-        **_plan_capture_override_entries(s),
+        **_tuning_override_entries(s),
     }
-    if s.loaded_unified_config:
-        overrides["unified_tuning_configuration"] = s.loaded_unified_config
-    if s.df_tuning_config:
-        overrides["df_tuning_config"] = s.df_tuning_config
     try:
         database_config = db_manager.create_config(
             s.platform_key,
@@ -1434,6 +1595,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         if logger:
             logger.error(f"Database configuration failed: {exc}")
         ctx.exit(1)
+    promote_tuning_provenance(database_config, s.tuning_enabled, s.tuning_source_value, s.tuning_template_ref)
 
     _driver_version = database_config.driver_version_actual or database_config.driver_version_resolved
     _mode_tag = " \\[external]" if s.table_mode == "external" else ""
@@ -1461,70 +1623,12 @@ def _run_direct(s: types.SimpleNamespace) -> None:
 
     _warn_tpcds_subscale(s)
 
-    benchmark_config = BenchmarkConfig(
-        name=s.benchmark,
-        display_name=benchmark_info["display_name"],
-        scale_factor=s.scale,
-        queries=s.queries_to_run,
-        compress_data=s.compress_data,
-        compression_type=s.compression_type,
-        compression_level=s.compression_level,
-        test_execution_type=s.test_execution_type,
-        capture_plans=s.capture_plans,
-        analyze_plans=s.analyze_plans,
-        strict_plan_capture=s.strict_plan_capture,
-        stats_reset=s.stats_reset,
-        stats_per_table_timing=s.stats_per_table_timing,
-        options={
-            **s.verbosity_payload,
-            "estimated_time_range": benchmark_info["estimated_time_range"],
-            "tuning_enabled": s.tuning_enabled,
-            "table_mode": s.table_mode,
-            "unified_tuning_configuration": s.loaded_unified_config,
-            **({"data_organization": s.data_organization_payload} if s.data_organization_payload is not None else {}),
-            "force_regenerate": s.force_regenerate,
-            "enable_preflight_validation": s.enable_preflight_validation,
-            "enable_postgen_manifest_validation": s.enable_postgen_manifest_validation,
-            "enable_postload_validation": s.enable_postload_validation,
-            "seed": s.seed,
-            **({"power_iterations": s.iterations} if s.iterations is not None else {}),
-            "ignore_memory_warnings": s.ignore_memory_warnings,
-            **({"cache_dir": str(Path.home() / ".benchbox" / "datagen")} if s.global_cache else {}),
-            **({"table_format": s.table_format_value} if s.table_format_value is not None else {}),
-            **(
-                {"table_format_compression": s.table_format_compression}
-                if s.table_format_compression is not None
-                else {}
-            ),
-            **(
-                {"table_format_partition_cols": list(s.table_format_partition_cols)}
-                if s.table_format_partition_cols
-                else {}
-            ),
-            **({"presort": s.presort} if s.presort is not None else {}),
-            **_strict_translation_config_entry(s),
-            **_platform_option_config_entries(s),
-            **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
-        },
-    )
+    benchmark_config = _build_benchmark_config(s, benchmark_info)
 
     profiler = SystemProfiler()
     system_profile = profiler.get_system_profile()
 
-    execution_context = _build_execution_context(
-        phases_to_run=s.phases_to_run,
-        seed=s.seed,
-        compression=s.comp_config,
-        mode=s.mode,
-        official=s.official,
-        validation=s.val_config,
-        force=s.force_config,
-        queries_to_run=s.queries_to_run,
-        capture_plans=s.capture_plans,
-        strict_plan_capture=s.strict_plan_capture,
-        non_interactive=s.non_interactive,
-        tuning=s.tuning,
-    )
+    execution_context = _build_execution_context_from_plan(s)
 
     orchestrator = BenchmarkOrchestrator()
     orchestrator.set_verbosity(s.verbosity_settings)
@@ -1539,7 +1643,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         benchmark_config,
         system_profile,
         database_config,
-        s.phases_to_run,
+        list(s.resolved_run_plan.phases),
         quiet=bool(s.quiet),
         no_progress=bool(s.no_progress),
         no_monitoring=bool(s.no_monitoring),
@@ -1615,13 +1719,18 @@ def _direct_handle_result(
             compression_type=s.compression_type,
             compression_level=s.compression_level,
             test_execution_type=s.test_execution_type,
+            queries=list(benchmark_config.queries) if getattr(benchmark_config, "queries", None) is not None else None,
+            mode=getattr(s, "resolved_mode", None),
             seed=s.seed,
+            iterations=s.resolved_run_plan.iterations,
+            non_replayable_options=list(s.resolved_run_plan.non_replayable_options),
             output=s.output,
             additional_options={"table_mode": s.table_mode},
         )
         if result_cli_failure_reason(result):  # narrower than non_clean_reason; see status.py
             s.ctx.exit(1)
     else:
+        _emit_load_failure_marker(result)
         console.print(f"\n[red]❌ Benchmark failed: {result.validation_status}[/red]")
         s.ctx.exit(1)
 
@@ -1637,16 +1746,10 @@ def _data_or_load_build_db_config(s: types.SimpleNamespace, db_manager: Database
     overrides = {
         **s.verbosity_payload,
         "force_recreate": s.force_regenerate,
-        "tuning_enabled": s.tuning_enabled,
-        "force_upload": bool(s.force_upload),
-        **_plan_capture_override_entries(s),
+        **_tuning_override_entries(s),
     }
-    if s.loaded_unified_config:
-        overrides["unified_tuning_configuration"] = s.loaded_unified_config
-    if s.df_tuning_config:
-        overrides["df_tuning_config"] = s.df_tuning_config
     try:
-        return db_manager.create_config(
+        database_config = db_manager.create_config(
             s.platform_key,
             dict(s.parsed_platform_options),
             overrides,
@@ -1656,7 +1759,8 @@ def _data_or_load_build_db_config(s: types.SimpleNamespace, db_manager: Database
         if logger:
             logger.error(f"Database configuration failed: {exc}")
         ctx.exit(1)
-    return None
+    promote_tuning_provenance(database_config, s.tuning_enabled, s.tuning_source_value, s.tuning_template_ref)
+    return database_config
 
 
 def _data_or_load_validate_inputs(s: types.SimpleNamespace) -> None:
@@ -1715,69 +1819,12 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
 
     _warn_tpcds_subscale(s)
 
-    benchmark_config = BenchmarkConfig(
-        name=s.benchmark,
-        display_name=benchmark_info["display_name"],
-        scale_factor=s.scale,
-        queries=s.queries_to_run,
-        compress_data=s.compress_data,
-        compression_type=s.compression_type,
-        compression_level=s.compression_level,
-        test_execution_type=s.test_execution_type,
-        capture_plans=s.capture_plans,
-        analyze_plans=s.analyze_plans,
-        strict_plan_capture=s.strict_plan_capture,
-        stats_reset=s.stats_reset,
-        stats_per_table_timing=s.stats_per_table_timing,
-        options={
-            **s.verbosity_payload,
-            "estimated_time_range": benchmark_info["estimated_time_range"],
-            "table_mode": s.table_mode,
-            "unified_tuning_configuration": s.loaded_unified_config,
-            **({"data_organization": s.data_organization_payload} if s.data_organization_payload is not None else {}),
-            "force_regenerate": s.force_regenerate,
-            "enable_preflight_validation": s.enable_preflight_validation,
-            "enable_postgen_manifest_validation": s.enable_postgen_manifest_validation,
-            "enable_postload_validation": s.enable_postload_validation,
-            "seed": s.seed,
-            **({"power_iterations": s.iterations} if s.iterations is not None else {}),
-            "ignore_memory_warnings": s.ignore_memory_warnings,
-            **({"cache_dir": str(Path.home() / ".benchbox" / "datagen")} if s.global_cache else {}),
-            **({"table_format": s.table_format_value} if s.table_format_value is not None else {}),
-            **(
-                {"table_format_compression": s.table_format_compression}
-                if s.table_format_compression is not None
-                else {}
-            ),
-            **(
-                {"table_format_partition_cols": list(s.table_format_partition_cols)}
-                if s.table_format_partition_cols
-                else {}
-            ),
-            **({"presort": s.presort} if s.presort is not None else {}),
-            **_strict_translation_config_entry(s),
-            **_platform_option_config_entries(s),
-            **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
-        },
-    )
+    benchmark_config = _build_benchmark_config(s, benchmark_info)
 
     profiler = SystemProfiler()
     system_profile = profiler.get_system_profile()
 
-    execution_context = _build_execution_context(
-        phases_to_run=s.phases_to_run,
-        seed=s.seed,
-        compression=s.comp_config,
-        mode=s.mode,
-        official=s.official,
-        validation=s.val_config,
-        force=s.force_config,
-        queries_to_run=s.queries_to_run,
-        capture_plans=s.capture_plans,
-        strict_plan_capture=s.strict_plan_capture,
-        non_interactive=s.non_interactive,
-        tuning=s.tuning,
-    )
+    execution_context = _build_execution_context_from_plan(s)
 
     orchestrator = BenchmarkOrchestrator()
     orchestrator.set_verbosity(s.verbosity_settings)
@@ -1797,7 +1844,7 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
         benchmark_config,
         system_profile,
         database_config,
-        s.phases_to_run,
+        list(s.resolved_run_plan.phases),
         quiet=bool(s.quiet),
         no_progress=bool(s.no_progress),
         no_monitoring=bool(s.no_monitoring),
@@ -1870,11 +1917,16 @@ def _data_or_load_handle_result(
             compression_type=s.compression_type,
             compression_level=s.compression_level,
             test_execution_type=s.test_execution_type,
+            queries=list(benchmark_config.queries) if getattr(benchmark_config, "queries", None) is not None else None,
+            mode=getattr(s, "resolved_mode", None),
             seed=s.seed,
+            iterations=s.resolved_run_plan.iterations,
+            non_replayable_options=list(s.resolved_run_plan.non_replayable_options),
             output=s.output,
             additional_options={"table_mode": s.table_mode},
         )
     else:
+        _emit_load_failure_marker(result)
         console.print(
             f"\n[red]❌ {'Data generation' if s.execution_mode == 'data_only' else 'Data loading'} failed: {result.validation_status}[/red]"
         )
@@ -1921,10 +1973,61 @@ def _run_interactive(s: types.SimpleNamespace) -> None:
     display_system_recommendations(system_profile)
 
     use_last_run = _interactive_try_quick_restart(s)
+    s.quick_restart_used = use_last_run
     if not use_last_run:
         _interactive_normal_flow(s, system_profile)
 
     _interactive_preflight_and_execute(s, system_profile)
+
+
+def _explicit_run_fields(s: types.SimpleNamespace) -> frozenset[str]:
+    """Return run parameters explicitly supplied on the current command line."""
+    if not hasattr(s.ctx, "get_parameter_source"):
+        return frozenset({"table_mode"} if s.table_mode_cli_supplied else ())
+
+    explicit: set[str] = set()
+    for field in (
+        "platform",
+        "benchmark",
+        "scale",
+        "phases",
+        "queries",
+        "tuning",
+        "table_mode",
+        "output",
+        "mode",
+        "seed",
+        "compression",
+        "iterations",
+        "concurrency",
+    ):
+        try:
+            if s.ctx.get_parameter_source(field) == click.core.ParameterSource.COMMANDLINE:
+                explicit.add(field)
+        except Exception:
+            continue
+    return frozenset(explicit)
+
+
+def _resolve_quick_restart_atomically(
+    s: types.SimpleNamespace,
+    last_run: dict[str, Any],
+) -> ResolvedRunPlan:
+    """Merge and resolve saved intent, rolling back every field on failure."""
+    return resolve_quick_restart_atomically(
+        s,
+        last_run,
+        current_request=getattr(s, "run_request", None) or _current_run_request(s),
+        explicit_fields=_explicit_run_fields(s),
+        # Saved scale is resolved input; reapplying Click's DEFAULT provenance
+        # would replace it with the benchmark registry default.
+        resolve=lambda state: _resolve_run_request(
+            state,
+            apply_default_scale=False,
+            tuning_non_interactive=True,
+        ),
+        data_organization_environment=DATA_ORGANIZATION_ENV,
+    )
 
 
 def _interactive_try_quick_restart(s: types.SimpleNamespace) -> bool:
@@ -1942,31 +2045,29 @@ def _interactive_try_quick_restart(s: types.SimpleNamespace) -> bool:
     if not Confirm.ask("Reuse this configuration?", default=False):
         return False
 
-    s.platform = last_run["database"]
-    s.benchmark = last_run["benchmark"]
-    s.scale = last_run["scale"]
-    s.tuning = last_run.get("tuning_mode", "tuned")
-    s.phases = last_run.get("phases", ["load", "power"])
-    if not s.output:
-        s.output = last_run.get("output")
-    if not s.table_mode_cli_supplied:
-        s.table_mode = str(last_run.get("table_mode", s.table_mode) or "native").lower()
-    if s.table_mode == "external" and s.tuning.strip().lower() == "tuned":
-        _reject_external_tuned(console, s.logger, s.ctx)
+    try:
+        plan = _resolve_quick_restart_atomically(s, last_run)
+    except ValueError as exc:
+        console.print(f"[red]❌ Saved quick-restart configuration is invalid: {exc}[/red]")
+        if s.logger:
+            s.logger.error("Quick-restart resolution failed: %s", exc)
+        s.ctx.exit(1)
+        raise AssertionError("click.Context.exit() returned unexpectedly") from exc
 
     console.print("[green]✓ Using saved configuration[/green]")
-
-    if s.resolved_mode is None:
-        caps = PlatformRegistry.get_platform_capabilities(s.platform)
-        if caps is not None:
-            s.resolved_mode = s.mode if s.mode is not None else caps.default_mode
-        else:
-            s.resolved_mode = "sql"
+    if not plan.request.exact_replay:
+        console.print("[yellow]⚠ Configuration reuse is not an exact replay.[/yellow]")
+        for note in plan.request.compatibility_notes:
+            console.print(f"[dim yellow]  • {note}[/dim yellow]")
     db_manager = DatabaseManager()
     db_manager.set_verbosity(s.verbosity_settings)
+    assert plan.platform_key is not None
     s.database_config = db_manager.create_config(
-        platform=s.platform, runtime_overrides={"execution_mode": s.resolved_mode}
+        plan.platform_key,
+        dict(s.parsed_platform_options),
+        {**s.verbosity_payload, "force_recreate": s.force_regenerate, **_tuning_override_entries(s)},
     )
+    promote_tuning_provenance(s.database_config, s.tuning_enabled, s.tuning_source_value, s.tuning_template_ref)
 
     bench_manager = BenchmarkManager()
     bench_manager.set_verbosity(s.verbosity_settings)
@@ -1982,46 +2083,7 @@ def _interactive_try_quick_restart(s: types.SimpleNamespace) -> bool:
 
     _warn_tpcds_subscale(s)
 
-    s.benchmark_config = BenchmarkConfig(
-        name=s.benchmark,
-        display_name=benchmark_info.get("display_name", s.benchmark.upper()),
-        scale_factor=s.scale,
-        queries=s.queries_to_run,
-        concurrency=last_run.get("concurrency", 1),
-        compress_data=last_run.get("compress_data", True),
-        compression_type=last_run.get("compression_type", "zstd"),
-        compression_level=last_run.get("compression_level", None),
-        test_execution_type=last_run.get("test_execution_type", "power"),
-        capture_plans=s.capture_plans,
-        strict_plan_capture=s.strict_plan_capture,
-        options={
-            "estimated_time_range": benchmark_info.get("estimated_time_range", (0, 60)),
-            "table_mode": s.table_mode,
-            "complexity": benchmark_info.get("complexity", "medium"),
-            **({"data_organization": s.data_organization_payload} if s.data_organization_payload is not None else {}),
-            "force_regenerate": s.force_regenerate,
-            "seed": s.seed,
-            **({"power_iterations": s.iterations} if s.iterations is not None else {}),
-            "ignore_memory_warnings": s.ignore_memory_warnings,
-            **({"cache_dir": str(Path.home() / ".benchbox" / "datagen")} if s.global_cache else {}),
-            **({"table_format": s.table_format_value} if s.table_format_value is not None else {}),
-            **(
-                {"table_format_compression": s.table_format_compression}
-                if s.table_format_compression is not None
-                else {}
-            ),
-            **(
-                {"table_format_partition_cols": list(s.table_format_partition_cols)}
-                if s.table_format_partition_cols
-                else {}
-            ),
-            **({"presort": s.presort} if s.presort is not None else {}),
-            **_strict_translation_config_entry(s),
-            **_platform_option_config_entries(s),
-            **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
-        },
-    )
-    s.benchmark_config.options.update(s.verbosity_settings.to_config())
+    s.benchmark_config = _build_benchmark_config(s, benchmark_info)
     console.print()
     return True
 
@@ -2039,6 +2101,8 @@ def _interactive_normal_flow(s: types.SimpleNamespace, system_profile: Any) -> N
     s.database_config = db_manager.select_database(style_filter=style_filter)
 
     _interactive_resolve_mode_for_selected_platform(s)
+    if sys.stdin.isatty() and sys.stdout.isatty():
+        _interactive_prompt_platform_options(s)
     _interactive_cloud_setup_if_needed(s)
 
     console.print("\n[bold]Step 4 of 6:[/bold] [cyan]Benchmark Configuration[/cyan]")
@@ -2051,6 +2115,22 @@ def _interactive_normal_flow(s: types.SimpleNamespace, system_profile: Any) -> N
         _interactive_collect_flags(s, db_manager, bench_manager)
 
     _interactive_tuning_step(s, system_profile)
+    s.platform = s.database_config.type
+    s.platform_key = normalize_platform_name(s.platform)
+    s.benchmark = s.benchmark_config.name
+    s.scale = s.benchmark_config.scale_factor
+    interactive_platform_options = getattr(s, "_interactive_platform_options", None)
+    if interactive_platform_options:
+        s.parsed_platform_options = dict(interactive_platform_options)
+    _resolve_data_organization(s, resolve_dataframe=False)
+    if s.data_organization_payload is not None:
+        s.benchmark_config.options["data_organization"] = s.data_organization_payload
+    else:
+        s.benchmark_config.options.pop("data_organization", None)
+    if s.df_tuning_config:
+        s.benchmark_config.options["df_tuning_config"] = s.df_tuning_config
+    else:
+        s.benchmark_config.options.pop("df_tuning_config", None)
 
 
 def _interactive_resolve_mode_for_selected_platform(s: types.SimpleNamespace) -> None:
@@ -2077,36 +2157,56 @@ def _interactive_resolve_mode_for_selected_platform(s: types.SimpleNamespace) ->
             s.resolved_mode = caps.default_mode
             s.database_config.execution_mode = s.resolved_mode
     else:
-        s.database_config.execution_mode = s.mode if s.mode is not None else "sql"
+        s.resolved_mode = s.mode if s.mode is not None else "sql"
+        s.database_config.execution_mode = s.resolved_mode
+
+
+def _run_stages_through_cloud_storage(s: types.SimpleNamespace) -> bool:
+    """Whether this run's *deployment* stages remotely; firebolt Core, motherduck and starburst do not."""
+    mode = resolved_deployment_mode(s.database_config)
+    return PlatformRegistry.requires_cloud_storage_for_deployment(s.database_config.type, mode)
+
+
+def _run_requires_platform_credentials(s: types.SimpleNamespace) -> bool:
+    mode = resolved_deployment_mode(s.database_config) or PlatformRegistry.get_default_deployment(
+        s.database_config.type
+    )
+    capability = PlatformRegistry.get_deployment_capability(s.database_config.type, mode) if mode else None
+    return bool(capability and capability.requires_credentials)
 
 
 def _interactive_cloud_setup_if_needed(s: types.SimpleNamespace) -> None:
-    """Perform cloud credentials + output location setup for cloud-requiring platforms."""
+    """Perform credential setup and, when required, remote output setup."""
     ctx = s.ctx
-    if not PlatformRegistry.requires_cloud_storage(s.database_config.type):
+    stages_remotely = _run_stages_through_cloud_storage(s)
+    if not stages_remotely and not _run_requires_platform_credentials(s):
         return
 
-    credentials_ok = check_and_setup_platform_credentials(
-        platform=s.database_config.type,
-        console_obj=console,
-        interactive=not s.non_interactive,
-    )
+    if s.database_config.type.casefold() in _GUIDED_CREDENTIAL_PLATFORMS:
+        credentials_ok = check_and_setup_platform_credentials(
+            platform=s.database_config.type,
+            console_obj=console,
+            interactive=not s.non_interactive,
+        )
 
-    if not credentials_ok:
-        console.print(f"\n[red]❌ Cannot proceed without {s.database_config.type.upper()} credentials[/red]")
-        console.print(f"\n[dim]To configure later: benchbox setup --platform {s.database_config.type}[/dim]")
-        ctx.exit(1)
+        if not credentials_ok:
+            console.print(f"\n[red]❌ Cannot proceed without {s.database_config.type.upper()} credentials[/red]")
+            console.print(f"\n[dim]To configure later: benchbox setup --platform {s.database_config.type}[/dim]")
+            ctx.exit(1)
+    elif not stages_remotely:
+        # Server platforms validate credentials from their connection options;
+        # they do not have a CredentialManager setup flow.
+        return
 
-    if s.output:
+    if not stages_remotely or s.output:
         return
     default_output = None
-    if PlatformRegistry.requires_cloud_storage(s.database_config.type):
-        from benchbox.security.credentials import CredentialManager
+    from benchbox.security.credentials import CredentialManager
 
-        cred_manager = CredentialManager()
-        if cred_manager.has_credentials(s.database_config.type):
-            creds = cred_manager.get_platform_credentials(s.database_config.type)
-            default_output = creds.get("default_output_location") if creds else None
+    cred_manager = CredentialManager()
+    if cred_manager.has_credentials(s.database_config.type):
+        creds = cred_manager.get_platform_credentials(s.database_config.type)
+        default_output = creds.get("default_output_location") if creds else None
 
     cloud_output_hint = prompt_cloud_output_location(
         platform_name=s.database_config.type,
@@ -2164,7 +2264,7 @@ def _interactive_prompt_output_and_format(
     prompt_table_format_fn: Any,
 ) -> None:
     """Prompt for optional output directory and table-format selection."""
-    if not s.output and not PlatformRegistry.requires_cloud_storage(s.database_config.type):
+    if not s.output and not _run_stages_through_cloud_storage(s):
         custom_output = prompt_output_fn(default_output="benchmark_runs/")
         if custom_output:
             s.output = custom_output
@@ -2187,7 +2287,6 @@ def _interactive_collect_flags(
         prompt_official_mode,
         prompt_output_location,
         prompt_phases,
-        prompt_platform_options,
         prompt_query_subset,
         prompt_seed,
         prompt_table_format,
@@ -2198,7 +2297,7 @@ def _interactive_collect_flags(
 
     if not s.table_mode_cli_supplied:
         s.table_mode = prompt_table_mode(default_mode=s.table_mode)
-        if s.table_mode == "external" and s.tuning.strip().lower() == "tuned":
+        if s.table_mode == "external" and _tuning_arg_is_tuning_bearing(s.tuning):
             _reject_external_tuned(console, s.logger, s.ctx)
     else:
         console.print(f"[dim]Using table mode from CLI: {s.table_mode}[/dim]")
@@ -2232,16 +2331,29 @@ def _interactive_collect_flags(
             db_manager.set_verbosity(s.verbosity_settings)
             bench_manager.set_verbosity(s.verbosity_settings)
 
-    if not s.parsed_platform_options:
-        platform_opts = prompt_platform_options(s.database_config.type)
-        if platform_opts:
-            if s.database_config.options is None:
-                s.database_config.options = {}
-            s.database_config.options.update(platform_opts)
-            s.benchmark_config.options["platform_options"] = dict(platform_opts)
-            s.benchmark_config.options["platform_option_sources"] = {
-                str(key): "runtime_override" for key in platform_opts
-            }
+    _interactive_prompt_platform_options(s)
+
+
+def _interactive_prompt_platform_options(s: types.SimpleNamespace) -> None:
+    if s.parsed_platform_options:
+        return
+
+    platform_opts = getattr(s, "_interactive_platform_options", None)
+    if platform_opts is None:
+        from benchbox.cli.benchmarks import prompt_platform_options
+
+        platform_opts = prompt_platform_options(s.database_config.type) or {}
+        s._interactive_platform_options = platform_opts
+
+    if not platform_opts:
+        return
+    if s.database_config.options is None:
+        s.database_config.options = {}
+    s.database_config.options.update(platform_opts)
+    benchmark_config = getattr(s, "benchmark_config", None)
+    if benchmark_config is not None:
+        benchmark_config.options["platform_options"] = dict(platform_opts)
+        benchmark_config.options["platform_option_sources"] = {str(key): "runtime_override" for key in platform_opts}
 
 
 def _interactive_prompt_seed(s: types.SimpleNamespace, prompt_seed_fn: Any) -> None:
@@ -2272,6 +2384,7 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
 
     from benchbox.cli.tuning import run_tuning_wizard
 
+    tuning_source_value = TuningSource.BASELINE.value
     if sys.stdin.isatty() and sys.stdout.isatty():
         if Confirm.ask("\nWould you like to configure tuning options?", default=True):
             s.loaded_unified_config = run_tuning_wizard(
@@ -2281,6 +2394,7 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
                 interactive=True,
             )
             s.tuning_enabled, s.tuning = infer_runtime_tuning_mode(s.loaded_unified_config)
+            tuning_source_value = TuningSource.INTERACTIVE_WIZARD.value
             console.print("[green]✅ Tuning configuration completed[/green]")
             s.tuning_config_file = None
             s.use_auto_tuning = False
@@ -2299,15 +2413,26 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
         s.tuning_config_file = None
         s.use_auto_tuning = False
 
-    if s.table_mode == "external" and s.tuning.strip().lower() == "tuned":
+    # This step never runs through `resolve_tuning()` (it's the fully
+    # interactive wizard path, not a `--tuning` CLI value), so build a fresh
+    # `TuningResolution` here rather than leaving the stale pre-wizard one
+    # from `_resolve_tuning()` in place -- otherwise `canonical_mode` could
+    # still read as the earlier resolution's mode/source pair.
+    s.tuning_resolution = (
+        TuningResolution(mode=TuningMode.TUNED, source=TuningSource.INTERACTIVE_WIZARD, enabled=True)
+        if s.tuning_enabled
+        else TuningResolution(mode=TuningMode.NOTUNING, source=TuningSource.BASELINE, enabled=False)
+    )
+
+    if s.table_mode == "external" and _tuning_arg_is_tuning_bearing(s.tuning):
         _reject_external_tuned(console, s.logger, s.ctx)
 
+    s.tuning_source_value, s.tuning_template_ref = tuning_source_value, None  # no template file here
     if getattr(s.database_config, "options", None) is None:
         s.database_config.options = {}
     s.database_config.options["tuning_enabled"] = s.tuning_enabled
-    s.database_config.tuning_enabled = s.tuning_enabled
+    promote_tuning_provenance(s.database_config, s.tuning_enabled, s.tuning_source_value, s.tuning_template_ref)
     s.database_config.show_query_plans = s.show_query_plans
-    s.database_config.unified_tuning_configuration = s.loaded_unified_config
 
     s.benchmark_config.options["unified_tuning_configuration"] = s.loaded_unified_config
     s.benchmark_config.options["tuning_enabled"] = s.tuning_enabled
@@ -2338,22 +2463,87 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
         s.benchmark_config.options["table_format_compression"] = s.table_format_compression
 
 
+def _finalize_normal_interactive_plan(s: types.SimpleNamespace) -> None:
+    """Finalize wizard selections once, before either preview or execution."""
+    assert s.database_config is not None
+    assert s.benchmark_config is not None
+    s.platform = s.database_config.type
+    s.platform_key = normalize_platform_name(s.platform)
+    s.benchmark = s.benchmark_config.name
+    s.scale = s.benchmark_config.scale_factor
+    s.phases = ",".join(s.phases_to_run)
+    s.test_execution_type = _derive_execution_type(s.phases_to_run)
+    s.execution_mode = s.test_execution_type
+    s.queries_to_run = list(s.benchmark_config.queries) if s.benchmark_config.queries else None
+    s.queries = ",".join(s.queries_to_run) if s.queries_to_run else None
+    if not s.compression_cli_set:
+        selected_compression = CompressionConfig(
+            enabled=s.benchmark_config.compress_data,
+            type=s.benchmark_config.compression_type,
+            level=s.benchmark_config.compression_level,
+        )
+        s.compression = selected_compression
+        s.comp_config = selected_compression
+        s.compress_data = selected_compression.enabled
+        s.no_compression = not selected_compression.enabled
+        s.compression_type = selected_compression.type
+        s.compression_level = selected_compression.level
+    s.concurrency = s.benchmark_config.concurrency
+    s.run_request = _current_run_request(s)
+    s.resolved_run_plan = _capture_resolved_run_plan(s)
+
+    plan: ResolvedRunPlan = s.resolved_run_plan
+    # The wizard can turn official mode ON after `select_benchmark()` already
+    # built this config with `official=False` - `_interactive_collect_flags`
+    # updates only `s.official`. Without this copy `compliance_mode_kwargs()`
+    # reads the stale config value, so a run the wizard reported as official
+    # classifies as `unofficial_nonstandard` and `benchbox submit` refuses it.
+    s.benchmark_config.official = bool(getattr(s, "official", False))
+    s.benchmark_config.scale_factor = plan.scale
+    s.benchmark_config.queries = list(plan.queries) if plan.queries is not None else None
+    s.benchmark_config.compress_data = plan.compression_enabled
+    s.benchmark_config.compression_type = plan.compression_type
+    s.benchmark_config.compression_level = plan.compression_level
+    s.benchmark_config.test_execution_type = plan.test_execution_type
+    s.benchmark_config.stats_reset = getattr(s, "stats_reset", None)
+    s.benchmark_config.stats_per_table_timing = bool(getattr(s, "stats_per_table_timing", False))
+    s.benchmark_config.options.update(
+        {
+            "table_mode": plan.table_mode,
+            "tuning_enabled": plan.tuning_enabled,
+            "unified_tuning_configuration": plan.loaded_unified_config,
+        }
+    )
+    if plan.seed is None:
+        s.benchmark_config.options.pop("seed", None)
+    else:
+        s.benchmark_config.options["seed"] = plan.seed
+    if plan.data_organization is None:
+        s.benchmark_config.options.pop("data_organization", None)
+    else:
+        s.benchmark_config.options["data_organization"] = dict(plan.data_organization)
+    if plan.dataframe_tuning_config is None:
+        s.benchmark_config.options.pop("df_tuning_config", None)
+    else:
+        s.benchmark_config.options["df_tuning_config"] = plan.dataframe_tuning_config
+    s.database_config.execution_mode = plan.resolved_mode
+
+
 def _interactive_preflight_and_execute(s: types.SimpleNamespace, system_profile: Any) -> None:
     """Run pre-flight cloud check, interactive preview, execution, and export."""
     ctx = s.ctx
     assert s.database_config is not None
     assert s.benchmark_config is not None
-    # The interactive wizard builds s.benchmark_config in _interactive_normal_flow
-    # (bench_manager.select_benchmark()) / _interactive_try_quick_restart, neither
-    # of which knows about --stats-reset/--stats-per-table-timing - those are
-    # collected onto `s` afterward via _interactive_collect_flags. The direct and
-    # load-only paths pass them at BenchmarkConfig construction time; mirror that
-    # here so the actual run (runner.py reads benchmark_config.stats_reset /
-    # .stats_per_table_timing, not s.stats_reset) honors what the preview below
-    # already shows the user, instead of silently running with the defaults.
-    s.benchmark_config.stats_reset = getattr(s, "stats_reset", None)
-    s.benchmark_config.stats_per_table_timing = bool(getattr(s, "stats_per_table_timing", False))
-    if PlatformRegistry.requires_cloud_storage(s.database_config.type) and not s.output:
+    if not getattr(s, "quick_restart_used", False):
+        _finalize_normal_interactive_plan(s)
+    else:
+        # Quick restart already finalized both configs from the atomic plan.
+        s.benchmark_config.stats_reset = getattr(s, "stats_reset", None)
+        s.benchmark_config.stats_per_table_timing = bool(getattr(s, "stats_per_table_timing", False))
+        # Quick restart already finalized concurrency in its resolved plan.
+        if getattr(s, "concurrency", None) is not None:
+            s.benchmark_config.concurrency = s.concurrency
+    if _run_stages_through_cloud_storage(s) and not s.output:
         console.print()
         console.print("[red]❌ Error: Cloud platform requires --output parameter[/red]")
         console.print(
@@ -2389,20 +2579,7 @@ def _interactive_preflight_and_execute(s: types.SimpleNamespace, system_profile:
     console.print("\n[bold]Step 6 of 6:[/bold] [cyan]Benchmark Execution[/cyan]")
     console.print("Executing benchmark with platform optimizations...")
 
-    execution_context = _build_execution_context(
-        phases_to_run=s.phases_to_run,
-        seed=s.seed,
-        compression=s.comp_config,
-        mode=s.mode,
-        official=s.official,
-        validation=s.val_config,
-        force=s.force_config,
-        queries_to_run=s.queries_to_run,
-        capture_plans=s.capture_plans,
-        strict_plan_capture=s.strict_plan_capture,
-        non_interactive=s.non_interactive,
-        tuning=s.tuning,
-    )
+    execution_context = _build_execution_context_from_plan(s)
 
     orchestrator = BenchmarkOrchestrator()
     orchestrator.set_verbosity(s.verbosity_settings)
@@ -2417,7 +2594,7 @@ def _interactive_preflight_and_execute(s: types.SimpleNamespace, system_profile:
         s.benchmark_config,
         system_profile,
         s.database_config,
-        s.phases_to_run,
+        list(s.resolved_run_plan.phases),
         quiet=bool(s.quiet),
         no_progress=bool(s.no_progress),
         no_monitoring=bool(s.no_monitoring),
@@ -2431,6 +2608,7 @@ def _interactive_show_preview(s: types.SimpleNamespace) -> None:
     """Show the pre-execution interactive preview panel."""
     from benchbox.cli.dryrun import display_interactive_preview
 
+    plan: ResolvedRunPlan = s.resolved_run_plan
     force_str = None
     if s.force:
         if s.force.datagen and s.force.upload:
@@ -2455,11 +2633,11 @@ def _interactive_show_preview(s: types.SimpleNamespace) -> None:
     display_interactive_preview(
         database_config=s.database_config,
         benchmark_config=s.benchmark_config,
-        phases=s.phases_to_run,
+        phases=list(plan.phases),
         output=s.output,
-        table_mode=s.table_mode,
-        tuning=s.tuning if s.tuning != "notuning" else None,
-        seed=s.seed,
+        table_mode=plan.table_mode,
+        tuning=plan.request.tuning if plan.request.tuning != "notuning" else None,
+        seed=plan.seed,
         force=force_str,
         official=s.official,
         capture_plans=s.capture_plans,
@@ -2537,11 +2715,18 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
             compression_type=s.benchmark_config.compression_type,
             compression_level=s.benchmark_config.compression_level,
             test_execution_type=s.benchmark_config.test_execution_type,
+            queries=(
+                list(s.benchmark_config.queries) if getattr(s.benchmark_config, "queries", None) is not None else None
+            ),
+            mode=getattr(s, "resolved_mode", None),
             seed=s.seed,
+            iterations=s.resolved_run_plan.iterations,
+            non_replayable_options=list(s.resolved_run_plan.non_replayable_options),
             output=s.output,
             additional_options={"table_mode": s.table_mode},
         )
     else:
+        _emit_load_failure_marker(result)
         console.print(f"\n[red]❌ Benchmark failed with status: {result.validation_status}[/red]")
         ctx.exit(1)
 
@@ -2563,7 +2748,7 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--phases",
     type=str,
     default="power",
-    help="Phases: generate,load,statistics,warmup,power,throughput,maintenance",
+    help=f"Phases: {','.join(VALID_PHASES)}",
 )
 @click.option(
     "--queries",
@@ -2598,6 +2783,7 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--dry-run",
     type=str,
     metavar="OUTPUT_DIR",
+    callback=ValidationRules.validate_dry_run_output_dir,
     help="Preview configuration without execution",
 )
 @click.option(
@@ -2755,11 +2941,18 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
 )
 @advanced_option(
     "--mode",
-    type=click.Choice(["sql", "dataframe"], case_sensitive=False),
+    type=click.Choice(list(RUN_MODES), case_sensitive=False),
     default=None,
     help="Execution mode: sql or dataframe",
 )
 @advanced_option("--seed", type=int, help="RNG seed for query parameter generation")
+@advanced_option(
+    "--concurrency",
+    type=click.IntRange(min=1),
+    default=None,
+    hidden=True,
+    help="Concurrent streams (hidden; for run-official)",
+)
 @advanced_option(
     "--iterations",
     type=click.IntRange(min=1),
@@ -2850,6 +3043,7 @@ def run(
     benchmark_option_pairs: tuple[tuple[str, str], ...],
     mode: str | None,
     seed: int | None,
+    concurrency: int | None,
     iterations: int | None,
     no_monitoring: bool,
     no_progress: bool,
@@ -2914,6 +3108,7 @@ def run(
         benchmark_option_pairs=benchmark_option_pairs,
         mode=mode,
         seed=seed,
+        concurrency=concurrency,
         iterations=iterations,
         no_monitoring=no_monitoring,
         no_progress=no_progress,

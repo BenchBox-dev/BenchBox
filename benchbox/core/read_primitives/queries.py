@@ -37,7 +37,17 @@ class ReadPrimitivesQueryManager(BaseQueryCatalogMixin):
 
         return self._catalog_version
 
-    # get_query() and has_variant() are inherited from BaseQueryCatalogMixin
+    def get_query(self, query_id: str, dialect: str | None = None) -> str:
+        """Return a catalog query, applying ClickHouse's case-sensitive lag spelling."""
+
+        query = super().get_query(query_id, dialect)
+        if query_id == "timeseries_trend_analysis" and dialect and dialect.lower().strip() == "clickhouse":
+            # ClickHouse 25.8 resolves the window function only when the
+            # identifier is lowercase; keep the canonical catalog SQL portable.
+            return query.replace("LAG(monthly_revenue, 1)", "lag(monthly_revenue, 1)")
+        return query
+
+    # has_variant() is inherited from BaseQueryCatalogMixin
 
     def get_all_queries(self) -> dict[str, str]:
         """Get all Read Primitives queries.

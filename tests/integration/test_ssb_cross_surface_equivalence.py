@@ -38,26 +38,39 @@ pytestmark = [
     pytest.mark.duckdb,
 ]
 
+# The six SSB queries fixed by #870: they returned zero rows at every scale (a
+# generator value-format defect) and passed the gate empty-vs-empty. They must now
+# be non-empty so a regression that re-empties them fails in this fast lane, not
+# only in the heavyweight vacuity gate (which is what masked the bug originally).
+_PREVIOUSLY_EMPTY = ("Q2.1", "Q2.2", "Q2.3", "Q3.3", "Q3.4", "Q4.3")
 
-def test_ssb_dataframe_surface_equivalent_to_sql(tmp_path):
+
+@pytest.fixture(scope="module")
+def ssb_cell(tmp_path_factory):
+    """Build the bounded SF=0.1 SSB DuckDB cell once for the module's tests."""
+    gate = GATES["ssb"]
+    data = gate.build(EQUIVALENCE_SCALE, tmp_path_factory.mktemp("ssb_cell"))
+    try:
+        yield data
+    finally:
+        data.connection.close()
+
+
+def test_ssb_dataframe_surface_equivalent_to_sql(ssb_cell):
     """Every SSB DataFrame query (both backends) must match its own SQL surface."""
     gate = GATES["ssb"]
-    data = gate.build(EQUIVALENCE_SCALE, tmp_path)
-    connection = data.connection
-    try:
-        contexts = build_production_contexts(data.benchmark, data.data_dir, backends=gate.backends)
-        divergences = find_cross_surface_divergences(
-            connection,
-            query_ids=data.query_ids,
-            reference_sql=data.reference_sql,
-            dataframe_query=data.dataframe_query,
-            contexts=contexts,
-            validator=ResultValidator(tolerance=gate.tolerance),
-            backends=gate.backends,
-        )
-        coverage = count_executed_cells(data.query_ids, data.dataframe_query, gate.backends)
-    finally:
-        connection.close()
+    data = ssb_cell
+    contexts = build_production_contexts(data.benchmark, data.data_dir, backends=gate.backends)
+    divergences = find_cross_surface_divergences(
+        data.connection,
+        query_ids=data.query_ids,
+        reference_sql=data.reference_sql,
+        dataframe_query=data.dataframe_query,
+        contexts=contexts,
+        validator=ResultValidator(tolerance=gate.tolerance),
+        backends=gate.backends,
+    )
+    coverage = count_executed_cells(data.query_ids, data.dataframe_query, gate.backends)
 
     # Both gated backends must actually compare something - a fully-unimplemented
     # backend would make the gate silently green by comparing nothing.
@@ -69,4 +82,19 @@ def test_ssb_dataframe_surface_equivalent_to_sql(tmp_path):
     unexpected = {d.key for d in divergences} - set(gate.known_divergences)
     assert not unexpected, "SSB DataFrame surface diverges from SQL: " + ", ".join(
         f"{d.key} ({d.detail})" for d in divergences if d.key in unexpected
+    )
+
+
+def test_ssb_previously_empty_queries_now_discriminate(ssb_cell):
+    """The #870 queries must return >=1 reference row (no allowlist re-masks them)."""
+    data = ssb_cell
+    # The gate dropped its legitimately_empty allowlist, so no SSB cell may be
+    # vacuous; this pins the six historically-empty queries directly and fast.
+    assert not GATES["ssb"].legitimately_empty, (
+        "the SSB gate must carry no legitimately_empty classification once the data is fixed"
+    )
+    empty = [qid for qid in _PREVIOUSLY_EMPTY if not data.connection.execute(data.reference_sql(qid)).fetchall()]
+    assert not empty, (
+        f"SSB queries regressed to vacuous (0 reference rows) at SF={EQUIVALENCE_SCALE}: {empty} - "
+        "the generator no longer emits values matching the canonical query literals (#870)."
     )

@@ -128,6 +128,7 @@ class TestTuningValidator:
         mock_adapter = Mock()
         mock_adapter.tuning_enabled = False
         mock_adapter.get_effective_tuning_configuration = Mock(return_value=None)
+        mock_adapter._validate_database_tunings = Mock(return_value=Mock(is_valid=True, errors=[], warnings=[]))
 
         validator = TuningValidator(mock_adapter, {})
         result = validator.validate()
@@ -135,6 +136,23 @@ class TestTuningValidator:
         assert result.is_valid is True
         assert len(result.errors) == 0
         assert len(result.warnings) == 0
+
+    def test_validate_no_tuning_enabled_warns_when_database_has_tuning_metadata(self):
+        mock_adapter = Mock()
+        mock_adapter.tuning_enabled = False
+        mock_adapter.get_effective_tuning_configuration = Mock(return_value=None)
+        mock_adapter._validate_database_tunings = Mock(
+            return_value=Mock(
+                is_valid=True,
+                errors=[],
+                warnings=["Database contains tuning metadata but no tunings expected for this run"],
+            )
+        )
+
+        result = TuningValidator(mock_adapter, {"database": "test"}).validate()
+
+        assert result.is_valid is True
+        assert result.warnings == ["Database contains tuning metadata but no tunings expected for this run"]
 
     def test_validate_with_valid_tuning(self):
         """Test validation with valid tuning configuration."""
@@ -145,6 +163,7 @@ class TestTuningValidator:
         mock_tuning_result = Mock()
         mock_tuning_result.is_valid = True
         mock_tuning_result.errors = []
+        mock_tuning_result.warnings = []
         mock_adapter._validate_database_tunings = Mock(return_value=mock_tuning_result)
 
         validator = TuningValidator(mock_adapter, {})
@@ -162,6 +181,7 @@ class TestTuningValidator:
         mock_tuning_result = Mock()
         mock_tuning_result.is_valid = False
         mock_tuning_result.errors = ["Error 1", "Error 2"]
+        mock_tuning_result.warnings = []
         mock_adapter._validate_database_tunings = Mock(return_value=mock_tuning_result)
 
         validator = TuningValidator(mock_adapter, {})
@@ -180,6 +200,7 @@ class TestTuningValidator:
         mock_tuning_result = Mock()
         mock_tuning_result.is_valid = False
         mock_tuning_result.errors = [f"Error {i}" for i in range(10)]
+        mock_tuning_result.warnings = []
         mock_adapter._validate_database_tunings = Mock(return_value=mock_tuning_result)
 
         validator = TuningValidator(mock_adapter, {})
@@ -195,17 +216,20 @@ class TestTuningValidator:
         mock_adapter.tuning_enabled = True
         mock_adapter.get_effective_tuning_configuration = Mock(return_value=None)
 
-        # Mock TuningMetadataManager - patch at the import location
-        with patch("benchbox.core.tuning.metadata.TuningMetadataManager") as mock_manager_class:
-            mock_manager = mock_manager_class.return_value
-            mock_manager.load_tunings.return_value = ["tuning1", "tuning2"]
+        mock_adapter._validate_database_tunings = Mock(
+            return_value=Mock(
+                is_valid=True,
+                errors=[],
+                warnings=["Database contains tuning metadata but no tunings expected for this run"],
+            )
+        )
 
-            validator = TuningValidator(mock_adapter, {"database": "test"})
-            result = validator.validate()
+        validator = TuningValidator(mock_adapter, {"database": "test"})
+        result = validator.validate()
 
-            assert result.is_valid is True
-            assert len(result.warnings) == 1
-            assert "contains tuning metadata" in result.warnings[0]
+        assert result.is_valid is True
+        assert len(result.warnings) == 1
+        assert "contains tuning metadata" in result.warnings[0]
 
 
 class TestSchemaValidator:

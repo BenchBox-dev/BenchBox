@@ -13,13 +13,14 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
 from benchbox.core.visualization.chart_types import CHART_TYPE_DESCRIPTIONS
 from benchbox.core.visualization.orchestration import render_chart_set
 from benchbox.core.visualization.suggestions import build_visualization_profile, recommend_charts, select_primary_chart
 from benchbox.mcp.errors import ErrorCode, make_error
+from benchbox.mcp.security import PathProvider, resolve_path_provider
 from benchbox.mcp.tools.path_utils import resolve_result_file_path
 
 logger = logging.getLogger(__name__)
@@ -76,25 +77,26 @@ MCP_GENERATE_CHART_DESCRIPTION = (
     "Generate ASCII chart output from BenchBox result files using semantic chart IDs or chart templates. "
     f"{BENCHBOX_CHART_NAMESPACE_NOTE} "
     f"Current semantic chart IDs: {_semantic_chart_id_help()}. "
-    f"Current templates: {_template_name_help()}."
+    f"Current templates: {_template_name_help()}. "
+    "MCP output is inline-only: file output and non-ASCII formats are rejected."
 )
 
 # Tool annotations for read-only visualization info tools
 VIZ_READONLY_ANNOTATIONS = ToolAnnotations(
     title="Visualization information",
-    readOnlyHint=True,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=False,
+    read_only_hint=True,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=False,
 )
 
-# Tool annotations for chart generation (creates files)
+# Tool annotations for inline chart generation
 VIZ_GENERATE_ANNOTATIONS = ToolAnnotations(
-    title="Generate visualization",
-    readOnlyHint=False,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=False,
+    title="Generate inline visualization",
+    read_only_hint=True,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=False,
 )
 
 
@@ -201,7 +203,7 @@ def _generate_ascii_chart(
         }
 
     except Exception as e:
-        logger.exception(f"ASCII chart generation failed: {e}")
+        logger.error("ASCII chart generation failed (%s)", type(e).__name__)
         return make_error(
             ErrorCode.INTERNAL_ERROR,
             f"ASCII chart generation failed: {e}",
@@ -279,7 +281,7 @@ def _suggest_charts_impl(file_list: list[str], resolved_paths: list[Path]) -> di
             details={"result_files": file_list},
         )
     except Exception as e:
-        logger.exception(f"Chart suggestion failed: {e}")
+        logger.error("Chart suggestion failed (%s)", type(e).__name__)
         return make_error(
             ErrorCode.INTERNAL_ERROR,
             f"Chart suggestion failed: {e}",
@@ -320,14 +322,12 @@ def _generate_chart_impl(
 
 
 def register_visualization_tools(
-    mcp: FastMCP,
+    mcp: MCPServer,
     *,
-    results_dir: Path,
-    charts_dir: Path,
+    results_dir: PathProvider,
+    charts_dir: PathProvider,
 ) -> None:
     """Register visualization tools with the MCP server."""
-    configured_results_dir = Path(results_dir)
-    configured_charts_dir = Path(charts_dir)
 
     @mcp.tool(description=MCP_SUGGEST_CHARTS_DESCRIPTION, annotations=VIZ_READONLY_ANNOTATIONS)
     def suggest_charts(result_files: str) -> dict[str, Any]:
@@ -347,7 +347,7 @@ def register_visualization_tools(
                 suggestion="Provide comma-separated list of result filenames",
             )
 
-        result = _resolve_and_validate_result_files(file_list, configured_results_dir)
+        result = _resolve_and_validate_result_files(file_list, resolve_path_provider(results_dir))
         if isinstance(result, dict):
             return result
         resolved_paths, file_list = result
@@ -380,9 +380,13 @@ def register_visualization_tools(
             - Comparison: generate_chart(result_files="duckdb.json,polars.json", chart_type="query_heatmap", format="ascii")
 
         ASCII charts are rendered inline and returned in the 'content' field. They include:
-            - ANSI colors for terminal display (copy-paste preserves formatting)
             - Unicode box-drawing characters for clean visualization
             - Best/worst highlighting, legends, and scale indicators
+
+        Output is deliberately ANSI-color-free. MCP responses are protocol
+        payloads consumed by non-terminal clients, where escape sequences are
+        noise rather than formatting, so the renderer is always constructed with
+        ``ChartOptions(use_color=False)``.
         """
         file_list = [f.strip() for f in result_files.split(",") if f.strip()]
         if not file_list:
@@ -392,8 +396,21 @@ def register_visualization_tools(
                 suggestion="Provide comma-separated list of result filenames",
             )
 
-        _ = configured_charts_dir  # reserved for future chart file outputs
-        result = _resolve_and_validate_result_files(file_list, configured_results_dir)
+        if format != "ascii":
+            return make_error(
+                ErrorCode.VALIDATION_INVALID_FORMAT,
+                "MCP chart output supports only the inline 'ascii' format",
+                details={"format": format, "supported_formats": ["ascii"]},
+            )
+        if output_dir is not None:
+            return make_error(
+                ErrorCode.VALIDATION_ERROR,
+                "MCP chart output is inline-only; file output is not supported",
+                details={"output_mode": "inline", "supported_formats": ["ascii"]},
+            )
+
+        resolve_path_provider(charts_dir)  # Validate the configured provider without accepting a caller path.
+        result = _resolve_and_validate_result_files(file_list, resolve_path_provider(results_dir))
         if isinstance(result, dict):
             return result
         resolved_paths, file_list = result

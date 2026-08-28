@@ -15,16 +15,17 @@ import json
 import logging
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from benchbox.core.benchmark_registry import (
     get_all_benchmarks,
     get_benchmark_default_scale,
-    get_benchmark_metadata,
     get_benchmark_surface,
     get_public_benchmark_class,
-    list_public_benchmark_ids,
 )
+from benchbox.mcp.security import PathProvider, resolve_path_provider
+from benchbox.mcp.tools.discovery import build_benchmark_payload, build_platform_payloads
+from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
 
@@ -65,63 +66,58 @@ def _get_benchmark_query_ids(benchmark_lower: str, name: str) -> list[str]:
 
 
 def _build_benchmark_detail(name: str) -> str:
-    """Build JSON response with detailed benchmark information."""
-    benchmark_lower = name.lower()
-    meta = get_benchmark_metadata(benchmark_lower)
+    """Projection of the canonical benchmark payload for the resource surface.
 
-    if meta is None or get_benchmark_surface(benchmark_lower) != "public":
+    Resources keep their own flatter field names (`query_count`/`query_ids`
+    rather than the tool's nested `queries` object) and their own field set --
+    they carry `estimated_time_minutes`, which the tool does not, and omit the
+    tool's `schema` block. What they no longer do is walk the registry a second
+    time to build them.
+    """
+    payload = build_benchmark_payload(name)
+
+    if not payload["found"]:
         return json.dumps(
             {
-                "error": f"Benchmark '{name}' not found",
-                "available": list_public_benchmark_ids(),
+                "error": f"Benchmark '{payload['requested']}' not found",
+                "available": payload["available"],
             }
         )
 
-    query_ids = _get_benchmark_query_ids(benchmark_lower, name)
-
     return json.dumps(
         {
-            "name": benchmark_lower,
-            "display_name": meta.get("display_name", benchmark_lower),
-            "description": meta.get("description", ""),
-            "category": meta.get("category", "unknown"),
-            "support_status": meta["support_status"],
-            "query_count": meta.get("num_queries", len(query_ids)),
-            "query_ids": query_ids,
-            "scale_factors": {
-                "default": meta.get("default_scale", 0.01),
-                "options": meta.get("scale_options", [0.01, 0.1, 1, 10]),
-                "minimum": meta.get("min_scale", 0.01),
-            },
-            "complexity": meta.get("complexity", "Medium"),
-            "estimated_time_minutes": meta.get("estimated_time_range", (1, 5)),
-            "dataframe_support": meta.get("supports_dataframe", False),
+            "name": payload["name"],
+            "display_name": payload["display_name"],
+            "description": payload["description"],
+            "category": payload["category"],
+            "support_status": payload["support_status"],
+            "query_count": payload["query_count"],
+            # Deliberately NOT truncated: the tool caps ids at 30 for response
+            # size, but a resource read is the documented way to get the full
+            # list, and TPC-DS-scale benchmarks have far more than 30.
+            "query_ids": payload["query_ids"],
+            "scale_factors": payload["scale_factors"],
+            "complexity": payload["complexity"],
+            "estimated_time_minutes": payload["estimated_time_minutes"],
+            "dataframe_support": payload["dataframe_support"],
         },
         indent=2,
     )
 
 
 def _build_platforms_list() -> str:
-    """Build JSON response listing all available platforms."""
-    from benchbox.core.platform_registry import PlatformRegistry
-
-    platforms = []
-    all_metadata = PlatformRegistry.get_all_platform_metadata()
-
-    for name, metadata in all_metadata.items():
-        capabilities = metadata.get("capabilities", {})
-        info = PlatformRegistry.get_platform_info(name)
-
-        platforms.append(
-            {
-                "name": name,
-                "display_name": metadata.get("display_name", name),
-                "category": metadata.get("category", "unknown"),
-                "available": info.available if info else False,
-                "supports_sql": capabilities.get("supports_sql", False),
-                "supports_dataframe": capabilities.get("supports_dataframe", False),
-            }
-        )
+    """Projection of the canonical platform payloads for the resource surface."""
+    platforms = [
+        {
+            "name": platform["name"],
+            "display_name": platform["display_name"],
+            "category": platform["category"],
+            "available": platform["available"],
+            "supports_sql": platform["supports_sql"],
+            "supports_dataframe": platform["supports_dataframe"],
+        }
+        for platform in build_platform_payloads()
+    ]
 
     return json.dumps({"platforms": platforms, "count": len(platforms)}, indent=2)
 
@@ -180,7 +176,7 @@ def _parse_result_file_metadata(file_path: Path) -> dict | None:
             "execution_id": data.get("run", {}).get("id", "unknown"),
         }
     except Exception as e:
-        logger.warning(f"Could not parse result file {file_path}: {e}")
+        logger.warning("Could not parse result file %s (%s)", file_path.name, type(e).__name__)
         return None
 
 
@@ -195,11 +191,7 @@ def _build_recent_results(results_dir: Path) -> str:
             }
         )
 
-    result_files = [
-        path
-        for path in results_dir.glob("*.json")
-        if not path.name.endswith(".plans.json") and not path.name.endswith(".tuning.json")
-    ]
+    result_files = [path for path in results_dir.glob("*.json") if not path.name.endswith(COMPANION_SUFFIXES)]
     runs = []
 
     for file_path in sorted(result_files, key=lambda p: p.stat().st_mtime, reverse=True)[:20]:
@@ -253,14 +245,12 @@ def _build_system_profile() -> str:
     )
 
 
-def register_all_resources(mcp: FastMCP, *, results_dir: Path) -> None:
+def register_all_resources(mcp: MCPServer, *, results_dir: PathProvider) -> None:
     """Register all MCP resources with the server.
 
     Args:
-        mcp: The FastMCP server instance to register resources with.
+        mcp: The MCPServer instance to register resources with.
     """
-
-    resolved_results_dir = Path(results_dir).expanduser()
 
     @mcp.resource("benchbox://benchmarks")
     def list_benchmarks_resource() -> str:
@@ -285,7 +275,7 @@ def register_all_resources(mcp: FastMCP, *, results_dir: Path) -> None:
     @mcp.resource("benchbox://results/recent")
     def get_recent_results_resource() -> str:
         """Get list of recent benchmark results."""
-        return _build_recent_results(resolved_results_dir)
+        return _build_recent_results(resolve_path_provider(results_dir).expanduser())
 
     @mcp.resource("benchbox://system/profile")
     def get_system_profile_resource() -> str:

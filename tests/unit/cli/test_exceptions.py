@@ -295,13 +295,20 @@ class TestValidationRules:
         # Should not raise exception
         ValidationRules.validate_output_directory(str(tmp_path))
 
-    def test_validate_output_directory_local_invalid(self):
-        """Test output directory validation with invalid local path."""
+    def test_validate_output_directory_local_invalid(self, tmp_path):
+        """Test output directory validation with invalid local path.
+
+        The invalid path sits under a regular FILE so creation fails for
+        every uid - root can mkdir /invalid, which made an absolute-path
+        probe pass vacuously as non-root and fail as root."""
+        blocker = tmp_path / "blocker"
+        blocker.write_text("")
+        invalid = str(blocker / "sub")
         with pytest.raises(ValidationError) as exc_info:
-            ValidationRules.validate_output_directory("/invalid/path/that/cannot/be/created")
+            ValidationRules.validate_output_directory(invalid)
 
         assert "Cannot create output directory" in str(exc_info.value)
-        assert exc_info.value.details["path"] == "/invalid/path/that/cannot/be/created"
+        assert exc_info.value.details["path"] == invalid
 
     def test_validate_output_directory_cloud_invalid_credentials(self):
         """Test output directory validation with cloud path and invalid credentials."""
@@ -312,3 +319,14 @@ class TestValidationRules:
         assert "Cloud storage credentials validation failed" in str(exc_info.value)
         # Provider can be 's3' (cloudpathlib installed) or 'unknown' (not installed)
         assert exc_info.value.details["provider"] in ("s3", "unknown")
+
+    def test_validate_output_directory_allows_user_stage_for_native_snowflake(self):
+        ValidationRules.validate_output_directory("@~/benchbox", platform="snowflake", table_mode="native")
+
+    def test_validate_output_directory_rejects_named_stage_for_native_snowflake(self):
+        with pytest.raises(CloudStorageError, match="named or table stage"):
+            ValidationRules.validate_output_directory("@my_stage/data", platform="snowflake", table_mode="native")
+
+    def test_validate_output_directory_rejects_stage_for_external_snowflake(self):
+        with pytest.raises(CloudStorageError, match="requires a cloud URI"):
+            ValidationRules.validate_output_directory("@~/benchbox", platform="snowflake", table_mode="external")

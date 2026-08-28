@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     )
 
 from ..core.exceptions import ConfigurationError
-from ..utils.cloud_storage import get_cloud_path_info
+from ..utils.cloud_storage import get_cloud_path_info, snowflake_stage_mode_error
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.config_utils import make_registered_platform_config_builder
@@ -115,10 +115,14 @@ class SnowflakeAdapter(PlatformAdapter):
         # staging_root is passed by orchestrator when using CloudStagingPath
         # For now, we log it but continue using internal stages (which work with local files)
         self.staging_root = config.get("staging_root")
+        self.table_mode = str(config.get("table_mode") or "native").lower()
         self.iceberg_external_volume = config.get("iceberg_external_volume")
         self.iceberg_catalog = config.get("iceberg_catalog") or "SNOWFLAKE"
         self.delta_table_format = config.get("delta_table_format") or "DELTA"
         if self.staging_root:
+            stage_error = snowflake_stage_mode_error(self.staging_root, table_mode=self.table_mode)
+            if stage_error:
+                raise ValueError(stage_error)
             path_info = get_cloud_path_info(self.staging_root)
             self.logger.info(
                 f"staging_root configured for Snowflake external mode ({path_info['provider']}://{path_info['bucket']})"
@@ -140,9 +144,8 @@ class SnowflakeAdapter(PlatformAdapter):
             raise ConfigurationError(
                 f"Snowflake configuration is incomplete. Missing: {', '.join(missing)}\n"
                 "Configure with one of:\n"
-                "  1. CLI: benchbox platforms setup --platform snowflake\n"
-                "  2. Environment variables: SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PASSWORD, etc.\n"
-                "  3. CLI options: --platform-option account=<account> --platform-option warehouse=<wh>"
+                "  1. CLI: benchbox setup --platform snowflake\n"
+                "  2. Environment variables: SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PASSWORD, etc."
             )
 
     @property
@@ -838,6 +841,9 @@ class SnowflakeAdapter(PlatformAdapter):
                 "Snowflake external mode requires --platform-option staging_root=<cloud-uri> "
                 "(for example s3://bucket/path, gs://bucket/path, or azure://container/path)."
             )
+        stage_error = snowflake_stage_mode_error(self.staging_root, table_mode="external")
+        if stage_error:
+            raise ValueError(stage_error)
 
     def create_external_tables(
         self, benchmark: Any, connection: Any, data_dir: Path
@@ -1204,6 +1210,7 @@ class SnowflakeAdapter(PlatformAdapter):
                 actual_row_count=actual_row_count,
                 first_row=result[0] if result else None,
                 validation_result=validation_result,
+                materialized_rows=result,
             )
 
             # Include Snowflake-specific fields
@@ -1543,7 +1550,10 @@ class SnowflakeAdapter(PlatformAdapter):
                 }
 
             # Get table information
-            cursor.execute(f"""
+            from benchbox.platforms.snowflake_introspection import normalize_snowflake_schema
+
+            cursor.execute(
+                """
                 SELECT
                     TABLE_NAME,
                     ROW_COUNT,
@@ -1553,9 +1563,11 @@ class SnowflakeAdapter(PlatformAdapter):
                     LAST_ALTERED,
                     CLUSTERING_KEY
                 FROM INFORMATION_SCHEMA.TABLES
-                WHERE TABLE_SCHEMA = '{self.schema}'
+                WHERE TABLE_SCHEMA = %s
                 AND TABLE_TYPE = 'BASE TABLE'
-            """)
+                """,
+                (normalize_snowflake_schema(self.schema),),
+            )
             tables = cursor.fetchall()
             metadata["tables"] = [
                 {
@@ -1591,6 +1603,19 @@ class SnowflakeAdapter(PlatformAdapter):
             self.logger.info(f"Triggered reclustering for table {table_name.upper()}")
         finally:
             cursor.close()
+
+    def get_tuning_introspector(self):
+        """Read ``INFORMATION_SCHEMA`` clustering keys to corroborate the ledger.
+
+        Snowflake's tuning footprint is the clustering key, applied after load
+        by ``ALTER TABLE ... CLUSTER BY``. Those statements already reach the
+        applied ledger (``apply_standard_unified_tuning`` wraps the connection
+        in a recording connection), so this supplies the catalog side that lets
+        them be corroborated instead of classified ``unverifiable``.
+        """
+        from benchbox.platforms.snowflake_introspection import SnowflakeTuningIntrospector
+
+        return SnowflakeTuningIntrospector(schema=self.schema)
 
     def close_connection(self, connection: Any) -> None:
         """Close Snowflake connection."""
@@ -1677,6 +1702,7 @@ class SnowflakeAdapter(PlatformAdapter):
         try:
             # Import here to avoid circular imports
             from benchbox.core.tuning.interface import TuningType
+            from benchbox.platforms.snowflake_introspection import normalize_snowflake_schema, parse_clustering_key
 
             # Handle clustering keys
             cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
@@ -1694,20 +1720,34 @@ class SnowflakeAdapter(PlatformAdapter):
 
             if clustering_columns:
                 # Check current clustering key
-                cursor.execute(f"""
-                    SELECT CLUSTERING_KEY
-                    FROM INFORMATION_SCHEMA.TABLES
-                    WHERE TABLE_SCHEMA = '{self.schema}'
-                    AND TABLE_NAME = '{table_name}'
-                """)
+                cursor.execute(
+                    """
+                        SELECT CLUSTERING_KEY, AUTO_CLUSTERING_ON
+                        FROM INFORMATION_SCHEMA.TABLES
+                        WHERE TABLE_SCHEMA = %s
+                        AND TABLE_NAME = %s
+                    """,
+                    (normalize_snowflake_schema(self.schema), table_name),
+                )
                 result = cursor.fetchone()
                 current_clustering = result[0] if result and result[0] else None
+                automatic_clustering_value = result[1] if result and len(result) > 1 else None
+                automatic_clustering_on = automatic_clustering_value is True or str(
+                    automatic_clustering_value
+                ).strip().upper() in {
+                    "ON",
+                    "TRUE",
+                    "1",
+                }
 
                 desired_clustering = f"({', '.join(clustering_columns)})"
+                cluster_sql = f"ALTER TABLE {table_name} CLUSTER BY ({', '.join(clustering_columns)})"
 
-                if current_clustering != desired_clustering:
+                clustering_matches = parse_clustering_key(current_clustering) == parse_clustering_key(
+                    desired_clustering
+                )
+                if not clustering_matches:
                     # Apply clustering key
-                    cluster_sql = f"ALTER TABLE {table_name} CLUSTER BY ({', '.join(clustering_columns)})"
                     try:
                         cursor.execute(cluster_sql)
                         self.logger.info(f"Applied clustering key to {table_name}: {', '.join(clustering_columns)}")
@@ -1724,6 +1764,19 @@ class SnowflakeAdapter(PlatformAdapter):
                         self.logger.warning(f"Failed to apply clustering key to {table_name}: {e}")
                 else:
                     self.logger.info(f"Table {table_name} already has desired clustering key: {current_clustering}")
+                    ledger = getattr(self, "_applied_tuning_ledger", None)
+                    if ledger is not None:
+                        ledger.record_dropped(cluster_sql, "already present in Snowflake catalog; ALTER skipped")
+
+                    # A reused table can have the right key while Automatic
+                    # Clustering is suspended. The key check and maintenance
+                    # state are independent catalog facts.
+                    if len(clustering_columns) <= 4 and not automatic_clustering_on:
+                        try:
+                            cursor.execute(f"ALTER TABLE {table_name} RESUME RECLUSTER")
+                            self.logger.info(f"Enabled automatic clustering for {table_name}")
+                        except Exception as e:
+                            self.logger.debug(f"Could not enable automatic clustering for {table_name}: {e}")
 
             # Handle sorting - in Snowflake, this is achieved through clustering
             sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)

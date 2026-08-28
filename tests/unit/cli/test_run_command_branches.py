@@ -17,6 +17,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
+from benchbox.cli.run_resolution import ResolvedRunPlan, RunRequest
+
 # benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
 # same name as the run submodule.  On Python 3.10 mock's string-based patch()
 # resolves the target via getattr(benchbox.cli.commands, "run"), which returns
@@ -30,6 +32,52 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+def _minimal_resolved_run_plan() -> ResolvedRunPlan:
+    """Canonical plan fixture for tests that enter a post-resolution helper directly."""
+    request = RunRequest(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        phases=("power",),
+        queries=None,
+        tuning="notuning",
+        table_mode="native",
+        output=None,
+        mode="sql",
+        seed=None,
+        compression_enabled=False,
+        compression_type="none",
+        compression_level=None,
+    )
+    return ResolvedRunPlan(
+        request=request,
+        platform_key="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        phases=("power",),
+        queries=None,
+        test_execution_type="power",
+        execution_mode="power",
+        resolved_mode="sql",
+        table_mode="native",
+        tuning_resolution=MagicMock(canonical_mode=None),
+        canonical_tuning_mode=None,
+        tuning_enabled=False,
+        tuning_config_file=None,
+        use_auto_tuning=False,
+        loaded_unified_config=None,
+        data_organization=None,
+        dataframe_tuning_config=None,
+        compression_enabled=False,
+        compression_type="none",
+        compression_level=None,
+        iterations=None,
+        concurrency=1,
+        seed=None,
+        non_replayable_options=(),
+    )
 
 
 # ===================================================================
@@ -171,9 +219,30 @@ class TestBuildExecutionContext:
         assert ctx.mode == "sql"
         assert ctx.seed is None
         assert ctx.query_subset is None
-        assert ctx.tuning_mode is None  # "notuning" produces None
+        assert ctx.tuning_mode == "notuning"
         assert ctx.validation_mode == "loose"
         assert ctx.force_datagen is True
+
+    def test_absent_tuning_stays_not_recorded(self):
+        from benchbox.cli.commands.run import _build_execution_context
+        from benchbox.cli.composite_params import CompressionConfig, ForceConfig, ValidationConfig
+
+        ctx = _build_execution_context(
+            phases_to_run=["power"],
+            seed=None,
+            compression=CompressionConfig(enabled=False, type="none", level=None),
+            mode=None,
+            official=False,
+            validation=ValidationConfig(mode="exact"),
+            force=ForceConfig(datagen=False, upload=False),
+            queries_to_run=None,
+            capture_plans=False,
+            strict_plan_capture=False,
+            non_interactive=False,
+            tuning=None,
+        )
+
+        assert ctx.tuning_mode is None
 
     def test_official_mode(self):
         from benchbox.cli.commands.run import _build_execution_context
@@ -396,7 +465,8 @@ class TestDirectHandleResult:
             test_execution_type="power",
             seed=None,
             output=None,
-            table_mode="standard",
+            table_mode="native",
+            resolved_run_plan=_minimal_resolved_run_plan(),
         )
         result = SimpleNamespace(
             validation_status="PARTIAL",
@@ -420,6 +490,8 @@ class TestDirectHandleResult:
         export.assert_called_once()
         render_charts.assert_called_once()
         save_last_run.assert_called_once()
+        assert save_last_run.call_args.kwargs["iterations"] is None
+        assert save_last_run.call_args.kwargs["non_replayable_options"] == []
         publish_bundle.assert_not_called()
         ctx.exit.assert_called_once_with(1)
 

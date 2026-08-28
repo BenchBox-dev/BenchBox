@@ -95,7 +95,11 @@ class TPCDSOfficialBenchmark:
             dialect: SQL dialect for query translation (e.g., 'bigquery', 'snowflake')
             **kwargs: Additional benchmark configuration options
         """
-        self.benchmark = TPCDSBenchmark(scale_factor=scale_factor, output_dir=output_dir, verbose=verbose, **kwargs)
+        benchmark_kwargs = dict(kwargs)
+        benchmark_kwargs.setdefault("official", True)
+        self.benchmark = TPCDSBenchmark(
+            scale_factor=scale_factor, output_dir=output_dir, verbose=verbose, **benchmark_kwargs
+        )
 
         # Store target dialect for query translation
         self.dialect = dialect

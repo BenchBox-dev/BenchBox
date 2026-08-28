@@ -498,6 +498,39 @@ class TestPlatformAdapter:
         assert isinstance(results, list)
         assert all(r.get("run_type") == "measurement" for r in results)
 
+    def test_execute_single_query_applies_benchmark_materialized_result_oracle(self):
+        class MaterializedAdapter(MockPlatformAdapter):
+            def execute_query(self, connection, query, query_id, **kwargs):
+                rows = [(1, 0.8), (2, 0.9)]
+                return self._build_query_result_with_validation(
+                    query_id=query_id,
+                    execution_time=0.125,
+                    actual_row_count=len(rows),
+                    first_row=rows[0],
+                    materialized_rows=rows,
+                )
+
+        class Benchmark:
+            scale_factor = 0.01
+
+            @staticmethod
+            def validate_query_result(query_id, rows):
+                from benchbox.core.vector_search.metrics import validate_search_result
+
+                validate_search_result(query_id, rows)
+
+        result = MaterializedAdapter()._execute_single_query(
+            Benchmark(),
+            connection=object(),
+            query_id="q1",
+            query_sql="SELECT 1",
+            benchmark_type="vector_search",
+        )
+
+        assert result["status"] == "FAILED"
+        assert result["execution_time_seconds"] == 0.125
+        assert "not descending" in result["error"]
+
     def test_execute_all_queries_benchmark_no_dialect_parameter(self):
         """Test _execute_all_queries when benchmark doesn't support dialect parameter."""
         adapter = MockPlatformAdapterWithDialect()
@@ -1422,6 +1455,23 @@ class TestStandardExecutionPhase:
         assert result[0].query_id == "Q1"  # Default
         assert result[0].run_type == "measurement"
 
+    def test_create_standard_execution_phase_keeps_global_order_when_position_is_present(self):
+        adapter = MockPlatformAdapter()
+
+        result = adapter._create_standard_execution_phase(
+            [
+                {
+                    "query_id": "Q19",
+                    "execution_order": 19,
+                    "position": 1,
+                    "execution_time_seconds": 0.25,
+                    "status": "SUCCESS",
+                }
+            ]
+        )
+
+        assert result[0].execution_order == 19
+
 
 class TestThroughputPhaseCreation:
     """Tests for throughput phase creation."""
@@ -1447,6 +1497,8 @@ class TestThroughputPhaseCreation:
             {"query_id": "Q2", "execution_time_seconds": 2.0, "success": True},
         ]
         stream1.queries_executed = 2
+        stream1.success = False
+        stream1.error = "stream stopped"
 
         throughput_result = Mock()
         throughput_result.stream_results = [stream1]
@@ -1455,6 +1507,9 @@ class TestThroughputPhaseCreation:
         throughput_result.end_time = "2025-01-01T10:01:00"
         throughput_result.config = Mock(num_streams=1)
         throughput_result.throughput_at_size = 720.0
+        throughput_result.streams_executed = 1
+        throughput_result.streams_successful = 0
+        throughput_result.errors = ["Stream 0 failed: stream stopped"]
 
         result = adapter._create_throughput_phase(throughput_result)
 
@@ -1463,6 +1518,10 @@ class TestThroughputPhaseCreation:
         assert result.streams[0].stream_id == 0
         assert len(result.streams[0].query_executions) == 2
         assert result.total_queries_executed == 2
+        assert result.success is False
+        assert result.errors == ["Stream 0 failed: stream stopped"]
+        assert result.streams[0].success is False
+        assert result.streams[0].error_message == "stream stopped"
         assert result.streams[0].query_executions[0].run_type == "measurement"
         assert result.streams[0].query_executions[1].run_type == "measurement"
 
@@ -1477,6 +1536,8 @@ class TestThroughputPhaseCreation:
         stream1.duration = 60.0
         stream1.query_results = [{"query_id": "Q1", "execution_time_seconds": 1.0, "success": True, "iteration": 0}]
         stream1.queries_executed = 1
+        stream1.success = True
+        stream1.error = None
 
         throughput_result = Mock()
         throughput_result.stream_results = [stream1]
@@ -1485,11 +1546,80 @@ class TestThroughputPhaseCreation:
         throughput_result.end_time = "2025-01-01T10:01:00"
         throughput_result.config = Mock(num_streams=1)
         throughput_result.throughput_at_size = 720.0
+        throughput_result.streams_executed = 1
+        throughput_result.streams_successful = 1
+        throughput_result.errors = []
 
         result = adapter._create_throughput_phase(throughput_result)
 
         assert result is not None
         assert result.streams[0].query_executions[0].run_type == "warmup"
+
+    def test_create_throughput_phase_preserves_explicit_zero_position(self):
+        adapter = MockPlatformAdapter()
+        stream = Mock()
+        stream.stream_id = 0
+        stream.start_time = "2025-01-01T10:00:00"
+        stream.end_time = "2025-01-01T10:01:00"
+        stream.duration = 60.0
+        stream.query_results = [{"query_id": "Q1", "position": 0, "execution_time_seconds": 1.0, "success": True}]
+        stream.queries_executed = 1
+        stream.success = True
+        stream.error = None
+
+        throughput_result = Mock()
+        throughput_result.stream_results = [stream]
+        throughput_result.total_time = 60.0
+        throughput_result.start_time = stream.start_time
+        throughput_result.end_time = stream.end_time
+        throughput_result.config = Mock(num_streams=1)
+        throughput_result.throughput_at_size = 720.0
+        throughput_result.streams_executed = 1
+        throughput_result.streams_successful = 1
+        throughput_result.errors = []
+
+        result = adapter._create_throughput_phase(throughput_result)
+
+        assert result.streams[0].query_executions[0].execution_order == 0
+
+    @pytest.mark.parametrize(
+        ("query_result", "expected_duration_ms"),
+        [
+            ({"query_id": "Q1", "execution_time_seconds": 0.0009, "success": True}, 0.9),
+            ({"query_id": "Q1", "execution_time_seconds": 0.0, "success": True}, 0.0),
+            ({"query_id": "Q1", "success": True}, None),
+        ],
+    )
+    def test_create_throughput_phase_preserves_duration_precision_and_missing_values(
+        self, query_result, expected_duration_ms
+    ):
+        """Throughput capture must not manufacture or truncate query durations."""
+        adapter = MockPlatformAdapter()
+        stream = Mock()
+        stream.stream_id = 0
+        stream.start_time = "2025-01-01T10:00:00"
+        stream.end_time = "2025-01-01T10:01:00"
+        stream.duration = 60.0
+        stream.query_results = [query_result]
+        stream.queries_executed = 1
+        stream.success = True
+        stream.error = None
+
+        throughput_result = Mock()
+        throughput_result.stream_results = [stream]
+        throughput_result.total_time = 60.0
+        throughput_result.start_time = stream.start_time
+        throughput_result.end_time = stream.end_time
+        throughput_result.config = Mock(num_streams=1)
+        throughput_result.throughput_at_size = 720.0
+        throughput_result.streams_executed = 1
+        throughput_result.streams_successful = 1
+        throughput_result.errors = []
+
+        result = adapter._create_throughput_phase(throughput_result)
+
+        assert result is not None
+        assert result.streams[0].query_executions[0].execution_time_ms == expected_duration_ms
 
 
 class TestGetExistingTables:
@@ -2706,6 +2836,8 @@ class TestTPCHAndTPCDSExecutionHelpers:
             },
         ]
         assert adapter._last_throughput_test_result is throughput_result
+        assert throughput_result.success is False
+        assert throughput_result.throughput_at_size is None
         assert any("Target dialect" in str(call) for call in mock_console.print.call_args_list)
 
     @patch("benchbox.platforms.base.execution.quiet_console")
@@ -2866,6 +2998,8 @@ class TestTPCHAndTPCDSExecutionHelpers:
         assert connection.cursor.call_count == 1
         assert results[-1]["error"] == "tpch timeout"
         assert adapter._last_throughput_test_result is throughput_result
+        assert throughput_result.success is False
+        assert throughput_result.throughput_at_size is None
 
     @patch("benchbox.platforms.base.execution.quiet_console")
     def test_execute_tpch_maintenance_test_passes_rf_intervals_and_integrity_flag(self, _mock_console, tmp_path):

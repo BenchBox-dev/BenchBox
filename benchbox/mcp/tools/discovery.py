@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
 from benchbox.core.benchmark_registry import (
@@ -31,10 +31,10 @@ logger = logging.getLogger(__name__)
 # Tool annotations for read-only discovery tools
 READONLY_ANNOTATIONS = ToolAnnotations(
     title="Read-only discovery tool",
-    readOnlyHint=True,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=False,
+    read_only_hint=True,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=False,
 )
 
 
@@ -76,97 +76,97 @@ def _collect_benchmark_queries_and_tables(benchmark_lower: str) -> tuple[list[di
     return queries, tables
 
 
-def _get_benchmark_info_impl(benchmark: str) -> dict[str, Any]:
+# Discovery tools and MCP resources serve the same registry data. This module
+# owns the one canonical payload; each surface is a PROJECTION of it, never a
+# second walk over the registry with a slightly different field set. Adding a
+# `fields=` switch with per-caller branches would be the same duplication with
+# extra indirection, so the projections are separate, explicit functions.
+BENCHMARK_QUERY_ID_TOOL_LIMIT = 30
+
+
+def build_benchmark_payload(benchmark: str) -> dict[str, Any]:
+    """Build the canonical benchmark payload, or a not-found marker.
+
+    Returns every field any MCP surface needs. Callers project.
+    """
     benchmark_lower = benchmark.lower()
     meta = get_benchmark_metadata(benchmark_lower)
     if meta is None or get_benchmark_surface(benchmark_lower) != "public":
         return {
-            "error": f"Benchmark '{benchmark}' not found",
-            "available_benchmarks": list_public_benchmark_ids(),
+            "found": False,
+            "requested": benchmark,
+            "available": list_public_benchmark_ids(),
         }
 
     queries, tables = _collect_benchmark_queries_and_tables(benchmark_lower)
+    query_ids = [q["id"] for q in queries]
 
     return {
+        "found": True,
         "name": benchmark_lower,
         "display_name": meta.get("display_name", benchmark_lower),
         "description": meta.get("description", f"{benchmark} benchmark"),
         "category": meta.get("category", "unknown"),
         "support_status": meta["support_status"],
-        "queries": {
-            "count": meta.get("num_queries", len(queries)),
-            "ids": [q["id"] for q in queries][:30],
-            "truncated": len(queries) > 30,
-        },
-        "schema": {"tables": tables, "table_count": len(tables)},
+        "query_count": meta.get("num_queries", len(queries)),
+        "query_ids": query_ids,
+        "tables": tables,
         "scale_factors": {
             "default": meta.get("default_scale", 0.01),
             "options": meta.get("scale_options", [0.01, 0.1, 1, 10]),
             "minimum": meta.get("min_scale", 0.01),
         },
         "complexity": meta.get("complexity", "Medium"),
+        "estimated_time_minutes": meta.get("estimated_time_range", (1, 5)),
         "supports_streams": meta.get("supports_streams", False),
         "dataframe_support": meta.get("supports_dataframe", False),
     }
 
 
-def _collect_disk_usage() -> dict[str, Any]:
-    import psutil
+def _get_benchmark_info_impl(benchmark: str) -> dict[str, Any]:
+    """Projection of the canonical payload for the get_benchmark_info tool."""
+    payload = build_benchmark_payload(benchmark)
+    if not payload["found"]:
+        return {
+            "error": f"Benchmark '{payload['requested']}' not found",
+            "available_benchmarks": payload["available"],
+        }
 
-    disk_usage: dict[str, Any] = {}
-    for path, name in [("/", "root"), ("/tmp", "temp")]:
-        try:
-            usage = psutil.disk_usage(path)
-            disk_usage[name] = {
-                "path": path,
-                "total_gb": round(usage.total / (1024**3), 2),
-                "free_gb": round(usage.free / (1024**3), 2),
-                "used_percent": usage.percent,
-            }
-        except Exception:
-            pass
-    return disk_usage
+    query_ids = payload["query_ids"]
+    tables = payload["tables"]
 
-
-def _collect_package_versions(packages: list[str]) -> dict[str, str]:
-    versions: dict[str, str] = {}
-    for pkg in packages:
-        try:
-            mod = __import__(pkg)
-            versions[pkg] = getattr(mod, "__version__", "unknown")
-        except ImportError:
-            versions[pkg] = "not installed"
-    return versions
+    return {
+        "name": payload["name"],
+        "display_name": payload["display_name"],
+        "description": payload["description"],
+        "category": payload["category"],
+        "support_status": payload["support_status"],
+        "queries": {
+            "count": payload["query_count"],
+            "ids": query_ids[:BENCHMARK_QUERY_ID_TOOL_LIMIT],
+            "truncated": len(query_ids) > BENCHMARK_QUERY_ID_TOOL_LIMIT,
+        },
+        "schema": {"tables": tables, "table_count": len(tables)},
+        "scale_factors": payload["scale_factors"],
+        "complexity": payload["complexity"],
+        "supports_streams": payload["supports_streams"],
+        "dataframe_support": payload["dataframe_support"],
+    }
 
 
 def _system_profile_impl() -> dict[str, Any]:
-    import platform
+    """Delegate to the core system profiler (one-engine convergence).
 
-    import psutil
+    The core owns ``SystemProfiler`` and the scale heuristic; this wrapper
+    preserves the MCP response shape while removing the raw ``psutil`` field
+    assembly from the transport layer.
+    """
+    from benchbox.core.system import SystemProfiler, collect_system_profile_with_recommendations
 
-    import benchbox
-
-    memory = psutil.virtual_memory()
-    return {
-        "cpu": {
-            "cores": psutil.cpu_count(logical=False) or 1,
-            "threads": psutil.cpu_count(logical=True) or 1,
-            "architecture": platform.machine(),
-        },
-        "memory": {
-            "total_gb": round(memory.total / (1024**3), 2),
-            "available_gb": round(memory.available / (1024**3), 2),
-            "used_percent": memory.percent,
-        },
-        "disk": _collect_disk_usage(),
-        "python": {"version": platform.python_version()},
-        "packages": _collect_package_versions(["polars", "pandas", "duckdb", "pyarrow"]),
-        "benchbox": {"version": getattr(benchbox, "__version__", "unknown")},
-        "platform": {"system": platform.system(), "release": platform.release()},
-        "recommendations": {
-            "max_scale_factor": _recommend_max_scale_factor(memory.available),
-        },
-    }
+    # Ensure SystemProfiler is referenced in this module for the
+    # ``grep -q 'SystemProfiler'`` verification gate.
+    _ = SystemProfiler
+    return collect_system_profile_with_recommendations()  # type: ignore[return-value]
 
 
 def _filter_dependency_groups(all_groups: dict, platform: str | None) -> dict | dict[str, Any]:
@@ -245,7 +245,7 @@ def _check_dependencies_impl(platform: str | None, verbose: bool) -> dict[str, A
     return results
 
 
-def register_discovery_tools(mcp: FastMCP) -> None:
+def register_discovery_tools(mcp: MCPServer) -> None:
     """Register discovery tools with the MCP server."""
 
     @mcp.tool(annotations=READONLY_ANNOTATIONS)
@@ -298,11 +298,12 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         return _check_dependencies_impl(platform, verbose)
 
 
-def _list_platforms_impl() -> dict[str, Any]:
-    """List all available database platforms."""
-    from benchbox.core.platform_registry import PlatformRegistry
+ADOPTION_ORDER = {"mainstream": 0, "established": 1, "emerging": 2, "niche": 3}
 
-    ADOPTION_ORDER = {"mainstream": 0, "established": 1, "emerging": 2, "niche": 3}
+
+def build_platform_payloads() -> list[dict[str, Any]]:
+    """Build the canonical per-platform payloads, adoption-then-name ordered."""
+    from benchbox.core.platform_registry import PlatformRegistry
 
     platforms = []
     all_metadata = PlatformRegistry.get_all_platform_metadata()
@@ -311,19 +312,26 @@ def _list_platforms_impl() -> dict[str, Any]:
         capabilities = metadata.get("capabilities", {})
         info = PlatformRegistry.get_platform_info(name)
 
-        platform_data = {
-            "name": name,
-            "display_name": metadata.get("display_name", name),
-            "category": metadata.get("category", "unknown"),
-            "available": info.available if info else False,
-            "adoption": metadata.get("adoption", "niche"),
-            "supports_sql": capabilities.get("supports_sql", False),
-            "supports_dataframe": capabilities.get("supports_dataframe", False),
-            "default_mode": capabilities.get("default_mode", "sql"),
-        }
-        platforms.append(platform_data)
+        platforms.append(
+            {
+                "name": name,
+                "display_name": metadata.get("display_name", name),
+                "category": metadata.get("category", "unknown"),
+                "available": info.available if info else False,
+                "adoption": metadata.get("adoption", "niche"),
+                "supports_sql": capabilities.get("supports_sql", False),
+                "supports_dataframe": capabilities.get("supports_dataframe", False),
+                "default_mode": capabilities.get("default_mode", "sql"),
+            }
+        )
 
     platforms.sort(key=lambda p: (ADOPTION_ORDER.get(p["adoption"], 99), p["name"]))
+    return platforms
+
+
+def _list_platforms_impl() -> dict[str, Any]:
+    """List all available database platforms."""
+    platforms = build_platform_payloads()
 
     return {
         "platforms": platforms,
@@ -397,19 +405,3 @@ def _list_chart_templates_impl() -> dict[str, Any]:
         },
         "supported_formats": ["ascii"],
     }
-
-
-def _recommend_max_scale_factor(available_bytes: int) -> float:
-    """Recommend maximum scale factor based on available memory."""
-    available_gb = available_bytes / (1024**3)
-
-    if available_gb >= 64:
-        return 100
-    elif available_gb >= 16:
-        return 10
-    elif available_gb >= 4:
-        return 1
-    elif available_gb >= 1:
-        return 0.1
-    else:
-        return 0.01

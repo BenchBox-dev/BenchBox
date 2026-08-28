@@ -11,7 +11,7 @@ BenchBox supports platforms across registry categories and editorial documentati
 
 <!-- benchbox-registry-counts:start -->
 
-Platform registry: **50** metadata entries; **45** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=27, experimental=17, deprecated=1.
+Platform registry: **51** metadata entries; **46** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=28, experimental=17, deprecated=1.
 
 <!-- benchbox-registry-counts:end -->
 
@@ -22,7 +22,7 @@ Platform registry: **50** metadata entries; **45** SQL-capable; **19** DataFrame
 | dataframe | 5 | DataFrame-only metadata entries |
 | distributed | 6 | Federated, cluster, and distributed SQL engines |
 | embedded | 1 | Built-in embedded runtime |
-| olap | 3 | PostgreSQL extension and embedded OLAP variants |
+| olap | 4 | PostgreSQL extension, embedded OLAP, and DuckLake lakehouse variants |
 | relational | 1 | General relational database support |
 | timeseries | 3 | Time-series engines with SQL/query support |
 
@@ -70,14 +70,15 @@ BenchBox supports multiple deployment modes for platforms, enabling the same ben
 
 ### Platforms with Multiple Deployment Modes
 
-| Platform        | Default Mode  | Available Modes        | Syntax Examples                                 |
-| --------------- | ------------- | ---------------------- | ----------------------------------------------- |
-| **ClickHouse**  | `local`       | `local`, `server`      | `clickhouse-local`, `clickhouse-server`         |
-| **Firebolt**    | `core`        | `core`, `cloud`        | `firebolt:core`, `firebolt:cloud`               |
-| **TimescaleDB** | `self-hosted` | `self-hosted`, `cloud` | `timescaledb`, `timescaledb:cloud`              |
-| **PySpark**     | `local`       | `local`                | `pyspark`                                       |
-| **LakeSail**    | `local`       | `local`, `distributed` | `lakesail` (+ `lakesail-df` for DataFrame mode) |
-| **Velox**       | `local`       | `local`, `remote`      | `velox` with `--velox-deployment local\|remote` |
+| Platform        | Default Mode  | Available Modes                              | Syntax Examples                                 |
+| --------------- | ------------- | -------------------------------------------- | ----------------------------------------------- |
+| **ClickHouse**  | `local`       | `local`, `server`                            | `clickhouse-local`, `clickhouse-server`         |
+| **Firebolt**    | `core`        | `core`, `cloud`                              | `firebolt:core`, `firebolt:cloud`               |
+| **TimescaleDB** | `self-hosted` | `self-hosted`, `cloud`                       | `timescaledb`, `timescaledb:cloud`              |
+| **PySpark**     | `local`       | `local`                                      | `pyspark`                                       |
+| **LakeSail**    | `local`       | `local`, `distributed`                       | `lakesail` (+ `lakesail-df` for DataFrame mode) |
+| **Velox**       | `local`       | `local`, `remote`                            | `velox` with `--platform-option deployment=local\|remote` |
+| **DuckLake**    | `local`       | `local`, `postgres_catalog`, `cloud_storage` | `ducklake` with `--platform-option catalog=...` |
 
 ### First-Class Cloud Platforms (Dialect Inheritance)
 
@@ -85,6 +86,7 @@ BenchBox supports multiple deployment modes for platforms, enabling the same ben
 | -------------------- | --------------------- | ------------------ | ---------------------------- |
 | **ClickHouse Cloud** | ClickHouse            | `clickhouse-cloud` | Managed ClickHouse service   |
 | **MotherDuck**       | DuckDB                | `motherduck`       | Serverless DuckDB cloud      |
+| **DuckLake**         | DuckDB                | `ducklake`         | Local DuckDB lakehouse (Parquet + SQL catalog) |
 | **Starburst**        | Trino                 | `starburst`        | Starburst Galaxy managed Trino |
 
 
@@ -119,7 +121,7 @@ Zero-infrastructure platforms that run in-process. Ideal for development, testin
 | **SQL Support**    | Full              | Full               | Full               | **DataFrame only** | Full                     |
 
 ```{note}
-**ClickHouse Platforms**: ClickHouse is available as three first-class platforms: `clickhouse-local` (chDB, zero-config), `clickhouse-server` (self-hosted), and `clickhouse-cloud` (managed). The legacy bare `clickhouse` selector still works but is deprecated. See [Migration Guide](clickhouse-migration.md).
+**ClickHouse Platforms**: ClickHouse is available as three first-class platforms: `clickhouse-local` (chDB, zero-config), `clickhouse-server` (self-hosted), and `clickhouse-cloud` (managed). The legacy bare `clickhouse` selector has been removed and now raises an error naming these replacements. See [Migration Guide](clickhouse-migration.md).
 ```
 
 ### Relative Performance Characteristics

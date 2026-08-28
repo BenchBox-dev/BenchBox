@@ -186,7 +186,6 @@ benchbox/platforms/
 benchbox/cli/
 ├── main.py                # CLI entry point and command registration
 ├── orchestrator.py        # BenchmarkOrchestrator (run lifecycle)
-├── execution_pipeline.py  # Legacy execution-pipeline compatibility module
 ├── commands/              # Click command implementations
 │   ├── run.py             #   benchbox run (main command)
 │   ├── compare.py         #   benchbox compare

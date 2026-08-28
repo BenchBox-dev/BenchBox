@@ -1,0 +1,14 @@
+{
+  "benchmark": "Metadata",
+  "bundle_file": "metadata_primitives_sf1_pyspark_df_20260502_214436_50a3043f.json",
+  "bundle_hash": "b832942360b04460953b46f2865c3ad7871e5dce14070990ad5ec3cbc1533a5e",
+  "companion_hashes": {},
+  "phase": 2,
+  "platform": "PySpark",
+  "result_source": "internal",
+  "scale_factor": 1.0,
+  "submission_path": "path_30338255ec33",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:49:00.333164+00:00",
+  "submitted_by": "BenchBox UAT"
+}

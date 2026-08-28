@@ -14,10 +14,14 @@ from pathlib import Path
 BUNDLES_DIR = Path("results-data/bundles")
 INVENTORY_PATH = Path("results-data/corpus-inventory.json")
 
-SKIP_NAMES = {"corpus-inventory.json", "submission-manifest.json"}
-COMPANION_SUFFIXES = (".plans.json", ".tuning.json")
 SUBMISSION_MANIFEST = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
+
+CHECKOUT_ROOT = Path(__file__).resolve().parents[1]
+if str(CHECKOUT_ROOT) not in sys.path:
+    sys.path.insert(0, str(CHECKOUT_ROOT))
+
+from benchbox.validation.bundle import discover_bundles as discover_primary_bundles
 
 # Canonical provenance vocabulary. Import the one source of truth when the full
 # package is available; fall back to inline literals on the slim
@@ -53,13 +57,7 @@ def _normalize_funding(value: object) -> str:
 
 def discover_bundles(bundles_dir: Path) -> list[Path]:
     """Find all primary bundle JSON files."""
-    return [
-        path
-        for path in sorted(bundles_dir.rglob("*.json"))
-        if path.name not in SKIP_NAMES
-        and not any(path.name.endswith(s) for s in COMPANION_SUFFIXES)
-        and not path.name.endswith(SUBMISSION_MANIFEST_SUFFIX)
-    ]
+    return discover_primary_bundles(bundles_dir)
 
 
 def _bundle_hash(bundle_path: Path) -> str:
@@ -85,24 +83,59 @@ def _is_vendor_subtree(bundle_path: Path, bundles_dir: Path) -> bool:
 
 
 def _bundle_trust_label(bundle_path: Path, bundles_dir: Path) -> str:
-    """Resolve trust label from the bundle's location and sidecar presence.
+    """Resolve trust label from the bundle's location and recorded provenance.
 
     Precedence:
       1. vendor-supplied — bundle under the maintainer-controlled top-level
          ``vendor/`` subtree (see :func:`_is_vendor_subtree`).
-      2. community-submission — a submission-manifest sidecar is present. Prefers
-         the per-bundle name (`<stem>.manifest.json`); falls back to the legacy
-         singleton (`submission-manifest.json`) so already-merged submissions
-         keep their community label.
-      3. maintainer-run — the default for maintainer-committed bundles.
+      2. the sidecar's explicit ``result_source``, mapped through
+         ``SOURCE_TO_TRUST_LABEL``. This is the authoritative signal.
+      3. community-submission — a sidecar exists but records no
+         ``result_source``. Unknown provenance fails safe to the
+         less-trusted label; it is never promoted by assumption.
+      4. maintainer-run — the default for maintainer-committed bundles with no
+         sidecar at all.
+
+    Sidecar *presence* used to imply community provenance on its own, which was
+    wrong in one direction that mattered: ``benchbox submit`` writes a sidecar
+    unconditionally, including when a maintainer runs it. That labelled 191 of
+    207 maintainer-generated bundles ``community-submission``, and because
+    community submissions are not ranking-eligible the public leaderboard
+    rendered 15 of 207 results. Reading the recorded source instead of
+    inferring from a file's existence fixes the cause rather than the symptom.
     """
     if _is_vendor_subtree(bundle_path, bundles_dir):
         return VENDOR_TRUST_LABEL
-    per_bundle = bundle_path.parent / f"{bundle_path.stem}{SUBMISSION_MANIFEST_SUFFIX}"
-    legacy = bundle_path.parent / SUBMISSION_MANIFEST
-    if per_bundle.is_file() or legacy.is_file():
-        return COMMUNITY_TRUST_LABEL
-    return DEFAULT_TRUST_LABEL
+
+    manifest = _read_submission_manifest(bundle_path)
+    if manifest is None:
+        return DEFAULT_TRUST_LABEL
+
+    source = manifest.get("result_source")
+    if source in SOURCE_TO_TRUST_LABEL:
+        return SOURCE_TO_TRUST_LABEL[source]
+    # A sidecar with no recorded source has unknown provenance. Fail safe.
+    return COMMUNITY_TRUST_LABEL
+
+
+def _read_submission_manifest(bundle_path: Path) -> dict | None:
+    """Return the bundle's submission manifest, or None when it has none.
+
+    Prefers the per-bundle name (``<stem>.manifest.json``) and falls back to
+    the legacy directory-wide singleton so already-merged submissions keep
+    their recorded provenance.
+    """
+    for candidate in (
+        bundle_path.parent / f"{bundle_path.stem}{SUBMISSION_MANIFEST_SUFFIX}",
+        bundle_path.parent / SUBMISSION_MANIFEST,
+    ):
+        if candidate.is_file():
+            try:
+                loaded = json.loads(candidate.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                return {}
+            return loaded if isinstance(loaded, dict) else {}
+    return None
 
 
 def _bundle_funding(bundle_path: Path, data: dict) -> str:

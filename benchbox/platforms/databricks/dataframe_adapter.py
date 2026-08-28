@@ -342,6 +342,7 @@ class DatabricksDataFrameAdapter(DatabricksAdapter):
                 actual_row_count=actual_row_count,
                 first_row=tuple(result[0]) if result else None,
                 validation_result=validation_result,
+                materialized_rows=result,
             )
 
             # Add DataFrame mode metadata

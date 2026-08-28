@@ -7,6 +7,8 @@ from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any, Literal, TypeAlias
 from urllib.parse import urlparse
 
+from benchbox.core.results.platform_options import sanitize_platform_options
+
 MetadataSource: TypeAlias = Literal[
     "registered_default",
     "saved_config",
@@ -255,6 +257,25 @@ def build_environment_payload(
     return _compact(payload)
 
 
+def _sanitize_metadata_block(
+    value: Any,
+    *,
+    default: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Convert a metadata mapping (or dataclass) and filter credential-shaped keys.
+
+    Shared export boundary for raw_config, raw_metadata, and the normalized
+    deployment/cloud/compute/storage blocks. Non-secret tuning fields pass
+    through unchanged.
+    """
+    converted = _metadata_dict(value)
+    if not converted and default is not None:
+        converted = dict(default)
+    if not converted:
+        return {}
+    return sanitize_platform_options(converted)
+
+
 def build_platform_metadata_payload(
     *,
     platform_info: Mapping[str, Any] | None,
@@ -265,19 +286,30 @@ def build_platform_metadata_payload(
     storage: PlatformStorageMetadata | Mapping[str, Any] | None,
     raw_config: Mapping[str, Any] | None,
     raw_metadata: Mapping[str, Any] | None,
+    sanitize_raw_config: bool = True,
 ) -> dict[str, Any]:
-    """Build normalized ``platform`` metadata blocks with conservative defaults."""
+    """Build normalized ``platform`` metadata blocks with conservative defaults.
+
+    Credential redaction is unconditional for every mapping this function
+    emits (raw_config, raw_metadata, and the normalized deployment/cloud/
+    compute/storage blocks). ``sanitize_raw_config`` remains a compatibility
+    argument for callers that supplied it, but never opts out of filtering.
+    """
+    _ = sanitize_raw_config  # compatibility only; boundary filtering is mandatory
     default_deployment = _default_deployment_metadata(platform_info or {}, platform_config or {})
     payload: dict[str, Any] = {
-        "deployment": _metadata_dict(deployment) or default_deployment.to_dict(),
-        "cloud": _metadata_dict(cloud) or PlatformCloudMetadata().to_dict(),
-        "compute": _metadata_dict(compute) or PlatformComputeMetadata().to_dict(),
-        "storage": _metadata_dict(storage) or PlatformStorageMetadata().to_dict(),
+        "deployment": _sanitize_metadata_block(deployment, default=default_deployment.to_dict()),
+        "cloud": _sanitize_metadata_block(cloud, default=PlatformCloudMetadata().to_dict()),
+        "compute": _sanitize_metadata_block(compute, default=PlatformComputeMetadata().to_dict()),
+        "storage": _sanitize_metadata_block(storage, default=PlatformStorageMetadata().to_dict()),
     }
-    raw_config_payload = _metadata_dict(raw_config)
+    # ``raw_config`` may come from an adapter-specific hook rather than the
+    # normalized platform config fallback. Keep this as the public export
+    # boundary so every selected source receives the same structural filtering.
+    raw_config_payload = _sanitize_metadata_block(raw_config)
     if raw_config_payload:
         payload["raw_config"] = raw_config_payload
-    raw_metadata_payload = _metadata_dict(raw_metadata)
+    raw_metadata_payload = _sanitize_metadata_block(raw_metadata)
     if raw_metadata_payload:
         payload["raw_metadata"] = raw_metadata_payload
     return _compact(payload)

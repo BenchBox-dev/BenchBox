@@ -88,6 +88,22 @@ def test_workflow_metrics_expression_uses_min_not_max() -> None:
     assert ".completed_at] | max // null" not in workflow
 
 
+def test_lint_baseline_cache_writes_are_serialized() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+
+    assert "group: develop-post-merge-lint-${{ github.ref }}" in workflow
+    assert "cancel-in-progress: false" in workflow
+
+
+def test_medium_test_timeout_matches_the_pre_merge_lane() -> None:
+    pre_merge = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+    post_merge = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+    )
+
+    assert pre_merge["jobs"]["medium-test"]["timeout-minutes"] == post_merge["jobs"]["medium-test"]["timeout-minutes"]
+
+
 def test_explorer_tokens_failure_counted_in_red_at() -> None:
     # Mirror of test_failed_post_merge_jobs_use_earliest_completion_timestamp
     # but with an `explorer-tokens` failure as the earliest. Locks in the
@@ -229,7 +245,12 @@ def test_close_orphaned_prs_waits_for_post_merge_validation_success() -> None:
     )
     close_orphaned_prs = workflow_yaml["jobs"]["close-orphaned-prs"]
     assert close_orphaned_prs["needs"] == ["lint", "fast-test", "explorer-tokens", "medium-test"]
-    assert close_orphaned_prs.get("if") is None
+    # Schedule exclusion is allowed (gates-only sweep); push path must still
+    # wait on all four gates and must not run mutation work on schedule.
+    job_if = close_orphaned_prs.get("if")
+    assert job_if is None or "github.event_name != 'schedule'" in str(job_if)
+    # Must not use always() here: a skipped/failed gate must skip close.
+    assert "always()" not in str(job_if or "")
 
 
 def test_post_merge_explorer_tokens_job_runs_unconditionally() -> None:

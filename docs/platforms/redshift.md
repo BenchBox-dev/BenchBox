@@ -47,7 +47,7 @@ export REDSHIFT_IAM_ROLE=arn:aws:iam::123456789:role/RedshiftS3Access
 ### Interactive Setup
 
 ```bash
-benchbox platforms setup --platform redshift
+benchbox setup --platform redshift
 ```
 
 ### CLI Options
@@ -136,9 +136,9 @@ benchbox run --platform redshift --benchmark tpch --scale 1.0
 
 ```bash
 # Configure S3 staging for COPY command
+# (the IAM role is part of the stored Redshift credentials)
 benchbox run --platform redshift --benchmark tpch --scale 100.0 \
-  --staging-root s3://your-bucket/benchbox/ \
-  --platform-option iam_role=arn:aws:iam::123456789:role/RedshiftS3Access
+  --output s3://your-bucket/benchbox/
 ```
 
 ### With Tuning
@@ -241,8 +241,7 @@ benchbox run --platform redshift --benchmark tpch \
 ```bash
 # Configure S3 staging
 benchbox run --platform redshift --benchmark tpch --scale 10.0 \
-  --staging-root s3://bucket/benchbox/ \
-  --platform-option iam_role=arn:aws:iam::123:role/RedshiftS3
+  --output s3://bucket/benchbox/
 ```
 
 ### IAM Role Setup

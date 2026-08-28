@@ -1,11 +1,7 @@
-"""Tests for platform registration alignment between systems.
+"""Tests for manifest-derived platform registration and capability alignment.
 
-This test module ensures that the two platform registration systems stay synchronized:
-1. get_platform_adapter() in benchbox/platforms/__init__.py - CLI adapter factory
-2. PlatformRegistry in benchbox/core/platform_registry.py - metadata and discovery
-
-These tests prevent drift between the systems that has caused bugs in the past
-where platforms were added to one system but not the other.
+Static platform sets are projections of the typed manifest. Subsystem-specific
+maps are tested as semantic consumers, never restated here as another registry.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -14,6 +10,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import pytest
 
+from benchbox.core.platform_manifest import PLATFORM_MANIFEST, get_platform_aliases
 from benchbox.core.platform_registry import PlatformRegistry
 
 pytestmark = [
@@ -22,86 +19,17 @@ pytestmark = [
 ]
 
 
-# Define canonical platform names and their aliases
-# This is the source of truth for what platforms should exist
-CANONICAL_SQL_PLATFORMS = {
-    "duckdb",
-    "motherduck",
-    "sqlite",
-    "datafusion",
-    "clickhouse",
-    "clickhouse-local",  # First-class embedded chDB platform
-    "clickhouse-server",  # First-class self-hosted ClickHouse platform
-    "clickhouse-cloud",  # First-class ClickHouse Cloud platform (refactored from clickhouse:cloud)
-    "databricks",
-    "bigquery",
-    "redshift",
-    "snowflake",
-    "trino",
-    "starburst",
-    "athena",
-    "spark",
-    "pyspark",
-    "firebolt",
-    "presto",
-    "postgresql",
-    "synapse",
-    "fabric_dw",
-    "influxdb",
-    "starrocks",
-    "doris",
-    "databend",
-    "questdb",
-    "lakesail",
-    "velox",
-    "fabric-lakehouse",
-}
-# Note: polars was removed from CANONICAL_SQL_PLATFORMS as SQL mode is no longer supported
-
-# Aliases that map to canonical names (alias -> canonical)
-PLATFORM_ALIASES = {
-    "sqlite3": "sqlite",
-    "azure_synapse": "synapse",
-}
-
-# DataFrame-only platforms that should NOT be in get_platform_adapter()
-# These platforms only support DataFrame execution mode, not SQL
+CANONICAL_SQL_PLATFORMS = {entry.key for entry in PLATFORM_MANIFEST if entry.capabilities["supports_sql"]}
+PLATFORM_ALIASES = get_platform_aliases("cli")
 DATAFRAME_ONLY_PLATFORMS = {
-    "pandas",
-    "modin",
-    "cudf",
-    "dask",
+    entry.key
+    for entry in PLATFORM_MANIFEST
+    if entry.capabilities["supports_dataframe"] and not entry.capabilities["supports_sql"] and entry.adapter is None
 }
-
-# Platforms that have adapters but don't support SQL mode
-# These have adapters for data loading only, SQL execution will raise NotImplementedError
 HYBRID_DATAFRAME_PLATFORMS = {
-    "polars",  # SQL mode removed due to TPC benchmark incompatibility
-}
-
-# Platforms registered in PlatformRegistry but not yet implemented in get_platform_adapter()
-# These platforms use remote job submission (Livy API, Connect API, etc.) rather than
-# direct SQL adapters. They're excluded from the adapter mapping test.
-PLATFORMS_NOT_YET_IN_ADAPTER_MAPPING = {
-    # Cloud Spark DataFrame platforms (submit via Livy/Connect)
-    "databricks-df",
-    "fabric-spark",
-    "synapse-spark",
-    "athena-spark",
-    "glue",
-    "emr-serverless",
-    "dataproc",
-    "dataproc-serverless",
-    "snowpark-connect",
-    # Onehouse Quanton - managed serverless Spark (submit via Onehouse API)
-    "quanton",
-    # PostgreSQL extensions - use postgresql adapter with extension-specific tuning
-    "timescaledb",
-    "pg-duckdb",
-    "pg-mooncake",
-    # Newly added - adapter class exists but not yet wired into platform_mapping
-    "cedardb",
-    "singlestore",
+    entry.key
+    for entry in PLATFORM_MANIFEST
+    if entry.capabilities["supports_dataframe"] and not entry.capabilities["supports_sql"] and entry.adapter is not None
 }
 
 
@@ -111,82 +39,6 @@ class TestPlatformRegistrationAlignment:
     def setup_method(self):
         """Clear registry cache before each test."""
         PlatformRegistry.clear_cache()
-
-    def _get_platform_adapter_mapping(self) -> dict:
-        """Extract the platform_mapping dict from get_platform_adapter().
-
-        This uses the same logic as the function to get the mapping.
-        """
-        # Import adapters the same way get_platform_adapter does
-        from benchbox.platforms import (
-            AthenaAdapter,
-            AzureSynapseAdapter,
-            BigQueryAdapter,
-            ClickHouseAdapter,
-            ClickHouseCloudAdapter,
-            ClickHouseLocalAdapter,
-            ClickHouseServerAdapter,
-            DatabricksAdapter,
-            DataFusionAdapter,
-            DuckDBAdapter,
-            FabricLakehouseAdapter,
-            FabricWarehouseAdapter,
-            FireboltAdapter,
-            InfluxDBAdapter,
-            MotherDuckAdapter,
-            PolarsAdapter,
-            PostgreSQLAdapter,
-            PrestoAdapter,
-            PySparkSQLAdapter,
-            RedshiftAdapter,
-            SnowflakeAdapter,
-            SparkAdapter,
-            SQLiteAdapter,
-            TrinoAdapter,
-        )
-        from benchbox.platforms.databend import DatabendAdapter
-        from benchbox.platforms.doris import DorisAdapter
-        from benchbox.platforms.lakesail import LakeSailAdapter
-        from benchbox.platforms.questdb import QuestDBAdapter
-        from benchbox.platforms.starburst import StarburstAdapter
-        from benchbox.platforms.starrocks import StarRocksAdapter
-        from benchbox.platforms.velox import VeloxAdapter
-
-        return {
-            "duckdb": DuckDBAdapter,
-            "motherduck": MotherDuckAdapter,
-            "sqlite": SQLiteAdapter,
-            "sqlite3": SQLiteAdapter,
-            "datafusion": DataFusionAdapter,
-            "polars": PolarsAdapter,
-            "clickhouse": ClickHouseAdapter,
-            "clickhouse-local": ClickHouseLocalAdapter,
-            "clickhouse-server": ClickHouseServerAdapter,
-            "clickhouse-cloud": ClickHouseCloudAdapter,
-            "databricks": DatabricksAdapter,
-            "bigquery": BigQueryAdapter,
-            "redshift": RedshiftAdapter,
-            "snowflake": SnowflakeAdapter,
-            "trino": TrinoAdapter,
-            "starburst": StarburstAdapter,
-            "athena": AthenaAdapter,
-            "spark": SparkAdapter,
-            "pyspark": PySparkSQLAdapter,
-            "firebolt": FireboltAdapter,
-            "presto": PrestoAdapter,
-            "postgresql": PostgreSQLAdapter,
-            "synapse": AzureSynapseAdapter,
-            "azure_synapse": AzureSynapseAdapter,
-            "fabric_dw": FabricWarehouseAdapter,
-            "fabric-lakehouse": FabricLakehouseAdapter,
-            "influxdb": InfluxDBAdapter,
-            "starrocks": StarRocksAdapter,
-            "doris": DorisAdapter,
-            "databend": DatabendAdapter,
-            "questdb": QuestDBAdapter,
-            "lakesail": LakeSailAdapter,
-            "velox": VeloxAdapter,
-        }
 
     def test_all_canonical_platforms_in_registry_metadata(self):
         """All canonical SQL platforms must have metadata in PlatformRegistry."""
@@ -204,84 +56,6 @@ class TestPlatformRegistrationAlignment:
             f"Platforms missing from PlatformRegistry._adapters: {missing}. "
             "Add registration in auto_register_platforms()."
         )
-
-    def test_all_canonical_platforms_in_adapter_mapping(self):
-        """All canonical SQL platforms must be in get_platform_adapter() mapping."""
-        mapping = self._get_platform_adapter_mapping()
-        mapping_platforms = {k for k in mapping.keys() if k not in PLATFORM_ALIASES}
-
-        missing = CANONICAL_SQL_PLATFORMS - mapping_platforms
-        assert not missing, (
-            f"Platforms missing from get_platform_adapter() mapping: {missing}. Add entry in platform_mapping dict."
-        )
-
-    def test_adapter_mapping_platforms_exist_in_registry(self):
-        """All platforms in get_platform_adapter() must exist in PlatformRegistry."""
-        mapping = self._get_platform_adapter_mapping()
-        registered = set(PlatformRegistry.get_available_platforms())
-
-        # Get canonical names from mapping (resolve aliases)
-        mapping_canonical = set()
-        for name in mapping.keys():
-            if name in PLATFORM_ALIASES:
-                mapping_canonical.add(PLATFORM_ALIASES[name])
-            else:
-                mapping_canonical.add(name)
-
-        missing = mapping_canonical - registered
-        assert not missing, (
-            f"Platforms in get_platform_adapter() but not in PlatformRegistry: {missing}. "
-            "Add registration in auto_register_platforms()."
-        )
-
-    def test_registry_platforms_exist_in_adapter_mapping(self):
-        """All registered SQL platforms in PlatformRegistry must be in get_platform_adapter()."""
-        mapping = self._get_platform_adapter_mapping()
-        registered = set(PlatformRegistry.get_available_platforms())
-
-        # Exclude DataFrame-only platforms and platforms not yet implemented
-        excluded = DATAFRAME_ONLY_PLATFORMS | PLATFORMS_NOT_YET_IN_ADAPTER_MAPPING
-        sql_registered = registered - excluded
-
-        mapping_canonical = set()
-        for name in mapping.keys():
-            if name in PLATFORM_ALIASES:
-                mapping_canonical.add(PLATFORM_ALIASES[name])
-            else:
-                mapping_canonical.add(name)
-
-        missing = sql_registered - mapping_canonical
-        assert not missing, (
-            f"Platforms in PlatformRegistry but not in get_platform_adapter(): {missing}. "
-            "Add entry in platform_mapping dict or add to PLATFORMS_NOT_YET_IN_ADAPTER_MAPPING."
-        )
-
-    def test_dataframe_only_platforms_not_in_adapter_mapping(self):
-        """DataFrame-only platforms should NOT be in get_platform_adapter()."""
-        mapping = self._get_platform_adapter_mapping()
-
-        wrongly_included = DATAFRAME_ONLY_PLATFORMS & set(mapping.keys())
-        assert not wrongly_included, (
-            f"DataFrame-only platforms should not be in get_platform_adapter(): {wrongly_included}. "
-            "These platforms don't support SQL mode and should only be accessed via get_dataframe_adapter()."
-        )
-
-    def test_aliases_resolve_to_canonical_names(self):
-        """All defined aliases must resolve to valid canonical platforms."""
-        for alias, canonical in PLATFORM_ALIASES.items():
-            assert canonical in CANONICAL_SQL_PLATFORMS, (
-                f"Alias '{alias}' points to '{canonical}' which is not a canonical platform"
-            )
-
-    def test_alias_targets_have_same_adapter_class(self):
-        """Aliases must map to the same adapter class as their canonical name."""
-        mapping = self._get_platform_adapter_mapping()
-
-        for alias, canonical in PLATFORM_ALIASES.items():
-            if alias in mapping and canonical in mapping:
-                assert mapping[alias] is mapping[canonical], (
-                    f"Alias '{alias}' maps to different adapter than canonical '{canonical}'"
-                )
 
 
 class TestPlatformRequirementsAlignment:
@@ -357,36 +131,17 @@ class TestPlatformCapabilitiesAlignment:
             assert caps.supports_dataframe, f"Dual-mode platform '{platform}' missing supports_dataframe"
 
     def test_dataframe_adapter_mapping_matches_registry_capabilities(self):
-        """Platforms with DataFrame adapters in adapter_factory must have supports_dataframe=True.
+        """The local DataFrame factory's semantic keys must be DataFrame-capable."""
+        from benchbox.platforms import _DATAFRAME_PLATFORM_INFO
 
-        This catches the bug where a DataFrame adapter exists but the registry
-        declares supports_dataframe=False, causing runtime errors like:
-        "Platform 'datafusion' does not support dataframe mode"
-        """
-        import inspect
-        import re
-
-        from benchbox.platforms.adapter_factory import _get_dataframe_adapter
-
-        # Get the adapter mapping from adapter_factory by inspecting _get_dataframe_adapter
-        # The mapping is defined inside the function, so we extract it via the source
-        source = inspect.getsource(_get_dataframe_adapter)
-
-        # Extract platform names from the adapter_mapping dict in the source
-        # Looking for patterns like: "polars": (PolarsDataFrameAdapter, ...
-        pattern = r'"(\w+)":\s*\('
-        mapped_platforms = set(re.findall(pattern, source))
-
-        # Each mapped platform must have supports_dataframe=True in the registry
-        for platform in mapped_platforms:
-            caps = PlatformRegistry.get_platform_capabilities(platform)
+        for spelling in _DATAFRAME_PLATFORM_INFO:
+            canonical = PLATFORM_ALIASES.get(spelling, spelling)
+            caps = PlatformRegistry.get_platform_capabilities(canonical)
             assert caps is not None, (
-                f"Platform '{platform}' has DataFrame adapter in adapter_factory but no capabilities in registry"
+                f"DataFrame factory spelling '{spelling}' resolves to missing platform '{canonical}'"
             )
             assert caps.supports_dataframe, (
-                f"Platform '{platform}' has DataFrame adapter in adapter_factory "
-                f"but registry declares supports_dataframe=False. "
-                f"Fix: Set supports_dataframe=True in platform_registry.py metadata."
+                f"DataFrame factory spelling '{spelling}' resolves to platform '{canonical}' without supports_dataframe"
             )
 
 

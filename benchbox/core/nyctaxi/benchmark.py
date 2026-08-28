@@ -298,7 +298,12 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 table,
                 path,
                 row_count=row_counts.get(table, 0),
-                metadata={"csv_has_header": True, "csv_null_marker": None},
+                metadata={
+                    "csv_delimiter": ",",
+                    "csv_has_header": True,
+                    "csv_null_marker": None,
+                    "csv_normalize_booleans": False,
+                },
             )
 
         manifest.write()
@@ -319,6 +324,7 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         from benchbox.sql_compat.registry import REGISTRY
         from benchbox.sql_compat.rules.query_source.nyctaxi_variants import (
             CLICKHOUSE_RUSH_HOUR_SQL,
+            CLICKHOUSE_TRIP_DURATION_SQL,
             CLICKHOUSE_TRIPS_BY_DOW_SQL,
             CLICKHOUSE_WEEKDAY_WEEKEND_SQL,
             STARROCKS_RUSH_HOUR_SQL,
@@ -344,6 +350,7 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "trips-by-day-of-week": CLICKHOUSE_TRIPS_BY_DOW_SQL,
                 "weekday-weekend-comparison": CLICKHOUSE_WEEKDAY_WEEKEND_SQL,
                 "rush-hour-analysis": CLICKHOUSE_RUSH_HOUR_SQL,
+                "trip-duration-analysis": CLICKHOUSE_TRIP_DURATION_SQL,
             },
         }
         # Iterate both platforms independently - a real dialect string never matches both.

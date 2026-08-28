@@ -28,6 +28,10 @@ class TestDetectSchemaVersion:
         data = {"version": "2.1"}
         assert detect_schema_version(data) == "2.1"
 
+    def test_detects_v2_2(self):
+        data = {"version": "2.2"}
+        assert detect_schema_version(data) == "2.2"
+
     def test_detects_legacy_schema_version_key(self):
         data = {"schema_version": "2.0"}
         assert detect_schema_version(data) == "2.0"

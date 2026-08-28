@@ -284,6 +284,10 @@ class BenchmarkConfig(BaseModel):
     compression_type: str = "zstd"
     compression_level: Optional[int] = None
     test_execution_type: str = "standard"  # standard, power, throughput, maintenance, combined
+    # TPC-compliant mode. Benchmarks with a compliance gate (currently TPC-DS)
+    # must receive this to classify as `official`; without it a run can never
+    # pass `benchbox submit`.
+    official: bool = False
 
     @field_validator("scale_factor")
     @classmethod
@@ -426,6 +430,12 @@ class PlatformInfo(BaseModel):
     requirements: list[str]
     installation_command: str
     adoption: str = "niche"  # One of: mainstream, established, emerging, niche
+    # Product support tier from the platform manifest: stable, beta, experimental,
+    # or deprecated. Distinct from `available`/`enabled`, which report only whether
+    # the driver is installed locally (see docs/reference/public-contracts.md).
+    # None when the source spec carries no status, so surfaces can render "unknown"
+    # rather than implying a support promise the registry never made.
+    support_status: Optional[str] = None
     category: str = "database"
     supports: list[str] = Field(default_factory=list)
     driver_package: Optional[str] = None
@@ -494,7 +504,7 @@ class ExecutionContext(BaseModel):
     non_interactive: bool = False
 
     # Tuning
-    tuning_mode: Optional[str] = None  # "tuned", "notuning", "auto", or path
+    tuning_mode: Optional[str] = None  # Canonical value from benchbox.core.tuning.modes, or absent.
 
     def to_cli_args(self) -> list[str]:
         """Reconstruct CLI arguments from non-default values.
@@ -547,7 +557,7 @@ class ExecutionContext(BaseModel):
             args.extend(["--queries", ",".join(self.query_subset)])
         if self.strict_plan_capture:
             args.extend(["--plan-config", "strict:true"])
-        if self.tuning_mode and self.tuning_mode != "notuning":
+        if self.tuning_mode:
             args.extend(["--tuning", self.tuning_mode])
 
         return args

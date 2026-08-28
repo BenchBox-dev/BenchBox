@@ -126,7 +126,7 @@ class TestBenchmarkOrchestratorPowerThroughput:
         self.orchestrator.directory_manager.get_datagen_path = Mock(return_value="/tmp/test_datagen")
         self.orchestrator.directory_manager.get_database_path = Mock(return_value="/tmp/test_db.duckdb")
 
-    @patch("benchbox.cli.orchestrator.run_benchmark_lifecycle")
+    @patch("benchbox.core.run_service.run_benchmark_lifecycle")
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     @patch.object(BenchmarkOrchestrator, "_get_benchmark_instance")
     def test_power_test_execution_type(self, mock_get_benchmark, mock_get_platform, mock_lifecycle):
@@ -212,7 +212,7 @@ class TestBenchmarkOrchestratorPowerThroughput:
         # Metrics come from lifecycle result
         assert getattr(result, "power_at_size", None) == 123.45
 
-    @patch("benchbox.cli.orchestrator.run_benchmark_lifecycle")
+    @patch("benchbox.core.run_service.run_benchmark_lifecycle")
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     @patch.object(BenchmarkOrchestrator, "_get_benchmark_instance")
     def test_throughput_test_execution_type(self, mock_get_benchmark, mock_get_platform, mock_lifecycle):
@@ -297,7 +297,7 @@ class TestBenchmarkOrchestratorPowerThroughput:
         assert result is not None
         assert getattr(result, "throughput_at_size", None) == 987.65
 
-    @patch("benchbox.cli.orchestrator.run_benchmark_lifecycle")
+    @patch("benchbox.core.run_service.run_benchmark_lifecycle")
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     @patch.object(BenchmarkOrchestrator, "_get_benchmark_instance")
     def test_combined_test_execution_type(self, mock_get_benchmark, mock_get_platform, mock_lifecycle):

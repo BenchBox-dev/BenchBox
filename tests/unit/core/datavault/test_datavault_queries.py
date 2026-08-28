@@ -124,6 +124,17 @@ class TestQueryContent:
         assert "with" in q15
         assert "revenue" in q15
 
+    def test_q10_preaggregates_returned_lineitems_before_customer_details(self, query_manager):
+        """Q10 should bound its wide join while retaining Data Vault existence checks."""
+        q10 = query_manager.get_query(10).lower()
+
+        assert "lineitem_revenue_by_order as" in q10
+        assert "customer_revenue as" in q10
+        assert q10.index("group by ll.hk_order") < q10.index("join hub_customer")
+        assert "join hub_order" in q10
+        assert "join hub_nation" in q10
+        assert "sum(cr.customer_revenue) as revenue" in q10
+
     def test_q12_stays_tpc_style_without_cte(self, query_manager):
         """Q12 should stay close to TPC-H structure and avoid CTE wrappers."""
         q12 = query_manager.get_query(12).lower()

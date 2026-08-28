@@ -26,6 +26,7 @@ def check_dependencies(ctx, platform, verbose, show_matrix):
     Verifies platform dependencies and provides installation commands for
     missing packages. Shows comprehensive installation matrix for all platforms.
 
+    \b
     Examples:
         benchbox check-deps                      # Overview of all platforms
         benchbox check-deps --platform databricks # Check specific platform
@@ -115,7 +116,7 @@ def _show_platform(
         console.print(f"[green]✅ {platform} dependencies are installed[/green]")
     else:
         console.print(f"[red]❌ {platform} missing dependencies: {', '.join(missing)}[/red]")
-        console.print(f"\nExtra: [yellow]{dep_info.name}[/yellow]")
+        console.print(f"\nExtra: [yellow]{dep_info.extra_name}[/yellow]")
         console.print(dep_info.get_install_message())
         console.print("\nNeed help comparing extras? Run: benchbox check-deps --matrix")
 

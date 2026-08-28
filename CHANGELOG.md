@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.4.0] - 2026-08-27
+
+### Added
+
+- **Results Explorer (Curated Preview)** - Interactive in-browser analytics over benchmark runs at
+  [benchbox.dev/results/](https://benchbox.dev/results/), including multi-platform leaderboards,
+  query waterfalls, hardware disclosures, comparison tools, and an embedded SQL workbench.
+- **DuckLake platform (Beta)** - Run benchmarks against DuckLake with independently selectable
+  DuckDB, SQLite, or PostgreSQL catalogs and local or S3-backed Parquet storage. Install with
+  `benchbox[ducklake]`.
+- **Result provenance and funding disclosure** - Canonical result-source, trust-label, and funding
+  vocabulary, `benchbox run --funding`, optional provenance in result bundles, and the
+  `vendor-supplied` trust label.
+
+### Fixed
+
+- **Correct TPC throughput metrics in newly exported results** - TPC-H and TPC-DS throughput drivers
+  now include every executed query in Throughput@Size, correcting the previous 22x and 99x
+  understatements. Historical bundles remain unchanged.
+- **Unrunnable precompiled TPC binaries fall back to source compilation** - BenchBox probes bundled
+  dbgen, qgen, dsdgen, and dsqgen binaries before selecting them and compiles a compatible tool when
+  the bundled executable cannot run on the host.
+- **Secret redaction** - DuckLake PostgreSQL-catalog errors no longer echo connection passwords,
+  MotherDuck tokens no longer leak through chained exception causes, and `*_key_id` platform options
+  are redacted from exported metadata.
+- **Honest tuning configuration** - Removed the unused `BENCHBOX_TUNING_ENABLED` environment variable
+  and corrected `--tuning auto` guidance for SQL platforms.
+- **DataFusion path compatibility** - Programmatic `load_data` calls now accept table paths supplied
+  as either strings or `pathlib.Path` objects.
+
+### Removed
+
+- **BREAKING: bare `clickhouse` platform alias removed** - Use `clickhouse-local`,
+  `clickhouse-server`, or `clickhouse-cloud`. The `ch` shorthand now resolves to
+  `clickhouse-local`.
+- **BREAKING: `databricks-connect` install extra removed** - Use
+  `benchbox[cloud-spark-databricks]`; it continues to install the upstream `databricks-connect`
+  package.
+
 ## [0.3.1] - 2026-07-09
 
 ### New
@@ -670,17 +711,19 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01
 
 ### Links
 
-- **Documentation**: [GitHub Repository](https://github.com/joeharris76/benchbox)
-- **Issues**: [Report bugs and request features](https://github.com/joeharris76/benchbox/issues)
+- **Documentation**: [GitHub Repository](https://github.com/BenchBox-dev/BenchBox)
+- **Issues**: [Report bugs and request features](https://github.com/BenchBox-dev/BenchBox/issues)
 - **PyPI**: [pypi.org/project/benchbox](https://pypi.org/project/benchbox/)
 
-[0.3.1]: https://github.com/joeharris76/benchbox/compare/v0.3.0...v0.3.1
-[0.3.0]: https://github.com/joeharris76/benchbox/compare/v0.2.1...v0.3.0
-[0.2.1]: https://github.com/joeharris76/benchbox/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/joeharris76/benchbox/compare/v0.1.5...v0.2.0
-[0.1.5]: https://github.com/joeharris76/benchbox/compare/v0.1.4...v0.1.5
-[0.1.4]: https://github.com/joeharris76/benchbox/compare/v0.1.3...v0.1.4
-[0.1.3]: https://github.com/joeharris76/benchbox/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/joeharris76/benchbox/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/joeharris76/benchbox/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/joeharris76/benchbox/releases/tag/v0.1.0
+[Unreleased]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/BenchBox-dev/BenchBox/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/BenchBox-dev/BenchBox/compare/v0.1.5...v0.2.0
+[0.1.5]: https://github.com/BenchBox-dev/BenchBox/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/BenchBox-dev/BenchBox/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/BenchBox-dev/BenchBox/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/BenchBox-dev/BenchBox/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/BenchBox-dev/BenchBox/releases/tag/v0.1.0

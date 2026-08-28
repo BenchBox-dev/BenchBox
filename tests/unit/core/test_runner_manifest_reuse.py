@@ -10,6 +10,7 @@ import pytest
 
 from benchbox.core.runner.runner import _ensure_data_generated
 from benchbox.core.schemas import BenchmarkConfig
+from benchbox.utils.cloud_storage import CloudStagingPath
 
 pytestmark = [
     pytest.mark.unit,
@@ -247,6 +248,61 @@ def test_force_regenerate_overrides_populated_tables(tmp_path: Path, benchmark_c
     dummy.generate_data.assert_called_once()
 
 
+def test_populated_missing_tables_trigger_regeneration(tmp_path: Path, benchmark_config: BenchmarkConfig):
+    """A populated mapping with missing files must not bypass generation."""
+
+    class DummyBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = tmp_path
+            self.tables = {"orders": tmp_path / "missing.dat"}
+            self.generate_data = Mock()
+
+    dummy = DummyBenchmark()
+
+    result = _ensure_data_generated(dummy, benchmark_config)
+
+    assert result is True
+    dummy.generate_data.assert_called_once()
+
+
+def test_populated_tables_must_match_manifest_before_reuse(tmp_path: Path, benchmark_config: BenchmarkConfig):
+    """Existing but stale table mappings must not be reused."""
+    _write_manifest(tmp_path, table_names=["customer"])
+    stale_path = tmp_path / "orders.dat"
+    stale_path.write_text("stale\n")
+
+    class DummyBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = tmp_path
+            self.tables = {"orders": stale_path}
+            self.generate_data = Mock()
+
+    dummy = DummyBenchmark()
+
+    result = _ensure_data_generated(dummy, benchmark_config)
+
+    assert result is True
+    dummy.generate_data.assert_called_once()
+
+
+def test_external_populated_tables_without_manifest_are_reused(tmp_path: Path, benchmark_config: BenchmarkConfig):
+    """External caller-provided tables must not require a local datagen manifest."""
+    benchmark_config.options["table_mode"] = "external"
+
+    class DummyBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = tmp_path
+            self.tables = {"orders": "s3://bucket/benchbox/orders"}
+            self.generate_data = Mock()
+
+    dummy = DummyBenchmark()
+
+    result = _ensure_data_generated(dummy, benchmark_config)
+
+    assert result is False
+    dummy.generate_data.assert_not_called()
+
+
 def test_invalid_manifest_regenerates(tmp_path: Path, benchmark_config: BenchmarkConfig):
     manifest = _write_manifest(tmp_path, table_names=["orders"])
     # Corrupt manifest by altering file size expectation
@@ -397,6 +453,26 @@ def test_table_name_directory_collision_invalidates_manifest(tmp_path: Path, ben
     result = _ensure_data_generated(dummy, benchmark_config)
 
     assert result is True, "Table-name directory collision should trigger regeneration"
+    dummy.generate_data.assert_called_once()
+
+
+def test_cloud_staging_path_checks_local_directory_collisions(tmp_path: Path, benchmark_config: BenchmarkConfig):
+    """Cloud staging keeps the local collision guard while carrying its remote target."""
+    _write_manifest(tmp_path, table_names=["customer"])
+    stale_dir = tmp_path / "customer"
+    stale_dir.mkdir()
+    (stale_dir / "metadata.json").write_text("stale")
+
+    class DummyBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = CloudStagingPath(tmp_path, "abfss://c@a.dfs.core.windows.net/benchbox")
+            self.tables = None
+            self.generate_data = Mock()
+
+    dummy = DummyBenchmark()
+    result = _ensure_data_generated(dummy, benchmark_config)
+
+    assert result is True
     dummy.generate_data.assert_called_once()
 
 

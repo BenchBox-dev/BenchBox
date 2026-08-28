@@ -64,6 +64,35 @@ Failure artifacts (traces, screenshots, video, HTML report) land under
 `results-explorer/test-results/` and `results-explorer/playwright-report/`
 and are both gitignored.
 
+## Public-site visual baseline policy
+
+The full public-site visual suite is broader than the Explorer's current
+functional gate. Its baseline policy is recorded in
+`_project/audits/public-site-visual-baseline-policy-2026-08-15.md`:
+raw screenshots stay out of Git, protected `develop` produces SHA-bound
+baseline artifacts, and pull requests compare against the exact base-SHA
+artifact. Missing or unverifiable baselines fail closed; a PR diagnostic
+artifact is never promoted directly to a baseline. The capture harness at `results-explorer/e2e/captures/public-site-pages.spec.ts`
+and Pages-shaped server are reusable building blocks. `.github/workflows/docs.yml`
+now uploads the protected baseline from `develop` and retrieves the exact
+base-SHA artifact for pull requests; the comparison is blocking once the
+one-time bootstrap baseline exists.
+
+An intentional visual change or route/viewport addition needs explicit
+maintainer acceptance. After reviewing the PR's `public-site-visual-diagnostics-*`
+artifact, set the repository variable `APPROVED_HEAD_SHA` to the PR's complete
+head SHA and set `APPROVAL_REASON` to a nonempty review note, then rerun the
+failed workflow. The approval applies only when both values are present and the
+approved SHA exactly equals GitHub's current PR head SHA. It may accept changed
+digests and unexpected new captures, but it never accepts a capture missing
+from the current matrix. Clear both variables after the approved run so only
+one reviewed head occupies the repository-wide approval slot.
+
+This approval does not create or replace a baseline. Only the protected
+`develop` push or its `workflow_dispatch` run uploads the next SHA-bound
+baseline after the reviewed PR merges; PR diagnostic artifacts remain
+short-lived and non-promotable.
+
 ## What CI gates
 
 [`.github/workflows/results-explorer-browser.yml`](../../.github/workflows/results-explorer-browser.yml)
@@ -79,7 +108,7 @@ only the token/theme scans and unit/fast tests).
   flake data collected during w9 of
   `implement-results-explorer-browser-functional-tests` supports it.
 
-All three jobs upload Playwright reports on failure with a 14-day retention
+All three jobs upload Playwright reports on failure with a 3-day retention
 so maintainers can download a full trace from the PR checks page. The CI
 jobs call the same shared browser scripts that maintainers run locally,
 rather than re-encoding fixture/build/test sequencing in the workflow.

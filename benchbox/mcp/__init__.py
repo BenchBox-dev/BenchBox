@@ -12,9 +12,9 @@ The MCP server exposes BenchBox functionality through:
 
 - **server**: Main server creation and configuration
 - **errors**: Structured error handling with error codes and categories
-- **schemas**: Pydantic input validation models
-- **observability**: Structured logging and metrics collection
-- **execution**: Async execution tracking for long-running benchmarks
+- **schemas**: Platform-option admission and input validation
+- **jobs**: Durable job queue for authenticated remote execution
+- **telemetry**: Server-side telemetry for remote deployments
 
 ## Example Usage
 
@@ -50,15 +50,21 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from benchbox.mcp.security import RemoteSecurityRuntime
 
 try:
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server.mcpserver import MCPServer
 except ImportError as e:
     raise ImportError(
         "MCP SDK not installed. Install with:\n"
         "  pip install 'benchbox[mcp]'  # pip/venv\n"
         "  uv add benchbox --extra mcp  # uv project"
     ) from e
+
+from benchbox.mcp.transport import MCPTransport
 
 # Lazy imports to avoid circular dependencies
 __all__ = [
@@ -69,13 +75,6 @@ __all__ = [
     "ErrorCategory",
     "MCPError",
     "make_error",
-    # Observability
-    "ToolCallContext",
-    "get_metrics_collector",
-    # Execution
-    "ExecutionStatus",
-    "ExecutionState",
-    "get_execution_tracker",
 ]
 
 
@@ -85,20 +84,24 @@ def create_server(
     charts_dir: str | Path | None = None,
     log_level: str | int | None = None,
     env: Mapping[str, str] | None = None,
-) -> FastMCP:
+    remote_security: RemoteSecurityRuntime | None = None,
+) -> MCPServer:
     """Create and configure the BenchBox MCP server.
 
     Returns:
-        Configured FastMCP server instance with all tools, resources, and prompts registered.
+        Configured MCPServer instance with all tools, resources, and prompts registered.
     """
     from benchbox.mcp.server import create_benchbox_server
 
-    return create_benchbox_server(
-        results_dir=results_dir,
-        charts_dir=charts_dir,
-        log_level=log_level,
-        env=env,
-    )
+    kwargs: dict[str, Any] = {
+        "results_dir": results_dir,
+        "charts_dir": charts_dir,
+        "log_level": log_level,
+        "env": env,
+    }
+    if remote_security is not None:
+        kwargs["remote_security"] = remote_security
+    return create_benchbox_server(**kwargs)
 
 
 def run_server(
@@ -107,6 +110,12 @@ def run_server(
     charts_dir: str | Path | None = None,
     log_level: str | int | None = None,
     env: Mapping[str, str] | None = None,
+    transport: MCPTransport = "stdio",
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    streamable_http_path: str = "/mcp",
+    security_config: str | Path | None = None,
+    readiness_evidence: str | Path | None = None,
 ) -> None:
     """Run the BenchBox MCP server.
 
@@ -114,13 +123,30 @@ def run_server(
     - `benchbox-mcp` CLI command
     - `python -m benchbox.mcp`
     """
-    server = create_server(
-        results_dir=results_dir,
-        charts_dir=charts_dir,
-        log_level=log_level,
+    from benchbox.mcp.security import RemoteSecurityRuntime
+    from benchbox.mcp.transport import MCPTransportSettings, run_transport
+
+    remote_security = RemoteSecurityRuntime.from_file(security_config) if security_config is not None else None
+
+    transport_settings = MCPTransportSettings(
+        transport=transport,
+        host=host,
+        port=port,
+        streamable_http_path=streamable_http_path,
+        remote_security=remote_security,
+        readiness_evidence=Path(readiness_evidence) if readiness_evidence is not None else None,
         env=env,
     )
-    server.run()
+    server_kwargs: dict[str, Any] = {
+        "results_dir": results_dir,
+        "charts_dir": charts_dir,
+        "log_level": log_level,
+        "env": env,
+    }
+    if remote_security is not None:
+        server_kwargs["remote_security"] = remote_security
+    server = create_server(**server_kwargs)
+    run_transport(server, transport_settings)
 
 
 # Lazy-loaded exports for error handling
@@ -132,16 +158,4 @@ def __getattr__(name: str):
         return {"ErrorCode": ErrorCode, "ErrorCategory": ErrorCategory, "MCPError": MCPError, "make_error": make_error}[
             name
         ]
-    elif name in ("ToolCallContext", "get_metrics_collector"):
-        from benchbox.mcp.observability import ToolCallContext, get_metrics_collector
-
-        return {"ToolCallContext": ToolCallContext, "get_metrics_collector": get_metrics_collector}[name]
-    elif name in ("ExecutionStatus", "ExecutionState", "get_execution_tracker"):
-        from benchbox.mcp.execution import ExecutionState, ExecutionStatus, get_execution_tracker
-
-        return {
-            "ExecutionStatus": ExecutionStatus,
-            "ExecutionState": ExecutionState,
-            "get_execution_tracker": get_execution_tracker,
-        }[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

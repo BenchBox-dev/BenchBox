@@ -150,10 +150,12 @@
           "benchbox_private"
         ],
         "prefixes": {
-          "environment.platform_runtime.engine_host": "host_",
           "platform.raw_config.host": "host_",
           "platform.raw_config.database": "database_"
-        }
+        },
+        "absent_keys": [
+          "engine_host"
+        ]
       }
     },
     {
@@ -276,11 +278,13 @@
           "prefix/",
           "athena_private"
         ],
+        "absent_keys": [
+          "output_location"
+        ],
         "prefixes": {
           "platform.cloud.account": "account_",
           "platform.compute.workgroup": "workgroup_",
-          "platform.storage.bucket": "bucket_",
-          "platform.raw_config.output_location": "path_"
+          "platform.storage.bucket": "bucket_"
         }
       }
     },

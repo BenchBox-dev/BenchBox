@@ -102,6 +102,44 @@ def test_interactive_header_shown_for_prompted_tty_run():
     mock_console.print.assert_called_once()
 
 
+def test_interactive_cloud_setup_leaves_server_credentials_to_adapter():
+    state = SimpleNamespace(
+        database_config=SimpleNamespace(type="postgresql"),
+        non_interactive=False,
+        output=None,
+        ctx=Mock(),
+    )
+
+    with (
+        patch.object(_run_module, "_run_stages_through_cloud_storage", return_value=False),
+        patch.object(_run_module, "_run_requires_platform_credentials", return_value=True),
+        patch.object(_run_module, "check_and_setup_platform_credentials") as check_credentials,
+    ):
+        _run_module._interactive_cloud_setup_if_needed(state)
+
+    check_credentials.assert_not_called()
+    state.ctx.exit.assert_not_called()
+
+
+def test_interactive_cloud_setup_guides_singlestore_credentials():
+    state = SimpleNamespace(
+        database_config=SimpleNamespace(type="singlestore"),
+        non_interactive=False,
+        output=None,
+        ctx=Mock(),
+    )
+
+    with (
+        patch.object(_run_module, "_run_stages_through_cloud_storage", return_value=False),
+        patch.object(_run_module, "_run_requires_platform_credentials", return_value=True),
+        patch.object(_run_module, "check_and_setup_platform_credentials", return_value=True) as check_credentials,
+    ):
+        _run_module._interactive_cloud_setup_if_needed(state)
+
+    check_credentials.assert_called_once_with(platform="singlestore", console_obj=_run_module.console, interactive=True)
+    state.ctx.exit.assert_not_called()
+
+
 def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_path: Path):
     runner = CliRunner()
 
@@ -124,7 +162,10 @@ def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_
         display_name="TPC-H",
         scale_factor=0.01,
         queries=None,
-        concurrency=1,
+        concurrency=4,
+        compress_data=True,
+        compression_type="gzip",
+        compression_level=6,
         options={},
     )
     bench_manager = Mock()
@@ -187,7 +228,13 @@ def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_
         stack.enter_context(patch("benchbox.cli.tuning.run_tuning_wizard", return_value=guided_config))
         mock_preview = stack.enter_context(patch("benchbox.cli.dryrun.display_interactive_preview"))
         mock_confirm = stack.enter_context(patch.object(_run_module.Confirm, "ask"))
-        mock_caps.return_value = SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="sql",
+            supports_sql=True,
+            supports_dataframe=False,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         def _confirm_side_effect(prompt, default=False):
             text = str(prompt)
@@ -211,11 +258,27 @@ def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_
     assert benchmark_config.options["table_format_compression"] == "zstd"
     assert benchmark_config.options["unified_tuning_configuration"] is guided_config
     assert benchmark_config.options["tuning_enabled"] is True
+    assert (
+        benchmark_config.concurrency,
+        benchmark_config.compress_data,
+        benchmark_config.compression_type,
+        benchmark_config.compression_level,
+    ) == (4, True, "gzip", 6)
     assert database_config.options["tuning_enabled"] is True
     assert database_config.tuning_enabled is True
-    assert database_config.unified_tuning_configuration is guided_config
+    # unified_tuning_configuration is deliberately NOT promoted onto database_config
+    # (a pydantic model): model_dump() would serialize the dataclass to a plain
+    # dict, which would break PlatformAdapter's config consumption. The live
+    # object instead reaches the adapter via benchmark_config.options (asserted
+    # above) -> get_platform_config()'s "tuning_config" kwarg.
+    assert database_config.tuning_source == "wizard"
+    assert database_config.tuning_source_file is None
     mock_preview.assert_called_once()
+    assert mock_preview.call_args.kwargs["benchmark_config"] is benchmark_config
+    assert mock_preview.call_args.kwargs["benchmark_config"].concurrency == 4
     orchestrator.set_custom_output_dir.assert_called_once_with(str(tmp_path / "normalized"))
+    assert mock_execute.call_args.args[1] is benchmark_config
+    assert mock_execute.call_args.args[1].compression_type == "gzip"
     assert mock_execute.call_args.args[4] == ["generate", "load", "power"]
     assert mock_execute.call_args.kwargs["execution_context"].query_subset == ["Q1", "Q6"]
     mock_save_last_run.assert_called_once()
@@ -225,6 +288,14 @@ def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_
     assert save_kwargs["seed"] == 77
     assert save_kwargs["output"] == str(tmp_path / "chosen-output")
     assert save_kwargs["phases"] == ["generate", "load", "power"]
+    assert save_kwargs["queries"] == ["Q1", "Q6"]
+    assert save_kwargs["mode"] == "sql"
+    assert save_kwargs["concurrency"] == 4
+    assert (save_kwargs["compress_data"], save_kwargs["compression_type"], save_kwargs["compression_level"]) == (
+        True,
+        "gzip",
+        6,
+    )
 
 
 def test_interactive_stats_controls_reach_benchmark_config(tmp_path: Path):
@@ -322,7 +393,13 @@ def test_interactive_stats_controls_reach_benchmark_config(tmp_path: Path):
         stack.enter_context(patch("benchbox.cli.tuning.run_tuning_wizard", return_value=guided_config))
         stack.enter_context(patch("benchbox.cli.dryrun.display_interactive_preview"))
         mock_confirm = stack.enter_context(patch.object(_run_module.Confirm, "ask"))
-        mock_caps.return_value = SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="sql",
+            supports_sql=True,
+            supports_dataframe=False,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         def _confirm_side_effect(prompt, default=False):
             text = str(prompt)
@@ -432,7 +509,13 @@ def test_interactive_execution_type_derived_from_phases(tmp_path: Path):
         stack.enter_context(patch("benchbox.cli.tuning.run_tuning_wizard"))
         stack.enter_context(patch("benchbox.cli.dryrun.display_interactive_preview"))
         mock_confirm = stack.enter_context(patch.object(_run_module.Confirm, "ask"))
-        mock_caps.return_value = SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="sql",
+            supports_sql=True,
+            supports_dataframe=False,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         def _confirm_side_effect(prompt, default=False):
             text = str(prompt)
@@ -537,7 +620,13 @@ def test_interactive_dataframe_tuning_acceptance_applies_runtime_defaults(tmp_pa
             patch("benchbox.core.dataframe.tuning.get_smart_defaults", return_value=df_tuning_config)
         )
         mock_confirm = stack.enter_context(patch.object(_run_module.Confirm, "ask"))
-        mock_caps.return_value = SimpleNamespace(default_mode="dataframe", supports_sql=False, supports_dataframe=True)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="dataframe",
+            supports_sql=False,
+            supports_dataframe=True,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         def _confirm_side_effect(prompt, default=False):
             text = str(prompt)
@@ -555,7 +644,8 @@ def test_interactive_dataframe_tuning_acceptance_applies_runtime_defaults(tmp_pa
     mock_df_defaults.assert_called_once_with("polars-df")
     assert benchmark_config.options["df_tuning_config"] is df_tuning_config
     assert database_config.tuning_enabled is True
-    assert database_config.unified_tuning_configuration is guided_config
+    assert benchmark_config.options["unified_tuning_configuration"] is guided_config
+    assert database_config.tuning_source == "wizard"
 
 
 def test_interactive_wizard_baseline_maps_to_notuning_for_external_mode(tmp_path: Path):
@@ -640,7 +730,13 @@ def test_interactive_wizard_baseline_maps_to_notuning_for_external_mode(tmp_path
         stack.enter_context(patch("benchbox.cli.tuning.run_tuning_wizard", return_value=baseline_config))
         mock_preview = stack.enter_context(patch("benchbox.cli.dryrun.display_interactive_preview"))
         mock_confirm = stack.enter_context(patch.object(_run_module.Confirm, "ask"))
-        mock_caps.return_value = SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="sql",
+            supports_sql=True,
+            supports_dataframe=False,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         def _confirm_side_effect(prompt, default=False):
             text = str(prompt)
@@ -658,7 +754,8 @@ def test_interactive_wizard_baseline_maps_to_notuning_for_external_mode(tmp_path
     assert mock_execute.called
     assert benchmark_config.options["tuning_enabled"] is False
     assert database_config.tuning_enabled is False
-    assert database_config.unified_tuning_configuration is baseline_config
+    assert benchmark_config.options["unified_tuning_configuration"] is baseline_config
+    assert database_config.tuning_source == "wizard"
     mock_preview.assert_called_once()
     assert mock_preview.call_args.kwargs["tuning"] is None
     mock_save_last_run.assert_called_once()
@@ -746,7 +843,13 @@ def test_interactive_dataframe_wizard_baseline_skips_runtime_defaults(tmp_path: 
         mock_preview = stack.enter_context(patch("benchbox.cli.dryrun.display_interactive_preview"))
         mock_df_defaults = stack.enter_context(patch("benchbox.core.dataframe.tuning.get_smart_defaults"))
         mock_confirm = stack.enter_context(patch.object(_run_module.Confirm, "ask"))
-        mock_caps.return_value = SimpleNamespace(default_mode="dataframe", supports_sql=False, supports_dataframe=True)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="dataframe",
+            supports_sql=False,
+            supports_dataframe=True,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         def _confirm_side_effect(prompt, default=False):
             text = str(prompt)
@@ -819,7 +922,13 @@ def test_fallback_wizard_baseline_reclassifies_runtime_state_for_dataframe_platf
             patch.object(
                 _run_module.PlatformRegistry,
                 "get_platform_capabilities",
-                return_value=SimpleNamespace(default_mode="dataframe", supports_sql=False, supports_dataframe=True),
+                return_value=SimpleNamespace(
+                    default_mode="dataframe",
+                    supports_sql=False,
+                    supports_dataframe=True,
+                    deployment_modes={},
+                    default_deployment=None,
+                ),
             )
         )
         stack.enter_context(patch.object(_run_module.PlatformRegistry, "requires_cloud_storage", return_value=False))
@@ -867,6 +976,104 @@ def test_fallback_wizard_baseline_reclassifies_runtime_state_for_dataframe_platf
     assert "df_tuning_config" not in executed_benchmark_config.options
     mock_save_last_run.assert_called_once()
     assert mock_save_last_run.call_args.kwargs["tuning_mode"] == "notuning"
+
+
+def test_direct_dataframe_tuning_config_propagates_to_benchmark_config(tmp_path: Path):
+    """Non-interactive `benchbox run` must forward the resolved DataFrame tuning
+    config into benchmark_config.options so the adapter is built tuned.
+
+    Regression for cli-dataframe-tuning-config-propagation: the direct builder
+    resolved df_tuning_config onto the run state but never placed it in
+    benchmark_config.options (the interactive path did), so a plain
+    ``benchbox run --tuning <file>`` on a DataFrame platform reached the adapter
+    untuned and its bundle carried no applied ledger.
+    """
+    runner = CliRunner()
+
+    profiler = Mock()
+    profiler.get_system_profile.return_value = SimpleNamespace(
+        cpu_cores_logical=8,
+        memory_total_gb=32,
+        architecture="x86_64",
+        os_type="darwin",
+    )
+    profiler.display_profile.return_value = None
+
+    database_config = SimpleNamespace(
+        type="polars-df",
+        options={},
+        execution_mode="dataframe",
+        driver_version_actual=None,
+        driver_version_resolved=None,
+    )
+    db_manager = Mock()
+    db_manager.create_config.return_value = database_config
+
+    bench_manager = Mock()
+    bench_manager.benchmarks = {
+        "tpch": {
+            "display_name": "TPC-H",
+            "estimated_time_range": (2, 10),
+            "complexity": "medium",
+            "num_queries": 22,
+        }
+    }
+    bench_manager.validate_scale_factor.return_value = None
+
+    orchestrator = Mock()
+    result_payload = SimpleNamespace(validation_status="PASSED", execution_id="exec-123", query_results=[])
+    df_tuning_config = SimpleNamespace(name="df-direct-tuned")
+
+    with ExitStack() as stack:
+        stack.enter_context(patch.object(_run_module, "SystemProfiler", return_value=profiler))
+        stack.enter_context(patch.object(_run_module, "DatabaseManager", return_value=db_manager))
+        stack.enter_context(patch.object(_run_module, "BenchmarkManager", return_value=bench_manager))
+        stack.enter_context(patch.object(_run_module, "BenchmarkOrchestrator", return_value=orchestrator))
+        stack.enter_context(patch.object(_run_module, "display_system_recommendations"))
+        stack.enter_context(
+            patch.object(
+                _run_module.PlatformRegistry,
+                "get_platform_capabilities",
+                return_value=SimpleNamespace(
+                    default_mode="dataframe",
+                    supports_sql=False,
+                    supports_dataframe=True,
+                    deployment_modes={},
+                    default_deployment=None,
+                ),
+            )
+        )
+        stack.enter_context(patch.object(_run_module.PlatformRegistry, "requires_cloud_storage", return_value=False))
+        # Isolate the plumbing under test: pretend the resolver produced a
+        # DataFrame tuning config regardless of tuning-mode internals.
+        mock_resolve = stack.enter_context(
+            patch.object(_run_module, "resolve_dataframe_tuning_config", return_value=df_tuning_config)
+        )
+        mock_execute = stack.enter_context(
+            patch.object(_run_module, "_execute_orchestrated_run", return_value=result_payload)
+        )
+        stack.enter_context(
+            patch.object(
+                _run_module,
+                "_export_orchestrated_result",
+                return_value={"json": str(tmp_path / "results.json")},
+            )
+        )
+        stack.enter_context(patch.object(_run_module, "_render_post_run_charts"))
+        stack.enter_context(patch("benchbox.cli.onboarding.check_and_run_first_time_setup", return_value=False))
+        stack.enter_context(patch("benchbox.cli.preferences.load_last_run_config", return_value=None))
+        stack.enter_context(patch("benchbox.cli.preferences.save_last_run_config"))
+
+        result = runner.invoke(
+            run,
+            ["--platform", "polars-df", "--benchmark", "tpch", "--non-interactive"],
+            obj=_run_obj(),
+        )
+
+    assert result.exit_code == 0, result.output
+    assert mock_resolve.called
+    executed_benchmark_config = mock_execute.call_args.args[1]
+    assert executed_benchmark_config.options["df_tuning_config"] is df_tuning_config
 
 
 def test_interactive_tuning_declined_sets_notuning_state(tmp_path: Path):
@@ -952,7 +1159,13 @@ def test_interactive_tuning_declined_sets_notuning_state(tmp_path: Path):
         mock_wizard = stack.enter_context(patch("benchbox.cli.tuning.run_tuning_wizard"))
         mock_preview = stack.enter_context(patch("benchbox.cli.dryrun.display_interactive_preview"))
         mock_confirm = stack.enter_context(patch.object(_run_module.Confirm, "ask"))
-        mock_caps.return_value = SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="sql",
+            supports_sql=True,
+            supports_dataframe=False,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         def _confirm_side_effect(prompt, default=False):
             text = str(prompt)
@@ -974,7 +1187,8 @@ def test_interactive_tuning_declined_sets_notuning_state(tmp_path: Path):
     assert benchmark_config.options["tuning_enabled"] is False
     assert database_config.options["tuning_enabled"] is False
     assert database_config.tuning_enabled is False
-    baseline_config = database_config.unified_tuning_configuration
+    assert database_config.tuning_source == "baseline"
+    baseline_config = benchmark_config.options["unified_tuning_configuration"]
     assert baseline_config.primary_keys.enabled is False
     assert baseline_config.foreign_keys.enabled is False
     assert baseline_config.unique_constraints.enabled is False
@@ -1009,12 +1223,19 @@ def test_interactive_cloud_platform_stops_when_credentials_are_missing():
         stack.enter_context(patch.object(_run_module, "DatabaseManager", return_value=db_manager))
         stack.enter_context(patch.object(_run_module, "BenchmarkManager", return_value=bench_manager))
         stack.enter_context(patch.object(_run_module, "display_system_recommendations"))
+        stack.enter_context(patch.object(_benchmarks_module, "prompt_platform_options", return_value={}))
         mock_caps = stack.enter_context(patch.object(_run_module.PlatformRegistry, "get_platform_capabilities"))
         stack.enter_context(patch.object(_run_module.PlatformRegistry, "requires_cloud_storage", return_value=True))
         stack.enter_context(patch.object(_run_module, "check_and_setup_platform_credentials", return_value=False))
         stack.enter_context(patch("benchbox.cli.onboarding.check_and_run_first_time_setup", return_value=False))
         stack.enter_context(patch("benchbox.cli.preferences.load_last_run_config", return_value=None))
-        mock_caps.return_value = SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="sql",
+            supports_sql=True,
+            supports_dataframe=False,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         result = runner.invoke(run, [], obj=_run_obj())
 
@@ -1075,7 +1296,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(
@@ -1187,7 +1414,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(
@@ -1221,7 +1454,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(
@@ -1243,7 +1482,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(
@@ -1275,7 +1520,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(
@@ -1298,7 +1549,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(
@@ -1321,7 +1578,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(
@@ -1344,7 +1607,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(

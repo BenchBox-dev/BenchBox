@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Union
 
-from benchbox.core.base_benchmark import BaseBenchmark
+from benchbox.base import BaseBenchmark
 from benchbox.core.tpcds.generator import TPCDSDataGenerator
 from benchbox.core.tpcds_obt.etl.transformer import SUPPORTED_CHANNELS, TPCDSOBTTransformer
 from benchbox.core.tpcds_obt.queries import TPCDSOBTQueryManager
@@ -357,14 +357,89 @@ class TPCDSOBTBenchmark(BaseBenchmark):
         # They use a static query set. We accept these params for API compatibility.
         sql = self.query_manager.get_query(query_id, params)
         if dialect:
-            sql = self.translate_query_text(sql, dialect)
+            sql = self.translate_query_text(sql, dialect, query_id=int(query_id))
         return sql
 
     def get_all_queries(self) -> dict[str, str]:
         """Get all available OBT queries."""
         return {str(k): v for k, v in self.query_manager.get_queries().items()}
 
-    def translate_query_text(self, query_text: str, target_dialect: str) -> str:
+    @staticmethod
+    def _rewrite_clickhouse_query(query_id: int, query_text: str) -> str:
+        """Apply the proven TPC-DS ClickHouse rewrites to equivalent OBT shapes."""
+        if query_id not in {47, 57, 66}:
+            return query_text
+
+        from benchbox.core.tpcds.benchmark.runner import TPCDSBenchmark
+
+        normalized = " ".join(query_text.split()).replace("( ", "(").replace(" )", ")")
+        if query_id in {47, 57}:
+            rewritten = TPCDSBenchmark._rewrite_clickhouse_monthly_avg_query(query_id, normalized)
+            first_select = re.search(r"WITH v1_monthly AS \(SELECT (?P<select>.+?) FROM ", rewritten, re.IGNORECASE)
+            v1_marker = rewritten.find(", v1 AS (")
+            v1_open = v1_marker + len(", v1 AS ")
+            if first_select is None or v1_marker == -1:
+                raise ValueError(f"Unsupported ClickHouse OBT Q{query_id} rewrite shape")
+
+            v1_close = TPCDSBenchmark._find_matching_parenthesis(rewritten, v1_open)
+            alias_map = dict(
+                re.findall(
+                    r"\b(obt\.[a-zA-Z_][a-zA-Z0-9_]*)\s+AS\s+([a-zA-Z_][a-zA-Z0-9_]*)", first_select.group("select")
+                )
+            )
+            v1_body = rewritten[v1_open + 1 : v1_close]
+            for source_column, alias in alias_map.items():
+                v1_body = re.sub(rf"\b{re.escape(source_column)}\b", alias, v1_body)
+            rewritten = f"{rewritten[: v1_open + 1]}{v1_body}{rewritten[v1_close:]}"
+
+            marker = ") SELECT * FROM v2 WHERE "
+            if marker in rewritten:
+                prefix, outer = rewritten.split(marker, 1)
+                outer = re.sub(
+                    r"\b(d_year|avg_monthly_sales|sum_sales)\b",
+                    r"v2.\1",
+                    outer,
+                    flags=re.IGNORECASE,
+                )
+                rewritten = f"{prefix}) SELECT v2.* FROM v2 AS v2 WHERE {outer}"
+            return rewritten
+
+        normalized = normalized.replace("obt.sold_date_d_year", "d_year").replace("obt.sold_date_d_moy", "d_moy")
+        rewritten = TPCDSBenchmark._rewrite_clickhouse_q66(normalized)
+        channel_body_end = rewritten.find(") SELECT ")
+        if channel_body_end == -1:
+            raise ValueError("Unsupported ClickHouse OBT Q66 rewrite shape")
+        channel_body = rewritten[len("WITH channel_sales AS (") : channel_body_end]
+        branches = re.split(r"\s+UNION ALL\s+", channel_body, maxsplit=1, flags=re.IGNORECASE)
+        if len(branches) != 2:
+            raise ValueError("Unsupported ClickHouse OBT Q66 channel shape")
+
+        rewritten_branches = []
+        for branch in branches:
+            select_part, from_part = re.split(r"\s+FROM\s+", branch, maxsplit=1, flags=re.IGNORECASE)
+            select_part = re.sub(
+                r"(?<!\.)\bd_year\s+AS\s+year\b",
+                "obt.sold_date_d_year AS year",
+                select_part,
+                flags=re.IGNORECASE,
+            )
+            select_part = re.sub(
+                r"(?<!\.)\bd_moy\b",
+                "obt.sold_date_d_moy AS d_moy",
+                select_part,
+                count=1,
+                flags=re.IGNORECASE,
+            )
+            from_part = re.sub(r"(?<!\.)\bd_year\b", "obt.sold_date_d_year", from_part, flags=re.IGNORECASE)
+            from_part = re.sub(r"(?<!\.)\bd_moy\b", "obt.sold_date_d_moy", from_part, flags=re.IGNORECASE)
+            rewritten_branches.append(f"{select_part} FROM {from_part}")
+
+        rewritten = (
+            f"WITH channel_sales AS ({' UNION ALL '.join(rewritten_branches)}){rewritten[channel_body_end + 1 :]}"
+        )
+        return re.sub(r"\bw_warehouse_sq_ft\b", "warehouse_w_warehouse_sq_ft", rewritten)
+
+    def translate_query_text(self, query_text: str, target_dialect: str, *, query_id: int | None = None) -> str:
         """Apply dialect-specific rewrites to a single OBT query.
 
         OBT query conversion emits DuckDB SQL.  Route non-DuckDB targets through
@@ -376,13 +451,16 @@ class TPCDSOBTBenchmark(BaseBenchmark):
         if target not in {"duckdb", "standard", "ansi"}:
             from benchbox.utils.dialect_utils import translate_sql_query
 
+            translation_target = "clickhouse" if target == "clickhouse-local" else target
             query_text = translate_sql_query(
                 query_text,
-                target_dialect=target,
+                target_dialect=translation_target,
                 source_dialect="duckdb",
                 identify=True,
             )
 
+        if target in {"clickhouse", "clickhouse-local"} and query_id is not None:
+            query_text = self._rewrite_clickhouse_query(query_id, query_text)
         if target in {"doris", "starrocks"}:
             query_text = _add_derived_table_aliases(query_text)
         return query_text
@@ -399,7 +477,7 @@ class TPCDSOBTBenchmark(BaseBenchmark):
         """
         queries = {str(k): v for k, v in self.query_manager.get_queries().items()}
         if dialect:
-            queries = {qid: self.translate_query_text(sql, dialect) for qid, sql in queries.items()}
+            queries = {qid: self.translate_query_text(sql, dialect, query_id=int(qid)) for qid, sql in queries.items()}
         return queries
 
     def supports_dataframe_mode(self) -> bool:
@@ -451,6 +529,16 @@ class TPCDSOBTBenchmark(BaseBenchmark):
         if target not in {"duckdb", "postgres", "ansi", "standard"}:
             ddl = translate_sql_query(ddl, target_dialect=target, source_dialect="postgres", identify=True)
         return ddl
+
+    def __enter__(self) -> TPCDSOBTBenchmark:
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+        """Preserve the deprecated-base context-manager cleanup contract."""
+        cleanup = getattr(self, "cleanup", None)
+        if callable(cleanup):
+            cleanup()
+        return False
 
 
 # ---------------------------------------------------------------------------

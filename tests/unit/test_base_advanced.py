@@ -18,6 +18,7 @@ import pytest
 
 from benchbox.base import BaseBenchmark
 from benchbox.core.connection import DatabaseConnection, DatabaseError
+from benchbox.utils.path_utils import resolve_benchmark_runs_dir
 
 pytestmark = [
     pytest.mark.unit,
@@ -107,7 +108,7 @@ class TestMockBaseBenchmarkInitialization:
         """Test basic benchmark initialization."""
         benchmark = MockBaseBenchmark(scale_factor=1.0)
         assert benchmark.scale_factor == 1.0
-        assert benchmark.output_dir == Path.cwd() / "benchmark_runs" / "datagen" / "mockbase_sf1"
+        assert benchmark.output_dir == resolve_benchmark_runs_dir() / "datagen" / "mockbase_sf1"
         assert not benchmark._data_generated
         assert not benchmark._load_data_called
 
@@ -769,7 +770,7 @@ class TestMockBaseBenchmarkBackwardCompatibility:
 
         # Test basic functionality that existing benchmarks rely on
         assert benchmark.scale_factor == 1.0
-        assert benchmark.output_dir == Path.cwd() / "benchmark_runs" / "datagen" / "mockbase_sf1"
+        assert benchmark.output_dir == resolve_benchmark_runs_dir() / "datagen" / "mockbase_sf1"
 
         # Test query methods
         queries = benchmark.get_queries()
@@ -798,6 +799,19 @@ class TestMockBaseBenchmarkBackwardCompatibility:
         queries = benchmark.get_queries()
 
         assert queries == {"custom": "SELECT 'custom' as result"}
+
+    def test_run_with_platform_keeps_structural_third_party_adapter_compatibility(self):
+        """External adapters keep working without inheriting capability protocols."""
+
+        class ThirdPartyAdapter:
+            def run_benchmark(self, benchmark, **run_config):
+                return {"benchmark": benchmark, "run_config": run_config}
+
+        benchmark = MockBaseBenchmark()
+        result = benchmark.run_with_platform(ThirdPartyAdapter(), query_subset=["q1"])
+
+        assert result["benchmark"] is benchmark
+        assert result["run_config"] == {"query_subset": ["q1"], "benchmark_type": "olap"}
 
     def test_load_data_override_works(self):
         """Test that _load_data can be overridden properly."""
@@ -1023,6 +1037,7 @@ class TestMockBaseBenchmarkResultHelpers:
                     "execution_time_seconds": 1.25,
                     "row_count": 3,
                     "query_text": "select 1",
+                    "status": "SUCCESS",
                 }
             ],
             execution_metadata={
@@ -1237,6 +1252,7 @@ class TestMockBaseBenchmarkResultHelpers:
             tunings_applied={"threads": 8},
             tuning_config_hash="abc123",
             tuning_source_file="tuning.yaml",
+            tuning_source="auto_discovered",
             query_plans_captured=2,
             plan_capture_failures=1,
             plan_capture_errors=[{"query_id": "Q2"}],
@@ -1256,6 +1272,7 @@ class TestMockBaseBenchmarkResultHelpers:
             tunings_applied={"threads": 8},
             config_hash="abc123",
             source_file="tuning.yaml",
+            source="auto_discovered",
         )
         builder.add_plan_capture_stats.assert_called_once_with(2, 1, [{"query_id": "Q2"}])
 

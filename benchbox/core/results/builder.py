@@ -58,6 +58,8 @@ from benchbox.core.results.platform_info import (
     PlatformInfoInput,
     format_platform_display_name,
 )
+from benchbox.core.results.platform_options import sanitize_platform_options
+from benchbox.core.results.query_execution import query_execution_to_legacy_dict
 from benchbox.core.results.query_normalizer import (
     QueryResultInput,
     format_query_id,
@@ -274,6 +276,14 @@ class ResultBuilder:
         self._tunings_applied: dict[str, Any] | None = None
         self._tuning_config_hash: str | None = None
         self._tuning_source_file: str | None = None
+        self._tuning_source: str | None = None
+        # Applied-tuning ledger (execution-derived): the honest status, the
+        # to_payload() dict, and the physical-identity hash. Defaults mirror the
+        # BenchmarkResults dataclass so a caller that never sets them is a no-op.
+        self._tuning_validation_status: str = "not_validated"
+        self._tuning_metadata_saved: bool = False
+        self._applied_tuning_ledger: dict[str, Any] | None = None
+        self._applied_ledger_hash: str | None = None
 
         # Query plan capture statistics
         self._query_plans_captured: int = 0
@@ -470,11 +480,45 @@ class ResultBuilder:
         tunings_applied: dict[str, Any] | None = None,
         config_hash: str | None = None,
         source_file: str | None = None,
+        source: str | None = None,
+        *,
+        validation_status: str | None = None,
+        metadata_saved: bool | None = None,
+        applied_tuning_ledger: dict[str, Any] | None = None,
+        applied_ledger_hash: str | None = None,
     ) -> None:
-        """Set tuning configuration information."""
+        """Set tuning configuration information.
+
+        Args:
+            tunings_applied: The requested UnifiedTuningConfiguration.to_dict().
+            config_hash: requested_config_hash per ADR-1 (SHA-256 over
+                tunings_applied, canonical JSON).
+            source_file: Template reference (repo-relative path or
+                basename+content-hash) - never a raw local path.
+            source: Raw TuningSource enum value (e.g. "auto_discovered").
+            validation_status: honest execution-derived tuning_validation_status
+                (e.g. "applied_unverified"); ``None`` keeps the model default.
+            metadata_saved: tuning_metadata_saved persistence note (decoupled
+                from the tuning status); ``None`` keeps the default.
+            applied_tuning_ledger: the AppliedTuningLedger.to_payload() dict
+                produced by the execution path (ADR-1 additive companion).
+            applied_ledger_hash: physical-identity hash over the executed
+                statements; distinct from ``config_hash`` (the requested hash).
+        """
         self._tunings_applied = tunings_applied
         self._tuning_config_hash = config_hash
         self._tuning_source_file = source_file
+        self._tuning_source = source
+        if validation_status is not None:
+            self._tuning_validation_status = validation_status
+        if metadata_saved is not None:
+            self._tuning_metadata_saved = bool(metadata_saved)
+        # Guarded like the two above so a second set_tuning_info call that omits
+        # the ledger cannot silently wipe an already-set one.
+        if applied_tuning_ledger is not None:
+            self._applied_tuning_ledger = applied_tuning_ledger
+        if applied_ledger_hash is not None:
+            self._applied_ledger_hash = applied_ledger_hash
 
     def set_cost_summary(self, cost_summary: dict[str, Any]) -> None:
         """Set cost summary for cloud platforms."""
@@ -551,10 +595,15 @@ class ResultBuilder:
         measurement_results = [r for r in self._query_results if r.run_type == "measurement" and r.iteration > 0]
         results_for_stats = measurement_results if measurement_results else self._query_results
         successful_queries = [r for r in results_for_stats if r.status == "SUCCESS"]
-        failed_queries = [r for r in results_for_stats if r.status == "FAILED"]
+        # Only successful or intentionally skipped queries are non-failures.
+        # Keep SKIPPED out of failure accounting so optional unsupported
+        # operations remain separately represented in the exported query rows.
+        failed_queries = [r for r in results_for_stats if r.status not in ("SUCCESS", "SKIPPED")]
 
         # Use measurement execution times for aggregate timing metrics when possible
-        exec_times_all = [r.execution_time_seconds for r in results_for_stats if r.execution_time_seconds > 0]
+        exec_times_all = [
+            seconds for r in results_for_stats if (seconds := r.execution_time_seconds) is not None and seconds > 0
+        ]
 
         # Calculate timing statistics
         timing_stats = TimingStatsCalculator.calculate_seconds(exec_times_all)
@@ -673,6 +722,11 @@ class ResultBuilder:
             tunings_applied=self._tunings_applied,
             tuning_config_hash=self._tuning_config_hash,
             tuning_source_file=self._tuning_source_file,
+            tuning_source=self._tuning_source,
+            tuning_validation_status=self._tuning_validation_status,
+            tuning_metadata_saved=self._tuning_metadata_saved,
+            applied_tuning_ledger=self._applied_tuning_ledger,
+            applied_ledger_hash=self._applied_ledger_hash,
             # Query plan stats
             query_plans_captured=self._query_plans_captured,
             plan_capture_failures=self._plan_capture_failures,
@@ -698,7 +752,7 @@ class ResultBuilder:
             return delta.total_seconds()
 
         # Fall back to sum of query times plus loading time
-        total_query_time = sum(r.execution_time_seconds for r in self._query_results)
+        total_query_time = sum(r.execution_time_seconds or 0.0 for r in self._query_results)
         return total_query_time + (self._loading_time_ms / 1000.0)
 
     def _calculate_tpc_metrics(self) -> dict[str, float | None]:
@@ -776,7 +830,7 @@ class ResultBuilder:
         if any(r.status != "SUCCESS" for r in final_results):
             return None
 
-        times = [r.execution_time_seconds for r in final_results if r.execution_time_seconds > 0]
+        times = [seconds for r in final_results if (seconds := r.execution_time_seconds) is not None and seconds > 0]
         if not times:
             return None
         return TPCMetricsCalculator.calculate_power_at_size(times, self._benchmark.scale_factor)
@@ -852,7 +906,7 @@ class ResultBuilder:
                     query_id=format_query_id(result.query_id),
                     stream_id=str(result.stream_id),
                     execution_order=i + 1,
-                    execution_time_ms=int(result.execution_time_seconds * 1000),
+                    execution_time_ms=result.execution_time_ms,
                     status=result.status,
                     rows_returned=result.rows_returned,
                     error_message=result.error_message,
@@ -869,7 +923,7 @@ class ResultBuilder:
             geometric_mean = TPCMetricsCalculator.calculate_geometric_mean(exec_times_seconds)
 
         # Calculate total duration
-        total_duration_ms = sum(int(r.execution_time_seconds * 1000) for r in self._query_results)
+        total_duration_ms = sum(int(r.execution_time_ms or 0.0) for r in self._query_results)
 
         now_iso = datetime.now().isoformat()
 
@@ -910,7 +964,7 @@ class ResultBuilder:
                         query_id=format_query_id(result.query_id),
                         stream_id=str(stream_id),
                         execution_order=i + 1,
-                        execution_time_ms=int(result.execution_time_seconds * 1000),
+                        execution_time_ms=result.execution_time_ms,
                         status=result.status,
                         rows_returned=result.rows_returned,
                         error_message=result.error_message,
@@ -943,44 +997,19 @@ class ResultBuilder:
         )
 
     def _format_query_results(self) -> list[dict[str, Any]]:
-        """Format query results as list of dictionaries."""
+        """Format canonical executions as producer compatibility dictionaries."""
         results = []
         for result in self._query_results:
-            result_dict: dict[str, Any] = {
-                "query_id": format_query_id(result.query_id),
-                "execution_time_seconds": result.execution_time_seconds,
-                "execution_time": result.execution_time_seconds,
-                "execution_time_ms": int(result.execution_time_seconds * 1000),
-                "status": result.status,
-                "rows_returned": result.rows_returned,
-                "iteration": result.iteration,
-                "stream_id": result.stream_id,
-            }
-
-            if result.error_message:
-                result_dict["error_message"] = result.error_message
-            if result.cost is not None:
-                result_dict["cost"] = result.cost
-            if result.run_type:
-                result_dict["run_type"] = result.run_type
-            if result.row_count_validation:
-                result_dict["row_count_validation"] = result.row_count_validation
-            if result.dataframe_skip_summary:
-                result_dict["dataframe_skip_summary"] = result.dataframe_skip_summary
-            if result.query_plan is not None:
-                result_dict["query_plan"] = result.query_plan
-            if result.plan_fingerprint is not None:
-                result_dict["plan_fingerprint"] = result.plan_fingerprint
-            if result.plan_fingerprint_normalized is not None:
-                result_dict["plan_fingerprint_normalized"] = result.plan_fingerprint_normalized
-            if result.plan_capture_time_ms is not None:
-                result_dict["plan_capture_time_ms"] = result.plan_capture_time_ms
-            if result.plan_capture_error is not None:
-                result_dict["plan_capture_error"] = result.plan_capture_error
-            if result.result_digest is not None:
-                result_dict["result_digest"] = result.result_digest
-            if result.test_type:
-                result_dict["test_type"] = result.test_type
+            result_dict = query_execution_to_legacy_dict(
+                result,
+                include_seconds=True,
+                include_legacy_seconds_alias=True,
+            )
+            result_dict["query_id"] = format_query_id(result.query_id)
+            if result.execution_time_ms is not None:
+                # Preserve the established compatibility dictionary exactly;
+                # schema-v2 export retains its own sub-millisecond rounding.
+                result_dict["execution_time_ms"] = int(result.execution_time_ms)
 
             results.append(result_dict)
 
@@ -1038,7 +1067,9 @@ class ResultBuilder:
             cloud=self._platform_cloud,
             compute=self._platform_compute,
             storage=self._platform_storage,
-            raw_config=self._platform_raw_config if self._platform_raw_config is not None else platform_config,
+            raw_config=self._platform_raw_config
+            if self._platform_raw_config is not None
+            else sanitize_platform_options(platform_config),
             raw_metadata=self._platform_raw_metadata,
         )
 

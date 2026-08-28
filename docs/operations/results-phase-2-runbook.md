@@ -4,8 +4,16 @@ Phase 2 is the PR-based community submission flow for the BenchBox public result
 corpus. The product boundary and launch rationale live in
 [`docs/development/benchbox-results-platform-strategy.md`](../development/benchbox-results-platform-strategy.md).
 This runbook documents the current operating model only: contributor PRs target
-`published-results`, CI validates them, maintainers review them, merges trigger the
-static explorer rebuild, and no hosted API is involved.
+`published-results`, CI validates them, maintainers review them, and the protected
+release workflow is the only path that can rebuild and deploy the static Explorer;
+no hosted API is involved.
+
+Authority is split by surface: `develop` owns code, validators, generators,
+the recurring maintainer seed, and the curated release-preview corpus;
+`published-results` owns the complete accepted Phase 2 archive. Each branch
+generates its inventory from its own tree. Published-only submissions are
+expected and are not automatically backported into the curated Explorer
+source.
 
 ## 1. Submission Lifecycle
 
@@ -20,8 +28,9 @@ static explorer rebuild, and no hosted API is involved.
 
 ### 1.2 Maintainer-run additions (sync from develop)
 
-Maintainer-side corpus changes — the `seed-corpus.yml` workflow's on-demand
-(`workflow_dispatch`) refresh, ad-hoc UAT integrations like PR #164, validator updates — land on
+Maintainer-side corpus changes — the `seed-corpus.yml` workflow's monthly
+schedule and on-demand (`workflow_dispatch`) refresh (see
+[`corpus-refresh.md`](corpus-refresh.md)), ad-hoc UAT integrations like PR #164, validator updates — land on
 `develop` first because that is where the project's tooling and tests live.
 The
 [`sync-results-data-to-published.yml`](../../.github/workflows/sync-results-data-to-published.yml)
@@ -32,35 +41,177 @@ validators, plus `corpus-inventory.json`) and opens a **draft** PR against
 auto-merges — a maintainer reviews and flips it ready when the develop-side
 change is ready to surface on the public corpus branch.
 
+**Publication fixed-point gate.** Before building a mirror branch or opening
+a PR, the sync workflow runs the same check as
+`tests/unit/scripts/test_corpus_privacy_invariant.py::test_rederived_corpus_publishes_byte_identically_to_what_is_stored`
+against the develop content at `GITHUB_SHA` (the bytes about to be mirrored).
+If re-anonymization would rewrite any primary bundle, the run fails loudly and
+does **not** open a mirror. That keeps `published-results` from receiving a
+corpus that Explorer publication would immediately rewrite, and sequences any
+in-flight re-derivation automatically: the mirror waits until develop is at
+the fixed point, then proceeds unattended. A red sync run with drift still
+present is the expected signal while re-derivation is open — not a stuck
+manual gate.
+
+For `results-data/bundles/`, the apply is a **union overlay**, not a wipe:
+develop's files overwrite matching paths on `published-results`, and paths
+that exist only on `published-results` (accepted archive submissions that were
+not separately curated onto `develop`) are left intact. A previous
+wipe-then-checkout strategy deleted
+those published-only submissions whenever develop was also ahead.
+Develop-side *path deletions* do not auto-propagate (a deleted seed path that
+still exists only on published-results becomes published-only and is kept).
+After overlay, the workflow regenerates `corpus-inventory.json` from the
+unioned tree so community-only paths remain inventory-listed. Other allowlist
+files (docs, validators) still use per-path checkout / removal. The scheduled
+[`corpus-drift-check.yml`](../../.github/workflows/corpus-drift-check.yml)
+canary classifies develop-ahead vs published-only and never recommends a
+wipe-based full mirror while published-only paths exist.
+
+#### Public deletion / privacy takedown (intentional path removal)
+
+The union overlay **intentionally does not** propagate develop-side deletions
+inside `results-data/bundles/`. If a path is removed on `develop` but still
+exists only on `published-results`, it becomes **published-only** and is kept
+on the next mirror. That protects community submissions the automated sync
+must never wipe.
+
+When a maintainer must remove a path from the public corpus (privacy
+remediation, takedown, mistaken publish):
+
+1. **Do not** reintroduce a wipe-then-checkout of `results-data/bundles/` on
+   the sync workflow, and **do not** run a full-tree wipe of published bundles
+   while any published-only paths should survive. A full wipe would delete
+   every community submission that is not on develop.
+2. Open a **manual PR against `published-results`** that deletes only the
+   intended path(s) under `results-data/bundles/` (and any related docs if
+   needed).
+3. Regenerate inventory on that branch:
+   `uv run -- python scripts/generate_corpus_inventory.py --write`, then
+   stage `results-data/corpus-inventory.json` with the path removals.
+4. Merge after review. Leave develop in sync if the same path still exists
+   there (delete on develop in a separate PR if the seed/corpus copy must go
+   too); the next develop→published mirror will not resurrect a path that is
+   already gone from both trees, and will not re-delete other published-only
+   paths.
+
 If the workflow's heuristics ever miss a path (or a one-off mirror is
 needed outside the trigger conditions), trigger it manually via
 `workflow_dispatch` from the Actions tab.
 
+#### Why the mirror PR needs its own check, and what still doesn't run there
+
+The mirror PR is opened by `sync-results-data-to-published.yml` using its own
+`GITHUB_TOKEN`, so its author is `github-actions[bot]`. GitHub does not start
+the `pull_request` workflow unattended for that bot-created event. A maintainer
+may explicitly approve or rerun an `action_required` check, but that is a human
+action and not the mirror's automatic evidence. #1542 shipped with an empty
+`statusCheckRollup` for exactly this reason: not zero failures, zero checks.
+
+The sync workflow now closes that gap itself: before opening or updating the
+PR, it runs the same two corpus gates `validate-submission.yml` would have
+(bundle validation via `scripts/validate_submission.py`, inventory freshness
+via `scripts/generate_corpus_inventory.py --check`) against the exact content
+it is about to mirror, and posts the result as a `corpus-mirror/validate-bundles`
+commit status on the mirror branch's head SHA. A commit status is a plain
+Statuses-API write, not a workflow trigger, so it is unaffected by the
+GITHUB_TOKEN recursion rule above and needed no new credential — only a
+`statuses: write` permission grant on the token this workflow already holds.
+
+Trusted same-repository mirror branches may carry truthful
+`summary.validation=partial` maintainer results; they remain non-ranking.
+Community submissions stay stricter: a manifest is required, the query list
+must be non-empty, and `summary.validation` must be `passed` with no failed
+measurement evidence. The independently rerunnable submission workflow uses
+the same four-signal mirror trust gate (base `published-results`, same
+repository, the `auto/results-mirror-*` branch pattern, and
+`github-actions[bot]` as the PR author) before allowing partial validation or
+a vendor-subtree addition.
+
+A separate, narrower gap remains and is **not** fixed by the above:
+`published-results` carries exactly one workflow file
+(`validate-submission.yml`). `pr-base-guard.yml` — the repo-wide check that
+every PR gets regardless of base, added precisely so a PR against an
+unexpected base branch cannot show zero checks — cannot run against
+`published-results` because its file simply does not exist there, whatever
+its trigger says. It cannot be added by the sync workflow either:
+`GITHUB_TOKEN` cannot push changes under `.github/workflows/` regardless of
+the `permissions:` block granted to it (a hard-coded GitHub Actions
+restriction — see the "workflow file itself is NOT auto-mirrored" section of
+[`adr-published-results-slim-corpus-branch.md`](../development/adr/adr-published-results-slim-corpus-branch.md),
+which already documents this exact restriction for `validate-submission.yml`
+edits). Porting `pr-base-guard.yml` (or any future repo-wide guard) onto
+`published-results` is therefore a **manual** maintainer step, using the same
+diff-and-reapply protocol the ADR already prescribes for validator changes:
+
+```bash
+git diff origin/develop:.github/workflows/pr-base-guard.yml \
+         origin/published-results:.github/workflows/pr-base-guard.yml
+```
+
+then apply and push directly to `published-results` (or a PR against it) as
+a maintainer with `contents: write` access. In practice this matters less
+than it sounds: `pr-base-guard.yml` only protects against a PR whose base is
+some *other* branch entirely, and every route onto `published-results`
+(contributor submissions, this sync workflow) already targets it directly —
+but a future stacked-PR mistake against this branch would still see zero
+checks until this manual port happens. Treat it as tracked debt, not a
+silent gap.
+
+Two honest limits on what the new status does and does not buy, so nobody
+reads more protection into a green badge than is there:
+
+- **It is advisory, not enforcing.** No ruleset targets `published-results` —
+  the repo's rulesets target `develop`, `release`, `v*` branches, and tags — so
+  a maintainer can still flip a mirror PR ready and merge it with the status
+  red. The status makes the verdict *visible*; the maintainer review step the
+  draft state exists for is still what enforces it.
+- **It is self-attested.** The run that builds the mirror content is the run
+  that validates it and posts the verdict, so it catches bad *content*
+  (a bundle that fails schema, hash, or privacy validation; a stale inventory)
+  but not tampering with the mirror branch after the fact. A later
+  `--force-with-lease` push from another run re-posts against the new head SHA,
+  so a stale green status cannot ride on top of new bytes — but a direct manual
+  push to `auto/results-mirror-*` would leave the last status attached to an
+  older SHA, and the PR would show no status for the new one rather than a
+  wrong one.
+
 ### 1.3 Explorer publish path
 
-The static explorer at `benchbox.dev/results/` is intended to build and
-deploy from `main` via [`docs.yml`](../../.github/workflows/docs.yml): the
-`build` job runs on pushes and PRs to `main`, and the `deploy` job (Pages)
-runs only on pushes to `main`. `published-results` is **not** the explorer's
-build source — it is the corpus-archive branch that contributor PRs target
-and that mirrors develop's `results-data/`.
+The static Explorer at `benchbox.dev/results/` is wired through
+[`docs.yml`](../../.github/workflows/docs.yml): the `build` job runs for
+documentation PRs targeting `release` or `develop` and for pushes to `release`,
+while the `deploy` job runs only for a protected push to `release`.
+`published-results` is **not** the Explorer's build source — it is the
+corpus-archive branch that contributor PRs target and that mirrors develop's
+`results-data/`.
 
-> **Current state (pre-launch):** the explorer steps in `docs.yml` are gated
-> on `hashFiles('results-explorer/package.json')`, and `release-cut`
-> (`Makefile`) currently `git rm`s `results-explorer/` and `results-data/`
-> from the release branch, so those paths are **not on `main`** and the
-> explorer build/deploy steps are a deliberate no-op there today. The site is
-> therefore not yet published from `main`. For the explorer to go live from
-> `main`, the develop → main release flow must stop curating
-> `results-explorer/`/`results-data/` out of the release branch — a maintainer
-> decision tracked separately. Until then, treat `benchbox.dev/results/` as a
-> develop-built preview, not a main-deployed site.
+> **Curated-preview state:** `release-cut` retains `results-explorer/`,
+> `results-data/`, and the three publication helpers under
+> `_project/scripts/`; all other `_project/` content remains development-only.
+> The `docs.yml` build still gates Explorer steps on
+> `hashFiles('results-explorer/package.json')`, but a release that includes the
+> application now fails closed when the corpus, helper set, or generated
+> snapshot is missing. The deploy job runs only after a protected push to
+> `release`, and the `github-pages` environment must permit `release`.
+>
+> This is a curated preview, not a broad leaderboard or full-cohort claim.
+> Completion evidence must pin the release SHA, artifact digest, deployment
+> ID, prior rollback target, environment approval, route/header checks, range
+> reads, bundle privacy scan, and live custom-domain behavior. A develop
+> checkout, manual workflow build, or local static server is not deployed-site
+> evidence.
 
 ## 2. Maintainer Review Checklist
 
-- Accept only complete benchmark runs with plausible metadata and timings.
-- Reject bundles that fail CI, omit required schema-v2 fields, or obviously misstate environment details.
-- Reject partial cohorts that would mislead the compare view.
+- For community PRs, accept only complete, non-empty benchmark runs with
+  `summary.validation=passed`, plausible metadata, and timings.
+- For trusted maintainer mirror PRs, truthful partial results may be retained
+  as non-ranking capability evidence when the limitation is documented.
+- Reject any bundle that fails its applicable CI policy, omits required
+  schema-v2 fields, or obviously misstates environment details.
+- Reject or quarantine partial results whose cause is unknown or whose metadata
+  would make them ranking-eligible.
 - Confirm the bundle path and filenames are coherent with the existing corpus naming.
 - Close stale contributor PRs after 14 days without response, with a short thank-you note.
 
@@ -96,6 +247,35 @@ git commit -m "chore: refresh corpus inventory"
 
 If you are fixing the contributor branch yourself, explain that in the PR before pushing.
 
+## 4b. Corpus Path Privacy
+
+Every JSON file under `results-data/` must be free of private absolute paths.
+`tests/unit/scripts/test_corpus_privacy_invariant.py` scans the whole corpus on
+every code CI run, not just the files a PR touched. #1467 cleaned the corpus;
+this gate is what stops it regressing. A changed-files scan cannot do that job:
+a bundle merged before the scan existed is invisible to it permanently.
+
+The gate is marked `fast`, so it runs inside `code-test`, which
+`ci-required-result` gates on. A corpus-only diff still routes to `code-test`;
+the same test file pins both facts so the gate cannot become decorative.
+
+To re-migrate after importing legacy bundles:
+
+```bash
+uv run -- python _project/scripts/results_explorer_corpus_migrate.py
+```
+
+Dry run by default; add `--write` to apply. It reuses the canonical
+`AnonymizationManager` and preserves values that are already public hashes, so
+re-running it on the current corpus is a verified no-op (207 unchanged). It
+writes an audit trail to
+`results-data/bundles/path-privacy-migration.manifest.json` recording old/new
+hashes and result IDs — never a private value.
+
+Migrating rewrites `result_id` for every changed bundle. The Explorer derives
+result IDs from the *published* bytes, so regenerate the inventory afterwards
+(§4) and expect detail URLs to move.
+
 ## 5. Rolling Back a Bad Merge
 
 Use a fresh branch off the affected target branch. Set `REMOTE` to the repo you are
@@ -119,16 +299,17 @@ misleading, and whether a corrected resubmission is welcome.
 If the corpus is correct but the explorer build needs to rerun:
 
 ```bash
-gh workflow run docs.yml --repo joeharris76/BenchBox
-gh run watch --repo joeharris76/BenchBox
+gh workflow run docs.yml --repo BenchBox-dev/BenchBox
+gh run watch --repo BenchBox-dev/BenchBox
 ```
 
 Use `workflow_dispatch` only after confirming there is no newer push already
 rebuilding the site. Note that `workflow_dispatch` runs the `build` job but
 **not** the `deploy` job — the Pages deploy is gated on
-`github.event_name == 'push' && github.ref == 'refs/heads/main'` — so a manual
+`github.event_name == 'push' && github.ref == 'refs/heads/release'` — so a manual
 run validates the build without publishing. A publish requires a push to
-`main` (and, per §1.3, the explorer paths actually being present on `main`).
+`release` (and, per §1.3, the Explorer paths actually being present on
+`release`).
 
 ## 7. Data Locations
 

@@ -100,6 +100,15 @@ class StarRocksWorkloadMixin:
                 tuning_config=effective_config,
             )
 
+            # Physical table_tunings (partitioning/sorting/distribution columns)
+            # render only when tuning is actually enabled -- matching the same
+            # `self.tuning_enabled` gate DataLoader uses elsewhere, and per ADR-3
+            # baseline policy (notuning = platform defaults + engine-mandatory
+            # DISTRIBUTED BY only, no tuned rendering).
+            table_tunings = None
+            if self.tuning_enabled and effective_config is not None:
+                table_tunings = effective_config.table_tunings
+
             # Strip SQL line comments before splitting so comment-prefixed blocks
             # (e.g. metadata_primitives header, write_primitives staging separator)
             # don't hide the CREATE TABLE from _optimize_table_definition.
@@ -118,7 +127,7 @@ class StarRocksWorkloadMixin:
                     pass
 
                 for statement in statements:
-                    statement = self._optimize_table_definition(statement)
+                    statement = self._optimize_table_definition(statement, table_tunings)
                     cursor.execute(statement)
                     self.logger.debug(f"Executed schema statement: {statement[:100]}...")
             finally:
@@ -132,8 +141,20 @@ class StarRocksWorkloadMixin:
 
         return elapsed_seconds(start_time)
 
-    def _optimize_table_definition(self, statement: str) -> str:
-        """Optimize table definition for StarRocks compatibility."""
+    def _optimize_table_definition(self, statement: str, table_tunings: dict[str, Any] | None = None) -> str:
+        """Optimize table definition for StarRocks compatibility.
+
+        Args:
+            statement: A single CREATE TABLE statement (DuckDB dialect).
+            table_tunings: Optional mapping of table_name -> TableTuning, from
+                the effective tuning configuration, present only when tuning is
+                enabled (see create_schema). When a matching, non-empty
+                TableTuning exists for this statement's table, tuned
+                PARTITION BY / DISTRIBUTED BY / ORDER BY clauses are rendered via
+                core.tuning.generators.starrocks.StarRocksDDLGenerator -- the
+                same single renderer dry-run preview uses (ADR-3) -- instead of
+                the engine-mandatory first-column DISTRIBUTED BY baseline.
+        """
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
 
@@ -211,16 +232,116 @@ class StarRocksWorkloadMixin:
         # Recompute after possible DUPLICATE KEY mutation
         current_upper = statement.upper()
 
-        # Add DISTRIBUTED BY HASH if not present
-        if "DISTRIBUTED BY" not in current_upper:
-            if first_col:
-                # Append distribution clause
-                if statement.rstrip().endswith(";"):
-                    statement = statement.rstrip()[:-1] + f"\nDISTRIBUTED BY HASH(`{first_col}`) BUCKETS 8;"
-                else:
-                    statement = statement.rstrip() + f"\nDISTRIBUTED BY HASH(`{first_col}`) BUCKETS 8"
+        # Resolve tuned PARTITION BY / DISTRIBUTED BY / ORDER BY clauses through
+        # the single StarRocks DDL renderer. Returns None (engine-mandatory
+        # baseline only) when tuning is disabled or no non-empty TableTuning is
+        # configured for this table.
+        from benchbox.core.tuning.ddl_generator import get_ddl_generator
+
+        generator = get_ddl_generator("starrocks")
+        tuning_clauses, tuned_table_name = self._resolve_tuned_ddl_clauses(statement, table_tunings, generator)
+
+        # Add DISTRIBUTED BY HASH (engine-mandatory) plus any tuned PARTITION BY /
+        # ORDER BY clauses, in StarRocks' required clause order: PARTITION BY ->
+        # DISTRIBUTED BY -> ORDER BY. Every clause string comes from the generator
+        # so dry-run preview and this execution path can never disagree. Untuned
+        # tables (tuning_clauses is None) get exactly the historical
+        # DISTRIBUTED BY HASH(<first_column>) BUCKETS 8 baseline.
+        if "DISTRIBUTED BY" not in current_upper and first_col:
+            suffix_clauses: list[str] = []
+            # Genuinely tuned clauses (for the applied-tuning ledger, w4) -- the
+            # engine-mandatory first-column DISTRIBUTED BY is excluded because it
+            # is a baseline requirement, not a tuning choice.
+            tuned_clauses: list[str] = []
+
+            if tuning_clauses is not None and tuning_clauses.partition_by and "PARTITION BY" not in current_upper:
+                partition_clause = generator.render_partition_clause(tuning_clauses.partition_by)
+                suffix_clauses.append(partition_clause)
+                tuned_clauses.append(partition_clause)
+
+            # Tuned distribution column overrides the first-column baseline.
+            dist_tuned = bool(tuning_clauses and tuning_clauses.distribute_by)
+            dist_col = tuning_clauses.distribute_by if dist_tuned else first_col
+            distribution_clause = generator.render_distribution_clause(dist_col)
+            suffix_clauses.append(distribution_clause)
+            if dist_tuned:
+                tuned_clauses.append(distribution_clause)
+
+            if tuning_clauses is not None and tuning_clauses.order_by and "ORDER BY" not in current_upper:
+                order_clause = generator.render_order_by_clause(tuning_clauses.order_by)
+                suffix_clauses.append(order_clause)
+                tuned_clauses.append(order_clause)
+
+            suffix = "\n".join(suffix_clauses)
+            stripped = statement.rstrip()
+            if stripped.endswith(";"):
+                statement = stripped[:-1] + f"\n{suffix};"
+            else:
+                statement = stripped + f"\n{suffix}"
+
+            # Record what was actually rendered into this executed CREATE TABLE.
+            self._record_starrocks_tuning_to_ledger(tuned_table_name, tuned_clauses)
 
         return statement
+
+    def _resolve_tuned_ddl_clauses(self, statement: str, table_tunings: dict[str, Any] | None, generator: Any):
+        """Resolve tuned PARTITION BY / DISTRIBUTED BY / ORDER BY clauses for this
+        statement's table, if any.
+
+        Returns ``(clauses, table_name)``. ``clauses`` is None when tuning is not
+        enabled (``table_tunings`` is falsy), no TableTuning is configured for
+        this table, or the configured TableTuning renders no clauses -- callers
+        fall back to the engine-mandatory DISTRIBUTED BY baseline in that case.
+        ``table_name`` is the parsed CREATE TABLE name (for ledger attribution),
+        or None when it could not be parsed.
+        """
+        if not table_tunings:
+            return None, None
+
+        match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+`?(\w+)`?", statement, re.IGNORECASE)
+        if not match:
+            return None, None
+        table_name = match.group(1)
+
+        # Benchmark table names are lowercase while shipped tuning templates key
+        # tables uppercase (e.g. "LINEITEM") -- same case-insensitive lookup
+        # pattern as core/dryrun.py and the ClickHouse workload.
+        table_tuning = None
+        for configured_name, configured_tuning in table_tunings.items():
+            if str(configured_name).upper() == table_name.upper():
+                table_tuning = configured_tuning
+                break
+
+        if table_tuning is None or not table_tuning.has_any_tuning():
+            return None, table_name
+
+        clauses = generator.generate_tuning_clauses(table_tuning)
+        if clauses.is_empty():
+            return None, table_name
+        return clauses, table_name
+
+    def _record_starrocks_tuning_to_ledger(self, table_name: str | None, clauses: list[str]) -> None:
+        """Record rendered StarRocks tuning clauses into the applied-tuning ledger.
+
+        StarRocks applies PARTITION BY / DISTRIBUTED BY / ORDER BY as CREATE TABLE
+        clauses (not standalone statements), so the base connection-wrapping
+        capture never sees them; recording them here is what lets a tuned run
+        report ``applied_unverified`` instead of ``noop`` (w4). Only genuinely
+        tuned clauses are recorded -- the engine-mandatory first-column
+        DISTRIBUTED BY baseline is not a tuning choice. Guarded: a no-op when no
+        ledger is attached (non-tuned or non-benchmark runs), and capture never
+        breaks a run.
+        """
+        ledger = getattr(self, "_applied_tuning_ledger", None)
+        if ledger is None or not clauses:
+            return
+        try:
+            from benchbox.core.tuning.applied_ledger import PHASE_DDL
+
+            for clause in clauses:
+                ledger.record(clause, PHASE_DDL, mechanism="starrocks_ddl_generator", table=table_name)
+        except Exception as exc:  # capture must never break a run
+            self.logger.debug("StarRocks applied-ledger record degraded: %s", exc)
 
     # DuckDB/standard SQL → StarRocks type mappings.
     # Each entry is (pattern, replacement, case_sensitive). TIMESTAMP and TIME are

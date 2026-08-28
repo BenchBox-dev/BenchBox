@@ -167,6 +167,19 @@ class MotherDuckAdapter(PlatformAdapter):
         if config.get("memory_limit"):
             adapter_config["memory_limit"] = config["memory_limit"]
 
+        # Pass through tuning provenance/config
+        for key in [
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+            "verbose_enabled",
+            "very_verbose",
+        ]:
+            if key in config:
+                adapter_config[key] = config[key]
+
         return cls(**adapter_config)
 
     def get_target_dialect(self) -> str:
@@ -210,9 +223,16 @@ class MotherDuckAdapter(PlatformAdapter):
         except Exception as e:
             safe_error = _redact_motherduck_token(str(e), self.token)
             logger.error(f"Failed to connect to MotherDuck: {safe_error}")
+            # `from None`, not `from e`: the cause would carry the unredacted
+            # connection string (token included) into any printed traceback,
+            # undoing the redaction above. Unconditional because __init__
+            # rejects a missing token, so there is no credential-free run whose
+            # chain is worth keeping - unlike ducklake.py, which gates the same
+            # suppression on actually holding a secret. safe_error preserves the
+            # driver's diagnosis, so only the raw duplicate is dropped.
             raise ConnectionError(
                 f"Failed to connect to MotherDuck: {safe_error}\nCheck your MOTHERDUCK_TOKEN and network connection."
-            ) from e
+            ) from None
 
     def close_connection(self, connection=None):
         """Close MotherDuck connection."""

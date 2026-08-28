@@ -1,3 +1,7 @@
+# TEMPLATE — canonical, repeatedly-run release-gate stage config; edited in
+# place across releases (e.g. cross_scale_coverage_min_pairs re-derivation),
+# not cloned per sweep. See _project/specs/uat-framework.md Section 9.
+#
 # Release-gate re-run — STAGE 1 of 3: native SQL + dataframe (native execution).
 #
 # Run order (see docs/operations/uat-framework.md "Release-gate re-run"):
@@ -28,6 +32,9 @@ platforms:
 benchmarks:
   groups: ["all"]
 
+compatibility:
+  release_gate_runtime_envelopes: true
+
 scales:
   rungs: [0.01, 0.1, 1.0]
 
@@ -41,7 +48,6 @@ execute:
 
 preflight:
   free_space_min_gib: 5
-  free_space_path: "~/Developer/benchmark_runs"
 
 cleanup:
   preserve_datagen: true
@@ -51,15 +57,30 @@ cleanup:
 validate:
   validator_clean_rate_floor: 1.0
 
+# `package` was in `phases:` above with no `package:` section -- every
+# release-gate sweep aborted at the package phase with
+# PackagePhaseError("package.submit_terminal_state is required..."),
+# invisible until w1's load-time enforcement caught it
+# (uat-config-schema-spec-realignment). local-stage matches every other
+# checked-in config; PR-opening states are stubs (tests/uat/phases/package.py).
+package:
+  submit_terminal_state: "local-stage"
+
 report:
   matrix_summary_tsv: "matrix_summary.tsv"
-  # APPROVE gate teeth: require every required (platform, benchmark) pair to be
-  # clean across all three rungs. Set to the count expected after a green run;
-  # a breach forces a non-zero report exit so the gate cannot be APPROVED on a
-  # partial/regressed sweep. Tune to the approved pair count during bring-up.
-  cross_scale_coverage_min_pairs: 1
-
-output:
-  benchmark_runs_dir_template: "~/Developer/benchmark_runs"
-  logs_dir_template: "~/Developer/benchmark_runs/logs/release_gate_01_native_dataframe_{date}"
-  submissions_dir_template: "~/Developer/benchmark_runs/submissions/{name}"
+  # APPROVE gate teeth: require at least this many (platform, benchmark) pairs
+  # to be passed AND validator-clean across all three rungs; a breach forces a
+  # non-zero report exit so the gate cannot be APPROVED on a partial/regressed
+  # sweep.
+  # Derivation (uat-release-gate-enforcement w4, 2026-07-12, updated for the
+  # SQLite vector_search benchmark capability gate): enumerate_cells_with_pruning
+  # over this config yields 150 pairs with every
+  # rung (0.01/0.1/1.0) enumerable -- the only pairs the cross-scale check can
+  # ever count (208 raw pairs minus 55 whose registry scale ladder omits a
+  # rung, e.g. clickbench/joinorder 1.0-only and read_primitives 0.01/0.1-only,
+  # three measured runtime-envelope exclusions, and the SQLite vector_search
+  # capability exclusion).
+  # floor = max(8, floor(0.8 * 150)) = 120. The 0.8 slack absorbs legitimate
+  # environment variance without letting a mass regression sign off; never set
+  # this to the eligible count exactly.
+  cross_scale_coverage_min_pairs: 120

@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from benchbox.core.results.query_normalizer import normalize_query_id
+from tests.unit.mcp.public_api import get_tool
 
 pytestmark = [
     pytest.mark.unit,
@@ -122,13 +123,7 @@ class TestGetResultsList:
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path / "nonexistent")
-        tools = {}
-        if hasattr(server, "_tool_manager"):
-            tool_dict = getattr(server._tool_manager, "_tools", {})
-            for name, tool in tool_dict.items():
-                tools[name] = tool.fn
-
-        fn = tools["get_results"]
+        fn = get_tool(server, "get_results").fn
         result = fn()  # result_file=None -> list mode
 
         assert result["runs"] == []
@@ -142,8 +137,7 @@ class TestGetResultsList:
         _make_result_file(tmp_path, "run1.json", data)
 
         server = create_server(results_dir=tmp_path)
-        tool_dict = getattr(server._tool_manager, "_tools", {})
-        fn = tool_dict["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn()
 
@@ -160,7 +154,7 @@ class TestGetResultsList:
         _make_result_file(tmp_path, "sqlite_run.json", _make_benchmark_result(platform="sqlite"))
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(platform="duckdb")
 
@@ -175,7 +169,7 @@ class TestGetResultsList:
         _make_result_file(tmp_path, "tpcds_run.json", _make_benchmark_result(benchmark="tpcds"))
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(benchmark="tpcds")
 
@@ -190,7 +184,7 @@ class TestGetResultsList:
             _make_result_file(tmp_path, f"run_{i}.json", _make_benchmark_result())
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(limit=2)
 
@@ -205,7 +199,7 @@ class TestGetResultsList:
         _make_result_file(tmp_path, "run.json", data)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn()
 
@@ -220,7 +214,7 @@ class TestGetResultsList:
         _make_result_file(tmp_path, "good.json", _make_benchmark_result())
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn()
 
@@ -233,7 +227,7 @@ class TestGetResultsList:
         _make_result_file(tmp_path, "run.json", _make_benchmark_result())
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(platform="duckdb", benchmark="tpch", limit=5)
 
@@ -250,7 +244,7 @@ class TestGetResultsList:
         _make_result_file(override_dir, "override.json", _make_benchmark_result(platform="duckdb"))
 
         server = create_server(results_dir=override_dir)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
         result = fn()
 
         assert result["count"] == 1
@@ -269,7 +263,7 @@ class TestGetResultsExport:
         _make_result_file(tmp_path, "run.json", data)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(result_file="run.json", format="yaml")
 
@@ -291,7 +285,7 @@ class TestGetResultsExport:
         _make_result_file(tmp_path, "run.json", data)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(result_file="run.json", format="details")
 
@@ -306,7 +300,7 @@ class TestGetResultsExport:
         _make_result_file(tmp_path, "run.json", data)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(result_file="run.json", format="details", include_queries=False)
 
@@ -321,7 +315,7 @@ class TestGetResultsExport:
         _make_result_file(tmp_path, "run.json", data)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(result_file="run.json", format="json")
 
@@ -338,7 +332,7 @@ class TestGetResultsExport:
         _make_result_file(tmp_path, "run.json", data)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(result_file="run.json", format="csv")
 
@@ -355,7 +349,7 @@ class TestGetResultsExport:
         _make_result_file(tmp_path, "run.json", data)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(result_file="run.json", format="csv")
 
@@ -369,7 +363,7 @@ class TestGetResultsExport:
         _make_result_file(tmp_path, "run.json", data)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(result_file="run.json", format="html")
 
@@ -387,7 +381,7 @@ class TestGetResultsExport:
         _make_result_file(tmp_path, "run.json", data)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(result_file="run.json", format="json", output_path="export.json")
 
@@ -403,7 +397,7 @@ class TestGetResultsExport:
         _make_result_file(tmp_path, "run.json", data)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(result_file="run.json", format="json", output_path="../escape.json")
 
@@ -418,7 +412,7 @@ class TestGetResultsExport:
         _make_result_file(tmp_path, "run.json", data)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(result_file="run.json", format="json", output_path="/tmp/evil.json")
 
@@ -429,7 +423,7 @@ class TestGetResultsExport:
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(result_file="missing.json", format="json")
 
@@ -447,7 +441,7 @@ class TestGetResultsSummary:
         _make_result_file(tmp_path, "run.json", data)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(result_file="run.json", format="markdown")
 
@@ -464,7 +458,7 @@ class TestGetResultsSummary:
         _make_result_file(tmp_path, "run.json", data)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(result_file="run.json", format="text")
 
@@ -478,7 +472,7 @@ class TestGetResultsSummary:
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["get_results"].fn
+        fn = get_tool(server, "get_results").fn
 
         result = fn(result_file="nonexistent.json", format="text")
 
@@ -498,7 +492,7 @@ class TestAnalyzeResultsCompare:
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="compare", file1="missing.json", file2="also_missing.json")
 
@@ -513,7 +507,7 @@ class TestAnalyzeResultsCompare:
         _make_result_file(tmp_path, "baseline.json", _make_benchmark_result())
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="compare", file1="baseline.json", file2="missing.json")
 
@@ -541,7 +535,7 @@ class TestAnalyzeResultsCompare:
         _make_result_file(tmp_path, "comparison.json", comparison)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="compare", file1="baseline.json", file2="comparison.json", threshold_percent=10.0)
 
@@ -566,7 +560,7 @@ class TestAnalyzeResultsCompare:
         _make_result_file(tmp_path, "comparison.json", comparison)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="compare", file1="baseline.json", file2="comparison.json")
 
@@ -591,7 +585,7 @@ class TestAnalyzeResultsCompare:
         _make_result_file(tmp_path, "comparison.json", comparison)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="compare", file1="baseline.json", file2="comparison.json")
 
@@ -607,7 +601,7 @@ class TestAnalyzeResultsCompare:
         _make_result_file(tmp_path, "c.json", comparison)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="compare", file1="b.json", file2="c.json")
 
@@ -625,7 +619,7 @@ class TestAnalyzeResultsCompare:
         _make_result_file(tmp_path, "run2.json", _make_benchmark_result())
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="compare", file1="run1", file2="run2")
 
@@ -640,7 +634,7 @@ class TestAnalyzeResultsRegressions:
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path / "nonexistent")
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="regressions")
 
@@ -654,7 +648,7 @@ class TestAnalyzeResultsRegressions:
         _make_result_file(tmp_path, "only_one.json", _make_benchmark_result())
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="regressions")
 
@@ -684,7 +678,7 @@ class TestAnalyzeResultsRegressions:
         _make_result_file(tmp_path, "newer.json", newer)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="regressions")
 
@@ -716,7 +710,7 @@ class TestAnalyzeResultsRegressions:
         _make_result_file(tmp_path, "newer.json", newer)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="regressions")
 
@@ -735,7 +729,7 @@ class TestAnalyzeResultsRegressions:
         _make_result_file(tmp_path, "duckdb2.json", _make_benchmark_result(platform="duckdb"))
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="regressions", platform="duckdb")
 
@@ -765,7 +759,7 @@ class TestAnalyzeResultsRegressions:
         _make_result_file(tmp_path, "newer.json", newer)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="regressions")
 
@@ -799,7 +793,7 @@ class TestAnalyzeResultsRegressions:
         _make_result_file(tmp_path, "newer.json", newer)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         # At 10% threshold, 8% is stable
         result_10 = fn(analysis="regressions", threshold_percent=10.0)
@@ -818,7 +812,7 @@ class TestAnalyzeResultsTrends:
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="trends", metric="invalid_metric")
 
@@ -830,7 +824,7 @@ class TestAnalyzeResultsTrends:
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path / "nonexistent")
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="trends")
 
@@ -852,7 +846,7 @@ class TestAnalyzeResultsTrends:
             os.utime(f, (time.time() - (300 - i * 100), time.time() - (300 - i * 100)))
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="trends")
 
@@ -887,7 +881,7 @@ class TestAnalyzeResultsTrends:
         _make_result_file(tmp_path, "run2.json", data2)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="trends", metric="geometric_mean")
 
@@ -913,7 +907,7 @@ class TestAnalyzeResultsTrends:
         _make_result_file(tmp_path, "run2.json", data)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="trends", metric="total_time")
 
@@ -936,7 +930,7 @@ class TestAnalyzeResultsTrends:
             os.utime(f, (time.time() - (300 - i * 100), time.time() - (300 - i * 100)))
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="trends")
 
@@ -959,7 +953,7 @@ class TestAnalyzeResultsTrends:
             os.utime(f, (time.time() - (300 - i * 100), time.time() - (300 - i * 100)))
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="trends")
 
@@ -982,7 +976,7 @@ class TestAnalyzeResultsTrends:
             os.utime(f, (time.time() - (500 - i * 100), time.time() - (500 - i * 100)))
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="trends", limit=3)
 
@@ -995,7 +989,7 @@ class TestAnalyzeResultsTrends:
         _make_result_file(tmp_path, "run.json", _make_benchmark_result(platform="duckdb"))
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="trends", platform="snowflake")
 
@@ -1010,7 +1004,7 @@ class TestAnalyzeResultsAggregate:
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="aggregate", group_by="invalid")
 
@@ -1022,7 +1016,7 @@ class TestAnalyzeResultsAggregate:
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path / "nonexistent")
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="aggregate")
 
@@ -1036,7 +1030,7 @@ class TestAnalyzeResultsAggregate:
         _make_result_file(tmp_path, "sqlite1.json", _make_benchmark_result(platform="sqlite"))
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="aggregate", group_by="platform")
 
@@ -1055,7 +1049,7 @@ class TestAnalyzeResultsAggregate:
         _make_result_file(tmp_path, "tpcds.json", _make_benchmark_result(benchmark="tpcds"))
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="aggregate", group_by="benchmark")
 
@@ -1070,7 +1064,7 @@ class TestAnalyzeResultsAggregate:
         _make_result_file(tmp_path, "day2.json", _make_benchmark_result(timestamp="2026-01-16T10:00:00"))
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="aggregate", group_by="date")
 
@@ -1092,7 +1086,7 @@ class TestAnalyzeResultsAggregate:
         _make_result_file(tmp_path, "run.json", data)
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="aggregate", group_by="platform")
 
@@ -1109,7 +1103,7 @@ class TestAnalyzeResultsAggregate:
         _make_result_file(tmp_path, "sqlite.json", _make_benchmark_result(platform="sqlite"))
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="aggregate", platform="duckdb", group_by="platform")
 
@@ -1123,7 +1117,7 @@ class TestAnalyzeResultsAggregate:
         _make_result_file(tmp_path, "run.json", _make_benchmark_result(platform="duckdb"))
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="aggregate", platform="snowflake")
 
@@ -1137,7 +1131,7 @@ class TestAnalyzeResultsAggregate:
         _make_result_file(tmp_path, "run2.json", _make_benchmark_result(platform="sqlite"))
 
         server = create_server(results_dir=tmp_path)
-        fn = getattr(server._tool_manager, "_tools", {})["analyze_results"].fn
+        fn = get_tool(server, "analyze_results").fn
 
         result = fn(analysis="aggregate")
 
@@ -1158,7 +1152,7 @@ class TestRunBenchmarkDryRun:
         from benchbox.mcp import create_server
 
         server = create_server()
-        fn = getattr(server._tool_manager, "_tools", {})["run_benchmark"].fn
+        fn = get_tool(server, "run_benchmark").fn
 
         result = fn(platform="duckdb", benchmark="nonexistent_bench", scale_factor=0.01, dry_run=True)
 
@@ -1185,7 +1179,7 @@ class TestRunBenchmarkDryRun:
         mock_result.warnings = []
 
         server = create_server()
-        fn = getattr(server._tool_manager, "_tools", {})["run_benchmark"].fn
+        fn = get_tool(server, "run_benchmark").fn
 
         with patch("benchbox.core.dryrun.DryRunExecutor") as mock_executor_cls:
             mock_executor = MagicMock()
@@ -1211,7 +1205,7 @@ class TestRunBenchmarkDryRun:
         mock_result.warnings = []
 
         server = create_server()
-        fn = getattr(server._tool_manager, "_tools", {})["run_benchmark"].fn
+        fn = get_tool(server, "run_benchmark").fn
 
         with patch("benchbox.core.dryrun.DryRunExecutor") as mock_executor_cls:
             mock_executor = MagicMock()
@@ -1230,7 +1224,7 @@ class TestRunBenchmarkDryRun:
         from benchbox.mcp import create_server
 
         server = create_server()
-        fn = getattr(server._tool_manager, "_tools", {})["run_benchmark"].fn
+        fn = get_tool(server, "run_benchmark").fn
 
         with patch("benchbox.core.dryrun.DryRunExecutor") as mock_executor_cls:
             mock_executor_cls.side_effect = RuntimeError("test failure")
@@ -1254,7 +1248,7 @@ class TestRunBenchmarkDataOnly:
         from benchbox.mcp import create_server
 
         server = create_server()
-        fn = getattr(server._tool_manager, "_tools", {})["run_benchmark"].fn
+        fn = get_tool(server, "run_benchmark").fn
 
         result = fn(platform="duckdb", benchmark="nonexistent", scale_factor=0.01, mode="data_only")
 
@@ -1272,81 +1266,79 @@ class TestAnalyticsHelpers:
 
     def test_classify_regression_severity_critical(self):
         """>=100% delta is critical."""
-        from benchbox.mcp.tools.analytics import _classify_regression_severity
+        from benchbox.core.results.regression_policy import classify_severity as _classify_regression_severity
 
         assert _classify_regression_severity(100.0) == "critical"
         assert _classify_regression_severity(200.0) == "critical"
 
     def test_classify_regression_severity_high(self):
         """50-99% delta is high."""
-        from benchbox.mcp.tools.analytics import _classify_regression_severity
+        from benchbox.core.results.regression_policy import classify_severity as _classify_regression_severity
 
         assert _classify_regression_severity(50.0) == "high"
         assert _classify_regression_severity(99.0) == "high"
 
     def test_classify_regression_severity_medium(self):
         """25-49% delta is medium."""
-        from benchbox.mcp.tools.analytics import _classify_regression_severity
+        from benchbox.core.results.regression_policy import classify_severity as _classify_regression_severity
 
         assert _classify_regression_severity(25.0) == "medium"
         assert _classify_regression_severity(49.0) == "medium"
 
     def test_classify_regression_severity_low(self):
         """<25% delta is low."""
-        from benchbox.mcp.tools.analytics import _classify_regression_severity
+        from benchbox.core.results.regression_policy import classify_severity as _classify_regression_severity
 
         assert _classify_regression_severity(10.0) == "low"
         assert _classify_regression_severity(24.0) == "low"
 
     def test_calculate_metric_geometric_mean(self):
         """geometric_mean calculates correctly."""
-        from benchbox.mcp.tools.analytics import _calculate_metric
+        from benchbox.core.results.metrics import calculate_named_metric
 
         # geometric mean of [4, 9] = sqrt(36) = 6
-        result = _calculate_metric([4.0, 9.0], "geometric_mean")
+        result = calculate_named_metric([4.0, 9.0], "geometric_mean")
         assert abs(result - 6.0) < 0.01
 
     def test_calculate_metric_p50(self):
-        """p50 returns median value."""
-        from benchbox.mcp.tools.analytics import _calculate_metric
+        """p50 returns the middle value for an odd count under nearest-rank."""
+        from benchbox.core.results.metrics import calculate_named_metric
 
-        result = _calculate_metric([10.0, 20.0, 30.0, 40.0, 50.0], "p50")
+        result = calculate_named_metric([10.0, 20.0, 30.0, 40.0, 50.0], "p50")
         assert result == 30.0
 
     def test_calculate_metric_total_time(self):
         """total_time returns sum."""
-        from benchbox.mcp.tools.analytics import _calculate_metric
+        from benchbox.core.results.metrics import calculate_named_metric
 
-        result = _calculate_metric([10.0, 20.0, 30.0], "total_time")
+        result = calculate_named_metric([10.0, 20.0, 30.0], "total_time")
         assert result == 60.0
 
     def test_percentile_empty_list(self):
         """Percentile of empty list returns 0."""
-        from benchbox.mcp.tools.analytics import _percentile
+        from benchbox.core.results.metrics import percentile_ms
 
-        assert _percentile([], 50) == 0
+        assert percentile_ms([], 0.50) == 0
 
     def test_percentile_single_element(self):
         """Percentile of single element returns that element."""
-        from benchbox.mcp.tools.analytics import _percentile
+        from benchbox.core.results.metrics import percentile_ms
 
-        assert _percentile([42.0], 50) == 42.0
-        assert _percentile([42.0], 95) == 42.0
+        assert percentile_ms([42.0], 0.50) == 42.0
+        assert percentile_ms([42.0], 0.95) == 42.0
 
     def test_std_dev_single_element(self):
         """Std dev of single element returns 0."""
-        from benchbox.mcp.tools.analytics import _std_dev
+        from benchbox.core.results.metrics import sample_stdev_ms
 
-        assert _std_dev([42.0]) == 0
+        assert sample_stdev_ms([42.0]) == 0
 
     def test_std_dev_known_values(self):
         """Std dev of known values is correct."""
-        import math
-
-        from benchbox.mcp.tools.analytics import _std_dev
+        from benchbox.core.results.metrics import sample_stdev_ms
 
         # std dev of [2, 4, 4, 4, 5, 5, 7, 9] = 2.138...
-        result = _std_dev([2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0])
+        result = sample_stdev_ms([2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0])
         assert abs(result - 2.138) < 0.01
 
     def test_extract_plan_summary(self):

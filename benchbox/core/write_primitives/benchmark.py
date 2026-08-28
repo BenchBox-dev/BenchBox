@@ -25,6 +25,7 @@ from benchbox.core.connection import DatabaseConnection
 from benchbox.core.primitives_benchmark_utils import (
     build_tpch_staging_tables_sql,
     quote_identifier,
+    summarize_validation_failures,
     table_exists,
 )
 from benchbox.core.transactional.benchmark_base import TransactionalBenchmarkBase
@@ -394,10 +395,14 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             Tuple of (effective_sql, skip_reason). If skip_reason is not None,
             the operation should be skipped.
         """
-        # Adapter-preprocessed SQL takes priority
-        if sql_override is not None:
-            return sql_override, None
-
+        # Skip decisions depend on (operation, platform_key), NOT on the SQL body,
+        # so they run BEFORE any adapter ``sql_override`` is honored. An override
+        # is a dialect rewrite of the operation body (e.g. a bulk_load COPY ->
+        # CREATE EXTERNAL TABLE rewrite), not a signal that the operation is
+        # supported. Evaluating it first would let an operation marked unsupported
+        # (``platform_overrides {platform: null}``) still execute on that platform
+        # whenever the adapter also returns a preprocessed body - the override
+        # side-channel bypass (audit finding N8).
         if getattr(operation, "aggregate_state", None) is not None:
             platform_label = platform_key or "SQL"
             return None, (
@@ -418,25 +423,42 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                     f"{POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS[operation.id]}"
                 )
 
-        if (platform_key or "").lower() == "duckdb":
-            duckdb_skip_reason = duckdb_write_primitive_skip_reason(operation)
-            if duckdb_skip_reason is not None:
-                return None, (f"Operation '{operation.id}' is skipped on DuckDB: {duckdb_skip_reason}")
-
-        effective_sql = operation.write_sql
-
+        # A ``null`` platform override is an unsupported-on-this-platform skip; a
+        # string override is a per-platform SQL body used only when the adapter
+        # did not supply its own ``sql_override`` below.
+        platform_override_sql: str | None = None
         if platform_key and operation.platform_overrides and platform_key in operation.platform_overrides:
             override = operation.platform_overrides[platform_key]
             if override is None:
                 return None, f"Operation '{operation.id}' is unsupported on platform '{platform_key}'."
-            effective_sql = override
+            platform_override_sql = override
 
         if (missing_file := self._check_bulk_load_file_dependencies(operation)) is not None:
             return None, (
                 f"Operation '{operation.id}' is skipped because required bulk-load files are missing: {missing_file}"
             )
 
-        if (empty_reason := self._check_staging_table_population(effective_sql, connection)) is not None:
+        # Body precedence once the operation is confirmed runnable: adapter
+        # ``sql_override`` (preprocessed) wins, then a platform override, then the
+        # catalog default. The staging-population guard uses the catalog default,
+        # which names the logical staging tables regardless of any dialect rewrite.
+        if sql_override is not None:
+            effective_sql = sql_override
+        elif platform_override_sql is not None:
+            effective_sql = platform_override_sql
+        else:
+            effective_sql = operation.write_sql
+
+        # Gate against the SQL DuckDB will actually run: bundled DuckDB rejects
+        # MERGE INTO, but a per-platform override that removes it (or one that
+        # introduces it) must be judged on the effective body, not the catalog
+        # default.
+        if (platform_key or "").lower() == "duckdb":
+            duckdb_skip_reason = duckdb_write_primitive_skip_reason(operation, effective_sql)
+            if duckdb_skip_reason is not None:
+                return None, (f"Operation '{operation.id}' is skipped on DuckDB: {duckdb_skip_reason}")
+
+        if (empty_reason := self._check_staging_table_population(operation.write_sql, connection)) is not None:
             return None, f"Operation '{operation.id}' is skipped because {empty_reason}"
 
         return effective_sql, None
@@ -575,6 +597,19 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         """
         return f"c_name || '|' || c_address || '|' || CAST({acctbal_expr} AS VARCHAR) || '|' || c_mktsegment"
 
+    def _date_literal(self, value: str) -> str:
+        """Return a date literal accepted by the active setup dialect.
+
+        SQLite accepts date values through scalar functions such as ``DATE()``
+        but does not parse the SQL-standard ``DATE 'YYYY-MM-DD'`` literal.
+        Staging population runs directly on the connection, before the normal
+        operation SQL translation path, so this dialect-specific spelling must
+        be applied here.
+        """
+        if self._setup_dialect.lower() == "sqlite":
+            return f"DATE('{value}')"
+        return f"DATE '{value}'"
+
     def _get_population_sql(self, table_name: str, source_table: str) -> str:
         """Get the INSERT SQL to populate a staging table from its source.
 
@@ -615,11 +650,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             # valid_to is the open-ended sentinel. Built from the full customer
             # table so it scales with the scale factor.
             fingerprint = self._scd2_row_hash_expr("c_acctbal")
+            valid_from = self._date_literal("1990-01-01")
+            valid_to = self._date_literal("9999-12-31")
             return (
                 f"INSERT INTO {quoted_table} "
                 f"SELECT c_custkey AS sk, c_custkey, c_name, c_address, c_acctbal, c_mktsegment, "
                 f"{fingerprint} AS row_hash, true AS is_current, "
-                f"DATE '1990-01-01' AS valid_from, DATE '9999-12-31' AS valid_to "
+                f"{valid_from} AS valid_from, {valid_to} AS valid_to "
                 f"FROM {quoted_source}"
             )
         elif table_name == "scd2_ops_stage_customer":
@@ -634,7 +671,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             #               current max) that have no current version yet.
             fp_changed = self._scd2_row_hash_expr("c_acctbal + 100")
             fp_same = self._scd2_row_hash_expr("c_acctbal")
-            effective = "DATE '2026-01-01'"
+            effective = self._date_literal("2026-01-01")
             return (
                 f"INSERT INTO {quoted_table} "
                 f"SELECT c_custkey, c_name, c_address, c_acctbal + 100, c_mktsegment, "
@@ -656,6 +693,21 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         else:
             # Full copy for other tables
             return f"INSERT INTO {quoted_table} SELECT * FROM {quoted_source}"
+
+    def _execute_population_sql(self, connection: DatabaseConnection, sql: str) -> None:
+        """Execute staging population SQL using the active dialect's statement contract.
+
+        SQLite's DB-API ``execute`` accepts only one statement, while the SCD2
+        stage population is intentionally a three-statement batch. The other
+        adapters accept the batch as-is, so split only for SQLite and keep the
+        existing execution path unchanged elsewhere.
+        """
+        if self._setup_dialect.lower() == "sqlite":
+            for statement in sql.split(";"):
+                if statement.strip():
+                    connection.execute(statement)
+            return
+        connection.execute(sql)
 
     def _populate_staging_tables(self, connection: DatabaseConnection, tables: dict[str, str]) -> dict[str, int]:
         """Populate staging tables from source tables.
@@ -718,7 +770,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 # Table is empty - populate it
                 self.log_verbose(f"Populating {table_name} from {source_table} ({source_count} rows)...")
                 populate_sql = self._get_population_sql(table_name, source_table)
-                connection.execute(populate_sql)
+                self._execute_population_sql(connection, populate_sql)
 
                 result = connection.execute(f"SELECT COUNT(*) FROM {quoted_table}").fetchone()
                 status[table_name] = result[0] if result else 0
@@ -776,13 +828,25 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             )
 
         try:
-            # Drop existing staging tables if force=True (done once before loop)
-            if force:
+            # A staging set whose manifest does not match this run is stale, not
+            # reusable. Without this the population loop below takes its "already
+            # populated" branch on the leftover rows, nothing is rebuilt, and the
+            # unconditional _write_staging_manifest() at the end then certifies
+            # the stale data as this run's -- the exact silent wrong-results bug
+            # the manifest exists to close. Kept identical to the
+            # transaction_primitives gate; these two setup() paths drifting is how
+            # the original bug survived review.
+            rebuild = force or not self._staging_manifest_matches(connection, required_tables)
+
+            # Drop existing staging tables when rebuilding (done once before loop)
+            if rebuild:
+                reason = "force mode" if force else "stale/absent staging manifest"
+                self._drop_legacy_staging_manifests(connection)
                 for table_name in STAGING_TABLES:
                     try:
                         quoted = self._quote_identifier(table_name)
                         connection.execute(f"DROP TABLE IF EXISTS {quoted}")
-                        self.log_verbose(f"Dropped existing {table_name} (force mode)")
+                        self.log_verbose(f"Dropped existing {table_name} ({reason})")
                     except Exception as e:
                         self.log_verbose(f"Warning: Could not drop {table_name}: {e}")
 
@@ -827,6 +891,12 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                         status[table_name] = result[0] if result else 0
                     except Exception:
                         status[table_name] = 0
+
+            # Record this setup()'s provenance (benchmark, scale, spec version,
+            # source digest) so is_setup() can require an exact match rather
+            # than trusting a bare COUNT(*) that a stale staging set from a
+            # different scale/seed would also satisfy.
+            self._write_staging_manifest(connection, required_tables)
 
             self.log_verbose(f"Setup complete: {status}")
 
@@ -931,13 +1001,22 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         self.log_verbose("Reset complete")
 
     def is_setup(self, connection: DatabaseConnection) -> bool:
-        """Check if staging tables are ready.
+        """Check if staging tables are ready for THIS run.
+
+        Requires both that the required staging tables exist and have data,
+        AND that the staging provenance manifest (see
+        ``TransactionalBenchmarkBase._staging_manifest_matches``) matches
+        this benchmark's scale/spec/source. A staging set left over from a
+        different scale factor (or a legacy database with no manifest at
+        all) fails this check and forces one rebuild, rather than silently
+        benchmarking the wrong data volume.
 
         Args:
             connection: Database connection
 
         Returns:
-            True if all staging tables exist and have data
+            True if all required staging tables exist, have data, and their
+            manifest matches this run's provenance.
         """
         try:
             # Check that required staging tables exist and have data
@@ -957,7 +1036,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
                 if not result or result[0] == 0:
                     return False
-            return True
+            return self._staging_manifest_matches(connection, ["orders", "lineitem"])
         except Exception:
             return False
 
@@ -1208,9 +1287,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 operation, connection, operation_id
             )
 
+            # The write SQL executed without raising, but a failed post-condition
+            # validation means the operation did not do what it claims. Report it
+            # as VALIDATION_FAILED (distinct from an execution FAILED) rather than
+            # SUCCESS, so a corrupting or no-op operation cannot render green.
             return OperationResult(
                 operation_id=operation_id,
-                success=True,
+                success=validation_passed,
                 write_duration_ms=write_duration_ms,
                 rows_affected=rows_affected,
                 validation_duration_ms=validation_duration_ms,
@@ -1218,7 +1301,8 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 validation_results=validation_results,
                 cleanup_duration_ms=cleanup_duration_ms,
                 cleanup_success=cleanup_success,
-                status="SUCCESS",
+                status="SUCCESS" if validation_passed else "VALIDATION_FAILED",
+                error=None if validation_passed else summarize_validation_failures(validation_results),
                 cleanup_warning=cleanup_warning,
                 executed_sql=write_sql,
             )
@@ -1510,7 +1594,12 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                         "query_id": op_id,
                         "status": status,
                         "execution_time_seconds": op_result.write_duration_ms / 1000.0,
-                        "rows_returned": op_result.rows_affected,
+                        # DBAPI reports -1 when a statement has no meaningful
+                        # rowcount (for example DDL). The public result schema
+                        # requires a non-negative integer, so preserve the
+                        # operation status while representing unknown count as
+                        # zero at this boundary.
+                        "rows_returned": max(0, op_result.rows_affected),
                         **({"error": error} if error else {}),
                     }
                 )

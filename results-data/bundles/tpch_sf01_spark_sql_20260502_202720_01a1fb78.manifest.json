@@ -1,0 +1,14 @@
+{
+  "benchmark": "TPC-H",
+  "bundle_file": "tpch_sf01_spark_sql_20260502_202720_01a1fb78.json",
+  "bundle_hash": "020dc18f844bbc5441fbc8a8dbec3fe3eaf238b413ad6e8e3052077a400f78bd",
+  "companion_hashes": {},
+  "phase": 2,
+  "platform": "Spark",
+  "result_source": "internal",
+  "scale_factor": 0.1,
+  "submission_path": "path_30338255ec33",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:51:42.524741+00:00",
+  "submitted_by": "BenchBox UAT"
+}

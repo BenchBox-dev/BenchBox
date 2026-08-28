@@ -1,0 +1,4 @@
+# Ignore generated database and columnar files that may be created
+# by the static build pipeline or local development workflows.
+*.duckdb
+*.parquet

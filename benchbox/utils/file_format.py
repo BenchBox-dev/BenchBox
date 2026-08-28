@@ -445,24 +445,47 @@ def has_trailing_delimiter(
 
 
 def _check_first_nonempty_line(path: Path, checker, CompressionError, CompressionManager) -> bool:
-    """Read the first non-empty line from a (possibly compressed) file and apply checker."""
+    r"""Read the first non-empty line from a (possibly compressed) file and apply checker.
+
+    TEXT MODE IS REQUIRED, not incidental. Both reads below open ``"rt"``, so
+    universal newlines translate ``\r\n`` to ``\n`` before the checker sees the
+    line -- and every checker in ``has_trailing_delimiter`` strips only ``\n``.
+    A file written on Windows ends ``|\r\n``, so switching either read to binary
+    for throughput would leave a stray ``\r``: the field-count checker would see
+    an extra field, the ends-with checker would stop matching, and on bytes
+    ``rstrip("\n")`` raises outright. That is the exact Windows misdetection
+    PR #1332 fixed, and it would come back silently across all ten platform
+    callers.
+
+    READ FAILURES PROPAGATE. This used to wrap everything in
+    ``except Exception: return False``, so a missing file, a permission error or
+    an undecompressable stream was reported as "this file has no trailing
+    delimiter" -- a confident answer to a question that was never asked. For a
+    file that does carry one, the caller then omitted the synthetic column and
+    PyArrow failed downstream with a column-count mismatch naming neither the
+    real cause nor the file. Every caller passes a path it is about to load, so
+    surfacing the original error is strictly more useful than guessing.
+
+    Pinned by ``tests/unit/utils/test_file_format.py::
+    TestHasTrailingDelimiterFraming``, which asserts all four
+    framing/terminator combinations.
+    """
     compression_type = detect_compression(path)
-    try:
-        if compression_type:
-            manager = CompressionManager()
-            compressor = manager.get_compressor(compression_type)
-            with compressor.open_for_read(path, mode="rt") as handle:
-                for line in handle:
-                    if line.strip():
-                        return checker(line)
-            return False
-        with path.open("rt", encoding="utf-8", errors="replace") as handle:
+    if compression_type:
+        manager = CompressionManager()
+        compressor = manager.get_compressor(compression_type)
+        with compressor.open_for_read(path, mode="rt") as handle:
             for line in handle:
                 if line.strip():
                     return checker(line)
         return False
-    except Exception:
-        return False
+    with path.open("rt", encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if line.strip():
+                return checker(line)
+    # The only False that means "answered": a file with no non-empty line
+    # genuinely has no framing to detect.
+    return False
 
 
 def get_column_names_with_trailing(column_names: list[str], has_trailing: bool) -> list[str]:

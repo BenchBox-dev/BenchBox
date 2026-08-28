@@ -1,0 +1,48 @@
+name: Develop ruleset drift
+
+on:
+  pull_request_target:
+    branches:
+      - develop
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    branches:
+      - develop
+
+concurrency:
+  group: develop-ruleset-drift-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ruleset-drift:
+    name: ruleset-drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout trusted develop policy
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          persist-credentials: false
+
+      - name: Compare live governance with the trusted runbook
+        env:
+          RULESET_DRIFT_TOKEN: ${{ secrets.RULESET_DRIFT_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/ruleset_drift_check.py \
+            --token "${RULESET_DRIFT_TOKEN}" \
+            --require-bypass-actor-visibility \
+            --output ruleset-drift.json
+
+      - name: Upload drift evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: develop-ruleset-drift-${{ github.event.pull_request.number || github.run_id }}-${{ github.run_attempt }}
+          path: ruleset-drift.json
+          if-no-files-found: warn
+          retention-days: 30

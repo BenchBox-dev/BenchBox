@@ -20,6 +20,7 @@ import pytest
 from benchbox.core.dataframe.query_resolution import build_dataframe_query_filter
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.platform_info import PlatformInfoInput
+from benchbox.core.run_service import get_execution_mode, is_dataframe_execution
 from benchbox.core.runner.dataframe_runner import (
     DATAFRAME_PRODUCTION_EXECUTION_PATH,
     DATAFRAME_RUNNER_API_SURFACE,
@@ -27,8 +28,6 @@ from benchbox.core.runner.dataframe_runner import (
     DataFramePhases,
     DataFrameRunOptions,
     _get_queries_for_benchmark,
-    get_execution_mode,
-    is_dataframe_execution,
     run_dataframe_benchmark,
 )
 from benchbox.core.schemas import BenchmarkConfig
@@ -72,6 +71,22 @@ class TestIsDataFrameExecution:
     def test_case_insensitive(self):
         """Test case insensitive detection."""
         assert is_dataframe_execution(types.SimpleNamespace(type="Polars-DF")) is True
+
+    def test_explicit_mode_sql_wins_over_df_suffix(self):
+        """Explicit mode overrides a -df platform name."""
+        assert is_dataframe_execution(types.SimpleNamespace(type="polars-df", mode="sql")) is False
+
+    def test_explicit_mode_dataframe_wins_over_sql_platform(self):
+        """Explicit dataframe mode overrides a SQL platform name."""
+        assert is_dataframe_execution(types.SimpleNamespace(type="duckdb", mode="dataframe")) is True
+
+    def test_deployment_suffix_is_stripped(self):
+        """Deployment suffixes are not treated as DataFrame mode by themselves."""
+        assert is_dataframe_execution(types.SimpleNamespace(type="clickhouse:cloud")) is False
+
+    def test_combined_df_and_deployment_suffix(self):
+        """Combined -df and :deployment suffixes still imply DataFrame mode."""
+        assert is_dataframe_execution(types.SimpleNamespace(type="databricks-df:serverless")) is True
 
 
 class TestGetExecutionMode:
@@ -263,7 +278,7 @@ class TestRunDataframeBenchmark:
             )
 
         load_fn.assert_not_called()
-        assert result.validation_status == "PASSED"
+        assert result.validation_status == "NOT_RUN"
         assert result.total_queries == 0
 
     def test_load_phase_uses_data_loader_preparation_pipeline(self, tmp_path):
@@ -300,7 +315,7 @@ class TestRunDataframeBenchmark:
                 benchmark_instance=benchmark_instance,
             )
 
-        assert result.validation_status == "PASSED"
+        assert result.validation_status == "NOT_RUN"
         loader.prepare_benchmark_data.assert_called_once_with(
             benchmark=benchmark_instance,
             scale_factor=1.0,
@@ -481,12 +496,8 @@ class TestMaintenancePhaseValidation:
         )
 
         assert result is not None
-        # Mocked adapter raises nothing and DataFramePhases(load=False, execute=False)
-        # means the runner's except branch never runs (no "FAILED" overwrite) and there
-        # are no query results to demote status to "PARTIAL" - "PASSED" is the only
-        # reachable outcome (see builder.py's default and dataframe_runner.py's except
-        # branch).
-        assert result.validation_status == "PASSED"
+        # A load/execute-free DataFrame result carries no correctness evidence.
+        assert result.validation_status == "NOT_RUN"
 
     def test_power_phase_does_not_raise(self):
         """Test that power execution type works normally (queries only)."""

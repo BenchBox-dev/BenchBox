@@ -9,6 +9,26 @@ Related TODO: `isolate-experimental-core-subsystems`
 
 Proposed extracted library or package name: `benchbox-experimental`
 
+## Status (2026-08-13)
+
+**Blocked on evidence for further extraction.** The namespace move is already
+represented in the repository, but the default wheel still ships the
+experimental package. No companion package or extra is justified until demand,
+install-size benefit, CI burden, and release cost are measured.
+
+Measured on `origin/develop` at `723126bf3` with `uv build --wheel`. Reproduction
+steps are in `_project/decisions/future-state-extraction-evidence-2026-08-13.md`.
+
+| Measure | Result |
+| --- | --- |
+| Wheel | 10,219,657 bytes; 1,325 archive entries |
+| `benchbox.experimental` entries | 24; 307,255 uncompressed bytes |
+
+The measured contents confirm that experimental code remains packaged, but do
+not establish that extraction is worth its versioning, CI, and dependency-skew
+cost. No CI-minute or release-cost measurement was taken. Default-wheel contents
+remain unchanged in this item.
+
 ## Future State
 
 BenchBox core exposes only documented, supported benchmark surfaces. Prototype
@@ -34,7 +54,7 @@ Core users interact with supported benchmarks only:
 
 ```bash
 uv add benchbox
-benchbox list-benchmarks
+benchbox benchmarks list
 benchbox run --platform duckdb --benchmark tpch --scale 0.01
 ```
 

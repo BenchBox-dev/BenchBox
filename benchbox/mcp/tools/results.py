@@ -10,44 +10,45 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import csv
-import html
 import io
 import json
 import logging
 from pathlib import Path
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
+from benchbox.core.constants import EXPORT_FORMATS, MCP_RESULT_FORMATS
 from benchbox.core.results.loader import ResultLoadError, UnsupportedSchemaError, load_result_file
 from benchbox.mcp.errors import ErrorCode, make_error
+from benchbox.mcp.security import PathProvider, resolve_path_provider
 from benchbox.mcp.tools.path_utils import resolve_result_file_path
+from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
 
 # Tool annotations for read-only results tools
 RESULTS_READONLY_ANNOTATIONS = ToolAnnotations(
     title="Read benchmark results",
-    readOnlyHint=True,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=False,
+    read_only_hint=True,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=False,
 )
 
 # Tool annotations for export (creates files)
 EXPORT_ANNOTATIONS = ToolAnnotations(
     title="Export benchmark results",
-    readOnlyHint=False,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=False,
+    read_only_hint=False,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=False,
 )
 
 
-def register_results_tools(mcp: FastMCP, *, results_dir: Path) -> None:
+def register_results_tools(mcp: MCPServer, *, results_dir: PathProvider) -> None:
     """Register results tools with the MCP server."""
-    configured_results_dir = Path(results_dir)
 
     @mcp.tool(annotations=RESULTS_READONLY_ANNOTATIONS)
     def get_results(
@@ -75,9 +76,10 @@ def register_results_tools(mcp: FastMCP, *, results_dir: Path) -> None:
         """
         # If no result_file, list recent runs
         if result_file is None or format == "list":
-            return _list_recent_runs_impl(limit, platform, benchmark, configured_results_dir)
+            return _list_recent_runs_impl(limit, platform, benchmark, resolve_path_provider(results_dir))
 
         # Get results for specific file
+        configured_results_dir = resolve_path_provider(results_dir)
         results = _get_results_impl(result_file, include_queries, results_dir=configured_results_dir)
         if "error" in results:
             return results
@@ -86,7 +88,7 @@ def register_results_tools(mcp: FastMCP, *, results_dir: Path) -> None:
         format_lower = format.lower()
         if format_lower == "details":
             return results
-        elif format_lower in ("json", "csv", "html"):
+        elif format_lower in EXPORT_FORMATS:
             return _export_results_impl(results, result_file, format_lower, output_path, configured_results_dir)
         elif format_lower in ("text", "markdown"):
             return _export_summary_impl(results, format_lower)
@@ -94,7 +96,7 @@ def register_results_tools(mcp: FastMCP, *, results_dir: Path) -> None:
             return make_error(
                 ErrorCode.VALIDATION_INVALID_FORMAT,
                 f"Invalid format: {format}",
-                details={"valid_formats": ["list", "details", "json", "csv", "html", "text", "markdown"]},
+                details={"valid_formats": list(MCP_RESULT_FORMATS)},
             )
 
 
@@ -108,11 +110,7 @@ def _list_recent_runs_impl(
     if not results_dir.exists():
         return {"runs": [], "count": 0, "message": f"No results directory found at {results_dir}"}
 
-    result_files = [
-        path
-        for path in results_dir.glob("*.json")
-        if not path.name.endswith(".plans.json") and not path.name.endswith(".tuning.json")
-    ]
+    result_files = [path for path in results_dir.glob("*.json") if not path.name.endswith(COMPANION_SUFFIXES)]
 
     runs = []
     for file_path in sorted(result_files, key=lambda p: p.stat().st_mtime, reverse=True):
@@ -156,7 +154,7 @@ def _list_recent_runs_impl(
                 break
 
         except Exception as e:
-            logger.warning(f"Could not parse result file {file_path}: {e}")
+            logger.warning("Could not parse result file %s (%s)", file_path.name, type(e).__name__)
             continue
 
     return {
@@ -249,7 +247,9 @@ def _export_results_impl(
             content = "query_id,runtime_ms,status\n"
 
     elif format == "html":
-        content = _generate_html_report(results)
+        from benchbox.core.results.html_report import generate_html_report
+
+        content = generate_html_report(results)
 
     # Write to file if output_path provided
     if output_path:
@@ -298,113 +298,8 @@ def _export_results_impl(
     }
 
 
-def _generate_html_report(results: dict[str, Any]) -> str:
-    """Generate HTML report with XSS prevention."""
-    esc = html.escape
-    benchmark = results.get("benchmark", {})
-    platform_type = esc(str(results.get("platform", {}).get("name", "Unknown")))
-    benchmark_name = esc(str(benchmark.get("name") or benchmark.get("id") or "Unknown"))
-    scale_factor = esc(str(benchmark.get("scale_factor", "Unknown")))
-    execution_id = esc(str(results.get("run", {}).get("id", "Unknown")))
-
-    html_parts = [
-        "<!DOCTYPE html>",
-        "<html><head>",
-        f"<title>Benchmark Results: {benchmark_name}</title>",
-        "<style>",
-        "body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 40px; }",
-        "h1 { color: #333; }",
-        "table { border-collapse: collapse; width: 100%; margin-top: 20px; }",
-        "th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }",
-        "th { background-color: #4CAF50; color: white; }",
-        "tr:nth-child(even) { background-color: #f2f2f2; }",
-        ".summary { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }",
-        "</style>",
-        "</head><body>",
-        f"<h1>Benchmark Results: {benchmark_name}</h1>",
-        "<div class='summary'>",
-        f"<p><strong>Platform:</strong> {platform_type}</p>",
-        f"<p><strong>Scale Factor:</strong> {scale_factor}</p>",
-        f"<p><strong>Execution ID:</strong> {execution_id}</p>",
-    ]
-
-    if "summary" in results:
-        summary = results["summary"]
-        queries_summary = summary.get("queries", {})
-        timing = summary.get("timing", {})
-        total_queries = esc(str(queries_summary.get("total", "N/A")))
-        total_runtime = esc(str(timing.get("total_ms", "N/A")))
-        html_parts.append(f"<p><strong>Total Queries:</strong> {total_queries}</p>")
-        html_parts.append(f"<p><strong>Total Runtime:</strong> {total_runtime} ms</p>")
-
-    html_parts.append("</div>")
-
-    queries = results.get("queries", [])
-    if queries:
-        html_parts.extend(
-            [
-                "<h2>Query Results</h2>",
-                "<table>",
-                "<tr><th>Query</th><th>Runtime (ms)</th><th>Status</th></tr>",
-            ]
-        )
-        for q in queries:
-            q_id = esc(str(q.get("id", "")))
-            q_runtime = esc(str(q.get("ms", "")))
-            q_status = esc(str(q.get("status", "")))
-            html_parts.append(f"<tr><td>{q_id}</td><td>{q_runtime}</td><td>{q_status}</td></tr>")
-        html_parts.append("</table>")
-
-    html_parts.extend(["</body></html>"])
-    return "\n".join(html_parts)
-
-
 def _export_summary_impl(results: dict[str, Any], format: str) -> dict[str, Any]:
-    """Export formatted summary of benchmark results."""
-    lines = []
+    """Export formatted summary of benchmark results (transport wrapper)."""
+    from benchbox.core.results.html_report import generate_summary_content
 
-    if format == "markdown":
-        benchmark = results.get("benchmark", {})
-        benchmark_name = benchmark.get("name") or benchmark.get("id") or "Unknown"
-        lines.append(f"# Benchmark Results: {benchmark_name}")
-        lines.append("")
-        lines.append(f"**Platform**: {results.get('platform', {}).get('name', 'Unknown')}")
-        lines.append(f"**Scale Factor**: {benchmark.get('scale_factor', 'Unknown')}")
-        lines.append(f"**Execution ID**: {results.get('run', {}).get('id', 'Unknown')}")
-        lines.append("")
-
-        if "summary" in results:
-            summary = results["summary"]
-            queries = summary.get("queries", {})
-            timing = summary.get("timing", {})
-            lines.append("## Summary")
-            lines.append("")
-            lines.append(f"- Total Queries: {queries.get('total', 'N/A')}")
-            lines.append(f"- Total Runtime: {timing.get('total_ms', 'N/A')} ms")
-            lines.append("")
-
-        if "queries" in results:
-            lines.append("## Query Results")
-            lines.append("")
-            lines.append("| Query | Runtime (ms) | Status |")
-            lines.append("|-------|-------------|--------|")
-            for q in results.get("queries", [])[:20]:
-                lines.append(f"| {q.get('id', 'N/A')} | {q.get('ms', 'N/A')} | {q.get('status', 'N/A')} |")
-    else:
-        # Plain text format
-        benchmark = results.get("benchmark", {})
-        benchmark_name = benchmark.get("name") or benchmark.get("id") or "Unknown"
-        lines.append(f"Benchmark Results: {benchmark_name}")
-        lines.append(f"Platform: {results.get('platform', {}).get('name', 'Unknown')}")
-        lines.append(f"Scale Factor: {benchmark.get('scale_factor', 'Unknown')}")
-        lines.append("")
-
-        if "summary" in results:
-            summary = results["summary"]
-            queries = summary.get("queries", {})
-            timing = summary.get("timing", {})
-            lines.append("Summary:")
-            lines.append(f"  Total Queries: {queries.get('total', 'N/A')}")
-            lines.append(f"  Total Runtime: {timing.get('total_ms', 'N/A')} ms")
-
-    return {"format": format, "content": "\n".join(lines)}
+    return generate_summary_content(results, format)

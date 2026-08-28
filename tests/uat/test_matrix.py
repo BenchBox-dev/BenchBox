@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib.util
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -9,10 +11,20 @@ import pytest
 from benchbox.core.benchmark_registry import CATEGORY_ORDER
 from benchbox.core.platform_registry import PlatformRegistry
 from tests.uat import compatibility, matrix
-from tests.uat.config import validate_config
+from tests.uat.config import load_config, validate_config
 from tests.uat.phases import enumerate as enum_phase
 
 pytestmark = pytest.mark.fast
+
+_RELEASE_GATE_CONFIGS_DIR = Path(__file__).parent / "configs"
+
+
+def _release_gate_config_names() -> tuple[str, ...]:
+    """Discover `release-gate-*.yaml` configs by glob rather than a hardcoded
+    list, so a future `release-gate-04-*.yaml` stage is automatically probed
+    by `test_release_gate_platforms_resolve_from_dev_venv_or_have_uv_extra`
+    (uat-operator-provisioning review response, 2026-07-19)."""
+    return tuple(sorted(path.name for path in _RELEASE_GATE_CONFIGS_DIR.glob("release-gate-*.yaml")))
 
 
 # ---------------------------------------------------------------------------
@@ -74,6 +86,44 @@ def test_native_model_compatibility_rules_cover_fast_native_targets():
             rule = compatibility.compatibility_rule_for(platform, benchmark, benchmarks[benchmark])
             assert rule is not None
             assert rule.rule_id == f"uat.compat.{platform}.{benchmark}.benchmark_gate"
+
+
+def test_sqlite_vector_search_is_explicitly_pruned():
+    benchmarks = matrix.load_benchmarks()
+
+    rule = compatibility.compatibility_rule_for("sqlite", "vector_search", benchmarks["vector_search"])
+
+    assert rule is not None
+    assert rule.rule_id == "uat.compat.sqlite.vector_search.benchmark_gate"
+    assert "no SQLite query variant" in rule.reason
+
+
+def test_clickhouse_local_metadata_acl_is_fail_closed():
+    benchmarks = matrix.load_benchmarks()
+
+    rule = compatibility.compatibility_rule_for(
+        "clickhouse-local", "metadata_primitives", benchmarks["metadata_primitives"]
+    )
+
+    assert rule is not None
+    assert rule.rule_id == "uat.compat.clickhouse-local.metadata_primitives.benchmark_gate"
+    assert "SHOW USERS" in rule.reason
+    assert "clickhouse-local-mode.md" in rule.evidence or "benchmark_gate" in rule.evidence
+
+
+def test_postgresql_write_primitives_is_a_supported_uat_cell():
+    """postgresql x write_primitives must stay an enumerable (un-pruned) UAT cell.
+
+    The three SCD2 ops run green on live PostgreSQL (see
+    tests/integration/platforms/test_write_primitives_scd2_postgresql_live.py),
+    so the pair must not be compatibility-pruned. This guards audit finding C: the
+    ops were correct-but-unexecuted, and a future benchmark gate must not silently
+    drop the cell without also removing the live coverage.
+    """
+    benchmarks = matrix.load_benchmarks()
+    assert "postgresql" in matrix.DOCKER_PLATFORMS
+    rule = compatibility.compatibility_rule_for("postgresql", "write_primitives", benchmarks["write_primitives"])
+    assert rule is None, f"postgresql x write_primitives unexpectedly pruned: {rule}"
 
 
 def test_resolve_benchmarks_categories():
@@ -201,6 +251,45 @@ def test_missing_benchmarks_from_include_matches_resolve_benchmarks_drop():
 
 
 # ---------------------------------------------------------------------------
+# known_platform_ids / missing_platforms_from_include
+# (uat-config-schema-spec-realignment w2 -- mirrors missing_benchmarks_from_include).
+# ---------------------------------------------------------------------------
+
+
+def test_known_platform_ids_covers_curated_groups():
+    known = matrix.known_platform_ids()
+    assert set(matrix.SQL_PLATFORMS).issubset(known)
+    assert set(matrix.DATAFRAME_PLATFORMS).issubset(known)
+    assert "duckdb" in known
+    assert "polars-df" in known
+
+
+def test_missing_platforms_from_include_flags_unknown_ids():
+    out = matrix.missing_platforms_from_include(["duckdb", "totally_bogus_platform_xyz"])
+    assert out == ["totally_bogus_platform_xyz"]
+
+
+def test_missing_platforms_from_include_dedupes_and_preserves_order():
+    out = matrix.missing_platforms_from_include(["bogus_a", "duckdb", "bogus_b", "bogus_a"])
+    assert out == ["bogus_a", "bogus_b"]
+
+
+def test_missing_platforms_from_include_empty_when_all_known():
+    assert matrix.missing_platforms_from_include(["duckdb", "polars-df"]) == []
+
+
+def test_missing_platforms_from_include_matches_resolve_platforms_drop():
+    """`resolve_platforms` silently drops unknown `include` ids (mirrors
+    `resolve_benchmarks`); this helper must flag exactly the ids that drop
+    causes, so accounting stays honest."""
+    include = ["duckdb", "totally_bogus_platform_xyz"]
+    resolved = matrix.resolve_platforms(include=include)
+    missing = matrix.missing_platforms_from_include(include)
+    assert set(include) == set(resolved) | set(missing)
+    assert set(resolved) & set(missing) == set()
+
+
+# ---------------------------------------------------------------------------
 # enumerate_cells_with_pruning registry/ladder accounting
 # (uat-accounting-hardening w2/w3): a typo'd benchmark id or a scale outside
 # the registry's declared scale_options must produce a visible accounting
@@ -233,6 +322,45 @@ def test_enumerate_with_pruning_records_registry_missing_benchmark():
     }
     assert all(c.status == enum_phase.REGISTRY_PRUNE_STATUS for c in missing_rows)
     assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
+
+
+def test_enumerate_with_pruning_records_registry_missing_platform():
+    raw = {
+        "platforms": {"include": ["duckdb", "totally_bogus_platform_xyz"]},
+        "benchmarks": {"include": ["tpch", "tpcds"]},
+        "scales": {"rungs": [0.01, 0.1]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_registry_cfg(raw))
+
+    assert {c.platform for c in result.cells} == {"duckdb"}
+    missing_rows = [c for c in result.compatibility_pruned if c.rule_id == "platform-not-in-registry"]
+    # One row per missing platform x resolved benchmark x requested scale -
+    # it must be visible in accounting output, not silently absent.
+    assert {(c.platform, c.benchmark, c.scale) for c in missing_rows} == {
+        ("totally_bogus_platform_xyz", "tpch", 0.01),
+        ("totally_bogus_platform_xyz", "tpch", 0.1),
+        ("totally_bogus_platform_xyz", "tpcds", 0.01),
+        ("totally_bogus_platform_xyz", "tpcds", 0.1),
+    }
+    assert all(c.status == enum_phase.REGISTRY_PRUNE_STATUS for c in missing_rows)
+    assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
+
+
+def test_enumerate_with_pruning_records_both_unknown_include_dimensions():
+    raw = {
+        "platforms": {"include": ["totally_bogus_platform_xyz"]},
+        "benchmarks": {"include": ["totally_bogus_benchmark_xyz"]},
+        "scales": {"rungs": [0.01]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_registry_cfg(raw))
+
+    assert result.cells == ()
+    assert {(row.rule_id, row.platform, row.benchmark, row.scale) for row in result.compatibility_pruned} == {
+        ("platform-not-in-registry", "totally_bogus_platform_xyz", "totally_bogus_benchmark_xyz", 0.01),
+        ("benchmark-not-in-registry", "totally_bogus_platform_xyz", "totally_bogus_benchmark_xyz", 0.01),
+    }
 
 
 def test_enumerate_with_pruning_records_ladder_pruned_scales():
@@ -344,3 +472,104 @@ def test_benchbox_run_argv_velox_iterations_one():
     iter_idx = argv.index("--iterations")
     opt_idx = argv.index("--platform-option")
     assert iter_idx < opt_idx
+
+
+def test_benchbox_run_official_argv_includes_quiet_by_default():
+    argv = matrix.benchbox_run_official_argv("duckdb", "tpch", 1, phases="throughput", streams=3, seed=42)
+    assert "--quiet" in argv
+    assert "--streams" in argv and argv[argv.index("--streams") + 1] == "3"
+
+
+def test_benchbox_run_official_argv_can_omit_quiet_for_diagnostics():
+    argv = matrix.benchbox_run_official_argv(
+        "duckdb",
+        "tpch",
+        1,
+        phases="throughput",
+        streams=3,
+        seed=42,
+        quiet=False,
+    )
+    assert "--quiet" not in argv
+
+
+# ---------------------------------------------------------------------------
+# w1 (uat-operator-provisioning): every release-gate platform must resolve
+# from the persistent dev venv (`uv sync` dev group) OR have a
+# PLATFORM_UV_EXTRA entry -- otherwise a second operator's sweep records
+# ModuleNotFoundError cells as FAILED with no doc pointing at the cause.
+# No network: probes importlib.util.find_spec on the registry-declared
+# driver module. Conservative by construction -- platforms with no
+# registry `libraries` entry (native/stdlib platforms with nothing to
+# probe) are skipped rather than guessed at.
+# ---------------------------------------------------------------------------
+
+
+def _release_gate_platforms() -> set[str]:
+    platforms: set[str] = set()
+    for name in _release_gate_config_names():
+        cfg = load_config(_RELEASE_GATE_CONFIGS_DIR / name)
+        platforms.update(matrix.resolve_platforms(groups=cfg.platforms.groups or ()))
+    return platforms
+
+
+def _registry_driver_module(platform: str) -> str | None:
+    """Conservative import-module name for `platform`'s primary required
+    driver library, sourced from PlatformRegistry metadata (the same
+    `libraries[].import_name`/`name` precedence `_detect_library` uses) --
+    not a hand-maintained platform->module table that can drift. Returns
+    None when the registry has no required library (nothing to probe)."""
+    base = platform[:-3] if platform.endswith("-df") else platform
+    meta = PlatformRegistry.get_all_platform_metadata().get(base)
+    if not meta:
+        return None
+    required = [lib for lib in meta.get("libraries", []) if lib.get("required", True)]
+    if not required:
+        return None
+    lib = required[0]
+    return lib.get("import_name", lib["name"])
+
+
+def test_release_gate_platforms_resolve_from_dev_venv_or_have_uv_extra():
+    platforms = _release_gate_platforms()
+    assert platforms, "release-gate configs resolved to zero platforms; test fixture is broken"
+
+    unresolved = []
+    for platform in sorted(platforms):
+        if platform in matrix.PLATFORM_UV_EXTRA:
+            continue  # `uv run --extra` installs it per cell; dev-venv probe not applicable.
+        module = _registry_driver_module(platform)
+        if module is None:
+            continue  # no registry-declared driver (native/stdlib platform); nothing to probe.
+        if importlib.util.find_spec(module) is None:
+            unresolved.append((platform, module))
+
+    assert not unresolved, (
+        f"platform(s) have no PLATFORM_UV_EXTRA entry and their driver module is not "
+        f"importable from the dev venv: {unresolved} -- add a PLATFORM_UV_EXTRA entry "
+        f"(tests/uat/matrix.py) or a dev dependency-group requirement (pyproject.toml)"
+    )
+
+
+def test_probe_platform_reachability_never_touches_the_cache():
+    """The no-cache probe must neither read nor write `_REACHABILITY_CACHE`.
+
+    Writing would let one caller silently satisfy the next caller's check --
+    the defect that made the post-start readiness check disable the
+    skip_unreachable check downstream of it. Reading would defeat the
+    liveness probe, whose entire job is to notice that a previously
+    reachable stack has died.
+    """
+    matrix._REACHABILITY_CACHE["postgresql"] = True
+    with patch.object(matrix, "tcp_probe", return_value=False) as probe:
+        assert matrix.probe_platform_reachability("postgresql") is False
+    assert probe.called
+    # Untouched: the stale True is still there, unread and unmodified.
+    assert matrix._REACHABILITY_CACHE == {"postgresql": True}
+
+
+def test_platform_is_reachable_still_caches():
+    with patch.object(matrix, "tcp_probe", return_value=False) as probe:
+        assert matrix.platform_is_reachable("postgresql") is False
+        assert matrix.platform_is_reachable("postgresql") is False
+    assert probe.call_count == 1

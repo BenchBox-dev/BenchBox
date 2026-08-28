@@ -1,3 +1,7 @@
+# TEMPLATE — canonical, repeatedly-run release-gate stage config; edited in
+# place across releases (e.g. cross_scale_coverage_min_pairs re-derivation),
+# not cloned per sweep. See _project/specs/uat-framework.md Section 9.
+#
 # Release-gate re-run — STAGE 2 of 3: Docker non-OLTP stacks.
 #
 # Start ONLY after release-gate-01-native-dataframe.yaml has fully completed
@@ -39,7 +43,6 @@ execute:
 
 preflight:
   free_space_min_gib: 5
-  free_space_path: "~/Developer/benchmark_runs"
   docker_required: true
 
 cleanup:
@@ -57,11 +60,21 @@ cleanup:
 validate:
   validator_clean_rate_floor: 1.0
 
+# `package` was in `phases:` above with no `package:` section -- every
+# release-gate sweep aborted at the package phase with
+# PackagePhaseError("package.submit_terminal_state is required..."),
+# invisible until w1's load-time enforcement caught it
+# (uat-config-schema-spec-realignment). local-stage matches every other
+# checked-in config; PR-opening states are stubs (tests/uat/phases/package.py).
+package:
+  submit_terminal_state: "local-stage"
+
 report:
   matrix_summary_tsv: "matrix_summary.tsv"
-  cross_scale_coverage_min_pairs: 1
-
-output:
-  benchmark_runs_dir_template: "~/Developer/benchmark_runs"
-  logs_dir_template: "~/Developer/benchmark_runs/logs/release_gate_02_docker_nonoltp_{date}"
-  submissions_dir_template: "~/Developer/benchmark_runs/submissions/{name}"
+  # Derivation (uat-release-gate-enforcement w4, 2026-07-12, develop @ acfb89922):
+  # enumerate_cells_with_pruning over this config yields 64 pairs with every
+  # rung (0.01/0.1/1.0) enumerable (83 raw pairs minus 19 whose registry scale
+  # ladder omits a rung). floor = max(4, floor(0.8 * 64)) = 51. The 0.8 slack
+  # absorbs a down docker stack without letting a mass regression sign off;
+  # never set this to the eligible count exactly.
+  cross_scale_coverage_min_pairs: 51

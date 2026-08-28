@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Optional, Union
 
 from benchbox.core.benchmark_result_validation import BenchmarkResultValidationMixin
 from benchbox.core.connection import DatabaseConnection
+from benchbox.core.contracts import SQLBenchmarkExecutor, as_sql_benchmark_executor
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.cloud_storage import create_path_handler
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
@@ -148,6 +149,16 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         # Store remaining kwargs as attributes
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+    def cleanup(self) -> None:
+        """Release benchmark-owned resources when a wrapper is discarded.
+
+        The deprecated internal base exposed this no-op lifecycle hook, and
+        older core implementations may call ``super().cleanup()`` after
+        releasing their own generators. Keep the hook on the public base while
+        those implementations migrate so the compatibility boundary remains
+        behaviorally neutral.
+        """
 
     @property
     def output_dir(self) -> Any:
@@ -519,7 +530,7 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
             logger.error(f"Benchmark execution failed: {str(e)}")
             raise
 
-    def run_with_platform(self, platform_adapter, **run_config):
+    def run_with_platform(self, platform_adapter: SQLBenchmarkExecutor, **run_config: Any) -> "BenchmarkResults":
         """Run complete benchmark using platform-specific optimizations.
 
         This method provides a unified interface for running benchmarks
@@ -552,7 +563,7 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         run_config.setdefault("benchmark_type", default_benchmark_type)
 
         # Execute using the platform adapter
-        return platform_adapter.run_benchmark(self, **run_config)
+        return as_sql_benchmark_executor(platform_adapter).run_benchmark(self, **run_config)
 
     def _get_default_benchmark_type(self) -> str:
         """Get the default benchmark type for platform optimizations.
@@ -758,6 +769,7 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
             tunings_applied=kwargs.get("tunings_applied"),
             config_hash=kwargs.get("tuning_config_hash"),
             source_file=kwargs.get("tuning_source_file"),
+            source=kwargs.get("tuning_source"),
         )
         builder.add_plan_capture_stats(
             kwargs.get("query_plans_captured", 0),

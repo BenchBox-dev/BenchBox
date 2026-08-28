@@ -36,16 +36,12 @@ pytestmark = [
 
 
 def _get_tool_functions() -> dict[str, Any]:
-    """Create a fresh MCP server and extract registered tool functions."""
+    """Create a fresh MCP server and expose public tool invokers."""
     from benchbox.mcp import create_server
+    from tests.unit.mcp.public_api import get_tool_functions
 
     server = create_server()
-    tools: dict[str, Any] = {}
-    if hasattr(server, "_tool_manager"):
-        tool_dict = getattr(server._tool_manager, "_tools", {})
-        for name, tool in tool_dict.items():
-            tools[name] = tool.fn
-    return tools
+    return get_tool_functions(server)
 
 
 @pytest.fixture(scope="module")
@@ -61,16 +57,19 @@ def _mock_run(
     phases: str,
     extra_result_kwargs: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Call run_benchmark with run_with_platform mocked; return (response, call_kwargs)."""
+    """Call run_benchmark with the shared core service mocked."""
     fn = tool_functions["run_benchmark"]
 
     mock_result = MagicMock()
     mock_result.query_results = []
 
-    mock_instance = MagicMock()
-    mock_instance.run_with_platform.return_value = mock_result
+    captured: dict[str, Any] = {}
 
-    mock_bm_class = MagicMock(return_value=mock_instance)
+    def execute_run(**kwargs):
+        config = kwargs["config"]
+        captured.update(config.options or {})
+        captured["test_execution_type"] = config.test_execution_type
+        return mock_result
 
     result_path = tmp_path / "result.json"
     write_v2_result_file(
@@ -85,17 +84,17 @@ def _mock_run(
 
     with (
         patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-        patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
+        patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=MagicMock),
         patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
+        patch("benchbox.core.run_service.execute_run", side_effect=execute_run),
     ):
         result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, phases=phases)
 
-    call_kwargs = mock_instance.run_with_platform.call_args[1]
-    return result, call_kwargs
+    return result, captured
 
 
 class TestStatisticsPhaseFlagThreading:
-    """gather_statistics/statistics_benchmark_name threading into run_with_platform."""
+    """gather_statistics/statistics_benchmark_name threading into core config."""
 
     def test_statistics_in_phases_forwards_gather_statistics_flag(self, tool_functions, tmp_path):
         """`statistics` in phases sets gather_statistics=True and statistics_benchmark_name
@@ -133,7 +132,7 @@ class TestStatisticsPhaseFlagThreading:
 class TestStatisticsPhaseResponsePassThrough:
     """phases.statistics pass-through from the exported result into the MCP response.
 
-    These are deliberately shallow pass-through checks: ``run_with_platform`` is
+    These are deliberately shallow pass-through checks: the core run service is
     mocked and the exported result file is hand-written, so they only prove the MCP
     response carries through whatever ``phases`` the exporter produced. They do NOT
     exercise the ``supports_statistics_phase`` registry gate or ``run_statistics_phase``

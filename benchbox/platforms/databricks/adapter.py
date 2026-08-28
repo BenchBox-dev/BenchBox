@@ -154,9 +154,8 @@ class DatabricksAdapter(PlatformAdapter):
             raise ConfigurationError(
                 f"Databricks configuration is incomplete. Missing: {', '.join(missing)}\n"
                 "Configure with one of:\n"
-                "  1. CLI: benchbox platforms setup --platform databricks\n"
-                "  2. Environment variables: DATABRICKS_HOST, DATABRICKS_HTTP_PATH, DATABRICKS_TOKEN\n"
-                "  3. CLI options: --platform-option server_hostname=<host> --platform-option http_path=<path>"
+                "  1. CLI: benchbox setup --platform databricks\n"
+                "  2. Environment variables: DATABRICKS_HOST, DATABRICKS_HTTP_PATH, DATABRICKS_TOKEN"
             )
 
     @property
@@ -335,6 +334,10 @@ class DatabricksAdapter(PlatformAdapter):
         # Pass through other relevant config
         for key in [
             "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
             "verbose_enabled",
             "very_verbose",
             "uc_catalog",
@@ -2003,6 +2006,7 @@ class DatabricksAdapter(PlatformAdapter):
                 actual_row_count=actual_row_count,
                 first_row=result[0] if result else None,
                 validation_result=validation_result,
+                materialized_rows=result,
             )
 
             # Include Databricks-specific fields

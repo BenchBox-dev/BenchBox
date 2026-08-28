@@ -9,6 +9,25 @@ from benchbox.core.connection import DatabaseConnection
 from benchbox.core.tpch.schema import get_create_all_tables_sql as get_tpch_ddl, get_table as get_tpch_table
 
 
+def summarize_validation_failures(validation_results: list[dict[str, Any]]) -> str:
+    """Build a one-line summary of failed (non-skipped) validation queries.
+
+    Shared by both primitives benchmarks as the ``error`` message for a
+    ``VALIDATION_FAILED`` OperationResult, so the console and result payload name
+    which post-conditions the write violated, e.g.
+    "validation failed: at_most_one_current_per_business_key (40 rows)".
+    A result without a ``skipped`` key is treated as not skipped.
+    """
+    parts = []
+    for vr in validation_results:
+        if vr.get("skipped") or vr.get("passed", True):
+            continue
+        parts.append(f"{vr.get('query_id', '?')} ({vr.get('actual_rows', '?')} rows)")
+    if not parts:
+        return "validation failed"
+    return "validation failed: " + ", ".join(parts)
+
+
 def quote_identifier(identifier: str) -> str:
     """Quote a SQL identifier after validating it is safe."""
     if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", identifier):

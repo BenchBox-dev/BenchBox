@@ -9,6 +9,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Union
 
+import click
 from rich.console import Console
 from rich.markup import escape
 
@@ -303,7 +304,7 @@ class ErrorHandler:
 
         # Suggest reporting the issue
         self.console.print("\n[yellow]This appears to be an unexpected error.[/yellow]")
-        self.console.print("Please report this issue at: [blue]https://github.com/joeharris76/benchbox/issues[/blue]")
+        self.console.print("Please report this issue at: [blue]https://github.com/BenchBox-dev/benchbox/issues[/blue]")
         self.console.print("[dim]Include the version information above in your report.[/dim]")
 
     def _show_configuration_help(self, error: BenchboxCLIError, context: Optional[ErrorContext]) -> None:
@@ -461,12 +462,29 @@ class ValidationRules:
             )
 
     @staticmethod
-    def validate_output_directory(output_dir: str) -> None:
+    def validate_output_directory(output_dir: str, *, platform: str | None = None, table_mode: str = "native") -> None:
         """Validate output directory."""
         from benchbox.utils.cloud_storage import (
             is_cloud_path,
+            is_snowflake_stage_path,
+            snowflake_stage_mode_error,
             validate_cloud_credentials,
         )
+
+        if is_snowflake_stage_path(output_dir):
+            stage_error = snowflake_stage_mode_error(output_dir, table_mode=table_mode)
+            if stage_error:
+                raise CloudStorageError(
+                    f"Invalid Snowflake staging configuration: {stage_error}",
+                    details={
+                        "path": output_dir,
+                        "provider": "snowflake_stage",
+                        "platform": platform,
+                        "table_mode": table_mode,
+                        "error": stage_error,
+                    },
+                )
+            return
 
         if is_cloud_path(output_dir):
             # Validate cloud credentials
@@ -493,3 +511,19 @@ class ValidationRules:
                     f"Cannot create output directory: {output_dir}",
                     details={"path": output_dir, "error": str(e)},
                 ) from e
+
+    @staticmethod
+    def validate_dry_run_output_dir(ctx: click.Context, param: click.Parameter, value: Optional[str]) -> Optional[str]:
+        """Click callback: reject option-like values for --dry-run OUTPUT_DIR.
+
+        --dry-run takes a required directory argument, so a following flag
+        (e.g. `--dry-run --non-interactive`) is silently consumed as the
+        directory name, creating a directory literally named
+        "--non-interactive". Fail fast with a clear message instead.
+        """
+        if value is not None and value.startswith("-"):
+            raise click.BadParameter(
+                f"'{value}' looks like a command-line flag, not a directory. "
+                "Pass a directory for --dry-run, e.g. --dry-run ./preview --non-interactive."
+            )
+        return value

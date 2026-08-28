@@ -25,6 +25,15 @@ ClickHouse Local Mode uses [chDB](https://github.com/chdb-io/chdb), the official
 - **Same SQL Compatibility**: Full ClickHouse SQL dialect support
 - **Easy Installation**: Single `uv add chdb` command
 
+### Capability boundary: ACL introspection
+
+The embedded chDB connection used by `clickhouse-local` runs as its built-in
+`default` user and does not expose the grants required to inspect
+`system.users`, `system.roles`, or `system.grants`. The metadata-primitives ACL
+workload therefore requires `clickhouse-server` (or ClickHouse Cloud) with an
+appropriately privileged user; it is not an executable `clickhouse-local` UAT
+cell. Non-ACL catalog queries remain supported in local mode.
+
 ## Installation
 
 ### Prerequisites
@@ -78,7 +87,7 @@ benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01 \
 - `--platform clickhouse-cloud` - Use ClickHouse Cloud (see [ClickHouse Cloud](clickhouse-cloud.md))
 
 ```{deprecated} v0.2.0
-The legacy colon syntax (`clickhouse:local`, `clickhouse:server`) and bare `clickhouse` selector still work but emit deprecation warnings. Use the first-class names above. See [Migration Guide](clickhouse-migration.md).
+The bare `clickhouse` selector has been removed and now raises an error naming the first-class replacements. The legacy colon syntax (`clickhouse:local`, `clickhouse:server`) still works but emits deprecation warnings. Use the first-class names above. See [Migration Guide](clickhouse-migration.md).
 ```
 
 #### Local Mode Specific Arguments

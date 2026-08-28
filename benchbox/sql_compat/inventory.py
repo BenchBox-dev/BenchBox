@@ -146,6 +146,11 @@ _DDL_GOVERNANCE_TRANSFORMER_ALIASES: dict[tuple[str, str], tuple[str, ...]] = {
     ("athena", "_convert_to_external_table"): ("athena_convert_to_external_table",),
     ("bigquery", "_convert_to_bigquery_table"): ("bigquery_convert_to_bigquery_table",),
     ("clickhouse", "_optimize_table_definition"): ("clickhouse_ddl_optimizer",),
+    # _resolve_tuned_ddl_clauses is a helper invoked by _optimize_table_definition
+    # (line ~120) to compute the PARTITION BY/ORDER BY clauses it splices into the
+    # statement; it is part of the same registered DDL_OPTIMIZE transform, not a
+    # second independent rewrite.
+    ("clickhouse", "_resolve_tuned_ddl_clauses"): ("clickhouse_ddl_optimizer",),
     ("databend", "_optimize_table_definition"): ("databend_ddl_optimizer",),
     ("databricks", "_convert_to_delta_table"): ("databricks_delta_ddl_optimizer",),
     ("doris", "_inject_doris_ddl_clauses"): ("doris_inject_ddl_clauses",),
@@ -160,6 +165,12 @@ _DDL_GOVERNANCE_TRANSFORMER_ALIASES: dict[tuple[str, str], tuple[str, ...]] = {
     ("snowflake", "_optimize_table_definition"): ("snowflake_ddl_optimizer",),
     ("spark", "optimize_spark_table_definition"): ("spark_ddl_optimizer",),
     ("starrocks", "_optimize_table_definition"): ("starrocks_ddl_optimizer",),
+    # _resolve_tuned_ddl_clauses is a helper invoked by _optimize_table_definition
+    # to compute the PARTITION BY/DISTRIBUTED BY/ORDER BY clauses it splices into
+    # the statement via the single StarRocksDDLGenerator; it is part of the same
+    # registered DDL_OPTIMIZE transform, not a second independent rewrite (mirrors
+    # the clickhouse entry above).
+    ("starrocks", "_resolve_tuned_ddl_clauses"): ("starrocks_ddl_optimizer",),
     ("synapse", "_optimize_table_definition"): ("azure_synapse_ddl_optimizer",),
     ("trino", "_optimize_table_definition"): ("trino_ddl_optimizer",),
     ("velox", "optimize_spark_table_definition"): ("velox_ddl_optimizer",),
@@ -1057,9 +1068,15 @@ def main(argv: list[str] | None = None) -> int:
                 if d.detail:
                     emit(f"    {d.detail}", stderr=True)
             emit(
-                "Register each unregistered transform in "
-                "benchbox/sql_compat/rules/ddl_optimize/{platform}_ddl_rewrites.py "
-                "or add an explicit drift exemption with rationale.",
+                "Fix by one of:\n"
+                "  1) register the transform's rule in "
+                "benchbox/sql_compat/rules/ddl_optimize/{platform}_ddl_rewrites.py, or\n"
+                "  2) if it IS registered but under a different function name, add a "
+                "(platform_key, func_name) -> (registered_name, ...) entry to "
+                "_DDL_GOVERNANCE_TRANSFORMER_ALIASES in benchbox/sql_compat/inventory.py, or\n"
+                "  3) add an explicit drift exemption (_DDL_DRIFT_EXEMPTIONS) with rationale.\n"
+                "No regen mode exists for this guard -- it is always a reviewed hand edit, "
+                "not covered by `make guards-fix`.",
                 stderr=True,
             )
             exit_code = 1

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import csv
 import json
-import statistics
 import sys
 from pathlib import Path
 
 import click
 
 from benchbox.cli.shared import console
+from benchbox.core.results.metrics import geometric_mean_ms, percentile_ms
 
 
 @click.command("aggregate")
@@ -47,16 +47,19 @@ def aggregate(ctx, input_dir, output_file, benchmark, platform):
     Output includes: timestamp, benchmark, platform, scale, geometric mean,
     total time, and per-query statistics (p50, p95, p99).
 
+    \b
     Examples:
         # Aggregate all results in directory
         benchbox aggregate --input-dir benchmark_runs/ --output-file trends.csv
 
+    \b
         # Filter by benchmark
         benchbox aggregate \\
           --input-dir benchmark_runs/ \\
           --output-file tpch_trends.csv \\
           --benchmark tpch
 
+    \b
         # Filter by platform
         benchbox aggregate \\
           --input-dir benchmark_runs/ \\
@@ -134,7 +137,7 @@ def _extract_result_row(data: dict, result_file: Path) -> dict | None:
     duration_ms = execution.get("duration_ms", 0)
 
     query_details = results.get("queries", {}).get("details", [])
-    geomean, p50, p95, p99 = _compute_query_statistics(query_details)
+    times_ms = _successful_query_times_ms(query_details)
 
     return {
         "timestamp": timestamp,
@@ -142,35 +145,25 @@ def _extract_result_row(data: dict, result_file: Path) -> dict | None:
         "platform": plat_name,
         "scale_factor": scale_factor,
         "total_time_s": duration_ms / 1000.0,
-        "geometric_mean_ms": geomean,
-        "p50_ms": p50,
-        "p95_ms": p95,
-        "p99_ms": p99,
+        # Statistics come from benchbox.core.results.metrics so that a CLI
+        # aggregate row and an MCP analytics response over the same bundles
+        # report the same numbers.
+        "geometric_mean_ms": geometric_mean_ms(times_ms),
+        "p50_ms": percentile_ms(times_ms, 0.50),
+        "p95_ms": percentile_ms(times_ms, 0.95),
+        "p99_ms": percentile_ms(times_ms, 0.99),
         "num_queries": len(query_details),
         "file": result_file.name,
     }
 
 
-def _compute_query_statistics(query_details: list[dict]) -> tuple[float, float, float, float]:
-    """Compute geometric mean, p50, p95, p99 from query details."""
-    if not query_details:
-        return 0, 0, 0, 0
-
-    times_ms = []
-    for q in query_details:
-        if q.get("status") == "SUCCESS":
-            exec_time_ms = q.get("timing", {}).get("execution_ms", 0)
-            if exec_time_ms > 0:
-                times_ms.append(exec_time_ms)
-
-    if not times_ms:
-        return 0, 0, 0, 0
-
-    geomean = statistics.geometric_mean(times_ms) if all(t > 0 for t in times_ms) else 0
-    p50 = statistics.median(times_ms)
-    p95 = statistics.quantiles(times_ms, n=20)[18] if len(times_ms) >= 20 else max(times_ms)
-    p99 = statistics.quantiles(times_ms, n=100)[98] if len(times_ms) >= 100 else max(times_ms)
-    return geomean, p50, p95, p99
+def _successful_query_times_ms(query_details: list[dict]) -> list[float]:
+    """Return execution times for successful queries with a positive duration."""
+    return [
+        query["timing"]["execution_ms"]
+        for query in query_details
+        if query.get("status") == "SUCCESS" and query.get("timing", {}).get("execution_ms", 0) > 0
+    ]
 
 
 def _write_aggregated_csv(output_path: Path, aggregated_data: list[dict]) -> None:

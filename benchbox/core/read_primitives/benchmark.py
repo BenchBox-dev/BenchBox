@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
 from benchbox.core.connection import DatabaseConnection
+from benchbox.core.contracts import run_categorized_query_benchmark
 from benchbox.core.read_primitives.generator import ReadPrimitivesDataGenerator
 from benchbox.core.read_primitives.queries import ReadPrimitivesQueryManager
 from benchbox.core.read_primitives.schema import TABLES, get_all_create_table_sql
@@ -371,7 +372,7 @@ class ReadPrimitivesBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, D
         Returns:
             Dictionary containing benchmark results for the category
         """
-        return self.run_benchmark(connection, None, iterations, [category])
+        return run_categorized_query_benchmark(self, connection, category, iterations)
 
     def get_benchmark_info(self) -> dict[str, Any]:
         """Get information about the benchmark.

@@ -18,6 +18,8 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from benchbox.core.tuning.applied_ledger import PHASE_DDL, AppliedTuningLedger, recording_connection
+
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -867,7 +869,7 @@ class TestGetPlatformMetadata:
 
         call_count = [0]
 
-        def _execute(sql):
+        def _execute(sql, params=None):
             call_count[0] += 1
             if "CURRENT_VERSION" in sql.upper():
                 mock_cursor.fetchone.return_value = (version,)
@@ -917,15 +919,21 @@ class TestGetPlatformMetadata:
         assert result["warehouse_info"]["size"] == "LARGE"
 
     def test_tables_list_populated(self):
-        adapter = _make_adapter()
+        adapter = _make_adapter(schema="bench")
         mock_conn = Mock()
         tables = [("LINEITEM", 6000000, 102400, 1, None, None, None)]
-        mock_conn.cursor.return_value = self._make_cursor(tables=tables)
+        mock_cursor = self._make_cursor(tables=tables)
+        mock_conn.cursor.return_value = mock_cursor
 
         result = adapter._get_platform_metadata(mock_conn)
 
         assert "tables" in result
         assert result["tables"][0]["table_name"] == "LINEITEM"
+        table_query = next(
+            call for call in mock_cursor.execute.call_args_list if "INFORMATION_SCHEMA.TABLES" in call.args[0]
+        )
+        assert "TABLE_SCHEMA = %s" in table_query.args[0]
+        assert table_query.args[1] == ("BENCH",)
 
     def test_metadata_error_key_on_exception(self):
         adapter = _make_adapter()
@@ -1041,6 +1049,74 @@ class TestApplyTableTunings:
         all_sqls = [call[0][0] for call in mock_cursor.execute.call_args_list]
         alter_sqls = [s for s in all_sqls if "ALTER TABLE" in s.upper() and "CLUSTER BY" in s.upper()]
         assert len(alter_sqls) == 0
+
+    def test_resumes_reclustering_when_matching_key_is_suspended(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("(o_orderdate)", "OFF")
+
+        tuning = self._make_tuning(table_name="ORDERS", cluster_cols=[self._make_col("o_orderdate")])
+        adapter.apply_table_tunings(tuning, mock_conn)
+
+        all_sqls = [call.args[0] for call in mock_cursor.execute.call_args_list]
+        assert "ALTER TABLE ORDERS RESUME RECLUSTER" in all_sqls
+
+    def test_linear_catalog_form_skips_alter_and_records_dropped_intent(self):
+        adapter = _make_adapter()
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("LINEAR(O_ORDERDATE, O_CUSTKEY)",)
+
+        tuning = self._make_tuning(
+            table_name="ORDERS",
+            cluster_cols=[self._make_col("o_orderdate", 0), self._make_col("o_custkey", 1)],
+        )
+        adapter.apply_table_tunings(tuning, mock_conn)
+
+        all_sqls = [call.args[0] for call in mock_cursor.execute.call_args_list]
+        assert not any("ALTER TABLE" in sql.upper() and "CLUSTER BY" in sql.upper() for sql in all_sqls)
+        assert [d.intent for d in adapter._applied_tuning_ledger.dropped] == [
+            "ALTER TABLE ORDERS CLUSTER BY (o_orderdate, o_custkey)"
+        ]
+        assert "already present" in adapter._applied_tuning_ledger.dropped[0].reason
+
+    def test_clustering_precheck_binds_normalized_schema_and_table(self):
+        adapter = _make_adapter(schema="bench")
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = (None,)
+
+        tuning = self._make_tuning(table_name="orders", cluster_cols=[self._make_col("o_orderdate")])
+        adapter.apply_table_tunings(tuning, mock_conn)
+
+        query_call = mock_cursor.execute.call_args_list[0]
+        assert "TABLE_SCHEMA = %s" in query_call.args[0]
+        assert "TABLE_NAME = %s" in query_call.args[0]
+        assert query_call.args[1] == ("BENCH", "ORDERS")
+
+    def test_fresh_table_records_executed_clustering_statements(self):
+        adapter = _make_adapter()
+        ledger = AppliedTuningLedger()
+        adapter._applied_tuning_ledger = ledger
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = (None,)
+        recording = recording_connection(mock_conn, ledger, PHASE_DDL)
+
+        tuning = self._make_tuning(table_name="ORDERS", cluster_cols=[self._make_col("o_orderdate")])
+        adapter.apply_table_tunings(tuning, recording)
+
+        assert [statement.statement for statement in ledger.executed_statements] == [
+            "ALTER TABLE ORDERS CLUSTER BY (o_orderdate)",
+            "ALTER TABLE ORDERS RESUME RECLUSTER",
+        ]
+        assert ledger.dropped == []
 
     def test_partition_cols_used_as_clustering_fallback(self):
         adapter = _make_adapter()

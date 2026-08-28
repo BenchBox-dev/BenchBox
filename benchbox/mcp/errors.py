@@ -10,9 +10,173 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
+
+# Driver/adapter exceptions echo back the strings they were built from -
+# a DSN, an ATTACH statement, a config assignment - so exception text is a
+# credential materialisation channel (the #1333/#1345 family). Scrub
+# secret-assignment patterns and URL userinfo before the text leaves the
+# server; key-list redaction cannot help here because the secret is already
+# embedded in a value.
+# Keep the key vocabulary in one pattern so JSON, assignment, and prose forms
+# cannot drift apart.
+# Expandable keys accept common suffixes (e.g. motherduck_token). Short exact
+# keys (pat) must not expand into longer non-secret words such as "path".
+_SECRET_KEY_PATTERN = (
+    r"(?:(?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|account[_-]?key|"
+    r"key[_-]?id|credential|dsn|connection[_-]?string|private[_-]?key|sas)[a-z0-9_-]*|"
+    r"pat)"
+)
+_SECRET_ASSIGNMENT_RE = re.compile(
+    rf"(({_SECRET_KEY_PATTERN})\s*=\s*)"
+    r"(?:'[^']*'|\"[^\"]*\"|[^&\s,;'\")]+)",
+    flags=re.IGNORECASE,
+)
+# Azure SAS tokens are query-string shaped (sv=...&sig=...); the generic value
+# arm stops at ``&`` and would leave signature segments in the clear.
+_SECRET_SAS_KEY_PATTERN = r"(?:storage[_-]?sas(?:[_-]?token)?|sas)[a-z0-9_-]*"
+_SECRET_SAS_ASSIGNMENT_RE = re.compile(
+    rf"(({_SECRET_SAS_KEY_PATTERN})\s*=\s*)"
+    r"(?:'[^']*'|\"[^\"]*\"|[^\s,;'\")]+)",
+    flags=re.IGNORECASE,
+)
+# Unquoted PEM / multi-line private keys span whitespace; the generic arm only
+# takes the first token and leaves base64 body lines intact. Truncated PEM
+# (BEGIN without END) and CRLF-separated base64 continuations must still mask.
+_SECRET_PRIVATE_KEY_KEY_PATTERN = r"private[_-]?key[a-z0-9_-]*"
+# Body lines are base64-ish; allow ``_`` so truncated PEM / test sentinels are
+# not split mid-token (which re-exposes the remainder after the first mask).
+_SECRET_PRIVATE_KEY_BODY_LINE = r"[A-Za-z0-9+/=_]+"
+_SECRET_PRIVATE_KEY_ASSIGNMENT_RE = re.compile(
+    rf"(({_SECRET_PRIVATE_KEY_KEY_PATTERN})\s*=\s*)"
+    r"(?:"
+    r"'[^']*'"
+    r"|\"[^\"]*\""
+    r"|-----BEGIN[^\n]*-----[\s\S]*?-----END[^\n]*-----"
+    rf"|-----BEGIN[^\n]*-----(?:\r?\n{_SECRET_PRIVATE_KEY_BODY_LINE})*"
+    rf"|[^\s,;'\")]+(?:\r?\n{_SECRET_PRIVATE_KEY_BODY_LINE})*"
+    r")",
+    flags=re.IGNORECASE,
+)
+_SECRET_QUOTED_ASSIGNMENT_RE = re.compile(
+    rf"""(?P<prefix>["']{_SECRET_KEY_PATTERN}["']\s*:\s*)(?P<quote>["'])(?P<value>(?:\\.|(?!(?P=quote)).)*(?P=quote))""",
+    flags=re.IGNORECASE,
+)
+_SECRET_COLON_ASSIGNMENT_RE = re.compile(
+    rf"(?P<prefix>{_SECRET_KEY_PATTERN}\s*:\s*)(?P<value>'[^']*'|\"[^\"]*\"|[^&\s,;]+)",
+    flags=re.IGNORECASE,
+)
+_SECRET_PROSE_CONNECTOR_RE = re.compile(
+    rf"(?P<prefix>\b{_SECRET_KEY_PATTERN}\s+(?:is|was|equals?|set\s+to|configured\s+as)\s+)"
+    r"(?P<value>[^\s,;:()]+)",
+    flags=re.IGNORECASE,
+)
+_SECRET_PROSE_RE = re.compile(
+    rf"(?P<prefix>\b{_SECRET_KEY_PATTERN}\s+)(?P<value>[^\s,;:()]+)",
+    flags=re.IGNORECASE,
+)
+_NON_SECRET_SECRET_WORDS = frozenset(
+    {
+        "blank",
+        "configured",
+        "empty",
+        "expired",
+        "failed",
+        "field",
+        "found",
+        "invalid",
+        "is",
+        "lookup",
+        "missing",
+        "must",
+        "not",
+        "null",
+        "present",
+        "provided",
+        "required",
+        "set",
+        "setting",
+        "should",
+        "store",
+        "undefined",
+        "value",
+        "was",
+    }
+)
+# Bare prose after a secret key ("password X", "token Y") over-matches ordinary
+# diagnostic English ("secret sauce", "token refresh", "password reset"). Only
+# scrub bare-prose tokens that look credential-like; connector forms
+# ("password is X") stay aggressive because the connector marks assignment.
+_BARE_PROSE_OPAQUE_ALPHA_MIN = 20
+_BARE_PROSE_ALLCAPS_MIN = 6
+_URL_USERINFO_RE = re.compile(r"(://)[^/@\s]+@")
+
+
+def _is_non_secret_word(value: str) -> bool:
+    """True when *value* is an allowlisted diagnostic word, not a secret."""
+    return value.lower() in _NON_SECRET_SECRET_WORDS
+
+
+def _is_credential_like_bare_prose_value(value: str) -> bool:
+    """True when a bare-prose token after a secret key looks like a secret value.
+
+    Pure short alphabetic English after a key name is diagnostic wording, not
+    credential material. Tokens with digits, underscores, separators, long
+    opaque alpha, or ALL-CAPS identifiers are treated as values.
+    """
+    if _is_non_secret_word(value):
+        return False
+    if not value.isalpha():
+        # Digits, underscores, hyphens, base64 punctuation, etc.
+        return True
+    if value.isupper() and len(value) >= _BARE_PROSE_ALLCAPS_MIN:
+        return True
+    if len(value) >= _BARE_PROSE_OPAQUE_ALPHA_MIN:
+        return True
+    return False
+
+
+def scrub_secret_material(text: str) -> str:
+    """Mask secret-assignment values and URL userinfo in free text."""
+
+    def replace_quoted(match: re.Match[str]) -> str:
+        return f"{match.group('prefix')}{match.group('quote')}****{match.group('quote')}"
+
+    def replace_colon(match: re.Match[str]) -> str:
+        value = match.group("value")
+        if _is_non_secret_word(value):
+            return match.group(0)
+        return f"{match.group('prefix')}****"
+
+    def replace_connector_prose(match: re.Match[str]) -> str:
+        # "password is X" / "token was Y" — connector marks assignment; scrub
+        # unless the token is an allowlisted diagnostic word.
+        value = match.group("value")
+        if _is_non_secret_word(value):
+            return match.group(0)
+        return f"{match.group('prefix')}****"
+
+    def replace_bare_prose(match: re.Match[str]) -> str:
+        # "password X" without a connector: only scrub credential-like tokens so
+        # benign phrases (secret sauce, token refresh, password reset) survive.
+        value = match.group("value")
+        if not _is_credential_like_bare_prose_value(value):
+            return match.group(0)
+        return f"{match.group('prefix')}****"
+
+    scrubbed = _SECRET_QUOTED_ASSIGNMENT_RE.sub(replace_quoted, text)
+    # Specialized arms before the generic assignment so multi-param SAS and
+    # multi-line private keys are not truncated at ``&`` / first whitespace.
+    scrubbed = _SECRET_PRIVATE_KEY_ASSIGNMENT_RE.sub(r"\1****", scrubbed)
+    scrubbed = _SECRET_SAS_ASSIGNMENT_RE.sub(r"\1****", scrubbed)
+    scrubbed = _SECRET_ASSIGNMENT_RE.sub(r"\1****", scrubbed)
+    scrubbed = _SECRET_COLON_ASSIGNMENT_RE.sub(replace_colon, scrubbed)
+    scrubbed = _SECRET_PROSE_CONNECTOR_RE.sub(replace_connector_prose, scrubbed)
+    scrubbed = _SECRET_PROSE_RE.sub(replace_bare_prose, scrubbed)
+    return _URL_USERINFO_RE.sub(r"\1****@", scrubbed)
 
 
 class ErrorCode(str, Enum):
@@ -230,6 +394,7 @@ def make_not_found_error(
     resource_type: str,
     resource_id: str,
     available: list[str] | None = None,
+    suggestion: str | None = None,
 ) -> dict[str, Any]:
     """Create a resource not found error response.
 
@@ -237,6 +402,9 @@ def make_not_found_error(
         resource_type: Type of resource (e.g., "benchmark", "platform")
         resource_id: ID/name that was not found
         available: List of available options
+        suggestion: Recovery hint. The default is derived from ``resource_type``
+            and only names a real tool for resource types whose listing tool is
+            ``list_<type>s``; pass an explicit hint for anything else.
 
     Returns:
         Standardized error response with suggestions.
@@ -248,7 +416,8 @@ def make_not_found_error(
     if available:
         details["available"] = available
 
-    suggestion = f"Use list_{resource_type}s() to see available options" if resource_type else None
+    if suggestion is None and resource_type:
+        suggestion = f"Use list_{resource_type}s() to see available options"
 
     return make_error(
         ErrorCode.RESOURCE_NOT_FOUND,
@@ -335,11 +504,11 @@ def make_execution_error(
         details["execution_id"] = execution_id
     if exception:
         details["exception_type"] = type(exception).__name__
-        details["exception_message"] = str(exception)
+        details["exception_message"] = scrub_secret_material(str(exception))
 
     return make_error(
         ErrorCode.BENCHMARK_EXECUTION_FAILED,
-        message,
+        scrub_secret_material(message),
         details=details,
         retry_hint=retry_hint,
     )

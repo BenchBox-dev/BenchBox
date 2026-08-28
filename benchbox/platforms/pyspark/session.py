@@ -24,10 +24,11 @@ import subprocess
 import sys
 import threading
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.results.platform_options import sanitize_platform_options
 from benchbox.platforms.base.spark_logging import suppress_window_exec_warning
 from benchbox.utils.dependencies import get_package_install_message
 
@@ -345,7 +346,15 @@ class SparkSessionManager:
 
         with cls._lock:
             if cls._session is None:
-                logger.debug("Creating SparkSession with config: %s", config)
+                # extra_configs can carry credential-bearing Spark conf keys
+                # (fs.s3a.secret.key and friends) - redact before logging.
+                logger.debug(
+                    "Creating SparkSession with config: %s",
+                    replace(
+                        config,
+                        extra_configs=tuple(sorted(sanitize_platform_options(dict(config.extra_configs)).items())),
+                    ),
+                )
                 if not cls._java_validated:
                     _validate_java_version()
                     cls._java_validated = True

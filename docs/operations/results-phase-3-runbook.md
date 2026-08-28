@@ -8,6 +8,12 @@ Phase 1 and Phase 2 have no hosted services. This runbook applies exclusively to
 Phase 3. Until Phase 3 launches, file GitHub issues for any anomalies found in
 the static explorer or PR-based submission pipeline.
 
+> **Not implemented yet.** The CLI surfaces described below - `benchbox admin
+> ...`, `benchbox result withdraw`, and `benchbox setup --service` - are Phase 3
+> designs, not part of the shipped CLI. Hosted submission credentials are
+> managed today with `benchbox auth login --service <url>`; see
+> `benchbox auth --help`.
+
 ---
 
 ## w4 - Auth Model
@@ -109,6 +115,14 @@ in 7 days. This check is enforced at token provisioning time, not retroactively.
 
 The API does not queue submissions when limits are hit. Submissions are rejected
 immediately so actors can see the error and retry at the correct time.
+
+Applied-tuning receipt companions have two additional validation bounds:
+8 MiB for the complete `.applied.json` file and 10,000 entries in its
+`receipt.entries` list. Both limits are intentionally far above realistic runs.
+Submissions that exceed either bound fail validation rather than being silently
+truncated. As a defense for legacy or manually published inputs, the Explorer
+pipeline caps the same fields and records `truncated`, `truncation_reason`, and
+the original byte or entry count in the stored receipt.
 
 ---
 

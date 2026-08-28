@@ -65,17 +65,22 @@ class TestMcpLazyExports:
         MCPError = mcp_mod.MCPError
         assert MCPError is not None
 
-    def test_getattr_tool_call_context(self):
+    def test_getattr_make_error(self):
         import benchbox.mcp as mcp_mod
 
-        ToolCallContext = mcp_mod.ToolCallContext
-        assert ToolCallContext is not None
+        make_error = mcp_mod.make_error
+        assert make_error is not None
 
-    def test_getattr_execution_status(self):
+    @pytest.mark.parametrize(
+        "removed",
+        ["ToolCallContext", "get_metrics_collector", "ExecutionStatus", "ExecutionState", "get_execution_tracker"],
+    )
+    def test_getattr_removed_dead_exports_raise(self, removed: str):
+        """The observability/execution lazy attrs went away with their modules."""
         import benchbox.mcp as mcp_mod
 
-        ExecutionStatus = mcp_mod.ExecutionStatus
-        assert ExecutionStatus is not None
+        with pytest.raises(AttributeError):
+            getattr(mcp_mod, removed)
 
     def test_getattr_unknown_raises_attribute_error(self):
         import benchbox.mcp as mcp_mod

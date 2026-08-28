@@ -52,11 +52,12 @@ from .base.adapter import check_isolation_capability
 # Adapters loaded eagerly (light dependencies or core):
 #   - DuckDBAdapter (duckdb - core dependency, always available)
 #   - MotherDuckAdapter (duckdb - shares core dependency)
+#   - DuckLakeAdapter (duckdb - shares core dependency; requires duckdb>=1.3 at runtime)
 #   - SQLiteAdapter (stdlib sqlite3)
 #   - DataFusionAdapter (datafusion - ~68 MB native lib, now lazy)
 #   - PolarsAdapter (polars - ~142 MB native lib, now lazy)
-#   - PostgreSQLAdapter (psycopg2 - core dependency)
-#   - TimescaleDBAdapter (psycopg2 - shares core dependency)
+#   - PostgreSQLAdapter (psycopg (v3) - core dependency)
+#   - TimescaleDBAdapter (psycopg (v3) - shares core dependency)
 # ============================================================================
 
 # Cache for lazily loaded adapters and constants
@@ -68,6 +69,7 @@ _lazy_adapter_diagnostics: dict[str, dict[str, object]] = {}
 _LAZY_ADAPTER_ROWS = """\
 DuckDBAdapter|.duckdb
 MotherDuckAdapter|.motherduck
+DuckLakeAdapter|.ducklake
 SQLiteAdapter|.sqlite
 PostgreSQLAdapter|.postgresql
 TimescaleDBAdapter|.timescaledb
@@ -274,7 +276,7 @@ def _load_optional_adapter(module_path: str, class_name: str) -> Optional[Type[P
 
 
 _EXPORT_NAMES = """\
-PlatformAdapter ConnectionConfig BenchmarkResults DuckDBAdapter MotherDuckAdapter DataFusionAdapter PolarsAdapter
+PlatformAdapter ConnectionConfig BenchmarkResults DuckDBAdapter MotherDuckAdapter DuckLakeAdapter DataFusionAdapter PolarsAdapter
 ClickHouseAdapter ClickHouseCloudAdapter DatabricksAdapter BigQueryAdapter RedshiftAdapter SnowflakeAdapter
 TrinoAdapter AthenaAdapter SparkAdapter PySparkSQLAdapter FireboltAdapter DatabendAdapter InfluxDBAdapter
 PrestoAdapter PostgreSQLAdapter PgDuckDBAdapter PgMooncakeAdapter CedarDBAdapter QuestDBAdapter AzureSynapseAdapter
@@ -394,11 +396,25 @@ def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
 
     # Use from_config() if adapter supports config-aware initialization (e.g., Databricks, Snowflake)
     # This enables proper schema naming based on benchmark/scale/tuning configuration
+    # Inject the canonical registry key so PlatformAdapter.canonical_platform_type
+    # reflects the resolved platform selector rather than falling back to a
+    # normalized display name. Upstream config plumbing (core/platform_config.py)
+    # strips "type" from DatabaseConfig before adapters are constructed, so this
+    # is the authoritative point where the canonical key reaches the adapter.
+    # Overwrite (not setdefault): any inbound "type" is the raw user selector,
+    # possibly an alias (e.g. "sqlite3"); canonical_name is its resolved form.
+    config["type"] = canonical_name
     if hasattr(adapter_class, "from_config") and callable(adapter_class.from_config):
         adapter_instance = adapter_class.from_config(config)
     else:
         # Simple adapters use direct constructor (e.g., DuckDB, SQLite)
         adapter_instance = adapter_class(**config)
+
+    # Some from_config implementations rebuild their constructor config with
+    # selected keys only, dropping the injected "type" -- restore it on the
+    # stored platform_config so canonical_platform_type works uniformly.
+    if isinstance(getattr(adapter_instance, "platform_config", None), dict):
+        adapter_instance.platform_config.setdefault("type", canonical_name)
 
     # Attach driver metadata for downstream consumers (CLI summaries, exports).
     adapter_instance.driver_package = resolution.package or package_hint
@@ -617,6 +633,7 @@ databricks|liquid_clustering_columns|Comma-separated Databricks liquid clusterin
 bigquery|staging_root|GCS path for staging data (e.g., gs://bucket/path)|{}
 bigquery|storage_bucket|GCS bucket name for data staging (alternative to staging_root)|{}
 bigquery|storage_prefix|GCS path prefix within bucket for data staging|{}
+bigquery|biglake_connection|BigLake connection for external table modes, as project.region.name|{}
 trino|catalog|Trino catalog to use (e.g., hive, iceberg, memory). Auto-discovered if not specified.|{}
 trino|staging_root|Cloud storage path for staging data (e.g., s3://..., gs://..., abfss://...)|{}
 trino|table_format|Table format for creating tables (memory, hive, iceberg, delta)|{'default': 'memory'}
@@ -680,6 +697,19 @@ pg-duckdb|max_parallel_workers_per_gather|PostgreSQL max_parallel_workers_per_ga
 pg-duckdb|force_execution|Force DuckDB execution engine for all queries|{'parser': 'parse_bool', 'default': True}
 pg-duckdb|postgres_scan_threads|Threads for parallel PostgreSQL table scanning (0 = auto)|{'parser': 'int', 'default': 0}
 pg-duckdb|compare_native|Run native DuckDB comparison for matched queries|{'parser': 'parse_bool', 'default': False}
+pg-duckdb|duckdb_db_path|Path to the DuckDB database file pg_duckdb attaches|{}
+ducklake|metadata_path|DuckLake catalog metadata file path (.ducklake)|{}
+ducklake|data_path|DuckLake Parquet data directory (local path or s3:// URI)|{}
+ducklake|deployment_mode|DuckLake deployment mode: local, local_catalog_s3, postgres_catalog, or postgres_catalog_s3|{'choices': ('local', 'local_catalog_s3', 'postgres_catalog', 'postgres_catalog_s3')}
+ducklake|catalog|DuckLake catalog backend: duckdb, sqlite, or postgres|{'choices': ('duckdb', 'sqlite', 'postgres'), 'default': 'duckdb'}
+ducklake|pg_host|PostgreSQL hostname for the postgres catalog backend|{'default': 'localhost'}
+ducklake|pg_port|PostgreSQL port for the postgres catalog backend|{'parser': 'int', 'default': 5432}
+ducklake|pg_database|PostgreSQL database name for the postgres catalog backend (must already exist; DuckLake does not CREATE DATABASE)|{}
+ducklake|pg_user|PostgreSQL username for the postgres catalog backend|{'default': 'postgres'}
+ducklake|pg_password|PostgreSQL password for the postgres catalog backend|{}
+ducklake|s3_key_id|AWS access key ID for S3 DATA_PATH (omit to use the credential_chain provider)|{}
+ducklake|s3_secret|AWS secret access key for S3 DATA_PATH|{}
+ducklake|s3_region|AWS region for S3 DATA_PATH|{}
 pg-mooncake|host|PostgreSQL server hostname (with pg_mooncake installed)|{'default': 'localhost'}
 pg-mooncake|port|PostgreSQL server port|{'parser': 'int', 'default': 5432}
 pg-mooncake|database|PostgreSQL database name (auto-generated if not specified)|{}
@@ -717,6 +747,7 @@ synapse|storage_account|Azure storage account for data staging|{}
 synapse|container|Azure blob container name|{}
 synapse|storage_sas_token|SAS token for Azure storage access|{}
 synapse|resource_class|Workload resource class (e.g., staticrc20, staticrc30)|{'default': 'staticrc20'}
+synapse|staging_root|Azure staging path, including the storage account (e.g., abfss://container@account.dfs.core.windows.net/path)|{}
 fabric_dw|server|Fabric warehouse endpoint (e.g., workspace-guid.datawarehouse.fabric.microsoft.com)|{}
 fabric_dw|workspace|Fabric workspace name or GUID|{}
 fabric_dw|warehouse|Fabric warehouse name|{}
@@ -794,6 +825,21 @@ sqlite|database_path|Path to the SQLite database file (auto-generated from --ben
 sqlite|timeout|SQLite connection timeout in seconds|{'parser': 'float', 'default': '30.0'}
 sqlite|check_same_thread|Enforce that connections are used on the creating thread only|{'parser': 'parse_bool', 'default': 'false'}
 spark|adaptive_enabled|Enable or disable Spark Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
+spark|java_home|Path to the JDK Spark should run under|{}
+spark|driver_memory|Spark driver JVM heap, e.g. 4g or 8g (default 4g)|{}
+pyspark|driver_memory|PySpark driver JVM heap, e.g. 4g or 8g (default 4g)|{}
+pyspark|shuffle_partitions|Number of PySpark shuffle partitions|{'parser': 'int'}
+athena|aws_profile|Named AWS CLI profile to authenticate with|{}
+athena|s3_bucket|S3 bucket for query results and data staging|{}
+athena|s3_staging_dir|S3 URI Athena writes query results to (e.g., s3://bucket/path)|{}
+athena|staging_root|S3 path for staging data (alternative to s3_bucket)|{}
+motherduck|database|MotherDuck database name|{}
+redshift|iam_role|IAM role ARN Redshift COPY assumes to read from S3|{}
+redshift|s3_bucket|S3 bucket for data staging|{}
+redshift|staging_root|S3 path for staging data (e.g., s3://bucket/path)|{}
+snowflake|staging_root|Cloud storage path for staging data|{}
+snowflake|iceberg_external_volume|Snowflake EXTERNAL VOLUME name for Iceberg tables|{}
+lakesail|endpoint|Spark Connect server endpoint (for example, sc://localhost:50051)|{'default': 'sc://localhost:50051'}
 velox|deployment|Deployment mode: 'local' (in-process SparkSession, Linux only) or 'remote' (Spark-Connect server)|{'choices': ('local', 'remote'), 'default': 'local'}
 velox|endpoint|Spark-Connect endpoint for remote mode (e.g., sc://localhost:50051)|{'default': 'sc://localhost:50051'}
 velox|gluten_jar_path|Absolute path to the Gluten Velox bundle jar (required for local mode)|{'aliases': ('jar',)}

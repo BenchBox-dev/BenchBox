@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import stat
 from datetime import datetime
 from pathlib import Path
 
@@ -67,6 +68,82 @@ def _assert_canonical_json_file(path: Path) -> None:
     assert raw == canonical_json_bytes(json.loads(raw))
 
 
+def test_write_file_disables_local_newline_translation(monkeypatch, tmp_path):
+    destination = tmp_path / "result.json"
+
+    def open_without_translation(file_path, mode, *, encoding, newline):
+        assert newline == ""
+        return Path(file_path).open(mode, encoding=encoding, newline=newline)
+
+    monkeypatch.setattr("builtins.open", open_without_translation)
+
+    ResultExporter(output_dir=tmp_path, anonymize=False)._write_file(destination, "{\n}\n")
+    assert destination.read_bytes() == b"{\n}\n"
+
+
+def test_write_file_is_atomic_when_replace_fails(monkeypatch, tmp_path):
+    destination = tmp_path / "result.json"
+    destination.write_text("old\n", encoding="utf-8")
+
+    def fail_replace(_temporary, _destination):
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(exporter_module.os, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="replace failed"):
+        ResultExporter(output_dir=tmp_path, anonymize=False)._write_file(destination, "new\n")
+
+    assert destination.read_text(encoding="utf-8") == "old\n"
+    assert not list(tmp_path.glob(".result.json.*.tmp"))
+
+
+def test_write_file_preserves_existing_permissions(tmp_path):
+    destination = tmp_path / "result.json"
+    destination.write_text("old\n", encoding="utf-8")
+    destination.chmod(0o640)
+
+    ResultExporter(output_dir=tmp_path, anonymize=False)._write_file(destination, "new\n")
+
+    assert destination.read_text(encoding="utf-8") == "new\n"
+    assert stat.S_IMODE(destination.stat().st_mode) == 0o640
+
+
+def test_write_file_prefers_canonical_cloud_bytes(tmp_path):
+    class CloudPath:
+        content: bytes | None = None
+
+        def write_bytes(self, content: bytes) -> None:
+            self.content = content
+
+        def write_text(self, content: str, *, encoding: str) -> None:
+            raise AssertionError("cloud byte writes must take precedence")
+
+    destination = CloudPath()
+    exporter = ResultExporter(output_dir=tmp_path, anonymize=False)
+    exporter.is_cloud_output = True
+
+    exporter._write_file(destination, "{\n}\n")
+
+    assert destination.content == b"{\n}\n"
+
+
+def test_write_file_supports_legacy_cloud_text_api(tmp_path):
+    class CloudTextPath:
+        content: str | None = None
+
+        def write_text(self, content: str, *, encoding: str) -> None:
+            assert encoding == "utf-8"
+            self.content = content
+
+    destination = CloudTextPath()
+    exporter = ResultExporter(output_dir=tmp_path, anonymize=False)
+    exporter.is_cloud_output = True
+
+    exporter._write_file(destination, "{\n}\n")
+
+    assert destination.content == "{\n}\n"
+
+
 def test_exporter_serializes_execution_phases(tmp_path):
     """JSON export should handle execution phases via v2.0 schema.
 
@@ -125,7 +202,7 @@ def test_exporter_serializes_execution_phases(tmp_path):
         payload = json.load(f)
 
     # v2.0 schema has version, run, benchmark, platform, summary, queries
-    assert payload["version"] == "2.1"
+    assert payload["version"] == "2.2"
     assert payload["run"]["id"] == "test-run"
     assert payload["benchmark"]["id"] == "tpch"
     assert payload["platform"]["name"] == "duckdb"
@@ -200,6 +277,62 @@ def test_canonical_bundle_export_serializes_primary_and_companions(monkeypatch, 
     _assert_canonical_json_file(primary_path)
     _assert_canonical_json_file(tmp_path / f"{primary_path.stem}.plans.json")
     _assert_canonical_json_file(tmp_path / f"{primary_path.stem}.tuning.json")
+
+
+def test_canonical_bundle_export_anonymizes_nested_tuning_constraint_shapes(monkeypatch, tmp_path):
+    """Anonymized .tuning.json must pseudonymize list-of-dicts FK companions and
+    slash-delimited local_table scalars while preserving enabled/action flags.
+    """
+    nested_constraints = {
+        "version": "2.1",
+        "run_id": "cost-duckdb",
+        "requested": {
+            "constraints": {
+                "foreign_keys": {
+                    "enabled": True,
+                    "on_delete_action": "CASCADE",
+                    "tables": [
+                        {
+                            "table": "orders",
+                            "columns": ["o_orderkey"],
+                            "referenced_table": "customers",
+                        }
+                    ],
+                },
+                "local_table": "orders/o_orderkey",
+                "references_table": "customers",
+                "primary_keys": {
+                    "enabled": True,
+                    "tables": {"orders": ["o_orderkey"]},
+                },
+            }
+        },
+    }
+    monkeypatch.setattr(exporter_module, "build_tuning_payload", lambda _result: nested_constraints)
+
+    exported = ResultExporter(output_dir=tmp_path, anonymize=True).export_result(
+        _minimal_result("duckdb"),
+        formats=["json"],
+    )
+    tuning_path = tmp_path / f"{exported['json'].stem}.tuning.json"
+    raw = tuning_path.read_text(encoding="utf-8")
+    assert all(identifier not in raw for identifier in ("orders", "o_orderkey", "customers"))
+
+    payload = json.loads(raw)
+    constraints = payload["requested"]["constraints"]
+    fk = constraints["foreign_keys"]
+    assert fk["enabled"] is True
+    assert fk["on_delete_action"] == "CASCADE"
+    assert fk["tables"][0]["table"].startswith("table_")
+    assert fk["tables"][0]["columns"][0].startswith("column_")
+    assert constraints["local_table"].startswith("table_")
+    assert constraints["references_table"].startswith("table_")
+    pk_tables = constraints["primary_keys"]["tables"]
+    table_key = next(iter(pk_tables))
+    assert table_key.startswith("table_")
+    assert pk_tables[table_key][0].startswith("column_")
+    assert constraints["primary_keys"]["enabled"] is True
+    _assert_canonical_json_file(tuning_path)
 
 
 def test_canonical_bundle_export_anonymizes_plans_raw_explain_output(monkeypatch, tmp_path):
@@ -442,6 +575,9 @@ def test_exporter_omits_direct_total_for_unavailable_normalized_cost(tmp_path):
     assert payload["normalized_cost"]["cost_status"] == "unavailable"
     assert payload["normalized_cost"]["normalized_cost_usd"] is None
     assert "total_usd" not in payload.get("cost", {})
+    # The synthetic result has a validation claim; provide matching phase evidence
+    # before exercising public-submission admission.
+    payload["phases"]["validation"]["status"] = "PASSED"
     _assert_submission_valid(payload)
 
 
@@ -451,22 +587,22 @@ def test_exporter_preserves_local_zero_total_with_normalized_provenance(tmp_path
     assert payload["normalized_cost"]["cost_status"] == "not_applicable_local"
     assert payload["normalized_cost"]["normalized_cost_usd"] == "0"
     assert payload["cost"]["total_usd"] == 0
+    # The synthetic result has a validation claim; provide matching phase evidence
+    # before exercising public-submission admission.
+    payload["phases"]["validation"]["status"] = "PASSED"
     _assert_submission_valid(payload)
 
 
 def test_exporter_rejects_unsupported_type(tmp_path, caplog) -> None:
-    """Exporter should handle unsupported types gracefully by logging error."""
+    """Exporter should reject unsupported result types with an actionable error."""
 
     exporter = ResultExporter(output_dir=tmp_path, anonymize=False)
 
     class LegacyResult:
         timestamp = datetime.now()
 
-    # Exporter catches exceptions and logs them instead of raising
-    result = exporter.export_result(LegacyResult(), formats=["json"])  # type: ignore[arg-type]
-
-    # Should return empty dict (no files exported)
-    assert result == {}
+    with pytest.raises(RuntimeError, match="Failed to export json"):
+        exporter.export_result(LegacyResult(), formats=["json"])  # type: ignore[arg-type]
 
     # Error should be logged - check for any error message indicating failure
     assert any("Failed to export" in record.message or "Error" in record.levelname for record in caplog.records)

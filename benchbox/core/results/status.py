@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from benchbox.core.results.query_status import bundle_failed_query_count, int_or_none
+
 NON_CLEAN_VALIDATION_STATUSES: frozenset[str] = frozenset(
     {"failed", "interrupted", "partial", "error", "not_run", "not_validated", "uncertain", "unknown"}
 )
@@ -15,6 +17,12 @@ NON_CLEAN_TRANSLATION_STATUSES: frozenset[str] = frozenset({"fallback", "failed"
 # executed — DataFrame mode, --validation disabled — is not a failed run.
 # Matches the v0.3.0 exit semantics.
 CLI_FAILURE_VALIDATION_STATUSES: frozenset[str] = frozenset({"failed", "interrupted", "partial", "error"})
+# Derived partition of NON_CLEAN that is not a CLI-level failure: statuses that
+# keep the bundle non-clean for publication without making the run a CLI
+# failure. Includes never-executed validation (not_run, not_validated, unknown)
+# and claim-weakened validation (uncertain). Keep derived — do not hand-maintain
+# a third literal set.
+UNVALIDATED_VALIDATION_STATUSES: frozenset[str] = NON_CLEAN_VALIDATION_STATUSES - CLI_FAILURE_VALIDATION_STATUSES
 
 
 def normalize_validation_status(value: Any) -> str | None:
@@ -51,12 +59,12 @@ def translation_status_is_non_clean(value: Any) -> bool:
 
 def result_failed_query_count(result: Any) -> int:
     """Return a conservative failed-query count from a BenchmarkResults-like object."""
-    failed = _int_or_none(getattr(result, "failed_queries", None))
+    failed = int_or_none(getattr(result, "failed_queries", None))
     if failed is not None:
         return max(failed, 0)
 
-    total = _int_or_none(getattr(result, "total_queries", None))
-    successful = _int_or_none(getattr(result, "successful_queries", None))
+    total = int_or_none(getattr(result, "total_queries", None))
+    successful = int_or_none(getattr(result, "successful_queries", None))
     if total is not None and successful is not None and total > successful:
         return max(total - successful, 0)
     return 0
@@ -106,26 +114,24 @@ def result_cli_failure_reason(result: Any) -> str | None:
     return None
 
 
-def bundle_failed_query_count(data: dict[str, Any]) -> int:
-    """Return failed query count from a schema-v2 bundle dict."""
-    summary = data.get("summary")
-    if isinstance(summary, dict):
-        queries = summary.get("queries")
-        if isinstance(queries, dict):
-            failed = _int_or_none(queries.get("failed"))
-            if failed is not None and failed > 0:
-                return failed
+def result_unvalidated_reason(result: Any) -> str | None:
+    """Return a reason when validation is non-clean but not a CLI-level failure.
 
-            total = _int_or_none(queries.get("total"))
-            passed = _int_or_none(queries.get("passed"))
-            skipped = _int_or_none(queries.get("skipped")) or 0
-            if total is not None and passed is not None and total > passed + skipped:
-                return max(total - passed - skipped, 0)
+    Distinct from CLI failures and schema/integrity violations: statuses in
+    :data:`UNVALIDATED_VALIDATION_STATUSES` keep the result non-clean for
+    publication but are not schema-violation terminal states. The partition
+    includes both never-executed validation (``not_run``/``not_validated``/
+    ``unknown``) and claim-weakened validation (``uncertain``). Returns
+    ``None`` when there are failed queries (those take precedence) or when the
+    validation status is not in the unvalidated partition.
+    """
+    if result_failed_query_count(result):
+        return None
 
-    query_rows = data.get("queries")
-    if isinstance(query_rows, list):
-        return sum(1 for query in query_rows if _query_row_failed(query))
-    return 0
+    status = normalize_validation_status(getattr(result, "validation_status", None))
+    if status in UNVALIDATED_VALIDATION_STATUSES:
+        return f"validation_status={status}"
+    return None
 
 
 def bundle_non_clean_reason(data: dict[str, Any]) -> str | None:
@@ -169,28 +175,3 @@ def _bundle_translation_status(data: dict[str, Any]) -> str | None:
     if not isinstance(execution, dict):
         return None
     return normalize_translation_status(execution.get("translation"))
-
-
-def _query_row_failed(query: Any) -> bool:
-    if not isinstance(query, dict):
-        return False
-    run_type = str(query.get("run_type") or "measurement").lower()
-    if run_type != "measurement":
-        return False
-    status = query.get("status")
-    return status is not None and str(status).upper() not in {"SUCCESS", "SKIPPED"}
-
-
-def _int_or_none(value: Any) -> int | None:
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float) and value.is_integer():
-        return int(value)
-    if isinstance(value, str):
-        try:
-            return int(value)
-        except ValueError:
-            return None
-    return None

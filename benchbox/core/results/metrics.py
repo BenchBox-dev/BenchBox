@@ -17,6 +17,96 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+# Metric names accepted by :func:`calculate_named_metric`. This vocabulary is
+# shared by every surface, so a name means the same thing in a CLI aggregate
+# CSV, an MCP trends response, and a result bundle.
+NAMED_METRICS = ("geometric_mean", "p50", "p95", "p99", "total_time", "mean")
+
+
+def percentile_ms(times_ms: Sequence[float], p: float) -> float:
+    """Return the p-th percentile of ``times_ms`` using the nearest-rank method.
+
+    ``p`` is a fraction in ``[0, 1]``: ``percentile_ms(times, 0.95)`` is p95.
+    A ``p`` outside that range raises ``ValueError`` rather than being clamped.
+    The surface-local implementations this function replaced took ``p`` on a
+    0-100 scale, so ``percentile_ms(times, 95)`` is the likely porting mistake;
+    clamping it would silently return ``max(times_ms)`` and call it a p95.
+
+    BenchBox uses nearest-rank -- rank ``ceil(n * p)``, clamped to ``[1, n]`` --
+    as its single percentile definition, for two reasons:
+
+    1. It returns an actually-observed measurement. An interpolated percentile
+       reports a duration no query ever took, and with small query counts the
+       interpolating methods drift far: over 22 TPC-H timings, the exclusive
+       method that ``statistics.quantiles(n=20)[18]`` implements returned a p95
+       of 293.5 ms when the second-slowest query took 200 ms.
+    2. It is what every published BenchBox result bundle already reports, so
+       adopting it repo-wide changes no archived number.
+
+    Returns 0.0 for an empty sequence.
+
+    Raises:
+        ValueError: If ``p`` is outside ``[0, 1]``.
+    """
+    if not 0.0 <= p <= 1.0:
+        raise ValueError(f"percentile must be a fraction in [0, 1], got {p!r} (use 0.95 for p95, not 95)")
+
+    sorted_times = sorted(times_ms)
+    n = len(sorted_times)
+    if n == 0:
+        return 0.0
+    rank = min(max(1, math.ceil(n * p)), n)
+    return sorted_times[rank - 1]
+
+
+def geometric_mean_ms(times_ms: Sequence[float]) -> float:
+    """Return the geometric mean of the strictly positive values in ``times_ms``.
+
+    Non-positive timings have no logarithm and are excluded rather than
+    poisoning the result. Returns 0.0 when nothing positive remains.
+    """
+    positive = [t for t in times_ms if t > 0]
+    if not positive:
+        return 0.0
+    return statistics.geometric_mean(positive)
+
+
+def sample_stdev_ms(times_ms: Sequence[float]) -> float:
+    """Return the sample standard deviation, or 0.0 for fewer than two values."""
+    times_list = list(times_ms)
+    if len(times_list) < 2:
+        return 0.0
+    return statistics.stdev(times_list)
+
+
+def calculate_named_metric(times_ms: Sequence[float], metric: str) -> float:
+    """Return one named summary metric over ``times_ms``.
+
+    Args:
+        times_ms: Execution times in milliseconds.
+        metric: One of :data:`NAMED_METRICS`. Any other name falls back to the
+            arithmetic mean, preserving the behavior of the surface-local
+            implementations this function replaced.
+
+    Returns:
+        The metric value, or 0.0 when ``times_ms`` is empty.
+    """
+    times_list = list(times_ms)
+    if not times_list:
+        return 0.0
+
+    if metric == "geometric_mean":
+        return geometric_mean_ms(times_list)
+    if metric == "p50":
+        return percentile_ms(times_list, 0.50)
+    if metric == "p95":
+        return percentile_ms(times_list, 0.95)
+    if metric == "p99":
+        return percentile_ms(times_list, 0.99)
+    if metric == "total_time":
+        return sum(times_list)
+    return statistics.mean(times_list)
+
 
 class TPCMetricsCalculator:
     """Calculate TPC-compliant benchmark metrics.
@@ -123,14 +213,127 @@ class TPCMetricsCalculator:
         Returns:
             Geometric mean of times, or 0.0 if not calculable
         """
-        if not times:
-            return 0.0
+        return geometric_mean_ms(times)
 
-        valid_times = [t for t in times if t > 0]
-        if not valid_times:
-            return 0.0
+    @staticmethod
+    def resolve_scale_factor(
+        power_data: dict,
+        throughput_data: dict,
+        scale_factor: float | None = None,
+    ) -> float:
+        """Resolve scale factor from result data or explicit value.
 
-        return statistics.geometric_mean(valid_times)
+        Moved from ``benchbox.cli.commands.metrics`` so the policy lives in
+        core and any surface (CLI, MCP) uses the same resolution. The CLI
+        translates ``ValueError`` to its console message + ``sys.exit(1)``.
+
+        Args:
+            power_data: Power test result dict.
+            throughput_data: Throughput test result dict.
+            scale_factor: Explicit SF when supplied, otherwise auto-detected.
+
+        Returns:
+            Resolved scale factor.
+
+        Raises:
+            ValueError: If SF cannot be auto-detected or the two files
+                disagree.
+        """
+        if scale_factor is not None:
+            return scale_factor
+        sf_power = power_data.get("environment", {}).get("scale_factor")
+        sf_throughput = throughput_data.get("environment", {}).get("scale_factor")
+        if sf_power and sf_throughput:
+            if sf_power != sf_throughput:
+                raise ValueError(f"Scale factor mismatch: power={sf_power}, throughput={sf_throughput}")
+            return sf_power
+        raise ValueError("Could not auto-detect scale factor. Please specify --scale-factor")
+
+    @staticmethod
+    def derive_tpc_metrics(
+        power_data: dict,
+        throughput_data: dict,
+        scale_factor: float,
+    ) -> tuple[float | None, float | None, float | None, float | None]:
+        """Extract or derive Power@Size and Throughput@Size.
+
+        Core relocation of ``benchbox.cli.commands.metrics._derive_tpc_metrics``
+        so derivation policy is not CLI-only. Returns ``(power_at_size,
+        throughput_at_size, power_time, throughput_time)``.
+
+        The method first consults ``summary.tpc_metrics`` on each file; when
+        absent and the run is not ``unofficial_subscale``, it derives the
+        metric via :meth:`calculate_power_at_size` /
+        :meth:`calculate_throughput_at_size`.
+        """
+        power_metrics = power_data.get("summary", {}).get("tpc_metrics", {})
+        throughput_metrics = throughput_data.get("summary", {}).get("tpc_metrics", {})
+
+        power_time_ms = power_data.get("summary", {}).get("timing", {}).get("total_ms")
+        throughput_time_ms = throughput_data.get("summary", {}).get("timing", {}).get("total_ms")
+        power_time = (power_time_ms / 1000.0) if power_time_ms else None
+        throughput_time = (throughput_time_ms / 1000.0) if throughput_time_ms else None
+
+        power_at_size = power_metrics.get("power_at_size")
+        throughput_at_size = throughput_metrics.get("throughput_at_size")
+
+        compliance_class = power_data.get("benchmark", {}).get("compliance_class")
+        is_subscale = compliance_class == "unofficial_subscale"
+
+        if power_at_size is None or throughput_at_size is None:
+            if power_at_size is None and not is_subscale:
+                power_query_times = [
+                    q["ms"] / 1000.0
+                    for q in power_data.get("queries", [])
+                    if q.get("run_type") == "measurement" and q.get("status") == "SUCCESS"
+                ]
+                if power_query_times:
+                    power_at_size = TPCMetricsCalculator.calculate_power_at_size(power_query_times, scale_factor)
+            if throughput_at_size is None and not is_subscale:
+                t_summary = throughput_data.get("summary", {}).get("queries", {})
+                total_queries = t_summary.get("total")
+                t_time_ms = throughput_data.get("summary", {}).get("timing", {}).get("total_ms")
+                if total_queries and t_time_ms:
+                    num_streams = throughput_data.get("run", {}).get("streams", 1)
+                    throughput_at_size = TPCMetricsCalculator.calculate_throughput_at_size(
+                        total_queries,
+                        t_time_ms / 1000.0,
+                        scale_factor,
+                        num_streams,
+                    )
+        return power_at_size, throughput_at_size, power_time, throughput_time
+
+    @staticmethod
+    def compute_qphh_result(
+        power_data: dict,
+        throughput_data: dict,
+        scale_factor: float | None = None,
+    ) -> dict:
+        """Compute the QphH result dict from loaded power/throughput dicts.
+
+        Pure core helper so CLI keeps parsing/emission only. Raises
+        ``ValueError`` when derivation fails; CLI maps it to a console error.
+        """
+        sf = TPCMetricsCalculator.resolve_scale_factor(power_data, throughput_data, scale_factor)
+        power_at_size, throughput_at_size, power_time, throughput_time = TPCMetricsCalculator.derive_tpc_metrics(
+            power_data, throughput_data, sf
+        )
+        if power_at_size is None or throughput_at_size is None:
+            raise ValueError("Could not derive Power@Size or Throughput@Size from result data")
+        num_streams = throughput_data.get("run", {}).get("streams") or throughput_data.get("environment", {}).get(
+            "num_streams", 1
+        )
+        qphh_at_size = TPCMetricsCalculator.calculate_qph(power_at_size, throughput_at_size)
+        return {
+            "benchmark": "TPC-H",
+            "scale_factor": sf,
+            "num_streams": num_streams,
+            "power_test_time": power_time,
+            "throughput_test_time": throughput_time,
+            "power_at_size": power_at_size,
+            "throughput_at_size": throughput_at_size,
+            "qphh_at_size": qphh_at_size,
+        }
 
 
 class TimingStatsCalculator:
@@ -160,33 +363,18 @@ class TimingStatsCalculator:
             return {}
 
         times_list = list(times_ms)
-        sorted_times = sorted(times_list)
-        n = len(sorted_times)
-
-        def percentile(p: float) -> float:
-            """Calculate percentile using nearest-rank method."""
-            if n == 0:
-                return 0.0
-            k = max(1, math.ceil(n * p))
-            k = min(k, n)  # Clamp to valid rank
-            k -= 1  # Convert rank to 0-based index
-            return sorted_times[k]
-
-        # Calculate geometric mean (only for positive values)
-        positive_times = [t for t in times_list if t > 0]
-        geom_mean = statistics.geometric_mean(positive_times) if positive_times else 0.0
 
         return {
             "total_ms": sum(times_list),
             "avg_ms": statistics.mean(times_list),
             "min_ms": min(times_list),
             "max_ms": max(times_list),
-            "geometric_mean_ms": geom_mean,
-            "stdev_ms": statistics.stdev(times_list) if n > 1 else 0.0,
-            "p50_ms": percentile(0.50),
-            "p90_ms": percentile(0.90),
-            "p95_ms": percentile(0.95),
-            "p99_ms": percentile(0.99),
+            "geometric_mean_ms": geometric_mean_ms(times_list),
+            "stdev_ms": sample_stdev_ms(times_list),
+            "p50_ms": percentile_ms(times_list, 0.50),
+            "p90_ms": percentile_ms(times_list, 0.90),
+            "p95_ms": percentile_ms(times_list, 0.95),
+            "p99_ms": percentile_ms(times_list, 0.99),
         }
 
     @staticmethod

@@ -5,15 +5,120 @@ from ~70% toward 85%.  Tests exercise real registry methods (no mocking of
 the registry itself) and assert on concrete values.
 """
 
+import copy
+import json
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 
+from benchbox.core.platform_manifest import (
+    _PLATFORM_MANIFEST_JSON,
+    PLATFORM_MANIFEST,
+    _load_manifest,
+    get_adapter_imports,
+    get_all_platform_aliases,
+    get_platform_alias_modes,
+    get_platform_aliases,
+    get_platform_metadata,
+)
 from benchbox.core.platform_registry import (
     DeploymentCapability,
     PlatformCapability,
     PlatformRegistry,
 )
+from benchbox.platforms.base import PlatformAdapter
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
+
+PLATFORM_MANIFEST_GENERATOR = Path(__file__).resolve().parents[3] / "_project" / "scripts" / "platform_manifest.py"
+requires_dev_manifest_generator = pytest.mark.skipif(
+    not PLATFORM_MANIFEST_GENERATOR.is_file(),
+    reason="platform-manifest drift checks require development-only _project tooling",
+)
+
+EXPECTED_CLI_ALIASES = {
+    "azure-synapse": "synapse",
+    "azuresynapse": "synapse",
+    "bq": "bigquery",
+    "ch": "clickhouse-local",
+    "cudf-df": "cudf",
+    "dask-df": "dask",
+    "datafusion-df": "datafusion",
+    "dbx": "databricks",
+    "duck": "duckdb",
+    "fabric-dw": "fabric_dw",
+    "fusion": "datafusion",
+    "gbq": "bigquery",
+    "lakesail-df": "lakesail",
+    "modin-df": "modin",
+    "pandas-df": "pandas",
+    "pg": "postgresql",
+    "pgsql": "postgresql",
+    "polars-df": "polars",
+    "postgres": "postgresql",
+    "prestodb": "presto",
+    "pyspark-df": "pyspark",
+    "rs": "redshift",
+    "snow": "snowflake",
+    "trinodb": "trino",
+}
+EXPECTED_REGISTRY_ALIASES = {
+    "azure_synapse": "synapse",
+    "fabric-dw": "fabric_dw",
+    "fabric_lakehouse": "fabric-lakehouse",
+    "sqlite3": "sqlite",
+}
+EXPECTED_ADAPTER_REGISTRATION_ORDER = (
+    "duckdb",
+    "motherduck",
+    "ducklake",
+    "datafusion",
+    "databricks",
+    "databricks-df",
+    "clickhouse",
+    "clickhouse-local",
+    "clickhouse-server",
+    "clickhouse-cloud",
+    "starrocks",
+    "sqlite",
+    "bigquery",
+    "redshift",
+    "snowflake",
+    "trino",
+    "starburst",
+    "presto",
+    "postgresql",
+    "timescaledb",
+    "pg-duckdb",
+    "pg-mooncake",
+    "questdb",
+    "cedardb",
+    "synapse",
+    "pyspark",
+    "firebolt",
+    "databend",
+    "doris",
+    "singlestore",
+    "influxdb",
+    "fabric_dw",
+    "athena",
+    "glue",
+    "emr-serverless",
+    "athena-spark",
+    "dataproc",
+    "dataproc-serverless",
+    "fabric-spark",
+    "fabric-lakehouse",
+    "synapse-spark",
+    "spark",
+    "lakesail",
+    "velox",
+    "polars",
+    "snowpark-connect",
+    "quanton",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -48,6 +153,21 @@ class TestAliasResolution:
         # Mutating the returned dict should not affect the registry
         aliases["bogus_alias"] = "bogus"
         assert "bogus_alias" not in PlatformRegistry.get_all_aliases()
+
+    def test_cli_dataframe_alias_is_not_a_core_registry_alias(self):
+        from benchbox.cli.platform import normalize_platform_name
+
+        assert normalize_platform_name("polars-df") == "polars"
+        assert PlatformRegistry.resolve_platform_name("polars-df") == "polars-df"
+        with pytest.raises(ValueError, match="not registered"):
+            PlatformRegistry.get_adapter_class("polars-df")
+
+    @pytest.mark.parametrize(
+        ("alias", "canonical"),
+        EXPECTED_REGISTRY_ALIASES.items(),
+    )
+    def test_preexisting_core_aliases_still_resolve(self, alias, canonical):
+        assert PlatformRegistry.resolve_platform_name(alias) == canonical
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +209,55 @@ class TestAdapterRegistration:
 
         PlatformRegistry.register_adapter("duckdb", DuckDBAdapter)
         assert PlatformRegistry._availability_cache is None
+
+    def test_registration_rejects_non_adapter_class(self, monkeypatch):
+        class NotAnAdapter:
+            pass
+
+        monkeypatch.setattr(PlatformRegistry, "_adapters", {})
+        with pytest.raises(TypeError, match="must subclass PlatformAdapter"):
+            PlatformRegistry.register_adapter("duckdb", NotAnAdapter)  # type: ignore[arg-type]
+
+    def test_registration_rejects_alias_or_builtin_without_adapter(self, monkeypatch):
+        from benchbox.platforms.duckdb import DuckDBAdapter
+
+        monkeypatch.setattr(PlatformRegistry, "_adapters", {})
+        with pytest.raises(ValueError, match="alias"):
+            PlatformRegistry.register_adapter("duck", DuckDBAdapter)
+        with pytest.raises(ValueError, match="alias"):
+            PlatformRegistry.register_adapter("sqlite3", DuckDBAdapter)
+        with pytest.raises(ValueError, match="no runtime adapter"):
+            PlatformRegistry.register_adapter("pandas", DuckDBAdapter)
+
+    def test_third_party_adapter_registration_remains_supported(self, monkeypatch):
+        from benchbox.platforms.duckdb import DuckDBAdapter
+
+        class ThirdPartyAdapter(DuckDBAdapter):
+            pass
+
+        monkeypatch.setattr(PlatformRegistry, "_adapters", {})
+        monkeypatch.setattr(PlatformRegistry, "_auto_registered", True)
+        PlatformRegistry.register_adapter("third-party", ThirdPartyAdapter)
+        assert PlatformRegistry.get_adapter_class("third-party") is ThirdPartyAdapter
+        assert PlatformRegistry.get_available_platforms() == ["third-party"]
+
+    def test_registration_rejects_conflicting_class(self, monkeypatch):
+        from benchbox.platforms.duckdb import DuckDBAdapter
+
+        class ConflictingDuckDBAdapter(DuckDBAdapter):
+            pass
+
+        monkeypatch.setattr(PlatformRegistry, "_adapters", {})
+        PlatformRegistry.register_adapter("duckdb", DuckDBAdapter)
+        with pytest.raises(ValueError, match="already registered"):
+            PlatformRegistry.register_adapter("duckdb", ConflictingDuckDBAdapter)
+
+    def test_registered_classes_preserve_platform_adapter_invariant(self):
+        PlatformRegistry.clear_cache()
+        registered = PlatformRegistry.get_available_platforms()
+        assert "duckdb" in registered
+        for adapter_class in PlatformRegistry._adapters.values():
+            assert issubclass(adapter_class, PlatformAdapter)
 
 
 # ---------------------------------------------------------------------------
@@ -385,3 +554,115 @@ class TestExtractRequirementPackage:
 
     def test_whitespace_only_returns_none(self):
         assert PlatformRegistry._extract_requirement_package("   ") is None
+
+
+# ---------------------------------------------------------------------------
+# Typed platform manifest and drift behavior
+# ---------------------------------------------------------------------------
+
+
+class TestPlatformManifest:
+    def test_platforms_manifest_compatibility_facade_reexports_core_authority(self):
+        from benchbox.core import platform_manifest as core_manifest
+        from benchbox.platforms import manifest as compatibility_manifest
+
+        assert compatibility_manifest.PLATFORM_MANIFEST is core_manifest.PLATFORM_MANIFEST
+        assert compatibility_manifest.PlatformManifestEntry is core_manifest.PlatformManifestEntry
+        assert compatibility_manifest.get_adapter_imports is core_manifest.get_adapter_imports
+
+    def test_registry_and_cli_are_exact_manifest_projections(self):
+        from benchbox.cli.platform import PLATFORM_ALIASES
+        from benchbox.core.platform_registry import _OPTIONAL_ADAPTERS
+
+        assert len(PLATFORM_MANIFEST) == 51
+        assert PlatformRegistry.get_all_platform_metadata() == get_platform_metadata()
+        assert get_platform_aliases("cli") == EXPECTED_CLI_ALIASES
+        assert get_platform_aliases("registry") == EXPECTED_REGISTRY_ALIASES
+        assert get_all_platform_aliases() == EXPECTED_CLI_ALIASES | EXPECTED_REGISTRY_ALIASES
+        assert PlatformRegistry.get_all_aliases() == EXPECTED_REGISTRY_ALIASES
+        assert PLATFORM_ALIASES == EXPECTED_CLI_ALIASES
+        assert get_platform_alias_modes("cli") == {
+            alias: "dataframe" for alias in EXPECTED_CLI_ALIASES if alias.endswith("-df")
+        }
+        assert get_adapter_imports() == _OPTIONAL_ADAPTERS
+
+    def test_adapter_registration_order_preserves_public_availability_order(self, monkeypatch):
+        from benchbox.core.platform_registry import _OPTIONAL_ADAPTERS
+
+        assert tuple(name for name, _module, _class_name in _OPTIONAL_ADAPTERS) == EXPECTED_ADAPTER_REGISTRATION_ORDER
+        monkeypatch.setattr(PlatformRegistry, "_adapters", {})
+        monkeypatch.setattr(PlatformRegistry, "_auto_registered", False)
+        assert PlatformRegistry.get_available_platforms() == list(EXPECTED_ADAPTER_REGISTRATION_ORDER)
+
+    def test_static_manifest_import_does_not_load_optional_sdks(self):
+        code = """
+import sys
+from benchbox.core.platform_manifest import PLATFORM_MANIFEST
+blocked = {'chdb', 'datafusion', 'databricks.sql', 'google.cloud.bigquery', 'polars', 'pyspark', 'snowflake'}
+loaded = sorted(name for name in blocked if name in sys.modules)
+raise SystemExit('optional SDKs loaded: ' + ', '.join(loaded) if loaded else 0)
+"""
+        result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
+        assert result.returncode == 0, result.stderr or result.stdout
+
+    def test_duplicate_canonical_key_is_rejected(self):
+        payload = json.loads(_PLATFORM_MANIFEST_JSON)
+        payload.append(copy.deepcopy(payload[0]))
+        with pytest.raises(ValueError, match="Duplicate canonical platform keys"):
+            _load_manifest(json.dumps(payload))
+
+    def test_duplicate_alias_is_rejected(self):
+        payload = json.loads(_PLATFORM_MANIFEST_JSON)
+        payload[1]["aliases"].append(copy.deepcopy(payload[0]["aliases"][0]))
+        payload[1]["aliases"].sort(key=lambda alias: alias["name"])
+        with pytest.raises(ValueError, match="Duplicate platform alias"):
+            _load_manifest(json.dumps(payload))
+
+    def test_dataframe_alias_requires_typed_mode_semantics(self):
+        payload = json.loads(_PLATFORM_MANIFEST_JSON)
+        payload[1]["aliases"][0].pop("implied_mode")
+        with pytest.raises(ValueError, match="must declare implied_mode='dataframe'"):
+            _load_manifest(json.dumps(payload))
+
+    def test_duplicate_adapter_registration_is_rejected(self):
+        payload = json.loads(_PLATFORM_MANIFEST_JSON)
+        payload[1]["adapter"] = copy.deepcopy(payload[0]["adapter"])
+        with pytest.raises(ValueError, match="Duplicate adapter registrations"):
+            _load_manifest(json.dumps(payload))
+
+    def test_invalid_execution_capabilities_are_rejected(self):
+        payload = json.loads(_PLATFORM_MANIFEST_JSON)
+        payload[0]["capabilities"]["supports_sql"] = False
+        payload[0]["capabilities"]["supports_dataframe"] = True
+        with pytest.raises(ValueError, match="defaults to unsupported SQL mode"):
+            _load_manifest(json.dumps(payload))
+
+    @requires_dev_manifest_generator
+    def test_generated_inventory_and_semantic_surfaces_are_current(self):
+        result = subprocess.run(
+            [sys.executable, str(PLATFORM_MANIFEST_GENERATOR), "--check"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr or result.stdout
+
+    @requires_dev_manifest_generator
+    def test_dataframe_availability_typo_is_detected_and_restoration_passes(self, monkeypatch):
+        from _project.scripts.platform_manifest import validate_platform_surfaces
+
+        import benchbox.platforms as platform_package
+
+        adapter_name, availability_name, guidance = platform_package._DATAFRAME_PLATFORM_INFO["polars-df"]
+        assert availability_name == "POLARS_AVAILABLE"
+        with monkeypatch.context() as scoped:
+            scoped.setitem(
+                platform_package._DATAFRAME_PLATFORM_INFO,
+                "polars-df",
+                (adapter_name, "POLARS_AVAILABL", guidance),
+            )
+            assert any(
+                "polars-df" in error and "POLARS_AVAILABL" in error and "unknown lazy availability constant" in error
+                for error in validate_platform_surfaces()
+            )
+        assert not any("POLARS_AVAILABL" in error for error in validate_platform_surfaces())

@@ -28,8 +28,14 @@ import yaml
 from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path_handler
 from benchbox.utils.compression_mixin import CompressionMixin
 from benchbox.utils.data_validation import BenchmarkDataValidator
-from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
-from benchbox.utils.file_format import COMPRESSION_EXTENSIONS
+from benchbox.utils.datagen_manifest import (
+    MANIFEST_FILENAME,
+    DataGenerationManifest,
+    get_table_files,
+    load_manifest,
+    resolve_compression_metadata,
+)
+from benchbox.utils.file_format import COMPRESSION_EXTENSIONS, detect_data_format
 from benchbox.utils.scale_factor import format_scale_factor
 from benchbox.utils.stale_artifact_pruning import TableArtifactPattern, prune_stale_table_artifacts
 from benchbox.utils.tpc_compilation import CompilationStatus, ensure_tpc_binaries
@@ -44,6 +50,107 @@ def _load_generator_specs() -> dict[str, Any]:
 _GENERATOR_SPECS = _load_generator_specs()
 _TPCH_TABLE_CODES = dict(_GENERATOR_SPECS["table_codes"])
 _TPCH_BASE_ROW_COUNTS = dict(_GENERATOR_SPECS["base_row_counts"])
+
+# Chunk size for the streaming trailing-delimiter rewrite (bytes).
+_NORMALIZE_CHUNK_SIZE = 1 << 20
+
+# A durable marker lets reuse skip a full scan once row counts have been
+# measured. Manifests written before this marker are repaired once, then take
+# the fast reuse path on subsequent runs.
+_MEASURED_ROW_COUNTS_SOURCE = "measured"
+
+
+def _has_trailing_delimiter(path: Path) -> bool:
+    """Probe the last bytes of ``path`` for a classic dbgen trailing delimiter.
+
+    dbgen row framing is decided at compile time (EOL_HANDLING), so every row
+    in a file shares the same framing; inspecting the file tail is sufficient
+    to classify the whole file.
+
+    The line terminator is an independent variable: a file produced on Windows
+    ends ``|\r\n``, not ``|\n``. Strip the terminator before looking for the
+    delimiter rather than matching one spelling of it, or a CRLF file reads as
+    already-clean and is never normalized.
+    """
+    size = path.stat().st_size
+    if size == 0:
+        return False
+    # 3 bytes covers the longest terminator ("|\r\n"); the clamped seek handles
+    # files shorter than that.
+    with path.open("rb") as handle:
+        handle.seek(max(0, size - 3))
+        tail = handle.read()
+    return tail.rstrip(b"\r\n").endswith(b"|")
+
+
+def normalize_tbl_trailing_delimiters(path: Path) -> bool:
+    """Strip exactly one trailing ``|`` before each newline, rewriting in place.
+
+    The bundled dbgen binaries are all compiled with -DEOL_HANDLING (#1069)
+    and emit no trailing delimiter, so this is normally an O(1) tail-probe
+    no-op. It remains a safety net for classic dbgen file-mode output (a
+    stale locally-built binary predating that CFLAGS fix, or any source
+    compile on a platform outside the precompiled matrix): TPCCompiler's
+    ``needs_compilation()`` only checks whether a binary file already exists,
+    with no staleness/CFLAGS check against current source, so a pre-existing
+    ``_sources/tpc-h/dbgen/dbgen`` is reused as-is and never recompiled.
+
+    Only the delimiter immediately before the line terminator is removed;
+    interior empty fields are preserved. In ``.tbl`` format a trailing empty
+    field is a delimiter artifact, not a NULL (see
+    :func:`benchbox.utils.file_format.get_data_extension`).
+
+    The rewrite streams fixed-size chunks through a temporary file, so large
+    scale-factor outputs are never loaded into memory. Files that are already
+    clean are detected with an O(1) tail probe and left untouched, which also
+    makes the operation idempotent.
+
+    Args:
+        path: Uncompressed ``.tbl`` (or ``.tbl.N`` chunk) file to normalize.
+
+    Returns:
+        True if the file was rewritten, False if it was already clean.
+    """
+    if not _has_trailing_delimiter(path):
+        return False
+
+    tmp_path = path.with_name(path.name + ".normalize.tmp")
+    try:
+        with path.open("rb") as src, tmp_path.open("wb") as dst:
+            carry = b""
+            while True:
+                chunk = src.read(_NORMALIZE_CHUNK_SIZE)
+                if not chunk:
+                    break
+                data = carry + chunk
+                # Hold back a chunk-final "|" or "|\r": the terminator may
+                # continue into the next chunk and must be stripped together
+                # with the delimiter. Two bytes are needed because a chunk
+                # boundary can fall inside "|\r\n".
+                if data.endswith(b"|"):
+                    carry = b"|"
+                    data = data[:-1]
+                elif data.endswith(b"|\r"):
+                    carry = b"|\r"
+                    data = data[:-2]
+                else:
+                    carry = b""
+                # A newline only occurs at a row boundary, so "|" immediately
+                # before one is always the trailing delimiter. Both terminators
+                # are handled: replacing exactly one "|" per row never touches
+                # interior empty fields, and the line ending is preserved as-is.
+                dst.write(data.replace(b"|\r\n", b"\r\n").replace(b"|\n", b"\n"))
+            # A held-back delimiter at EOF means the final row is unterminated
+            # but still carries it; drop the "|" and keep any terminator bytes.
+            if carry == b"|\r":
+                dst.write(b"\r")
+        with contextlib.suppress(OSError):
+            shutil.copystat(path, tmp_path)
+        os.replace(tmp_path, path)
+    finally:
+        with contextlib.suppress(OSError):
+            tmp_path.unlink(missing_ok=True)
+    return True
 
 
 class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityMixin):
@@ -810,7 +917,25 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
                 self.validator.print_validation_report(validation_result, verbose=False)
                 self.logger.info("Skipping data generation (existing data is valid)")
 
-            return self._collect_existing_table_files(target_dir)
+            existing_manifest = self._load_existing_manifest(target_dir)
+            manifest_paths: dict[str, Path | list[Path]] = {}
+            if existing_manifest is not None:
+                # A measured manifest is authoritative and must not trigger a
+                # full dataset scan on every reuse. Legacy manifests are
+                # repaired once in place, preserving all format and
+                # compression metadata from the prior run.
+                self._refresh_reused_manifest(target_dir, existing_manifest)
+                manifest_paths = self._paths_from_manifest(target_dir, existing_manifest)
+                if manifest_paths:
+                    return manifest_paths
+
+            existing_paths = self._collect_existing_table_files(target_dir)
+            if existing_manifest is None or not manifest_paths:
+                # No usable manifest exists, so create one from the discovered
+                # files. This is a first-write/recovery path, not a recurring
+                # reuse scan for a measured manifest.
+                self._write_manifest(target_dir, existing_paths)
+            return existing_paths
 
         removed_stale = self._prune_stale_table_artifacts(target_dir)
         if removed_stale and self.verbose_enabled:
@@ -904,6 +1029,112 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
 
         return existing
 
+    def _load_existing_manifest(self, target_dir: Path) -> dict[str, Any] | None:
+        """Load a local manifest when one is present and structurally valid."""
+        manifest_path = target_dir / MANIFEST_FILENAME
+        if not manifest_path.is_file():
+            return None
+        try:
+            manifest = load_manifest(manifest_path)
+        except (OSError, TypeError, ValueError) as exc:
+            self.logger.warning("Ignoring unreadable TPC-H manifest %s: %s", manifest_path, exc)
+            return None
+        if not isinstance(manifest, dict):
+            self.logger.warning("Ignoring non-object TPC-H manifest %s", manifest_path)
+            return None
+        return manifest
+
+    @staticmethod
+    def _resolve_manifest_path(target_dir: Path, manifest_path: object) -> Path | None:
+        """Resolve a manifest entry path without changing its representation."""
+        if not isinstance(manifest_path, str) or not manifest_path:
+            return None
+        path = Path(manifest_path)
+        return path if path.is_absolute() else target_dir / path
+
+    def _paths_from_manifest(self, target_dir: Path, manifest: dict[str, Any]) -> dict[str, Path | list[Path]]:
+        """Return the manifest-selected paths, preserving organized formats."""
+        tables = manifest.get("tables")
+        if not isinstance(tables, dict):
+            return {}
+
+        table_paths: dict[str, Path | list[Path]] = {}
+        for table_name in tables:
+            entries = get_table_files(manifest, table_name)
+            paths = [
+                resolved
+                for entry in entries
+                if isinstance(entry, dict)
+                for resolved in [self._resolve_manifest_path(target_dir, entry.get("path"))]
+                if resolved is not None
+            ]
+            if paths:
+                table_paths[table_name] = paths[0] if len(paths) == 1 else paths
+        return table_paths
+
+    def _refresh_reused_manifest(self, target_dir: Path, manifest: dict[str, Any]) -> None:
+        """Repair legacy row counts without rebuilding the manifest.
+
+        New manifests carry ``row_counts_source=measured``. They are reused as
+        is, which avoids reopening every compressed shard. A legacy manifest
+        without that marker is scanned only for its TBL entries, preserving
+        organized Parquet/Delta/Iceberg entries and the original compression
+        metadata. The repaired manifest is then marked so this work happens
+        only once.
+        """
+        if manifest.get("row_counts_source") == _MEASURED_ROW_COUNTS_SOURCE:
+            return
+
+        tables = manifest.get("tables")
+        if not isinstance(tables, dict):
+            return
+
+        measured_counts: dict[Path, int] = {}
+        count_complete = True
+
+        def refresh_entries(entries: object) -> None:
+            nonlocal count_complete
+            if not isinstance(entries, list):
+                return
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                file_path = self._resolve_manifest_path(target_dir, entry.get("path"))
+                if file_path is None or detect_data_format(file_path) != "tbl":
+                    continue
+                if not file_path.is_file():
+                    count_complete = False
+                    continue
+                try:
+                    resolved_path = file_path.resolve()
+                    if resolved_path not in measured_counts:
+                        measured_counts[resolved_path] = self._count_file_rows(file_path)
+                    entry["row_count"] = measured_counts[resolved_path]
+                except (OSError, RuntimeError, ValueError) as exc:
+                    count_complete = False
+                    self.logger.warning("Unable to measure reused TPC-H file %s: %s", file_path, exc)
+
+        for table_data in tables.values():
+            if isinstance(table_data, list):
+                # Manifest v1 stores a flat list of entries per table.
+                refresh_entries(table_data)
+            elif isinstance(table_data, dict):
+                formats = table_data.get("formats")
+                if isinstance(formats, dict):
+                    for entries in formats.values():
+                        refresh_entries(entries)
+
+        if not count_complete:
+            # Do not claim a partial repair is authoritative. The next reuse
+            # attempt will retry the legacy entries that could not be measured.
+            return
+
+        manifest["row_counts_source"] = _MEASURED_ROW_COUNTS_SOURCE
+        manifest_path = target_dir / MANIFEST_FILENAME
+        temporary_path = manifest_path.with_name(f".{manifest_path.name}.tmp")
+        temporary_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        temporary_path.replace(manifest_path)
+
     def _prune_stale_table_artifacts(self, target_dir: Path) -> list[Path]:
         """Remove stale per-table artifacts before regeneration.
 
@@ -974,6 +1205,16 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
         """
         table_paths, precompressed_tables = self._gather_generated_table_paths(target_dir)
 
+        # Classic (non -z) dbgen writes a trailing field delimiter on every
+        # row. Normalize file-mode output before any compression or data
+        # organization so results match the streaming path byte-for-byte.
+        # The bundled binaries are clean (#1069), so this is normally an O(1)
+        # no-op; it remains a safety net for a stale locally-built dbgen that
+        # predates -DEOL_HANDLING (needs_compilation() has no staleness
+        # check, so an existing binary is never recompiled - see
+        # normalize_tbl_trailing_delimiters's docstring).
+        self._normalize_table_delimiters(table_paths, precompressed_tables)
+
         # Data organization is a post-generation output mode. When configured,
         # prefer organized outputs over raw compression artifacts.
         if self._data_organization_config is not None:
@@ -994,6 +1235,25 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
 
         self._write_manifest(target_dir, table_paths)
         return table_paths
+
+    def _normalize_table_delimiters(
+        self,
+        table_paths: dict[str, Path | list[Path]],
+        precompressed_tables: set[str],
+    ) -> None:
+        """Strip classic dbgen trailing row delimiters from uncompressed outputs.
+
+        Covers both single-file mode (``customer.tbl``) and parallel chunked
+        mode (``customer.tbl.1`` ... ``customer.tbl.N``). Pre-compressed
+        tables are skipped: they come from the streaming (-z) path or a
+        previous run and are already normalized.
+        """
+        for table_name, paths in table_paths.items():
+            if table_name in precompressed_tables:
+                continue
+            for file_path in paths if isinstance(paths, list) else [paths]:
+                if normalize_tbl_trailing_delimiters(file_path):
+                    self.log_verbose(f"Stripped trailing row delimiters from {file_path.name}")
 
     def _apply_data_organization(
         self,
@@ -1206,6 +1466,7 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
             compression=resolve_compression_metadata(self),
             parallel=self.parallel,
             seed=getattr(self, "seed", None),
+            extra_metadata={"row_counts_source": _MEASURED_ROW_COUNTS_SOURCE},
         )
 
         # Collect ALL chunk files for each table
@@ -1216,9 +1477,12 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
             if isinstance(file_path_or_paths, list):
                 chunk_files = file_path_or_paths
                 if chunk_files:
-                    rows_per_chunk = expected_rows_total // len(chunk_files)
                     for chunk_file in chunk_files:
-                        manifest.add_entry(table, chunk_file, row_count=rows_per_chunk)
+                        manifest.add_entry(
+                            table,
+                            chunk_file,
+                            row_count=self._manifest_row_count(chunk_file, expected_rows_total // len(chunk_files)),
+                        )
                     self.log_very_verbose(f"Added {len(chunk_files)} chunk files for {table} to manifest")
                 continue
 
@@ -1253,19 +1517,47 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
                 )
 
                 if chunk_files:
-                    # Distribute row count across chunks (approximately equal)
-                    rows_per_chunk = expected_rows_total // len(chunk_files) if chunk_files else expected_rows_total
-
                     for chunk_file in chunk_files:
-                        manifest.add_entry(table, chunk_file, row_count=rows_per_chunk)
+                        manifest.add_entry(
+                            table,
+                            chunk_file,
+                            row_count=self._manifest_row_count(chunk_file, expected_rows_total // len(chunk_files)),
+                        )
 
                     self.log_very_verbose(f"Added {len(chunk_files)} chunk files for {table} to manifest")
                     continue
 
             # Single file (not sharded)
-            manifest.add_entry(table, first_file_path, row_count=expected_rows_total)
+            manifest.add_entry(
+                table,
+                first_file_path,
+                row_count=self._manifest_row_count(first_file_path, expected_rows_total),
+            )
 
         manifest.write()
+
+    def _manifest_row_count(self, file_path: Path, fallback: int) -> int:
+        """Return the measured row count for a TPC-H text file.
+
+        Generated and reused ``.tbl`` files are the source of truth for the
+        manifest. A fallback remains only for non-TBL organized outputs (for
+        example Parquet), whose row metadata is owned by that format's writer.
+        """
+        file_path = Path(file_path)
+        if detect_data_format(file_path) != "tbl":
+            return fallback
+        return self._count_file_rows(file_path)
+
+    def _count_file_rows(self, file_path: Path) -> int:
+        """Count records in an uncompressed or supported compressed TPC-H file."""
+        compression_type = self.compression_manager.detect_compression(file_path)
+        if compression_type == "none":
+            with file_path.open("rt", encoding="utf-8", newline="") as stream:
+                return sum(1 for _ in stream)
+
+        compressor = self.compression_manager.get_compressor(compression_type)
+        with compressor.open_for_read(file_path, "rt") as stream:
+            return sum(1 for _ in stream)
 
     def _expected_row_count(self, table: str) -> int:
         base = _TPCH_BASE_ROW_COUNTS.get(table.lower())
@@ -1274,5 +1566,3 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
         if table.lower() in {"nation", "region"}:
             return base
         return max(0, int(round(base * float(self.scale_factor))))
-
-    # No post-generation compressed-file counting; counts captured during compression or plain-text counting for uncompressed

@@ -14,6 +14,7 @@ import pytest
 
 from benchbox import H2ODB
 from benchbox.core.h2odb.benchmark import H2OBenchmark as H2ODBBenchmark
+from benchbox.utils.path_utils import resolve_benchmark_runs_dir
 
 from .fixtures.benchmark_test_mixin import BenchmarkTestMixin
 
@@ -265,7 +266,7 @@ class TestH2ODBBenchmarkDirectly(BenchmarkTestMixin):
         assert h2odb.scale_factor == 0.01
         # Default path follows: benchmark_runs/datagen/{benchmark}_sf{formatted_sf}
         # 0.01 formats as "sf001" per format_scale_factor()
-        assert h2odb.output_dir == Path.cwd() / "benchmark_runs" / "datagen" / "h2odb_sf001"
+        assert h2odb.output_dir == resolve_benchmark_runs_dir() / "datagen" / "h2odb_sf001"
         assert h2odb._name == "H2O Database Benchmark"
         assert h2odb._version == "1.0"
 

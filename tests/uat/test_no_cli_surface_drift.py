@@ -13,14 +13,38 @@ pytestmark = pytest.mark.fast
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALLOWED_INTERNAL_CLI_FILES = {
+    # cli-package-shadows-main-submodule-with-function: package-level lazy
+    # resolution now preserves ``main`` as a submodule instead of caching the
+    # entrypoint function under the same name. The console script still points
+    # at benchbox.cli.app:main, so this changes import behavior, not Click's
+    # command surface.
+    "benchbox/cli/__init__.py",
+    # one-engine-residual-dedup: the CLI group callback now pushes its
+    # ConfigManager down to the utils-level config seam
+    # (install_cli_config_provider), inverting the utils -> cli import that
+    # .importlinter carried as an ignore entry. Callback body only; no click
+    # decorator or command signature changed.
+    "benchbox/cli/app.py",
     # relocate-cli-hook-registries: these two are now thin back-compat
     # re-export shims; the real registries live in benchbox/core/hooks/
     # (outside the CLI surface this guard protects).
     "benchbox/cli/benchmark_hooks.py",
     "benchbox/cli/platform_hooks.py",
     "benchbox/cli/benchmarks.py",
+    # one-engine-unify-statistics: `aggregate` now computes its geometric mean
+    # and percentiles with benchbox.core.results.metrics instead of a private
+    # copy, so CLI and MCP report the same numbers. The @click.command and
+    # @click.option decorators, the aggregate() signature, and the CSV column
+    # list are untouched; only the p50/p95/p99 values change (nearest-rank
+    # instead of median + statistics.quantiles).
+    "benchbox/cli/commands/aggregate.py",
     "benchbox/cli/commands/__init__.py",
     "benchbox/cli/commands/calculate_qphh.py",
+    # tighten-dependencies-phase-3-extras-deprecation: repoints check-deps'
+    # missing-dependency message at dep_info.extra_name (databricks-connect
+    # extra removal renamed the attribute); display string only, no click
+    # decorators or command signature touched.
+    "benchbox/cli/commands/checks.py",
     "benchbox/cli/commands/compare_dataframes.py",
     "benchbox/cli/commands/compare_plans.py",
     # fix-plan-consumption-phases-and-loader-reattach: internal-only fix repointing
@@ -30,24 +54,89 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/commands/show_plan.py",
     "benchbox/cli/commands/convert.py",
     "benchbox/cli/commands/df_tuning.py",
+    # one-engine-unify-constants: --format's Click Choice is now
+    # list(benchbox.core.constants.EXPORT_FORMATS) instead of an inline
+    # ["json", "csv", "html"] literal. Identical accepted values; the
+    # decorator, the export() signature, and the option name are unchanged.
+    "benchbox/cli/commands/export.py",
     "benchbox/cli/commands/publish.py",
+    # one-engine-unify-regression-policy: the trends table's hardcoded -5%
+    # IMPROVED cutoff now calls
+    # benchbox.core.results.regression_policy.is_meaningful_improvement, so the
+    # display constant lives with the rest of the policy. No click decorator,
+    # command signature, or column changed.
+    "benchbox/cli/commands/report.py",
     "benchbox/cli/commands/run.py",
     "benchbox/cli/commands/run_official.py",
     "benchbox/cli/commands/submit.py",
     "benchbox/cli/commands/tuning.py",
+    # tuning-renderer-consolidation-and-baseline-policy: `benchbox tuning
+    # platforms`'s SQL table body is now generated from
+    # capability_registry.PLATFORM_TUNING_CAPABILITIES
+    # (_sql_platform_capability_rows helper) instead of a hand-written
+    # platform/feature-description list. list_platforms keeps its existing
+    # @tuning_group.command("platforms") decorator and takes no arguments;
+    # only the table's row content changed, not the command's surface.
+    "benchbox/cli/commands/tuning_group.py",
     "benchbox/cli/commands/visualize.py",
+    # fix/one-engine-batch: execution_pipeline.py deleted (superseded by
+    # benchbox/core/run_service.py); empty deletion is not a Click surface
+    # change, only removal of dead module.
+    "benchbox/cli/execution_pipeline.py",
+    # cli-tuning-wizard-presort-hint-divergence: wizard hint now derives from
+    # registry presort_table_configs instead of hardcoded l_shipdate; prompt
+    # text only, no Click decorator or signature change.
+    "benchbox/cli/tuning.py",
+    # one-engine-sink-cli-logic: datagen/metrics/publish sink into core
+    # (QphH/admission/tuning); CLI commands remain but bodies delegate to
+    # core — internal move, surface decorators/signatures unchanged.
+    "benchbox/cli/commands/datagen.py",
+    "benchbox/cli/commands/metrics.py",
     "benchbox/cli/composite_params.py",
     "benchbox/cli/config.py",
+    # cli-debug-logging-raw-options: sanitizes values attached to internal
+    # DEBUG records. No Click decorator or command signature changes.
+    "benchbox/cli/database.py",
     "benchbox/cli/display.py",
     "benchbox/cli/dryrun.py",
+    # tuning-author-experience-honesty-quickfixes: reordered resolve_tuning's
+    # keyword checks (notuning/auto/tuned) to run before the path-existence
+    # check, and fixed the invalid-value error hint ("--tuning list" ->
+    # "benchbox tuning list"). Internal resolution logic only; no click
+    # decorators or command signatures touched.
+    "benchbox/cli/tuning_resolver.py",
+    # tuning-author-experience-honesty-quickfixes: added
+    # ValidationRules.validate_dry_run_output_dir, a click callback (moved out
+    # of commands/run.py to keep it under the module size guard) that rejects
+    # option-like --dry-run OUTPUT_DIR values. A plain staticmethod, not a
+    # click.command/option/argument/group-decorated function, so it carries no
+    # CLI surface of its own.
+    "benchbox/cli/exceptions.py",
     "benchbox/cli/help.py",
     "benchbox/cli/main.py",
+    "benchbox/cli/onboarding.py",
     "benchbox/cli/orchestrator.py",
     # fix-datafusion-df-mode-erasure: comment-only clarification of
     # PLATFORM_ALIASES' -df entries; no click surface in this module.
     "benchbox/cli/platform.py",
+    # fix/customer-facing-cli-url-and-help: dead docs.benchbox.dev URLs and
+    # Click \\b markers in command docstrings. No @click decorator, option,
+    # or function signature changed; the guard's decorator/signature snapshot
+    # stays equal. File-level allow is required because this test first diffs
+    # names under benchbox/cli/ against the allowlist.
+    "benchbox/cli/commands/benchmarks.py",
+    "benchbox/cli/commands/config.py",
+    "benchbox/cli/commands/download_answers.py",
+    "benchbox/cli/commands/plan_history.py",
+    "benchbox/cli/commands/profile.py",
+    "benchbox/cli/commands/results.py",
+    "benchbox/cli/commands/shell.py",
 }
 ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
+    # pr-review-followup-1394: SingleStore credential setup is intentionally
+    # added to the public setup platform choice and dispatch paths; the CLI
+    # tests pin the choice, interactive handler, and validate-only handler.
+    "benchbox/cli/commands/setup.py",
     "benchbox/cli/commands/calculate_qphh.py",
     "benchbox/cli/commands/compare_dataframes.py",
     "benchbox/cli/commands/compare_plans.py",
@@ -63,6 +152,22 @@ ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     # results-labels-funding (PR #1021): adds --funding/--notes disclosure options
     # to `submit`, intentionally changing submit()'s signature surface.
     "benchbox/cli/commands/submit.py",
+    # one-engine-unify-constants: this guard snapshots decorator SOURCE TEXT, so
+    # replacing the inline ["json", "csv", "html"] literal with
+    # list(EXPORT_FORMATS) trips it even though the accepted values are
+    # identical -- defining a constant once necessarily rewrites the decorator.
+    # The value set is now checked directly, and more strictly than a source
+    # snapshot can: test_surface_constant_parity.py reads the live Click Choice
+    # off the registered command and asserts it equals EXPORT_FORMATS.
+    "benchbox/cli/commands/export.py",
+    # platforms-list-unreadable-at-standard-width: `platforms list` gains
+    # --detail and a `json` --format value so the default table fits an
+    # 80-column terminal. That is an intentional customer-facing surface
+    # change, which is exactly what this guard exists to make deliberate
+    # rather than accidental. Temporary, like the run.py entry above: the
+    # guard diffs against the base ref, so once this lands on develop the
+    # baseline already carries the new signature and the entry can go.
+    "benchbox/cli/platform.py",
 }
 ALLOWED_INTERNAL_CLI_FILES = ALLOWED_INTERNAL_CLI_FILES | ALLOWED_HIDDEN_COMPAT_CLI_FILES
 FORBIDDEN_CLI_SURFACE_DECORATORS = {"argument", "command", "group", "option"}
@@ -170,12 +275,43 @@ def submit(
     )
 
 
+def test_cli_surface_guard_allows_package_init_lazy_body_changes():
+    base_source = """def __getattr__(name):
+    if name == "main":
+        return entrypoint
+"""
+    current_source = """def __getattr__(name):
+    return import_module(f"benchbox.cli.{name}")
+"""
+
+    assert "benchbox/cli/__init__.py" in ALLOWED_INTERNAL_CLI_FILES
+    assert not _cli_surface_changed(
+        "benchbox/cli/__init__.py",
+        base_source=base_source,
+        current_source=current_source,
+    )
+
+
 def test_cli_surface_guard_skips_when_base_ref_is_missing(monkeypatch: pytest.MonkeyPatch):
     missing_base = "refs/heads/__benchbox_missing_base__"
     monkeypatch.setenv("BENCHBOX_BASE_REF", missing_base)
 
     with pytest.raises(pytest.skip.Exception, match=f"base ref {missing_base!r} is not available"):
         _verified_base_ref()
+
+
+def test_git_output_decoding_is_independent_of_the_host_locale(monkeypatch: pytest.MonkeyPatch):
+    utf8_output = "benchbox/cli/commands/λ.py\n".encode()
+
+    def fake_run(args, **kwargs):
+        encoding = kwargs.get("encoding", "cp1252")
+        return subprocess.CompletedProcess(args, 0, utf8_output.decode(encoding), "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = _git("diff", "--name-only")
+
+    assert result.stdout == "benchbox/cli/commands/λ.py\n"
 
 
 def _verified_base_ref() -> str:
@@ -199,7 +335,8 @@ def _source_at_ref(ref: str, path: str) -> str:
 
 def _source_at_worktree(path: str) -> str:
     try:
-        return (REPO_ROOT / path).read_text()
+        # Explicit encoding: the default is locale-dependent (cp1252 on Windows).
+        return (REPO_ROOT / path).read_text(encoding="utf-8")
     except FileNotFoundError:
         return ""
 
@@ -250,7 +387,7 @@ def _git(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
         ["git", *args],
         cwd=REPO_ROOT,
-        text=True,
+        encoding="utf-8",
         capture_output=True,
         check=False,
     )

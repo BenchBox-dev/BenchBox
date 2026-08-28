@@ -1,0 +1,55 @@
+name: PR base guard
+
+# Every other PR workflow filters on `branches: [develop]` (or release /
+# published-results), so a PR whose base is another feature branch triggers
+# NOTHING - not pr.yml, not ci-required-result, not the browser lane. The PR
+# page then looks calm rather than alarming: there are no failing checks
+# because there are no checks at all, and the content reaches develop later
+# attributed to the parent's PR, having never been validated on its own.
+#
+# This workflow carries no `branches:` filter, so it is the one check such a
+# PR does get. On a normal base it passes in seconds; on a stacked base it
+# fails loudly and says what to do.
+#
+# It must never become a required context that cannot report - the failure it
+# exists to fix. That is why the filter is absent rather than set to a wide
+# list: a list can go stale as branches are added, absence cannot.
+
+on:
+  pull_request:
+    # `edited` is included so retargeting an existing PR re-evaluates. Without
+    # it, a PR opened against develop and later repointed at a feature branch
+    # would keep its stale green result.
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  base-branch:
+    name: PR base branch is an integration branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          case "$BASE_REF" in
+            develop|release|published-results)
+              echo "Base branch '$BASE_REF' is an integration branch; the normal CI lanes apply."
+              ;;
+            *)
+              echo "::error::PR base branch is '$BASE_REF', not develop, release or published-results."
+              echo ""
+              echo "Every PR workflow in this repository filters on those branches, so this PR"
+              echo "runs no CI at all - no pr.yml, no ci-required-result, no browser lane. Its"
+              echo "content reaches develop only when the parent merges, at which point it has"
+              echo "never been validated on its own and is attributed to the parent's PR."
+              echo ""
+              echo "develop squash-merges, so a stacked chain also needs a rebase and force-push"
+              echo "after every parent merge. Retarget this PR at develop, or fold the change"
+              echo "into the parent PR."
+              exit 1
+              ;;
+          esac

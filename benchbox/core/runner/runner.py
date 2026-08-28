@@ -13,7 +13,10 @@ import logging
 import time
 import uuid
 from collections.abc import Mapping
+from copy import copy
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from benchbox.core.benchmark_loader import (
@@ -24,9 +27,19 @@ from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
 )
+from benchbox.core.contracts import (
+    as_connection_lifecycle,
+    as_dataframe_benchmark_executor,
+    as_external_table_loader,
+    as_native_table_loader,
+    as_sql_benchmark_executor,
+    as_statistics_phase_runner,
+)
 from benchbox.core.results.driver_metadata import apply_driver_metadata
 from benchbox.core.results.models import (
     BenchmarkResults,
+    ExecutionPhases,
+    SetupPhase,
 )
 from benchbox.core.results.platform_options import build_platform_options_capture
 from benchbox.core.runner.conversion import FormatConversionOrchestrator
@@ -58,7 +71,7 @@ from benchbox.platforms.base.runtime_metadata import (
     collect_normalized_result_metadata,
 )
 from benchbox.platforms.dataframe.benchmark_mixin import DataFramePhases, DataFrameRunOptions
-from benchbox.utils.cloud_storage import create_path_handler
+from benchbox.utils.cloud_storage import CloudStagingPath, create_path_handler, is_cloud_path
 from benchbox.utils.dialect_utils import (
     SqlTranslationOutcome,
     sql_translation_context,
@@ -184,7 +197,7 @@ def _run_manifest_validation(benchmark: Any, benchmark_config: BenchmarkConfig) 
 
 
 def _run_postload_validation(
-    adapter: Any,
+    adapter: object | None,
     benchmark_config: BenchmarkConfig,
     platform_config: dict[str, Any] | None,
 ) -> ValidationResult | None:
@@ -197,10 +210,11 @@ def _run_postload_validation(
 
     if not hasattr(adapter, "create_connection") or not hasattr(adapter, "close_connection"):
         return None
+    connection_lifecycle = as_connection_lifecycle(adapter)
 
     connection = None
     try:
-        connection = adapter.create_connection(**(platform_config or {}))
+        connection = connection_lifecycle.create_connection(**(platform_config or {}))
         engine = DatabaseValidationEngine()
         return engine.validate_loaded_data(connection, benchmark_config.name.lower(), benchmark_config.scale_factor)
     except Exception as exc:  # pragma: no cover - defensive safeguard
@@ -213,7 +227,7 @@ def _run_postload_validation(
     finally:
         if connection is not None:
             try:
-                adapter.close_connection(connection)
+                connection_lifecycle.close_connection(connection)
             except Exception:  # pragma: no cover - defensive safeguard
                 pass
 
@@ -387,7 +401,7 @@ def _execute_load_only_mode(
     *,
     benchmark: Any,
     benchmark_config: BenchmarkConfig,
-    adapter: Any,
+    adapter: object,
     platform_config: dict[str, Any] | None,
     validation_opts: ValidationOptions,
     table_mode: str = "native",
@@ -401,8 +415,9 @@ def _execute_load_only_mode(
     schema_time = 0.0
     postload_result: ValidationResult | None = None
 
+    connection_lifecycle = as_connection_lifecycle(adapter)
     try:
-        connection = adapter.create_connection(**(platform_config or {}))
+        connection = connection_lifecycle.create_connection(**(platform_config or {}))
 
         if table_mode == "external":
             if not getattr(adapter, "supports_external_tables", False):
@@ -421,7 +436,9 @@ def _execute_load_only_mode(
             raise RuntimeError("Benchmark output directory not configured; cannot perform load-only operations")
 
         if table_mode == "external":
-            table_stats, load_time, per_table_timings = adapter.create_external_tables(benchmark, connection, data_dir)
+            table_stats, load_time, per_table_timings = as_external_table_loader(adapter).create_external_tables(
+                benchmark, connection, data_dir
+            )
             schema_phase = {
                 "status": "SKIPPED",
                 "duration_ms": 0,
@@ -429,8 +446,9 @@ def _execute_load_only_mode(
             }
         else:
             # Create schema before loading data in native table mode.
-            schema_time = adapter.create_schema(benchmark, connection)
-            table_stats, load_time, per_table_timings = adapter.load_data(benchmark, connection, data_dir)
+            native_loader = as_native_table_loader(adapter)
+            schema_time = native_loader.create_schema(benchmark, connection)
+            table_stats, load_time, per_table_timings = native_loader.load_data(benchmark, connection, data_dir)
             schema_phase = {
                 "status": "COMPLETED",
                 "duration_ms": int(schema_time * 1000),
@@ -461,7 +479,7 @@ def _execute_load_only_mode(
         statistics_time_seconds = 0.0
         run_statistics_phase = getattr(adapter, "run_statistics_phase", None)
         if gather_statistics and callable(run_statistics_phase):
-            statistics_phase = run_statistics_phase(
+            statistics_phase = as_statistics_phase_runner(adapter).run_statistics_phase(
                 benchmark,
                 connection,
                 benchmark_name=benchmark_config.name,
@@ -516,7 +534,7 @@ def _execute_load_only_mode(
         return result_obj, postload_result
     finally:
         if connection is not None:
-            adapter.close_connection(connection)
+            connection_lifecycle.close_connection(connection)
 
 
 def _get_table_schemas_from_benchmark(benchmark: Any) -> dict[str, dict[str, Any]]:
@@ -720,6 +738,10 @@ def _build_run_config_from_options(
         requested_sources=options.get("platform_option_sources"),
         database_options=_database_platform_options(database_config),
     )
+    run_options: dict[str, Any] = {}
+    requested_phases = options.get("requested_phases")
+    if requested_phases:
+        run_options["requested_phases"] = list(requested_phases)
     return RunConfig(
         benchmark=benchmark_config.name,
         query_subset=benchmark_config.queries,
@@ -729,6 +751,7 @@ def _build_run_config_from_options(
         seed=(int(seed_raw) if seed_raw is not None else None),
         platform_options=platform_options or None,
         platform_option_sources=platform_option_sources or None,
+        options=run_options,
         connection={
             "database_path": (platform_config or {}).get("database_path"),
         },
@@ -755,7 +778,7 @@ def _build_run_config_from_options(
 
 
 def _execute_via_adapter(
-    adapter: Any,
+    adapter: object,
     benchmark: Any,
     benchmark_config: BenchmarkConfig,
     system_profile: SystemProfile | None,
@@ -786,7 +809,7 @@ def _execute_via_adapter(
             verbose=verbosity_settings.verbose,
             very_verbose=verbosity_settings.very_verbose,
         )
-        return adapter.run_benchmark(
+        return as_dataframe_benchmark_executor(adapter).run_benchmark(
             benchmark,
             benchmark_config=benchmark_config,
             system_profile=system_profile,
@@ -803,7 +826,7 @@ def _execute_via_adapter(
     kwargs = {k: v for k, v in run_config.__dict__.items() if k != "benchmark"}
     if run_config.benchmark is not None:
         kwargs.setdefault("benchmark_name", run_config.benchmark)
-    return adapter.run_benchmark(benchmark, **kwargs)
+    return as_sql_benchmark_executor(adapter).run_benchmark(benchmark, **kwargs)
 
 
 def _run_data_generation_phase(
@@ -877,6 +900,105 @@ def _build_data_only_result(
     return result_obj
 
 
+def _clickhouse_load_failure_details(
+    exc: BaseException,
+    *,
+    adapter: Any,
+    platform_config: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Return a durable, credential-free payload for a ClickHouse load failure.
+
+    ClickHouse server streaming deliberately raises a typed
+    ``ClickHouseServerLoadError``.  Keep the structured fields at this
+    orchestration boundary instead of forcing UAT to reverse-engineer a
+    human-readable log line.  The payload reports rows handed to the driver as
+    ``rows_attempted``; the driver does not expose a commit count when an
+    INSERT fails, so claiming those rows were committed would be incorrect.
+    """
+
+    # Keep the core -> platform dependency one-way.  The platform loader's
+    # typed exception is intentionally recognized by its stable boundary
+    # contract rather than importing ``benchbox.platforms`` from core (the
+    # architecture lint forbids that reverse dependency).
+    if type(exc).__name__ != "ClickHouseServerLoadError" or not all(
+        hasattr(exc, attribute) for attribute in ("table_name", "source_files", "rows_attempted", "cause")
+    ):
+        return None
+
+    resolved_config = dict(platform_config or {})
+    memory_keys = (
+        "max_memory_usage",
+        "max_threads",
+        "max_execution_time",
+        "insert_block_size",
+    )
+    memory_settings: dict[str, Any] = {}
+    for key in memory_keys:
+        value = resolved_config.get(key, getattr(adapter, key, None))
+        if value is not None:
+            memory_settings[key] = value
+
+    driver_timeout = resolved_config.get("send_receive_timeout", getattr(adapter, "send_receive_timeout", None))
+    cause = exc.cause
+    return {
+        "table": exc.table_name,
+        "source_files": [str(path) for path in exc.source_files],
+        "rows_attempted": int(exc.rows_attempted),
+        "memory_settings": memory_settings,
+        "driver_timeout_s": driver_timeout,
+        "exception": {
+            "type": type(cause).__name__,
+            "message": str(cause),
+        },
+        # A load failure is not a result bundle.  This is intentionally null so
+        # consumers cannot mistake a failed/partial load for query evidence.
+        "result_json": None,
+    }
+
+
+def _build_clickhouse_load_failure_result(
+    *,
+    benchmark: Any,
+    benchmark_config: BenchmarkConfig,
+    database_config: DatabaseConfig | None,
+    adapter: Any,
+    platform_config: Mapping[str, Any] | None,
+    exc: BaseException,
+    execution_context: ExecutionContext | None,
+) -> BenchmarkResults:
+    """Build a failed sentinel while retaining typed ClickHouse load diagnostics."""
+
+    details = _clickhouse_load_failure_details(exc, adapter=adapter, platform_config=platform_config)
+    if details is None:
+        raise TypeError("_build_clickhouse_load_failure_result requires ClickHouseServerLoadError")
+
+    result = BenchmarkResults(
+        benchmark_name=getattr(benchmark_config, "display_name", benchmark_config.name.upper()),
+        platform=getattr(adapter, "platform_name", getattr(database_config, "type", "unknown")),
+        scale_factor=benchmark_config.scale_factor,
+        execution_id=uuid.uuid4().hex[:8],
+        timestamp=datetime.now(),
+        duration_seconds=0.0,
+        total_queries=0,
+        successful_queries=0,
+        failed_queries=0,
+        query_results=[],
+        query_definitions={},
+        execution_phases=ExecutionPhases(setup=SetupPhase()),
+        validation_status="FAILED",
+        validation_details={"error": str(exc), "load_failure": details},
+        data_loading_time=0.0,
+        schema_creation_time=0.0,
+        total_rows_loaded=0,
+        data_size_mb=0.0,
+        table_statistics={},
+        execution_metadata={"mode": "load_failure"},
+    )
+    if execution_context is not None:
+        result.execution_context = execution_context.model_dump()
+    return result
+
+
 def _build_setup_only_result(
     benchmark: Any,
     adapter: Any,
@@ -916,7 +1038,7 @@ def _run_load_only_mode(
     benchmark: Any,
     benchmark_config: BenchmarkConfig,
     system_profile: SystemProfile | None,
-    adapter: Any,
+    adapter: object,
     platform_config: dict[str, Any] | None,
     validation_opts: ValidationOptions,
     table_mode: str,
@@ -950,7 +1072,7 @@ def _run_load_only_mode(
             verbose=verbosity_settings.verbose,
             very_verbose=verbosity_settings.very_verbose,
         )
-        return adapter.run_benchmark(
+        return as_dataframe_benchmark_executor(adapter).run_benchmark(
             benchmark,
             benchmark_config=benchmark_config,
             system_profile=system_profile,
@@ -1192,23 +1314,36 @@ def run_benchmark_lifecycle(
     should_run_load_only = test_type == "load_only" or (phases.load and not phases.execute and adapter is not None)
 
     if should_run_load_only:
-        with sql_translation_context(strict=strict_translation) as translation_outcomes:
-            result_obj = _run_load_only_mode(
-                benchmark=benchmark,
-                benchmark_config=benchmark_config,
-                system_profile=system_profile,
-                adapter=adapter,
-                platform_config=platform_config,
-                validation_opts=validation_opts,
-                table_mode=table_mode,
-                options=options,
-                verbosity_settings=verbosity_settings,
-                monitor=monitor,
-                output_root=output_root,
-                is_dataframe_adapter=is_dataframe_adapter,
-                validation_records=validation_records,
-                gather_statistics=phases.statistics,
-            )
+        try:
+            with sql_translation_context(strict=strict_translation) as translation_outcomes:
+                result_obj = _run_load_only_mode(
+                    benchmark=benchmark,
+                    benchmark_config=benchmark_config,
+                    system_profile=system_profile,
+                    adapter=adapter,
+                    platform_config=platform_config,
+                    validation_opts=validation_opts,
+                    table_mode=table_mode,
+                    options=options,
+                    verbosity_settings=verbosity_settings,
+                    monitor=monitor,
+                    output_root=output_root,
+                    is_dataframe_adapter=is_dataframe_adapter,
+                    validation_records=validation_records,
+                    gather_statistics=phases.statistics,
+                )
+        except Exception as exc:
+            if _clickhouse_load_failure_details(exc, adapter=adapter, platform_config=platform_config) is not None:
+                return _build_clickhouse_load_failure_result(
+                    benchmark=benchmark,
+                    benchmark_config=benchmark_config,
+                    database_config=database_config,
+                    adapter=adapter,
+                    platform_config=platform_config,
+                    exc=exc,
+                    execution_context=execution_context,
+                )
+            raise
         result_obj = _finalize_validation_metadata(result_obj, validation_records)
         result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=adapter, database_config=database_config)
         result_obj = _enrich_normalized_runtime_metadata(
@@ -1245,20 +1380,33 @@ def run_benchmark_lifecycle(
         gather_statistics=phases.statistics,
     )
 
-    with sql_translation_context(strict=strict_translation) as translation_outcomes:
-        result_obj = _execute_via_adapter(
-            adapter=adapter,
-            benchmark=benchmark,
-            benchmark_config=benchmark_config,
-            system_profile=system_profile,
-            run_config=run_config,
-            options=options,
-            phases=phases,
-            verbosity_settings=verbosity_settings,
-            monitor=monitor,
-            output_root=output_root,
-            is_dataframe_adapter=is_dataframe_adapter,
-        )
+    try:
+        with sql_translation_context(strict=strict_translation) as translation_outcomes:
+            result_obj = _execute_via_adapter(
+                adapter=adapter,
+                benchmark=benchmark,
+                benchmark_config=benchmark_config,
+                system_profile=system_profile,
+                run_config=run_config,
+                options=options,
+                phases=phases,
+                verbosity_settings=verbosity_settings,
+                monitor=monitor,
+                output_root=output_root,
+                is_dataframe_adapter=is_dataframe_adapter,
+            )
+    except Exception as exc:
+        if _clickhouse_load_failure_details(exc, adapter=adapter, platform_config=platform_config) is not None:
+            return _build_clickhouse_load_failure_result(
+                benchmark=benchmark,
+                benchmark_config=benchmark_config,
+                database_config=database_config,
+                adapter=adapter,
+                platform_config=platform_config,
+                exc=exc,
+                execution_context=execution_context,
+            )
+        raise
 
     if validation_opts.enable_postload_validation and not is_dataframe_adapter:
         postload_result = _run_postload_validation(adapter, benchmark_config, platform_config)
@@ -1376,17 +1524,24 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
     options = getattr(config, "options", {}) or {}
     force_regenerate_flag = bool(options.get("force_regenerate"))
     no_regenerate_flag = bool(options.get("no_regenerate"))
+    populated_tables_invalid = False
 
-    # If tables already present, assume generation done (unless force requested)
+    # Validate populated tables too. Callers may provide stale or incomplete
+    # mappings, so truthiness alone must not bypass manifest and file checks.
     if getattr(benchmark, "tables", None) and not force_regenerate_flag:
-        return False
+        if _populated_tables_are_valid(benchmark, config):
+            return False
+        populated_tables_invalid = True
+        if no_regenerate_flag:
+            raise RuntimeError("no_regenerate is set but populated benchmark tables are missing or stale")
+        emit("⚠️ Populated benchmark tables are missing or stale; regenerating benchmark data")
 
     output_dir = getattr(benchmark, "output_dir", None)
     manifest_valid = False
     manifest_found = False
     manifest_data: dict | None = None
 
-    if output_dir and not force_regenerate_flag:
+    if output_dir and not force_regenerate_flag and not populated_tables_invalid:
         manifest_valid, manifest_data, manifest_found = _validate_manifest_if_present(benchmark, config)
         if manifest_valid:
             summary = _populate_tables_from_manifest(benchmark, manifest_data)
@@ -1436,6 +1591,63 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
     benchmark.generate_data()
     emit(f"✅ Data generation completed in {time.monotonic() - _gen_start:.2f}s")
     return True
+
+
+def _populated_tables_are_valid(benchmark: Any, config: BenchmarkConfig) -> bool:
+    """Return whether caller-provided table mappings are safe to reuse."""
+    tables = getattr(benchmark, "tables", None)
+    table_mode = str((getattr(config, "options", {}) or {}).get("table_mode", "native") or "native").lower()
+    if not tables or not _table_mapping_paths_exist(tables, allow_cloud_uris=table_mode == "external"):
+        return False
+
+    if table_mode == "external":
+        # External table mappings are supplied by the caller and may not have a
+        # local datagen manifest. Their paths are validated at the adapter
+        # boundary, so local manifest comparison would incorrectly regenerate
+        # otherwise usable external data.
+        return True
+
+    output_dir = getattr(benchmark, "output_dir", None)
+    if not output_dir:
+        # External table mappings have no local manifest to compare against;
+        # existence is the strongest validation available at this boundary.
+        return True
+
+    manifest_valid, manifest_data, _manifest_found = _validate_manifest_if_present(benchmark, config)
+    if not manifest_valid or manifest_data is None:
+        return False
+
+    manifest_benchmark = copy(benchmark)
+    manifest_benchmark.tables = None
+    _populate_tables_from_manifest(manifest_benchmark, manifest_data)
+    return _normalize_table_mapping(tables) == _normalize_table_mapping(getattr(manifest_benchmark, "tables", None))
+
+
+def _table_mapping_paths_exist(value: Any, *, allow_cloud_uris: bool = False) -> bool:
+    """Recursively verify that every path in a table mapping exists."""
+    if isinstance(value, Mapping):
+        return bool(value) and all(
+            _table_mapping_paths_exist(child, allow_cloud_uris=allow_cloud_uris) for child in value.values()
+        )
+    if isinstance(value, (list, tuple, set)):
+        return bool(value) and all(
+            _table_mapping_paths_exist(child, allow_cloud_uris=allow_cloud_uris) for child in value
+        )
+    if isinstance(value, (str, Path)):
+        if allow_cloud_uris and is_cloud_path(value):
+            return True
+        return Path(value).exists()
+    exists = getattr(value, "exists", None)
+    return bool(exists and exists()) if callable(exists) else False
+
+
+def _normalize_table_mapping(value: Any) -> Any:
+    """Normalize table mapping containers for stable path comparisons."""
+    if isinstance(value, Mapping):
+        return {str(key): _normalize_table_mapping(child) for key, child in sorted(value.items())}
+    if isinstance(value, (list, tuple, set)):
+        return [_normalize_table_mapping(child) for child in value]
+    return str(value)
 
 
 def _populate_tables_from_manifest(benchmark: Any, manifest: dict | None = None) -> dict[str, Any] | None:
@@ -1568,10 +1780,14 @@ def _check_table_directory_collisions(output_dir: Any, tables: dict) -> bool:
     """Return True if any unrecorded table-name directory collides with the manifest."""
     from pathlib import Path
 
-    if not isinstance(output_dir, Path):
+    if isinstance(output_dir, CloudStagingPath):
+        local_output_dir = Path(str(output_dir))
+    elif isinstance(output_dir, Path):
+        local_output_dir = output_dir
+    else:
         return False
     for table_name, table_data in tables.items():
-        table_dir = output_dir / table_name
+        table_dir = local_output_dir / table_name
         if not table_dir.is_dir():
             continue
         all_entries = _collect_all_entries(table_data)

@@ -138,8 +138,18 @@ def run_package(
     for result_path in result_paths:
         if classify_results and result_path.exists():
             submit_state = classify_for_submit(result_path)
-            if submit_state is SubmitTerminalState.unofficial:
-                warn(f"[package] skipping unofficial result {result_path}: submit_terminal_state=unofficial")
+            # Soft-skip states that are successful runs but non-submittable: they
+            # must not inflate package failure_count (same posture as unofficial).
+            # Integrity failures (query_failure / schema_violation / missing_manifest)
+            # still count as package failures.
+            if submit_state in {
+                SubmitTerminalState.unofficial,
+                SubmitTerminalState.unvalidated,
+            }:
+                warn(
+                    f"[package] skipping {submit_state.value} result {result_path}: "
+                    f"submit_terminal_state={submit_state.value}"
+                )
                 continue
             if submit_state is not SubmitTerminalState.submittable:
                 warn(

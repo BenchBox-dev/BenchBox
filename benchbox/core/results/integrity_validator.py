@@ -690,12 +690,12 @@ def validate_directory(
 ) -> list[IntegrityReport]:
     """Validate all result JSON files in a directory.
 
-    Excludes .plans.json and .tuning.json companion files.
+    Excludes .plans.json, .tuning.json, and .applied.json companion files.
     """
     path = Path(path)
     validator = ResultIntegrityValidator()
     return [
         _validate_path(filepath, validator)
         for filepath in sorted(path.glob(pattern))
-        if not filepath.name.endswith((".plans.json", ".tuning.json"))
+        if not filepath.name.endswith((".plans.json", ".tuning.json", ".applied.json"))
     ]

@@ -99,7 +99,7 @@ def test_force_regenerate_flag_passed_to_benchmark():
         patch.object(BenchmarkOrchestrator, "_get_platform_config", return_value={"type": "duckdb"}),
         patch("benchbox.cli.orchestrator.get_platform_adapter", return_value=Mock()),
         patch(
-            "benchbox.cli.orchestrator.run_benchmark_lifecycle",
+            "benchbox.core.run_service.run_benchmark_lifecycle",
             side_effect=lambda **kwargs: lifecycle_calls.append(kwargs) or Mock(),
         ),
     ):

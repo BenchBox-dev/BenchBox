@@ -104,7 +104,7 @@ def test_verbosity_settings_flow_through_orchestrator(monkeypatch, tmp_path):
     monkeypatch.setattr("benchbox.cli.orchestrator.get_platform_adapter", lambda *a, **k: _StubAdapter())
 
     # Mock the lifecycle function
-    monkeypatch.setattr("benchbox.cli.orchestrator.run_benchmark_lifecycle", fake_run_benchmark_lifecycle)
+    monkeypatch.setattr("benchbox.core.run_service.run_benchmark_lifecycle", fake_run_benchmark_lifecycle)
 
     # Also need to patch _get_benchmark_instance to actually instantiate the stub
     def mock_get_benchmark_instance(self, config, system_profile):

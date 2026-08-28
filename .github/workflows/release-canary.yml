@@ -16,16 +16,16 @@ permissions:
 
 env:
   RELEASE_CANARY_REF: develop
+  RELEASE_CANARY_SHARD_COUNT: 6
 
 jobs:
-  credential-free-non-fast:
-    name: credential-free non-fast canary
+  collect-credential-free-non-fast:
+    name: collect credential-free non-fast canary
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 15
     outputs:
       checked_sha: ${{ steps.checked-ref.outputs.checked_sha }}
       collected_count: ${{ steps.collect.outputs.collected_count }}
-      pytest_exit_code: ${{ steps.run-tests.outputs.pytest_exit_code }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -52,79 +52,171 @@ jobs:
         id: collect
         shell: bash
         run: |
-          set -euo pipefail
+          set -o pipefail
           mkdir -p release-canary-artifacts
+          rc=0
           uv run -- python -m pytest \
             --collect-only \
             -q \
             -n 0 \
             -m "(slow or resource_heavy) and not (stress or live_integration)" \
             | tee release-canary-artifacts/non-fast-collect.txt
+          pipeline_status=("${PIPESTATUS[@]}")
+          rc=${pipeline_status[0]}
+          tee_rc=${pipeline_status[1]}
+          if [ "$rc" != "0" ] || [ "$tee_rc" != "0" ]; then
+            echo "::error::Credential-free non-fast test collection or log capture failed."
+            exit 1
+          fi
           count=$(grep -Eo '^[0-9]+/[0-9]+ tests collected' release-canary-artifacts/non-fast-collect.txt | tail -1 | cut -d/ -f1)
           if [ -z "$count" ]; then
             echo "::error::Could not parse collected non-fast canary count."
             exit 1
           fi
-          echo "collected_count=$count" >> "$GITHUB_OUTPUT"
-
-      - name: Run credential-free non-fast tests
-        id: run-tests
-        shell: bash
-        run: |
-          rc=0
-          uv run -- python -m pytest \
-            -m "(slow or resource_heavy) and not (stress or live_integration)" \
-            -n 0 \
-            --tb=short \
-            --maxfail=5 \
-            2>&1 | tee release-canary-artifacts/non-fast-pytest.log \
-            || rc=${PIPESTATUS[0]}
-          echo "pytest_exit_code=$rc" >> "$GITHUB_OUTPUT"
-
-      - name: Write non-fast canary summary
-        if: always()
+          uv run -- python scripts/release_canary_sharding.py collect \
+            --input release-canary-artifacts/non-fast-collect.txt \
+            --nodeids-output release-canary-artifacts/non-fast-nodeids.txt \
+            --summary-output release-canary-artifacts/non-fast-collection-summary.json \
+            --expected-count "$count" \
+            --shard-count "$RELEASE_CANARY_SHARD_COUNT" \
+            --checked-ref develop \
+            --checked-sha "${CHECKED_SHA}" \
+            --github-output "$GITHUB_OUTPUT"
         env:
           CHECKED_SHA: ${{ steps.checked-ref.outputs.checked_sha }}
-          COLLECTED_COUNT: ${{ steps.collect.outputs.collected_count }}
-          PYTEST_EXIT_CODE: ${{ steps.run-tests.outputs.pytest_exit_code }}
-        run: |
-          uv run -- python - <<'PY'
-          import json
-          import os
-          from datetime import datetime, timezone
-          from pathlib import Path
-
-          payload = {
-              "workflow": "release-canary.yml",
-              "job": "credential-free-non-fast",
-              "checked_ref": "develop",
-              "commit_sha": os.environ["CHECKED_SHA"],
-              "run_id": os.environ["GITHUB_RUN_ID"],
-              "completed_at": datetime.now(timezone.utc).isoformat(),
-              "suite_families": ["slow", "resource_heavy"],
-              "excluded_families": ["stress", "live_integration"],
-              "marker_expression": "(slow or resource_heavy) and not (stress or live_integration)",
-              "collected_count": os.environ.get("COLLECTED_COUNT", ""),
-              "pytest_exit_code": os.environ.get("PYTEST_EXIT_CODE", ""),
-          }
-          out = Path("release-canary-artifacts/non-fast-summary.json")
-          out.parent.mkdir(exist_ok=True)
-          out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-          PY
 
       - name: Upload non-fast canary artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: release-canary-non-fast
+          name: release-canary-nodeids
           path: release-canary-artifacts/
           retention-days: 30
 
-      - name: Fail if non-fast canary failed
-        if: steps.run-tests.outputs.pytest_exit_code != '0'
+  credential-free-non-fast:
+    name: credential-free non-fast canary (shard ${{ matrix.shard_number }}/6)
+    runs-on: ubuntu-latest
+    needs: [collect-credential-free-non-fast]
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard_index: 0
+            shard_number: 1
+          - shard_index: 1
+            shard_number: 2
+          - shard_index: 2
+            shard_number: 3
+          - shard_index: 3
+            shard_number: 4
+          - shard_index: 4
+            shard_number: 5
+          - shard_index: 5
+            shard_number: 6
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.collect-credential-free-non-fast.outputs.checked_sha }}
+          fetch-depth: 0
+
+      - name: Download collected node IDs
+        uses: actions/download-artifact@v4
+        with:
+          name: release-canary-nodeids
+          path: release-canary-artifacts
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Partition node IDs
+        shell: bash
+        env:
+          SHARD_INDEX: ${{ matrix.shard_index }}
         run: |
-          echo "::error::Credential-free non-fast canary failed."
-          exit 1
+          uv run -- python scripts/release_canary_sharding.py shard \
+            --input release-canary-artifacts/non-fast-nodeids.txt \
+            --nodeids-output "release-canary-artifacts/shard-${SHARD_INDEX}-nodeids.txt" \
+            --summary-output "release-canary-artifacts/shard-${SHARD_INDEX}-summary.json" \
+            --shard-index "$SHARD_INDEX" \
+            --shard-count "$RELEASE_CANARY_SHARD_COUNT"
+
+      - name: Run credential-free non-fast shard
+        id: run-tests
+        shell: bash
+        env:
+          SHARD_INDEX: ${{ matrix.shard_index }}
+        run: |
+          set -o pipefail
+          mapfile -t node_ids < "release-canary-artifacts/shard-${SHARD_INDEX}-nodeids.txt"
+          rc=0
+          if [ "${#node_ids[@]}" -eq 0 ]; then
+            echo "No tests assigned to shard ${SHARD_INDEX}." | tee "release-canary-artifacts/shard-${SHARD_INDEX}-pytest.log"
+          else
+            uv run -- python -m pytest \
+              -m "(slow or resource_heavy) and not (stress or live_integration)" \
+              -n 0 \
+              --tb=short \
+              --maxfail=5 \
+              "${node_ids[@]}" \
+              2>&1 | tee "release-canary-artifacts/shard-${SHARD_INDEX}-pytest.log"
+            pipeline_status=("${PIPESTATUS[@]}")
+            rc=${pipeline_status[0]}
+            tee_rc=${pipeline_status[1]}
+            if [ "$tee_rc" != "0" ]; then
+              rc="$tee_rc"
+            fi
+          fi
+          echo "pytest_exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit "$rc"
+
+      - name: Write shard summary
+        if: always()
+        shell: bash
+        env:
+          SHARD_INDEX: ${{ matrix.shard_index }}
+          SHARD_COUNT: ${{ env.RELEASE_CANARY_SHARD_COUNT }}
+          CHECKED_SHA: ${{ needs.collect-credential-free-non-fast.outputs.checked_sha }}
+          COLLECTED_COUNT: ${{ needs.collect-credential-free-non-fast.outputs.collected_count }}
+          PYTEST_EXIT_CODE: ${{ steps.run-tests.outputs.pytest_exit_code }}
+        run: |
+          assigned_count=""
+          shard_nodeids="release-canary-artifacts/shard-${SHARD_INDEX}-nodeids.txt"
+          if [ -f "$shard_nodeids" ]; then
+            assigned_count=$(wc -l < "$shard_nodeids" | tr -d ' ')
+          fi
+          cat > "release-canary-artifacts/shard-${SHARD_INDEX}-summary.json" <<EOF
+          {
+            "workflow": "release-canary.yml",
+            "job": "credential-free-non-fast",
+            "checked_ref": "develop",
+            "commit_sha": "${CHECKED_SHA}",
+            "run_id": "${GITHUB_RUN_ID}",
+            "shard_index": ${SHARD_INDEX},
+            "shard_count": ${SHARD_COUNT},
+            "marker_expression": "(slow or resource_heavy) and not (stress or live_integration)",
+            "collected_count": "${COLLECTED_COUNT}",
+            "assigned_count": "${assigned_count}",
+            "pytest_exit_code": "${PYTEST_EXIT_CODE}"
+          }
+          EOF
+
+      - name: Upload shard artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-canary-non-fast-shard-${{ matrix.shard_index }}
+          path: release-canary-artifacts/
+          retention-days: 30
 
   ruleset-drift:
     name: ruleset drift
@@ -147,7 +239,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
-      - name: Check ruleset drift
+      - name: Check ruleset and environment-protection drift
         id: drift
         shell: bash
         env:
@@ -176,7 +268,7 @@ jobs:
       - name: Fail if ruleset drift was detected
         if: steps.drift.outputs.drift_exit_code != '0'
         run: |
-          echo "::error::Ruleset drift check failed."
+          echo "::error::Ruleset or environment-protection drift check failed."
           exit 1
 
   pypi-latest-installability:
@@ -217,16 +309,24 @@ jobs:
   release-canary-result:
     name: release-canary-result
     runs-on: ubuntu-latest
-    needs: [credential-free-non-fast, ruleset-drift, pypi-latest-installability]
+    needs:
+      [
+        collect-credential-free-non-fast,
+        credential-free-non-fast,
+        ruleset-drift,
+        pypi-latest-installability,
+      ]
     if: always()
     steps:
       - name: Write release canary summary
         env:
-          CHECKED_SHA: ${{ needs.credential-free-non-fast.outputs.checked_sha }}
+          COLLECTION_RESULT: ${{ needs.collect-credential-free-non-fast.result }}
+          CHECKED_SHA: ${{ needs.collect-credential-free-non-fast.outputs.checked_sha }}
           NON_FAST_RESULT: ${{ needs.credential-free-non-fast.result }}
           RULESET_DRIFT_RESULT: ${{ needs.ruleset-drift.result }}
           PYPI_LATEST_RESULT: ${{ needs.pypi-latest-installability.result }}
-          NON_FAST_COUNT: ${{ needs.credential-free-non-fast.outputs.collected_count }}
+          NON_FAST_COUNT: ${{ needs.collect-credential-free-non-fast.outputs.collected_count }}
+          SHARD_COUNT: ${{ env.RELEASE_CANARY_SHARD_COUNT }}
         run: |
           mkdir -p release-canary-artifacts
           cat > release-canary-artifacts/release-canary-summary.json <<EOF
@@ -237,11 +337,14 @@ jobs:
             "run_id": "${GITHUB_RUN_ID}",
             "suite_families": ["slow", "resource_heavy"],
             "excluded_families": ["stress", "live_integration"],
+            "marker_expression": "(slow or resource_heavy) and not (stress or live_integration)",
             "freshness_contract_hours": 48,
+            "collection_result": "${COLLECTION_RESULT}",
             "non_fast_result": "${NON_FAST_RESULT}",
             "ruleset_drift_result": "${RULESET_DRIFT_RESULT}",
             "pypi_latest_installability_result": "${PYPI_LATEST_RESULT}",
-            "non_fast_collected_count": "${NON_FAST_COUNT}"
+            "non_fast_collected_count": "${NON_FAST_COUNT}",
+            "non_fast_shard_count": "${SHARD_COUNT}"
           }
           EOF
 
@@ -254,6 +357,7 @@ jobs:
 
       - name: Aggregate release canary result
         env:
+          COLLECTION_RESULT: ${{ needs.collect-credential-free-non-fast.result }}
           NON_FAST_RESULT: ${{ needs.credential-free-non-fast.result }}
           RULESET_DRIFT_RESULT: ${{ needs.ruleset-drift.result }}
           PYPI_LATEST_RESULT: ${{ needs.pypi-latest-installability.result }}
@@ -261,6 +365,7 @@ jobs:
           set -euo pipefail
           failed=0
           for pair in \
+            "collect-credential-free-non-fast=$COLLECTION_RESULT" \
             "credential-free-non-fast=$NON_FAST_RESULT" \
             "ruleset-drift=$RULESET_DRIFT_RESULT" \
             "pypi-latest-installability=$PYPI_LATEST_RESULT"; do

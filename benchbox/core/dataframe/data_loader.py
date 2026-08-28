@@ -78,7 +78,11 @@ DEFAULT_CACHE_DIR = Path("benchmark_runs") / "datagen"
 # inference; and empty fields in declared string columns load as '' instead of
 # null when the SQL dialect keeps '' (null_marker is None). Pre-v4 caches must be
 # regenerated to pick up the declared dtypes and the empty-string contract.
-DATAFRAME_CACHE_VERSION = "v4"
+# v5: headered CSVs are read with skip_rows=1 when explicit column names are
+# supplied. Pre-v5 caches for such benchmarks either failed conversion (and
+# silently fell back to an untyped read of the source file) or embedded the header
+# row as data, so they must be regenerated.
+DATAFRAME_CACHE_VERSION = "v5"
 
 # Format subdirectory names that belong to the DataFrame cache layer.
 # Used by clear_cache() to selectively remove cached conversions without
@@ -365,6 +369,7 @@ class FormatConverter:
         write_config: DataFrameWriteConfiguration | None = None,
         column_types: dict[str, str] | None = None,
         null_marker: str | None = "",
+        has_header: bool = False,
     ) -> tuple[ConversionStatus, int]:
         """Convert CSV/TBL file to Parquet format.
 
@@ -411,8 +416,15 @@ class FormatConverter:
             if is_tbl_file and column_names and has_trailing:
                 actual_column_names = column_names + [TRAILING_DUMMY_COLUMN]
 
+            # PyArrow's `column_names` REPLACES the header names but does NOT skip
+            # the header LINE, so a headered CSV read with explicit column names
+            # parses its own header as a data row. With declared numeric/date types
+            # that conversion FAILS, and the caller then silently falls back to the
+            # raw source file -- an UNTYPED read where dates stay strings and every
+            # date filter matches nothing. Headerless TPC `.tbl` is unaffected.
             read_options = pv.ReadOptions(
                 column_names=actual_column_names if actual_column_names else None,
+                skip_rows=1 if (has_header and actual_column_names) else 0,
             )
             parse_options = pv.ParseOptions(delimiter=delimiter)
             arrow_column_types = FormatConverter._resolve_arrow_types(column_types)
@@ -895,6 +907,13 @@ class DataFrameDataLoader:
         self.prefer_parquet = prefer_parquet
         self.force_regenerate = force_regenerate
         self.write_config = write_config
+        # Honest signal for the applied-tuning ledger (ADR-1): the non-default
+        # physical write-layout that was actually applied to the data returned by
+        # the most recent ``prepare_benchmark_data`` call. ``None`` when no layout
+        # was applied (default config, or source returned as-is without going
+        # through the converter). Read by the DataFrame adapters to fold POST_LOAD
+        # write-layout statements into the applied ledger.
+        self.applied_write_layout: DataFrameWriteConfiguration | None = None
 
         # Get platform capabilities
         try:
@@ -975,6 +994,21 @@ class DataFrameDataLoader:
 
         # Resolve write config before the format check so sort_by can force conversion.
         effective_write_config = write_config or self.write_config
+        # Reset the applied-layout signal; set it only on paths where the returned
+        # data actually carries a non-default physical layout (see below).
+        self.applied_write_layout = None
+        layout_applied = bool(
+            effective_write_config
+            and not effective_write_config.is_default()
+            # Only the Parquet path physically writes the requested layout:
+            # `_convert_data` logs a warning and returns the source files
+            # unchanged for any other target format. That is reachable for
+            # pandas-df (whose optimal format is CSV) once a `sort_by` config
+            # pushes past the already-in-target-format early return. Claiming the
+            # layout there folds POST_LOAD statements and an applied hash into
+            # the ledger for a layout that was never written.
+            and target_format == DataFormat.PARQUET
+        )
 
         # Check if source is already in target format.
         # Skip conversion unless write_config requests physical layout changes (e.g. sort_by),
@@ -982,6 +1016,8 @@ class DataFrameDataLoader:
         source_format = self._detect_source_format(source_files)
         needs_layout_transform = bool(effective_write_config and effective_write_config.sort_by)
         if source_format == target_format and not needs_layout_transform:
+            # Source returned verbatim: no conversion ran, so no write-layout was
+            # applied even if a config was supplied.
             logger.info(f"Source data already in {target_format.value} format")
             return source_files
         if source_format == target_format and needs_layout_transform:
@@ -1011,11 +1047,16 @@ class DataFrameDataLoader:
         ):
             cached = self.cache.get_cached_files(benchmark_name, scale_factor, target_format)
             if cached:
+                # Cache key folds in the non-default write_config (above), so the
+                # cached files physically carry the requested layout.
                 logger.info(f"Using cached {target_format.value} data")
+                if layout_applied:
+                    self.applied_write_layout = effective_write_config
                 return cached
 
-        # Convert to target format
-        return self._convert_data(
+        # Convert to target format. Conversion routes the data through the
+        # FormatConverter, which applies the write_config's physical layout.
+        converted = self._convert_data(
             benchmark=benchmark,
             benchmark_name=benchmark_name,
             scale_factor=scale_factor,
@@ -1025,6 +1066,9 @@ class DataFrameDataLoader:
             source_hash=source_hash,
             write_config=effective_write_config,
         )
+        if layout_applied:
+            self.applied_write_layout = effective_write_config
+        return converted
 
     def _get_source_files(self, benchmark: Any, data_dir: Path | None) -> dict[str, list[Path]]:
         """Get source data file paths.
@@ -1238,6 +1282,7 @@ class DataFrameDataLoader:
         table_metadata: dict[str, dict[str, Any]] = {}
 
         benchmark_delimiter = getattr(benchmark, "csv_delimiter", None)
+        benchmark_has_header = bool(getattr(benchmark, "csv_has_header", False))
 
         for table_name, source_path in source_files.items():
             source_list = source_path if isinstance(source_path, list) else [source_path]
@@ -1254,6 +1299,7 @@ class DataFrameDataLoader:
                 benchmark_delimiter,
                 cache_path,
                 null_marker=null_markers.get(table_name, ""),
+                has_header=benchmark_has_header,
             )
 
             if len(converted_list) == 1:
@@ -1300,6 +1346,7 @@ class DataFrameDataLoader:
         cache_path: Path,
         *,
         null_marker: str | None = "",
+        has_header: bool = False,
     ) -> tuple[list[Path], list[dict[str, Any]]]:
         """Convert a single table's source files to Parquet."""
         converted_list: list[Path] = []
@@ -1327,6 +1374,7 @@ class DataFrameDataLoader:
                 write_config=table_write_config,
                 column_types=column_types,
                 null_marker=null_marker,
+                has_header=has_header and format_type == "csv",
             )
 
             if status == ConversionStatus.SUCCESS:

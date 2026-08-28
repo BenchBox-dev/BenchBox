@@ -5,6 +5,8 @@ Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 
 from benchbox.core.dataframe.query import QueryCategory
@@ -165,6 +167,78 @@ class TestTSBSDevOpsParameters:
         result = get_parameters("Q1")
         assert isinstance(result, TSBSDevOpsParameters)
         assert result.query_id == "Q1"
+
+    def test_query_time_bounds_are_native_temporal_values(self):
+        from benchbox.core.tsbs_devops.dataframe_queries.parameters import get_parameters
+
+        params = get_parameters("Q1")
+
+        assert params.get("start_time") == datetime(2024, 1, 1)
+        assert params.get("end_time") == datetime(2024, 1, 1, 12)
+
+    @pytest.mark.parametrize("query_id", ALL_QUERY_IDS)
+    def test_time_parameters_are_native_datetimes(self, query_id):
+        from benchbox.core.tsbs_devops.dataframe_queries.parameters import get_parameters
+
+        params = get_parameters(query_id)
+
+        assert isinstance(params.get("start_time"), datetime)
+        assert isinstance(params.get("end_time"), datetime)
+
+    def test_production_time_bounds_filter_polars_timestamp_column(self):
+        pl = pytest.importorskip("polars")
+
+        from benchbox.core.tsbs_devops.dataframe_queries.queries import _expr_window
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        ctx = PolarsDataFrameAdapter().create_context()
+        ctx.register_table(
+            "cpu",
+            pl.DataFrame(
+                {
+                    "time": [datetime(2024, 1, 1), datetime(2025, 1, 1)],
+                    "hostname": ["host_0", "host_0"],
+                }
+            ),
+        )
+
+        result, _, _ = _expr_window(ctx, "Q1", "cpu", host=True)
+
+        assert result.collect().height == 1
+
+    def test_production_time_bounds_filter_polars_raw_csv_timestamp_column(self, tmp_path):
+        pl = pytest.importorskip("polars")
+
+        from benchbox.core.tsbs_devops.dataframe_queries.queries import _expr_window
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        class Benchmark:
+            def get_schema(self):
+                return {
+                    "cpu": {
+                        "columns": {
+                            "time": {"type": "TIMESTAMP"},
+                            "hostname": {"type": "VARCHAR(255)"},
+                        }
+                    }
+                }
+
+        csv_path = tmp_path / "cpu.csv"
+        csv_path.write_text("time,hostname\n2024-01-01 00:00:00,host_0\n2025-01-01 00:00:00,host_0\n")
+        adapter = PolarsDataFrameAdapter()
+        ctx = adapter.create_context()
+        adapter.load_table(
+            ctx,
+            "cpu",
+            [csv_path],
+            column_names=["time", "hostname"],
+            benchmark=Benchmark(),
+        )
+
+        result, _, _ = _expr_window(ctx, "Q1", "cpu", host=True)
+
+        assert ctx.get_table("cpu").native.collect_schema()["time"] == pl.Datetime("us")
+        assert result.collect().height == 1
 
 
 class TestTSBSDevOpsBenchmarkRegistry:

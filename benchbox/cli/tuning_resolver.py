@@ -10,6 +10,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import hashlib
 import os
 from dataclasses import dataclass, field
 from enum import Enum
@@ -20,11 +21,81 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from benchbox.core.tuning import modes as tuning_modes
+from benchbox.core.tuning.packaged_templates import list_packaged_templates, packaged_template_path
+
 if TYPE_CHECKING:
     from logging import Logger
 
     from benchbox.cli.config import ConfigManager
+    from benchbox.core.config import DatabaseConfig
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def promote_tuning_provenance(
+    database_config: DatabaseConfig | None,
+    tuning_enabled: bool,
+    tuning_source: str | None,
+    tuning_source_file: str | None,
+) -> None:
+    """Mirror tuning provenance onto top-level DatabaseConfig fields.
+
+    ``DatabaseManager.create_config()`` only folds CLI overrides into
+    ``database_config.options`` (a nested dict); ``PlatformAdapter.__init__``
+    reads ``tuning_enabled``/``tuning_source``/``tuning_source_file`` as
+    top-level config keys via ``from_config()``. Without this promotion the
+    resolved tuning state never reaches the adapter for the CLI's
+    non-interactive run paths.
+
+    Deliberately does NOT also promote ``unified_tuning_configuration``:
+    DatabaseConfig is a pydantic model, and ``model_dump()`` (used downstream
+    to build the adapter's platform_config) recursively serializes
+    dataclass-valued extra fields into plain dicts, which would hand the
+    adapter a dict instead of a UnifiedTuningConfiguration instance. The
+    unified config instead reaches the adapter unmodified via the
+    ``tuning_config`` kwarg channel (``get_platform_config()`` passes it
+    through as a live object reference, never through model_dump).
+    """
+    if database_config is None:
+        return
+    database_config.tuning_enabled = tuning_enabled
+    database_config.tuning_source = tuning_source
+    database_config.tuning_source_file = tuning_source_file
+
+
+def resolve_template_reference(config_file: Path | None, repo_root: Path | None = None) -> str | None:
+    """Compute a shareable reference for a tuning template file.
+
+    Returns a repo-relative POSIX path when the file lives inside the
+    BenchBox repository. Otherwise returns ``"<basename>:<16-hex-content-hash>"``
+    so the reference stays stable and identifying without leaking the local
+    filesystem layout. Never returns a raw absolute path - result bundles are
+    shared across machines and users (see ADR-1 / must_preserve).
+
+    Args:
+        config_file: Resolved path to the tuning template file, or None.
+        repo_root: Override for the repo root (tests only); defaults to the
+            BenchBox checkout containing this module.
+
+    Returns:
+        A repo-relative path string, a basename+hash reference, or None if
+        no config file was used.
+    """
+    if config_file is None:
+        return None
+    resolved = Path(config_file).resolve()
+    root = repo_root if repo_root is not None else _REPO_ROOT
+    try:
+        return resolved.relative_to(root).as_posix()
+    except ValueError:
+        pass
+    try:
+        digest = hashlib.sha256(resolved.read_bytes()).hexdigest()[:16]
+    except OSError:
+        digest = "unreadable"
+    return f"{resolved.name}:{digest}"
 
 
 class TuningMode(Enum):
@@ -41,6 +112,7 @@ class TuningSource(Enum):
 
     EXPLICIT_FILE = "explicit_file"  # User provided a file path
     AUTO_DISCOVERED = "auto_discovered"  # Found via template discovery
+    PACKAGED_RESOURCE = "packaged_resource"  # Found via last-resort packaged-template tier
     SMART_DEFAULTS = "smart_defaults"  # Generated from system profile
     BASELINE = "baseline"  # No tuning (all disabled)
     INTERACTIVE_WIZARD = "wizard"  # User configured via wizard
@@ -60,11 +132,35 @@ class TuningResolution:
     info_messages: list[str] = field(default_factory=list)
 
     @property
+    def canonical_mode(self) -> str:
+        """The pinned ADR-2 `tuning_mode` vocabulary value for this resolution.
+
+        Maps this resolver's internal (mode, source) pair onto the shared
+        vocabulary in `benchbox.core.tuning.modes` (see
+        docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md
+        §2): a `--tuning tuned` request that resolved via
+        `TuningSource.FALLBACK` (no template found) is recorded as
+        `tuned-fallback`, distinct from a genuinely curated-template `tuned`
+        run -- this is the fix for finding C4 (fallback runs silently
+        facet-matching curated runs). A resolved custom file is always
+        recorded as `custom`, never the raw local path. Every other
+        (mode, source) pair -- including `TUNED` resolved via
+        `INTERACTIVE_WIZARD`, `AUTO_DISCOVERED`, or an explicit config-file
+        default -- maps to the plain mode value.
+        """
+        if self.mode is TuningMode.TUNED and self.source is TuningSource.FALLBACK:
+            return tuning_modes.TUNED_FALLBACK
+        if self.mode is TuningMode.CUSTOM_FILE:
+            return tuning_modes.CUSTOM
+        return self.mode.value
+
+    @property
     def source_description(self) -> str:
         """Human-readable description of where the config came from."""
         descriptions = {
             TuningSource.EXPLICIT_FILE: f"Loaded from explicit path: {self.config_file}",
             TuningSource.AUTO_DISCOVERED: f"Auto-discovered template: {self.config_file}",
+            TuningSource.PACKAGED_RESOURCE: f"Packaged template resource (bundled with benchbox): {self.config_file}",
             TuningSource.SMART_DEFAULTS: "Generated from system profile (auto mode)",
             TuningSource.BASELINE: "Baseline mode (all optimizations disabled)",
             TuningSource.INTERACTIVE_WIZARD: "Configured via interactive wizard",
@@ -80,6 +176,12 @@ def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
     1. BENCHBOX_TUNING_PATH environment variable (if set)
     2. Project-relative path: examples/tunings/{platform}/{benchmark}_tuned.yaml
     3. Current working directory: {platform}/{benchmark}_tuned.yaml
+    4. Packaged resource bundled with the installed benchbox package (last
+       resort - see benchbox.core.tuning.packaged_templates). Only a subset
+       of platform/benchmark pairs ship a packaged template; this tier exists
+       so `--tuning tuned` still resolves a real template when benchbox is
+       installed as a package and run outside a repository checkout, where
+       tiers 2-3 above never exist.
 
     The BENCHBOX_TUNING_PATH can be set to a custom directory containing
     platform-specific tuning templates following the same structure:
@@ -109,6 +211,9 @@ def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
     if cwd_template != primary:  # Avoid duplicate if cwd is project root
         paths.append(cwd_template)
 
+    # 4. Packaged resource (last resort; see docstring above)
+    paths.append(packaged_template_path(platform, benchmark))
+
     return paths
 
 
@@ -119,6 +224,14 @@ def list_available_tuning_templates(
 ) -> dict[str, list[Path]]:
     """List all available tuning templates, optionally filtered.
 
+    Mirrors the tier order in `get_tuning_template_paths`: when the
+    default, cwd-relative `examples/tunings/` directory is not present (e.g.
+    benchbox installed as a package and run outside a repository checkout),
+    this falls back to the packaged-resource tier (last resort) instead of
+    reporting no templates. That fallback only applies when `base_path` is
+    left at its default - an explicitly passed `base_path` that doesn't exist
+    returns no templates, same as before.
+
     Args:
         platform: Filter to specific platform (optional)
         benchmark: Filter to specific benchmark (optional)
@@ -127,12 +240,15 @@ def list_available_tuning_templates(
     Returns:
         Dictionary mapping platform names to list of available template paths
     """
+    using_default_base = base_path is None
     if base_path is None:
         base_path = Path("examples/tunings")
 
     templates: dict[str, list[Path]] = {}
 
     if not base_path.exists():
+        if using_default_base:
+            return list_packaged_templates(platform=platform, benchmark=benchmark)
         return templates
 
     for platform_dir in base_path.iterdir():
@@ -189,6 +305,10 @@ def resolve_tuning(
     """
     tuning_lower = tuning_arg.lower()
 
+    # Keyword checks (Cases 1-3) all run before the path-existence check (Case 4)
+    # so that a local file/directory named like a keyword (e.g. "./tuned") can
+    # never shadow the keyword's meaning.
+
     # === Case 1: notuning - baseline mode ===
     if tuning_lower == "notuning":
         return _resolve_notuning(logger)
@@ -197,14 +317,14 @@ def resolve_tuning(
     if tuning_lower == "auto":
         return _resolve_auto(logger)
 
-    # === Case 3: Explicit file path ===
+    # === Case 3: tuned - auto-discovery or fallback ===
+    if tuning_lower == "tuned":
+        return _resolve_tuned(platform, benchmark, config_manager, logger)
+
+    # === Case 4: Explicit file path ===
     tuning_path = Path(tuning_arg)
     if tuning_path.exists():
         return _resolve_explicit_file(tuning_path, logger)
-
-    # === Case 4: tuned - auto-discovery or fallback ===
-    if tuning_lower == "tuned":
-        return _resolve_tuned(platform, benchmark, config_manager, logger)
 
     # === Case 5: Invalid value (not a keyword and file doesn't exist) ===
     _raise_invalid_tuning_value(tuning_arg)
@@ -224,15 +344,25 @@ def _resolve_notuning(logger: Logger | None) -> TuningResolution:
 
 
 def _resolve_auto(logger: Logger | None) -> TuningResolution:
-    """Resolve auto (smart defaults) mode."""
+    """Resolve auto (smart defaults) mode.
+
+    Real system-profile smart defaults are only implemented for DataFrame
+    platforms today (see ``resolve_dataframe_tuning_config`` in
+    ``tuning_runtime.py``); SQL platforms fall back to a basic, untuned
+    configuration. This function does not know the resolved platform/mode, so
+    the concrete "SQL gets a basic config" warning is emitted downstream once
+    that is known (see ``run.py::_load_unified_tuning_config``).
+    """
     resolution = TuningResolution(
         mode=TuningMode.AUTO,
         source=TuningSource.SMART_DEFAULTS,
         enabled=True,
     )
-    resolution.info_messages.append("Tuning mode: auto (using smart defaults based on system profile)")
+    resolution.info_messages.append(
+        "Tuning mode: auto (smart defaults based on system profile - DataFrame platforms only today)"
+    )
     if logger:
-        logger.debug("Tuning mode: auto (smart defaults)")
+        logger.debug("Tuning mode: auto (smart defaults; DataFrame platforms only)")
     return resolution
 
 
@@ -283,13 +413,39 @@ def _resolve_tuned(
         search_paths = get_tuning_template_paths(platform, benchmark)
         resolution.searched_paths = search_paths
 
+        # The packaged tier is always the last candidate in search_paths (see
+        # get_tuning_template_paths); compare against it to tell a real,
+        # cwd/env-relative auto-discovered template apart from the packaged
+        # fallback for provenance purposes (must_preserve: packaged-template
+        # provenance is recorded distinctly from AUTO_DISCOVERED).
+        packaged_candidate = packaged_template_path(platform, benchmark)
+
         for path in search_paths:
             if path.exists():
-                resolution.source = TuningSource.AUTO_DISCOVERED
                 resolution.config_file = path.resolve()
-                resolution.info_messages.append(f"Tuning: auto-discovered template at {resolution.config_file}")
-                if logger:
-                    logger.debug(f"Tuning mode: tuned (auto-discovered: {resolution.config_file})")
+                if path == packaged_candidate:
+                    resolution.source = TuningSource.PACKAGED_RESOURCE
+                    # Same provenance-ref helper used for every other source
+                    # (repo-relative path in a dev checkout; package-relative
+                    # "<basename>:<content-hash>" when running from an
+                    # installed wheel with no repo root to resolve against -
+                    # see resolve_template_reference()'s docstring). This is
+                    # only used for the log/info message here; the actual
+                    # bundle field is computed the same way in run.py's
+                    # _load_unified_tuning_config from resolution.config_file.
+                    template_ref = resolve_template_reference(resolution.config_file)
+                    resolution.info_messages.append(
+                        f"Tuning: using packaged template resource at {resolution.config_file} (ref: {template_ref})"
+                    )
+                    if logger:
+                        logger.debug(
+                            f"Tuning mode: tuned (packaged resource: {resolution.config_file}, ref={template_ref})"
+                        )
+                else:
+                    resolution.source = TuningSource.AUTO_DISCOVERED
+                    resolution.info_messages.append(f"Tuning: auto-discovered template at {resolution.config_file}")
+                    if logger:
+                        logger.debug(f"Tuning mode: tuned (auto-discovered: {resolution.config_file})")
                 return resolution
 
         resolution.warnings.append(
@@ -313,7 +469,7 @@ def _raise_invalid_tuning_value(tuning_arg: str) -> None:
         raise ValueError(
             f"Tuning file not found: '{tuning_arg}'\n"
             f"Please verify the file exists at the specified path.\n"
-            f"Use --tuning list to see available templates."
+            f"Use 'benchbox tuning list' to see available templates."
         )
     else:
         raise ValueError(
@@ -323,7 +479,7 @@ def _raise_invalid_tuning_value(tuning_arg: str) -> None:
             f"  'notuning' - Disable all optimizations (baseline mode)\n"
             f"  'auto'     - Use smart defaults based on system profile\n"
             f"  PATH       - Path to custom YAML config file\n"
-            f"\nUse --tuning list to see available templates."
+            f"\nUse 'benchbox tuning list' to see available templates."
         )
 
 
@@ -343,7 +499,11 @@ def display_tuning_resolution(
     for msg in resolution.info_messages:
         if resolution.source == TuningSource.BASELINE:
             console.print(f"[dim]{msg}[/dim]")
-        elif resolution.source in (TuningSource.AUTO_DISCOVERED, TuningSource.EXPLICIT_FILE):
+        elif resolution.source in (
+            TuningSource.AUTO_DISCOVERED,
+            TuningSource.EXPLICIT_FILE,
+            TuningSource.PACKAGED_RESOURCE,
+        ):
             console.print(f"[green]{msg}[/green]")
         else:
             console.print(f"[blue]{msg}[/blue]")
@@ -358,6 +518,38 @@ def display_tuning_resolution(
         for path in resolution.searched_paths:
             exists_marker = "[green]found[/green]" if path.exists() else "[dim]not found[/dim]"
             console.print(f"  [dim]{path}[/dim] ({exists_marker})")
+
+
+def warn_sql_auto_mode(
+    resolution: TuningResolution,
+    resolved_mode: str | None,
+    console: Console,
+    logger: Logger | None = None,
+    quiet: bool = False,
+) -> None:
+    """Log and, on SQL platforms, warn about a basic-config `--tuning auto` resolution.
+
+    Callers reach here whenever ``_load_unified_tuning_config`` falls through
+    to a basic, freshly-constructed ``UnifiedTuningConfiguration`` (the only
+    resolution source that does so is ``TuningMode.AUTO``). Real
+    system-profile smart defaults (``resolve_dataframe_tuning_config`` in
+    ``tuning_runtime.py``) only exist for DataFrame platforms today, so SQL
+    platforms get an explicit warning instead of silently proceeding while the
+    `auto` info message implies real smart defaults were applied.
+    """
+    if logger:
+        logger.debug(f"Using basic unified config for mode: {resolution.mode.value}")
+    if resolution.mode != TuningMode.AUTO or resolved_mode == "dataframe":
+        return
+    if not quiet:
+        console.print(
+            "[yellow]Warning: --tuning auto smart defaults are DataFrame-only today; "
+            "this SQL run proceeds with a basic constraints-only configuration "
+            "(primary/foreign/unique/check constraints enabled; no other tunings applied), "
+            "not an untuned baseline.[/yellow]"
+        )
+    if logger:
+        logger.debug("Tuning mode auto on a non-DataFrame platform: using basic unified config")
 
 
 def display_tuning_list(

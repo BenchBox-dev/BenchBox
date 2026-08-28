@@ -1,0 +1,14 @@
+{
+  "benchmark": "Write Primitives",
+  "bundle_file": "write_primitives_sf001_datafusion_df_20260502_223008_c5299ef7.json",
+  "bundle_hash": "c75bf5e0ee8f2c3b31a0f349a9c70199335888633f96322fa8b37b371a250845",
+  "companion_hashes": {},
+  "phase": 2,
+  "platform": "DataFusion",
+  "result_source": "internal",
+  "scale_factor": 0.01,
+  "submission_path": "path_30338255ec33",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:53:35.630913+00:00",
+  "submitted_by": "BenchBox UAT"
+}

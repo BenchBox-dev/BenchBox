@@ -10,7 +10,9 @@ This implementation is based on the TPC-H specification.
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import atexit
 import subprocess
+import threading
 from pathlib import Path
 from typing import Optional, Union
 
@@ -24,6 +26,41 @@ class QGenBinary:
         """Find qgen or fail immediately."""
         self.qgen_path = self._find_qgen_or_fail()
         self.templates_dir = self._find_templates_dir()
+        # Lazily-created, reused working directory for qgen invocations (see
+        # _ensure_work_dir). Guards concurrent first-creation from multiple
+        # threads (e.g. throughput-test pre-generation, which fans out
+        # per-stream generation across a ThreadPoolExecutor).
+        self._work_dir: Optional[str] = None
+        self._work_dir_lock = threading.Lock()
+
+    def _ensure_work_dir(self) -> str:
+        """Return a writable working directory for qgen, creating it once.
+
+        qgen only *reads* ``dists.dss`` from its cwd and writes generated SQL
+        to stdout (no other files are written into the working directory in
+        this mode), so a single directory can safely be shared across every
+        ``generate()`` call -- including concurrent calls from multiple
+        threads -- instead of paying a fresh ``mkdtemp`` + ``dists.dss`` copy
+        on every single query generation. The directory is removed at
+        process exit via ``atexit`` since it is no longer a context-managed
+        ``TemporaryDirectory``.
+        """
+        if self._work_dir is not None:
+            return self._work_dir
+
+        with self._work_dir_lock:
+            if self._work_dir is None:
+                import shutil
+                import tempfile
+
+                work_dir = tempfile.mkdtemp(prefix="benchbox_qgen_")
+                dists_src = self.templates_dir / "dists.dss"
+                if dists_src.exists():
+                    shutil.copy2(dists_src, Path(work_dir) / "dists.dss")
+                atexit.register(shutil.rmtree, work_dir, ignore_errors=True)
+                self._work_dir = work_dir
+
+        return self._work_dir
 
     def generate(self, query_id: int, *, seed: Optional[int] = None, scale_factor: float = 1.0) -> str:
         """Generate query using qgen. Returns clean SQL.
@@ -56,26 +93,20 @@ class QGenBinary:
         env = os.environ.copy()
         env["DSS_QUERY"] = str(self.templates_dir / query_dir)
 
-        # Run qgen from a writable directory (temp dir) but point to source templates
-        import shutil
-        import tempfile
+        # Run qgen from a writable directory, reused across calls (see
+        # _ensure_work_dir), but point to source templates via DSS_QUERY above.
+        work_dir = self._ensure_work_dir()
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Copy required dists.dss file to temp directory
-            dists_src = self.templates_dir / "dists.dss"
-            if dists_src.exists():
-                shutil.copy2(dists_src, Path(temp_dir) / "dists.dss")
-
-            result = subprocess.run(
-                cmd,
-                cwd=temp_dir,  # Use temp dir as writable working directory
-                env=env,
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=10,
-            )
-            return self._clean_sql(result.stdout)
+        result = subprocess.run(
+            cmd,
+            cwd=work_dir,  # Use the shared work dir as writable working directory
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+        return self._clean_sql(result.stdout)
 
     def _find_qgen_or_fail(self) -> str:
         """Find qgen executable or attempt compilation if missing."""

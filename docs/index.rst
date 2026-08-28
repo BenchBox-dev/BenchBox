@@ -69,7 +69,7 @@ BenchBox is a comprehensive database benchmarking toolkit supporting TPC-H, TPC-
 
    contributing-results.md
    operations/release-guide.md
-   operations/dev-loop-worktree-pool.md
+   operations/dev-loop-worktrees.md
    operations/results-phase-2-runbook.md
 
 .. toctree::

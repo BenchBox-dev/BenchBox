@@ -3,10 +3,10 @@ name: Lint
 on:
   push:
     branches:
-      - main
+      - release
   pull_request:
     branches:
-      - main
+      - release
 
 concurrency:
   group: lint-${{ github.ref }}
@@ -48,8 +48,16 @@ jobs:
         if: hashFiles('_project/scripts/timing_policy_check.py') != ''
         run: uv run -- python _project/scripts/timing_policy_check.py --strict
 
+      - name: UAT spec LOC table drift check
+        if: hashFiles('_project/scripts/uat_loc_table.py') != ''
+        run: uv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check
+
       - name: Compatibility docs drift check
         run: make compat-docs-check
+
+      - name: Platform manifest drift check
+        if: hashFiles('_project/scripts/platform_manifest.py') != ''
+        run: make platform-manifest-check
 
       - name: Dependency audit (no unused declarations)
         if: hashFiles('_project/scripts/dependency_audit/check_deps.py') != ''

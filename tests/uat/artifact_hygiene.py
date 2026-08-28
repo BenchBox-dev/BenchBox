@@ -1,4 +1,8 @@
-"""Local-artifact hygiene guardrails for external-root benchmark runs.
+"""Local-artifact hygiene guardrails for benchmark runs with an external root.
+
+The default output root is itself external — it is anchored to the enclosing
+work tree's *parent* — so these guardrails apply to plain runs too, not only to
+runs that pass ``--output`` or set ``BENCHBOX_OUTPUT_DIR``.
 
 Background — the 2026-06-01 incident: a corpus run launched from a pool
 worktree with ``BENCHBOX_OUTPUT_DIR`` pointed at an external root
@@ -8,7 +12,8 @@ output-root propagation fix (PR #780) means external-root runs should never
 write into the local ``benchmark_runs/`` again; these helpers detect and
 report loudly if that invariant is ever broken.
 
-The guardrails are *report-only*. They snapshot ``cwd/benchmark_runs`` before
+The guardrails are *report-only*. They snapshot the worktree-local
+``benchmark_runs`` before
 a run and assert it did not grow afterwards. They never delete or move
 artifacts — surfacing the unexpected local path (and the external root that
 should have received the writes) is the entire job.
@@ -22,12 +27,13 @@ from pathlib import Path
 from typing import Mapping
 
 from benchbox.core.runtime_paths import DEFAULT_BENCHMARK_RUNS_ROOT
+from benchbox.utils.path_utils import default_benchmark_runs_root, find_work_tree_root
 
 LOCAL_RUNS_DIRNAME = str(DEFAULT_BENCHMARK_RUNS_ROOT)
 
 
 class LocalArtifactGrowthError(AssertionError):
-    """Raised when ``cwd/benchmark_runs`` grows during an external-root run."""
+    """Raised when the worktree-local ``benchmark_runs`` grows."""
 
 
 def dir_size_bytes(path: Path) -> int:
@@ -47,14 +53,32 @@ def dir_size_bytes(path: Path) -> int:
     return total
 
 
+def _guard_base(cwd: Path | str | None = None) -> Path:
+    """Return the actual worktree root for a guard started from any subdirectory."""
+    base = Path(cwd).resolve() if cwd is not None else Path.cwd().resolve()
+    return find_work_tree_root(base) or base
+
+
 def local_runs_root(cwd: Path | str | None = None) -> Path:
     """Return the worktree-local ``benchmark_runs/`` root for ``cwd``."""
-    base = Path(cwd) if cwd is not None else Path.cwd()
-    return base / LOCAL_RUNS_DIRNAME
+    return _guard_base(cwd) / LOCAL_RUNS_DIRNAME
 
 
 def _normalize(path: str | Path) -> Path:
     return Path(path).expanduser()
+
+
+def _default_runs_root(base: Path) -> Path | None:
+    """Resolve the default ``benchmark_runs`` root for a run started in ``base``.
+
+    Defers to :func:`benchbox.utils.path_utils.default_benchmark_runs_root` so
+    the anchor cannot drift from the runtime one. Returns ``None`` outside a
+    work tree, where the default is cwd-local by definition and there is
+    nothing external to guard.
+    """
+    if find_work_tree_root(base) is None:
+        return None
+    return default_benchmark_runs_root(base)
 
 
 def configured_external_root(
@@ -63,16 +87,20 @@ def configured_external_root(
     cwd: Path | str | None = None,
     output: str | Path | None = None,
 ) -> Path | None:
-    """Resolve a configured output root iff it points *outside* ``cwd``.
+    """Resolve a configured output root iff it points *outside* the worktree.
 
     An external root is "configured" when ``--output`` (``output``) is given
-    or ``BENCHBOX_OUTPUT_DIR`` is set to a non-empty value. The guardrail only
-    applies when that root resolves to a location outside the current working
-    directory — ordinary default local runs (no env/flag, or a root inside the
-    worktree) return ``None`` so they are never blocked.
+    or ``BENCHBOX_OUTPUT_DIR`` is set to a non-empty value. When neither is
+    set, the *default* root is used — since the default is anchored to the
+    enclosing work tree's parent it is normally external too, so plain runs
+    are covered by the same guardrail rather than being exempt from it.
+
+    The guardrail only applies when the resolved root lies outside the actual
+    worktree, even when UAT was launched from a nested directory. A root inside
+    the worktree returns ``None`` so genuinely local runs are never blocked.
     """
     env_map = os.environ if env is None else env
-    base = Path(cwd).resolve() if cwd is not None else Path.cwd().resolve()
+    base = _guard_base(cwd)
 
     candidate: Path | None = None
     if output is not None and str(output).strip():
@@ -81,6 +109,11 @@ def configured_external_root(
         raw = env_map.get("BENCHBOX_OUTPUT_DIR")
         if raw is not None and raw.strip():
             candidate = _normalize(raw.strip())
+        else:
+            # No explicit root: fall back to the resolved default, which is
+            # anchored to the work tree's parent and is therefore external for
+            # any run launched from inside a checkout.
+            candidate = _default_runs_root(base)
 
     if candidate is None:
         return None

@@ -252,8 +252,7 @@ CatalogNotFoundError: Catalog does not exist
 1. **List available catalogs:**
    ```bash
    # Trino/Presto
-   benchbox platforms check --platform trino \
-     --platform-option host=localhost
+   benchbox platforms check trino
    ```
 
 2. **Specify the correct catalog:**
@@ -495,7 +494,7 @@ aws s3 cp test.txt s3://your-bucket/benchbox/
 
 # Configure staging
 benchbox run --platform redshift --benchmark tpch --scale 10 \
-  --staging-root s3://your-bucket/benchbox/
+  --output s3://your-bucket/benchbox/
 ```
 
 #### Snowflake Stages
@@ -580,7 +579,7 @@ benchbox run --platform <platform> --benchmark tpch --scale 0.01 \
 
 ### Resources
 
-- [GitHub Issues](https://github.com/joeharris76/benchbox/issues) - Report bugs
+- [GitHub Issues](https://github.com/BenchBox-dev/benchbox/issues) - Report bugs
 - [Platform Docs](../platforms/index.md) - Platform-specific guides
 - [Configuration Guide](configuration.md) - Detailed options
 

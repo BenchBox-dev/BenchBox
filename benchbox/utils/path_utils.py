@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 
 from benchbox.core.runtime_paths import (
-    DEFAULT_BENCHMARK_RUNS_ROOT,
+    default_benchmark_runs_root as _default_benchmark_runs_root,
     resolve_benchmark_runs_root,
 )
 from benchbox.utils.scale_factor import format_scale_factor
@@ -28,17 +28,60 @@ def get_default_data_directory() -> Path:
     return Path.cwd() / "data"
 
 
+def find_work_tree_root(start: Path | None = None) -> Path | None:
+    """Return the enclosing Git work tree root, or ``None`` if there is none.
+
+    Walks ``start`` (default :func:`Path.cwd`) and its parents looking for a
+    ``.git`` entry. Both forms count: ``.git`` is a *directory* in a normal
+    clone and a *file* pointing at the real git dir in a linked worktree, so
+    the check is ``exists()`` rather than ``is_dir()``.
+
+    This is deliberately pure Python — it runs during benchmark construction,
+    where shelling out to ``git rev-parse`` would add a subprocess to a hot
+    path and fail outright when git is not installed.
+
+    Args:
+        start: Directory to start from. Defaults to the current directory.
+            Resolved first, so a relative path still walks real parents.
+
+    Returns:
+        The directory containing the ``.git`` entry, or None when ``start`` is
+        not inside a Git work tree.
+    """
+    origin = Path.cwd() if start is None else Path(start).resolve()
+    for candidate in (origin, *origin.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def default_benchmark_runs_root(start: Path | None = None) -> Path:
+    """Return the default ``benchmark_runs`` root for a run started in ``start``.
+
+    The single source of truth for the default anchor: the enclosing work
+    tree's *sibling* when ``start`` is inside a checkout, else ``start``'s own
+    ``benchmark_runs``. Callers that need the full precedence chain (explicit
+    root, then ``BENCHBOX_OUTPUT_DIR``, then this) want
+    :func:`resolve_benchmark_runs_dir` instead.
+    """
+    return _default_benchmark_runs_root(start)
+
+
 def resolve_benchmark_runs_dir() -> Path:
     """Return the resolved ``benchmark_runs/`` root.
 
-    Honors ``BENCHBOX_OUTPUT_DIR``; otherwise anchors the historical
-    ``benchmark_runs`` default to :func:`Path.cwd` so callers using the result
-    for filesystem operations get an absolute path.
+    Honors ``BENCHBOX_OUTPUT_DIR``; otherwise anchors the default
+    ``benchmark_runs`` directory to the *parent* of the enclosing Git work
+    tree, so it becomes a sibling of the checkout (``../benchmark_runs``)
+    rather than a directory inside it. Every clone and linked worktree of the
+    same project therefore shares one root, which keeps generated data
+    reusable across checkouts instead of re-generating it per worktree — and
+    keeps multi-gigabyte artifacts out of the repository.
+
+    Outside a Git work tree — the installed-package case — the historical
+    :func:`Path.cwd` anchor is kept unchanged.
     """
-    root = resolve_benchmark_runs_root(env=os.environ)
-    if root == DEFAULT_BENCHMARK_RUNS_ROOT:
-        return Path.cwd() / DEFAULT_BENCHMARK_RUNS_ROOT
-    return root
+    return resolve_benchmark_runs_root(env=os.environ)
 
 
 def get_benchmark_runs_datagen_path(

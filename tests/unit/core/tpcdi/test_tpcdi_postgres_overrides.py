@@ -52,3 +52,28 @@ def test_postgres_removes_same_select_alias_references() -> None:
     assert "ORDER BY 15, total_trade_value DESC" in queries["AQ10"]
     assert "FROM (VALUES (0)) AS dummy" not in queries["EQ7"]
     assert "overall_quality_score" in queries["EQ7"]
+
+
+def test_datafusion_renders_boolean_dates_and_eq7_aliases() -> None:
+    """DataFusion TPC-DI SQL must use native booleans, date arithmetic, and derived metrics."""
+    queries = _bench().get_queries(dialect="datafusion")
+    rendered = "\n".join(queries.values())
+
+    assert "IsCurrent = 1" not in rendered
+    assert "IsCurrent = 0" not in rendered
+    assert "TT_IS_SELL = 1" not in rendered
+    assert "TT_IS_SELL = 0" not in rendered
+    assert "JULIANDAY" not in rendered.upper()
+    assert "date_diff(" not in rendered.lower()
+    assert "AGE(" not in rendered.upper()
+    assert "FROM (VALUES (0)) AS dummy" not in queries["EQ7"]
+    assert "FROM (\n    SELECT" in queries["EQ7"]
+    assert "IsCurrent IS TRUE" in queries["EQ7"]
+
+
+@pytest.mark.parametrize("query_id", ["AQ9", "EQ7", "VQ6"])
+def test_get_query_datafusion_matches_bulk_variant(query_id: str) -> None:
+    """Single-query DataFusion retrieval must use the same variant as bulk retrieval."""
+    bench = _bench()
+
+    assert bench.get_query(query_id, dialect="datafusion") == bench.get_queries(dialect="datafusion")[query_id]

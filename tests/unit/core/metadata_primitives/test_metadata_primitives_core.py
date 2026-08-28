@@ -153,6 +153,44 @@ class TestMetadataPrimitivesQueryManager:
         with pytest.raises(ValueError, match="not supported on dialect"):
             manager.get_query("schema_list_views", dialect="clickhouse")
 
+    def test_datafusion_uses_view_definition_column_and_skips_constraints(self):
+        """DataFusion's catalog contract exposes ``definition`` but no constraints view."""
+        manager = MetadataPrimitivesQueryManager()
+
+        view_query = manager.get_query("schema_list_views", dialect="datafusion")
+        assert "definition AS view_definition" in view_query
+
+        for query_id in (
+            "query_list_constraints",
+            "constraint_fk_list",
+            "constraint_pk_list",
+            "constraint_referential_integrity",
+            "constraint_summary",
+        ):
+            with pytest.raises(ValueError, match="not supported on dialect"):
+                manager.get_query(query_id, dialect="datafusion")
+
+        datafusion_queries = manager.get_queries_for_dialect("datafusion")
+        assert all(
+            query_id not in datafusion_queries
+            for query_id in (
+                "query_list_constraints",
+                "constraint_fk_list",
+                "constraint_pk_list",
+                "constraint_referential_integrity",
+                "constraint_summary",
+            )
+        )
+
+    def test_clickhouse_role_membership_uses_native_admin_option_name(self):
+        """ClickHouse exposes role delegation as ``with_admin_option``."""
+        manager = MetadataPrimitivesQueryManager()
+
+        query = manager.get_query("acl_role_membership", dialect="clickhouse")
+
+        assert "with_admin_option AS admin_option" in query
+        assert "\n    admin_option\n" not in query
+
     def test_get_query_entry(self):
         """Test getting full query entry."""
         manager = MetadataPrimitivesQueryManager()

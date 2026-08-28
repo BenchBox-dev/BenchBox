@@ -6,6 +6,8 @@
 ```
 
 Documentation for contributors and developers working on BenchBox.
+Agent review, identity, and attribution protocol lives in unpublished
+`docs/agent/`, not in this handbook.
 
 ## Roadmap
 
@@ -21,6 +23,7 @@ Documentation for contributors and developers working on BenchBox.
 
 - [Adding New Platforms](adding-new-platforms.md) - How to add support for new database platforms
 - [New Platform Acceptance Checklist](new-platform-acceptance-checklist.md) - Required registry, docs, tests, compatibility, and UAT gates
+- [PR base branch policy](pr-base-branch-policy.md) - Integration bases only; stacked/feature-base PRs unsupported
 - [Import Patterns](import-patterns.md) - Lazy loading and dependency management patterns
 - [TPC Compilation Guide](tpc-compilation-guide.md) - Compiling TPC benchmark tools
 

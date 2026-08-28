@@ -12,14 +12,90 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
+import threading
 
 # Import expected_results to trigger provider registration
 # This ensures TPC-H and TPC-DS providers are available when QueryValidator is instantiated
 import benchbox.core.expected_results  # noqa: F401
 from benchbox.core.expected_results.models import ValidationMode, ValidationResult
 from benchbox.core.expected_results.registry import get_registry
+from benchbox.core.expected_results.tpch_results import (
+    PARAMETER_SENSITIVE_QUERY_IDS as _TPCH_PARAMETER_SENSITIVE_QUERY_IDS,
+)
 
 logger = logging.getLogger(__name__)
+
+# Per-benchmark parameter-sensitive query-id sets consulted by the
+# non-reference-seed relaxation in validate_query_result(). These queries carry
+# a canonical EXACT expectation (validated against the answer file at the
+# reference seed) and are relaxed to their RANGE bounds / LOOSE tolerance only
+# when a caller signals a non-reference seed. Benchmarks with no entry here
+# (e.g. TPC-DS) always validate against their declared mode.
+_PARAMETER_SENSITIVE_QUERY_IDS_BY_BENCHMARK: dict[str, frozenset[str]] = {
+    "tpch": _TPCH_PARAMETER_SENSITIVE_QUERY_IDS,
+    "tpc-h": _TPCH_PARAMETER_SENSITIVE_QUERY_IDS,
+}
+
+
+def get_parameter_sensitive_query_ids(benchmark_type: str) -> frozenset[str]:
+    """Return the parameter-sensitive query-id set for a benchmark, if any.
+
+    Empty frozenset for benchmarks with no known parameter-sensitive queries
+    (e.g. TPC-DS today) -- the exclusion check in validate_query_result()
+    never fires for them.
+    """
+    return _PARAMETER_SENSITIVE_QUERY_IDS_BY_BENCHMARK.get(benchmark_type.lower(), frozenset())
+
+
+# Thread-local reference-seed determination. Set by the TPC-H power/throughput
+# drivers (benchbox.core.tpch.power_test, benchbox.core.tpch.throughput_test)
+# immediately before executing a query, and read here to decide whether a
+# parameter-sensitive query's EXACT-mode mismatch should be excluded instead
+# of failed. Thread-local (not a plain module global) because throughput
+# streams execute concurrently, one thread per stream (see
+# benchbox.core.throughput.runner.StreamRunner) -- a single shared global
+# would let one stream's context leak into a concurrently-running stream's
+# validation call.
+_reference_seed_state = threading.local()
+
+
+def set_reference_seed_context(is_reference_seed: bool | None) -> None:
+    """Record, for the CURRENT THREAD, whether the query about to run through
+    QueryValidator is using the pinned TPC reference seed's substitution
+    parameters.
+
+    This module never derives or compares seeds itself -- callers (the TPC-H
+    power/throughput drivers) compute the comparison against
+    benchbox.core.tpch.benchmark.get_reference_seed() and pass the result in.
+
+    Values:
+        True: this query's actual seed matches the reference seed for its
+            scale factor (or the run used qgen defaults, which the TPC-H
+            drivers treat as reference-equivalent) -- exact validation applies
+            normally, including for the parameter-sensitive queries.
+        False: this query is running under different substitution parameters
+            than the reference answer set -- get_parameter_sensitive_query_ids
+            entries are relaxed from their canonical EXACT mode to their RANGE
+            bounds (or LOOSE tolerance) rather than exact-compared, so
+            spec-sanctioned parameter variance is accepted while a 0-row or
+            out-of-range result still fails.
+        None (the default/unset value): unknown -- preserves the pre-existing
+            behavior of always attempting EXACT validation. Benchmarks that
+            never call this function (TPC-DS, DataFrame validation, any other
+            QueryValidator caller) are therefore completely unaffected by the
+            relaxation below.
+    """
+    _reference_seed_state.is_reference_seed = is_reference_seed
+
+
+def get_reference_seed_context() -> bool | None:
+    """Return the current thread's reference-seed determination, if set."""
+    return getattr(_reference_seed_state, "is_reference_seed", None)
+
+
+def clear_reference_seed_context() -> None:
+    """Reset the current thread's reference-seed context to unset (None)."""
+    _reference_seed_state.is_reference_seed = None
 
 
 class QueryValidator:
@@ -27,9 +103,9 @@ class QueryValidator:
 
     This class validates query results by comparing actual row counts against
     expected results from the registry. It supports:
-    - Exact row count validation (requires reference seed)
-    - Loose tolerance-based validation (for custom seeds, ±50% default)
-    - Range-based validation for non-deterministic queries
+    - Exact row count validation for fixed-cardinality queries
+    - Loose tolerance-based validation for designated parameter-sensitive queries
+    - Range-based validation for designated parameter-sensitive queries
     - Graceful handling of queries without expected results
 
     Automatically ensures all providers are registered on initialization.
@@ -160,6 +236,33 @@ class QueryValidator:
                 validation_mode=ValidationMode.SKIP,
                 warning_message=warning_msg,
             )
+
+        # Parameter-sensitive TPC-H queries (answer-set-boundary Q11/16/18/20)
+        # carry a canonical EXACT expectation because their answer-file
+        # cardinality is known under the reference seed. When a caller has
+        # signalled a NON-reference seed (set_reference_seed_context(False)) the
+        # query ran under different substitution parameters, so the exact count
+        # no longer applies: relax to the query's RANGE bounds (or LOOSE
+        # tolerance) instead of an exact comparison. This still fails a 0-row or
+        # out-of-range result while accepting spec-sanctioned variance -- a real
+        # bound, not the old unconditional skip. Reference-seed context (True)
+        # and callers that never set it (None -- qgen defaults, TPC-DS,
+        # DataFrame validation) fall through to the EXACT dispatch below, so a
+        # reference-seed regression is still caught exactly.
+        if get_reference_seed_context() is False and query_id_normalized in get_parameter_sensitive_query_ids(
+            benchmark_type
+        ):
+            if (
+                expected_result.expected_row_count_min is not None
+                and expected_result.expected_row_count_max is not None
+            ):
+                return self._validate_range(
+                    query_id_str,
+                    expected_result.expected_row_count_min,
+                    expected_result.expected_row_count_max,
+                    actual_row_count,
+                )
+            return expected_result.validate_loose(actual_row_count, scale_factor)
 
         # Get expected count (handles formulas and scale factors)
         expected_count = expected_result.get_expected_count(scale_factor)

@@ -1,0 +1,14 @@
+{
+  "benchmark": "Star Schema",
+  "bundle_file": "ssb_sf001_spark_sql_20260502_204553_d48f60f0.json",
+  "bundle_hash": "86331e7e2e52054ed5cea77a961dddf4ab1ad0a5e002b37792769c52221e5f93",
+  "companion_hashes": {},
+  "phase": 2,
+  "platform": "Spark",
+  "result_source": "internal",
+  "scale_factor": 0.01,
+  "submission_path": "path_30338255ec33",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:49:57.875530+00:00",
+  "submitted_by": "BenchBox UAT"
+}

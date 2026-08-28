@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib
+import sys
+from types import ModuleType
 from typing import Any
 
 _EXPORTS = {
@@ -16,7 +18,6 @@ _EXPORTS = {
     "profile": ("benchbox.cli.commands.profile", "profile"),
     "benchmarks": ("benchbox.cli.commands.benchmarks", "benchmarks"),
     "validate": ("benchbox.cli.commands.config", "validate"),
-    "create_sample_tuning": ("benchbox.cli.commands.tuning", "create_sample_tuning"),
     "export": ("benchbox.cli.commands.export", "export"),
     "check_dependencies": ("benchbox.cli.commands.checks", "check_dependencies"),
     "results": ("benchbox.cli.commands.results", "results"),
@@ -67,6 +68,16 @@ def get_config_manager() -> Any:
     if config_manager is None:
         config_manager = __getattr__("ConfigManager")
     return config_manager()
+
+
+class _CallableMainModule(ModuleType):
+    """Preserve the historic callable package export while remaining a module."""
+
+    def __call__(self) -> None:
+        self.main()
+
+
+sys.modules[__name__].__class__ = _CallableMainModule
 
 
 if __name__ == "__main__":

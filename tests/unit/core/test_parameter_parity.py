@@ -300,7 +300,9 @@ class TestRunnerParameterWiring:
             mock_set.assert_not_called()
 
     def test_execute_queries_clears_overrides_on_no_query_path(self):
-        """_execute_dataframe_queries clears overrides even when no queries are discovered."""
+        """_execute_dataframe_queries clears overrides even when no queries are discovered and ConfigurationError is raised."""
+        from benchbox.core.exceptions import ConfigurationError
+
         config = MagicMock()
         config.name = "tpch"
         config.scale_factor = 0.01
@@ -314,10 +316,11 @@ class TestRunnerParameterWiring:
         with (
             patch("benchbox.core.runner.dataframe_runner._get_queries_for_benchmark", return_value=[]),
             patch("benchbox.core.runner.dataframe_runner._clear_parameter_overrides") as mock_clear,
+            pytest.raises(ConfigurationError, match="no DataFrame query source"),
         ):
-            out = _execute_dataframe_queries(adapter, ctx, config, benchmark_instance, monitor=None)
-            assert out == []
-            mock_clear.assert_called_once_with("tpch")
+            _execute_dataframe_queries(adapter, ctx, config, benchmark_instance, monitor=None)
+
+        mock_clear.assert_called_once_with("tpch")
 
     def test_execute_queries_clears_overrides_on_unexpected_exception(self):
         """_execute_dataframe_queries clears overrides when execution path raises unexpectedly."""

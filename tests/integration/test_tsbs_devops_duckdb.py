@@ -8,6 +8,8 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+from datetime import datetime
+
 import duckdb
 import pytest
 
@@ -181,6 +183,27 @@ class TestTSBSDevOpsDuckDBIntegration:
 
             # Should be well-formed (basic check)
             assert query_text.count("(") == query_text.count(")"), f"Query {query_id} should have balanced parentheses"
+
+    def test_lastpoint_query_executes(self, tsbs_benchmark, duckdb_conn):
+        """The joined last-point query must qualify columns shared by both relations."""
+        duckdb_conn.execute("""
+            CREATE TABLE cpu (
+                time TIMESTAMP,
+                hostname VARCHAR,
+                usage_user DOUBLE,
+                usage_system DOUBLE,
+                usage_idle DOUBLE
+            )
+        """)
+        duckdb_conn.execute("""
+            INSERT INTO cpu VALUES
+                ('2024-01-01 00:00:00', 'host_0', 10, 5, 85),
+                ('2024-01-01 01:00:00', 'host_0', 20, 5, 75)
+        """)
+
+        rows = duckdb_conn.execute(tsbs_benchmark.get_query("lastpoint")).fetchall()
+
+        assert rows == [("host_0", datetime(2024, 1, 1, 1, 0), 20.0, 5.0, 75.0)]
 
     def test_scale_factor_validation(self, temp_dir):
         """Test that invalid scale factors are rejected."""

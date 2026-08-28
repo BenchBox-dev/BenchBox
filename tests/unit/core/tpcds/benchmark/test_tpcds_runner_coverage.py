@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from benchbox.core.results.metrics import TPCMetricsCalculator
 from benchbox.core.tpcds.benchmark.runner import TPCDSBenchmark
 from benchbox.core.tpcds.schema import TABLES
 from benchbox.core.validation import ValidationResult
@@ -87,6 +88,14 @@ def test_postgres_q90_rewrite_guards_zero_denominator(tpcds_benchmark):
     query = "SELECT CAST(amc AS DECIMAL(15, 4)) / CAST(pmc AS DECIMAL(15, 4)) AS am_pm_ratio FROM counts"
 
     rewritten = tpcds_benchmark._apply_target_dialect_overrides(90, query, "postgres")
+
+    assert "/ NULLIF(CAST(pmc AS DECIMAL(15, 4)), 0)" in rewritten
+
+
+def test_datafusion_q90_rewrite_guards_zero_denominator(tpcds_benchmark):
+    query = "SELECT CAST(amc AS DECIMAL(15, 4)) / CAST(pmc AS DECIMAL(15, 4)) AS am_pm_ratio FROM counts"
+
+    rewritten = tpcds_benchmark._apply_target_dialect_overrides(90, query, "datafusion")
 
     assert "/ NULLIF(CAST(pmc AS DECIMAL(15, 4)), 0)" in rewritten
 
@@ -209,8 +218,15 @@ def test_run_throughput_test_success(tpcds_benchmark, monkeypatch):
     assert result.streams_executed == 1
     assert result.streams_successful == 1
     assert result.success is True
-    assert result.throughput_at_size > 0
     assert result.stream_results[0]["queries_executed"] == 99
+    assert result.throughput_at_size == pytest.approx(
+        TPCMetricsCalculator.calculate_throughput_at_size(
+            total_queries=99,
+            total_time_seconds=result.total_duration,
+            scale_factor=1.0,
+            num_streams=1,
+        )
+    )
 
 
 def test_run_power_test_collects_query_error(tpcds_benchmark, monkeypatch):

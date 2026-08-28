@@ -338,25 +338,32 @@ def shell(ctx, platform, database, benchmark, scale, list_only, last, output, ho
 
     Supported platforms: DuckDB, SQLite, ClickHouse (more coming soon)
 
+    \b
     Examples:
         # Interactive selection from available databases
         benchbox shell
 
+    \b
         # List available databases
         benchbox shell --list
 
+    \b
         # Connect to most recent database
         benchbox shell --last
 
+    \b
         # Filter and select
         benchbox shell --benchmark tpch --scale 1.0
 
+    \b
         # Direct connection
         benchbox shell --platform duckdb --database benchmark.duckdb
 
+    \b
         # Use database from specific output directory
         benchbox shell --output benchmark_runs/results/tpch_20250101_120000
 
+    \b
         # ClickHouse shell
         benchbox shell --platform clickhouse --host localhost --port 9000 \\
           --user default --database benchbox

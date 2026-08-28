@@ -11,6 +11,7 @@ branch.
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import re
 from decimal import Decimal, InvalidOperation
@@ -32,8 +33,29 @@ except ImportError:  # pragma: no cover - slim published-results branch mirror.
     FUNDING_SOURCES = ("employer", "personal", "free-trial", "vendor-sponsored", "grant", "unspecified")
     RESULT_SOURCES = ("internal", "community", "vendor")
 
+
+def _load_bundle_failed_query_count():
+    """Load the stdlib-only helper without running results package initializers."""
+    helper_path = Path(__file__).resolve().parents[1] / "core" / "results" / "query_status.py"
+    spec = importlib.util.spec_from_file_location("_benchbox_query_status", helper_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load failed-query policy from {helper_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.bundle_failed_query_count
+
+
+bundle_failed_query_count = _load_bundle_failed_query_count()
+
 # Max length for the optional free-text submission_notes manifest field.
 SUBMISSION_NOTES_MAX_LEN = 500
+
+# Applied tuning receipts are attacker-controlled submission companions. These
+# ceilings sit well above realistic runs while bounding validation and Explorer
+# ingestion work. Oversized submissions fail loudly; the Explorer pipeline has
+# a separate defensive truncation marker for already-published legacy inputs.
+APPLIED_RECEIPT_MAX_ENTRIES = 10_000
+APPLIED_COMPANION_MAX_BYTES = 8 * 1024 * 1024
 
 # ---------------------------------------------------------------------------
 # Schema-v2 required top-level keys
@@ -49,12 +71,26 @@ REQUIRED_QUERY_KEYS = {"id", "ms"}
 # without the full BenchBox package.
 ACCEPTED_VERSION_PREFIX = "2."
 NUMERIC_SCHEMA_VERSION_RE = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
+ROW_COUNT_VALIDATION_SCHEMA_VERSION = (2, 2)
+ROW_COUNT_VALIDATION_MESSAGE_MAX_CHARS = 500
+ROW_COUNT_VALIDATION_STATUSES = frozenset({"PASSED", "FAILED", "SKIPPED", "ERROR"})
+ROW_COUNT_VALIDATION_FIELDS = frozenset({"status", "expected", "actual", "error", "warning"})
+ROW_COUNT_VALIDATION_REQUIRED_FIELDS = frozenset({"status", "expected", "actual"})
 
-# Companion file suffixes - skipped during bundle discovery.
-COMPANION_SUFFIXES = (".plans.json", ".tuning.json")
+# Companion file suffixes - skipped during bundle discovery, and copied
+# alongside their result bundle by publish/submit. `.applied.json` carries the
+# applied tuning ledger + `applied_ledger_hash`; leaving it out of this tuple
+# dropped that evidence from public bundles and surfaced it as a standalone run
+# in discovery paths.
+COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json")
 SUBMISSION_MANIFEST_FILENAME = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 PUBLIC_CLEAN_VALIDATION_STATUS = "passed"
+# Maintainer seed corpus includes partial and historically unvalidated cohorts
+# by design. Trusted mirror validation may retain these explicit non-clean
+# states; community submissions may not. Explorer ranking still excludes every
+# non-clean state, including ``not_run``.
+PUBLIC_MIRROR_ALLOWED_VALIDATION_STATUSES = frozenset({"passed", "partial", "not_run"})
 PUBLIC_NON_CLEAN_TRANSLATION_STATUSES = {"fallback", "failed"}
 CLI_REFUSED_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
 
@@ -277,7 +313,12 @@ def _validate_platform_section(platform: Any, vr: ValidationResult) -> None:
             vr.warn(f"Unknown platform name: {pl_name!r}")
 
 
-def _validate_summary_section(summary: Any, vr: ValidationResult) -> None:
+def _validate_summary_section(
+    summary: Any,
+    vr: ValidationResult,
+    *,
+    allow_partial_validation: bool = False,
+) -> None:
     if not isinstance(summary, dict):
         vr.error("'summary' must be a dict")
         return
@@ -285,12 +326,22 @@ def _validate_summary_section(summary: Any, vr: ValidationResult) -> None:
     if isinstance(queries_summary, dict):
         total_q = queries_summary.get("total", 0)
         if isinstance(total_q, (int, float)) and total_q == 0:
-            vr.warn("summary.queries.total is 0 - empty result?")
+            vr.error("summary.queries.total must be greater than 0 for a public result")
 
     validation_status = _normalize_status(summary.get("validation"))
-    if validation_status != PUBLIC_CLEAN_VALIDATION_STATUS:
+    allowed = (
+        PUBLIC_MIRROR_ALLOWED_VALIDATION_STATUSES
+        if allow_partial_validation
+        else frozenset({PUBLIC_CLEAN_VALIDATION_STATUS})
+    )
+    if validation_status not in allowed:
         if validation_status is None:
             vr.error("summary.validation is required for public submissions and must be 'passed'")
+        elif allow_partial_validation:
+            vr.error(
+                f"summary.validation must be one of {sorted(allowed)} for trusted mirror "
+                f"validation, got {validation_status!r}"
+            )
         else:
             vr.error(f"summary.validation must be 'passed' for public submissions, got {validation_status!r}")
 
@@ -489,7 +540,72 @@ def _validate_public_cost_section(data: dict[str, Any], vr: ValidationResult) ->
             )
 
 
-def _validate_single_query(index: int, q: Any, vr: ValidationResult) -> bool:
+def _schema_version_tuple(version: Any) -> tuple[int, ...] | None:
+    if not isinstance(version, str) or not NUMERIC_SCHEMA_VERSION_RE.fullmatch(version.strip()):
+        return None
+    return tuple(int(part) for part in version.strip().split("."))
+
+
+def _validate_row_count_validation(index: int, q: dict[str, Any], version: Any, vr: ValidationResult) -> None:
+    if "row_count_validation" not in q:
+        return
+
+    version_tuple = _schema_version_tuple(version)
+    if version_tuple is None or version_tuple < ROW_COUNT_VALIDATION_SCHEMA_VERSION:
+        vr.error(f"queries[{index}].row_count_validation requires schema version 2.2 or later")
+
+    evidence = q.get("row_count_validation")
+    if not isinstance(evidence, dict):
+        vr.error(f"queries[{index}].row_count_validation must be an object")
+        return
+
+    unknown = set(evidence) - ROW_COUNT_VALIDATION_FIELDS
+    if unknown:
+        vr.error(f"queries[{index}].row_count_validation has unknown fields: {sorted(unknown)}")
+    missing = ROW_COUNT_VALIDATION_REQUIRED_FIELDS - set(evidence)
+    if missing:
+        vr.error(f"queries[{index}].row_count_validation missing fields: {sorted(missing)}")
+
+    status = evidence.get("status")
+    if not isinstance(status, str) or status not in ROW_COUNT_VALIDATION_STATUSES:
+        vr.error(f"queries[{index}].row_count_validation.status is invalid: {status!r}")
+
+    normalized_counts: dict[str, int | None] = {}
+    for field in ("expected", "actual"):
+        value = evidence.get(field)
+        if value is None:
+            normalized_counts[field] = None
+        elif isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            vr.error(f"queries[{index}].row_count_validation.{field} must be a non-negative integer or null")
+            normalized_counts[field] = None
+        else:
+            normalized_counts[field] = value
+
+    rows = q.get("rows")
+    if rows is not None and (isinstance(rows, bool) or not isinstance(rows, int) or rows < 0):
+        vr.error(f"queries[{index}].rows must be a non-negative integer or null when row-count evidence is present")
+        rows = None
+    if normalized_counts["actual"] != rows:
+        vr.error(f"queries[{index}].row_count_validation.actual must match queries[{index}].rows")
+    if status == "PASSED" and (
+        normalized_counts["expected"] is None or normalized_counts["actual"] != normalized_counts["expected"]
+    ):
+        vr.error(f"queries[{index}].row_count_validation PASSED requires equal integer expected and actual counts")
+
+    for field in ("error", "warning"):
+        if field not in evidence:
+            continue
+        message = evidence[field]
+        if not isinstance(message, str):
+            vr.error(f"queries[{index}].row_count_validation.{field} must be a string")
+        elif len(message) > ROW_COUNT_VALIDATION_MESSAGE_MAX_CHARS:
+            vr.error(
+                f"queries[{index}].row_count_validation.{field} exceeds "
+                f"{ROW_COUNT_VALIDATION_MESSAGE_MAX_CHARS} characters"
+            )
+
+
+def _validate_single_query(index: int, q: Any, version: Any, vr: ValidationResult) -> bool:
     """Validate one queries[i] entry. Returns True if ms>0 was seen (non-zero signal)."""
     if not isinstance(q, dict):
         vr.error(f"queries[{index}] is not a dict")
@@ -499,6 +615,8 @@ def _validate_single_query(index: int, q: Any, vr: ValidationResult) -> bool:
     if missing_qk:
         vr.error(f"queries[{index}] missing keys: {sorted(missing_qk)}")
         return False
+
+    _validate_row_count_validation(index, q, version, vr)
 
     ms = q.get("ms")
     if ms is None:
@@ -515,24 +633,91 @@ def _validate_single_query(index: int, q: Any, vr: ValidationResult) -> bool:
     return ms_f > 0
 
 
-def _validate_queries_section(queries: Any, vr: ValidationResult) -> None:
+def _validate_queries_section(queries: Any, version: Any, vr: ValidationResult) -> None:
     if not isinstance(queries, list):
         vr.error("'queries' must be a list")
         return
     if len(queries) == 0:
-        vr.warn("queries array is empty")
+        vr.error("queries array must not be empty for a public result")
         return
 
     any_nonzero = False
+    any_nonzero_measurement = False
     for i, q in enumerate(queries):
-        if _validate_single_query(i, q, vr):
+        if _validate_single_query(i, q, version, vr):
             any_nonzero = True
+            run_type = str(q.get("run_type") or "measurement").lower() if isinstance(q, dict) else ""
+            if run_type == "measurement":
+                any_nonzero_measurement = True
 
     if not any_nonzero:
         vr.error("All query timings are 0ms - likely invalid data")
+    elif not any_nonzero_measurement:
+        vr.error("queries must contain at least one positive measurement timing")
 
 
-def _validate_bundle(data: dict, vr: ValidationResult) -> None:
+def _validate_execution_consistency(data: dict[str, Any], vr: ValidationResult) -> None:
+    """Reject a clean validation claim that contradicts measurement evidence."""
+    summary = data.get("summary")
+    if not isinstance(summary, dict) or _normalize_status(summary.get("validation")) != PUBLIC_CLEAN_VALIDATION_STATUS:
+        return
+
+    failed = bundle_failed_query_count(data)
+    if failed > 0:
+        noun = "query" if failed == 1 else "queries"
+        vr.error(f"summary.validation='passed' contradicts {failed} failed measurement {noun}")
+
+    queries = data.get("queries")
+    if isinstance(queries, list):
+        for i, q in enumerate(queries):
+            if not isinstance(q, dict):
+                continue
+            rcv = q.get("row_count_validation")
+            if isinstance(rcv, dict):
+                rcv_status = rcv.get("status")
+                if rcv_status is not None and rcv_status != "PASSED":
+                    vr.error(
+                        f"summary.validation='passed' contradicts queries[{i}].row_count_validation.status={rcv_status!r}"
+                    )
+
+
+def _validate_validation_phase_consistency(data: dict[str, Any], vr: ValidationResult) -> None:
+    """Reject validation claims contradicted by supplied validation-phase evidence."""
+    summary = data.get("summary")
+    if not isinstance(summary, dict):
+        return
+    summary_status = _normalize_status(summary.get("validation"))
+    if summary_status not in {"passed", "partial"}:
+        return
+
+    # ``phases`` is an optional extension to schema-v2. Older valid bundles do
+    # not carry phase evidence, so absence of the extension is not evidence of
+    # a failed validation claim. When the extension is present, however, keep
+    # the consistency check fail-closed for an explicitly missing/unknown
+    # validation phase.
+    if "phases" not in data:
+        return
+    phases = data["phases"]
+    if not isinstance(phases, dict) or "validation" not in phases:
+        phase_status = "unknown"
+    else:
+        validation_phase = phases["validation"]
+        raw_phase_status = validation_phase.get("status") if isinstance(validation_phase, dict) else None
+        phase_status = (
+            (_normalize_status(raw_phase_status) or "unknown") if isinstance(raw_phase_status, str) else "unknown"
+        )
+
+    compatible_phase_statuses = {"passed"} if summary_status == "passed" else {"passed", "partial"}
+    if phase_status not in compatible_phase_statuses:
+        vr.error(f"summary.validation={summary_status!r} contradicts phases.validation.status={phase_status!r}")
+
+
+def _validate_bundle(
+    data: dict,
+    vr: ValidationResult,
+    *,
+    allow_partial_validation: bool = False,
+) -> None:
     """Run all validation checks on a parsed bundle dict."""
     _capture_metadata(data, vr)
 
@@ -545,10 +730,16 @@ def _validate_bundle(data: dict, vr: ValidationResult) -> None:
     _validate_run_section(data.get("run", {}), vr)
     _validate_benchmark_section(data.get("benchmark", {}), vr)
     _validate_platform_section(data.get("platform", {}), vr)
-    _validate_summary_section(data.get("summary", {}), vr)
+    _validate_summary_section(
+        data.get("summary", {}),
+        vr,
+        allow_partial_validation=allow_partial_validation,
+    )
     _validate_translation_section(data, vr)
     _validate_public_cost_section(data, vr)
-    _validate_queries_section(data.get("queries", []), vr)
+    _validate_queries_section(data.get("queries", []), data.get("version"), vr)
+    _validate_execution_consistency(data, vr)
+    _validate_validation_phase_consistency(data, vr)
 
 
 def _hash_file(file_path: Path) -> str:
@@ -654,25 +845,68 @@ def _validate_manifest_hash(manifest_path: Path, bundle_dir: Path, vr: Validatio
         return
 
     for comp_name, comp_expected in companion_hashes.items():
-        if not isinstance(comp_name, str) or not _is_safe_bundle_filename(comp_name):
-            vr.error(f"Unsafe companion filename in manifest: {comp_name!r} (must be a plain filename)")
-            continue
-        comp_path = bundle_dir / comp_name
-        if comp_path.is_symlink():
-            vr.error(f"Companion file is a symlink, not a regular file: {comp_name} (symlinks not allowed)")
-            continue
-        if not comp_path.is_file():
-            vr.error(f"Companion file declared in manifest not found in PR: {comp_name}")
-            continue
-        if not isinstance(comp_expected, str) or not comp_expected:
-            vr.error(f"Empty companion hash for {comp_name}")
-            continue
-        comp_actual = _hash_file(comp_path)
-        if comp_actual != comp_expected:
-            vr.error(
-                f"Companion hash mismatch for {comp_name}: manifest says "
-                f"{comp_expected[:16]}..., computed {comp_actual[:16]}..."
-            )
+        _validate_manifest_companion(comp_name, comp_expected, bundle_dir, vr)
+
+
+def _validate_manifest_companion(
+    comp_name: object,
+    comp_expected: object,
+    bundle_dir: Path,
+    vr: ValidationResult,
+) -> None:
+    """Validate one manifest-declared companion without widening orchestration."""
+    if not isinstance(comp_name, str) or not _is_safe_bundle_filename(comp_name):
+        vr.error(f"Unsafe companion filename in manifest: {comp_name!r} (must be a plain filename)")
+        return
+    comp_path = bundle_dir / comp_name
+    if comp_path.is_symlink():
+        vr.error(f"Companion file is a symlink, not a regular file: {comp_name} (symlinks not allowed)")
+        return
+    if not comp_path.is_file():
+        vr.error(f"Companion file declared in manifest not found in PR: {comp_name}")
+        return
+    if not isinstance(comp_expected, str) or not comp_expected:
+        vr.error(f"Empty companion hash for {comp_name}")
+        return
+    if not _validate_applied_companion_limits(comp_path, vr):
+        return
+    comp_actual = _hash_file(comp_path)
+    if comp_actual != comp_expected:
+        vr.error(
+            f"Companion hash mismatch for {comp_name}: manifest says "
+            f"{comp_expected[:16]}..., computed {comp_actual[:16]}..."
+        )
+
+
+def _validate_applied_companion_limits(companion: Path, vr: ValidationResult) -> bool:
+    """Reject an applied receipt that exceeds the public submission bounds."""
+    if not companion.name.lower().endswith(".applied.json"):
+        return True
+    try:
+        size = companion.stat().st_size
+    except OSError as exc:
+        vr.error(f"Cannot inspect applied companion {companion.name}: {exc}")
+        return False
+    if size > APPLIED_COMPANION_MAX_BYTES:
+        vr.error(
+            f"Applied companion {companion.name} exceeds the {APPLIED_COMPANION_MAX_BYTES}-byte limit ({size} bytes)"
+        )
+        return False
+    try:
+        payload = json.loads(companion.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        # Companion schema validation remains owned by its producer. This gate
+        # only bounds inputs and must not broaden existing rejection semantics.
+        return True
+    receipt = payload.get("receipt") if isinstance(payload, dict) else None
+    entries = receipt.get("entries") if isinstance(receipt, dict) else None
+    if isinstance(entries, list) and len(entries) > APPLIED_RECEIPT_MAX_ENTRIES:
+        vr.error(
+            f"Applied receipt {companion.name} exceeds the {APPLIED_RECEIPT_MAX_ENTRIES}-entry limit "
+            f"({len(entries)} entries)"
+        )
+        return False
+    return True
 
 
 def _validate_manifest_provenance(manifest: dict[str, Any], primary_path: Path, vr: ValidationResult) -> None:
@@ -723,16 +957,21 @@ def _validate_manifest_provenance(manifest: dict[str, Any], primary_path: Path, 
 
 def discover_bundles(path: Path) -> list[Path]:
     """Find all primary bundle JSON files under a directory (excludes companions)."""
-    bundles = []
-    for f in sorted(path.rglob("*.json")):
-        if any(f.name.endswith(s) for s in COMPANION_SUFFIXES):
-            continue
-        if f.name == "corpus-inventory.json":
-            continue
-        if _is_submission_manifest_path(f):
-            continue
-        bundles.append(f)
-    return bundles
+    return [candidate for candidate in sorted(path.rglob("*")) if is_primary_bundle_file(candidate)]
+
+
+def is_primary_bundle_file(path: Path) -> bool:
+    """Return whether *path* is a regular primary bundle, case-insensitively."""
+    if not path.is_file():
+        return False
+    name = path.name.lower()
+    if not name.endswith(".json"):
+        return False
+    if any(name.endswith(suffix) for suffix in COMPANION_SUFFIXES):
+        return False
+    if name == "corpus-inventory.json":
+        return False
+    return not _is_submission_manifest_path(path)
 
 
 def _is_submission_manifest_path(path: Path) -> bool:
@@ -745,10 +984,16 @@ def _is_submission_manifest_path(path: Path) -> bool:
     ``<bundle_stem>.manifest.json`` exclusively, and the published-results
     workflow filter mirrors this skip pattern.
     """
-    return path.name == SUBMISSION_MANIFEST_FILENAME or path.name.endswith(SUBMISSION_MANIFEST_SUFFIX)
+    name = path.name.lower()
+    return name == SUBMISSION_MANIFEST_FILENAME or name.endswith(SUBMISSION_MANIFEST_SUFFIX)
 
 
-def validate_bundles(paths: list[Path], require_manifest: bool = False) -> list[ValidationResult]:
+def validate_bundles(
+    paths: list[Path],
+    require_manifest: bool = False,
+    *,
+    allow_partial_validation: bool = False,
+) -> list[ValidationResult]:
     """Validate a list of bundle files. Returns one ValidationResult per file.
 
     When ``require_manifest`` is True, a primary bundle with no paired
@@ -759,6 +1004,12 @@ def validate_bundles(paths: list[Path], require_manifest: bool = False) -> list[
     mirror PRs that sync develop's corpus onto ``published-results``. Without
     it, a community bundle submitted without a sidecar would pass validation and
     then inherit the ``maintainer-run`` trust label (and ranking eligibility).
+
+    When ``allow_partial_validation`` is True, ``summary.validation`` may be
+    ``passed``, ``partial``, or the explicit ``not_run`` state. That is for
+    the trusted maintainer mirror path only: the seed corpus intentionally
+    retains partial and legacy unvalidated evidence. Community submissions
+    must leave the flag off so every non-clean status remains refused.
     """
     results = []
     for bundle_path in paths:
@@ -769,6 +1020,10 @@ def validate_bundles(paths: list[Path], require_manifest: bool = False) -> list[
 
         if not bundle_path.exists():
             vr.error(f"File not found: {bundle_path}")
+            results.append(vr)
+            continue
+        if not bundle_path.is_file():
+            vr.error(f"Bundle path is not a regular file: {bundle_path}")
             results.append(vr)
             continue
 
@@ -784,7 +1039,19 @@ def validate_bundles(paths: list[Path], require_manifest: bool = False) -> list[
             results.append(vr)
             continue
 
-        _validate_bundle(data, vr)
+        _validate_bundle(data, vr, allow_partial_validation=allow_partial_validation)
+
+        # Bound an adjacent applied companion even if a hand-authored manifest
+        # omitted it. The manifest hash contract is checked separately below;
+        # resource bounds must not depend on honest companion enumeration.
+        applied_name = f"{bundle_path.stem}.applied.json".lower()
+        for companion in bundle_path.parent.iterdir():
+            if companion.name.lower() != applied_name:
+                continue
+            if companion.is_symlink():
+                vr.error(f"Companion file is a symlink, not a regular file: {companion.name} (symlinks not allowed)")
+            elif companion.is_file():
+                _validate_applied_companion_limits(companion, vr)
 
         # Check for submission manifest alongside the bundle.
         # Prefer per-bundle name (<stem>.manifest.json), fall back to legacy.

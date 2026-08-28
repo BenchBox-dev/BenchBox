@@ -130,7 +130,7 @@ from benchbox import TPCH
 benchmark = TPCH(scale_factor=0.1)
 
 # Test on multiple platforms
-platforms = ["duckdb", "clickhouse"]
+platforms = ["duckdb", "clickhouse-local"]
 
 for platform_name in platforms:
     print(f"Running on {platform_name}...")
@@ -339,11 +339,9 @@ benchbox run --platform lakesail --benchmark tpch --scale 1.0
 # DataFrame mode
 benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
 
-# Distributed mode
-benchbox run --platform lakesail --benchmark tpch --scale 10.0 \
-    --lakesail-mode distributed \
-    --lakesail-workers 4 \
-    --lakesail-endpoint sc://my-sail-cluster:50051
+# Distributed mode is selected through the Python adapter
+# (LakeSail registers no --platform-option keys)
+benchbox run --platform lakesail --benchmark tpch --scale 10.0
 ```
 
 See [LakeSail Platform Guide](lakesail.md) for the full configuration reference.
@@ -368,11 +366,11 @@ uv add benchbox --extra velox
 # Local mode - in-process SparkSession with the Gluten bundle jar loaded
 benchbox run --platform velox --benchmark tpch --scale 0.1 \
     --platform-option gluten_jar_path=/opt/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar \
-    --offheap-size 8g
+    --platform-option offheap_size=8g
 
 # Remote mode - connect to a pre-started Gluten-enabled Spark Connect server
-benchbox run --platform velox --velox-deployment remote \
-    --velox-endpoint sc://localhost:50051 \
+benchbox run --platform velox --platform-option deployment=remote \
+    --platform-option endpoint=sc://localhost:50051 \
     --benchmark tpch --scale 0.1
 ```
 

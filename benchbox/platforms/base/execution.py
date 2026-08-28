@@ -49,6 +49,7 @@ from benchbox.core.power_harnesses import (
 )
 from benchbox.core.results.builder import benchmark_family, normalize_benchmark_id
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT, QUERY_RUN_TYPE_WARMUP
+from benchbox.core.throughput.result import throughput_result_succeeded
 from benchbox.core.tpch.platform_power import _power_query_result, _power_test_error_result
 from benchbox.platforms.base.connection_wrappers import (
     PlatformAdapterConnection,
@@ -58,6 +59,58 @@ from benchbox.utils.dialect_utils import SQLTranslationError
 from benchbox.utils.printing import quiet_console
 
 __all__ = ["TestDriversMixin", "_power_query_result", "_power_test_error_result"]
+
+
+def _resolve_requested_stream_count(run_config: dict, default: int = 2) -> int:
+    """Resolve the concurrent stream count a throughput driver should use.
+
+    Both TPC-H and TPC-DS throughput drivers must agree on precedence, so this
+    is the single shared mapping point ("driver boundary") between the
+    RunConfig/BenchmarkConfig schema and the legacy ad hoc keys some callers
+    still pass directly:
+
+    1. ``num_streams`` / ``streams`` - back-compat keys some callers (and
+       existing unit tests) populate directly on a hand-built ``run_config``
+       dict, without going through ``RunConfig`` at all.
+    2. ``concurrent_streams`` - the canonical field
+       (``RunConfig.concurrent_streams`` <- ``BenchmarkConfig.concurrency``,
+       see ``benchbox/core/schemas.py``), present whenever ``run_config`` was
+       built from a real ``RunConfig`` (``benchbox/core/runner/runner.py``
+       spreads ``RunConfig.__dict__`` into the adapter kwargs). This is what
+       lets a user-requested stream count actually reach the driver.
+    3. ``default`` (2) - preserved only when NONE of the above keys are
+       present at all, i.e. a bare/legacy ``run_config`` dict that never
+       carried any stream-count information (must_preserve: existing default
+       of 2 streams when the user requests nothing).
+
+    Do NOT rename ``concurrent_streams`` across the schema to close this gap
+    elsewhere; this function is the intended mapping boundary.
+
+    Floor to the TPC throughput minimum (2)
+    ----------------------------------------
+    ``BenchmarkConfig.concurrency`` defaults to 1 (``benchbox/core/schemas.py``),
+    and the real pipeline *always* spreads it into ``run_config`` as
+    ``concurrent_streams=1`` (``RunConfig.concurrent_streams`` <-
+    ``benchmark_config.concurrency`` in ``benchbox/core/runner/runner.py:726``,
+    then ``run_config.__dict__`` is spread into the adapter kwargs at
+    ``runner.py:803``). That means a resolved count of 1 -- whether it came
+    from the schema default or an explicit user request of 1 -- is bitwise
+    indistinguishable at this boundary; there is no "unset" sentinel on the
+    wire to tell them apart. Both TPC-H and TPC-DS throughput tests have a
+    hard 2-stream minimum, and the must_preserve contract requires the
+    default (no stream count requested at all) to still run 2 streams. The
+    only resolution that satisfies both is to floor the final result to 2
+    regardless of how it was resolved above. Values >= 2 from any precedence
+    tier pass through unchanged; the num_streams/streams/concurrent_streams
+    precedence order above is untouched by this floor.
+    """
+    resolved = default
+    for key in ("num_streams", "streams", "concurrent_streams"):
+        value = run_config.get(key)
+        if value is not None:
+            resolved = int(value)
+            break
+    return max(resolved, 2)
 
 
 class _CapturedPlan(NamedTuple):
@@ -230,7 +283,7 @@ class TestDriversMixin:
             # Extract configuration
             scale_factor = run_config.get("scale_factor", 1.0)
             validation_mode = run_config.get("validation_mode")  # Universal validation mode
-            num_streams = run_config.get("num_streams", 2)
+            num_streams = _resolve_requested_stream_count(run_config)
             verbose = run_config.get("verbose", False)
 
             # Set TPC-DS validation mode from config (takes precedence over environment variable)
@@ -240,12 +293,17 @@ class TestDriversMixin:
                 f"[green]Running TPC-DS Throughput Test (Scale Factor: {scale_factor}, Streams: {num_streams})[/green]"
             )
 
-            # Create connection factory that wraps the platform adapter connection
+            # Create connection factory that wraps the platform adapter connection.
+            # new_stream_connection() dispatches on stream_connection_capability:
+            # SHARED_CURSOR (default) returns a thread-safe cursor of this one
+            # shared connection - correct and unchanged for embedded engines like
+            # DuckDB (https://duckdb.org/docs/stable/guides/python/multiple_threads).
+            # INDEPENDENT_CONNECTION (server-style adapter override) instead opens
+            # a brand-new connection/session per stream - see
+            # PlatformAdapter.new_stream_connection() for the full contract.
             def connection_factory():
-                # Create thread-safe cursor for concurrent stream execution
-                # See: https://duckdb.org/docs/stable/guides/python/multiple_threads
-                stream_cursor = _make_stream_cursor(connection)
-                conn_wrapper = PlatformAdapterConnection(stream_cursor, self)
+                stream_connection = self.new_stream_connection(connection)
+                conn_wrapper = PlatformAdapterConnection(stream_connection, self)
                 # Configure benchmark context for query validation
                 conn_wrapper.benchmark_type = "tpcds"
                 conn_wrapper.scale_factor = scale_factor
@@ -277,6 +335,11 @@ class TestDriversMixin:
                 throughput_test_result = throughput_test.run(config=cfg)
             else:
                 throughput_test_result = throughput_test.run()
+
+            throughput_test_result.success = throughput_result_succeeded(throughput_test_result, num_streams)
+            if not throughput_test_result.success:
+                throughput_test_result.throughput_at_size = None
+                throughput_test_result.query_throughput = 0.0
 
             # Display results
             if self.very_verbose:
@@ -365,18 +428,18 @@ class TestDriversMixin:
 
         try:
             scale_factor = run_config.get("scale_factor", 1.0)
-            num_streams = run_config.get("num_streams", run_config.get("streams", 2))
+            num_streams = _resolve_requested_stream_count(run_config)
             verbose = run_config.get("verbose", False)
 
             console.print(
                 f"[green]Running TPC-H Throughput Test (Scale Factor: {scale_factor}, Streams: {num_streams})[/green]"
             )
 
+            # See new_stream_connection() docstring / connection_factory comment
+            # in _execute_tpcds_throughput_test above for the capability contract.
             def connection_factory():
-                # Create thread-safe cursor for concurrent stream execution
-                # See: https://duckdb.org/docs/stable/guides/python/multiple_threads
-                stream_cursor = _make_stream_cursor(connection)
-                conn_wrapper = PlatformAdapterConnection(stream_cursor, self)
+                stream_connection = self.new_stream_connection(connection)
+                conn_wrapper = PlatformAdapterConnection(stream_connection, self)
                 # Configure benchmark context for query validation
                 conn_wrapper.benchmark_type = "tpch"
                 conn_wrapper.scale_factor = scale_factor
@@ -402,6 +465,10 @@ class TestDriversMixin:
             else:
                 throughput_test_result = throughput_test.run()
 
+            throughput_test_result.success = throughput_result_succeeded(throughput_test_result, num_streams)
+            if not throughput_test_result.success:
+                throughput_test_result.throughput_at_size = None
+                throughput_test_result.query_throughput = 0.0
             self._last_throughput_test_result = throughput_test_result
 
             if throughput_test_result.success:
@@ -473,12 +540,17 @@ class TestDriversMixin:
 
             console.print(f"[green]Running TPC-DS Maintenance Test (Scale Factor: {scale_factor})[/green]")
 
-            # Create connection factory that wraps the platform adapter connection
+            # Create connection factory that wraps the platform adapter connection.
+            # Routed through new_stream_connection() (see the throughput
+            # connection_factory above): SHARED_CURSOR (default) returns a
+            # thread-safe cursor of this one shared connection - unchanged for
+            # embedded engines like DuckDB. INDEPENDENT_CONNECTION opens a
+            # fresh connection/session per RF1/RF2 maintenance stream, so a
+            # server engine's refresh stream no longer shares the query
+            # stream's session.
             def connection_factory():
-                # Create thread-safe cursor for concurrent stream execution
-                # See: https://duckdb.org/docs/stable/guides/python/multiple_threads
-                stream_cursor = _make_stream_cursor(connection)
-                conn_wrapper = PlatformAdapterConnection(stream_cursor, self)
+                stream_connection = self.new_stream_connection(connection)
+                conn_wrapper = PlatformAdapterConnection(stream_connection, self)
                 # Configure benchmark context for query validation
                 conn_wrapper.benchmark_type = "tpcds"
                 conn_wrapper.scale_factor = scale_factor
@@ -568,13 +640,18 @@ class TestDriversMixin:
 
             console.print(f"[green]Running TPC-H Maintenance Test (Scale Factor: {scale_factor})[/green]")
 
+            # Routed through new_stream_connection() (see the throughput
+            # connection_factory in _execute_tpch_throughput_test): SHARED_CURSOR
+            # (default) returns a thread-safe cursor of this one shared
+            # connection - unchanged for embedded engines like DuckDB.
+            # INDEPENDENT_CONNECTION opens a fresh connection/session per
+            # RF1/RF2 maintenance stream, so a server engine's refresh stream
+            # no longer shares the query stream's session.
             def connection_factory():
-                # Create thread-safe cursor for maintenance operations
-                # See: https://duckdb.org/docs/stable/guides/python/multiple_threads
-                stream_cursor = _make_stream_cursor(connection)
+                stream_connection = self.new_stream_connection(connection)
                 # Use maintenance_mode=True to execute all queries directly on the connection
                 # (RF1/RF2 operations need real data, not validation-wrapped results)
-                conn_wrapper = PlatformAdapterConnection(stream_cursor, self, maintenance_mode=True)
+                conn_wrapper = PlatformAdapterConnection(stream_connection, self, maintenance_mode=True)
                 conn_wrapper.benchmark_type = "tpch"
                 conn_wrapper.scale_factor = scale_factor
                 return conn_wrapper
@@ -976,6 +1053,20 @@ class TestDriversMixin:
             return self._execute_operation_query(benchmark, connection, query_id)
 
         scale_factor = getattr(benchmark, "scale_factor", None)
+        validator = getattr(benchmark, "validate_query_result", None)
+        if callable(validator):
+            from benchbox.platforms.base.result_capture import materialized_result_validation
+
+            with materialized_result_validation(validator):
+                return self.execute_query(
+                    connection,
+                    query_sql,
+                    query_id,
+                    benchmark_type=benchmark_type,
+                    scale_factor=scale_factor,
+                    validate_row_count=self.enable_validation,
+                )
+
         return self.execute_query(
             connection,
             query_sql,
@@ -1050,6 +1141,12 @@ class TestDriversMixin:
             error_msg = result.get("error", "Unknown error")
             error_preview = error_msg[:80] + "..." if len(error_msg) > 80 else error_msg
             console.print(f"[red]❌ Query {index}/{total}: {query_id} FAILED - {error_preview}[/red]")
+        elif status == "VALIDATION_FAILED" or result.get("validation_passed") is False:
+            # The operation's write ran but a post-condition validation failed:
+            # surface it as a failure, never a green line.
+            error_msg = result.get("error") or "post-condition validation failed"
+            error_preview = error_msg[:80] + "..." if len(error_msg) > 80 else error_msg
+            console.print(f"[red]❌ Query {index}/{total}: {query_id} VALIDATION FAILED - {error_preview}[/red]")
         elif status == "SKIPPED":
             skip_reason = result.get("skip_reason") or result.get("error") or "Operation not supported on this platform"
             reason_preview = skip_reason[:80] + "..." if len(skip_reason) > 80 else skip_reason
@@ -1080,9 +1177,19 @@ class TestDriversMixin:
             console.print(f"[yellow]Benchmark cancelled. Processed {len(results)}/{total_queries} queries.[/yellow]")
             return
 
-        successful = len([r for r in results if r.get("status") == "SUCCESS"])
+        successful = len(
+            [r for r in results if r.get("status") == "SUCCESS" and r.get("validation_passed") is not False]
+        )
         skipped = len([r for r in results if r.get("status") == "SKIPPED"])
-        failed = len([r for r in results if r.get("status") == "FAILED"])
+        # A VALIDATION_FAILED operation (write ran, post-condition failed) counts
+        # as a failure, not a pass, alongside execution FAILED.
+        failed = len(
+            [
+                r
+                for r in results
+                if r.get("status") in ("FAILED", "VALIDATION_FAILED") or r.get("validation_passed") is False
+            ]
+        )
         if failed > 0:
             console.print(
                 f"[yellow]Completed {total_queries} queries: {successful} passed, {skipped} skipped, {failed} failed.[/yellow]"

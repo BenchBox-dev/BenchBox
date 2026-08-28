@@ -71,6 +71,42 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  binary-framing:
+    # Exercise each bundled TPC-H dbgen binary the runner can natively execute
+    # and assert its rows carry no trailing '|' (-DEOL_HANDLING convention, see
+    # PR #1056/#1069). The test skips foreign-arch binaries per-binary, so the
+    # ubuntu/macos/windows runners together cover linux-x86_64, darwin-arm64,
+    # windows-x86_64 and windows-arm64 (an x86_64 PE) natively. This is the only
+    # lane that runs the slow framing guard, so binary drift is caught here.
+    name: TPC-H binary framing guard
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Verify bundled dbgen binaries emit clean framing
+        run: |
+          uv run -- python -m pytest tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py -m slow -v
+
   check-test-patterns:
     runs-on: ubuntu-latest
     steps:
@@ -95,7 +131,7 @@ jobs:
       # Keep empty unless triage is documented in the TODO item.
       # PYSEC-2026-87 (lxml): redshift-connector==2.1.13 pins lxml<=6.0.2, so
       # the fixed lxml 6.1.0 can't be resolved until upstream relaxes that
-      # bound. See _project/TODO/main/planning/lxml-cve-pysec-2026-87-blocked-by-redshift-connector.yaml
+      # bound. See tracker item `lxml-cve-pysec-2026-87-blocked-by-redshift-connector`.
       PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-87"
     steps:
       - name: Checkout code
@@ -357,6 +393,11 @@ jobs:
         run: npm ci
         working-directory: results-explorer
 
+      - name: Audit frontend dependencies
+        if: steps.explorer.outputs.present == 'true'
+        run: npm run audit:high
+        working-directory: results-explorer
+
       - name: Verify parity fixtures match Python source
         if: steps.explorer.outputs.present == 'true'
         run: make parity-check
@@ -373,12 +414,12 @@ jobs:
     # exactly how release-canary.yml sat dead while the repo's safety story
     # leaned on it). This job scans the DEVELOP tree (where scheduled
     # workflows are authored) and fails when any of them has no SCHEDULED
-    # run within its cadence-derived window. It executes from main's copy of
-    # nightly.yml, so it takes effect once this file reaches main.
-    # DELIBERATE: a scheduled workflow newly authored on develop goes red
-    # here until it lands on main — that lag is exactly the silent gap this
-    # guard converts to a loud one; land the file (admin/release flow) or
-    # remove the schedule.
+    # run within its cadence-derived window. Scheduled workflows execute from
+    # the DEFAULT branch (develop, as of the 2026-07-08 default-branch switch),
+    # which is where they are authored, so this guard is effective as soon as a
+    # scheduled workflow merges to develop — there is no "until it lands on the
+    # release branch" lag anymore. (Before the switch the default was main, so
+    # a workflow stayed dark until a release carried it there; that gap is gone.)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -405,6 +446,7 @@ jobs:
           import sys
           import time
           import urllib.error
+          import urllib.parse
           import urllib.request
           from datetime import datetime, timedelta, timezone
           from pathlib import Path
@@ -474,6 +516,70 @@ jobs:
               print(f"::error::GitHub API unreachable after retries for {url}: {last_err}")
               sys.exit(1)
 
+          def _api_json(url: str):
+              """GET *url* as JSON, or None on any failure.
+
+              Every caller is a grace path: a failure here must never crash the
+              liveness job, only decline to relax it.
+              """
+              headers = {
+                  "Accept": "application/vnd.github+json",
+                  "User-Agent": "benchbox-scheduled-workflow-liveness",
+              }
+              if token:
+                  headers["Authorization"] = f"Bearer {token}"
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=30) as resp:
+                      return json.load(resp)
+              except (urllib.error.HTTPError, urllib.error.URLError, ValueError):
+                  return None
+
+          def _parse_ts(value):
+              if not value:
+                  return None
+              try:
+                  return datetime.fromisoformat(value.replace("Z", "+00:00"))
+              except ValueError:
+                  return None
+
+          def workflow_registered_at(workflow_file: str):
+              """Anchor date for the activation grace of a never-fired schedule.
+
+              The grace exists for a scheduled workflow whose first cron fire is
+              still pending: it has zero scheduled runs not because it is dead
+              but because it has not had a chance to fire yet.
+
+              This used to read ONLY the Actions API `created_at`, which is when
+              the FILE first registered -- and that is the wrong date for a
+              workflow that gains a cron later. `seed-corpus.yml` registered
+              2026-04-02 as a dispatch-only workflow and gained
+              `cron: "0 7 1 * *"` on 2026-08-21 in #1794. Its first scheduled
+              fire is 1 September, but the grace was measured from April, so it
+              was reported dead and took the whole liveness job red -- and would
+              have stayed red until September no matter what anyone did.
+
+              So take the LATER of file registration and the last commit that
+              touched the workflow file. This path is only reached when a
+              workflow has never had a scheduled run at all, so a recently
+              edited file is far more likely to be newly scheduled than dead.
+              """
+              anchors = []
+
+              payload = _api_json(f"{api}/repos/{repo}/actions/workflows/{workflow_file}")
+              if isinstance(payload, dict):
+                  anchors.append(_parse_ts(payload.get("created_at")))
+
+              path = f".github/workflows/{workflow_file}"
+              commits = _api_json(
+                  f"{api}/repos/{repo}/commits?path={urllib.parse.quote(path)}&per_page=1"
+              )
+              if isinstance(commits, list) and commits:
+                  commit = commits[0].get("commit", {}).get("committer", {})
+                  anchors.append(_parse_ts(commit.get("date")))
+
+              anchors = [a for a in anchors if a is not None]
+              return max(anchors) if anchors else None
+
           dead: list[str] = []
           checked = 0
           for path in sorted(wf_dir.glob("*.yml")) + sorted(wf_dir.glob("*.yaml")):
@@ -485,6 +591,19 @@ jobs:
               window_days = cadence_window_days(cron_re.findall(on_block.group(1)))
               runs = latest_scheduled_run(path.name)
               if not runs:
+                  # Activation grace: a workflow added within its own cadence
+                  # window has not had a scheduled fire yet, so "no runs" is
+                  # expected, not dead. This grace only RELAXES the check (it can
+                  # never turn a live schedule red); worst case it tolerates a
+                  # genuinely-dead brand-new workflow for one cadence window,
+                  # after which the missing run trips the check normally.
+                  registered = workflow_registered_at(path.name)
+                  if registered is not None and datetime.now(timezone.utc) - registered <= timedelta(days=window_days):
+                      print(
+                          f"{path.name}: registered {registered.date()}, no scheduled "
+                          f"run yet -- within its {window_days}-day activation grace."
+                      )
+                      continue
                   dead.append(
                       f"{path.name}: no scheduled runs at all -- absent from the "
                       "default branch, or its cron is disabled/never fires"
@@ -510,6 +629,115 @@ jobs:
               sys.exit(1)
           print(f"All {checked} scheduled workflow(s) alive within their cadence windows.")
           PY
+
+  throughput-uat:
+    # Closes the throughput-uat-and-ci-coverage gap: concurrency previously had
+    # zero UAT/CI coverage, so a regression that broke multi-stream execution
+    # (or silently floored the requested stream count -- see
+    # throughput-stream-count-wiring-defect) would have shipped green. This
+    # job is the nightly-only real-DB/real-CLI lane; PR fast-lane runtime is
+    # unaffected (see tests/uat/configs/uat-throughput-duckdb-nightly.yaml).
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run real-DB throughput integration tests (DuckDB)
+        run: |
+          uv run -- python -m pytest tests/integration -k "throughput and duckdb" -m integration --tb=short -v
+
+      - name: Capture throughput UAT start timestamp
+        # Captured BEFORE the sweep step so the assert step below can filter
+        # on "written after this run started" precisely, instead of the
+        # previous full-hour `now() - 1h` window -- which, over a shared,
+        # persistent results dir (multi-cell sweeps, repeated nightly runs
+        # on a non-ephemeral runner), risked resolving a stale file from an
+        # earlier run instead of this run's own export.
+        run: |
+          echo "THROUGHPUT_UAT_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S)" >> "$GITHUB_ENV"
+
+      - name: Run DuckDB throughput UAT cell (TPC-H SF1, run-official --streams 3)
+        # Gated on the sweep's own exit code: the config's
+        # `validator_clean_rate_floor: 1.0` plus the strict report exit
+        # policy fail this step on any non-clean cell. The TPC-H
+        # queries-11/16/18/20 seed-derivation defect that used to keep this
+        # cell permanently red (and required a `continue-on-error: true`
+        # here) was fixed in #1142 -- see the HISTORICAL NOTE on
+        # `validate_throughput_metric` in tests/uat/throughput.py. Do NOT
+        # re-add `continue-on-error` here; the step below is the
+        # independent, defense-in-depth wiring check, not a substitute for
+        # gating on this step's own exit code.
+        run: |
+          make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml
+
+      - name: Assert the requested stream count reached the driver and every stream succeeded
+        # Independent, defense-in-depth gate. `if: !cancelled()` is load-bearing:
+        # without it, a FAILED sweep step above would SKIP this step under GitHub
+        # Actions' default `success()` step-condition, so the gate would silently
+        # stop running exactly when it matters most. `!cancelled()` makes it run
+        # (and gate) on both a passing AND a failing sweep -- only a workflow
+        # cancellation skips it -- so this check stays genuinely independent of
+        # the sweep step's outcome. Now strict: both the wiring-defect check
+        # (distinct stream ids == requested, validate_stream_count) AND the
+        # per-stream success check (every counted stream had >=1 SUCCESSFUL
+        # query, validate_stream_success) must pass -- see tests/uat/throughput.py
+        # for why these stay two separate functions.
+        if: ${{ !cancelled() }}
+        run: |
+          uv run -- python -c "
+          import datetime, os, sys
+          from datetime import timezone
+          from pathlib import Path
+          from tests.uat.throughput import (
+              validate_stream_count,
+              validate_stream_success,
+          )
+
+          # Narrow window: the timestamp captured immediately before the sweep
+          # step above, not a full-hour lookback -- see that step's comment.
+          # The capture step writes UTC (date -u); strptime yields a naive
+          # datetime whose .timestamp() would otherwise be read as LOCAL, so
+          # anchor it to UTC explicitly -- correct on any runner TZ, not just
+          # ubuntu-latest's UTC.
+          started_after = datetime.datetime.strptime(
+              os.environ['THROUGHPUT_UAT_STARTED_AT'], '%Y-%m-%dT%H:%M:%S'
+          ).replace(tzinfo=timezone.utc)
+          results_dir = Path.home() / 'Developer' / 'benchmark_runs' / 'results'
+          candidates = [
+              p for p in results_dir.glob('tpch_sf1_duckdb_*.json')
+              if not p.name.endswith('.applied.json')
+              and not p.name.endswith('.plans.json')
+              and p.stat().st_mtime >= (started_after.timestamp() - 5)
+          ]
+          result_path = max(candidates, key=lambda p: (p.stat().st_mtime, p.name)) if candidates else None
+          if result_path is None:
+              print('::error::No throughput UAT result JSON found for duckdb/tpch')
+              sys.exit(1)
+          import json
+          result_json = json.loads(result_path.read_text(encoding='utf-8'))
+          ok, reason = validate_stream_count(result_json, requested_streams=3)
+          if not ok:
+              print(f'::error::{reason}')
+              sys.exit(1)
+          ok, reason = validate_stream_success(result_json)
+          if not ok:
+              print(f'::error::{reason}')
+              sys.exit(1)
+          print(f'OK: stream count and per-stream success both verified ({result_path})')
+          "
 
   pyspark-tests:
     runs-on: ubuntu-latest
@@ -539,3 +767,81 @@ jobs:
       - name: Run PySpark tests
         run: |
           make test-pyspark
+
+  green-unmerged-sweep:
+    # External read-only observer for true auto-merge stranding (arm intent
+    # then lost): green + auto-merge OFF alone is an intentional hold after
+    # the post-#1592 policy and is NOT alerted. The script requires timeline
+    # evidence of prior arm (ready_for_review / auto_squash_enabled /
+    # auto_merge_disabled) and excludes durable holds (draft or the
+    # `no-auto-merge` label). It does NOT modify auto-merge-on-open.yml and
+    # does NOT enable auto-merge itself -- --apply only upserts one
+    # marker-tagged tracking issue and must never re-arm a hold it did not
+    # set. See docs/operations/pr-triage.md.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: write
+      # green_unmerged_sweep.py lists check runs (commits/{sha}/check-runs) for
+      # every candidate PR, and with --check-post-merge also lists workflow runs
+      # (actions/workflows/develop-post-merge.yml/runs). A job-level permissions
+      # map sets every unlisted scope to "no access", so without these two the
+      # scheduled sweep 403s before it can classify PRs or update its tracking
+      # issue.
+      checks: read
+      actions: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Run green-unmerged sweep
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: uv run -- python _project/scripts/green_unmerged_sweep.py --apply --check-post-merge
+
+  fast-lane-ratchet-check:
+    # Auto-ratchet signal for the fast-lane test-count ceiling (see
+    # fast-lane-decouple-ceiling-contention-2 and
+    # docs/operations/fast-lane-budget.md): runs the same fast-lane collect
+    # pr.yml's guard-timing-policy step uses and, when headroom drops below
+    # the warning threshold, files/updates ONE marker-tagged tracking issue
+    # with the current numbers and the exact edit to make -- it does NOT
+    # push a branch or open a PR itself (GITHUB_TOKEN-authored PRs get no
+    # required checks; same known constraint green_unmerged_sweep.py's own
+    # docstring notes). A ceiling bump stays a deliberate human/agent PR;
+    # this job only surfaces the need before the next test-adding PR
+    # collides with the cap.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run fast-lane ceiling ratchet check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: uv run -- python _project/scripts/fast_lane_ratchet_check.py --apply

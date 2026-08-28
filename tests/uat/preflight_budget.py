@@ -1,14 +1,15 @@
 """Disk-budget estimator for UAT configs.
 
-The checked-in TSV is an operator-maintained inventory from prior UAT
-sweeps. Unknown cells stay visible in the estimate instead of being
-treated as zero; preflight uses known peak demand as a headroom gate while
-surfacing unknown coverage as an operator warning.
+The checked-in TSV is an operator-maintained inventory from prior UAT sweeps.
+Unknown cells stay visible in the estimate instead of being treated as zero.
+Preflight uses known peak demand as a headroom gate while surfacing unknown
+coverage as an operator warning. All values represent lower bounds.
 """
 
 from __future__ import annotations
 
 import csv
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -19,9 +20,100 @@ from tests.uat.phases.enumerate import Cell, enumerate_cells
 DEFAULT_TABLE_PATH = Path(__file__).resolve().parent / "data" / "disk_budget_table.tsv"
 
 
+def free_space_gib(path: str | Path) -> float:
+    """Return free space at `path` in GiB."""
+    p = Path(path).expanduser()
+    if not p.exists():
+        p = next((ancestor for ancestor in p.parents if ancestor.exists()), Path("/"))
+    usage = shutil.disk_usage(p)
+    return usage.free / (1024**3)
+
+
+DATABASE_STATUS_MEASURED = "measured"
+DATABASE_STATUS_UNMEASURED = "unmeasured"
+
+
+@dataclass(frozen=True)
+class MemorySnapshot:
+    """Host memory reading for free-memory headroom gate (preflight.free_memory_min_gib)."""
+
+    free_gib: float | None
+    swap_used_percent: float | None
+
+
+def read_memory_snapshot() -> MemorySnapshot:
+    """Best-effort host free-memory and swap-pressure reading via psutil."""
+    try:
+        import psutil
+    except ImportError:
+        return MemorySnapshot(free_gib=None, swap_used_percent=None)
+    try:
+        free_gib = psutil.virtual_memory().available / (1024**3)
+    except (OSError, RuntimeError, ValueError, AttributeError):
+        free_gib = None
+    try:
+        swap_used_percent = psutil.swap_memory().percent
+    except (OSError, RuntimeError, ValueError, AttributeError):
+        swap_used_percent = None
+    return MemorySnapshot(free_gib=free_gib, swap_used_percent=swap_used_percent)
+
+
+@dataclass(frozen=True)
+class MemoryHeadroomCheck:
+    """Memory-gate result for one host memory snapshot."""
+
+    free_gib: float | None
+    required_gib: float
+    swap_used_percent: float | None
+
+    @property
+    def shortfall(self) -> bool:
+        """True iff free memory was measured and fell below the floor.
+
+        An unmeasured reading (`free_gib is None`) is never a shortfall --
+        the fail-safe "unknown != failing" branch (see
+        `read_memory_snapshot`).
+        """
+        return self.free_gib is not None and self.free_gib < self.required_gib
+
+
+def check_memory_headroom(snapshot: MemorySnapshot, *, min_free_gib: float) -> MemoryHeadroomCheck:
+    """Compare a memory snapshot against the configured floor.
+
+    Mirrors `check_disk_headroom`'s shape. Callers own the 0-disables
+    convention (`min_free_gib <= 0` means the gate is off) the same way
+    `execute.py`'s free-space check does -- this function does not special
+    case it, but `shortfall` is `False` whenever `min_free_gib <= 0` since
+    no measured `free_gib` can be less than a non-positive floor.
+    """
+    return MemoryHeadroomCheck(
+        free_gib=snapshot.free_gib,
+        required_gib=min_free_gib,
+        swap_used_percent=snapshot.swap_used_percent,
+    )
+
+
+def format_memory_headroom_failure(check: MemoryHeadroomCheck) -> str:
+    """Operator-facing abort reason for a memory-budget shortfall."""
+    swap_note = f"; swap {check.swap_used_percent:.1f}% used" if check.swap_used_percent is not None else ""
+    return (
+        f"memory headroom gate failed: {check.free_gib:.2f} GiB free < {check.required_gib:.2f} GiB required{swap_note}"
+    )
+
+
 @dataclass(frozen=True)
 class DiskBudgetRow:
-    """One observed disk envelope for a (platform, benchmark, scale) cell."""
+    """One observed disk envelope for a (platform, benchmark, scale) cell.
+
+    `database_status` records whether `peak_database_gib` is a real
+    observation or a placeholder, read from the optional
+    `peak_database_gib_status` TSV column. It defaults to
+    `DATABASE_STATUS_MEASURED` so a table without the column keeps its
+    historical meaning, but the checked-in inventory sets every row to
+    `DATABASE_STATUS_UNMEASURED` -- its `peak_database_gib` zeros are "we
+    never measured this", NOT "these databases are free" (see the module
+    docstring). Only a real measured sweep may flip a row to `measured`.
+    """
 
     platform: str
     benchmark: str
@@ -29,6 +121,11 @@ class DiskBudgetRow:
     peak_datagen_gib: float
     peak_database_gib: float
     transient_growth_gib: float
+    database_status: str = DATABASE_STATUS_MEASURED
+
+    @property
+    def database_measured(self) -> bool:
+        return self.database_status == DATABASE_STATUS_MEASURED
 
 
 @dataclass(frozen=True)
@@ -46,12 +143,25 @@ class UnknownDiskCell:
 
 @dataclass(frozen=True)
 class DiskBudget:
-    """Estimated disk demand for a config."""
+    """Estimated disk demand for a config.
+
+    ``database_by_platform_gib`` is the measured loaded-database term only,
+    keyed by platform, derived from the configured cells' inventory rows.
+    Unmeasured or missing rows stay out of that map rather than being modelled
+    as free. ``concurrent_database_gib`` is the sum (all platforms coexist);
+    ``chunked_database_gib`` is the max (one platform at a time). Both are
+    lower bounds over the measured subset.
+    """
 
     cells: int
     est_peak_gib: float
     est_steady_gib: float
     unknown_cells: tuple[UnknownDiskCell, ...]
+    database_by_platform_gib: tuple[tuple[str, float], ...] = ()
+    concurrent_database_gib: float = 0.0
+    chunked_database_gib: float = 0.0
+    platforms_total: int = 0
+    platforms_with_measured_database: int = 0
 
 
 @dataclass(frozen=True)
@@ -89,11 +199,82 @@ def cell_key(platform: str, benchmark: str, scale: float) -> str:
     return f"{platform}|{benchmark}|{scale:g}"
 
 
+@dataclass(frozen=True)
+class CellDiskPrediction:
+    """Conservative per-cell disk-growth prediction from one inventory row.
+
+    ``known_growth_gib`` is deliberately a lower bound: datagen and transient
+    growth are measured when the row exists, while an unmeasured database
+    footprint is kept as ``None`` and excluded from the arithmetic. Callers
+    must surface ``database_measured`` alongside any decision; the missing
+    database term is never silently represented as a measured zero.
+    """
+
+    platform: str
+    benchmark: str
+    scale: float
+    datagen_gib: float
+    transient_growth_gib: float
+    database_gib: float | None
+
+    @property
+    def database_measured(self) -> bool:
+        """Whether the prediction includes a measured database footprint."""
+        return self.database_gib is not None
+
+    @property
+    def known_growth_gib(self) -> float:
+        """Return the measured lower-bound growth reserved before the cell."""
+        return self.datagen_gib + self.transient_growth_gib + (self.database_gib or 0.0)
+
+    @property
+    def is_lower_bound(self) -> bool:
+        """True when the unmeasured database component is omitted."""
+        return not self.database_measured
+
+
+def predict_cell_disk_growth(
+    platform: str,
+    benchmark: str,
+    scale: float,
+    *,
+    table: BudgetTable,
+    datagen_already_present: bool = False,
+) -> CellDiskPrediction | None:
+    """Predict the known disk growth for one cell, or ``None`` if unknown.
+
+    Datagen is shared by benchmark and scale across platforms, so callers
+    provide ``datagen_already_present`` after the first source has run. The
+    database term is per platform/cell and contributes only when its inventory
+    row explicitly marks it as measured. A missing row remains unknown rather
+    than becoming a false zero.
+    """
+    row = table.get((platform, benchmark, scale))
+    if row is None:
+        return None
+    return CellDiskPrediction(
+        platform=platform,
+        benchmark=benchmark,
+        scale=scale,
+        datagen_gib=0.0 if datagen_already_present else row.peak_datagen_gib,
+        transient_growth_gib=row.transient_growth_gib,
+        database_gib=row.peak_database_gib if row.database_measured else None,
+    )
+
+
 def load_budget_table(path: Path | None = None) -> BudgetTable:
     """Load the advisory disk-budget TSV.
 
     Extra columns are ignored so future inventories can carry provenance
-    without changing the estimator contract.
+    without changing the estimator contract, with one exception: the
+    optional `peak_database_gib_status` column is read into
+    `DiskBudgetRow.database_status`. It is how the inventory declares that
+    a `peak_database_gib` value is a placeholder rather than a
+    measurement, and every row of the checked-in table currently declares
+    `unmeasured` -- so the loaded-database term of every estimate this
+    module produces is zero for want of data, not because the databases
+    are small. `assess_budget_coverage` turns that into an operator-facing
+    disclosure; nothing here silently treats it as a real zero.
     """
     table_path = path or DEFAULT_TABLE_PATH
     rows: BudgetTable = {}
@@ -120,6 +301,7 @@ def load_budget_table(path: Path | None = None) -> BudgetTable:
                 peak_datagen_gib=float(row["peak_datagen_gib"]),
                 peak_database_gib=float(row["peak_database_gib"]),
                 transient_growth_gib=float(row["transient_growth_gib"]),
+                database_status=(row.get("peak_database_gib_status") or DATABASE_STATUS_MEASURED).strip().lower(),
             )
             rows[(budget_row.platform, budget_row.benchmark, budget_row.scale_factor)] = budget_row
     return rows
@@ -129,35 +311,20 @@ def estimate_peak_disk(config: UATConfig, *, table_path: Path | None = None) -> 
     """Return an advisory disk estimate for all cells enumerated by *config*.
 
     Datagen is counted once per (benchmark, scale) because UAT reuses
-    source data across platforms where possible. Database and transient
-    growth are counted per cell. Unknown cells are reported separately;
-    callers must not treat them as a hard gate.
+    source data across platforms where possible. Measured loaded-database
+    demand is summed per platform (not guessed: only inventory rows marked
+    ``measured`` contribute). Transient growth is counted per cell. Unknown
+    and unmeasured cells are reported separately; callers must not treat a
+    missing database figure as zero demand.
     """
     return estimate_cells(enumerate_cells(config), table=load_budget_table(table_path))
-
-
-def estimate_peak_disk_by_scale(config: UATConfig, *, table_path: Path | None = None) -> dict[float, DiskBudget]:
-    """Return advisory disk estimates grouped by scale rung."""
-    table = load_budget_table(table_path)
-    cells_by_scale: dict[float, list[Cell]] = {}
-    for cell in enumerate_cells(config):
-        cells_by_scale.setdefault(cell.scale, []).append(cell)
-    return {scale: estimate_cells(cells, table=table) for scale, cells in cells_by_scale.items()}
-
-
-def estimate_largest_scale_peak_disk(config: UATConfig, *, table_path: Path | None = None) -> DiskBudget:
-    """Return the disk estimate for the largest configured scale rung."""
-    by_scale = estimate_peak_disk_by_scale(config, table_path=table_path)
-    if not by_scale:
-        return DiskBudget(cells=0, est_peak_gib=0.0, est_steady_gib=0.0, unknown_cells=())
-    return by_scale[max(by_scale)]
 
 
 def estimate_cells(cells: Iterable[Cell], *, table: BudgetTable) -> DiskBudget:
     """Estimate a concrete cell iterable; public for focused tests."""
     cells_tuple = tuple(cells)
     datagen_by_source: dict[tuple[str, float], float] = {}
-    database_gib = 0.0
+    database_by_platform: dict[str, float] = {}
     transient_gib = 0.0
     unknown: list[UnknownDiskCell] = []
 
@@ -168,16 +335,171 @@ def estimate_cells(cells: Iterable[Cell], *, table: BudgetTable) -> DiskBudget:
             continue
         datagen_key = (cell.benchmark, cell.scale)
         datagen_by_source[datagen_key] = max(datagen_by_source.get(datagen_key, 0.0), row.peak_datagen_gib)
-        database_gib += row.peak_database_gib
+        if row.database_measured:
+            database_by_platform[cell.platform] = database_by_platform.get(cell.platform, 0.0) + row.peak_database_gib
         transient_gib += row.transient_growth_gib
 
+    database_gib = sum(database_by_platform.values())
+    platform_totals = tuple(sorted(database_by_platform.items()))
     steady_gib = sum(datagen_by_source.values()) + database_gib
     return DiskBudget(
         cells=len(cells_tuple),
         est_peak_gib=steady_gib + transient_gib,
         est_steady_gib=steady_gib,
         unknown_cells=tuple(unknown),
+        database_by_platform_gib=platform_totals,
+        concurrent_database_gib=database_gib,
+        chunked_database_gib=max(database_by_platform.values(), default=0.0),
+        platforms_total=len({cell.platform for cell in cells_tuple}),
+        platforms_with_measured_database=len(database_by_platform),
     )
+
+
+def largest_scale_cells(config: UATConfig) -> tuple[Cell, ...]:
+    """Return the enumerated cells at the config's largest configured scale rung.
+
+    This is the live cell-selection path for the preflight disk-budget gate
+    (`estimate_disk_budget_summary_and_gate` in `phases/preflight.py`), so
+    `assess_budget_coverage` reports coverage of exactly what the gate gated
+    on rather than of a differently-selected population.
+    """
+    cells_by_scale: dict[float, list[Cell]] = {}
+    for cell in enumerate_cells(config):
+        cells_by_scale.setdefault(cell.scale, []).append(cell)
+    if not cells_by_scale:
+        return ()
+    return tuple(cells_by_scale[max(cells_by_scale)])
+
+
+@dataclass(frozen=True)
+class DiskBudgetCoverage:
+    """How much of a `DiskBudget` rests on measured data rather than absence.
+
+    Two independent gaps, counted separately because they fail differently
+    (see the module docstring):
+
+    - `cells_with_rows` / `cells_total` and `measured_platforms` /
+      `platforms_total`: cells the inventory has no row for at all. These
+      contribute 0 GiB to the estimate.
+    - `cells_with_measured_database` / `cells_total`: cells whose row
+      exists but whose `peak_database_gib` is a declared placeholder. These
+      contribute a real datagen figure and a fictitious 0 GiB database
+      figure.
+
+    `is_lower_bound` is true when either gap is non-empty, which is the
+    signal callers must use to avoid reporting a passing gate as "fits".
+    """
+
+    cells_total: int
+    cells_with_rows: int
+    cells_with_measured_database: int
+    platforms_total: int
+    measured_platforms: tuple[str, ...]
+    unmeasured_platforms: tuple[str, ...]
+
+    @property
+    def is_lower_bound(self) -> bool:
+        """True when the estimate omits demand it could not measure."""
+        return self.cells_with_rows < self.cells_total or self.cells_with_measured_database < self.cells_total
+
+
+def assess_budget_coverage(cells: Iterable[Cell], *, table: BudgetTable) -> DiskBudgetCoverage:
+    """Report which of *cells* the budget table actually measures.
+
+    A platform counts as measured only when EVERY one of its cells has a
+    row AND every one of those rows declares a measured
+    `peak_database_gib`. Anything weaker would let a platform with one
+    datagen row and no database measurement read as covered, which is the
+    exact "modelled as 0" failure this exists to prevent.
+    """
+    cells_tuple = tuple(cells)
+    platforms = sorted({cell.platform for cell in cells_tuple})
+    cells_with_rows = 0
+    cells_with_measured_database = 0
+    unmeasured: set[str] = set()
+    for cell in cells_tuple:
+        row = table.get((cell.platform, cell.benchmark, cell.scale))
+        if row is None:
+            unmeasured.add(cell.platform)
+            continue
+        cells_with_rows += 1
+        if row.database_measured:
+            cells_with_measured_database += 1
+        else:
+            unmeasured.add(cell.platform)
+    return DiskBudgetCoverage(
+        cells_total=len(cells_tuple),
+        cells_with_rows=cells_with_rows,
+        cells_with_measured_database=cells_with_measured_database,
+        platforms_total=len(platforms),
+        measured_platforms=tuple(p for p in platforms if p not in unmeasured),
+        unmeasured_platforms=tuple(p for p in platforms if p in unmeasured),
+    )
+
+
+_MAX_LISTED_PLATFORMS = 6
+
+
+def format_budget_coverage(coverage: DiskBudgetCoverage) -> str:
+    """One-line operator disclosure of what the budget estimate does not know.
+
+    Deliberately never says "fits". A complete estimate is stated as
+    complete; anything else is stated as a lower bound, naming the
+    unmeasured platforms so the operator can tell "measured and fine" from
+    "mostly unmeasured".
+    """
+    if coverage.cells_total == 0:
+        return "Disk budget coverage: no cells enumerated for this config; nothing measured and nothing gated"
+    if not coverage.is_lower_bound:
+        return (
+            "Disk budget coverage: COMPLETE -- measured rows cover all "
+            f"{coverage.cells_total} largest-scale cell(s) across all "
+            f"{coverage.platforms_total} platform(s)"
+        )
+    listed = coverage.unmeasured_platforms[:_MAX_LISTED_PLATFORMS]
+    remainder = len(coverage.unmeasured_platforms) - len(listed)
+    names = ", ".join(listed) + (f", +{remainder} more" if remainder > 0 else "")
+    return (
+        "Disk budget coverage: PARTIAL -- this estimate is a LOWER BOUND, not a certification that the "
+        f"sweep fits. Measured rows cover {len(coverage.measured_platforms)} of {coverage.platforms_total} "
+        f"platform(s); {coverage.cells_with_rows} of {coverage.cells_total} largest-scale cell(s) have any "
+        f"row and {coverage.cells_with_measured_database} of {coverage.cells_total} have a measured "
+        f"loaded-database footprint. Unmeasured platform(s): {names}"
+    )
+
+
+def format_budget_verdict(check: DiskHeadroomCheck, coverage: DiskBudgetCoverage) -> str:
+    """Operator-facing verdict for a disk gate that did NOT refuse the sweep.
+
+    Never renders as "fits" when coverage is partial: an operator must be
+    able to tell "measured and fine" from "mostly unmeasured". Callers use
+    `format_disk_headroom_failure` for the refusing direction, which stays
+    sound regardless of coverage -- a lower bound that already does not fit
+    cannot fit.
+
+    `coverage.cells_total == 0` (e.g. `platforms: {include: [duckdb],
+    exclude: [duckdb]}` enumerating nothing) gets its own branch, mirroring
+    `format_budget_coverage`'s: with no cells, `coverage.is_lower_bound` is
+    trivially `False` (`0 < 0` is `False` on both terms), which would
+    otherwise fall through to the "fits" branch below and print a MEASURED
+    fit for a config that measured nothing -- self-contradicting alongside
+    `format_budget_coverage`'s own "nothing measured and nothing gated"
+    line, and a violation of this function's "never renders as fits when
+    coverage is partial" contract (zero cells is the most partial coverage
+    possible).
+    """
+    if coverage.cells_total == 0:
+        return (
+            "Disk budget verdict: no cells enumerated for this config; the "
+            f"{check.required_gib:.2f} GiB requirement above reflects the configured "
+            "floor only, not a measured or estimated disk footprint"
+        )
+    if coverage.is_lower_bound:
+        return (
+            f"Disk budget verdict: no shortfall detected against a lower-bound requirement of "
+            f"{check.required_gib:.2f} GiB; real demand may be higher (see coverage above)"
+        )
+    return f"Disk budget verdict: measured requirement of {check.required_gib:.2f} GiB fits every required root"
 
 
 def check_disk_headroom(
@@ -185,9 +507,29 @@ def check_disk_headroom(
     roots: Iterable[DiskRootFreeSpace],
     *,
     min_free_gib: float,
+    platform_chunking: bool = False,
 ) -> DiskHeadroomCheck:
-    """Compare an estimated peak budget against required disk roots."""
-    required_gib = max(min_free_gib, budget.est_peak_gib)
+    """Compare an estimated peak budget against required disk roots.
+
+    The `max(...)` is load-bearing, not defensive: `preflight.free_space_min_gib`
+    is the operator's configured absolute floor, and because the budget is a
+    LOWER BOUND that is routinely far below it (the loaded-database term is
+    currently identically zero -- see the module docstring), dropping the
+    `max` would let a sweep start with a fraction of a GiB free against a
+    5 GiB configured floor. `test_disk_headroom_gate_enforces_configured_floor`
+    pins it.
+
+    `platform_chunking` swaps the loaded-database term from
+    `concurrent_database_gib` (all platforms' databases coexisting, the
+    default execution envelope) to `chunked_database_gib` (one platform's
+    databases at a time, the envelope `execute.platform_chunking` actually
+    runs). Without this swap the gate refuses operators who selected chunking
+    specifically to shrink concurrent disk demand.
+    """
+    peak_gib = budget.est_peak_gib
+    if platform_chunking:
+        peak_gib += budget.chunked_database_gib - budget.concurrent_database_gib
+    required_gib = max(min_free_gib, peak_gib)
     shortfalls = tuple(
         DiskHeadroomShortfall(root.label, root.path, root.free_gib, required_gib)
         for root in roots
@@ -202,15 +544,30 @@ def format_disk_budget(budget: DiskBudget) -> str:
         "Disk budget estimate: "
         f"{budget.est_peak_gib:.2f} GiB peak "
         f"({budget.est_steady_gib:.2f} GiB steady; "
-        f"cells={budget.cells}; unknown={len(budget.unknown_cells)})"
+        f"cells={budget.cells}; unknown={len(budget.unknown_cells)}; "
+        f"measured-db platforms={budget.platforms_with_measured_database}/{budget.platforms_total}; "
+        f"database concurrent={budget.concurrent_database_gib:.2f} GiB "
+        f"chunked_max={budget.chunked_database_gib:.2f} GiB; "
+        "basis=measured inventory rows at configured rungs, not a guessed per-platform constant)"
     )
 
 
-def format_disk_headroom_failure(check: DiskHeadroomCheck) -> str:
+def format_disk_headroom_failure(check: DiskHeadroomCheck, budget: DiskBudget | None = None) -> str:
     """Operator-facing abort reason for disk-budget shortfalls."""
     details = "; ".join(
         f"{shortfall.label} {shortfall.path}: "
         f"{shortfall.free_gib:.1f} GiB free < {shortfall.required_gib:.1f} GiB required"
         for shortfall in check.shortfalls
     )
-    return f"disk headroom gate failed: {details}"
+    message = f"disk headroom gate failed: {details}"
+    if budget is None or not check.shortfalls:
+        return message
+    worst = min(check.shortfalls, key=lambda shortfall: shortfall.free_gib - shortfall.required_gib)
+    shortfall_gib = worst.required_gib - worst.free_gib
+    return (
+        f"{message}; computed shortfall {shortfall_gib:.1f} GiB "
+        f"(measured-db platforms={budget.platforms_with_measured_database}/{budget.platforms_total}, "
+        f"database concurrent={budget.concurrent_database_gib:.2f} GiB, "
+        f"chunked_max={budget.chunked_database_gib:.2f} GiB; "
+        "failing now rather than exhausting disk mid-sweep)"
+    )

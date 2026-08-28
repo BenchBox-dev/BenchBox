@@ -7,13 +7,25 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import dataclasses
+import inspect
+import json
+import re
 import subprocess
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
 
-from benchbox.core.results.anonymization import AnonymizationConfig, AnonymizationManager
+from benchbox.core.results.anonymization import (
+    _IDENTIFIER_KEYS,
+    PUBLIC_REDACTED_VALUE,
+    AnonymizationConfig,
+    AnonymizationManager,
+    _is_public_pseudonym,
+    find_public_path_leaks,
+)
 
 pytestmark = [
     pytest.mark.unit,
@@ -459,107 +471,37 @@ class TestAnonymizationConfig:
         """Test default configuration values."""
         config = AnonymizationConfig()
 
-        assert config.include_machine_id is True
         assert config.machine_id_salt is None
-        assert config.anonymize_paths is True
-        assert config.include_system_profile is True
-        assert config.anonymize_hostnames is True
-        assert config.anonymize_usernames is True
+        assert config.pii_patterns
+        assert config.custom_sanitizers == {}
 
     def test_custom_config(self):
         """Test custom configuration values."""
-        config = AnonymizationConfig(
-            include_machine_id=False,
-            machine_id_salt="custom_salt",
-            anonymize_paths=False,
-        )
+        config = AnonymizationConfig(machine_id_salt="custom_salt")
 
-        assert config.include_machine_id is False
         assert config.machine_id_salt == "custom_salt"
-        assert config.anonymize_paths is False
 
+    def test_no_flag_promises_privacy_it_does_not_deliver(self):
+        """Every remaining field must actually reach published output.
 
-class TestAnonymizeSystemProfile:
-    """Test anonymize_system_profile method."""
-
-    def test_returns_dict_with_expected_keys(self):
-        manager = AnonymizationManager()
-        profile = manager.anonymize_system_profile()
-        assert isinstance(profile, dict)
-        assert "os_type" in profile
-        assert "cpu_count" in profile
-        assert "python_version" in profile
-
-    def test_hostname_is_anonymized(self):
-        config = AnonymizationConfig(anonymize_hostnames=True)
-        manager = AnonymizationManager(config)
-        profile = manager.anonymize_system_profile()
-        assert profile["hostname"].startswith("host_")
-
-    def test_hostname_not_anonymized_when_disabled(self):
-        config = AnonymizationConfig(anonymize_hostnames=False)
-        manager = AnonymizationManager(config)
-        profile = manager.anonymize_system_profile()
-        assert not profile["hostname"].startswith("host_")
-
-    def test_username_anonymized_when_enabled(self):
-        config = AnonymizationConfig(anonymize_usernames=True)
-        manager = AnonymizationManager(config)
-        profile = manager.anonymize_system_profile()
-        username = profile.get("username", "")
-        assert username.startswith("user_") or username == "anonymous"
-
-    def test_include_system_profile_false_returns_empty(self):
-        config = AnonymizationConfig(include_system_profile=False)
-        manager = AnonymizationManager(config)
-        profile = manager.anonymize_system_profile()
-        assert profile == {}
-
-    def test_hostname_is_cached_consistently(self):
-        manager = AnonymizationManager()
-        p1 = manager.anonymize_system_profile()
-        p2 = manager.anonymize_system_profile()
-        assert p1["hostname"] == p2["hostname"]
-
-
-class TestSanitizePath:
-    """Test path sanitization."""
-
-    def test_allowed_prefix_path_unchanged(self):
-        manager = AnonymizationManager()
-        result = manager.sanitize_path("/tmp/benchmark/results.json")
-        assert result == "/tmp/benchmark/results.json"
-
-    def test_path_anonymization_disabled(self):
-        config = AnonymizationConfig(anonymize_paths=False)
-        manager = AnonymizationManager(config)
-        result = manager.sanitize_path("/home/user/secret/data.parquet")
-        assert result == "/home/user/secret/data.parquet"
-
-    def test_long_path_component_hashed(self):
-        manager = AnonymizationManager()
-        # A path component with more than 20 chars should be hashed
-        result = manager.sanitize_path("/some/averylongdirectorynamewithmanychars/file.parquet")
-        assert "averylongdirectorynamewithmanychars" not in result
-        assert "dir_" in result
-
-    def test_path_cache_returns_same_result(self):
-        manager = AnonymizationManager()
-        p = "/home/alice/project/data.csv"
-        r1 = manager.sanitize_path(p)
-        r2 = manager.sanitize_path(p)
-        assert r1 == r2
-
-    def test_common_system_dirs_kept(self):
-        manager = AnonymizationManager()
-        result = manager.sanitize_path("/home/foo")
-        assert "home" in result
-
-    def test_numeric_component_hashed(self):
-        manager = AnonymizationManager()
-        result = manager.sanitize_path("/data/user123/file.parquet")
-        # "user123" has a digit so should be hashed
-        assert "user123" not in result
+        The retired flags (include_machine_id, anonymize_paths,
+        allowed_path_prefixes, include_system_profile, anonymize_hostnames,
+        anonymize_usernames) fed only the deleted legacy API. They read as
+        privacy controls but gated nothing on the publication path, which is
+        the worst kind of config: a caller could set anonymize_paths=False
+        and see no change, or leave it True and assume paths were protected
+        by it. Keep the surface honest.
+        """
+        retired = {
+            "include_machine_id",
+            "anonymize_paths",
+            "allowed_path_prefixes",
+            "include_system_profile",
+            "anonymize_hostnames",
+            "anonymize_usernames",
+        }
+        present = {f.name for f in dataclasses.fields(AnonymizationConfig)}
+        assert not (present & retired), f"dead privacy flags are back: {sorted(present & retired)}"
 
 
 class TestRemovePII:
@@ -599,126 +541,955 @@ class TestRemovePII:
         assert manager.remove_pii(clean) == clean
 
 
-class TestAnonymizeQueryMetadata:
-    """Test query metadata anonymization."""
+class TestPublicPayloadSecretKeys:
+    """The public export path must honor every secret part the internal
+    capture path honors — both consumers read one shared list, so a key that
+    is redacted at capture time can never be published by re-export either."""
 
-    def test_safe_fields_preserved(self):
+    @staticmethod
+    def _payload(config):
+        return {"platform_metadata": {"platform_raw_config": config}}
+
+    def test_key_id_values_are_redacted(self):
         manager = AnonymizationManager()
-        meta = {"query_id": "Q1", "execution_time": 1.5, "rows_returned": 100, "status": "ok"}
-        result = manager.anonymize_query_metadata(meta)
-        assert result["query_id"] == "Q1"
-        assert result["execution_time"] == 1.5
-        assert result["rows_returned"] == 100
+        out = manager.anonymize_result_payload(
+            self._payload({"s3_key_id": "AKIA-SENTINEL", "kms_key_id": "KMS-SENTINEL"})
+        )
+        raw = json.dumps(out, default=str)
+        assert "AKIA-SENTINEL" not in raw
+        assert "KMS-SENTINEL" not in raw
 
-    def test_sql_text_pii_removed(self):
+    def test_already_covered_keys_keep_behavior(self):
         manager = AnonymizationManager()
-        meta = {"sql_text": "SELECT * FROM t WHERE email = 'user@example.com'"}
-        result = manager.anonymize_query_metadata(meta)
-        assert "user@example.com" not in result["sql_text"]
+        out = manager.anonymize_result_payload(
+            self._payload({"pg_password": "PW-SENTINEL", "username": "alice-sentinel"})
+        )["platform_metadata"]["platform_raw_config"]
+        assert out["pg_password"] == PUBLIC_REDACTED_VALUE
+        assert out["username"] != "alice-sentinel"
+        assert out["username"].startswith("user_")
 
-    def test_file_path_sanitized(self):
+    def test_secret_parts_shared_with_platform_options(self):
+        from benchbox.core.results.anonymization import _SECRET_KEY_PARTS as anon_parts
+        from benchbox.core.results.platform_options import _SECRET_KEY_PARTS as capture_parts
+
+        assert set(capture_parts) <= set(anon_parts)
+
+    def test_data_modelling_keys_are_not_over_redacted(self):
         manager = AnonymizationManager()
-        meta = {"file_path": "/tmp/data.parquet"}
-        result = manager.anonymize_query_metadata(meta)
-        assert result["file_path"] == "/tmp/data.parquet"
-
-    def test_nested_dict_recursed(self):
-        manager = AnonymizationManager()
-        meta = {"nested": {"sql_text": "SELECT 1"}}
-        result = manager.anonymize_query_metadata(meta)
-        assert "nested" in result
-
-    def test_list_values_processed(self):
-        manager = AnonymizationManager()
-        meta = {"tags": ["fast", "192.168.1.1"]}
-        result = manager.anonymize_query_metadata(meta)
-        assert isinstance(result["tags"], list)
-        joined = " ".join(result["tags"])
-        assert "192.168.1.1" not in joined
-
-    def test_empty_dict_returns_empty(self):
-        manager = AnonymizationManager()
-        assert manager.anonymize_query_metadata({}) == {}
-
-
-class TestAnonymizeExecutionMetadata:
-    """Test execution metadata anonymization."""
-
-    def test_safe_benchmark_fields_preserved(self):
-        manager = AnonymizationManager()
-        meta = {
-            "benchmark_name": "tpch",
-            "platform": "duckdb",
-            "scale_factor": 1.0,
-            "execution_id": "run-001",
-        }
-        result = manager.anonymize_execution_metadata(meta)
-        assert result["benchmark_name"] == "tpch"
-        assert result["platform"] == "duckdb"
-
-    def test_machine_id_replaced_with_anonymous(self):
-        manager = AnonymizationManager()
-        meta = {"machine_id": "real-machine-id-12345"}
-        result = manager.anonymize_execution_metadata(meta)
-        assert "anonymous_machine_id" in result
-        assert result["anonymous_machine_id"].startswith("machine_")
-
-    def test_system_profile_included(self):
-        manager = AnonymizationManager()
-        meta = {"system_profile": {"hostname": "myhost", "os_type": "Linux"}}
-        result = manager.anonymize_execution_metadata(meta)
-        assert "system_profile" in result
-
-    def test_data_path_sanitized(self):
-        manager = AnonymizationManager()
-        meta = {"data_directory": "/tmp/bench_data"}
-        result = manager.anonymize_execution_metadata(meta)
-        assert result["data_directory"] == "/tmp/bench_data"
-
-    def test_query_results_list_anonymized(self):
-        manager = AnonymizationManager()
-        meta = {
-            "query_results": [
-                {"query_id": "Q1", "execution_time": 1.0},
-                {"query_id": "Q2", "execution_time": 2.0},
-            ]
-        }
-        result = manager.anonymize_execution_metadata(meta)
-        assert isinstance(result["query_results"], list)
-        assert len(result["query_results"]) == 2
-
-    def test_empty_metadata_returns_empty(self):
-        manager = AnonymizationManager()
-        assert manager.anonymize_execution_metadata({}) == {}
-
-
-class TestValidateAnonymization:
-    """Test anonymization validation."""
-
-    def test_valid_anonymized_data_passes(self):
-        manager = AnonymizationManager()
-        meta = {"benchmark_name": "tpch", "machine_id": "x"}
-        anonymized = manager.anonymize_execution_metadata(meta)
-        validation = manager.validate_anonymization(meta, anonymized)
-        assert validation["is_valid"] is True
-        assert isinstance(validation["checks_performed"], list)
-
-    def test_pii_in_anonymized_data_generates_warning(self):
-        manager = AnonymizationManager()
-        original = {}
-        # Manually inject IP into otherwise clean data
-        anonymized = {"result": "connected to 10.0.0.1"}
-        validation = manager.validate_anonymization(original, anonymized)
-        warnings = " ".join(validation["warnings"])
-        assert "IP" in warnings or "ip" in warnings.lower()
-
-    def test_missing_machine_id_generates_error(self):
-        config = AnonymizationConfig(include_machine_id=True)
-        manager = AnonymizationManager(config)
-        validation = manager.validate_anonymization({}, {"result": "ok"})
-        assert any("machine" in e.lower() for e in validation["errors"])
-        assert validation["is_valid"] is False
+        out = manager.anonymize_result_payload(
+            self._payload({"sort_key": "l_shipdate", "partition_key": "l_orderkey"})
+        )["platform_metadata"]["platform_raw_config"]
+        assert out["sort_key"] == "l_shipdate"
+        assert out["partition_key"] == "l_orderkey"
 
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestPublicPayloadApiKeyAndAccountKey:
+    """The shared secret list must cover api_key/*_account_key on the public
+    path too — these leaked through anonymize_result_payload verbatim."""
+
+    def test_api_key_and_storage_account_key_are_redacted(self):
+        manager = AnonymizationManager()
+        out = json.dumps(
+            manager.anonymize_result_payload(
+                {
+                    "platform_metadata": {
+                        "platform_raw_config": {
+                            "api_key": "APIKEY-SENTINEL",
+                            "onehouse_api_key": "OH-SENTINEL",
+                            "storage_account_key": "AZKEY-SENTINEL",
+                        }
+                    }
+                }
+            ),
+            default=str,
+        )
+        assert "APIKEY-SENTINEL" not in out
+        assert "OH-SENTINEL" not in out
+        assert "AZKEY-SENTINEL" not in out
+
+
+class TestPublicPayloadCredentialAliases:
+    """The public anonymizer must share exact alias handling with capture."""
+
+    def test_aliases_are_redacted_while_preserving_tuning_keys_and_path_contract(self):
+        out = AnonymizationManager().anonymize_result_payload(
+            {
+                "platform_metadata": {
+                    "platform_raw_config": {
+                        "passwd": "PASSWD_SECRET",
+                        "pwd": "PWD_SECRET",
+                        "pat": "PAT_SECRET",
+                        "path": "/tmp/data",
+                        "sort_key": "o_orderkey",
+                    }
+                }
+            }
+        )["platform_metadata"]["platform_raw_config"]
+
+        assert out["passwd"] == PUBLIC_REDACTED_VALUE
+        assert out["pwd"] == PUBLIC_REDACTED_VALUE
+        assert out["pat"] == PUBLIC_REDACTED_VALUE
+        # Exact key ``path`` is a residual local-FS drop key (no public consumer).
+        assert "path" not in out
+        assert out["sort_key"] == "o_orderkey"
+
+
+class TestPublicPayloadSslRootCert:
+    """The libpq sslrootcert spelling ends in neither path nor file, so the
+    raw local path (leaking the home-dir username) passed through."""
+
+    def test_sslrootcert_path_is_hashed(self):
+        out = json.dumps(
+            AnonymizationManager().anonymize_result_payload(
+                {"platform_metadata": {"platform_raw_config": {"sslrootcert": "/Users/joe/certs/root.pem"}}}
+            ),
+            default=str,
+        )
+        assert "/Users/joe" not in out
+
+    def test_underscore_cert_paths_still_hashed(self):
+        out = json.dumps(
+            AnonymizationManager().anonymize_result_payload(
+                {"platform_metadata": {"platform_raw_config": {"ca_cert_path": "/Users/joe/certs/ca.pem"}}}
+            ),
+            default=str,
+        )
+        assert "/Users/joe" not in out
+
+
+class TestPublicPayloadTupleRecursion:
+    """A tuple fell through to the scalar branch untouched, so any payload
+    branch not pre-flattened by internal capture leaked tuple contents."""
+
+    def test_tuple_nested_identifier_is_anonymized(self):
+        out = json.dumps(
+            AnonymizationManager().anonymize_result_payload(
+                {"platform_metadata": {"nested": ({"userid": "TUP-SENTINEL"},)}}
+            ),
+            default=str,
+        )
+        assert "TUP-SENTINEL" not in out
+
+    def test_tuple_secret_key_is_redacted(self):
+        out = json.dumps(
+            AnonymizationManager().anonymize_result_payload(
+                {"platform_metadata": {"configs": ({"password": "TUPPW-SENTINEL"},)}}
+            ),
+            default=str,
+        )
+        assert "TUPPW-SENTINEL" not in out
+
+    def test_list_and_dict_recursion_unchanged(self):
+        out = AnonymizationManager().anonymize_result_payload(
+            {"platform_metadata": {"platform_raw_config": [{"username": "alice-sentinel"}]}}
+        )["platform_metadata"]["platform_raw_config"]
+        assert out[0]["username"].startswith("user_")
+
+    def test_unordered_collections_are_sorted_before_export(self):
+        out = AnonymizationManager().anonymize_result_payload(
+            {"platform_metadata": {"values": frozenset({"zeta", "alpha"})}}
+        )
+
+        assert out["platform_metadata"]["values"] == ["alpha", "zeta"]
+
+
+class TestTuningPayloadAnonymization:
+    def test_unknown_constraint_fields_use_generic_public_sanitization(self):
+        out = AnonymizationManager().anonymize_tuning_payload(
+            {
+                "requested": {
+                    "constraints": {
+                        "foreign_keys": {
+                            "password": "CONSTRAINT-PASSWORD",
+                            "owner_email": "owner@example.com",
+                            "endpoint": "https://warehouse.example.com",
+                            "path": "/Users/alice/private-run",
+                        }
+                    }
+                }
+            }
+        )
+
+        serialized = json.dumps(out)
+        assert "CONSTRAINT-PASSWORD" not in serialized
+        assert "owner@example.com" not in serialized
+        assert "warehouse.example.com" not in serialized
+        assert "/Users/alice" not in serialized
+
+    def test_constraint_table_and_column_identifiers_are_pseudonymized(self):
+        out = AnonymizationManager().anonymize_tuning_payload(
+            {
+                "requested": {
+                    "constraints": {
+                        "primary_keys": {
+                            "enabled": True,
+                            "tables": {"orders": ["o_orderkey"]},
+                        },
+                        "foreign_keys": {
+                            "enabled": True,
+                            "tables": {
+                                "lineitem": {
+                                    "columns": ["l_orderkey"],
+                                    "referenced_table": "orders",
+                                    "referenced_columns": ["o_orderkey"],
+                                }
+                            },
+                        },
+                    }
+                }
+            }
+        )
+
+        serialized = json.dumps(out)
+        assert all(identifier not in serialized for identifier in ("orders", "lineitem", "o_orderkey", "l_orderkey"))
+        constraints = out["requested"]["constraints"]
+        assert next(iter(constraints["primary_keys"]["tables"])).startswith("table_")
+        assert constraints["primary_keys"]["tables"][next(iter(constraints["primary_keys"]["tables"]))][0].startswith(
+            "column_"
+        )
+
+    def test_nested_companion_constraint_shapes_are_pseudonymized(self):
+        """List-of-dicts FK tables, slash-delimited local_table, and TPC-DI-style
+        references_table/references_column must not leak identifiers. The simple
+        mapping shape was already covered; these companion shapes were the
+        residual leak after #1479.
+        """
+        out = AnonymizationManager().anonymize_tuning_payload(
+            {
+                "requested": {
+                    "constraints": {
+                        "foreign_keys": {
+                            "enabled": True,
+                            "on_delete_action": "CASCADE",
+                            "tables": [
+                                {
+                                    "table": "orders",
+                                    "columns": ["o_orderkey"],
+                                    "referenced_table": "customers",
+                                    "referenced_columns": ["c_custkey"],
+                                }
+                            ],
+                        },
+                        "local_table": "orders/o_orderkey",
+                        "references_table": "customers",
+                        "references_column": "c_custkey",
+                    }
+                }
+            }
+        )
+
+        serialized = json.dumps(out)
+        assert all(identifier not in serialized for identifier in ("orders", "o_orderkey", "customers", "c_custkey"))
+        constraints = out["requested"]["constraints"]
+        fk = constraints["foreign_keys"]
+        assert fk["enabled"] is True
+        assert fk["on_delete_action"] == "CASCADE"
+        assert isinstance(fk["tables"], list) and len(fk["tables"]) == 1
+        entry = fk["tables"][0]
+        assert entry["table"].startswith("table_")
+        assert entry["referenced_table"].startswith("table_")
+        assert entry["columns"][0].startswith("column_")
+        assert entry["referenced_columns"][0].startswith("column_")
+        assert constraints["local_table"].startswith("table_")
+        assert constraints["references_table"].startswith("table_")
+        assert constraints["references_column"].startswith("column_")
+
+    def test_mixed_and_list_constraint_companion_shapes(self):
+        """Mixed scalar/dict collections and top-level list constraints."""
+        out = AnonymizationManager().anonymize_tuning_payload(
+            {
+                "requested": {
+                    "constraints": {
+                        "foreign_keys": {
+                            "tables": [
+                                "orders",
+                                {"table": "customers", "columns": [{"name": "c_custkey"}, "c_nationkey"]},
+                            ]
+                        },
+                    }
+                }
+            }
+        )
+        serialized = json.dumps(out)
+        assert all(identifier not in serialized for identifier in ("orders", "customers", "c_custkey", "c_nationkey"))
+        tables = out["requested"]["constraints"]["foreign_keys"]["tables"]
+        assert tables[0].startswith("table_")
+        assert tables[1]["table"].startswith("table_")
+        assert tables[1]["columns"][0]["name"].startswith("column_")
+        assert tables[1]["columns"][1].startswith("column_")
+
+        list_constraints = AnonymizationManager().anonymize_tuning_payload(
+            {"requested": {"constraints": [{"table": "orders", "columns": ["o_orderkey"]}]}}
+        )
+        serialized_list = json.dumps(list_constraints)
+        assert "orders" not in serialized_list and "o_orderkey" not in serialized_list
+        assert list_constraints["requested"]["constraints"][0]["table"].startswith("table_")
+
+    def test_table_and_column_identifiers_are_pseudonymized_but_source_is_preserved(self):
+        manager = AnonymizationManager()
+        out = manager.anonymize_tuning_payload(
+            {
+                "source_file": "examples/tunings/custom.yaml:0123456789abcdef",
+                "requested": {
+                    "table_tunings": {
+                        "lineitem": {
+                            "table_name": "lineitem",
+                            "sorting": [{"name": "l_orderkey", "order": 1}],
+                        }
+                    }
+                },
+            }
+        )
+
+        tuning = out["requested"]["table_tunings"]
+        table_key = next(iter(tuning))
+        assert table_key.startswith("table_")
+        assert tuning[table_key]["table_name"].startswith("table_")
+        assert tuning[table_key]["sorting"][0]["name"].startswith("column_")
+        assert out["source_file"] == "examples/tunings/custom.yaml:0123456789abcdef"
+
+    @pytest.mark.parametrize(
+        "source_file",
+        [
+            "/Users/alice/private/custom.yaml",
+            r"C:\Users\alice\private\custom.yaml",
+            "../private/custom.yaml",
+            "source=/Users/alice/private/custom.yaml",
+            "template.yaml\n/Users/alice/private/custom.yaml",
+        ],
+    )
+    def test_untrusted_tuning_source_path_is_hashed(self, source_file):
+        out = AnonymizationManager().anonymize_tuning_payload({"source_file": source_file})
+
+        assert out["source_file"].startswith("path_")
+        assert "alice" not in out["source_file"]
+
+
+class TestPublicPayloadWorkspaceRoleAndApplicationIds:
+    """Near-miss variants of covered identifier keys are the recurring leak
+    pattern: workspace_name, job_role and application_id all exported
+    verbatim while workspace/workspaceid and role/iamrole were covered."""
+
+    @staticmethod
+    def _payload(config):
+        return {"platform_metadata": {"platform_raw_config": config}}
+
+    def test_workspace_name_pseudonymizes_like_workspace(self):
+        out = AnonymizationManager().anonymize_result_payload(self._payload({"workspace_name": "WSN-SENTINEL"}))[
+            "platform_metadata"
+        ]["platform_raw_config"]
+        assert out["workspace_name"] != "WSN-SENTINEL"
+        assert out["workspace_name"].startswith("workspace_")
+
+    def test_job_role_pseudonymizes_like_role(self):
+        out = AnonymizationManager().anonymize_result_payload(self._payload({"job_role": "JR-SENTINEL"}))[
+            "platform_metadata"
+        ]["platform_raw_config"]
+        assert out["job_role"] != "JR-SENTINEL"
+        assert out["job_role"].startswith("role_")
+
+    def test_application_id_is_hashed(self):
+        out = AnonymizationManager().anonymize_result_payload(self._payload({"application_id": "APP-SENTINEL"}))[
+            "platform_metadata"
+        ]["platform_raw_config"]
+        assert out["application_id"] != "APP-SENTINEL"
+        assert out["application_id"].startswith("application_")
+
+
+class TestPublicPayloadPgUserAndTenantId:
+    """pg_user must pseudonymize like every other username spelling, and a
+    tenant id (an org-identifying GUID) must hash — both escaped the public
+    identifier map because their compact keys matched nothing."""
+
+    @staticmethod
+    def _payload(config):
+        return {"platform_metadata": {"platform_raw_config": config}}
+
+    def test_pg_user_pseudonymizes_like_username(self):
+        manager = AnonymizationManager()
+        out = manager.anonymize_result_payload(self._payload({"pg_user": "PGUSER-SENTINEL"}))["platform_metadata"][
+            "platform_raw_config"
+        ]
+        assert out["pg_user"] != "PGUSER-SENTINEL"
+        assert out["pg_user"].startswith("user_")
+
+    def test_tenant_id_is_hashed(self):
+        manager = AnonymizationManager()
+        out = manager.anonymize_result_payload(self._payload({"tenant_id": "TENANT-SENTINEL"}))["platform_metadata"][
+            "platform_raw_config"
+        ]
+        assert out["tenant_id"] != "TENANT-SENTINEL"
+        assert out["tenant_id"].startswith("tenant_")
+
+    def test_existing_identifier_behavior_unchanged(self):
+        manager = AnonymizationManager()
+        out = manager.anonymize_result_payload(
+            self._payload({"username": "alice-sentinel", "account": "acct-sentinel"})
+        )["platform_metadata"]["platform_raw_config"]
+        assert out["username"].startswith("user_")
+        assert out["account"].startswith("account_")
+
+
+class TestPublicPayloadSecretMessages:
+    def test_message_values_use_the_shared_secret_key_classifier(self):
+        manager = AnonymizationManager()
+        out = manager.anonymize_result_payload(
+            {
+                "platform_metadata": {
+                    "error_message": "api_key=API-SENTINEL storage_account_key=AZ-SENTINEL",
+                    "stderr": "AccountKey=AZ-CONNECTION-SENTINEL",
+                }
+            }
+        )
+        serialized = json.dumps(out, default=str)
+        assert "API-SENTINEL" not in serialized
+        assert "AZ-SENTINEL" not in serialized
+        assert "AZ-CONNECTION-SENTINEL" not in serialized
+
+
+class TestPublicPayloadPathPrivacy:
+    def test_generic_working_directory_is_omitted(self):
+        """Unread path fields are dropped at the public boundary, not hashed.
+
+        ``working_dir`` has no publication consumer (ADR published-identifier
+        field set); emitting a confirmable ``path_`` token would only feed the
+        dictionary oracle.
+        """
+        out = AnonymizationManager().anonymize_result_payload(
+            {"platform_metadata": {"working_dir": "/Users/alice/benchbox/run", "mode": "sql"}}
+        )
+        serialized = json.dumps(out, default=str)
+        assert "/Users/alice" not in serialized
+        assert "working_dir" not in out["platform_metadata"]
+        assert out["platform_metadata"]["mode"] == "sql"
+
+    def test_nested_generic_metadata_paths_are_hashed_without_field_allowlist(self):
+        out = AnonymizationManager().anonymize_result_payload(
+            {"platform_metadata": {"raw_config": {"runtime": {"path_value": "/home/alice/cache"}}}}
+        )
+        assert "/home/alice" not in json.dumps(out, default=str)
+        assert out["platform_metadata"]["raw_config"]["runtime"]["path_value"].startswith("path_")
+
+    def test_relative_references_and_urls_are_not_false_positives(self):
+        payload = {
+            "source_ref": "examples/tunings/custom.yaml:0123456789abcdef",
+            "url": "https://example.com/home/alice/reference",
+        }
+        assert find_public_path_leaks(payload) == []
+        out = AnonymizationManager().anonymize_result_payload(payload)
+        assert out["source_ref"] == payload["source_ref"]
+        assert out["url"].startswith("endpoint_")
+
+    def test_detector_reports_field_paths_without_echoing_values(self):
+        leaks = find_public_path_leaks({"nested": [{"working_dir": "/Users/alice/private"}]})
+        assert leaks == ["nested.0.working_dir"]
+
+    def test_detector_flags_private_paths_encoded_as_object_keys(self):
+        """Scanning values alone called this payload clean."""
+        leaks = find_public_path_leaks({"per_path_timings": {"/Users/alice/db": 1.2}})
+        assert leaks == ["per_path_timings.<key>"]
+
+    def test_key_leak_report_does_not_echo_the_key(self):
+        """The offending key *is* the private path, so it must stay redacted."""
+        leaks = find_public_path_leaks({"metadata": {"/Users/alice/secret-project": True}})
+        assert leaks and "alice" not in " ".join(leaks)
+        assert "secret-project" not in " ".join(leaks)
+
+    def test_detector_flags_a_leaking_key_at_the_root(self):
+        leaks = find_public_path_leaks({"/Users/alice/db": 1})
+        assert leaks == ["<key>"]
+
+    def test_leaking_key_is_elided_from_descendant_field_paths(self):
+        """Reporting a nested leak must not splice the parent key back in.
+
+        These diagnostics are surfaced in submission PR comments and Explorer
+        exceptions, so a raw key in a child's path discloses the private path
+        precisely when the detector is doing its job.
+        """
+        leaks = find_public_path_leaks({"/Users/alice/secret": {"working_dir": "/home/bob/private"}})
+        joined = " ".join(leaks)
+        assert "<key>.working_dir" in leaks
+        assert "alice" not in joined
+        assert "secret" not in joined
+        assert "bob" not in joined
+
+    def test_ordinary_keys_are_not_flagged(self):
+        """Relative and non-path keys stay clean - no blanket key rejection."""
+        payload = {"queries": {"q1": 1.0, "tpch/q2": 2.0}, "platform": {"name": "DuckDB"}}
+        assert find_public_path_leaks(payload) == []
+
+    def test_root_owned_home_paths_are_private_even_under_generic_keys(self):
+        payload = {"raw_config": {"location": "/root/private-run"}}
+
+        assert find_public_path_leaks(payload)
+        out = AnonymizationManager().anonymize_result_payload(payload)
+        assert "/root/private-run" not in json.dumps(out, default=str)
+
+
+class TestPublicUnreadIdentifierDrop:
+    """Unread identifier fields are omitted, not pseudonymised.
+
+    ADR published-identifier-field-set: six fields have no consumer in the
+    publication pipeline, Explorer, or contract. Publishing a confirmable
+    ``prefix_<12 hex>`` token for them only feeds the dictionary oracle.
+    """
+
+    DROP_FIELDS = (
+        "machine_id",
+        "working_dir",
+        "driver_runtime_python_executable",
+        "database_path",
+        "data_path",
+        "engine_host",
+    )
+
+    def test_drop_fields_are_omitted_at_every_nesting_depth(self):
+        payload = {
+            "machine_id": "raw-machine",
+            "environment": {
+                "machine_id": "raw-machine",
+                "client_host": {"machine_id": "raw-machine", "hostname": "alice-laptop"},
+                "platform_runtime": {"engine_host": "db.internal", "runtime_type": "local"},
+            },
+            "platform": {
+                "config": {
+                    "working_dir": "/Users/alice/benchbox",
+                    "database_path": "/tmp/db.duckdb",
+                    "data_path": "/Users/alice/data",
+                    "driver_runtime_python_executable": "/Users/alice/.venv/bin/python",
+                    "endpoint": "https://example.invalid/warehouse",
+                    "database_name": "analytics",
+                }
+            },
+            "metadata": {"submission_path": "PR-based"},
+        }
+        out = AnonymizationManager().anonymize_result_payload(payload)
+        serialized = json.dumps(out, default=str)
+        for key in self.DROP_FIELDS:
+            assert key not in serialized, f"drop-field key still present: {key}"
+            assert f'"{key}"' not in serialized
+        assert "alice" not in serialized
+        assert "db.internal" not in serialized
+        # Retained fields still publish a pseudonym.
+        assert _is_public_pseudonym(out["platform"]["config"]["endpoint"], "endpoint")
+        assert _is_public_pseudonym(out["platform"]["config"]["database_name"], "database")
+        assert out["metadata"]["submission_path"] == "PR-based" or _is_public_pseudonym(
+            out["metadata"]["submission_path"], "path"
+        )
+        assert out["environment"]["client_host"]["hostname"].startswith("host_")
+        assert out["environment"]["platform_runtime"]["runtime_type"] == "local"
+
+    def test_alias_drop_keys_of_unread_identifiers_are_omitted(self):
+        """Aliases of the six unread fields must drop, not mint path_ tokens."""
+        payload = {
+            "platform": {
+                "config": {
+                    "workdir": "/Users/alice/project",
+                    "working_directory": "/Users/alice/project",
+                    "working_root": "/Users/alice/project",
+                    "data_dir": "/Users/alice/data",
+                    "data_directory": "/Users/alice/data",
+                    "python_executable": "/Users/alice/.venv/bin/python",
+                    "endpoint": "https://example.invalid/warehouse",
+                    "database_name": "analytics",
+                }
+            },
+            "metadata": {"submission_path": "PR-based"},
+        }
+        out = AnonymizationManager().anonymize_result_payload(payload)
+        cfg = out["platform"]["config"]
+        for key in (
+            "workdir",
+            "working_directory",
+            "working_root",
+            "data_dir",
+            "data_directory",
+            "python_executable",
+        ):
+            assert key not in cfg, f"alias drop key still present: {key}"
+        assert "alice" not in json.dumps(out)
+        # Retained consumers still publish under canonical keys.
+        assert _is_public_pseudonym(cfg["endpoint"], "endpoint")
+        assert _is_public_pseudonym(cfg["database_name"], "database")
+        assert out["metadata"]["submission_path"] == "PR-based" or _is_public_pseudonym(
+            out["metadata"]["submission_path"], "path"
+        )
+
+    def test_residual_local_path_keys_are_dropped_not_hashed(self):
+        """Pure local-FS residual keys omit rather than mint empty-salt path_ tokens."""
+        payload = {
+            "platform": {
+                "config": {
+                    "output_dir": "/Users/alice/out",
+                    "output_directory": "/Users/alice/out",
+                    "output_path": "/Users/alice/out/run.json",
+                    "output_location": "/Users/alice/out",
+                    "result_dir": "/Users/alice/results",
+                    "result_path": "/Users/alice/results/run.json",
+                    "log_path": "/Users/alice/logs/run.log",
+                    "log_file": "/Users/alice/logs/run.log",
+                    "file_path": "/Users/alice/data/file.parquet",
+                    "path": "/Users/alice/scratch",
+                    "source_root": "/Users/alice/src",
+                    "credential_file": "/Users/alice/.aws/credentials",
+                    # KEEP HASH / retained consumers
+                    "sslrootcert": "/Users/alice/certs/root.pem",
+                    "s3_staging_url": "s3://tenant-bucket/staging/",
+                    "staging_location": "s3://tenant-bucket/staging/",
+                    "staging_url": "s3://tenant-bucket/staging/",
+                    "http_path": "/sql/1.0/warehouses/abc",
+                    "host": "db.example.internal",
+                    "hostname": "db.example.internal",
+                    "server": "db.example.internal",
+                    "endpoint": "https://example.invalid/warehouse",
+                    "database_name": "analytics",
+                }
+            },
+            "metadata": {"submission_path": "/Users/alice/submission.json"},
+        }
+        out = AnonymizationManager().anonymize_result_payload(payload)
+        cfg = out["platform"]["config"]
+        for key in (
+            "output_dir",
+            "output_directory",
+            "output_path",
+            "output_location",
+            "result_dir",
+            "result_path",
+            "log_path",
+            "log_file",
+            "file_path",
+            "path",
+            "source_root",
+            "credential_file",
+        ):
+            assert key not in cfg, f"residual local path key still present: {key}"
+        serialized = json.dumps(out, default=str)
+        assert "alice" not in serialized
+        # Remote-ish / intentional privacy hashes remain published as pseudonyms.
+        assert _is_public_pseudonym(cfg["sslrootcert"], "path")
+        assert _is_public_pseudonym(cfg["s3_staging_url"], "endpoint")  # *url suffix
+        assert _is_public_pseudonym(cfg["staging_location"], "path")
+        assert _is_public_pseudonym(cfg["staging_url"], "endpoint")
+        assert _is_public_pseudonym(cfg["http_path"], "path")
+        assert cfg["host"].startswith("host_")
+        assert cfg["hostname"].startswith("host_")
+        assert cfg["server"].startswith("host_")
+        assert _is_public_pseudonym(cfg["endpoint"], "endpoint")
+        assert _is_public_pseudonym(cfg["database_name"], "database")
+        assert _is_public_pseudonym(out["metadata"]["submission_path"], "path")
+
+    def test_empty_client_host_omitted_after_machine_id_drop(self):
+        """client_host that only held machine_id must not publish as {}."""
+        out = AnonymizationManager().anonymize_result_payload(
+            {"environment": {"client_host": {"machine_id": "raw-machine"}, "other": 1}}
+        )
+        assert "client_host" not in out.get("environment", {})
+        assert out["environment"]["other"] == 1
+
+    def test_already_empty_client_host_is_omitted(self):
+        """Empty client_host maps are omitted so stored residuals can be re-derived away."""
+        payload = {"environment": {"client_host": {}, "other": 1}}
+        out = AnonymizationManager().anonymize_result_payload(payload)
+        assert "client_host" not in out.get("environment", {})
+        assert out["environment"]["other"] == 1
+
+    def test_nonempty_client_host_profile_still_exports(self):
+        out = AnonymizationManager().anonymize_result_payload(
+            {
+                "environment": {
+                    "client_host": {
+                        "machine_id": "raw-machine",
+                        "os": "macOS",
+                        "arch": "arm64",
+                        "cpu": "Apple M-series",
+                        "memory_gb": 32,
+                    }
+                }
+            }
+        )
+        host = out["environment"]["client_host"]
+        assert "machine_id" not in host
+        assert host["os"] == "macOS"
+        assert host["arch"] == "arm64"
+        assert host["cpu"] == "Apple M-series"
+        assert host["memory_gb"] == 32
+
+    def test_drop_is_idempotent_when_fields_already_absent(self):
+        manager = AnonymizationManager()
+        once = manager.anonymize_result_payload({"platform": {"config": {"endpoint": "https://x.example"}}})
+        assert manager.anonymize_result_payload(once) == once
+        assert "machine_id" not in once
+        assert "working_dir" not in once.get("platform", {}).get("config", {})
+
+    def test_tuning_constraints_omit_drop_keys_without_keyerror(self):
+        """Scalar walk under unconstrained keys must not KeyError when the key is dropped."""
+        out = AnonymizationManager().anonymize_tuning_payload(
+            {
+                "source_file": "templates/tuning/example.yaml",
+                "requested": {
+                    "constraints": {
+                        "machine_id": "raw-machine",
+                        "working_dir": "/Users/alice/run",
+                        "table": "lineitem",
+                        "nested": {"engine_host": "db.internal", "ok": 1},
+                    },
+                    "table_tunings": {
+                        "lineitem": {
+                            "machine_id": "should-drop",
+                            "columns": [{"name": "l_orderkey"}],
+                        }
+                    },
+                },
+            }
+        )
+        constraints = out["requested"]["constraints"]
+        assert "machine_id" not in constraints
+        assert "working_dir" not in constraints
+        assert "engine_host" not in constraints["nested"]
+        assert constraints["nested"]["ok"] == 1
+        assert "table" in constraints
+        tunings = out["requested"]["table_tunings"]
+        assert "lineitem" not in tunings  # table keys are hashed
+        assert tunings, "table_tunings should retain the hashed table entry"
+        for table_entry in tunings.values():
+            assert "machine_id" not in table_entry
+
+
+class TestPublicPseudonymFixedPoint:
+    """Anonymization must reach a fixed point.
+
+    Curated bundles are stored already-anonymized, so the Explorer publication
+    boundary anonymizes values this module produced. Hashing a pseudonym again
+    mints a second token for the same machine, so the corpus and a freshly
+    submitted run from that machine would group apart. Nothing fails when this
+    breaks - the grouping is just silently wrong - so it is pinned here.
+    """
+
+    PAYLOAD = {
+        "environment": {
+            "client_host": {"hostname": "host_0123456789ab"},
+            "platform_runtime": {"runtime_type": "local"},
+        },
+        "platform": {
+            "config": {
+                "database": "analytics",
+                "database_name": "analytics",
+                "endpoint": "https://example.invalid/warehouse",
+                "s3_bucket": "alice-results",
+                "role_arn": "arn:aws:iam::1234:role/bench",
+                "submission_path": "/Users/alice/submission.json",
+            }
+        },
+        "config": {"platform_options": {"account_id": "acct-1", "cluster_id": "c-1", "schema_name": "public"}},
+    }
+
+    def test_result_payload_anonymization_is_idempotent(self):
+        manager = AnonymizationManager()
+        once = manager.anonymize_result_payload(self.PAYLOAD)
+        assert manager.anonymize_result_payload(once) == once
+
+    def test_tuning_payload_anonymization_is_idempotent(self):
+        """Tuning hashes table/column names into mapping *keys*, so re-walking
+        an already-anonymized companion re-hashes the keys as well as values.
+        """
+        manager = AnonymizationManager()
+        payload = {
+            "source_file": "examples/tunings/custom.yaml",
+            "requested": {
+                "table_tunings": {"lineitem": {"columns": [{"name": "l_orderkey"}]}},
+                "constraints": {"primary_key": {"table": "orders", "columns": ["o_orderkey"]}},
+            },
+        }
+        once = manager.anonymize_tuning_payload(payload)
+        assert manager.anonymize_tuning_payload(once) == once
+
+    def test_pseudonym_survives_a_second_pass_unchanged(self):
+        manager = AnonymizationManager()
+        once = manager.anonymize_result_payload(self.PAYLOAD)
+        twice = manager.anonymize_result_payload(once)
+        assert twice["platform"]["config"]["endpoint"] == once["platform"]["config"]["endpoint"]
+        assert twice["platform"]["config"]["database_name"] == once["platform"]["config"]["database_name"]
+        assert twice["environment"]["client_host"]["hostname"] == once["environment"]["client_host"]["hostname"]
+
+    def test_every_emitted_pseudonym_is_recognized_as_one(self):
+        """Pin the emitter against the recognizer.
+
+        These are two halves of one contract - the ``[:12]`` slice and the
+        width the pass-through accepts. Widening one alone silently restores
+        the double-hash bug, and no payload-level test would notice.
+        """
+        manager = AnonymizationManager()
+        for prefix in sorted(set(_IDENTIFIER_KEYS.values()) | {"path", "host", "endpoint", "table", "column"}):
+            emitted = manager._hash_public_identifier("some-private-value", prefix)
+            assert _is_public_pseudonym(emitted, prefix), f"{prefix}: emitted {emitted!r} is not recognized"
+            assert manager._hash_public_identifier(emitted, prefix) == emitted
+
+    def test_capture_side_machine_id_is_omitted_not_published(self):
+        """Public boundary omits machine_id; internal capture id never publishes.
+
+        ``get_anonymous_machine_id`` remains for capture-side grouping. The
+        public walk drops the key entirely (ADR field set), so the internal
+        16-hex token is never re-emitted as a 12-hex public pseudonym.
+        """
+        manager = AnonymizationManager()
+        internal = manager.get_anonymous_machine_id()
+        published = manager.anonymize_result_payload({"machine_id": internal, "note": "keep"})
+        assert "machine_id" not in published
+        assert published["note"] == "keep"
+
+    def test_pass_through_does_not_cross_prefixes(self):
+        """A token only survives in the field family that would mint it.
+
+        Without prefix scoping, a ``host_``-shaped value would survive verbatim
+        inside a path field, letting a submitted payload carry a chosen token
+        into a namespace the anonymizer never assigned it to.
+        """
+        manager = AnonymizationManager()
+        # submission_path is retained and path-prefixed; a host-shaped value
+        # must be re-hashed into the path namespace rather than passed through.
+        out = manager.anonymize_result_payload({"submission_path": "host_0123456789ab"})
+        assert out["submission_path"] != "host_0123456789ab"
+        assert _is_public_pseudonym(out["submission_path"], "path")
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "path_0123456789",  # too short
+            "path_0123456789abc",  # too long
+            "path_0123456789zz",  # not hex
+            "path_",  # no digest
+            "pathx_0123456789ab",  # prefix is not an exact match
+        ],
+    )
+    def test_only_the_exact_pseudonym_shape_passes_through(self, value):
+        assert not _is_public_pseudonym(value, "path")
+        out = AnonymizationManager().anonymize_result_payload({"submission_path": value})
+        assert out["submission_path"] != value
+
+
+class TestLegacyAnonymizationSchemeIsGone:
+    """One salted scheme, no second weaker one.
+
+    The module used to carry a parallel legacy API - sanitize_path,
+    anonymize_query_metadata, anonymize_execution_metadata,
+    anonymize_system_profile, validate_anonymization - that hashed with
+    UNSALTED md5 truncated to 8 hex and, in sanitize_path's case, returned
+    private paths completely unchanged. It had no production caller, so it
+    leaked nothing in practice, but it sat in the same module as the real
+    boundary where a future caller could reasonably have trusted it.
+    """
+
+    LEGACY_METHODS = (
+        "sanitize_path",
+        "anonymize_query_metadata",
+        "anonymize_execution_metadata",
+        "anonymize_system_profile",
+        "validate_anonymization",
+    )
+
+    @pytest.mark.parametrize("name", LEGACY_METHODS)
+    def test_legacy_method_is_gone(self, name):
+        assert not hasattr(AnonymizationManager, name), f"{name} is back on the public surface"
+
+    def test_no_unsalted_md5_pseudonym_scheme_remains(self):
+        """md5 is unsalted and 8 hex here - trivially reversible for a
+        username or hostname. The public boundary uses salted sha256.
+        """
+        source = inspect.getsource(sys.modules[AnonymizationManager.__module__])
+        assert "md5" not in source, "an md5 pseudonym scheme is back in the anonymizer"
+
+    def test_every_pseudonym_emitter_uses_the_shared_salted_helper(self):
+        """Catch a second emitter even if it reaches for sha256.
+
+        The bug was two schemes, not md5 specifically. Any new
+        f"prefix_{...hexdigest()[:n]}" that bypasses _hash_public_identifier
+        would reintroduce it, so pin that the module truncates a digest in
+        exactly the two places that are supposed to.
+        """
+        source = inspect.getsource(sys.modules[AnonymizationManager.__module__])
+        truncations = re.findall(r"hexdigest\(\)\[:[^\]]+\]", source)
+        assert len(truncations) == 2, f"unexpected digest truncations: {truncations}"
+
+    def test_no_sibling_module_mints_a_pseudonym_behind_the_boundary(self):
+        """Widen the check past this one module.
+
+        The rung above reads only ``anonymization.py``, so a second emitter
+        added in a sibling under ``benchbox/core/results/`` would satisfy it
+        while reintroducing exactly the split this class exists to prevent.
+        Scan the package and require that anything minting a ``<prefix>_<hex>``
+        token does it through the shared salted helper.
+        """
+        package = Path(inspect.getfile(sys.modules[AnonymizationManager.__module__])).parent
+        emitter = re.compile(r"f\"[a-z_]+_\{[^}]*hexdigest\(\)")
+        offenders = []
+        for path in sorted(package.glob("*.py")):
+            text = path.read_text(encoding="utf-8")
+            if path.name == "anonymization.py":
+                continue
+            if emitter.search(text):
+                offenders.append(path.name)
+        assert not offenders, f"pseudonym emitters outside the shared helper: {offenders}"
+
+    def test_public_surface_is_only_the_salted_boundary(self):
+        public = {
+            name for name, _ in inspect.getmembers(AnonymizationManager, inspect.isfunction) if not name.startswith("_")
+        }
+        assert public == {
+            "get_anonymous_machine_id",
+            "anonymize_result_payload",
+            "anonymize_tuning_payload",
+            "remove_pii",
+        }, public
+
+    def test_salt_does_not_reach_an_already_anonymized_value(self):
+        """Pin the salt/pass-through interaction, including its downside.
+
+        The pass-through is checked BEFORE the salt is applied, so a value that
+        is already a pseudonym survives verbatim no matter whose salt is in
+        play. That is required for idempotence, but it means changing the salt
+        does not re-pseudonymize a stored corpus: new captures adopt the new
+        salt while stored bundles keep the old pseudonyms, splitting one
+        machine across two identities. Rotating the salt requires re-deriving
+        the corpus from pre-anonymization originals. Documented under
+        "Salt rotation" in docs/reference/result-formats.md.
+
+        Scoped to retained fields (endpoint / database_name / submission_path);
+        unread identifiers are omitted rather than salted.
+        """
+        a = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-A"))
+        b = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-B"))
+        raw = {"endpoint": "https://warehouse.example.invalid/sql"}
+
+        published_by_a = a.anonymize_result_payload(raw)["endpoint"]
+        published_by_b = b.anonymize_result_payload(raw)["endpoint"]
+        assert published_by_a != published_by_b, "salt must scope pseudonyms derived from raw values"
+
+        reanonymized = b.anonymize_result_payload({"endpoint": published_by_a})["endpoint"]
+        assert reanonymized == published_by_a, "already-anonymized values are salt-independent by design"
+
+    def test_no_public_method_returns_a_private_path_verbatim(self):
+        """The concrete defect: sanitize_path('/Users/alice/bench') used to
+        return that string unchanged, and find_public_path_leaks flagged its
+        own module's output as a leak.
+        """
+        manager = AnonymizationManager()
+        private = "/Users/alice/bench"
+        for payload in (
+            {"working_dir": private},
+            {"database_path": private},
+            {"submission_path": private},
+            {"note": private},
+        ):
+            out = manager.anonymize_result_payload(payload)
+            assert find_public_path_leaks(out) == [], f"{payload} leaked: {out}"
+            assert "alice" not in json.dumps(out)
+            # Dropped keys must be absent; retained path keys must be hashed.
+            for dropped in ("working_dir", "database_path"):
+                assert dropped not in out
+            if "submission_path" in payload:
+                assert _is_public_pseudonym(out["submission_path"], "path")

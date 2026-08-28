@@ -401,23 +401,22 @@ class TestTPCHStreamRunner:
         assert runner.dialect == "sqlite"
         assert runner.verbose
 
-    def test_stream_runner_implemented_methods(self):
-        """Test that stream runner methods are implemented and handle errors gracefully."""
+    def test_stream_runner_methods_raise_not_implemented(self):
+        """run_stream/run_concurrent_streams never fake success; they always raise NotImplementedError.
+
+        These methods used to "handle" a missing file by returning a
+        success=False dict, and an empty stream list by returning a
+        success=True dict -- both computed from counting comment lines rather
+        than running any SQL. That fake-success stub is retired: both methods
+        now raise NotImplementedError unconditionally.
+        """
         runner = TPCHStreamRunner("connection_string")
 
-        # run_stream should be implemented and handle missing files gracefully
-        result = runner.run_stream(Path("/fake/stream.sql"), 1)
-        assert isinstance(result, dict)
-        assert "success" in result
-        assert result["success"] is False  # Should fail gracefully with nonexistent file
-        assert "error" in result
-        assert "not found" in result["error"] or "does not exist" in result["error"]
+        with pytest.raises(NotImplementedError, match="does not execute SQL"):
+            runner.run_stream(Path("/fake/stream.sql"), 1)
 
-        # run_concurrent_streams should be implemented and handle empty lists
-        result = runner.run_concurrent_streams([])
-        assert isinstance(result, dict)
-        assert "success" in result
-        assert result["num_streams"] == 0
+        with pytest.raises(NotImplementedError, match="does not execute SQL"):
+            runner.run_concurrent_streams([])
 
 
 class TestTPCHStreamsIntegration:

@@ -429,6 +429,7 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
                 execution_time=elapsed,
                 actual_row_count=len(rows),
                 first_row=rows[0] if rows else None,
+                materialized_rows=result,
             )
             result_dict["stream_id"] = stream_id
             result_dict["results"] = rows
@@ -467,16 +468,33 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
 
     @staticmethod
     def _resolve_table_names(benchmark: Any) -> list[str]:
-        """Resolve table names from common BenchBox benchmark interfaces."""
-        if hasattr(benchmark, "get_table_loading_order") and callable(benchmark.get_table_loading_order):
-            return list(benchmark.get_table_loading_order())
+        """Resolve table names from common BenchBox benchmark interfaces.
+
+        ``get_table_loading_order`` takes the discovered table list and
+        returns it in FK-safe order (TPCH/SSB/CoffeeShop/TPCDS all require
+        this argument); it cannot be used to discover the table list itself.
+        So the raw list is discovered first via the other interfaces, then
+        handed to ``get_table_loading_order`` for ordering if available.
+        """
+        available: list[str] | None = None
         if hasattr(benchmark, "get_available_tables") and callable(benchmark.get_available_tables):
-            return list(benchmark.get_available_tables())
-        if hasattr(benchmark, "get_table_names") and callable(benchmark.get_table_names):
-            return list(benchmark.get_table_names())
-        tables = getattr(benchmark, "tables", None)
-        if isinstance(tables, dict):
-            return list(tables.keys())
+            available = list(benchmark.get_available_tables())
+        elif hasattr(benchmark, "get_table_names") and callable(benchmark.get_table_names):
+            available = list(benchmark.get_table_names())
+        elif hasattr(benchmark, "get_schema") and callable(benchmark.get_schema):
+            schema = benchmark.get_schema()
+            if isinstance(schema, dict):
+                available = list(schema)
+        else:
+            tables = getattr(benchmark, "tables", None)
+            if isinstance(tables, dict):
+                available = list(tables.keys())
+
+        if available is not None:
+            if hasattr(benchmark, "get_table_loading_order") and callable(benchmark.get_table_loading_order):
+                return list(benchmark.get_table_loading_order(available))
+            return available
+
         raise ConfigurationError("Benchmark does not expose table names for Snowpark data loading")
 
     def execute_dataframe(
@@ -629,6 +647,17 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
             "private_key_passphrase": config.get("private_key_passphrase"),
             "warehouse_size": config.get("warehouse_size", "MEDIUM"),
         }
+
+        # Pass through tuning provenance/config
+        for key in [
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+        ]:
+            if key in config:
+                params[key] = config[key]
 
         return cls(**params)
 

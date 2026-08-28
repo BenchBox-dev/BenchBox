@@ -225,13 +225,14 @@ def main(argv: list[str] | None = None) -> int:
     print("-" * 70)
 
     # Import TPC-H query definitions
-    from benchbox.core.tpch.dataframe_queries import get_tpch_query
+    from benchbox.core.tpch.dataframe_queries import get_query
 
     sample_queries = ["Q1", "Q6"]  # Simple aggregation queries that work well on GPU
 
     for qid in sample_queries:
-        query = get_tpch_query(qid)
-        if query is None:
+        try:
+            query = get_query(qid)
+        except KeyError:
             print(f"\nQuery {qid} not found")
             continue
 

@@ -29,6 +29,10 @@ DATAFRAME_SQL_ONLY_RULE = CompatibilityRule(
 )
 
 _NATIVE_MODEL_BENCHMARK_GATES = {
+    ("sqlite", "vector_search"): (
+        "SQLite lacks vector similarity/ANN support; vector_search has no SQLite query variant and uses "
+        "DuckDB-specific array syntax."
+    ),
     ("datafusion", "write_primitives"): (
         "DataFusion UAT runs through the in-memory SessionContext adapter; the adapter only rewrites "
         "write_primitives bulk-load operations and does not expose the durable row-level DML contract "
@@ -63,7 +67,8 @@ _NATIVE_MODEL_BENCHMARK_GATES = {
 _NATIVE_MODEL_BENCHMARK_EVIDENCE = (
     "benchbox/core/ai_primitives/specs.yaml unsupported_platforms; "
     "benchbox/platforms/datafusion.py DataFusionConnectionCompat; "
-    "benchbox/platforms/clickhouse_local.py embedded chDB local adapter"
+    "benchbox/platforms/clickhouse_local.py embedded chDB local adapter; "
+    "benchbox/core/vector_search/queries.py and schema_specs.yaml"
 )
 
 _DATAFRAME_TRANSACTIONAL_BENCHMARK_GATES = {
@@ -116,6 +121,24 @@ _TIMESCALEDB_DATAVAULT_RUNTIME_ENVELOPE_REASON = (
     "TimescaleDB-specific runtime envelope failure for the current release gate."
 )
 
+_SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_REASON = (
+    "SQLite TPC-DS OBT SF1 cannot meet the 1200s release-gate cell contract on the native UAT host. "
+    "The 2026-08-25 probe loaded 1,325,000 of 5,041,336 rows from the 518-column artifact in 304.9s, "
+    "projecting 1,391s for loading alone. This is the SQLite bind/WAL path, not an index or SQL-compatibility "
+    "issue. Keep it pruned until a bounded atomic bulk loader fits the declared budget."
+)
+
+_SQLITE_TPCDS_RUNTIME_ENVELOPE_REASON = (
+    "SQLite TPC-DS missed the 1200s release-gate contract at all three scales on 2026-08-25. "
+    "At SF0.01, query 13 and query 48 exceeded 300s; eleven queries also need unsupported ROLLUP semantics. "
+    "Keep the cells pruned until bounded query rewrites or planner improvements fit the budget."
+)
+_DATAFUSION_DATAVAULT_RUNTIME_ENVELOPE_REASON = (
+    "DataFusion DataVault query 18 at SF1 is outside the 16 GiB release-host envelope measured on 2026-08-25. "
+    "Stage 1 passed SF0.01 and SF0.1, but SF1 was killed; with PR #1914 spilling active, a 12 GiB pool "
+    "was also host-killed. Diagnostic runs retain every scale."
+)
+
 _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES = (
     {
         (platform, "joinorder"): _JOINORDER_RUNTIME_ENVELOPE_REASON
@@ -127,6 +150,20 @@ _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES = (
     }
     | {("timescaledb", "datavault"): _TIMESCALEDB_DATAVAULT_RUNTIME_ENVELOPE_REASON}
 )
+
+_RELEASE_GATE_RUNTIME_ENVELOPES = _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES | {
+    ("datafusion", "datavault"): _DATAFUSION_DATAVAULT_RUNTIME_ENVELOPE_REASON,
+    ("sqlite", "tpcds"): _SQLITE_TPCDS_RUNTIME_ENVELOPE_REASON,
+    ("sqlite", "tpcds_obt"): _SQLITE_TPCDS_OBT_RUNTIME_ENVELOPE_REASON,
+}
+
+_RELEASE_GATE_STAGES_UNUSED_RUNTIME_ENVELOPES = frozenset(_PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES)
+
+_RELEASE_GATE_RUNTIME_ENVELOPE_EVIDENCE = {
+    ("datafusion", "datavault"): "docs/operations/uat-framework.md: DataVault evidence (2026-08-25)",
+    ("sqlite", "tpcds"): "docs/operations/uat-framework.md: SQLite TPC-DS evidence (2026-08-25)",
+    ("sqlite", "tpcds_obt"): "PR #1904; docs/operations/uat-framework.md: SQLite OBT evidence (2026-08-25)",
+}
 
 
 def compatibility_rule_for(
@@ -164,13 +201,17 @@ def compatibility_rule_for(
                 evidence=_DATAFRAME_WRITE_MANAGER_EVIDENCE,
             )
     if include_release_gate_runtime_envelopes:
-        runtime_envelope_reason = _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES.get((platform, benchmark))
+        runtime_envelope_reason = _RELEASE_GATE_RUNTIME_ENVELOPES.get((platform, benchmark))
         if runtime_envelope_reason:
+            runtime_envelope_evidence = _RELEASE_GATE_RUNTIME_ENVELOPE_EVIDENCE.get(
+                (platform, benchmark),
+                "2026-05-14 enabled-platform UAT release-gate audit; not a runtime compatibility gate",
+            )
             return CompatibilityRule(
                 rule_id=f"uat.compat.{platform}.{benchmark}.release_gate_runtime_envelope",
                 status="blocked",
                 reason=runtime_envelope_reason,
-                evidence="2026-05-14 enabled-platform UAT release-gate audit; not a runtime compatibility gate",
+                evidence=runtime_envelope_evidence,
             )
     caps = PlatformRegistry.get_platform_capabilities(platform)
     unsupported_benchmarks = getattr(caps, "unsupported_benchmarks", {}) if caps else {}

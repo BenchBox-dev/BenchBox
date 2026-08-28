@@ -30,7 +30,7 @@ def test_producer_policy_only_accepts_current_schema_version() -> None:
     assert "producer result schema policy" in older.error_message()
 
 
-@pytest.mark.parametrize("version", ["2.0", "2.1"])
+@pytest.mark.parametrize("version", ["2.0", "2.1", "2.2"])
 def test_strict_runtime_policies_accept_known_v2_versions(version: str) -> None:
     assert RUNTIME_SCHEMA_POLICY.evaluate(version).accepted
     assert LOADER_SCHEMA_POLICY.evaluate(version).accepted
@@ -53,10 +53,10 @@ def test_strict_runtime_policies_reject_unsupported_versions(version: object, re
         decision = policy.evaluate(version)
         assert not decision.accepted
         assert decision.reason == reason
-        assert "schema versions 2.0 and 2.1" in decision.error_message()
+        assert "schema versions 2.0, 2.1, and 2.2" in decision.error_message()
 
 
-@pytest.mark.parametrize("version", ["2.0", "2.1", "2.99", "2.1.3"])
+@pytest.mark.parametrize("version", ["2.0", "2.1", "2.2", "2.99", "2.1.3"])
 def test_public_submission_policy_forward_accepts_numeric_v2_family(version: str) -> None:
     assert PUBLIC_SUBMISSION_SCHEMA_POLICY.evaluate(version).accepted
 
@@ -74,6 +74,7 @@ def test_public_submission_policy_rejects_legacy_missing_and_malformed(version: 
     [
         ({"version": "2.0"}, "2.0"),
         ({"version": "2.1"}, "2.1"),
+        ({"version": "2.2"}, "2.2"),
         ({"schema_version": "2.0"}, "2.0"),
         ({"version": "2.99"}, LEGACY_NORMALIZED_SCHEMA_VERSION),
         ({"version": "1.0"}, LEGACY_NORMALIZED_SCHEMA_VERSION),
@@ -91,3 +92,43 @@ def test_normalizer_policy_names_fallback_reason_for_unknown_v2() -> None:
     assert decision.accepted
     assert decision.normalized_version == LEGACY_NORMALIZED_SCHEMA_VERSION
     assert decision.reason == "legacy-fallback-unknown-v2"
+
+
+def test_producer_payload_boundary_redacts_platform_metadata_sentinels() -> None:
+    """Producer schema path must apply the multi-source credential boundary."""
+    import json
+    from datetime import datetime
+
+    from benchbox.core.results.models import BenchmarkResults
+    from benchbox.core.results.schema import build_result_payload
+
+    gates = (
+        "RAW_CONFIG_GATE",
+        "RAW_METADATA_GATE",
+        "DEPLOYMENT_GATE",
+        "CLOUD_GATE",
+        "COMPUTE_GATE",
+        "STORAGE_GATE",
+    )
+    result = BenchmarkResults(
+        benchmark_name="synthetic",
+        platform="synthetic",
+        scale_factor=1.0,
+        execution_id="schema-policy-gate",
+        timestamp=datetime.now(),
+        duration_seconds=0.1,
+        total_queries=0,
+        successful_queries=0,
+        failed_queries=0,
+        platform_info={"sort_key": "o_orderkey", "threads": 4},
+        platform_raw_config={"password": "RAW_CONFIG_GATE"},
+        platform_raw_metadata={"password": "RAW_METADATA_GATE"},
+        platform_deployment={"token": "DEPLOYMENT_GATE"},
+        platform_cloud={"access_key": "CLOUD_GATE"},
+        platform_compute={"connection_string": "COMPUTE_GATE"},
+        platform_storage={"secret": "STORAGE_GATE"},
+    )
+    text = json.dumps(build_result_payload(result), default=str)
+    for gate in gates:
+        assert gate not in text, f"producer payload leaked {gate}"
+    assert "o_orderkey" in text

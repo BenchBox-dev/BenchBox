@@ -6,9 +6,10 @@ Production DataFrame execution is routed by ``benchbox.core.runner.runner`` to
 module is retained as a deprecated internal compatibility runner while older
 tests and helper imports are migrated.
 
-The mode-detection helpers remain internal utility compatibility points for
-CLI/dry-run paths. New DataFrame lifecycle behavior should be added to the
-adapter mixin path, not here.
+The mode-detection helpers now live in ``benchbox.core.run_service`` beside
+run-plan resolution. New DataFrame lifecycle behavior should be added to the
+adapter mixin path, not here; this module remains only for legacy lifecycle
+helpers until the deletion-only compatibility item is claimed.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -23,10 +24,12 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import DEFAULT
 
+from benchbox.core.benchmark_loader import COMPLIANCE_GATED_BENCHMARKS
 from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
 )
+from benchbox.core.contracts import DataFrameQueryRuntime, as_tuning_ledger_writer
 from benchbox.core.dataframe import (
     check_sufficient_memory,
     format_memory_warning,
@@ -39,11 +42,13 @@ from benchbox.core.dataframe.query_resolution import (
     get_tpcds_dataframe_queries,
     get_tpcds_legacy_queries,
     get_tpch_dataframe_queries,
+    registry_dataframe_queries,
     resolve_tpcds_query_manager,
     resolve_tpcds_stream_queries,
 )
+from benchbox.core.dataframe.query_validation import validate_dataframe_query_results
 from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
-from benchbox.core.exceptions import InsufficientMemoryError
+from benchbox.core.exceptions import ConfigurationError, InsufficientMemoryError
 from benchbox.core.results import (
     BenchmarkInfoInput,
     ResultBuilder,
@@ -123,6 +128,31 @@ def _benchmark_provides_dataframe_queries(benchmark_instance: Any | None) -> boo
     return _benchmark_defines_hook(benchmark_instance, "get_dataframe_queries")
 
 
+def _serialize_tuning_config(tuning_config: Any) -> dict[str, Any] | None:
+    """Render a DataFrame tuning config as a JSON-safe dict for run-config metadata.
+
+    ``BenchmarkConfig.options["df_tuning_config"]`` holds a live
+    ``DataFrameTuningConfiguration`` because adapters need the object itself.
+    ``RunConfigInput.tuning_config`` is typed ``dict`` and is emitted verbatim
+    into ``execution_metadata.run_config``, which the JSON exporter writes with
+    plain ``json.dumps`` -- so the live object must never reach it or export
+    raises and the run silently produces no result JSON and no ``.applied.json``
+    companion. Falls back to dropping the value (``None``) rather than failing
+    the run when the object exposes no usable ``to_dict()``.
+    """
+    if tuning_config is None:
+        return None
+    if isinstance(tuning_config, dict):
+        return tuning_config
+    to_dict = getattr(tuning_config, "to_dict", None)
+    if callable(to_dict):
+        rendered = to_dict()
+        if isinstance(rendered, dict):
+            return rendered
+    logger.debug("Dropping non-serializable df_tuning_config (%s) from run-config metadata", type(tuning_config))
+    return None
+
+
 @dataclass
 class DataFramePhases:
     """Phases for DataFrame benchmark execution."""
@@ -145,7 +175,7 @@ class DataFrameRunOptions:
 
 def run_dataframe_benchmark(
     benchmark_config: BenchmarkConfig,
-    adapter: Any,
+    adapter: DataFrameQueryRuntime,
     system_profile: SystemProfile | None = None,
     *,
     data_dir: Path | None = None,
@@ -208,10 +238,12 @@ def run_dataframe_benchmark(
             test_type=test_execution_type if test_execution_type != "standard" else "power",
             benchmark_id=normalize_benchmark_id(benchmark_config.name),
             display_name=getattr(benchmark_config, "display_name", benchmark_config.name),
+            compliance_class=dataframe_compliance_class(benchmark_instance, benchmark_config),
         ),
         platform=platform_info,
     )
     builder.mark_started()
+    builder.set_validation_status("NOT_RUN")
 
     options_map = getattr(benchmark_config, "options", {}) or {}
     builder.set_run_config(
@@ -222,7 +254,13 @@ def run_dataframe_benchmark(
             phases=options_map.get("phases"),
             query_subset=getattr(benchmark_config, "queries", None),
             tuning_mode=options_map.get("tuning_mode"),
-            tuning_config=options_map.get("df_tuning_config"),
+            # `df_tuning_config` is the *live* DataFrameTuningConfiguration kept in
+            # options for adapter construction. RunConfigInput.tuning_config is
+            # emitted verbatim into execution_metadata.run_config and the JSON
+            # exporter uses plain json.dumps, so passing the object through makes
+            # export raise -- the run then yields no result JSON and no
+            # .applied.json companion. Serialize it before it reaches metadata.
+            tuning_config=_serialize_tuning_config(options_map.get("df_tuning_config")),
         )
     )
 
@@ -287,11 +325,21 @@ def run_dataframe_benchmark(
                 monitor=monitor,
             )
 
+            validation_summary = validate_dataframe_query_results(
+                query_results,
+                benchmark_name=benchmark_config.name,
+                scale_factor=scale_factor,
+                validation_mode=options_map.get("validation_mode"),
+                seed=options_map.get("seed"),
+            )
+            builder.set_validation_status(validation_summary.status, validation_summary.details)
+
             # Add query results to builder
             for qr in query_results:
                 builder.add_query_result(normalize_query_result(qr))
             builder.set_phase_status("power_test", "COMPLETED")
 
+        _attach_applied_tuning_ledger(adapter, builder)
         builder.mark_completed()
         return builder.build()
 
@@ -302,12 +350,26 @@ def run_dataframe_benchmark(
             {"error": str(e), "error_type": type(e).__name__},
         )
         builder.add_execution_metadata("error", str(e))
+        _attach_applied_tuning_ledger(adapter, builder)
         builder.mark_completed()
         return builder.build()
 
 
+def _attach_applied_tuning_ledger(adapter: object, builder: Any) -> None:
+    """Feed the adapter's applied-tuning ledger into ``builder`` before build.
+
+    Parity with the production adapter path: delegates to
+    ``TuningConfigurableMixin._write_applied_tuning_ledger`` so the built result
+    carries ``applied_tuning_ledger`` + ``applied_ledger_hash`` + the honest
+    ``tuning_validation_status``. Guarded for adapters without the tuning mixin.
+    """
+    writer = getattr(adapter, "_write_applied_tuning_ledger", None)
+    if callable(writer):
+        as_tuning_ledger_writer(adapter)._write_applied_tuning_ledger(builder)
+
+
 def _load_dataframe_data(
-    adapter: Any,
+    adapter: DataFrameQueryRuntime,
     ctx: Any,
     benchmark_config: BenchmarkConfig,
     benchmark_instance: Any | None,
@@ -387,11 +449,18 @@ def _load_dataframe_data(
             )
             logger.error(f"Failed to load {table_name}: {e}")
 
+    # Parity with the production adapter path: fold the physical write-layout the
+    # loader actually applied into the adapter's applied-tuning ledger (POST_LOAD).
+    # Guarded -- a no-op for adapters without the tuning mixin or when no
+    # non-default layout was applied.
+    if hasattr(adapter, "_fold_write_layout_into_ledger"):
+        adapter._fold_write_layout_into_ledger(getattr(loader, "applied_write_layout", None))
+
     return table_stats, per_table_stats
 
 
 def _execute_dataframe_queries(
-    adapter: Any,
+    adapter: DataFrameQueryRuntime,
     ctx: Any,
     benchmark_config: BenchmarkConfig,
     benchmark_instance: Any | None,
@@ -446,8 +515,13 @@ def _execute_dataframe_queries(
             initial_queries = [q for q in initial_queries if q.query_id.upper() in query_filter]
 
         if not initial_queries:
-            logger.warning("No queries found for execution")
-            return []
+            # Never return an empty result set here. The caller goes straight
+            # on to mark power_test COMPLETED, so a silent empty list produced
+            # a bundle reporting 0/0 queries, validation "passed", and exit 0 --
+            # a run that executed nothing and looked like a clean pass. Sixty
+            # such bundles are in the public corpus today, all from seven
+            # benchmark families with no DataFrame query source.
+            raise ConfigurationError(no_dataframe_queries_message(benchmark_id, query_filter))
 
         total_queries = len(initial_queries)
         logger.info(f"Executing {total_queries} queries")
@@ -687,6 +761,69 @@ def _clear_parameter_overrides(benchmark_id: str) -> None:
             pass
 
 
+def dataframe_compliance_class(benchmark_instance: object | None, benchmark_config: object) -> str | None:
+    """Resolve the compliance class a DataFrame result must carry.
+
+    The SQL path gets this for free: `result_factory.build_enhanced_benchmark_result`
+    reads `benchmark.compliance_class` off the benchmark instance. Both DataFrame
+    builders construct `BenchmarkInfoInput` themselves and omitted the field, and
+    they build from the CONFIG rather than the instance, so threading `official`
+    through the config -- as PR #1770 did -- could never reach them.
+
+    The effect was not cosmetic. `benchbox submit` refuses a TPC-DS bundle whose
+    compliance class is unofficial, so no DataFrame result could ever be
+    published, however the user invoked it.
+
+    Prefer the instance, which has already run the classifier. Fall back to
+    classifying from the config so a caller that passes no instance still gets a
+    truthful value rather than silence.
+    """
+    from_instance = getattr(benchmark_instance, "compliance_class", None)
+    if from_instance is not None:
+        return _compliance_value(from_instance)
+
+    name = str(getattr(benchmark_config, "name", "") or "").lower()
+    if name not in COMPLIANCE_GATED_BENCHMARKS:
+        return None
+    from benchbox.core.tpcds.compliance import classify_tpcds_run
+
+    return _compliance_value(
+        classify_tpcds_run(
+            float(getattr(benchmark_config, "scale_factor", 0) or 0),
+            official=bool(getattr(benchmark_config, "official", False)),
+        )
+    )
+
+
+def _compliance_value(compliance_class: object) -> str:
+    """Plain wire string for a compliance class, enum or already-a-string.
+
+    `str()` on the enum yields `TpcdsComplianceClass.UNOFFICIAL_SUBSCALE`, not
+    `unofficial_subscale`, and the submit and admission gates compare against
+    the plain value. The SQL path emits the plain value, so this must too.
+    """
+    return str(getattr(compliance_class, "value", compliance_class))
+
+
+def no_dataframe_queries_message(benchmark_id: str, query_filter: set[str] | None) -> str:
+    """Explain why zero queries were discovered, and what the user can do.
+
+    The two causes need different advice: an over-narrow `--queries` filter is
+    the user's to correct, whereas a benchmark with no DataFrame query source
+    at all is a coverage gap they cannot fix from the command line.
+    """
+    if query_filter:
+        return (
+            f"No DataFrame queries matched {sorted(query_filter)} for benchmark {benchmark_id!r}. "
+            "Check the --queries selection against the benchmark's query IDs."
+        )
+    return (
+        f"Benchmark {benchmark_id!r} has no DataFrame query source, so DataFrame mode would "
+        "execute nothing. Run it in SQL mode instead -- use the platform's plain name rather "
+        "than its -df alias -- or choose a benchmark with DataFrame support."
+    )
+
+
 def _get_queries_for_benchmark(
     benchmark_config: BenchmarkConfig,
     benchmark_instance: Any | None,
@@ -727,7 +864,7 @@ def _get_queries_for_benchmark(
     if _benchmark_provides_dataframe_queries(benchmark_instance):
         return benchmark_instance.get_dataframe_queries()
 
-    return []
+    return registry_dataframe_queries(benchmark_id)
 
 
 def _get_tpch_dataframe_queries(
@@ -770,42 +907,3 @@ def _get_clickbench_dataframe_queries(
 ) -> list[Any]:
     """Get ClickBench DataFrame queries."""
     return get_clickbench_dataframe_queries(benchmark_config, benchmark_instance, stream_id)
-
-
-def is_dataframe_execution(database_config: Any) -> bool:
-    """Check if execution should use DataFrame mode.
-
-    DataFrame mode is determined by platform naming convention:
-    - polars-df: DataFrame mode
-    - pandas-df: DataFrame mode
-    - polars: SQL mode (if exists)
-    - duckdb: SQL mode
-
-    Args:
-        database_config: Database configuration with platform type
-
-    Returns:
-        True if DataFrame mode should be used
-    """
-    if database_config is None:
-        return False
-
-    from benchbox.platforms.adapter_factory import is_dataframe_mode
-
-    platform_type = getattr(database_config, "type", "")
-    explicit_mode = getattr(database_config, "mode", None)
-    return is_dataframe_mode(platform_type, explicit_mode)
-
-
-def get_execution_mode(database_config: Any) -> str:
-    """Get the execution mode for a platform.
-
-    Args:
-        database_config: Database configuration
-
-    Returns:
-        "dataframe" or "sql"
-    """
-    if is_dataframe_execution(database_config):
-        return "dataframe"
-    return "sql"

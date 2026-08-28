@@ -26,7 +26,6 @@ from benchbox.utils.input_validation import (
     quote_identifier,
     quote_qualified_identifier,
     safe_format_table_reference,
-    sanitize_error_message,
     validate_benchmark_name,
     validate_platform_name,
     validate_query_complexity,
@@ -446,29 +445,6 @@ class TestValidateScaleFactor:
         """Very large scale factors should raise ValidationError."""
         with pytest.raises(ValidationError, match="too large"):
             validate_scale_factor(200000)
-
-
-class TestSanitizeErrorMessage:
-    """Tests for error message sanitization."""
-
-    def test_redact_table_names(self):
-        """Table names should be redacted."""
-        msg = "Table 'users' not found"
-        result = sanitize_error_message(msg)
-        assert "users" not in result
-        assert "[REDACTED]" in result
-
-    def test_redact_column_names(self):
-        """Column names should be redacted."""
-        msg = "Column 'password' is invalid"
-        result = sanitize_error_message(msg)
-        assert "password" not in result
-
-    def test_preserve_with_flag_false(self):
-        """Messages should not be redacted when flag is False."""
-        msg = "Table 'users' not found"
-        result = sanitize_error_message(msg, redact_identifiers=False)
-        assert msg == result
 
 
 class TestSafeFormatTableReference:

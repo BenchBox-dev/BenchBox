@@ -15,27 +15,18 @@ if TYPE_CHECKING:
 
 from benchbox.cli.config import DirectoryManager
 from benchbox.core.benchmark_loader import (
+    compliance_mode_kwargs,
     get_core_benchmark_class,
     instantiate_benchmark_class,
 )
 
 # Import from common_types to avoid circular imports
 from benchbox.core.config import BenchmarkConfig, RunConfig
-from benchbox.core.constants import (
-    GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
-    GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
-)
 from benchbox.core.hooks.platform_hooks import PlatformHookRegistry
 from benchbox.core.platform_config import get_platform_config as _core_get_platform_config
 from benchbox.core.platform_registry import PlatformRegistry
-from benchbox.core.results.driver_metadata import apply_driver_metadata
 from benchbox.core.results.models import BenchmarkResults
-from benchbox.core.runner.dataframe_runner import is_dataframe_execution
-from benchbox.core.runner.runner import (
-    LifecyclePhases,
-    ValidationOptions,
-    run_benchmark_lifecycle,
-)
+from benchbox.core.run_service import execute_run, resolve_lifecycle_phases, resolve_run_config
 from benchbox.core.schemas import ExecutionContext
 from benchbox.platforms import get_adapter, get_platform_adapter
 from benchbox.utils.cloud_storage import is_databricks_path
@@ -44,6 +35,21 @@ from benchbox.utils.verbosity import VerbositySettings
 
 # Module-level console handle used by orchestrator output paths.
 console = quiet_console
+
+
+def resolved_deployment_mode(database_config) -> Optional[str]:
+    """Return the deployment mode this run selected, or None for the default.
+
+    Platforms that expose a deployment choice register it as a
+    ``deployment_mode`` platform option, so an explicit selection arrives in
+    ``database_config.options``. Returning None lets the registry fall back to
+    the platform's ``default_deployment``.
+    """
+    if not database_config:
+        return None
+    options = getattr(database_config, "options", None) or {}
+    mode = options.get("deployment_mode")
+    return mode or None
 
 
 def _build_failure_result(config: BenchmarkConfig, exc: Exception) -> BenchmarkResults:
@@ -150,6 +156,10 @@ class BenchmarkOrchestrator:
         construction_output_dir = self._resolve_construction_output_dir(config, benchmark_class)
         if construction_output_dir is not None:
             optional_kwargs["output_dir"] = construction_output_dir
+        # This builder is a second construction path alongside
+        # benchmark_loader.get_benchmark_instance; both must carry compliance mode
+        # or the CLI silently produces unsubmittable results.
+        optional_kwargs.update(compliance_mode_kwargs(config))
 
         benchmark_instance = instantiate_benchmark_class(benchmark_class, kwargs, optional_kwargs)
 
@@ -246,13 +256,6 @@ class BenchmarkOrchestrator:
         self.console.print(f"[blue]Initializing {config.name} benchmark...[/blue]")
 
         try:
-            # Preserve the exact requested phases for downstream execution logic.
-            # This lets combined mode run only the phases the user asked for.
-            if phases_to_run:
-                options = dict(getattr(config, "options", {}) or {})
-                options["requested_phases"] = list(phases_to_run)
-                config.options = options
-
             # Resolve benchmark instance (keeps tests patchable)
             benchmark = self._get_benchmark_instance(config, system_profile)
             self.console.print(
@@ -277,77 +280,29 @@ class BenchmarkOrchestrator:
             self._apply_default_cloud_output_dir(database_config)
             output_root = self._resolve_output_root(config, benchmark, platform_cfg)
 
-            # Use LifecyclePhases as single source of truth
-            if phases_to_run:
-                # Map CLI phases directly to LifecyclePhases
-                phases = LifecyclePhases(
-                    generate="generate" in phases_to_run,
-                    load="load" in phases_to_run,
-                    execute=any(p in phases_to_run for p in ["warmup", "power", "throughput", "maintenance"]),
-                    statistics="statistics" in phases_to_run,
-                )
-            else:
-                # Default to standard lifecycle (generate + load + execute);
-                # the statistics phase stays opt-in.
-                phases = LifecyclePhases(generate=True, load=True, execute=True)
+            self._warn_on_execute_without_load(config, database_config, phases_to_run)
 
-            # Validate phase combinations and warn about potential issues
-            if phases.execute and not phases.load and database_config is not None:
-                # Only warn for full benchmark runs, not read-only test types (power/throughput)
-                # Power and Throughput tests are designed to query existing data without loading
-                test_execution_type = getattr(config, "test_execution_type", "standard")
-                readonly_tests = ["power", "throughput"]
-                cloud_platforms = ["databricks", "snowflake", "bigquery", "redshift"]
-
-                if test_execution_type not in readonly_tests and database_config.type.lower() in cloud_platforms:
-                    self.console.print(
-                        "[yellow]⚠️  Executing without load phase - assuming data already exists in database[/yellow]"
-                    )
-
-            # Validation options from CLI config
             opts = getattr(config, "options", {}) or {}
-            validation = ValidationOptions(
-                enable_preflight_validation=bool(opts.get("enable_preflight_validation")),
-                enable_postgen_manifest_validation=bool(opts.get("enable_postgen_manifest_validation", False)),
-                enable_postload_validation=bool(opts.get("enable_postload_validation", False)),
-            )
+            monitor = progress.get_monitor() if progress is not None else None
 
-            # Extract monitor from progress if provided
-            monitor = None
-            if progress is not None:
-                monitor = progress.get_monitor()
+            def build_adapter(*, execution_mode, output_root, phases):
+                return self._build_platform_adapter(
+                    database_config, execution_mode, output_root, opts, platform_cfg, benchmark, phases, config
+                )
 
-            # Detect execution mode for logging purposes
-            execution_mode = getattr(database_config, "execution_mode", None) if database_config else None
-            if execution_mode is None and database_config is not None:
-                execution_mode = PlatformRegistry.get_default_mode(database_config.type)
-                if is_dataframe_execution(database_config):
-                    execution_mode = "dataframe"
-
-            adapter = self._build_platform_adapter(
-                database_config, execution_mode, output_root, opts, platform_cfg, benchmark, phases, config
-            )
-
-            # Delegate lifecycle to core runner (handles both SQL and DataFrame adapters)
-            result = run_benchmark_lifecycle(
-                benchmark_config=config,
+            return execute_run(
+                config=config,
+                benchmark_instance=benchmark,
                 database_config=database_config,
                 system_profile=system_profile,
                 platform_config=platform_cfg,
-                phases=phases,
-                validation_opts=validation,
                 output_root=output_root,
-                benchmark_instance=benchmark,
-                platform_adapter=adapter,
+                phases_to_run=phases_to_run,
+                adapter_factory=build_adapter,
                 verbosity=self._verbosity,
                 monitor=monitor,
-                enable_resource_monitoring=False,
                 execution_context=execution_context,
             )
-
-            # Canonical runtime metadata enrichment for all `benchbox run` paths.
-            apply_driver_metadata(result, database_config=database_config, platform_adapter=adapter)
-            return result
 
         except Exception as e:
             # Check if this is a missing credentials error for a cloud platform
@@ -371,13 +326,37 @@ class BenchmarkOrchestrator:
             self.console.print(f"[red]❌ Benchmark execution failed: {e}[/red]")
             return _build_failure_result(config, e)
 
+    def _warn_on_execute_without_load(self, config, database_config, phases_to_run) -> None:
+        """Warn when a cloud run queries without loading. Console-only, CLI-scoped."""
+        if database_config is None:
+            return
+        phases = resolve_lifecycle_phases(phases_to_run)
+        if not (phases.execute and not phases.load):
+            return
+        # Power and Throughput tests are designed to query existing data without loading.
+        test_execution_type = getattr(config, "test_execution_type", "standard")
+        readonly_tests = ["power", "throughput"]
+        cloud_platforms = ["databricks", "snowflake", "bigquery", "redshift"]
+        if test_execution_type not in readonly_tests and database_config.type.lower() in cloud_platforms:
+            self.console.print(
+                "[yellow]⚠️  Executing without load phase - assuming data already exists in database[/yellow]"
+            )
+
     def _apply_default_cloud_output_dir(self, database_config) -> None:
-        """If no custom output dir is set and platform requires cloud storage, pull default from credentials."""
+        """If no custom output dir is set and this run stages remotely, pull default from credentials.
+
+        Gated on the *deployment* rather than the platform category: platforms
+        like firebolt (Core), motherduck and starburst are categorised as cloud
+        but their default deployment does not stage through cloud storage, so
+        pulling a cloud output location for them would redirect a local run's
+        data at a remote stage it never needed.
+        """
         if self.custom_output_dir or not database_config:
             return
         from benchbox.security.credentials import CredentialManager
 
-        if not PlatformRegistry.requires_cloud_storage(database_config.type):
+        deployment_mode = resolved_deployment_mode(database_config)
+        if not PlatformRegistry.requires_cloud_storage_for_deployment(database_config.type, deployment_mode):
             return
         cred_manager = CredentialManager()
         if not cred_manager.has_credentials(database_config.type):
@@ -464,9 +443,13 @@ class BenchmarkOrchestrator:
         return adapter
 
     def _prepare_run_config(self, config: BenchmarkConfig, database_config) -> RunConfig:
-        """Prepare benchmark run configuration using structured dataclass."""
+        """Prepare benchmark run configuration using structured dataclass.
 
-        # Get tuning configuration if available for distinct naming
+        Resolution itself lives in benchbox.core.run_service. What stays here is
+        the part core cannot own: DirectoryManager is CLI-layer, so the CLI
+        computes the database path and hands the service data instead of a
+        directory manager.
+        """
         tuning_config = None
         if config.options:
             tuning_config = config.options.get("unified_tuning_configuration")
@@ -478,36 +461,7 @@ class BenchmarkOrchestrator:
             tuning_config=tuning_config,
         )
 
-        options = config.options or {}
-        iterations = int(
-            options.get("power_iterations", GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS)
-            or GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS
-        )
-        warmups = int(
-            options.get("power_warmup_iterations", GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS)
-            or GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS
-        )
-        fail_fast = bool(options.get("power_fail_fast", False))
-
-        return RunConfig(
-            query_subset=config.queries,
-            concurrent_streams=config.concurrency,
-            test_execution_type=getattr(config, "test_execution_type", "standard"),
-            scale_factor=config.scale_factor,
-            capture_plans=config.capture_plans,
-            analyze_plans=getattr(config, "analyze_plans", None),
-            strict_plan_capture=config.strict_plan_capture,
-            seed=int(options.get("seed")) if options.get("seed") is not None else None,
-            connection={"database_path": str(database_path)},
-            verbose=self._verbosity.verbose,
-            verbose_level=self._verbosity.level,
-            verbose_enabled=self._verbosity.verbose_enabled,
-            very_verbose=self._verbosity.very_verbose,
-            quiet=self._verbosity.quiet,
-            iterations=max(1, iterations),
-            warm_up_iterations=max(0, warmups),
-            power_fail_fast=fail_fast,
-        )
+        return resolve_run_config(config, database_path=database_path, verbosity=self._verbosity)
 
     def _should_offer_credential_setup(self, database_config, error: Exception) -> bool:
         """Check if error indicates missing credentials for a cloud platform.
@@ -525,7 +479,7 @@ class BenchmarkOrchestrator:
         platform = database_config.type.lower()
 
         # Only offer for cloud platforms that support credential setup
-        cloud_platforms = ["snowflake", "bigquery", "databricks", "redshift"]
+        cloud_platforms = ["snowflake", "bigquery", "databricks", "redshift", "singlestore"]
         if platform not in cloud_platforms:
             return False
 
@@ -548,7 +502,7 @@ class BenchmarkOrchestrator:
         """Offer and run interactive credential setup when credentials are missing.
 
         Args:
-            platform: Platform name (snowflake, bigquery, databricks, redshift)
+            platform: Platform name (snowflake, bigquery, databricks, redshift, singlestore)
 
         Returns:
             True if credentials were successfully set up, False otherwise

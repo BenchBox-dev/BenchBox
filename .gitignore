@@ -66,6 +66,10 @@ docs/site/
 data/
 generated/
 benchmark_runs/
+# Defence in depth: a Snowflake stage path (@~/...) must never resolve to a
+# local directory, but if one ever does it must not become a commit. Left
+# unanchored so a run started from any subdirectory is covered too.
+@~/
 spark-warehouse/
 *.db
 *.csv
@@ -99,6 +103,10 @@ _project/*
 !_project/LAUNCH_*.md
 !_project/CONTENT_*.md
 !_project/SOCIAL_*.md
+# Committed TODO-tracker export snapshot (written weekly by
+# .github/workflows/todo-db-export.yml) -- provenance trail, must be tracked.
+!_project/todo-db-export/
+!_project/todo-db-export/**
 
 # Include pre-compiled TPC binaries for distribution
 !_binaries/
@@ -141,12 +149,11 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 
 # skill-sync mirrors (regenerate locally via `make skill-sync`). The `claude`
 # target is a TRACKED snapshot — committed for cloud/CI, managed by the
-# skill-sync block below. codex/gemini/antigravity stay untracked local mirrors.
+# skill-sync block below. the shared agents mirror stays untracked locally.
 .codex/skills/
 .codex/shared-skills/
 .codex/shared-skills.lock.json
 .gemini/skills/
-.antigravity/skills/
 .agents/
 .antigravitycli/
 
@@ -163,6 +170,7 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 !_project/notes/
 !_project/research/
 !_project/blind-spots/
+!_project/release-evidence/
 !_project/specs/
 !_project/sqlglot-upstream/
 !_project/verification-logs/
@@ -181,6 +189,17 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 # pure functions of the per-item _project/{TODO,DONE}/**/*.yaml files.
 _project/TODO/_indexes/
 _project/DONE/_indexes/
+
+# Local-SQLite TODO tracker spike (see _project/specs/todo-db-tracker.md):
+# per-clone operational state (DBs / replica) stays ignored; credential-free
+# backend config.json is tracked so clones discover the hosted URL.
+.todo-db/*.db
+.todo-db/*.sqlite
+.todo-db/*.sqlite-*
+.todo-db/replica*
+.todo-db/standalone-replica*
+.todo-db/export/
+.todo-db/archive/
 _project/blind-spots/_indexes/
 
 # Ephemeral review/audit evidence. Commit durable markdown summaries instead.
@@ -197,10 +216,9 @@ _project/verification-logs/*/
 _project/verification-logs/*.log
 _project/verification-logs/*.out
 
-# uv lockfile for the _project/scripts tooling project. Generated on first
-# `uv run --project _project/scripts ...` and was repeatedly leaving fresh
-# pool worktrees "dirty", blocking `make worktree-release`.
-_project/scripts/uv.lock
+# The _project/scripts environment now contains the released todo-db runtime.
+# Its lockfile is tracked so cutover, clean-clone, and CI commands resolve the
+# same immutable package instead of relying on a developer checkout or PATH.
 
 # Firebolt data and core data directories
 /firebolt-data
@@ -218,8 +236,6 @@ ci-log.txt
 node_modules/
 
 # >>> skill-sync managed (do not edit) >>>
-/.antigravity/skills/
+/.agents/skills/
 /.claude/skills/blog/
-/.codex/skills/
-/.gemini/skills/
 # <<< skill-sync managed <<<

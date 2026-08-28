@@ -3,8 +3,8 @@
 # BenchBox
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Beta Software](https://img.shields.io/badge/Status-Beta-blue.svg)](https://github.com/joeharris76/benchbox/issues)
-[![codecov](https://codecov.io/github/joeharris76/BenchBox/graph/badge.svg?token=3NY6DK7MDO)](https://codecov.io/github/joeharris76/BenchBox)
+[![Beta Software](https://img.shields.io/badge/Status-Beta-blue.svg)](https://github.com/BenchBox-dev/benchbox/issues)
+[![codecov](https://codecov.io/github/BenchBox-dev/BenchBox/graph/badge.svg?token=3NY6DK7MDO)](https://codecov.io/github/BenchBox-dev/BenchBox)
 [![PyPI Release](https://img.shields.io/pypi/v/benchbox)](https://pypi.org/project/benchbox/)
 [![PyPI Downloads](https://img.shields.io/pepy/dt/benchbox.svg?label=PyPI%20Downloads)](https://pypi.org/project/benchbox/)
 
@@ -18,7 +18,7 @@ BenchBox provides industry-standard (TPC-H, TPC-DS), academic (Join Order), and 
 
 BenchBox embeds the entire benchmark lifecycle, including query and data generation, result analysis, and reporting for these benchmarks in a single Python tool with simple setup.
 
-BenchBox uses Python-native interfaces for popular local data tools (DuckDB, DataFusion, Polars) and cloud platforms (Snowflake, Databricks, ClickHouse).
+BenchBox uses Python-native interfaces for popular local data tools (DuckDB, DataFusion, Polars) and cloud adapters (Snowflake, Databricks, ClickHouse). Those warehouse adapters are installable; they are *unproven* on the public corpus until a published bundle exists.
 
 ## Versioning
 
@@ -28,9 +28,9 @@ BenchBox _loosely_ follows [Semantic Versioning](https://semver.org/) using the 
 - **MINOR** when we add backward-compatible changes _OR significantly expand functionality_.
 - **PATCH** when we make bug fixes or documentation updates, _bug-fixes may not be backward-compatible_.
 
-Current release: v0.3.1. This marker mirrors `pyproject.toml` on `develop` (bumped only during release-cut, so it trails the actual latest published release between cuts) and is checked for internal consistency by `benchbox --version`; it is **not** what `pip install benchbox` gets you today.
+Current release: v0.4.0. This marker mirrors `pyproject.toml` on `develop`, which is kept in sync with the latest published release (bumped to match after each release), and is checked for internal consistency by `benchbox --version`.
 
-**The actual PyPI-latest release is `v0.3.0`** (published 2026-05-16; see [PyPI's release history](https://pypi.org/project/benchbox/#history) or `pip index versions benchbox` for the authoritative answer). **Known issue:** `v0.3.0`'s clean install is broken — `pip install benchbox` followed by `import benchbox` fails with `ModuleNotFoundError: No module named 'pandas'`. The fix is complete on `develop` (see `CHANGELOG.md`'s Unreleased section) but not yet published under a released version; until a recovery release ships, install from `develop` if you hit this: `pip install git+https://github.com/joeharris76/BenchBox.git@develop`. Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
+**The current PyPI-latest release is `v0.4.0`** (published 2026-08-27; see [PyPI's release history](https://pypi.org/project/benchbox/#history) or `pip index versions benchbox` for the authoritative answer). Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
 
 **For Developers**: See [Release Automation Guide](release/RELEASE_AUTOMATION.md) for the automated release process with reproducible builds and timestamp normalization.
 
@@ -38,7 +38,7 @@ Current release: v0.3.1. This marker mirrors `pyproject.toml` on `develop` (bump
 
 > **BenchBox is BETA software.** Core functionality and the CLI are stable. APIs may still change before 1.0. See [DISCLAIMER.md](DISCLAIMER.md) for full details on what this means and how to get help.
 
-The default wheel ships the `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, concurrency subsystems). This namespace is **outside the supported Beta product surface**: it has no stability guarantees, may change or be removed without notice, and is not integrated with the benchmark registry or public CLI. It is present in the wheel for developer convenience only.
+The default wheel ships the `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, load_testing subsystems). This namespace is **outside the supported Beta product surface**: it has no stability guarantees, may change or be removed without notice, and is not integrated with the benchmark registry or public CLI. It is present in the wheel for developer convenience only.
 
 Public contract tiers, support-status vocabulary, and source-of-truth rules for platform and benchmark count claims are tracked in [Public Contracts and Support Taxonomy](docs/reference/public-contracts.md).
 
@@ -46,19 +46,134 @@ Registry-backed count claims are checked by unit tests so README and platform do
 
 <!-- benchbox-registry-counts:start -->
 
-- Platform registry: **50** metadata entries; **45** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=27, experimental=17, deprecated=1.
+- Platform registry: **51** metadata entries; **46** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=28, experimental=17, deprecated=1.
 - Benchmark registry: **23** metadata entries; **22** public discovery entries.
 
 <!-- benchbox-registry-counts:end -->
 
+## Quick Start
+
+Get started with BenchBox in 3 steps:
+
+### 1. Install BenchBox
+
+Choose the installation that matches your target platform:
+
+**Recommended (using uv):**
+```bash
+# For local development — this is what the rest of the Quick Start uses
+uv add benchbox --extra duckdb
+
+# For cloud platforms
+uv add benchbox --extra cloud
+
+# For everything (all platforms + ClickHouse)
+uv add benchbox --extra all
+```
+
+`uv add benchbox` on its own installs the core package, which ships SQLite
+only. DuckDB is an extra, so the `--extra duckdb` above is what makes step 3
+work. See [Installation Matrix](#installation-matrix) for the full set.
+
+**Alternative (pip-compatible):**
+```bash
+uv pip install "benchbox[duckdb]"
+uv pip install "benchbox[cloud]"
+uv pip install "benchbox[all]"
+```
+
+### 2. Verify Installation
+
+Check that everything is working:
+
+```bash
+# Verify BenchBox is installed
+benchbox --version
+
+# Check available platforms
+benchbox check-deps --matrix
+```
+
+### 3. Run Your First Benchmark
+
+Start with a simple local benchmark:
+
+```python
+from benchbox import TPCH
+
+# Create a small TPC-H benchmark for testing
+tpch = TPCH(scale_factor=0.01)  # ~10MB dataset for quick testing
+
+# Generate sample data
+print("Generating data...")
+data_paths = tpch.generate_data()
+print(f"✅ Generated {len(data_paths)} data files")
+
+# Get a sample query
+query1 = tpch.get_query(1, seed=42)  # Reproducible parameters
+print(f"✅ Generated TPC-H Query 1")
+
+# Run on embedded DuckDB (no setup required)
+import duckdb
+conn = duckdb.connect(":memory:")
+
+# Create schema and load data
+conn.execute(tpch.get_create_tables_sql())
+for table_file in data_paths:
+    table_name = table_file.split('/')[-1].replace('.csv', '')
+    conn.execute(f"COPY {table_name} FROM '{table_file}' WITH (DELIMITER '|', HEADER false)")
+
+# Execute the query
+result = conn.execute(query1).fetchdf()
+print(f"✅ Query executed successfully, returned {len(result)} rows")
+```
+
+### Run a DataFrame Benchmark
+
+Compare SQL vs DataFrame execution paradigms:
+
+```bash
+# SQL mode - queries executed via SQL
+benchbox run --platform duckdb --benchmark tpch --scale 0.01
+
+# DataFrame mode - queries executed via native Polars API
+benchbox run --platform polars-df --benchmark tpch --scale 0.01
+```
+
+Same benchmark, same scale factor, different execution paradigm.
+
+### Next Steps
+
+**For Cloud Platforms:**
+- See [Platform Documentation](docs/platforms/index.md) for platform-specific setup
+- Start with `examples/getting_started/` for zero-config DuckDB runs and credential-ready cloud samples
+- Explore `examples/features/` for capability-specific examples (query subsets, tuning, result analysis, etc.)
+- Check `examples/use_cases/` for real-world patterns (CI/CD regression testing, platform evaluation, cost optimization)
+- See `examples/programmatic/` for Python API usage and integration patterns
+- Use `--dry-run OUTPUT_DIR` on the CLI or example scripts to export a JSON/YAML plan and per-query SQL files before executing benchmarks
+- Use `benchbox run` CLI for full benchmark execution
+
+**For Advanced Usage:**
+- Explore the full benchmark suite: TPC-H, TPC-DS, TPC-DI, ClickBench, H2ODB, NYC Taxi, Flight Data, Vector Search, and more
+- Scale up with larger datasets (scale factors 1.0, 10.0, 100.0+)
+- Compare performance across different platforms
+- See [examples/INDEX.md](examples/INDEX.md) for complete examples navigation
+- See [examples/PATTERNS.md](examples/PATTERNS.md) for common workflow patterns
 ## Features
 
 - **Embedded Benchmarks**: Self-contained benchmark data and queries
 - **Benchmark Catalog**: TPC-H, TPC-DS, TPC-DI, TPC-DS-OBT, TPC-H Skew, TPC-Havoc, SSB, AMPLab, JoinOrder, ClickBench, H2ODB, NYC Taxi, Flight Data, TSBS DevOps, CoffeeShop, TPC-H Data Vault, Vector Search, Read Primitives, Write Primitives, Transaction Primitives, Metadata Primitives, AI Primitives
 - **Cross-Database**: Same benchmarks work on any database platform
 - **DataFrame Mode**: Native DataFrame API benchmarking with Polars, Pandas, DataFusion, Dask, and other DataFrame runtimes
-- **SQL Platforms**: DuckDB, MotherDuck, SQLite, DataFusion, PostgreSQL, TimescaleDB, ClickHouse (Local, Server, Cloud), CedarDB, Firebolt, Databend, Doris, StarRocks, SingleStore, QuestDB, InfluxDB, pg_duckdb, pg_mooncake, Databricks SQL, Snowflake, BigQuery, Redshift, Azure Synapse Analytics, Microsoft Fabric Warehouse, Microsoft Fabric Lakehouse SQL, Trino, Starburst, Presto, Amazon Athena, Spark, PySpark, LakeSail Sail, Apache Gluten + Velox, Onehouse Quanton, AWS Glue, Amazon EMR Serverless, Amazon Athena for Apache Spark, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Azure Synapse Analytics Spark
-- **DataFrame Platforms**: DataFusion-DF, Polars-DF, Pandas-DF, Modin-DF, Dask-DF, cuDF-DF (GPU), PySpark-DF, Databricks-DF, LakeSail-DF
+- **SQL platforms**: names and support tiers come from the platform registry (`stable` / `beta` / `experimental` / `deprecated`). *unproven* means the public corpus has no bundle for that platform yet (`results-data/corpus-inventory.json`). This is not a second taxonomy — see [Public Contracts and Support Taxonomy](docs/reference/public-contracts.md). `benchbox platforms list` shows **Support** separately from local **Driver** availability.
+  - **stable**: DataFusion, DuckDB, SQLite
+  - **beta**: Apache Spark, ClickHouse Local (chDB), PySpark; *unproven*: Amazon Athena, Amazon Redshift, Apache Doris, Azure Synapse Analytics, ClickHouse Cloud, ClickHouse Server, Databend, Databricks SQL, DuckLake, Firebolt, Google BigQuery, InfluxDB, Microsoft Fabric Lakehouse SQL, Microsoft Fabric Warehouse, MotherDuck, PostgreSQL, PrestoDB, QuestDB, SingleStore, Snowflake, Starburst, StarRocks, TimescaleDB, Trino
+  - **experimental**: LakeSail Sail; *unproven*: Amazon Athena for Apache Spark, Amazon EMR Serverless, Apache Gluten + Velox, AWS Glue, Azure Synapse Analytics Spark, CedarDB, Databricks DataFrame, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Onehouse Quanton, pg_duckdb, pg_mooncake, Snowpark Connect for Spark
+  - **deprecated**: ClickHouse (*unproven*; compatibility selector)
+- **DataFrame platforms**: same registry labels. *unproven* has the same corpus meaning as above.
+  - **stable**: DataFusion, Polars; *unproven*: Pandas
+  - **beta**: PySpark; *unproven*: Dask, Databricks SQL
+  - **experimental**: LakeSail Sail; *unproven*: Amazon Athena for Apache Spark, Amazon EMR Serverless, AWS Glue, Azure Synapse Analytics Spark, cuDF, Databricks DataFrame, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Modin, Onehouse Quanton, Snowpark Connect for Spark
 - **Open Table Formats**: Delta Lake, Apache Iceberg, Apache Hudi (via Databricks, Quanton, Trino, Spark platforms)
 - **SQL Translation**: Automatic query conversion between SQL dialects
 - **Self-Contained Python Package**: Core install requires no external database servers or system dependencies; opt-in to extra package installs for cloud platforms when needed.
@@ -380,110 +495,6 @@ These extras add connectivity to specific platforms and are installed only when 
 - **Reduced conflicts**: Platform-specific dependencies are isolated
 - **Easy maintenance**: Update cloud SDKs independently of core functionality
 
-## Quick Start
-
-Get started with BenchBox in 3 steps:
-
-### 1. Install BenchBox
-
-Choose the installation that matches your target platform:
-
-**Recommended (using uv):**
-```bash
-# For local development (DuckDB only)
-uv add benchbox
-
-# For cloud platforms (recommended)
-uv add benchbox --extra cloud
-
-# For everything (all platforms + ClickHouse)
-uv add benchbox --extra all
-```
-
-**Alternative (pip-compatible):**
-```bash
-uv pip install benchbox
-uv pip install "benchbox[cloud]"
-uv pip install "benchbox[all]"
-```
-
-### 2. Verify Installation
-
-Check that everything is working:
-
-```bash
-# Verify BenchBox is installed
-benchbox --version
-
-# Check available platforms
-benchbox check-deps --matrix
-```
-
-### 3. Run Your First Benchmark
-
-Start with a simple local benchmark:
-
-```python
-from benchbox import TPCH
-
-# Create a small TPC-H benchmark for testing
-tpch = TPCH(scale_factor=0.01)  # ~10MB dataset for quick testing
-
-# Generate sample data
-print("Generating data...")
-data_paths = tpch.generate_data()
-print(f"✅ Generated {len(data_paths)} data files")
-
-# Get a sample query
-query1 = tpch.get_query(1, seed=42)  # Reproducible parameters
-print(f"✅ Generated TPC-H Query 1")
-
-# Run on embedded DuckDB (no setup required)
-import duckdb
-conn = duckdb.connect(":memory:")
-
-# Create schema and load data
-conn.execute(tpch.get_create_tables_sql())
-for table_file in data_paths:
-    table_name = table_file.split('/')[-1].replace('.csv', '')
-    conn.execute(f"COPY {table_name} FROM '{table_file}' WITH (DELIMITER '|', HEADER false)")
-
-# Execute the query
-result = conn.execute(query1).fetchdf()
-print(f"✅ Query executed successfully, returned {len(result)} rows")
-```
-
-### Run a DataFrame Benchmark
-
-Compare SQL vs DataFrame execution paradigms:
-
-```bash
-# SQL mode - queries executed via SQL
-benchbox run --platform duckdb --benchmark tpch --scale 0.01
-
-# DataFrame mode - queries executed via native Polars API
-benchbox run --platform polars-df --benchmark tpch --scale 0.01
-```
-
-Same benchmark, same scale factor, different execution paradigm.
-
-### Next Steps
-
-**For Cloud Platforms:**
-- See [Platform Documentation](docs/platforms/index.md) for platform-specific setup
-- Start with `examples/getting_started/` for zero-config DuckDB runs and credential-ready cloud samples
-- Explore `examples/features/` for capability-specific examples (query subsets, tuning, result analysis, etc.)
-- Check `examples/use_cases/` for real-world patterns (CI/CD regression testing, platform evaluation, cost optimization)
-- See `examples/programmatic/` for Python API usage and integration patterns
-- Use `--dry-run OUTPUT_DIR` on the CLI or example scripts to export a JSON/YAML plan and per-query SQL files before executing benchmarks
-- Use `benchbox run` CLI for full benchmark execution
-
-**For Advanced Usage:**
-- Explore the full benchmark suite: TPC-H, TPC-DS, TPC-DI, ClickBench, H2ODB, NYC Taxi, Flight Data, Vector Search, and more
-- Scale up with larger datasets (scale factors 1.0, 10.0, 100.0+)
-- Compare performance across different platforms
-- See [examples/INDEX.md](examples/INDEX.md) for complete examples navigation
-- See [examples/PATTERNS.md](examples/PATTERNS.md) for common workflow patterns
 ## Command-Line Interface (CLI)
 
 BenchBox provides a comprehensive command-line interface (CLI) for all benchmarking operations, from data generation to result analysis.
@@ -623,9 +634,8 @@ benchbox run --platform databricks --benchmark tpcds --scale 1 \
   --output dbfs:/Volumes/workspace/benchmarks/
 
 # BigQuery with custom configuration
-benchbox run --platform bigquery --benchmark tpch --scale 0.1 \
-  --platform-option project_id=my-project \
-  --verbose
+export BIGQUERY_PROJECT=my-project
+benchbox run --platform bigquery --benchmark tpch --scale 0.1 --verbose
 
 # Snowflake baseline comparison
 benchbox run --platform snowflake --benchmark tpch --scale 1 \
@@ -751,34 +761,35 @@ BENCHBOX_NON_INTERACTIVE=true benchbox run \
 ```bash
 # Databricks SQL Warehouse with Unity Catalog
 benchbox run --platform databricks --benchmark tpch --scale 1 \
-  --platform-option catalog=main \
-  --platform-option schema=benchbox \
+  --platform-option uc_catalog=main \
+  --platform-option uc_schema=benchbox \
   --output dbfs:/Volumes/main/benchbox/results/
 
-# Check available Databricks options
-benchbox run --describe-platform-options databricks
+# Check Databricks status and capabilities
+benchbox platforms status databricks
 ```
 
 **BigQuery:**
 ```bash
 # BigQuery with custom project and dataset
+export BIGQUERY_PROJECT=my-project
+export BIGQUERY_DATASET=benchbox
 benchbox run --platform bigquery --benchmark tpcds --scale 0.1 \
-  --platform-option project_id=my-project \
-  --platform-option dataset=benchbox \
   --output gs://my-bucket/benchmarks/
 
-# BigQuery with specific location
-benchbox run --platform bigquery --benchmark tpch \
-  --platform-option location=europe-west1
+# BigQuery in a specific location
+export BIGQUERY_LOCATION=europe-west1
+benchbox run --platform bigquery --benchmark tpch
 ```
 
 **Snowflake:**
 ```bash
 # Snowflake with custom warehouse
-benchbox run --platform snowflake --benchmark tpch --scale 1 \
-  --platform-option warehouse=LARGE_WH \
-  --platform-option database=BENCHBOX \
-  --tuning tuned
+# Connection settings come from the environment or `benchbox setup`,
+# not from --platform-option.
+export SNOWFLAKE_WAREHOUSE=LARGE_WH
+export SNOWFLAKE_DATABASE=BENCHBOX
+benchbox run --platform snowflake --benchmark tpch --scale 1 --tuning tuned
 
 # Snowflake baseline run
 benchbox run --platform snowflake --benchmark tpcds \
@@ -850,8 +861,8 @@ benchbox --help
 benchbox run --help
 benchbox platforms --help
 
-# Platform options
-benchbox run --describe-platform-options clickhouse
+# Platform status and capabilities
+benchbox platforms status clickhouse
 ```
 
 **Enable Verbose Output:**
@@ -896,12 +907,15 @@ benchbox run \
   --platform-option secure=true
 ```
 
-You can inspect the available options for any platform without executing a
-benchmark by using `--describe-platform-options`:
+You can inspect a platform's status and capabilities without executing a
+benchmark:
 
 ```bash
-benchbox run --describe-platform-options clickhouse
+benchbox platforms status clickhouse
 ```
+
+The supported option keys for each platform are listed in
+[Configuration](docs/reference/cli/configuration.md#platform-specific-options).
 
 Python helper:
 
@@ -1249,13 +1263,13 @@ As Beta software, BenchBox benefits greatly from community feedback and contribu
 
 ### Reporting Issues
 
-**Bug Reports**: Found a problem? [Create an issue](https://github.com/joeharris76/benchbox/issues/new) with:
+**Bug Reports**: Found a problem? [Create an issue](https://github.com/BenchBox-dev/benchbox/issues/new) with:
 - Steps to reproduce the issue
 - Expected vs actual behavior
 - Environment details (Python version, platform, database)
 - Minimal code example if possible
 
-**Feature Requests**: Have an idea? [Open an issue](https://github.com/joeharris76/benchbox/issues/new) describing:
+**Feature Requests**: Have an idea? [Open an issue](https://github.com/BenchBox-dev/benchbox/issues/new) describing:
 - The use case and problem you're trying to solve
 - Proposed solution or approach
 - How it fits with existing functionality
@@ -1263,7 +1277,7 @@ As Beta software, BenchBox benefits greatly from community feedback and contribu
 ### Community Guidelines
 
 - **Be patient**: As Beta software, responses may take time
-- **Search first**: Check existing [issues](https://github.com/joeharris76/benchbox/issues) before creating new ones
+- **Search first**: Check existing [issues](https://github.com/BenchBox-dev/benchbox/issues) before creating new ones
 - **Be specific**: Detailed reports help us understand and fix issues faster
 - **Stay constructive**: Focus on problems and solutions, not criticism
 

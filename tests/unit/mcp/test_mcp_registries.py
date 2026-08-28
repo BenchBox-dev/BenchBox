@@ -1,7 +1,7 @@
 """Tests for MCP resource and prompt registry modules.
 
-Tests that register_all_resources and register_all_prompts actually register
-callable functions with the FastMCP server that produce correct output.
+Tests that register_all_resources and register_all_prompts publish correct
+output through MCPServer's public APIs.
 """
 
 import json
@@ -9,6 +9,14 @@ import sys
 from pathlib import Path
 
 import pytest
+
+from tests.unit.mcp.public_api import (
+    get_prompt_contents,
+    list_prompt_names,
+    list_resource_template_uris,
+    list_resource_uris,
+    read_resource_text,
+)
 
 pytestmark = [
     pytest.mark.unit,
@@ -23,10 +31,10 @@ pytestmark = [
 
 
 def _make_mcp():
-    """Create a real FastMCP instance for registration testing."""
-    from mcp.server.fastmcp import FastMCP
+    """Create a real MCPServer instance for registration testing."""
+    from mcp.server.mcpserver import MCPServer
 
-    return FastMCP("test-benchbox")
+    return MCPServer("test-benchbox", version="test")
 
 
 # ---------------------------------------------------------------------------
@@ -50,15 +58,8 @@ class TestRegisterAllResources:
         mcp = _make_mcp()
         register_all_resources(mcp, results_dir=Path("benchmark_runs/results"))
 
-        # Access the registered function directly via the resource manager
-        # FastMCP stores resources; we can invoke the underlying function
-        # by finding it in the registered resources
-        resources = mcp._resource_manager._resources
-        assert "benchbox://benchmarks" in resources
-
-        # Call the underlying function
-        fn = resources["benchbox://benchmarks"].fn
-        result = fn()
+        assert "benchbox://benchmarks" in list_resource_uris(mcp)
+        result = read_resource_text(mcp, "benchbox://benchmarks")
         data = json.loads(result)
         assert "benchmarks" in data
         assert "count" in data
@@ -73,12 +74,9 @@ class TestRegisterAllResources:
         mcp = _make_mcp()
         register_all_resources(mcp, results_dir=Path("benchmark_runs/results"))
 
-        templates = mcp._resource_manager._templates
         template_key = "benchbox://benchmarks/{name}"
-        assert template_key in templates
-
-        fn = templates[template_key].fn
-        result = fn(name="tpch")
+        assert template_key in list_resource_template_uris(mcp)
+        result = read_resource_text(mcp, "benchbox://benchmarks/tpch")
         data = json.loads(result)
         assert data["name"] == "tpch"
         assert data["display_name"] == "TPC-H"
@@ -91,9 +89,7 @@ class TestRegisterAllResources:
         mcp = _make_mcp()
         register_all_resources(mcp, results_dir=Path("benchmark_runs/results"))
 
-        templates = mcp._resource_manager._templates
-        fn = templates["benchbox://benchmarks/{name}"].fn
-        result = fn(name="nonexistent")
+        result = read_resource_text(mcp, "benchbox://benchmarks/nonexistent")
         data = json.loads(result)
         assert "error" in data
         assert "available" in data
@@ -104,11 +100,8 @@ class TestRegisterAllResources:
         mcp = _make_mcp()
         register_all_resources(mcp, results_dir=Path("benchmark_runs/results"))
 
-        resources = mcp._resource_manager._resources
-        assert "benchbox://platforms" in resources
-
-        fn = resources["benchbox://platforms"].fn
-        result = fn()
+        assert "benchbox://platforms" in list_resource_uris(mcp)
+        result = read_resource_text(mcp, "benchbox://platforms")
         data = json.loads(result)
         assert "platforms" in data
         assert data["count"] > 0
@@ -119,9 +112,7 @@ class TestRegisterAllResources:
         mcp = _make_mcp()
         register_all_resources(mcp, results_dir=Path("benchmark_runs/results"))
 
-        templates = mcp._resource_manager._templates
-        fn = templates["benchbox://platforms/{name}"].fn
-        result = fn(name="duckdb")
+        result = read_resource_text(mcp, "benchbox://platforms/duckdb")
         data = json.loads(result)
         assert data["name"] == "duckdb"
         assert "capabilities" in data
@@ -132,9 +123,7 @@ class TestRegisterAllResources:
         mcp = _make_mcp()
         register_all_resources(mcp, results_dir=Path("benchmark_runs/results"))
 
-        templates = mcp._resource_manager._templates
-        fn = templates["benchbox://platforms/{name}"].fn
-        result = fn(name="nonexistent_platform")
+        result = read_resource_text(mcp, "benchbox://platforms/nonexistent_platform")
         data = json.loads(result)
         assert "error" in data
 
@@ -144,9 +133,7 @@ class TestRegisterAllResources:
         mcp = _make_mcp()
         register_all_resources(mcp, results_dir=tmp_path / "nonexistent")
 
-        resources = mcp._resource_manager._resources
-        fn = resources["benchbox://results/recent"].fn
-        result = fn()
+        result = read_resource_text(mcp, "benchbox://results/recent")
         data = json.loads(result)
         assert data["count"] == 0
         assert data["runs"] == []
@@ -166,9 +153,7 @@ class TestRegisterAllResources:
         mcp = _make_mcp()
         register_all_resources(mcp, results_dir=tmp_path)
 
-        resources = mcp._resource_manager._resources
-        fn = resources["benchbox://results/recent"].fn
-        result = fn()
+        result = read_resource_text(mcp, "benchbox://results/recent")
         data = json.loads(result)
         assert data["count"] == 1
         assert data["runs"][0]["platform"] == "duckdb"
@@ -180,11 +165,8 @@ class TestRegisterAllResources:
         mcp = _make_mcp()
         register_all_resources(mcp, results_dir=Path("benchmark_runs/results"))
 
-        resources = mcp._resource_manager._resources
-        assert "benchbox://system/profile" in resources
-
-        fn = resources["benchbox://system/profile"].fn
-        result = fn()
+        assert "benchbox://system/profile" in list_resource_uris(mcp)
+        result = read_resource_text(mcp, "benchbox://system/profile")
         data = json.loads(result)
         assert "cpu" in data
         assert "memory" in data
@@ -212,12 +194,12 @@ class TestRegisterAllPrompts:
         mcp = _make_mcp()
         register_all_prompts(mcp)
 
-        prompts = mcp._prompt_manager._prompts
-        assert "analyze_results" in prompts
-
-        fn = prompts["analyze_results"].fn
-        result = fn(benchmark="tpch", platform="duckdb", focus="slowest_queries")
+        assert "analyze_results" in list_prompt_names(mcp)
+        result = get_prompt_contents(
+            mcp, "analyze_results", benchmark="tpch", platform="duckdb", focus="slowest_queries"
+        )
         assert len(result) == 1
+        assert result[0].text.startswith("Analyze the TPCH benchmark results")
         assert "TPCH" in result[0].text
         assert "duckdb" in result[0].text
         assert "slowest_queries" in result[0].text
@@ -228,9 +210,7 @@ class TestRegisterAllPrompts:
         mcp = _make_mcp()
         register_all_prompts(mcp)
 
-        prompts = mcp._prompt_manager._prompts
-        fn = prompts["analyze_results"].fn
-        result = fn(benchmark="tpcds", platform="polars-df")
+        result = get_prompt_contents(mcp, "analyze_results", benchmark="tpcds", platform="polars-df")
         assert len(result) == 1
         assert "TPCDS" in result[0].text
         assert "slowest_queries" not in result[0].text
@@ -241,9 +221,9 @@ class TestRegisterAllPrompts:
         mcp = _make_mcp()
         register_all_prompts(mcp)
 
-        prompts = mcp._prompt_manager._prompts
-        fn = prompts["compare_platforms"].fn
-        result = fn(benchmark="tpch", platforms="duckdb,polars-df", scale_factor=0.1)
+        result = get_prompt_contents(
+            mcp, "compare_platforms", benchmark="tpch", platforms="duckdb,polars-df", scale_factor=0.1
+        )
         assert len(result) == 1
         assert "duckdb" in result[0].text
         assert "polars-df" in result[0].text
@@ -255,9 +235,13 @@ class TestRegisterAllPrompts:
         mcp = _make_mcp()
         register_all_prompts(mcp)
 
-        prompts = mcp._prompt_manager._prompts
-        fn = prompts["identify_regressions"].fn
-        result = fn(baseline_run="run1.json", comparison_run="run2.json", threshold_percent=15.0)
+        result = get_prompt_contents(
+            mcp,
+            "identify_regressions",
+            baseline_run="run1.json",
+            comparison_run="run2.json",
+            threshold_percent=15.0,
+        )
         assert len(result) == 1
         assert "run1.json" in result[0].text
         assert "run2.json" in result[0].text
@@ -269,9 +253,7 @@ class TestRegisterAllPrompts:
         mcp = _make_mcp()
         register_all_prompts(mcp)
 
-        prompts = mcp._prompt_manager._prompts
-        fn = prompts["identify_regressions"].fn
-        result = fn()
+        result = get_prompt_contents(mcp, "identify_regressions")
         assert len(result) == 1
         assert "recent" in result[0].text.lower()
 
@@ -281,9 +263,9 @@ class TestRegisterAllPrompts:
         mcp = _make_mcp()
         register_all_prompts(mcp)
 
-        prompts = mcp._prompt_manager._prompts
-        fn = prompts["benchmark_planning"].fn
-        result = fn(use_case="production", platforms="duckdb,snowflake", time_budget_minutes=60)
+        result = get_prompt_contents(
+            mcp, "benchmark_planning", use_case="production", platforms="duckdb,snowflake", time_budget_minutes=60
+        )
         assert len(result) == 1
         assert "production" in result[0].text
         assert "60 minutes" in result[0].text
@@ -294,9 +276,9 @@ class TestRegisterAllPrompts:
         mcp = _make_mcp()
         register_all_prompts(mcp)
 
-        prompts = mcp._prompt_manager._prompts
-        fn = prompts["troubleshoot_failure"].fn
-        result = fn(error_message="Connection refused", platform="snowflake", benchmark="tpch")
+        result = get_prompt_contents(
+            mcp, "troubleshoot_failure", error_message="Connection refused", platform="snowflake", benchmark="tpch"
+        )
         assert len(result) == 1
         assert "Connection refused" in result[0].text
         assert "snowflake" in result[0].text
@@ -307,9 +289,7 @@ class TestRegisterAllPrompts:
         mcp = _make_mcp()
         register_all_prompts(mcp)
 
-        prompts = mcp._prompt_manager._prompts
-        fn = prompts["troubleshoot_failure"].fn
-        result = fn()
+        result = get_prompt_contents(mcp, "troubleshoot_failure")
         assert len(result) == 1
         assert "No specific context provided" in result[0].text
 
@@ -319,9 +299,9 @@ class TestRegisterAllPrompts:
         mcp = _make_mcp()
         register_all_prompts(mcp)
 
-        prompts = mcp._prompt_manager._prompts
-        fn = prompts["benchmark_run"].fn
-        result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, queries="Q1,Q6")
+        result = get_prompt_contents(
+            mcp, "benchmark_run", platform="duckdb", benchmark="tpch", scale_factor=0.01, queries="Q1,Q6"
+        )
         assert len(result) == 1
         assert "duckdb" in result[0].text
         assert "TPCH" in result[0].text
@@ -333,9 +313,7 @@ class TestRegisterAllPrompts:
         mcp = _make_mcp()
         register_all_prompts(mcp)
 
-        prompts = mcp._prompt_manager._prompts
-        fn = prompts["benchmark_run"].fn
-        result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01)
+        result = get_prompt_contents(mcp, "benchmark_run", platform="duckdb", benchmark="tpch", scale_factor=0.01)
         assert len(result) == 1
         assert "TPCH" in result[0].text
 
@@ -345,9 +323,7 @@ class TestRegisterAllPrompts:
         mcp = _make_mcp()
         register_all_prompts(mcp)
 
-        prompts = mcp._prompt_manager._prompts
-        fn = prompts["platform_tuning"].fn
-        result = fn(platform="duckdb", workload="OLAP heavy joins")
+        result = get_prompt_contents(mcp, "platform_tuning", platform="duckdb", workload="OLAP heavy joins")
         assert len(result) == 1
         assert "duckdb" in result[0].text
         assert "OLAP heavy joins" in result[0].text
@@ -358,8 +334,6 @@ class TestRegisterAllPrompts:
         mcp = _make_mcp()
         register_all_prompts(mcp)
 
-        prompts = mcp._prompt_manager._prompts
-        fn = prompts["platform_tuning"].fn
-        result = fn(platform="snowflake")
+        result = get_prompt_contents(mcp, "platform_tuning", platform="snowflake")
         assert len(result) == 1
         assert "snowflake" in result[0].text

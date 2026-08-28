@@ -177,6 +177,7 @@ def _prompt_default_output_location(
         console: Rich console for output
         credentials: Current credentials dictionary
     """
+    from benchbox.core.platform_registry import SNOWFLAKE_DEFAULT_OUTPUT_LOCATION, PlatformRegistry
     from benchbox.utils.cloud_storage import is_cloud_path
 
     console.print("\n[bold]Default Output Location (Optional):[/bold]")
@@ -189,32 +190,35 @@ def _prompt_default_output_location(
         console.print("[dim]You can add --output <cloud-path> when running benchmarks[/dim]\n")
         return
 
-    # Show examples - user stage first (simpler, no setup required)
-    console.print("\n[bold cyan]Recommended: User Stage (easiest)[/bold cyan]")
-    console.print("  • [dim]@~/benchbox[/dim] (your private user stage)")
-    console.print("  • [dim]@~/data[/dim]")
-    console.print("  • [dim]@~/staged[/dim]")
-    console.print("\n[dim]User stages (@~) are private to your account and require no setup[/dim]")
+    # Examples come from the registry so this prompt and the documented
+    # examples cannot drift apart; stage forms sort first (no setup required).
+    examples = PlatformRegistry.get_cloud_path_examples("snowflake")
+    stage_examples = [e for e in examples if e.startswith("@")]
+    external_examples = [e for e in examples if not e.startswith("@")]
 
-    console.print("\n[bold cyan]Alternative: External Stage Locations[/bold cyan]")
-    console.print("  • [dim]s3://my-bucket/benchbox-data[/dim]")
-    console.print("  • [dim]azure://container/benchbox-data[/dim]")
-    console.print("  • [dim]gcs://my-bucket/benchbox-data[/dim]")
-    console.print("\n[dim]Note: External stages require cloud storage setup[/dim]\n")
+    if stage_examples:
+        console.print("\n[bold cyan]Recommended: User Stage (easiest)[/bold cyan]")
+        for example in stage_examples:
+            console.print(f"  • [dim]{example}[/dim]")
+        console.print("\n[dim]User stages (@~) are private to your account and require no setup[/dim]")
+
+    if external_examples:
+        console.print("\n[bold cyan]Alternative: External Stage Locations[/bold cyan]")
+        for example in external_examples:
+            console.print(f"  • [dim]{example}[/dim]")
+        console.print("\n[dim]Note: External stages require cloud storage setup[/dim]\n")
 
     # Prompt for path with validation - suggest user stage as default
     while True:
-        cloud_path = Prompt.ask("[bold]Enter default storage path[/bold]", default="@~/benchbox")
+        cloud_path = Prompt.ask("[bold]Enter default storage path[/bold]", default=SNOWFLAKE_DEFAULT_OUTPUT_LOCATION)
 
         if not cloud_path:
             console.print("[yellow]Skipping default output location[/yellow]\n")
             return
 
-        # Validate path format - accept Snowflake user stages (@~) or cloud paths
-        is_user_stage = cloud_path.startswith("@~")
-        is_valid_cloud = is_cloud_path(cloud_path)
-
-        if not is_user_stage and not is_valid_cloud:
+        # Validate with the SAME classifier the run path uses, so anything this
+        # prompt accepts is guaranteed to resolve as a remote location later.
+        if not is_cloud_path(cloud_path):
             console.print(f"[yellow]⚠️  Warning: '{cloud_path}' doesn't look like a valid path[/yellow]")
             console.print(
                 "[dim]Expected formats: @~/path (user stage) or s3://, azure://, gcs:// (external stage)[/dim]"

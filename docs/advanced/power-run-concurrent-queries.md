@@ -169,15 +169,20 @@ Concurrent Query Execution runs multiple query streams simultaneously to test:
 
 ### Configuration Options
 
+The values below are an illustrative example, not the shipped defaults — see
+[Configuration reference → `execution`](../reference/cli/configuration.md#execution)
+for the default value of every field (`max_concurrent` defaults to **2**,
+not the `4` used here):
+
 ```yaml
 execution:
   concurrent_queries:
     enabled: true                          # Enable concurrent execution
-    max_concurrent: 4                      # Maximum concurrent streams
-    query_timeout_seconds: 600             # Individual query timeout
-    stream_timeout_seconds: 7200           # Total stream timeout
-    retry_failed_queries: true             # Retry failed queries
-    max_retries: 5                         # Maximum retry attempts
+    max_concurrent: 4                      # Maximum concurrent streams (default: 2)
+    query_timeout_seconds: 600             # Individual query timeout (default: 300)
+    stream_timeout_seconds: 7200           # Total stream timeout (default: 3600)
+    retry_failed_queries: true             # Retry failed queries (default: true)
+    max_retries: 5                         # Maximum retry attempts (default: 3)
 ```
 
 ### Usage Examples
@@ -471,7 +476,11 @@ assert result.query_results[0]['stream_id'] == 0   # Stream ID recorded
 assert result.query_results[0]['position'] == 1    # Position in permutation
 ```
 
-For detailed compliance documentation, see: `_project/TPC_SPECIFICATION_COMPLIANCE.md`
+For detailed compliance documentation, see:
+[TPC-H Official Guide → Specification Compliance](../guides/tpc/tpc-h-official-guide.md#tpc-h-specification-compliance),
+[TPC-DS Official Guide](../guides/tpc/tpc-ds-official-guide.md), and the shared
+[TPC Patterns Usage Guide](../guides/tpc/tpc-patterns-usage.md) (stream/permutation
+implementation used by both benchmarks).
 
 ## Troubleshooting
 

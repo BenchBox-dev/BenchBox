@@ -205,8 +205,12 @@ def test_export_invalid_schema_version(tmp_path):
 
     result = run_cli_command(["export", str(result_file), "--format", "csv"])
 
-    assert result.returncode == 0  # Command completes but shows error
-    assert "Unsupported schema version" in result.stdout or "Error" in result.stdout
+    assert result.returncode == 1  # Invalid input must fail closed
+    assert (
+        "Unsupported schema version" in result.stdout
+        or "Error" in result.stdout
+        or "unsupported" in result.stderr.lower()
+    )
 
 
 @pytest.mark.integration
@@ -219,8 +223,8 @@ def test_export_corrupted_json(tmp_path):
 
     result = run_cli_command(["export", str(result_file), "--format", "csv"])
 
-    assert result.returncode == 0  # Command completes but shows error
-    assert "Error" in result.stdout or "Invalid" in result.stdout
+    assert result.returncode == 1  # Invalid input must fail closed
+    assert "Error" in result.stdout or "Invalid" in result.stdout or "invalid" in result.stderr.lower()
 
 
 @pytest.mark.integration
@@ -275,7 +279,7 @@ def test_export_preserves_content(tmp_path):
 
     # Verify key fields are preserved (v2.x schema structure)
     # Note: Schema v2.x shortens benchmark names by stripping " Benchmark" suffix
-    assert exported_data["version"] in ("2.0", "2.1")
+    assert exported_data["version"] in ("2.0", "2.1", "2.2")
     assert exported_data["benchmark"]["name"] == "TPC-H"  # Shortened from "TPC-H Benchmark"
     assert exported_data["run"]["id"] == "preserve_test"
     assert exported_data["benchmark"]["scale_factor"] == 10.0

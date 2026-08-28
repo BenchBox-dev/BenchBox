@@ -1,0 +1,591 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("@/db", () => ({
+  queryRows: vi.fn(),
+}));
+
+import { queryRows } from "@/db";
+import {
+  clearDuckdbQueryCachesForTests,
+  listResults,
+  getResultDetailMetrics,
+  getQueryDisplayTimings,
+  getQueryExecutions,
+  getDetailResult,
+  getBenchmarkMatrixCells,
+  getBenchmarkRanking,
+  getBenchmarkSummaryFromDuckDB,
+  getPlatformIndexRows,
+  getCohort,
+  getMetaLeaderboard,
+  getMetaLeaderboardData,
+  getExistingResultIds,
+  memoizedSnapshotQueryRows,
+  resolveShortId,
+  toShortIds,
+  type ResultDetailMetricsRow,
+} from "@/lib/duckdbQueries";
+import { buildComparabilityFields } from "@/components/ComparabilityReceipt";
+
+const mockedQueryRows = vi.mocked(queryRows);
+
+beforeEach(() => {
+  mockedQueryRows.mockReset();
+  clearDuckdbQueryCachesForTests();
+});
+
+describe("duckdbQueries - SQL targets and parameters", () => {
+  it("listResults selects from bench.results", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await listResults();
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.results/);
+    expect(params).toBeUndefined();
+  });
+
+  it("listResults accepts a parameterized facet WHERE clause", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await listResults({ sql: "WHERE benchmark IN (?)", params: ["tpch"] });
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toContain("WHERE benchmark IN (?)");
+    expect(params).toEqual(["tpch"]);
+  });
+
+  it("memoizes listResults by WHERE clause and params for the current snapshot", async () => {
+    const rows = [{ result_id: "r1" }];
+    mockedQueryRows.mockResolvedValueOnce(rows);
+
+    const first = await listResults({ sql: "WHERE benchmark IN (?)", params: ["tpch"] });
+    const second = await listResults({ sql: "WHERE benchmark IN (?)", params: ["tpch"] });
+
+    expect(first).toBe(second);
+    expect(mockedQueryRows).toHaveBeenCalledTimes(1);
+
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await listResults({ sql: "WHERE benchmark IN (?)", params: ["tpcds"] });
+    expect(mockedQueryRows).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not cache empty listResults responses so cold-load retries can recover", async () => {
+    const recoveredRows = [{ result_id: "r1" }];
+    mockedQueryRows.mockResolvedValueOnce([]);
+    mockedQueryRows.mockResolvedValueOnce(recoveredRows);
+
+    await expect(listResults()).resolves.toEqual([]);
+    await expect(listResults()).resolves.toBe(recoveredRows);
+    expect(mockedQueryRows).toHaveBeenCalledTimes(2);
+  });
+
+  it("memoizes ad hoc snapshot row queries by caller key, SQL, and params", async () => {
+    const rows = [{ value: "tpch", count: 2 }];
+    const query = {
+      sql: "SELECT benchmark AS value, COUNT(*) AS count FROM bench.results WHERE platform = ? GROUP BY 1",
+      params: ["duckdb"],
+    };
+    mockedQueryRows.mockResolvedValueOnce(rows);
+
+    const first = await memoizedSnapshotQueryRows("query-facet:benchmark", query);
+    const second = await memoizedSnapshotQueryRows("query-facet:benchmark", query);
+
+    expect(first).toBe(second);
+    expect(mockedQueryRows).toHaveBeenCalledTimes(1);
+  });
+
+  it("getResultDetailMetrics returns the single matching row or null", async () => {
+    mockedQueryRows.mockResolvedValueOnce([{ result_id: "r1" }]);
+    const row = await getResultDetailMetrics("r1");
+    expect(row).toEqual({ result_id: "r1" });
+
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.result_detail_metrics/);
+    expect(sql).toMatch(/result_id = \?/);
+    expect(params).toEqual(["r1"]);
+
+    mockedQueryRows.mockResolvedValueOnce([]);
+    const missing = await getResultDetailMetrics("nope");
+    expect(missing).toBeNull();
+  });
+
+  it("getQueryDisplayTimings orders by query_id", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await getQueryDisplayTimings("r1");
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.query_display_timings/);
+    expect(sql).toMatch(/ORDER BY query_id/);
+    expect(params).toEqual(["r1"]);
+  });
+
+  it("getQueryExecutions preserves null-as-zero stream and iteration ordering without COALESCE", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await getQueryExecutions("r1");
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.query_executions/);
+    expect(sql).toMatch(/CASE WHEN stream IS NULL THEN 0 ELSE stream END/);
+    expect(sql).toMatch(/CASE WHEN iter IS NULL THEN 0 ELSE iter END/);
+    expect(sql).not.toMatch(/COALESCE/);
+    expect(params).toEqual(["r1"]);
+  });
+
+  describe("getDetailResult - physical_mechanisms unknown vs recorded-empty (ADR-2 §3)", () => {
+    // A "wide row" shaped exactly as the real result_detail_metrics view
+    // would hand back to getResultDetailMetrics: NULL becomes `null` here,
+    // and a recorded-but-empty mechanism list becomes duckdb_builder.py's
+    // "" (comma-join of []), not NULL.
+    function makeWideRow(overrides: Partial<ResultDetailMetricsRow>): ResultDetailMetricsRow {
+      return {
+        result_id: "r1",
+        benchmark: "tpch",
+        scale_factor: 0.1,
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        driver_version: null,
+        run_date: "2026-04-01",
+        power_score: null,
+        total_duration_s: 60,
+        geomean_ms: 10,
+        display_geomean_ms: 10,
+        query_count: 2,
+        has_display_timing: true,
+        valid_query_count: 2,
+        missing_query_count: 0,
+        zero_timing_count: 0,
+        display_exclusion_reason: null,
+        comparison_exclusion_reason: null,
+        ranking_exclusion_reason: null,
+        trust_label: "maintainer-run",
+        funding: "unspecified",
+        visibility: "public-curated",
+        platform_version: null,
+        execution_mode: "sql",
+        tuning_mode: "tuned",
+        tuning_hash: null,
+        test_type: "power",
+        validation_status: "exact",
+        cost_usd: null,
+        compliance_class: null,
+        has_plans: false,
+        plans_published: false,
+        has_tuning: true,
+        bundle_download_url: "",
+        os: null,
+        arch: null,
+        cpu_count: null,
+        memory_gb: null,
+        python: null,
+        physical_mechanisms: null,
+        ...overrides,
+      };
+    }
+
+    async function fetchDetail(resultId: string, wideRow: ResultDetailMetricsRow) {
+      // getDetailResult() Promise.all()s getResultDetailMetrics,
+      // getQueryDisplayTimings, and getQueryExecutions, in that order.
+      mockedQueryRows.mockResolvedValueOnce([wideRow]);
+      mockedQueryRows.mockResolvedValueOnce([]);
+      mockedQueryRows.mockResolvedValueOnce([]);
+      return getDetailResult(resultId);
+    }
+
+    it("a legacy row (no logical_profile recorded -> NULL) yields undefined, not []", async () => {
+      const legacy = await fetchDetail("legacy", makeWideRow({ result_id: "legacy", physical_mechanisms: null }));
+      expect(legacy?.physical_mechanisms).toBeUndefined();
+    });
+
+    it("a modern row with a recorded-but-empty mechanism list ('') yields [], not undefined", async () => {
+      const modernEmpty = await fetchDetail(
+        "modern-empty",
+        makeWideRow({ result_id: "modern-empty", physical_mechanisms: "" }),
+      );
+      expect(modernEmpty?.physical_mechanisms).toEqual([]);
+    });
+
+    it("production path: a legacy result paired with a modern tuned result skips the mechanism-warning field (unknown, not a false mismatch)", async () => {
+      const legacy = await fetchDetail("legacy", makeWideRow({ result_id: "legacy", physical_mechanisms: null }));
+      const modern = await fetchDetail(
+        "modern",
+        makeWideRow({ result_id: "modern", physical_mechanisms: "indexes,clustering" }),
+      );
+      expect(legacy).not.toBeNull();
+      expect(modern).not.toBeNull();
+
+      const fields = buildComparabilityFields([legacy!, modern!]);
+      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toBeUndefined();
+    });
+
+    it("production path: two modern tuned results with recorded-empty mechanisms participate in comparison as a match", async () => {
+      const a = await fetchDetail("a", makeWideRow({ result_id: "a", physical_mechanisms: "" }));
+      const b = await fetchDetail(
+        "b",
+        makeWideRow({ result_id: "b", platform: "SQLite", physical_mechanisms: "" }),
+      );
+      expect(a).not.toBeNull();
+      expect(b).not.toBeNull();
+
+      const fields = buildComparabilityFields([a!, b!]);
+      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toMatchObject({
+        status: "match",
+        summary: "None rendered",
+      });
+    });
+  });
+
+  it("getBenchmarkMatrixCells scopes by (benchmark, scale_factor, phase)", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await getBenchmarkMatrixCells("tpch", 0.1, "power");
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.benchmark_matrix_cells/);
+    expect(params).toEqual(["tpch", 0.1, "power"]);
+  });
+
+  it("getBenchmarkRanking sorts by rank NULLS LAST", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await getBenchmarkRanking("tpch", 0.1, "power");
+    const [sql] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.benchmark_rankings/);
+    expect(sql).toMatch(/LEFT JOIN bench\.results/);
+    expect(sql).toMatch(/normalized_cost_usd/);
+    expect(sql).toMatch(/cost_model_version/);
+    expect(sql).toMatch(/deployment_class/);
+    expect(sql).toMatch(/instance_or_warehouse/);
+    expect(sql).toMatch(/ORDER BY br\.rank NULLS LAST/);
+  });
+
+  it("getBenchmarkSummaryFromDuckDB preserves per-cell timing eligibility", async () => {
+    mockedQueryRows
+      .mockResolvedValueOnce([
+        {
+          benchmark: "tpch",
+          scale_factor: 0.1,
+          phase: "power",
+          result_id: "r1",
+          platform_id: "duckdb",
+          platform: "DuckDB",
+          short_id: "r1",
+          trust_label: "maintainer-run",
+          run_date: "2026-04-01",
+          is_ranking_eligible: true,
+          has_display_timing: true,
+          valid_query_count: 1,
+          missing_query_count: 0,
+          zero_timing_count: 1,
+          display_exclusion_reason: null,
+          comparison_exclusion_reason: "insufficient_valid_timings",
+          ranking_exclusion_reason: "insufficient_valid_timings",
+          power_score: null,
+          display_geomean_ms: 10,
+          sample_geomean_ms: 10,
+          cost_usd: null,
+          compliance_class: null,
+          primary_metric: "display_geomean_ms",
+          primary_order: "asc",
+          percentile_p50: null,
+          percentile_p90: null,
+          percentile_p95: null,
+          percentile_p99: null,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          benchmark: "tpch",
+          scale_factor: 0.1,
+          phase: "power",
+          result_id: "r1",
+          platform_id: "duckdb",
+          query_id: "Q1",
+          display_ms: 10,
+          is_valid_display_timing: true,
+          timing_exclusion_reason: null,
+        },
+        {
+          benchmark: "tpch",
+          scale_factor: 0.1,
+          phase: "power",
+          result_id: "r1",
+          platform_id: "duckdb",
+          query_id: "Q2",
+          display_ms: 0,
+          is_valid_display_timing: false,
+          timing_exclusion_reason: "zero_timing",
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const summary = await getBenchmarkSummaryFromDuckDB("tpch", 0.1, "power");
+
+    expect(summary?.platforms[0]?.timings).toEqual({ Q1: 10, Q2: 0 });
+    expect(summary?.platforms[0]?.timing_eligibility).toEqual({
+      Q1: { is_valid_display_timing: true, timing_exclusion_reason: null },
+      Q2: { is_valid_display_timing: false, timing_exclusion_reason: "zero_timing" },
+    });
+  });
+
+  it("getPlatformIndexRows omits the filter when platformId is undefined", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await getPlatformIndexRows();
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.results r/);
+    expect(sql).toMatch(/COALESCE\(si\.short_id, ''\) AS short_id/);
+    expect(sql).toMatch(/LEFT JOIN bench\.short_ids si ON si\.result_id = r\.result_id/);
+    expect(sql).toMatch(/LEFT JOIN bench\.benchmark_rankings br ON br\.result_id = r\.result_id/);
+    expect(sql).toMatch(/CASE WHEN br\.phase IS NOT NULL THEN br\.phase/);
+    expect(sql).toMatch(/br\.primary_metric/);
+    expect(sql).toMatch(/validation_status/);
+    expect(sql).toMatch(/normalized_cost_usd/);
+    expect(sql).toMatch(/deployment_class/);
+    expect(sql).toMatch(/cloud_provider/);
+    expect(sql).toMatch(/instance_or_warehouse/);
+    expect(sql).toMatch(/storage_format/);
+    expect(sql.match(/COALESCE\(/g)).toHaveLength(1);
+    expect(sql).not.toMatch(/WHERE/);
+    expect(params).toBeUndefined();
+  });
+
+  it("getPlatformIndexRows filters by platform_id when provided", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await getPlatformIndexRows("duckdb");
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/WHERE r\.platform_id = \?/);
+    expect(params).toEqual(["duckdb"]);
+  });
+
+  it("does not cache empty platform index rows so cold-load retries can recover", async () => {
+    const recoveredRows = [{ result_id: "r1" }];
+    mockedQueryRows.mockResolvedValueOnce([]);
+    mockedQueryRows.mockResolvedValueOnce(recoveredRows);
+
+    await expect(getPlatformIndexRows()).resolves.toEqual([]);
+    await expect(getPlatformIndexRows()).resolves.toBe(recoveredRows);
+    expect(mockedQueryRows).toHaveBeenCalledTimes(2);
+  });
+
+  it("getCohort selects all variants for a cohort_key", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await getCohort("tpch-sf0.1-power");
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.cohort_metadata/);
+    expect(sql).toMatch(/WHERE cohort_key = \?/);
+    expect(params).toEqual(["tpch-sf0.1-power"]);
+  });
+
+  it("getMetaLeaderboard orders by avg_rank NULLS LAST", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await getMetaLeaderboard();
+    const [sql] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.meta_leaderboard/);
+    expect(sql).toMatch(/ORDER BY avg_rank NULLS LAST/);
+  });
+
+  it("memoizes stable metadata helper reads for the current snapshot", async () => {
+    const rows = [{ platform_id: "duckdb", platform: "DuckDB", avg_rank: 1, n_cohorts: 2 }];
+    mockedQueryRows.mockResolvedValueOnce(rows);
+
+    const first = await getMetaLeaderboard();
+    const second = await getMetaLeaderboard();
+
+    expect(first).toBe(second);
+    expect(mockedQueryRows).toHaveBeenCalledTimes(1);
+  });
+
+  it("evicts failed metadata helper reads so a retry can recover", async () => {
+    mockedQueryRows.mockRejectedValueOnce(new Error("snapshot not ready"));
+    await expect(getMetaLeaderboard()).rejects.toThrow("snapshot not ready");
+
+    const rows = [{ platform_id: "duckdb", platform: "DuckDB", avg_rank: 1, n_cohorts: 2 }];
+    mockedQueryRows.mockResolvedValueOnce(rows);
+
+    await expect(getMetaLeaderboard()).resolves.toEqual(rows);
+    expect(mockedQueryRows).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("getMetaLeaderboardData", () => {
+  function makeCohortRow(overrides: Partial<Record<string, unknown>>) {
+    return {
+      cohort_key: "clickbench-sf0.1-power",
+      benchmark: "clickbench",
+      scale_factor: 0.1,
+      phase: "power",
+      cohort_label: "ClickBench SF0.1",
+      cohort_href: "/results/clickbench/",
+      platform_count: 2,
+      primary_metric: "display_geomean_ms",
+      primary_order: "asc",
+      platform_id: "duckdb",
+      platform: "DuckDB",
+      result_id: "r1",
+      short_id: "",
+      tuning_mode: "tuned",
+      trust_label: "maintainer-run",
+      rank: 1,
+      metric_value: 10,
+      speedup_vs_best: 1,
+      ...overrides,
+    };
+  }
+
+  it("returns null when cohort_metadata is empty", async () => {
+    mockedQueryRows
+      .mockResolvedValueOnce([]) // meta_leaderboard
+      .mockResolvedValueOnce([]); // cohort_metadata
+    await expect(getMetaLeaderboardData()).resolves.toBeNull();
+  });
+
+  it("pivots cohort rows into cohorts[] and platforms[].ranks by platform_id", async () => {
+    mockedQueryRows
+      .mockResolvedValueOnce([
+        { platform_id: "duckdb", platform: "DuckDB", avg_rank: 1, n_cohorts: 2 },
+        { platform_id: "sqlite", platform: "SQLite", avg_rank: 2, n_cohorts: 1 },
+      ])
+      .mockResolvedValueOnce([
+        makeCohortRow({ platform_id: "duckdb", result_id: "r1", rank: 1 }),
+        makeCohortRow({
+          platform_id: "sqlite",
+          platform: "SQLite",
+          result_id: "r2",
+          rank: 2,
+          metric_value: 20,
+          speedup_vs_best: 0.5,
+          tuning_mode: "auto",
+          trust_label: "community-submission",
+        }),
+        makeCohortRow({
+          cohort_key: "tpch-sf1-power",
+          benchmark: "tpch",
+          scale_factor: 1,
+          phase: "power",
+          cohort_label: "TPC-H SF1",
+          cohort_href: "/results/tpch/",
+          platform_count: 1,
+          primary_metric: "power_score",
+          primary_order: "desc",
+          platform_id: "duckdb",
+          result_id: "r3",
+          rank: 1,
+          metric_value: 3000,
+          speedup_vs_best: 1,
+        }),
+      ]);
+
+    const data = await getMetaLeaderboardData();
+    expect(data).not.toBeNull();
+    expect(data!.cohorts).toHaveLength(2);
+    const clickbench = data!.cohorts.find((c) => c.key === "clickbench-sf0.1-power")!;
+    expect(clickbench.label).toBe("ClickBench SF0.1");
+    expect(clickbench.platforms).toHaveLength(2);
+
+    const duckdb = data!.platforms.find((p) => p.platform_id === "duckdb")!;
+    expect(duckdb.ranks["clickbench-sf0.1-power"]?.rank).toBe(1);
+    expect(duckdb.ranks["tpch-sf1-power"]?.rank).toBe(1);
+    expect(duckdb.avg_rank).toBe(1);
+    expect(duckdb.n_cohorts).toBe(2);
+
+    const sqlite = data!.platforms.find((p) => p.platform_id === "sqlite")!;
+    expect(sqlite.ranks["clickbench-sf0.1-power"]?.rank).toBe(2);
+    expect(sqlite.ranks["tpch-sf1-power"]).toBeUndefined();
+  });
+
+  it("keeps the best (lowest) rank when a platform has multiple variants in one cohort", async () => {
+    mockedQueryRows
+      .mockResolvedValueOnce([{ platform_id: "duckdb", platform: "DuckDB", avg_rank: 1, n_cohorts: 1 }])
+      .mockResolvedValueOnce([
+        makeCohortRow({ result_id: "r-tuned", rank: 1, tuning_mode: "tuned" }),
+        makeCohortRow({ result_id: "r-auto", rank: 3, tuning_mode: "auto" }),
+      ]);
+
+    const data = await getMetaLeaderboardData();
+    const duckdb = data!.platforms.find((p) => p.platform_id === "duckdb")!;
+    expect(duckdb.ranks["clickbench-sf0.1-power"]?.rank).toBe(1);
+    // All variants are preserved in the per-cohort platforms[] list.
+    expect(data!.cohorts[0]!.platforms).toHaveLength(2);
+  });
+
+  it("skips platforms with null rank when building the ranks map", async () => {
+    mockedQueryRows
+      .mockResolvedValueOnce([{ platform_id: "duckdb", platform: "DuckDB", avg_rank: null, n_cohorts: 0 }])
+      .mockResolvedValueOnce([makeCohortRow({ rank: null, metric_value: null, speedup_vs_best: null })]);
+
+    const data = await getMetaLeaderboardData();
+    const duckdb = data!.platforms.find((p) => p.platform_id === "duckdb")!;
+    expect(duckdb.ranks).toEqual({});
+  });
+});
+
+describe("resolveShortId", () => {
+  it("individually confirms IDs omitted from the batch probe", async () => {
+    const onInitialExistingIds = vi.fn();
+    mockedQueryRows
+      .mockResolvedValueOnce([{ result_id: "known-a" }])
+      .mockResolvedValueOnce([]);
+
+    await expect(
+      getExistingResultIds(["known-a", "missing-b"], onInitialExistingIds),
+    ).resolves.toEqual(new Set(["known-a"]));
+    expect(onInitialExistingIds).toHaveBeenCalledWith(new Set(["known-a"]));
+    expect(mockedQueryRows).toHaveBeenCalledTimes(2);
+    expect(mockedQueryRows.mock.calls).toEqual([
+      ["SELECT result_id FROM bench.result_detail_metrics WHERE result_id IN (?, ?)", ["known-a", "missing-b"]],
+      ["SELECT result_id FROM bench.result_detail_metrics WHERE result_id = ?", ["missing-b"]],
+    ]);
+  });
+
+  it("retains a real ID recovered by an individual confirmation after a partial batch read", async () => {
+    mockedQueryRows
+      .mockResolvedValueOnce([{ result_id: "known-a" }])
+      .mockResolvedValueOnce([{ result_id: "cold-b" }]);
+
+    await expect(getExistingResultIds(["known-a", "cold-b"])).resolves.toEqual(
+      new Set(["known-a", "cold-b"]),
+    );
+    expect(mockedQueryRows).toHaveBeenCalledTimes(2);
+    expect(mockedQueryRows.mock.calls[1]).toEqual([
+      "SELECT result_id FROM bench.result_detail_metrics WHERE result_id = ?",
+      ["cold-b"],
+    ]);
+  });
+
+  it("does not query existing detail IDs for an empty input", async () => {
+    await expect(getExistingResultIds([])).resolves.toEqual(new Set());
+    expect(mockedQueryRows).not.toHaveBeenCalled();
+  });
+
+  it("returns the input unchanged when it is not a short-id-shaped string", async () => {
+    // Full result_ids contain hyphens and are never 8+ contiguous hex chars.
+    const fullId = "tpch-duckdb-abcdef12";
+    await expect(resolveShortId(fullId)).resolves.toBe(fullId);
+    expect(mockedQueryRows).not.toHaveBeenCalled();
+  });
+
+  it("queries short_ids when input looks like a short id", async () => {
+    mockedQueryRows.mockResolvedValueOnce([{ result_id: "full-result-id" }]);
+    const out = await resolveShortId("abcdef12");
+    expect(out).toBe("full-result-id");
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.short_ids WHERE short_id = \?/);
+    expect(params).toEqual(["abcdef12"]);
+  });
+
+  it("returns the input unchanged when no match is found", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await expect(resolveShortId("deadbeef")).resolves.toBe("deadbeef");
+  });
+});
+
+describe("toShortIds", () => {
+  it("returns [] immediately for an empty input without issuing a query", async () => {
+    await expect(toShortIds([])).resolves.toEqual([]);
+    expect(mockedQueryRows).not.toHaveBeenCalled();
+  });
+
+  it("maps each full id to its short id, falling back to the full id on misses", async () => {
+    mockedQueryRows.mockResolvedValueOnce([
+      { result_id: "id-a", short_id: "aaaaaaaa" },
+      { result_id: "id-c", short_id: "cccccccc" },
+    ]);
+    const out = await toShortIds(["id-a", "id-b", "id-c"]);
+    expect(out).toEqual(["aaaaaaaa", "id-b", "cccccccc"]);
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    // 3 inputs → 3 ? placeholders
+    expect(sql).toMatch(/IN \(\?, \?, \?\)/);
+    expect(params).toEqual(["id-a", "id-b", "id-c"]);
+  });
+});

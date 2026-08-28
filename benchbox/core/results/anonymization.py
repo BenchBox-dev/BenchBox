@@ -21,6 +21,13 @@ from urllib.parse import urlparse
 
 import yaml
 
+from benchbox.core.results import platform_options as _platform_options
+
+is_secret_option_key = _platform_options.is_secret_option_key
+# Compatibility export for callers/tests that compare the shared classifier's
+# source list; behavior goes through ``is_secret_option_key`` below.
+_SECRET_KEY_PARTS = _platform_options._SECRET_KEY_PARTS
+
 logger = logging.getLogger(__name__)
 
 PUBLIC_REDACTED_VALUE = "<redacted>"
@@ -33,7 +40,11 @@ def _load_anonymization_specs() -> dict[str, Any]:
 
 _ANONYMIZATION_SPECS = _load_anonymization_specs()
 
-_SECRET_KEY_PARTS = tuple(_ANONYMIZATION_SPECS["secret_key_parts"])
+# Secret-key matching is shared with the internal capture path through
+# ``is_secret_option_key`` so the lists cannot diverge again. The spec file
+# deliberately no longer carries its own copy - the two hand-synced lists
+# drifted within a month of #1346 (``keyid`` was added to platform_options
+# only), which left ``*_key_id`` values unredacted on this public path.
 _IDENTIFIER_KEYS = dict(_ANONYMIZATION_SPECS["identifier_keys"])
 _ENDPOINT_KEYS = set(_ANONYMIZATION_SPECS["endpoint_keys"])
 _PATH_KEYS = set(_ANONYMIZATION_SPECS["path_keys"])
@@ -41,16 +52,38 @@ _MOUNT_COLLECTION_KEYS = set(_ANONYMIZATION_SPECS["mount_collection_keys"])
 _MOUNT_PATH_KEYS = set(_ANONYMIZATION_SPECS["mount_path_keys"])
 _LOCAL_ENDPOINT_VALUES = set(_ANONYMIZATION_SPECS["local_endpoint_values"])
 _MESSAGE_KEYS = set(_ANONYMIZATION_SPECS["message_keys"])
+# Unread identifier fields: omit at the public boundary rather than publish a
+# confirmable pseudonym. Compact forms; see anonymization_specs.yaml.
+_PUBLIC_DROP_KEYS = frozenset(_ANONYMIZATION_SPECS["public_drop_keys"])
+# Optional nested maps that collapse to `{}` after drop keys are removed.
+# Omit the empty block rather than publishing a hollow object (e.g. client_host
+# that only held machine_id). Compact forms match ``_compact_key``.
+_PUBLIC_EMPTY_OPTIONAL_MAP_KEYS = frozenset({"clienthost"})
 
 _MESSAGE_PATH_RE = re.compile(
     r"(?<![A-Za-z0-9_])("
-    r"(?:~|/Users|/home|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
+    r"(?:~|/Users|/home|/root|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
     r"|[A-Za-z]:\\Users\\[^\s'\",;)]*"
     r")"
 )
+_TUNING_SOURCE_REFERENCE_RE = re.compile(
+    r"[a-z0-9_.-]+(?:/[a-z0-9_.-]+)*(?::[0-9a-f]{16,64})?",
+    re.IGNORECASE,
+)
 _MESSAGE_URL_RE = re.compile(r"\b[a-z][a-z0-9+.-]*://[^\s'\",;)]*", flags=re.IGNORECASE)
 _MESSAGE_SECRET_ASSIGNMENT_RE = re.compile(
-    r"\b([a-z0-9_]*(?:token|password|secret|access_key|private_key)[a-z0-9_]*)=[^&\s,;)]*",
+    r"\b([a-z0-9][a-z0-9_.-]*)=[^&\s,;)]*",
+    flags=re.IGNORECASE,
+)
+# Public bundles may contain path-like values below generic metadata keys
+# (for example ``working_dir`` or a nested ``raw_config`` entry).  Keep this
+# detector deliberately narrower than a generic slash matcher: URL paths,
+# SQL literals, and repository-relative tuning references must remain intact.
+_PRIVATE_LOCAL_PATH_RE = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"(?:~|/Users|/home|/root|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
+    r"|[A-Za-z]:\\Users\\[^\s'\",;)]*"
+    r")",
     flags=re.IGNORECASE,
 )
 
@@ -59,22 +92,98 @@ def _compact_key(key: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", key.lower())
 
 
+# Width of the digest carried by a public pseudonym. Shared by the emitter and
+# the recognizer below so the two cannot drift into a non-idempotent pair.
+_PUBLIC_HASH_WIDTH = 12
+_PUBLIC_HASH_DIGITS = frozenset("0123456789abcdef")
+
+
+def _is_public_pseudonym(value: str, prefix: str) -> bool:
+    """Return whether *value* is already the pseudonym ``prefix`` would emit.
+
+    Deliberately scoped to one prefix and to the exact emitted digest width
+    rather than matching any pseudonym-shaped token: see
+    ``AnonymizationManager._hash_public_identifier``.
+    """
+    marker = f"{prefix}_"
+    if not value.startswith(marker):
+        return False
+    digest = value[len(marker) :]
+    return len(digest) == _PUBLIC_HASH_WIDTH and all(char in _PUBLIC_HASH_DIGITS for char in digest)
+
+
+# Community-facing publish paths (``benchbox submit``) require a non-empty salt
+# from this env var. The value must not be baked into the repository.
+PUBLIC_PSEUDONYM_SALT_ENV = "BENCHBOX_MACHINE_ID_SALT"
+
+
+class MissingPublicPseudonymSaltError(ValueError):
+    """Raised when a community-facing path is used without a deployment salt."""
+
+
+def resolve_public_pseudonym_salt(
+    *,
+    explicit: Optional[str] = None,
+    environ: Optional[dict[str, str]] = None,
+) -> Optional[str]:
+    """Return a non-empty public pseudonym salt, or ``None`` if unset.
+
+    Precedence: *explicit* argument, then :data:`PUBLIC_PSEUDONYM_SALT_ENV`.
+    Empty strings are treated as unset. The OSS default remains empty so a
+    repository-baked constant cannot pretend to be a secret.
+    """
+    if explicit is not None:
+        stripped = str(explicit).strip()
+        return stripped or None
+    env = environ if environ is not None else os.environ
+    raw = env.get(PUBLIC_PSEUDONYM_SALT_ENV)
+    if raw is None:
+        return None
+    stripped = str(raw).strip()
+    return stripped or None
+
+
+def require_public_pseudonym_salt(
+    *,
+    explicit: Optional[str] = None,
+    environ: Optional[dict[str, str]] = None,
+) -> str:
+    """Return a non-empty salt or raise :class:`MissingPublicPseudonymSaltError`.
+
+    Use on community-facing publish paths only. Private/local export may still
+    use an empty default salt.
+    """
+    salt = resolve_public_pseudonym_salt(explicit=explicit, environ=environ)
+    if salt is None:
+        raise MissingPublicPseudonymSaltError(
+            "Community publish requires a non-empty public pseudonym salt. "
+            f"Set the {PUBLIC_PSEUDONYM_SALT_ENV} environment variable to a "
+            "deployment-private value before the first public export/submit. "
+            "See docs/development/adr/adr-published-identifier-field-set.md "
+            "(retained-field salt decision)."
+        )
+    return salt
+
+
 @dataclass
 class AnonymizationConfig:
-    """Configuration for result anonymization."""
+    """Configuration for result anonymization.
 
-    # Machine identification
-    include_machine_id: bool = True
+    ``machine_id_salt`` defaults to empty. Under that default, public
+    identifier pseudonyms are a confirmation oracle for anyone who knows the
+    documented hash (see ``adr-published-identifier-field-set`` retained-field
+    salt decision). Open-source BenchBox keeps the empty default so a
+    repository-baked salt cannot pretend to be a secret. Operators who publish
+    community-facing results must set a non-empty salt known only to the
+    deployment before the first public export (via ``machine_id_salt`` or
+    :data:`PUBLIC_PSEUDONYM_SALT_ENV`). Already-public-shaped tokens still pass
+    through unchanged (publication fixed point).
+    """
+
+    # Machine identification. The salt feeds both get_anonymous_machine_id and
+    # the public pseudonym hash, so it is the one knob that changes published
+    # identity for *raw* values. Empty default = residual confirmation oracle.
     machine_id_salt: Optional[str] = None
-
-    # Path sanitization
-    anonymize_paths: bool = True
-    allowed_path_prefixes: list[str] = field(default_factory=lambda: ["/tmp", "/var/tmp"])
-
-    # System info
-    include_system_profile: bool = True
-    anonymize_hostnames: bool = True
-    anonymize_usernames: bool = True
 
     # Data anonymization
     pii_patterns: list[str] = field(
@@ -88,6 +197,25 @@ class AnonymizationConfig:
     # Custom sanitizers
     custom_sanitizers: dict[str, str] = field(default_factory=dict)
 
+    @classmethod
+    def from_public_environ(
+        cls,
+        *,
+        environ: Optional[dict[str, str]] = None,
+        require_salt: bool = False,
+    ) -> "AnonymizationConfig":
+        """Build config from the public-salt environment variable.
+
+        When *require_salt* is true, raises :class:`MissingPublicPseudonymSaltError`
+        if the salt is unset (community publish). When false, empty salt is allowed
+        for private/local use.
+        """
+        if require_salt:
+            salt: Optional[str] = require_public_pseudonym_salt(environ=environ)
+        else:
+            salt = resolve_public_pseudonym_salt(environ=environ)
+        return cls(machine_id_salt=salt)
+
 
 class AnonymizationManager:
     """Manages anonymization of benchmark results and metadata."""
@@ -100,8 +228,6 @@ class AnonymizationManager:
         """
         self.config = config or AnonymizationConfig()
         self._machine_id_cache: Optional[str] = None
-        self._path_mapping: dict[str, str] = {}
-        self._hostname_mapping: dict[str, str] = {}
 
     def _get_macos_platform_uuid(self) -> Optional[str]:
         """Get macOS IOPlatformUUID - a stable hardware-based identifier.
@@ -318,18 +444,236 @@ class AnonymizationManager:
         """
         return self._anonymize_public_value(payload, ())
 
+    def anonymize_tuning_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Anonymize a tuning companion while preserving normalized provenance.
+
+        Tuning payloads use table names as mapping keys and column names under
+        a generic ``name`` key, so the generic payload walker cannot identify
+        those identifiers. Current capture emits ``source_file`` as a normalized
+        repository-relative reference, optionally suffixed by a content digest.
+        Legacy or user-authored companions are untrusted, so any other value is
+        path-hashed before a bundle is re-exported.
+        """
+        source_file = payload.get("source_file")
+        working = dict(payload)
+        working.pop("source_file", None)
+
+        requested = working.get("requested")
+        constraints = None
+        table_tunings = None
+        if isinstance(requested, dict):
+            requested = dict(requested)
+            constraints = requested.get("constraints")
+            table_tunings = requested.pop("table_tunings", None)
+            working["requested"] = requested
+
+        anonymized = self.anonymize_result_payload(working)
+        if source_file is not None:
+            anonymized["source_file"] = (
+                source_file
+                if self._is_normalized_tuning_source_reference(source_file)
+                else self._hash_public_identifier(str(source_file), "path")
+            )
+        if constraints is not None or table_tunings is not None:
+            anonymized_requested = anonymized.setdefault("requested", {})
+            if isinstance(anonymized_requested, dict):
+                # Non-dict companions (list-of-constraint-dicts) are untrusted
+                # shapes too; route every non-None value through the recursive
+                # constraint walker rather than only dict payloads.
+                if constraints is not None:
+                    anonymized_requested["constraints"] = self._anonymize_tuning_constraints(constraints)
+                if table_tunings is not None:
+                    anonymized_requested["table_tunings"] = self._anonymize_tuning_table_tunings(table_tunings)
+        return anonymized
+
+    @staticmethod
+    def _is_normalized_tuning_source_reference(value: Any) -> bool:
+        """Return whether *value* is a safe repo-relative/template reference."""
+        if not isinstance(value, str) or not _TUNING_SOURCE_REFERENCE_RE.fullmatch(value):
+            return False
+        reference = value.rpartition(":")[0] if ":" in value else value
+        return bool(reference) and all(part not in {"", ".", ".."} for part in reference.split("/"))
+
+    # Identifier-bearing companion keys. Scalar keys hash the value (including
+    # slash-delimited compounds such as ``orders/o_orderkey`` as one token so
+    # neither segment survives). Collection keys hash list/dict containers while
+    # recursing into nested dict entries so list-of-dicts FK shapes do not leak.
+    _CONSTRAINT_TABLE_SCALAR_KEYS = frozenset(
+        {
+            "table",
+            "table_name",
+            "referenced_table",
+            "referenced_table_name",
+            "local_table",
+            "references_table",
+        }
+    )
+    _CONSTRAINT_COLUMN_SCALAR_KEYS = frozenset(
+        {
+            "column",
+            "column_name",
+            "name",
+            "referenced_column",
+            "referenced_column_name",
+            "references_column",
+            "local_column",
+        }
+    )
+    _CONSTRAINT_TABLE_COLLECTION_KEYS = frozenset({"tables", "table_names", "referenced_tables"})
+    _CONSTRAINT_COLUMN_COLLECTION_KEYS = frozenset(
+        {"columns", "column_names", "referenced_columns", "referenced_column_names"}
+    )
+
+    def _anonymize_tuning_constraints(self, value: Any) -> Any:
+        """Anonymize table/column identifiers nested in constraint settings.
+
+        Walks dict/list/tuple companions recursively. Only identifier-bearing
+        keys (table/column scalars and collections, including TPC-DI-style
+        ``local_table`` / ``references_table``) are pseudonymized; enabled
+        flags, actions, and unrelated tuning values pass through.
+        """
+        if isinstance(value, dict):
+            anonymized: dict[str, Any] = {}
+            for key, child in value.items():
+                # Same drop set as the public walker: omit unread identifiers
+                # rather than KeyErroring when the scalar walk drops the key.
+                if _compact_key(str(key)) in _PUBLIC_DROP_KEYS:
+                    continue
+                if key in self._CONSTRAINT_TABLE_SCALAR_KEYS:
+                    anonymized[key] = self._anonymize_constraint_identifier_value(child, "table")
+                elif key in self._CONSTRAINT_COLUMN_SCALAR_KEYS:
+                    anonymized[key] = self._anonymize_constraint_identifier_value(child, "column")
+                elif key in self._CONSTRAINT_TABLE_COLLECTION_KEYS:
+                    anonymized[key] = self._anonymize_constraint_identifier_collection(child, "table")
+                elif key in self._CONSTRAINT_COLUMN_COLLECTION_KEYS:
+                    anonymized[key] = self._anonymize_constraint_identifier_collection(child, "column")
+                else:
+                    if isinstance(child, (dict, list, tuple)):
+                        anonymized[key] = self._anonymize_tuning_constraints(child)
+                    else:
+                        walked = self._anonymize_public_value({str(key): child}, ())
+                        if str(key) in walked:
+                            anonymized[key] = walked[str(key)]
+            return anonymized
+        if isinstance(value, list):
+            return [self._anonymize_tuning_constraints(item) for item in value]
+        if isinstance(value, tuple):
+            return [self._anonymize_tuning_constraints(item) for item in value]
+        return value
+
+    def _anonymize_constraint_identifier_value(self, value: Any, prefix: str) -> Any:
+        """Hash one identifier scalar, or walk a nested collection under a scalar key."""
+        if isinstance(value, (dict, list, tuple)):
+            return self._anonymize_constraint_identifier_collection(value, prefix)
+        if value in (None, ""):
+            return value
+        return self._hash_public_identifier(str(value), prefix)
+
+    def _anonymize_constraint_identifier_collection(self, value: Any, prefix: str) -> Any:
+        """Hash identifier collections while preserving their container shape.
+
+        Dict keys are table/column identifiers. List/tuple string items are
+        hashed; nested dicts/lists recurse so list-of-dicts FK companions
+        (``tables: [{table, columns, referenced_table}, ...]``) do not pass
+        through unhashed.
+        """
+        if isinstance(value, dict):
+            return {
+                self._hash_public_identifier(str(key), prefix): self._anonymize_constraint_columns(child)
+                for key, child in value.items()
+            }
+        if isinstance(value, (list, tuple)):
+            return [self._anonymize_constraint_identifier_item(item, prefix) for item in value]
+        if isinstance(value, str):
+            return self._hash_public_identifier(value, prefix)
+        return value
+
+    def _anonymize_constraint_identifier_item(self, item: Any, prefix: str) -> Any:
+        """Hash one collection member, or recurse into nested companion structure."""
+        if isinstance(item, str):
+            return self._hash_public_identifier(item, prefix)
+        if isinstance(item, dict):
+            return self._anonymize_tuning_constraints(item)
+        if isinstance(item, (list, tuple)):
+            return [self._anonymize_constraint_identifier_item(child, prefix) for child in item]
+        return item
+
+    def _anonymize_constraint_columns(self, value: Any) -> Any:
+        """Hash column lists stored as values under a table identifier."""
+        if isinstance(value, (list, tuple)):
+            return [self._anonymize_constraint_identifier_item(item, "column") for item in value]
+        if isinstance(value, dict):
+            return self._anonymize_tuning_constraints(value)
+        if isinstance(value, str):
+            return self._hash_public_identifier(value, "column")
+        return value
+
+    def _anonymize_tuning_table_tunings(self, value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                self._hash_public_identifier(str(key), "table"): self._anonymize_tuning_value(child)
+                for key, child in value.items()
+            }
+        return self._anonymize_tuning_value(value)
+
+    def _anonymize_tuning_value(self, value: Any) -> Any:
+        if isinstance(value, dict):
+            anonymized: dict[str, Any] = {}
+            for key, child in value.items():
+                if _compact_key(str(key)) in _PUBLIC_DROP_KEYS:
+                    continue
+                if key in {"table", "table_name"}:
+                    anonymized[key] = self._hash_public_identifier(str(child), "table")
+                elif key in {"column", "column_name", "name"}:
+                    anonymized[key] = self._hash_public_identifier(str(child), "column")
+                else:
+                    anonymized[key] = self._anonymize_tuning_value(child)
+            return anonymized
+        if isinstance(value, list):
+            return [self._anonymize_tuning_value(item) for item in value]
+        if isinstance(value, tuple):
+            return [self._anonymize_tuning_value(item) for item in value]
+        return value
+
     def _anonymize_public_value(self, value: Any, key_path: tuple[str, ...]) -> Any:
         if isinstance(value, dict):
             anonymized: dict[str, Any] = {}
             for key, child in value.items():
+                # Drop unread identifier fields at every nesting depth so they
+                # never appear as pseudonyms in public bundles (ADR published
+                # identifier field set).
+                if _compact_key(str(key)) in _PUBLIC_DROP_KEYS:
+                    continue
                 child_path = (*key_path, str(key))
                 if self._is_secret_metadata_key(child_path):
-                    anonymized[key] = PUBLIC_REDACTED_VALUE if child not in (None, "") else child
+                    child_value = PUBLIC_REDACTED_VALUE if child not in (None, "") else child
                 else:
-                    anonymized[key] = self._anonymize_public_value(child, child_path)
+                    child_value = self._anonymize_public_value(child, child_path)
+                # After dropping identifier-only content (e.g. client_host with
+                # only machine_id), omit empty optional blocks rather than
+                # publishing a hollow object. Non-empty profiles keep.
+                # One-time corpus re-derive (rederive-prune-empty-client-host)
+                # also strips already-empty `{}` residuals so stored bytes match
+                # the fresh public shape.
+                if (
+                    isinstance(child_value, dict)
+                    and not child_value
+                    and _compact_key(str(key)) in _PUBLIC_EMPTY_OPTIONAL_MAP_KEYS
+                ):
+                    continue
+                anonymized[key] = child_value
             return anonymized
 
-        if isinstance(value, list):
+        if isinstance(value, (set, frozenset)):
+            # Set iteration depends on PYTHONHASHSEED. Sort by the stable
+            # scalar representation before recursing so canonical JSON is
+            # reproducible across processes.
+            value = sorted(value, key=repr)
+
+        if isinstance(value, (list, tuple, set, frozenset)):
+            # Tuples/sets serialize as JSON arrays; recursing as a list keeps
+            # their contents inside the anonymization boundary instead of
+            # falling through to the scalar branch untouched.
             return [self._anonymize_public_value(item, key_path) for item in value]
 
         return self._anonymize_public_scalar(value, key_path)
@@ -344,6 +688,17 @@ class AnonymizationManager:
         if isinstance(value, str) and self._is_message_metadata_key(key_path):
             return self._sanitize_public_message(value)
 
+        if isinstance(value, str):
+            # Key-aware path handling covers the normal schema fields, while
+            # this recursive value check protects generic/nested metadata that
+            # a producer can add without first adding a field-name allowlist.
+            # Replace only the private path token so surrounding diagnostic
+            # text remains useful and URLs/SQL are not blanket-redacted.
+            value = _PRIVATE_LOCAL_PATH_RE.sub(
+                lambda match: self._hash_public_identifier(match.group(0), "path"),
+                value,
+            )
+
         prefix = self._identifier_prefix_for_key_path(key_path)
         if prefix is not None:
             if prefix == "host" and isinstance(value, str) and self._is_local_endpoint_value(value):
@@ -356,8 +711,7 @@ class AnonymizationManager:
         return value
 
     def _is_secret_metadata_key(self, key_path: tuple[str, ...]) -> bool:
-        key = _compact_key(key_path[-1]) if key_path else ""
-        return any(part in key for part in _SECRET_KEY_PARTS)
+        return bool(key_path) and is_secret_option_key(key_path[-1])
 
     def _is_message_metadata_key(self, key_path: tuple[str, ...]) -> bool:
         key = _compact_key(key_path[-1]) if key_path else ""
@@ -384,13 +738,43 @@ class AnonymizationManager:
             return "host" if key in {"host", "hostname", "server", "enginehost"} else "endpoint"
         if key.endswith("url") or key.endswith("endpoint"):
             return "endpoint"
-        if key.endswith("path") or key.endswith("directory") or key.endswith("file") or key in _PATH_KEYS:
+        if (
+            key.endswith("path")
+            or key.endswith("directory")
+            or key.endswith("dir")
+            or key.endswith("folder")
+            or key.endswith("root")
+            or key.endswith("file")
+            or key.endswith("executable")
+            or key in _PATH_KEYS
+        ):
             return "path"
         return None
 
     def _hash_public_identifier(self, value: str, prefix: str) -> str:
+        """Hash one identifier into a stable public pseudonym.
+
+        Anonymization has to reach a fixed point. Curated bundles are stored
+        already-anonymized, so the Explorer publication boundary re-anonymizes
+        values this method produced; hashing them a second time would mint a
+        different pseudonym for the same machine than a freshly submitted run
+        gets, and pseudonym stability is what lets the Explorer group results
+        by machine at all. A value already carrying *this* prefix's pseudonym
+        shape therefore passes through untouched.
+
+        The pass-through is scoped to ``prefix`` and to the exact emitted
+        digest width, not to pseudonym shape in general. That keeps a
+        capture-side ``machine_<16 hex>`` hashed, so internal and public
+        identities stay decoupled, and stops a ``host_`` token from surviving
+        verbatim inside a ``path_`` field. A submitter can still hand-craft a
+        value of this shape to pick their own pseudonym, so a pseudonym is a
+        grouping key only - never a provenance or trust signal. Provenance is
+        carried by trust labels.
+        """
+        if _is_public_pseudonym(value, prefix):
+            return value
         salt = self.config.machine_id_salt or ""
-        digest = hashlib.sha256(f"{salt}|{prefix}|{value}".encode()).hexdigest()[:12]
+        digest = hashlib.sha256(f"{salt}|{prefix}|{value}".encode()).hexdigest()[:_PUBLIC_HASH_WIDTH]
         return f"{prefix}_{digest}"
 
     @staticmethod
@@ -404,133 +788,19 @@ class AnonymizationManager:
     def _looks_like_connection_string(value: str) -> bool:
         if re.search(r"://[^/@\s:]+:[^/@\s]+@", value):
             return True
-        return bool(
-            re.search(
-                r"\b[a-z0-9_]*(?:password|token|secret|access_key|private_key)[a-z0-9_]*=",
-                value,
-                flags=re.IGNORECASE,
-            )
-        )
+        return any(is_secret_option_key(match.group(1)) for match in _MESSAGE_SECRET_ASSIGNMENT_RE.finditer(value))
 
     def _sanitize_public_message(self, value: str) -> str:
         cleaned = self.remove_pii(value)
-        cleaned = _MESSAGE_SECRET_ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}={PUBLIC_REDACTED_VALUE}", cleaned)
+        cleaned = _MESSAGE_SECRET_ASSIGNMENT_RE.sub(
+            lambda match: (
+                f"{match.group(1)}={PUBLIC_REDACTED_VALUE}" if is_secret_option_key(match.group(1)) else match.group(0)
+            ),
+            cleaned,
+        )
         cleaned = _MESSAGE_URL_RE.sub(lambda match: self._hash_public_identifier(match.group(0), "endpoint"), cleaned)
         cleaned = _MESSAGE_PATH_RE.sub(lambda match: self._hash_public_identifier(match.group(0), "path"), cleaned)
         return cleaned
-
-    def anonymize_system_profile(self) -> dict[str, Any]:
-        """Generate anonymized system profile information.
-
-        Returns:
-            Dictionary with anonymized system information
-        """
-        if not self.config.include_system_profile:
-            return {}
-
-        profile = {}
-
-        try:
-            # Operating system (safe to include)
-            profile["os_type"] = platform.system()
-            profile["os_release"] = platform.release()
-            profile["architecture"] = platform.machine()
-
-            # Hardware information (generally safe)
-            profile["cpu_count"] = os.cpu_count()
-            profile["python_version"] = platform.python_version()
-
-            # Memory information (if available, in general terms)
-            try:
-                import psutil
-
-                memory = psutil.virtual_memory()
-                # Round to nearest GB for privacy
-                profile["memory_gb"] = round(memory.total / (1024**3))
-            except ImportError:
-                profile["memory_gb"] = None
-
-            # Hostname (anonymized if requested)
-            if self.config.anonymize_hostnames:
-                hostname = platform.node()
-                if hostname not in self._hostname_mapping:
-                    hash_obj = hashlib.md5(hostname.encode())
-                    self._hostname_mapping[hostname] = f"host_{hash_obj.hexdigest()[:8]}"
-                profile["hostname"] = self._hostname_mapping[hostname]
-            else:
-                profile["hostname"] = platform.node()
-
-            # Username (anonymized if requested)
-            if self.config.anonymize_usernames:
-                try:
-                    username = os.getlogin()
-                    hash_obj = hashlib.md5(username.encode())
-                    profile["username"] = f"user_{hash_obj.hexdigest()[:8]}"
-                except Exception:
-                    profile["username"] = "anonymous"
-            else:
-                profile["username"] = os.getlogin() if hasattr(os, "getlogin") else "unknown"
-
-        except Exception as e:
-            logger.warning(f"Failed to collect system profile: {e}")
-            profile["collection_error"] = str(e)
-
-        return profile
-
-    def sanitize_path(self, path: str) -> str:
-        """Sanitize file paths by removing or anonymizing sensitive components.
-
-        Args:
-            path: File path to sanitize
-
-        Returns:
-            Sanitized path string
-        """
-        if not self.config.anonymize_paths:
-            return path
-
-        original_path = str(path)
-
-        # Check if path is in allowed prefixes (keep as-is)
-        for prefix in self.config.allowed_path_prefixes:
-            if original_path.startswith(prefix):
-                return original_path
-
-        # Use cached mapping if available
-        if original_path in self._path_mapping:
-            return self._path_mapping[original_path]
-
-        # Parse path components
-        path_obj = Path(original_path)
-        sanitized_parts = []
-
-        # Handle different path components
-        for i, part in enumerate(path_obj.parts):
-            if i == 0:
-                # Root or drive - keep structure but anonymize
-                if part.startswith("/"):
-                    sanitized_parts.append("/")
-                elif ":" in part:  # Windows drive
-                    sanitized_parts.append("C:")
-                else:
-                    sanitized_parts.append(part)
-            elif part in ["tmp", "temp", "var", "usr", "opt", "home", "Users"]:
-                # Common system directories - keep
-                sanitized_parts.append(part)
-            elif len(part) > 20 or any(char.isdigit() for char in part):
-                # Long names or names with numbers - likely UUIDs or sensitive
-                hash_obj = hashlib.md5(part.encode())
-                sanitized_parts.append(f"dir_{hash_obj.hexdigest()[:8]}")
-            else:
-                # Regular directory names - keep
-                sanitized_parts.append(part)
-
-        sanitized_path = str(Path(*sanitized_parts))
-
-        # Cache the mapping
-        self._path_mapping[original_path] = sanitized_path
-
-        return sanitized_path
 
     def remove_pii(self, text: str) -> str:
         """Remove personally identifiable information from text.
@@ -556,160 +826,55 @@ class AnonymizationManager:
 
         return cleaned_text
 
-    def anonymize_query_metadata(self, query_metadata: dict[str, Any]) -> dict[str, Any]:
-        """Anonymize query execution metadata.
 
-        Args:
-            query_metadata: Original query metadata
+def find_public_path_leaks(value: Any, key_path: tuple[str, ...] = ()) -> list[str]:
+    """Return dotted paths containing private absolute paths in public JSON.
 
-        Returns:
-            Anonymized metadata dictionary
-        """
-        if not query_metadata:
-            return {}
+    The detector is intentionally value-redacting: callers can report the
+    offending field path without echoing a user's home directory or other
+    machine-local material.  It is shared by submission validation and the
+    Explorer publication boundary so both surfaces enforce the same contract.
 
-        anonymized = {}
+    Object *keys* are checked as well as values.  A payload can encode a path
+    as a mapping key -- ``{"per_path_timings": {"/Users/alice/db": 1.2}}`` is
+    the shape that occurs in practice -- and scanning values alone would call
+    that clean.  Such a key is reported at ``<parent>.<key>`` with the key
+    itself elided, because the offending string *is* the private path and
+    naming it would break the redaction contract above.
+    """
 
-        for key, value in query_metadata.items():
-            if key in ["query_id", "execution_time", "rows_returned", "status"]:
-                # Safe metadata - keep as-is
-                anonymized[key] = value
-            elif key == "sql_text":
-                # Clean SQL text of PII
-                anonymized[key] = self.remove_pii(str(value))
-            elif key in ["file_path", "data_path", "output_path"]:
-                # Paths - sanitize
-                anonymized[key] = self.sanitize_path(str(value))
-            elif isinstance(value, str):
-                # String values - clean of PII
-                anonymized[key] = self.remove_pii(value)
-            elif isinstance(value, dict):
-                # Nested dictionaries - recurse
-                anonymized[key] = self.anonymize_query_metadata(value)
-            elif isinstance(value, list):
-                # Lists - process each item
-                anonymized[key] = [
-                    self.anonymize_query_metadata(item)
-                    if isinstance(item, dict)
-                    else self.remove_pii(str(item))
-                    if isinstance(item, str)
-                    else item
-                    for item in value
-                ]
-            else:
-                # Other types - keep as-is
-                anonymized[key] = value
+    leaks: list[str] = []
 
-        return anonymized
+    if isinstance(value, dict):
+        for key, child in value.items():
+            # A leaking key is elided in its own report *and* in the path of
+            # everything beneath it: recursing with the raw key would put the
+            # private path back into a descendant's diagnostic, which is the
+            # one place these strings are surfaced (PR comments, exceptions).
+            label = str(key)
+            if isinstance(key, str) and _PRIVATE_LOCAL_PATH_RE.search(key):
+                label = "<key>"
+                leaks.append(".".join((*key_path, label)))
+            leaks.extend(find_public_path_leaks(child, (*key_path, label)))
+        return leaks
 
-    def anonymize_execution_metadata(self, metadata: dict[str, Any]) -> dict[str, Any]:
-        """Anonymize complete execution metadata.
+    if isinstance(value, (list, tuple, set, frozenset)):
+        for index, child in enumerate(value):
+            leaks.extend(find_public_path_leaks(child, (*key_path, str(index))))
+        return leaks
 
-        Args:
-            metadata: Original execution metadata
+    if isinstance(value, str) and _PRIVATE_LOCAL_PATH_RE.search(value):
+        leaks.append(".".join(key_path) or "<root>")
+    return leaks
 
-        Returns:
-            Fully anonymized metadata dictionary
-        """
-        if not metadata:
-            return {}
 
-        anonymized = {
-            "anonymization_version": "1.0",
-            "anonymized_at": metadata.get("timestamp", "unknown"),
-        }
-
-        # Process each metadata field
-        for key, value in metadata.items():
-            if key in [
-                "benchmark_name",
-                "platform",
-                "scale_factor",
-                "execution_id",
-                "timestamp",
-                "duration_seconds",
-                "total_queries",
-                "successful_queries",
-            ]:
-                # Safe benchmark metadata
-                anonymized[key] = value
-            elif key == "machine_id":
-                # Replace with anonymous ID
-                anonymized["anonymous_machine_id"] = self.get_anonymous_machine_id()
-            elif key == "system_profile":
-                # Anonymize system information
-                anonymized["system_profile"] = self.anonymize_system_profile()
-            elif key in ["database_path", "data_directory", "output_directory"]:
-                # Paths - sanitize
-                anonymized[key] = self.sanitize_path(str(value))
-            elif key == "query_results" and isinstance(value, list):
-                # Query results - anonymize each
-                anonymized[key] = [self.anonymize_query_metadata(query) for query in value]
-            elif isinstance(value, dict):
-                # Nested dictionaries
-                anonymized[key] = self.anonymize_execution_metadata(value)
-            elif isinstance(value, str):
-                # String values
-                anonymized[key] = self.remove_pii(value)
-            else:
-                # Other values - keep as-is
-                anonymized[key] = value
-
-        return anonymized
-
-    def validate_anonymization(self, original_data: dict[str, Any], anonymized_data: dict[str, Any]) -> dict[str, Any]:
-        """Validate that anonymization was successful.
-
-        Args:
-            original_data: Original data before anonymization
-            anonymized_data: Data after anonymization
-
-        Returns:
-            Validation results dictionary
-        """
-        validation = {
-            "is_valid": True,
-            "warnings": [],
-            "errors": [],
-            "checks_performed": [],
-        }
-
-        # Check for potential PII leaks
-        str(original_data).lower()
-        anonymized_str = str(anonymized_data).lower()
-
-        # Check for common PII patterns in anonymized data
-        pii_checks = [
-            (r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "IP addresses"),
-            (r"\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b", "email addresses"),
-            (r"/home/[^/]+", "home directory paths"),
-            (r"/users/[^/]+", "user directory paths"),
-            (r"[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}", "UUIDs"),
-        ]
-
-        for pattern, description in pii_checks:
-            if re.search(pattern, anonymized_str, re.IGNORECASE):
-                validation["warnings"].append(f"Potential {description} found in anonymized data")
-            validation["checks_performed"].append(f"Checked for {description}")
-
-        # Verify anonymous machine ID is present
-        if self.config.include_machine_id:
-            if "anonymous_machine_id" not in anonymized_str:
-                validation["errors"].append("Anonymous machine ID not found in anonymized data")
-            validation["checks_performed"].append("Anonymous machine ID presence")
-
-        # Check that system profile is anonymized
-        if self.config.include_system_profile:
-            if "system_profile" in anonymized_data:
-                profile = anonymized_data["system_profile"]
-                if self.config.anonymize_hostnames and "hostname" in profile:
-                    if not profile["hostname"].startswith("host_"):
-                        validation["warnings"].append("Hostname may not be properly anonymized")
-                if self.config.anonymize_usernames and "username" in profile:
-                    if not profile["username"].startswith("user_"):
-                        validation["warnings"].append("Username may not be properly anonymized")
-            validation["checks_performed"].append("System profile anonymization")
-
-        validation["is_valid"] = len(validation["errors"]) == 0
-
-        return validation
+__all__ = [
+    "PUBLIC_PSEUDONYM_SALT_ENV",
+    "PUBLIC_REDACTED_VALUE",
+    "AnonymizationConfig",
+    "AnonymizationManager",
+    "MissingPublicPseudonymSaltError",
+    "find_public_path_leaks",
+    "require_public_pseudonym_salt",
+    "resolve_public_pseudonym_salt",
+]

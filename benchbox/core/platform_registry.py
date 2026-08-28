@@ -11,17 +11,26 @@ enabling dynamic discovery and instantiation of platform adapters.
 
 import argparse
 import importlib
-import json
 from collections import Counter
 from collections.abc import Iterable
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Literal, Optional
 
+from benchbox.core.platform_manifest import (
+    SUPPORT_STATUS_VALUES,
+    SupportStatus,
+    get_adapter_imports,
+    get_all_platform_aliases,
+    get_platform_aliases,
+    get_platform_manifest_entry,
+    get_platform_metadata,
+    is_valid_platform_key,
+)
 from benchbox.core.schemas import LibraryInfo, PlatformInfo
 from benchbox.platforms.base import PlatformAdapter
 
 CostClass = Literal["free", "paid_credits", "paid_compute"]
-SupportStatus = Literal["stable", "beta", "experimental", "repo_only", "deprecated", "document_only"]
 OptionalAdapterImportStatus = Literal[
     "available",
     "missing_optional_dependency",
@@ -32,71 +41,13 @@ OptionalAdapterImportStatus = Literal[
     "not_configured",
 ]
 
-SUPPORT_STATUS_VALUES: tuple[SupportStatus, ...] = (
-    "stable",
-    "beta",
-    "experimental",
-    "repo_only",
-    "deprecated",
-    "document_only",
-)
-
-_PLATFORM_SUPPORT_STATUS: dict[str, SupportStatus] = {
-    # Local/core platforms with broad fast-test and docs coverage.
-    "duckdb": "stable",
-    "sqlite": "stable",
-    "datafusion": "stable",
-    "polars": "stable",
-    "pandas": "stable",
-    # Supported beta product surface. Local dependency availability remains separate.
-    "motherduck": "beta",
-    "clickhouse-local": "beta",
-    "clickhouse-server": "beta",
-    "clickhouse-cloud": "beta",
-    "databricks": "beta",
-    "bigquery": "beta",
-    "redshift": "beta",
-    "snowflake": "beta",
-    "trino": "beta",
-    "starburst": "beta",
-    "athena": "beta",
-    "spark": "beta",
-    "pyspark": "beta",
-    "firebolt": "beta",
-    "presto": "beta",
-    "postgresql": "beta",
-    "timescaledb": "beta",
-    "synapse": "beta",
-    "fabric_dw": "beta",
-    "fabric-lakehouse": "beta",
-    "influxdb": "beta",
-    "starrocks": "beta",
-    "doris": "beta",
-    "databend": "beta",
-    "questdb": "beta",
-    "dask": "beta",
-    "singlestore": "beta",
-    # Shipped for evaluation, migration work, or ecosystem breadth.
-    "cedardb": "experimental",
-    "pg-duckdb": "experimental",
-    "pg-mooncake": "experimental",
-    "databricks-df": "experimental",
-    "glue": "experimental",
-    "emr-serverless": "experimental",
-    "athena-spark": "experimental",
-    "dataproc": "experimental",
-    "dataproc-serverless": "experimental",
-    "fabric-spark": "experimental",
-    "synapse-spark": "experimental",
-    "snowpark-connect": "experimental",
-    "lakesail": "experimental",
-    "velox": "experimental",
-    "quanton": "experimental",
-    "modin": "experimental",
-    "cudf": "experimental",
-    # Legacy selector retained while users migrate to first-class ClickHouse names.
-    "clickhouse": "deprecated",
-}
+# The output location the Snowflake credential prompt advertises as its
+# default. It lives next to get_cloud_path_examples() — and is the first entry
+# of the snowflake example list — so the prompt and the documented examples
+# cannot drift apart again. Any value here must stay acceptable to
+# benchbox.utils.cloud_storage.is_cloud_path, which is the classifier the run
+# path uses; a test pins that agreement.
+SNOWFLAKE_DEFAULT_OUTPUT_LOCATION = "@~/benchbox"
 
 _NATIVE_IMPORT_ERROR_MARKERS = (
     "dlopen",
@@ -116,67 +67,6 @@ def _is_internal_module_miss(missing_name: str, module_path: str | None = None) 
     if module_path is not None and (missing_name == module_path or missing_name.startswith(f"{module_path}.")):
         return True
     return missing_name == "benchbox" or missing_name.startswith("benchbox.")
-
-
-_PLATFORM_METADATA_JSON = """{
-"duckdb": {"display_name": "DuckDB", "description": "Columnar OLAP engine • Single-node • In-memory", "category": "analytical", "libraries": [{"name": "duckdb", "required": true}], "requirements": ["duckdb>=0.8.0"], "installation_command": "uv add duckdb", "adoption": "mainstream", "supports": ["olap", "in_memory", "columnar"], "driver_package": "duckdb", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "duckdb", "default_deployment": "local", "deployment_modes": {"local": {"mode": "local", "display_name": "DuckDB Local", "description": "Embedded in-process DuckDB", "requires_credentials": false, "requires_cloud_storage": false, "requires_network": false, "default_for_platform": true, "dependencies": ["duckdb"], "auth_methods": []}}}, "support_status": "stable"},
-"datafusion": {"display_name": "DataFusion", "description": "Arrow-based SQL • Single-node • In-memory", "category": "analytical", "libraries": [{"name": "datafusion", "required": true}], "requirements": ["datafusion>=34.0.0"], "installation_command": "uv add datafusion", "adoption": "emerging", "supports": ["olap", "in_memory", "columnar", "arrow", "dataframe"], "driver_package": "datafusion", "capabilities": {"supports_sql": true, "supports_dataframe": true, "default_mode": "sql"}, "support_status": "stable"},
-"sqlite": {"display_name": "SQLite", "description": "Row-based OLTP database • Single-node • File-based", "category": "embedded", "libraries": [{"name": "sqlite3", "required": true}], "requirements": ["sqlite3 (built-in)"], "installation_command": "Built-in Python library", "adoption": "niche", "supports": ["transactional", "file_based"], "driver_package": null, "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql"}, "support_status": "stable"},
-"polars": {"display_name": "Polars", "description": "DataFrame engine • In-memory • Columnar", "category": "analytical", "libraries": [{"name": "polars", "required": true}], "requirements": ["polars>=0.20.0"], "installation_command": "uv add polars", "adoption": "established", "supports": ["olap", "in_memory", "columnar", "dataframe"], "driver_package": "polars", "capabilities": {"supports_sql": false, "supports_dataframe": true, "default_mode": "dataframe"}, "support_status": "stable"},
-"motherduck": {"display_name": "MotherDuck", "description": "Serverless DuckDB cloud • Managed • Cloud storage", "category": "cloud", "libraries": [{"name": "duckdb", "required": true}], "requirements": ["duckdb>=0.9.0"], "installation_command": "uv add duckdb", "adoption": "emerging", "supports": ["olap", "cloud", "columnar", "serverless"], "driver_package": "duckdb", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "duckdb", "inherits_from": "duckdb", "cost_class": "paid_credits", "default_deployment": "managed", "deployment_modes": {"managed": {"mode": "managed", "display_name": "MotherDuck Cloud", "description": "Serverless DuckDB in MotherDuck cloud", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["duckdb"], "auth_methods": ["token"]}}}, "support_status": "beta"},
-"clickhouse": {"display_name": "ClickHouse", "description": "Columnar OLAP database • Local/server • Distributed", "category": "analytical", "libraries": [{"name": "clickhouse_driver", "required": true, "import_name": "clickhouse_driver"}, {"name": "chdb", "required": false, "description": "Local ClickHouse"}], "requirements": ["clickhouse-driver>=0.2.0"], "installation_command": "uv add clickhouse-driver", "adoption": "established", "supports": ["olap", "columnar", "distributed"], "driver_package": "clickhouse-driver", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "clickhouse", "default_deployment": "local", "deployment_modes": {"local": {"mode": "local", "display_name": "ClickHouse Local (chDB)", "description": "Embedded ClickHouse via chDB library", "requires_credentials": false, "requires_cloud_storage": false, "requires_network": false, "default_for_platform": true, "dependencies": ["chdb"], "auth_methods": []}, "server": {"mode": "self-hosted", "display_name": "ClickHouse Server", "description": "Self-hosted ClickHouse server or cluster", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": false, "dependencies": ["clickhouse-driver"], "auth_methods": ["password"]}}}, "support_status": "deprecated"},
-"clickhouse-local": {"display_name": "ClickHouse Local (chDB)", "description": "Embedded ClickHouse via chDB • In-process • Zero network", "category": "analytical", "libraries": [{"name": "chdb", "required": true, "import_name": "chdb"}], "requirements": ["chdb>=0.10.0"], "installation_command": "uv add benchbox --extra clickhouse-local", "adoption": "established", "supports": ["olap", "columnar", "embedded", "in-process"], "driver_package": "chdb", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "clickhouse", "inherits_from": "clickhouse"}, "support_status": "beta"},
-"clickhouse-server": {"display_name": "ClickHouse Server", "description": "Self-hosted ClickHouse • Docker/dedicated • High-performance columnar", "category": "analytical", "libraries": [{"name": "clickhouse_driver", "required": true, "import_name": "clickhouse_driver"}], "requirements": ["clickhouse-driver>=0.2.0"], "installation_command": "uv add benchbox --extra clickhouse-server", "adoption": "established", "supports": ["olap", "columnar", "distributed", "self-hosted"], "driver_package": "clickhouse-driver", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "clickhouse", "inherits_from": "clickhouse", "default_deployment": "self-hosted", "deployment_modes": {"self-hosted": {"mode": "self-hosted", "display_name": "ClickHouse Server Self-Hosted", "description": "Self-hosted ClickHouse Server server", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["clickhouse_driver"], "auth_methods": ["password"]}}}, "support_status": "beta"},
-"clickhouse-cloud": {"display_name": "ClickHouse Cloud", "description": "Managed ClickHouse • Serverless/dedicated • Cloud analytics", "category": "cloud", "libraries": [{"name": "clickhouse_connect", "required": true, "import_name": "clickhouse_connect"}], "requirements": ["clickhouse-connect>=0.10.0"], "installation_command": "uv add benchbox --extra clickhouse-cloud", "adoption": "emerging", "supports": ["olap", "columnar", "distributed", "serverless", "cloud"], "driver_package": "clickhouse-connect", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "clickhouse", "inherits_from": "clickhouse", "cost_class": "paid_compute", "default_deployment": "managed", "deployment_modes": {"managed": {"mode": "managed", "display_name": "ClickHouse Cloud", "description": "ClickHouse Cloud managed service", "requires_credentials": true, "requires_cloud_storage": true, "requires_network": true, "default_for_platform": true, "dependencies": ["clickhouse-connect"], "auth_methods": ["password", "oauth"]}}}, "support_status": "beta"},
-"bigquery": {"display_name": "Google BigQuery", "description": "Columnar data warehouse • Serverless • Petabyte-scale", "category": "cloud", "libraries": [{"name": "google.cloud.bigquery", "required": true, "import_name": "google.cloud.bigquery"}, {"name": "google.cloud.storage", "required": true, "import_name": "google.cloud.storage"}], "requirements": ["google-cloud-bigquery>=3.0.0", "google-cloud-storage>=2.0.0"], "installation_command": "uv add google-cloud-bigquery google-cloud-storage", "adoption": "mainstream", "supports": ["olap", "serverless", "petabyte_scale"], "driver_package": "google-cloud-bigquery", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "cost_class": "paid_credits"}, "support_status": "beta"},
-"databricks": {"display_name": "Databricks SQL", "description": "Lakehouse platform • Distributed • Spark-based", "category": "cloud", "libraries": [{"name": "databricks.sql", "required": true, "import_name": "databricks.sql"}], "requirements": ["databricks-sql-connector>=2.0.0"], "installation_command": "uv add databricks-sql-connector", "adoption": "mainstream", "supports": ["olap", "spark", "lakehouse"], "driver_package": "databricks-sql-connector", "capabilities": {"supports_sql": true, "supports_dataframe": true, "default_mode": "sql", "cost_class": "paid_credits"}, "support_status": "beta"},
-"databricks-df": {"display_name": "Databricks DataFrame", "description": "Databricks with PySpark DataFrame API • Databricks Connect", "category": "cloud", "libraries": [{"name": "databricks.sql", "required": true, "import_name": "databricks.sql"}, {"name": "databricks.connect", "required": true, "import_name": "databricks.connect"}], "requirements": ["databricks-sql-connector>=2.0.0", "databricks-connect>=14.0.0"], "installation_command": "uv add databricks-sql-connector databricks-connect", "adoption": "niche", "supports": ["olap", "spark", "lakehouse", "dataframe"], "driver_package": "databricks-connect", "capabilities": {"supports_sql": true, "supports_dataframe": true, "default_mode": "dataframe", "cost_class": "paid_credits"}, "support_status": "experimental"},
-"snowflake": {"display_name": "Snowflake", "description": "Columnar data warehouse • Serverless • Multi-cloud", "category": "cloud", "libraries": [{"name": "snowflake.connector", "required": true, "import_name": "snowflake.connector"}], "requirements": ["snowflake-connector-python>=3.0.0"], "installation_command": "uv add snowflake-connector-python", "adoption": "mainstream", "supports": ["olap", "serverless", "multi_cloud"], "driver_package": "snowflake-connector-python", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "cost_class": "paid_credits"}, "support_status": "beta"},
-"redshift": {"display_name": "Amazon Redshift", "description": "Columnar data warehouse • Distributed • AWS MPP", "category": "cloud", "libraries": [{"name": "redshift_connector", "required": true}, {"name": "boto3", "required": true}], "requirements": ["redshift-connector>=2.0.0", "boto3>=1.20.0"], "installation_command": "uv add redshift-connector boto3", "adoption": "established", "supports": ["olap", "columnar", "aws"], "driver_package": "redshift-connector", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "cost_class": "paid_compute"}, "support_status": "beta"},
-"trino": {"display_name": "Trino", "description": "Distributed SQL • Federated • Multi-source", "category": "distributed", "libraries": [{"name": "trino", "required": true}], "requirements": ["trino>=0.328.0"], "installation_command": "uv add trino", "adoption": "established", "supports": ["olap", "federated", "distributed"], "driver_package": "trino", "notes": "Supports Trino and Starburst Enterprise. For PrestoDB use presto-python-client. For AWS Athena use the athena adapter.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "trino", "default_deployment": "self-hosted", "deployment_modes": {"self-hosted": {"mode": "self-hosted", "display_name": "Trino Self-Hosted", "description": "Self-hosted Trino cluster", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["trino"], "auth_methods": ["password", "oauth"]}}}, "support_status": "beta"},
-"starburst": {"display_name": "Starburst", "description": "Managed Trino • Starburst Galaxy • Serverless", "category": "cloud", "libraries": [{"name": "trino", "required": true}], "requirements": ["trino>=0.328.0"], "installation_command": "uv add trino", "adoption": "emerging", "supports": ["olap", "federated", "distributed", "serverless", "cloud"], "driver_package": "trino", "notes": "Starburst Galaxy managed Trino service. Uses trino Python driver with HTTPS. For self-hosted Trino use the trino adapter.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "trino", "inherits_from": "trino", "cost_class": "paid_compute", "default_deployment": "managed", "deployment_modes": {"managed": {"mode": "managed", "display_name": "Starburst Galaxy", "description": "Starburst Galaxy managed Trino service", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["trino"], "auth_methods": ["password", "api_key"]}}}, "support_status": "beta"},
-"presto": {"display_name": "PrestoDB", "description": "Distributed SQL • Federated • Meta fork", "category": "distributed", "libraries": [{"name": "prestodb", "required": true, "import_name": "prestodb"}], "requirements": ["presto-python-client>=0.8.4"], "installation_command": "uv add presto-python-client", "adoption": "niche", "supports": ["olap", "federated", "distributed"], "driver_package": "presto-python-client", "notes": "Supports PrestoDB (Meta's fork) with X-Presto-* headers. For Trino/Starburst use the trino adapter. For AWS Athena use the athena adapter.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "default_deployment": "self-hosted", "deployment_modes": {"self-hosted": {"mode": "self-hosted", "display_name": "PrestoDB Self-Hosted", "description": "Self-hosted PrestoDB server", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["prestodb"], "auth_methods": ["password"]}}}, "support_status": "beta"},
-"postgresql": {"display_name": "PostgreSQL", "description": "Relational database • COPY loading", "category": "relational", "libraries": [{"name": "psycopg", "required": true}], "requirements": ["psycopg[binary]>=3.1"], "installation_command": "uv add 'psycopg[binary]'", "adoption": "established", "supports": ["olap", "oltp", "relational"], "driver_package": "psycopg", "notes": "Supports PostgreSQL 12+. COPY-based bulk loading. For time-series workloads use timescaledb.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "default_deployment": "self-hosted", "deployment_modes": {"self-hosted": {"mode": "self-hosted", "display_name": "PostgreSQL Self-Hosted", "description": "Self-hosted PostgreSQL server", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["psycopg"], "auth_methods": ["password"]}}}, "support_status": "beta"},
-"timescaledb": {"display_name": "TimescaleDB", "description": "Time-series database • Hypertables • Compression", "category": "timeseries", "libraries": [{"name": "psycopg", "required": true}], "requirements": ["psycopg[binary]>=3.1"], "installation_command": "uv add 'psycopg[binary]'", "adoption": "niche", "supports": ["timeseries", "olap", "compression"], "driver_package": "psycopg", "notes": "PostgreSQL extension for time-series. Automatic hypertables, compression policies. Requires TimescaleDB 2.x on server.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "timescaledb", "default_deployment": "self-hosted", "deployment_modes": {"self-hosted": {"mode": "self-hosted", "display_name": "TimescaleDB Self-Hosted", "description": "Self-hosted TimescaleDB server", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["psycopg[binary]"], "auth_methods": ["password"]}, "cloud": {"mode": "managed", "display_name": "TigerData", "description": "TigerData managed PostgreSQL service", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": false, "dependencies": ["psycopg[binary]"], "auth_methods": ["password"]}}}, "support_status": "beta"},
-"pg-mooncake": {"display_name": "pg_mooncake", "description": "Columnstore PostgreSQL • Parquet/Iceberg • DuckDB Execution", "category": "olap", "libraries": [{"name": "psycopg", "required": true}], "requirements": ["psycopg[binary]>=3.1"], "installation_command": "uv add 'psycopg[binary]'", "adoption": "emerging", "supports": ["olap", "columnstore", "analytics"], "driver_package": "psycopg", "notes": "PostgreSQL extension adding native columnstore tables (Parquet/Iceberg) with DuckDB execution. Requires pg_mooncake on server. Conflicts with standalone pg_duckdb (shared libduckdb.so).", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "pg_mooncake", "conflicts_with": ["pg-duckdb"], "default_deployment": "self-hosted", "deployment_modes": {"self-hosted": {"mode": "self-hosted", "display_name": "pg_mooncake Self-Hosted", "description": "Self-hosted PostgreSQL with pg_mooncake extension", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["psycopg[binary]"], "auth_methods": ["password"]}}}, "support_status": "experimental"},
-"cedardb": {"display_name": "CedarDB", "description": "High-performance OLAP/OLTP • PostgreSQL-compatible • Formerly Umbra", "category": "olap", "libraries": [{"name": "psycopg", "required": true}], "requirements": ["psycopg[binary]>=3.1"], "installation_command": "uv add 'psycopg[binary]'", "adoption": "emerging", "supports": ["olap", "oltp", "relational"], "driver_package": "psycopg", "notes": "CedarDB (formerly Umbra) is a standalone RDBMS with PostgreSQL wire protocol compatibility. Not a PostgreSQL extension - connects via standard psycopg3 (psycopg) drivers.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "cedardb", "default_deployment": "self-hosted", "deployment_modes": {"self-hosted": {"mode": "self-hosted", "display_name": "CedarDB Self-Hosted", "description": "Self-hosted CedarDB server", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["psycopg[binary]"], "auth_methods": ["password"]}}}, "support_status": "experimental"},
-"pg-duckdb": {"display_name": "pg_duckdb", "description": "DuckDB-accelerated PostgreSQL • Vectorized OLAP • MotherDuck", "category": "olap", "libraries": [{"name": "psycopg", "required": true}], "requirements": ["psycopg[binary]>=3.1"], "installation_command": "uv add 'psycopg[binary]'", "adoption": "emerging", "supports": ["olap", "analytics"], "driver_package": "psycopg", "notes": "PostgreSQL extension embedding DuckDB vectorized execution. Requires pg_duckdb 1.0+ on server. Conflicts with pg_mooncake (shared libduckdb.so).", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "pg_duckdb", "conflicts_with": ["pg-mooncake"], "cost_class": "paid_credits", "default_deployment": "self-hosted", "deployment_modes": {"self-hosted": {"mode": "self-hosted", "display_name": "pg_duckdb Self-Hosted", "description": "Self-hosted PostgreSQL with pg_duckdb extension", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["psycopg[binary]"], "auth_methods": ["password"]}, "motherduck": {"mode": "managed", "display_name": "pg_duckdb + MotherDuck", "description": "pg_duckdb with MotherDuck cloud offload for hybrid queries", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": false, "dependencies": ["psycopg[binary]"], "auth_methods": ["token"]}}}, "support_status": "experimental"},
-"synapse": {"display_name": "Azure Synapse Analytics", "description": "Cloud data warehouse • Dedicated SQL Pool • Azure MPP", "category": "cloud", "libraries": [{"name": "pyodbc", "required": true}, {"name": "azure.storage.blob", "required": false, "import_name": "azure.storage.blob"}, {"name": "azure.identity", "required": false, "import_name": "azure.identity"}], "requirements": ["pyodbc>=4.0.0"], "installation_command": "uv add pyodbc azure-storage-blob azure-identity", "adoption": "established", "supports": ["olap", "columnar", "azure", "distributed"], "driver_package": "pyodbc", "notes": "Supports Azure Synapse Dedicated SQL Pools. COPY INTO for bulk loading. T-SQL dialect.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "cost_class": "paid_compute"}, "support_status": "beta"},
-"fabric_dw": {"display_name": "Microsoft Fabric Warehouse", "description": "Microsoft Fabric Warehouse • OneLake • Delta Lake native", "category": "cloud", "libraries": [{"name": "pyodbc", "required": true}, {"name": "azure.identity", "required": true, "import_name": "azure.identity"}, {"name": "azure.storage.filedatalake", "required": false, "import_name": "azure.storage.filedatalake"}], "requirements": ["pyodbc>=4.0.0", "azure-identity>=1.15.0"], "installation_command": "uv add pyodbc azure-identity azure-storage-file-datalake", "adoption": "niche", "supports": ["olap", "columnar", "azure", "delta_lake", "onelake"], "driver_package": "pyodbc", "notes": "Supports Fabric Warehouse only (not Lakehouse). Entra ID auth only. OneLake + COPY INTO for bulk loading. T-SQL dialect (subset).", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "cost_class": "paid_compute"}, "support_status": "beta"},
-"firebolt": {"display_name": "Firebolt", "description": "Vectorized analytics • Local/Cloud • PG-wire", "category": "cloud", "libraries": [{"name": "firebolt.db", "required": true, "import_name": "firebolt.db"}], "requirements": ["firebolt-sdk>=1.18.0"], "installation_command": "uv add firebolt-sdk", "adoption": "emerging", "supports": ["olap", "vectorized", "columnar", "local", "cloud"], "driver_package": "firebolt-sdk", "notes": "Supports Firebolt Core (free, local Docker) and Firebolt Cloud. PostgreSQL-compatible SQL dialect. Vectorized query execution optimized for analytics.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "firebolt", "cost_class": "paid_compute", "default_deployment": "core", "deployment_modes": {"core": {"mode": "local", "display_name": "Firebolt Core", "description": "Free local Firebolt via Docker container", "requires_credentials": false, "requires_cloud_storage": false, "requires_network": false, "default_for_platform": true, "dependencies": ["firebolt-sdk"], "auth_methods": []}, "cloud": {"mode": "managed", "display_name": "Firebolt Cloud", "description": "Firebolt Cloud managed service", "requires_credentials": true, "requires_cloud_storage": true, "requires_network": true, "default_for_platform": false, "dependencies": ["firebolt-sdk"], "auth_methods": ["oauth", "service_account"]}}}, "support_status": "beta"},
-"starrocks": {"display_name": "StarRocks", "description": "Columnar analytics engine • Distributed • Fast OLAP", "category": "analytical", "libraries": [{"name": "pymysql", "required": true, "import_name": "pymysql"}], "requirements": ["pymysql>=1.1.0"], "installation_command": "uv add pymysql", "adoption": "emerging", "supports": ["olap", "columnar", "distributed", "mpp"], "driver_package": "pymysql", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "starrocks", "default_deployment": "self-hosted", "deployment_modes": {"self-hosted": {"mode": "self-hosted", "display_name": "StarRocks Self-Hosted", "description": "Self-hosted StarRocks cluster", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["pymysql"], "auth_methods": ["password"]}}}, "support_status": "beta"},
-"databend": {"display_name": "Databend", "description": "Cloud-native OLAP • Rust • Snowflake-compatible", "category": "cloud", "libraries": [{"name": "databend_driver", "required": true, "import_name": "databend_driver"}], "requirements": ["databend-driver>=0.28.0"], "installation_command": "uv add databend-driver", "adoption": "emerging", "supports": ["olap", "cloud", "columnar", "object_storage", "snowflake_compatible"], "driver_package": "databend-driver", "notes": "Cloud-native Rust-based data warehouse with Snowflake-compatible SQL. Compute/storage separation on object storage (S3, GCS, Azure Blob). Uses Snowflake dialect as sqlglot translation proxy.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "databend", "cost_class": "paid_compute", "default_deployment": "cloud", "deployment_modes": {"cloud": {"mode": "managed", "display_name": "Databend Cloud", "description": "Databend Cloud managed service", "requires_credentials": true, "requires_cloud_storage": true, "requires_network": true, "default_for_platform": true, "dependencies": ["databend-driver"], "auth_methods": ["password"]}, "self-hosted": {"mode": "self-hosted", "display_name": "Databend Self-Hosted", "description": "User-managed Databend cluster with object storage", "requires_credentials": true, "requires_cloud_storage": true, "requires_network": true, "default_for_platform": false, "dependencies": ["databend-driver"], "auth_methods": ["password"]}}}, "support_status": "beta"},
-"doris": {"display_name": "Apache Doris", "description": "MPP OLAP • Real-time analytics • MySQL protocol", "category": "distributed", "libraries": [{"name": "pymysql", "required": true}], "requirements": ["pymysql>=1.0.0"], "installation_command": "uv add pymysql", "adoption": "emerging", "supports": ["olap", "mpp", "columnar", "real-time", "vectorized"], "driver_package": "pymysql", "notes": "Apache Doris 2.0+ with vectorized execution. MySQL protocol on port 9030, Stream Load on port 8030. SQLGlot 'doris' dialect.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "doris", "default_deployment": "self-hosted", "deployment_modes": {"self-hosted": {"mode": "self-hosted", "display_name": "Apache Doris Self-Hosted", "description": "Self-hosted Apache Doris cluster", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["pymysql"], "auth_methods": ["password"]}}}, "support_status": "beta"},
-"singlestore": {"display_name": "SingleStore", "description": "Distributed SQL • Real-time analytics • MySQL protocol", "category": "distributed", "libraries": [{"name": "singlestoredb", "required": true, "import_name": "singlestoredb"}], "requirements": ["singlestoredb>=1.0.0"], "installation_command": "uv add singlestoredb", "adoption": "emerging", "supports": ["olap", "htap", "distributed", "columnstore", "real-time", "mysql-compatible"], "driver_package": "singlestoredb", "notes": "SingleStore 8.0+ with columnstore analytics. MySQL wire protocol on port 3306. SQLGlot 'mysql' dialect. Supports both Helios (cloud) and self-managed deployments.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "singlestore", "cost_class": "paid_compute", "default_deployment": "self-hosted", "deployment_modes": {"self-hosted": {"mode": "self-hosted", "display_name": "SingleStore Self-Managed", "description": "Self-managed SingleStore cluster", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["singlestoredb"], "auth_methods": ["password"]}, "cloud": {"mode": "managed", "display_name": "SingleStore Helios", "description": "SingleStore Helios managed cloud service", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": false, "dependencies": ["singlestoredb"], "auth_methods": ["password"]}}}, "support_status": "beta"},
-"influxdb": {"display_name": "InfluxDB", "description": "Time series database • FlightSQL • Arrow-native", "category": "timeseries", "libraries": [{"name": "influxdb3", "required": true, "import_name": "influxdb3"}, {"name": "flightsql", "required": false, "alternative": true, "import_name": "flightsql"}], "requirements": ["influxdb3-python>=0.1.0"], "installation_command": "uv add influxdb3-python", "adoption": "niche", "supports": ["timeseries", "olap", "arrow", "flightsql"], "driver_package": "influxdb3-python", "notes": "InfluxDB 3.x time series database with native SQL support via FlightSQL. Built on Apache Arrow, DataFusion, and Parquet. Optimized for TSBS DevOps workloads.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "default_deployment": "self-hosted", "deployment_modes": {"self-hosted": {"mode": "self-hosted", "display_name": "InfluxDB Self-Hosted", "description": "Self-hosted InfluxDB server", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["influxdb3"], "auth_methods": ["password"]}}}, "support_status": "beta"},
-"questdb": {"display_name": "QuestDB", "description": "Time-series database • PG wire protocol • High-performance ingestion", "category": "timeseries", "libraries": [{"name": "psycopg", "required": true}, {"name": "requests", "required": true}], "requirements": ["psycopg[binary]>=3.1", "requests>=2.28.0"], "installation_command": "uv add benchbox --extra questdb", "adoption": "emerging", "supports": ["timeseries", "olap", "columnar", "high_throughput"], "driver_package": "psycopg", "notes": "QuestDB 7.0+ time-series database. PostgreSQL wire protocol for queries, REST API for data import. Optimized for fast ingestion and time-series analytics.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "questdb", "default_deployment": "self-hosted", "deployment_modes": {"self-hosted": {"mode": "self-hosted", "display_name": "QuestDB Self-Hosted", "description": "Self-hosted QuestDB server (Docker recommended)", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["psycopg[binary]"], "auth_methods": ["password"]}}, "unsupported_benchmarks": {"vector_search": "QuestDB 9.3.4 has no VECTOR column type. Schema creation fails immediately. No fix planned: requires QuestDB to add native vector support."}}, "support_status": "beta"},
-"athena": {"display_name": "Amazon Athena", "description": "Serverless SQL • S3 data lake • Pay-per-query", "category": "cloud", "libraries": [{"name": "pyathena", "required": true}, {"name": "boto3", "required": true}], "requirements": ["pyathena>=3.0.0", "boto3>=1.20.0"], "installation_command": "uv add pyathena boto3", "adoption": "established", "supports": ["olap", "serverless", "s3", "data_lake"], "driver_package": "pyathena", "notes": "AWS serverless query service using Trino under the hood. Pay-per-query pricing ($5/TB scanned). Native S3 and Glue Data Catalog integration.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "cost_class": "paid_credits"}, "support_status": "beta"},
-"glue": {"display_name": "AWS Glue", "description": "Managed Spark • Serverless ETL • Pay-per-DPU", "category": "cloud", "libraries": [{"name": "boto3", "required": true}], "requirements": ["boto3>=1.34.0"], "installation_command": "uv add boto3", "adoption": "niche", "supports": ["olap", "serverless", "spark", "etl", "s3"], "driver_package": "boto3", "notes": "AWS managed Spark ETL service. Pay-per-DPU pricing (~$0.44/DPU-hour). Uses Glue Data Catalog for metadata. Supports both SQL and DataFrame execution modes.", "capabilities": {"supports_sql": true, "supports_dataframe": true, "default_mode": "sql", "cost_class": "paid_compute"}, "support_status": "experimental"},
-"emr-serverless": {"display_name": "Amazon EMR Serverless", "description": "Serverless Spark • Sub-second startup • Pay-per-use", "category": "cloud", "libraries": [{"name": "boto3", "required": true}], "requirements": ["boto3>=1.34.0"], "installation_command": "uv add boto3", "adoption": "niche", "supports": ["olap", "serverless", "spark", "s3"], "driver_package": "boto3", "notes": "AWS serverless Spark with automatic scaling and sub-second startup. Pay per vCPU-hour and memory-GB-hour. Uses Glue Data Catalog for metadata.", "capabilities": {"supports_sql": true, "supports_dataframe": true, "default_mode": "sql", "cost_class": "paid_compute"}, "support_status": "experimental"},
-"athena-spark": {"display_name": "Amazon Athena for Apache Spark", "description": "Interactive Spark • Sub-second startup • Session-based", "category": "cloud", "libraries": [{"name": "boto3", "required": true}], "requirements": ["boto3>=1.34.0"], "installation_command": "uv add boto3", "adoption": "niche", "supports": ["olap", "interactive", "spark", "s3", "sessions"], "driver_package": "boto3", "notes": "AWS interactive Spark with notebook-style sessions. Sub-second startup with pre-provisioned capacity. Uses Glue Data Catalog for metadata. Pay per DPU-hour.", "capabilities": {"supports_sql": true, "supports_dataframe": true, "default_mode": "sql", "cost_class": "paid_compute"}, "support_status": "experimental"},
-"dataproc": {"display_name": "Google Cloud Dataproc", "description": "Managed Spark • Google Cloud clusters • Per-second billing", "category": "cloud", "libraries": [{"name": "google-cloud-dataproc", "required": true}, {"name": "google-cloud-storage", "required": true}], "requirements": ["google-cloud-dataproc>=5.0.0", "google-cloud-storage>=2.0.0"], "installation_command": "uv add google-cloud-dataproc google-cloud-storage", "adoption": "niche", "supports": ["olap", "spark", "cluster", "gcs", "hive"], "driver_package": "google-cloud-dataproc", "notes": "Google Cloud managed Spark service. Per-second billing with preemptible VM support. Supports persistent and ephemeral clusters. Uses Hive Metastore for table metadata.", "capabilities": {"supports_sql": true, "supports_dataframe": true, "default_mode": "sql", "cost_class": "paid_compute"}, "support_status": "experimental"},
-"dataproc-serverless": {"display_name": "Google Cloud Dataproc Serverless", "description": "Serverless Spark • No cluster management • Auto-scaling", "category": "cloud", "libraries": [{"name": "google-cloud-dataproc", "required": true}, {"name": "google-cloud-storage", "required": true}], "requirements": ["google-cloud-dataproc>=5.0.0", "google-cloud-storage>=2.0.0"], "installation_command": "uv add google-cloud-dataproc google-cloud-storage", "adoption": "niche", "supports": ["olap", "spark", "serverless", "gcs", "hive"], "driver_package": "google-cloud-dataproc", "notes": "Google Cloud Dataproc Serverless for fully managed Spark. No cluster management required. Sub-minute startup, auto-scaling, per-second billing. Uses Batch Controller API.", "capabilities": {"supports_sql": true, "supports_dataframe": true, "default_mode": "sql", "cost_class": "paid_compute"}, "support_status": "experimental"},
-"fabric-spark": {"display_name": "Microsoft Fabric Spark", "description": "SaaS Spark • OneLake storage • Entra ID auth", "category": "cloud", "libraries": [{"name": "azure-identity", "required": true}, {"name": "azure-storage-file-datalake", "required": true}, {"name": "requests", "required": true}], "requirements": ["azure-identity>=1.15.0", "azure-storage-file-datalake>=12.14.0", "requests>=2.31.0"], "installation_command": "uv add azure-identity azure-storage-file-datalake requests", "adoption": "niche", "supports": ["olap", "spark", "saas", "delta", "onelake"], "driver_package": "azure-identity", "notes": "Microsoft Fabric SaaS Spark with OneLake storage. Uses Livy API for session management. Entra ID (Azure AD) authentication. Capacity Units billing model.", "capabilities": {"supports_sql": true, "supports_dataframe": true, "default_mode": "sql", "cost_class": "paid_compute"}, "support_status": "experimental"},
-"fabric-lakehouse": {"display_name": "Microsoft Fabric Lakehouse SQL", "description": "Read-only T-SQL endpoint • Lakehouse analytics", "category": "cloud", "libraries": [{"name": "pyodbc", "required": true}, {"name": "azure-identity", "required": true}], "requirements": ["pyodbc>=4.0.39", "azure-identity>=1.15.0"], "installation_command": "uv add benchbox --extra fabric", "adoption": "niche", "supports": ["olap", "cloud", "read_only", "delta", "onelake"], "driver_package": "pyodbc", "notes": "Fabric Lakehouse SQL Analytics Endpoint is read-only. Use fabric-spark for generate/load phases and fabric-lakehouse for query phases.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "cost_class": "paid_compute"}, "support_status": "beta"},
-"synapse-spark": {"display_name": "Azure Synapse Analytics Spark", "description": "Enterprise Spark • ADLS Gen2 • Spark pools", "category": "cloud", "libraries": [{"name": "azure-identity", "required": true}, {"name": "azure-storage-file-datalake", "required": true}, {"name": "requests", "required": true}], "requirements": ["azure-identity>=1.15.0", "azure-storage-file-datalake>=12.14.0", "requests>=2.31.0"], "installation_command": "uv add azure-identity azure-storage-file-datalake requests", "adoption": "niche", "supports": ["olap", "spark", "enterprise", "adls", "hive"], "driver_package": "azure-identity", "notes": "Azure Synapse Analytics Spark with ADLS Gen2 storage. Uses Livy API for session management. vCore-hour billing. Supports external Hive Metastore.", "capabilities": {"supports_sql": true, "supports_dataframe": true, "default_mode": "sql", "cost_class": "paid_compute"}, "support_status": "experimental"},
-"spark": {"display_name": "Apache Spark", "description": "Distributed SQL • Local/cluster • Spark engine", "category": "distributed", "libraries": [{"name": "pyspark", "required": true}], "requirements": ["pyspark>=3.5.0"], "installation_command": "uv add pyspark", "adoption": "mainstream", "supports": ["olap", "distributed", "spark", "batch"], "driver_package": "pyspark", "notes": "Apache Spark distributed SQL engine. Supports local, standalone, YARN, and Kubernetes modes. Use 'pyspark' for DataFrame API benchmarking.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql"}, "support_status": "beta"},
-"velox": {"display_name": "Apache Gluten + Velox", "description": "Spark SQL • Native C++ acceleration • Gluten plugin", "category": "distributed", "libraries": [{"name": "pyspark", "required": true}], "requirements": ["pyspark>=3.5.0"], "installation_command": "uv add benchbox --extra velox", "adoption": "emerging", "supports": ["olap", "distributed", "spark", "native", "accelerated", "batch"], "driver_package": "pyspark", "notes": "Apache Gluten + Velox accelerates Spark SQL by offloading physical operators to a vectorized C++ engine. Requires the Gluten bundle jar on the execution host. Linux only for local mode; Docker is the primary path on macOS/Windows. See docs/platforms/velox.md and docker/velox/.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "spark", "default_deployment": "local", "deployment_modes": {"local": {"mode": "local", "display_name": "Velox Local", "description": "SparkSession with Gluten jar on local Linux host (or Docker container)", "requires_credentials": false, "requires_cloud_storage": false, "requires_network": false, "default_for_platform": true, "dependencies": ["pyspark"], "auth_methods": []}, "remote": {"mode": "self-hosted", "display_name": "Velox Remote", "description": "Connect to a pre-started Spark-Connect server with Gluten wired", "requires_credentials": false, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": false, "dependencies": ["pyspark"], "auth_methods": []}}}, "support_status": "experimental"},
-"lakesail": {"display_name": "LakeSail Sail", "description": "Spark-compatible SQL • Rust/DataFusion • Spark Connect", "category": "analytical", "libraries": [{"name": "pyspark", "required": true}], "requirements": ["pyspark>=3.4.0"], "installation_command": "uv add pyspark", "adoption": "emerging", "supports": ["olap", "spark_compatible", "datafusion", "rust", "batch"], "driver_package": "pyspark", "notes": "LakeSail Sail is a Rust-based drop-in Spark replacement built on DataFusion. Connects via Spark Connect protocol using standard PySpark client. 4x faster than Apache Spark on TPC-H SF100.", "capabilities": {"supports_sql": true, "supports_dataframe": true, "default_mode": "sql", "platform_family": "spark", "default_deployment": "local", "deployment_modes": {"local": {"mode": "local", "display_name": "LakeSail Local", "description": "Single-node multi-threaded execution", "requires_credentials": false, "requires_cloud_storage": false, "requires_network": false, "default_for_platform": true, "dependencies": ["pyspark"], "auth_methods": []}, "distributed": {"mode": "self-hosted", "display_name": "LakeSail Distributed", "description": "Distributed cluster of Rust workers", "requires_credentials": false, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": false, "dependencies": ["pyspark"], "auth_methods": []}}}, "support_status": "experimental"},
-"snowpark-connect": {"display_name": "Snowpark Connect for Spark", "description": "PySpark API • Snowflake native • No cluster required", "category": "cloud", "libraries": [{"name": "snowflake.snowpark", "required": true, "import_name": "snowflake.snowpark"}], "requirements": ["snowflake-snowpark-python>=1.20.0"], "installation_command": "uv add snowflake-snowpark-python", "adoption": "niche", "supports": ["olap", "pyspark_compatible", "snowflake", "dataframe"], "driver_package": "snowflake-snowpark-python", "notes": "PySpark DataFrame API compatibility layer on Snowflake. NOT Apache Spark - translates DataFrame operations to Snowflake SQL. No Spark cluster required.", "capabilities": {"supports_sql": true, "supports_dataframe": true, "default_mode": "dataframe", "cost_class": "paid_credits"}, "support_status": "experimental"},
-"quanton": {"display_name": "Onehouse Quanton", "description": "Serverless Spark • Hudi/Iceberg/Delta • 2-3x faster", "category": "cloud", "libraries": [{"name": "requests", "required": true}, {"name": "boto3", "required": true}], "requirements": ["requests>=2.31.0", "boto3>=1.34.0"], "installation_command": "uv add requests boto3", "adoption": "emerging", "supports": ["olap", "serverless", "spark", "hudi", "iceberg", "delta", "s3", "lakehouse"], "driver_package": "requests", "notes": "Onehouse Quanton serverless Spark. Multi-table-format support (Hudi, Iceberg, Delta). XTable cross-format metadata translation. 2-3x better price-performance than EMR/Databricks.", "capabilities": {"supports_sql": true, "supports_dataframe": true, "default_mode": "sql", "platform_family": "spark", "cost_class": "paid_compute", "default_deployment": "managed", "deployment_modes": {"managed": {"mode": "managed", "display_name": "Onehouse Quanton", "description": "Serverless managed Spark on Onehouse", "requires_credentials": true, "requires_cloud_storage": true, "requires_network": true, "default_for_platform": true, "dependencies": ["requests", "boto3"], "auth_methods": ["api_key"]}}}, "support_status": "experimental"},
-"pandas": {"display_name": "Pandas", "description": "Python DataFrame library • In-memory • Single-node", "category": "dataframe", "libraries": [{"name": "pandas", "required": true}], "requirements": ["pandas>=2.0.0"], "installation_command": "uv add pandas", "adoption": "emerging", "supports": ["dataframe", "in_memory"], "driver_package": null, "capabilities": {"supports_sql": false, "supports_dataframe": true, "default_mode": "dataframe"}, "support_status": "stable"},
-"modin": {"display_name": "Modin", "description": "Distributed Pandas • Ray/Dask backend • Drop-in", "category": "dataframe", "libraries": [{"name": "modin", "required": true}], "requirements": ["modin[ray]>=0.28.0"], "installation_command": "uv add modin[ray]", "adoption": "niche", "supports": ["dataframe", "distributed"], "driver_package": null, "capabilities": {"supports_sql": false, "supports_dataframe": true, "default_mode": "dataframe"}, "support_status": "experimental"},
-"cudf": {"display_name": "cuDF", "description": "GPU DataFrame • NVIDIA RAPIDS • CUDA required", "category": "dataframe", "libraries": [{"name": "cudf", "required": true}], "requirements": ["cudf-cu12>=24.0.0"], "installation_command": "pip install cudf-cu12 (requires NVIDIA GPU)", "adoption": "niche", "supports": ["dataframe", "gpu"], "driver_package": null, "capabilities": {"supports_sql": false, "supports_dataframe": true, "default_mode": "dataframe"}, "support_status": "experimental"},
-"dask": {"display_name": "Dask", "description": "Distributed DataFrame • Lazy eval • Cluster-scale", "category": "dataframe", "libraries": [{"name": "dask", "required": true}], "requirements": ["dask[distributed]>=2024.0.0"], "installation_command": "uv add dask[distributed]", "adoption": "niche", "supports": ["dataframe", "distributed", "lazy"], "driver_package": null, "capabilities": {"supports_sql": false, "supports_dataframe": true, "default_mode": "dataframe"}, "support_status": "beta"},
-"pyspark": {"display_name": "PySpark", "description": "Spark DataFrame API • Distributed • Java 17+", "category": "dataframe", "libraries": [{"name": "pyspark", "required": true}], "requirements": ["pyspark>=3.5.0"], "installation_command": "uv add pyspark", "adoption": "established", "supports": ["dataframe", "distributed", "spark"], "driver_package": null, "notes": "Requires Java 17 or 21. Java 23+ not supported by PySpark 4.x.", "capabilities": {"supports_sql": true, "supports_dataframe": true, "default_mode": "dataframe", "platform_family": "spark", "default_deployment": "local", "deployment_modes": {"local": {"mode": "local", "display_name": "PySpark Local", "description": "Local PySpark with single-node Spark", "requires_credentials": false, "requires_cloud_storage": false, "requires_network": false, "default_for_platform": true, "dependencies": ["pyspark"], "auth_methods": []}}}, "support_status": "beta"}
-}"""
-
-
-def _load_platform_metadata() -> dict[str, dict[str, Any]]:
-    data = json.loads(_PLATFORM_METADATA_JSON)
-    if not isinstance(data, dict):
-        raise ValueError("platform metadata payload must contain a mapping")
-    return data
 
 
 @dataclass(frozen=True)
@@ -270,10 +160,10 @@ class PlatformCapability:
 class PlatformRegistry:
     """Registry for platform adapters with factory functionality.
 
-    This is the single source of truth for platform definitions, metadata,
-    and adapter registration. The get_platform_adapter() function in
-    benchbox/platforms/__init__.py delegates to this registry for adapter
-    lookup while handling CLI-specific concerns like error messages.
+    Static definitions are projected from ``benchbox.core.platform_manifest``.
+    This class owns runtime adapter state and factory behavior. The
+    get_platform_adapter() function in benchbox/platforms/__init__.py delegates
+    to this registry for adapter lookup while handling CLI-specific concerns.
 
     Alias Support:
         Platform aliases (e.g., 'sqlite3' -> 'sqlite') are resolved via
@@ -285,21 +175,7 @@ class PlatformRegistry:
     _availability_cache: Optional[dict[str, bool]] = None
     _platform_metadata: dict[str, dict[str, Any]] = {}
     _auto_registered: bool = False
-    _self_hosted_deployment_platforms: tuple[str, ...] = (
-        "clickhouse-server",
-        "postgresql",
-        "presto",
-        "influxdb",
-    )
-
-    # Platform name aliases mapping user-friendly names to canonical names
-    _platform_aliases: dict[str, str] = {
-        "sqlite3": "sqlite",
-        "azure_synapse": "synapse",
-        "fabric_lakehouse": "fabric-lakehouse",
-        # Fabric Warehouse: hyphen form is preferred CLI key; underscore form is legacy
-        "fabric-dw": "fabric_dw",
-    }
+    _platform_aliases: dict[str, str] = get_platform_aliases("registry")
 
     @classmethod
     def resolve_platform_name(cls, platform_name: str) -> str:
@@ -341,68 +217,8 @@ class PlatformRegistry:
 
     @classmethod
     def _build_platform_metadata(cls) -> dict[str, dict[str, Any]]:
-        """Build comprehensive platform metadata registry."""
-        metadata = _load_platform_metadata()
-        cls._apply_self_hosted_deployment_defaults(metadata)
-        cls._apply_support_status(metadata)
-        return metadata
-
-    @classmethod
-    def _apply_self_hosted_deployment_defaults(cls, metadata: dict[str, dict[str, Any]]) -> None:
-        """Add explicit self-hosted deployment metadata for server-style platforms."""
-        for platform_name in cls._self_hosted_deployment_platforms:
-            spec = metadata.get(platform_name)
-            if spec is None:
-                continue
-            caps = spec.setdefault("capabilities", {})
-            caps.setdefault("default_deployment", "self-hosted")
-            deployment_modes = caps.setdefault("deployment_modes", {})
-            deployment_modes.setdefault(
-                "self-hosted",
-                {
-                    "mode": "self-hosted",
-                    "display_name": f"{spec['display_name']} Self-Hosted",
-                    "description": f"Self-hosted {spec['display_name']} server",
-                    "requires_credentials": True,
-                    "requires_cloud_storage": False,
-                    "requires_network": True,
-                    "default_for_platform": True,
-                    "dependencies": [lib["name"] for lib in spec.get("libraries", []) if lib.get("required")],
-                    "auth_methods": ["password"],
-                },
-            )
-
-        velox = metadata.get("velox", {}).get("capabilities", {}).get("deployment_modes", {}).get("remote")
-        if velox is not None:
-            velox["mode"] = "self-hosted"
-
-    @staticmethod
-    def _apply_support_status(metadata: dict[str, dict[str, Any]]) -> None:
-        """Attach and validate product support status for every platform."""
-        missing = sorted(set(metadata) - set(_PLATFORM_SUPPORT_STATUS))
-        orphaned = sorted(set(_PLATFORM_SUPPORT_STATUS) - set(metadata))
-        invalid = sorted(
-            name for name, status in _PLATFORM_SUPPORT_STATUS.items() if status not in SUPPORT_STATUS_VALUES
-        )
-        if missing or orphaned or invalid:
-            details = []
-            if missing:
-                details.append(f"missing support_status for: {', '.join(missing)}")
-            if orphaned:
-                details.append(f"support_status entries without metadata: {', '.join(orphaned)}")
-            if invalid:
-                details.append(f"invalid support_status entries: {', '.join(invalid)}")
-            raise ValueError("Invalid platform support_status metadata: " + "; ".join(details))
-
-        for platform_name, platform_spec in metadata.items():
-            existing = platform_spec.get("support_status")
-            status = _PLATFORM_SUPPORT_STATUS[platform_name]
-            if existing is not None and existing != status:
-                raise ValueError(
-                    f"Platform {platform_name!r} has conflicting support_status values: "
-                    f"{existing!r} in metadata and {status!r} in registry map"
-                )
-            platform_spec["support_status"] = status
+        """Build mutable legacy metadata from the typed manifest authority."""
+        return get_platform_metadata()
 
     @classmethod
     def _ensure_registered(cls) -> None:
@@ -419,13 +235,30 @@ class PlatformRegistry:
 
     @classmethod
     def register_adapter(cls, platform_name: str, adapter_class: type[PlatformAdapter]) -> None:
-        """Register a platform adapter class.
+        """Register a built-in or third-party adapter under a canonical key.
 
         Args:
             platform_name: Name of the platform (e.g., 'duckdb', 'databricks')
             adapter_class: Platform adapter class
         """
-        cls._adapters[platform_name] = adapter_class
+        normalized = platform_name.lower()
+        if not is_valid_platform_key(normalized):
+            raise ValueError(f"Platform {platform_name!r} is not a valid canonical adapter key")
+        if normalized in get_all_platform_aliases():
+            raise ValueError(f"Platform alias {platform_name!r} cannot be used as an adapter registration key")
+        canonical_name = normalized
+        entry = get_platform_manifest_entry(canonical_name)
+        if entry is not None and entry.adapter is None:
+            raise ValueError(f"Built-in platform {platform_name!r} has no runtime adapter registration")
+        if not isinstance(adapter_class, type) or not issubclass(adapter_class, PlatformAdapter):
+            raise TypeError(f"Adapter registered for {canonical_name!r} must subclass PlatformAdapter")
+
+        existing = cls._adapters.get(canonical_name)
+        if existing is not None and existing is not adapter_class:
+            raise ValueError(
+                f"Platform {canonical_name!r} is already registered with {existing.__module__}.{existing.__name__}"
+            )
+        cls._adapters[canonical_name] = adapter_class
         # Clear availability cache when new adapter is registered
         cls._availability_cache = None
         # Initialize metadata if not present
@@ -643,11 +476,12 @@ class PlatformRegistry:
             libraries=libraries,
             available=available,
             enabled=available and canonical_name in cls._adapters,
-            requirements=platform_spec["requirements"],
+            requirements=deepcopy(platform_spec["requirements"]),
             installation_command=platform_spec["installation_command"],
             adoption=platform_spec.get("adoption", "niche"),
+            support_status=platform_spec.get("support_status"),
             category=platform_spec.get("category", "database"),
-            supports=platform_spec.get("supports", []),
+            supports=deepcopy(platform_spec.get("supports", [])),
             driver_package=driver_package,
         )
 
@@ -761,6 +595,9 @@ class PlatformRegistry:
                 "gs://my-bucket/benchbox/data",
             ],
             "snowflake": [
+                # User stage first: it is what the credential prompt defaults to
+                # and needs no cloud-storage setup.
+                SNOWFLAKE_DEFAULT_OUTPUT_LOCATION,
                 "s3://my-bucket/benchbox/data",
                 "azure://my-container/benchbox/data",
                 "gcs://my-bucket/benchbox/data",
@@ -782,20 +619,30 @@ class PlatformRegistry:
         cls._availability_cache = None
 
     @classmethod
-    def get_all_platform_metadata(cls) -> dict[str, dict[str, Any]]:
-        """Get all platform metadata for CLI use.
-
-        Returns:
-            Dictionary mapping platform names to their metadata
-        """
+    def _get_cached_platform_metadata(cls) -> dict[str, dict[str, Any]]:
+        """Return the internal metadata cache for read-only registry decisions."""
         if not cls._platform_metadata:
             cls._platform_metadata = cls._build_platform_metadata()
-        return cls._platform_metadata.copy()
+        return cls._platform_metadata
+
+    @classmethod
+    def get_all_platform_metadata(cls) -> dict[str, dict[str, Any]]:
+        """Get a fully isolated mutable copy of all platform metadata.
+
+        Returns:
+            Dictionary mapping platform names to independently mutable metadata.
+        """
+        return deepcopy(cls._get_cached_platform_metadata())
+
+    @classmethod
+    def get_platform_names(cls) -> list[str]:
+        """Get platform names without copying nested metadata values."""
+        return list(cls._get_cached_platform_metadata())
 
     @classmethod
     def get_platform_support_status(cls, platform_name: str) -> Optional[SupportStatus]:
         """Return the registry support status for a platform."""
-        metadata = cls.get_all_platform_metadata()
+        metadata = cls._get_cached_platform_metadata()
         canonical_name = cls.resolve_platform_name(platform_name)
         platform_spec = metadata.get(canonical_name)
         if platform_spec is None:
@@ -808,13 +655,13 @@ class PlatformRegistry:
         if status not in SUPPORT_STATUS_VALUES:
             raise ValueError(f"Unknown support_status {status!r}. Expected one of: {', '.join(SUPPORT_STATUS_VALUES)}")
 
-        metadata = cls.get_all_platform_metadata()
+        metadata = cls._get_cached_platform_metadata()
         return sorted(name for name, spec in metadata.items() if spec["support_status"] == status)
 
     @classmethod
     def get_platform_count_summary(cls) -> dict[str, Any]:
         """Return registry-derived platform counts for docs drift checks."""
-        metadata = cls.get_all_platform_metadata()
+        metadata = cls._get_cached_platform_metadata()
         status_counts = Counter(spec["support_status"] for spec in metadata.values())
         category_counts = Counter(spec.get("category", "unknown") for spec in metadata.values())
         sql_capable = sum(1 for spec in metadata.values() if spec.get("capabilities", {}).get("supports_sql", False))
@@ -945,12 +792,13 @@ class PlatformRegistry:
                 default_for_platform=mode_spec.get("default_for_platform", False),
                 display_name=mode_spec.get("display_name", ""),
                 description=mode_spec.get("description", ""),
-                dependencies=mode_spec.get("dependencies", []),
-                auth_methods=mode_spec.get("auth_methods", []),
+                dependencies=deepcopy(mode_spec.get("dependencies", [])),
+                auth_methods=deepcopy(mode_spec.get("auth_methods", [])),
             )
 
         # unsupported_benchmarks is computed from registry benchmark_gate rules;
         # the hardcoded dict in metadata is the legacy source and is ignored post-w16.
+        import benchbox.sql_compat.rules.benchmark_gate.clickhouse_local_gate  # noqa: F401
         import benchbox.sql_compat.rules.benchmark_gate.lakesail_gate  # noqa: F401
         import benchbox.sql_compat.rules.benchmark_gate.pg_family_gate  # noqa: F401
         import benchbox.sql_compat.rules.benchmark_gate.questdb_gate  # noqa: F401
@@ -1072,7 +920,7 @@ class PlatformRegistry:
     @classmethod
     def get_self_hosted_platforms(cls, *, include_deprecated: bool = False) -> list[str]:
         """Return platforms with at least one self-hosted deployment mode."""
-        metadata = cls.get_all_platform_metadata()
+        metadata = cls._get_cached_platform_metadata()
         out: list[str] = []
         for name, spec in metadata.items():
             if not include_deprecated and spec.get("support_status") in {"deprecated", "document_only"}:
@@ -1089,7 +937,7 @@ class PlatformRegistry:
         *,
         include_deprecated: bool = False,
     ) -> list[str]:
-        metadata = cls.get_all_platform_metadata()
+        metadata = cls._get_cached_platform_metadata()
         out: list[str] = []
         for name, spec in metadata.items():
             if not include_deprecated and spec.get("support_status") in {"deprecated", "document_only"}:
@@ -1135,7 +983,7 @@ class PlatformRegistry:
 
         Platform families group related platforms that share SQL dialect,
         benchmark compatibility, and data type mappings. For example:
-        - 'duckdb' family: duckdb, motherduck
+        - 'duckdb' family: duckdb, motherduck, ducklake
         - 'clickhouse' family: clickhouse (local, server, cloud modes)
         - 'trino' family: trino, starburst, athena
 
@@ -1156,7 +1004,7 @@ class PlatformRegistry:
 
         Child platforms inherit SQL dialect, benchmark compatibility, and
         data type mappings from their parent. For example:
-        - motherduck inherits from duckdb
+        - motherduck, ducklake inherit from duckdb
         - starburst inherits from trino
 
         Args:
@@ -1231,54 +1079,7 @@ class PlatformRegistry:
 # (name, module_path, class_name) - each entry becomes one optional import+register.
 # pg-mooncake historically co-registered questdb in the same try/except; that
 # coupling is now explicit (two separate entries).
-_OPTIONAL_ADAPTERS: tuple[tuple[str, str, str], ...] = (
-    ("duckdb", "benchbox.platforms.duckdb", "DuckDBAdapter"),
-    ("motherduck", "benchbox.platforms.motherduck", "MotherDuckAdapter"),
-    ("datafusion", "benchbox.platforms.datafusion", "DataFusionAdapter"),
-    ("databricks", "benchbox.platforms.databricks", "DatabricksAdapter"),
-    ("databricks-df", "benchbox.platforms.databricks", "DatabricksDataFrameAdapter"),
-    ("clickhouse", "benchbox.platforms.clickhouse", "ClickHouseAdapter"),
-    ("clickhouse-local", "benchbox.platforms.clickhouse_local", "ClickHouseLocalAdapter"),
-    ("clickhouse-server", "benchbox.platforms.clickhouse_server", "ClickHouseServerAdapter"),
-    ("clickhouse-cloud", "benchbox.platforms.clickhouse_cloud", "ClickHouseCloudAdapter"),
-    ("starrocks", "benchbox.platforms.starrocks", "StarRocksAdapter"),
-    ("sqlite", "benchbox.platforms.sqlite", "SQLiteAdapter"),
-    ("bigquery", "benchbox.platforms.bigquery", "BigQueryAdapter"),
-    ("redshift", "benchbox.platforms.redshift", "RedshiftAdapter"),
-    ("snowflake", "benchbox.platforms.snowflake", "SnowflakeAdapter"),
-    ("trino", "benchbox.platforms.trino", "TrinoAdapter"),
-    ("starburst", "benchbox.platforms.starburst", "StarburstAdapter"),
-    ("presto", "benchbox.platforms.presto", "PrestoAdapter"),
-    ("postgresql", "benchbox.platforms.postgresql", "PostgreSQLAdapter"),
-    ("timescaledb", "benchbox.platforms.timescaledb", "TimescaleDBAdapter"),
-    ("pg-duckdb", "benchbox.platforms.pg_duckdb", "PgDuckDBAdapter"),
-    ("pg-mooncake", "benchbox.platforms.pg_mooncake", "PgMooncakeAdapter"),
-    ("questdb", "benchbox.platforms.questdb", "QuestDBAdapter"),
-    ("cedardb", "benchbox.platforms.cedardb", "CedarDBAdapter"),
-    ("synapse", "benchbox.platforms.azure_synapse", "AzureSynapseAdapter"),
-    ("pyspark", "benchbox.platforms.pyspark", "PySparkSQLAdapter"),
-    ("firebolt", "benchbox.platforms.firebolt", "FireboltAdapter"),
-    ("databend", "benchbox.platforms.databend", "DatabendAdapter"),
-    ("doris", "benchbox.platforms.doris", "DorisAdapter"),
-    ("singlestore", "benchbox.platforms.singlestore", "SingleStoreAdapter"),
-    ("influxdb", "benchbox.platforms.influxdb", "InfluxDBAdapter"),
-    ("fabric_dw", "benchbox.platforms.fabric_warehouse", "FabricWarehouseAdapter"),
-    ("athena", "benchbox.platforms.athena", "AthenaAdapter"),
-    ("glue", "benchbox.platforms.aws", "AWSGlueAdapter"),
-    ("emr-serverless", "benchbox.platforms.aws", "EMRServerlessAdapter"),
-    ("athena-spark", "benchbox.platforms.aws", "AthenaSparkAdapter"),
-    ("dataproc", "benchbox.platforms.gcp", "DataprocAdapter"),
-    ("dataproc-serverless", "benchbox.platforms.gcp", "DataprocServerlessAdapter"),
-    ("fabric-spark", "benchbox.platforms.azure", "FabricSparkAdapter"),
-    ("fabric-lakehouse", "benchbox.platforms.fabric_lakehouse", "FabricLakehouseAdapter"),
-    ("synapse-spark", "benchbox.platforms.azure", "SynapseSparkAdapter"),
-    ("spark", "benchbox.platforms.spark", "SparkAdapter"),
-    ("lakesail", "benchbox.platforms.lakesail", "LakeSailAdapter"),
-    ("velox", "benchbox.platforms.velox", "VeloxAdapter"),
-    ("polars", "benchbox.platforms.polars_platform", "PolarsAdapter"),
-    ("snowpark-connect", "benchbox.platforms.snowpark_connect", "SnowparkConnectAdapter"),
-    ("quanton", "benchbox.platforms.onehouse", "QuantonAdapter"),
-)
+_OPTIONAL_ADAPTERS: tuple[tuple[str, str, str], ...] = get_adapter_imports()
 
 _OPTIONAL_ADAPTER_REGISTRATION_DIAGNOSTICS: dict[str, dict[str, Any]] = {}
 

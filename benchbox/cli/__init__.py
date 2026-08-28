@@ -19,12 +19,7 @@ __all__ = ["main"]
 
 
 def __getattr__(name: str) -> Any:
-    if name == "main":
-        from benchbox.cli.main import main
-
-        globals()[name] = main
-        return main
-    # Lazy-load any submodule (commands, orchestrator, cloud_storage, etc.)
+    # Lazy-load any submodule (main, commands, orchestrator, cloud_storage, etc.)
     try:
         module = importlib.import_module(f"{__name__}.{name}")
     except ModuleNotFoundError:

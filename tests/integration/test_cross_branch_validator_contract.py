@@ -76,6 +76,7 @@ def _minimal_schema_v2_bundle() -> dict:
         "benchmark": {"id": "tpch", "scale_factor": 0.01},
         "platform": {"name": "duckdb"},
         "summary": {"validation": "passed", "queries": {"total": 22, "passed": 22, "failed": 0}},
+        "phases": {"validation": {"status": "PASSED"}},
         "queries": [{"id": "Q1", "ms": 100.0}],
     }
 
@@ -84,6 +85,10 @@ def test_writer_emits_hash_format_validator_accepts(monkeypatch: pytest.MonkeyPa
     """End-to-end contract: `benchbox submit` must produce a bundle
     that the shared published-results validator accepts."""
     sub = importlib.import_module("benchbox.cli.commands.submit")
+
+    # `benchbox submit` is community-facing end-to-end (both --output and
+    # --service modes) and hard-refuses without a deployment salt.
+    monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "integration-test-community-publish-salt")
 
     src = tmp_path / "tpch_duckdb.json"
     src.write_text(json.dumps(_minimal_schema_v2_bundle()), encoding="utf-8")
@@ -111,6 +116,10 @@ def test_writer_companion_hashes_validator_accepts(monkeypatch: pytest.MonkeyPat
     """Companion files (.plans.json / .tuning.json) — the per-file hash
     contract covers them too via manifest.companion_hashes."""
     sub = importlib.import_module("benchbox.cli.commands.submit")
+
+    # `benchbox submit` is community-facing end-to-end and hard-refuses
+    # without a deployment salt.
+    monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "integration-test-community-publish-salt")
 
     src = tmp_path / "tpch_duckdb.json"
     src.write_text(json.dumps(_minimal_schema_v2_bundle()), encoding="utf-8")

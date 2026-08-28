@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "benchbox"
-version = "0.3.1"
+version = "0.4.0"
 description = "Embedded benchmark datasets and queries for database evaluation. Implements TPC-H, TPC-DS, TPC-DI and other industry-standard benchmarks."
 readme = "README.md"
 authors = [{ name = "Joe Harris", email = "joe@benchbox.dev" }]
@@ -33,7 +33,7 @@ dependencies = [
     "sqlglot>=25.6.0,<31.0.0",
     # CLI essentials
     # click: capped <9 - historically click majors rename decorators/context APIs.
-    "click>=8.0.0,<9.0.0",
+    "click>=8.3.3,<9.0.0",  # >=8.3.3: PYSEC-2026-2132 fix
     "rich>=13.0.0",
     "keyring>=25.0.0",
     "psutil>=5.9.0",
@@ -114,7 +114,7 @@ all = [
     # Browser-generated results.duckdb files use the default v1.0.0 on-disk format,
     # readable by @duckdb/duckdb-wasm regardless of writer version; cap <2 to catch
     # the next-major API break in CI.
-    "duckdb>=1.0.0,<2.0.0",
+    "duckdb>=1.3.0,<2.0.0",
     "clickhouse-connect>=0.10.0",
     "clickhouse-driver>=0.2.0",
     "databricks-sql-connector>=2.0.0",
@@ -135,7 +135,7 @@ all = [
     "azure-storage-file-datalake>=12.14.0",  # For Microsoft Fabric OneLake
     "pyathena>=3.0.0",  # For AWS Athena
     "boto3>=1.20.0",
-    "cloudpathlib>=0.15.0",
+    "cloudpathlib[azure,gs,s3]>=0.15.0",
     "pandas>=2.0.0",  # For TPC-DI benchmark
     "chdb>=0.10.0; sys_platform != 'win32'",   # For ClickHouse local mode (not available on Windows)
     "deltalake>=1.2.1",  # For Delta Lake table format
@@ -160,12 +160,21 @@ cloud = [
     "trino>=0.328.0",
     "pyathena>=3.0.0",  # For AWS Athena
     "boto3>=1.20.0",
-    "cloudpathlib>=0.15.0",
+    "cloudpathlib[azure,gs,s3]>=0.15.0",
 ]
-cloudstorage = ["cloudpathlib>=0.15.0"]
+cloudstorage = [
+    "cloudpathlib[azure,gs,s3]>=0.15.0",
+]
 
 # Individual platforms (for minimal installations)
 duckdb = ["duckdb>=1.0.0,<2.0.0"]
+# DuckLake needs a HIGHER duckdb floor than the duckdb extra: the `ducklake`
+# extension does not exist before DuckDB 1.3, and the adapter enforces that at
+# connection time. The general floor stays >=1.0 because browser-generated
+# results.duckdb files use the v1.0.0 on-disk format, so only this extra raises
+# it - `uv add 'benchbox[ducklake]'` then resolves a runtime that can actually
+# load the extension instead of failing at the first ATTACH.
+ducklake = ["duckdb>=1.3.0,<2.0.0"]
 clickhouse = ["clickhouse-driver>=0.2.0"]  # TCP binary protocol (clickhouse-server)
 clickhouse-server = ["clickhouse-driver>=0.2.0"]  # Canonical extra for clickhouse-server platform
 clickhouse-cloud = ["clickhouse-connect>=0.10.0"]  # HTTP protocol (ClickHouse Cloud)
@@ -184,7 +193,7 @@ redshift = [
     "boto3>=1.20.0",
     "cloudpathlib>=0.15.0",
 ]
-snowflake = ["snowflake-connector-python>=3.0.0", "cloudpathlib>=0.15.0"]
+snowflake = ["snowflake-connector-python>=3.0.0", "cloudpathlib[azure,gs,s3]>=0.15.0"]
 trino = ["trino>=0.328.0", "cloudpathlib>=0.15.0"]
 presto = ["presto-python-client>=0.8.4", "cloudpathlib>=0.15.0"]
 postgresql = ["psycopg[binary]>=3.1"]
@@ -327,14 +336,6 @@ cloud-spark-databricks = [
     "cloudpathlib>=0.15.0",
 ]
 
-# Legacy alias for databricks-connect (deprecated, use cloud-spark-databricks)
-databricks-connect = [
-    "databricks-sql-connector>=2.0.0",
-    "databricks-sdk>=0.20.0",
-    "databricks-connect>=14.0.0",
-    "cloudpathlib>=0.15.0",
-]
-
 # All cloud Spark platforms combined
 cloud-spark = [
     # AWS (Glue, EMR Serverless, Athena Spark)
@@ -360,7 +361,12 @@ cloud-spark = [
 # Note: mcp requires Python 3.10+, so this extra only works on 3.10+
 # Includes visualization deps since MCP server exposes chart generation tools
 mcp = [
-    "mcp>=1.2.0",
+    # MCP SDK 2 migration is complete; keep future majors behind explicit review.
+    "mcp>=2,<3",
+    # The MCP surface advertises DuckDB as its local executable default.
+    "duckdb>=1.0.0,<2.0.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.44,<2",
+    "opentelemetry-sdk>=1.44,<2",
 ]
 spark = [
     "pyspark>=4.0.1",
@@ -371,11 +377,11 @@ benchbox = "benchbox.cli.app:main"
 benchbox-mcp = "benchbox.mcp.cli:main"
 
 [project.urls]
-"Homepage" = "https://github.com/joeharris76/benchbox"
-"Bug Tracker" = "https://github.com/joeharris76/benchbox/issues"
+"Homepage" = "https://github.com/BenchBox-dev/benchbox"
+"Bug Tracker" = "https://github.com/BenchBox-dev/benchbox/issues"
 "Documentation" = "https://benchbox.readthedocs.io/"
-"Repository" = "https://github.com/joeharris76/benchbox.git"
-"Changelog" = "https://github.com/joeharris76/benchbox/blob/main/CHANGELOG.md"
+"Repository" = "https://github.com/BenchBox-dev/benchbox.git"
+"Changelog" = "https://github.com/BenchBox-dev/benchbox/blob/release/CHANGELOG.md"
 
 [tool.ty]
 # ty configuration
@@ -427,7 +433,7 @@ dev = [
     "ruff==0.11.13",  # pinned: preview = true is active globally; ruff upgrades may activate new rules
     "ty>=0.0.1a14",
     "ansi2html>=1.8.0",  # scripts/capture_chart_images.py - ANSI→HTML conversion for chart captures
-    "pillow>=10.0.0",  # scripts/capture_chart_images.py - PIL.Image for chart PNG output
+    "pillow>=12.3.0",  # scripts/capture_chart_images.py - PIL.Image for chart PNG output; >=12.3.0: PYSEC-2026-2253..3453 fixes
     # Explorer fixture and deployment snapshots use the default v1.0.0 on-disk format,
     # readable by @duckdb/duckdb-wasm regardless of writer version; cap <2 to catch
     # the next-major API break in CI.
@@ -452,7 +458,7 @@ dev = [
     "influxdb3-python>=0.10.0", # Databricks SDK (needed for tests/unit/platforms/test_databricks_copy_into.py UC volumes)
     "databricks-sdk>=0.20.0", # PySpark (needed for tests/unit/platforms/dataframe/test_pyspark_df.py and related)
     "pyspark>=3.5.0", # XML parsing (needed for tests/unit/core/tpcdi/test_etl_sources.py)
-    "mcp>=1.2.0",
+    "mcp>=2,<3",
     "sphinx>=7.4.7", # Documentation
     "roman-numerals<4.0", # Sphinx 9 needs roman_numerals module; v4.x broke the import
     "myst-parser>=3.0.1",
@@ -469,6 +475,8 @@ dev = [
     "codespell>=2.4.2",
     "pre-commit>=4.6.0",
     "import-linter>=2.13",
+    "opentelemetry-sdk>=1.44,<2",
+    "opentelemetry-exporter-otlp-proto-http>=1.44,<2",
 ]
 
 [tool.mutmut]
@@ -499,8 +507,7 @@ exclude = [
     ".git",
     "__pycache__",
     ".tox",
-    # Non-production directories
-    "_project",             # Internal project tooling and scripts
+    # Non-production directories with intentionally separate style contracts
     "examples/notebooks",   # Example notebooks (different code style)
     "examples/visualization", # Visualization notebooks
     "tests/validation",     # One-off validation scripts
@@ -661,10 +668,10 @@ omit = [
     # TPC-DI ETL: requires full CDC/SCD pipeline infrastructure with staged
     # incremental loads. Cannot be meaningfully unit-tested at unit granularity.
     "benchbox/core/tpcdi/etl/scd_processor.py",
-    # Experimental concurrency: changes frequently, pool tester requires real
+    # Experimental load testing: changes frequently, pool tester requires real
     # concurrent database connections (~284 miss stmts).
-    "benchbox/experimental/concurrency/executor.py",
-    "benchbox/experimental/concurrency/pool_tester.py",
+    "benchbox/experimental/load_testing/executor.py",
+    "benchbox/experimental/load_testing/pool_tester.py",
     # ClickBench DF queries: single wide table with 105 columns and specific
     # data patterns, same rationale as TPC-DS/datavault/nyctaxi DF omissions
     # (~310 miss stmts).
@@ -686,203 +693,29 @@ exclude_lines = [
 
 
 [tool.benchbox.complexity]
-# Cyclomatic complexity check configuration (used by scripts/check_complexity.py).
-# max_complexity: hard ceiling - functions above this are CI failures.
-# warn_complexity: advisory - functions above this are printed as warnings.
+# Cyclomatic complexity policy (used by _project/scripts/check_complexity.py).
+# max_complexity: custom hard ceiling - scores above this fail.
+# warn_complexity: scores at or above this are always reported as advisory.
 max_complexity = 20
 warn_complexity = 12
-# Modules temporarily excluded from per-module complexity checks.
-exclude_modules = []
-# Individual functions excluded from the check (format: "file:function").
-# Use sparingly - only for genuinely irreducible complexity (e.g., CLI dispatch).
-exclude_functions = [
-    # CLI run() is a Click command with many flags; refactoring underway.
-    "benchbox/cli/commands/run.py:run",
-    # ── Approved ignore_with_rationale entries (2026-02-20) ──
-    # Each maps to a row in quality/complexity/classification-matrix.yaml
-    # Re-review triggers are documented per-function in the matrix.
-    # --- ASCII visualization renderers (inherent grid/layout complexity) ---
-    "benchbox/core/visualization/ascii/line_chart.py:render",          # 43 - Bresenham line drawing + grid state
-    "benchbox/core/visualization/ascii/box_plot.py:render",            # 30 - three-line-per-series box plot geometry
-    "benchbox/core/visualization/ascii/scatter_plot.py:render",        # 26 - Pareto frontier + grid point placement
-    "benchbox/core/visualization/ascii/bar_chart.py:render",           # 22 - outlier truncation + sub-character blocks
-    "benchbox/core/visualization/ascii/rank_table.py:render",          # 22 - ranking with tie handling
-    "benchbox/core/visualization/ascii/cdf_chart.py:render",           # 21 - grid-based CDF plotting
-    # --- TPC specification implementations (spec-driven branching) ---
-    "benchbox/core/tpcds/power_test.py:run",                           # 33 - TPC-DS power test per spec
-    "benchbox/core/tpcds_obt/query_conversion.py:_post_process",       # 32 - per-query OBT conversion edge cases
-    "benchbox/core/tpcds/c_tools.py:_generate_with_binary",            # 25 - dsqgen binary wrapper
-    "benchbox/core/tpcds/throughput_test.py:_execute_stream",          # 24 - TPC-DS throughput stream execution
-    "benchbox/core/tpcds/benchmark/runner.py:run_throughput_test",     # 22 - TPC-DS throughput test per spec
-    "benchbox/core/tpcds/benchmark/runner.py:run_power_test",          # 22 - TPC-DS power test per spec
-    "benchbox/core/results/display.py:print_dry_run_summary",          # 21 - conditional section display
-    "benchbox/core/tpcds/throughput_test.py:run",                      # 18 - TPC-DS spec; outer loop coordinates concurrent streams
-    "benchbox/core/tpcds_obt/query_conversion.py:_rewrite_select",     # 18 - AST rewrite with dependency ordering (role_map → column → join)
-    "benchbox/core/tpch/maintenance_test.py:_execute_rf1",             # 18 - TPC-H RF1 spec; each SQL step depends on prior result
-    "benchbox/core/tpch/power_test.py:run",                            # 18 - TPC-H power test; spec mandates permutation order
-    "benchbox/core/tpch/throughput_test.py:run",                       # 18 - TPC-H throughput; spec mandates TTT timing from first to last stream
-    "benchbox/core/runner/dataframe_runner.py:_execute_dataframe_queries",  # 18 - TPC power test methodology; warmup + permuted query loop
-    "benchbox/core/tpch/throughput_test.py:_execute_stream",           # 17 - TPC-H single stream; 22 queries in spec permutation order
-    # --- Platform adapters (genuinely distinct platform semantics) ---
-    "benchbox/platforms/base/adapter.py:_summarize_performance_characteristics",  # 34 - well-structured statistical aggregation
-    "benchbox/platforms/dataframe/unified_frame.py:join",              # 33 - multi-platform join dispatch (Polars/PySpark/DataFusion)
-    "benchbox/platforms/base/adapter.py:_collect_resource_utilization", # 24 - cross-platform metric collection with independent try/except
-    "benchbox/platforms/credentials/redshift.py:setup_redshift_credentials",  # 24 - interactive credential wizard
-    "benchbox/platforms/redshift.py:get_platform_info",                # 24 - serverless vs provisioned deployment branching
-    "benchbox/platforms/bigquery.py:get_platform_info",                # 23 - independent INFORMATION_SCHEMA queries
-    "benchbox/platforms/dataframe/unified_frame.py:_datafusion_join_with_exprs",  # 23 - DataFusion join workaround
-    "benchbox/platforms/credentials/redshift.py:validate_redshift_credentials",  # 22 - sequential validation pipeline
-    "benchbox/platforms/clickhouse/metadata.py:get_platform_info",     # 21 - local vs server mode branching
-    "benchbox/platforms/credentials/bigquery.py:validate_bigquery_credentials",  # 21 - multi-service validation
-    "benchbox/platforms/databricks/adapter.py:apply_table_tunings",    # 21 - Liquid Clustering vs Z-ORDER
-    "benchbox/platforms/dataframe/unified_frame.py:_extract_multi_agg_arithmetic",  # 21 - DataFusion AST workaround
-    "benchbox/platforms/dataframe/unified_frame.py:sort",              # 20 - Polars/PySpark/DataFusion each require distinct sort APIs
-    "benchbox/platforms/credentials/athena.py:setup_athena_credentials",  # 20 - interactive credential wizard; auto-detect vs manual with dependent branching
-    "benchbox/platforms/credentials/bigquery.py:setup_bigquery_credentials",  # 20 - interactive credential wizard; file validation + optional Cloud Storage path
-    "benchbox/platforms/dataframe/unified_frame.py:_apply_datafusion_post_ops",  # 19 - literal vs multi-agg arithmetic post-ops have fundamentally different expression semantics
-    "benchbox/platforms/base/adapter.py:capture_query_plan",           # 17 - multi-level filter chain (query ID, iteration count, sampling, EXPLAIN)
-    "benchbox/platforms/credentials/snowflake.py:setup_snowflake_credentials",  # 16 - interactive credential wizard; account normalization + multi-step auth validation
-    # --- MCP tool registration (structural nesting from framework) ---
-    "benchbox/mcp/tools/discovery.py:register_discovery_tools",        # 29 - MCP registration pattern
-    "benchbox/mcp/tools/analytics.py:register_analytics_tools",        # 22 - MCP registration pattern
-    # --- Thread-safety (single-flight cache; locking protocol cannot be simplified) ---
-    "benchbox/core/expected_results/registry.py:_get_benchmark_results",  # 17 - single-flight cache with cross-thread coordination
-    # --- Query plan parsers (AST node dispatch; each operator has distinct properties) ---
-    "benchbox/core/query_plans/parsers/datafusion.py:_convert_to_logical_operator",  # 17 - AST node → LogicalOperator with operator-specific property extraction
-    "benchbox/core/query_plans/parsers/datafusion.py:_extract_operator_info",  # 23 - operator-type dispatch (scan/join/filter/sort/projection/aggregate/limit)
-    # --- Platform registration (41 independent try/except blocks, one per platform) ---
-    "benchbox/core/platform_registry.py:auto_register_platforms",          # 41 - each platform import is isolated; CC reflects platform count, not algorithmic complexity
-    # --- Catalog loaders (per-field YAML validation with distinct rules per field) ---
-    "benchbox/core/ai_primitives/catalog/loader.py:load_ai_catalog",       # 29 - field-by-field validation: id, sql, category, variants, skip_on, model, tokens, batch_size, cost
-    "benchbox/core/write_primitives/catalog/loader.py:load_write_primitives_catalog",  # 25 - field-by-field validation: id, category, write_sql, validation_queries, cleanup_sql, flags
-    # --- Manifest validation (multi-layer validation recently expanded for contamination detection) ---
-    "benchbox/core/runner/runner.py:_validate_manifest_if_present",        # 23 - entry validation + directory collision detection + cloud/local path dispatch
-    # --- Benchmark test setup (spec-required sequential dependency chain) ---
-    "benchbox/core/transaction_primitives/benchmark.py:setup",          # 17 - spec-required: validation → lock → cleanup → staging population in strict order
-    # --- Deferred complexity reduction (architectural redesign needed) ---
-    "benchbox/core/runner/runner.py:run_benchmark_lifecycle",            # 39 - main orchestration with genuinely distinct code paths (data_only, load_only, SQL, DataFrame)
-    "benchbox/cli/orchestrator.py:execute_benchmark",                    # 24 - interleaved output/phase/adapter/credential logic; tightly coupled to CLI UX
-    # --- CLI/release (linear workflows with safety-critical branching) ---
-    "benchbox/cli/commands/compare_plans.py:compare_plans",            # 27 - deprecated, slated for removal
-    "benchbox/cli/commands/export.py:export",                          # 22 - clean CLI with distinct source resolution paths
-    "benchbox/release/sync.py:cmd_pull",                               # 25 — auditable safety-check workflow
-    "benchbox/release/sync.py:cmd_push",                               # 22 — mirror of cmd_pull
-    # --- Interactive shell REPL (user-input dispatch loop is state-machine-inherent) ---
-    "benchbox/cli/commands/shell.py:_launch_sqlite_shell",             # 16 - SQLite REPL; command dispatch + SQL execution loop cannot be flattened
-    "benchbox/cli/commands/shell.py:_launch_duckdb_shell",             # 15 - DuckDB REPL; same pattern as SQLite shell
-    # --- Converters (linear pipelines with resource cleanup) ---
-    "benchbox/utils/format_converters/iceberg_converter.py:convert",   # 24 - Iceberg conversion pipeline
-    # --- Required complexity at CC=14 (2026-02-21 evaluation, batch w15) ---
-    # These sit at CC=14 (below warn=15) but are documented for completeness.
-    "benchbox/cli/commands/show_plan.py:show_plan",                    # 14 - 4 except branches + 3-way format dispatch; irreducible for CLI command
-    "benchbox/cli/commands/tuning_group.py:_display_config_settings_table",  # 14 - one guard per config field; proportional to field count
-    "benchbox/core/query_plans/parsers/base.py:_harmonize_operator_type",  # 14 - 12-way keyword→enum mapping; 1:1 with enum members
-    "benchbox/core/concurrency/analyzer.py:analyze_contention",        # 14 - mutually-exclusive classification decision tree
-    "benchbox/core/metadata_primitives/complexity.py:__post_init__",   # 14 - N independent field validation guards; inherent to dataclass
-    # --- Required complexity at CC=14 (2026-03-12 evaluation) ---
-    # Inherent complexity: domain-driven branching that cannot be meaningfully reduced.
-    "benchbox/core/results/builder.py:to_dict",                        # 14 - conditional serialization of 12 optional fields; each `if` guards one field
-    "benchbox/platforms/clickhouse_cloud.py:_create_external_tables_via_s3",  # 14 - 4-way format dispatch (iceberg/parquet × local/cloud) with distinct S3 semantics
-    "benchbox/platforms/databricks/adapter.py:get_platform_info",      # 14 - independent try/except probes for SDK, runtime, and warehouse metadata
-    "benchbox/platforms/dataframe/benchmark_mixin.py:run_benchmark",   # 14 - orchestration flow: memory check → validation → context → load → execute → result
-    "benchbox/platforms/redshift.py:apply_table_tunings",              # 14 - Redshift DDL constraints require individual DISTSTYLE/DISTKEY/SORTKEY inspection
-    "benchbox/utils/format_converters/base.py:map_sql_type_to_arrow",  # 14 - type dispatch; DECIMAL requires parameter parsing that breaks dict-based approach
-    "benchbox/utils/input_validation.py:validate_query_id",            # 14 - benchmark-specific allowlists with distinct ID format rules per benchmark
-    "benchbox/utils/stale_artifact_pruning.py:prune_stale_table_artifacts",  # 14 - compressed/uncompressed × single/sharded × expected-format; branching reflects real combinations
-    # --- Required complexity at CC=13 (2026-03-12 evaluation, wave 3) ---
-    # Inherent complexity: validator/serializer logic, spec orchestration, and platform-specific semantics.
-    "benchbox/cli/benchmarks.py:prompt_table_format",                  # 13 - interactive format/compression wizard with dependent prompts
-    "benchbox/cli/composite_params.py:parse",                          # 13 - per-key plan-capture parsing with distinct validation rules
-    "benchbox/cli/config.py:create_sample_unified_tuning_config",      # 13 - sample tuning config mirrors real platform capability differences
-    "benchbox/cli/platform.py:setup_platforms",                        # 13 - stateful interactive setup wizard with action dispatch
-    "benchbox/core/dataframe/capabilities.py:check_sufficient_memory", # 13 - GPU/system memory checks and platform recommendations are capability-driven
-    "benchbox/core/dryrun.py:_extract_queries",                        # 13 - query extraction dispatch is benchmark/spec driven across SQL and DataFrame modes
-    "benchbox/core/metadata_primitives/dataframe_operations.py:execute_get_schema",  # 13 - per-platform schema APIs are genuinely distinct
-    "benchbox/core/query_plans/parsers/duckdb.py:_convert_to_logical_operator",  # 13 - AST-driven operator dispatch with type-specific property extraction
-    "benchbox/core/query_plans/parsers/duckdb.py:_harmonize_duckdb_operator",   # 13 - 1:1 DuckDB operator mapping to logical enums
-    "benchbox/core/results/query_plan_models.py:get_structural_signature",       # 13 - semantic fingerprint builder conditionally serializes plan fields
-    "benchbox/core/results/schema.py:validate",                       # 13 - schema validator applies separate rules per required block
-    "benchbox/core/results/schema.py:_build_execution_from_context",  # 13 - execution serialization merges optional flags with special-case compression/force handling
-    "benchbox/core/results/schema.py:_build_config_block",            # 13 - config serialization needs per-field precedence and compression merge rules
-    "benchbox/core/results/schema.py:_build_phases_block",            # 13 - phase serialization mirrors heterogeneous setup/power/throughput structures
-    "benchbox/core/schemas.py:to_cli_args",                           # 13 - CLI reconstruction is proportional to optional flag formatting rules
-    "benchbox/core/tpc_validation.py:validate",                       # 13 - validator subclasses apply one rule per completeness/result/schema concern
-    "benchbox/core/tpcdi/queries.py:resolve_query_order",             # 13 - Kahn topological sort with query-only dependency filtering is algorithmic
-    "benchbox/core/tpcds/generator/streaming.py:_generate_parent_table_chunk_with_children",  # 13 - TPC-DS parent/child chunk generation couples subprocess, compression, and manifest updates
-    "benchbox/core/tpch/generator.py:_run_dbgen_native",              # 13 - dbgen orchestration spans streaming/file modes, env setup, and cleanup
-    "benchbox/core/tpch/maintenance_test.py:_execute_rf2",            # 13 - TPC-H RF2 requires ordered deletes, transaction handling, and rollback
-    "benchbox/core/transaction_primitives/benchmark.py:execute_operation",  # 13 - transaction operation lifecycle coordinates setup, validation, cleanup, and warnings
-    "benchbox/core/tuning/generators/doris.py:generate_tuning_clauses",      # 13 - Doris tuning maps distinct tuning types to engine-specific DDL semantics
-    "benchbox/core/tuning/generators/redshift.py:generate_tuning_clauses",   # 13 - Redshift tuning maps sort/dist semantics to engine-specific clauses
-    "benchbox/core/write_primitives/benchmark.py:setup",              # 13 - staging-table setup is a guarded sequence with lock/release guarantees
-    "benchbox/platforms/azure_synapse.py:load_data",                  # 13 - load path must juggle benchmark tables, manifest fallback, and blob vs bulk-insert semantics
-    "benchbox/platforms/base/adapter.py:handle_existing_database",    # 13 - safety-critical reuse/recreate decision tree depends on file vs server DB semantics
-    "benchbox/platforms/base/adapter.py:_execute_combined_test",      # 13 - combined TPC flow dispatches benchmark-specific phase orchestration
-    "benchbox/platforms/base/adapter.py:_execute_tpcds_power_test",   # 13 - wraps official TPC-DS power test with warmups, stream handling, and normalization
-    "benchbox/platforms/base/adapter.py:_execute_tpcds_throughput_test",  # 13 - wraps official TPC-DS throughput test with stream/concurrency normalization
-    "benchbox/platforms/base/spark_execution_mixin.py:_load_data_spark",    # 13 - Spark load path branches on format, staging, and Spark-specific writer semantics
-    "benchbox/platforms/bigquery.py:apply_table_tunings",             # 13 - tuning application depends on BigQuery partition/clustering metadata constraints
-    "benchbox/platforms/clickhouse_cloud.py:_create_external_tables_via_gcs",  # 13 - GCS external view creation spans local/cloud Iceberg and Parquet inputs
-    "benchbox/platforms/databricks/adapter.py:_upload_to_uc_volume",  # 13 - UC volume uploads handle local vs manifest sources and Databricks path semantics
-    "benchbox/platforms/dataframe/polars_maintenance.py:_do_merge",   # 13 - Polars MERGE emulation dispatches inserts/updates/deletes by clause semantics
-    "benchbox/platforms/datafusion.py:_convert_and_register_parquet",  # 13 - DataFusion loading coordinates conversion, registration, and schema preservation
-    "benchbox/platforms/duckdb.py:execute_query",                     # 13 - DuckDB execution path combines execution, plan capture, and result-shape compatibility
-    "benchbox/platforms/firebolt.py:_resolve_data_files",             # 13 - Firebolt file resolution spans local/cloud/manifest staging variants
-    "benchbox/platforms/firebolt.py:_load_data_via_insert",           # 13 - Firebolt insert loading coordinates staged files, SQL generation, and fallback handling
-    "benchbox/platforms/influxdb/client.py:to_line_protocol",         # 13 - Influx line-protocol encoding branches by tags, fields, types, and escaping rules
-    "benchbox/platforms/presto.py:get_platform_info",                 # 13 - platform info comes from independent engine/catalog/session probes
-    "benchbox/platforms/redshift.py:configure_for_benchmark",         # 13 - Redshift session tuning and cache validation are safety-oriented engine semantics
-    "benchbox/platforms/snowflake.py:get_platform_info",              # 13 - platform info is assembled from independent account/runtime probes
-    "benchbox/platforms/snowflake.py:apply_table_tunings",            # 13 - Snowflake tuning compares live clustering state before engine-specific DDL changes
-    "benchbox/release/content_validation.py:_is_example_line",        # 13 — heuristic classifier must combine marker, table, bullet, and blockquote context
-    "benchbox/utils/execution_manager.py:execute_power_runs",         # 13 - power-run orchestration manages warmups, monitoring, fail-fast, and stream permutations
-    # --- Required complexity at CC=12 (2026-03-12 evaluation, wave 4) ---
-    # Inherent complexity: sequential workflows, platform/operator dispatch, measurement protocols.
-    "benchbox/cli/commands/run_official.py:run_official",             # 12 - deprecated CLI wrapper with TPC spec validation + argument assembly
-    "benchbox/cli/commands/convert.py:convert",                      # 12 - sequential conversion workflow with distinct error handling per step
-    "benchbox/cli/tuning.py:_run_simple_wizard",                     # 12 - platform-specific tuning dispatch (Databricks/Snowflake/BigQuery/Redshift)
-    "benchbox/core/dataframe/benchmark_suite.py:_benchmark_query",   # 12 - interleaved measurement protocol (warmup/timing/memory/lazy evaluation)
-    "benchbox/core/dataframe/benchmark_suite.py:_run_df_query",      # 12 - sequential benchmark phases (resolve/load/lookup/warmup/measure)
-    "benchbox/core/metadata_primitives/benchmark.py:run_dataframe_benchmark",  # 12 - schema vs catalog operation dispatch with fundamentally different execution models
-    "benchbox/core/metadata_primitives/dataframe_operations.py:execute_complex_type_introspection",  # 12 - platform-specific type APIs (Polars/Spark/Pandas)
-    "benchbox/core/query_plans/insights.py:detect_antipatterns",     # 12 - semantically distinct antipattern checks (cross-join/conditions/depth/scans)
-    "benchbox/core/query_plans/parsers/duckdb.py:_parse_json_node",  # 12 - operator-specific attribute extraction (scan/filter/join/aggregate/sort)
-    "benchbox/core/read_primitives/benchmark.py:_load_data",         # 12 - sequential data loading with reuse check, schema creation, and per-table file resolution
-    "benchbox/core/runner/runner.py:_execute_load_only_mode",        # 12 - external vs native table mode dispatch with mode-dependent execution paths
-    "benchbox/core/tpcdi/etl/customer_mgmt_processor.py:parse_file", # 12 - XML action type dispatch (NEW/UPDCUST/ADDACCT/INACT) with namespace resilience
-    # --- Required complexity at CC=12 (2026-03-12 follow-up, wave 4b) ---
-    # Inherent complexity: spec workflows, platform-specific loading, runtime resolution, and SQL normalization.
-    "benchbox/core/tpcds/c_tools.py:_clean_sql",                     # 12 - TPC-DS SQL normalization handles vendor-specific syntax families with distinct rewrites
-    "benchbox/core/tpcds/dataframe_queries/rollup_helper.py:expand_rollup_pandas",  # 12 - rollup expansion must switch between grouped levels, grand totals, and Dask scalar handling
-    "benchbox/core/tpcds/generator/streaming.py:_generate_parent_table_with_children",  # 12 - streaming generation coordinates subprocess output, compression, manifest updates, and cleanup
-    "benchbox/core/tpcds_obt/query_conversion.py:_rewrite_columns",  # 12 - AST column rewrite must distinguish fact vs dimension mapping and OBT alias semantics
-    "benchbox/core/tpch/generator.py:_generate_local",               # 12 - TPC-H data generation orchestrates validation, sample reuse, regeneration, and streaming/file output modes
-    "benchbox/core/tpch/maintenance_test.py:run_maintenance_test",   # 12 - maintenance test follows the spec-required RF1/RF2 workflow with timed intervals and result accounting
-    "benchbox/core/tpch/power_test.py:__init__",                     # 12 - seed/validation initialization reflects TPC-H answer-set rules and stream-specific validation constraints
-    "benchbox/platforms/adapter_factory.py:get_adapter",             # 12 - unified platform factory must validate mode/deployment combinations before dispatch
-    "benchbox/platforms/base/adapter.py:_create_enhanced_data_generation_phase",  # 12 - defensive per-table stats extraction handles arbitrary benchmark table containers
-    "benchbox/platforms/clickhouse/tuning.py:generate_tuning_clause",  # 12 - ClickHouse tuning composes partition/order semantics with engine-specific precedence rules
-    "benchbox/platforms/databend/adapter.py:_insert_files_batched",  # 12 - batch loader interleaves delimiter validation, row escaping, and flush boundaries
-    "benchbox/platforms/databricks/credentials.py:setup_databricks_credentials",  # 12 - interactive credential setup mixes autodetect, secure prompting, validation, and optional defaults
-    "benchbox/platforms/dataframe/benchmark_mixin.py:_get_tpcds_queries",  # 12 - TPC-DS stream permutation and variant fallback are spec-driven and registry-dependent
-    "benchbox/platforms/datafusion.py:create_connection",            # 12 - DataFusion connection setup must branch across runtime APIs, spill config, and session options
-    "benchbox/platforms/duckdb.py:validate_platform_capabilities",   # 12 - capability validator applies independent library/version/memory checks with structured warnings
-    "benchbox/platforms/fabric_warehouse.py:load_data",              # 12 - Fabric loading coordinates table discovery, OneLake COPY, direct fallback, and platform-specific errors
-    "benchbox/platforms/firebolt.py:_load_data_via_s3",              # 12 - Firebolt S3 staging combines upload, credential resolution, ingest SQL, and per-file accounting
-    "benchbox/platforms/postgresql.py:validate_platform_capabilities",  # 12 - capability validator applies independent driver/version/memory checks with structured warnings
-    "benchbox/platforms/redshift.py:__init__",                       # 12 - Redshift initialization validates dependencies, staging config, and connection defaults in one workflow
-    "benchbox/platforms/starburst.py:_configure_starburst_defaults",  # 12 - Galaxy config must merge env defaults, role-qualified usernames, and required-auth validation
-    "benchbox/utils/format_converters/delta_converter.py:convert",   # 12 - Delta conversion pipeline validates schema, reads shards, writes table metadata, and reports progress
-    "benchbox/utils/format_converters/vortex_converter.py:convert",  # 12 - Vortex conversion pipeline validates schema, writes output, validates row counts, and cleans partial files
-    "benchbox/utils/runtime_env.py:discover_isolated_runtime",       # 12 - isolated runtime discovery scans filesystem candidates, site-packages, and ABI compatibility
-    "benchbox/utils/runtime_env.py:ensure_driver_version",           # 12 - driver resolution workflow must check current env, isolated runtimes, and optional auto-install fallbacks
-]
+# Exception expiry must be strictly in the future and no more than this many
+# calendar days away. A bounded review window prevents permanent waivers.
+max_exception_days = 90
+# Temporary exceptions apply only to scores above max_complexity. Every entry
+# must pin target, line, measured score, owner, rationale, and future expiry.
+# Advisory scores are always visible. See docs/development/quality-gate-policy.md.
+exclusions = []
 
 [tool.benchbox.duplicates]
 # Duplicate code detection configuration (scripts/check_duplicate_code.py).
 # Uses AST structural hashing to find Type-2 clones (same structure, different
 # identifiers). The threshold is a ceiling on total duplicated lines; raise it
 # only when intentional duplication is added and lower it as clones are removed.
+#
+# PR gate: `make duplicate-check-delta` / pr.yml `guard-duplicate-delta` compares
+# duplicated lines against the merge-base of the PR base (or origin/develop) and
+# fails only when the change *increases* the count. Absolute `threshold` below
+# remains for local/campaign use (`make duplicate-check`), not the PR delta path.
 #
 # Re-baseline protocol: when `make duplicate-check-verbose` reports actual
 # duplicated lines consistently above the threshold, re-run the classification

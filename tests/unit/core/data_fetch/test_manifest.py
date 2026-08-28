@@ -14,7 +14,9 @@ import pytest
 from benchbox.core.data_fetch import (
     DataManifest,
     ManifestValidationError,
+    TableEntry,
     compute_manifest_hash,
+    compute_manifest_identity_hash,
     load_manifest,
 )
 
@@ -139,3 +141,123 @@ def test_tables_must_be_array(tmp_path: Path) -> None:
     p = _write(tmp_path, body)
     with pytest.raises(ManifestValidationError, match="must be an array"):
         load_manifest(p)
+
+
+# ---- logical-mode manifests (per-table logical_sha256 pinned) ----
+
+_T1_LOGICAL = "1a" * 32
+_T2_LOGICAL = "2b" * 32
+_LOGICAL_TABLES = [
+    TableEntry(
+        name="t1",
+        file="t1.parquet",
+        sha256=_HEX_B,
+        row_count=100,
+        logical_sha256=_T1_LOGICAL,
+        schema={"id": "integer", "name": "character varying"},
+    ),
+    TableEntry(
+        name="t2",
+        file="t2.parquet",
+        sha256=_HEX_C,
+        row_count=200,
+        logical_sha256=_T2_LOGICAL,
+        schema={"id": "integer"},
+    ),
+]
+_LOGICAL_URL = "https://example.com/logical.tar.zst"
+_LOGICAL_DAH = "cd" * 32
+
+
+def _logical_body(tables: list[TableEntry], *, data_archive_hash: str = _LOGICAL_DAH) -> str:
+    manifest_hash = compute_manifest_identity_hash(
+        dataset_version="test-logical-v1",
+        data_archive_hash=data_archive_hash,
+        url=_LOGICAL_URL,
+        license_file="DATA-LICENSE.md",
+        tables=tables,
+    )
+    lines = [
+        'dataset_version = "test-logical-v1"',
+        f'manifest_hash = "{manifest_hash}"',
+        f'data_archive_hash = "{data_archive_hash}"',
+        f'url = "{_LOGICAL_URL}"',
+        f'archive_sha256 = "{_HEX_D}"',
+        'license_file = "DATA-LICENSE.md"',
+        "",
+    ]
+    for t in tables:
+        lines += ["[[tables]]", f'name = "{t.name}"', f'file = "{t.file}"', f'sha256 = "{t.sha256}"']
+        if t.logical_sha256 is not None:
+            lines.append(f'logical_sha256 = "{t.logical_sha256}"')
+        lines.append(f"row_count = {t.row_count}")
+        for col, col_type in t.schema.items():
+            lines.append(f'schema.{col} = "{col_type}"')
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _write_raw(tmp: Path, body: str) -> Path:
+    p = tmp / "data_manifest.toml"
+    p.write_text(body)
+    return p
+
+
+def test_load_logical_manifest(tmp_path: Path) -> None:
+    p = _write_raw(tmp_path, _logical_body(_LOGICAL_TABLES))
+    m = load_manifest(p)
+    assert m.is_logical
+    assert m.table("t1").logical_sha256 == _T1_LOGICAL
+    assert m.table("t1").schema == {"id": "integer", "name": "character varying"}
+    assert m.data_archive_hash == _LOGICAL_DAH
+
+
+def test_legacy_manifest_is_not_logical(tmp_path: Path) -> None:
+    p = _write(tmp_path, _MINIMAL)
+    assert load_manifest(p).is_logical is False
+
+
+def test_logical_manifest_hash_stable_across_transport_byte_change(tmp_path: Path) -> None:
+    """The whole point of logical mode: changing per-table byte sha256 and the
+    transport archive_sha256 (what a non-deterministic rebuild changes) must NOT
+    invalidate manifest_hash."""
+    p = _write_raw(tmp_path, _logical_body(_LOGICAL_TABLES))
+    original = load_manifest(p)
+    rebuilt = p.read_text()
+    # Anchor on the leading newline so the per-table byte `sha256` line is hit
+    # without also matching `logical_sha256`.
+    rebuilt = rebuilt.replace(f'\nsha256 = "{_HEX_B}"', f'\nsha256 = "{"e" * 64}"')
+    rebuilt = rebuilt.replace(f'archive_sha256 = "{_HEX_D}"', f'archive_sha256 = "{"f" * 64}"')
+    p.write_text(rebuilt)
+    reloaded = load_manifest(p)  # must not raise
+    assert reloaded.manifest_hash == original.manifest_hash
+    assert reloaded.table("t1").sha256 == "e" * 64
+    assert reloaded.table("t1").logical_sha256 == _T1_LOGICAL
+
+
+def test_logical_manifest_tamper_on_logical_hash_detected(tmp_path: Path) -> None:
+    p = _write_raw(tmp_path, _logical_body(_LOGICAL_TABLES))
+    p.write_text(p.read_text().replace(f'logical_sha256 = "{_T1_LOGICAL}"', f'logical_sha256 = "{"ff" * 32}"'))
+    with pytest.raises(ManifestValidationError, match="manifest_hash mismatch"):
+        load_manifest(p)
+
+
+def test_logical_manifest_tamper_on_schema_detected(tmp_path: Path) -> None:
+    p = _write_raw(tmp_path, _logical_body(_LOGICAL_TABLES))
+    p.write_text(p.read_text().replace('schema.name = "character varying"', 'schema.name = "integer"'))
+    with pytest.raises(ManifestValidationError, match="manifest_hash mismatch"):
+        load_manifest(p)
+
+
+def test_mixed_logical_mode_rejected(tmp_path: Path) -> None:
+    partial = [
+        _LOGICAL_TABLES[0],
+        TableEntry(name="t2", file="t2.parquet", sha256=_HEX_C, row_count=200, schema={"id": "integer"}),
+    ]
+    # Build text by hand so t2 simply omits logical_sha256; the identity hash
+    # over the pair is irrelevant because mode-detection fails first.
+    body = _logical_body(_LOGICAL_TABLES).replace(f'logical_sha256 = "{_T2_LOGICAL}"\n', "")
+    p = _write_raw(tmp_path, body)
+    with pytest.raises(ManifestValidationError, match="present on some tables but missing"):
+        load_manifest(p)
+    assert partial  # documents the intended shape

@@ -26,6 +26,7 @@ from benchbox.core.tuning.interface import (
     TuningType,
     UnifiedTuningConfiguration,
 )
+from benchbox.utils.config_interface import ConfigInterface, set_config_provider
 from benchbox.utils.database_naming import generate_database_filename
 from benchbox.utils.printing import quiet_console
 from benchbox.utils.scale_factor import format_scale_factor
@@ -128,7 +129,6 @@ def _apply_environment_overrides(config_dict: dict[str, Any]) -> dict[str, Any]:
     - BENCHBOX_SCALE_FACTOR: Override benchmarks.default_scale
     - BENCHBOX_VERBOSE: Override execution.verbose
     - BENCHBOX_MAX_WORKERS: Override execution.max_workers
-    - BENCHBOX_TUNING_ENABLED: Override tuning.enabled
     - BENCHBOX_TUNING_CONFIG: Override tuning.default_config_file
 
     Args:
@@ -143,9 +143,11 @@ def _apply_environment_overrides(config_dict: dict[str, Any]) -> dict[str, Any]:
         "BENCHBOX_SCALE_FACTOR": ("benchmarks", "default_scale", float),
         "BENCHBOX_VERBOSE": ("execution", "verbose", lambda v: v.lower() in ["true", "1", "yes", "on"]),
         "BENCHBOX_MAX_WORKERS": ("execution", "max_workers", int),
-        "BENCHBOX_TUNING_ENABLED": ("tuning", "enabled", lambda v: v.lower() in ["true", "1", "yes", "on"]),
         "BENCHBOX_TUNING_CONFIG": ("tuning", "default_config_file", str),
-        "BENCHBOX_OUTPUT_DIR": ("output", "directory", str),
+        # NOTE: BENCHBOX_OUTPUT_DIR is deliberately absent. It is resolved on the
+        # run path by benchbox.utils.path_utils.resolve_benchmark_runs_dir(), not
+        # through this config object. Mapping it to a config key nothing reads
+        # made the setting look authoritative while having no effect.
         "BENCHBOX_MEMORY_LIMIT_GB": ("execution", "memory_limit_gb", int),
     }
 
@@ -179,8 +181,9 @@ class BenchBoxConfig(BaseModel):
 class ConfigManager:
     """Configuration file and settings management."""
 
-    def __init__(self, config_path: Optional[Path] = None):
+    def __init__(self, config_path: Optional[Path] = None, *, strict: bool = False):
         self.console = quiet_console
+        self.strict = strict
         self.config_path = config_path or self._get_default_config_path()
         self.config = self._load_config()
         # Apply environment variable overrides for tuning settings
@@ -200,6 +203,9 @@ class ConfigManager:
     def _load_config(self) -> BenchBoxConfig:
         """Load configuration from file or create default."""
         try:
+            if self.strict and not self.config_path.exists():
+                raise FileNotFoundError(f"Configuration file not found: {self.config_path}")
+
             if self.config_path.exists():
                 try:
                     with open(self.config_path, encoding="utf-8") as f:
@@ -207,16 +213,24 @@ class ConfigManager:
 
                     # If config file is empty or doesn't have any of our main sections,
                     # return default config
-                    if not config_data or not any(
-                        key in config_data
-                        for key in [
-                            "system",
-                            "database",
-                            "benchmarks",
-                            "output",
-                            "execution",
-                        ]
+                    if (
+                        not config_data
+                        or not isinstance(config_data, dict)
+                        or not any(
+                            key in config_data
+                            for key in [
+                                "system",
+                                "database",
+                                "benchmarks",
+                                "output",
+                                "execution",
+                            ]
+                        )
                     ):
+                        if self.strict:
+                            raise ValueError(
+                                f"Configuration file {self.config_path} is empty or has no recognized sections"
+                            )
                         return self._get_default_config()
 
                     # Merge with defaults to ensure all required fields exist
@@ -224,11 +238,15 @@ class ConfigManager:
                     merged_config = deep_merge_dicts(default_config.model_dump(), config_data)
                     return BenchBoxConfig(**merged_config)
                 except Exception as e:
+                    if self.strict:
+                        raise ValueError(f"Failed to load config from {self.config_path}: {e}") from e
                     console.print(f"[yellow]Warning: Failed to load config from {self.config_path}: {e}[/yellow]")
                     return self._get_default_config()
             else:
                 return self._get_default_config()
         except (PermissionError, OSError) as e:
+            if self.strict:
+                raise ValueError(f"Failed to access config from {self.config_path}: {e}") from e
             console.print(f"[yellow]Warning: Permission denied accessing {self.config_path}: {e}[/yellow]")
             return self._get_default_config()
 
@@ -253,7 +271,9 @@ class ConfigManager:
             },
             output={
                 "formats": ["json", "console"],
-                "directory": "./benchmark_runs/results",
+                # No "directory" key: the results root is resolved at run time
+                # from BENCHBOX_OUTPUT_DIR / the work-tree-anchored default, so a
+                # config default here would be dead and misleading.
                 "timestamp_format": "%Y%m%d_%H%M%S",
                 "submit_to_service": False,
                 "service_url": "https://api.benchbox.dev/v1",
@@ -285,12 +305,10 @@ class ConfigManager:
                 },
             },
             tuning={
-                "enabled": False,
                 "default_config_file": None,
                 "validate_on_load": True,
                 "allow_platform_incompatible": False,
                 "environment_overrides": {
-                    "BENCHBOX_TUNING_ENABLED": "enabled",
                     "BENCHBOX_TUNING_CONFIG": "default_config_file",
                 },
             },
@@ -701,7 +719,10 @@ class ConfigManager:
 
         Args:
             config: UnifiedTuningConfiguration to validate
-            platform: Platform to validate against (default: uses configured preferred platform)
+            platform: Canonical platform type key to validate against (e.g.
+                'duckdb', 'clickhouse-local'). Default: the configured
+                preferred platform ('database.preferred'), which is stored as
+                a canonical key -- never pass an adapter display name here.
         """
         if platform is None:
             platform = self.get("database.preferred", "duckdb")
@@ -715,8 +736,15 @@ class ConfigManager:
         if config.foreign_keys.enabled is None:
             constraint_errors.append("foreign_keys.enabled must be explicitly specified (true or false)")
 
-        # Validate platform-specific configuration
-        platform_errors = config.validate_for_platform(platform)
+        # Validate platform-specific configuration. Warnings (constraint-type
+        # mismatches, platforms without compatibility data) are surfaced but
+        # never fail the load; only hard errors do.
+        platform_errors, platform_warnings = config.validate_for_platform_detailed(platform)
+
+        if platform_warnings:
+            console.print(f"[yellow]⚠️ Unified tuning validation warnings for platform '{platform}':[/yellow]")
+            for warning in platform_warnings:
+                console.print(f"  - {warning}")
 
         all_errors = constraint_errors + platform_errors
 
@@ -839,7 +867,8 @@ class DirectoryManager:
 
         When ``base_dir`` is omitted, the root is resolved via
         :func:`resolve_benchmark_runs_dir`, which honors
-        ``BENCHBOX_OUTPUT_DIR`` and falls back to ``Path.cwd() / "benchmark_runs"``.
+        ``BENCHBOX_OUTPUT_DIR`` and falls back to a worktree-sibling
+        ``benchmark_runs`` root (or a cwd-local root outside Git).
         """
         from benchbox.utils.path_utils import resolve_benchmark_runs_dir
 
@@ -1015,3 +1044,29 @@ class DirectoryManager:
             "databases": get_dir_size(self.databases_dir),
             "total": get_dir_size(self.base_dir),
         }
+
+
+class CLIConfigProvider(ConfigInterface):
+    """Expose the CLI's ConfigManager through the utils-level config seam.
+
+    This adapter lives in the CLI layer, not in benchbox.utils, so the import
+    edge points DOWN (cli -> utils) instead of up. benchbox.utils.config_interface
+    used to import benchbox.cli.config itself, which is the layering violation
+    .importlinter carried as an ignore entry.
+    """
+
+    def __init__(self, config_manager: "ConfigManager | None" = None):
+        self._config_manager = config_manager or ConfigManager()
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._config_manager.get(key, default)
+
+    def set(self, key: str, value: Any) -> None:
+        self._config_manager.set(key, value)
+
+
+def install_cli_config_provider(config_manager: "ConfigManager | None" = None) -> CLIConfigProvider:
+    """Make the CLI's configuration the process-wide provider."""
+    provider = CLIConfigProvider(config_manager)
+    set_config_provider(provider)
+    return provider

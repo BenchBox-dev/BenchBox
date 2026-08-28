@@ -371,6 +371,44 @@ class TestMotherDuckCreateConnection:
         assert "motherduck_token=****" in str(exc_info.value)
         assert "motherduck_token=****" in caplog.text
 
+    def test_create_connection_does_not_leak_token_through_chained_cause(self):
+        """Redacting the message is not enough on its own.
+
+        ``raise ... from e`` keeps the original driver exception as __cause__,
+        and Python prints its text in the "direct cause" section of any
+        traceback - so a token scrubbed from the message still reaches logs and
+        CI output through the chain. The raised error must expose the token
+        neither in its message nor anywhere in its cause/context chain.
+        """
+        import traceback
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="secret-token", database="benchbox")
+
+        with (
+            patch("benchbox.platforms.motherduck.duckdb") as mock_duckdb,
+            pytest.raises(ConnectionError) as exc_info,
+        ):
+            mock_duckdb.connect.side_effect = RuntimeError(
+                "failed to connect to md:benchbox?motherduck_token=secret-token"
+            )
+            adapter.create_connection()
+
+        assert exc_info.value.__cause__ is None
+        # __suppress_context__ is what stops the implicit "During handling of
+        # the above exception" section from printing the raw driver error;
+        # `from None` sets it, a plain `raise ConnectionError(...)` would not.
+        assert exc_info.value.__suppress_context__ is True
+
+        # End-to-end: the rendered traceback - the form that actually reaches a
+        # log file or CI console - carries no token material at all.
+        rendered = "".join(
+            traceback.format_exception(type(exc_info.value), exc_info.value, exc_info.value.__traceback__)
+        )
+        assert "secret-token" not in rendered
+        assert "motherduck_token=****" in rendered
+
 
 class TestMotherDuckAddCliArguments:
     """Test add_cli_arguments registers expected flags."""

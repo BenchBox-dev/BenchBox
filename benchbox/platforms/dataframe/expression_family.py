@@ -44,7 +44,11 @@ from benchbox.platforms.dataframe._result_helpers import (
     build_success_result_dict,
 )
 from benchbox.platforms.dataframe.benchmark_mixin import BenchmarkExecutionMixin
-from benchbox.platforms.dataframe.shared_loading import declared_string_columns, resolve_dataframe_csv_dialect
+from benchbox.platforms.dataframe.shared_loading import (
+    declared_string_columns,
+    declared_temporal_columns,
+    resolve_dataframe_csv_dialect,
+)
 from benchbox.platforms.dataframe.tuning_mixin import TuningConfigurableMixin
 from benchbox.platforms.dataframe.unified_frame import UnifiedExpr, UnifiedLazyFrame, UnifiedWhen
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -937,6 +941,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         column_names: list[str] | None = None,
         null_marker: str | None = None,
         string_columns: list[str] | None = None,
+        temporal_columns: dict[str, str] | None = None,
     ) -> LazyDF:
         """Read a CSV file into a DataFrame.
 
@@ -948,6 +953,8 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
             string_columns: Declared string columns whose empty CSV fields must
                 stay ``""`` when ``null_marker`` is ``None``.
+            temporal_columns: Declared date/timestamp columns keyed by normalized
+                Arrow type (``date32`` or ``timestamp[us]``).
 
         Returns:
             LazyFrame/DataFrame with the file contents
@@ -1249,6 +1256,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
                 default_has_header=has_header,
             )
             string_columns = declared_string_columns(benchmark, table_name, column_names)
+            temporal_columns = declared_temporal_columns(benchmark, table_name, column_names)
 
             df = self._load_csv_files(
                 file_paths,
@@ -1257,6 +1265,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
                 column_names=column_names,
                 null_marker=null_marker,
                 string_columns=string_columns,
+                temporal_columns=temporal_columns,
             )
 
         # Register table
@@ -1561,6 +1570,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         column_names: list[str] | None,
         null_marker: str | None = None,
         string_columns: list[str] | None = None,
+        temporal_columns: dict[str, str] | None = None,
     ) -> LazyDF:
         """Load CSV/TBL files.
 
@@ -1572,6 +1582,8 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             null_marker: Passed through to read_csv for trailing-delimiter probing.
             string_columns: Declared string columns whose empty CSV fields must
                 stay ``""`` when ``null_marker`` is ``None``.
+            temporal_columns: Declared date/timestamp columns keyed by normalized
+                Arrow type (``date32`` or ``timestamp[us]``).
 
         Returns:
             Combined DataFrame
@@ -1584,6 +1596,8 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         }
         if string_columns:
             read_kwargs["string_columns"] = string_columns
+        if temporal_columns:
+            read_kwargs["temporal_columns"] = temporal_columns
 
         if len(file_paths) == 1:
             return self.read_csv(file_paths[0], **read_kwargs)

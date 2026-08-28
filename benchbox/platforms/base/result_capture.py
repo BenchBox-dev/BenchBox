@@ -30,14 +30,16 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import math
 import os
 import platform
 import re
 import statistics
 import threading
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -47,7 +49,13 @@ from benchbox.core.results.builder import (
     _BENCHMARK_FAMILY,
     normalize_benchmark_id,
 )
+from benchbox.core.results.metrics import percentile_ms, sample_stdev_ms
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT
+from benchbox.core.results.query_execution import (
+    query_duration_ms_from_legacy,
+    query_execution_from_legacy_dict,
+    query_execution_to_legacy_dict,
+)
 from benchbox.core.results.query_plan_models import (
     DEFAULT_PLAN_MAX_DEPTH,
     DEFAULT_RAW_OUTPUT_MAX_BYTES,
@@ -65,6 +73,58 @@ from benchbox.platforms.base.utils import is_non_interactive
 from benchbox.utils.clock import elapsed_seconds
 from benchbox.utils.printing import quiet_console
 from benchbox.utils.timeout_manager import run_with_timeout
+
+MaterializedRows = Sequence[Sequence[object]]
+MaterializedRowsSource = MaterializedRows | Callable[[], MaterializedRows]
+MaterializedResultValidator = Callable[[str, MaterializedRows], None]
+
+_MATERIALIZED_RESULT_VALIDATOR: ContextVar[MaterializedResultValidator | None] = ContextVar(
+    "benchbox_materialized_result_validator",
+    default=None,
+)
+
+
+@contextmanager
+def materialized_result_validation(validator: MaterializedResultValidator) -> Iterator[None]:
+    """Apply a benchmark-local full-result oracle to one adapter execution.
+
+    A context variable keeps concurrent throughput streams isolated while
+    avoiding a public ``execute_query`` signature change across every adapter.
+    Platform implementations pass their already-materialized rows to the
+    shared result builder; the oracle runs after the adapter has captured the
+    measured execution duration.
+    """
+    token = _MATERIALIZED_RESULT_VALIDATOR.set(validator)
+    try:
+        yield
+    finally:
+        _MATERIALIZED_RESULT_VALIDATOR.reset(token)
+
+
+def materialized_result_validation_active() -> bool:
+    """Return whether the current adapter execution needs its full result rows."""
+    return _MATERIALIZED_RESULT_VALIDATOR.get() is not None
+
+
+def apply_materialized_result_validation(
+    result: dict[str, Any],
+    query_id: str,
+    materialized_rows: MaterializedRowsSource | None,
+) -> None:
+    """Apply the active benchmark-local oracle to a successful result in place."""
+    materialized_validator = _MATERIALIZED_RESULT_VALIDATOR.get()
+    if materialized_validator is None or result["status"] != "SUCCESS":
+        return
+
+    try:
+        if materialized_rows is None:
+            raise RuntimeError("platform adapter did not expose materialized rows for structural validation")
+        rows = materialized_rows if isinstance(materialized_rows, Sequence) else materialized_rows()
+        materialized_validator(str(query_id), rows)
+    except Exception as exc:
+        result["status"] = "FAILED"
+        result["error"] = str(exc) or type(exc).__name__
+
 
 try:
     from benchbox.core.results.models import ExecutionPhases, QueryDefinition
@@ -261,67 +321,39 @@ def _extract_result_field(result: Any, attr: str, default: Any = None) -> Any:
 
 
 def _coerce_time_seconds(result: Any) -> float | None:
-    """Best-effort conversion of execution time to seconds."""
-    time_ms = _extract_result_field(result, "execution_time_ms")
-    if time_ms is not None:
-        try:
-            return float(time_ms) / 1000.0
-        except (TypeError, ValueError):  # pragma: no cover - defensive
-            return None
+    """Convert an explicitly-unit-tagged query duration to seconds.
 
-    time_value = _extract_result_field(result, "execution_time_seconds")
-    if time_value is None:
-        time_value = _extract_result_field(result, "duration")
-
-    if time_value is None:
-        return None
-
-    try:
-        seconds = float(time_value)
-    except (TypeError, ValueError):  # pragma: no cover - defensive
-        return None
-
-    # Heuristic: treat very large numbers as milliseconds
-    if seconds > 1000:
-        seconds /= 1000.0
-    return seconds
-
-
-def _percentile(values: list[float], percentile: float) -> float:
-    """Linear-interpolation percentile on a sorted list."""
-    if not values:
-        return 0.0
-    if len(values) == 1:
-        return values[0]
-
-    rank = (percentile / 100) * (len(values) - 1)
-    lower_idx = math.floor(rank)
-    upper_idx = math.ceil(rank)
-
-    if lower_idx == upper_idx:
-        return values[int(rank)]
-
-    weight = rank - lower_idx
-    return values[lower_idx] + weight * (values[upper_idx] - values[lower_idx])
+    Duration aliases retain the canonical adapter's validation and explicit
+    units without coupling this field-specific summary to unrelated legacy
+    fields such as ``rows_returned``.
+    """
+    duration_ms = query_duration_ms_from_legacy(result)
+    return None if duration_ms is None else duration_ms / 1000.0
 
 
 def _build_latency_stats(values: list[float]) -> dict[str, Any] | None:
     """Compute latency stats (min/max/mean/median/p90/p95/p99/stdev) in both units."""
+
     if not values:
         return None
 
     sorted_values = sorted(values)
     count = len(sorted_values)
+    # Percentiles and stdev delegate to the canonical core helpers so that
+    # result bundles and CLI/MCP surfaces report the same numbers.  Values
+    # are in seconds; convert to milliseconds for percentile_ms /
+    # sample_stdev_ms, then back to seconds for the seconds block.
+    values_ms = [v * 1000.0 for v in sorted_values]
     stats_seconds = {
         "count": count,
         "min": sorted_values[0],
         "max": sorted_values[-1],
         "mean": statistics.fmean(sorted_values),
         "median": statistics.median(sorted_values),
-        "p90": _percentile(sorted_values, 90),
-        "p95": _percentile(sorted_values, 95),
-        "p99": _percentile(sorted_values, 99),
-        "stdev": statistics.pstdev(sorted_values) if count > 1 else 0.0,
+        "p90": percentile_ms(values_ms, 0.90) / 1000.0,
+        "p95": percentile_ms(values_ms, 0.95) / 1000.0,
+        "p99": percentile_ms(values_ms, 0.99) / 1000.0,
+        "stdev": sample_stdev_ms(values_ms) / 1000.0,
     }
 
     stats_milliseconds = {key: (value * 1000.0 if key != "count" else value) for key, value in stats_seconds.items()}
@@ -336,15 +368,20 @@ def _build_numeric_stats(values: list[float]) -> dict[str, Any] | None:
 
     sorted_values = sorted(values)
     count = len(sorted_values)
+    # Row-count percentiles use the same nearest-rank definition as timing
+    # percentiles; percentile_ms is reused for its rank math (unit is
+    # irrelevant to the percentile) and sample_stdev_ms for stdev so that
+    # every surface shares one stdev definition (sample, not population).
+    values_float = [float(v) for v in sorted_values]
     return {
         "count": count,
         "min": sorted_values[0],
         "max": sorted_values[-1],
         "mean": statistics.fmean(sorted_values),
         "median": statistics.median(sorted_values),
-        "p90": _percentile(sorted_values, 90),
-        "p95": _percentile(sorted_values, 95),
-        "stdev": statistics.pstdev(sorted_values) if count > 1 else 0.0,
+        "p90": percentile_ms(values_float, 0.90),
+        "p95": percentile_ms(values_float, 0.95),
+        "stdev": sample_stdev_ms(values_float),
     }
 
 
@@ -548,7 +585,7 @@ class ResultCaptureMixin:
         }
 
         try:
-            import psutil  # type: ignore
+            import psutil
         except ImportError:
             snapshot["reason"] = "psutil not installed"
             return snapshot
@@ -1282,6 +1319,7 @@ class ResultCaptureMixin:
         validation_result: Any = None,
         error: str | None = None,
         result_digest: str | None = None,
+        materialized_rows: MaterializedRowsSource | None = None,
     ) -> dict[str, Any]:
         """Build query result dictionary with consistent validation field mapping.
 
@@ -1298,6 +1336,8 @@ class ResultCaptureMixin:
             result_digest: Gate-only full-result value digest (optional). Present
                 only when BENCHBOX_EMIT_RESULT_DIGEST armed the value oracle; absent
                 on a normal run so the payload shape is unchanged.
+            materialized_rows: Full rows, or a lazy row supplier, for an active
+                benchmark-local structural oracle. Ignored when no oracle is active.
 
         Returns:
             Dictionary with standardized query result fields
@@ -1344,7 +1384,17 @@ class ResultCaptureMixin:
 
             result_dict["row_count_validation"] = row_count_validation
 
-        return result_dict
+        apply_materialized_result_validation(result_dict, query_id, materialized_rows)
+
+        execution = query_execution_from_legacy_dict(result_dict)
+        compatibility_result = query_execution_to_legacy_dict(
+            execution,
+            include_milliseconds=False,
+            include_seconds=True,
+            error_field="error",
+        )
+        compatibility_result["first_row"] = first_row
+        return compatibility_result
 
     def _build_query_failure_result(
         self,
@@ -1375,14 +1425,24 @@ class ResultCaptureMixin:
                 exc_info=True,
             )
 
-        return {
-            "query_id": query_id,
-            "status": "FAILED",
-            "execution_time_seconds": execution_time,
-            "rows_returned": 0,
-            "error": str(exception),
-            "error_type": type(exception).__name__,
-        }
+        execution = QueryExecution(
+            query_id=query_id,
+            stream_id=None,
+            execution_order=None,
+            execution_time_seconds=execution_time,
+            status="FAILED",
+            rows_returned=0,
+            error_message=str(exception),
+            error_type=type(exception).__name__,
+            iteration=None,
+            run_type=None,
+        )
+        return query_execution_to_legacy_dict(
+            execution,
+            include_milliseconds=False,
+            include_seconds=True,
+            error_field="error",
+        )
 
     def _build_dry_run_result(self, query_id: str) -> dict[str, Any]:
         """Build standardized dry-run query result dictionary.
@@ -1396,15 +1456,24 @@ class ResultCaptureMixin:
             Dictionary with standardized dry-run result fields
         """
         self.log_very_verbose(f"Captured query {query_id} for dry-run")
-        return {
-            "query_id": query_id,
-            "status": "DRY_RUN",
-            "execution_time_seconds": 0.0,
-            "rows_returned": 0,
-            "first_row": None,
-            "error": None,
-            "dry_run": True,
-        }
+        execution = QueryExecution(
+            query_id=query_id,
+            stream_id=None,
+            execution_order=None,
+            execution_time_seconds=0.0,
+            status="DRY_RUN",
+            rows_returned=0,
+            iteration=None,
+            run_type=None,
+        )
+        compatibility_result = query_execution_to_legacy_dict(
+            execution,
+            include_milliseconds=False,
+            include_seconds=True,
+            error_field="error",
+        )
+        compatibility_result.update(first_row=None, error=None, dry_run=True)
+        return compatibility_result
 
     @staticmethod
     def _normalize_and_validate_file_paths(
@@ -1441,6 +1510,7 @@ class ResultCaptureMixin:
         tunings_applied_dict,
         tuning_validation_status,
         tuning_metadata_saved,
+        requested_config_hash=None,
     ):
         """Create a benchmark result indicating validation failure."""
         from datetime import datetime as _datetime
@@ -1501,6 +1571,9 @@ class ResultCaptureMixin:
             tunings_applied=tunings_applied_dict,
             tuning_validation_status=tuning_validation_status,
             tuning_metadata_saved=tuning_metadata_saved,
+            tuning_config_hash=requested_config_hash,
+            tuning_source_file=getattr(self, "tuning_source_file", None),
+            tuning_source=getattr(self, "tuning_source", None),
             platform_info=platform_info,
             **normalized_metadata,
             validation_status="FAILED",  # This is the key fix
@@ -1511,6 +1584,8 @@ class ResultCaptureMixin:
         """Convert throughput test outputs into structured execution metadata."""
         if throughput_result is None:
             return None
+
+        from benchbox.core.throughput.result import throughput_result_succeeded, throughput_stream_succeeded
 
         streams: list[ThroughputStream] = []
         total_queries_executed = 0
@@ -1530,8 +1605,19 @@ class ResultCaptureMixin:
 
             query_executions: list[QueryExecution] = []
             for idx, query_result in enumerate(stream_result.query_results, start=1):
-                execution_order = query_result.get("position") or query_result.get("execution_order") or idx
-                execution_time_ms = int(float(query_result.get("execution_time_seconds", 0.0)) * 1000)
+                # ``position`` is the stream-local slot. It is deliberately
+                # distinct from the flattened result's global execution order;
+                # preserve an explicit zero instead of using truthiness.
+                position = query_result.get("position")
+                execution_order_value = query_result.get("execution_order")
+                if position is not None:
+                    execution_order = position
+                elif execution_order_value is not None:
+                    execution_order = execution_order_value
+                else:
+                    execution_order = idx
+                execution_time_seconds = query_result.get("execution_time_seconds")
+                execution_time_ms = None if execution_time_seconds is None else float(execution_time_seconds) * 1000
 
                 query_executions.append(
                     QueryExecution(
@@ -1546,6 +1632,14 @@ class ResultCaptureMixin:
                     )
                 )
 
+            stream_success = throughput_stream_succeeded(stream_result)
+            stream_error = getattr(stream_result, "error", None)
+            if not stream_success and not stream_error:
+                stream_error = (
+                    f"{getattr(stream_result, 'queries_successful', 0)}/"
+                    f"{getattr(stream_result, 'queries_executed', 0)} queries succeeded"
+                )
+
             streams.append(
                 ThroughputStream(
                     stream_id=stream_result.stream_id,
@@ -1553,12 +1647,15 @@ class ResultCaptureMixin:
                     end_time=end_iso,
                     duration_ms=duration_ms,
                     query_executions=query_executions,
+                    success=stream_success,
+                    error_message=stream_error,
                 )
             )
             total_queries_executed += getattr(stream_result, "queries_executed", len(stream_result.query_results))
 
         duration_ms = int(float(getattr(throughput_result, "total_time", 0.0)) * 1000)
         end_time_iso = throughput_result.end_time or datetime.now().isoformat()
+        phase_success = throughput_result_succeeded(throughput_result)
 
         return ThroughputTestPhase(
             start_time=throughput_result.start_time,
@@ -1567,7 +1664,9 @@ class ResultCaptureMixin:
             num_streams=getattr(getattr(throughput_result, "config", None), "num_streams", len(streams)),
             streams=streams,
             total_queries_executed=total_queries_executed,
-            throughput_at_size=getattr(throughput_result, "throughput_at_size", 0.0),
+            throughput_at_size=(getattr(throughput_result, "throughput_at_size", None) if phase_success else None),
+            success=phase_success,
+            errors=list(getattr(throughput_result, "errors", []) or []),
         )
 
     @staticmethod
@@ -1613,22 +1712,19 @@ class ResultCaptureMixin:
     def _create_standard_execution_phase(
         self, query_results: list[dict[str, Any]], stream_id: str = "standard"
     ) -> list[QueryExecution]:
-        """Convert legacy query results to enhanced query executions."""
+        """Convert compatibility dictionaries to canonical query executions."""
         query_executions = []
 
         for i, result in enumerate(query_results):
-            query_executions.append(
-                QueryExecution(
-                    query_id=result.get("query_id", f"Q{i + 1}"),
-                    stream_id=stream_id,
-                    execution_order=i + 1,
-                    execution_time_ms=round(result.get("execution_time_seconds", 0) * 1000, 2),
-                    status=result.get("status", "UNKNOWN"),
-                    rows_returned=result.get("rows_returned"),
-                    error_message=result.get("error"),
-                    run_type=result.get("run_type", QUERY_RUN_TYPE_MEASUREMENT),
-                )
-            )
+            source = dict(result)
+            source.setdefault("query_id", f"Q{i + 1}")
+            source.setdefault("stream_id", stream_id)
+            source.setdefault("execution_order", i + 1)
+            source.setdefault("run_type", QUERY_RUN_TYPE_MEASUREMENT)
+            execution = query_execution_from_legacy_dict(source)
+            if execution.execution_time_ms is not None:
+                execution = replace(execution, execution_time_ms=round(execution.execution_time_ms, 2))
+            query_executions.append(execution)
 
         return query_executions
 
@@ -1692,60 +1788,6 @@ class ResultCaptureMixin:
         quiet_console.print(f"✅ External tables created in {loading_time:.2f}s{_fmt_tag}")
         data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
         return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, False
-
-    def _setup_fresh_database_phases(self, benchmark, connection: Any, effective_tuning_config) -> tuple:
-        """Set up phases for fresh database (schema creation, tuning, data loading).
-
-        When ``self.table_mode == "external"`` the adapter skips native schema
-        creation and tuning, and calls ``create_external_tables`` instead of
-        ``load_data``.
-
-        Returns:
-            Tuple of (schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, tuning_metadata_saved)
-        """
-        data_dir = Path(benchmark.output_dir) if hasattr(benchmark, "output_dir") else Path(".")
-
-        if self.table_mode == "external":
-            # External table mode: skip native schema/tuning, create external references
-            if not self.supports_external_tables:
-                raise RuntimeError(f"Platform '{self.platform_name}' does not support --table-mode external")
-            validate_fn = getattr(self, "validate_external_table_requirements", None)
-            if callable(validate_fn):
-                validate_fn()
-
-            schema_time = 0.0
-            schema_creation_phase = self._create_enhanced_schema_creation_phase(benchmark, connection, 0.0)
-            schema_creation_phase.status = "SKIPPED"
-
-            quiet_console.print("Creating external tables...")
-            table_stats, loading_time, per_table_timings = self.create_external_tables(benchmark, connection, data_dir)
-            _fmt_tag = f" [{self.external_format}]" if self.external_format else ""
-            quiet_console.print(f"✅ External tables created in {loading_time:.2f}s{_fmt_tag}")
-            data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
-            return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, False
-
-        quiet_console.print("Creating database schema...")
-        schema_time = self.create_schema(benchmark, connection)
-        schema_creation_phase = self._create_enhanced_schema_creation_phase(benchmark, connection, schema_time)
-
-        tuning_metadata_saved = False
-        if self.tuning_enabled and effective_tuning_config:
-            quiet_console.print("Applying unified tuning configuration...")
-            self.apply_unified_tuning(effective_tuning_config, connection)
-            quiet_console.print("✅ Unified tuning configuration applied")
-
-            quiet_console.print("Saving tuning metadata...")
-            tuning_metadata_saved = self.save_tuning_metadata(connection)
-            if tuning_metadata_saved:
-                quiet_console.print("✅ Tuning metadata saved")
-            else:
-                quiet_console.print("⚠️ Failed to save tuning metadata")
-
-        quiet_console.print("Loading benchmark data...")
-        table_stats, loading_time, per_table_timings = self.load_data(benchmark, connection, data_dir)
-        quiet_console.print(f"✅ Data loading completed in {loading_time:.2f}s")
-        data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
-        return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, tuning_metadata_saved
 
     def _check_validation_failure(self, validation_phase) -> bool:
         """Check if validation failed and log details. Returns True if validation failed."""
@@ -1850,7 +1892,9 @@ class ResultCaptureMixin:
             )
             from benchbox.utils.system_info import get_system_info
 
-            anonymization_manager = AnonymizationManager(AnonymizationConfig())
+            # Soft-read env salt when present so capture-side machine ids match
+            # salted public export. Unset salt keeps the empty OSS default.
+            anonymization_manager = AnonymizationManager(AnonymizationConfig.from_public_environ())
             system_info = get_system_info()
             system_profile = system_info.to_dict()
             anonymous_machine_id = anonymization_manager.get_anonymous_machine_id()

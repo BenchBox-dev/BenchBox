@@ -11,6 +11,7 @@ from benchbox.core.coffeeshop.schema import (
     TABLES,
     get_all_create_table_sql,
     get_create_table_sql,
+    get_table_loading_order,
     get_tunings,
 )
 
@@ -106,3 +107,26 @@ class TestGetTunings:
         assert order_lines.partitioning is not None
         partition_cols = [c.name for c in order_lines.partitioning]
         assert "order_date" in partition_cols
+
+
+class TestGetTableLoadingOrder:
+    """Regression coverage for the FK load-ordering defect
+    (tuning-fk-load-ordering-fix-20260716): without get_table_loading_order,
+    callers fall back to alphabetical order. For CoffeeShop's current
+    3-table schema alphabetical happens to be FK-safe by coincidence
+    (dim_locations, dim_products, order_lines) -- this test asserts the
+    *derived* property (order_lines depends on both dims) rather than
+    relying on that coincidence, so it stays meaningful if the schema
+    grows.
+    """
+
+    def test_includes_every_table_exactly_once(self):
+        order = get_table_loading_order()
+        assert sorted(order) == sorted(TABLES.keys())
+        assert len(order) == len(set(order))
+
+    def test_order_lines_loads_after_both_dimension_tables(self):
+        order = get_table_loading_order()
+        position = {name: i for i, name in enumerate(order)}
+        assert position["dim_locations"] < position["order_lines"]
+        assert position["dim_products"] < position["order_lines"]

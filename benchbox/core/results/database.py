@@ -16,15 +16,19 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.results.environment import build_platform_metadata_payload
 from benchbox.core.results.models import BenchmarkResults
+from benchbox.core.results.platform_options import sanitize_platform_options
+from benchbox.core.results.regression_policy import is_regression
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +42,14 @@ _RANKING_METRIC_CONFIG = {
     "power_at_size": ("power_at_size", "DESC"),
     "cost_efficiency": ("total_cost / NULLIF(successful_queries, 0)", "ASC"),
 }
+_BACKUP_TABLE_NAME_PATTERN = re.compile(r"^queries_orphan_backup_\d{20}$")
+
+
+def _validate_backup_table_name(table_name: str) -> str:
+    """Validate a generated orphan-backup table name before SQL interpolation."""
+    if _BACKUP_TABLE_NAME_PATTERN.fullmatch(table_name) is None:
+        raise ValueError(f"Unsafe SQLite backup table name: {table_name!r}")
+    return table_name
 
 
 @dataclass
@@ -155,7 +167,7 @@ class PerformanceTrend:
     max_geometric_mean_ms: float
     sample_count: int
     change_pct: float | None  # Change from previous period
-    is_regression: bool  # True if >10% slowdown
+    is_regression: bool  # Per benchbox.core.results.regression_policy
 
 
 @dataclass
@@ -193,6 +205,7 @@ class ResultDatabase:
         """Get a database connection with row factory."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
         try:
             yield conn
         finally:
@@ -351,12 +364,41 @@ class ResultDatabase:
             total_cost = result.cost_summary.get("total_cost")
 
         # Build metadata
-        metadata = {
+        metadata: dict[str, Any] = {
             "system_profile": result.system_profile,
-            "platform_info": result.platform_info,
+            # ~/.benchbox/results.db outlives the run; sanitize so a
+            # convention slip in an adapter's platform_info never persists a
+            # secret to the local sink.
+            "platform_info": sanitize_platform_options(result.platform_info or {}),
             "tunings_applied": result.tunings_applied,
             "test_execution_type": result.test_execution_type,
         }
+        # Persist filtered platform metadata when the result carries explicit
+        # blocks so the local DB is not a silent egress channel for raw_config,
+        # raw_metadata, or the normalized deployment/cloud/compute/storage
+        # mappings. Same structural boundary as public/private payloads.
+        has_explicit_platform_meta = any(
+            getattr(result, name, None) is not None
+            for name in (
+                "platform_deployment",
+                "platform_cloud",
+                "platform_compute",
+                "platform_storage",
+                "platform_raw_config",
+                "platform_raw_metadata",
+            )
+        )
+        if has_explicit_platform_meta:
+            metadata["platform"] = build_platform_metadata_payload(
+                platform_info=result.platform_info,
+                platform_config=None,
+                deployment=getattr(result, "platform_deployment", None),
+                cloud=getattr(result, "platform_cloud", None),
+                compute=getattr(result, "platform_compute", None),
+                storage=getattr(result, "platform_storage", None),
+                raw_config=getattr(result, "platform_raw_config", None),
+                raw_metadata=getattr(result, "platform_raw_metadata", None),
+            )
 
         with self._connection() as conn:
             cursor = conn.cursor()
@@ -649,6 +691,69 @@ class ResultDatabase:
                 logger.info(f"Deleted result {execution_id}")
             return deleted
 
+    def count_orphaned_queries(self) -> int:
+        """Count query rows whose parent result no longer exists."""
+        with self._connection() as conn:
+            row = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM queries AS q
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM results AS r WHERE r.id = q.result_id
+                )
+                """
+            ).fetchone()
+            return int(row[0])
+
+    def repair_orphaned_queries(self, *, dry_run: bool = True) -> int:
+        """Back up and remove orphaned query rows when explicitly requested.
+
+        Args:
+            dry_run: Return the orphan count without changing the database.
+
+        Returns:
+            Number of orphaned query rows found (and removed when ``dry_run`` is
+            false). A timestamped backup table is created before deletion.
+        """
+        with self._connection() as conn:
+            row = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM queries AS q
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM results AS r WHERE r.id = q.result_id
+                )
+                """
+            ).fetchone()
+            orphan_count = int(row[0])
+            if dry_run or orphan_count == 0:
+                return orphan_count
+
+            backup_table = _validate_backup_table_name(
+                f"queries_orphan_backup_{datetime.now(timezone.utc):%Y%m%d%H%M%S%f}"
+            )
+            conn.execute(
+                f"""
+                CREATE TABLE {backup_table} AS
+                SELECT q.*
+                FROM queries AS q
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM results AS r WHERE r.id = q.result_id
+                )
+                """
+            )
+            conn.execute(
+                """
+                DELETE FROM queries
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM results AS r WHERE r.id = queries.result_id
+                )
+                """
+            )
+            conn.commit()
+            logger.warning("Removed %d orphaned query rows; backup table: %s", orphan_count, backup_table)
+            return orphan_count
+
     def calculate_rankings(
         self,
         benchmark: str,
@@ -890,7 +995,7 @@ class ResultDatabase:
                     max_geometric_mean_ms=current.max_geometric_mean_ms,
                     sample_count=current.sample_count,
                     change_pct=change,
-                    is_regression=change > 10,  # >10% slowdown
+                    is_regression=is_regression(change),
                 )
 
         return trends
@@ -933,8 +1038,16 @@ class ResultDatabase:
                     trends = self.get_performance_trends(platform, benchmark, sf, periods=2, period_days=lookback_days)
 
                     for trend in trends:
-                        if trend.is_regression and trend.change_pct and trend.change_pct > threshold_pct:
-                            regressions.append(trend)
+                        # Evaluate against the caller's threshold only.
+                        # Previously this also required trend.is_regression,
+                        # which get_performance_trends computes at the default
+                        # 10% -- so any threshold below 10 was silently inert
+                        # (a 7% slowdown could never be reported at
+                        # --threshold 5). is_regression is recomputed here so
+                        # the returned records agree with the filter that
+                        # selected them.
+                        if is_regression(trend.change_pct, threshold_pct):
+                            regressions.append(replace(trend, is_regression=True))
 
         return regressions
 

@@ -11,12 +11,18 @@ import sys
 from pathlib import Path
 from typing import Iterable, cast
 
+from skill_sync_ci_policy import compare_repository_manifest
+
 DEFAULT_RULES = Path(".github/path-filters.yml")
 # The three buckets every ruleset must define. Any other top-level key in
 # path-filters.yml is treated as an "extra group" (see `extra_group_keys`)
 # and automatically grows a `<group>-needed` / `<group>-paths` output pair —
 # add a new gated job by adding a YAML key, not by touching this script.
 CORE_RULE_KEYS = {"safe-content", "content-guard", "code-ci"}
+# The workflow uses a semantic output name for the source-path gate while the
+# rules file keeps the job-oriented `explorer-tokens` key. Treat the alias as
+# a first-class extra group so output declarations stay in lockstep.
+GROUP_ALIASES = {"explorer-paths": "explorer-tokens"}
 LIST_NAMES = {
     "changed": "changed_paths",
     "content": "content_guard_paths",
@@ -86,9 +92,12 @@ def extra_group_keys(rules: dict[str, list[str]]) -> list[str]:
     Each name becomes a `<name>_paths` / `<name>_needed` decision key, a
     `<name>-needed` GitHub Actions output, and a `<name>.txt` helper list —
     all derived generically so a new gated job (e.g. `packaging`, `viz`)
-    only requires a new key in path-filters.yml, not a script change.
+    only requires a new key in path-filters.yml, not a script change. The
+    small alias map above lets a job use a clearer output name when its rule
+    key is intentionally job-oriented.
     """
-    return [key for key in rules if key not in CORE_RULE_KEYS]
+    groups = [key for key in rules if key not in CORE_RULE_KEYS]
+    return [*groups, *(alias for alias, source in GROUP_ALIASES.items() if source in rules)]
 
 
 def git_changed_paths(base_ref: str) -> list[str]:
@@ -121,26 +130,37 @@ def ordered_unique(paths: Iterable[str]) -> list[str]:
     return result
 
 
-def classify_paths(changed_paths: list[str], rules: dict[str, list[str]]) -> dict[str, object]:
+def classify_paths(
+    changed_paths: list[str],
+    rules: dict[str, list[str]],
+    *,
+    forced_code_paths: Iterable[str] = (),
+    manifest_decision_reason: str | None = None,
+) -> dict[str, object]:
     safe_patterns = rules["safe-content"]
     content_patterns = rules["content-guard"]
     code_patterns = rules["code-ci"]
+    specialized_patterns = rules.get("skill-integrity", [])
+    forced = set(forced_code_paths)
 
     safe_paths = [path for path in changed_paths if matches_any(path, safe_patterns)]
     content_paths = [path for path in changed_paths if matches_any(path, content_patterns)]
+    specialized_paths = [path for path in changed_paths if matches_any(path, specialized_patterns)]
     explicit_code_paths = [path for path in changed_paths if matches_any(path, code_patterns)]
-    # A path is `code` if it is not on the safe-content allowlist OR if it is
-    # explicitly on the code-ci allowlist (the latter wins over safe-content
-    # so a file like `docs/conf.py` runs full CI even when `docs/**.md`
-    # is also matched in the same diff).
-    code_paths = [path for path in changed_paths if path not in safe_paths or path in explicit_code_paths]
-    # `unknown_paths` are code-classified paths with no explicit code-ci
-    # match — typically a brand-new top-level area. They still route through
-    # code-ci because the classifier fails closed.
-    unknown_paths = [path for path in code_paths if not matches_any(path, code_patterns)]
+    # Explicit code and semantic trust-boundary decisions win over every
+    # narrower class. Otherwise an allowlisted specialized path is excluded
+    # from both code and unknown; an unmatched path remains fail-closed code.
+    code_paths = [
+        path
+        for path in changed_paths
+        if path in forced or path in explicit_code_paths or (path not in safe_paths and path not in specialized_paths)
+    ]
+    unknown_paths = [path for path in code_paths if path not in forced and not matches_any(path, code_patterns)]
 
-    safe_content_only = bool(changed_paths) and not code_paths
-    needs_code_ci = not safe_content_only
+    skill_integrity_needed = bool(specialized_paths)
+    safe_content_only = bool(changed_paths) and not code_paths and not skill_integrity_needed
+    needs_code_ci = not bool(changed_paths) or bool(code_paths)
+    skill_integrity_only = bool(changed_paths) and skill_integrity_needed and not needs_code_ci
     markdown_paths = [path for path in content_paths if path.endswith(".md")]
     yaml_paths = [path for path in content_paths if path.endswith((".yaml", ".yml"))]
     todo_paths = [path for path in yaml_paths if path.startswith("_project/TODO/") or path.startswith("_project/DONE/")]
@@ -159,15 +179,24 @@ def classify_paths(changed_paths: list[str], rules: dict[str, list[str]]) -> dic
         "safe_content_only": safe_content_only,
         "needs_code_ci": needs_code_ci,
         "content_guard_needed": bool(content_paths),
-        "estimated_runner_minutes_saved": 5 if safe_content_only else 0,
+        "skill_integrity_only": skill_integrity_only,
+        "specialized_paths": specialized_paths,
+        "forced_code_paths": [path for path in changed_paths if path in forced],
+        "manifest_decision_reason": manifest_decision_reason,
+        "estimated_runner_minutes_saved": 5 if not needs_code_ci else 0,
     }
 
     group_keys = extra_group_keys(rules)
     for group in group_keys:
         group_id = group.replace("-", "_")
-        matched = [path for path in changed_paths if matches_any(path, rules[group])]
+        source_group = GROUP_ALIASES.get(group, group)
+        matched = [path for path in changed_paths if matches_any(path, rules[source_group])]
         decision[f"{group_id}_paths"] = matched
         decision[f"{group_id}_needed"] = bool(matched)
+    # `explorer-paths` is an output alias, not a nested `explorer/paths`
+    # namespace. Normalize its generic path key to the public JSON/list name.
+    if "explorer_paths_paths" in decision:
+        decision["explorer_paths"] = decision.pop("explorer_paths_paths")
     # Record which extra groups exist so downstream writers (GitHub output,
     # helper lists) can loop over them without re-deriving from raw rules.
     decision["extra_group_ids"] = [group.replace("-", "_") for group in group_keys]
@@ -188,6 +217,7 @@ def write_github_output(path: Path, decision: dict[str, object]) -> None:
         f"safe-content-only={bool_text(decision['safe_content_only'])}",
         f"needs-code-ci={bool_text(decision['needs_code_ci'])}",
         f"content-guard-needed={bool_text(decision['content_guard_needed'])}",
+        f"skill-integrity-only={bool_text(decision.get('skill_integrity_only'))}",
         f"estimated-runner-minutes-saved={decision['estimated_runner_minutes_saved']}",
     ]
     # Extra path-filter groups (packaging, viz, ...): one `<group>-needed`
@@ -224,7 +254,16 @@ def write_summary(path: Path, decision: dict[str, object]) -> None:
         summary.write(f"- Code paths: {len(code_paths)}\n")
         summary.write(f"- Unknown paths: {len(unknown_paths)}\n")
         summary.write(f"- Safe content only: `{bool_text(decision['safe_content_only'])}`\n")
+        summary.write(f"- Skill integrity only: `{bool_text(decision.get('skill_integrity_only'))}`\n")
         summary.write(f"- Needs code CI: `{bool_text(decision['needs_code_ci'])}`\n")
+        selected = []
+        if decision["content_guard_needed"]:
+            selected.append("content")
+        if decision.get("skill_integrity_needed"):
+            selected.append("skill-integrity")
+        if decision["needs_code_ci"]:
+            selected.append("product-code")
+        summary.write(f"- Selected lanes: `{', '.join(selected) or 'none'}`\n")
         summary.write(f"- Estimated runner minutes saved: `{decision['estimated_runner_minutes_saved']}`\n")
 
 
@@ -232,7 +271,7 @@ def write_lists(directory: Path, decision: dict[str, object]) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     list_names = dict(LIST_NAMES)
     for group_id in cast(list[str], decision.get("extra_group_ids", [])):
-        list_names[group_id] = f"{group_id}_paths"
+        list_names[group_id] = group_id if group_id.endswith("_paths") else f"{group_id}_paths"
     for filename, decision_key in list_names.items():
         with (directory / f"{filename}.txt").open("w", encoding="utf-8") as list_file:
             for path in path_list(decision, decision_key):
@@ -251,7 +290,7 @@ def main() -> int:
     parser.add_argument("--lists-dir", type=Path, help="Write changed/content/code helper lists")
     parser.add_argument(
         "--check",
-        choices=["needs-code-ci", "safe-content-only", "content-guard-needed"],
+        choices=["needs-code-ci", "safe-content-only", "content-guard-needed", "skill-integrity-only"],
         help="Exit 0 when the named decision is true, otherwise exit 1",
     )
     args = parser.parse_args()
@@ -270,7 +309,38 @@ def main() -> int:
             changed_paths = git_changed_paths(args.base_ref)
         else:
             changed_paths = stdin_changed_paths()
-        decision = classify_paths(ordered_unique(changed_paths), rules)
+        changed_paths = ordered_unique(changed_paths)
+        forced_code_paths: list[str] = []
+        manifest_reason: str | None = None
+        manifest_base_sha: str | None = None
+        if "skill-sync.yaml" in changed_paths:
+            if not args.base_ref:
+                forced_code_paths.append("skill-sync.yaml")
+                manifest_reason = "manifest_base_ref_missing"
+            else:
+                resolved = subprocess.run(
+                    ["git", "rev-parse", "--verify", f"{args.base_ref}^{{commit}}"],
+                    check=False,
+                    text=True,
+                    capture_output=True,
+                )
+                if resolved.returncode != 0:
+                    forced_code_paths.append("skill-sync.yaml")
+                    manifest_reason = "manifest_base_ref_unresolvable"
+                else:
+                    base_sha = resolved.stdout.strip()
+                    manifest_base_sha = base_sha
+                    manifest_decision = compare_repository_manifest(base_sha)
+                    manifest_reason = manifest_decision.reason
+                    if not manifest_decision.narrow_eligible:
+                        forced_code_paths.append("skill-sync.yaml")
+        decision = classify_paths(
+            changed_paths,
+            rules,
+            forced_code_paths=forced_code_paths,
+            manifest_decision_reason=manifest_reason,
+        )
+        decision["manifest_base_sha"] = manifest_base_sha
 
     if args.json_out:
         args.json_out.write_text(json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8")

@@ -21,7 +21,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from importlib import metadata as importlib_metadata
 from pathlib import Path
@@ -61,6 +61,27 @@ _MAX_IDENTIFIER_LENGTH = 128
 
 class DataLoadingError(Exception):
     """Exception raised during data loading operations."""
+
+
+class ClickHouseServerLoadError(DataLoadingError):
+    """Terminal failure while streaming a table into ClickHouse server mode."""
+
+    def __init__(
+        self,
+        table_name: str,
+        source_files: list[Path],
+        rows_attempted: int,
+        cause: BaseException,
+    ) -> None:
+        self.table_name = table_name
+        self.source_files = tuple(source_files)
+        self.rows_attempted = rows_attempted
+        self.cause = cause
+        sources = ", ".join(path.name for path in source_files)
+        super().__init__(
+            f"ClickHouse server load failed for {table_name!r} after {rows_attempted:,} streamed row(s) "
+            f"from {sources}: {cause}"
+        )
 
 
 def validate_sql_identifier(name: str, context: str = "identifier") -> str:
@@ -185,34 +206,50 @@ def resolve_csv_dialect(
     """
     name_lower = table_name.lower()
 
-    # (a) Manifest metadata wins — keys are always stored lowercase by the resolver
-    meta = data_source.table_metadata.get(name_lower)
-    if meta:
-        return CsvDialect(
-            delimiter=meta.get("csv_delimiter", get_delimiter_for_file(file_path)),
-            has_header=bool(meta.get("csv_has_header", False)),
-            null_marker=meta.get("csv_null_marker", None),
-            normalize_booleans=bool(meta.get("csv_normalize_booleans", False)),
-            quote=meta.get("csv_quote", None),
-        )
-
-    # (b) Benchmark instance attributes
     benchmark_delimiter = _get_optional_str_attr(benchmark, "csv_delimiter")
     benchmark_header = _get_optional_bool_attr(benchmark, "csv_has_header")
     benchmark_booleans = _get_optional_bool_attr(benchmark, "csv_normalize_booleans")
     benchmark_null_marker = _get_optional_str_attr(benchmark, "csv_null_marker")
+    ext = get_data_extension(file_path)
+    is_tpc = ext in (".tbl", ".dat")
+    format_delimiter = "|" if is_tpc else get_delimiter_for_file(file_path)
+    format_null_marker = "" if is_tpc else None
+
+    # (a) Manifest metadata wins per field. A partial manifest falls through
+    # to (b) and (c) only for fields it does not define. Explicit None remains
+    # meaningful for csv_null_marker, so use key membership for that field.
+    meta = data_source.table_metadata.get(name_lower)
+    if meta is not None:
+        return CsvDialect(
+            delimiter=meta.get("csv_delimiter", benchmark_delimiter or format_delimiter),
+            has_header=bool(meta.get("csv_has_header", benchmark_header if benchmark_header is not None else False)),
+            null_marker=(
+                meta["csv_null_marker"]
+                if "csv_null_marker" in meta
+                else benchmark_null_marker
+                if benchmark_null_marker is not None
+                else format_null_marker
+            ),
+            normalize_booleans=bool(
+                meta.get(
+                    "csv_normalize_booleans",
+                    benchmark_booleans if benchmark_booleans is not None else False,
+                )
+            ),
+            quote=meta.get("csv_quote", None),
+        )
+
+    # (b) Benchmark instance attributes
     if any(v is not None for v in (benchmark_delimiter, benchmark_header, benchmark_booleans, benchmark_null_marker)):
         logger.warning(
             "table '%s': CSV dialect from benchmark attributes (no manifest metadata). "
             "Annotate the generator with manifest metadata to suppress this warning.",
             table_name,
         )
-        ext = get_data_extension(file_path)
-        is_tpc = ext in (".tbl", ".dat")
         return CsvDialect(
-            delimiter=benchmark_delimiter if benchmark_delimiter is not None else ("|" if is_tpc else ","),
+            delimiter=benchmark_delimiter if benchmark_delimiter is not None else format_delimiter,
             has_header=bool(benchmark_header) if benchmark_header is not None else False,
-            null_marker=benchmark_null_marker if benchmark_null_marker is not None else ("" if is_tpc else None),
+            null_marker=benchmark_null_marker if benchmark_null_marker is not None else format_null_marker,
             normalize_booleans=bool(benchmark_booleans) if benchmark_booleans is not None else False,
             quote=None,
         )
@@ -223,7 +260,6 @@ def resolve_csv_dialect(
         "Annotate the generator with manifest metadata to suppress this warning.",
         table_name,
     )
-    ext = get_data_extension(file_path)
     if ext in (".tbl", ".dat"):
         return CsvDialect(
             delimiter="|",
@@ -818,6 +854,29 @@ class NoCompressionHandler(CompressionHandler):
             yield f
 
 
+def _resolve_table_schema(schema: Any, table_name: str) -> Any:
+    """Look up one table's schema, tolerant of case and non-dict schemas."""
+    if not isinstance(schema, dict):
+        return {}
+    return schema.get(table_name, schema.get(table_name.lower(), {}))
+
+
+def _schema_table_columns(table_schema: Any) -> list[Any] | None:
+    """Return a table schema's column list, or None if it has no column list.
+
+    Accepts either a dict shape (``{"columns": [...]}``) or a
+    ``BaseSchemaTable``-like object exposing a ``.columns`` attribute (e.g. the
+    Data Vault / TPC-H / TPC-DS ``Table`` classes). A plain ``"columns" in
+    table_schema`` test raises ``argument of type 'Table' is not iterable`` for
+    the object form, which previously aborted DataVault server-mode loads.
+    """
+    if isinstance(table_schema, dict):
+        columns = table_schema.get("columns")
+    else:
+        columns = getattr(table_schema, "columns", None)
+    return columns if isinstance(columns, list) else None
+
+
 class SchemaInspector:
     """Inspector for determining table schema information."""
 
@@ -836,10 +895,11 @@ class SchemaInspector:
         """
         # Try to get from schema first
         schema = benchmark.get_schema() if hasattr(benchmark, "get_schema") else {}
-        table_schema = schema.get(table_name, schema.get(table_name, {}))
+        table_schema = _resolve_table_schema(schema, table_name)
 
-        if "columns" in table_schema:
-            return len(table_schema["columns"])
+        columns = _schema_table_columns(table_schema)
+        if columns is not None:
+            return len(columns)
 
         # Fallback: read first line to determine column count
         first_line = file_handle.readline().strip()
@@ -1211,11 +1271,9 @@ class DuckDBNativeHandler(FileFormatHandler):
 
 
 class ParquetFileHandler(FileFormatHandler):
-    """Handler for Parquet files using PyArrow.
+    """Handler for Parquet files using bounded PyArrow record batches."""
 
-    This is a generic handler that works across platforms by converting
-    Parquet to in-memory data and loading via INSERT statements.
-    """
+    _LOAD_SAVEPOINT = "benchbox_parquet_load"
 
     def get_delimiter(self) -> str:
         """Parquet is columnar format, not delimited."""
@@ -1242,36 +1300,39 @@ class ParquetFileHandler(FileFormatHandler):
         except ImportError as e:
             raise RuntimeError("pyarrow is required for Parquet loading") from e
 
-        # Read Parquet file
-        table = pq.read_table(file_path)
-        row_count = table.num_rows
+        # Keep all inserts for this file isolated from the caller's larger load
+        # transaction. DataLoader commits after every table; without a savepoint,
+        # a later batch/read failure would leave earlier batches committed as a
+        # silently truncated table when DataLoader handles the exception.
+        connection.execute(f"SAVEPOINT {self._LOAD_SAVEPOINT}")
+        savepoint_active = True
+        try:
+            parquet_file = pq.ParquetFile(file_path)
+            column_names = parquet_file.schema_arrow.names
+            validated_columns = [validate_sql_identifier(col, "column name") for col in column_names]
+            placeholders = ",".join(["?" for _ in validated_columns])
+            columns_str = ",".join(validated_columns)
 
-        if row_count == 0:
-            return 0
+            # Prepare INSERT statement
+            insert_sql = f"INSERT INTO {validated_table} ({columns_str}) VALUES ({placeholders})"
 
-        # Convert to Python data for insertion
-        # PyArrow's to_pylist() gives us list of dicts
-        data = table.to_pylist()
+            # Keep only one bounded record batch and its Python conversion in memory.
+            batch_size = 1000
+            row_count = 0
+            for batch in parquet_file.iter_batches(batch_size=batch_size):
+                data_tuples = [tuple(row[col] for col in column_names) for row in batch.to_pylist()]
+                if data_tuples:
+                    connection.executemany(insert_sql, data_tuples)
+                    row_count += len(data_tuples)
 
-        # Get column names from schema and validate each one
-        column_names = table.schema.names
-        validated_columns = [validate_sql_identifier(col, "column name") for col in column_names]
-        placeholders = ",".join(["?" for _ in validated_columns])
-        columns_str = ",".join(validated_columns)
-
-        # Prepare INSERT statement
-        insert_sql = f"INSERT INTO {validated_table} ({columns_str}) VALUES ({placeholders})"
-
-        # Convert dicts to tuples in correct column order
-        data_tuples = [tuple(row[col] for col in column_names) for row in data]
-
-        # Insert in batches for better performance
-        batch_size = 1000
-        for i in range(0, len(data_tuples), batch_size):
-            batch = data_tuples[i : i + batch_size]
-            connection.executemany(insert_sql, batch)
-
-        return row_count
+            connection.execute(f"RELEASE SAVEPOINT {self._LOAD_SAVEPOINT}")
+            savepoint_active = False
+            return row_count
+        except Exception:
+            if savepoint_active:
+                connection.execute(f"ROLLBACK TO SAVEPOINT {self._LOAD_SAVEPOINT}")
+                connection.execute(f"RELEASE SAVEPOINT {self._LOAD_SAVEPOINT}")
+            raise
 
 
 class DuckDBParquetHandler(FileFormatHandler):
@@ -1908,6 +1969,17 @@ class DuckDBVortexHandler(FileFormatHandler):
             return row_count
 
 
+# Matches DuckDB bracketed vector/list type suffixes, e.g. "FLOAT[128]",
+# "DOUBLE[3]", or "INTEGER[]" — used to route these to array parsing rather
+# than scalar numeric conversion during ClickHouse client-side inserts.
+# NOTE: the DDL side rewrites the same fixed-size forms to ClickHouse arrays
+# (workload.py: FLOAT[N] -> Array(Float32), DOUBLE[N] -> Array(Float64)); this
+# value-level detector is the insert-time counterpart and additionally covers
+# bracketless-size lists like "INTEGER[]". Keep the two in sync if a new
+# bracketed vector form is added to either surface.
+_CLICKHOUSE_VECTOR_TYPE_RE = re.compile(r"\[\s*\d*\s*\]")
+
+
 class ClickHouseNativeHandler(FileFormatHandler):
     """Handler for ClickHouse's native file() function.
 
@@ -1936,6 +2008,23 @@ class ClickHouseNativeHandler(FileFormatHandler):
     def _uses_server_mode(self) -> bool:
         """Return whether this handler targets a self-hosted ClickHouse server."""
         return getattr(self.adapter, "deployment_mode", None) == "server"
+
+    def _server_insert_block_size(self) -> int:
+        """Return the bounded clickhouse-driver transport block size.
+
+        The generic :class:`RowBatchProcessor` intentionally remains a 1,000-row
+        helper for other platforms. Server-mode ClickHouse never routes through
+        it: the native driver receives a real generator and owns transport
+        buffering at this explicitly configured size.
+        """
+        value = getattr(self.adapter, "insert_block_size", 65536)
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0 or value == 1000:
+            raise DataLoadingError("ClickHouse server insert_block_size must be a positive integer other than 1000")
+        return value
+
+    def _server_insert_settings(self) -> dict[str, int]:
+        """Return per-execute settings for a bounded native-driver insert."""
+        return {"insert_block_size": self._server_insert_block_size()}
 
     def _get_csv_loading_config(self, table_name: str) -> dict[str, str]:
         """Get CSV loading configuration for ClickHouse.
@@ -1990,8 +2079,10 @@ class ClickHouseNativeHandler(FileFormatHandler):
             if self._uses_server_mode():
                 base_ext = FileFormatRegistry.get_base_data_extension(file_path)
                 if base_ext == ".parquet":
-                    return self._load_parquet_via_client_insert(validated_table, file_path, connection)
-                return self._load_delimited_via_client_insert(validated_table, file_path, connection, benchmark, logger)
+                    return self._load_parquet_via_client_insert(validated_table, [file_path], connection)
+                return self._load_delimited_via_client_insert(
+                    validated_table, [file_path], connection, benchmark, logger
+                )
 
             escaped_path = escape_sql_string_literal(str(file_path))
 
@@ -2039,44 +2130,76 @@ class ClickHouseNativeHandler(FileFormatHandler):
     def _load_delimited_via_client_insert(
         self,
         validated_table: str,
-        file_path: Path,
+        file_paths: list[Path],
         connection: Any,
         benchmark: Any,
         logger: Any,
     ) -> int:
-        """Load host-local delimited files into ClickHouse server via client batches."""
-        compression_handler = FileFormatRegistry.get_compression_handler(file_path)
-
-        with compression_handler.open(file_path) as file_handle:
-            data_start = None
-            if self.has_header:
-                file_handle.readline()
-                data_start = file_handle.tell()
-
-            column_count = SchemaInspector.get_column_count(
-                benchmark, validated_table, file_handle, self.delimiter_char
-            )
+        """Stream host-local delimited files through one native-driver insert."""
+        row_count = 0
+        row_generator: Any | None = None
+        try:
+            column_count = None
+            for file_path in file_paths:
+                compression_handler = FileFormatRegistry.get_compression_handler(file_path)
+                with compression_handler.open(file_path) as file_handle:
+                    column_count = SchemaInspector.get_column_count(
+                        benchmark, validated_table, file_handle, self.delimiter_char
+                    )
+                if column_count is not None:
+                    break
             if column_count is None:
                 logger.debug(f"Could not determine column count for {validated_table}")
                 return 0
-            if data_start is not None:
-                file_handle.seek(data_start)
 
-            total_rows = 0
-            processor = RowBatchProcessor()
-            insert_sql = f"INSERT INTO {validated_table} VALUES"
             column_types = self._get_column_type_names(benchmark, validated_table)
-            for batch_data, current_count in processor.process_file(file_handle, self.delimiter_char, column_count):
-                connection.execute(insert_sql, self._convert_rows_for_clickhouse(batch_data, column_types))
-                total_rows = current_count
 
-        return total_rows
+            def rows() -> Iterator[tuple[Any, ...]]:
+                nonlocal row_count
+                for file_path in file_paths:
+                    handler = FileFormatRegistry.get_compression_handler(file_path)
+                    with handler.open(file_path) as file_handle:
+                        if self.has_header:
+                            next(file_handle, None)
+                        for line in file_handle:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            fields = line.split(self.delimiter_char)
+                            fields.extend([""] * max(0, column_count - len(fields)))
+                            fields = fields[:column_count]
+                            row_count += 1
+                            yield tuple(
+                                self._convert_field_for_clickhouse(
+                                    value,
+                                    column_types[index] if index < len(column_types) else None,
+                                )
+                                for index, value in enumerate(fields)
+                            )
+
+            row_generator = rows()
+            connection.execute(
+                f"INSERT INTO {validated_table} VALUES",
+                row_generator,
+                settings=self._server_insert_settings(),
+            )
+            return row_count
+        except ClickHouseServerLoadError:
+            raise
+        except Exception as exc:
+            raise ClickHouseServerLoadError(validated_table, file_paths, row_count, exc) from exc
+        finally:
+            if row_generator is not None:
+                row_generator.close()
 
     def _get_column_type_names(self, benchmark: Any, table_name: str) -> list[str | None]:
         """Return schema type strings for a benchmark table when available."""
         schema = benchmark.get_schema() if hasattr(benchmark, "get_schema") else {}
-        table_schema = schema.get(table_name, schema.get(table_name.lower(), {}))
-        columns = table_schema.get("columns", []) if isinstance(table_schema, dict) else []
+        table_schema = _resolve_table_schema(schema, table_name)
+        # Handles both dict schemas and BaseSchemaTable objects (e.g. DataVault),
+        # so object-schema benchmarks get real column types instead of an empty
+        # list (which silently skipped type conversion for those loads).
+        columns = _schema_table_columns(table_schema) or []
 
         type_names: list[str | None] = []
         for column in columns:
@@ -2113,9 +2236,12 @@ class ClickHouseNativeHandler(FileFormatHandler):
 
         type_upper = type_name.upper()
 
-        # Array types: parse the CSV string representation into a Python list so
-        # clickhouse-driver receives a sequence rather than a raw string.
-        if "ARRAY" in type_upper:
+        # Array/vector types: "Array(...)" or DuckDB bracketed vector/list syntax
+        # such as "FLOAT[128]" (fixed-size vector) or "INTEGER[]" (list). Parse
+        # the bracketed CSV string into a Python list so clickhouse-driver
+        # receives a sequence; otherwise "FLOAT[128]" matches the FLOAT branch
+        # below and float("[0.02,...]") raises (Bucket C).
+        if "ARRAY" in type_upper or _CLICKHOUSE_VECTOR_TYPE_RE.search(type_upper):
             if not value or value.upper() in ("\\N", "NULL"):
                 return None
             try:
@@ -2126,10 +2252,19 @@ class ClickHouseNativeHandler(FileFormatHandler):
                 pass
             return value
 
+        # DateTime/DateTime64/TIMESTAMP must be classified BEFORE the DATE prefix:
+        # "DATETIME".startswith("DATE") is True, so a bare DATE check misroutes
+        # timestamps into date.fromisoformat() (raises on the time component),
+        # and plain "TIMESTAMP" otherwise falls through as a str, which the
+        # driver rejects with "'str' object has no attribute 'tzinfo'" (Bucket B).
+        is_datetime = "DATETIME" in type_upper or "TIMESTAMP" in type_upper
+        is_date = not is_datetime and type_upper.startswith("DATE")
+
         needs_non_string_value = (
             "INT" in type_upper
             or any(token in type_upper for token in ("DECIMAL", "NUMERIC", "DOUBLE", "FLOAT", "REAL"))
-            or type_upper.startswith("DATE")
+            or is_date
+            or is_datetime
         )
         if value == "":
             return None if needs_non_string_value else value
@@ -2140,33 +2275,66 @@ class ClickHouseNativeHandler(FileFormatHandler):
             return Decimal(value)
         if any(token in type_upper for token in ("DOUBLE", "FLOAT", "REAL")):
             return float(value)
-        if type_upper.startswith("DATE"):
+        if is_datetime:
+            # datetime.fromisoformat() only accepts a trailing "Z" (RFC 3339
+            # UTC shorthand) starting in Python 3.11; on the supported 3.10
+            # runtime (requires-python >=3.10) it raises ValueError.
+            # Normalize to the explicit "+00:00" offset fromisoformat has
+            # always accepted, matching the pattern used elsewhere in this
+            # codebase (e.g. core/tpc_validation.py, mcp/tools/analytics.py).
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if is_date:
             return date.fromisoformat(value)
         return value
 
-    def _load_parquet_via_client_insert(self, validated_table: str, file_path: Path, connection: Any) -> int:
-        """Load host-local Parquet files into ClickHouse server via client batches."""
+    def _load_parquet_via_client_insert(self, validated_table: str, file_paths: list[Path], connection: Any) -> int:
+        """Stream host-local Parquet files through one native-driver insert."""
+        row_count = 0
+        row_generator: Any | None = None
         try:
-            import pyarrow.parquet as pq
-        except ImportError as e:
-            raise RuntimeError("pyarrow is required for Parquet loading") from e
+            try:
+                import pyarrow.parquet as pq
+            except ImportError as exc:
+                raise RuntimeError("pyarrow is required for Parquet loading") from exc
 
-        table = pq.read_table(file_path)
-        if table.num_rows == 0:
-            return 0
+            first_table = pq.ParquetFile(file_paths[0])
+            column_names = first_table.schema_arrow.names
+            validated_columns = [validate_sql_identifier(col, "column name") for col in column_names]
+            expected_rows = 0
+            for file_path in file_paths:
+                parquet_file = pq.ParquetFile(file_path)
+                if parquet_file.schema_arrow.names != column_names:
+                    raise DataLoadingError(
+                        f"ClickHouse server Parquet shards for {validated_table!r} have different columns: {file_path}"
+                    )
+                expected_rows += parquet_file.metadata.num_rows if parquet_file.metadata is not None else 0
+            if expected_rows == 0:
+                return 0
 
-        column_names = table.schema.names
-        validated_columns = [validate_sql_identifier(col, "column name") for col in column_names]
-        rows = table.to_pylist()
-        insert_sql = f"INSERT INTO {validated_table} ({','.join(validated_columns)}) VALUES"
+            insert_sql = f"INSERT INTO {validated_table} ({','.join(validated_columns)}) VALUES"
+            batch_size = self._server_insert_block_size()
 
-        batch_size = 1000
-        for start in range(0, len(rows), batch_size):
-            batch_rows = rows[start : start + batch_size]
-            batch = [tuple(row[col] for col in column_names) for row in batch_rows]
-            connection.execute(insert_sql, batch)
+            def rows() -> Iterator[tuple[Any, ...]]:
+                nonlocal row_count
+                for file_path in file_paths:
+                    parquet_file = pq.ParquetFile(file_path)
+                    for batch in parquet_file.iter_batches(batch_size=batch_size):
+                        for row in batch.to_pylist():
+                            row_count += 1
+                            yield tuple(row[column_name] for column_name in column_names)
 
-        return table.num_rows
+            row_generator = rows()
+            connection.execute(insert_sql, row_generator, settings=self._server_insert_settings())
+            if row_count != expected_rows:
+                raise DataLoadingError(f"streamed {row_count:,} row(s), expected {expected_rows:,}")
+            return row_count
+        except ClickHouseServerLoadError:
+            raise
+        except Exception as exc:
+            raise ClickHouseServerLoadError(validated_table, file_paths, row_count, exc) from exc
+        finally:
+            if row_generator is not None:
+                row_generator.close()
 
     def load_table_bulk(
         self,
@@ -2185,7 +2353,30 @@ class ClickHouseNativeHandler(FileFormatHandler):
         Falls back to the default per-shard loop only when shards span multiple directories.
         """
         if self._uses_server_mode():
-            return super().load_table_bulk(table_name, file_paths, connection, benchmark, logger)
+            if not file_paths:
+                return 0
+            validated_table = validate_sql_identifier(table_name, "table name")
+            base_extensions = {FileFormatRegistry.get_base_data_extension(path) for path in file_paths}
+            if len(base_extensions) != 1:
+                raise ClickHouseServerLoadError(
+                    validated_table,
+                    file_paths,
+                    0,
+                    DataLoadingError(f"mixed file formats are not supported: {sorted(base_extensions)}"),
+                )
+            if hasattr(self.adapter, "dry_run_mode") and self.adapter.dry_run_mode:
+                if hasattr(self.adapter, "capture_sql"):
+                    extension = next(iter(base_extensions))
+                    sql = (
+                        f"INSERT INTO {validated_table} VALUES"
+                        if extension != ".parquet"
+                        else f"INSERT INTO {validated_table}"
+                    )
+                    self.adapter.capture_sql(sql, "load_data_bulk", validated_table)
+                return 0
+            if next(iter(base_extensions)) == ".parquet":
+                return self._load_parquet_via_client_insert(validated_table, file_paths, connection)
+            return self._load_delimited_via_client_insert(validated_table, file_paths, connection, benchmark, logger)
 
         if len(file_paths) == 1:
             return self.load_table(table_name, file_paths[0], connection, benchmark, logger)
@@ -2631,6 +2822,8 @@ class DataLoader:
             return handler.load_table_bulk(
                 table_name, shard_paths, self.connection, self.benchmark, self.adapter.logger
             )
+        except ClickHouseServerLoadError:
+            raise
         except Exception as e:
             quiet_console.print(f"  ❌ Failed to bulk-load {table_name}: {e}")
             return 0
@@ -2685,6 +2878,8 @@ class DataLoader:
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
             quiet_console.print(f"⚠️  Skipping {file_path.name} - decompression/file error: {e}")
             return 0
+        except ClickHouseServerLoadError:
+            raise
         except Exception as e:
             quiet_console.print(f"  ❌ Failed to load {file_path.name}: {e}")
             return 0
@@ -2946,6 +3141,7 @@ class SchemaHelpersMixin:
 
 __all__ = [
     "DataLoadingError",
+    "ClickHouseServerLoadError",
     "DataSource",
     "CsvDialect",
     "DUCKDB_NO_NULL_CONVERSION_SENTINEL",

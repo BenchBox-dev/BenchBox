@@ -41,6 +41,7 @@ from .base.config_utils import (
     POSTGRES_FAMILY_PLATFORM_FIELDS,
     make_platform_config_builder,
 )
+from .base.connection_wrappers import StreamConnectionCapability
 from .base.data_loading import (
     CsvDialect,
     DataSourceResolver,
@@ -238,7 +239,15 @@ def _build_postgres_connection_kwargs(config: dict[str, Any], *, default_port: i
     else:
         result["database"] = "benchbox"
 
-    for key in ("tuning_config", "verbose_enabled", "very_verbose"):
+    for key in (
+        "tuning_config",
+        "tuning_enabled",
+        "unified_tuning_configuration",
+        "tuning_source",
+        "tuning_source_file",
+        "verbose_enabled",
+        "very_verbose",
+    ):
         if key in config:
             result[key] = config[key]
 
@@ -254,6 +263,14 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     plan_capture_phase_eligible = True
+    # psycopg connections do not support true concurrent statement execution
+    # across cursors of one connection (server-side session state --
+    # transactions, SET, prepared statements -- lives on the connection, and
+    # concurrent cursor use serializes or raises). Each throughput/pool-test
+    # stream therefore gets its own independent connection/session; see
+    # new_stream_connection() below and
+    # benchbox/platforms/base/connection_wrappers.py:StreamConnectionCapability.
+    stream_connection_capability = StreamConnectionCapability.INDEPENDENT_CONNECTION
 
     @property
     def platform_name(self) -> str:
@@ -504,6 +521,89 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         self.log_operation_complete("PostgreSQL connection", details=f"Applied: {', '.join(settings_applied)}")
         return conn
 
+    def new_stream_connection(self, connection: Any) -> Any:
+        """Open an independent PostgreSQL connection for one throughput stream.
+
+        Overrides the base ``SHARED_CURSOR`` implementation: psycopg
+        connections carry server-side session state (transactions, ``SET``
+        GUCs, prepared statements) and do not support true concurrent
+        statement execution across cursors of one connection, so sharing
+        ``connection`` across concurrent throughput streams would either
+        serialize on it or corrupt session-local state between streams. Each
+        stream instead gets a brand-new connection built from this adapter's
+        existing connection parameters, with the same session GUCs applied as
+        ``create_connection`` (schema/database creation is a one-time setup
+        step already done on the shared ``connection`` and is not repeated
+        here). The returned connection is closed by the caller (the
+        throughput/maintenance stream driver's ``finally`` block) -- see
+        ``PlatformAdapter.new_stream_connection()`` for the full contract.
+
+        Args:
+            connection: The adapter's shared platform connection. Not reused
+                here -- a fresh connection/session is always opened.
+
+        Returns:
+            A new, independent psycopg connection for this stream.
+        """
+        del connection  # not reused: INDEPENDENT_CONNECTION always opens a fresh session
+        params = self._get_connection_params()
+        conn = psycopg.connect(**params)
+
+        cursor = None
+        try:
+            cursor = conn.cursor()
+            guc_statements = [
+                f"SET work_mem = '{self.work_mem}'",
+                f"SET maintenance_work_mem = '{self.maintenance_work_mem}'",
+                f"SET effective_cache_size = '{self.effective_cache_size}'",
+                f"SET max_parallel_workers_per_gather = {self.max_parallel_workers_per_gather}",
+            ]
+            for sql in guc_statements:
+                try:
+                    cursor.execute(sql)
+                except Exception as e:
+                    conn.rollback()
+                    self.logger.debug(f"Could not apply stream session setting ({sql}): {e}")
+
+            # Safety: self.schema validated by _validate_identifier() before use in f-string
+            if self.schema != "public" and self._validate_identifier(self.schema):
+                cursor.execute(f'SET search_path TO "{self.schema}", public')
+
+            # Reapply any subclass-specific session-local state (e.g. pg_duckdb's
+            # duckdb.force_execution) so this stream session is configured the
+            # same way as the setup connection instead of running as vanilla
+            # PostgreSQL. No-op for the base adapter.
+            self._apply_stream_session_state(conn)
+
+            conn.commit()
+            return conn
+        except Exception:
+            conn.close()
+            raise
+        finally:
+            if cursor is not None:
+                cursor.close()
+
+    def _apply_stream_session_state(self, connection: Any) -> None:
+        """Reapply subclass session-local state to a fresh throughput-stream connection.
+
+        ``new_stream_connection`` opens an independent connection per stream and
+        applies this adapter's shared GUCs (work_mem, search_path, ...) inline.
+        Postgres-family subclasses whose ``create_connection`` sets *additional*
+        session-scoped state -- pg_duckdb's ``duckdb.force_execution`` / thread /
+        MotherDuck GUCs, pg_mooncake's ``mooncake.default_bucket`` -- MUST
+        override this hook so every stream session is configured the same way as
+        the setup connection; otherwise a multi-stream throughput/maintenance
+        run silently executes on differently-configured (often vanilla-
+        PostgreSQL) sessions and mismeasures the requested engine. One-time
+        database setup (extension creation, database/schema creation) stays in
+        ``create_connection`` and is deliberately NOT repeated per stream.
+
+        The base implementation is a no-op: plain PostgreSQL carries no
+        session-local state beyond the GUCs ``new_stream_connection`` applies.
+        """
+        del connection  # base adapter has no extra per-session state to reapply
+
     def create_schema(self, benchmark, connection: Any) -> float:
         """Create schema using benchmark's SQL definitions."""
         start_time = mono_time()
@@ -707,7 +807,7 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         statistics are absent for DML.
 
         ANALYZE is also suppressed when ``self.analyze_plans`` is False (e.g. the
-        isolated capture phase or ``--platform-option analyze_plans=false``):
+        isolated capture phase or the top-level ``--no-analyze-plans`` flag):
         plain EXPLAIN (FORMAT JSON) captures the estimated plan structure without
         re-executing the query, so a SELECT is not run a second time.
         """

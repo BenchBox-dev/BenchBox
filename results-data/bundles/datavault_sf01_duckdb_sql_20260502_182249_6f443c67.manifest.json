@@ -1,0 +1,14 @@
+{
+  "benchmark": "Data Vault",
+  "bundle_file": "datavault_sf01_duckdb_sql_20260502_182249_6f443c67.json",
+  "bundle_hash": "659b4dadfc18d01c680a12b690a5ff08b74e1e6990de92d9e4dedff268901f21",
+  "companion_hashes": {},
+  "phase": 2,
+  "platform": "DuckDB",
+  "result_source": "internal",
+  "scale_factor": 0.1,
+  "submission_path": "path_30338255ec33",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:47:48.113675+00:00",
+  "submitted_by": "BenchBox UAT"
+}

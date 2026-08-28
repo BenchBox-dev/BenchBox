@@ -1505,3 +1505,95 @@ class TestDataFrameDataLoaderWithWriteConfig:
 
         result = loader._get_table_write_config(config, "table", None)
         assert result is config
+
+    def test_applied_write_layout_set_on_cache_hit_with_nondefault_config(self):
+        """The honest applied-layout signal is set when the returned (cached) data
+        physically carries a non-default write_config (the cache key folds it in)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            loader = DataFrameDataLoader(cache_dir=tmpdir / "cache")
+            benchmark = MagicMock()
+            benchmark.name = "tpch"
+            benchmark.tables = {"customer": Path(tmpdir / "customer.tbl")}
+            (tmpdir / "customer.tbl").touch()
+
+            write_config = DataFrameWriteConfiguration(compression="snappy", row_group_size=250_000)
+            with (
+                patch.object(loader.cache, "has_cached_data", return_value=True),
+                patch.object(
+                    loader.cache,
+                    "get_cached_files",
+                    return_value={"customer": tmpdir / "customer.parquet"},
+                ),
+            ):
+                loader.prepare_benchmark_data(benchmark, scale_factor=1.0, write_config=write_config)
+
+            assert loader.applied_write_layout is write_config
+
+    def test_applied_write_layout_none_when_source_returned_verbatim(self):
+        """No conversion ran (source already in target format, no sort), so no
+        physical layout was applied even though a non-default config was supplied."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            source = tmpdir / "customer.tbl"
+            source.write_text("1|Alice|100.00\n")
+
+            loader = DataFrameDataLoader(prefer_parquet=False)
+            benchmark = MagicMock()
+            benchmark.name = "tpch"
+            benchmark.tables = {"customer": source}
+
+            # Compression-only config (no sort_by) does not force conversion.
+            write_config = DataFrameWriteConfiguration(compression="snappy")
+            paths = loader.prepare_benchmark_data(benchmark, scale_factor=1.0, write_config=write_config)
+
+            returned = paths["customer"]
+            returned = returned if isinstance(returned, list) else [returned]
+            assert source in returned
+            assert loader.applied_write_layout is None
+
+    def test_applied_write_layout_none_when_target_format_is_not_parquet(self):
+        """Regression (PR #1269 review follow-up): `_convert_data` returns the source
+        files unchanged for a non-Parquet target, so no physical layout is written --
+        the signal must stay None even though a sort_by config forced us past the
+        already-in-target-format early return. Otherwise the adapter folds POST_LOAD
+        statements and an applied hash into the ledger for a layout never applied."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            source = tmpdir / "customer.csv"
+            source.write_text("1|Alice|100.00\n")
+
+            # prefer_parquet=False -> optimal target format is CSV, not Parquet.
+            loader = DataFrameDataLoader(prefer_parquet=False)
+            benchmark = MagicMock()
+            benchmark.name = "tpch"
+            benchmark.tables = {"customer": source}
+
+            # sort_by forces the conversion path (past the verbatim early return),
+            # but _convert_data cannot apply a layout to a non-Parquet target.
+            write_config = DataFrameWriteConfiguration(sort_by=[SortColumn(name="c_custkey", order="asc")])
+            loader.prepare_benchmark_data(benchmark, scale_factor=1.0, write_config=write_config)
+
+            assert loader.applied_write_layout is None
+
+    def test_applied_write_layout_none_for_default_config_on_cache_hit(self):
+        """A default write_config applies no physical layout -> signal stays None."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            loader = DataFrameDataLoader(cache_dir=tmpdir / "cache")
+            benchmark = MagicMock()
+            benchmark.name = "tpch"
+            benchmark.tables = {"customer": Path(tmpdir / "customer.tbl")}
+            (tmpdir / "customer.tbl").touch()
+
+            with (
+                patch.object(loader.cache, "has_cached_data", return_value=True),
+                patch.object(
+                    loader.cache,
+                    "get_cached_files",
+                    return_value={"customer": tmpdir / "customer.parquet"},
+                ),
+            ):
+                loader.prepare_benchmark_data(benchmark, scale_factor=1.0, write_config=DataFrameWriteConfiguration())
+
+            assert loader.applied_write_layout is None

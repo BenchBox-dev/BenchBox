@@ -1,8 +1,8 @@
 # Cutting a BenchBox release
 
 BenchBox releases follow a **version-branch flow** on a single repo
-(`joeharris76/BenchBox`) with two long-lived branches: `develop` (dev work)
-and `main` (release-only). This guide is the maintainer runbook.
+(`BenchBox-dev/BenchBox`) with two long-lived branches: `develop` (dev work)
+and `release` (release-only). This guide is the maintainer runbook.
 
 ## The flow (2 commands)
 
@@ -13,13 +13,15 @@ make release-cut VERSION=X.Y.Z
 make release-finalize VERSION=X.Y.Z
 ```
 
-That's the entire flow. The two Make targets do the rest.
+That's the entire flow. The two Make targets do the rest. Wheel install,
+release canary, and correctness remain the blocking gates; UAT is a
+non-blocking matrix campaign.
 
 ## Pre-merge release-required contract
 
-Release PRs target `main` and must be opened from branches accepted by
-`.github/workflows/validate-main-pr.yml` (`vX.Y.Z`, optionally with a suffix).
-Before a release PR can merge, the `main-release-only` ruleset must require:
+Release PRs target `release` and must be opened from branches accepted by
+`.github/workflows/validate-release-pr.yml` (`vX.Y.Z`, optionally with a suffix).
+Before a release PR can merge, the `release-only` ruleset must require:
 
 - `validate-base`
 - `release-required-result`
@@ -32,17 +34,20 @@ Before a release PR can merge, the `main-release-only` ruleset must require:
   (`DuckDB x TPC-H` at SF=1 with the pinned reference qgen seed, through
   generate/load/execute with EXACT stored answer-set row-count validation of the
   18 answer-stable TPC-H queries; Q11/Q16/Q18/Q20 are excluded for answer-set
-  boundary sensitivity, and validation is cardinality-level, not value-level);
+  boundary sensitivity, and validation is cardinality-level, not value-level).
+  The stored digests are Linux-generated, so on Apple silicon with macOS 26 or newer run
+  `make ci-linux` for parity rather than reading a local mismatch as a defect;
 - the credential-free integration-not-slow suite:
   `tests/integration -m "integration and not (slow or stress or resource_heavy or live_integration)"`;
 - isolated exact-one-wheel package build/install smoke;
 - dependency upper-bound checks;
 - release-branch curation checks that confirm dev-only paths are absent.
 
-It does **not** guarantee the full stress matrix, live cloud credentials, or
-long-running UAT. Slow/resource-heavy coverage is enforced through the
-freshness-based release canary below, not by rerunning that suite on every
-release PR.
+It does **not** rerun the full stress matrix, live cloud integrations, or
+long-running UAT on the release PR itself. Slow/resource-heavy coverage is
+enforced through the freshness-based release canary below. Wheel install,
+canary, and correctness gates remain blocking; long-running UAT is a
+non-blocking matrix campaign.
 
 ## Release canary and ruleset drift
 
@@ -69,8 +74,30 @@ visibility to expose bypass actors; the default `GITHUB_TOKEN` is insufficient
 for that part of the contract.
 
 Stress tests, live cloud integrations, and long-running UAT remain advisory
-until their credential, cost, and flake policies are stable enough to make
-them release-blocking.
+until their credential, cost, and flake policies are stable enough to make them
+release-blocking.
+
+## UAT matrix campaign evidence (advisory)
+
+`scripts/release_readiness_check.py` reports committed UAT evidence when it
+exists. A green verdict, clean source tree, ancestor source SHA, and recent
+completion remain useful campaign-quality signals, but missing, red, stale,
+non-ancestor, or dirty evidence does not fail `validate-base`. Producing the
+three-stage evidence is not a release-cut precondition.
+
+Running the optional campaign:
+
+```bash
+make uat-sweep CONFIG=tests/uat/configs/release-gate-01-native-dataframe.yaml
+make uat-sweep CONFIG=tests/uat/configs/release-gate-02-docker-nonoltp.yaml   # after stage 1 completes
+make uat-sweep CONFIG=tests/uat/configs/release-gate-03-docker-oltp.yaml     # after stage 2 completes
+make uat-gate-check STAGE1=<run-dir> STAGE2=<run-dir> STAGE3=<run-dir>
+# review the campaign report; it is historical evidence, not a release input
+```
+
+See `docs/operations/uat-framework.md` "Three-stage UAT campaign" for campaign
+ordering and its report checklist. The emergency override below applies only
+to the blocking canary check.
 
 Emergency override is admin-only: set repository variables
 `RELEASE_READINESS_OVERRIDE_SHA` to the exact release PR head SHA and
@@ -83,24 +110,70 @@ must not be bypassed with an undocumented local change.
 1. Cuts a `vX.Y.Z` branch off `develop` (`develop` itself is never modified).
 2. Bumps the 6 version sources via `scripts/update_version.py` and generates
    the CHANGELOG entry via `scripts/generate_changelog_entry.py --since-ref
-   origin/main`. The release note boundary is the current release branch patch
-   delta against `main`, not `git log origin/main..HEAD` ancestry and not the
+   origin/release`. The release note boundary is the current release branch patch
+   delta against `release`, not `git log origin/release..HEAD` ancestry and not the
    latest tag reachable from `develop`, because `release-finalize`
    intentionally does not replay release commits onto `develop`.
-3. Opens `$EDITOR` on `CHANGELOG.md` for hand-curation. (Headless mode:
-   refuses to skip the curation step rather than silently committing
-   raw output.)
+3. Opens `$EDITOR` on `CHANGELOG.md` for hand-curation when a terminal is
+   attached, then gates on `generate_changelog_entry.py --check-curation`,
+   which inspects the drafted section's text: it rejects verbatim commit
+   subjects (trailing `(#NNNN)`), the manual-edit placeholder, and more than
+   60 bullets. Curation is always required — the draft is the raw
+   `origin/release..HEAD` delta, hundreds of commits whenever `release` lags
+   `develop`. Headless runs stop here: hand-curate the section, then re-run
+   `make release-cut` (see "Resuming or aborting a cut" below).
+   `RELEASE_ALLOW_RAW_CHANGELOG=1` accepts the raw draft deliberately.
 4. Curates the release branch — `git rm`'s the dev-only and deferred
-   release paths (`_project/`, `_blog/`, results explorer/data, agent
-   configs, dev-tooling root files; full list in the `release-cut:`
-   Makefile target and gated by `scripts/check_release_curation.py`).
+   release paths while retaining the curated Results Explorer publication
+   inputs: `results-data/`, `results-explorer/`,
+   `_project/scripts/explorer_pipeline/`,
+   `_project/scripts/explorer_publish.py`, and
+   `_project/scripts/results_explorer_snapshot_invariants.py`. The rest of
+   `_project/`, `_blog/`, agent configs, and dev-tooling root files remain
+   development-only; the exact list is enforced by the `release-cut:`
+   Makefile target and `scripts/check_release_curation.py`.
    For v0.3.0, `landing/` and `docs/blog/` stay in the release tree so
-   `/prompts/` and promoted release posts ship; `results-explorer/`,
-   `results-data/`, and explorer/results-data workflows do not.
-5. Commits a single `Release vX.Y.Z` commit on `vX.Y.Z`, pushes, and
-   opens a PR against `main`.
-6. Sweeps prior `v*` branches on origin (option-c lifecycle: keep until
+   `/prompts/` and promoted release posts ship. Explorer browser/seed/
+   submission/sync workflows remain development-only.
+5. Commits a single `Release vX.Y.Z` commit on `vX.Y.Z`.
+6. Merges `origin/release` into `vX.Y.Z` with `-s ours
+   --allow-unrelated-histories`. `release` and `develop` have unrelated roots and
+   diverge permanently, so without this the release PR is unmergeable, GitHub
+   cannot compute a merge ref, and **no CI runs at all**. `-s ours` keeps the
+   curated release tree byte-for-byte (the merge is guarded on that) and only
+   records `release` as a second parent, which `release-finalize`'s squash-merge
+   then collapses away.
+7. Pushes and opens a PR against `release`.
+8. Sweeps prior `v*` branches on origin (option-c lifecycle: keep until
    superseded, then auto-delete on the next `release-cut`).
+
+### Resuming or aborting a cut
+
+Steps 1-3 are idempotent, so an interrupted cut is resumed by re-running the
+same command from the `vX.Y.Z` branch:
+
+```bash
+make release-cut VERSION=X.Y.Z      # reuses the branch, keeps the CHANGELOG section
+```
+
+The branch is reused rather than recreated, the version bump and `uv lock`
+re-apply to the same values, and an existing `## [X.Y.Z]` section is left
+untouched — so a section you curated between runs survives. To throw the cut
+away instead:
+
+```bash
+make release-cut-abort VERSION=X.Y.Z   # reset, return to develop, delete the branch
+```
+
+`release-cut-abort` refuses once `vX.Y.Z` exists on origin, and refuses to run
+from any branch other than `vX.Y.Z` or `develop`. `release-cut` likewise
+refuses to resume a branch that already carries its `Release vX.Y.Z` commit.
+
+Changelog summarization shells out to the `claude` CLI. It is skipped
+automatically inside a Claude Code session (where the nested call blocks until
+its 120s timeout) and whenever `BENCHBOX_CHANGELOG_SUMMARIZE=0`; set
+`BENCHBOX_CHANGELOG_SUMMARIZE=1` to force it. Skipping only means the draft is
+raw commit subjects, which step 3 requires you to curate anyway.
 
 ### What `release-finalize` does
 
@@ -109,33 +182,48 @@ must not be bypassed with an undocumented local change.
    both `validate-base` and `release-required-result` are present and green.
    Missing means the ruleset/workflow contract is broken; pending means wait
    in GitHub Actions and rerun the command. `release-finalize` does not poll.
-3. Squash-merges the PR. (Ruleset `main-release-only` also blocks the merge
+3. Squash-merges the PR. (Ruleset `release-only` also blocks the merge
    unless `validate-base` and `release-required-result` are green.)
-4. Fast-forwards `main` and tags `vX.Y.Z`.
+4. Fast-forwards `release` and tags `vX.Y.Z`.
 5. Pushes the tag — which fires `.github/workflows/release.yml`:
    `dependency-bounds` → `build` (with `SOURCE_DATE_EPOCH` from the tag
    commit) → `publish` (PyPI trusted publisher) → `github-release` →
    `test-installation` (cross-platform pip install verification).
 6. Leaves `develop` untouched. Dev-only paths persist on develop by
    design (per A3 in `_project/decisions/single-repo-migration.md`); the
-   release squash on `main` does not need to be replayed onto develop.
+   release squash on `release` does not need to be replayed onto develop.
 
-Push-to-main jobs are post-merge signals. They may still start when `main`
+**Syncing `develop`'s version.** `release-cut`/`release-finalize` never modify
+`develop` (step 6), so its declared version does not track releases on its own —
+D5's original "rebase `develop` onto `main`" step became impossible once
+`release`/`develop` diverged as unrelated roots. After a release publishes, bump
+`develop` to match on a branch off `develop`:
+`scripts/update_version.py --version X.Y.Z --update-pyproject`, then `uv lock`,
+then PR back to `develop`. This realigns all six version sources
+(`benchbox/__init__.py`, `pyproject.toml`, the three `Current release:` doc
+markers, and the `landing/index.html` badge) with the latest published release,
+so `develop` no longer trails PyPI.
+
+Push-to-release jobs are post-merge signals. They may still start when `release`
 advances, but they are not pre-publish evidence: the tag push follows the
 successful release PR merge and `.github/workflows/release.yml` begins from
-that public tag. If a post-merge `main` check fails after the tag is pushed,
+that public tag. If a post-merge `release` check fails after the tag is pushed,
 handle it as a patch release or incident; do not treat the already-published
 release as if it had been blocked.
 
 ## Recovering from common failures
 
 - **`validate-base` or `release-required-result` is missing**: stop. The
-  `main-release-only` ruleset or release workflow contract is out of sync;
+  `release-only` ruleset or release workflow contract is out of sync;
   do not finalize until both stable required contexts exist.
 - **`validate-base` or `release-required-result` is pending or failed**: wait
   for GitHub Actions or fix on a feature branch off `develop`, PR back to
   `develop`, then re-run `make release-cut` (the option-c sweep will delete
   the stale `vX.Y.Z` branch automatically).
+- **UAT campaign evidence is missing, stale, red, dirty, or non-ancestor**:
+  follow up with the optional three-stage campaign and review its report (see
+  "UAT matrix campaign evidence"). This does not block `release-finalize` and
+  does not use the emergency override.
 - **Release canary is missing, stale, or red**: inspect the latest
   `release-canary.yml` run. If the non-fast canary failed, fix through
   `develop`; if ruleset drift failed, update the live GitHub ruleset or this

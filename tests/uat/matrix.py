@@ -34,12 +34,20 @@ PLATFORM_CLI_FLAGS: dict[str, list[str]] = {
 }
 
 # Platform -> uv extra name (`uv run --extra X`).
+# modin[ray] and databend-driver are NOT in the default dev dependency-group
+# (pyproject.toml [dependency-groups] dev) -- only under [project.optional-
+# dependencies] -- so a plain `uv sync` never installs them (see
+# uat-operator-provisioning finding 1). "modin-df" is the matrix/CLI platform
+# key (see UAT_DATAFRAME_PLATFORM_BASES); the pyproject extra is named
+# "modin" (no -df suffix).
 PLATFORM_UV_EXTRA: dict[str, str] = {
     "clickhouse-local": "clickhouse-local",
     "clickhouse-server": "clickhouse-server",
     "lakesail": "lakesail",
     "singlestore": "singlestore",
     "influxdb": "influxdb",
+    "modin-df": "modin",
+    "databend": "databend",
 }
 
 # Platform groupings.
@@ -80,10 +88,6 @@ UAT_DATAFRAME_PLATFORM_BASES: tuple[str, ...] = (
     "dask",
     "datafusion",
 )
-
-SQL_PLATFORMS: tuple[str, ...] = ()
-DOCKER_PLATFORMS: tuple[str, ...] = ()
-DATAFRAME_PLATFORMS: tuple[str, ...] = ()
 
 
 def _registry_platform_subset(
@@ -131,16 +135,68 @@ PLATFORM_GROUPS: dict[str, tuple[str, ...]] = {
 }
 
 
+def known_platform_ids() -> frozenset[str]:
+    """Full registry-known platform ids UAT's `platforms.include` may name.
+
+    Union of `PlatformRegistry.get_sql_platforms()` and
+    `get_dataframe_platforms()`, plus the `-df` CLI alias suffix for every
+    dataframe-capable platform (`benchbox.cli.platform.PLATFORM_ALIASES`
+    maps e.g. `polars-df` -> `polars`; mirrored here by suffix rather than
+    importing CLI code into the UAT framework). This is the same "true
+    registry" boundary `missing_benchmarks_from_include` uses via
+    `load_benchmarks()` -- broader than any single curated `PLATFORM_GROUPS`
+    bucket, so a real (if UAT-out-of-scope, e.g. a cloud platform) registry
+    id is never flagged, only a genuine typo/removed id.
+    """
+    sql = set(PlatformRegistry.get_sql_platforms())
+    dataframe = set(PlatformRegistry.get_dataframe_platforms())
+    # Guard against ids that already carry the suffix (e.g. `databricks-df`
+    # is registered under both capabilities) so we don't mint spurious
+    # `databricks-df-df` entries.
+    df_aliases = {f"{platform}-df" for platform in dataframe if not platform.endswith("-df")}
+    return frozenset(sql | dataframe | df_aliases)
+
+
+def missing_platforms_from_include(
+    include: Iterable[str],
+    known: Iterable[str] | None = None,
+) -> list[str]:
+    """Return `include` entries naming a platform absent from the registry.
+
+    `resolve_platforms` silently drops `include` entries not in
+    `known_platform_ids()` (mirrors `missing_benchmarks_from_include` /
+    `resolve_benchmarks` for benchmarks) - so a typo'd or removed platform id
+    in a sweep config's `platforms.include` list would otherwise vanish with
+    zero signal before `enumerate_cells_with_pruning` ever sees it. This
+    exposes exactly which requested ids were dropped for that reason,
+    preserving request order and de-duplicating, so callers can turn them
+    into accounting rows instead of a silent drop.
+    """
+    known_set = set(known_platform_ids()) if known is None else set(known)
+    seen: set[str] = set()
+    missing: list[str] = []
+    for platform in include:
+        if platform not in known_set and platform not in seen:
+            seen.add(platform)
+            missing.append(platform)
+    return missing
+
+
 def resolve_platforms(
     groups: Iterable[str] = (),
     include: Iterable[str] = (),
     exclude: Iterable[str] = (),
+    known: Iterable[str] | None = None,
 ) -> list[str]:
     """Resolve a final platform list given group, include, and exclude filters.
 
     Order: groups expanded first (in the order given, deduplicated by first
-    occurrence), then `include` appended, then `exclude` removed.
+    occurrence), then `include` appended, then `exclude` removed. `include`
+    entries absent from `known` (default `known_platform_ids()`) are silently
+    dropped, mirroring `resolve_benchmarks`; use `missing_platforms_from_include`
+    to surface those drops as accounting rows.
     """
+    known_set = set(known_platform_ids()) if known is None else set(known)
     seen: set[str] = set()
     resolved: list[str] = []
     for group in groups:
@@ -151,7 +207,7 @@ def resolve_platforms(
                 seen.add(platform)
                 resolved.append(platform)
     for platform in include:
-        if platform not in seen:
+        if platform in known_set and platform not in seen:
             seen.add(platform)
             resolved.append(platform)
     excluded = set(exclude)
@@ -184,27 +240,51 @@ def tcp_probe(host: str, port: int, timeout_s: float = 2.0) -> bool:
         return False
 
 
-def platform_is_reachable(platform: str) -> bool:
-    """Return True iff `platform` has no port mapping or its port is open.
+def probe_platform_reachability(platform: str, *, timeout_s: float = 2.0) -> bool:
+    """Return True iff `platform` has no port mapping or its port is open RIGHT NOW.
 
-    The reachability endpoint is re-resolved from the compose-derived facts on
-    each cache miss so an env override (e.g. SINGLESTORE_HOST_PORT) set before
-    the probe is honored.
+    The no-cache variant: never reads `_REACHABILITY_CACHE` and never writes
+    to it. Two callers need that guarantee, for opposite reasons.
+
+    1. The per-cell liveness probe (`phases/execute.py`). A cached answer is
+       useless to it by construction -- it exists precisely to notice that a
+       stack which WAS reachable has since died, which is the only way to
+       catch a container that outlives the post-start readiness check. The
+       2026-08-04 CedarDB incident died ~29s after `up --wait` returned and
+       every subsequent cell was recorded as a cell failure.
+    2. The post-start readiness check. Writing `True` here would poison the
+       cache for whatever probes next, converting a later real probe into a
+       stale cached pass.
+
+    `platform_is_reachable` remains the cached, once-per-process entry point
+    for callers that just want "is this platform up" at sweep or platform
+    granularity. The reachability endpoint is re-resolved from the
+    compose-derived facts on every call so an env override (e.g.
+    SINGLESTORE_HOST_PORT) set before the probe is honored.
     """
-    if platform in _REACHABILITY_CACHE:
-        return _REACHABILITY_CACHE[platform]
     addr = docker_assets.host_reachability_endpoint(platform)
     if addr is None:
-        # No probe configured -> assume reachable.
-        _REACHABILITY_CACHE[platform] = True
+        # No probe configured -> assume reachable. Costs no socket, so the
+        # per-cell liveness probe is free for native platforms (duckdb, ...).
         return True
     host, _, port_s = addr.partition(":")
     try:
         port = int(port_s)
     except ValueError:
-        _REACHABILITY_CACHE[platform] = True
         return True
-    reachable = tcp_probe(host, port)
+    return tcp_probe(host, port, timeout_s=timeout_s)
+
+
+def platform_is_reachable(platform: str) -> bool:
+    """Return True iff `platform` has no port mapping or its port is open.
+
+    Cached per platform for this process (see `_REACHABILITY_CACHE`);
+    invalidated only by `invalidate_reachability_cache_after_lifecycle_change`.
+    Use `probe_platform_reachability` when a fresh answer is required.
+    """
+    if platform in _REACHABILITY_CACHE:
+        return _REACHABILITY_CACHE[platform]
+    reachable = probe_platform_reachability(platform)
     _REACHABILITY_CACHE[platform] = reachable
     return reachable
 
@@ -403,6 +483,57 @@ def benchbox_run_argv(
     ]
     if compression is not None:
         argv += ["--compression", compression]
+    argv += PLATFORM_CLI_FLAGS.get(platform, [])
+    argv += docker_assets.platform_extra_opts(platform)
+    if local_managed_platform:
+        argv += docker_assets.local_managed_platform_extra_opts(platform)
+    argv += list(extra_args)
+    return argv
+
+
+def benchbox_run_official_argv(
+    platform: str,
+    benchmark: str,
+    scale: float,
+    *,
+    phases: str,
+    streams: int,
+    seed: int | None = None,
+    extra_args: Iterable[str] = (),
+    local_managed_platform: bool = False,
+    quiet: bool = True,
+) -> list[str]:
+    """Build the `uv run -- benchbox run-official ...` argv for a throughput cell.
+
+    `run-official` (unlike `run`) has a `--streams` option that reaches
+    `BenchmarkConfig.concurrency` via `_forward_requested_streams`
+    (`benchbox/cli/commands/run_official.py`) -- the only CLI surface that
+    can request N>1 concurrent throughput streams today; see
+    `tests.uat.throughput` and the `throughput-stream-count-wiring-defect`
+    TODO's `deferred` note. `run-official` requires a TPC-compliant scale
+    factor (`tests.uat.throughput.TPC_ALLOWED_SCALE_FACTORS`). UAT uses
+    `--quiet` by default so the deprecated command reuses the same final
+    bare-path stdout contract as `benchbox run`; callers can disable it for
+    a verbose diagnostic rerun.
+    """
+    argv = uv_run_argv(platform)
+    argv += [
+        "benchbox",
+        "run-official",
+        benchmark,
+        "--platform",
+        platform,
+        "--scale",
+        str(scale),
+        "--phases",
+        phases,
+        "--streams",
+        str(streams),
+    ]
+    if seed is not None:
+        argv += ["--seed", str(seed)]
+    if quiet:
+        argv += ["--quiet"]
     argv += PLATFORM_CLI_FLAGS.get(platform, [])
     argv += docker_assets.platform_extra_opts(platform)
     if local_managed_platform:

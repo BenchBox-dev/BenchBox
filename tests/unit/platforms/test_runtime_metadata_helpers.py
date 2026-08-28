@@ -80,6 +80,43 @@ def test_embedded_platform_maps_to_local_process_runtime() -> None:
     assert metadata["platform_raw_config"]["database_path"] == ":memory:"
 
 
+def test_platform_raw_config_excludes_internal_tuning_keys_and_reprs() -> None:
+    """w1/w2 regression: platform.raw_config must never carry internal
+    bookkeeping keys (e.g. tuning_config) or a Python repr() string for an
+    unserializable value - see tuning-repr-serialization-leak-fix-20260712."""
+
+    class _TuningConfig:
+        def __repr__(self) -> str:  # pragma: no cover - guards against leakage
+            return "UnifiedTuningConfiguration(rules=[...], overrides={...}, " + "x" * 800 + ")"
+
+    metadata = build_default_normalized_result_metadata(
+        _Adapter(
+            {
+                "platform_type": "duckdb",
+                "platform_name": "DuckDB",
+                "execution_mode": "sql",
+                "connection_mode": "memory",
+                "configuration": {
+                    "database_path": ":memory:",
+                    "tuning_config": _TuningConfig(),
+                    "unified_tuning_configuration": _TuningConfig(),
+                    "tuning_enabled": True,
+                    "_explicit_platform_options": {"database_path": ":memory:"},
+                },
+            }
+        )
+    )
+
+    raw_config = metadata["platform_raw_config"]
+    assert raw_config["database_path"] == ":memory:"
+    assert "tuning_config" not in raw_config
+    assert "unified_tuning_configuration" not in raw_config
+    assert "tuning_enabled" not in raw_config
+    assert "_explicit_platform_options" not in raw_config
+    for value in raw_config.values():
+        assert not (isinstance(value, str) and "UnifiedTuningConfiguration(" in value)
+
+
 def test_dataframe_adapter_maps_to_dataframe_process_runtime() -> None:
     metadata = build_default_normalized_result_metadata(_DataFrameAdapter(), execution_mode="dataframe")
 

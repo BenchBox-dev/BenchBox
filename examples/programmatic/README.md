@@ -177,7 +177,7 @@ print(f"Performance change: {change:+.1f}%")
 ### 3. Custom Benchmarks
 
 ```python
-from benchbox.core.base_benchmark import BaseBenchmark
+from benchbox.base import BaseBenchmark
 
 class MyBenchmark(BaseBenchmark):
     def generate_data(self):

@@ -5,6 +5,9 @@
 # Pre-existing excludes from pyproject.toml are omitted (already triaged)
 # Classification completed: 2026-02-20 (w3/w4/w5/w6), 2026-03-12 (wave 4 and wave 4b)
 # Metadata below keeps the original scan totals; classification_summary reflects current matrix rows.
+# Historical planning artifact: these totals and classifications are not a live
+# gate. Run `make complexity-check` for the current scan and enforcement result.
+# Do not use this matrix to infer present complexity ownership or status.
 
 metadata:
   generated_date: "2026-02-20"

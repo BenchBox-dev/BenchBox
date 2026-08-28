@@ -75,7 +75,7 @@ class TestBenchmarkOrchestratorValidation:
                 return_value=bench_instance,
             ),
             patch("benchbox.cli.orchestrator.get_platform_adapter", return_value=Mock()) as mock_adapter,
-            patch("benchbox.cli.orchestrator.run_benchmark_lifecycle") as mock_run,
+            patch("benchbox.core.run_service.run_benchmark_lifecycle") as mock_run,
         ):
             mock_result = Mock(spec=BenchmarkResults)
             mock_run.return_value = mock_result
@@ -132,7 +132,7 @@ class TestBenchmarkOrchestratorValidation:
                 return_value=bench_instance,
             ),
             patch("benchbox.cli.orchestrator.get_platform_adapter") as mock_adapter,
-            patch("benchbox.cli.orchestrator.run_benchmark_lifecycle") as mock_run,
+            patch("benchbox.core.run_service.run_benchmark_lifecycle") as mock_run,
         ):
             mock_run.return_value = Mock(spec=BenchmarkResults)
             self.orchestrator.execute_benchmark(config, _mk_system_profile(), database_config=None)
@@ -156,7 +156,7 @@ class TestBenchmarkOrchestratorValidation:
                 "_get_benchmark_instance",
                 return_value=bench_instance,
             ),
-            patch("benchbox.cli.orchestrator.run_benchmark_lifecycle") as mock_run,
+            patch("benchbox.core.run_service.run_benchmark_lifecycle") as mock_run,
         ):
             mock_run.return_value = Mock(spec=BenchmarkResults)
             result = self.orchestrator.execute_benchmark(
@@ -196,7 +196,7 @@ class TestBenchmarkOrchestratorValidation:
                 return_value=bench_instance,
             ),
             patch("benchbox.cli.orchestrator.get_platform_adapter", return_value=adapter) as mock_get_adapter,
-            patch("benchbox.cli.orchestrator.run_benchmark_lifecycle") as mock_run,
+            patch("benchbox.core.run_service.run_benchmark_lifecycle") as mock_run,
         ):
             mock_run.return_value = Mock(spec=BenchmarkResults)
             result = self.orchestrator.execute_benchmark(

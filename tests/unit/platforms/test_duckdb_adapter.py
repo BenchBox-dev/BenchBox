@@ -48,6 +48,28 @@ class TestDuckDBAdapter:
             assert adapter.thread_limit is None
             assert adapter.enable_progress_bar is False
 
+    @pytest.mark.parametrize("value", ["2GiB", "2 GB", "2 gigabytes", "2e3 MB", "976.5 KiB"])
+    def test_initialization_accepts_duckdb_memory_size_syntax(self, value):
+        """Direct adapter configuration must preserve DuckDB's supported spellings."""
+        with patch("benchbox.platforms.duckdb.duckdb"):
+            adapter = DuckDBAdapter(memory_limit=value, max_temp_directory_size=value)
+
+        assert adapter.memory_limit == value
+        assert adapter.max_temp_directory_size == value
+
+    def test_initialization_accepts_duckdb_default_temp_size_expression(self):
+        with patch("benchbox.platforms.duckdb.duckdb"):
+            adapter = DuckDBAdapter(max_temp_directory_size="90% of available disk space")
+
+        assert adapter.max_temp_directory_size == "90% of available disk space"
+
+    @pytest.mark.parametrize("value", ["2", "2 tebibytes", "2GB'; DROP TABLE results; --", "/tmp/secret"])
+    def test_initialization_rejects_invalid_or_unsafe_memory_size(self, value):
+        """Invalid SET values must fail before they can reach SQL construction."""
+        with patch("benchbox.platforms.duckdb.duckdb"):
+            with pytest.raises(ValueError, match="memory_limit"):
+                DuckDBAdapter(memory_limit=value)
+
     def test_create_external_tables_uses_read_parquet_views(self, tmp_path):
         """External mode should create views over read_parquet() sources."""
         with patch("benchbox.platforms.duckdb.duckdb"):
@@ -387,7 +409,7 @@ class TestDuckDBAdapter:
             call("SET default_order = 'ASC'"),
         ]
         for expected_call in expected_calls:
-            mock_connection.execute.assert_any_call(expected_call.args[0])
+            mock_connection.execute.assert_any_call(*expected_call.args)
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_create_connection_file_database(self, mock_duckdb):
@@ -733,10 +755,16 @@ class TestDuckDBAdapter:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)
-            # Create a dummy sharded zstd file name; actual contents won't be read because
-            # connection is mocked and we only validate SQL generation and handler selection
+            # The DuckDB connection is mocked, but the contents ARE read: the
+            # loader probes the first line for a trailing delimiter to decide
+            # parser arity. This previously wrote plain text under a .zst name
+            # and only passed because the probe swallowed the decompression
+            # failure and guessed "no trailing delimiter". That swallow is gone,
+            # so the fixture has to be genuinely compressed.
+            import zstandard
+
             fpath = tmp / "customer.tbl.1.zst"
-            fpath.write_text("1|foo|\n2|bar|\n")  # content won't matter for mocked connection
+            fpath.write_bytes(zstandard.ZstdCompressor().compress(b"1|foo|\n2|bar|\n"))
 
             mock_benchmark.tables = {"customer": str(fpath)}
             mock_benchmark.get_table_loading_order.return_value = ["customer"]
@@ -799,6 +827,18 @@ class TestDuckDBAdapter:
 
         # Should enable query tree profiling for primitives
         mock_connection.execute.assert_any_call("SET enable_profiling = 'query_tree'")
+
+    @patch("benchbox.platforms.duckdb.duckdb")
+    def test_configure_for_benchmark_transaction_primitives_serializes_execution(self, mock_duckdb):
+        """Transaction primitives avoid DuckDB's parallel DML invalidation path."""
+        mock_connection = Mock()
+        mock_duckdb.connect.return_value = mock_connection
+
+        adapter = DuckDBAdapter(thread_limit=8)
+
+        adapter.configure_for_benchmark(mock_connection, "transaction_primitives")
+
+        mock_connection.execute.assert_called_once_with("SET threads TO 1")
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_execute_query_success(self, mock_duckdb):
@@ -1264,7 +1304,7 @@ class TestDuckDBAdapter:
         ]
 
         for expected_call in expected_calls:
-            mock_connection.execute.assert_any_call(expected_call.args[0])
+            mock_connection.execute.assert_any_call(*expected_call.args)
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_table_loading_order(self, mock_duckdb):
@@ -1609,3 +1649,75 @@ class TestDuckDBAdapter:
         assert any("delta_scan(" in sql for sql in executed_sql)
         assert not any("iceberg_scan(" in sql for sql in executed_sql)
         assert adapter.external_format == "delta"
+
+
+class TestMCPThreadsReachTheEffectiveSetting:
+    """The public MCP `threads` option must change DuckDB execution."""
+
+    @staticmethod
+    def _adapter_from_mcp_request(tmp_path: Path, options: dict):
+        from benchbox.core.run_service import (
+            translate_platform_options_for_adapter as _prepare_adapter_platform_options,
+        )
+        from benchbox.mcp.schemas import validate_platform_options
+
+        normalized = validate_platform_options("duckdb", options)
+        prepared = _prepare_adapter_platform_options("duckdb", normalized)
+        return DuckDBAdapter.from_config(
+            {
+                "benchmark": "tpch",
+                "scale_factor": 0.01,
+                "database_path": str(tmp_path / "mcp_threads.duckdb"),
+                **prepared,
+            }
+        )
+
+    def test_from_config_preserves_the_translated_thread_limit(self, tmp_path: Path):
+        """`from_config` rebuilds its config from a key list; `threads` must survive it."""
+        adapter = self._adapter_from_mcp_request(tmp_path, {"threads": 7})
+
+        assert adapter.thread_limit == 7
+        assert adapter.get_platform_info()["configuration"]["thread_limit"] == 7
+
+    def test_connection_emits_the_thread_setting(self, tmp_path: Path):
+        """A deterministic connection spy proves the SET statement is issued."""
+        adapter = self._adapter_from_mcp_request(tmp_path, {"threads": 7})
+
+        connection = Mock()
+        with (
+            patch.object(adapter, "_duckdb_module") as duckdb_module,
+            patch.object(adapter, "_detect_connection_version", return_value=None),
+            patch.object(adapter, "handle_existing_database"),
+        ):
+            duckdb_module.connect.return_value = connection
+            adapter.create_connection()
+
+        assert call("SET threads TO 7") in connection.execute.call_args_list
+
+    def test_a_real_connection_reports_the_requested_thread_count(self, tmp_path: Path):
+        """The strongest evidence: DuckDB itself reports the setting."""
+        adapter = self._adapter_from_mcp_request(tmp_path, {"threads": 3})
+
+        connection = adapter.create_connection()
+        try:
+            assert connection.execute("SELECT current_setting('threads')").fetchone()[0] == 3
+        finally:
+            with contextlib.suppress(Exception):
+                connection.close()
+
+    def test_without_the_option_duckdb_keeps_its_own_default(self, tmp_path: Path):
+        """The mapping must not impose a thread limit on requests that omit it."""
+        adapter = self._adapter_from_mcp_request(tmp_path, {})
+
+        assert adapter.thread_limit is None
+
+        connection = Mock()
+        with (
+            patch.object(adapter, "_duckdb_module") as duckdb_module,
+            patch.object(adapter, "_detect_connection_version", return_value=None),
+            patch.object(adapter, "handle_existing_database"),
+        ):
+            duckdb_module.connect.return_value = connection
+            adapter.create_connection()
+
+        assert not any("SET threads" in str(executed) for executed in connection.execute.call_args_list)

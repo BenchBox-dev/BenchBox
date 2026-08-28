@@ -180,22 +180,26 @@ class TestDuckDBCursorWrapper:
 
 
 class TestBuildDuckdbCtasSortSql:
-    """Unit tests for _build_duckdb_ctas_sort_sql (module-level helper)."""
+    """Unit tests for _build_duckdb_ctas_sort_sql (module-level helper).
+
+    Uses real TuningColumn instances (not Mocks): the helper now delegates to
+    core.tuning.generators.duckdb.DuckDBDDLGenerator via a TableTuning, whose
+    constructor validates that sorting columns are genuine TuningColumn
+    instances -- see the renderer-consolidation TODO's w2 duckdb migration.
+    """
 
     def test_single_column_sort(self):
-        col = Mock()
-        col.name = "l_shipdate"
-        col.order = 1
+        from benchbox.core.tuning.interface import TuningColumn
+
+        col = TuningColumn(name="l_shipdate", type="DATE", order=1)
         sql = _build_duckdb_ctas_sort_sql("lineitem", [col])
         assert sql == "CREATE OR REPLACE TABLE lineitem AS SELECT * FROM lineitem ORDER BY l_shipdate;"
 
     def test_multi_column_preserves_order(self):
-        c1 = Mock()
-        c1.name = "l_shipdate"
-        c1.order = 1
-        c2 = Mock()
-        c2.name = "l_orderkey"
-        c2.order = 2
+        from benchbox.core.tuning.interface import TuningColumn
+
+        c1 = TuningColumn(name="l_shipdate", type="DATE", order=1)
+        c2 = TuningColumn(name="l_orderkey", type="INTEGER", order=2)
         sql = _build_duckdb_ctas_sort_sql("lineitem", [c1, c2])
         assert "ORDER BY l_shipdate, l_orderkey" in sql
 

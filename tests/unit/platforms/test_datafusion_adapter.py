@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from benchbox.platforms.base.data_loading import DataSource
 from benchbox.platforms.datafusion import DataFusionAdapter, DataFusionConnectionCompat
 
 pytestmark = [
@@ -140,6 +141,121 @@ class TestDataFusionAdapter:
                         mock_config.with_parquet_pruning.assert_called_once_with(True)
                         mock_config.with_repartition_joins.assert_called_once_with(True)
                         mock_config.with_batch_size.assert_called_once_with(16384)
+
+    def test_create_connection_honors_optimization_flags(self):
+        """MCP-supplied DataFusion optimization flags must reach SessionConfig."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mock_config = Mock()
+            mock_config.with_target_partitions.return_value = mock_config
+            mock_config.with_parquet_pruning.return_value = mock_config
+            mock_config.with_repartition_joins.return_value = mock_config
+            mock_config.with_repartition_aggregations.return_value = mock_config
+            mock_config.with_repartition_windows.return_value = mock_config
+            mock_config.with_information_schema.return_value = mock_config
+            mock_config.with_batch_size.return_value = mock_config
+            mock_config.set.side_effect = Exception("Config not supported")
+
+            mock_runtime_builder = Mock()
+            mock_runtime_builder.build.return_value = Mock()
+
+            with patch("benchbox.platforms.datafusion.SessionConfig", return_value=mock_config):
+                with patch("benchbox.platforms.datafusion.SessionContext"):
+                    with patch("benchbox.platforms.datafusion.RuntimeEnv", return_value=mock_runtime_builder):
+                        adapter = DataFusionAdapter(
+                            working_dir=tmpdir,
+                            parquet_pushdown=False,
+                            repartition_joins=False,
+                        )
+
+                        with patch.object(adapter, "handle_existing_database"):
+                            adapter.create_connection()
+
+            mock_config.with_parquet_pruning.assert_called_once_with(False)
+            mock_config.with_repartition_joins.assert_called_once_with(False)
+
+    def test_create_connection_configures_runtime_builder_without_build_method(self):
+        """DataFusion 53 builders must receive memory and spill settings directly."""
+
+        class RuntimeEnvBuilderV53:
+            def __init__(self):
+                self.memory_bytes = None
+                self.disk_manager_enabled = False
+
+            def with_fair_spill_pool(self, size):
+                self.memory_bytes = size
+                return self
+
+            def with_disk_manager_os(self):
+                self.disk_manager_enabled = True
+                return self
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("benchbox.platforms.datafusion.RuntimeEnv", RuntimeEnvBuilderV53):
+                with patch("benchbox.platforms.datafusion.SessionContext") as session_context:
+                    adapter = DataFusionAdapter(working_dir=tmpdir, memory_limit="8G")
+
+                    with patch.object(adapter, "handle_existing_database"):
+                        adapter.create_connection()
+
+            runtime = session_context.call_args.args[1]
+            assert runtime.memory_bytes == 8 * 1024 * 1024 * 1024
+            assert runtime.disk_manager_enabled is True
+
+    def test_create_connection_does_not_report_unavailable_runtime_settings(self):
+        """Legacy runtime fallback metadata must not claim memory or spill configuration."""
+
+        class LegacyRuntimeEnv:
+            pass
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("benchbox.platforms.datafusion.RuntimeEnv", LegacyRuntimeEnv):
+                with patch("benchbox.platforms.datafusion.SessionContext"):
+                    adapter = DataFusionAdapter(working_dir=tmpdir, memory_limit="8G")
+
+                    with patch.object(adapter, "handle_existing_database"):
+                        with patch.object(adapter, "log_operation_complete") as operation_complete:
+                            adapter.create_connection()
+
+            details = operation_complete.call_args.kwargs["details"]
+            assert "memory_pool=" not in details
+            assert "disk_spilling=" not in details
+
+    def test_create_connection_does_not_report_runtime_rejected_by_context(self):
+        """Context fallback must not report settings from a rejected runtime builder."""
+
+        class RuntimeEnvBuilderV53:
+            def with_fair_spill_pool(self, _size):
+                return self
+
+            def with_disk_manager_os(self):
+                return self
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("benchbox.platforms.datafusion.RuntimeEnv", RuntimeEnvBuilderV53):
+                with patch("benchbox.platforms.datafusion.SessionContext", side_effect=[TypeError, Mock()]):
+                    adapter = DataFusionAdapter(working_dir=tmpdir, memory_limit="8G")
+
+                    with patch.object(adapter, "handle_existing_database"):
+                        with patch.object(adapter, "log_operation_complete") as operation_complete:
+                            adapter.create_connection()
+
+            details = operation_complete.call_args.kwargs["details"]
+            assert "memory_pool=" not in details
+            assert "disk_spilling=" not in details
+
+    def test_from_config_forwards_optimization_flags(self, tmp_path):
+        """Unified configuration must preserve DataFusion optimization flags."""
+        with patch.object(DataFusionAdapter, "__init__", return_value=None) as init:
+            DataFusionAdapter.from_config(
+                {
+                    "working_dir": str(tmp_path),
+                    "parquet_pushdown": False,
+                    "repartition_joins": False,
+                }
+            )
+
+        assert init.call_args.kwargs["parquet_pushdown"] is False
+        assert init.call_args.kwargs["repartition_joins"] is False
 
     def test_parse_memory_limit(self):
         """Test memory limit parsing."""
@@ -297,6 +413,41 @@ class TestDataFusionAdapter:
             mock_parquet_writer.assert_called_once()
             # Verify table was registered
             mock_conn.register_parquet.assert_called_once()
+
+    @patch("benchbox.platforms.datafusion.SessionContext")
+    @patch("pyarrow.csv.read_csv")
+    @patch("pyarrow.parquet.ParquetWriter")
+    def test_parquet_conversion_honors_manifest_delimiter_over_format_hint(
+        self, mock_parquet_writer, mock_read_csv, mock_session_context
+    ):
+        """CSV metadata wins when a manifest labels the file with a legacy tbl format."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_file = Path(tmpdir) / "tags.csv"
+            csv_file.write_text("host,region\nhost_0,us-east-1\n")
+
+            adapter = DataFusionAdapter(working_dir=tmpdir, data_format="parquet")
+            mock_table = Mock()
+            mock_table.num_rows = 1
+            mock_table.schema = Mock()
+            mock_read_csv.return_value = mock_table
+            data_source = DataSource(
+                source_type="manifest_v2",
+                tables={"tags": [csv_file]},
+                table_formats={"tags": "tbl"},
+                table_metadata={"tags": {"csv_delimiter": ",", "csv_has_header": True}},
+            )
+
+            adapter._load_table_parquet(
+                Mock(),
+                "tags",
+                [csv_file],
+                Path(tmpdir),
+                csv_format="tbl",
+                data_source=data_source,
+                benchmark=Mock(csv_delimiter=None, csv_has_header=True),
+            )
+
+            assert mock_read_csv.call_args.kwargs["parse_options"].delimiter == ","
 
     def test_is_parquet_file(self):
         """Test Parquet file detection by extension."""
@@ -530,6 +681,37 @@ class TestDataFusionAdapter:
             assert result["status"] == "SUCCESS"
             assert result["rows_returned"] == 10
             assert result["execution_time_seconds"] >= 0
+
+    @patch("benchbox.platforms.datafusion.SessionContext")
+    def test_q20_rewrite_is_scoped_to_tpch(self, mock_session_context):
+        """The TPC-H Q20 rewrite must not replace Data Vault query 20 SQL."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            adapter = DataFusionAdapter(working_dir=tmpdir)
+            mock_conn = Mock()
+            mock_df = Mock()
+            mock_batch = Mock()
+            mock_batch.num_rows = 0
+            mock_batch.num_columns = 0
+            mock_df.collect.return_value = [mock_batch]
+            mock_conn.sql.return_value = mock_df
+            query = """SELECT ss.s_name
+FROM hub_supplier hs
+JOIN sat_supplier ss ON hs.hk_supplier = ss.hk_supplier
+JOIN sat_part sp ON sp.p_name LIKE 'forest%'
+JOIN sat_nation sn ON sn.n_name = 'CANADA'
+JOIN sat_lineitem sl ON sl.l_shipdate >= DATE '1994-01-01'
+WHERE DATE '1994-01-01' <= DATE '1995-01-01'"""
+
+            result = adapter.execute_query(
+                mock_conn,
+                query,
+                "20",
+                benchmark_type="datavault",
+                validate_row_count=False,
+            )
+
+            assert result["status"] == "SUCCESS"
+            assert mock_conn.sql.call_args.args[0] == query
 
     @patch("benchbox.platforms.datafusion.SessionContext")
     def test_execute_query_failure(self, mock_session_context):
@@ -831,6 +1013,35 @@ class TestDataFusionAdapter:
             assert adapter.data_format == "parquet"
             assert adapter.batch_size == 16384
             assert str(Path(tmpdir) / "databases") in str(adapter.working_dir)
+
+    @patch("benchbox.platforms.datafusion.SessionContext")
+    def test_from_config_preserves_target_partitions_option(self, mock_session_context):
+        """The MCP-facing target_partitions key must reach the adapter consumer."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = {
+                "benchmark": "tpch",
+                "scale_factor": 0.01,
+                "output_dir": tmpdir,
+                "target_partitions": 7,
+            }
+
+            adapter = DataFusionAdapter.from_config(config)
+
+            assert adapter.target_partitions == 7
+
+    @patch("benchbox.platforms.datafusion.SessionContext")
+    def test_from_config_reads_nested_options_with_top_level_precedence(self, mock_session_context):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = {
+                "working_dir": tmpdir,
+                "memory_limit": "8G",
+                "options": {"memory_limit": "4G", "target_partitions": 2},
+            }
+
+            adapter = DataFusionAdapter.from_config(config)
+
+            assert adapter.memory_limit == "8G"
+            assert adapter.target_partitions == 2
 
     @patch("benchbox.platforms.datafusion.SessionContext")
     def test_add_cli_arguments(self, mock_session_context):

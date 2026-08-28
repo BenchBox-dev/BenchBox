@@ -5,9 +5,10 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import gzip
 import logging
 from pathlib import Path
-from types import SimpleNamespace
+from types import GeneratorType, SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
@@ -40,6 +41,11 @@ def clickhouse_dependencies():
 class TestClickHouseAdapter:
     """Test ClickHouse platform adapter functionality."""
 
+    def test_tpcds_q35_is_removed_from_local_memory_incompatibilities(self):
+        """Q35's ClickHouse semi-join rewrite removes its known local memory failure."""
+        assert 35 not in ClickHouseAdapter.KNOWN_INCOMPATIBLE_QUERIES["tpcds"]
+        assert "Query 35" not in ClickHouseAdapter.__doc__
+
     def test_initialization_success(self):
         """Test successful adapter initialization in server mode."""
         with patch("benchbox.platforms.clickhouse.setup.ClickHouseClient"):
@@ -56,6 +62,15 @@ class TestClickHouseAdapter:
             assert adapter.host == "localhost"
             assert adapter.port == 9000
             assert adapter.deployment_mode == "server"
+            assert adapter.insert_block_size == 65536
+
+    def test_server_insert_block_size_rejects_legacy_batch_size(self):
+        """The server path cannot be configured back to the 1,000-row fallback."""
+        with (
+            patch("benchbox.platforms.clickhouse.setup.ClickHouseClient"),
+            pytest.raises(ValueError, match="other than 1000"),
+        ):
+            ClickHouseAdapter(deployment_mode="server", insert_block_size=1000)
 
     def test_initialization_missing_driver(self):
         """Test initialization when ClickHouse driver dependencies are missing (server mode)."""
@@ -90,6 +105,20 @@ class TestClickHouseAdapter:
         assert mock_client_class.call_count == 3
         # Should execute SHOW DATABASES, CREATE DATABASE, and SELECT 1
         assert mock_client.execute.call_count == 3
+        assert mock_client_class.call_args_list[2].kwargs["send_receive_timeout"] == 300
+        assert mock_client_class.call_args_list[2].kwargs["sync_request_timeout"] == 300
+
+    @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
+    def test_create_connection_uses_configured_server_timeout(self, mock_client_class):
+        """The configured driver timeout is applied to the scoped server client."""
+        mock_client_class.return_value = Mock()
+        mock_client_class.return_value.execute.side_effect = [[], None, None]
+
+        adapter = ClickHouseAdapter(deployment_mode="server", send_receive_timeout=900)
+        adapter.create_connection()
+
+        assert mock_client_class.call_args_list[2].kwargs["send_receive_timeout"] == 900
+        assert mock_client_class.call_args_list[2].kwargs["sync_request_timeout"] == 900
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_create_connection_bootstraps_database_before_scoped_client(self, mock_client_class):
@@ -162,8 +191,17 @@ class TestClickHouseAdapter:
 
         mock_benchmark = Mock()
         mock_benchmark.get_create_tables_sql.return_value = (
-            "CREATE TABLE test (id INT); CREATE TABLE test2 (name STRING);"
+            "CREATE TABLE test (id INT NOT NULL, optional DECIMAL(10,2)); CREATE TABLE test2 (name STRING);"
         )
+        mock_benchmark.get_schema.return_value = {
+            "test": {
+                "columns": [
+                    {"name": "id", "type": "INT", "nullable": False},
+                    {"name": "optional", "type": "DECIMAL(10,2)", "nullable": True},
+                ]
+            },
+            "test2": {"columns": {"name": {"type": "STRING", "nullable": False}}},
+        }
 
         adapter = ClickHouseAdapter(deployment_mode="server")
         connection = adapter.create_connection()
@@ -174,6 +212,10 @@ class TestClickHouseAdapter:
         assert schema_time >= 0
         # Should execute multiple statements
         assert mock_client.execute.call_count >= 2
+        executed_ddl = "\n".join(str(call.args[0]) for call in mock_client.execute.call_args_list)
+        assert "id INT NOT NULL" in executed_ddl
+        assert "optional Nullable(DECIMAL(10,2))" in executed_ddl
+        assert "name STRING" in executed_ddl
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_load_data_with_tables(self, mock_client_class):
@@ -182,10 +224,16 @@ class TestClickHouseAdapter:
         mock_client_class.return_value = mock_client
         # Mock database check to return empty list (database doesn't exist)
         # Mock database creation and SELECT 1 to return None for connection setup
-        # Mock COUNT(*) query to return the row count
-        # Mock: database check, database create, connection test,
-        # COUNT(*) before, INSERT statement, COUNT(*) after
-        mock_client.execute.side_effect = [[], None, None, [[0]], None, [[100]]]
+        # Mock database setup and consume the generator as the real driver does.
+        execute_results = iter([[], None, None])
+
+        def execute(*args, **kwargs):
+            if len(args) > 1 and isinstance(args[1], GeneratorType):
+                list(args[1])
+                return None
+            return next(execute_results)
+
+        mock_client.execute.side_effect = execute
 
         # Create temporary test file first
         import tempfile
@@ -258,34 +306,46 @@ class TestClickHouseAdapter:
         assert isinstance(result["execution_time_seconds"], float)
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
-    def test_configure_for_benchmark_tuning_disabled(self, mock_client_class):
-        """Test benchmark optimization when tuning is disabled."""
+    def test_configure_for_benchmark_tuning_disabled_is_baseline_only(self, mock_client_class):
+        """Baseline (notuning) never applies the OLAP session pack, even for OLAP benchmark types.
+
+        Per ADR-3 (docs/development/tuning-adr-003-baseline-and-single-renderer.md):
+        notuning = platform defaults + engine-mandatory only. The OLAP
+        session pack (grace_hash join, spill thresholds,
+        optimize_aggregation_in_order) is a curated performance profile, not
+        a baseline default, and must not fire when tuning is disabled --
+        before this fix it fired ONLY when tuning was disabled, exactly
+        backwards. join_use_nulls=1 is a standard-SQL-semantics setting, not
+        part of the performance pack, so it stays in the always-applied basic
+        settings and fires here too (see tpchavoc equivalence regression:
+        anti-join variants need standard NULL semantics on every mode).
+        """
         mock_client = Mock()
         mock_client_class.return_value = mock_client
 
         # Use server mode to avoid chdb initialization in unit tests
         adapter = ClickHouseAdapter(deployment_mode="server", strict_validation=False)
-        adapter.tuning_enabled = False  # Explicitly disable tuning
+        adapter.tuning_enabled = False  # Explicitly disable tuning (baseline)
         connection = adapter.create_connection()
-
-        # Should apply OLAP optimizations for OLAP benchmark types
-        adapter.configure_for_benchmark(connection, "olap")
-
-        # Should execute multiple optimization statements (basic + OLAP)
-        assert mock_client.execute.call_count > 5  # basic settings + OLAP settings
-
-        # Reset mock for next test
         mock_client.reset_mock()
 
-        # Should only apply basic optimizations for non-OLAP benchmark types
-        adapter.configure_for_benchmark(connection, "read_primitives")
+        # Baseline: no OLAP pack even for an OLAP benchmark type.
+        adapter.configure_for_benchmark(connection, "olap")
 
-        # Should execute fewer statements (basic settings + cache control + validation = 10)
-        assert mock_client.execute.call_count == 10  # basic (6) + cache (3) + validation (1)
+        # Basic settings (7, incl. join_use_nulls) + cache control settings (3) + validation query (1) = 11.
+        assert mock_client.execute.call_count == 11
+        executed_sql = " ".join(call[0][0] for call in mock_client.execute.call_args_list)
+        assert "grace_hash" not in executed_sql
+        assert "optimize_aggregation_in_order" not in executed_sql
+        assert "join_use_nulls" in executed_sql
+
+        mock_client.reset_mock()
+        adapter.configure_for_benchmark(connection, "read_primitives")
+        assert mock_client.execute.call_count == 11
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
-    def test_configure_for_benchmark_tuning_enabled(self, mock_client_class):
-        """Test benchmark optimization when tuning is enabled."""
+    def test_configure_for_benchmark_tuning_enabled_applies_olap_pack(self, mock_client_class):
+        """Tuned OLAP/TPC-H/TPC-DS runs get the curated OLAP session pack."""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
         # Mock database check to return empty list
@@ -299,12 +359,19 @@ class TestClickHouseAdapter:
         # Reset mock to clear the connection setup calls
         mock_client.reset_mock()
 
-        # Should only apply basic settings when tuning is enabled
+        # Should apply the OLAP settings pack for OLAP benchmark types when tuned.
         adapter.configure_for_benchmark(connection, "olap")
 
-        # Should execute only basic optimization statements (no OLAP-specific ones)
-        # Basic settings (6) + cache control settings (3) + validation query (1) = 10
-        assert mock_client.execute.call_count == 10  # basic + cache + validation
+        # Should execute multiple optimization statements (basic + OLAP)
+        assert mock_client.execute.call_count > 5  # basic settings + OLAP settings
+        executed_sql = " ".join(call[0][0] for call in mock_client.execute.call_args_list)
+        assert "grace_hash" in executed_sql
+        assert "optimize_aggregation_in_order" in executed_sql
+
+        mock_client.reset_mock()
+        # Non-OLAP benchmark types don't get the pack even when tuned.
+        adapter.configure_for_benchmark(connection, "read_primitives")
+        assert mock_client.execute.call_count == 11  # basic (7, incl. join_use_nulls) + cache (3) + validation (1)
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_configure_for_benchmark_join_memory_uses_50_pct_multiplier(self, mock_client_class):
@@ -313,7 +380,7 @@ class TestClickHouseAdapter:
         mock_client_class.return_value = mock_client
 
         adapter = ClickHouseAdapter(deployment_mode="server", strict_validation=False)
-        adapter.tuning_enabled = False  # trigger OLAP settings path
+        adapter.tuning_enabled = True  # tuned path triggers the OLAP settings pack
 
         connection = adapter.create_connection()
         mock_client.reset_mock()
@@ -357,7 +424,7 @@ class TestClickHouseAdapter:
                 strict_validation=False,
                 data_path=tmpdir,
             )
-            adapter.tuning_enabled = False  # Disable tuning to test OLAP optimizations
+            adapter.tuning_enabled = True  # Tuned path applies the OLAP settings pack
 
             # Should apply OLAP optimizations but skip embedded-incompatible settings
             adapter.configure_for_benchmark(mock_connection, "olap")
@@ -373,6 +440,94 @@ class TestClickHouseAdapter:
             # But other settings should still be applied
             assert "max_memory_usage" in executed_sql
             assert "max_threads" in executed_sql
+
+    @pytest.mark.skipif(not CHDB_AVAILABLE, reason="chDB not installed (required to execute real ClickHouse DDL)")
+    def test_tuned_ddl_executes_against_real_chdb(self, tmp_path):
+        """ClickHouse (via chdb) actually accepts the tuned PARTITION BY/ORDER BY DDL, not just string-matches it.
+
+        Complements the string-parity snapshot test
+        (tests/unit/core/tuning/test_renderer_snapshot_clickhouse.py), which
+        proves dry-run preview and _optimize_table_definition render
+        identical text but never executes anything. This test builds the
+        same tuned CREATE TABLE statement through the real
+        ClickHouseWorkloadMixin._optimize_table_definition path, executes it
+        against a genuine embedded ClickHouse engine (chdb), and confirms via
+        SHOW CREATE TABLE that the engine actually applied the tuned
+        partition/order clauses -- i.e. it is real, engine-accepted DDL, not
+        just a string BenchBox believes is valid.
+        """
+        from benchbox.core.tpcds.benchmark.runner import TPCDSBenchmark
+        from benchbox.core.tpcds.schema.registry import get_tunings
+        from benchbox.core.tuning.interface import TableTuning, TuningColumn
+
+        adapter = ClickHouseAdapter(deployment_mode="local", strict_validation=False, data_path=str(tmp_path))
+        connection = adapter.create_connection()
+
+        table_tuning = TableTuning(
+            table_name="lineitem",
+            partitioning=[TuningColumn(name="l_shipdate", type="DATE", order=1)],
+            sorting=[TuningColumn(name="l_orderkey", type="INTEGER", order=1)],
+        )
+        table_tunings = {"lineitem": table_tuning}
+
+        statement = "CREATE TABLE lineitem (l_orderkey Int32, l_shipdate Date)"
+        rendered = adapter._optimize_table_definition(statement, table_tunings)
+
+        # PARTITION BY is always parenthesized at render time (PR #1180 review:
+        # multi-column partitioning needs a tuple expression, e.g. `(a, b)`).
+        assert "PARTITION BY (toYYYYMM(l_shipdate))" in rendered
+        assert "ORDER BY (l_orderkey)" in rendered
+
+        # The real proof: chdb must accept this DDL without raising.
+        connection.execute(rendered)
+
+        show_create_rows = connection.execute("SHOW CREATE TABLE lineitem").fetchall()
+        ddl_text = show_create_rows[0][0]
+
+        # chdb/ClickHouse echoes back the clauses it actually applied to the
+        # table (not just what we asked for), so this confirms the engine
+        # accepted -- not silently ignored -- the tuned rendering. ClickHouse
+        # normalizes away the redundant parens for a single-expression
+        # PARTITION BY on echo (verified empirically), unlike the multi-column
+        # case where they're semantically required and preserved.
+        assert "PARTITION BY toYYYYMM(l_shipdate)" in ddl_text
+        assert "ORDER BY l_orderkey" in ddl_text
+
+        # And insert/select round-trips through the tuned table, proving it's
+        # not just a syntactically-accepted but functionally broken table.
+        connection.execute("INSERT INTO lineitem VALUES (1, '2026-01-15'), (2, '2026-02-01')")
+        count_rows = connection.execute("SELECT count(*) FROM lineitem").fetchall()
+        assert count_rows[0][0] == 2
+
+        # Execute the complete tuned TPC-DS schema. This catches both key
+        # nullability and case drift: tuning templates use uppercase names,
+        # while the benchmark emits lowercase, case-sensitive ClickHouse DDL.
+        benchmark = TPCDSBenchmark(scale_factor=0.01, output_dir=tmp_path / "tpcds")
+        nullable_by_table = adapter._get_nullable_columns_by_table(benchmark)
+        tpcds_tunings = get_tunings().table_tunings
+        created_tables: list[str] = []
+        statements = [
+            statement.strip()
+            for statement in benchmark.get_create_tables_sql(dialect="duckdb").split(";")
+            if statement.strip()
+        ]
+        for statement in statements:
+            table_name = adapter._extract_table_name(statement)
+            assert table_name is not None
+            nullable_columns = nullable_by_table.get(table_name.lower(), set())
+            tuning_clauses = adapter._resolve_tuned_ddl_clauses(statement, tpcds_tunings)
+            key_columns = adapter._resolve_key_columns(statement, tuning_clauses, nullable_columns)
+            rendered = adapter._optimize_table_definition(
+                statement,
+                tpcds_tunings,
+                nullable_columns=nullable_columns,
+            )
+            for key_column in key_columns:
+                assert f"{key_column} Nullable(" not in rendered
+            connection.execute(rendered)
+            created_tables.append(table_name)
+
+        assert len([table for table in created_tables if table != "dbgen_version"]) == 24
 
     def test_get_database_path_server_mode(self):
         """Test database path generation in server mode returns None."""
@@ -463,6 +618,22 @@ class TestClickHouseAdapter:
             duckdb_double_array = "CREATE TABLE vectors (id BIGINT, embedding DOUBLE[256])"
             assert "Array(Float64)" in adapter._optimize_table_definition(duckdb_double_array)
 
+            # Vector-search generation never emits NULL fields. Its schema
+            # must say so explicitly; ClickHouse rejects Nullable(Array(...)).
+            from benchbox.core.vector_search.benchmark import VectorSearchBenchmark
+
+            vector_benchmark = VectorSearchBenchmark(scale_factor=0.01)
+            assert adapter._get_nullable_columns_by_table(vector_benchmark) == {}
+            vector_ddl = vector_benchmark.get_create_tables_sql(dialect="duckdb")
+            rendered = [
+                adapter._optimize_table_definition(statement.strip())
+                for statement in vector_ddl.split(";")
+                if statement.strip()
+            ]
+            assert all("Nullable(Array(" not in statement for statement in rendered)
+            assert any("embedding Array(Float32)" in statement for statement in rendered)
+            assert any("query_vector Array(Float32)" in statement for statement in rendered)
+
             # \b word boundary must protect identifiers that merely contain the
             # FLOAT/DOUBLE substring; the rewrite is for type tokens only. The
             # mixed case asserts both: the real FLOAT[N] type token IS rewritten
@@ -472,6 +643,53 @@ class TestClickHouseAdapter:
             assert "vec Array(Float32)" in mixed_out
             assert "my_float_col INT" in mixed_out
             assert "FLOAT[" not in mixed_out
+
+            time_ddl = (
+                "CREATE TABLE metrics (time TIMESTAMP, metric_time TIME, hostname VARCHAR(64), "
+                "PRIMARY KEY (time, hostname))"
+            )
+            time_out = adapter._optimize_table_definition(time_ddl)
+            assert "time TIMESTAMP" in time_out
+            assert "metric_time String" in time_out
+            assert "PRIMARY KEY (time, hostname)" in time_out
+            assert "String TIMESTAMP" not in time_out
+
+            # Nullable wrapping is confined to selected type spans. A nested
+            # comma in DECIMAL must not consume the following compact column.
+            compact = "CREATE TABLE t (amount DECIMAL(10,2), next_col INTEGER, tail VARCHAR(5))"
+            compact_out = adapter._optimize_table_definition(
+                compact,
+                nullable_columns={"amount", "next_col"},
+            )
+            assert "amount Nullable(DECIMAL(10,2)), next_col Nullable(INTEGER), tail VARCHAR(5)" in compact_out
+
+            # Source-nullable metadata and an explicit NOT NULL declaration
+            # are contradictory; fail loudly instead of emitting invalid DDL.
+            with pytest.raises(ValueError, match="source-nullable column 'amount'"):
+                adapter._optimize_table_definition(
+                    "CREATE TABLE t (amount DECIMAL(10,2) NOT NULL)",
+                    nullable_columns={"amount"},
+                )
+
+            from benchbox.core.tuning.interface import TableTuning, TuningColumn
+
+            tuned = {
+                "events": TableTuning(
+                    table_name="events",
+                    partitioning=[TuningColumn(name="event_date", type="DATE", order=1)],
+                    sorting=[TuningColumn(name="event_id", type="INTEGER", order=1)],
+                )
+            }
+            keyed = adapter._optimize_table_definition(
+                "CREATE TABLE events (event_id INTEGER, event_date DATE, payload VARCHAR(50))",
+                tuned,
+                nullable_columns={"event_id", "event_date", "payload"},
+            )
+            assert "event_id INTEGER" in keyed
+            assert "event_date DATE" in keyed
+            assert "payload Nullable(VARCHAR(50))" in keyed
+            assert "event_id Nullable" not in keyed
+            assert "event_date Nullable" not in keyed
 
     def test_array_field_parsed_to_list_not_float(self):
         """An Array column value like ``[0.1,0.2]`` is parsed to a Python list.
@@ -493,6 +711,127 @@ class TestClickHouseAdapter:
         assert handler._convert_field_for_clickhouse("0.5", "FLOAT") == 0.5
         # NULL sentinels in an array column become None.
         assert handler._convert_field_for_clickhouse("\\N", "Array(Float32)") is None
+
+    def test_vector_bracket_type_parsed_to_list_not_float(self):
+        """DuckDB bracketed vector/list types route to array parsing (Bucket C).
+
+        A fixed-size vector column typed ``FLOAT[128]`` (or list ``INTEGER[]``)
+        must be parsed into a Python sequence, not passed to ``float("[...]")``
+        which raised ``could not convert string to float`` and dropped rows.
+        """
+        from benchbox.platforms.base.data_loading import ClickHouseNativeHandler
+
+        handler = ClickHouseNativeHandler(delimiter=",", adapter=None, benchmark=None)
+
+        assert handler._convert_field_for_clickhouse("[0.02,0.5,0.9]", "FLOAT[3]") == [0.02, 0.5, 0.9]
+        assert handler._convert_field_for_clickhouse("[1,2,3]", "INTEGER[]") == [1, 2, 3]
+        assert handler._convert_field_for_clickhouse("[0.1,0.2]", "DOUBLE[2]") == [0.1, 0.2]
+        # Empty/NULL sentinels in a bracketed vector column become None.
+        assert handler._convert_field_for_clickhouse("", "FLOAT[3]") is None
+        assert handler._convert_field_for_clickhouse("\\N", "FLOAT[3]") is None
+
+    def test_datetime_and_timestamp_conversion(self):
+        """DateTime/TIMESTAMP classify before the DATE prefix (Bucket B).
+
+        ``"DATETIME".startswith("DATE")`` is True, so a naive DATE check
+        misrouted timestamps into ``date.fromisoformat`` (raised on the time
+        component); bare ``TIMESTAMP`` otherwise fell through as a ``str`` that
+        clickhouse-driver rejected with ``'str' object has no attribute
+        'tzinfo'``. Both must become ``datetime`` objects.
+        """
+        from datetime import date as date_cls, datetime as dt
+
+        from benchbox.platforms.base.data_loading import ClickHouseNativeHandler
+
+        handler = ClickHouseNativeHandler(delimiter=",", adapter=None, benchmark=None)
+        conv = handler._convert_field_for_clickhouse
+
+        assert conv("2020-01-15 12:30:00", "DATETIME") == dt(2020, 1, 15, 12, 30, 0)
+        assert conv("2020-01-15 12:30:00", "TIMESTAMP") == dt(2020, 1, 15, 12, 30, 0)
+        # DateTime64 with a "T"/"Z" ISO form parses (and stays tz-aware).
+        assert conv("2016-01-01T00:00:00Z", "DateTime64(3)").year == 2016
+        # A plain DATE column is unaffected — still a date, not a datetime.
+        assert conv("2020-01-15", "DATE") == date_cls(2020, 1, 15)
+        # Empty datetime/timestamp fields become NULL (Bucket A policy).
+        assert conv("", "DATETIME") is None
+        assert conv("", "TIMESTAMP") is None
+
+    def test_datetime_z_suffix_parses_on_python_3_10(self):
+        """Regression for #1201's follow-up: datetime.fromisoformat() only
+        accepts a trailing "Z" (RFC 3339 UTC shorthand) starting in Python
+        3.11; the repo's minimum supported runtime is 3.10
+        (requires-python >=3.10), where the same call raises ValueError.
+        Verified directly against a real Python 3.10 interpreter
+        (/usr/bin/python3.10): `datetime.fromisoformat("2016-01-01T00:00:00Z")`
+        raises "Invalid isoformat string", while `.replace("Z", "+00:00")`
+        first fixes it -- confirming this is a real cross-version bug this
+        (3.11+) test process cannot reproduce on its own.
+        """
+        from datetime import datetime as dt, timezone
+
+        from benchbox.platforms.base.data_loading import ClickHouseNativeHandler
+
+        handler = ClickHouseNativeHandler(delimiter=",", adapter=None, benchmark=None)
+        conv = handler._convert_field_for_clickhouse
+
+        assert conv("2016-01-01T00:00:00Z", "DATETIME") == dt(2016, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        assert conv("2016-01-01T00:00:00Z", "TIMESTAMP") == dt(2016, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+    def test_empty_numeric_date_fields_become_null_not_default(self):
+        """Empty numeric/date source fields convert to NULL, never a default (Bucket A).
+
+        Ratified policy: an empty value in a nullable numeric/date column is
+        absent -> NULL, never coerced to 0/epoch (which would fabricate joinable
+        values and corrupt answer-sets). Empty String fields stay empty strings.
+        """
+        from benchbox.platforms.base.data_loading import ClickHouseNativeHandler
+
+        handler = ClickHouseNativeHandler(delimiter=",", adapter=None, benchmark=None)
+        conv = handler._convert_field_for_clickhouse
+
+        for type_name in ("INTEGER", "BIGINT", "DECIMAL(10,2)", "DOUBLE", "DATE", "DATETIME"):
+            assert conv("", type_name) is None, f"empty {type_name} must become NULL"
+        # Empty String columns are preserved as empty strings, not turned into NULL.
+        assert conv("", "VARCHAR") == ""
+        assert conv("", "CHAR(16)") == ""
+
+    def test_object_schema_table_column_count_and_types(self):
+        """BaseSchemaTable object schemas (e.g. DataVault) load, not crash (Bucket D).
+
+        get_schema() returns ``{name: Table}`` for object-schema benchmarks; a
+        bare ``"columns" in table_schema`` raised ``argument of type 'Table' is
+        not iterable`` and aborted the load. Column count and per-column types
+        must both be derived from the object's ``.columns`` instead.
+        """
+        from benchbox.core.datavault import schema as dv
+        from benchbox.platforms.base.data_loading import ClickHouseNativeHandler, SchemaInspector
+
+        class _ObjectSchemaBenchmark:
+            def get_schema(self):
+                return dv.TABLES_BY_NAME.copy()  # {name: BaseSchemaTable}
+
+        benchmark = _ObjectSchemaBenchmark()
+        table_name, table = next(iter(dv.TABLES_BY_NAME.items()))
+
+        # Column count comes from the object's columns, without crashing.
+        count = SchemaInspector.get_column_count(benchmark, table_name, file_handle=None, delimiter=",")
+        assert count == len(table.columns)
+
+        # Type names are extracted from the Table's Column objects (get_sql_type),
+        # so object-schema loads get real type conversion (not silent skip).
+        handler = ClickHouseNativeHandler.__new__(ClickHouseNativeHandler)
+        type_names = handler._get_column_type_names(benchmark, table_name)
+        assert len(type_names) == len(table.columns)
+        assert type_names == [col.get_sql_type().upper() for col in table.columns]
+
+        # A dict-shaped schema still works (regression guard).
+        class _DictSchemaBenchmark:
+            def get_schema(self):
+                return {"t": {"columns": [{"type": "INTEGER"}, {"type": "VARCHAR"}]}}
+
+        dict_bm = _DictSchemaBenchmark()
+        assert SchemaInspector.get_column_count(dict_bm, "t", file_handle=None, delimiter=",") == 2
+        assert handler._get_column_type_names(dict_bm, "t") == ["INTEGER", "VARCHAR"]
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_get_platform_metadata(self, mock_client_class):
@@ -676,98 +1015,6 @@ class TestClickHouseAdapter:
         # Should not raise exception with None tuning
         adapter.apply_table_tunings(None, connection)
 
-    @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
-    def test_generate_tuning_clause_with_partitioning(self, mock_client_class):
-        """Test generating tuning clause with partitioning."""
-        mock_client_class.return_value = Mock()
-
-        # Mock TuningType and columns
-        with patch("benchbox.core.tuning.interface.TuningType") as mock_tuning_type:
-            mock_tuning_type.PARTITIONING = "partitioning"
-
-            # Mock table tuning object
-            mock_tuning = Mock()
-            mock_tuning.table_name = "test_table"
-            mock_tuning.partitioning = [Mock()]  # Has partitioning configuration
-            mock_tuning.clustering = None
-            mock_tuning.sorting = None
-            mock_tuning.distribution = None
-
-            # Mock column object
-            mock_column = Mock()
-            mock_column.name = "date_col"
-            mock_column.order = 1
-
-            mock_tuning.get_columns_by_type.return_value = [mock_column]
-
-            adapter = ClickHouseAdapter(deployment_mode="server")
-
-            clause = adapter.generate_tuning_clause(mock_tuning)
-
-            assert "PARTITION BY" in clause
-            assert "date_col" in clause
-
-    @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
-    def test_generate_tuning_clause_with_sorting(self, mock_client_class):
-        """Test generating tuning clause with sorting."""
-        mock_client_class.return_value = Mock()
-
-        # Mock TuningType and columns
-        with patch("benchbox.core.tuning.interface.TuningType") as mock_tuning_type:
-            mock_tuning_type.SORTING = "sorting"
-            mock_tuning_type.CLUSTERING = "clustering"
-            mock_tuning_type.PARTITIONING = "partitioning"
-
-            # Mock table tuning object
-            mock_tuning = Mock()
-            mock_tuning.table_name = "test_table"
-            mock_tuning.partitioning = None
-            mock_tuning.clustering = None
-            mock_tuning.sorting = [Mock()]  # Has sorting configuration
-            mock_tuning.distribution = None
-
-            # Mock column object
-            mock_column = Mock()
-            mock_column.name = "sort_col"
-            mock_column.order = 1
-
-            mock_tuning.get_columns_by_type.return_value = [mock_column]
-
-            adapter = ClickHouseAdapter(deployment_mode="server")
-
-            clause = adapter.generate_tuning_clause(mock_tuning)
-
-            assert "ORDER BY" in clause
-            assert "sort_col" in clause
-
-    @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
-    def test_generate_tuning_clause_none(self, mock_client_class):
-        """Test generating tuning clause with None input."""
-        mock_client_class.return_value = Mock()
-
-        adapter = ClickHouseAdapter(deployment_mode="server")
-
-        clause = adapter.generate_tuning_clause(None)
-        assert clause == ""
-
-    @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
-    def test_generate_tuning_clause_empty(self, mock_client_class):
-        """Test generating tuning clause with empty configuration."""
-        mock_client_class.return_value = Mock()
-
-        # Mock table tuning object with no tuning configurations
-        mock_tuning = Mock()
-        mock_tuning.table_name = "test_table"
-        mock_tuning.partitioning = None
-        mock_tuning.clustering = None
-        mock_tuning.sorting = None
-        mock_tuning.distribution = None
-
-        adapter = ClickHouseAdapter(deployment_mode="server")
-
-        clause = adapter.generate_tuning_clause(mock_tuning)
-        assert clause == ""
-
 
 class TestClickHouseNativeHandlerBulk:
     """Tests for ClickHouseNativeHandler.load_table_bulk() glob-pattern loading."""
@@ -902,12 +1149,15 @@ class TestClickHouseNativeHandlerBulk:
         handler.adapter.capture_sql.assert_called_once()
 
     def test_server_mode_loads_host_files_with_client_batches(self, tmp_path):
-        """ClickHouse server mode cannot use file() for host-local Docker paths."""
+        """ClickHouse server mode streams host-local Docker files through one insert."""
         shard = tmp_path / "region.tbl"
         shard.write_text("1|AFRICA\n2|AMERICA\n", encoding="utf-8")
 
         handler = self._make_handler(server_mode=True)
         connection = Mock()
+        connection.execute.side_effect = (
+            lambda query, params=None, **kwargs: list(params) if params is not None else None
+        )
         benchmark = Mock()
         benchmark.get_schema.return_value = {
             "region": {
@@ -918,14 +1168,143 @@ class TestClickHouseNativeHandlerBulk:
             }
         }
 
-        result = handler.load_table_bulk("region", [shard], connection, benchmark, Mock())
+        with patch("benchbox.platforms.base.data_loading.RowBatchProcessor") as batch_processor:
+            result = handler.load_table_bulk("region", [shard], connection, benchmark, Mock())
 
         assert result == 2
-        connection.execute.assert_called_once_with(
-            "INSERT INTO region VALUES",
-            [(1, "AFRICA"), (2, "AMERICA")],
-        )
+        batch_processor.assert_not_called()
+        query, params = connection.execute.call_args.args[:2]
+        assert query == "INSERT INTO region VALUES"
+        assert isinstance(params, GeneratorType)
+        assert connection.execute.call_args.kwargs["settings"]["insert_block_size"] > 1000
         assert "file(" not in connection.execute.call_args[0][0]
+
+    def test_server_mode_uses_one_generator_across_shards(self, tmp_path):
+        """All shards for one table share one bounded native-driver generator."""
+        shards = [tmp_path / "region.tbl.1", tmp_path / "region.tbl.2"]
+        shards[0].write_text("1|AFRICA\n", encoding="utf-8")
+        shards[1].write_text("2|AMERICA\n", encoding="utf-8")
+
+        handler = self._make_handler(server_mode=True)
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {
+            "region": {
+                "columns": [
+                    {"name": "r_regionkey", "type": "INTEGER"},
+                    {"name": "r_name", "type": "CHAR(25)"},
+                ]
+            }
+        }
+        connection = Mock()
+        seen: dict[str, object] = {}
+
+        def execute(query, params=None, **kwargs):
+            seen["query"] = query
+            seen["params_type"] = type(params)
+            seen["generator"] = params
+            seen["rows"] = list(params)
+            seen["settings"] = kwargs["settings"]
+
+        connection.execute.side_effect = execute
+
+        result = handler.load_table_bulk("region", shards, connection, benchmark, Mock())
+
+        assert result == 2
+        assert seen["query"] == "INSERT INTO region VALUES"
+        assert seen["params_type"] is GeneratorType
+        assert seen["rows"] == [(1, "AFRICA"), (2, "AMERICA")]
+        assert seen["settings"] == {"insert_block_size": 65536}
+        assert seen["generator"].gi_frame is None
+
+    def test_server_mode_dry_run_is_explicit_and_not_a_batch_placeholder(self, tmp_path):
+        """Server dry-run records the insert without pretending 1,000 rows were loaded."""
+        shard = tmp_path / "region.tbl"
+        shard.write_text("1|AFRICA\n", encoding="utf-8")
+        handler = self._make_handler(dry_run=True, server_mode=True)
+        connection = Mock()
+
+        result = handler.load_table_bulk("region", [shard], connection, Mock(), Mock())
+
+        assert result == 0
+        assert not connection.execute.called
+        handler.adapter.capture_sql.assert_called_once()
+        assert "INSERT INTO region VALUES" in handler.adapter.capture_sql.call_args.args[0]
+
+    def test_server_mode_preserves_header_blank_and_width_normalization(self, tmp_path):
+        """Streaming parser keeps the established header/blank/pad/truncate contract."""
+        shard = tmp_path / "events.csv.gz"
+        with gzip.open(shard, "wt", encoding="utf-8") as file_handle:
+            file_handle.write("id,name\n\n1,alpha,ignored\n2\n")
+
+        handler = self._make_handler(server_mode=True)
+        handler.delimiter_char = ","
+        handler.has_header = True
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {"events": {"columns": [{"type": "INTEGER"}, {"type": "STRING"}]}}
+        connection = Mock()
+        seen_rows: list[tuple[object, ...]] = []
+
+        def execute(query, params=None, **kwargs):
+            assert isinstance(params, GeneratorType)
+            seen_rows.extend(params)
+
+        connection.execute.side_effect = execute
+
+        result = handler.load_table_bulk("events", [shard], connection, benchmark, Mock())
+
+        assert result == 2
+        assert seen_rows == [(1, "alpha"), (2, "")]
+
+    def test_server_mode_parquet_is_bounded_and_not_materialized(self, tmp_path):
+        """Parquet uses iter_batches and sends a real generator to the driver."""
+        pa = pytest.importorskip("pyarrow")
+        import pyarrow.parquet as pq
+
+        shard = tmp_path / "events.parquet"
+        pq.write_table(pa.table({"id": [1, 2], "name": ["alpha", "beta"]}), shard)
+        handler = self._make_handler(server_mode=True)
+        connection = Mock()
+        seen: dict[str, object] = {}
+
+        def execute(query, params=None, **kwargs):
+            seen["type"] = type(params)
+            seen["rows"] = list(params)
+            seen["settings"] = kwargs["settings"]
+
+        connection.execute.side_effect = execute
+
+        result = handler.load_table_bulk("events", [shard], connection, Mock(), Mock())
+
+        assert result == 2
+        assert seen == {
+            "type": GeneratorType,
+            "rows": [(1, "alpha"), (2, "beta")],
+            "settings": {"insert_block_size": 65536},
+        }
+
+    def test_server_mode_failure_is_typed_and_terminal(self, tmp_path):
+        """A driver failure is surfaced with table/source/partial-row context."""
+        from benchbox.platforms.base.data_loading import ClickHouseServerLoadError
+
+        shard = tmp_path / "events.tbl"
+        shard.write_text("1|alpha\n2|beta\n", encoding="utf-8")
+        handler = self._make_handler(server_mode=True)
+        connection = Mock()
+
+        def execute(query, params=None, **kwargs):
+            list(params)
+            raise RuntimeError("server timed out")
+
+        connection.execute.side_effect = execute
+
+        with pytest.raises(ClickHouseServerLoadError) as exc_info:
+            handler.load_table_bulk("events", [shard], connection, Mock(), Mock())
+
+        error = exc_info.value
+        assert error.table_name == "events"
+        assert error.source_files == (shard,)
+        assert error.rows_attempted == 2
+        assert "server timed out" in str(error)
 
 
 # ===================================================================
@@ -1031,6 +1410,36 @@ class TestClickHouseWorkloadCoverage:
         adapter.log_verbose = Mock()
         adapter.log_very_verbose = Mock()
         return adapter
+
+    def test_local_tpchavoc_resource_variants_get_statement_level_grace_hash(self):
+        """Local Havoc Q5 variants use the bounded join policy without changing the session."""
+        adapter = self._adapter(deployment_mode="local")
+        connection = Mock()
+        connection.execute.return_value = [(1,)]
+
+        result = adapter.execute_query(
+            connection,
+            "SELECT 1",
+            "5_v8",
+            benchmark_type="tpchavoc",
+            validate_row_count=False,
+        )
+
+        assert result["status"] == "SUCCESS"
+        statement = connection.execute.call_args.args[0]
+        assert "join_algorithm = 'grace_hash'" in statement
+        assert "grace_hash_join_initial_buckets = 8" in statement
+
+    def test_server_tpchavoc_resource_variants_keep_session_policy_unchanged(self):
+        """The ClickHouse Local resource guard must not alter server execution."""
+        adapter = self._adapter(deployment_mode="server")
+        connection = Mock()
+        connection.execute.return_value = [(1,)]
+
+        adapter.execute_query(connection, "SELECT 1", "5_v7", benchmark_type="tpchavoc", validate_row_count=False)
+
+        statement = connection.execute.call_args.args[0]
+        assert "join_algorithm" not in statement
 
     def test_extract_primary_key_columns_handles_inline_and_composite_keys(self):
         adapter = self._adapter()
@@ -1319,6 +1728,18 @@ class TestClickHouseQueryTransformerSettings:
         t = self._transformer()
         result = t.add_query_settings("SELECT 1")
         assert "joined_subquery_requires_alias = 0" in result
+
+    def test_additional_settings_share_the_statement_settings_clause(self):
+        """Query-specific policies must not append a second SETTINGS clause."""
+        t = self._transformer()
+        result = t.add_query_settings(
+            "SELECT 1",
+            (("join_algorithm", "grace_hash"), ("grace_hash_join_initial_buckets", 8)),
+        )
+
+        assert result.count(" SETTINGS ") == 1
+        assert "join_algorithm = 'grace_hash'" in result
+        assert "grace_hash_join_initial_buckets = 8" in result
 
     def test_enable_analyzer_not_added_for_plain_select(self):
         """Simple queries must NOT get enable_analyzer = 0 (uses new analyzer by default)."""

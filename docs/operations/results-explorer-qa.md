@@ -30,6 +30,29 @@ cd results-explorer
 npm run test:e2e:fixtures
 ```
 
+### Pages-shaped assembled-artifact acceptance
+
+After downloading the exact `site/` directory produced by the protected docs
+workflow, run the direct-route acceptance against that artifact rather than
+against `vite dev` or the Explorer-only test server:
+
+```bash
+cd results-explorer
+E2E_SITE_DIR=/absolute/path/to/site \\
+E2E_PAGES_SHAPED=1 npx playwright test --project=chromium --workers=1 e2e/routes/pages-artifact.spec.ts
+```
+
+This spec is deliberately fixture-free, so it needs no `npm run test:e2e:fixtures`
+first and asserts nothing about corpus row counts. Do not point this command at
+`direct-route.spec.ts`: that file pins generated fixture ids and exact row
+counts, which fail against a production artifact.
+
+The server returns the assembled root `404.html` with HTTP 404 for missing
+Pages routes, so the test proves the browser redirect/route restoration and a
+native `/docs/` navigation. The test also checks that the snapshot is served
+from the artifact itself. This command is an acceptance check only; it does
+not upload or deploy the artifact.
+
 ## Audit develop SHA contract
 
 Every Markdown report under `_project/audits/*.md` must begin with YAML
@@ -142,11 +165,14 @@ Test on at least Home and one ResultDetail.
 - Three cards: Results / Benchmarks / Platforms. Numbers match the corpus (11 results, 2 benchmarks, 7 platforms expected — confirmed by running `npm run test:e2e:fixtures` and querying the generated `results.duckdb`; re-verify if the generator's variant list changes).
 
 ### S2.2 MetaLeaderboard mode toggle (`?mode=`)
-- Three modes: **times** (default), **ranks**, **speedup**. Click each.
-- Verify URL updates to `?mode=ranks` / `?mode=speedup`. `mode=times` may or may not appear in the URL — note which.
+- Three modes: **speedup** (default), **times**, **ranks**. Click each.
+- A link with no `?mode=` renders speedup. Verify URL updates to `?mode=times` / `?mode=ranks`; returning to speedup removes
+  the default-valued parameter.
 - Reload after switching: mode persists.
-- Numbers in cells change appropriately between modes: times = ms, ranks = small ints, speedup = best-in-cohort
-  `1.00×` with slower entries below `1.00×`.
+- In the default grid, every ranking column follows one rule: speedup `1.00×` is best and lower values are worse. Each header
+  repeats that rule even when the native metrics disagree on direction. The cell keeps its native metric as secondary text.
+- Numbers in cells change appropriately between modes: times = native metric, ranks = small ints, speedup = best-in-cohort
+  `1.00×` with slower entries below `1.00×` plus the native value.
 
 ### S2.3 Filter chips (multi-select: Benchmark, Scale)
 - Click a chip → row toggles, URL updates (`?bm=tpch` etc., array form).
@@ -281,7 +307,9 @@ IDs you should read off the Browse view:
 
 ---
 
-## S6 — Compare (`/results/compare?ids=…`)
+## S6 — Compare (`/results/compare?ids=…`) — comparison renderer; candidate picking is in Query (rx-19, rx-27)
+
+Candidate picking no longer renders at `/results/compare`. The builder shows the pinned result (when `?ids=<one>`) and a link to Query. Selecting the second run happens in Query's paged, searchable table; `/results/compare?ids=<a,b>` remains the comparison renderer only. Document height assertions use the large fixture (rx-13), not the default 11-result fixture.
 
 ### S6.1 Two-result compare (same benchmark + SF)
 - Use two sample IDs from above. Renders charts, comparison table, and a comparability receipt with no differences.
@@ -299,11 +327,12 @@ IDs you should read off the Browse view:
 - `?metric=` is **not** a supported URL contract and must not switch Compare chart semantics.
 - No in-page primary-metric toggle is expected.
 
-### S6.5 Bad inputs
-- `?ids=` empty → friendly error.
-- `?ids=does-not-exist` → friendly error.
-- `?ids=valid,does-not-exist` → either render the partial set with a warning, or fail cleanly. Report which.
-- `?ids=` with a single id → either redirect to ResultDetail or show a "need 2+" message.
+### S6.5 Bad inputs and builder parity (rx-19)
+- `?ids=` empty → open the Compare builder with no pinned result (`Compare.tsx:94-112,157-182`).
+- `?ids=does-not-exist` → show a friendly "No result found" error (`Compare.tsx:185-215`).
+- `?ids=valid,does-not-exist` → render the available result with an "Ignored unavailable result ID" warning and keep the original multi-selection URL so a refresh preserves the recovery state (`Compare.tsx:273-315,339-348`).
+- `?ids=` with one valid id → open the Compare builder with that result pinned; do not redirect to ResultDetail or show a "need 2+" message (`Compare.tsx:185-205`).
+- Duplicate/stale ids, reload, shared-link copy, and the Pages 404 redirect round trip are covered by `compare-parity.spec.ts`.
 
 ---
 
@@ -317,6 +346,8 @@ This is the DuckDB-WASM ad-hoc explorer. Heaviest surface — give it the most t
 ### S7.2 Faceted filters
 - Multi-select: benchmark, platform, scale, tuning, trust, validation. Each updates URL (`?benchmark=…&platform=…` array form) and the rows + facet counts.
 - Single-select: `has_cost`, `window` (date). URL round-trip.
+- Free-text search matches platform name, platform version, and public result ID case-insensitively. It round-trips through
+  `?q=` and resets the result page to 1 when changed.
 - Clearing all filters returns to the unfiltered view.
 
 ### S7.3 Schema-aware column picker
@@ -328,7 +359,13 @@ This is the DuckDB-WASM ad-hoc explorer. Heaviest surface — give it the most t
 - Click each visible column header. Sort state (`run_date desc` is the default) updates.
 
 ### S7.5 Row limit
-- The default row limit is `DEFAULT_ROW_LIMIT`. Switch to "unlimited" / `UNLIMITED_ROW_LIMIT` and verify the row count grows. Switch back.
+- The main result table fetches 24 rows at a time with SQL `LIMIT`/`OFFSET`; it must not render the full filtered corpus and
+  hide rows in CSS. Use Previous/Next and confirm `?page=` round-trips, the displayed range changes, and a compare pick made
+  on page 1 remains selected on page 2.
+- The default corpus cap is `DEFAULT_ROW_LIMIT`. Switch to "unlimited" / `UNLIMITED_ROW_LIMIT` and verify the filtered count
+  grows where the corpus exceeds the default cap. Switch back.
+- CSV and JSON export cover every row matching the current facets and free-text search within the selected corpus cap, across
+  all pages, and include only the currently visible columns. Paging never narrows export to the current 24-row page.
 
 ### S7.6 SQL editor
 - Default text: `SELECT * FROM bench.results ORDER BY run_date DESC`. Run it.
@@ -337,6 +374,10 @@ This is the DuckDB-WASM ad-hoc explorer. Heaviest surface — give it the most t
 - Run a query that returns 0 rows. Empty state, not error.
 - Run a query that returns columns the column-picker doesn't know about. Should still render.
 - **Security check:** the read-only guarantee comes from the **read-only attach**, not from `bench.results` being a view. `results-explorer/src/db.ts` attaches the snapshot with `ATTACH 'results.duckdb' AS bench (READ_ONLY)`, so DDL/DML against `bench.*` (`DROP TABLE bench.results`, `INSERT`, `UPDATE`, `DELETE`) is rejected with a read-only error — `bench.results` is a real table, and there is no per-statement SQL filtering. `CREATE TABLE`/`SET` against the default in-memory catalog **succeed**, but they are tab-local and transient and cannot alter the published snapshot (served read-only over HTTP; every visitor gets their own copy). Confirm a `DELETE FROM bench.results` surfaces a read-only/error message (pinned by an e2e test in `results-explorer/e2e/routes/query.spec.ts`), not a silent success.
+- **Scratchpad table treatment:** arbitrary SQL results remain separate from the paged main results table. The scratchpad keeps
+  its 200-row incremental renderer (`Show more SQL rows`) because an arbitrary statement cannot be safely rewritten with the
+  main table's fixed projection, count query, and `LIMIT`/`OFFSET` contract. Any tables created in the default in-memory
+  catalog remain tab-local and transient as described above; they do not enter facets, main-table paging, or exports.
 
 ### S7.7 Starter queries
 - Cycle through every starter category. Each should be one click → SQL pasted into editor → click run → renders without error.

@@ -35,11 +35,12 @@ class TestBenchmarkOrchestrator:
         """Clean up test fixtures."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_orchestrator_initialization(self):
+    def test_orchestrator_initialization(self, tmp_path: Path):
         """Test BenchmarkOrchestrator initialization."""
         # Test with base directory
-        orchestrator = BenchmarkOrchestrator(base_dir="/tmp/test")
-        assert orchestrator.directory_manager.base_dir == Path("/tmp/test")
+        base_dir = tmp_path / "benchmark-output"
+        orchestrator = BenchmarkOrchestrator(base_dir=base_dir)
+        assert orchestrator.directory_manager.base_dir == base_dir
         assert orchestrator.custom_output_dir is None
 
         # Test without base directory
@@ -52,7 +53,7 @@ class TestBenchmarkOrchestrator:
         self.orchestrator.set_custom_output_dir(test_dir)
         assert self.orchestrator.custom_output_dir == test_dir
 
-    @patch("benchbox.cli.orchestrator.run_benchmark_lifecycle")
+    @patch("benchbox.core.run_service.run_benchmark_lifecycle")
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     @patch("benchbox.cli.orchestrator.console")
     def test_execute_benchmark_standard_mode(self, mock_console, mock_get_adapter, mock_lifecycle):
@@ -137,7 +138,7 @@ class TestBenchmarkOrchestrator:
         # Verify platform adapter was called
         mock_get_adapter.assert_called_once()
 
-    @patch("benchbox.cli.orchestrator.run_benchmark_lifecycle")
+    @patch("benchbox.core.run_service.run_benchmark_lifecycle")
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     def test_execute_benchmark_enriches_driver_metadata_on_canonical_path(self, mock_get_adapter, mock_lifecycle):
         """Driver metadata is propagated on orchestrator/lifecycle path."""
@@ -508,7 +509,7 @@ class TestBenchmarkOrchestrator:
         assert run_config.connection is not None
         assert "database_path" in run_config.connection
 
-    @patch("benchbox.cli.orchestrator.run_benchmark_lifecycle")
+    @patch("benchbox.core.run_service.run_benchmark_lifecycle")
     def test_execute_data_only_mode_success(self, mock_lifecycle):
         """Test data-only mode execution success using lifecycle path."""
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01, test_execution_type="data_only")
@@ -538,7 +539,7 @@ class TestBenchmarkOrchestrator:
         assert isinstance(result, BenchmarkResults)
         assert result.test_execution_type == "data_only"
 
-    @patch("benchbox.cli.orchestrator.run_benchmark_lifecycle")
+    @patch("benchbox.core.run_service.run_benchmark_lifecycle")
     def test_execute_data_only_mode_error(self, mock_lifecycle):
         """Test data-only mode execution error using lifecycle path."""
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01, test_execution_type="data_only")
@@ -594,6 +595,13 @@ class TestBenchmarkOrchestratorErrorHandling:
     def teardown_method(self):
         """Clean up test fixtures."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_singlestore_missing_credentials_offers_guided_setup(self):
+        database_config = Mock(type="singlestore")
+
+        assert self.orchestrator._should_offer_credential_setup(
+            database_config, RuntimeError("configuration requires username and password")
+        )
 
     def test_platform_config_without_system_profile(self):
         """Test platform config generation without system profile."""

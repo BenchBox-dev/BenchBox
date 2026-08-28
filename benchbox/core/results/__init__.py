@@ -40,11 +40,27 @@ from .environment import (
     PlatformRuntimeEnvironment,
     PlatformStorageMetadata,
 )
-from .metrics import TimingStatsCalculator, TPCMetricsCalculator
+from .metrics import (
+    NAMED_METRICS,
+    TimingStatsCalculator,
+    TPCMetricsCalculator,
+    calculate_named_metric,
+    geometric_mean_ms,
+    percentile_ms,
+    sample_stdev_ms,
+)
+from .models import QueryExecution
 from .platform_info import (
     PlatformInfoInput,
     build_platform_info,
     format_platform_display_name,
+)
+from .query_execution import (
+    QueryExecutionContractError,
+    query_execution_from_compact_v2,
+    query_execution_from_legacy_dict,
+    query_execution_to_compact_v2,
+    query_execution_to_legacy_dict,
 )
 from .query_normalizer import (
     QueryResultInput,
@@ -92,17 +108,28 @@ __all__ = [
     "PlatformStorageMetadata",
     # Metrics
     "TPCMetricsCalculator",
+    "calculate_named_metric",
+    "geometric_mean_ms",
+    "percentile_ms",
+    "sample_stdev_ms",
+    "NAMED_METRICS",
     "TimingStatsCalculator",
     # Platform Info
     "PlatformInfoInput",
     "build_platform_info",
     "format_platform_display_name",
     # Query Normalizer
+    "QueryExecution",
+    "QueryExecutionContractError",
     "QueryResultInput",
     "format_query_id",
     "normalize_query_id",
     "normalize_query_result",
     "normalize_query_results",
+    "query_execution_from_compact_v2",
+    "query_execution_from_legacy_dict",
+    "query_execution_to_compact_v2",
+    "query_execution_to_legacy_dict",
     # Timing
     "TimingAnalyzer",
     "TimingCollector",

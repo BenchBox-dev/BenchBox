@@ -11,7 +11,9 @@ Sources of truth:
   - Curation list: the `git rm -rf` / `git rm -f` lines inside the
     `release-cut:` target in Makefile.
   - Required deferred release paths: explicit release-cut removals for
-    v0.3.0 surfaces that remain on develop but must not ship on main.
+    develop-only surfaces that remain on develop but must not ship on release.
+  - Required curated-preview release paths: the Explorer corpus, application,
+    and three build-time helpers that must remain available to docs.yml.
 
 Fails (exit 1) on any top-level path that appears in neither list, naming
 the offending paths and recommending which list to update.
@@ -23,6 +25,7 @@ Run locally:
 from __future__ import annotations
 
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -30,14 +33,23 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DECISION_DOC = REPO_ROOT / "_project" / "decisions" / "single-repo-migration.md"
 MAKEFILE = REPO_ROOT / "Makefile"
+DEVELOPMENT_TREE_TARGETS_VARIABLE = "DEVELOPMENT_TREE_ONLY_TARGETS"
+CURATED_RESUMABLE_PROJECT_TARGETS = {"release-cut"}
 REQUIRED_CURATED_PATHS = frozenset(
     {
-        "results-data",
-        "results-explorer",
         ".github/workflows/results-explorer-browser.yml",
         ".github/workflows/seed-corpus.yml",
         ".github/workflows/sync-results-data-to-published.yml",
         ".github/workflows/validate-submission.yml",
+    }
+)
+REQUIRED_RELEASE_PATHS = frozenset(
+    {
+        "results-data",
+        "results-explorer",
+        "_project/scripts/explorer_pipeline",
+        "_project/scripts/explorer_publish.py",
+        "_project/scripts/results_explorer_snapshot_invariants.py",
     }
 )
 
@@ -70,7 +82,7 @@ def parse_curation_list(makefile: Path) -> set[str]:
     """Extract `git rm` paths from the `release-cut:` target body."""
     text = makefile.read_text(encoding="utf-8")
     match = re.search(
-        r"^release-cut:\s*\n((?:[ \t].*\n|\n)+)",
+        r"^release-cut:[^\n]*\n((?:[ \t].*\n|\n)+)",
         text,
         re.MULTILINE,
     )
@@ -86,8 +98,65 @@ def parse_curation_list(makefile: Path) -> set[str]:
         if not rm_match:
             continue
         # Skip option tokens such as --ignore-unmatch; only pathspecs count.
-        paths.update(p for p in rm_match.group(1).split() if not p.startswith("-"))
+        paths.update(p for p in shlex.split(rm_match.group(1)) if not p.startswith("-"))
     return paths
+
+
+def parse_development_tree_targets(makefile: Path) -> set[str]:
+    """Read the Make targets declared unavailable on a curated release."""
+    lines = makefile.read_text(encoding="utf-8").splitlines()
+    values: list[str] = []
+    collecting = False
+    for line in lines:
+        if not collecting:
+            prefix = f"{DEVELOPMENT_TREE_TARGETS_VARIABLE} :="
+            if not line.startswith(prefix):
+                continue
+            line = line[len(prefix) :].strip()
+            collecting = True
+        continued = line.endswith("\\")
+        values.extend(line.removesuffix("\\").split())
+        if not continued:
+            break
+    return set(values)
+
+
+def project_dependent_make_targets(root: Path) -> set[str]:
+    """Return targets whose recipes execute or manipulate an `_project/` path."""
+    targets: set[str] = set()
+    for path in [root / "Makefile", *sorted((root / "make").glob("*.mk"))]:
+        target: str | None = None
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if (
+                line
+                and not line[0].isspace()
+                and ":" in line
+                and ":=" not in line
+                and not line.startswith(("#", "define", "endef"))
+            ):
+                target = line.split(":", 1)[0].strip()
+            recipe = line.lstrip("\t")
+            if (
+                not line.startswith("\t")
+                or not target
+                or target in {".development-tree-required", ".release-cut-tree-required"}
+                or "_project/" not in recipe
+            ):
+                continue
+            if recipe.lstrip("@").startswith(("#", "echo ")):
+                continue
+            targets.add(target)
+    return targets
+
+
+def development_tree_target_findings(root: Path) -> list[str]:
+    """Find retained Make recipes that would fail opaquely after curation."""
+    declared = parse_development_tree_targets(root / "Makefile")
+    required = project_dependent_make_targets(root) - CURATED_RESUMABLE_PROJECT_TARGETS
+    return [
+        f"Make target {target!r} references _project/ but is not declared development-only"
+        for target in sorted(required - declared)
+    ]
 
 
 def list_tracked_top_level() -> set[str]:
@@ -107,13 +176,22 @@ def main() -> int:
     curated = parse_curation_list(MAKEFILE)
     tracked = list_tracked_top_level()
 
+    missing_release_paths = sorted(REQUIRED_RELEASE_PATHS - main_only)
+    if missing_release_paths:
+        print("ERROR: the curated-preview release scope is missing required shipped paths:")
+        for path in missing_release_paths:
+            print(f"  - {path}")
+        print()
+        print("Add each path to the release-shipped amendment in single-repo-migration.md.")
+        return 1
+
     missing_required = sorted(REQUIRED_CURATED_PATHS - curated)
     if missing_required:
         print("ERROR: release-cut is missing required deferred-path curation:")
         for path in missing_required:
             print(f"  - {path}")
         print()
-        print("These paths stay on develop but must be git-rm'd from v0.3.0 release branches.")
+        print("These paths stay on develop but must be git-rm'd from release branches.")
         return 1
 
     accounted = main_only | curated

@@ -2,24 +2,9 @@ name: Documentation
 
 on:
   push:
-    branches: [main]
-    paths:
-      - "benchbox/**"
-      - "docs/**"
-      - "examples/**"
-      - "landing/**"
-      - "_project/scripts/explorer_pipeline/**"
-      - "_project/scripts/explorer_publish.py"
-      - "_project/scripts/results_explorer_snapshot_invariants.py"
-      - "results-data/**"
-      - "results-explorer/**"
-      - "scripts/**"
-      - ".github/workflows/docs.yml"
-      - "Makefile"
-      - "README.md"
-      - "pyproject.toml"
+    branches: [release, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [release, develop]
     paths:
       - "benchbox/**"
       - "docs/**"
@@ -39,6 +24,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -78,11 +64,9 @@ jobs:
       # --- Results Explorer ---
       # Steps gate on package.json as a sentinel so the workflow degrades
       # gracefully if the explorer directory is ever removed or renamed.
-      # This is also the intended dormancy on the release branch: results-explorer/
-      # and _project/scripts/explorer_publish.py ship on develop, not main, so on
-      # a main build hashFiles(...) is empty and every explorer step below is a
-      # deliberate no-op rather than accidental dead code (see
-      # tests/uat/phases/explorer_smoke.py:explorer_present).
+      # The curated release retains results-explorer/, results-data/, and the
+      # three publication helpers under _project/scripts/. A release that
+      # includes the application must carry the complete publication input set.
       - name: Validate results-explorer lockfile
         if: hashFiles('results-explorer/package.json') != ''
         run: |
@@ -104,6 +88,14 @@ jobs:
         run: npm ci
         working-directory: results-explorer
 
+      - name: Verify curated Explorer publication inputs
+        if: hashFiles('results-explorer/package.json') != ''
+        run: |
+          test -d results-data/bundles
+          test -d _project/scripts/explorer_pipeline
+          test -f _project/scripts/explorer_publish.py
+          test -f _project/scripts/results_explorer_snapshot_invariants.py
+
       - name: Typecheck results-explorer
         if: hashFiles('results-explorer/package.json') != ''
         run: npm run typecheck
@@ -112,98 +104,141 @@ jobs:
       - name: Build explorer data (static pipeline)
         if: hashFiles('results-explorer/package.json') != ''
         run: uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/
-        # Note: results-data/bundles/ may be empty on first deploy; pipeline handles empty gracefully
 
       # Gate the built read model before it is bundled into the deployed site.
-      # Skips gracefully when the pipeline produced no snapshot (empty corpus).
       - name: Validate explorer snapshot invariants
         if: hashFiles('results-explorer/package.json') != ''
         run: |
-          if [ -f results-explorer/public/data/results.duckdb ]; then
-            uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb
-          else
-            echo "No results.duckdb produced (empty corpus); skipping invariants check."
-          fi
+          test -s results-explorer/public/data/results.duckdb
+          uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb
 
       - name: Build results-explorer
         if: hashFiles('results-explorer/package.json') != ''
         run: npm run build
         working-directory: results-explorer
 
-      - name: Assemble landing page + docs site
-        run: |
-          rm -rf site
-          mkdir -p site/docs site/blog
-          # Copy landing page if it exists, otherwise docs become the root
-          if [ -d "landing" ]; then
-            cp -R landing/* site/
-            # Copy docs excluding blog/ (blog is served at /blog/ not /docs/blog/)
-            rsync -a --exclude='blog/' docs/_build/html/ site/docs/
-          else
-            cp -R docs/_build/html/* site/
-          fi
-          # Copy blog to root-level /blog/ path (ABlog generates in docs/_build/html/blog/)
-          if [ -d "docs/_build/html/blog" ]; then
-            cp -R docs/_build/html/blog/* site/blog/
-          fi
-          # Copy _static and _images assets to site root for blog pages (they reference ../_static/ and ../_images/)
-          cp -R docs/_build/html/_static site/_static
-          if [ -d "docs/_build/html/_images" ]; then
-            cp -R docs/_build/html/_images site/_images
-          fi
-          # Copy CNAME if it exists
-          [ -f docs/CNAME ] && cp docs/CNAME site/CNAME || true
-          touch site/.nojekyll
-
-      - name: Copy explorer to site
-        if: hashFiles('results-explorer/package.json') != ''
-        run: |
-          mkdir -p site/results
-          cp -r results-explorer/dist/. site/results/
-
-      - name: Add SPA 404 fallback for results-explorer
-        if: hashFiles('results-explorer/package.json') != ''
-        # GitHub Pages only serves a root-level 404.html as the custom error page;
-        # subdirectory 404.html files are treated as regular pages.
-        run: |
-          cat > site/404.html << 'FOUROHFOUR'
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="UTF-8">
-            <title>Page Not Found - BenchBox</title>
-            <script>
-              var redirectKey = 'benchbox.results.redirect';
-
-              if (window.location.pathname.startsWith('/results/')) {
-                var originalPath = window.location.pathname + window.location.search + window.location.hash;
-
-                try {
-                  window.sessionStorage.setItem(redirectKey, originalPath);
-                } catch (error) {
-                  // Ignore sessionStorage failures and still redirect to the SPA entrypoint.
-                }
-
-                window.location.replace('/results/');
-              }
-            </script>
-          </head>
-          <body>
-            <p>Page not found. <a href="/">Return to documentation</a>.</p>
-          </body>
-          </html>
-          FOUROHFOUR
+      - name: Assemble public site
+        run: uv run -- python scripts/assemble_public_site.py --site-dir site
 
       - name: Upload HTML artifacts
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
-  # Deploy to GitHub Pages (main pushes only)
+      # The visual job consumes the exact assembled tree without rebuilding it.
+      # This is a short-lived transport artifact, not a publication baseline.
+      - name: Upload assembled site for visual acceptance
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-site-assembled-${{ github.run_id }}
+          path: site
+          retention-days: 3
+
+  public-site-visual-regression:
+    name: Public-site visual regression
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop') ||
+      (github.event_name == 'pull_request' && github.base_ref == 'develop')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: results-explorer/package-lock.json
+
+      - name: Download assembled site
+        uses: actions/download-artifact@v4
+        with:
+          name: public-site-assembled-${{ github.run_id }}
+          path: site
+
+      - name: Install explorer dependencies
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: results-explorer
+
+      - name: Download exact base visual baseline
+        id: baseline
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PUBLIC_SITE_VISUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUBLIC_SITE_VISUAL_BASELINE: ${{ runner.temp }}/public-site-visual-baseline
+        run: node scripts/download-public-site-visual-baseline.mjs
+        working-directory: results-explorer
+
+      - name: Determine baseline mode
+        id: baseline-mode
+        env:
+          BASELINE_OUTCOME: ${{ steps.baseline.outcome }}
+          BOOTSTRAP: ${{ steps.baseline.outputs.bootstrap || 'false' }}
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/public-site-visual-baseline/manifest.json" ]; then
+            echo "require=1" >> "$GITHUB_OUTPUT"
+            echo "Exact base-SHA baseline found; comparison is blocking."
+          elif [ "$BASELINE_OUTCOME" = "failure" ] && [ "$BOOTSTRAP" != "true" ]; then
+            echo "::error::A protected baseline exists, but none is bound to this exact base SHA."
+            exit 1
+          else
+            echo "require=0" >> "$GITHUB_OUTPUT"
+            echo "No protected baseline exists yet; running the one-time bootstrap capture."
+          fi
+
+      - name: Capture and compare public site
+        env:
+          E2E_PAGES_SHAPED: "1"
+          E2E_SITE_DIR: ${{ github.workspace }}/site
+          PUBLIC_SITE_VISUAL_OUTPUT: ${{ runner.temp }}/public-site-visual-current
+          PUBLIC_SITE_VISUAL_BASELINE: ${{ steps.baseline-mode.outputs.require == '1' && format('{0}/public-site-visual-baseline', runner.temp) || '' }}
+          PUBLIC_SITE_VISUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUBLIC_SITE_VISUAL_REQUIRE_BASELINE: ${{ steps.baseline-mode.outputs.require }}
+          PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ github.sha }}
+          PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+          APPROVED_HEAD_SHA: ${{ github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA || '' }}
+          APPROVAL_REASON: ${{ github.event_name == 'pull_request' && vars.APPROVAL_REASON || '' }}
+        run: npm run test:e2e:public-site
+        working-directory: results-explorer
+
+      - name: Upload protected-develop visual baseline
+        if: >-
+          (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop')
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-site-visual-baseline
+          path: ${{ runner.temp }}/public-site-visual-current
+          retention-days: 30
+
+      - name: Upload visual diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-site-visual-diagnostics-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/public-site-visual-current
+            results-explorer/test-results
+            results-explorer/playwright-report
+          if-no-files-found: ignore
+          retention-days: 3
+
+  # Deploy to GitHub Pages (release pushes only)
   # Isolated as its own job so the github-pages environment protection
   # rules don't gate the build job on PRs.
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
     needs: build
     runs-on: ubuntu-latest
     environment:

@@ -13,7 +13,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Mapping, Optional, Union
 
 from benchbox.core.analysis.models import (
     ComparisonOutcome,
@@ -34,8 +34,18 @@ from benchbox.core.analysis.statistics import (
     welchs_t_test,
 )
 from benchbox.core.results.models import BenchmarkResults
+from benchbox.core.results.query_execution import (
+    DURATION_CONSISTENCY_TOLERANCE_MS,
+    query_execution_from_legacy_dict,
+)
 
 logger = logging.getLogger(__name__)
+
+# Query results built in memory currently carry both precise seconds and an
+# integer millisecond compatibility value.  Allow the sub-millisecond
+# difference introduced by that conversion while still rejecting conflicting
+# units instead of silently preferring one representation.
+_DURATION_CONSISTENCY_TOLERANCE_MS = DURATION_CONSISTENCY_TOLERANCE_MS
 
 
 @dataclass
@@ -677,15 +687,19 @@ class PlatformComparison:
         """
         cost_data = {}
         perf_data = {}
+        query_counts = {}
 
         for result in self.results:
             if result.cost_summary and "total_cost" in result.cost_summary:
                 total_cost = result.cost_summary["total_cost"]
                 if total_cost > 0:
                     cost_data[result.platform] = total_cost
+                    query_counts[result.platform] = result.total_queries
 
                     # Calculate queries per second
-                    total_time_sec = result.total_execution_time / 1000 if result.total_execution_time else 1.0
+                    # BenchmarkResults stores aggregate execution time in seconds
+                    # (both the lifecycle builder and the v2 loader use that unit).
+                    total_time_sec = result.total_execution_time if result.total_execution_time else 1.0
                     qps = result.total_queries / total_time_sec if total_time_sec > 0 else 0
 
                     # Performance per dollar (QPS / cost)
@@ -696,9 +710,9 @@ class PlatformComparison:
 
         # Cost per query
         cost_per_query = {
-            p: cost / self.results[i].total_queries
-            for i, (p, cost) in enumerate(cost_data.items())
-            if self.results[i].total_queries > 0
+            platform: cost / query_counts[platform]
+            for platform, cost in cost_data.items()
+            if query_counts[platform] > 0
         }
 
         # Rankings
@@ -924,17 +938,54 @@ def _extract_query_ids(result: BenchmarkResults) -> list[str]:
     """
     query_ids = set()
 
+    def is_comparable(execution) -> bool:
+        # Older in-memory results omit status; retain those rows for backwards
+        # compatibility while excluding explicitly failed or skipped work.
+        return execution.status in {"SUCCESS", "UNKNOWN"}
+
     # From query_results
     for qr in result.query_results or []:
-        if "query_id" in qr:
-            query_ids.add(str(qr["query_id"]))
+        execution = query_execution_from_legacy_dict(qr)
+        if execution.query_id and is_comparable(execution):
+            query_ids.add(execution.query_id)
 
     # From per_query_timings
     for timing in result.per_query_timings or []:
-        if "query_id" in timing:
-            query_ids.add(str(timing["query_id"]))
+        execution = query_execution_from_legacy_dict(timing)
+        if execution.query_id and is_comparable(execution):
+            query_ids.add(execution.query_id)
 
     return sorted(query_ids)
+
+
+def _normalize_execution_time_ms(timing: Mapping[str, Any]) -> float | None:
+    """Return one query duration in milliseconds.
+
+    Milliseconds are the canonical comparison representation.
+    ``execution_time_seconds`` and the legacy bare ``execution_time`` field
+    are seconds and are converted explicitly.  The latter convention matches
+    ``BenchmarkResultBuilder`` and the result plotting compatibility path; no
+    unit is inferred from the value's magnitude.
+
+    When multiple representations are present, they must agree within one
+    millisecond.  This tolerance admits the integer-millisecond value emitted
+    alongside precise seconds by ``BenchmarkResultBuilder``; after validation,
+    the seconds-derived millisecond value is retained so sub-millisecond
+    precision is not erased.  A larger
+    disagreement is rejected because choosing either value would hide corrupt
+    or unit-confused input.
+
+    Args:
+        timing: Query result or legacy per-query timing mapping.
+
+    Returns:
+        Duration in milliseconds, including ``0.0``, or ``None`` when no
+        duration representation is present.
+
+    Raises:
+        ValueError: If a duration is not numeric or representations conflict.
+    """
+    return query_execution_from_legacy_dict(timing).execution_time_ms
 
 
 def _extract_query_times(result: BenchmarkResults) -> dict[str, float]:
@@ -946,29 +997,30 @@ def _extract_query_times(result: BenchmarkResults) -> dict[str, float]:
     Returns:
         Dictionary of query_id to execution time in ms
     """
-    times: dict[str, float] = {}
+    samples: dict[str, list[float]] = {}
+
+    def is_comparable(execution) -> bool:
+        # Older in-memory results omit status; retain those rows for backwards
+        # compatibility while excluding explicitly failed or skipped work.
+        return execution.status in {"SUCCESS", "UNKNOWN"}
 
     # From query_results
     for qr in result.query_results or []:
-        query_id = str(qr.get("query_id", ""))
-        time_ms = qr.get("execution_time_ms") or qr.get("execution_time_seconds", qr.get("execution_time", 0))
-        if query_id and time_ms > 0:
-            times[query_id] = float(time_ms)
+        execution = query_execution_from_legacy_dict(qr)
+        query_id = execution.query_id
+        time_ms = execution.execution_time_ms
+        if query_id and is_comparable(execution) and time_ms is not None:
+            samples.setdefault(query_id, []).append(time_ms)
 
     # From per_query_timings (may have multiple runs)
     for timing in result.per_query_timings or []:
-        query_id = str(timing.get("query_id", ""))
-        time_ms = timing.get("execution_time_ms") or timing.get(
-            "execution_time_seconds", timing.get("execution_time", 0)
-        )
-        if query_id and time_ms > 0:
-            # Average if we already have a time
-            if query_id in times:
-                times[query_id] = (times[query_id] + float(time_ms)) / 2
-            else:
-                times[query_id] = float(time_ms)
+        execution = query_execution_from_legacy_dict(timing)
+        query_id = execution.query_id
+        time_ms = execution.execution_time_ms
+        if query_id and is_comparable(execution) and time_ms is not None:
+            samples.setdefault(query_id, []).append(time_ms)
 
-    return times
+    return {query_id: sum(query_samples) / len(query_samples) for query_id, query_samples in samples.items()}
 
 
 def _get_query_times_for_query(
@@ -988,21 +1040,26 @@ def _get_query_times_for_query(
     """
     times = []
 
+    def is_comparable(execution) -> bool:
+        # Older in-memory results omit status; retain those rows for backwards
+        # compatibility while excluding explicitly failed or skipped work.
+        return execution.status in {"SUCCESS", "UNKNOWN"}
+
     # From query_results
     for qr in result.query_results or []:
-        if str(qr.get("query_id", "")) == query_id:
-            time_ms = qr.get("execution_time_ms") or qr.get("execution_time_seconds", qr.get("execution_time", 0))
-            if time_ms > 0:
-                times.append(float(time_ms))
+        execution = query_execution_from_legacy_dict(qr)
+        if execution.query_id == query_id and is_comparable(execution):
+            time_ms = execution.execution_time_ms
+            if time_ms is not None:
+                times.append(time_ms)
 
     # From per_query_timings
     for timing in result.per_query_timings or []:
-        if str(timing.get("query_id", "")) == query_id:
-            time_ms = timing.get("execution_time_ms") or timing.get(
-                "execution_time_seconds", timing.get("execution_time", 0)
-            )
-            if time_ms > 0:
-                times.append(float(time_ms))
+        execution = query_execution_from_legacy_dict(timing)
+        if execution.query_id == query_id and is_comparable(execution):
+            time_ms = execution.execution_time_ms
+            if time_ms is not None:
+                times.append(time_ms)
 
     return times
 

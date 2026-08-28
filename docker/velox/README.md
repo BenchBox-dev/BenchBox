@@ -46,12 +46,16 @@ benchbox run --platform velox \
   --benchmark tpch --scale 1.0
 ```
 
-**Data path contract:** The server runs inside Docker and reads files by their host-side absolute paths. The compose file bind-mounts `$BENCHBOX_DATA_DIR` (default: `./benchmark_runs`) at the same absolute path inside the container. The host path BenchBox sends over gRPC must equal the in-container mount path, or every load fails with file-not-found.
+**Data path contract:** The server runs inside Docker and reads files by their host-side absolute paths. The compose file bind-mounts `$BENCHBOX_DATA_DIR` at the same absolute path inside the container. The host path BenchBox sends over gRPC must equal the in-container mount path, or every load fails with file-not-found.
+
+`BENCHBOX_DATA_DIR` has **no default** — export it as an **absolute path** before running compose. There is no fallback because any working default here could only ever be a directory-relative path, and a relative container mount target can never equal an absolute host path, breaking the data path contract for exactly the case a default would exist to serve (a checked-in `docker/velox/.env` with a relative fallback was tried and reverted for this reason). `make test-docker-up-velox` validates the variable is set and absolute before invoking compose; a bare `docker compose` run must export it manually:
 
 ```bash
-# If your data is not under ./benchmark_runs, override the mount:
-BENCHBOX_DATA_DIR=/mnt/benchbox-data docker compose up -d velox-connect
+export BENCHBOX_DATA_DIR=/mnt/benchbox-data
+docker compose up -d velox-connect
 ```
+
+A nested default (`${VAR:-${OTHER}}`) and the `${VAR:?message}` required-variable form are both unsupported by [mocker](../../docs/operations/uat-framework.md), the Apple-silicon local Docker-compatible engine — mocker leaves either form unresolved instead of erroring or substituting — which is why the mount uses the bare `${BENCHBOX_DATA_DIR}` form with no modifier at all.
 
 ## Workflow B — All-in-one Runner
 
@@ -104,7 +108,7 @@ VELOX_DOCKER_PLATFORM=linux/amd64 docker compose up -d velox-connect
 | `VELOX_OFFHEAP` | `8g` | Off-heap memory budget for Velox |
 | `SPARK_DRIVER_MEM` | `4g` | JVM driver heap |
 | `SPARK_CONNECT_PORT` | `50051` | Host port for the Spark-Connect server |
-| `BENCHBOX_DATA_DIR` | `./benchmark_runs` | Host data directory, bind-mounted into the container at the same path |
+| `BENCHBOX_DATA_DIR` | **none — required** | Host data directory, bind-mounted into the container at the same absolute path. Must be exported and absolute; `make test-docker-up-velox` enforces this before invoking compose. Compose interpolates the whole file, so `velox-runner` also needs this to resolve even though it has no data mount of its own. |
 
 ## Entrypoint Modes
 

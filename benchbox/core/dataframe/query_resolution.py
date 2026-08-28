@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import importlib
 import logging
 from dataclasses import replace
 from typing import Any
 from unittest.mock import DEFAULT
 
+from benchbox.core.dataframe.query import QueryRegistry
 from benchbox.core.results.builder import normalize_benchmark_id
 
 logger = logging.getLogger(__name__)
@@ -95,7 +97,41 @@ def get_dataframe_queries_for_benchmark(
             type(benchmark_queries).__name__,
         )
 
-    return []
+    return registry_dataframe_queries(benchmark_id)
+
+
+def registry_dataframe_queries(benchmark_id: str) -> list[Any]:
+    """Resolve DataFrame queries from the benchmark's own query registry.
+
+    Benchmarks may expose a ``dataframe_queries`` module or package with a
+    ``QueryRegistry`` under a benchmark-specific constant name. Query resolution
+    historically reached none of those registries: it named only tpch, tpcds and
+    clickbench, and the ``get_dataframe_queries`` instance hook is defined by
+    almost no benchmark class.
+
+    So seven families -- amplab, coffeeshop, h2odb, nyctaxi, ssb, tpch_skew,
+    tsbs_devops -- resolved to zero queries and emitted bundles reporting 0/0
+    with exit 0, while their queries sat registered and gate-tested. Sixty such
+    bundles are in the public corpus.
+
+    Only the three named benchmarks need bespoke resolvers, because their
+    queries are permuted per stream for TPC compliance. Everything else is a
+    plain ordered list.
+    """
+    target = f"benchbox.core.{benchmark_id}.dataframe_queries"
+    try:
+        module = importlib.import_module(target)
+    except ModuleNotFoundError as exc:
+        if exc.name and (exc.name == target or target.startswith(f"{exc.name}.")):
+            return []
+        raise
+
+    registries = {id(value): value for value in vars(module).values() if isinstance(value, QueryRegistry)}
+    if not registries:
+        return []
+    if len(registries) > 1:
+        raise RuntimeError(f"Multiple DataFrame query registries found in {target}; resolution is ambiguous")
+    return next(iter(registries.values())).get_all_queries()
 
 
 def get_tpch_dataframe_queries(stream_id: int) -> list[Any]:

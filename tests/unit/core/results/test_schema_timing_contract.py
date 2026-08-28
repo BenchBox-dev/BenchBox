@@ -8,6 +8,9 @@ from typing import Any
 
 import pytest
 
+from benchbox.core.results.metrics import percentile_ms
+from benchbox.core.results.models import ExecutionPhases, SetupPhase, ThroughputStream, ThroughputTestPhase
+from benchbox.core.results.query_execution import QueryExecutionContractError
 from benchbox.core.results.schema import build_result_payload
 
 pytestmark = [
@@ -51,7 +54,93 @@ def _result_with_queries(query_results: list[dict[str, Any]], execution_id: str 
     )
 
 
-def test_build_result_payload_prefers_execution_time_seconds() -> None:
+def test_build_result_payload_redacts_platform_metadata_credential_sentinels() -> None:
+    """Timing payload construction must not bypass the platform metadata boundary."""
+    import json
+
+    from benchbox.core.results.models import BenchmarkResults
+
+    gates = (
+        "RAW_CONFIG_GATE",
+        "RAW_METADATA_GATE",
+        "DEPLOYMENT_GATE",
+        "CLOUD_GATE",
+        "COMPUTE_GATE",
+        "STORAGE_GATE",
+    )
+    result = BenchmarkResults(
+        benchmark_name="synthetic",
+        platform="synthetic",
+        scale_factor=1.0,
+        execution_id="timing-meta-gate",
+        timestamp=datetime(2026, 2, 12),
+        duration_seconds=0.1,
+        total_queries=0,
+        successful_queries=0,
+        failed_queries=0,
+        platform_info={"sort_key": "o_orderkey", "threads": 4},
+        platform_raw_config={"password": "RAW_CONFIG_GATE", "threads": 4},
+        platform_raw_metadata={"password": "RAW_METADATA_GATE"},
+        platform_deployment={"token": "DEPLOYMENT_GATE"},
+        platform_cloud={"access_key": "CLOUD_GATE"},
+        platform_compute={"connection_string": "COMPUTE_GATE"},
+        platform_storage={"secret": "STORAGE_GATE"},
+    )
+    text = json.dumps(build_result_payload(result), default=str)
+    for gate in gates:
+        assert gate not in text, f"timing payload path leaked {gate}"
+    assert "o_orderkey" in text
+
+
+def test_build_result_payload_accepts_consistent_duration_aliases() -> None:
+    result = _result_with_queries(
+        [
+            {
+                "query_id": "Q1",
+                "status": "SUCCESS",
+                "execution_time_seconds": 1.25,
+                "execution_time": 1.25,
+                "execution_time_ms": 1250,
+                "rows_returned": 10,
+                "iteration": 1,
+                "stream_id": 5,
+                "run_type": "measurement",
+            }
+        ]
+    )
+    result.execution_phases = ExecutionPhases(
+        setup=SetupPhase(),
+        throughput_test=ThroughputTestPhase(
+            start_time="2026-02-12T00:00:00",
+            end_time="2026-02-12T00:00:01",
+            duration_ms=1000,
+            num_streams=1,
+            streams=[
+                ThroughputStream(5, "start", "end", 1000, [], success=False, error_message="worker died"),
+            ],
+            total_queries_executed=1,
+            throughput_at_size=None,
+            success=False,
+            errors=["Stream 5 failed: worker died"],
+        ),
+    )
+
+    payload = build_result_payload(result)
+
+    assert payload["queries"][0]["ms"] == 1250.0
+    assert payload["run"]["streams"] == 1
+    assert payload["phases"]["throughput_test"] == {
+        "status": "FAILED",
+        "duration_ms": 1000,
+        "stream_results": [
+            {"stream_id": 5, "success": False, "error": "worker died"},
+        ],
+        "errors": ["Stream 5 failed: worker died"],
+    }
+    assert "throughput_at_size" not in payload["summary"].get("tpc_metrics", {})
+
+
+def test_build_result_payload_rejects_conflicting_duration_aliases() -> None:
     result = _result_with_queries(
         [
             {
@@ -59,17 +148,13 @@ def test_build_result_payload_prefers_execution_time_seconds() -> None:
                 "status": "SUCCESS",
                 "execution_time_seconds": 1.25,
                 "execution_time": 9.99,
-                "execution_time_ms": None,
                 "rows_returned": 10,
-                "iteration": 1,
-                "stream_id": 0,
-                "run_type": "measurement",
             }
         ]
     )
 
-    payload = build_result_payload(result)
-    assert payload["queries"][0]["ms"] == 1250.0
+    with pytest.raises(QueryExecutionContractError, match="Conflicting query duration representations"):
+        build_result_payload(result)
 
 
 def test_build_result_payload_preserves_positive_sub_ms_measurements() -> None:
@@ -93,6 +178,27 @@ def test_build_result_payload_preserves_positive_sub_ms_measurements() -> None:
     assert payload["queries"][0]["ms"] == 0.04
     assert payload["summary"]["timing"]["min_ms"] == 0.04
     assert payload["summary"]["timing"]["max_ms"] == 0.04
+
+
+def test_build_result_payload_uses_shared_nearest_rank_percentiles() -> None:
+    times_ms = [float(value) for value in range(1, 101)]
+    result = _result_with_queries(
+        [
+            {
+                "query_id": f"Q{index}",
+                "status": "SUCCESS",
+                "execution_time_seconds": value / 1000,
+                "rows_returned": 1,
+            }
+            for index, value in enumerate(times_ms, start=1)
+        ]
+    )
+
+    timing = build_result_payload(result)["summary"]["timing"]
+
+    assert timing["p90_ms"] == percentile_ms(times_ms, 0.90)
+    assert timing["p95_ms"] == percentile_ms(times_ms, 0.95)
+    assert timing["p99_ms"] == percentile_ms(times_ms, 0.99)
 
 
 def test_build_result_payload_run_type_contract_and_compat_fallback() -> None:

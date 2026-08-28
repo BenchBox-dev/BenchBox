@@ -11,6 +11,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -33,6 +34,24 @@ if TYPE_CHECKING:
     from benchbox.core.tuning.interface import TuningColumn
 
 logger = logging.getLogger(__name__)
+
+# Adapter-level memory-size validation: broader than the MCP request contract
+# (which is intentionally narrow for remote admission) but still bounded and
+# injection-safe. Accepts DuckDB's supported decimal and binary spellings,
+# including long-form decimal units, optional spaces, and scientific notation,
+# while rejecting SQL metacharacters. See duckdb-set-statement-value-hardening.
+_DUCKDB_MEMORY_SIZE_PATTERN = (
+    r"\s*[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\s*"
+    r"(?:B|bytes?|K|KB|kilobytes?|M|MB|megabytes?|G|GB|gigabytes?|T|TB|terabytes?|KiB|MiB|GiB|TiB)\s*"
+)
+_MEMORY_LIMIT_PATTERN = re.compile(
+    rf"^{_DUCKDB_MEMORY_SIZE_PATTERN}$",
+    re.IGNORECASE,
+)
+_MAX_TEMP_DIRECTORY_SIZE_PATTERN = re.compile(
+    rf"^(?:{_DUCKDB_MEMORY_SIZE_PATTERN}|90%\s+of\s+available\s+disk\s+space)$",
+    re.IGNORECASE,
+)
 
 
 def _normalize_duckdb_version(raw_version: Any) -> str | None:
@@ -101,9 +120,40 @@ def _build_duckdb_ctas_sort_sql(table_name: str, sort_columns) -> str:
     """Build DuckDB-compatible CTAS sort SQL shared by DuckDB and MotherDuck adapters.
 
     ``sort_columns`` must be pre-sorted by the caller (ascending by ``column.order``).
+
+    Per the tuning-renderer-consolidation TODO (ADR-3 "single renderer"),
+    this delegates to ``core.tuning.generators.duckdb.DuckDBDDLGenerator`` --
+    the same generator dry-run preview uses (see ``core/dryrun.py``'s
+    ``_extract_ddl_preview``) -- instead of building the ORDER BY clause
+    independently. The generator's ``TableTuning`` input requires real
+    ``TuningColumn`` instances (it validates column identifiers), so this
+    only accepts genuine ``TuningColumn`` objects; the one real caller
+    (``SortedIngestionMixin.apply_ctas_sort``) always supplies them.
     """
-    order_by_clause = ", ".join(column.name for column in sort_columns)
-    return f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM {table_name} ORDER BY {order_by_clause};"
+    from benchbox.core.tuning.ddl_generator import get_ddl_generator
+    from benchbox.core.tuning.interface import TableTuning
+
+    generator = get_ddl_generator("duckdb")
+    table_tuning = TableTuning(table_name=table_name, sorting=list(sort_columns))
+    clauses = generator.generate_tuning_clauses(table_tuning)
+    return generator.generate_ctas_ddl(
+        table_name=table_name,
+        source_query=f"SELECT * FROM {table_name}",
+        tuning=clauses,
+        or_replace=True,
+    )
+
+
+def _duckdb_sort_index_sql(table_name_upper: str, column_names: list[str]) -> str:
+    """CREATE INDEX DDL for a DuckDB sort index.
+
+    Shared by the pre-load tuning path (``apply_table_tunings``) and the
+    post-CTAS re-creation (``_recreate_sort_index_after_ctas``) so both land the
+    SAME ``idx_<table>_sort`` footprint -- the one ``duckdb_indexes()`` (and thus
+    the introspection receipt) corroborates.
+    """
+    index_name = f"idx_{table_name_upper.lower()}_sort"
+    return f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name_upper} ({', '.join(column_names)})"
 
 
 def _resolve_external_data_source(benchmark: Any, data_dir: Path, adapter: Any = None) -> Any:
@@ -486,6 +536,17 @@ class DuckDBAdapter(PlatformAdapter):
     def platform_name(self) -> str:
         return "DuckDB"
 
+    def get_tuning_introspector(self):
+        """Corroborate the applied ledger against ``duckdb_indexes()``.
+
+        Enables the ``applied_unverified -> applied_verified`` upgrade for DuckDB
+        when the recorded ``CREATE INDEX`` statements are confirmed present in
+        the catalog (see ``benchbox.platforms.duckdb_introspection``).
+        """
+        from benchbox.platforms.duckdb_introspection import DuckDBTuningIntrospector
+
+        return DuckDBTuningIntrospector()
+
     @staticmethod
     def add_cli_arguments(parser) -> None:
         """Add DuckDB-specific CLI arguments."""
@@ -535,8 +596,20 @@ class DuckDBAdapter(PlatformAdapter):
         # Force recreate
         adapter_config["force_recreate"] = config.get("force", False)
 
-        # Pass through other relevant config
-        for key in ["tuning_config", "verbose_enabled", "very_verbose"]:
+        # Pass through other relevant config.  `thread_limit` is read by
+        # `__init__` and applied as a DuckDB `SET threads` statement; omitting it
+        # here silently discards the caller's request, because `__init__` only
+        # ever sees this rebuilt config, never the original.
+        for key in [
+            "thread_limit",
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+            "verbose_enabled",
+            "very_verbose",
+        ]:
             if key in config:
                 adapter_config[key] = config[key]
         for key in [
@@ -608,9 +681,25 @@ class DuckDBAdapter(PlatformAdapter):
         self._duckdb_module = self._initialize_duckdb_runtime(config)
         # DuckDB configuration
         self.database_path = config.get("database_path", ":memory:")
-        self.memory_limit = config.get("memory_limit", "4GB")
-        self.max_temp_directory_size = config.get("max_temp_directory_size")
-        self.thread_limit = config.get("thread_limit")
+        raw_memory = config.get("memory_limit", "4GB")
+        if raw_memory is not None:
+            if not isinstance(raw_memory, str) or not _MEMORY_LIMIT_PATTERN.fullmatch(raw_memory):
+                raise ValueError("memory_limit must use a bounded memory size (e.g., '4GB')")
+        self.memory_limit = raw_memory
+        raw_temp = config.get("max_temp_directory_size")
+        if raw_temp is not None:
+            if not isinstance(raw_temp, str) or not _MAX_TEMP_DIRECTORY_SIZE_PATTERN.fullmatch(raw_temp):
+                raise ValueError(
+                    "max_temp_directory_size must use a DuckDB size (e.g., '4GB' or '90% of available disk space')"
+                )
+        self.max_temp_directory_size = raw_temp
+        raw_threads = config.get("thread_limit")
+        if raw_threads is not None:
+            try:
+                raw_threads = int(raw_threads)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("thread_limit must be an integer") from exc
+        self.thread_limit = raw_threads
         self.enable_progress_bar = config.get("progress_bar", False)
 
     def _initialize_duckdb_runtime(self, config: dict[str, Any]):
@@ -731,18 +820,25 @@ class DuckDBAdapter(PlatformAdapter):
             )
 
         # Apply DuckDB settings
+        from benchbox.platforms.base.data_loading import escape_sql_string_literal
+
         config_applied = []
         if self.memory_limit:
-            conn.execute(f"SET memory_limit = '{self.memory_limit}'")
+            # DuckDB does not support parameters in SET statements. Keep the
+            # value a string literal, with the adapter-level whitelist above
+            # providing the validation boundary and escaping as defense in depth.
+            memory_limit = escape_sql_string_literal(str(self.memory_limit))
+            conn.execute(f"SET memory_limit = '{memory_limit}'")
             config_applied.append(f"memory_limit={self.memory_limit}")
             self.log_very_verbose(f"DuckDB memory limit set to: {self.memory_limit}")
 
         if self.max_temp_directory_size:
-            conn.execute(f"SET max_temp_directory_size = '{self.max_temp_directory_size}'")
+            max_temp_directory_size = escape_sql_string_literal(str(self.max_temp_directory_size))
+            conn.execute(f"SET max_temp_directory_size = '{max_temp_directory_size}'")
             config_applied.append(f"max_temp_directory_size={self.max_temp_directory_size}")
             self.log_very_verbose(f"DuckDB max temp directory size set to: {self.max_temp_directory_size}")
 
-        if self.thread_limit:
+        if self.thread_limit is not None:
             conn.execute(f"SET threads TO {self.thread_limit}")
             config_applied.append(f"threads={self.thread_limit}")
             self.log_very_verbose(f"DuckDB thread limit set to: {self.thread_limit}")
@@ -908,8 +1004,81 @@ class DuckDBAdapter(PlatformAdapter):
         """Build DuckDB CTAS SQL used by PlatformAdapter.apply_ctas_sort."""
         return _build_duckdb_ctas_sort_sql(table_name, sort_columns)
 
+    def apply_ctas_sort(self, table_name: str, tuning_config: Any, connection: Any) -> bool:
+        """CTAS-sort a table, then re-create its sort index so the footprint survives.
+
+        The shared CTAS sort issues ``CREATE OR REPLACE TABLE ... ORDER BY``,
+        which drops the ``idx_<table>_sort`` index ``apply_table_tunings`` built
+        pre-load. Left there, post-load introspection finds no catalog footprint
+        (``duckdb_indexes()`` is empty for the table) and the run stays
+        ``applied_unverified`` even though it physically sorted. Re-create the
+        index post-CTAS so introspection can corroborate it.
+        """
+        applied = super().apply_ctas_sort(table_name, tuning_config, connection)
+        if applied and not self.dry_run_mode:
+            self._recreate_sort_index_after_ctas(table_name, tuning_config, connection)
+        return applied
+
+    def _recreate_sort_index_after_ctas(self, table_name: str, tuning_config: Any, connection: Any) -> None:
+        """Re-create the sort index the CTAS re-materialization dropped.
+
+        Records the re-creation as a ``PHASE_POST_LOAD`` layout op (folded into
+        the applied ledger by ``_fold_layout_operations_into_ledger``) so the
+        introspection receipt can corroborate a real, surviving
+        ``duckdb_indexes()`` footprint and upgrade the run to
+        ``applied_verified``. Never breaks a run: a failed re-creation is logged
+        and recorded as a failed op, and the load continues.
+        """
+        sort_columns = self._resolve_ctas_sort_columns(table_name, tuning_config)
+        if not sort_columns:
+            return
+        sorted_cols = sorted(sort_columns, key=lambda col: col.order)
+        table_name_upper = table_name.upper()
+        index_sql = _duckdb_sort_index_sql(table_name_upper, [col.name for col in sorted_cols])
+        try:
+            connection.execute(index_sql)
+            self.log_verbose(f"Re-created sort index on {table_name_upper} after CTAS sort")
+        except Exception as exc:  # capture never breaks a run
+            self.logger.warning(f"Failed to re-create sort index on {table_name_upper} after CTAS: {exc}")
+            self._record_sort_index_layout_op(index_sql, table_name_upper, status="failed", error=exc)
+            return
+        self._record_sort_index_layout_op(index_sql, table_name_upper, status="applied")
+
+    def _record_sort_index_layout_op(
+        self, statement: str, table: str, *, status: str, error: Exception | None = None
+    ) -> None:
+        """Append a post-load sort-index op for ``_fold_layout_operations_into_ledger``."""
+        from benchbox.core.tuning.applied_ledger import PHASE_POST_LOAD
+
+        ops = getattr(self, "_applied_layout_operations", None)
+        if ops is None:
+            ops = []
+            self._applied_layout_operations = ops
+        ops.append(
+            {
+                "statement": statement,
+                "phase": PHASE_POST_LOAD,
+                "status": status,
+                "mechanism": "sort_index",
+                "table": table,
+                "error_message": str(error) if error is not None else None,
+            }
+        )
+
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Apply DuckDB-specific optimizations based on benchmark type."""
+        benchmark = getattr(self, "benchmark", None)
+        transaction_benchmark = getattr(benchmark, "_benchmark_label", "").lower() == "transaction primitives"
+        if benchmark_type.lower() == "transaction_primitives" or transaction_benchmark:
+            # DuckDB 1.3.x can produce duplicate rows for a read-after-write
+            # scalar subquery when parallel operators are enabled. The following
+            # INSERT...SELECT can then hit DuckDB's batch-index assertion and
+            # invalidate the database. Transaction Primitives measures transaction
+            # semantics, not intra-query parallelism, so keep its execution path
+            # single-threaded while preserving the caller's setting for all other
+            # benchmarks.
+            connection.execute("SET threads TO 1")
+
         # Enable profiling only when displaying plans; skip when capture_plans is active.
         if self.show_query_plans and not self.capture_plans:
             connection.execute("SET enable_profiling = 'query_tree'")
@@ -1006,6 +1175,7 @@ class DuckDBAdapter(PlatformAdapter):
                 first_row=rows[0] if rows else None,
                 validation_result=validation_result,
                 result_digest=result_digest,
+                materialized_rows=rows,
             )
 
             # Capture and merge structured query plan (SUCCESS-guarded in the helper)
@@ -1209,8 +1379,7 @@ class DuckDBAdapter(PlatformAdapter):
                 column_names = [col.name for col in sorted_cols]
 
                 # Create index for sort optimization
-                index_name = f"idx_{table_name_upper.lower()}_sort"
-                index_sql = f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name_upper} ({', '.join(column_names)})"
+                index_sql = _duckdb_sort_index_sql(table_name_upper, column_names)
 
                 try:
                     connection.execute(index_sql)
@@ -1243,6 +1412,14 @@ class DuckDBAdapter(PlatformAdapter):
                 self.logger.info(
                     f"Partitioning strategy for {table_name_upper}: {', '.join(column_names)} (handled at data loading level)"
                 )
+                # Requested-but-not-rendered as a DDL statement: recorded as a
+                # dropped intent so the ledger surfaces the request honestly.
+                _ledger = getattr(self, "_applied_tuning_ledger", None)
+                if _ledger is not None:
+                    _ledger.record_dropped(
+                        f"partitioning:{table_name_upper}",
+                        "DuckDB applies partitioning at data-loading time, not via DDL",
+                    )
 
             # Distribution not applicable for DuckDB
             distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
@@ -1250,6 +1427,12 @@ class DuckDBAdapter(PlatformAdapter):
                 self.logger.warning(
                     f"Distribution tuning not applicable for single-node DuckDB on table: {table_name_upper}"
                 )
+                _ledger = getattr(self, "_applied_tuning_ledger", None)
+                if _ledger is not None:
+                    _ledger.record_dropped(
+                        f"distribution:{table_name_upper}",
+                        "Distribution tuning is not applicable for single-node DuckDB",
+                    )
 
         except ImportError:
             self.logger.warning("Tuning interface not available - skipping tuning application")
@@ -1259,18 +1442,25 @@ class DuckDBAdapter(PlatformAdapter):
     def apply_unified_tuning(self, tuning_config, connection) -> None:
         """Apply unified tuning configuration to DuckDB.
 
+        The connection is wrapped so the CREATE INDEX statements emitted by
+        ``apply_table_tunings`` land in the applied-tuning ledger (DDL phase).
+        Wrapping degrades to the raw connection when no ledger is present.
+
         Args:
             tuning_config: UnifiedTuningConfiguration instance
             connection: DuckDB connection
         """
+        from benchbox.core.tuning.applied_ledger import PHASE_DDL, recording_connection
+
+        recording = recording_connection(connection, getattr(self, "_applied_tuning_ledger", None), PHASE_DDL)
         try:
             # Apply table-level tunings for each table configuration
             for table_name, table_tuning in tuning_config.table_tunings.items():
                 self.logger.info(f"Applying unified tuning to table: {table_name}")
-                self.apply_table_tunings(table_name, table_tuning, connection)
+                self.apply_table_tunings(table_name, table_tuning, recording)
 
             # Apply platform-specific optimizations
-            self.apply_platform_optimizations(tuning_config, connection)
+            self.apply_platform_optimizations(tuning_config, recording)
 
             # Apply constraint configurations (already handled in schema creation)
             self.logger.info("Constraint configuration applied during schema creation")

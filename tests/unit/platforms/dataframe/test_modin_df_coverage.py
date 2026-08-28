@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -172,3 +173,99 @@ class TestModinCoverage:
         assert info["platform"] == "Modin"
         assert info["engine"] == "ray"
         assert info["version"] == "0.30"
+
+
+class TestSupportedEngineIsFailClosed:
+    """An accepted-but-unsupported backend is an unreliable public contract."""
+
+    def test_pandas_is_rejected_rather_than_resembling_a_valid_engine(self):
+        with pytest.raises(ValueError, match="Unsupported Modin engine 'pandas'"):
+            mod.ModinDataFrameAdapter._validate_engine("pandas")
+
+    @pytest.mark.parametrize("engine", ["python", "native", "", "ray;dask", "unidist2"])
+    def test_unreviewed_backends_are_rejected(self, engine):
+        with pytest.raises(ValueError, match="Unsupported Modin engine"):
+            mod.ModinDataFrameAdapter._validate_engine(engine)
+
+    @pytest.mark.parametrize(
+        ("engine", "expected"),
+        [("ray", "ray"), ("dask", "dask"), ("unidist", "unidist"), ("RAY", "ray"), (" dask ", "dask")],
+    )
+    def test_reviewed_backends_are_accepted_and_normalized(self, engine, expected):
+        assert mod.ModinDataFrameAdapter._validate_engine(engine) == expected
+
+    def test_unidist_stays_supported_because_it_is_publicly_documented(self):
+        """docs/platforms/modin-dataframe.md and platform_readiness both list it."""
+        assert mod.ModinDataFrameAdapter._validate_engine("unidist") == "unidist"
+
+    def test_the_mcp_allowlist_is_a_subset_of_the_adapter_contract(self):
+        """MCP is deliberately narrower, but it must never accept what the adapter rejects."""
+        from benchbox.mcp.schemas import MCP_PLATFORM_OPTION_ALLOWLIST
+
+        mcp_choices = set(MCP_PLATFORM_OPTION_ALLOWLIST["modin"]["engine"].choices)
+        assert mcp_choices <= set(mod.SUPPORTED_MODIN_ENGINES)
+        # unidist is documented as experimental, so it stays out of the MCP surface.
+        assert "unidist" not in mcp_choices
+
+    def test_a_preset_environment_engine_is_validated_not_trusted(self, monkeypatch):
+        """MODIN_ENGINE is what Modin actually reads, so it is the real boundary."""
+        adapter = object.__new__(mod.ModinDataFrameAdapter)
+        adapter.engine = "ray"
+        adapter.verbose = False
+        adapter.very_verbose = False
+
+        monkeypatch.setenv(mod.MODIN_ENGINE_ENV, "pandas")
+        with pytest.raises(ValueError, match="Unsupported Modin engine 'pandas'"):
+            adapter._resolve_effective_engine()
+
+    def test_a_preset_environment_engine_wins_but_stays_reviewed(self, monkeypatch):
+        adapter = object.__new__(mod.ModinDataFrameAdapter)
+        adapter.engine = "ray"
+        adapter.verbose = False
+        adapter.very_verbose = False
+
+        monkeypatch.setenv(mod.MODIN_ENGINE_ENV, "dask")
+        assert adapter._resolve_effective_engine() == "dask"
+
+    def test_the_reported_engine_and_the_variable_modin_reads_agree(self, monkeypatch):
+        """setdefault used to leave self.engine and MODIN_ENGINE disagreeing."""
+        adapter = object.__new__(mod.ModinDataFrameAdapter)
+        adapter.engine = "dask"
+        adapter.verbose = False
+        adapter.very_verbose = False
+
+        monkeypatch.setenv(mod.MODIN_ENGINE_ENV, "ray")
+        adapter.engine = adapter._resolve_effective_engine()
+        adapter._configure_engine()
+        assert adapter.engine == os.environ[mod.MODIN_ENGINE_ENV] == "ray"
+
+    def test_the_constructor_rejects_an_unreviewed_environment_engine(self, monkeypatch):
+        """Rejection must happen before any backend is initialized."""
+        monkeypatch.setattr(mod, "MODIN_AVAILABLE", True)
+        monkeypatch.setattr(mod, "PANDAS_AVAILABLE", True)
+        monkeypatch.setenv(mod.MODIN_ENGINE_ENV, "unreviewed_backend")
+        called = []
+        monkeypatch.setattr(mod, "_initialize_ray_for_local_execution", lambda *a, **k: called.append(1))
+
+        with pytest.raises(ValueError, match="Unsupported Modin engine"):
+            mod.ModinDataFrameAdapter(engine="ray")
+
+        assert called == []
+
+    def test_constructor_rejects_before_touching_the_modin_environment(self, monkeypatch):
+        """Validation must run before MODIN_ENGINE is written."""
+        monkeypatch.delenv("MODIN_ENGINE", raising=False)
+        monkeypatch.setattr(mod, "MODIN_AVAILABLE", True)
+        monkeypatch.setattr(mod, "PANDAS_AVAILABLE", True)
+
+        with pytest.raises(ValueError, match="Unsupported Modin engine 'pandas'"):
+            mod.ModinDataFrameAdapter(engine="pandas")
+
+        assert "MODIN_ENGINE" not in os.environ
+
+    def test_tuning_engine_affinity_shares_the_reviewed_set(self):
+        """engine_affinity must not become a second, drifting allow-list."""
+        import inspect
+
+        source = inspect.getsource(mod.ModinDataFrameAdapter._apply_tuning)
+        assert "SUPPORTED_MODIN_ENGINES" in source

@@ -1,0 +1,14 @@
+{
+  "benchmark": "TPC-H",
+  "bundle_file": "tpch_sf001_pyspark_df_20260502_212950_2dbda97e.json",
+  "bundle_hash": "f826d18daa439184bdfea37f83ba9f01706d5ab1a11f34fb610d23db7c91e417",
+  "companion_hashes": {},
+  "phase": 2,
+  "platform": "PySpark",
+  "result_source": "internal",
+  "scale_factor": 0.01,
+  "submission_path": "path_30338255ec33",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:51:31.911358+00:00",
+  "submitted_by": "BenchBox UAT"
+}

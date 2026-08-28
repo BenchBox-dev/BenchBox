@@ -19,7 +19,7 @@ This document provides guidelines and instructions for contributing.
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/joeharris76/BenchBox.git
+   git clone https://github.com/BenchBox-dev/BenchBox.git
    cd BenchBox
    ```
 
@@ -42,25 +42,22 @@ This document provides guidelines and instructions for contributing.
 
 ## Branches & PR gate
 
-`develop` is the long-lived development branch; **all changes land via PR**. `main` is release-only (handled by the version-branch flow — see `docs/operations/release-guide.md`). PRs target `develop` and squash-merge with linear history.
+`develop` is the long-lived development branch and the repository's default branch; **all changes land via PR**. `release` is release-only (handled by the version-branch flow — see `docs/operations/release-guide.md`). PRs target `develop` and squash-merge with linear history.
 
-Required CI on `develop` reports through `ci-required-result`. The umbrella uses `.github/path-filters.yml` to classify each PR: content-only PRs run content validation and skip Python fast tests, while code, infra, workflow, tooling, and unknown paths run the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate. Reviews are not required for solo-dev work; auto-merge handles landing.
+Required CI on `develop` reports through `ci-required-result`. The umbrella uses `.github/path-filters.yml` to classify each PR: content-only PRs run content validation and skip Python fast tests, while code, infra, workflow, tooling, and unknown paths run the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate. Reviews are not required for solo-dev work; once a finished branch is armed, auto-merge lands it when required checks are green.
 
 ## Development Workflow
 
-The canonical loop is **branch → edit → preflight → `make pr-open`**. Auto-merge takes the PR over the line once CI is green; you don't poll.
+The canonical loop is **branch → edit → preflight → `make pr-open` → (when final) arm**. `make pr-open` **withholds** auto-merge by default so follow-up commits cannot race a half-pushed stack. When the branch is finished, arm with `make pr-ready` (or open already-final work with `make pr-open READY=1`); then walk away — don't poll.
 
-1. **Create a feature branch off `develop`.** For parallel work, prefer a worktree so the main clone keeps `develop` checked out:
+1. **Create a feature worktree off `develop`.** Agents must keep the main clone read-only:
 
    ```bash
-   # Single-branch (simplest):
-   git checkout develop && git pull
-   git checkout -b feat/your-thing
-
-   # Or, parallel-friendly — claim a retained pool worktree off develop
-   # (run `make worktree-pool-init` once first):
-   WORKTREE_PATH=$(make -s worktree-claim BRANCH=feat/your-thing | sed -n 's/^WORKTREE_PATH=//p')
-   cd "$WORKTREE_PATH" && uv sync --group dev
+   WORKTREE_PATH=../BenchBox.wt-feat-your-thing
+   make worktree-create BRANCH=feat/your-thing WORKTREE_PATH="$WORKTREE_PATH"
+   cd "$WORKTREE_PATH"
+   make agent-write-preflight
+   uv sync --group dev
    ```
 
 2. **Make your changes.** Iterate with the fast lane:
@@ -81,19 +78,29 @@ The canonical loop is **branch → edit → preflight → `make pr-open`**. Auto
    git commit -m "fix: resolve race in foo loader"
    ```
 
-4. **Run the local preflight, then open the PR with auto-merge in one shot:**
+4. **Run the local preflight, then open the PR (auto-merge withheld):**
 
    ```bash
    make pr-preflight      # local lint + path-aware content guard / fast tests
-   make pr-open           # push + gh pr create --base develop + gh pr merge --auto --squash
+   make pr-open           # push + gh pr create --base develop (does NOT arm auto-merge)
    ```
 
-   `make pr-open` refuses to run from `develop` or `main`. The PR will squash-merge the moment the required checks turn green. Don't poll for CI — auto-merge handles it.
+   `make pr-open` refuses to run from `develop` or `release`. The PR stays open without auto-merge so you can push follow-ups safely.
 
-5. **After merge**, the remote branch auto-deletes (repo setting `delete_branch_on_merge`). Sweep any stale local branches and worktrees with:
+5. **When the branch is final, arm auto-merge** (hands-free finish path):
 
    ```bash
-   make worktree-prune    # removes worktrees whose branches are gone on origin
+   make pr-ready          # arm squash auto-merge on the open PR
+   # Or open and arm in one step when you already know the branch is done:
+   # make pr-open READY=1
+   ```
+
+   `make pr-ready` (or `READY=1`) is the only arm path: `auto-merge-on-open.yml` is revoke-only and never arms — not on `opened` / `reopened` / `synchronize`, and not on draft → ready (`ready_for_review` is not even a trigger; the historical workflow arm point never fired once and was deleted). Once armed, the PR squash-merges when required checks turn green — don't poll. Soundness-critical paths and the `no-auto-merge` hold label stay withheld pending review (see `docs/operations/repo-admin-settings.md`).
+
+6. **After merge**, remove the clean linked worktree. The remote branch normally auto-deletes through the repository setting; clean local branches separately:
+
+   ```bash
+   make worktree-remove WORKTREE_PATH="$WORKTREE_PATH"
    ```
 
    Inspect open PRs at any time with `make pr-status`.
@@ -128,7 +135,7 @@ This runs the broader CI mirror:
 
 Or run any of those individually. Additional one-offs: `make security-audit`, `make spellcheck`, `make docstring-coverage`.
 
-Skip `make ci-local` for everyday changes — `make pr-preflight` is the right gate. Auto-merge will block on any non-required check failure that *is* surfaced (e.g. doc build), so the cost of being wrong is just a re-push.
+Skip `make ci-local` for everyday changes — `make pr-preflight` is the right gate. Once the PR is armed, auto-merge still blocks on any non-required check failure that *is* surfaced (e.g. doc build), so the cost of being wrong is just a re-push (and re-arm with `make pr-ready` if needed).
 
 ## Testing
 
@@ -216,12 +223,13 @@ External contributions land via PR against `develop` (squash-merge). Releases
 are cut by maintainers via the version-branch flow documented in
 [`docs/operations/release-guide.md`](docs/operations/release-guide.md):
 
-1. `make bump VERSION=X.Y.Z` and `make changelog-draft VERSION=X.Y.Z` on `develop`.
-2. `make release-prepare VERSION=X.Y.Z` cuts `vX.Y.Z` from `develop` with a
-   release-curated tree and opens a PR against `main`.
-3. Squash-merge the PR; tag `main`; `release.yml` publishes to PyPI.
-4. `make release-rebase-develop VERSION=X.Y.Z` rebases `develop` onto the
-   release-shaped `main`.
+1. `make release-cut VERSION=X.Y.Z` on an up-to-date `develop`. It cuts `vX.Y.Z`
+   with a release-curated tree and opens a PR against `release`.
+2. Review the PR and wait for `validate-base` and `release-required-result`.
+3. `make release-finalize VERSION=X.Y.Z` merges and tags the release; `release.yml`
+   publishes to PyPI.
+
+Use `make release-cut-abort VERSION=X.Y.Z` to back out an in-flight cut.
 
 We follow semantic versioning.
 

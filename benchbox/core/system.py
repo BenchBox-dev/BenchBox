@@ -95,3 +95,108 @@ class SystemProfiler:
             return f"{platform.machine()} CPU"
         else:
             return f"{platform.machine()} CPU"
+
+
+def recommend_max_scale_factor(available_bytes: int) -> float:
+    """Recommend maximum scale factor based on available memory.
+
+    Heuristic used by the system profiler and the MCP discovery surface.
+    Thresholds are intentionally coarse -- they gate user-facing
+    recommendations, not correctness.
+    """
+    available_gb = available_bytes / (1024**3)
+
+    if available_gb >= 64:
+        return 100
+    elif available_gb >= 16:
+        return 10
+    elif available_gb >= 4:
+        return 1
+    elif available_gb >= 1:
+        return 0.1
+    else:
+        return 0.01
+
+
+def collect_system_profile_with_recommendations() -> dict[str, object]:
+    """Collect a JSON-serialisable system profile with recommendations.
+
+    Thin assembly over :class:`SystemProfiler` that the MCP discovery tool
+    and other surfaces can share. ``available_bytes`` is sourced from the
+    same ``psutil`` snapshot that populates the memory section, so the
+    recommendation is consistent with the reported ``available_gb``.
+    """
+    import platform as _platform
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        import psutil as _psutil
+
+        _has_psutil = True
+    except ImportError:
+        _has_psutil = False  # type: ignore[assignment]
+
+    profiler = SystemProfiler()
+    profile = profiler.get_system_profile()
+
+    # Re-derive available_bytes for the recommendation consistently.
+    if _has_psutil:
+        try:
+            _mem = _psutil.virtual_memory()
+            _available_bytes = int(_mem.available)
+        except Exception:
+            _available_bytes = int(profile.memory_available_gb * (1024**3))
+    else:
+        _available_bytes = int(profile.memory_available_gb * (1024**3))
+
+    # Disk usage (best-effort, mirrors the MCP helper).
+    disk_usage: dict[str, object] = {}
+    if _has_psutil:
+        for _path, _name in [("/", "root"), ("/tmp", "temp")]:
+            try:
+                _usage = _psutil.disk_usage(_path)
+                disk_usage[_name] = {
+                    "path": _path,
+                    "total_gb": round(_usage.total / (1024**3), 2),
+                    "free_gb": round(_usage.free / (1024**3), 2),
+                    "used_percent": _usage.percent,
+                }
+            except Exception:
+                pass
+
+    # Package versions (best-effort).
+    packages: dict[str, str] = {}
+    for _pkg in ["polars", "pandas", "duckdb", "pyarrow"]:
+        try:
+            _mod = __import__(_pkg)
+            packages[_pkg] = getattr(_mod, "__version__", "unknown")
+        except ImportError:
+            packages[_pkg] = "not installed"
+
+    try:
+        _benchbox_version = version("benchbox")
+    except PackageNotFoundError:
+        _benchbox_version = "unknown"
+
+    return {
+        "cpu": {
+            "cores": profile.cpu_cores_physical,
+            "threads": profile.cpu_cores_logical,
+            "architecture": profile.architecture,
+        },
+        "memory": {
+            "total_gb": round(profile.memory_total_gb, 2),
+            "available_gb": round(profile.memory_available_gb, 2),
+            "used_percent": round((1 - profile.memory_available_gb / profile.memory_total_gb) * 100, 1)
+            if profile.memory_total_gb
+            else 0,
+        },
+        "disk": disk_usage,
+        "python": {"version": _platform.python_version()},
+        "packages": packages,
+        "benchbox": {"version": _benchbox_version},
+        "platform": {"system": _platform.system(), "release": _platform.release()},
+        "recommendations": {
+            "max_scale_factor": recommend_max_scale_factor(_available_bytes),
+        },
+    }

@@ -21,6 +21,7 @@ from benchbox.core.connection import DatabaseConnection
 from benchbox.core.primitives_benchmark_utils import (
     build_tpch_staging_tables_sql,
     quote_identifier,
+    summarize_validation_failures,
     table_exists,
 )
 from benchbox.core.transaction_primitives.generator import TransactionPrimitivesDataGenerator
@@ -375,12 +376,24 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             )
 
         try:
-            # Drop existing staging tables if force=True (done once before loop)
-            if force:
+            # A staging set whose manifest does not match this run is stale, not
+            # reusable. Without this the population loop below takes its "already
+            # populated" branch on the leftover rows, nothing is rebuilt, and the
+            # unconditional _write_staging_manifest() at the end then certifies
+            # the stale data as this run's -- the exact silent wrong-results bug
+            # the manifest exists to close. Reuse the force drop path rather than
+            # adding a second one; a dropped table re-enters the loop empty and
+            # repopulates through the already-audited branch.
+            rebuild = force or not self._staging_manifest_matches(connection, required_tables)
+
+            # Drop existing staging tables when rebuilding (done once before loop)
+            if rebuild:
+                reason = "force mode" if force else "stale/absent staging manifest"
+                self._drop_legacy_staging_manifests(connection)
                 for table_name in STAGING_TABLES:
                     try:
                         connection.execute(f"DROP TABLE IF EXISTS {table_name}")
-                        self.log_verbose(f"Dropped existing {table_name} (force mode)")
+                        self.log_verbose(f"Dropped existing {table_name} ({reason})")
                     except Exception as e:
                         self.log_verbose(f"Warning: Could not drop {table_name}: {e}")
 
@@ -463,6 +476,12 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                         status[table_name] = result[0] if result else 0
                     except Exception:
                         status[table_name] = 0
+
+            # Record this setup()'s provenance (benchmark, scale, spec version,
+            # source digest) so is_setup() can require an exact match rather
+            # than trusting a bare COUNT(*) that a stale staging set from a
+            # different scale/seed would also satisfy.
+            self._write_staging_manifest(connection, required_tables)
 
             self.log_verbose(f"Setup complete: {status}")
 
@@ -556,13 +575,22 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         self.log_verbose("Reset complete")
 
     def is_setup(self, connection: DatabaseConnection) -> bool:
-        """Check if staging tables are ready.
+        """Check if staging tables are ready for THIS run.
+
+        Requires both that the key staging tables exist and have data, AND
+        that the staging provenance manifest (see
+        ``TransactionalBenchmarkBase._staging_manifest_matches``) matches
+        this benchmark's scale/spec/source. A staging set left over from a
+        different scale factor (or a legacy database with no manifest at
+        all) fails this check and forces one rebuild, rather than silently
+        benchmarking the wrong data volume.
 
         Args:
             connection: Database connection
 
         Returns:
-            True if all staging tables exist and have data
+            True if all staging tables exist, have data, and their manifest
+            matches this run's provenance.
         """
         try:
             # Check that key staging tables exist and have data
@@ -570,7 +598,7 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                 result = connection.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
                 if not result or result[0] == 0:
                     return False
-            return True
+            return self._staging_manifest_matches(connection, ["orders", "lineitem", "customer"])
         except Exception:
             return False
 
@@ -806,9 +834,13 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
 
             cleanup_duration_ms = (time.perf_counter() - cleanup_start) * 1000
 
+            # A failed post-condition validation means the operation did not do
+            # what it claims even though the write SQL did not raise. Report it as
+            # VALIDATION_FAILED (distinct from an execution FAILED), mirroring
+            # write_primitives, so it cannot render as a passing operation.
             return OperationResult(
                 operation_id=operation_id,
-                success=True,
+                success=validation_passed,
                 write_duration_ms=write_duration_ms,
                 rows_affected=rows_affected,
                 validation_duration_ms=validation_duration_ms,
@@ -816,6 +848,11 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                 validation_results=validation_results,
                 cleanup_duration_ms=cleanup_duration_ms,
                 cleanup_success=cleanup_success,
+                # Preserve this benchmark's "status None on normal success"
+                # idiom (derived to SUCCESS downstream); only stamp an explicit
+                # status when a post-condition validation fails.
+                status=None if validation_passed else "VALIDATION_FAILED",
+                error=None if validation_passed else summarize_validation_failures(validation_results),
                 cleanup_warning=cleanup_warning,
                 executed_sql=write_sql,
             )

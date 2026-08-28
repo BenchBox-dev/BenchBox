@@ -21,6 +21,12 @@ pytestmark = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def _community_publish_salt(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Community submit requires a deployment salt; tests use a private test value."""
+    monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "unit-test-community-publish-salt")
+
+
 def _fake_result() -> SimpleNamespace:
     return SimpleNamespace(
         benchmark_name="tpch",
@@ -42,7 +48,8 @@ def _valid_submission_bundle() -> dict:
         "benchmark": {"id": "tpch", "name": "TPC-H", "scale_factor": 0.01},
         "platform": {"name": "duckdb", "version": "1.3.0"},
         "summary": {"validation": "passed", "queries": {"total": 1, "passed": 1, "failed": 0}},
-        "queries": [{"id": "Q1", "ms": 123, "status": "pass"}],
+        "phases": {"validation": {"status": "PASSED"}},
+        "queries": [{"id": "Q1", "ms": 123, "status": "SUCCESS"}],
     }
 
 
@@ -86,6 +93,18 @@ def _canonical_file_bytes(path: Path) -> bytes:
 # ---------------------------------------------------------------------------
 # 1. No args - explains usage, exit 1
 # ---------------------------------------------------------------------------
+
+
+def test_submit_refuses_without_public_pseudonym_salt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Community submit hard-refuses when BENCHBOX_MACHINE_ID_SALT is unset."""
+    monkeypatch.delenv("BENCHBOX_MACHINE_ID_SALT", raising=False)
+    src = tmp_path / "ok.json"
+    _write_valid_submission_bundle(src)
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+    result = CliRunner().invoke(sub.submit, [str(src), "--dry-run", "--output", str(tmp_path / "out")])
+    assert result.exit_code == 1
+    assert "Submission refused" in result.output
+    assert "BENCHBOX_MACHINE_ID_SALT" in result.output
 
 
 def test_submit_requires_file_or_last(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -171,6 +190,24 @@ def test_submit_refuses_partial_query_failure(monkeypatch: pytest.MonkeyPatch, t
     assert not out_dir.exists()
 
 
+def test_submit_refuses_unvalidated_with_distinct_message(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    src = tmp_path / "tpch_duckdb_unvalidated.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    unvalidated = _fake_result()
+    unvalidated.validation_status = "not_validated"
+    unvalidated.failed_queries = 0
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (unvalidated, {}))
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
+
+    assert result.exit_code == 1
+    assert "unvalidated" in result.output
+    assert "validation_status=not_validated" in result.output
+    assert "schema violation" not in result.output.lower()
+    assert not out_dir.exists()
+
+
 # ---------------------------------------------------------------------------
 # 4b. Packaged CONTRIBUTING.md aligns with canonical docs/contributing-results.md
 #     (regression for dry-run-followup-package-canonical-contributing)
@@ -194,7 +231,7 @@ def test_submit_contributing_md_includes_canonical_required_items(
         "published-results",
         "generate_corpus_inventory",
         "validate_submission",
-        "docs.benchbox.dev",
+        "benchbox.dev/docs/contributing-results.html",
         "<result>.manifest.json",
     ):
         assert required in contributing, f"missing {required!r} in packaged CONTRIBUTING.md"

@@ -30,6 +30,7 @@ from .metadata import (
     TuningMetadata,
     TuningMetadataManager,
 )
+from .policy_generation import TUNING_POLICY_GENERATION
 from .profile_validation import (
     CandidateTemplateMapping,
     TuningProfileValidationIssue,
@@ -65,6 +66,8 @@ __all__ = [
     "TuningMetadata",
     "TuningMetadataManager",
     "MetadataValidationResult",
+    # Tuning-policy generation seam (ADR-3)
+    "TUNING_POLICY_GENERATION",
     # Workload tuning profiles
     "WorkloadTuningCandidate",
     "WorkloadTuningProfile",

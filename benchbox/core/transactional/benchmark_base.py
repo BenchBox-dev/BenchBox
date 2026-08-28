@@ -9,14 +9,17 @@ to implement their spec-specific ``execute_operation``, ``setup``,
 
 from __future__ import annotations
 
+import hashlib
 import re
 from abc import abstractmethod
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Generic, Optional, TypeVar, Union
 
 from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.connection import DatabaseConnection
 from benchbox.core.operations import OperationExecutor
+from benchbox.core.primitives_benchmark_utils import quote_identifier
 from benchbox.core.transactional.operations_registry_base import OperationsRegistryBase
 
 ResultT = TypeVar("ResultT")
@@ -27,6 +30,11 @@ _SET_THEN_BEGIN_ISOLATION_RE = re.compile(
     r"BEGIN\s+TRANSACTION\s*;",
     re.IGNORECASE,
 )
+
+
+def _sql_escape(value: Any) -> str:
+    """Escape a value for embedding in a single-quoted SQL string literal."""
+    return str(value).replace("'", "''")
 
 
 class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, OperationExecutor, Generic[ResultT]):
@@ -298,6 +306,157 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
                 connection.rollback()
         except Exception as exc:
             self.log_verbose(f"Warning: rollback after operation error failed: {exc}")
+
+    # ------------------------------------------------------------------
+    # Staging provenance manifest
+    #
+    # Shared by transaction_primitives and write_primitives is_setup()/
+    # setup() overrides -- implemented ONCE here so the two families cannot
+    # drift the way the plain-COUNT is_setup checks did (see TODO
+    # transactional-staging-reuse-ignores-provenance). A staging set left
+    # over from a different scale/spec/source cannot silently satisfy
+    # is_setup() for the current run: setup() records this run's provenance
+    # in a single-row-per-benchmark manifest table, and is_setup() requires
+    # an exact match. A missing manifest (every pre-existing database, since
+    # no prior code ever wrote one) is NOT treated as "probably fine" -- it
+    # returns False and forces one self-healing rebuild.
+    # ------------------------------------------------------------------
+
+    #: In-database table recording the provenance (benchmark, scale, spec
+    #: version, source digest) of the staging data the most recent setup()
+    #: produced. Keyed by ``benchmark`` so transaction_primitives and
+    #: write_primitives sharing one physical database do not clobber each
+    #: other's row.
+    #:
+    #: The ``_v2`` generation is load-bearing, not cosmetic. The first release
+    #: of this manifest wrote a row unconditionally at the end of ``setup()``,
+    #: including on the path that skipped repopulation because the staging
+    #: tables were already non-empty. Those rows are *internally consistent* --
+    #: correct scale, correct spec version, and a digest of the live source
+    #: tables -- while the staging data they describe is stale. Reusing the
+    #: original table name would therefore match them, ``is_setup()`` would
+    #: short-circuit, and every database that generation already mis-certified
+    #: would stay silently wrong forever. A new name makes them unmatchable, so
+    #: those databases take the missing-manifest path and rebuild once.
+    _STAGING_MANIFEST_TABLE = "benchbox_staging_manifest_v2"
+
+    #: Superseded manifest table, dropped on rebuild so a database does not
+    #: carry a stale generation's rows around indefinitely. Never read.
+    _LEGACY_STAGING_MANIFEST_TABLES: tuple[str, ...] = ("benchbox_staging_manifest",)
+
+    def _quote_identifier(self, identifier: str) -> str:
+        """Quote a SQL identifier. Subclasses override for dialect-specific quoting."""
+        return quote_identifier(identifier)
+
+    def _drop_legacy_staging_manifests(self, connection: DatabaseConnection) -> None:
+        """Remove superseded manifest generations during a rebuild.
+
+        Best-effort: a failure here leaves harmless cruft, never an incorrect
+        reuse decision, because the superseded names are never read.
+        """
+        for legacy in self._LEGACY_STAGING_MANIFEST_TABLES:
+            try:
+                connection.execute(f"DROP TABLE IF EXISTS {self._quote_identifier(legacy)}")
+            except Exception:  # noqa: BLE001 - cleanup only; never fail setup over cruft
+                pass
+
+    def _staging_provenance_key(self) -> tuple[str, str, str]:
+        """Return ``(benchmark_id, scale, spec_version)`` identifying this run's staging provenance.
+
+        ``scale`` is normalised through ``float`` so a benchmark constructed
+        with ``scale_factor=1`` and one constructed with ``scale_factor=1.0``
+        agree. Without it the two stringify differently ("1" vs "1.0"), never
+        match each other's manifest, and each pays a full staging rebuild.
+        """
+        benchmark_id = getattr(self, "_benchmark_label", self.__class__.__name__)
+        try:
+            scale = str(float(self.scale_factor))
+        except (TypeError, ValueError):
+            scale = str(self.scale_factor)
+        return str(benchmark_id), scale, str(getattr(self, "_version", "unknown"))
+
+    def _staging_source_digest(self, connection: DatabaseConnection, source_tables: list[str]) -> str:
+        """Fingerprint the live TPC-H source tables backing this benchmark's staging data.
+
+        INVARIANT: no benchmark operation may mutate ``source_tables``. Both
+        operation catalogues read orders/lineitem/customer and write only to
+        their own staging tables, which is what keeps the digest stable for the
+        duration of a run. ``is_setup()`` legitimately goes False mid-run when
+        an operation empties a staging table it gates on; the manifest still
+        matching at that moment is what limits the response to repopulating
+        that one table. Add an operation that writes to a source table and
+        every subsequent operation instead pays a full drop-and-repopulate of
+        the whole staging set.
+
+        Hashes ordered ``table:row_count`` pairs so a manifest written against
+        one data volume cannot match a differently-provisioned database even
+        when ``scale_factor`` happens to read the same (e.g. a reused
+        directory whose actual row counts diverge from the label). A table
+        access failure counts as ``count=0`` rather than aborting -- mirrors
+        :func:`benchbox.core.primitives_benchmark_utils.table_exists`'s
+        fail-closed philosophy, so a partially loaded source cannot produce a
+        stable-looking digest.
+        """
+        parts = []
+        for table in source_tables:
+            try:
+                quoted = self._quote_identifier(table)
+                result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
+                count = result[0] if result else 0
+            except Exception:
+                count = 0
+            parts.append(f"{table}:{count}")
+        payload = "|".join(parts)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _write_staging_manifest(self, connection: DatabaseConnection, source_tables: list[str]) -> None:
+        """Persist this setup()'s staging provenance so a later is_setup() can require an exact match.
+
+        Called from inside the subclass's own ``setup()`` -- the same
+        connection/lock discipline as the staging tables themselves, so a
+        write failure here raises like any other setup step and rolls back
+        via ``_rollback_connection_after_error`` in ``_prepare_operation``.
+        """
+        benchmark_id, scale, spec_version = self._staging_provenance_key()
+        source_digest = self._staging_source_digest(connection, source_tables)
+        quoted_table = self._quote_identifier(self._STAGING_MANIFEST_TABLE)
+
+        connection.execute(
+            f"CREATE TABLE IF NOT EXISTS {quoted_table} ("
+            "benchmark VARCHAR, scale VARCHAR, spec_version VARCHAR, "
+            "source_digest VARCHAR, created_at VARCHAR)"
+        )
+        connection.execute(f"DELETE FROM {quoted_table} WHERE benchmark = '{_sql_escape(benchmark_id)}'")
+        created_at = datetime.now(timezone.utc).isoformat()
+        connection.execute(
+            f"INSERT INTO {quoted_table} (benchmark, scale, spec_version, source_digest, created_at) VALUES "
+            f"('{_sql_escape(benchmark_id)}', '{_sql_escape(scale)}', '{_sql_escape(spec_version)}', "
+            f"'{_sql_escape(source_digest)}', '{_sql_escape(created_at)}')"
+        )
+
+    def _staging_manifest_matches(self, connection: DatabaseConnection, source_tables: list[str]) -> bool:
+        """Return True iff a manifest row exists whose benchmark/scale/spec/digest match this run.
+
+        A missing manifest table (never written -- true of every pre-existing
+        database) or any read error is NOT reuse-eligible: it returns False
+        and forces one rebuild rather than assuming a legacy database is
+        fine, which is the exact bug this manifest replaces.
+        """
+        benchmark_id, scale, spec_version = self._staging_provenance_key()
+        source_digest = self._staging_source_digest(connection, source_tables)
+        quoted_table = self._quote_identifier(self._STAGING_MANIFEST_TABLE)
+        try:
+            query = (
+                f"SELECT COUNT(*) FROM {quoted_table} WHERE "
+                f"benchmark = '{_sql_escape(benchmark_id)}' AND "
+                f"scale = '{_sql_escape(scale)}' AND "
+                f"spec_version = '{_sql_escape(spec_version)}' AND "
+                f"source_digest = '{_sql_escape(source_digest)}'"
+            )
+            result = connection.execute(query).fetchone()
+            return bool(result and result[0])
+        except Exception:
+            return False
 
     # ------------------------------------------------------------------
     # run_benchmark (identical across both families)

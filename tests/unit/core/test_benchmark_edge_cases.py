@@ -290,10 +290,23 @@ def test_transaction_primitives_reset_and_setup_checks(tmp_path):
     bench._populate_staging_table = lambda _c, t, s: populated.append((t, s))
     bench.reset(conn)
     assert ("txn_orders", "orders") in populated
-    assert bench.is_setup(conn) is True
 
+    # reset() repopulates staging tables but writes no provenance manifest -- only
+    # setup() does -- so populated-but-unmanifested tables are not reuse-eligible
+    # (TODO transactional-staging-reuse-ignores-provenance-20260805). Matching
+    # manifests round-trip against real DuckDB in
+    # tests/unit/core/transactional/test_staging_provenance.py; _StatefulConn drops
+    # WHERE clauses, so it cannot tell a current manifest from a stale one.
+    manifest = bench._STAGING_MANIFEST_TABLE
+    assert not any(sql.startswith("INSERT INTO") and manifest in sql for sql in conn.executed)
+    # False because the manifest gate rejected it, not because a table looked empty.
+    assert bench.is_setup(conn) is False
+    assert any(manifest in sql for sql in conn.executed)
+
+    # Empty staging tables short-circuit before the manifest is ever consulted.
     conn_zero = _StatefulConn({"txn_orders": 0, "txn_lineitem": 1, "txn_customer": 1})
     assert bench.is_setup(conn_zero) is False
+    assert not any(manifest in sql for sql in conn_zero.executed)
 
     bench.load_data(conn)
     bench.teardown(conn)

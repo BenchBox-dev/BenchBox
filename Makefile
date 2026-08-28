@@ -1,49 +1,60 @@
 # BenchBox Makefile
 # This makefile provides commands for building, testing and development
 
+# Freeze the root before includes change MAKEFILE_LIST; realpath preserves make -f/symlink consumers.
+# `override` reserves this bootstrap variable against command-line and `make -e` environment injection.
+override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
+
 PR_FANOUT_JOBS ?= 4
 PR_REVIEW_BASE ?= develop
 PR_REVIEW_PR_LIMIT ?= 1000
 PR_REVIEW_MAX_COMMENTS ?= 0
+PR_REVIEW_INCLUDE_RESOLVED ?= 0
+PR_REVIEW_FAIL_ON_PENDING ?= 0
 PR_REVIEW_EXECUTOR_SANDBOX ?= workspace-write
 PR_REVIEW_EXECUTOR_APPROVAL ?= never
-POOL_SIZE ?= 10
-WORKTREE_POOL_PARENT ?= ..
 DEV_LOOP_METRICS_DAYS ?= 30
 DEV_LOOP_METRICS_LIMIT ?= 100
 AUDIT_SHA_TARGET_REF ?= origin/develop
 AUDIT_SHA_REQUIRE_CURRENT ?=
-# Minimum free disk space (in 1K-blocks) required on the pool parent
-# directory before `make worktree-claim` will allocate a slot. Default
-# 5 GB. Override to 0 to bypass the check (e.g. during low-space CI).
-POOL_MIN_FREE_KB ?= 5000000
 JOINORDER_BUILD_DIR ?= $(HOME)/Developer/benchmark_runs/joinorder/build/joinorder-imdb-2013-v1
 JOINORDER_POSTGRES_DB ?= imdb
 JOINORDER_POSTGRES_USER ?= postgres
 JOINORDER_QUERIES ?= _project/joinorder/build-inputs/queries
 JOINORDER_REFERENCE ?= _project/joinorder/reference_cardinalities.json
 
-# Age threshold (in seconds) before a `.benchbox/claim_in_progress` marker
-# is treated as evidence of an aborted claim by `worktree-pool-check`.
-# Fresh markers indicate an in-flight `worktree-claim` and must not be
-# reported as aborted: `worktree-pool-check` is documented as safe for
-# periodic / cron use, and `worktree-claim` writes the marker at the
-# start of a normal claim and only removes it at the end. Default 600s
-# (10 min); concurrent claim runs typically finish in seconds.
-POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
+# These targets are deliberately retained in the release Make runtime so the
+# public target inventory stays stable, but their implementation or evidence
+# lives under the development-only portion of `_project/`. The curated release
+# retains only the small Explorer publication helper set. Fail with one
+# explicit policy message on a curated release instead of leaking file-not-found
+# errors from a partially retained `_project/` tree.
+DEVELOPMENT_TREE_ONLY_TARGETS := \
+	correctness-gate-digests-regen cross-surface-baseline-autodetect \
+	oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \
+	joinorder-verify-reference-results complexity-check complexity-report \
+	quality-governance-typecheck uv-lock-revision-check audit-deps audit-raw audit-raw-check \
+	audit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \
+	explorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \
+	agent-commit-range-check skill-integrity-check ci-lint pr-arm-auto-merge shrink-rollup \
+	pr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \
+	platform-manifest-check test-docker-parity blind-spots-list blind-spots-report \
+	soundness-drain-report soundness-drain-self-test
 
-# Shell command snippet that resolves the main clone's directory name
-# (e.g. "BenchBox"). Pool worktree paths derive from it as
-# $(WORKTREE_POOL_PARENT)/$(POOL_REPO_CMD).pool-NN. Inlined as a Make
-# variable so the four pool-management targets share a single source of
-# truth instead of repeating the four-deep nested expansion.
-POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
-
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-verify skill-sync-lock-audit mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check platform-manifest platform-manifest-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list
 
 # Primary test commands using pytest marker system
 test: test-fast
 	@echo "Default test run completed. Use 'make help' to see all test options."
+
+$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required
+
+.PHONY: .development-tree-required
+.development-tree-required:
+	@if [ ! -d "$(BENCHBOX_MAKEFILE_ROOT)_project/decisions" ]; then \
+		echo "Error: this target requires the BenchBox development tree (full development tree required); curated releases retain only the Results Explorer publication helpers under _project/scripts/." >&2; \
+		exit 2; \
+	fi
 
 test-all:
 	@echo "Running non-resource-heavy tests in parallel..."
@@ -261,6 +272,16 @@ cross-surface-update-baseline:
 	@test -n "$(BENCHMARK)" || { echo "Usage: make cross-surface-update-baseline BENCHMARK=<ssb|amplab|coffeeshop|clickbench|joinorder_synthetic|h2odb|read_primitives>"; exit 1; }
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark $(BENCHMARK) --update-baseline
 
+# Scheduled-maintenance glue (cross-surface-baseline-stale-entry-autodetect):
+# runs EVERY enforced gate's own blocking check, reads its "previously-known
+# divergences now equivalent" report (never re-derived), and invokes the
+# EXISTING --update-baseline writer above for any gate with a resolved entry.
+# Local dry-run for what .github/workflows/cross-surface-baseline-autodetect.yml
+# runs on a schedule; safe to run any time (a no-op when nothing is resolved).
+cross-surface-baseline-autodetect:
+	uv run -- python _project/scripts/cross_surface_baseline_autodetect.py \
+		--json-out _project/cross-surface-baseline-autodetect/summary.json
+
 # Regenerate the benchmark correctness-oracle coverage map (which oracle, if any,
 # guards each shipped benchmark). Derived from the registry + provider/gate
 # registries; commit the refreshed _project/analysis/ artifacts.
@@ -321,6 +342,7 @@ test-window:
 	uv run -- python -m pytest -m "window_functions" --tb=short
 
 # CI/CD testing
+# Maintained broad local CI profile (literal root-text compatibility contract).
 test-ci:
 	uv run -- python -m pytest -c pytest-ci.ini -m "not (slow or flaky or local_only)" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml
 
@@ -339,248 +361,7 @@ test-parallel:
 test-parallel-fast:
 	uv run -- python -m pytest -n auto -m "fast" --tb=short
 
-# Live integration tests (require cloud credentials)
-test-live:
-	@echo "Running live integration tests (requires cloud credentials)"
-	@echo "See .env.example for credential setup"
-	uv run -- python -m pytest -m "live_integration" --tb=short -v
-
-test-live-databricks:
-	@echo "Running Databricks live tests (requires DATABRICKS_TOKEN)"
-	uv run -- python -m pytest -m "live_databricks" --tb=short -v
-
-test-live-snowflake:
-	@echo "Running Snowflake live tests (requires SNOWFLAKE_PASSWORD)"
-	uv run -- python -m pytest -m "live_snowflake" --tb=short -v
-
-test-live-bigquery:
-	@echo "Running BigQuery live tests (requires BIGQUERY_PROJECT)"
-	uv run -- python -m pytest -m "live_bigquery" --tb=short -v
-
-test-live-all:
-	@echo "Running all live integration tests (requires credentials for all platforms)"
-	uv run -- python -m pytest -m "live_integration" --tb=short -v
-
-test-live-redshift:
-	@echo "Running Redshift live tests (requires REDSHIFT_HOST)"
-	uv run -- python -m pytest -m "live_redshift" --tb=short -v
-
-test-live-athena:
-	@echo "Running Athena live tests (requires ATHENA_REGION)"
-	uv run -- python -m pytest -m "live_athena" --tb=short -v
-
-test-live-firebolt:
-	@echo "Running Firebolt live tests (requires FIREBOLT_CLIENT_ID)"
-	uv run -- python -m pytest -m "live_firebolt" --tb=short -v
-
-test-live-firebolt-core:
-	@echo "Running Firebolt Core live tests (requires Docker - make test-docker-up-firebolt)"
-	uv run -- python -m pytest -m "live_firebolt_core" --tb=short -v -n 0
-
-test-live-starburst:
-	@echo "Running Starburst Galaxy live tests (requires STARBURST_HOST)"
-	uv run -- python -m pytest -m "live_starburst" --tb=short -v
-
-test-live-motherduck:
-	@echo "Running MotherDuck live tests (requires MOTHERDUCK_TOKEN)"
-	uv run -- python -m pytest -m "live_motherduck" --tb=short -v
-
-test-live-pg-duckdb:
-	@echo "Running pg_duckdb live tests (requires Docker PostgreSQL with pg_duckdb)"
-	uv run -- python -m pytest -m "live_pg_duckdb" --tb=short -v
-
-test-live-pg-mooncake:
-	@echo "Running pg_mooncake live tests (requires Docker PostgreSQL with pg_mooncake)"
-	uv run -- python -m pytest -m "live_pg_mooncake" --tb=short -v
-
-test-live-cedardb:
-	@echo "Running CedarDB live tests (requires Docker CedarDB - make test-docker-up-cedardb)"
-	uv run -- python -m pytest -m "live_cedardb" --tb=short -v -n 0
-
-test-docker-up-pg-extensions:
-	@echo "Starting pg_duckdb (port 5432) and pg_mooncake (port 5433)..."
-	@set -e; \
-		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
-		project_file="$$state_dir/pg-extensions.project"; \
-		mkdir -p "$$state_dir"; \
-		project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
-		if [ -z "$$project_name" ]; then \
-			project_name="benchbox-pg-extensions-test-$$(date +%s)-$$RANDOM"; \
-		fi; \
-		status=1; \
-		cleanup() { \
-			if [ $$status -ne 0 ]; then \
-				docker compose -p "$$project_name" -f docker/postgres-extensions/docker-compose.yml down -v >/dev/null 2>&1 || true; \
-				rm -f "$$project_file"; \
-			fi; \
-		}; \
-		trap cleanup EXIT INT TERM; \
-		docker compose -p "$$project_name" -f docker/postgres-extensions/docker-compose.yml up -d --wait; \
-		printf '%s\n' "$$project_name" > "$$project_file"; \
-		status=0
-
-test-docker-down-pg-extensions:
-	@set -e; \
-		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
-		project_file="$$state_dir/pg-extensions.project"; \
-		project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
-		if [ -z "$$project_name" ]; then \
-			echo "No tracked Docker test stack for pg-extensions"; \
-			exit 0; \
-		fi; \
-		docker compose -p "$$project_name" -f docker/postgres-extensions/docker-compose.yml down -v; \
-		rm -f "$$project_file"
-
-test-docker-pg-extensions:
-	@echo "Running pg_duckdb and pg_mooncake Docker integration tests"
-	@set -e; \
-		project_name="benchbox-pg-extensions-test-$$(date +%s)-$$RANDOM"; \
-		cleanup() { docker compose -p "$$project_name" -f docker/postgres-extensions/docker-compose.yml down -v || true; }; \
-		trap cleanup EXIT INT TERM; \
-		docker compose -p "$$project_name" -f docker/postgres-extensions/docker-compose.yml up -d --wait; \
-		uv run -- python -m pytest -m "live_pg_duckdb or live_pg_mooncake" --tb=short -v -n 0
-
-# Docker-based integration tests (requires Docker and docker compose)
-DOCKER_PLATFORMS := clickhouse trino presto postgresql starrocks doris databend influxdb cedardb firebolt questdb singlestore
-DOCKER_TEST_STATE_DIR ?= /tmp/benchbox-docker-projects
-
-# Container engine for local test-docker-* compose stacks: `docker` (default,
-# and the ONLY engine CI uses) or `mocker` (Docker-compatible CLI over Apple
-# `container`; Apple-silicon/macOS-26 LOCAL DEV ONLY, MUST NOT run in CI). The
-# docker/*/docker-compose.yml files stay unmodified; only the driver swaps.
-# See AGENTS.md "Mocker as a local test-docker engine".
-CONTAINER_ENGINE ?= docker
-COMPOSE := $(CONTAINER_ENGINE) compose
-
-# `compose down -v` extended to also remove leaked named volumes on a SUCCESSFUL
-# down. mocker 0.5.4's `compose down -v` removes containers but LEAKS named
-# volumes (a stale-data risk across runs); this prunes any volume with the
-# project prefix afterward. A no-op beyond `down -v` on docker (which already
-# removes them). Scoped to the project so it never touches unrelated volumes.
-# Grepping the project-prefixed name directly avoids assuming `volume ls` emits a
-# header or a fixed column layout. $(1)=project $(2)=compose file.
-define compose_down_fresh
-$(COMPOSE) -p "$(1)" -f "$(2)" down -v; if [ "$(CONTAINER_ENGINE)" = "mocker" ]; then mocker volume ls 2>/dev/null | grep -oE "$(1)[-_][A-Za-z0-9._-]+" | while read -r _v; do mocker volume rm "$$_v" >/dev/null 2>&1 || true; done; fi
-endef
-
-test-docker-up-%:
-	@set -e; \
-		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
-		project_file="$$state_dir/$*.project"; \
-		mkdir -p "$$state_dir"; \
-		project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
-		if [ -z "$$project_name" ]; then \
-			project_name="benchbox-$*-test-$$(date +%s)-$$RANDOM"; \
-		fi; \
-		status=1; \
-		cleanup() { \
-			if [ $$status -ne 0 ]; then \
-				{ $(call compose_down_fresh,$$project_name,docker/$*/docker-compose.yml) ; } >/dev/null 2>&1 || true; \
-				rm -f "$$project_file"; \
-			fi; \
-		}; \
-		trap cleanup EXIT INT TERM; \
-		$(COMPOSE) -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
-		printf '%s\n' "$$project_name" > "$$project_file"; \
-		status=0
-
-test-docker-down-%:
-	@set -e; \
-		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
-		project_file="$$state_dir/$*.project"; \
-		project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
-		if [ -z "$$project_name" ]; then \
-			echo "No tracked Docker test stack for $*"; \
-			exit 0; \
-		fi; \
-		$(call compose_down_fresh,$$project_name,docker/$*/docker-compose.yml); \
-		rm -f "$$project_file"
-
-# Explicit override: generic test-docker-% expands to -m "live_firebolt" (cloud tests).
-# Firebolt Core Docker tests use the separate live_firebolt_core marker.
-test-docker-firebolt:
-	@echo "Running Firebolt Core Docker integration tests"
-	@set -e; \
-		project_name="benchbox-firebolt-test-$$(date +%s)-$$RANDOM"; \
-		cleanup() { { $(call compose_down_fresh,$$project_name,docker/firebolt/docker-compose.yml) ; } || true; }; \
-		trap cleanup EXIT INT TERM; \
-		$(COMPOSE) -p "$$project_name" -f docker/firebolt/docker-compose.yml up -d --wait; \
-		uv run -- python -m pytest -m "live_firebolt_core" --tb=short -v -n 0
-
-test-docker-%:
-	@echo "Running $* Docker integration tests"
-	@set -e; \
-		project_name="benchbox-$*-test-$$(date +%s)-$$RANDOM"; \
-		cleanup() { { $(call compose_down_fresh,$$project_name,docker/$*/docker-compose.yml) ; } || true; }; \
-		trap cleanup EXIT INT TERM; \
-		$(COMPOSE) -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
-		uv run -- python -m pytest -m "live_$*" --tb=short -v -n 0
-
-test-docker-up-all:
-	@set -e; \
-		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
-		mkdir -p "$$state_dir"; \
-		run_id="$$(date +%s)-$$RANDOM"; \
-		status=1; \
-		cleanup() { \
-			if [ $$status -ne 0 ]; then \
-				echo "Cleaning up partially started Docker services..."; \
-				for p in $(DOCKER_PLATFORMS); do \
-					project_file="$$state_dir/$$p.project"; \
-					project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
-					if [ -n "$$project_name" ]; then \
-						{ $(call compose_down_fresh,$$project_name,docker/$$p/docker-compose.yml) ; } >/dev/null 2>&1 || true; \
-						rm -f "$$project_file"; \
-					fi; \
-				done; \
-			fi; \
-		}; \
-		trap cleanup EXIT INT TERM; \
-		for p in $(DOCKER_PLATFORMS); do \
-			project_file="$$state_dir/$$p.project"; \
-			project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
-			if [ -z "$$project_name" ]; then \
-				project_name="benchbox-$$p-test-$$run_id"; \
-				printf '%s\n' "$$project_name" > "$$project_file"; \
-			fi; \
-			echo "Starting $$p..."; \
-			$(COMPOSE) -p "$$project_name" -f docker/$$p/docker-compose.yml up -d --wait; \
-		done; \
-		status=0
-
-test-docker-down-all:
-	@set -e; \
-		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
-		for p in $(DOCKER_PLATFORMS); do \
-			project_file="$$state_dir/$$p.project"; \
-			project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
-			if [ -z "$$project_name" ]; then \
-				echo "Skipping $$p (no tracked Docker test stack)"; \
-				continue; \
-			fi; \
-			echo "Stopping $$p..."; \
-			$(call compose_down_fresh,$$project_name,docker/$$p/docker-compose.yml); \
-			rm -f "$$project_file"; \
-		done
-
-test-docker-all:
-	@echo "Running all Docker integration tests (requires Docker)"
-	@for p in $(DOCKER_PLATFORMS); do \
-		echo "=== Testing $$p ==="; \
-		$(MAKE) test-docker-$$p || exit 1; \
-	done
-
-# Compose-lifecycle parity acceptance test: asserts up --wait health-gating,
-# published-port reachability, and the down -v fresh-state guarantee (no leaked
-# container/volume) for the selected engine. Same asserts on docker and mocker so
-# parity is measured. Usage:
-#   make test-docker-parity                             # docker (default)
-#   make test-docker-parity CONTAINER_ENGINE=mocker     # Apple container backend
-#   make test-docker-parity PARITY_PLATFORMS="questdb postgresql doris"
-PARITY_PLATFORMS ?= questdb postgresql
-.PHONY: test-docker-parity
-test-docker-parity:
-	@bash _project/scripts/mocker_compose_parity.sh $(CONTAINER_ENGINE) $(PARITY_PLATFORMS)
+include $(BENCHBOX_MAKEFILE_ROOT)make/platform-tests.mk
 
 # Coverage commands using pytest
 coverage-fast:
@@ -600,10 +381,15 @@ coverage-report:
 
 # Cyclomatic complexity checks
 complexity-check:
-	uv run -- python scripts/check_complexity.py
+	uv run -- python _project/scripts/check_complexity.py
 
 complexity-report:
-	uv run -- python scripts/check_complexity.py --no-fail --top 30
+	uv run -- python _project/scripts/check_complexity.py --no-fail --top 30
+
+# Strict type island for governance code owned by this policy. Production and
+# architecture islands remain governed by the repository-wide permissive pass.
+quality-governance-typecheck:
+	uv run ty check --error all _project/scripts/check_complexity.py
 
 # Install and development
 install:
@@ -629,8 +415,17 @@ clean:
 # Linting (ruff + explorer token scan)
 lint:
 	uv run ruff check .
+	$(MAKE) windows-antipatterns-check
 	$(MAKE) lint-explorer-tokens
 	$(MAKE) lint-site-theme-tokens
+
+# Reject a uv.lock schema-revision downgrade (an older local uv rewrites
+# revision 3 back to 2 as a silent side effect of any `uv add`/`uv lock`).
+# Compares HEAD:uv.lock against the working tree; also wired as a pre-commit
+# hook gated on uv.lock changes. See docs/development/development.md.
+.PHONY: uv-lock-revision-check
+uv-lock-revision-check:
+	uv run -- python _project/scripts/check_uv_lock_revision.py $(if $(BASE_REF),--baseline-ref "$(BASE_REF)",)
 
 # Dependency audit - checks that every declared dep has an import site or is allowlisted.
 # Fails if an unused dep is introduced. See _project/scripts/dependency_audit/.
@@ -652,6 +447,12 @@ audit-sha-check:
 		--target-ref "$(AUDIT_SHA_TARGET_REF)" \
 		$(if $(AUDIT_SHA_REQUIRE_CURRENT),--require-current $(AUDIT_SHA_REQUIRE_CURRENT),) \
 		"$(FILE)"
+
+# Reject product-source patterns that depend on Unix-only behavior or the
+# process locale. The scanner is stdlib-only; its default root is benchbox/.
+.PHONY: windows-antipatterns-check
+windows-antipatterns-check:
+	uv run -- python scripts/check_windows_antipatterns.py
 
 # Validate marker registration and the explicit marker-strategy policy.
 lint-markers:
@@ -679,7 +480,7 @@ lint-site-theme-tokens:
 # unsuperseded analysis files revive the retired mixed-theme contract phrases.
 # Allowlist: inline `allow-stale-theme: <reason>` marker, or a supersession
 # header (Superseded / supersedes / supersession) in `_project/analysis/*`
-# files. `_project/DONE/*` is excluded by design.
+# historical archive files are excluded by design.
 lint-explorer-stale-theme:
 	python3 _project/scripts/scan_explorer_stale_theme.py
 
@@ -695,22 +496,50 @@ explorer-snapshot-check:
 artifact-hygiene:
 	uv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked
 
+agent-instructions-check:
+	uv run -- python _project/scripts/agent_instruction_audit.py
+
+agent-identity-check:
+	uv run -- python _project/scripts/agent_instruction_audit.py --check-git-identity
+
+# Merge-time guard. agent-identity-check reads the resolved config, which on a
+# CI runner is the runner's own identity and reveals nothing about the branch;
+# this inspects the commits themselves so agent authorship cannot reach develop.
+AGENT_IDENTITY_BASE_REF ?= origin/develop
+agent-commit-range-check:
+	@git fetch origin $(patsubst origin/%,%,$(AGENT_IDENTITY_BASE_REF)) --quiet 2>/dev/null || true
+	uv run -- python _project/scripts/agent_instruction_audit.py --check-commit-range $(AGENT_IDENTITY_BASE_REF)
+
 # skill-sync — materialize project-local skills from ~/.skill-sync/skills.
 # Manifest is tracked (skill-sync.yaml/skill-sync.lock). The `claude` target
-# (.claude/skills) is a TRACKED snapshot committed for cloud/CI parity — verify
-# it with `make skill-sync-verify`. The codex/gemini/antigravity mirrors stay
-# gitignored and are regenerated locally per developer. Override SKILL_SYNC to
-# point at a different install (e.g. an npm-installed copy).
+# (.claude/skills) is a TRACKED snapshot committed for cloud/CI parity —
+# integrity comes from PR review of the mirror diff, plus the untracked-mirror
+# drift guard (`scripts/check_untracked_skill_mirrors.sh`). The
+# codex/gemini/antigravity mirrors stay gitignored and are regenerated locally
+# per developer. Override SKILL_SYNC to point at a different install (e.g. an
+# npm-installed copy).
 SKILL_SYNC ?= /Users/joe/Developer/skill-sync/dist/cli/index.js
 
 skill-sync:
-	@if [ -f "$(SKILL_SYNC)" ]; then \
+	@# This recipe contains $$(MAKE), so make runs it even under `-n` (recursive
+	@# dry-run passthrough). Without the guard below, `make -n skill-sync` and
+	@# `make -n guards-fix` really execute `node ... sync` and mutate the skill
+	@# mirrors, so a documented "preview" was not read-only.
+	@case "$(firstword -$(MAKEFLAGS))" in \
+		*n*) echo "dry-run (-n): skipping skill-sync"; exit 0 ;; \
+	esac; \
+	if [ -f "$(SKILL_SYNC)" ]; then \
 		$(MAKE) -s agent-write-preflight; \
 		node "$(SKILL_SYNC)" sync; \
 	else \
 		echo "skill-sync not installed at $(SKILL_SYNC); skipping (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
 	fi
 
+# Fresh worktrees lack the gitignored codex/gemini/antigravity mirrors, so
+# doctor reports materialization/drift there until `make skill-sync` runs in
+# THIS worktree. Judge those rows only after that; a clean primary-clone check
+# does not certify a worktree that changed skill-sync.yaml or tracked Claude
+# mirrors. The tracked `.claude/skills` rows are the durable signal.
 skill-sync-check:
 	@if [ -f "$(SKILL_SYNC)" ]; then \
 		node "$(SKILL_SYNC)" doctor; \
@@ -718,25 +547,31 @@ skill-sync-check:
 		echo "skill-sync not installed at $(SKILL_SYNC); skipping (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
 	fi
 
-# skill-sync-verify — offline integrity gate for the tracked snapshot (CI/local).
-# Proves .claude/skills matches skill-sync.lock + the regenerated config; exits
-# non-zero on any hand-edit, stray file, or stale config. Skips when the CLI is
-# absent (e.g. cloud/CI without skill-sync) — the committed snapshot is plain
-# files and needs skill-sync only to be *verified*, not to be consumed.
-skill-sync-verify:
-	@if [ -f "$(SKILL_SYNC)" ]; then \
-		node "$(SKILL_SYNC)" verify; \
-	else \
-		echo "skill-sync not installed at $(SKILL_SYNC); skipping verify (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
-	fi
-
-# Review helper for PRs that modify skill-sync.lock while .claude/skills is gitignored.
-# Usage: make skill-sync-lock-audit [BASE=origin/develop] [TODO=_project/.../item.yaml] [CHECK=1]
-skill-sync-lock-audit:
-	uv run --project _project/scripts -- python _project/scripts/skill_sync_lock_audit.py \
-		--base $${BASE:-origin/develop} \
-		$${TODO:+--todo $$TODO} \
-		$${CHECK:+--check}
+# Fail-closed local counterpart of pr.yml's required skill-integrity job. The
+# verifier revision comes from the same policy module as CI, is built in an
+# isolated temporary directory on every run, and uses an empty HOME so a
+# developer's global skill-sync configuration cannot make verification pass.
+# Missing git/npm/node or an unavailable trusted revision is a hard failure.
+skill-integrity-check:
+	@set -eu; \
+	uv run -- python scripts/skill_sync_ci_policy.py validate --manifest skill-sync.yaml; \
+	VERIFIER=$$(uv run -- python -c 'from scripts.skill_sync_ci_policy import VERIFIER_REF, VERIFIER_REPOSITORY; print(VERIFIER_REF, VERIFIER_REPOSITORY)'); \
+	set -- $$VERIFIER; VERIFIER_REF=$$1; VERIFIER_REPOSITORY=$$2; \
+	VERIFIER_DIR=$$(mktemp -d "$${TMPDIR:-/tmp}/benchbox-skill-sync-verifier.XXXXXX"); \
+	trap 'rm -rf "$$VERIFIER_DIR"' EXIT; \
+	mkdir -p "$$VERIFIER_DIR/home"; \
+	git clone --quiet "$$VERIFIER_REPOSITORY" "$$VERIFIER_DIR/tool"; \
+	git -C "$$VERIFIER_DIR/tool" checkout --detach --quiet "$$VERIFIER_REF"; \
+	test "$$(git -C "$$VERIFIER_DIR/tool" rev-parse HEAD)" = "$$VERIFIER_REF"; \
+	(cd "$$VERIFIER_DIR/tool" && npm ci --ignore-scripts && npm run build); \
+	test -f "$$VERIFIER_DIR/tool/dist/cli/index.js"; \
+	env HOME="$$VERIFIER_DIR/home" node "$$VERIFIER_DIR/tool/dist/cli/index.js" verify --project "$(CURDIR)"; \
+	sh scripts/check_untracked_skill_mirrors.sh; \
+	$(MAKE) agent-instructions-check; \
+	$(MAKE) agent-identity-check; \
+	$(MAKE) agent-commit-range-check; \
+	uv run -- python -m pytest tests/unit/scripts/test_todo_wrapper.py::TestSkillThinness -q; \
+	$(MAKE) artifact-hygiene
 
 # Duplicate code detection (AST structural clone detection)
 duplicate-check:
@@ -748,31 +583,199 @@ duplicate-check-verbose:
 duplicate-check-json:
 	uv run -- python scripts/check_duplicate_code.py --json
 
+# Fail only when duplicated lines rose vs the merge-base of BASE_REF
+# (default origin/develop). CI sets BASE_REF to the PR base SHA.
+# Absolute threshold mode is `make duplicate-check`.
+duplicate-check-delta:
+	uv run -- python scripts/check_duplicate_code.py --delta-vs "$(if $(BASE_REF),$(BASE_REF),origin/develop)"
+
+makefile-inventory-check:
+	uv run -- python make/check_makefile_inventory.py
+
 mutation-test:
 	@echo "Running mutation tests on critical modules..."
 	uv run -- mutmut run
 	@echo "--- Mutation test results ---"
 	uv run -- mutmut results
 
+##@ Guards / drift-guard remediation
+#
+# guards-fix-regen-target: a "drift-guard" class of CI checks -- dependency
+# inventory, oracle coverage map, parity fixtures, compat docs, UAT LOC
+# table, skill-sync -- each fails on drift against a checked-in artifact and
+# each has ONE known mechanical regen command. This target runs every regen
+# that exists, in one place, so agents stop rediscovering the right command
+# per guard from a hand-carried prompt.
+#
+# guards-fix ONLY regenerates artifacts -- it never edits allowlists,
+# ceilings, or curation lists. Each guard's CHECK target still fails CI on
+# drift; regen is remediation, not suppression. Never wire this into CI to
+# self-heal -- it is an operator command, run locally, with the diff reviewed
+# and committed by a human.
+#
+# Some CHECK guards in this class have NO regen mode (the fix is always a
+# reviewed hand edit, not a mechanical rewrite) -- guards-fix does not touch
+# them; it only echoes where to look:
+#   - module-size guard (tests/system/test_module_size_thresholds.py) --
+#     the failure message prints a ready-to-paste ALLOWLIST entry.
+#   - DDL governance drift (benchbox/sql_compat/inventory.py --check-ddl-drift)
+#     -- register the transform, add a _DDL_GOVERNANCE_TRANSFORMER_ALIASES
+#     alias, or add a _DDL_DRIFT_EXEMPTIONS entry.
+#   - release curation list (scripts/check_release_curation.py) -- classify
+#     the path as main-only (docs) or release-cut curated (Makefile), by hand.
+.PHONY: guards-fix
+guards-fix:
+	@echo "== guards-fix: regenerating every mechanically-regenerable drift-guard artifact =="
+	@# Enforce the linked-worktree write rule BEFORE the first regen rewrites a
+	@# checked-in artifact. skill-sync runs this guard too, but only after
+	@# several earlier write steps -- and not at all when the skill-sync CLI is
+	@# absent, which would leave this whole write target unguarded.
+	@$(MAKE) -s agent-write-preflight
+	@echo "-- dependency inventory (audit-raw) --"
+	@$(MAKE) -s audit-raw
+	@echo "-- benchmark correctness-oracle coverage map --"
+	@$(MAKE) -s oracle-coverage-map
+	@echo "-- visualization parity fixtures --"
+	@$(MAKE) -s parity-fixtures
+	@echo "-- sql_compat capability matrix / skip-reference docs --"
+	@$(MAKE) -s compat-docs
+	@echo "-- skill-sync (no-ops with a notice if the skill-sync CLI is not installed) --"
+	@# Last regen step, contained: a failing skill-sync CLI (e.g. "unable to
+	@# read tree <sha>" in a fresh worktree) used to abort guards-fix here,
+	@# AFTER every other artifact had already been rewritten -- the summary and
+	@# the reviewable diff below never printed. Surface the failure loudly and
+	@# still finish the report; direct `make skill-sync` keeps its hard failure,
+	@# and genuine mirror drift is still enforced by skill-sync-check in CI.
+	@status=0; $(MAKE) -s skill-sync || status=$$?; \
+	if [ "$$status" -ne 0 ]; then \
+		echo "guards-fix: WARNING - the skill-sync step FAILED (see its output above); every other drift-guard artifact was still regenerated. Fix and re-run 'make skill-sync' separately."; \
+	fi; \
+	echo ""; \
+	echo "No regen mode -- these are reviewed hand edits, guards-fix does not touch them:"; \
+	echo "  - module-size guard: tests/system/test_module_size_thresholds.py (see its failure output for the ALLOWLIST entry to paste)"; \
+	echo "  - DDL governance drift: benchbox/sql_compat/inventory.py --check-ddl-drift (register the transform, alias it, or exempt it)"; \
+	echo "  - release curation list: scripts/check_release_curation.py (classify the path as main-only or release-cut curated)"; \
+	echo ""; \
+	echo "== guards-fix done. Review the diff below, then commit what you intend to keep. =="; \
+	git status --porcelain; \
+	exit "$$status"
+
 ##@ CI Local Equivalents
 # These targets mirror GitHub Actions workflows for local validation
 
-# CI lint check - exact match for lint.yml workflow
+# CI lint check - superset covering both lint.yml (release-branch gate) and
+# the pr.yml `lint` job (job id `code-lint`, the routine dev-PR gate), plus a
+# few extra local-only conveniences (lint-explorer-tokens,
+# lint-site-theme-tokens, skill-sync-check, spellcheck). Every guard the
+# pr.yml `lint` job runs (after dependency install) must also run here at the
+# COMMAND level, or tests/system/test_ci_lint_parity.py fails — see
+# docs/operations/ci-local-parity.md.
+#
+# Report-all: mirrors pr.yml's `lint-guard-summary` design. Every guard runs
+# to completion in one pass (no stopping at the first failure) with its
+# output streamed live as it runs; failures are collected into `failed` and
+# a single consolidated FAILED-guards list prints at the end, with a
+# nonzero exit iff at least one guard failed. `set +e` plus a `[ $$? -eq 0 ]`
+# check after each guard is what keeps this one shell session (the whole
+# recipe is one logical line via `\` continuations) going past a failing
+# guard instead of `make` aborting at the first nonzero exit.
+# Most guards below are equally meaningful whether `ci-lint` runs on a laptop
+# or on the ephemeral GitHub-hosted runner that develop-post-merge.yml uses
+# (they inspect the checked-out tree / installed venv / shipped registries,
+# none of which differ). A couple of guards instead read state that only
+# exists on a developer machine -- a resolved Git identity, a tool installed
+# at a hardcoded local path -- and either fail there for reasons unrelated to
+# the code under test, or worse, silently no-op and report success while
+# checking nothing. `_project/scripts/ci_lint_environment_gate.py` is the one
+# place that draws this boundary (a declarative table, not a per-guard inline
+# `if $GITHUB_ACTIONS` -- see its module docstring); a guard not listed there
+# always runs, on a runner exactly as it does locally.
+#
+# The gate reports its decision on stdout and the recipe skips only on the
+# exact token `SKIP`. Deliberately NOT `if <gate-command>; then`: every way of
+# failing to reach a decision (uv absent, broken venv, the script renamed, a
+# traceback) also exits non-zero, so using the exit status would make a broken
+# gate indistinguishable from a deliberate skip and silently drop the guard
+# with nothing recorded in `failed`. Anything other than `SKIP` runs the guard.
+#
+# The synthetic `GIT_CONFIG_*` identity that used to wrap agent-identity-check
+# here was removed with the gate: the guard no longer runs on a runner, so
+# nothing consumed it. Leaving it would have left
+# tests/system/test_ci_lint_parity.py asserting recipe text with no effect --
+# a vacuous pass inside the change whose whole purpose is removing vacuous
+# passes. That test now pins the gating instead.
 ci-lint:
 	@echo "Running CI lint checks..."
-	uv run ruff check .
-	uv run ruff format --check .
-	uv run ty check
-	$(MAKE) lint-markers
-	$(MAKE) lint-explorer-tokens
-	$(MAKE) lint-site-theme-tokens
-	$(MAKE) artifact-hygiene
-	$(MAKE) skill-sync-check
-	uv run -- python _project/scripts/timing_policy_check.py --strict
-	$(MAKE) compat-docs-check
-	$(MAKE) oracle-coverage-map-check
-	$(MAKE) audit-deps
-	@echo "✅ CI lint checks passed"
+	@case " $(MAKEFLAGS) " in *" n "*|*" -n "*|*" --just-print "*) echo "Dry-run: ci-lint guards suppressed"; exit 0;; esac; \
+	set +e; failed=""; \
+	uv run ruff check .; \
+	[ $$? -eq 0 ] || failed="$$failed ruff-check"; \
+	uv run ruff format --check .; \
+	[ $$? -eq 0 ] || failed="$$failed ruff-format"; \
+	uv run ty check; \
+	[ $$? -eq 0 ] || failed="$$failed ty-check"; \
+	$(MAKE) quality-governance-typecheck; \
+	[ $$? -eq 0 ] || failed="$$failed quality-governance-typecheck"; \
+	$(MAKE) uv-lock-revision-check; \
+	[ $$? -eq 0 ] || failed="$$failed uv-lock-revision"; \
+	$(MAKE) lint-markers; \
+	[ $$? -eq 0 ] || failed="$$failed lint-markers"; \
+	$(MAKE) lint-imports; \
+	[ $$? -eq 0 ] || failed="$$failed lint-imports"; \
+	$(MAKE) windows-antipatterns-check; \
+	[ $$? -eq 0 ] || failed="$$failed windows-antipatterns"; \
+	$(MAKE) lint-explorer-tokens; \
+	[ $$? -eq 0 ] || failed="$$failed lint-explorer-tokens"; \
+	$(MAKE) lint-site-theme-tokens; \
+	[ $$? -eq 0 ] || failed="$$failed lint-site-theme-tokens"; \
+	$(MAKE) artifact-hygiene; \
+	[ $$? -eq 0 ] || failed="$$failed artifact-hygiene"; \
+	$(MAKE) agent-instructions-check; \
+	[ $$? -eq 0 ] || failed="$$failed agent-instructions"; \
+	GATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py agent-identity || true); \
+	if [ "$$GATE" != "SKIP" ]; then \
+		$(MAKE) agent-identity-check; \
+		[ $$? -eq 0 ] || failed="$$failed agent-identity"; \
+	fi; \
+	$(MAKE) agent-commit-range-check; \
+	[ $$? -eq 0 ] || failed="$$failed agent-commit-range"; \
+	GATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py skill-sync-check || true); \
+	if [ "$$GATE" != "SKIP" ]; then \
+		$(MAKE) skill-sync-check; \
+		[ $$? -eq 0 ] || failed="$$failed skill-sync-check"; \
+	fi; \
+	uv run -- python _project/scripts/timing_policy_check.py --strict; \
+	[ $$? -eq 0 ] || failed="$$failed timing-policy"; \
+	uv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check; \
+	[ $$? -eq 0 ] || failed="$$failed uat-loc-table"; \
+	$(MAKE) compat-docs-check; \
+	[ $$? -eq 0 ] || failed="$$failed compat-docs-check"; \
+	$(MAKE) platform-manifest-check; \
+	[ $$? -eq 0 ] || failed="$$failed platform-manifest-check"; \
+	$(MAKE) oracle-coverage-map-check; \
+	[ $$? -eq 0 ] || failed="$$failed oracle-coverage-map-check"; \
+	uv run -- python scripts/check_public_contract_drift.py; \
+	[ $$? -eq 0 ] || failed="$$failed public-contract-drift"; \
+	$(MAKE) audit-deps; \
+	[ $$? -eq 0 ] || failed="$$failed audit-deps"; \
+	$(MAKE) audit-raw-check; \
+	[ $$? -eq 0 ] || failed="$$failed audit-raw-check"; \
+	uv run -- python scripts/check_release_curation.py; \
+	[ $$? -eq 0 ] || failed="$$failed release-curation"; \
+	sh scripts/check_untracked_skill_mirrors.sh; \
+	[ $$? -eq 0 ] || failed="$$failed skill-mirror-drift"; \
+	$(MAKE) duplicate-check-delta; \
+	[ $$? -eq 0 ] || failed="$$failed duplicate-delta"; \
+	$(MAKE) complexity-check; \
+	[ $$? -eq 0 ] || failed="$$failed complexity-check"; \
+	$(MAKE) spellcheck; \
+	[ $$? -eq 0 ] || failed="$$failed spellcheck"; \
+	if [ -n "$$failed" ]; then \
+		echo ""; \
+		echo "❌ FAILED guards:$$failed"; \
+		exit 1; \
+	fi; \
+	echo "✅ CI lint checks passed"
 
 # CI test check - exact match for test.yml workflow (fast tests with coverage)
 # Note: -p pytest_cov re-enables pytest-cov which is disabled by default in pytest.ini
@@ -802,9 +805,36 @@ security-audit:
 	@echo "✅ Security audit passed"
 
 # Spellcheck - exact match for docs.yml spellcheck job
+# node_modules is gitignored and only exists once someone runs the
+# results-explorer npm install, so leaving it unskipped made this gate pass in
+# CI (which never installs it) and fail locally on vendored typos - inverting
+# what a preflight is for. Keep any future vendored/generated tree out the same
+# way; do NOT skip a directory that holds tracked content.
+# Spellcheck scans the TRACKED file list rather than walking the working tree, so
+# a gitignored directory can never be scanned. Walking the tree made the gate
+# environment-dependent: it stayed green in CI and in fresh linked worktrees, but
+# failed in the maintainer's primary clone on gitignored paths that only exist
+# there. Deriving the file list from git fixes the class.
+#
+# --skip keeps only the FILENAME globs. Its directory entries are dropped on
+# purpose: codespell prunes directories while traversing, so a directory name in
+# --skip has no effect once explicit paths are passed. Hidden paths are excluded
+# as Git pathspecs too, preserving codespell's default hidden-directory filtering.
+# Tracked directories that must stay unscanned are excluded as Git pathspecs; the
+# remaining old directory list is gitignored, so `git ls-files` already excludes it.
+SPELLCHECK_SKIP_GLOBS := *.pyc,*.json,*.lock,*.svg,*.min.js,*.min.css,*.tpl,*.dst,*.tbl,*.dat,*.pdf
+SPELLCHECK_EXCLUDE_PATHS := \
+	':(exclude,glob).*'             ':(exclude,glob).*/**' \
+	':(exclude,glob)**/.*'          ':(exclude,glob)**/.*/**' \
+	':(exclude,glob)**/_binaries/**' ':(exclude,glob)_binaries/**' \
+	':(exclude,glob)**/_sources/**'  ':(exclude,glob)_sources/**' \
+	':(exclude,glob)**/_project/**'  ':(exclude,glob)_project/**' \
+	':(exclude,glob)**/_blog/**'     ':(exclude,glob)_blog/**'
+
 spellcheck:
 	@echo "Running spellcheck..."
-	uvx codespell --ignore-words=.codespell-ignore.txt --skip="*.pyc,_build,*.json,*.lock,*.svg,*.min.js,*.min.css,_binaries,*.tpl,*.dst,*.tbl,_sources,benchmark_runs,*.dat,*.pdf,_project,_blog,htmlcov,.venv"
+	git ls-files -z -- $(SPELLCHECK_EXCLUDE_PATHS) \
+		| xargs -0 uvx codespell --ignore-words=.codespell-ignore.txt --skip="$(SPELLCHECK_SKIP_GLOBS)"
 	@echo "✅ Spellcheck passed"
 
 # Linkcheck - exact match for docs.yml linkcheck job
@@ -879,8 +909,8 @@ ci-local:
 # value digests differ, so `make test-correctness-gate` FAILS on a correct tree on Apple
 # silicon (the pinned digest references are Linux-generated). This wrapper is the only way
 # to validate that soundness gate pre-PR from a Mac. Purely additive and opt-in: a no-op on
-# non-Apple-silicon / non-macOS-26 hosts, and NEVER a CI or pr-open dependency. One-time
-# setup + usage: AGENTS.md "Apple container Linux CI parity". Override the gate with
+# non-Apple-silicon / non-macOS-26 hosts, and NEVER a CI or pr-open dependency. The target
+# prints one-time setup commands; parity rationale: docs/operations/release-guide.md. Override with
 # `make ci-linux CI_LINUX_CMD='make ci-local'`.
 CI_LINUX_MACHINE ?= benchbox-agent
 CI_LINUX_CMD ?= make test-correctness-gate
@@ -895,11 +925,11 @@ ci-linux:
 		exit 0; \
 	fi; \
 	if ! command -v container >/dev/null 2>&1; then \
-		echo "ci-linux: Apple 'container' not installed -> 'brew install container' (see AGENTS.md)."; \
+		echo "ci-linux: Apple 'container' not installed -> 'brew install container'."; \
 		exit 1; \
 	fi; \
 	if ! container machine list 2>/dev/null | awk 'NR>1{print $$1}' | grep -Fqx "$(CI_LINUX_MACHINE)"; then \
-		echo "ci-linux: machine '$(CI_LINUX_MACHINE)' not found. One-time setup (see AGENTS.md):"; \
+		echo "ci-linux: machine '$(CI_LINUX_MACHINE)' not found. One-time setup:"; \
 		echo "  container system start"; \
 		echo "  container build --arch arm64 --tag local/benchbox-agent docker/benchbox-agent"; \
 		echo "  container machine create local/benchbox-agent --name $(CI_LINUX_MACHINE) --home-mount rw --cpus 4 --memory 8G"; \
@@ -931,101 +961,8 @@ dependency-check:
 format:
 	uv run ruff format .
 
-##@ Documentation
+include $(BENCHBOX_MAKEFILE_ROOT)make/documentation.mk
 
-# Build Sphinx documentation locally
-docs-build:
-	@echo "Building documentation..."
-	@cd docs && uv run sphinx-build -b html --keep-going . _build/html
-	@echo "✅ Docs built: docs/_build/html/index.html"
-
-# Build and serve documentation on http://localhost:8000
-docs-serve: docs-build
-	@echo "Serving docs at http://localhost:8000"
-	@echo "Press Ctrl+C to stop"
-	@cd docs/_build/html && uv run -- python -m http.server 8000
-
-# Clean documentation build artifacts
-docs-clean:
-	@echo "Cleaning documentation build artifacts..."
-	@rm -rf docs/_build
-	@echo "✅ Documentation artifacts cleaned"
-
-# Check for broken links in documentation
-docs-linkcheck:
-	@echo "Checking documentation for broken links..."
-	@cd docs && uv run sphinx-build -b linkcheck . _build/linkcheck
-	@echo ""
-	@echo "Link check results:"
-	@cat docs/_build/linkcheck/output.txt || echo "No broken links found!"
-
-# Validate example file references
-docs-validate:
-	@echo "Validating example file references..."
-	@uv run -- python scripts/validate_example_references.py
-	@echo ""
-	@echo "Checking example file syntax..."
-	@uv run -- python scripts/check_example_syntax.py
-	@echo ""
-	@echo "Validating visualization screenshot sync..."
-	@uv run -- python scripts/validate_visualization_images.py
-	@echo ""
-	@echo "Checking repo-local doc relative links..."
-	@uv run -- python scripts/check_doc_relative_links.py
-
-# Refresh generated visualization screenshots and sync shared docs/blog copies
-docs-images:
-	@echo "Capturing visualization screenshots..."
-	@uv run -- python scripts/capture_chart_images.py
-
-# Regenerate the /prompts/ landing route catalog include from catalog.yaml.
-prompt-quickstarts-write:
-	@uv run -- python scripts/generate_landing_quickstarts.py --write
-
-# Fail if landing/prompts/catalog.generated.js is stale or invalid.
-# Wired into docs CI by `landing-prompts-launch-gates`.
-prompt-quickstarts-check:
-	@uv run -- python scripts/generate_landing_quickstarts.py --check
-
-# Run all documentation checks (build, linkcheck, validate)
-docs-check: docs-validate docs-linkcheck docs-build
-	@echo ""
-	@echo "✅ All documentation checks passed!"
-
-# Compile TPC-DS (and TPC-H) binaries from patched sources for the current
-# platform and deploy them into benchbox/_binaries/ so they are used at runtime.
-# No Docker required - builds natively on macOS ARM64/x86_64.
-# Run this whenever _sources/tpc-ds/tools/ patches change.
-compile-tpcds-binaries:
-	bash _sources/compilation/scripts/compile-all-platforms.sh --native
-
-# ---------------------------------------------------------------------------
-# Visualization parity fixtures (CLI↔explorer contract)
-# ---------------------------------------------------------------------------
-
-# Regenerate fixtures from the canonical Python implementation.
-# This CHANGES the contract - commit the resulting diff after review.
-parity-fixtures:
-	uv run python tests/parity/generate_visualization_fixtures.py
-
-# Regenerate sql_compat capability matrix and skip reference docs from the registry.
-compat-docs:
-	uv run -- python scripts/generate_compat_docs.py
-
-# Verify committed compat docs and DDL governance match the registry/source.
-compat-docs-check:
-	uv run -- python scripts/generate_compat_docs.py --check
-	uv run -- python -m benchbox.sql_compat.inventory --output /tmp/benchbox-compat-inventory.jsonl --check-ddl-drift
-
-# Verify fixtures match the current Python implementation without overwriting.
-# Fails if any fixture is out of date (drift detected).
-parity-check:
-	@tmpdir=$$(mktemp -d) && \
-	uv run -- python tests/parity/generate_visualization_fixtures.py --out $$tmpdir && \
-	diff -r --exclude='.gitkeep' tests/parity/fixtures $$tmpdir && \
-	echo "parity-check: fixtures match Python source" && \
-	rm -rf $$tmpdir || \
-	(echo "parity-check FAILED: fixtures are out of date - run 'make parity-fixtures' to regenerate" && rm -rf $$tmpdir && exit 1)
 
 # Create distribution packages
 dist: clean
@@ -1039,76 +976,141 @@ run-test:
 # ---------------------------------------------------------------------------
 # Release flow (single-repo migration, version-branch model)
 # ---------------------------------------------------------------------------
-# These targets must be run from the public clone (origin -> joeharris76/BenchBox).
+# These targets must be run from the public clone (origin -> BenchBox-dev/BenchBox).
 # Do NOT invoke from the legacy private clone — it has no `origin` remote.
 #
-# Flow: develop -> v$(VERSION) -> (squash) main -> tag main -> release.yml publishes
-#   develop is intentionally NOT modified post-release. dev-only paths and
-#   deferred release surfaces (_project/, _blog/, results explorer, AGENTS.md,
-#   etc.) live on develop and are removed from the release branch by
-#   release-cut's curation step. landing/ and docs/blog/ stay in the release
-#   tree.
+# Flow: develop -> v$(VERSION) -> (squash) release -> tag release -> release.yml publishes
+#   develop is intentionally NOT modified post-release. Dev-only paths and
+#   deferred release surfaces (_project/ except the Explorer publication
+#   helpers, _blog/, agent configs, etc.) live on develop and are removed from
+#   the release branch by release-cut's curation step. The curated preview's
+#   results-data/, results-explorer/, and the three required publication
+#   helpers remain in the release tree. landing/ and docs/blog/ stay in the
+#   release tree.
 #
 # See docs/operations/release-guide.md and _project/decisions/single-repo-migration.md.
 
 RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 
-.PHONY: release-cut release-finalize
+.PHONY: release-cut release-cut-abort release-finalize .release-cut-tree-required
+
+.release-cut-tree-required:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Usage: make release-cut VERSION=X.Y.Z" >&2; \
+		exit 1; \
+	fi; \
+	if [ ! -d "$(BENCHBOX_MAKEFILE_ROOT)_project/decisions" ]; then \
+		BRANCH=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true); \
+		if [ "$$BRANCH" != "v$(VERSION)" ]; then \
+			echo "Error: release-cut requires the BenchBox development tree unless resuming v$(VERSION) after curation." >&2; \
+			exit 2; \
+		fi; \
+	fi
 
 # Cut a release branch from develop in one shot:
 #   1. Create v$(VERSION) branch off develop (develop is not modified).
 #   2. On v$(VERSION): bump version sources (scripts/update_version.py).
-#   3. On v$(VERSION): generate CHANGELOG.md entry from the origin/main patch delta.
-#   4. $EDITOR opens CHANGELOG.md for hand-curation (skipped if EDITOR unset).
-#   5. Curate: git rm dev-only/deferred paths (per A3 in single-repo-migration.md).
-#   6. Commit "Release v$(VERSION)" (bump + changelog + curation in one squash-friendly commit).
-#   7. Push, open PR vs main.
-#   8. Sweep stale v* branches on origin (option-c lifecycle).
-# Pre-conditions: on develop, clean tree.
+#   3. On v$(VERSION): generate CHANGELOG.md entry from the origin/release patch delta.
+#   4. $EDITOR opens CHANGELOG.md for hand-curation when interactive.
+#   5. Gate on the changelog curation check (--check-curation).
+#   6. Curate: git rm dev-only/deferred paths (per A3 in single-repo-migration.md).
+#   7. Commit "Release v$(VERSION)" (bump + changelog + curation in one squash-friendly commit).
+#   8. Merge origin/release with `-s ours` so the PR is mergeable and CI can run.
+#   9. Push, open PR vs release.
+#  10. Sweep stale v* branches on origin (option-c lifecycle).
+# Pre-conditions: on develop with a clean tree (new cut), or on v$(VERSION)
+# with no release commit yet (resume).
+#
+# Steps 1-5 are idempotent, so an interrupted cut is resumed by re-running the
+# same command: the branch is reused, the bump and `uv lock` re-apply to the
+# same values, and an existing CHANGELOG.md section is left untouched. The
+# v0.3.1 cut died at step 3 twice and left exactly that half-applied state.
+# `make release-cut-abort VERSION=X.Y.Z` discards it instead.
 # Usage: make release-cut VERSION=X.Y.Z
-release-cut:
+release-cut: .release-cut-tree-required
 	@test -n "$(VERSION)" || (echo "Usage: make release-cut VERSION=X.Y.Z" && exit 1)
-	@[ "$$(git rev-parse --abbrev-ref HEAD)" = "develop" ] || (echo "Error: must be on develop branch" && exit 1)
-	@[ -z "$$(git status --porcelain)" ] || (echo "Error: working tree must be clean" && exit 1)
+	@# Resume guard. --first-parent matters: the `-s ours` alignment merge below
+	@# puts origin/release's whole release ledger -- which contains commits literally
+	@# titled "Release vX.Y.Z" -- on the merge's second parent. Walking first-parent
+	@# only sees this branch's own commits, so the guard fires for both post-commit
+	@# states: release commit at HEAD, and release commit beneath the alignment merge.
+	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$BRANCH" = "v$(VERSION)" ]; then \
+		if git log --first-parent --format=%s develop..HEAD 2>/dev/null | grep -Fxq "Release v$(VERSION)"; then \
+			echo "Error: v$(VERSION) already carries its release commit; nothing left to resume." >&2; \
+			echo "       Finish it by hand (git push -u origin v$(VERSION) && gh pr create --base release ...)," >&2; \
+			echo "       remembering the -s ours alignment merge if it has not run yet, or start over:" >&2; \
+			echo "         make release-cut-abort VERSION=$(VERSION)" >&2; \
+			exit 1; \
+		fi; \
+		echo "==> Resuming interrupted cut on v$(VERSION)"; \
+	elif [ "$$BRANCH" = "develop" ]; then \
+		[ -z "$$(git status --porcelain)" ] || { echo "Error: working tree must be clean" >&2; exit 1; }; \
+		if git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null; then \
+			echo "Error: branch v$(VERSION) already exists but HEAD is develop." >&2; \
+			echo "       Resume it (git checkout v$(VERSION) && make release-cut VERSION=$(VERSION))" >&2; \
+			echo "       or discard it (make release-cut-abort VERSION=$(VERSION))." >&2; \
+			exit 1; \
+		fi; \
+	else \
+		echo "Error: must be on develop (new cut) or v$(VERSION) (resume), not $$BRANCH" >&2; exit 1; \
+	fi
 	git fetch origin
-	git checkout -b v$(VERSION) develop
+	@git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null \
+		&& git checkout v$(VERSION) \
+		|| git checkout -b v$(VERSION) develop
 	uv run -- python scripts/update_version.py --version $(VERSION) --update-pyproject
 	@# Refresh uv.lock now that pyproject.toml carries the new version, so the
 	@# pre-commit uv-lock hook has nothing to regenerate mid-commit (v0.3.1
 	@# aborted because the tracked lock was stale and the hook rewrote it).
 	uv lock
-	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/main
-	@if [ -n "$$EDITOR" ]; then \
+	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/release
+	@# The generated section is raw commit subjects across the whole
+	@# origin/release..HEAD delta (release lags develop by many releases), so it always
+	@# needs hand-curation. Open $$EDITOR when there is a terminal to open it in;
+	@# either way the --check-curation gate below decides, on the section's own
+	@# text, whether curation actually happened. The old gate tested only whether
+	@# EDITOR was set and stdin was a TTY, which `EDITOR=true` defeated.
+	@if [ -n "$$EDITOR" ] && [ -t 0 ]; then \
 		echo "==> Opening CHANGELOG.md in $$EDITOR for hand-curation"; \
 		$$EDITOR CHANGELOG.md; \
-	elif [ -t 0 ]; then \
-		echo "==> EDITOR unset; skipping interactive CHANGELOG curation"; \
 	else \
-		echo "ERROR: EDITOR unset and no TTY — refusing to skip changelog curation in headless mode." >&2; exit 1; \
+		echo "==> Non-interactive: CHANGELOG.md holds the raw generated draft."; \
+		echo "    Hand-curate the [$(VERSION)] section, then re-run: make release-cut VERSION=$(VERSION)"; \
 	fi
+	uv run -- python scripts/generate_changelog_entry.py --check-curation --version $(VERSION)
 	@# Curation FIRST so dev-only paths are never staged. Order matters: git rm
 	@# before git add ensures untracked files inside _project/ etc. don't end up
 	@# staged-for-add by a later git add.
-	@# Curation list: A3 of _project/decisions/single-repo-migration.md.
+	@# Curation list: A3 of _project/decisions/single-repo-migration.md. The
+	@# Explorer is an intentional curated-preview exception: keep its corpus,
+	@# application, and only the three build-time helpers required by docs.yml.
 	@# --ignore-unmatch: git rm aborts the ENTIRE command when any one pathspec
 	@# is untracked, and a leading `-` would hide that, silently skipping all
 	@# curation on that line (v0.3.1 shipped uncurated because of this). With
 	@# --ignore-unmatch, unmatched paths are a no-op and any remaining failure
 	@# is real, so no `-` prefix: real failures must abort the cut.
-	git rm -rf --ignore-unmatch _project _blog results-data results-explorer .claude .codex .gemini
+	git rm -rf --ignore-unmatch _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini
 	git rm -f --ignore-unmatch .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md
 	git rm -f --ignore-unmatch .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml
 	@# Tests that import _project/dev-only tooling or test curated-out surfaces
 	@# cannot collect on the release tree (found by the v0.3.1 release PR CI).
 	git rm -rf --ignore-unmatch tests/unit/scripts/explorer_pipeline tests/unit/explorer
-	git rm -f --ignore-unmatch tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_skill_sync_lock_audit.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/scripts/test_validate_todo.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/test_todo_executable_docs.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py
+	git rm -f --ignore-unmatch tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py
 	@# Post-curation guard: every curated path must be gone from the index.
-	@LEFTOVER=$$(git ls-files _project _blog results-data results-explorer .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_skill_sync_lock_audit.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/scripts/test_validate_todo.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/test_todo_executable_docs.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py); \
+	@LEFTOVER=$$(git ls-files _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py); \
 	if [ -n "$$LEFTOVER" ]; then \
-		echo "ERROR: release curation incomplete; dev-only paths still tracked:" >&2; \
+		echo "ERROR: release curation incomplete; development-only paths still tracked:" >&2; \
 		echo "$$LEFTOVER" | sed 's/^/  /' >&2; \
 		exit 1; \
 	fi
+	@for required_dir in results-data results-explorer _project/scripts/explorer_pipeline; do \
+		test -d "$$required_dir" || { echo "ERROR: curated Explorer publication directory is missing: $$required_dir" >&2; exit 1; }; \
+		git ls-files "$$required_dir" | grep -q . || { echo "ERROR: curated Explorer publication directory is not tracked: $$required_dir" >&2; exit 1; }; \
+	done
+	@for required_file in _project/scripts/explorer_publish.py _project/scripts/results_explorer_snapshot_invariants.py; do \
+		test -f "$$required_file" && git ls-files --error-unmatch "$$required_file" >/dev/null || { echo "ERROR: curated Explorer publication helper is missing: $$required_file" >&2; exit 1; }; \
+	done
 	@# Stage only the files update_version.py + generate_changelog_entry.py +
 	@# uv lock write. Explicit list (not `git add -A`) to avoid staging
 	@# build/cache artifacts.
@@ -1121,8 +1123,37 @@ release-cut:
 	@# every release cut. Nothing is skipped that matters: develop's PRs
 	@# already ran these hooks before this content was curated.
 	git commit --no-verify -m "Release v$(VERSION)"
+	@# Align release histories. release and develop have unrelated roots (Phase 4
+	@# filter-merge) and diverge permanently: release carries one squash commit per
+	@# release that develop never sees, and A4 step 6 (rebase develop onto release)
+	@# was removed by the 2026-04-27 amendment. So a branch cut cleanly from
+	@# develop is NOT mergeable into release — GitHub cannot compute a merge ref, the
+	@# PR sits at CONFLICTING, and *no CI runs at all*: neither validate-base nor
+	@# release-required-result ever trigger. Every cut before v0.3.1 (#711, #712,
+	@# #1029, #1043, #1072) fixed this by hand.
+	@#
+	@# `-s ours` records origin/release as a second parent while keeping the curated
+	@# release tree byte-for-byte; release-finalize's squash-merge then collapses
+	@# the branch to one commit, so this merge never reaches the release branch's
+	@# release-only ledger. Run AFTER the changelog step: --since-ref origin/release
+	@# computes the patch delta against a release branch that is not yet an ancestor
+	@# of this branch.
+	@#
+	@# --no-verify: merge fires pre-merge-commit (not pre-commit). That hook is not
+	@# in default_install_hook_types today, so this is defensive — but curation has
+	@# already deleted .pre-commit-config.yaml and the repo:local hook entrypoints,
+	@# so adding pre-merge-commit later would otherwise break every cut here.
+	@echo "==> Aligning release histories: merging origin/release into v$(VERSION) (strategy: ours)"
+	@RELEASE_TREE=$$(git rev-parse 'HEAD^{tree}') && \
+	git merge -s ours --no-verify --allow-unrelated-histories origin/release \
+		-m "Merge release into v$(VERSION) (strategy: ours) to align release histories" && \
+	MERGED_TREE=$$(git rev-parse 'HEAD^{tree}') && \
+	if [ "$$RELEASE_TREE" != "$$MERGED_TREE" ]; then \
+		echo "ERROR: alignment merge changed the curated release tree ($$RELEASE_TREE -> $$MERGED_TREE)" >&2; \
+		exit 1; \
+	fi
 	git push -u origin v$(VERSION)
-	gh pr create --base main --head v$(VERSION) --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
+	gh pr create --base release --head v$(VERSION) --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
 	@# Option-c lifecycle: delete any prior release branches on origin (loop sweeps stale entries).
 	@# ls-remote patterns match the LAST path component, so 'v*' alone also matches
 	@# e.g. fix/validate-submission-... (bit the 2026-07-08 v0.3.1 re-cut). Filter full
@@ -1139,14 +1170,41 @@ release-cut:
 	@echo "  2. Wait for the required release contexts: $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "  3. make release-finalize VERSION=$(VERSION)"
 
+# Discard a local, unpushed release cut: reset the working tree, return to
+# develop, delete the v$(VERSION) branch. Use when a cut died partway through
+# (bumped versions, rewritten uv.lock, curated-away paths, no commit) and you
+# want to start over rather than resume with `make release-cut VERSION=X.Y.Z`.
+# Refuses once the branch exists on origin — deleting a pushed release branch
+# is release-finalize's or the option-c sweep's job, not this target's.
+# Usage: make release-cut-abort VERSION=X.Y.Z
+release-cut-abort:
+	@test -n "$(VERSION)" || (echo "Usage: make release-cut-abort VERSION=X.Y.Z" && exit 1)
+	@git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null \
+		|| (echo "Nothing to abort: no local v$(VERSION) branch" >&2 && exit 1)
+	@if git ls-remote --exit-code --heads origin "v$(VERSION)" >/dev/null 2>&1; then \
+		echo "Error: v$(VERSION) exists on origin; aborting would discard a pushed branch." >&2; \
+		echo "       Close its release PR and delete the remote branch first." >&2; \
+		exit 1; \
+	fi
+	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$BRANCH" = "v$(VERSION)" ]; then \
+		echo "==> Discarding uncommitted cut state on v$(VERSION)"; \
+		git reset --hard HEAD; \
+		git checkout develop; \
+	elif [ "$$BRANCH" != "develop" ]; then \
+		echo "Error: expected to be on v$(VERSION) or develop, not $$BRANCH" >&2; exit 1; \
+	fi; \
+	git branch -D v$(VERSION)
+	@echo "==> Aborted: v$(VERSION) deleted; develop untouched."
+
 # After release-cut's PR is approved and all required release contexts are
-# green: squash-merge it, tag main, push the tag (fires release.yml), and
+# green: squash-merge it, tag release, push the tag (fires release.yml), and
 # leave develop alone.
 # Usage: make release-finalize VERSION=X.Y.Z
 release-finalize:
 	@test -n "$(VERSION)" || (echo "Usage: make release-finalize VERSION=X.Y.Z" && exit 1)
-	@PR=$$(gh pr list --base main --head v$(VERSION) --state open --json number --jq '.[0].number'); \
-	test -n "$$PR" || (echo "Error: no open PR found for v$(VERSION) → main" && exit 1); \
+	@PR=$$(gh pr list --base release --head v$(VERSION) --state open --json number --jq '.[0].number'); \
+	test -n "$$PR" || (echo "Error: no open PR found for v$(VERSION) → release" && exit 1); \
 	echo "==> Verifying required release contexts '$(RELEASE_REQUIRED_CONTEXTS)' for PR #$$PR"; \
 	for context in $(RELEASE_REQUIRED_CONTEXTS); do \
 		CHECK_BUCKET=$$(gh pr checks "$$PR" --required --json name,bucket,state --jq "map(select(.name == \"$$context\")) | if length == 1 then .[0].bucket elif length == 0 then \"missing\" else \"duplicate\" end"); \
@@ -1160,7 +1218,7 @@ release-finalize:
 		fi; \
 		case "$$CHECK_BUCKET" in \
 			pass) echo "==> $$context is green";; \
-			missing) echo "Error: required release context '$$context' is missing. Check main-release-only and release workflows." >&2; exit 1;; \
+			missing) echo "Error: required release context '$$context' is missing. Check release-only and release workflows." >&2; exit 1;; \
 			pending) echo "Error: required release context '$$context' is pending. Wait for GitHub Actions, then rerun." >&2; exit 1;; \
 			fail|cancel|skipping) echo "Error: required release context '$$context' is $$CHECK_BUCKET. Fix the release PR before finalizing." >&2; exit 1;; \
 			duplicate) echo "Error: multiple required contexts named '$$context' were returned. Fix workflow/ruleset drift." >&2; exit 1;; \
@@ -1170,13 +1228,16 @@ release-finalize:
 	echo "==> Squash-merging PR #$$PR (required release contexts are green)"; \
 	gh pr merge --squash "$$PR"
 	git fetch origin --tags
-	git checkout main
-	git pull --ff-only origin main
+	git checkout release
+	git pull --ff-only origin release
 	git tag v$(VERSION)
-	git push origin v$(VERSION)
+	@# release-cut intentionally leaves the local v$(VERSION) branch in place.
+	@# Name both sides of the tag refspec so Git cannot resolve the short name to
+	@# both refs/heads/v$(VERSION) and refs/tags/v$(VERSION).
+	git push origin refs/tags/v$(VERSION):refs/tags/v$(VERSION)
 	@echo
 	@echo "Tag v$(VERSION) pushed; release.yml will publish to PyPI."
-	@echo "Push-to-main jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS)."
+	@echo "Push-to-release jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "develop is intentionally unchanged — dev-only paths persist on develop."
 
 # =============================================================================
@@ -1186,57 +1247,101 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight .pr-preflight-route pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
 
-# Lightweight local gate before pushing. Mirrors CI lint and fast marker
-# selection, but not CI's coverage fail-under; run ci-test for the exact
-# coverage-enforced test workflow.
+# Local gate before pushing. One classifier artifact selects the same product
+# and skill-integrity lanes as CI. Content-only, product, unknown, empty, and
+# structurally unsafe skill diffs retain the full historical ci-lint + content
+# guard + fast-test contract; only an approved pure skill-integrity diff uses
+# the focused pinned-verifier lane. CI coverage thresholds remain CI-only.
 pr-preflight:
-	@$(MAKE) ci-lint
-	@$(MAKE) pr-preflight-fast-tests
-	@$(MAKE) -s uat-artifact-hygiene
-
-pr-preflight-fast-tests:
-	@DECISION=$$(mktemp); \
+	@set -eu; \
+	DECISION=$$(mktemp); \
 	LISTS=$$(mktemp -d); \
 	trap 'rm -f "$$DECISION"; rm -rf "$$LISTS"' EXIT; \
 	git fetch origin develop --quiet; \
 	uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
+	$(MAKE) -s .pr-preflight-route PATH_DECISION="$$DECISION" PATH_LISTS="$$LISTS"; \
+	$(MAKE) -s uat-artifact-hygiene
+
+# Consume the classifier decision only; never reimplement path globs here.
+# Mixed skill/product diffs run both lanes. Skill plus safe content stays on
+# the two narrow lanes. Content-only remains on the full product preflight
+# until a separately authorized optimization exists.
+.pr-preflight-route:
+	@set -eu; \
+	[ -n "$(PATH_DECISION)" ] && [ -f "$(PATH_DECISION)" ] || { echo "PATH_DECISION is required" >&2; exit 2; }; \
+	[ -n "$(PATH_LISTS)" ] && [ -d "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required" >&2; exit 2; }; \
+	ROUTE=$$(uv run -- python -c 'import json, sys; d=json.load(open(sys.argv[1], encoding="utf-8")); keys=("skill_integrity_needed", "content_guard_needed", "skill_integrity_only", "needs_code_ci"); assert all(type(d.get(k)) is bool for k in keys), "invalid preflight decision"; assert not d["skill_integrity_only"] or (d["skill_integrity_needed"] and not d["needs_code_ci"]), "contradictory preflight decision"; print(*(str(d[k]).lower() for k in keys))' "$(PATH_DECISION)"); \
+	set -- $$ROUTE; SKILL=$$1; CONTENT=$$2; SKILL_ONLY=$$3; \
+	if [ "$$SKILL_ONLY" = true ] && [ "$$CONTENT" != true ]; then \
+		echo "Selected preflight lanes: skill-integrity"; \
+		$(MAKE) -s skill-integrity-check; \
+	elif [ "$$SKILL_ONLY" = true ]; then \
+		echo "Selected preflight lanes: skill-integrity content"; \
+		$(MAKE) -s skill-integrity-check; \
+		$(MAKE) -s pr-content-guard PATH_LISTS="$(PATH_LISTS)"; \
+	else \
+		LANES=product; [ "$$CONTENT" = true ] && LANES="$$LANES content"; [ "$$SKILL" = true ] && LANES="$$LANES skill-integrity"; \
+		echo "Selected preflight lanes: $$LANES"; \
+		$(MAKE) ci-lint; \
+		if [ "$$SKILL" = true ]; then $(MAKE) -s skill-integrity-check; fi; \
+		$(MAKE) -s pr-preflight-fast-tests PATH_DECISION="$(PATH_DECISION)" PATH_LISTS="$(PATH_LISTS)"; \
+	fi
+
+# Always runs pr-content-guard for the historical full-preflight path. The
+# needs-code-ci decision gates only the fast-test run below. Pure approved
+# skill-integrity diffs do not enter this target; their focused lane carries
+# its own artifact, provenance, mirror, instruction, and identity controls.
+# Direct invocation (the opt-in pre-push hook) creates classifier artifacts
+# when the parent preflight did not already supply them.
+pr-preflight-fast-tests:
+	@set -eu; \
+	if [ -n "$(PATH_DECISION)" ] || [ -n "$(PATH_LISTS)" ]; then \
+		[ -n "$(PATH_DECISION)" ] && [ -f "$(PATH_DECISION)" ] || { echo "PATH_DECISION is required" >&2; exit 2; }; \
+		[ -n "$(PATH_LISTS)" ] && [ -d "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required" >&2; exit 2; }; \
+		DECISION="$(PATH_DECISION)"; \
+		LISTS="$(PATH_LISTS)"; \
+	else \
+		DECISION=$$(mktemp); \
+		LISTS=$$(mktemp -d); \
+		trap 'rm -f "$$DECISION"; rm -rf "$$LISTS"' EXIT; \
+		git fetch origin develop --quiet; \
+		uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
+	fi; \
+	$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
 	if uv run -- python scripts/path_filter_decision.py --json-in "$$DECISION" --check needs-code-ci >/dev/null; then \
 		echo "==> fast tests (CI marker selection; coverage remains CI-only)"; \
 		uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -q; \
 	else \
-		$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
 		echo "No code changes detected; skipping fast tests."; \
 	fi
 
 pr-content-guard:
 	@[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
+	EXISTING=$$(mktemp); \
+	trap 'rm -f "$$EXISTING"' EXIT; \
 	$(MAKE) artifact-hygiene; \
 	if [ -s "$(PATH_LISTS)/yaml.txt" ]; then \
-		uv run -- pre-commit run check-yaml --files $$(cat "$(PATH_LISTS)/yaml.txt"); \
+		: > "$$EXISTING"; \
+		while IFS= read -r path; do \
+			if [ -e "$$path" ]; then printf '%s\n' "$$path" >> "$$EXISTING"; else echo "Skipping deleted YAML path: $$path"; fi; \
+		done < "$(PATH_LISTS)/yaml.txt"; \
+		if [ -s "$$EXISTING" ]; then uv run -- pre-commit run check-yaml --files $$(cat "$$EXISTING"); else echo "No existing YAML content paths to lint."; fi; \
 	else \
 		echo "No YAML content paths changed."; \
 	fi; \
 	if [ -s "$(PATH_LISTS)/markdown.txt" ]; then \
-		uv run -- pre-commit run markdownlint --files $$(cat "$(PATH_LISTS)/markdown.txt"); \
+		: > "$$EXISTING"; \
+		while IFS= read -r path; do \
+			if [ -e "$$path" ]; then printf '%s\n' "$$path" >> "$$EXISTING"; else echo "Skipping deleted markdown path: $$path"; fi; \
+		done < "$(PATH_LISTS)/markdown.txt"; \
+		if [ -s "$$EXISTING" ]; then uv run -- pre-commit run markdownlint --files $$(cat "$$EXISTING"); else echo "No existing markdown content paths to lint."; fi; \
 	else \
 		echo "No markdown content paths changed."; \
-	fi; \
-	if [ -s "$(PATH_LISTS)/todo.txt" ]; then \
-		while IFS= read -r todo_path; do \
-			if [ ! -e "$$todo_path" ]; then \
-				echo "Skipping deleted TODO/DONE path: $$todo_path"; \
-				continue; \
-			fi; \
-			uv run --project _project/scripts -- python _project/scripts/validate_todo.py "$$todo_path"; \
-		done < "$(PATH_LISTS)/todo.txt"; \
-		uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph; \
-	else \
-		echo "No TODO/DONE YAML paths changed."; \
 	fi; \
 	if [ -s "$(PATH_LISTS)/docs.txt" ]; then \
 		$(MAKE) docs-validate; \
@@ -1244,30 +1349,43 @@ pr-content-guard:
 		echo "No docs paths changed."; \
 	fi
 
-# Push current branch and open a PR against develop with auto-merge enabled
-# unless the diff touches soundness-critical comparator/plan-parser paths.
-# Squash-merge happens automatically once `lint` + `test (ubuntu-latest, 3.12)`
-# go green. Refuses to run from develop/main.
+# Push current branch and open a PR against develop. Auto-merge is WITHHELD by
+# default so a follow-up commit cannot race a merge. Arm only when the branch
+# is final: `make pr-ready`, or `make pr-open READY=1` to open and arm in one
+# step. When a merge queue is enabled on develop, arming auto-merge enqueues
+# the PR for speculative integration once checks pass. Soundness-path diffs are
+# never armed or auto-enqueued (see pr-arm-auto-merge).
+# Refuses to run from develop/release.
 #
-# Idempotent: safe to rerun. If a PR is already open for the branch, reuses it
-# and just (re)enables auto-merge when the soundness-path review gate does not
-# apply — useful after a partial run, or to flip auto-merge on for a PR opened
-# via `gh pr create` directly.
+# Idempotent: safe to rerun. If a PR is already open for the branch, reuses it.
+# Without READY=1 this does not re-enable auto-merge — run `make pr-ready`
+# when the branch is final (or READY=1 here to arm after open/reuse).
 #
 # Pre-push warning: runs `git merge-tree` against every other open PR head
 # (pure git, ~1s, no CI) and prints any textual conflicts so you can coordinate
 # before landing. Warn-only — does not block the push.
+#
+# Currency: after fetching origin/develop, refuse unless that tip is an
+# ancestor of HEAD. Run `make pr-refresh` (one stale PR at a time) to absorb
+# develop. Do not merge develop here — pr-fanout would otherwise refresh
+# every worktree at once. STALE=1 is the explicit escape hatch.
 pr-open:
 	@$(MAKE) -s agent-write-preflight
 	@CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
-		develop|main) echo "Refusing to open PR from $$CURRENT — switch to a feature branch."; exit 1 ;; \
+		develop|main|release) echo "Refusing to open PR from $$CURRENT — switch to a feature branch."; exit 1 ;; \
 	esac; \
 	if [ -n "$(PR_BODY_FILE)" ] && [ ! -f "$(PR_BODY_FILE)" ]; then \
 		echo "PR_BODY_FILE does not exist: $(PR_BODY_FILE)" >&2; \
 		exit 1; \
 	fi; \
 	git fetch origin develop --quiet; \
+	if [ "$(STALE)" != "1" ]; then \
+		git merge-base --is-ancestor origin/develop HEAD || { \
+			echo "Refusing to open PR: HEAD is behind origin/develop. Run 'make pr-refresh' (one PR at a time) or retry with STALE=1." >&2; \
+			exit 1; \
+		}; \
+	fi; \
 	$(MAKE) -s pr-conflict-scan BRANCH="$$CURRENT" || true; \
 	git push -u origin "$$CURRENT" || { echo "Push failed for $$CURRENT — aborting before opening a PR (remote branch may be stale)." >&2; exit 1; }; \
 	URL=$$(gh pr list --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
@@ -1284,12 +1402,52 @@ pr-open:
 		fi; \
 	fi && \
 	echo "$$URL" && \
+	if [ "$(READY)" != "1" ]; then \
+		echo "Auto-merge withheld. Run 'make pr-ready' when the branch is final, or 'make pr-open READY=1' to open and arm in one step."; \
+	else \
+		$(MAKE) -s pr-arm-auto-merge URL="$$URL"; \
+	fi
+
+# Arms squash auto-merge / queue enrollment for an already-open PR. Split out of
+# pr-open so the soundness check has exactly one implementation and both entry
+# points get it. When a merge queue is active on develop, auto-merge enqueues
+# the PR for speculative combined-tree validation.
+# Honours the durable `no-auto-merge` hold label: before this check, the label
+# was only durable against paths that never arm (workflow + sweep) while the
+# one live arm path ignored it — #1626 was armed 52s after being labeled. See
+# _project/decisions/auto-merge-policy-consolidation-2026-08-06.md (D3).
+pr-arm-auto-merge:
+	@URL="$(URL)"; \
+	if [ -z "$$URL" ]; then \
+		CURRENT=$$(git branch --show-current); \
+		URL=$$(gh pr list --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
+	fi; \
+	if [ -z "$$URL" ]; then echo "No open PR found for this branch." >&2; exit 1; fi; \
+	LABELS=$$(gh pr view "$$URL" --json labels --jq '.labels[].name') || { echo "Cannot read PR labels — refusing to arm (fail closed)." >&2; exit 1; }; \
+	if printf '%s\n' "$$LABELS" | grep -qxF 'no-auto-merge'; then \
+		echo "PR carries the durable no-auto-merge hold label; leaving auto-merge disabled. Remove the label first if arming is intended."; \
+		exit 0; \
+	fi; \
+	git fetch origin develop --quiet; \
 	SOUNDNESS_PATH=$$(git diff --name-only --no-renames origin/develop...HEAD | uv run --project _project/scripts -- python _project/scripts/auto_merge_soundness_paths.py --stdin); \
 	if [ "$$SOUNDNESS_PATH" = "true" ]; then \
 		echo "Soundness-critical paths changed; leaving auto-merge disabled pending review."; \
 	else \
 		gh pr merge --auto --squash "$$URL"; \
 	fi
+
+# Declares the branch final and arms auto-merge / queue enrollment.
+#
+# Auto-merge is NOT armed by `pr-open`, because arming at creation is only
+# correct if nothing more will be pushed - and the usual reason something more
+# is pushed is review feedback, which arrives after the PR exists. A PR armed
+# at creation can satisfy its checks and merge while the follow-up commit is
+# still being written, leaving develop with a partial change and the rest
+# orphaned on a closed branch. That happened three times in one session
+# (#1503, #1521, #1531); the last two stranded the very commits that addressed
+# their own review findings.
+pr-ready:
+	@$(MAKE) -s pr-arm-auto-merge
 
 shrink-rollup:
 	@git fetch origin develop --quiet
@@ -1305,7 +1463,7 @@ pr-fanout:
 	git worktree list --porcelain | sed -n 's/^worktree //p' | while IFS= read -r wt; do \
 		[ "$$(realpath "$$wt")" = "$$MAIN_CLONE" ] && { echo "(skip $$wt: main clone)"; continue; }; \
 		BR=$$(git -C "$$wt" branch --show-current 2>/dev/null); \
-		case "$$BR" in develop|main|"") echo "(skip $$wt: branch=$$BR)"; continue ;; esac; \
+		case "$$BR" in develop|main|release|"") echo "(skip $$wt: branch=$$BR)"; continue ;; esac; \
 		IDX=$$(($${IDX:-0} + 1)); \
 		printf '%06d|%s\0' "$$IDX" "$$wt" >> "$$TMP"; \
 	done; \
@@ -1317,21 +1475,31 @@ pr-fanout:
 
 # Refresh the current PR branch onto origin/develop, then run pr-open.
 # This is the stale-PR escape hatch when required checks must be current with
-# develop: GitHub can show a PR as CLEAN even though auto-merge is waiting for
-# a branch update. Run this one stale PR at a time; updating several branches
-# at once can let the first merge stale the others again under strict checks.
+# develop: GitHub can show a PR as CLEAN even though merge is waiting for a
+# branch update. pr-refresh does NOT re-enable auto-merge on its own (pr-open
+# withholds unless READY=1); run `make pr-ready` when the branch is final.
+# Run this one stale PR at a time; updating several branches at once can let
+# the first merge stale the others again under strict checks.
 pr-refresh:
 	@CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
-		develop|main|"") echo "Refusing to refresh $$CURRENT — switch to a feature branch worktree."; exit 1 ;; \
+		develop|main|release|"") echo "Refusing to refresh $$CURRENT — switch to a feature branch worktree."; exit 1 ;; \
 	esac; \
 	git fetch origin develop --quiet && \
 	git merge --no-edit origin/develop && \
 	$(MAKE) -s pr-open
 
 # Pure-git pairwise textual-conflict probe. Caller passes BRANCH=<current>;
-# we compare HEAD against every other open PR head via `git merge-tree` and
-# print warnings. Warn-only; does not exit non-zero. Used internally by pr-open.
+# we compare HEAD against every other open PR head via `git merge-tree
+# --write-tree` and print warnings. Warn-only; does not exit non-zero. Used
+# internally by pr-open.
+#
+# Exit status is the signal: 0 clean, 1 conflict, >1 error (e.g. unrelated
+# histories). Bad refs also exit 1, hence the rev-parse guard above the probe.
+# Do not parse the deprecated three-arg `git merge-tree <base> <a> <b>`: its
+# `changed in both` / `added in both` / `removed in {local,remote}` lines are
+# informational trivial-merge headers, not conflicts, and its real conflict
+# markers are diff-prefixed (`+<<<<<<< .our`), so `^<<<<<<<` never matches.
 pr-conflict-scan:
 	@CURRENT="$(BRANCH)"; \
 	[ -n "$$CURRENT" ] || CURRENT=$$(git branch --show-current); \
@@ -1340,11 +1508,11 @@ pr-conflict-scan:
 	while read num branch; do \
 		[ "$$branch" = "$$CURRENT" ] && continue; \
 		git fetch origin "$$branch" --quiet 2>/dev/null || continue; \
-		base=$$(git merge-base HEAD "origin/$$branch" 2>/dev/null) || continue; \
-		out=$$(git merge-tree "$$base" HEAD "origin/$$branch" 2>/dev/null); \
-		if echo "$$out" | grep -qE '^(<<<<<<<|changed in both|added in both|removed in local|removed in remote|CONFLICT )'; then \
-			echo "  ⚠ textual conflict with PR #$$num ($$branch) — coordinate before landing"; \
-		fi; \
+		git rev-parse --verify --quiet "origin/$$branch^{commit}" >/dev/null || continue; \
+		out=$$(git merge-tree --write-tree --name-only HEAD "origin/$$branch" 2>/dev/null); \
+		[ $$? -eq 1 ] || continue; \
+		files=$$(printf '%s\n' "$$out" | awk 'NR>1 && NF==0{exit} NR>1{printf "%s%s", sep, $$0; sep=", "}'); \
+		echo "  ⚠ textual conflict with PR #$$num ($$branch) in $$files — coordinate before landing"; \
 	done; true
 
 # Show open PRs against develop and their CI + auto-merge state.
@@ -1362,6 +1530,8 @@ pr-review-followups-list:
 		--base "$(PR_REVIEW_BASE)" \
 		--limit-prs "$(PR_REVIEW_PR_LIMIT)" \
 		--max-comments "$(PR_REVIEW_MAX_COMMENTS)" \
+		$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_RESOLVED)),--include-resolved) \
+		$(if $(filter 1 true yes,$(PR_REVIEW_FAIL_ON_PENDING)),--fail-on-pending) \
 		$(if $(PR_REVIEW_REPO),--repo "$(PR_REVIEW_REPO)") \
 		$(if $(PR_REVIEW_SINCE),--since "$(PR_REVIEW_SINCE)") \
 		$(if $(PR_REVIEW_UNTIL),--until "$(PR_REVIEW_UNTIL)")
@@ -1452,553 +1622,20 @@ dev-loop-metrics:
 			"Conflict rate: \(rate($$conflicts; $$total)) (\($$conflicts)/\($$total))", \
 			"runner minutes total: \($$runner)" \
 		] | .[]' $$FILES
+	@echo "---"; \
+	echo "Dev-loop PR metrics (CI-failure baseline, see dev-loop-metrics-ci-failure-baseline-2):"; \
+	test -f _project/scripts/dev_loop_pr_metrics.py && uv run -- python _project/scripts/dev_loop_pr_metrics.py --days "$(DEV_LOOP_METRICS_DAYS)" || true
 
-# Initialize retained pool worktrees. Existing pool-NN paths are left untouched.
-worktree-pool-init:
-	@git fetch origin develop --quiet
-	@set -e; \
-	POOL_REPO=$$($(POOL_REPO_CMD)); \
-	i=1; \
-	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
-		pool=$$(printf 'pool-%02d' "$$i"); \
-		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		if [ -e "$$wt" ]; then \
-			git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { \
-				echo "Path exists but is not a git worktree: $$wt" >&2; \
-				exit 1; \
-			}; \
-			echo "$$pool exists: $$wt"; \
-		else \
-			echo "$$pool create: $$wt"; \
-			git worktree add --detach "$$wt" origin/develop; \
-			( cd "$$wt" && uv sync --group dev && uv run -- pre-commit install ); \
-		fi; \
-		i=$$((i + 1)); \
-	done
-	@POOL_REPO=$$($(POOL_REPO_CMD)); \
-	printf '%-8s | %-60s | %s\n' "pool" "path" "branch"; \
-	i=1; \
-	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
-		pool=$$(printf 'pool-%02d' "$$i"); \
-		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		if [ -d "$$wt/.git" ] || git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
-			branch=$$(git -C "$$wt" branch --show-current 2>/dev/null); \
-			[ -n "$$branch" ] || branch="(detached)"; \
-		else \
-			branch="(missing)"; \
-		fi; \
-		printf '%-8s | %-60s | %s\n' "$$pool" "$$wt" "$$branch"; \
-		i=$$((i + 1)); \
-	done
+include $(BENCHBOX_MAKEFILE_ROOT)make/worktrees.mk
 
-# Claim the first free pool worktree for a feature branch.
-#
-# Concurrency: every pool-mutating target (claim, release, pool-reset,
-# pool-sweep-stale) acquires the same `.git/pool.lock` via
-# scripts/_with_pool_lock.sh. They serialize against each other so
-# concurrent operations cannot leave a slot in a torn state. The lock
-# does NOT cover read-only inspection (worktree-pool-status), which is
-# safe to run anytime.
-worktree-claim:
-	@test -n "$(BRANCH)" || { echo "Usage: make worktree-claim BRANCH=<branch-name>"; exit 1; }
-	@case "$(BRANCH)" in chore/?*|fix/?*|feat/?*|docs/?*) ;; *) echo "BRANCH must match ^(chore|fix|feat|docs)/.+"; exit 1 ;; esac
-	@git check-ref-format --branch "$(BRANCH)" >/dev/null || { echo "Invalid git branch name: $(BRANCH)"; exit 1; }
-	@if [ "$(POOL_MIN_FREE_KB)" -gt 0 ]; then \
-		FREE_KB=$$(df -k "$(WORKTREE_POOL_PARENT)" 2>/dev/null | awk 'NR==2 {print $$4}'); \
-		if [ -n "$$FREE_KB" ] && [ "$$FREE_KB" -lt "$(POOL_MIN_FREE_KB)" ]; then \
-			echo "Refusing to claim: $$FREE_KB KB free on $(WORKTREE_POOL_PARENT) < $(POOL_MIN_FREE_KB) KB required." >&2; \
-			echo "Hint: run \`make worktree-pool-disk-clean\` to drop pytest/coverage caches," >&2; \
-			echo "      or override with \`POOL_MIN_FREE_KB=0 make worktree-claim BRANCH=...\`." >&2; \
-			exit 1; \
-		fi; \
-	fi
-	@git fetch origin develop --quiet
-	@LOCK="$$(realpath "$$(git rev-parse --git-common-dir)")/pool.lock"; \
-	scripts/_with_pool_lock.sh "$$LOCK" $(MAKE) -s worktree-claim-locked BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"
-
-# Orchestrator: try once, then auto-sweep stale slots, then try again.
-# The auto-sweep means routine pool exhaustion (forgotten releases) is
-# self-healing without operator intervention.
-#
-# The whole recipe runs in ONE shell (line continuations + a single `@`).
-# Each `@`-prefixed make recipe line otherwise spawns its own subshell, so
-# `if ... ; then exit 0; fi` would only exit that line's subshell — make
-# would happily continue to the auto-sweep retry path even after a
-# successful first attempt, falsely reporting failure to the caller.
-worktree-claim-locked:
-	@if $(MAKE) -s worktree-claim-attempt BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; then \
-		exit 0; \
-	fi; \
-	echo "No free pool worktree on first pass — auto-sweeping stale slots..." >&2; \
-	$(MAKE) -s worktree-pool-sweep-stale-locked POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)" >&2 || true; \
-	if $(MAKE) -s worktree-claim-attempt BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; then \
-		exit 0; \
-	fi; \
-	echo "Still no free pool worktree available after auto-sweep." >&2; \
-	echo "Hint: dirty or claim-aborted slots are not auto-recovered (they may have valuable state)." >&2; \
-	echo "      Run \`make worktree-pool-status\` to inspect, then \`make worktree-pool-reset POOL=NN\`" >&2; \
-	echo "      as a last-resort manual escape hatch after reviewing what will be discarded." >&2; \
-	exit 1
-
-# Single-pass claim attempt. Iterates the pool once; on the first
-# detached, clean, non-claim-aborted slot, hard-resets it to
-# origin/develop (scrubbing any residual INDEX/working-tree skew from
-# an interrupted release or manual `git checkout`) and mutates it to
-# the requested branch under an EXIT trap that rolls back on any failure
-# (including SIGINT/SIGTERM). EXIT is POSIX (works in dash/sh/bash); ERR
-# is not.
-# A `.benchbox/claim_in_progress` marker is written before mutation and
-# removed on success or rollback; if the process is SIGKILL'd between
-# write and removal, the marker survives and `worktree-pool-status`
-# reports the slot as `aborted` so the operator knows it needs reset.
-#
-# The `reset --hard` immediately before the final emptiness check is the
-# hardening for a subtle prior bug: `git status --porcelain` could return
-# empty on a slot whose INDEX still had stale staged entries from a
-# previous tenant (when the stale blob coincidentally matched HEAD's blob
-# for that path). The gate accepted the slot as "clean detached", but
-# the resulting worktree carried the previous tenant's INDEX into the new
-# branch. Resetting before the final emptiness check normalizes the slot.
-#
-# Ordering: a normal porcelain gate runs before mutation so dirty
-# detached slots are preserved for manual recovery. The marker is then
-# written BEFORE `reset --hard` so the EXIT trap can roll back a slot
-# whose reset is interrupted mid-flight (SIGINT/SIGTERM during the reset
-# would otherwise leave the slot in a partial state with no
-# aborted-marker signal). Slots skipped by the post-reset porcelain
-# check or a transient reset failure remove the marker before `continue`
-# so the trap's cleanup does not target the wrong slot on a later
-# iteration. The cleanup function itself runs an extra `reset --hard` so
-# an interrupted reset is fully normalized.
-worktree-claim-attempt:
-	@set -e; \
-	marker=""; wt=""; pool=""; claim_ok=0; \
-	cleanup() { \
-		trap '' INT TERM; \
-		if [ "$$claim_ok" != "1" ] && [ -n "$$marker" ]; then \
-			cleanup_marker="$$marker"; cleanup_wt="$$wt"; cleanup_pool="$$pool"; \
-			marker=""; \
-			rm -f "$$cleanup_marker"; \
-			git -C "$$cleanup_wt" checkout --detach origin/develop >/dev/null 2>&1 || true; \
-			git -C "$$cleanup_wt" reset --hard origin/develop >/dev/null 2>&1 || true; \
-			git -C "$$cleanup_wt" branch -D "$(BRANCH)" >/dev/null 2>&1 || true; \
-			echo "claim of $$cleanup_pool failed; slot returned to detached origin/develop" >&2; \
-		fi; \
-	}; \
-	on_int() { cleanup; exit 130; }; \
-	on_term() { cleanup; exit 143; }; \
-	trap cleanup EXIT; \
-	trap on_int INT; \
-	trap on_term TERM; \
-	POOL_REPO=$$($(POOL_REPO_CMD)); \
-	i=1; \
-	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
-		pool=$$(printf 'pool-%02d' "$$i"); \
-		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		i=$$((i + 1)); \
-		git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue; \
-		[ -f "$$wt/.benchbox/claim_in_progress" ] && continue; \
-		branch=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
-		[ -z "$$branch" ] || continue; \
-		pre_status=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
-		if [ -n "$$pre_status" ]; then \
-			echo "claim skip $$pool: porcelain non-empty before reset" >&2; \
-			continue; \
-		fi; \
-		marker="$$wt/.benchbox/claim_in_progress"; \
-		mkdir -p "$$wt/.benchbox"; \
-		printf 'pid=%s started=%s branch=%s\n' "$$$$" "$$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(BRANCH)" > "$$marker"; \
-		if ! git -C "$$wt" reset --hard origin/develop >/dev/null 2>&1; then \
-			rm -f "$$marker"; marker=""; \
-			echo "claim skip $$pool: reset --hard origin/develop failed" >&2; \
-			continue; \
-		fi; \
-		status=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
-		if [ -n "$$status" ]; then \
-			rm -f "$$marker"; marker=""; \
-			echo "claim skip $$pool: post-reset porcelain non-empty (untracked residue)" >&2; \
-			continue; \
-		fi; \
-		git -C "$$wt" checkout -b "$(BRANCH)" >/dev/null; \
-		if [ ! -f "$$wt/.venv/pyvenv.cfg" ] \
-			|| [ -n "$$(find "$$wt/uv.lock" "$$wt/pyproject.toml" -newer "$$wt/.venv/pyvenv.cfg" 2>/dev/null | head -n 1)" ]; then \
-			( cd "$$wt" && uv sync --group dev >/dev/null ); \
-		fi; \
-		rm -f "$$marker"; \
-		marker=""; \
-		claim_ok=1; \
-		printf 'WORKTREE_PATH=%s\n' "$$(cd "$$wt" && pwd -P)"; \
-		exit 0; \
-	done; \
-	exit 1
-
-worktree-release:
-	@top=$$(git rev-parse --show-toplevel); \
-	case "$$top" in *.pool-[0-9][0-9]) ;; *) echo "Refusing: worktree-release must run inside a pool-NN worktree."; exit 1 ;; esac; \
-	LOCK="$$(realpath "$$(git rev-parse --git-common-dir)")/pool.lock"; \
-	scripts/_with_pool_lock.sh "$$LOCK" $(MAKE) -s worktree-release-locked FORCE="$(FORCE)"
-
-worktree-release-locked:
-	@set -e; \
-	top=$$(git rev-parse --show-toplevel); \
-	branch=$$(git branch --show-current); \
-	test -n "$$branch" || { echo "Refusing: this pool worktree is already detached/free."; exit 1; }; \
-	case "$$branch" in develop|main) echo "Refusing to release protected branch $$branch."; exit 1 ;; esac; \
-	dirty=$$(git status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
-	if [ -n "$$dirty" ] && [ "$(FORCE)" != "1" ]; then \
-		echo "Refusing to release dirty pool worktree $$top. Review changes or rerun with FORCE=1."; \
-		echo "$$dirty"; \
-		exit 1; \
-	fi; \
-	if [ "$(FORCE)" != "1" ]; then \
-		state=$$(gh pr view "$$branch" --json state --jq .state 2>/dev/null || true); \
-		[ "$$state" = "MERGED" ] || { echo "Refusing: PR for $$branch is not MERGED; open or close PR first, or rerun with FORCE=1."; exit 1; }; \
-	fi; \
-	git checkout --detach origin/develop; \
-	git fetch origin develop --quiet; \
-	git reset --hard origin/develop; \
-	git branch -D "$$branch"; \
-	git remote prune origin; \
-	rm -rf "$$top/.venv"; \
-	echo "Released $$branch; worktree is detached at origin/develop (.venv cleared; next claim will re-sync)."
-
-## worktree-pool-status: report pool slot state + venv health + disk usage.
-##
-## Columns:
-##   pool, path, branch, state, claim_age, venv, size
-##
-## State semantics:
-##   free     — detached HEAD, working tree clean
-##   claimed  — on a feature branch, no PR or PR is open
-##   stale    — on a feature branch, PR is MERGED (release/sweep candidate)
-##   dirty    — uncommitted changes (filtered against .benchbox/ scratch
-##              dir which is the only expected non-ignored untracked path;
-##              .venv/ is .gitignored, so it does not appear in --untracked-files=normal)
-##   aborted  — `.benchbox/claim_in_progress` marker survived from a
-##              previous claim that was SIGKILL'd or otherwise died
-##              before its trap could clean up. Run pool-reset to recover.
-##   unknown  — gh pr view/list lookup failed (auth / network / rate limit)
-##              — distinguished from claimed-no-PR-yet
-##   missing  — pool slot directory absent
-##
-## Venv health:
-##   ok           — .venv/pyvenv.cfg exists and is at least as new as uv.lock + pyproject.toml
-##   stale        — .venv exists but uv.lock or pyproject.toml is newer (next claim will re-sync)
-##   missing      — .venv absent (claim will recreate; expected for free
-##                  slots, since release/sweep clears `.venv/`)
-##
-## PR-state lookup is batched: a single `gh pr list --state all` runs up
-## front and an associative awk lookup per slot replaces N per-slot
-## `gh pr view` calls. The bulk window is bumped to 1000 (gh's
-## effective max for one page); for any pool branch whose PR falls
-## outside the window, a per-branch `gh pr view` fallback fills in the
-## state so long-lived stale slots don't get misclassified as `claimed`.
-worktree-pool-status:
-	@POOL_REPO=$$($(POOL_REPO_CMD)); \
-	pr_table=$$(gh pr list --state all --base develop --limit 1000 \
-		--json headRefName,state \
-		--template '{{range .}}{{.headRefName}}{{"\t"}}{{.state}}{{"\n"}}{{end}}' 2>/dev/null); \
-	pr_lookup_failed=0; \
-	if [ -z "$$pr_table" ]; then pr_lookup_failed=1; fi; \
-	printf '%-8s | %-58s | %-28s | %-8s | %-13s | %-7s | %s\n' "pool" "path" "branch" "state" "claim_age" "venv" "size"; \
-	i=1; \
-	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
-		pool=$$(printf 'pool-%02d' "$$i"); \
-		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		branch="-"; state="missing"; age="-"; venv="-"; size="-"; \
-		if git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
-			current=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
-			dirty=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
-			aborted=0; \
-			[ -f "$$wt/.benchbox/claim_in_progress" ] && aborted=1; \
-			if [ ! -f "$$wt/.venv/pyvenv.cfg" ]; then \
-				venv="missing"; \
-			elif [ -n "$$(find "$$wt/uv.lock" "$$wt/pyproject.toml" -newer "$$wt/.venv/pyvenv.cfg" 2>/dev/null | head -n 1)" ]; then \
-				venv="stale"; \
-			else \
-				venv="ok"; \
-			fi; \
-			size=$$(du -sh "$$wt" 2>/dev/null | awk '{print $$1}'); \
-			[ -n "$$size" ] || size="-"; \
-			if [ "$$aborted" = "1" ]; then \
-				state="aborted"; \
-				[ -n "$$current" ] && branch="$$current" || branch="(detached)"; \
-				age=$$(git -C "$$wt" log -1 --format=%ar 2>/dev/null || echo "-"); \
-			elif [ -z "$$current" ]; then \
-				branch="(detached)"; \
-				if [ -z "$$dirty" ]; then state="free"; else state="dirty"; fi; \
-			else \
-				branch="$$current"; \
-				age=$$(git -C "$$wt" log -1 --format=%ar 2>/dev/null || echo "-"); \
-				if [ -n "$$dirty" ]; then \
-					state="dirty"; \
-				else \
-					pr_state=$$(printf '%s\n' "$$pr_table" | awk -F'\t' -v b="$$current" '$$1 == b {print $$2; exit}'); \
-					if [ -z "$$pr_state" ] && [ "$$pr_lookup_failed" = "0" ]; then \
-						pr_state=$$(gh pr view "$$current" --json state --jq .state 2>/dev/null || true); \
-					fi; \
-					if [ "$$pr_lookup_failed" = "1" ]; then \
-						state="unknown"; \
-					elif [ "$$pr_state" = "MERGED" ]; then \
-						state="stale"; \
-					else \
-						state="claimed"; \
-					fi; \
-				fi; \
-			fi; \
-		fi; \
-		printf '%-8s | %-58s | %-28s | %-8s | %-13s | %-7s | %s\n' "$$pool" "$$wt" "$$branch" "$$state" "$$age" "$$venv" "$$size"; \
-		i=$$((i + 1)); \
-	done; \
-	if [ "$$pr_lookup_failed" = "1" ]; then \
-		printf '\nNote: state=unknown — \`gh pr list\` returned no data.\n'; \
-		printf '  Check \`gh auth status\` and \`gh api rate_limit\` to recover.\n'; \
-	fi
-
-## worktree-pool-check: assert pool invariants and exit non-zero on drift.
-##
-## Fails if:
-##   - any slot directory is missing (count < POOL_SIZE)
-##   - extra `pool-NN` directories exist beyond POOL_SIZE in WORKTREE_POOL_PARENT
-##   - any slot is in `aborted` state (.benchbox/claim_in_progress survived)
-##
-## NOT a PR-CI gate. Intended use:
-##   - pre-release sanity check (catch drift before cutting a release)
-##   - periodic local cron / agent-loop hook
-##
-## Performance: avoids the gh PR lookup that worktree-pool-status uses, so
-## it is fast and safe to run frequently. Runs read-only — never mutates.
-##
-## See `_project/blind-spots/2026-04-30-214358-pool-size-not-codified-as-contract.md`.
-worktree-pool-check:
-	@POOL_REPO=$$($(POOL_REPO_CMD)); \
-	violations=""; \
-	missing_count=0; \
-	aborted_count=0; \
-	i=1; \
-	now_epoch=$$(date +%s); \
-	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
-		pool=$$(printf 'pool-%02d' "$$i"); \
-		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		if ! git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
-			violations="$$violations  - $$pool: missing ($$wt is not a git worktree)\n"; \
-			missing_count=$$((missing_count + 1)); \
-		elif [ -f "$$wt/.benchbox/claim_in_progress" ]; then \
-			marker_mtime_epoch=$$(stat -c %Y "$$wt/.benchbox/claim_in_progress" 2>/dev/null || stat -f %m "$$wt/.benchbox/claim_in_progress" 2>/dev/null || echo 0); \
-			case "$$marker_mtime_epoch" in ''|*[!0-9]*) marker_mtime_epoch=0 ;; esac; \
-			marker_age_seconds=$$((now_epoch - marker_mtime_epoch)); \
-			marker_age=$$(date -u -r "$$wt/.benchbox/claim_in_progress" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "?"); \
-			if [ "$$marker_age_seconds" -ge "$(POOL_CLAIM_MARKER_STALE_SECONDS)" ]; then \
-				violations="$$violations  - $$pool: aborted (claim_in_progress marker present, mtime $$marker_age, age $${marker_age_seconds}s >= $(POOL_CLAIM_MARKER_STALE_SECONDS)s)\n"; \
-				aborted_count=$$((aborted_count + 1)); \
-			fi; \
-		fi; \
-		i=$$((i + 1)); \
-	done; \
-	extras=""; \
-	for wt in "$(WORKTREE_POOL_PARENT)/$$POOL_REPO."pool-*; do \
-		[ -d "$$wt" ] || continue; \
-		base=$$(basename "$$wt"); \
-		num=$${base##*pool-}; \
-		case "$$num" in [0-9][0-9]) ;; *) continue ;; esac; \
-		num_dec=$$(expr "$$num" + 0); \
-		if [ "$$num_dec" -gt "$(POOL_SIZE)" ]; then \
-			extras="$$extras  - $$base (number > POOL_SIZE=$(POOL_SIZE))\n"; \
-		fi; \
-	done; \
-	if [ -n "$$extras" ]; then \
-		violations="$$violations  Extra pool slots beyond POOL_SIZE:\n$$extras"; \
-	fi; \
-	if [ -n "$$violations" ]; then \
-		printf 'Pool invariant check FAILED (POOL_SIZE=%s):\n' "$(POOL_SIZE)" >&2; \
-		printf '%b' "$$violations" >&2; \
-		printf 'Recover with `make worktree-pool-status` to inspect, then\n' >&2; \
-		printf '`make worktree-pool-reset POOL=NN` (last resort) or\n' >&2; \
-		printf '`make worktree-pool-init` to recreate missing slots.\n' >&2; \
-		exit 1; \
-	fi; \
-	printf 'Pool invariant check OK: %d slot(s), no aborted markers.\n' "$(POOL_SIZE)"
-
-## worktree-pool-reset POOL=NN [FORCE=1]: hard-reset a stuck pool slot to
-## origin/develop. Without FORCE=1, refuses if the slot has uncommitted
-## tracked changes. With FORCE=1, prompts for "RESET" then discards
-## tracked changes AND scrubs untracked + ignored content (including
-## `.venv/`, `benchmark_runs/`, build outputs) so the slot is reclaimed
-## clean. The `.benchbox/` cache directory is preserved across reset.
-## Use as an escape hatch when worktree-pool-sweep-stale won't release a
-## slot (e.g., dirty working tree, no merged PR), or to reclaim disk
-## from orphan benchmark output left by previous claims.
-worktree-pool-reset:
-	@test -n "$(POOL)" || { echo "Usage: make worktree-pool-reset POOL=NN"; exit 1; }
-	@case "$(POOL)" in [0-9][0-9]) ;; *) echo "POOL must be two digits, e.g. POOL=03"; exit 1 ;; esac
-	@LOCK="$$(realpath "$$(git rev-parse --git-common-dir)")/pool.lock"; \
-	scripts/_with_pool_lock.sh "$$LOCK" $(MAKE) -s worktree-pool-reset-locked POOL="$(POOL)" FORCE="$(FORCE)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"
-
-worktree-pool-reset-locked:
-	@set -e; \
-	POOL_REPO=$$($(POOL_REPO_CMD)); \
-	wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.pool-$(POOL)"; \
-	git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "No pool worktree found: $$wt"; exit 1; }; \
-	branch=$$(git -C "$$wt" branch --show-current 2>/dev/null || true); \
-	dirty=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
-	if [ -n "$$dirty" ] && [ "$(FORCE)" != "1" ]; then \
-		echo "Refusing to reset dirty pool worktree $$wt. Review changes or rerun with FORCE=1."; \
-		echo "$$dirty"; \
-		exit 1; \
-	fi; \
-	if [ "$(FORCE)" = "1" ]; then \
-		echo "About to reset $$wt to origin/develop."; \
-		if [ -n "$$branch" ]; then echo "Current branch: $$branch"; else echo "Current branch: (detached)"; fi; \
-		if [ -n "$$dirty" ]; then echo "Uncommitted changes to discard:"; echo "$$dirty"; fi; \
-		printf 'Type RESET to continue: '; \
-		read answer; \
-		[ "$$answer" = "RESET" ] || { echo "Aborted."; exit 1; }; \
-	fi; \
-	git -C "$$wt" fetch origin develop --quiet; \
-	git -C "$$wt" checkout --detach origin/develop; \
-	git -C "$$wt" reset --hard origin/develop; \
-	if [ "$(FORCE)" = "1" ]; then git -C "$$wt" clean -fdx -e .benchbox >/dev/null; fi; \
-	if [ "$(FORCE)" = "1" ] && [ -n "$$branch" ]; then \
-		case "$$branch" in develop|main) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
-	fi; \
-	echo "Reset pool-$(POOL): $$wt"
-
-## worktree-pool-sweep-stale: auto-release pool slots whose branch's PR
-## is MERGED on origin and whose working tree is clean. Idempotent;
-## refuses to touch slots that are dirty, claimed-no-PR, claimed-with-open-PR,
-## or where the gh API lookup failed (state=unknown). Run after a busy day
-## to recover slots that died between work and `make worktree-release`.
-##
-## Also drops `.venv/` from each released slot to free disk on inactive
-## pool worktrees; the next `worktree-claim` re-syncs from `~/.cache/uv/`.
-##
-## Acquires the pool lock for the duration of the sweep so concurrent
-## claims/releases cannot race with the per-slot reset operations.
-worktree-pool-sweep-stale:
-	@LOCK="$$(realpath "$$(git rev-parse --git-common-dir)")/pool.lock"; \
-	scripts/_with_pool_lock.sh "$$LOCK" $(MAKE) -s worktree-pool-sweep-stale-locked POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"
-
-worktree-pool-sweep-stale-locked:
-	@set -e; \
-	POOL_REPO=$$($(POOL_REPO_CMD)); \
-	pr_table=$$(gh pr list --state all --base develop --limit 1000 \
-		--json headRefName,state \
-		--template '{{range .}}{{.headRefName}}{{"\t"}}{{.state}}{{"\n"}}{{end}}' 2>/dev/null); \
-	if [ -z "$$pr_table" ]; then \
-		echo "gh pr list returned no data; refusing to sweep without PR-state visibility" >&2; \
-		exit 1; \
-	fi; \
-	swept=0; \
-	i=1; \
-	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
-		pool=$$(printf 'pool-%02d' "$$i"); \
-		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		i=$$((i + 1)); \
-		git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue; \
-		current=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
-		[ -n "$$current" ] || continue; \
-		dirty=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
-		if [ -n "$$dirty" ]; then \
-			echo "skip $$pool: dirty (branch=$$current)"; \
-			continue; \
-		fi; \
-		pr_state=$$(printf '%s\n' "$$pr_table" | awk -F'\t' -v b="$$current" '$$1 == b {print $$2; exit}'); \
-		if [ -z "$$pr_state" ]; then \
-			pr_state=$$(gh pr view "$$current" --json state --jq .state 2>/dev/null || true); \
-		fi; \
-		if [ "$$pr_state" != "MERGED" ]; then \
-			echo "skip $$pool: PR not merged (state=$${pr_state:-none})"; \
-			continue; \
-		fi; \
-		echo "sweep $$pool: releasing $$current (PR MERGED)"; \
-		git -C "$$wt" fetch origin develop --quiet; \
-		git -C "$$wt" checkout --detach origin/develop >/dev/null; \
-		git -C "$$wt" reset --hard origin/develop >/dev/null; \
-		git -C "$$wt" branch -D "$$current" >/dev/null 2>&1 || true; \
-		git -C "$$wt" remote prune origin >/dev/null 2>&1 || true; \
-		rm -rf "$$wt/.venv"; \
-		swept=$$((swept + 1)); \
-	done; \
-	echo "Swept $$swept pool slot(s)."
-
-## worktree-pool-disk-clean: drop pytest, mypy, ruff, coverage caches
-## from every pool slot without touching `.venv/` or git state. Useful
-## when the pre-claim free-space check refuses or `worktree-pool-status`
-## shows slots ballooning past their typical ~2 GB footprint.
-##
-## Lock-free by design: it only removes ignored cache directories, so
-## it cannot corrupt git state or interfere with concurrent claim/release.
-worktree-pool-disk-clean:
-	@set -e; \
-	POOL_REPO=$$($(POOL_REPO_CMD)); \
-	freed_total=0; \
-	cleaned=0; \
-	i=1; \
-	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
-		pool=$$(printf 'pool-%02d' "$$i"); \
-		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		i=$$((i + 1)); \
-		[ -d "$$wt" ] || continue; \
-		before=$$(du -sk "$$wt" 2>/dev/null | awk '{print $$1}'); \
-		find "$$wt" -type d \( -name '__pycache__' -o -name '.pytest_cache' -o -name '.ruff_cache' -o -name '.mypy_cache' \) -prune -exec rm -rf {} + 2>/dev/null || true; \
-		find "$$wt" -maxdepth 4 -type f \( -name '.coverage' -o -name '.coverage.*' \) -exec rm -f {} + 2>/dev/null || true; \
-		[ -d "$$wt/.benchbox/cache" ] && rm -rf "$$wt/.benchbox/cache" || true; \
-		after=$$(du -sk "$$wt" 2>/dev/null | awk '{print $$1}'); \
-		delta=$$((before - after)); \
-		if [ "$$delta" -gt 0 ]; then \
-			echo "$$pool: freed $${delta}K (was $${before}K, now $${after}K)"; \
-			freed_total=$$((freed_total + delta)); \
-			cleaned=$$((cleaned + 1)); \
-		fi; \
-	done; \
-	echo "Cleaned $$cleaned slot(s); freed $${freed_total}K total."
-
-worktree-list:
-	@git worktree list
-
-# Regenerate _project/{TODO,DONE}/_indexes/*.yaml from per-item YAML files.
-# Indexes are gitignored — run this whenever you want a fresh local copy.
-# todo_cli.py auto-runs the same script on first read, so this is a
-# convenience target for explicit regen (e.g. before grepping the indexes).
-todo-reindex:
-	@uv run _project/scripts/generate_indexes.py
-
-# Remove worktrees whose branches are gone on origin (already merged).
-# Legacy cleanup only. Pool worktrees are retained and released instead.
-worktree-prune:
-	@git fetch --prune --quiet
-	@MAIN_CLONE=$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")"); \
-	git worktree list --porcelain | awk 'function emit(){if (wt != "") print wt "|" br} /^worktree /{emit(); wt=$$2; br=""} /^branch /{br=$$2} END{emit()}' | \
-		while IFS='|' read -r wt br; do \
-			[ "$$wt" = "$$MAIN_CLONE" ] && continue; \
-			base=$$(basename "$$wt"); \
-			case "$$base" in *.pool-[0-9][0-9]) pool=$${base##*.}; echo "Skipping pool worktree $$pool (retained)"; continue ;; esac; \
-			[ -n "$$br" ] || continue; \
-			short=$${br#refs/heads/}; \
-			if ! git ls-remote --exit-code --heads origin "$$short" >/dev/null 2>&1; then \
-				echo "Removing worktree (branch gone on origin): $$wt [$$short]"; \
-				git worktree remove "$$wt" 2>/dev/null || git worktree remove --force "$$wt"; \
-				git branch -D "$$short" 2>/dev/null || true; \
-			fi; \
-		done
-	@git worktree prune
-
-# Blind-spot finding triage (file-first capture; see _project/blind-spots/README.md).
-blind-spots-list:
-	@uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py list
-
-blind-spots-report:
-	@uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py report
-
-# Alias: 'sweep' as the verb users will reach for; report is the v1 sweep view.
-blind-spots-sweep: blind-spots-report
+include $(BENCHBOX_MAKEFILE_ROOT)make/worktree-maintenance.mk
 
 # ----------------------------------------------------------------------
 # UAT framework (tests/uat/) — see _project/specs/uat-framework.md.
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
 # project-developer concern, benchbox is a project-user concern.
 # ----------------------------------------------------------------------
-.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up uat-docker-cleanup uat-artifact-hygiene
+.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-smoke uat-stress uat-bring-up uat-prepull uat-docker-cleanup uat-artifact-hygiene uat-gate-check
 
 # Local-artifact hygiene gate. No-op unless an external output root is
 # configured (BENCHBOX_OUTPUT_DIR or OUTPUT=); when it is, fails if the
@@ -2087,10 +1724,30 @@ uat-bring-up:
 		$(if $(BENCHMARK_RUNS_DIR),--benchmark-runs-dir "$(BENCHMARK_RUNS_DIR)",) \
 		$(if $(DRY_RUN),--dry-run,)
 
+# make uat-prepull PLATFORM=<name> [PREPULL_TIMEOUT_S=900] [DRY_RUN=1]
+# `compose pull --ignore-buildable` + `compose build` via the resolved engine,
+# project-scoped -- no health probe (compare uat-bring-up). Fetches images/
+# builds ahead of a sweep so a slow stack's first-run download doesn't eat
+# into cleanup.docker_start_timeout_s and present as a mysterious
+# skipped-unreachable platform. Reuses uat_bring_up.py --prepull-only rather
+# than a new script (same PLATFORM validation, project-name derivation,
+# resolved-engine identity print).
+uat-prepull:
+	$(if $(strip $(PLATFORM)),$(if $(filter $(PLATFORM),$(UAT_BRING_UP_KNOWN_PLATFORMS)),,$(error unknown platform '$(PLATFORM)'; supported: $(UAT_BRING_UP_KNOWN_PLATFORMS))),)
+	@if [ -z "$(PLATFORM)" ]; then \
+		echo "Usage: make uat-prepull PLATFORM=<name> [PREPULL_TIMEOUT_S=900] [DRY_RUN=1]" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python scripts/uat-bring-up/uat_bring_up.py \
+		--platform "$(PLATFORM)" \
+		--prepull-only \
+		$(if $(PREPULL_TIMEOUT_S),--prepull-timeout-s "$(PREPULL_TIMEOUT_S)",) \
+		$(if $(DRY_RUN),--dry-run,)
+
 # make uat-docker-cleanup [ENGINE=docker|container] [MODE=owned|images|max] [APPLY=1] [PREFIX=benchbox-uat]
 # ENGINE=container reclaims the Apple `container` store (~/Library/Application
 # Support/com.apple.container); MODE widens breadth owned<images<max. See
-# AGENTS.md "Apple container cleanup".
+# docs/operations/uat-framework.md "Container engine resolution".
 uat-docker-cleanup:
 	@uv run --no-sync -- python -m tests.uat._cli docker-cleanup \
 		$(if $(ENGINE),--engine "$(ENGINE)",) \
@@ -2107,6 +1764,11 @@ uat-sweep:
 	@uv run --no-sync -- python -m tests.uat._cli sweep --config "$(CONFIG)" \
 		$(if $(DRY_RUN),--dry-run,)
 
+# make uat-smoke
+# Native TPCH SF 0.01 smoke loop; no Docker, package, or explorer phase.
+uat-smoke:
+	@uv run --no-sync -- python -m tests.uat._cli sweep --config tests/uat/configs/uat-smoke.yaml
+
 # make uat-stress [PLATFORM=] [BENCHMARK=] [SCALE=] [CONFIG=]
 # Canned stress preset using the UAT framework matrix runner.
 uat-stress:
@@ -2115,6 +1777,22 @@ uat-stress:
 		$(if $(PLATFORM),--platform "$(PLATFORM)",) \
 		$(if $(BENCHMARK),--benchmark "$(BENCHMARK)",) \
 		$(if $(SCALE),--scale "$(SCALE)",)
+
+# make uat-gate-check STAGE1=<run-dir> STAGE2=<run-dir> STAGE3=<run-dir> [OUTPUT=<path>]
+# Aggregates the three release-gate stage summaries (uat_gate_summary.json in
+# each stage's run dir) into _project/release-evidence/uat-gate-summary.json,
+# enforcing cross-stage Docker ordering and the mechanized APPROVE checklist.
+# Review and commit the evidence file yourself; nothing here touches git.
+uat-gate-check:
+	@if [ -z "$(STAGE1)" ] || [ -z "$(STAGE2)" ] || [ -z "$(STAGE3)" ]; then \
+		echo "Usage: make uat-gate-check STAGE1=<run-dir> STAGE2=<run-dir> STAGE3=<run-dir> [OUTPUT=<path>]" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli gate-check \
+		--stage1 "$(STAGE1)" \
+		--stage2 "$(STAGE2)" \
+		--stage3 "$(STAGE3)" \
+		$(if $(OUTPUT),--output "$(OUTPUT)",)
 
 # make uat-execute CONFIG=tests/uat/configs/uat.yaml
 uat-execute:
@@ -2127,153 +1805,4 @@ uat-execute:
 		$(if $(DATABASES_ROOT),--databases-root "$(DATABASES_ROOT)",) \
 		$(if $(NO_CLEANUP),--no-cleanup,)
 
-# Help
-help:
-	@echo "BenchBox Makefile"
-	@echo "----------------"
-	@echo "Available commands:"
-	@echo ""
-	@echo "Core Testing:"
-	@echo "  make test            Run default test suite (fast tests)"
-	@echo "  make test-all        Run all tests"
-	@echo "  make test-unit       Run unit tests only"
-	@echo "  make test-integration Run integration tests only"
-	@echo "  make test-tpch       Run TPC-H tests only"
-	@echo "  make test-quick      Run quick tests without slow operations"
-	@echo "  make test-verbose    Run tests with verbose output"
-	@echo ""
-	@echo "Speed-Based Testing:"
-	@echo "  make test-pytest     Run all tests with pytest"
-	@echo "  make test-fast       Run fast tests (< 1 sec)"
-	@echo "  make test-medium     Run medium speed tests (1-10 sec)"
-	@echo "  make test-slow       Run slow tests (> 10 sec)"
-	@echo "  make test-dev        Fast development cycle testing"
-	@echo "  make test-smoke      Quick smoke testing"
-	@echo "  make test-correctness-gate Run bounded real-result correctness gate"
-	@echo "  make tpchavoc-equivalence-report Gate: TPC-Havoc variant vs canonical TPC-H equivalence (DuckDB)"
-	@echo "  make tpchavoc-equivalence-report-postgres Sample: TPC-Havoc variant equivalence on PostgreSQL"
-	@echo "  make tpchavoc-equivalence-report-datafusion Sample: TPC-Havoc variant equivalence on DataFusion"
-	@echo "  make tpchavoc-equivalence-report-clickhouse Sample: TPC-Havoc variant equivalence on ClickHouse"
-	@echo "  make tpchavoc-dataframe-equivalence-report Gate: TPC-Havoc DataFrame variants vs canonical TPC-H"
-	@echo "  make ssb-cross-surface-equivalence-report Gate: SSB DataFrame surface vs its own SQL surface"
-	@echo "  make amplab-cross-surface-equivalence-report Gate: AMPLab DataFrame surface vs its own SQL surface"
-	@echo "  make coffeeshop-cross-surface-equivalence-report Gate: CoffeeShop DataFrame surface vs its own SQL surface"
-	@echo "  make test-local-matrix Run real local benchmark matrix (stress)"
-	@echo "  make test-ci         Maintained broad local CI profile"
-	@echo ""
-	@echo "Database-Specific Testing:"
-	@echo "  make test-duckdb     Run DuckDB-specific tests"
-	@echo "  make test-sqlite     Run SQLite-specific tests"
-	@echo ""
-	@echo "Benchmark-Specific Testing:"
-	@echo "  make test-read-primitives Run primitives benchmark tests"
-	@echo "  make test-benchmarks Run all benchmark tests"
-	@echo "  make test-tpcds      Run TPC-DS tests"
-	@echo ""
-	@echo "Feature-Specific Testing:"
-	@echo "  make test-olap       Run OLAP functionality tests"
-	@echo "  make test-window     Run window functions tests"
-	@echo ""
-	@echo "CI/CD Testing:"
-	@echo "  make test-ci         Run maintained broad local CI profile"
-	@echo ""
-	@echo "CI Local Equivalents (run before push):"
-	@echo "  make ci-local        Run ALL CI checks locally (lint+test+docs+package)"
-	@echo "  make ci-lint         Lint + format check + type check (matches lint.yml)"
-	@echo "  make ci-test         Fast tests with coverage (matches test.yml)"
-	@echo "  make ci-docs         Build documentation (matches docs.yml)"
-	@echo "  make ci-linux        Reproduce the Linux pr.yml gate in Apple container (Apple silicon, opt-in)"
-	@echo "  make test-integration-smoke  Integration smoke tests"
-	@echo "  make test-package    Build and test package installation"
-	@echo "  make security-audit  Run pip-audit security check"
-	@echo "  make spellcheck      Run codespell on codebase"
-	@echo "  make docstring-coverage  Check docstring coverage with interrogate"
-	@echo "  make complexity-check    Check cyclomatic complexity (fails on violations)"
-	@echo "  make complexity-report   Report cyclomatic complexity (no failure)"
-	@echo ""
-	@echo "Parallel Testing:"
-	@echo "  make test-parallel   Run tests in parallel"
-	@echo "  make test-parallel-fast Run fast tests in parallel"
-	@echo ""
-	@echo "Live Integration Testing (requires cloud credentials):"
-	@echo "  make test-live       Run all live integration tests"
-	@echo "  make test-live-databricks Run Databricks live tests"
-	@echo "  make test-live-snowflake  Run Snowflake live tests"
-	@echo "  make test-live-bigquery   Run BigQuery live tests"
-	@echo "  make test-live-all   Run all live tests (all platforms)"
-	@echo ""
-	@echo "Utility:"
-	@echo "  make run-test TEST=path Run a specific test file"
-	@echo ""
-	@echo "UAT Operations:"
-	@echo "  make uat-docker-cleanup        Report abandoned UAT Docker resources and non-UAT cleanup commands"
-	@echo "  make uat-docker-cleanup APPLY=1 Remove only UAT-owned Docker leftovers"
-	@echo "  make uat-docker-cleanup ENGINE=container [MODE=owned|images|max] Reclaim the Apple container store"
-	@echo ""
-	@echo "Coverage:"
-	@echo "  make coverage-fast   Run fast-marked tests with coverage (quick feedback)"
-	@echo "  make coverage-all    Run full test suite with coverage report"
-	@echo "  make coverage-html   Generate HTML coverage report"
-	@echo "  make coverage-report Generate comprehensive coverage reports"
-	@echo ""
-	@echo "Development:"
-	@echo "  make lint            Check code style"
-	@echo "  make lint-markers    Validate test marker annotations (catches speed-lane conflicts)"
-	@echo "  make lint-imports    Enforce import-layering contracts (utils < core < platforms < cli; experimental/mcp isolation)"
-	@echo "  make typecheck       Run type checking with ty"
-	@echo "  make typecheck-uv    Run type checking with uv (development)"
-	@echo "  make validate-imports Validate import structure and detect circular dependencies"
-	@echo "  make dependency-check Validate lock file against pyproject specs (ARGS='--matrix' to show summary)"
-	@echo "  make duplicate-check Detect duplicate code via AST structural hashing"
-	@echo "  make mutation-test   Run mutation testing on critical modules (mutmut)"
-	@echo "  make format          Format code with ruff"
-	@echo "  make clean           Remove build artifacts"
-	@echo "  make install         Install the package"
-	@echo "  make develop         Install the package in development mode"
-	@echo "  make dist            Create distribution packages"
-	@echo "  make compile-tpcds-binaries  Rebuild TPC-DS/TPC-H binaries from patched sources (no Docker)"
-	@echo ""
-	@echo "Documentation:"
-	@echo "  make docs-build      Build Sphinx documentation locally"
-	@echo "  make docs-serve      Build and serve docs at http://localhost:8000"
-	@echo "  make docs-clean      Clean documentation build artifacts"
-	@echo "  make docs-linkcheck  Check for broken links in documentation"
-	@echo "  make docs-validate   Validate example references, syntax, and screenshot sync"
-	@echo "  make docs-images     Refresh generated visualization screenshots and sync docs/blog copies"
-	@echo "  make docs-check      Run all documentation checks (validate, linkcheck, build)"
-	@echo ""
-	@echo "PR Workflow & Worktrees:"
-	@echo "  make agent-write-preflight  Refuse write work from the BenchBox primary clone unless explicitly overridden"
-	@echo "  make pr-preflight    Run lint + fast marker tests locally (coverage remains CI-only)"
-	@echo "  make pr-open [PR_BODY_FILE=path] Push branch + open PR vs develop + enable auto-merge"
-	@echo "  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))"
-	@echo "  make shrink-rollup   Sum merged shrink ledger fragments from origin/develop"
-	@echo "  make pr-refresh      Merge origin/develop into current branch, push, and re-enable auto-merge"
-	@echo "  make pr-status       List your open PRs vs develop with CI + auto-merge state"
-	@echo "  make pr-review-followups-list        List un-actioned bot/agent review comments on merged PRs"
-	@echo "  make pr-review-followups             Action each comment, reply with marker, submit PR"
-	@echo "  make dev-loop-metrics  Summarize recent develop post-merge metrics (DEV_LOOP_METRICS_DAYS=$(DEV_LOOP_METRICS_DAYS))"
-	@echo "Worktree-pool lifecycle (preferred for new write sessions):"
-	@echo "  make worktree-pool-init           Bootstrap retained pool worktrees (POOL_SIZE=$(POOL_SIZE))"
-	@echo "  make worktree-claim BRANCH=name   Claim a free pool slot for a feature branch"
-	@echo "  make worktree-release             Inside a pool worktree: return to detached origin/develop after PR merges"
-	@echo "  make worktree-pool-status         Show pool slot state, venv health, and disk usage"
-	@echo "  make worktree-pool-check          Assert pool invariants (count, aborted slots) — exit non-zero on drift"
-	@echo "  make worktree-pool-sweep-stale    Auto-release pool slots whose PRs have merged"
-	@echo "  make worktree-pool-disk-clean     Drop pytest/mypy/ruff/coverage caches from pool slots (preserves .venv)"
-	@echo "  make worktree-pool-reset POOL=NN  Manual escape hatch for stuck pool slots"
-	@echo ""
-	@echo "Legacy / non-pool worktree utilities (pool path via worktree-claim is preferred):"
-	@echo "  make worktree-list             List active worktrees"
-	@echo "  make worktree-prune            Remove legacy non-pool worktrees whose branches are gone on origin"
-	@echo ""
-	@echo "Blind-Spot Findings (see _project/blind-spots/README.md):"
-	@echo "  make blind-spots-list   List open findings (one row each)"
-	@echo "  make blind-spots-report Counts by status + kind, oldest active first"
-	@echo "  make blind-spots-sweep  Alias for blind-spots-report"
-	@echo ""
-	@echo "Release Workflow (2-command flow; see docs/operations/release-guide.md):"
-	@echo "  make release-cut VERSION=X.Y.Z      Cut v\$$VERSION off develop, bump + changelog + curate, push, open PR vs main"
-	@echo "  make release-finalize VERSION=X.Y.Z Verify validate-base and release-required-result, squash-merge the release PR, tag main, push tag"
-	@echo ""
-	@echo "  make help            Show this help message"
+include $(BENCHBOX_MAKEFILE_ROOT)make/help.mk

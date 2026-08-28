@@ -1180,3 +1180,61 @@ class TestAzureSynapseDataLoading:
             mock_conn.cursor.return_value = Mock()
             with pytest.raises(ValueError, match="No data files found"):
                 adapter.load_data(Mock(), mock_conn, tmp_path)
+
+
+class TestSynapseStagingRootAcceptsEveryAzureSpelling:
+    """The gate keys off the provider family, not a literal list of spellings.
+
+    The old literal accepted a provider string ("abfs") the classifier never
+    produced, while rejecting the documented `azure://` form outright.
+    """
+
+    @pytest.mark.parametrize(
+        ("staging_root", "storage_account"),
+        [
+            ("az://container/benchbox", "explicit-account"),
+            ("azure://container/benchbox", "explicit-account"),
+            ("abfss://container@account.dfs.core.windows.net/benchbox", None),
+            ("abfs://container@account.dfs.core.windows.net/benchbox", None),
+        ],
+    )
+    def test_azure_staging_roots_are_accepted(self, synapse_stubs, staging_root, storage_account):
+        adapter = AzureSynapseAdapter(
+            server="myworkspace.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+            staging_root=staging_root,
+            **({"storage_account": storage_account} if storage_account else {}),
+        )
+        assert adapter.container == "container"
+        assert adapter.storage_account == (storage_account or "account")
+
+    def test_adls_uri_account_takes_precedence_over_explicit_account(self, synapse_stubs):
+        adapter = AzureSynapseAdapter(
+            server="myworkspace.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+            staging_root="abfss://container@uri-account.dfs.core.windows.net/benchbox",
+            storage_account="explicit-account",
+        )
+        assert adapter.storage_account == "uri-account"
+
+    def test_blob_staging_root_requires_account_or_explicit_option(self, synapse_stubs):
+        with pytest.raises(ValueError, match="must include a storage account"):
+            AzureSynapseAdapter(
+                server="myworkspace.sql.azuresynapse.net",
+                username="admin",
+                password="secret",
+                staging_root="azure://container/benchbox",
+            )
+
+    @pytest.mark.parametrize("staging_root", ["s3://bucket/benchbox", "gs://bucket/benchbox"])
+    def test_non_azure_staging_roots_are_still_rejected(self, synapse_stubs, staging_root):
+        """Widening the accepted spellings must not accept another cloud."""
+        with pytest.raises(ValueError, match="requires Azure storage"):
+            AzureSynapseAdapter(
+                server="myworkspace.sql.azuresynapse.net",
+                username="admin",
+                password="secret",
+                staging_root=staging_root,
+            )

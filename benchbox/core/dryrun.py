@@ -65,28 +65,25 @@ def _build_table_ddl_entry(tuning_clauses: Any) -> dict[str, Any]:
         ("sort_by", "sort_by"),
         ("partition_by", "partition_by"),
         ("cluster_by", "cluster_by"),
-        ("distribution_key", "distribution_key"),
-        ("distribution_style", "distribution_style"),
+        ("distribute_by", "distribute_by"),
+        ("order_by", "order_by"),
     ]
     for attr, key in _clause_fields:
         value = getattr(tuning_clauses, attr, None)
         if value:
             tuning_summary[key] = value
 
-    ddl_parts = []
-    if tuning_clauses.sort_by:
-        ddl_parts.append(f"ORDER BY ({tuning_clauses.sort_by})")
-    if tuning_clauses.partition_by:
-        ddl_parts.append(f"PARTITION BY ({tuning_clauses.partition_by})")
-    if tuning_clauses.cluster_by:
-        ddl_parts.append(f"CLUSTER BY ({tuning_clauses.cluster_by})")
-    if tuning_clauses.distribution_style:
-        ddl_parts.append(f"DISTSTYLE {tuning_clauses.distribution_style}")
-    if tuning_clauses.distribution_key:
-        ddl_parts.append(f"DISTKEY ({tuning_clauses.distribution_key})")
+    # Delegate clause assembly to TuningClauses.get_inline_clauses() (already used by
+    # generate_create_table_ddl) rather than re-deriving it here: each DDL generator
+    # formats its own clause text (e.g. DuckDB's sort_by already reads "ORDER BY ...",
+    # Redshift's distribute_by already reads "DISTSTYLE ... DISTKEY (...)"), so
+    # reconstructing labels from bare field values here duplicated - and, for fields
+    # like distribution_key/distribution_style that TuningClauses doesn't define,
+    # mismatched - that logic.
+    inline_clauses = tuning_clauses.get_inline_clauses() if hasattr(tuning_clauses, "get_inline_clauses") else []
 
     return {
-        "ddl_clauses": "\n".join(ddl_parts) if ddl_parts else None,
+        "ddl_clauses": "\n".join(inline_clauses) if inline_clauses else None,
         "tuning_summary": tuning_summary,
     }
 
@@ -173,7 +170,7 @@ class DryRunExecutor:
                 result.warnings.append(f"Schema generation failed: {e}")
 
             if benchmark_config.options.get("tuning_enabled", False):
-                result.tuning_config = self._extract_tuning_config(benchmark, benchmark_config)
+                result.tuning_config = self._extract_tuning_config(benchmark, benchmark_config, platform_type)
 
             # Extract DDL with tuning clauses for dry-run preview
             if execution_mode == "sql" and database_config:
@@ -500,24 +497,13 @@ class DryRunExecutor:
 
             if benchmark_id == "tpcds":
                 return self._execute_tpcds_test_class(
-                    benchmark,
-                    benchmark_config,
-                    test_execution_type,
-                    scale_factor,
-                    connection,
-                    platform_adapter,
+                    benchmark, benchmark_config, test_execution_type, scale_factor, connection, platform_adapter
                 )
-            elif benchmark_id == "tpch":
+            if benchmark_id == "tpch":
                 return self._execute_tpch_test_class(
-                    benchmark,
-                    benchmark_config,
-                    test_execution_type,
-                    scale_factor,
-                    connection,
-                    platform_adapter,
+                    benchmark, benchmark_config, test_execution_type, scale_factor, connection, platform_adapter
                 )
-            else:
-                return self._extract_standard_queries(benchmark)
+            return self._extract_standard_queries(benchmark)
 
         except Exception:
             return self._extract_standard_queries(benchmark)
@@ -531,30 +517,10 @@ class DryRunExecutor:
         connection,
         platform_adapter,
     ) -> dict[str, str]:
-        try:
-            # For TPC-DS tests, extract queries from the benchmark directly
-            # Test classes don't expose get_all_queries(), but benchmarks do
-            return self._extract_standard_queries(benchmark)
+        """Extract query text from the TPC-DS benchmark object."""
+        return self._extract_standard_queries(benchmark)
 
-        except Exception:
-            return {}
-
-    def _execute_tpch_test_class(
-        self,
-        benchmark,
-        benchmark_config,
-        test_execution_type: str,
-        scale_factor: float,
-        connection,
-        platform_adapter,
-    ) -> dict[str, str]:
-        try:
-            # For TPC-H tests, extract queries from the benchmark directly
-            # Test classes don't expose get_all_queries(), but benchmarks do
-            return self._extract_standard_queries(benchmark)
-
-        except Exception:
-            return {}
+    _execute_tpch_test_class = _execute_tpcds_test_class
 
     def _extract_standard_queries(self, benchmark) -> dict[str, str]:
         if hasattr(benchmark, "get_queries"):
@@ -895,14 +861,16 @@ class DryRunExecutor:
 
         return "\n".join(lines)
 
-    def _extract_tuning_config(self, benchmark, config: BenchmarkConfig) -> Optional[dict[str, Any]]:
+    def _extract_tuning_config(
+        self, benchmark, config: BenchmarkConfig, platform: Optional[str] = None
+    ) -> Optional[dict[str, Any]]:
         try:
             tuning_dict: dict[str, Any] = {}
 
             # Extract unified SQL tuning configuration
             unified_config = config.options.get("unified_tuning_configuration")
             if unified_config:
-                tuning_dict = self._extract_unified_tuning(unified_config)
+                tuning_dict = self._extract_unified_tuning(unified_config, platform)
 
             # Extract DataFrame tuning configuration (runtime + write)
             df_tuning_config = config.options.get("df_tuning_config")
@@ -922,9 +890,21 @@ class DryRunExecutor:
         except Exception:
             return None
 
+    # Platform-specific fields to include in platform_optimizations, keyed by the
+    # platform (lowercased database_config.type) that they are relevant to. These
+    # fields carry a non-empty default (e.g. databricks_clustering_strategy defaults
+    # to "z_order") so they must be gated on platform rather than on truthiness alone,
+    # or they show up as "enabled" for every platform.
+    _PLATFORM_SPECIFIC_OPTIMIZATION_FIELDS: dict[str, str] = {
+        "databricks_clustering_strategy": "databricks",
+        "physical_rendering_id": "databricks",
+    }
+
     @staticmethod
-    def _extract_unified_tuning(unified_config: Any) -> dict[str, Any]:
+    def _extract_unified_tuning(unified_config: Any, platform: Optional[str] = None) -> dict[str, Any]:
         """Extract constraints, platform optimizations, and table tunings from unified config."""
+        platform_key = (platform or "").lower()
+
         tuning_dict: dict[str, Any] = {
             "constraints": {
                 "primary_keys": {
@@ -941,7 +921,6 @@ class DryRunExecutor:
             },
             "platform_optimizations": {
                 "z_ordering": unified_config.platform_optimizations.z_ordering_enabled,
-                "databricks_clustering_strategy": unified_config.platform_optimizations.databricks_clustering_strategy,
                 "physical_rendering_id": unified_config.platform_optimizations.physical_rendering_id,
                 "liquid_clustering": unified_config.platform_optimizations.liquid_clustering_enabled,
                 "auto_optimize": unified_config.platform_optimizations.auto_optimize_enabled,
@@ -949,6 +928,12 @@ class DryRunExecutor:
                 "materialized_views": unified_config.platform_optimizations.materialized_views_enabled,
             },
         }
+
+        for field_name, owning_platform in DryRunExecutor._PLATFORM_SPECIFIC_OPTIMIZATION_FIELDS.items():
+            if platform_key == owning_platform:
+                tuning_dict["platform_optimizations"][field_name] = getattr(
+                    unified_config.platform_optimizations, field_name
+                )
 
         if unified_config.table_tunings:
             tuning_dict["table_tunings"] = {}
@@ -1078,13 +1063,31 @@ class DryRunExecutor:
         if not unified_config:
             return ddl_preview, post_load_statements
 
-        if not hasattr(benchmark, "get_tables"):
+        # Benchmark classes expose table names via get_schema() (see
+        # _generate_external_schema_sql below for the same pattern); no benchmark
+        # implements a get_tables() method, so that check always short-circuited
+        # this preview to empty.
+        if not hasattr(benchmark, "get_schema"):
             return ddl_preview, post_load_statements
 
-        tables = benchmark.get_tables()
+        # get_schema() is a dict on core benchmark classes but some public wrapper
+        # classes (e.g. JoinOrder) return a DDL string instead - normalize the same
+        # way _generate_external_schema_sql() does rather than assuming a mapping.
+        raw_schema = benchmark.get_schema()
+        if isinstance(raw_schema, dict):
+            tables = list(raw_schema.keys())
+        elif isinstance(raw_schema, list):
+            tables = [t["name"] for t in raw_schema if isinstance(t, dict) and "name" in t]
+        else:
+            return ddl_preview, post_load_statements
+
+        # Benchmark table names are lowercase (e.g. "lineitem") while shipped tuning
+        # templates key tables uppercase (e.g. "LINEITEM"); look up case-insensitively
+        # like profile_validation.extract_template_columns does.
+        table_tunings_by_upper = {str(key).upper(): value for key, value in unified_config.table_tunings.items()}
 
         for table_name in tables:
-            table_tuning = unified_config.table_tunings.get(table_name)
+            table_tuning = table_tunings_by_upper.get(str(table_name).upper())
             if not table_tuning:
                 continue
 
@@ -1101,6 +1104,7 @@ class DryRunExecutor:
         return ddl_preview, post_load_statements
 
     def _get_execution_context(self, benchmark_config: BenchmarkConfig, query_count: int) -> str:
+        """Describe the execution context represented by a dry-run preview."""
         test_execution_type = getattr(benchmark_config, "test_execution_type", "standard")
         benchmark_name = getattr(benchmark_config, "name", "").lower()
 
@@ -1123,3 +1127,151 @@ class DryRunExecutor:
                 return "Maintenance test execution (data operations)"
         else:
             return f"Standard sequential execution ({query_count} queries)"
+
+
+def preview_benchmark_run(  # noqa: C901
+    platform: str,
+    benchmark: str,
+    scale_factor: float,
+    queries: str | None,
+    mode: str | None,
+) -> dict[str, Any]:
+    """Core-owned dry-run preview for a benchmark run (shared by MCP and CLI).
+
+    Mirrors the previous ``benchbox.mcp.tools.benchmark._dry_run_impl``
+    behaviour -- validates platform/benchmark, resolves execution mode,
+    builds :class:`BenchmarkConfig` / :class:`DatabaseConfig`, calls
+    :class:`DryRunExecutor`, and shapes the response dict.  Transport layers
+    (MCP, CLI) should call this and add only transport-specific error wrapping
+    if needed.
+    """
+    import logging as _logging
+
+    from benchbox.core.benchmark_registry import get_all_benchmarks
+    from benchbox.core.platform_registry import PlatformRegistry
+    from benchbox.core.schemas import BenchmarkConfig as _BenchmarkConfig, DatabaseConfig as _DatabaseConfig
+    from benchbox.core.system import SystemProfiler as _SystemProfiler
+
+    _logger = _logging.getLogger(__name__)
+
+    try:
+        benchmark_lower = benchmark.lower()
+        all_benchmarks = get_all_benchmarks()
+
+        if benchmark_lower not in all_benchmarks:
+            return {
+                "status": "error",
+                "error": f"Benchmark '{benchmark}' not found",
+                "error_code": "RESOURCE_NOT_FOUND",
+                "details": {"requested": benchmark, "available": list(all_benchmarks.keys())},
+            }
+
+        platform_lower = platform.lower()
+        base_platform = platform_lower.replace("-df", "")
+        platform_info = PlatformRegistry.get_platform_info(base_platform)
+
+        warnings: list[str] = []
+        if platform_info is None:
+            warnings.append(f"Unknown platform: {platform}")
+        elif not platform_info.available:
+            warnings.append(f"Platform '{platform}' dependencies not installed: {platform_info.installation_command}")
+
+        # Resolve mode — core-owned; do not import from MCP (avoids circular dep).
+        resolved_mode: str
+        if mode is not None:
+            m_lower = mode.lower()
+            if m_lower in ("datagen", "generate"):
+                m_lower = "data_only"
+            if m_lower not in ("sql", "dataframe", "data_only"):
+                return {
+                    "status": "error",
+                    "error": f"Invalid mode: {mode}. Must be 'sql', 'dataframe', or 'data_only'",
+                    "error_code": "VALIDATION_ERROR",
+                }
+            if m_lower == "data_only":
+                resolved_mode = "data_only"
+            elif platform_info is not None and not PlatformRegistry.supports_mode(base_platform, m_lower):
+                supported = [m for m in ["sql", "dataframe"] if PlatformRegistry.supports_mode(base_platform, m)]
+                supported.append("data_only")
+                return {
+                    "status": "error",
+                    "error": f"Platform '{platform}' does not support {m_lower} mode",
+                    "error_code": "VALIDATION_UNSUPPORTED_MODE",
+                    "details": {
+                        "platform": platform,
+                        "requested_mode": m_lower,
+                        "supported_modes": supported,
+                    },
+                }
+            else:
+                resolved_mode = m_lower
+        elif platform_lower.endswith("-df"):
+            resolved_mode = "dataframe"
+        else:
+            # Default from registry, fall back to sql.
+            try:
+                resolved_mode = PlatformRegistry.get_default_mode(base_platform)
+            except Exception:
+                resolved_mode = "sql"
+
+        meta = all_benchmarks[benchmark_lower]
+        display_name = meta.get("display_name", benchmark_lower.upper())
+
+        benchmark_config = _BenchmarkConfig(
+            name=benchmark_lower,
+            display_name=display_name,
+            scale_factor=scale_factor,
+            queries=[q.strip() for q in queries.split(",")] if queries else None,
+        )
+
+        database_config = _DatabaseConfig(
+            type=platform_lower,
+            name=f"mcp_dryrun_{platform_lower}",
+            execution_mode=resolved_mode,
+        )
+
+        profiler = _SystemProfiler()
+        system_profile = profiler.get_system_profile()
+
+        executor = DryRunExecutor(output_dir=None)
+        result = executor.execute_dry_run(benchmark_config, system_profile, database_config)
+
+        warnings.extend(result.warnings)
+
+        response: dict[str, Any] = {
+            "status": "dry_run",
+            "platform": platform,
+            "benchmark": benchmark,
+            "scale_factor": scale_factor,
+            "execution_mode": result.execution_mode,
+        }
+
+        if result.query_preview:
+            query_ids = result.query_preview.get("queries", [])
+            response["execution_plan"] = {
+                "phases": ["load", "power"],
+                "total_queries": result.query_preview.get("query_count", 0),
+                "query_ids": query_ids[:30],
+                "query_ids_truncated": len(query_ids) > 30,
+            }
+
+        if result.estimated_resources:
+            data_size_mb = result.estimated_resources.get("estimated_data_size_mb", 0)
+            response["resource_estimates"] = {
+                "data_size_gb": round(data_size_mb / 1024, 2),
+                "memory_recommended_gb": max(2, round(data_size_mb / 1024 * 2, 1)),
+            }
+
+        if warnings:
+            response["warnings"] = warnings
+
+        return response
+
+    except Exception as e:
+        _logger.error("Dry run preview failed (%s)", type(e).__name__)
+        return {
+            "status": "error",
+            "error": f"Dry run failed: {e}",
+            "error_code": "INTERNAL_ERROR",
+            "details": {"exception_type": type(e).__name__},
+        }

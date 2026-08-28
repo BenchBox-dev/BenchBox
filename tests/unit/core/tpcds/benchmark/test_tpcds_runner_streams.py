@@ -84,28 +84,28 @@ class _Conn:
 # _execute_single_stream (module-level function)
 # ---------------------------------------------------------------------------
 class TestExecuteSingleStream:
-    def test_missing_stream_file(self, tmp_path: Path):
-        result = _execute_single_stream(0, tmp_path / "nonexistent.sql")
-        assert result["success"] is False
-        assert result["error"] is not None
-        assert "not found" in result["error"]
+    """_execute_single_stream used to "execute" a stream by counting `-- Query`
+    comment lines and reporting every query as successful, without running
+    any SQL (it doesn't even accept a database connection). That fake-success
+    stub is retired: it now raises NotImplementedError unconditionally,
+    regardless of whether the stream file exists or what it contains.
+    """
 
-    def test_valid_stream_file(self, tmp_path: Path):
+    def test_missing_stream_file_raises_not_implemented(self, tmp_path: Path):
+        with pytest.raises(NotImplementedError, match="does not execute SQL"):
+            _execute_single_stream(0, tmp_path / "nonexistent.sql")
+
+    def test_valid_stream_file_raises_not_implemented(self, tmp_path: Path):
         stream_file = tmp_path / "stream_0.sql"
         stream_file.write_text("-- Query 1 Position 1\nSELECT 1;\n-- Query 19 Position 2\nSELECT 19;\n")
-        result = _execute_single_stream(0, stream_file)
-        assert result["success"] is True
-        assert result["queries_executed"] == 2
-        assert result["queries_successful"] == 2
-        assert result["stream_id"] == 0
-        assert result["duration"] >= 0
+        with pytest.raises(NotImplementedError, match="does not execute SQL"):
+            _execute_single_stream(0, stream_file)
 
-    def test_empty_stream_file(self, tmp_path: Path):
+    def test_empty_stream_file_raises_not_implemented(self, tmp_path: Path):
         stream_file = tmp_path / "stream_empty.sql"
         stream_file.write_text("")
-        result = _execute_single_stream(0, stream_file)
-        assert result["success"] is True
-        assert result["queries_executed"] == 0
+        with pytest.raises(NotImplementedError, match="does not execute SQL"):
+            _execute_single_stream(0, stream_file)
 
 
 # ---------------------------------------------------------------------------

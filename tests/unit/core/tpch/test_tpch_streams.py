@@ -262,19 +262,24 @@ class TestTPCHStreamRunner:
 # Run stream (with mock file)
 # ---------------------------------------------------------------------------
 class TestRunStream:
-    """Tests for TPCHStreamRunner.run_stream."""
+    """Tests for TPCHStreamRunner.run_stream.
 
-    def test_run_stream_file_not_found(self):
-        """Running a stream with non-existent file sets error."""
+    NOTE: run_stream previously "executed" a stream by counting ``-- Query``
+    comment lines in the file and reporting every query as successful --
+    without ever running SQL against a database, despite this test suite's
+    ``connection_string="test://conn"`` fixtures implying otherwise. That was
+    the fake-success stub targeted by the concurrency-executor consolidation;
+    run_stream now raises NotImplementedError unconditionally instead.
+    """
+
+    def test_run_stream_raises_not_implemented_for_missing_file(self):
+        """run_stream raises NotImplementedError even for a non-existent file."""
         runner = TPCHStreamRunner(connection_string="test://conn", verbose=0)
-        result = runner.run_stream(Path("/nonexistent/stream.sql"), stream_id=0)
+        with pytest.raises(NotImplementedError, match="does not execute SQL"):
+            runner.run_stream(Path("/nonexistent/stream.sql"), stream_id=0)
 
-        assert result["success"] is False
-        assert result["error"] is not None
-        assert "not found" in result["error"].lower() or "No such file" in result["error"]
-
-    def test_run_stream_with_valid_file(self, tmp_path):
-        """Running a stream with a valid file produces correct results."""
+    def test_run_stream_raises_not_implemented_for_valid_file(self, tmp_path):
+        """run_stream raises NotImplementedError even when the stream file is real."""
         stream_file = tmp_path / "stream_0.sql"
         stream_file.write_text(
             "-- TPC-H Stream 0\n"
@@ -287,40 +292,17 @@ class TestRunStream:
         )
 
         runner = TPCHStreamRunner(connection_string="test://conn", verbose=0)
-        result = runner.run_stream(stream_file, stream_id=0)
+        with pytest.raises(NotImplementedError, match="does not execute SQL"):
+            runner.run_stream(stream_file, stream_id=0)
 
-        assert result["stream_id"] == 0
-        assert result["queries_executed"] == 3
-        assert result["queries_successful"] == 3
-        assert result["queries_failed"] == 0
-        assert result["success"] is True
-        assert result["duration"] >= 0
-
-    def test_run_stream_empty_file(self, tmp_path):
-        """Running a stream with an empty file produces zero queries."""
+    def test_run_stream_raises_not_implemented_for_empty_file(self, tmp_path):
+        """run_stream raises NotImplementedError even for an empty stream file."""
         stream_file = tmp_path / "stream_empty.sql"
         stream_file.write_text("-- Empty stream\n")
 
         runner = TPCHStreamRunner(connection_string="test://conn", verbose=0)
-        result = runner.run_stream(stream_file, stream_id=0)
-
-        assert result["queries_executed"] == 0
-        assert result["success"] is True
-
-    def test_run_stream_timing_fields(self, tmp_path):
-        """Result includes correct timing fields."""
-        stream_file = tmp_path / "stream_0.sql"
-        stream_file.write_text("-- Query 1 (Stream 0, Position 1)\nSELECT 1;\n")
-
-        runner = TPCHStreamRunner(connection_string="test://conn", verbose=0)
-        result = runner.run_stream(stream_file, stream_id=0)
-
-        assert result["start_time"] > 0
-        assert result["end_time"] >= result["start_time"]
-        assert result["duration"] == pytest.approx(
-            result["end_time"] - result["start_time"],
-            abs=0.01,
-        )
+        with pytest.raises(NotImplementedError, match="does not execute SQL"):
+            runner.run_stream(stream_file, stream_id=0)
 
 
 # ---------------------------------------------------------------------------
@@ -519,72 +501,28 @@ class TestGenerateStreams:
 class TestTPCHStreamRunnerAdditional:
     """Additional branch coverage for TPCHStreamRunner."""
 
-    def test_run_stream_logs_success_when_verbose(self, tmp_path):
-        """Verbose mode should log query success counts for a completed stream."""
+    def test_run_stream_raises_not_implemented_when_verbose(self, tmp_path):
+        """run_stream raises NotImplementedError regardless of verbosity; it never logs fake success."""
         runner = TPCHStreamRunner(connection_string="duckdb:///:memory:", verbose=1)
         stream_file = tmp_path / "stream.sql"
         stream_file.write_text("-- Query 1 (Stream 0, Position 1)\nSELECT 1;\n")
 
-        with patch.object(runner.logger, "info") as info_log:
-            result = runner.run_stream(stream_file, stream_id=0)
+        with pytest.raises(NotImplementedError, match="does not execute SQL"):
+            runner.run_stream(stream_file, stream_id=0)
 
-        assert result["success"] is True
-        info_log.assert_any_call("Stream %s completed: %s/%s queries successful", 0, 1, 1)
-
-    def test_run_concurrent_streams_uses_factory_and_restores_executor_config(self, tmp_path):
-        """Concurrent execution should build stream executors and restore config afterwards."""
+    def test_run_concurrent_streams_raises_not_implemented_no_longer_uses_executor(self, tmp_path):
+        """run_concurrent_streams raises directly; it no longer routes through ConcurrentQueryExecutor."""
         runner = TPCHStreamRunner(connection_string="duckdb:///:memory:", verbose=1)
         stream_file = tmp_path / "stream_0.sql"
         stream_file.write_text("-- Query 1 (Stream 0, Position 1)\nSELECT 1;\n")
-        concurrent_result = Mock(
-            stream_results=[{"success": True, "queries_executed": 1, "queries_successful": 1}],
-            queries_executed=1,
-            queries_successful=1,
-            queries_failed=0,
-            success=True,
-            errors=[],
-        )
-        executor = Mock()
-        executor.config = {"enabled": False}
-
-        def fake_execute(factory, num_streams):
-            stream_executor = factory(0)
-            assert stream_executor.run() == {"success": True}
-            with pytest.raises(ValueError, match="exceeds available stream files"):
-                factory(1)
-            assert num_streams == 1
-            return concurrent_result
-
-        executor.execute_concurrent_queries.side_effect = fake_execute
 
         with (
-            patch("benchbox.utils.execution_manager.ConcurrentQueryExecutor", return_value=executor),
-            patch.object(runner, "run_stream", return_value={"success": True}) as run_stream,
-            patch.object(runner.logger, "info") as info_log,
+            patch("benchbox.utils.execution_manager.ConcurrentQueryExecutor") as mock_executor_class,
+            pytest.raises(NotImplementedError, match="does not execute SQL"),
         ):
-            result = runner.run_concurrent_streams([stream_file])
+            runner.run_concurrent_streams([stream_file])
 
-        run_stream.assert_called_once_with(stream_file, 0)
-        assert executor.config["enabled"] is False
-        assert result["streams_successful"] == 1
-        info_log.assert_any_call("Concurrent streams completed: %s/%s streams successful", 1, 1)
-        info_log.assert_any_call("Total queries: %s/%s successful", 1, 1)
-
-    def test_run_concurrent_streams_handles_executor_failures(self, tmp_path):
-        """Executor failures should surface as unsuccessful concurrent runs."""
-        runner = TPCHStreamRunner(connection_string="duckdb:///:memory:", verbose=0)
-        stream_file = tmp_path / "stream_0.sql"
-        stream_file.write_text("-- Query 1 (Stream 0, Position 1)\nSELECT 1;\n")
-        executor = Mock()
-        executor.config = {"enabled": False}
-        executor.execute_concurrent_queries.side_effect = RuntimeError("executor blew up")
-
-        with patch("benchbox.utils.execution_manager.ConcurrentQueryExecutor", return_value=executor):
-            result = runner.run_concurrent_streams([stream_file])
-
-        assert executor.config["enabled"] is False
-        assert result["success"] is False
-        assert result["errors"] == ["executor blew up"]
+        mock_executor_class.assert_not_called()
 
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     @patch("subprocess.run")

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib
 import sys
+from datetime import datetime
 
 import pytest
 
@@ -231,8 +232,68 @@ class TestNYCTaxiParameters:
         from benchbox.core.nyctaxi.dataframe_queries.parameters import get_parameters
 
         result = get_parameters("Q1")
-        assert result.get("start_date") == "2019-01-01"
+        assert result.get("start_date") == datetime(2019, 1, 1)
         assert result.get("nonexistent", "fallback") == "fallback"
+
+    def test_query_date_bounds_are_native_temporal_values(self):
+        from benchbox.core.nyctaxi.dataframe_queries.queries import _date_bounds
+
+        start, end = _date_bounds("Q1", "2000-01-01", "2000-01-02")
+
+        assert start == datetime(2019, 1, 1)
+        assert end == datetime(2019, 1, 31)
+
+    @pytest.mark.parametrize("query_id", [f"Q{i}" for i in range(1, 25)])
+    def test_date_parameters_are_native_datetimes(self, query_id):
+        from benchbox.core.nyctaxi.dataframe_queries.parameters import get_parameters
+
+        params = get_parameters(query_id)
+
+        assert isinstance(params.get("start_date"), datetime)
+        assert isinstance(params.get("end_date"), datetime)
+
+    def test_production_date_bounds_filter_polars_timestamp_column(self):
+        pl = pytest.importorskip("polars")
+
+        from benchbox.core.nyctaxi.dataframe_queries.queries import _expression_window
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        ctx = PolarsDataFrameAdapter().create_context()
+        ctx.register_table(
+            "trips",
+            pl.DataFrame({"pickup_datetime": [datetime(2019, 1, 1), datetime(2020, 1, 1)]}),
+        )
+
+        result, _, _ = _expression_window(ctx, "Q1", "2000-01-01", "2000-01-02")
+
+        assert result.collect().height == 1
+
+    def test_production_date_bounds_filter_polars_raw_csv_timestamp_column(self, tmp_path):
+        pl = pytest.importorskip("polars")
+
+        from benchbox.core.nyctaxi.dataframe_queries.queries import _expression_window
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        class Benchmark:
+            def get_schema(self):
+                return {"trips": {"columns": {"pickup_datetime": {"type": "TIMESTAMP"}}}}
+
+        csv_path = tmp_path / "trips.csv"
+        csv_path.write_text("pickup_datetime\n2019-01-01 00:00:00\n2020-01-01 00:00:00\n")
+        adapter = PolarsDataFrameAdapter()
+        ctx = adapter.create_context()
+        adapter.load_table(
+            ctx,
+            "trips",
+            [csv_path],
+            column_names=["pickup_datetime"],
+            benchmark=Benchmark(),
+        )
+
+        result, _, _ = _expression_window(ctx, "Q1", "2000-01-01", "2000-01-02")
+
+        assert ctx.get_table("trips").native.collect_schema()["pickup_datetime"] == pl.Datetime("us")
+        assert result.collect().height == 1
 
 
 class TestNYCTaxiBenchmarkRegistry:

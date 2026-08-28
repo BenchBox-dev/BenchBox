@@ -178,6 +178,48 @@ class TestResultBuilder:
         assert result.failed_queries == 1
         assert result.validation_status == "PARTIAL"
 
+    def test_build_with_validation_failed_query_counts_as_failed(self) -> None:
+        """#1150 review: a write/op that ran but failed a post-condition check
+        (write_primitives/transaction_primitives status="VALIDATION_FAILED")
+        must count as a failure in aggregate accounting, not vanish from both
+        successful_queries and failed_queries.
+        """
+        builder = self.create_builder()
+        builder.add_query_result(self.create_query_result("1", 1.0, 100, "SUCCESS"))
+        builder.add_query_result(self.create_query_result("2", 1.0, 100, "VALIDATION_FAILED"))
+
+        result = builder.build()
+
+        assert result.total_queries == 2
+        assert result.successful_queries == 1
+        assert result.failed_queries == 1
+        assert result.validation_status == "PARTIAL"
+
+    @pytest.mark.parametrize(
+        ("status", "expected_failed", "expected_validation"),
+        [
+            ("ERROR", 1, "PARTIAL"),
+            ("TIMEOUT", 1, "PARTIAL"),
+            ("UNKNOWN", 1, "PARTIAL"),
+            ("SKIPPED", 0, "PASSED"),
+        ],
+    )
+    def test_build_counts_failure_statuses_without_counting_skipped(
+        self, status: str, expected_failed: int, expected_validation: str
+    ) -> None:
+        """Failure statuses affect gates, while intentional skips remain non-failures."""
+        builder = self.create_builder()
+        builder.add_query_result(self.create_query_result("1", 1.0, 100, "SUCCESS"))
+        builder.add_query_result(self.create_query_result("2", 0.0, 0, status))
+
+        result = builder.build()
+
+        assert result.successful_queries == 1
+        assert result.failed_queries == expected_failed
+        assert result.validation_status == expected_validation
+        if expected_failed:
+            assert result.power_at_size is None
+
     def test_build_calculates_tpc_metrics(self) -> None:
         """Test that TPC metrics are calculated."""
         builder = self.create_builder(scale_factor=1.0)
@@ -304,6 +346,47 @@ class TestResultBuilder:
         assert result.tunings_applied == {"memory": "8GB"}
         assert result.tuning_config_hash == "abc123"
         assert result.tuning_source_file == "tuning.yaml"
+
+    def test_build_threads_applied_ledger_fields(self) -> None:
+        """Applied-tuning ledger payload/hash + honest status survive onto the
+        built result (ADR-1 additive companion; distinct from the requested
+        config hash)."""
+        builder = self.create_builder()
+        ledger_payload = {
+            "status": "applied_unverified",
+            "applied_ledger_hash": "deadbeef" * 8,
+            "statements": [{"statement": "CREATE INDEX i ON t (a)", "phase": "ddl", "status": "executed"}],
+            "dropped": [],
+        }
+        builder.set_tuning_info(
+            tunings_applied={"memory": "8GB"},
+            config_hash="requested-hash",
+            validation_status="applied_unverified",
+            metadata_saved=True,
+            applied_tuning_ledger=ledger_payload,
+            applied_ledger_hash=ledger_payload["applied_ledger_hash"],
+        )
+
+        result = builder.build()
+
+        assert result.applied_tuning_ledger == ledger_payload
+        assert result.applied_ledger_hash == ledger_payload["applied_ledger_hash"]
+        assert result.tuning_validation_status == "applied_unverified"
+        assert result.tuning_metadata_saved is True
+        # The requested-config hash stays distinct from the applied hash.
+        assert result.tuning_config_hash == "requested-hash"
+        assert result.applied_ledger_hash != result.tuning_config_hash
+
+    def test_build_defaults_applied_ledger_fields_to_none(self) -> None:
+        """A build with no tuning info leaves the applied-ledger fields unset and
+        the status at the lowercase default."""
+        builder = self.create_builder()
+
+        result = builder.build()
+
+        assert result.applied_tuning_ledger is None
+        assert result.applied_ledger_hash is None
+        assert result.tuning_validation_status == "not_validated"
 
     def test_build_with_cost_summary(self) -> None:
         """Test building results with cost summary."""

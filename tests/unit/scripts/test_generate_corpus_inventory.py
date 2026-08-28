@@ -89,6 +89,88 @@ class TestGenerateInventory:
 
         assert inventory["bundles"][0]["trust_label"] == "community-submission"
 
+    @pytest.mark.parametrize(
+        ("result_source", "expected"),
+        [
+            ("internal", "maintainer-run"),
+            ("community", "community-submission"),
+            ("vendor", "vendor-supplied"),
+        ],
+    )
+    def test_recorded_result_source_decides_the_trust_label(
+        self, tmp_path: Path, result_source: str, expected: str
+    ) -> None:
+        """The sidecar's recorded source is authoritative, not its mere existence.
+
+        `benchbox submit` writes a sidecar unconditionally, including when a
+        maintainer runs it. Inferring community provenance from presence alone
+        labelled 191 of 207 maintainer-generated bundles `community-submission`,
+        and because those are not ranking-eligible the public leaderboard
+        rendered 15 of 207 results.
+        """
+        bundle_dir = tmp_path / "tpch" / "duckdb" / "sf0.01"
+        bundle_dir.mkdir(parents=True)
+        _write_bundle(bundle_dir / "result.json")
+        (bundle_dir / "result.manifest.json").write_text(json.dumps({"result_source": result_source}), encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert inventory["bundles"][0]["trust_label"] == expected
+
+    def test_unrecognized_result_source_fails_safe_to_community(self, tmp_path: Path) -> None:
+        """An unknown source is never promoted by assumption."""
+        bundle_dir = tmp_path / "tpch" / "duckdb" / "sf0.01"
+        bundle_dir.mkdir(parents=True)
+        _write_bundle(bundle_dir / "result.json")
+        (bundle_dir / "result.manifest.json").write_text(json.dumps({"result_source": "who-knows"}), encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert inventory["bundles"][0]["trust_label"] == "community-submission"
+
+    def test_unreadable_sidecar_fails_safe_to_community(self, tmp_path: Path) -> None:
+        bundle_dir = tmp_path / "tpch" / "duckdb" / "sf0.01"
+        bundle_dir.mkdir(parents=True)
+        _write_bundle(bundle_dir / "result.json")
+        (bundle_dir / "result.manifest.json").write_text("{not json", encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert inventory["bundles"][0]["trust_label"] == "community-submission"
+
+    def test_agrees_with_the_explorer_pipeline_derivation(self, tmp_path: Path) -> None:
+        """The two derivations must stay in lockstep.
+
+        `scripts/generate_corpus_inventory.py` and
+        `_project/scripts/explorer_pipeline/pipeline.py` each derive the trust
+        label independently. They drifted apart before: fixing one alone left
+        the shipping snapshot still showing 191 mislabelled rows.
+        """
+        import importlib
+
+        pipeline_module = importlib.import_module("_project.scripts.explorer_pipeline.pipeline")
+
+        bundles_dir = tmp_path
+        cases = [
+            ("none", None),
+            ("empty", {}),
+            ("internal", {"result_source": "internal"}),
+            ("community", {"result_source": "community"}),
+            ("vendor_src", {"result_source": "vendor"}),
+            ("unknown", {"result_source": "who-knows"}),
+        ]
+        for name, manifest in cases:
+            bundle_dir = bundles_dir / name
+            bundle_dir.mkdir(parents=True)
+            bundle_path = bundle_dir / "result.json"
+            _write_bundle(bundle_path)
+            if manifest is not None:
+                (bundle_dir / "result.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+            from_inventory = script._bundle_trust_label(bundle_path, bundles_dir)
+            from_pipeline = pipeline_module._manifest_trust_label(bundle_path, "maintainer-run")
+            assert from_inventory == from_pipeline, f"derivations disagree for {name}"
+
     def test_top_level_vendor_subtree_sets_vendor_label(self, tmp_path: Path) -> None:
         bundle_dir = tmp_path / "vendor"
         bundle_dir.mkdir(parents=True)
@@ -143,6 +225,7 @@ class TestGenerateInventory:
         _write_bundle(bundle_dir / "b.json", benchmark_id="tpch", platform="DuckDB")
         _write_bundle(bundle_dir / "a.json", benchmark_id="tpch", platform="DataFusion")
         (bundle_dir / "a.plans.json").write_text("{}", encoding="utf-8")
+        (bundle_dir / "a.applied.json").write_text("{}", encoding="utf-8")
         (bundle_dir / "a.manifest.json").write_text("{}", encoding="utf-8")
         (bundle_dir / "submission-manifest.json").write_text("{}", encoding="utf-8")
 
@@ -150,6 +233,15 @@ class TestGenerateInventory:
 
         assert [entry["file"] for entry in inventory["bundles"]] == ["a.json", "b.json"]
         assert inventory["summary"]["total_bundles"] == 2
+
+    def test_discovery_ignores_json_named_directories_and_mixed_case_companions(self, tmp_path: Path) -> None:
+        (tmp_path / "directory.json").mkdir()
+        _write_bundle(tmp_path / "result.JSON")
+        (tmp_path / "result.APPLIED.JSON").write_text("{}", encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert [entry["file"] for entry in inventory["bundles"]] == ["result.JSON"]
 
     def test_cohort_summary_groups_platforms(self, tmp_path: Path) -> None:
         _write_bundle(tmp_path / "duckdb.json", benchmark_id="tpch", scale_factor=0.1, platform="DuckDB")

@@ -1,10 +1,10 @@
-"""Result file loading and discovery utilities for schema v2.0.
+"""Result file loading and discovery utilities for schema v2.x.
 
 This module provides functionality to load and reconstruct BenchmarkResults
 from exported JSON files, enabling result re-export and analysis without
 re-running benchmarks.
 
-IMPORTANT: Only schema v2.0 files are supported. Legacy v1.x files are rejected.
+IMPORTANT: Only supported schema v2.x files are accepted. Legacy v1.x files are rejected.
 """
 
 from __future__ import annotations
@@ -24,9 +24,18 @@ from benchbox.core.results.models import (
     NativeComparisonEntry,
     SetupPhase,
 )
+from benchbox.core.results.query_execution import (
+    query_execution_from_compact_v2,
+    query_execution_to_legacy_dict,
+)
 from benchbox.core.results.query_normalizer import normalize_query_id
 from benchbox.core.results.query_plan_models import QueryPlanDAG
-from benchbox.core.results.schema_policy import LOADER_SCHEMA_POLICY, is_loader_supported_result_schema
+from benchbox.core.results.schema_policy import (
+    LOADER_SCHEMA_POLICY,
+    ROW_COUNT_VALIDATION_SCHEMA_VERSION,
+    is_loader_supported_result_schema,
+)
+from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
 
@@ -64,11 +73,7 @@ def find_latest_result(
         return None
 
     # Find all JSON files, excluding companion files
-    result_files = [
-        f
-        for f in directory_path.glob("*.json")
-        if not f.name.endswith(".plans.json") and not f.name.endswith(".tuning.json")
-    ]
+    result_files = [f for f in directory_path.glob("*.json") if not f.name.endswith(COMPANION_SUFFIXES)]
 
     if not result_files:
         return None
@@ -151,10 +156,11 @@ def load_result_file(filepath: Path | str) -> tuple[BenchmarkResults, dict[str, 
     # Load companion files if they exist
     plans_data, plans_load_error = _load_companion_file(filepath_obj, ".plans.json")
     tuning_data, _tuning_load_error = _load_companion_file(filepath_obj, ".tuning.json")
+    applied_data, _applied_load_error = _load_companion_file(filepath_obj, ".applied.json")
 
     # Reconstruct BenchmarkResults
     try:
-        result = reconstruct_benchmark_results(data, plans_data, tuning_data)
+        result = reconstruct_benchmark_results(data, plans_data, tuning_data, applied_data)
     except Exception as e:
         raise ResultLoadError(f"Failed to reconstruct BenchmarkResults: {e}") from e
 
@@ -205,12 +211,27 @@ def _load_companion_file(main_file: Path, suffix: str) -> tuple[dict[str, Any] |
         return None, f"{companion_path.name}: {e}"
 
 
+def _validate_versioned_query_extensions(data: dict[str, Any]) -> None:
+    """Reject query extensions that predate their schema contract."""
+    version = str(data.get("version", ""))
+    if version == ROW_COUNT_VALIDATION_SCHEMA_VERSION:
+        return
+
+    for index, query in enumerate(data.get("queries", [])):
+        if isinstance(query, dict) and "row_count_validation" in query:
+            raise ValueError(
+                f"queries[{index}].row_count_validation requires schema version "
+                f"{ROW_COUNT_VALIDATION_SCHEMA_VERSION}, got {version!r}"
+            )
+
+
 def reconstruct_benchmark_results(
     data: dict[str, Any],
     plans_data: dict[str, Any] | None = None,
     tuning_data: dict[str, Any] | None = None,
+    applied_data: dict[str, Any] | None = None,
 ) -> BenchmarkResults:
-    """Reconstruct a BenchmarkResults object from v2.0 JSON schema.
+    """Reconstruct a BenchmarkResults object from a supported v2.x JSON schema.
 
     This function reverses the transformation performed by build_result_payload()
     in the schema module, mapping JSON keys back to BenchmarkResults dataclass
@@ -220,6 +241,8 @@ def reconstruct_benchmark_results(
         data: Result data in v2.0 JSON format.
         plans_data: Optional plans companion file data.
         tuning_data: Optional tuning companion file data.
+        applied_data: Optional applied-ledger companion (``.applied.json``) data,
+            the AppliedTuningLedger.to_payload() dict; carried onto the result.
 
     Returns:
         Fully reconstructed BenchmarkResults object.
@@ -228,6 +251,7 @@ def reconstruct_benchmark_results(
         KeyError: If required fields are missing.
         ValueError: If data cannot be parsed correctly.
     """
+    _validate_versioned_query_extensions(data)
     run_section = data.get("run", {})
     benchmark_section = data.get("benchmark", {})
     platform_section = data.get("platform", {})
@@ -294,7 +318,10 @@ def reconstruct_benchmark_results(
         tunings_applied=tuning["tunings_applied"],
         tuning_source_file=tuning["tuning_source_file"],
         tuning_config_hash=tuning["tuning_config_hash"],
+        tuning_source=tuning["tuning_source"],
         tuning_validation_status=tuning["tuning_validation_status"],
+        applied_tuning_ledger=applied_data or None,
+        applied_ledger_hash=(applied_data or {}).get("applied_ledger_hash"),
         query_plans_captured=plans_captured,
         plan_capture_failures=plan_failures,
         cost_summary=cost_summary,
@@ -365,27 +392,56 @@ def _extract_platform_info(platform_section: dict[str, Any]) -> dict[str, Any]:
 
 
 def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str, Any] | None) -> dict[str, Any]:
-    """Extract tuning configuration from platform section and companion data."""
+    """Extract tuning configuration from platform section and companion data.
+
+    Prefers the new ADR-1 fields (``requested_config_hash``, ``tuning_source``)
+    and falls back to the legacy ``hash``/``source`` bridge keys for older
+    bundles that predate this extraction (see schema.py's
+    ``_legacy_tuning_source_bridge``).
+    """
     tunings_applied = None
     tuning_source_file = None
     tuning_config_hash = None
+    tuning_source = None
     tuning_validation_status = None
 
     tuning_summary = platform_section.get("tuning", {})
     if tuning_summary:
+        tuning_config_hash = tuning_summary.get("requested_config_hash") or tuning_summary.get("hash")
+        tuning_source = tuning_summary.get("tuning_source")
+        # Legacy fidelity: pre-ADR-1 bundles only ever recorded a "yaml"/"auto"
+        # source in the summary block, with no companion .tuning.json carrying
+        # a real source_file. Reconstruct the old "yaml" sentinel here so those
+        # summary-only bundles keep round-tripping a truthy tuning_source_file,
+        # matching this function's pre-existing behavior.
         tuning_source_file = "yaml" if tuning_summary.get("source") == "yaml" else None
-        tuning_config_hash = tuning_summary.get("hash")
 
     if tuning_data:
-        tunings_applied = tuning_data.get("clauses", {})
+        requested = tuning_data.get("requested")
+        if requested:
+            # schema.py's _requested_tuning_sections groups
+            # primary_keys/foreign_keys/unique_constraints/check_constraints
+            # under requested["constraints"] for export. tunings_applied must
+            # carry the flat UnifiedTuningConfiguration.to_dict() shape
+            # (builder.py's documented contract) so a load -> re-export round
+            # trip through build_tuning_payload doesn't drop every constraint
+            # and its platform.tuning.counts entry.
+            tunings_applied = dict(requested.get("constraints") or {})
+            for key in ("platform_optimizations", "table_tunings"):
+                if key in requested:
+                    tunings_applied[key] = requested[key]
+        else:
+            tunings_applied = tuning_data.get("clauses", {})
         tuning_source_file = tuning_data.get("source_file")
-        tuning_config_hash = tuning_data.get("hash")
+        tuning_config_hash = tuning_data.get("requested_config_hash") or tuning_data.get("hash") or tuning_config_hash
+        tuning_source = tuning_data.get("tuning_source") or tuning_source
         tuning_validation_status = tuning_data.get("validation_status")
 
     return {
         "tunings_applied": tunings_applied,
         "tuning_source_file": tuning_source_file,
         "tuning_config_hash": tuning_config_hash,
+        "tuning_source": tuning_source,
         "tuning_validation_status": tuning_validation_status,
     }
 
@@ -534,28 +590,16 @@ def _reconstruct_query_results(
     consumed_error_ids: set[int] = set()
 
     for q in queries_list:
-        query_id = q.get("id")
-        status = q.get("status", "SUCCESS")
-        result: dict[str, Any] = {
-            "query_id": query_id,
-            "execution_time_ms": q.get("ms"),
-            "rows_returned": q.get("rows"),
-            "status": status,
-        }
-        if q.get("iter") is not None:
-            result["iteration"] = q["iter"]
-        if q.get("stream") is not None:
-            result["stream_id"] = q["stream"]
-        if q.get("run_type") is not None:
-            result["run_type"] = q["run_type"]
-        if q.get("test_type"):
-            result["test_type"] = q["test_type"]
-        if q.get("plan_capture_error") is not None:
-            # Real DataFrame plan-capture-error cause (qpc-05 / F4.4, #1052
-            # review): without this, the export -> load -> re-export round
-            # trip silently drops it again even though it survives the JSON
-            # export itself.
-            result["plan_capture_error"] = q["plan_capture_error"]
+        execution = query_execution_from_compact_v2(q)
+        query_id = execution.query_id
+        status = execution.status
+        result = query_execution_to_legacy_dict(execution)
+        # Preserve the established loader API shape even when compact v2 omits
+        # optional numeric fields.  Schema re-export still omits these None
+        # values through the legacy adapter, while callers that index the
+        # reconstructed dictionary retain their historical contract.
+        result.setdefault("execution_time_ms", None)
+        result.setdefault("rows_returned", None)
 
         if status not in ("SUCCESS", "SKIPPED") and query_id is not None:
             error_queue = query_errors_by_id.get(normalize_query_id(query_id))

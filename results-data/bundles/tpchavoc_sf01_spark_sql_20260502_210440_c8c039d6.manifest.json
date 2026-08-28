@@ -1,0 +1,14 @@
+{
+  "benchmark": "TPC-Havoc",
+  "bundle_file": "tpchavoc_sf01_spark_sql_20260502_210440_c8c039d6.json",
+  "bundle_hash": "e3dd8c28b4a698d3c06d64f6da33d32b86251e29ff084dd8ae3d2a08b2992e47",
+  "companion_hashes": {},
+  "phase": 2,
+  "platform": "Spark",
+  "result_source": "internal",
+  "scale_factor": 0.1,
+  "submission_path": "path_30338255ec33",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:52:40.198760+00:00",
+  "submitted_by": "BenchBox UAT"
+}

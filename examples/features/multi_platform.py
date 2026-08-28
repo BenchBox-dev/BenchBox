@@ -387,7 +387,7 @@ def main() -> int:
     print()
     print("Next steps:")
     print("  • Use unified_runner.py for platform comparison:")
-    print("    for platform in duckdb clickhouse databricks; do")
+    print("    for platform in duckdb clickhouse-local databricks; do")
     print("      python unified_runner.py --platform $platform \\")
     print("        --benchmark tpch --scale 1.0 --phases power \\")
     print("        --output-dir ./results/$platform")

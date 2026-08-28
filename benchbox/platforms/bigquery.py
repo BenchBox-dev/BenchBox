@@ -135,9 +135,8 @@ class BigQueryAdapter(PlatformAdapter):
             raise ConfigurationError(
                 "BigQuery configuration requires project_id.\n"
                 "Configure with one of:\n"
-                "  1. CLI: benchbox platforms setup --platform bigquery\n"
+                "  1. CLI: benchbox setup --platform bigquery\n"
                 "  2. Environment variable: BIGQUERY_PROJECT\n"
-                "  3. CLI option: --platform-option project_id=<your-project>\n"
                 "Also ensure Google Cloud credentials are configured:\n"
                 "  - Set GOOGLE_APPLICATION_CREDENTIALS to service account JSON path\n"
                 "  - Or run 'gcloud auth application-default login'"
@@ -212,6 +211,10 @@ class BigQueryAdapter(PlatformAdapter):
             "disable_result_cache",
             "maximum_bytes_billed",
             "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
             "verbose_enabled",
             "very_verbose",
         ]:
@@ -1552,6 +1555,7 @@ class BigQueryAdapter(PlatformAdapter):
                 actual_row_count=actual_row_count,
                 first_row=result[0] if result else None,
                 validation_result=validation_result,
+                materialized_rows=result,
             )
 
             # Include BigQuery-specific fields

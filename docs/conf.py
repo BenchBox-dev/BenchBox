@@ -149,7 +149,19 @@ napoleon_use_rtype = True
 napoleon_type_aliases = None
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "_project"]
+exclude_patterns = [
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    "_project",
+    "agent",
+    "development/task-management-design.md",
+    "development/dependency-audit-raw.md",
+    "development/duplication-inventory.csv",
+    "development/duplication-residuals.md",
+    "development/unified_frame_any_survey.md",
+    "development/unified_frame_any_survey.csv",
+]
 
 language = "en"
 
@@ -210,7 +222,7 @@ html_theme_options = {
         "color-foreground-primary": "#f0f6fc",
         "color-foreground-secondary": "#c9d1d9",
     },
-    "source_repository": "https://github.com/joeharris76/benchbox/",
+    "source_repository": "https://github.com/BenchBox-dev/benchbox/",
     "source_branch": "main",
     "source_directory": "docs/",
 }

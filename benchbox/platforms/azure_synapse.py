@@ -87,11 +87,23 @@ class AzureSynapseAdapter(PlatformAdapter):
         # Azure storage configuration for data loading
         staging_root = config.get("staging_root")
         if staging_root:
-            from benchbox.utils.cloud_storage import get_cloud_path_info
+            from benchbox.utils.cloud_storage import cloud_provider_family, get_cloud_path_info
 
             path_info = get_cloud_path_info(staging_root)
-            if path_info["provider"] in ("az", "abfs", "abfss"):
-                self.storage_account = path_info.get("account") or self._extract_storage_account(staging_root)
+            # Gate on the provider *family*, not a literal list of spellings:
+            # the literal accepted "abfs" (which the classifier never produced)
+            # while rejecting the documented "azure://" form.
+            if cloud_provider_family(staging_root) == "azure":
+                self.storage_account = (
+                    path_info.get("account")
+                    or self._extract_storage_account(staging_root)
+                    or config.get("storage_account")
+                )
+                if not self.storage_account:
+                    raise ValueError(
+                        "Azure Synapse staging_root must include a storage account "
+                        "or provide the storage_account option"
+                    )
                 self.container = path_info["bucket"]
                 self.storage_path = path_info["path"].strip("/") if path_info["path"] else "benchbox-data"
                 self.logger.info(
@@ -99,7 +111,8 @@ class AzureSynapseAdapter(PlatformAdapter):
                 )
             else:
                 raise ValueError(
-                    f"Azure Synapse requires Azure storage (az://, abfs://, abfss://), got: {path_info['provider']}://"
+                    "Azure Synapse requires Azure storage (az://, azure://, abfs://, abfss://), "
+                    f"got: {path_info['provider']}://"
                 )
         else:
             # Fall back to explicit storage configuration
@@ -1010,6 +1023,7 @@ class AzureSynapseAdapter(PlatformAdapter):
                 actual_row_count=actual_row_count,
                 first_row=result[0] if result else None,
                 validation_result=validation_result,
+                materialized_rows=result,
             )
 
             self.log_verbose(f"Query {query_id} completed: {actual_row_count} rows in {execution_time:.3f}s")

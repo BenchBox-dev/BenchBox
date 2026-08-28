@@ -265,8 +265,8 @@ class TestMyPlatformAdapter:
         ctx = adapter.create_context()
         adapter.load_tables(ctx, sample_data)
 
-        from benchbox.core.tpch.dataframe_queries import get_tpch_query
-        query = get_tpch_query("Q1")
+        from benchbox.core.tpch.dataframe_queries import get_query
+        query = get_query("Q1")
         result = adapter.execute_query(ctx, query)
 
         assert len(result) > 0

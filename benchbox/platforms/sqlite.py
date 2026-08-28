@@ -9,6 +9,9 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import math
+import re
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -41,6 +44,13 @@ _TPCH_HELPER_INDEXES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_bb_tpch_orders_status_order ON orders (o_orderstatus, o_orderkey)",
     "CREATE INDEX IF NOT EXISTS idx_bb_tpch_supplier_nation_supp ON supplier (s_nationkey, s_suppkey)",
     "CREATE INDEX IF NOT EXISTS idx_bb_tpch_nation_name_key ON nation (n_name, n_nationkey)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_tpch_customer_nation_cust ON customer (c_nationkey, c_custkey)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_tpch_orders_date_order_customer ON orders (o_orderdate, o_orderkey, o_custkey)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_tpch_orders_customer_date ON orders (o_custkey, o_orderdate, o_orderkey)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_tpch_lineitem_part_supp_dates_qty "
+    "ON lineitem (l_partkey, l_suppkey, l_shipdate, l_quantity)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_tpch_partsupp_part_supp_cost "
+    "ON partsupp (ps_partkey, ps_suppkey, ps_supplycost)",
 )
 
 _JOINORDER_TABLES: frozenset[str] = frozenset(
@@ -109,6 +119,77 @@ _JOINORDER_HELPER_INDEXES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_bb_job_person_info_person_type ON person_info (person_id, info_type_id)",
     "CREATE INDEX IF NOT EXISTS idx_bb_job_person_info_type_person ON person_info (info_type_id, person_id)",
 )
+
+
+class _SQLiteStdDev:
+    """SQLite aggregate implementing PostgreSQL's sample STDDEV semantics."""
+
+    def __init__(self) -> None:
+        self.count = 0
+        self.mean = 0.0
+        self.m2 = 0.0
+
+    def step(self, value: Any) -> None:
+        if value is None:
+            return
+        value = float(value)
+        self.count += 1
+        delta = value - self.mean
+        self.mean += delta / self.count
+        self.m2 += delta * (value - self.mean)
+
+    def finalize(self) -> float | None:
+        if self.count < 2:
+            return None
+        return math.sqrt(self.m2 / (self.count - 1))
+
+
+class _SQLitePercentileCont:
+    """SQLite aggregate for the two-argument percentile-continuous form."""
+
+    def __init__(self) -> None:
+        self.percentile: float | None = None
+        self.values: list[float] = []
+
+    def step(self, percentile: Any, value: Any) -> None:
+        if percentile is None or value is None:
+            return
+        current_percentile = float(percentile)
+        if not 0.0 <= current_percentile <= 1.0:
+            raise ValueError("percentile must be between 0 and 1")
+        if self.percentile is None:
+            self.percentile = current_percentile
+        elif self.percentile != current_percentile:
+            raise ValueError("percentile must be constant within an aggregate")
+        self.values.append(float(value))
+
+    def finalize(self) -> float | None:
+        if not self.values:
+            return None
+        self.values.sort()
+        percentile = self.percentile or 0.0
+        position = (len(self.values) - 1) * percentile
+        lower = math.floor(position)
+        upper = math.ceil(position)
+        if lower == upper:
+            return self.values[lower]
+        weight = position - lower
+        return self.values[lower] + (self.values[upper] - self.values[lower]) * weight
+
+
+def _sqlite_regexp_replace(value: Any, pattern: Any, replacement: Any) -> str | None:
+    """Implement the three-argument REGEXP_REPLACE used by ClickBench."""
+    if value is None or pattern is None or replacement is None:
+        return None
+    return re.sub(str(pattern), str(replacement), str(value))
+
+
+def _register_sqlite_compatibility_functions(connection: Any) -> None:
+    """Register portable analytical functions missing from SQLite's core."""
+    connection.create_function("REGEXP_REPLACE", 3, _sqlite_regexp_replace)
+    connection.create_aggregate("STDDEV", 1, _SQLiteStdDev)
+    connection.create_aggregate("STDDEV_SAMP", 1, _SQLiteStdDev)
+    connection.create_aggregate("PERCENTILE_CONT", 2, _SQLitePercentileCont)
 
 
 class SQLiteAdapter(PlatformAdapter):
@@ -224,7 +305,15 @@ class SQLiteAdapter(PlatformAdapter):
         )
 
         # Pass through other relevant config (verbose settings, tuning config, etc.)
-        for key in ["tuning_config", "verbose_enabled", "very_verbose"]:
+        for key in [
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+            "verbose_enabled",
+            "very_verbose",
+        ]:
             if key in config:
                 adapter_config[key] = config[key]
 
@@ -289,8 +378,15 @@ class SQLiteAdapter(PlatformAdapter):
         db_path = self.get_database_path(**connection_config)
         self.log_very_verbose(f"SQLite database path: {db_path}")
 
+        # SQLite's DB-API driver does not bind Decimal instances returned by
+        # PyArrow's decimal Parquet columns. SQLite's NUMERIC affinity stores
+        # the adapted real value using its native numeric representation.
+        sqlite3.register_adapter(Decimal, float)
+
         # Create connection
         conn = sqlite3.connect(db_path, timeout=self.timeout, check_same_thread=self.check_same_thread)
+
+        _register_sqlite_compatibility_functions(conn)
 
         # Apply SQLite optimizations
         optimizations_applied = []
@@ -482,7 +578,15 @@ class SQLiteAdapter(PlatformAdapter):
         Reconstructs the tree-formatted text that SQLiteQueryPlanParser expects
         from the raw (id, parent, notused, detail) rows SQLite returns.
         """
-        cursor = connection.cursor()
+        if callable(getattr(connection, "cursor", None)):
+            cursor = connection.cursor()
+            _owns_cursor = True
+        elif hasattr(connection, "connection") and callable(getattr(connection.connection, "cursor", None)):
+            cursor = connection.connection.cursor()
+            _owns_cursor = True
+        else:
+            cursor = connection
+            _owns_cursor = False
         try:
             cursor.execute(f"EXPLAIN QUERY PLAN {query}")
             rows = cursor.fetchall()
@@ -491,7 +595,8 @@ class SQLiteAdapter(PlatformAdapter):
             self.logger.debug(f"Failed to get SQLite query plan: {e}")
             return None
         finally:
-            cursor.close()
+            if _owns_cursor and cursor is not None:
+                cursor.close()
 
     def get_query_plan_parser(self):
         """Get SQLite query plan parser."""
@@ -515,11 +620,10 @@ class SQLiteAdapter(PlatformAdapter):
         self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
 
         cursor = None
+        _owns_cursor = False
         try:
-            # Acquire the cursor inside the try: a broken/closed connection raises here,
-            # and that setup failure must be recorded as a FAILED query result (below)
-            # rather than aborting the whole benchmark run.
-            cursor = connection.cursor()
+            _owns_cursor = callable(getattr(connection, "cursor", None))
+            cursor = connection.cursor() if _owns_cursor else connection
             cursor.execute(query)
             results = cursor.fetchall()
 
@@ -559,21 +663,15 @@ class SQLiteAdapter(PlatformAdapter):
                 actual_row_count=actual_row_count,
                 first_row=results[0] if results else None,
                 validation_result=validation_result,
+                materialized_rows=results,
             )
             # Include full results for SQLite compatibility
             result["results"] = results
 
         except Exception as e:
-            execution_time = elapsed_seconds(start_time)
-            return {
-                "query_id": query_id,
-                "status": "FAILED",
-                "execution_time_seconds": execution_time,
-                "rows_returned": 0,
-                "error": str(e),
-            }
+            return self._build_query_failure_result(query_id, start_time, e)
         finally:
-            if cursor is not None:
+            if _owns_cursor and cursor is not None:
                 cursor.close()
 
         # Display plan in console when --show-query-plans is active.

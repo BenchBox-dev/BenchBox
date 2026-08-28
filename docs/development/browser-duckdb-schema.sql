@@ -11,6 +11,10 @@
 --   - ATTACH ... (READ_ONLY) is enforced at the browser layer; DDL never runs in-browser.
 --   - If the column set of `results` changes, bump
 --     EXPLORER_READ_MODEL_VERSION in `_project/scripts/explorer_pipeline/contract.py`.
+--   - Cohort/ranking identity is derived during publish: raw `benchmark` and
+--     `test_type` remain immutable evidence, while canonical aliases
+--     (`star_schema` -> `ssb`) and missing phase (`unknown`) are written into
+--     ranking/cohort keys. The frontend consumes the same v7 contract.
 
 -- ---------------------------------------------------------------------------
 -- Metadata table (required by browser read-model version guard)
@@ -74,6 +78,24 @@ CREATE TABLE IF NOT EXISTS results (
     execution_mode       VARCHAR,
     tuning_mode          VARCHAR,
     tuning_hash          VARCHAR,
+    -- ADR-1 bundle-emitted tuning identities (display-only, never a join/dedup
+    -- key): canonical requested-config hash and the physical applied-ledger
+    -- hash. NULL for legacy bundles.
+    requested_config_hash VARCHAR,
+    applied_ledger_hash   VARCHAR,
+    -- ADR-1 tuning verified-state (not_applicable / noop / applied_unverified
+    -- / applied_verified / failed). NULL for legacy bundles; distinct from the
+    -- run/query validation_status column below.
+    tuning_validation_status VARCHAR,
+    -- ADR-1 per-statement introspection receipt, carried verbatim from the
+    -- run's `{stem}.applied.json` companion as an opaque JSON string and
+    -- rendered read-only by the RunReceipt drill-down. NULL when the run
+    -- published no receipt (introspection did not run, or a legacy bundle).
+    applied_receipt      VARCHAR,
+    -- ADR-3 seam: explicit tuning-policy generation marker (display-only,
+    -- never a join/dedup key). NULL for legacy bundles, treated downstream as
+    -- the "pre-seam" generation.
+    tuning_policy_generation VARCHAR,
     test_type            VARCHAR,
     validation_status    VARCHAR,
     cost_usd             DOUBLE,
@@ -99,7 +121,13 @@ CREATE TABLE IF NOT EXISTS results (
     has_plans            BOOLEAN  NOT NULL,
     plans_published      BOOLEAN  NOT NULL,
     has_tuning           BOOLEAN  NOT NULL,
-    bundle_download_url  VARCHAR  NOT NULL
+    bundle_download_url  VARCHAR  NOT NULL,
+    -- ADR-2 section 3: platform-rendered physical tuning mechanisms
+    -- (comma-joined, sorted) and, for platforms that expose one, the physical
+    -- rendering strategy id. NULL when the bundle never recorded a logical
+    -- tuning profile.
+    physical_mechanisms   VARCHAR,
+    physical_rendering_id VARCHAR
 );
 
 -- ---------------------------------------------------------------------------
@@ -167,10 +195,16 @@ SELECT
     r.ranking_exclusion_reason,
     r.trust_label,
     r.visibility,
+    r.funding,
     r.platform_version,
     r.execution_mode,
     r.tuning_mode,
     r.tuning_hash,
+    r.requested_config_hash,
+    r.applied_ledger_hash,
+    r.tuning_validation_status,
+    r.applied_receipt,
+    r.tuning_policy_generation,
     r.test_type,
     r.validation_status,
     r.cost_usd,
@@ -196,6 +230,8 @@ SELECT
     r.plans_published,
     r.has_tuning,
     r.bundle_download_url,
+    r.physical_mechanisms,
+    r.physical_rendering_id,
     e.os,
     e.arch,
     e.cpu_count,
@@ -242,6 +278,7 @@ CREATE TABLE IF NOT EXISTS benchmark_rankings (
     platform           VARCHAR  NOT NULL,
     short_id           VARCHAR  NOT NULL,
     trust_label        VARCHAR  NOT NULL,
+    funding            VARCHAR  NOT NULL,
     tuning_mode        VARCHAR,
     tuning_hash        VARCHAR,
     execution_mode     VARCHAR,
@@ -313,6 +350,7 @@ SELECT
     comparison_exclusion_reason,
     ranking_exclusion_reason,
     trust_label,
+    funding,
     tuning_mode,
     execution_mode,
     compliance_class,

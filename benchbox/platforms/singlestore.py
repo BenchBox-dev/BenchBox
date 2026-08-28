@@ -215,7 +215,16 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
             adapter_config["database"] = f"benchbox_{benchmark_name}".lower().replace("-", "_")
 
         # Pass through other config
-        for key in ["force_recreate", "tuning_config", "verbose_enabled", "very_verbose"]:
+        for key in [
+            "force_recreate",
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+            "verbose_enabled",
+            "very_verbose",
+        ]:
             if key in config:
                 adapter_config[key] = config[key]
         if "force" in config:

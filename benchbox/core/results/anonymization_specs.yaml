@@ -1,12 +1,52 @@
-secret_key_parts:
-- password
-- token
-- secret
-- accesskey
-- privatekey
-- sessiontoken
-- connectionstring
-- credential
+# secret_key_parts intentionally lives in code, not here: both the internal
+# capture path and this public anonymization path read the single list in
+# benchbox/core/results/platform_options.py (_SECRET_KEY_PARTS). A second
+# hand-synced copy in this file diverged within a month of being split out.
+#
+# Keys listed here are omitted entirely from public payloads rather than
+# hashed. See docs/development/adr/adr-published-identifier-field-set.md:
+# they have no reader in the publication pipeline, Explorer, or contract,
+# and a pseudonym would still be a confirmation oracle with the empty
+# default salt. Compact forms match ``_compact_key`` (lowercase, non-alnum
+# stripped). Retained identifiers (endpoint, database_name, submission_path)
+# stay under identifier_keys / path / endpoint rules below.
+#
+# Alias rows cover alternate spellings of the six unread drop fields so a
+# producer using workdir/datadir/pythonexecutable cannot reintroduce empty-salt
+# path_/host_ tokens. Residual pure-local filesystem keys (output*/result*/
+# log*/filepath/path/sourceroot/credentialfile) are also dropped: no Explorer
+# or pipeline consumer, empty-salt confirmation oracle only.
+#
+# KEEP HASH (do not add here): sslrootcert (libpq privacy hash); s3stagingurl /
+# staginglocation / stagingurl / httppath (may embed account/tenant); host /
+# hostname / server (broader than engine_host, may be remote); retained
+# consumers endpoint / database_name / submission_path.
+public_drop_keys:
+- machineid
+- workingdir
+- workdir
+- workingdirectory
+- workingroot
+- driverruntimepythonexecutable
+- pythonexecutable
+- databasepath
+- datapath
+- datadir
+- datadirectory
+- enginehost
+# Residual local-path keys (compact forms): omit rather than path_ tokens.
+- outputdir
+- outputdirectory
+- outputpath
+- outputlocation
+- resultdir
+- resultpath
+- logpath
+- logfile
+- filepath
+- path
+- sourceroot
+- credentialfile
 identifier_keys:
   account: account
   accountid: account
@@ -21,6 +61,7 @@ identifier_keys:
   projectid: project
   workspace: workspace
   workspaceid: workspace
+  workspacename: workspace
   warehouse: warehouse
   warehousename: warehouse
   workgroup: workgroup
@@ -42,16 +83,23 @@ identifier_keys:
   username: user
   user: user
   userid: user
+  pguser: user
+  dbuser: user
+  tenant: tenant
+  tenantid: tenant
   role: role
   rolename: role
   rolearn: role
   iamrole: role
   iamrolearn: role
+  jobrole: role
   arn: arn
   engine: engine
   enginename: engine
   clientid: client
   machineid: machine
+  applicationid: application
+  serviceaccount: serviceaccount
 endpoint_keys:
 - apiendpoint
 - endpoint
@@ -65,6 +113,9 @@ endpoint_keys:
 path_keys:
 - credentialfile
 - databasepath
+# libpq spelling (redshift.py): no underscore, so the *path/*file suffix
+# rules never fire and the raw local path (home-dir username) leaked.
+- sslrootcert
 - datadirectory
 - datapath
 - filepath
@@ -77,6 +128,18 @@ path_keys:
 - sourceroot
 - staginglocation
 - stagingurl
+- datadir
+- workingdir
+- workingdirectory
+- workdir
+- workingroot
+- outputdir
+- resultdir
+- resultpath
+- logpath
+- logfile
+- pythonexecutable
+- driverruntimepythonexecutable
 mount_collection_keys:
 - bindmounts
 - mounts

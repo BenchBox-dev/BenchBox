@@ -36,6 +36,7 @@ def _write_result_json(
     failed: int = 0,
     validation: str = "passed",
     compliance_class: str | None = None,
+    translation_status: str | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     passed = 1 if failed == 0 else 0
@@ -48,11 +49,13 @@ def _write_result_json(
             "queries": {"total": 1, "passed": passed, "failed": failed},
             "validation": {"status": validation},
         },
-        "queries": [{"id": "Q1", "status": "SUCCESS" if failed == 0 else "ERROR", "execution_time_ms": 1}],
+        "queries": [{"id": "Q1", "status": "SUCCESS" if failed == 0 else "ERROR", "ms": 1}],
         "phases": {},
     }
     if compliance_class is not None:
         payload["benchmark"]["compliance_class"] = compliance_class
+    if translation_status is not None:
+        payload["execution"] = {"translation": {"status": translation_status}}
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
@@ -67,14 +70,61 @@ def _loadable_cases(tmp_path: Path) -> list[tuple[str, Path, SubmitTerminalState
     schema_violation = tmp_path / "schema-violation.json"
     _write_result_json(schema_violation, failed=0, validation="failed")
 
+    unvalidated_not_validated = tmp_path / "unvalidated-not-validated.json"
+    _write_result_json(unvalidated_not_validated, failed=0, validation="not_validated")
+
+    unvalidated_not_run = tmp_path / "unvalidated-not-run.json"
+    _write_result_json(unvalidated_not_run, failed=0, validation="not_run")
+
+    unvalidated_uncertain = tmp_path / "unvalidated-uncertain.json"
+    _write_result_json(unvalidated_uncertain, failed=0, validation="uncertain")
+
+    unvalidated_unknown = tmp_path / "unvalidated-unknown.json"
+    _write_result_json(unvalidated_unknown, failed=0, validation="unknown")
+
+    # Translation fallback alone is non-clean but not an unvalidated partition
+    # status → schema_violation terminal (not submittable).
+    translation_fallback = tmp_path / "translation-fallback.json"
+    _write_result_json(translation_fallback, failed=0, validation="passed", translation_status="fallback")
+
+    # Uncertain + translation fallback: unvalidated takes precedence over the
+    # translation non-clean reason so the refusal wording stays in the
+    # unvalidated family (claim-weakened), not schema_violation.
+    uncertain_with_translation_fallback = tmp_path / "uncertain-with-translation-fallback.json"
+    _write_result_json(
+        uncertain_with_translation_fallback,
+        failed=0,
+        validation="uncertain",
+        translation_status="fallback",
+    )
+
     unofficial = tmp_path / "unofficial.json"
     _write_result_json(unofficial, compliance_class="unofficial_subscale")
+
+    unofficial_and_unvalidated = tmp_path / "unofficial-and-unvalidated.json"
+    _write_result_json(
+        unofficial_and_unvalidated,
+        failed=0,
+        validation="not_validated",
+        compliance_class="unofficial_subscale",
+    )
 
     return [
         ("clean", clean, SubmitTerminalState.submittable),
         ("query_failure", query_failure, SubmitTerminalState.query_failure),
         ("schema_violation", schema_violation, SubmitTerminalState.schema_violation),
+        ("translation_fallback", translation_fallback, SubmitTerminalState.schema_violation),
+        ("unvalidated_not_validated", unvalidated_not_validated, SubmitTerminalState.unvalidated),
+        ("unvalidated_not_run", unvalidated_not_run, SubmitTerminalState.unvalidated),
+        ("unvalidated_uncertain", unvalidated_uncertain, SubmitTerminalState.unvalidated),
+        ("unvalidated_unknown", unvalidated_unknown, SubmitTerminalState.unvalidated),
+        (
+            "uncertain_with_translation_fallback",
+            uncertain_with_translation_fallback,
+            SubmitTerminalState.unvalidated,
+        ),
         ("unofficial", unofficial, SubmitTerminalState.unofficial),
+        ("unofficial_and_unvalidated", unofficial_and_unvalidated, SubmitTerminalState.unofficial),
     ]
 
 
@@ -99,12 +149,29 @@ def test_submit_classifier_contract_path_only_states(tmp_path: Path):
 
     malformed = tmp_path / "malformed.json"
     malformed.write_text("{not valid json", encoding="utf-8")
-    assert classify_result_path(malformed) is SubmitTerminalState.schema_violation
-    assert runner.classify_for_submit(malformed) is runner.SubmitTerminalState.schema_violation
+    # Load/parse failures are bundle_load_error, not schema_violation (integrity).
+    assert classify_result_path(malformed) is SubmitTerminalState.bundle_load_error
+    assert runner.classify_for_submit(malformed) is runner.SubmitTerminalState.bundle_load_error
+
+
+def test_submit_classifier_contract_load_error_distinct_from_integrity(tmp_path: Path):
+    """Loaded integrity failures stay schema_violation; unreadable files are load errors."""
+    integrity = tmp_path / "integrity.json"
+    _write_result_json(integrity, failed=0, validation="failed")
+    assert classify_result_path(integrity) is SubmitTerminalState.schema_violation
+
+    unreadable = tmp_path / "unreadable.json"
+    unreadable.write_bytes(b"\xff\xfe not json")
+    assert classify_result_path(unreadable) is SubmitTerminalState.bundle_load_error
 
 
 def test_submit_classifier_contract_cli_refusal_tracks_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """The CLI's externally observable refuse/accept verdict equals the shared state."""
+    # This test drives `sub.submit` end-to-end, which is community-facing and
+    # hard-refuses without a deployment salt. That precondition is orthogonal
+    # to the classification-refusal contract under test here, so satisfy it
+    # once up front (mirrors tests/unit/cli/commands/test_submit.py).
+    monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "unit-test-community-publish-salt")
     out_dir = tmp_path / "out"
     for label, path, expected in _loadable_cases(tmp_path):
         loaded, _raw = load_result_file(path)
@@ -121,5 +188,15 @@ def test_submit_classifier_contract_cli_refusal_tracks_state(tmp_path: Path, mon
             assert "Submission refused" in result.output, label
             if expected is SubmitTerminalState.unofficial:
                 assert "compliance_class" in result.output, label
+            elif expected is SubmitTerminalState.unvalidated:
+                # Distinct wording: must name unvalidated, not imply schema violation.
+                assert "unvalidated" in result.output, label
+                assert "validation_status=" in result.output, label
+                assert "schema violation" not in result.output.lower(), label
+                if "uncertain" in label:
+                    assert "uncertain correctness claim" in result.output, label
+                    assert "never executed" not in result.output, label
+                elif "not_validated" in label or "not_run" in label or "unknown" in label:
+                    assert "never executed" in result.output or "was skipped" in result.output, label
             else:
                 assert "not a clean pass" in result.output, label

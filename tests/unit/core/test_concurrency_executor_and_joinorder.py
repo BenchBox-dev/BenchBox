@@ -27,7 +27,7 @@ pytestmark = [
 
 class TestQueryExecution:
     def test_creation(self):
-        from benchbox.experimental.concurrency.executor import QueryExecution
+        from benchbox.experimental.load_testing.executor import QueryExecution
 
         qe = QueryExecution(
             query_id="Q1",
@@ -43,7 +43,7 @@ class TestQueryExecution:
         assert qe.queue_wait_time == 0.0
 
     def test_with_error(self):
-        from benchbox.experimental.concurrency.executor import QueryExecution
+        from benchbox.experimental.load_testing.executor import QueryExecution
 
         qe = QueryExecution(
             query_id="Q2",
@@ -59,7 +59,7 @@ class TestQueryExecution:
 
 class TestStreamResult:
     def test_success_rate(self):
-        from benchbox.experimental.concurrency.executor import StreamResult
+        from benchbox.experimental.load_testing.executor import StreamResult
 
         sr = StreamResult(
             stream_id=0,
@@ -71,7 +71,7 @@ class TestStreamResult:
         assert sr.success_rate == 80.0
 
     def test_success_rate_zero_queries(self):
-        from benchbox.experimental.concurrency.executor import StreamResult
+        from benchbox.experimental.load_testing.executor import StreamResult
 
         sr = StreamResult(
             stream_id=0,
@@ -83,7 +83,7 @@ class TestStreamResult:
         assert sr.success_rate == 0.0
 
     def test_throughput(self):
-        from benchbox.experimental.concurrency.executor import StreamResult
+        from benchbox.experimental.load_testing.executor import StreamResult
 
         sr = StreamResult(
             stream_id=0,
@@ -95,7 +95,7 @@ class TestStreamResult:
         assert sr.throughput == 5.0
 
     def test_throughput_zero_time(self):
-        from benchbox.experimental.concurrency.executor import StreamResult
+        from benchbox.experimental.load_testing.executor import StreamResult
 
         sr = StreamResult(
             stream_id=0,
@@ -109,7 +109,7 @@ class TestStreamResult:
 
 class TestConcurrentLoadConfig:
     def test_defaults(self):
-        from benchbox.experimental.concurrency.executor import ConcurrentLoadConfig
+        from benchbox.experimental.load_testing.executor import ConcurrentLoadConfig
 
         config = ConcurrentLoadConfig(
             query_factory=lambda i: (f"Q{i}", f"SELECT {i}"),
@@ -124,7 +124,7 @@ class TestConcurrentLoadConfig:
 
 class TestConcurrentLoadResult:
     def test_success_rate(self):
-        from benchbox.experimental.concurrency.executor import ConcurrentLoadResult
+        from benchbox.experimental.load_testing.executor import ConcurrentLoadResult
 
         result = ConcurrentLoadResult(
             start_time=0.0,
@@ -141,7 +141,7 @@ class TestConcurrentLoadResult:
         assert result.success_rate == 90.0
 
     def test_success_rate_zero(self):
-        from benchbox.experimental.concurrency.executor import ConcurrentLoadResult
+        from benchbox.experimental.load_testing.executor import ConcurrentLoadResult
 
         result = ConcurrentLoadResult(
             start_time=0.0,
@@ -158,7 +158,7 @@ class TestConcurrentLoadResult:
         assert result.success_rate == 0.0
 
     def test_get_percentile_latency(self):
-        from benchbox.experimental.concurrency.executor import ConcurrentLoadResult, QueryExecution, StreamResult
+        from benchbox.experimental.load_testing.executor import ConcurrentLoadResult, QueryExecution, StreamResult
 
         executions = [
             QueryExecution(
@@ -192,7 +192,7 @@ class TestConcurrentLoadResult:
         assert p99 >= p50
 
     def test_get_percentile_latency_empty(self):
-        from benchbox.experimental.concurrency.executor import ConcurrentLoadResult
+        from benchbox.experimental.load_testing.executor import ConcurrentLoadResult
 
         result = ConcurrentLoadResult(
             start_time=0.0,
@@ -216,8 +216,8 @@ class TestConcurrentLoadResult:
 
 class TestConcurrentLoadExecutor:
     def _make_config(self, *, queries_per_stream=2, duration=0.3, concurrency=1):
-        from benchbox.experimental.concurrency.executor import ConcurrentLoadConfig
-        from benchbox.experimental.concurrency.patterns import SteadyPattern
+        from benchbox.experimental.load_testing.executor import ConcurrentLoadConfig
+        from benchbox.experimental.load_testing.patterns import SteadyPattern
 
         conn_mock = MagicMock()
         conn_mock.close = MagicMock()
@@ -234,7 +234,7 @@ class TestConcurrentLoadExecutor:
         return config
 
     def test_run_basic(self):
-        from benchbox.experimental.concurrency.executor import ConcurrentLoadExecutor
+        from benchbox.experimental.load_testing.executor import ConcurrentLoadExecutor
 
         config = self._make_config()
         executor = ConcurrentLoadExecutor(config)
@@ -245,8 +245,8 @@ class TestConcurrentLoadExecutor:
         assert result.pattern_name == "SteadyPattern"
 
     def test_run_with_failures(self):
-        from benchbox.experimental.concurrency.executor import ConcurrentLoadConfig, ConcurrentLoadExecutor
-        from benchbox.experimental.concurrency.patterns import SteadyPattern
+        from benchbox.experimental.load_testing.executor import ConcurrentLoadConfig, ConcurrentLoadExecutor
+        from benchbox.experimental.load_testing.patterns import SteadyPattern
 
         config = ConcurrentLoadConfig(
             query_factory=lambda i: (f"Q{i}", f"SELECT {i}"),
@@ -261,8 +261,8 @@ class TestConcurrentLoadExecutor:
         assert result.total_queries_failed > 0
 
     def test_run_connection_factory_failure(self):
-        from benchbox.experimental.concurrency.executor import ConcurrentLoadConfig, ConcurrentLoadExecutor
-        from benchbox.experimental.concurrency.patterns import SteadyPattern
+        from benchbox.experimental.load_testing.executor import ConcurrentLoadConfig, ConcurrentLoadExecutor
+        from benchbox.experimental.load_testing.patterns import SteadyPattern
 
         def bad_factory():
             raise ConnectionError("connection refused")
@@ -283,8 +283,8 @@ class TestConcurrentLoadExecutor:
         assert len(errored) > 0
 
     def test_run_query_execution_exception(self):
-        from benchbox.experimental.concurrency.executor import ConcurrentLoadConfig, ConcurrentLoadExecutor
-        from benchbox.experimental.concurrency.patterns import SteadyPattern
+        from benchbox.experimental.load_testing.executor import ConcurrentLoadConfig, ConcurrentLoadExecutor
+        from benchbox.experimental.load_testing.patterns import SteadyPattern
 
         def exploding_execute(conn, sql):
             raise RuntimeError("query exploded")
@@ -302,7 +302,7 @@ class TestConcurrentLoadExecutor:
         assert result.total_queries_failed > 0
 
     def test_queue_metrics(self):
-        from benchbox.experimental.concurrency.executor import ConcurrentLoadExecutor
+        from benchbox.experimental.load_testing.executor import ConcurrentLoadExecutor
 
         config = self._make_config(concurrency=2, duration=0.5, queries_per_stream=3)
         executor = ConcurrentLoadExecutor(config)
@@ -311,8 +311,8 @@ class TestConcurrentLoadExecutor:
         assert isinstance(result.queue_metrics, dict)
 
     def test_resource_monitoring(self):
-        from benchbox.experimental.concurrency.executor import ConcurrentLoadConfig, ConcurrentLoadExecutor
-        from benchbox.experimental.concurrency.patterns import SteadyPattern
+        from benchbox.experimental.load_testing.executor import ConcurrentLoadConfig, ConcurrentLoadExecutor
+        from benchbox.experimental.load_testing.patterns import SteadyPattern
 
         config = ConcurrentLoadConfig(
             query_factory=lambda i: (f"Q{i}", f"SELECT {i}"),
@@ -329,7 +329,7 @@ class TestConcurrentLoadExecutor:
         assert isinstance(result.resource_metrics, dict)
 
     def test_calculate_queue_metrics_empty(self):
-        from benchbox.experimental.concurrency.executor import ConcurrentLoadExecutor
+        from benchbox.experimental.load_testing.executor import ConcurrentLoadExecutor
 
         config = self._make_config()
         executor = ConcurrentLoadExecutor(config)
@@ -338,7 +338,7 @@ class TestConcurrentLoadExecutor:
         assert metrics == {}
 
     def test_calculate_resource_metrics_empty(self):
-        from benchbox.experimental.concurrency.executor import ConcurrentLoadExecutor
+        from benchbox.experimental.load_testing.executor import ConcurrentLoadExecutor
 
         config = self._make_config()
         executor = ConcurrentLoadExecutor(config)

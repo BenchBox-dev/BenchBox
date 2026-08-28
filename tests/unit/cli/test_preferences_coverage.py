@@ -48,6 +48,10 @@ def test_last_run_save_load_clear_cycle(monkeypatch: pytest.MonkeyPatch, tmp_pat
         scale=0.01,
         tuning_mode="tuned",
         phases=["load", "power"],
+        queries=["Q1", "Q6"],
+        mode="dataframe",
+        iterations=5,
+        non_replayable_options=["force", "platform_options", "force"],
         additional_options={"x_opt": "1", "table_mode": "external"},
     )
 
@@ -56,6 +60,11 @@ def test_last_run_save_load_clear_cycle(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert loaded["database"] == "duckdb"
     assert loaded["x_opt"] == "1"
     assert loaded["table_mode"] == "external"
+    assert loaded["queries"] == ["Q1", "Q6"]
+    assert loaded["mode"] == "dataframe"
+    assert loaded["iterations"] == 5
+    assert loaded["replay_schema_version"] == 1
+    assert loaded["non_replayable_options"] == ["force", "platform_options"]
 
     prefs.clear_last_run_config()
     assert prefs.load_last_run_config() is None
@@ -104,6 +113,7 @@ def test_format_last_run_summary_paths_and_age(monkeypatch: pytest.MonkeyPatch, 
         "phases": ["load", "power"],
         "table_mode": "external",
         "concurrency": 4,
+        "iterations": 5,
         "timestamp": (datetime.now() - timedelta(minutes=2)).isoformat(),
     }
     out = prefs.format_last_run_summary(config)
@@ -111,6 +121,7 @@ def test_format_last_run_summary_paths_and_age(monkeypatch: pytest.MonkeyPatch, 
     assert "custom config" in out
     assert "tables: external" in out
     assert "4 streams" in out
+    assert "5 power iterations" in out
 
 
 def test_favorites_crud(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

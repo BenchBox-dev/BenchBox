@@ -14,6 +14,22 @@ from benchbox.core.schemas import DatabaseConfig, SystemProfile
 
 logger = logging.getLogger(__name__)
 
+# Semantically required producer keys. get_platform_config may emit many more
+# extras; adapters may ignore metadata. These keys must be forwarded by
+# ``build_adapter_config`` when present. Inventory (w0):
+# - consumed via helper: TUNING_FORWARD_KEYS in platforms/base/config_utils.py
+# - stripped metadata: type, name, connection_string
+# - adapter-specific extras: remaining DatabaseConfig fields (not required)
+REQUIRED_FROM_CONFIG_KEYS: frozenset[str] = frozenset(
+    {
+        "tuning_config",
+        "tuning_enabled",
+        "unified_tuning_configuration",
+        "tuning_source",
+        "tuning_source_file",
+    }
+)
+
 
 def get_platform_config(
     database_config: DatabaseConfig,
@@ -46,6 +62,7 @@ def get_platform_config(
 
     # Start with all database config fields (includes options and any extra platform-specific fields)
     platform_config.update(db_config_dict)
+    options = database_config.options if isinstance(database_config.options, dict) else {}
 
     # Include benchmark context for config-aware adapters (e.g., Databricks, Snowflake)
     # This enables proper schema naming based on benchmark/scale/tuning configuration
@@ -67,12 +84,15 @@ def get_platform_config(
         except Exception:
             total_memory_gb_val = 4.0
 
-        max_memory_limit = (
-            database_config.options.get("max_memory_limit_gb", 16)
-            if hasattr(database_config, "options") and database_config.options
-            else 16
-        )
-        platform_config["memory_limit"] = f"{min(int(total_memory_gb_val * 0.8), max_memory_limit)}GB"
+        if "memory_limit" in platform_config:
+            configured_memory_limit = platform_config["memory_limit"]
+        else:
+            configured_memory_limit = options.get("memory_limit")
+        if configured_memory_limit is not None:
+            platform_config["memory_limit"] = configured_memory_limit
+        else:
+            max_memory_limit = options.get("max_memory_limit_gb", 16)
+            platform_config["memory_limit"] = f"{min(int(total_memory_gb_val * 0.8), max_memory_limit)}GB"
 
         cpu_cores = getattr(system_profile, "cpu_cores_logical", 2)
         try:

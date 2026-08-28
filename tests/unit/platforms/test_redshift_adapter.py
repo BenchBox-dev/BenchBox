@@ -1464,6 +1464,12 @@ class TestRedshiftAdapter:
         assert any("query_group" in call for call in execute_calls)
         assert any("statement_timeout" in call for call in execute_calls)
 
+    def test_execute_query_uses_core_cursor_mixin(self):
+        """Redshift execute/validate now lives on the core kernel primitive."""
+        from benchbox.core.benchmark_mixins import CursorValidationQueryExecutionMixin
+
+        assert issubclass(RedshiftAdapter, CursorValidationQueryExecutionMixin)
+
     def test_execute_query_success(self):
         """Test successful query execution."""
         try:

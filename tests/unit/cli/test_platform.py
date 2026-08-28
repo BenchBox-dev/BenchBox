@@ -22,6 +22,7 @@ from benchbox.cli.platform import (
     LibraryInfo,
     PlatformInfo,
     PlatformManager,
+    _format_support_status,
     check_platforms,
     disable_platform,
     enable_platform,
@@ -105,9 +106,13 @@ class TestPlatformNameNormalization:
         assert normalize_platform_name("PrestoDB") == "presto"
 
     def test_normalize_clickhouse_alias(self):
-        """Test ClickHouse alias."""
-        assert normalize_platform_name("ch") == "clickhouse"
-        assert normalize_platform_name("CH") == "clickhouse"
+        """Test ClickHouse alias resolves to the first-class local platform.
+
+        Bare 'clickhouse' was removed after its deprecation window, so the 'ch'
+        shorthand now normalizes to 'clickhouse-local' (the default canonical).
+        """
+        assert normalize_platform_name("ch") == "clickhouse-local"
+        assert normalize_platform_name("CH") == "clickhouse-local"
 
     def test_normalize_bigquery_aliases(self):
         """Test BigQuery aliases."""
@@ -181,6 +186,82 @@ class TestPlatformInfo:
         assert platform.category == "analytical"
         assert len(platform.libraries) == 1
         assert platform.libraries[0].name == "duckdb"
+
+
+class TestSupportStatusIsDistinctFromDriverAvailability:
+    """Guard the two independent platform signals.
+
+    `support_status` is the product support tier from the registry;
+    `available`/`enabled` report only whether the driver imports locally.
+    docs/reference/public-contracts.md states these are different things, and the
+    platform table conflated them by labelling driver availability "Status".
+    """
+
+    def test_registry_populates_support_status_from_the_manifest(self):
+        """The tier must survive the manifest -> PlatformInfo hop, not be dropped."""
+        info = PlatformRegistry.get_platform_info("duckdb")
+
+        assert info is not None
+        assert info.support_status == "stable"
+
+    def test_an_installed_driver_does_not_imply_a_support_tier(self):
+        """An enabled experimental platform must still read as experimental."""
+        info = PlatformRegistry.get_platform_info("quanton")
+
+        assert info is not None
+        assert info.support_status == "experimental"
+
+    def test_a_missing_driver_does_not_downgrade_the_support_tier(self):
+        """Snowflake is beta whether or not its connector is installed here."""
+        info = PlatformRegistry.get_platform_info("snowflake")
+
+        assert info is not None
+        assert info.support_status == "beta"
+
+    def test_absent_status_renders_unknown_rather_than_inventing_a_tier(self):
+        """Never default to a tier the registry did not assert."""
+        assert "unknown" in _format_support_status(None)
+        assert "unknown" in _format_support_status("")
+        assert "stable" not in _format_support_status(None)
+
+    def test_unrecognised_status_is_shown_verbatim_not_remapped(self):
+        assert "some-future-tier" in _format_support_status("some-future-tier")
+
+    def test_known_statuses_render_their_own_label(self):
+        for status in ("stable", "beta", "experimental", "deprecated"):
+            assert status in _format_support_status(status)
+
+    def test_table_shows_both_signals_under_separate_headings(self):
+        """The rendered table must carry driver state and support tier separately."""
+        console = Console(file=StringIO(), width=200)
+        manager = PlatformManager()
+        manager.console = console
+
+        manager.display_platform_status(detail=True)
+        output = console.file.getvalue()
+
+        header = next(line for line in output.splitlines() if "Platform" in line and "Category" in line)
+        assert "Driver" in header
+        assert "Support" in header
+        # The old conflated heading must not come back as a column of its own.
+        assert "Status" not in header
+
+    def test_both_signals_survive_the_narrow_default_view(self):
+        """Narrowing the default must not drop either signal.
+
+        Category and Description move behind --detail; Driver and Support are
+        the two the taxonomy says must never be conflated, so they stay.
+        """
+        console = Console(file=StringIO(), width=80)
+        manager = PlatformManager()
+        manager.console = console
+
+        manager.display_platform_status()
+        output = console.file.getvalue()
+
+        header = next(line for line in output.splitlines() if "Platform" in line and "Driver" in line)
+        assert "Support" in header
+        assert "Status" not in header
 
 
 class TestPlatformManager:
@@ -277,12 +358,10 @@ class TestPlatformManager:
         assert lib_info.installed is False
         assert "No module named" in lib_info.import_error
 
-    @patch("importlib.import_module")
-    def test_detect_platforms_all_available(self, mock_import):
+    @patch.object(PlatformRegistry, "_detect_library")
+    def test_detect_platforms_all_available(self, mock_detect_library):
         """Test platform detection when all libraries are available."""
-        mock_module = Mock()
-        mock_module.__version__ = "1.0.0"
-        mock_import.return_value = mock_module
+        mock_detect_library.side_effect = lambda spec: LibraryInfo(name=spec["name"], version="1.0.0", installed=True)
 
         platforms = self.manager.detect_platforms()
 
@@ -295,19 +374,20 @@ class TestPlatformManager:
             assert platform_info.enabled is True
             assert len(platform_info.libraries) > 0
 
-    @patch("importlib.import_module")
-    def test_detect_platforms_some_missing(self, mock_import):
+    @patch.object(PlatformRegistry, "_detect_library")
+    def test_detect_platforms_some_missing(self, mock_detect_library):
         """Test platform detection when some libraries are missing."""
 
-        def side_effect(module_name):
-            if module_name in ["duckdb", "sqlite3"]:
-                mock_module = Mock()
-                mock_module.__version__ = "1.0.0"
-                return mock_module
-            else:
-                raise ImportError(f"No module named '{module_name}'")
+        def side_effect(spec):
+            installed = spec["name"] in {"duckdb", "sqlite3"}
+            return LibraryInfo(
+                name=spec["name"],
+                version="1.0.0" if installed else None,
+                installed=installed,
+                import_error=None if installed else f"No module named '{spec['name']}'",
+            )
 
-        mock_import.side_effect = side_effect
+        mock_detect_library.side_effect = side_effect
 
         platforms = self.manager.detect_platforms()
 
@@ -684,6 +764,18 @@ class TestCLICommands:
 
         assert result.exit_code == 0
         mock_manager.display_platform_list.assert_called_once_with(show_all=True)
+
+    @patch("benchbox.cli.platform.get_platform_manager")
+    def test_list_platforms_json_flag(self, mock_get_manager):
+        """The documented --json shorthand selects the lossless output path."""
+        mock_manager = Mock()
+        mock_get_manager.return_value = mock_manager
+
+        result = self.runner.invoke(list_platforms, ["--json"])
+
+        assert result.exit_code == 0
+        mock_manager.emit_platform_json.assert_called_once()
+        mock_manager.display_platform_status.assert_not_called()
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_list_platforms_show_deployments(self, mock_get_manager):
@@ -1332,3 +1424,103 @@ class TestSetupPlatformsCommand:
         assert result.exit_code == 0
         mock_select.assert_called_once()
         assert "No enabled platforms to disable." in result.output
+
+
+STANDARD_TERMINAL_WIDTH = 80
+DEFAULT_HEADERS = ("Platform", "Driver", "Support", "Libraries")
+
+
+def _render_platform_status(width: int, *, detail: bool = False) -> str:
+    """Render the real registry's status table at *width* columns.
+
+    Deliberately not mocked. The defect was a property of the real 51-platform
+    registry meeting a real terminal width; a three-row fixture would fit at
+    any width and prove nothing.
+    """
+    stream = StringIO()
+    manager = get_platform_manager()
+    manager.console = Console(file=stream, force_terminal=False, color_system=None, width=width)
+    manager.display_platform_status(detail=detail)
+    return stream.getvalue()
+
+
+def _header_line(output: str) -> str:
+    for line in output.splitlines():
+        if "Platform" in line and "Driver" in line:
+            return line
+    raise AssertionError(f"no header row found in:\n{output[:2000]}")
+
+
+def test_platform_status_headers_are_not_truncated_at_80_columns() -> None:
+    """Every default column header must survive an 80-column terminal.
+
+    `benchbox platforms list` is one of four commands `benchbox --help`
+    advertises. At 80 columns the old six-column table rendered as
+    `Platform | Driver | Suppo… | Libra… | Categ… | Desc…`, so every column
+    carrying the answer -- support tier above all -- was an ellipsis.
+    """
+    header = _header_line(_render_platform_status(STANDARD_TERMINAL_WIDTH))
+
+    assert "\u2026" not in header, f"a default column header is truncated at 80 columns: {header}"
+    for column in DEFAULT_HEADERS:
+        assert column in header, f"{column} missing from the default header: {header}"
+
+
+def test_platform_status_does_not_overflow_80_columns() -> None:
+    output = _render_platform_status(STANDARD_TERMINAL_WIDTH)
+
+    overflowing = [line for line in output.splitlines() if len(line.rstrip()) > STANDARD_TERMINAL_WIDTH]
+
+    assert not overflowing, "output wider than the terminal:\n" + "\n".join(overflowing[:5])
+
+
+def test_platform_status_default_omits_the_columns_that_forced_the_truncation() -> None:
+    header = _header_line(_render_platform_status(STANDARD_TERMINAL_WIDTH))
+
+    assert "Category" not in header
+    assert "Description" not in header
+
+
+def test_platform_status_detail_restores_the_full_table() -> None:
+    header = _header_line(_render_platform_status(200, detail=True))
+
+    for column in (*DEFAULT_HEADERS, "Category", "Description"):
+        assert column in header, f"{column} missing from --detail header: {header}"
+
+
+def test_the_width_gate_still_detects_a_truncated_header() -> None:
+    """Negative control.
+
+    Once the default fits, nothing in the real output is truncated, so a
+    control has to reproduce the condition: the same table with the two wide
+    columns restored, at the same 80 columns, must still truncate. If this
+    ever stops truncating, the assertions above have gone vacuous.
+    """
+    header = _header_line(_render_platform_status(STANDARD_TERMINAL_WIDTH, detail=True))
+
+    assert "\u2026" in header, f"expected --detail to truncate at 80 columns, got: {header}"
+
+
+def test_every_default_row_still_carries_its_support_tier() -> None:
+    """Narrowing must not cost the tier, which is the point of the command."""
+    output = _render_platform_status(STANDARD_TERMINAL_WIDTH)
+    tiers = ("stable", "beta", "experimental", "deprecated")
+
+    counted = sum(output.count(tier) for tier in tiers)
+    listed = len(get_platform_manager().detect_platforms())
+
+    assert counted >= listed, f"{counted} tier labels for {listed} platforms"
+
+
+def test_platform_status_orders_stable_platforms_before_experimental_ones() -> None:
+    output = _render_platform_status(STANDARD_TERMINAL_WIDTH)
+    # Table rows only. The trailing "By support tier: 5 stable, ..." summary
+    # also names every tier, and counting it would make the ordering assertion
+    # unsatisfiable rather than merely false.
+    lines = [line for line in output.splitlines() if line.startswith("\u2502")]
+
+    stable_rows = [index for index, line in enumerate(lines) if "stable" in line]
+    experimental_rows = [index for index, line in enumerate(lines) if "experimental" in line]
+
+    assert stable_rows and experimental_rows, "fixture assumption changed"
+    assert max(stable_rows) < min(experimental_rows)

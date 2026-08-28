@@ -1,6 +1,6 @@
 """BenchBox MCP Server implementation.
 
-This module creates and configures the FastMCP server with all BenchBox
+This module creates and configures the MCPServer with all BenchBox
 tools, resources, and prompts.
 
 Copyright 2026 Joe Harris / BenchBox Project
@@ -14,13 +14,21 @@ import logging
 import os
 import sys
 from collections.abc import Mapping
+from importlib.metadata import version
 from pathlib import Path
+from typing import Any, cast
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.caching import CacheHint
+from mcp.server.context import ServerRequestContext
+from mcp.server.lowlevel.server import RequestHandler
+from mcp.server.mcpserver import MCPServer
+from mcp.types import DiscoverResult, RequestParams
 
 from benchbox.core.runtime_paths import resolve_runtime_paths
 from benchbox.mcp.prompts import register_all_prompts
 from benchbox.mcp.resources import register_all_resources
+from benchbox.mcp.security import RemoteSecurityRuntime, configure_transport_security_logging
+from benchbox.mcp.telemetry import RedactedTelemetryMiddleware, TelemetrySettings, configure_telemetry
 from benchbox.mcp.tools.analytics import register_analytics_tools
 from benchbox.mcp.tools.benchmark import register_benchmark_tools
 from benchbox.mcp.tools.discovery import register_discovery_tools
@@ -35,6 +43,44 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+MCP_CACHE_HINTS = {
+    "server/discover": CacheHint(ttl_ms=300_000, scope="public"),
+    "tools/list": CacheHint(ttl_ms=300_000, scope="public"),
+    "prompts/list": CacheHint(ttl_ms=300_000, scope="public"),
+    "resources/list": CacheHint(ttl_ms=300_000, scope="public"),
+    "resources/templates/list": CacheHint(ttl_ms=300_000, scope="public"),
+    # Resource bodies include tenant result metadata and system profiles.
+    "resources/read": CacheHint(ttl_ms=0, scope="private"),
+}
+
+
+def _install_static_registry_capability_policy(mcp: MCPServer) -> None:
+    """Advertise that BenchBox registries do not change at runtime.
+
+    The SDK derives modern ``listChanged`` flags from the presence of the
+    ``subscriptions/listen`` transport, but BenchBox has no supported runtime
+    tool, prompt, or resource-list mutation path. Keep the subscription
+    transport for protocol compatibility while making the public capability
+    contract match the static registries.
+    """
+    low_level_server = mcp._lowlevel_server  # type: ignore[attr-defined]
+    discover_entry = low_level_server.get_request_handler("server/discover")
+    if discover_entry is None:  # pragma: no cover - an SDK contract failure
+        raise RuntimeError("MCP SDK did not register the server/discover handler")
+
+    original_handler = cast(RequestHandler[Any, RequestParams], discover_entry.handler)
+
+    async def static_registry_discover(
+        context: ServerRequestContext[Any, Any], params: RequestParams
+    ) -> DiscoverResult:
+        result = cast(DiscoverResult, await original_handler(context, params))
+        for capability in (result.capabilities.prompts, result.capabilities.resources, result.capabilities.tools):
+            if capability is not None:
+                capability.list_changed = False
+        return result
+
+    low_level_server.add_request_handler("server/discover", discover_entry.params_type, static_registry_discover)
 
 
 def _resolve_log_level(
@@ -71,7 +117,8 @@ def create_benchbox_server(
     charts_dir: str | Path | None = None,
     log_level: str | int | None = None,
     env: Mapping[str, str] | None = None,
-) -> FastMCP:
+    remote_security: RemoteSecurityRuntime | None = None,
+) -> MCPServer:
     """Create and configure the BenchBox MCP server.
 
     The server provides tools for:
@@ -80,7 +127,7 @@ def create_benchbox_server(
     - Results: Get results, compare runs, export data
 
     Returns:
-        Configured FastMCP server instance.
+        Configured MCPServer instance.
     """
     # Suppress all console output - MCP servers must not write to stdout
     # (stdout is reserved exclusively for JSON-RPC messages)
@@ -103,9 +150,34 @@ def create_benchbox_server(
         resolved_results_dir = runtime_paths.results_dir
         resolved_charts_dir = runtime_paths.charts_dir
 
-    # Create the FastMCP server
-    mcp = FastMCP(
-        name="benchbox",
+    environment = env if env is not None else os.environ
+    configure_telemetry(TelemetrySettings.from_env(environment))
+    middleware: list[Any] = [RedactedTelemetryMiddleware()]
+    server_kwargs: dict[str, object] = {"cache_hints": MCP_CACHE_HINTS}
+    job_runtime = None
+    if remote_security is not None:
+        from benchbox.mcp.jobs import DurableJobRuntime
+
+        job_runtime = DurableJobRuntime.create(
+            remote_security.config.state_db,
+            remote_security.config.jobs,
+            remote_security.workspaces,
+        )
+        # The SDK rejection warnings include the raw attacker-controlled Host
+        # or Origin value. Preserve the generic HTTP rejection without making
+        # those headers a log-egress channel.
+        configure_transport_security_logging()
+        middleware.append(remote_security.middleware)
+        server_kwargs.update(
+            auth=remote_security.auth_settings(),
+            token_verifier=remote_security.verifier,
+            lifespan=job_runtime.lifespan,
+        )
+    server_kwargs["middleware"] = middleware
+
+    mcp = MCPServer(
+        "benchbox",
+        version=version("benchbox"),
         instructions="""BenchBox is a SQL benchmarking framework for OLAP databases.
 
 Use these tools to:
@@ -126,6 +198,14 @@ To capture query execution plans, use the capture_plans parameter:
   run_benchmark(platform="datafusion", benchmark="tpch", capture_plans=True)
 Then inspect plans: get_query_plan(result_file="...", query_id="19")
 """,
+        **server_kwargs,
+    )
+
+    results_provider = (
+        remote_security.workspaces.current_results_dir if remote_security is not None else resolved_results_dir
+    )
+    charts_provider = (
+        remote_security.workspaces.current_charts_dir if remote_security is not None else resolved_charts_dir
     )
 
     # Register all tools
@@ -133,33 +213,47 @@ Then inspect plans: get_query_plan(result_file="...", query_id="19")
     register_discovery_tools(mcp)
 
     logger.info("Registering benchmark execution tools...")
-    register_benchmark_tools(mcp, results_dir=resolved_results_dir)
+    register_benchmark_tools(
+        mcp,
+        results_dir=results_provider,
+        allow_synchronous_execution=remote_security is None,
+        anonymize_results=remote_security is not None,
+    )
+    if job_runtime is not None:
+        from benchbox.mcp.jobs import register_durable_job_tools
+
+        register_durable_job_tools(mcp, job_runtime)
 
     logger.info("Registering results tools...")
-    register_results_tools(mcp, results_dir=resolved_results_dir)
+    register_results_tools(mcp, results_dir=results_provider)
 
     logger.info("Registering analytics tools...")
-    register_analytics_tools(mcp, results_dir=resolved_results_dir)
+    register_analytics_tools(
+        mcp,
+        results_dir=results_provider,
+        anonymize_results=remote_security is not None,
+    )
 
     logger.info("Registering visualization tools...")
     register_visualization_tools(
         mcp,
-        results_dir=resolved_results_dir,
-        charts_dir=resolved_charts_dir,
+        results_dir=results_provider,
+        charts_dir=charts_provider,
     )
 
     logger.info("Registering resources...")
-    register_all_resources(mcp, results_dir=resolved_results_dir)
+    register_all_resources(mcp, results_dir=results_provider)
 
     logger.info("Registering prompts...")
     register_all_prompts(mcp)
+    _install_static_registry_capability_policy(mcp)
 
     # Path options are threaded through here and consumed by MCP modules.
     # They are logged for startup visibility.
     logger.info(
         "MCP path configuration: results_dir=%s charts_dir=%s",
-        resolved_results_dir,
-        resolved_charts_dir,
+        "tenant-scoped" if remote_security is not None else resolved_results_dir,
+        "tenant-scoped" if remote_security is not None else resolved_charts_dir,
     )
     logger.info("BenchBox MCP server configured successfully")
 

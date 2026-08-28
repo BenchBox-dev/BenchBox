@@ -6,9 +6,11 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.tuning.introspection import has_order_by_clause
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
 from benchbox.utils.printing import emit
+from benchbox.utils.sql_parsing import find_matching_parenthesis
 
 from .query_transformer import ClickHouseQueryTransformer
 
@@ -40,15 +42,40 @@ class ClickHouseWorkloadMixin:
                 dialect="duckdb",
                 tuning_config=effective_config,
             )
+            nullable_columns_by_table = self._get_nullable_columns_by_table(benchmark)
+
+            # Physical table_tunings (partitioning/sorting/clustering columns)
+            # render only when tuning is actually enabled -- matching the same
+            # `self.tuning_enabled` gate DataLoader/apply_ctas_sort use
+            # elsewhere, and per ADR-3 baseline policy (notuning = platform
+            # defaults + engine-mandatory only, no tuned rendering).
+            table_tunings = None
+            if self.tuning_enabled and effective_config is not None:
+                table_tunings = effective_config.table_tunings
 
             # Split schema into individual statements and execute
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
 
             for statement in statements:
                 # Optimize table definitions for ClickHouse
-                statement = self._optimize_table_definition(statement)
-                connection.execute(statement)
-                self.logger.debug(f"Executed schema statement: {statement[:100]}...")
+                table_name = self._extract_table_name(statement)
+                nullable_columns = nullable_columns_by_table.get(table_name.lower(), set()) if table_name else set()
+                optimized = self._optimize_table_definition(
+                    statement,
+                    table_tunings,
+                    nullable_columns=nullable_columns,
+                )
+                connection.execute(optimized)
+                # Record a tuned MergeTree CREATE TABLE into the applied ledger
+                # here, immediately after it executes. The tuned keys are
+                # rendered into the CREATE TABLE executed on the raw connection
+                # (outside the tuning RecordingConnection), so without this it
+                # never enters the ledger and the run cannot reach
+                # applied_verified even though system.tables.sorting_key carries
+                # the key. Recording at execute time also keeps the
+                # order-sensitive applied_ledger_hash in true chronology.
+                self._record_tuned_sort_key_op(statement, optimized, table_name, table_tunings)
+                self.logger.debug(f"Executed schema statement: {optimized[:100]}...")
 
             self.logger.info(f"Schema created (PKs: {enable_primary_keys}, FKs: {enable_foreign_keys})")
 
@@ -58,8 +85,30 @@ class ClickHouseWorkloadMixin:
 
         return elapsed_seconds(start_time)
 
-    def _optimize_table_definition(self, statement: str) -> str:
-        """Optimize table definition for ClickHouse."""
+    def _optimize_table_definition(
+        self,
+        statement: str,
+        table_tunings: dict[str, Any] | None = None,
+        *,
+        nullable_columns: set[str] | None = None,
+    ) -> str:
+        """Optimize table definition for ClickHouse.
+
+        Args:
+            statement: A single CREATE TABLE statement.
+            table_tunings: Optional mapping of table_name -> TableTuning, from
+                the effective tuning configuration, present only when tuning
+                is enabled (see create_schema). When a matching, non-empty
+                TableTuning exists for this statement's table, tuned
+                PARTITION BY/ORDER BY clauses are rendered via
+                core.tuning.generators.clickhouse.ClickHouseDDLGenerator --
+                the same generator dry-run preview uses (ADR-3 single
+                renderer) -- instead of the engine-mandatory PK/tuple()
+                fallback below.
+            nullable_columns: Lowercase source-schema column names whose values
+                may be NULL. Columns used by resolved MergeTree keys are
+                intentionally excluded before wrapping.
+        """
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
 
@@ -85,6 +134,22 @@ class ClickHouseWorkloadMixin:
         statement = re.sub(r"\bFLOAT\s*\[\s*\d+\s*\]", "Array(Float32)", statement, flags=re.IGNORECASE)
         statement = re.sub(r"\bDOUBLE\s*\[\s*\d+\s*\]", "Array(Float64)", statement, flags=re.IGNORECASE)
 
+        # ClickHouse TIME requires enable_time_time64_type=1 (experimental).
+        # Portable remap to String ("HH:MM:SS") preserves semantics for benchmark
+        # data (coffeeshop order_time, tpcdi DIMTIME). Restrict this to column type
+        # positions so identifiers such as ``time`` in keys remain unchanged.
+        statement = re.sub(
+            r"(?P<prefix>[,(]\s*(?:\"[^\"]+\"|`[^`]+`|[A-Za-z_]\w*)\s+)TIME\b",
+            r"\g<prefix>String",
+            statement,
+            flags=re.IGNORECASE,
+        )
+
+        tuning_clauses = self._resolve_tuned_ddl_clauses(statement, table_tunings)
+        if nullable_columns:
+            key_columns = self._resolve_key_columns(statement, tuning_clauses, nullable_columns)
+            statement = self._apply_nullable_column_types(statement, nullable_columns - key_columns)
+
         # Include ClickHouse MergeTree engine and ORDER BY clause if not present
         statement_upper = statement.upper()
 
@@ -95,17 +160,32 @@ class ClickHouseWorkloadMixin:
             else:
                 statement = statement + " ENGINE = MergeTree()"
 
+        # Include PARTITION BY if not present and the tuned generator produced one.
+        statement_upper = statement.upper()
+        if "PARTITION BY" not in statement_upper and tuning_clauses is not None and tuning_clauses.partition_by:
+            partition_clause = f" PARTITION BY ({tuning_clauses.partition_by})"
+            if statement.endswith(";"):
+                statement = statement[:-1] + partition_clause + ";"
+            else:
+                statement = statement + partition_clause
+
         # Include ORDER BY if not present
         statement_upper = statement.upper()
         if "ORDER BY" not in statement_upper:
-            # Extract primary key columns if any exist in the statement
-            pk_columns = self._extract_primary_key_columns(statement)
-            if pk_columns:
-                # Use primary key columns for ORDER BY to satisfy ClickHouse requirement
-                order_by_clause = f" ORDER BY ({', '.join(pk_columns)})"
+            if tuning_clauses is not None and tuning_clauses.sort_by:
+                # Tuned rendering: ORDER BY (sort + clustering columns), via
+                # the shared ClickHouseDDLGenerator.
+                order_by_clause = f" ORDER BY ({tuning_clauses.sort_by})"
             else:
-                # Use tuple() for tables without primary keys
-                order_by_clause = " ORDER BY tuple()"
+                # Engine-mandatory baseline: MergeTree requires ORDER BY.
+                # Extract primary key columns if any exist in the statement.
+                pk_columns = self._extract_primary_key_columns(statement)
+                if pk_columns:
+                    # Use primary key columns for ORDER BY to satisfy ClickHouse requirement
+                    order_by_clause = f" ORDER BY ({', '.join(pk_columns)})"
+                else:
+                    # Use tuple() for tables without primary keys
+                    order_by_clause = " ORDER BY tuple()"
 
             if statement.endswith(";"):
                 statement = statement[:-1] + order_by_clause + ";"
@@ -113,6 +193,361 @@ class ClickHouseWorkloadMixin:
                 statement = statement + order_by_clause
 
         return statement
+
+    def _record_tuned_sort_key_op(
+        self,
+        original_statement: str,
+        executed_statement: str,
+        table_name: str | None,
+        table_tunings: dict[str, Any] | None,
+    ) -> None:
+        """Record a tuned MergeTree CREATE TABLE into the applied ledger.
+
+        The introspection receipt corroborates the recorded key clauses against
+        ``system.tables`` -- ``ORDER BY (cols)`` against ``sorting_key`` and
+        ``PARTITION BY (expr)`` against ``partition_key`` -- and upgrades the run
+        to ``applied_verified`` only when every one of them corroborates.
+
+        Recorded straight onto ``self._applied_tuning_ledger`` at
+        ``connection.execute`` time rather than queued on
+        ``_applied_layout_operations``: that queue is folded only after data
+        validation, which would place this ``CREATE TABLE`` *after* the
+        ``OPTIMIZE TABLE`` statements the recording connection captures during
+        load, and the order-sensitive ``applied_ledger_hash`` would then attest
+        an impossible chronology.
+
+        Recorded when the tuned generator produced EITHER a sort key or a
+        partition key. A partition-only tuned table must be recorded too: left
+        out, its unapplied partition key is never corroborated, and another
+        table's sort key could carry the whole run to ``applied_verified``.
+        A table with no tuned clause at all stays out of the ledger entirely --
+        its engine-mandatory ``ORDER BY`` (primary-key derived or ``tuple()``)
+        is not tuning, and corroborating it against nothing would be an unearned
+        upgrade. When only the partition is tuned, the baseline ``ORDER BY``
+        rides along in the recorded statement and is corroborated as a plain
+        catalog fact; it cannot mint verification on its own because the tuned
+        partition key must corroborate as well.
+        Never breaks a run: any failure degrades to a debug log.
+        """
+        try:
+            if not (getattr(self, "tuning_enabled", False) and table_tunings):
+                return
+            if has_order_by_clause(original_statement):
+                return  # pre-existing ORDER BY was not overridden by tuning
+            tuning_clauses = self._resolve_tuned_ddl_clauses(original_statement, table_tunings)
+            if tuning_clauses is None:
+                return
+            tuned_sort = bool(tuning_clauses.sort_by)
+            tuned_partition = bool(tuning_clauses.partition_by)
+            if not (tuned_sort or tuned_partition):
+                return
+            ledger = getattr(self, "_applied_tuning_ledger", None)
+            if ledger is None:
+                self.logger.debug("clickhouse tuned key ledger record skipped: no applied-tuning ledger on adapter")
+                return
+            from benchbox.core.tuning.applied_ledger import PHASE_DDL
+
+            if tuned_sort and tuned_partition:
+                mechanism = "table_keys"
+            elif tuned_sort:
+                mechanism = "sort_key"
+            else:
+                mechanism = "partition_key"
+            ledger.record(
+                executed_statement,
+                PHASE_DDL,
+                mechanism=mechanism,
+                table=table_name,
+            )
+        except Exception as exc:  # capture must never break a run
+            self.logger.debug("clickhouse tuned key ledger record degraded: %s", exc)
+
+    @staticmethod
+    def _extract_table_name(statement: str) -> str | None:
+        """Extract an unquoted table name from a CREATE TABLE statement."""
+        import re
+
+        match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+([A-Za-z_]\w*)", statement, re.IGNORECASE)
+        return match.group(1) if match else None
+
+    @staticmethod
+    def _get_nullable_columns_by_table(benchmark: Any) -> dict[str, set[str]]:
+        """Return source-nullable, non-primary-key columns by table.
+
+        BenchBox schemas use several shapes: dict/list columns (TPC-DS and
+        vector search), dict-of-column-specs (NYC Taxi and TSBS), and table
+        objects (Data Vault). Schema metadata treats an omitted ``nullable``
+        flag as nullable; explicit ``False`` is the non-null contract.
+        """
+        schema_getter = getattr(benchmark, "get_schema", None)
+        if not callable(schema_getter):
+            return {}
+        schema = schema_getter()
+        if not isinstance(schema, dict):
+            return {}
+
+        nullable_by_table: dict[str, set[str]] = {}
+        for table_name, table_schema in schema.items():
+            if isinstance(table_schema, dict):
+                columns = table_schema.get("columns")
+                table_primary_keys = {str(name).lower() for name in table_schema.get("primary_key", [])}
+            else:
+                columns = getattr(table_schema, "columns", None)
+                table_primary_keys = set()
+
+            if isinstance(columns, dict):
+                column_items = [(name, spec) for name, spec in columns.items()]
+            elif isinstance(columns, (list, tuple)):
+                column_items = []
+                for column in columns:
+                    name = column.get("name") if isinstance(column, dict) else getattr(column, "name", None)
+                    column_items.append((name, column))
+            else:
+                continue
+
+            nullable_columns: set[str] = set()
+            for raw_name, column in column_items:
+                if not isinstance(raw_name, str):
+                    continue
+                if isinstance(column, dict):
+                    is_nullable = column.get("nullable", True)
+                    is_primary_key = column.get("primary_key", False)
+                else:
+                    is_nullable = getattr(column, "nullable", True)
+                    is_primary_key = getattr(column, "primary_key", False)
+                column_name = raw_name.lower()
+                if bool(is_nullable) and not bool(is_primary_key) and column_name not in table_primary_keys:
+                    nullable_columns.add(column_name)
+
+            if nullable_columns:
+                nullable_by_table[str(table_name).lower()] = nullable_columns
+
+        return nullable_by_table
+
+    def _resolve_key_columns(self, statement: str, tuning_clauses: Any, nullable_columns: set[str]) -> set[str]:
+        """Return nullable candidates referenced by PK/partition/order keys."""
+        import re
+
+        key_columns = {name.lower() for name in self._extract_primary_key_columns(statement)}
+        if tuning_clauses is None:
+            return key_columns
+
+        key_expressions = [
+            value
+            for value in (
+                tuning_clauses.partition_by,
+                tuning_clauses.sort_by,
+                tuning_clauses.order_by,
+                tuning_clauses.cluster_by,
+                tuning_clauses.primary_key,
+            )
+            if value
+        ]
+        for column_name in nullable_columns:
+            identifier = re.compile(
+                rf"(?<![A-Za-z0-9_]){re.escape(column_name)}(?![A-Za-z0-9_])",
+                re.IGNORECASE,
+            )
+            if any(identifier.search(expression) for expression in key_expressions):
+                key_columns.add(column_name)
+        return key_columns
+
+    @classmethod
+    def _apply_nullable_column_types(cls, statement: str, nullable_columns: set[str]) -> str:
+        """Wrap selected CREATE TABLE column types with ``Nullable(...)``.
+
+        The scanner splits only on top-level commas, so nested type commas
+        such as ``DECIMAL(10,2)`` cannot consume the next column. Edits are
+        confined to selected type spans; every other byte remains unchanged.
+        """
+        import re
+
+        if not nullable_columns:
+            return statement
+
+        create_match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+[A-Za-z_]\w*\s*\(", statement, re.IGNORECASE)
+        if create_match is None:
+            return statement
+        open_index = statement.find("(", create_match.start())
+        close_index = find_matching_parenthesis(statement, open_index)
+        body = statement[open_index + 1 : close_index]
+        edits: list[tuple[int, int, str]] = []
+
+        for start, end in cls._top_level_column_spans(body):
+            segment = body[start:end]
+            name_match = re.match(r'^\s*(?:"(?P<quoted>[^"]+)"|(?P<plain>[A-Za-z_]\w*))\s+', segment)
+            if name_match is None:
+                continue
+            column_name = (name_match.group("quoted") or name_match.group("plain")).lower()
+            if column_name not in nullable_columns:
+                continue
+
+            type_start = name_match.end()
+            type_end = cls._column_type_end(segment, type_start)
+            data_type = segment[type_start:type_end].rstrip()
+            if not data_type or data_type.upper().startswith("NULLABLE("):
+                continue
+            # ClickHouse forbids Nullable(Array(...)); an Array column expresses
+            # nullability per element (Array(Nullable(T))), never at the array
+            # level. The FLOAT[N]/DOUBLE[N] -> Array(Float32/Float64) rewrite
+            # above turns vector_search embedding/query_vector columns into
+            # exactly these Array types, and their schema metadata omits
+            # `nullable`, so they reach here as nullable candidates. Leave them
+            # non-nullable rather than emitting a type ClickHouse rejects at
+            # CREATE TABLE.
+            if data_type.upper().startswith("ARRAY("):
+                continue
+            suffix = segment[type_end:]
+            if re.search(r"\bNOT\s+NULL\b", suffix, re.IGNORECASE):
+                raise ValueError(f"source-nullable column {column_name!r} is declared NOT NULL")
+            replacement_end = type_start + len(data_type)
+            edits.append((start + type_start, start + replacement_end, f"Nullable({data_type})"))
+
+        for start, end, replacement in reversed(edits):
+            body = body[:start] + replacement + body[end:]
+        return statement[: open_index + 1] + body + statement[close_index:]
+
+    @staticmethod
+    def _top_level_column_spans(body: str) -> list[tuple[int, int]]:
+        """Return comma-delimited spans while respecting nested SQL syntax."""
+        spans: list[tuple[int, int]] = []
+        start = 0
+        depth = 0
+        quote: str | None = None
+        index = 0
+        while index < len(body):
+            char = body[index]
+            if quote is not None:
+                if char == quote:
+                    if index + 1 < len(body) and body[index + 1] == quote:
+                        index += 2
+                        continue
+                    quote = None
+            elif char in {"'", '"'}:
+                quote = char
+            elif char in "([":
+                depth += 1
+            elif char in ")]":
+                depth -= 1
+            elif char == "," and depth == 0:
+                spans.append((start, index))
+                start = index + 1
+            index += 1
+        spans.append((start, len(body)))
+        return spans
+
+    @staticmethod
+    def _column_type_end(segment: str, type_start: int) -> int:
+        """Locate the end of a type expression before column constraints."""
+        import re
+
+        constraint = re.compile(
+            r"(?:NOT\s+NULL|NULL|PRIMARY\s+KEY|REFERENCES|DEFAULT|UNIQUE|CHECK|COLLATE|GENERATED|CONSTRAINT)\b",
+            re.IGNORECASE,
+        )
+        depth = 0
+        quote: str | None = None
+        index = type_start
+        while index < len(segment):
+            char = segment[index]
+            if quote is not None:
+                if char == quote:
+                    if index + 1 < len(segment) and segment[index + 1] == quote:
+                        index += 2
+                        continue
+                    quote = None
+            elif char in {"'", '"'}:
+                quote = char
+            elif char in "([":
+                depth += 1
+            elif char in ")]":
+                depth -= 1
+            elif char.isspace() and depth == 0:
+                next_token = segment[index:].lstrip()
+                if constraint.match(next_token):
+                    return index
+            index += 1
+        return len(segment.rstrip())
+
+    def _resolve_tuned_ddl_clauses(self, statement: str, table_tunings: dict[str, Any] | None):
+        """Resolve tuned PARTITION BY/ORDER BY clauses for this statement's table, if any.
+
+        Returns None when tuning is not enabled, no table_tuning is
+        configured for this table, or the configured table_tuning has no
+        partitioning/sorting/clustering columns -- callers fall back to the
+        engine-mandatory baseline in that case.
+        """
+        if not table_tunings:
+            return None
+
+        import re
+
+        match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+(\w+)", statement, re.IGNORECASE)
+        if not match:
+            return None
+        table_name = match.group(1)
+
+        # Benchmark table names are lowercase while shipped tuning templates
+        # key tables uppercase (e.g. "LINEITEM") -- same case-insensitive
+        # lookup pattern as core/dryrun.py's _extract_ddl_preview.
+        table_tuning = None
+        for configured_name, configured_tuning in table_tunings.items():
+            if str(configured_name).upper() == table_name.upper():
+                table_tuning = configured_tuning
+                break
+
+        if table_tuning is None or not table_tuning.has_any_tuning():
+            return None
+
+        from benchbox.core.tuning.ddl_generator import get_ddl_generator
+
+        generator = get_ddl_generator("clickhouse")
+        clauses = generator.generate_tuning_clauses(table_tuning)
+        if clauses.is_empty():
+            return None
+        self._normalize_tuning_clause_identifiers(statement, clauses)
+        return clauses
+
+    @classmethod
+    def _normalize_tuning_clause_identifiers(cls, statement: str, tuning_clauses: Any) -> None:
+        """Match tuning-template identifier case to the emitted DDL columns."""
+        import re
+
+        column_names = cls._ddl_column_name_map(statement)
+        if not column_names:
+            return
+
+        identifier = re.compile(r"[A-Za-z_]\w*")
+        for attribute in ("partition_by", "sort_by", "order_by", "cluster_by", "primary_key"):
+            expression = getattr(tuning_clauses, attribute, None)
+            if expression:
+                setattr(
+                    tuning_clauses,
+                    attribute,
+                    identifier.sub(lambda match: column_names.get(match.group(0).lower(), match.group(0)), expression),
+                )
+
+    @classmethod
+    def _ddl_column_name_map(cls, statement: str) -> dict[str, str]:
+        """Return lowercase-to-emitted names for CREATE TABLE columns."""
+        import re
+
+        create_match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+[A-Za-z_]\w*\s*\(", statement, re.IGNORECASE)
+        if create_match is None:
+            return {}
+        open_index = statement.find("(", create_match.start())
+        close_index = find_matching_parenthesis(statement, open_index)
+        body = statement[open_index + 1 : close_index]
+        names: dict[str, str] = {}
+        for start, end in cls._top_level_column_spans(body):
+            segment = body[start:end]
+            match = re.match(r'^\s*(?:"(?P<quoted>[^"]+)"|(?P<plain>[A-Za-z_]\w*))\s+', segment)
+            if match is None:
+                continue
+            name = match.group("quoted") or match.group("plain")
+            if name.upper() not in {"PRIMARY", "FOREIGN", "UNIQUE", "CHECK", "CONSTRAINT"}:
+                names[name.lower()] = name
+        return names
 
     def _extract_primary_key_columns(self, statement: str) -> list[str]:
         """Extract primary key column names from a CREATE TABLE statement.
@@ -344,8 +779,22 @@ class ClickHouseWorkloadMixin:
             # Apply ClickHouse-specific query transformations for SQL compatibility
             transformer = ClickHouseQueryTransformer(verbose=self.very_verbose)
             transformed_query = transformer.transform(query)
+            # Keep the OLAP tuning pack out of baseline sessions. These two
+            # ClickHouse Local Havoc variants instead need a statement-level
+            # grace-hash join policy: the default hash build exceeds the 8 GiB
+            # local ceiling, while chDB supports grace_hash for both queries.
+            additional_settings: tuple[tuple[str, str | int], ...] = ()
+            if (
+                self.deployment_mode == "local"
+                and (benchmark_type or "").lower() == "tpchavoc"
+                and str(query_id).lower() in {"5_v7", "5_v8"}
+            ):
+                additional_settings = (
+                    ("join_algorithm", "grace_hash"),
+                    ("grace_hash_join_initial_buckets", 8),
+                )
             # Session settings stay generic; analyzer-sensitive query rewrites live in the benchmark.
-            transformed_query = transformer.add_query_settings(transformed_query)
+            transformed_query = transformer.add_query_settings(transformed_query, additional_settings)
 
             # Log transformations if any were applied
             if transformer.get_transformations_applied() and self.verbose_enabled:
@@ -402,17 +851,18 @@ class ClickHouseWorkloadMixin:
                         "translated_query": None,
                     }
 
-            # Build successful result
+            # Preserve ClickHouse's historical row-count metadata semantics: a
+            # warning can accompany a successful validation result without the
+            # expected-results ValidationMode enum used by the shared builder.
             result_dict = {
                 "query_id": query_id,
                 "status": "SUCCESS",
                 "execution_time_seconds": execution_time,
                 "rows_returned": actual_row_count,
                 "first_row": result[0] if result else None,
-                "translated_query": None,  # Translation handled by base adapter
+                "translated_query": None,
             }
 
-            # Include validation metadata if validation was performed
             if validation_result:
                 row_count_validation = {
                     "expected": validation_result.expected_row_count,
@@ -422,6 +872,10 @@ class ClickHouseWorkloadMixin:
                 if validation_result.warning_message:
                     row_count_validation["warning"] = validation_result.warning_message
                 result_dict["row_count_validation"] = row_count_validation
+
+            from benchbox.platforms.base.result_capture import apply_materialized_result_validation
+
+            apply_materialized_result_validation(result_dict, query_id, result)
 
         except Exception as e:
             execution_time = elapsed_seconds(start_time)

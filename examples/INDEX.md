@@ -166,7 +166,7 @@ This index helps you discover examples organized by your goal, experience level,
 2. **TPC-DS**: [`getting_started/local/duckdb_tpcds_power.py`](getting_started/local/duckdb_tpcds_power.py)
    - More complex queries
    - Larger schema
-3. **Documentation**: See [docs/BENCHMARKS.md](../docs/BENCHMARKS.md)
+3. **Documentation**: See [Benchmarks catalog](../docs/benchmarks/index.md)
 
 ---
 
@@ -416,7 +416,7 @@ See [Platform Documentation](../docs/platforms/index.md) for detailed setup guid
 - **Getting Started**: [../docs/usage/getting-started.md](../docs/usage/getting-started.md)
 - **Examples Guide**: [../docs/usage/examples.md](../docs/usage/examples.md)
 - **CLI Reference**: [../docs/usage/cli-quick-start.md](../docs/usage/cli-quick-start.md)
-- **Benchmarks**: [../docs/BENCHMARKS.md](../docs/BENCHMARKS.md)
+- **Benchmarks**: [../docs/benchmarks/index.md](../docs/benchmarks/index.md)
 - **Platform Selection**: [../docs/platforms/platform-selection-guide.md](../docs/platforms/platform-selection-guide.md)
 - **Configuration**: [../docs/usage/configuration.md](../docs/usage/configuration.md)
 

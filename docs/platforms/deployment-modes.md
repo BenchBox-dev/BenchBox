@@ -103,7 +103,7 @@ This means MotherDuck automatically uses DuckDB's query translator and Starburst
 ClickHouse has three first-class platform names, plus a legacy `clickhouse` selector for backwards compatibility.
 
 ```{note}
-The bare `clickhouse` selector and colon syntax (`clickhouse:local`, `clickhouse:server`) are deprecated. Use the first-class names below. See [Migration Guide](clickhouse-migration.md).
+The bare `clickhouse` selector has been removed (it now raises an error). The colon syntax (`clickhouse:local`, `clickhouse:server`) is deprecated but still works. Use the first-class names below. See [Migration Guide](clickhouse-migration.md).
 ```
 
 ### clickhouse-local (chDB)
@@ -458,38 +458,37 @@ benchbox run --platform lakesail --benchmark tpch --scale 1.0
 # DataFrame benchmark
 benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
 
-# Override endpoint / tuning
-benchbox run --platform lakesail --benchmark tpch --scale 1.0 \
-    --lakesail-endpoint sc://localhost:50051 \
-    --lakesail-mode local \
-    --driver-memory 8g \
-    --shuffle-partitions 16
+# Endpoint and tuning overrides need the Python adapter (see the
+# LakeSail Platform Guide); LakeSail registers no --platform-option keys.
 ```
 
 ### Distributed Mode
 
 Cluster of Sail Rust workers. Same client, different deployment.
 
-```bash
-benchbox run --platform lakesail --benchmark tpch --scale 10.0 \
-    --lakesail-mode distributed \
-    --lakesail-workers 4 \
-    --lakesail-endpoint sc://my-sail-cluster:50051
+```python
+from benchbox.platforms.lakesail import LakeSailAdapter
+
+adapter = LakeSailAdapter(
+    sail_mode="distributed",
+    sail_workers=4,
+    endpoint="sc://my-sail-cluster:50051",
+)
 ```
 
-**Connection Parameters:**
+**Connection Parameters** (adapter constructor only - LakeSail has no CLI options):
 
-| Parameter | CLI Flag | Default | Notes |
-|-----------|----------|---------|-------|
-| `endpoint` | `--lakesail-endpoint` | `sc://localhost:50051` | Spark Connect URL |
-| `sail_mode` | `--lakesail-mode` | `local` | `local` or `distributed` |
-| `sail_workers` | `--lakesail-workers` | - | Worker count (distributed mode) |
-| `driver_memory` | `--driver-memory` | `4g` | Driver memory allocation |
-| `shuffle_partitions` | `--shuffle-partitions` | `200` | Shuffle partition count |
-| `table_format` | `--table-format` | `parquet` | `parquet` or `orc` |
-| `adaptive_enabled` | `--adaptive-enabled` | `true` | Adaptive Query Execution (AQE) |
+| Parameter | Default | Notes |
+|-----------|---------|-------|
+| `endpoint` | `sc://localhost:50051` | Spark Connect URL |
+| `sail_mode` | `local` | `local` or `distributed` |
+| `sail_workers` | - | Worker count (distributed mode) |
+| `driver_memory` | `4g` | Driver memory allocation |
+| `shuffle_partitions` | `200` | Shuffle partition count |
+| `table_format` | `parquet` | `parquet` or `orc` |
+| `adaptive_enabled` | `true` | Adaptive Query Execution (AQE) |
 
-Credentials can be stored via `benchbox credentials set lakesail --option endpoint=... --option sail_mode=distributed`. See [LakeSail Platform Guide](lakesail.md) for the full option reference.
+See [LakeSail Platform Guide](lakesail.md) for the full option reference.
 
 **Characteristics:**
 - No JVM on the execution path - Rust/DataFusion engine only
@@ -517,7 +516,7 @@ uv add benchbox --extra velox
 # Provide the Gluten bundle jar (see velox_jar_setup.md for release tarballs and verification steps)
 benchbox run --platform velox --benchmark tpch --scale 0.1 \
     --platform-option gluten_jar_path=/opt/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar \
-    --offheap-size 8g
+    --platform-option offheap_size=8g
 ```
 
 The adapter sets the mandatory Gluten configuration automatically:
@@ -543,24 +542,27 @@ Connect to a pre-started Gluten-enabled Spark Connect server (including the `ben
 docker compose up -d velox-connect
 
 # Drive the benchmark from the host
-benchbox run --platform velox --velox-deployment remote \
-    --velox-endpoint sc://localhost:50051 \
+benchbox run --platform velox --platform-option deployment=remote \
+    --platform-option endpoint=sc://localhost:50051 \
     --benchmark tpch --scale 0.1
 ```
 
 **Configuration Reference:**
 
-| Parameter | CLI Flag | Default | Notes |
-|-----------|----------|---------|-------|
-| `deployment` | `--velox-deployment` | `local` | `local` (in-process, Linux-only) or `remote` (Spark Connect) |
-| `endpoint` | `--velox-endpoint` | `sc://localhost:50051` | Spark Connect URL for `remote` mode |
-| `gluten_jar_path` | `--platform-option gluten_jar_path=…` (alias: `jar=…`) | - | Absolute path to the Gluten bundle jar (required for `local` mode) |
-| `gluten_version` | `--velox-version` | `1.6.0` | Informational; surfaced in `platform_info` |
-| `offheap_size` | `--offheap-size` | `8g` | `spark.memory.offHeap.size` for Velox |
-| `driver_memory` | `--driver-memory` | `4g` | JVM driver heap |
-| `shuffle_partitions` | `--shuffle-partitions` | `200` | `spark.sql.shuffle.partitions` |
-| `table_format` | `--table-format` | `parquet` | `parquet` or `orc` |
-| `adaptive_enabled` | `--adaptive-enabled` | `true` | Adaptive Query Execution (AQE) |
+Options marked "yes" are passed as `--platform-option KEY=VALUE`.
+
+| Parameter | CLI | Default | Notes |
+|-----------|-----|---------|-------|
+| `deployment` | yes | `local` | `local` (in-process, Linux-only) or `remote` (Spark Connect) |
+| `endpoint` | yes | `sc://localhost:50051` | Spark Connect URL for `remote` mode |
+| `gluten_jar_path` | yes (alias: `jar`) | - | Absolute path to the Gluten bundle jar (required for `local` mode) |
+| `offheap_size` | yes | `8g` | `spark.memory.offHeap.size` for Velox |
+| `driver_memory` | yes | `4g` | JVM driver heap |
+| `shuffle_partitions` | yes | `200` | `spark.sql.shuffle.partitions` |
+| `adaptive_enabled` | yes | `true` | Adaptive Query Execution (AQE) |
+| `gluten_version` | no | `1.6.0` | Informational; surfaced in `platform_info` |
+
+The table format is set with the `benchbox run --table-format` option.
 
 ### Verifying Velox Is Active
 
@@ -672,14 +674,16 @@ export TIMESCALE_SERVICE_URL=...
 
 ### Credential Manager
 
-BenchBox includes a credential manager for secure storage:
+BenchBox includes a credential manager for secure storage. It covers Databricks,
+Snowflake, BigQuery, Redshift, Athena, MotherDuck, and SingleStore; other
+platforms use the environment variables above.
 
 ```bash
 # Save credentials (stored securely)
-benchbox config credentials set --platform firebolt
+benchbox setup --platform snowflake
 
 # Credentials are automatically loaded when running benchmarks
-benchbox run --platform firebolt:cloud --benchmark tpch --scale 1.0
+benchbox run --platform snowflake --benchmark tpch --scale 1.0
 ```
 
 ### Platform-Specific Notes

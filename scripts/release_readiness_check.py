@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
-"""Release canary freshness gate.
+"""Release readiness gate: canary freshness with advisory UAT gate evidence.
 
 Used by the release-PR validation workflow. It fails closed unless the latest
 completed release canary workflow run is green, fresh, and, by default, has a
 summary artifact whose checked commit is an ancestor of the release PR head.
+
+Committed UAT gate evidence (`_project/release-evidence/uat-gate-summary.json`,
+written by `make uat-gate-check`) is evaluated and reported when available,
+but is a non-blocking campaign report. Missing, red, dirty, stale, or
+non-ancestor UAT evidence does not fail release readiness. Release trees
+curate `_project/` away, so in CI the optional evidence is read from the
+fetched `origin/develop` ref via `git show`.
+
+The `RELEASE_READINESS_OVERRIDE_SHA`/`_REASON` admin escape hatch bypasses the
+blocking canary check for one exact release head SHA.
 """
 
 from __future__ import annotations
@@ -19,11 +29,13 @@ import urllib.parse
 import urllib.request
 import zipfile
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
 BOOTSTRAP_REQUIRED_EXIT_CODE = 20
+
+UAT_GATE_EVIDENCE_RELPATH = "_project/release-evidence/uat-gate-summary.json"
 
 
 @dataclass(frozen=True)
@@ -51,6 +63,30 @@ def _api_json(url: str, token: str) -> dict[str, Any]:
         return json.loads(response.read().decode("utf-8"))
 
 
+class _SafeArtifactRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Prevent GitHub API credentials from following artifact redirects."""
+
+    @staticmethod
+    def _origin(url: str) -> tuple[str, str, int | None]:
+        parsed = urllib.parse.urlsplit(url)
+        return (parsed.scheme.lower(), (parsed.hostname or "").lower(), parsed.port)
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if redirected is not None and self._origin(req.full_url) != self._origin(redirected.full_url):
+            for header in ("Authorization", "Cookie", "Proxy-Authorization"):
+                redirected.remove_header(header)
+        return redirected
+
+
 def _api_bytes(url: str, token: str) -> bytes:
     request = urllib.request.Request(
         url,
@@ -60,7 +96,8 @@ def _api_bytes(url: str, token: str) -> bytes:
             "X-GitHub-Api-Version": "2022-11-28",
         },
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
+    opener = urllib.request.build_opener(_SafeArtifactRedirectHandler())
+    with opener.open(request, timeout=30) as response:
         return response.read()
 
 
@@ -182,6 +219,165 @@ def evaluate_canary_runs(
     return ReadinessResult(True, "Release canary is green, fresh, and applicable.", summary)
 
 
+def _load_uat_gate_evidence(path: str, ref: str) -> dict[str, Any] | None:
+    """Read the committed UAT gate evidence, from the working tree or from `ref`.
+
+    Release branches and the trusted-base checkout curate `_project/` away
+    (see `make release-cut`), so the release-PR workflow cannot read the
+    evidence from its own tree; it reads the committed file from the fetched
+    develop ref instead (`git fetch origin develop` already runs before the
+    readiness step). Returns None when the evidence is absent in both
+    places; raises on unparseable JSON (the caller reports that as an
+    evidence-validation failure, mirroring the canary artifact path).
+    """
+    file_path = Path(path)
+    if file_path.is_file():
+        return json.loads(file_path.read_text(encoding="utf-8"))
+    if ref:
+        # The ref fallback honors a --uat-evidence-path override too; the
+        # path must be repo-relative for `git show` (the default is).
+        result = subprocess.run(
+            ["git", "show", f"{ref}:{path}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return json.loads(result.stdout)
+    return None
+
+
+def evaluate_uat_gate_evidence(
+    payload: dict[str, Any] | None,
+    *,
+    now: datetime,
+    max_age_days: float,
+    head_sha: str,
+    require_ancestor: bool = True,
+    is_ancestor: Callable[[str, str], bool] = _is_ancestor_with_git,
+) -> ReadinessResult:
+    """Return the campaign-quality evaluation for committed UAT gate evidence.
+
+    ``ok=False`` marks incomplete or poor-quality campaign evidence. It is
+    advisory and never blocks a release cut.
+    """
+    if payload is None:
+        return ReadinessResult(
+            False,
+            (
+                "No committed UAT gate evidence found; campaign report is incomplete. "
+                "To refresh the optional campaign, run the 3-stage release-gate "
+                "sweep, `make uat-gate-check`, and commit "
+                f"{UAT_GATE_EVIDENCE_RELPATH} to develop."
+            ),
+            ["- uat_gate: missing"],
+        )
+
+    verdict = str(payload.get("verdict", "")).strip()
+    source_sha = str(payload.get("source_commit_sha", "")).strip()
+    source_dirty = bool(payload.get("source_dirty", True))
+    completed_raw = str(payload.get("completed_at") or "").strip()
+
+    summary = [
+        f"- uat_gate: {UAT_GATE_EVIDENCE_RELPATH}",
+        f"- uat_verdict: {verdict or '(missing)'}",
+        f"- uat_source_commit_sha: {source_sha or '(missing)'}",
+        f"- uat_source_dirty: {str(source_dirty).lower()}",
+        f"- uat_completed_at: {completed_raw or '(missing)'}",
+    ]
+    # Artifact-digest provenance (uat-evidence-provenance-binding w3): older
+    # combined evidence has no stage_artifact_digests at all. That is an
+    # additive format change, not a crash — gate-check already reports it as
+    # HOLD with a "regenerate evidence" message, and a combined evidence that
+    # was genuinely green after this PR always carries digests. Defense in
+    # depth: if a caller somehow produces a green combined evidence without
+    # digests, treat it as HOLD here with the same clear regenerate message
+    # (no provenance to bind). Threat model: digests recomputed on the
+    # operator machine are integrity against accident/drift, not tamper-proof
+    # provenance (no signing infra) — see _project/release-evidence/README.md.
+    if payload.get("stage_artifact_digests") is None:
+        # Surface as part of the summary so the HOLD message names what to do.
+        summary.append("- uat_stage_artifact_digests: (missing)")
+        # Only HOLD when the rest of the record would have been green; if it
+        # is already red, leave the original verdict's reason as the message
+        # (it already explains why, possibly already a regenerate reason via
+        # gate-check). The "missing digests" case for a green record needs an
+        # explicit regenerate HOLD here.
+        if verdict == "green" and not source_dirty and completed_raw:
+            return ReadinessResult(
+                False,
+                (
+                    "UAT campaign evidence has no artifact digests: advisory evidence quality failed; evidence was "
+                    "produced before artifact-digest provenance was added — "
+                    "regenerate evidence with the current orchestrator and "
+                    "`make uat-gate-check`"
+                ),
+                summary,
+            )
+
+    if verdict != "green":
+        return ReadinessResult(
+            False, f"UAT campaign evidence verdict is {verdict!r}; campaign report is incomplete.", summary
+        )
+    if source_dirty:
+        return ReadinessResult(
+            False,
+            "UAT campaign evidence was produced from a dirty source tree; advisory evidence quality failed.",
+            summary,
+        )
+    if not completed_raw:
+        return ReadinessResult(
+            False, "UAT campaign evidence records no completed_at; campaign report is incomplete.", summary
+        )
+    try:
+        completed_at = datetime.fromisoformat(completed_raw)
+    except ValueError:
+        return ReadinessResult(
+            False,
+            f"UAT campaign evidence completed_at {completed_raw!r} is unparseable; advisory evidence quality failed.",
+            summary,
+        )
+    if completed_at.tzinfo is None:
+        # A naive timestamp has no recoverable offset here: `.astimezone()`
+        # would reinterpret it against *this process's* local timezone (the
+        # CI runner's, not the operator's who produced the evidence), so
+        # evidence near the max-age cutoff could read stale or fresh purely
+        # based on where the check happens to run (#1162 review). New
+        # evidence is written with an explicit offset (see
+        # orchestrator._write_gate_summary_artifact); a naive timestamp here
+        # means older/hand-authored evidence, so assume UTC -- deterministic
+        # regardless of the evaluating environment, even if not necessarily
+        # the exact original operator offset.
+        completed_at = completed_at.replace(tzinfo=timezone.utc)
+    age_days = (now - completed_at).total_seconds() / 86400
+    summary.append(f"- uat_age: {age_days:.1f}d")
+    if age_days > max_age_days:
+        return ReadinessResult(
+            False,
+            f"UAT gate evidence is stale ({age_days:.1f}d; max {max_age_days:g}d).",
+            summary,
+        )
+    if not source_sha:
+        return ReadinessResult(
+            False, "UAT campaign evidence records no source_commit_sha; campaign report is incomplete.", summary
+        )
+    if require_ancestor and not is_ancestor(source_sha, head_sha):
+        return ReadinessResult(
+            False,
+            f"UAT gate evidence SHA {source_sha} is not an ancestor of release head {head_sha}.",
+            summary,
+        )
+    return ReadinessResult(True, "UAT gate evidence is green, fresh, and applicable.", summary)
+
+
+def _combined_result(canary: ReadinessResult, uat: ReadinessResult) -> ReadinessResult:
+    """Append the UAT campaign report without changing the canary verdict."""
+    summary = [*canary.summary, *uat.summary]
+    if not uat.ok:
+        return ReadinessResult(canary.ok, f"{canary.message} UAT evidence advisory: {uat.message}", summary)
+    return ReadinessResult(canary.ok, f"{canary.message} UAT campaign report: {uat.message}", summary)
+
+
 def _workflow_runs_url(repo: str, workflow: str, branch: str) -> str:
     branch = branch.strip()
     if not branch:
@@ -209,17 +405,33 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--workflow", default=os.environ.get("RELEASE_CANARY_WORKFLOW", "release-canary.yml"))
     parser.add_argument(
         "--branch",
-        default=os.environ.get("RELEASE_CANARY_BRANCH", "main"),
-        help="Trusted branch/ref that owns the release-canary workflow runs.",
+        default=os.environ.get("RELEASE_CANARY_BRANCH", "develop"),
+        help="Trusted branch/ref that owns the release-canary workflow runs (the default branch, develop as of the 2026-07-08 switch).",
     )
     parser.add_argument(
         "--max-age-hours", type=float, default=float(os.environ.get("RELEASE_CANARY_MAX_AGE_HOURS", "48"))
     )
     parser.add_argument("--head-sha", default=os.environ.get("GITHUB_SHA", ""))
-    parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "joeharris76/BenchBox"))
+    parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox"))
     parser.add_argument("--token", default=os.environ.get("GITHUB_TOKEN", ""))
     parser.add_argument("--checked-ref", default=os.environ.get("RELEASE_CANARY_CHECKED_REF", "develop"))
     parser.add_argument("--no-ancestor-check", action="store_true")
+    parser.add_argument(
+        "--uat-max-age-days",
+        type=float,
+        default=float(os.environ.get("RELEASE_UAT_MAX_AGE_DAYS", "21")),
+        help="Maximum age of the committed UAT gate evidence (default 21 days; see module docstring).",
+    )
+    parser.add_argument(
+        "--uat-evidence-path",
+        default=os.environ.get("RELEASE_UAT_EVIDENCE_PATH", UAT_GATE_EVIDENCE_RELPATH),
+        help="Working-tree path of the committed UAT gate evidence.",
+    )
+    parser.add_argument(
+        "--uat-evidence-ref",
+        default=os.environ.get("RELEASE_UAT_EVIDENCE_REF", "origin/develop"),
+        help="Git ref to read the evidence from when the working tree is curated (release/base checkouts).",
+    )
     parser.add_argument(
         "--bootstrap-on-missing-workflow",
         action="store_true",
@@ -278,7 +490,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             result = evaluate_canary_runs(
                 data.get("workflow_runs", []),
-                now=datetime.now(UTC),
+                now=datetime.now(timezone.utc),
                 max_age_hours=args.max_age_hours,
                 head_sha=args.head_sha,
                 require_ancestor=not args.no_ancestor_check,
@@ -294,6 +506,26 @@ def main(argv: list[str] | None = None) -> int:
                 f"Release canary readiness check failed while validating evidence: {exc}",
                 ["- canary: api-or-ancestor-check-error"],
             )
+    # Evaluate the advisory UAT campaign report only after a green canary. This
+    # preserves canary and bootstrap failure semantics; the report can never
+    # change the canary verdict.
+    if result.ok:
+        try:
+            evidence = _load_uat_gate_evidence(args.uat_evidence_path, args.uat_evidence_ref)
+            uat_result = evaluate_uat_gate_evidence(
+                evidence,
+                now=datetime.now(timezone.utc),
+                max_age_days=args.uat_max_age_days,
+                head_sha=args.head_sha,
+                require_ancestor=not args.no_ancestor_check,
+            )
+        except Exception as exc:
+            uat_result = ReadinessResult(
+                False,
+                f"UAT gate readiness check failed while validating evidence: {exc}",
+                ["- uat_gate: evidence-read-error"],
+            )
+        result = _combined_result(result, uat_result)
     _write_summary(result, summary_path=os.environ.get("GITHUB_STEP_SUMMARY"))
     if not result.ok:
         print(f"ERROR: {result.message}", file=sys.stderr)

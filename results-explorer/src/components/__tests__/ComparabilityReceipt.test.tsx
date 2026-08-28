@@ -1,0 +1,354 @@
+import { render, screen, within } from "@testing-library/preact";
+import { describe, expect, it } from "vitest";
+import type { DetailResult } from "@/types";
+import {
+  COMPARABILITY_WARNING_TARGET_ID,
+  buildComparabilityFields,
+  comparabilityWarningFields,
+  ComparabilityReceipt,
+} from "@/components/ComparabilityReceipt";
+
+function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
+  return {
+    result_id: "r1",
+    benchmark: "tpch",
+    scale_factor: 0.1,
+    platform: "DuckDB",
+    platform_id: "duckdb",
+    driver_version: "1.0",
+    run_date: "2026-04-01",
+    total_duration_s: 60,
+    geomean_ms: 10,
+    display_geomean_ms: 10,
+    power_score: 3000,
+    has_display_timing: true,
+    valid_query_count: 2,
+    missing_query_count: 0,
+    zero_timing_count: 0,
+    display_exclusion_reason: null,
+    comparison_exclusion_reason: null,
+    ranking_exclusion_reason: null,
+    environment: { os: "Linux", arch: "x64", cpu_count: 8, memory_gb: 32, python: "3.12" },
+    queries: [],
+    display_timings: [
+      { query_id: "Q1", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+      { query_id: "Q2", display_ms: 20, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+    ],
+    has_plans: false,
+    has_tuning: false,
+    bundle_download_url: "",
+    trust_label: "maintainer-run",
+    visibility: "public-curated",
+    funding: "unspecified",
+    platform_version: "0.10",
+    execution_mode: "sql",
+    tuning_mode: "default",
+    tuning_hash: null,
+    test_type: "power",
+    validation_status: "exact",
+    compliance_class: null,
+    cost_usd: null,
+    normalized_cost_usd: null,
+    cost_model_version: "2026.05.0",
+    cost_model_source: "benchbox.core.cost.pricing",
+    cost_scope: "compute_only",
+    cost_status: "unavailable",
+    billing_unit: "unknown",
+    pricing_region: "unknown",
+    ...overrides,
+  };
+}
+
+describe("ComparabilityReceipt", () => {
+  it("renders workload matches and published cost metadata", () => {
+    render(<ComparabilityReceipt results={[makeDetail(), makeDetail({ result_id: "r2", platform: "SQLite" })]} />);
+
+    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    expect(receipt.getAttribute("id")).toBe("comparability-receipt");
+    expect(within(receipt).getByText("No differences")).toBeTruthy();
+    expect(receipt).toHaveTextContent("Benchmark");
+    expect(receipt).toHaveTextContent("TPC-H");
+    expect(receipt).toHaveTextContent("Query scope");
+    expect(receipt).toHaveTextContent("2 queries");
+    expect(receipt).toHaveTextContent("Cost model");
+    expect(receipt).toHaveTextContent("2026.05.0 (benchbox.core.cost.pricing)");
+  });
+
+  it("flags normalized cost metadata differences", () => {
+    const fields = buildComparabilityFields([
+      makeDetail({ normalized_cost_usd: 0.42, cost_status: "normalized" }),
+      makeDetail({
+        result_id: "r2",
+        platform: "SQLite",
+        platform_id: "sqlite",
+        normalized_cost_usd: null,
+        cost_status: "unavailable",
+      }),
+    ]);
+
+    expect(fields.find((field) => field.label === "Normalized cost")).toMatchObject({
+      status: "diff",
+      detail: "DuckDB: $0.42; SQLite: unavailable",
+    });
+  });
+
+  it("warns when selected runs differ in methodology or environment fields", () => {
+    const duckdb = makeDetail();
+    const sqlite = makeDetail({
+      result_id: "r2",
+      platform: "SQLite",
+      platform_id: "sqlite",
+      driver_version: "2.0",
+      run_date: "2026-04-03",
+      environment: { os: "macOS", arch: "arm64", cpu_count: 10, memory_gb: 64, python: "3.11" },
+      tuning_mode: "manual",
+    });
+
+    render(<ComparabilityReceipt results={[duckdb, sqlite]} />);
+
+    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    expect(within(receipt).getAllByText("4 warnings")).toHaveLength(2);
+    const warningTarget = screen.getByTestId("comparability-warning-target");
+    expect(warningTarget.getAttribute("id")).toBe(COMPARABILITY_WARNING_TARGET_ID);
+    expect(warningTarget.getAttribute("tabindex")).toBe("-1");
+    expect(warningTarget).toHaveTextContent("Driver version");
+    expect(warningTarget).toHaveTextContent("Date window");
+    expect(receipt).toHaveTextContent("Driver version");
+    expect(receipt).toHaveTextContent("DuckDB: 1.0; SQLite: 2.0");
+    expect(receipt).toHaveTextContent("Date window");
+    expect(receipt).toHaveTextContent("2026-04-01 to 2026-04-03");
+    expect(receipt).toHaveTextContent("Tuning");
+    expect(receipt).toHaveTextContent("DuckDB: default; SQLite: manual");
+    expect(receipt).toHaveTextContent("Environment");
+    expect(receipt).toHaveTextContent("DuckDB: Linux, x64, 8 CPU");
+    expect(receipt).toHaveTextContent("SQLite: macOS, arm64, 10 CPU");
+  });
+
+  it("builds explicit warning fields for compare-page consumers", () => {
+    const fields = buildComparabilityFields([
+      makeDetail(),
+      makeDetail({
+        result_id: "r2",
+        platform: "SQLite",
+        platform_id: "sqlite",
+        test_type: "throughput",
+        display_timings: [{ query_id: "Q1", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null }],
+      }),
+    ]);
+
+    expect(fields.find((field) => field.label === "Phase")?.status).toBe("diff");
+    expect(fields.find((field) => field.label === "Query scope")?.status).toBe("diff");
+    expect(comparabilityWarningFields(fields).map((field) => field.label)).toEqual(["Phase", "Query scope"]);
+  });
+
+  it("uses singular count copy for one warning and one query", () => {
+    const duckdb = makeDetail({
+      display_timings: [
+        { query_id: "Q1", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+      ],
+    });
+    const sqlite = makeDetail({
+      result_id: "r2",
+      platform: "SQLite",
+      platform_id: "sqlite",
+      platform_version: "3.45",
+      display_timings: [
+        { query_id: "Q1", display_ms: 15, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+      ],
+    });
+
+    render(<ComparabilityReceipt results={[duckdb, sqlite]} />);
+
+    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    expect(within(receipt).getAllByText("1 warning")).toHaveLength(2);
+    expect(receipt).not.toHaveTextContent("1 warnings");
+    expect(receipt).toHaveTextContent("1 query");
+    expect(receipt).not.toHaveTextContent("1 queries");
+  });
+
+  it("flags benchmark and scale differences as explicit warning fields", () => {
+    const fields = buildComparabilityFields([
+      makeDetail(),
+      makeDetail({
+        result_id: "r2",
+        benchmark: "clickbench",
+        scale_factor: 1,
+        platform: "SQLite",
+        platform_id: "sqlite",
+      }),
+    ]);
+
+    expect(fields.find((field) => field.label === "Benchmark")).toMatchObject({
+      status: "diff",
+      detail: "DuckDB: TPC-H; SQLite: ClickBench",
+    });
+    expect(fields.find((field) => field.label === "Scale factor")).toMatchObject({
+      status: "diff",
+      detail: "DuckDB: SF 0.1; SQLite: SF 1",
+    });
+  });
+
+  describe("physical tuning mechanisms warning (ADR-2 §3)", () => {
+    it("warns -- without failing the match -- when two tuned runs render different mechanisms", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", physical_mechanisms: ["indexes", "clustering", "distribution", "sort", "z_order", "stats"] }),
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", physical_mechanisms: [] }),
+      ]);
+
+      const field = fields.find((f) => f.label === "Physical tuning mechanisms");
+      expect(field).toMatchObject({ status: "diff", summary: "Tuned runs rendered different physical mechanisms" });
+      expect(field?.detail).toContain("DuckDB: indexes, clustering, distribution, sort, z_order, stats");
+      expect(field?.detail).toContain("SQLite: none");
+
+      // A warning, not a match failure: the overall receipt still stays
+      // facet-matchable, it just surfaces in the warning list.
+      const warnings = comparabilityWarningFields(fields);
+      expect(warnings.some((f) => f.label === "Physical tuning mechanisms")).toBe(true);
+    });
+
+    it("matches (no warning) when two tuned runs render the same mechanism set", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", physical_mechanisms: ["indexes", "clustering"] }),
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", physical_mechanisms: ["clustering", "indexes"] }),
+      ]);
+
+      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toMatchObject({
+        status: "match",
+        summary: "2 mechanisms",
+      });
+    });
+
+    it("is omitted when fewer than two results are labeled tuned", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", physical_mechanisms: ["indexes"] }),
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "notuning" }),
+      ]);
+
+      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toBeUndefined();
+    });
+
+    it("is omitted when any tuned result predates physical_mechanisms ingest (undefined, not empty)", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", physical_mechanisms: ["indexes"] }),
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", physical_mechanisms: undefined }),
+      ]);
+
+      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toBeUndefined();
+    });
+  });
+
+  describe("tuning policy generation warning (ADR-3 seam)", () => {
+    it("warns -- without failing the match -- when two tuned runs span different generations", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", tuning_policy_generation: "adr-003" }),
+        // Absent marker = the concrete "pre-seam" generation, so this is a
+        // genuine cross-seam comparison, not "unknown, skip".
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", tuning_policy_generation: undefined }),
+      ]);
+
+      const field = fields.find((f) => f.label === "Tuning policy generation");
+      expect(field).toMatchObject({ status: "diff", summary: "Tuned runs span different tuning-policy generations" });
+      expect(field?.detail).toContain("DuckDB: adr-003");
+      expect(field?.detail).toContain("SQLite: pre-seam");
+
+      // A warning, not a match failure: the receipt stays facet-matchable and
+      // the difference only surfaces in the warning list.
+      const warnings = comparabilityWarningFields(fields);
+      expect(warnings.some((f) => f.label === "Tuning policy generation")).toBe(true);
+    });
+
+    it("matches (no warning) when two tuned runs share the same generation", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", tuning_policy_generation: "adr-003" }),
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", tuning_policy_generation: "adr-003" }),
+      ]);
+
+      expect(fields.find((f) => f.label === "Tuning policy generation")).toMatchObject({
+        status: "match",
+        summary: "adr-003",
+      });
+    });
+
+    it("matches (no warning) when both tuned runs are pre-seam (both markers absent)", () => {
+      // Two legacy runs are same-generation ("pre-seam" both), so no warning --
+      // the key distinction from the physical-mechanisms warning, where two
+      // undefineds mean "unknown" and the field is omitted entirely.
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", tuning_policy_generation: undefined }),
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", tuning_policy_generation: undefined }),
+      ]);
+
+      expect(fields.find((f) => f.label === "Tuning policy generation")).toMatchObject({
+        status: "match",
+        summary: "pre-seam",
+      });
+      expect(comparabilityWarningFields(fields).some((f) => f.label === "Tuning policy generation")).toBe(false);
+    });
+
+    it("is omitted when fewer than two results are labeled tuned", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", tuning_policy_generation: "adr-003" }),
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "notuning" }),
+      ]);
+
+      expect(fields.find((f) => f.label === "Tuning policy generation")).toBeUndefined();
+    });
+  });
+
+  describe("tuning identity fingerprint (ADR-1)", () => {
+    it("includes the requested-config and applied-ledger hashes in the Tuning fingerprint", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({
+          has_tuning: true,
+          tuning_mode: "tuned",
+          requested_config_hash: "a".repeat(64),
+          applied_ledger_hash: "b".repeat(64),
+        }),
+        makeDetail({ result_id: "r2", platform: "SQLite", platform_id: "sqlite", tuning_mode: "notuning" }),
+      ]);
+      const tuning = fields.find((f) => f.label === "Tuning");
+      expect(tuning?.detail).toContain("requested aaaaaaaaaaaa");
+      expect(tuning?.detail).toContain("applied bbbbbbbbbbbb");
+    });
+
+    it("annotates applied-statement drift when the recorded request is identical", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({
+          has_tuning: true,
+          tuning_mode: "tuned",
+          requested_config_hash: "a".repeat(64),
+          applied_ledger_hash: "b".repeat(64),
+        }),
+        makeDetail({
+          result_id: "r2",
+          platform: "SQLite",
+          platform_id: "sqlite",
+          has_tuning: true,
+          tuning_mode: "tuned",
+          requested_config_hash: "a".repeat(64),
+          applied_ledger_hash: "c".repeat(64),
+        }),
+      ]);
+
+      expect(fields.find((field) => field.label === "Tuning")).toMatchObject({
+        status: "diff",
+        summary: "Requested configuration matches; applied statements differ",
+      });
+    });
+
+    it("shows a mode-only tuning value as a plain label, never a hash fingerprint", () => {
+      // The self-derived tuning_hash must never act as a comparability key, and a
+      // mode-only bundle (no ADR-1 identity hash) shows the coarse tuning_mode
+      // plainly rather than a fabricated `requested`/`applied` fingerprint.
+      const fields = buildComparabilityFields([
+        makeDetail({ has_tuning: true, tuning_mode: "tuned", tuning_hash: "tuning123" }),
+        makeDetail({ result_id: "r2", platform: "SQLite", platform_id: "sqlite", tuning_mode: "notuning" }),
+      ]);
+      const tuning = fields.find((f) => f.label === "Tuning");
+      expect(tuning?.detail).toContain("DuckDB: tuned");
+      expect(tuning?.detail).not.toContain("requested");
+      expect(tuning?.detail).not.toContain("applied");
+      expect(tuning?.detail).not.toContain("tuning123");
+    });
+  });
+});

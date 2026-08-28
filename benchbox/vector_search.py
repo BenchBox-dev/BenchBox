@@ -8,6 +8,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Optional, Union
 
@@ -111,6 +112,10 @@ class VectorSearch(BaseBenchmark):
     def get_all_queries(self) -> dict[str, str]:
         """Return all queries in the default (DuckDB) dialect."""
         return self._impl.get_all_queries()
+
+    def validate_query_result(self, query_id: Union[int, str], rows: Sequence[Sequence[object]]) -> None:
+        """Validate materialized rows returned by a platform adapter."""
+        self._impl.validate_query_result(query_id, rows)
 
     def get_schema(self, dialect: str = "duckdb") -> dict[str, dict]:
         """Return the schema table definitions."""

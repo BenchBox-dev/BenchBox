@@ -129,14 +129,30 @@ def test_ensure_driver_version_prefers_isolated_runtime(monkeypatch, tmp_path):
     )
 
 
+# Synthetic driver name for isolated-runtime tests. Deliberately NOT a real
+# driver: load_driver_module's isolated branch purges the module tree before
+# importing, and evicting an already-loaded C extension so it is re-dlopen'd
+# later corrupts the interpreter (see the SIGSEGV note in runtime_env.py).
+ISOLATED_DRIVER_NAME = "benchbox_fake_isolated_driver"
+
+
 def test_load_driver_module_from_isolated_runtime(tmp_path):
+    """The isolated strategy imports the driver from its own site-packages.
+
+    Uses a synthetic package name, never a real driver: the isolated branch
+    calls _purge_module_tree() unconditionally, so naming a real C extension
+    here would evict an already-loaded one from this process and re-dlopen it
+    later -- the SIGSEGV hazard load_driver_module's own comment warns about.
+    Under xdist that poisoned the worker and crashed it at interpreter
+    finalization (gilstate_tss_set), failing unrelated tests that shared it.
+    """
     site_packages = tmp_path / "env" / "lib" / "python3.11" / "site-packages"
-    package_dir = site_packages / "duckdb"
+    package_dir = site_packages / ISOLATED_DRIVER_NAME
     package_dir.mkdir(parents=True)
     (package_dir / "__init__.py").write_text("__version__ = '0.9.2'\n")
 
     resolution = DriverResolution(
-        package="duckdb",
+        package=ISOLATED_DRIVER_NAME,
         requested="0.9.2",
         resolved="0.9.2",
         actual="0.9.2",
@@ -147,21 +163,21 @@ def test_load_driver_module_from_isolated_runtime(tmp_path):
     )
 
     try:
-        module = load_driver_module(import_name="duckdb", resolution=resolution)
+        module = load_driver_module(import_name=ISOLATED_DRIVER_NAME, resolution=resolution)
         assert getattr(module, "__version__", None) == "0.9.2"
         assert str(Path(module.__file__).resolve()).startswith(str(site_packages.resolve()))
     finally:
-        sys.modules.pop("duckdb", None)
+        sys.modules.pop(ISOLATED_DRIVER_NAME, None)
 
 
 def test_load_driver_module_strict_version_mismatch_raises(tmp_path):
     site_packages = tmp_path / "env" / "lib" / "python3.11" / "site-packages"
-    package_dir = site_packages / "duckdb"
+    package_dir = site_packages / ISOLATED_DRIVER_NAME
     package_dir.mkdir(parents=True)
     (package_dir / "__init__.py").write_text("__version__ = '0.9.1'\n")
 
     resolution = DriverResolution(
-        package="duckdb",
+        package=ISOLATED_DRIVER_NAME,
         requested="0.9.2",
         resolved="0.9.2",
         actual="0.9.2",
@@ -173,9 +189,9 @@ def test_load_driver_module_strict_version_mismatch_raises(tmp_path):
 
     try:
         with pytest.raises(RuntimeError, match="requested version is 0.9.2"):
-            load_driver_module(import_name="duckdb", resolution=resolution)
+            load_driver_module(import_name=ISOLATED_DRIVER_NAME, resolution=resolution)
     finally:
-        sys.modules.pop("duckdb", None)
+        sys.modules.pop(ISOLATED_DRIVER_NAME, None)
 
 
 def test_autoinstall_invalidates_import_caches(monkeypatch):

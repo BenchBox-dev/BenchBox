@@ -95,6 +95,11 @@ When your PR is opened, the **Validate Submission** workflow runs automatically.
 - **Sanity checks** - no all-zero timings, no negative durations, valid platform/benchmark names
 - **Metadata extraction** - a summary comment is posted on the PR showing what the submission adds
 
+Community submissions must include a manifest, execute at least one query, and
+report `summary.validation=passed` with no failed measurement evidence.
+Truthful partial results are accepted only from the trusted maintainer mirror
+path and remain excluded from rankings.
+
 If validation fails, the PR comment will explain what to fix. The workflow also
 checks that `results-data/corpus-inventory.json` matches the submitted bundles.
 If that check fails, rerun:
@@ -105,7 +110,16 @@ uv run -- python scripts/generate_corpus_inventory.py --write
 
 ### 5. Review and merge
 
-A maintainer reviews the submission for quality and environment consistency. Once approved and merged into `published-results`, the bundle enters the public corpus. The results explorer is designed to build and deploy from `main` (not from `published-results` directly) via the docs CI workflow, so once that deploy path is live, a merged submission would appear on the site at the next release rather than immediately. **Pre-launch caveat:** `release-cut` currently strips `results-explorer/` and `results-data/` out of every release branch, so the `main`-deployed site is not live yet — see [`docs/operations/results-phase-2-runbook.md`](operations/results-phase-2-runbook.md#13-explorer-publish-path) for the current state. Until that changes, treat `benchbox.dev/results/` as a develop-built preview rather than a guarantee that your merged submission will appear there.
+A maintainer reviews the submission for quality and environment consistency.
+Once approved and merged into `published-results`, the bundle enters the
+complete Phase 2 archive. It does not automatically enter `develop` or the
+curated static Explorer snapshot.
+
+Maintainer-run refreshes are monthly via `.github/workflows/seed-corpus.yml`
+(see [`docs/operations/corpus-refresh.md`](operations/corpus-refresh.md)). That
+path is not a substitute for community `benchbox submit` PRs.
+
+The Results Explorer is not built directly from `published-results`; the documented `docs.yml` workflow builds on the curated release path and deploys only after a protected push to `release`. The Explorer is a curated preview, not a broad leaderboard claim. See [`docs/operations/results-phase-2-runbook.md`](operations/results-phase-2-runbook.md#13-explorer-publish-path) for the publication path and launch evidence.
 
 ## What Makes a Good Submission
 
@@ -161,7 +175,7 @@ Submissions that don't meet these criteria may be asked for revisions:
 2. **No synthetic data** - results must come from actual benchmark execution
 3. **Reasonable timings** - query durations should be plausible for the platform and scale factor
 4. **Valid metadata** - benchmark ID, platform name, and scale factor must match known values
-5. **Schema v2 format** - BenchBox currently writes top-level `version` `"2.1"`. Public submission validation accepts numeric `2.x` versions for forward-compatible schema-v2 bundles, but rejects missing or malformed values. To check your bundle: `uv run -- python -c "import json; print(json.load(open('bundle.json'))['version'])"`
+5. **Schema v2 format** - BenchBox currently writes top-level `version` `"2.2"`. Public submission validation accepts numeric `2.x` versions for forward-compatible schema-v2 bundles, but rejects missing or malformed values. To check your bundle: `uv run -- python -c "import json; print(json.load(open('bundle.json'))['version'])"`
 
 ## Running Validation Locally
 

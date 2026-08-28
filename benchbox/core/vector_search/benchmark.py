@@ -18,6 +18,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
@@ -26,6 +27,7 @@ from benchbox.core.benchmark_mixins import DataGenerationMixin
 from benchbox.core.query_catalog_base import QuerySkippedError, TranslatableQueryMixin
 from benchbox.core.utils.tuning import extract_constraint_flags
 from benchbox.core.vector_search.generator import VectorSearchDataGenerator
+from benchbox.core.vector_search.metrics import validate_search_result
 from benchbox.core.vector_search.queries import VectorSearchQueryManager
 from benchbox.core.vector_search.schema import TABLES, get_all_create_table_sql
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -193,6 +195,16 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
     # Query execution
     # ------------------------------------------------------------------
 
+    def validate_query_result(self, query_id: Union[int, str], rows: Sequence[Sequence[object]]) -> None:
+        """Validate materialized rows returned by a platform adapter.
+
+        The generic adapter execution path does not call this benchmark's
+        ``run_benchmark`` method. Adapters use this opt-in hook after their
+        timed query execution to apply the same structural oracle to the
+        production CLI/MCP path.
+        """
+        validate_search_result(str(query_id), rows)
+
     def execute_query(
         self,
         query_id: Union[int, str],
@@ -309,6 +321,7 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
                         platform_version=platform_version,
                     )
                     duration = elapsed_seconds(start)
+                    self.validate_query_result(query_id, result)
                     query_results["iterations"].append(
                         {
                             "iteration": i + 1,

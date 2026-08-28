@@ -35,8 +35,9 @@ from benchbox.core.dataframe.query_resolution import (
     get_tpcds_dataframe_queries,
     get_tpch_dataframe_queries,
 )
+from benchbox.core.dataframe.query_validation import validate_dataframe_query_results
 from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
-from benchbox.core.exceptions import InsufficientMemoryError
+from benchbox.core.exceptions import ConfigurationError, InsufficientMemoryError
 from benchbox.core.results import (
     BenchmarkInfoInput,
     ResultBuilder,
@@ -50,6 +51,7 @@ from benchbox.core.results.models import (
 )
 from benchbox.core.results.query_plan_models import QueryPlanDAG
 from benchbox.core.results.schema import compute_plan_capture_stats
+from benchbox.core.runner.dataframe_runner import dataframe_compliance_class, no_dataframe_queries_message
 from benchbox.core.schemas import BenchmarkConfig, SystemProfile
 from benchbox.platforms.base.adapter import DriverIsolationCapability
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -290,10 +292,12 @@ class BenchmarkExecutionMixin:
                 test_type=getattr(benchmark_config, "test_execution_type", "power"),
                 benchmark_id=normalize_benchmark_id(benchmark_config.name),
                 display_name=getattr(benchmark_config, "display_name", benchmark_config.name),
+                compliance_class=dataframe_compliance_class(benchmark, benchmark_config),
             ),
             platform=platform_info,
         )
         builder.mark_started()
+        builder.set_validation_status("NOT_RUN")
 
         # Reset per-run plan-capture failure state (qpc-05 / F4.4 follow-up):
         # ExpressionFamilyAdapter doesn't inherit the SQL mixin's
@@ -383,6 +387,7 @@ class BenchmarkExecutionMixin:
                         {"error": str(load_err), "phase": "data_loading"},
                     )
                     builder.set_phase_status("data_loading", "FAILED")
+                    self._attach_applied_tuning_ledger(builder)
                     builder.mark_completed()
                     return builder.build()
             elif phases.load and skip_data_loading:
@@ -398,6 +403,17 @@ class BenchmarkExecutionMixin:
                     monitor=monitor,
                     run_options=options,
                 )
+
+                validation_summary = validate_dataframe_query_results(
+                    query_results,
+                    benchmark_name=benchmark_config.name,
+                    scale_factor=scale_factor,
+                    validation_mode=options_map.get("validation_mode"),
+                    seed=options_map.get("seed"),
+                )
+                builder.set_validation_status(validation_summary.status, validation_summary.details)
+                if validation_summary.details.get("checked") or validation_summary.details.get("errors"):
+                    builder.set_phase_status("validation", validation_summary.status)
 
                 # Add query results to builder
                 for qr in query_results:
@@ -415,6 +431,7 @@ class BenchmarkExecutionMixin:
                 )
                 builder.set_phase_status("power_test", "COMPLETED")
 
+            self._attach_applied_tuning_ledger(builder)
             builder.mark_completed()
             return builder.build()
 
@@ -425,8 +442,22 @@ class BenchmarkExecutionMixin:
                 {"error": str(e), "error_type": type(e).__name__},
             )
             builder.add_execution_metadata("error", str(e))
+            self._attach_applied_tuning_ledger(builder)
             builder.mark_completed()
             return builder.build()
+
+    def _attach_applied_tuning_ledger(self, builder: Any) -> None:
+        """Feed the applied-tuning ledger into ``builder`` before it builds.
+
+        Delegates to ``TuningConfigurableMixin._write_applied_tuning_ledger``
+        (present on every real DataFrame adapter) so the built ``BenchmarkResults``
+        carries ``applied_tuning_ledger`` + ``applied_ledger_hash`` + the honest
+        ``tuning_validation_status`` through the existing export path. Guarded so
+        non-tuning stub adapters (which lack the tuning mixin) are a no-op.
+        """
+        writer = getattr(self, "_write_applied_tuning_ledger", None)
+        if callable(writer):
+            writer(builder)
 
     def load_benchmark_into_context(
         self,
@@ -773,9 +804,18 @@ class BenchmarkExecutionMixin:
         column_names_map, csv_delimiter = self._resolve_column_names_and_delimiter(benchmark_config, benchmark_instance)
 
         # Load tables into context
-        return self._load_tables_into_context(
+        loaded = self._load_tables_into_context(
             ctx, data_paths, column_names_map, csv_delimiter, benchmark=benchmark_instance
         )
+
+        # Fold the physical write-layout the loader actually applied (its
+        # honest ``applied_write_layout`` signal) into the applied-tuning ledger
+        # as POST_LOAD statements. Guarded: a no-op for non-tuning adapters or
+        # when no non-default layout was applied.
+        if hasattr(self, "_fold_write_layout_into_ledger"):
+            self._fold_write_layout_into_ledger(getattr(loader, "applied_write_layout", None))
+
+        return loaded
 
     def _execute_queries_phase(
         self,
@@ -865,7 +905,12 @@ class BenchmarkExecutionMixin:
         skipped_results = self._build_skipped_results(filtered_skip_query_ids)
 
         if not initial_queries:
-            return self._handle_no_queries(skipped_results, filtered_skip_query_ids)
+            return self._handle_no_queries(
+                skipped_results,
+                filtered_skip_query_ids,
+                benchmark_id=normalize_benchmark_id(benchmark_config.name),
+                query_filter=query_filter,
+            )
 
         total_queries = len(initial_queries)
         logger.info(f"Executing {total_queries} queries")
@@ -982,8 +1027,22 @@ class BenchmarkExecutionMixin:
         self,
         skipped_results: list[dict[str, Any]],
         filtered_skip_query_ids: set[str],
+        benchmark_id: str = "",
+        query_filter: set[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Handle the case where no executable queries are found."""
+        """Handle the case where no executable queries are found.
+
+        Two very different situations reach here and only one is legitimate.
+
+        Queries existed and were deliberately skipped as unsupported: that is
+        recorded, with a DF_SKIP_SUMMARY row, and the run continues.
+
+        Nothing was found to run at all: that is a defect, and returning an
+        empty list let the caller mark power_test COMPLETED and emit a bundle
+        reporting 0/0 queries with exit 0 -- a run that executed nothing and
+        looked like a clean pass. Sixty such bundles are in the public corpus,
+        every one from a benchmark family with no DataFrame query source.
+        """
         logger.warning("No queries found for execution")
         if skipped_results:
             skipped_categories = self._count_query_categories(filtered_skip_query_ids)
@@ -1005,7 +1064,7 @@ class BenchmarkExecutionMixin:
                 }
             )
             return skipped_results
-        return []
+        raise ConfigurationError(no_dataframe_queries_message(benchmark_id, query_filter))
 
     def _run_warmup_iterations(
         self,

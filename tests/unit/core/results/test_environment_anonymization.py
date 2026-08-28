@@ -159,10 +159,13 @@ def test_anonymized_json_export_hashes_infrastructure_identifiers_and_redacts_se
         assert leaked not in serialized
 
     assert payload["export"]["anonymized"] is True
-    assert payload["environment"]["machine_id"].startswith("machine_")
+    # Unread identifier fields are omitted, not published as pseudonyms.
+    assert "machine_id" not in payload["environment"]
+    assert "machine_id" not in payload["environment"]["client_host"]
+    assert "engine_host" not in payload["environment"]["platform_runtime"]
+    assert "machine_id" not in payload.get("platform", {}).get("raw_metadata", {})
     assert payload["environment"]["client_host"]["hostname"].startswith("host_")
     assert payload["environment"]["client_host"]["username"].startswith("user_")
-    assert payload["environment"]["platform_runtime"]["engine_host"].startswith("host_")
     assert "path_" in payload["environment"]["platform_runtime"]["collection_error_message"]
     assert payload["environment"]["container"]["container_name"].startswith("container_")
     assert payload["environment"]["container"]["bind_mounts"][0]["source"].startswith("path_")
@@ -176,7 +179,8 @@ def test_anonymized_json_export_hashes_infrastructure_identifiers_and_redacts_se
     assert payload["platform"]["storage"]["prefix"].startswith("prefix_")
     assert payload["platform"]["raw_config"]["password"] == "<redacted>"
     assert payload["platform"]["raw_config"]["access_token"] == "<redacted>"
-    assert payload["platform"]["raw_config"]["credential_file"] == "<redacted>"
+    # Residual local-path drop: credential_file is omitted, not redacted-in-place.
+    assert "credential_file" not in payload["platform"]["raw_config"]
     assert payload["platform"]["raw_config"]["connection_string"] == "<redacted>"
     assert payload["config"]["platform_options"]["client_secret"] == "<redacted>"
 
@@ -217,6 +221,14 @@ def test_private_export_preserves_raw_platform_metadata_behind_explicit_option(t
 
     serialized = json.dumps(payload, sort_keys=True)
     assert payload["export"]["anonymized"] is False
-    assert "super-secret-password" in serialized
+    assert "super-secret-password" not in serialized
+    assert "raw-access-token" not in serialized
+    assert "secret@warehouse.internal.example.com" not in serialized
     assert "warehouse.internal.example.com" in serialized
     assert "raw-bucket" in serialized
+    assert payload["platform"]["raw_config"]["username"] == "<redacted>"
+    assert payload["platform"]["raw_config"]["password"] == "<redacted>"
+    assert payload["platform"]["raw_config"]["access_token"] == "<redacted>"
+    # raw_metadata and normalized blocks share the same structural boundary:
+    # credentials never egress even when anonymize=False preserves identifiers.
+    assert "super-secret-password" not in json.dumps(payload.get("platform", {}).get("raw_metadata", {}))

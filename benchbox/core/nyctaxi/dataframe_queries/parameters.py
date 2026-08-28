@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from csv import reader
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 _PARAM_ROWS = """\
@@ -46,7 +47,7 @@ NYCTAXI_DEFAULT_PARAMS: dict[str, dict[str, Any]] = {}
 for _query_id, _start, _end, _extra in reader(_PARAM_ROWS.splitlines(), delimiter="|"):
     _params: dict[str, Any] = {}
     if _start:
-        _params.update({"start_date": _start, "end_date": _end})
+        _params.update({"start_date": datetime.fromisoformat(_start), "end_date": datetime.fromisoformat(_end)})
     if _extra:
         _key, _value = _extra.split("=", 1)
         _params[_key] = int(_value)

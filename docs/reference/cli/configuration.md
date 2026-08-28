@@ -90,9 +90,8 @@ These variables override the corresponding settings in the configuration file (e
 | `BENCHBOX_SCALE_FACTOR` | `benchmarks.default_scale` | float | `0.01` | Default scale factor |
 | `BENCHBOX_VERBOSE` | `execution.verbose` | boolean | `true` | Enable verbose output (`true`/`1`/`yes`/`on`) |
 | `BENCHBOX_MAX_WORKERS` | `execution.max_workers` | integer | `4` | Maximum parallel worker threads |
-| `BENCHBOX_TUNING_ENABLED` | `tuning.enabled` | boolean | `false` | Enable table tuning by default |
-| `BENCHBOX_TUNING_CONFIG` | `tuning.default_config_file` | string | - | Path to tuning configuration file |
-| `BENCHBOX_OUTPUT_DIR` | `output.directory` | string | `./benchmark_runs/results` | Output directory for result files |
+| `BENCHBOX_TUNING_CONFIG` | `tuning.default_config_file` | string | - | Path to tuning configuration file. Used when `--tuning tuned` resolves with no explicit file (see [Tuning Commands](tuning.md)) |
+| `BENCHBOX_OUTPUT_DIR` | runtime path resolver | string | worktree-anchored `benchmark_runs` root | Runtime output root override; it is not exposed as `load_config().output.directory` |
 | `BENCHBOX_MEMORY_LIMIT_GB` | `execution.memory_limit_gb` | integer | `0` (auto) | Memory limit in GB; `0` means no limit |
 
 **Boolean parsing:** `true`, `1`, `yes`, `on` (case-insensitive) are treated as true.
@@ -202,7 +201,7 @@ benchbox run --platform athena-spark --benchmark tpch \
 
 Example:
 ```bash
-benchbox run --platform clickhouse --benchmark tpch \
+benchbox run --platform clickhouse-local --benchmark tpch \
   --platform-option mode=local \
   --platform-option secure=true \
   --platform-option port=9440
@@ -260,7 +259,7 @@ Result output and export settings.
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `formats` | list | `[json, console]` | Output format list |
-| `directory` | string | `./benchmark_runs/results` | Results directory |
+| `directory` | string | runtime-resolved | Results directory; resolved from the runtime output root rather than a legacy config key |
 | `timestamp_format` | string | `%Y%m%d_%H%M%S` | Timestamp format for result filenames |
 | `submit_to_service` | boolean | `false` | Legacy placeholder; use `benchbox submit --service` for hosted upload |
 | `service_url` | string | `https://api.benchbox.dev/v1` | Default hosted results service URL placeholder |
@@ -306,8 +305,7 @@ Table tuning and optimization settings.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `enabled` | boolean | `false` | Apply tuning configurations by default |
-| `default_config_file` | string | `null` | Path to a default tuning YAML file |
+| `default_config_file` | string | `null` | Default tuning YAML file used when `--tuning tuned` finds no explicit file; see [Tuning Commands](tuning.md) for the full resolution order |
 | `validate_on_load` | boolean | `true` | Validate tuning configurations when loaded |
 | `allow_platform_incompatible` | boolean | `false` | Allow tuning configs that contain platform-incompatible directives |
 
@@ -341,7 +339,6 @@ execution:
     warm_up_iterations: 2
 
 tuning:
-  enabled: true
   default_config_file: ./tuning/my_tuning.yaml
 ```
 

@@ -189,8 +189,9 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
         if not token:
             raise ValueError(
                 "MotherDuck deployment mode requires authentication token.\n"
-                "Provide via --platform-option motherduck_token=<token> or "
-                "set MOTHERDUCK_TOKEN environment variable.\n"
+                "Set the MOTHERDUCK_TOKEN environment variable.\n"
+                "It is deliberately not a --platform-option: options appear in "
+                "shell history and in the process list.\n"
                 "Get your token at https://app.motherduck.com/token"
             )
         config["motherduck_token"] = token
@@ -222,23 +223,8 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
                         "the 'postgresql' or 'duckdb' platform instead."
                     )
 
-            # Set pg_duckdb GUC parameters
-            if self.force_execution:
-                cursor.execute("SET duckdb.force_execution = true")
-                self.logger.info("Enabled duckdb.force_execution for DuckDB query routing")
-
-            if self.postgres_scan_threads > 0:
-                cursor.execute(f"SET duckdb.threads_for_postgres_scan = {int(self.postgres_scan_threads)}")
-                self.logger.info(f"Set duckdb.threads_for_postgres_scan = {self.postgres_scan_threads}")
-
-            # Configure MotherDuck if in motherduck mode
-            if self.deployment_mode == "motherduck" and self.motherduck_token:
-                cursor.execute(
-                    psycopg_sql.SQL("SET duckdb.motherduck_token = {}").format(
-                        psycopg_sql.Literal(self.motherduck_token)
-                    )
-                )
-                self.logger.info("Configured MotherDuck token for hybrid queries")
+            # Set pg_duckdb session GUCs (shared with per-stream sessions).
+            self._apply_pgduckdb_session_gucs(cursor)
 
             conn.commit()
 
@@ -254,6 +240,46 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
                 cursor.close()
 
         return conn
+
+    def _apply_pgduckdb_session_gucs(self, cursor: Any) -> None:
+        """Apply pg_duckdb's session-local GUCs on an open cursor.
+
+        Shared by ``create_connection`` (setup connection) and
+        ``_apply_stream_session_state`` (each throughput/maintenance stream
+        connection) so both are configured identically. Keeping the two in
+        lockstep is what prevents a stream from silently routing through vanilla
+        PostgreSQL instead of DuckDB.
+        """
+        if self.force_execution:
+            cursor.execute("SET duckdb.force_execution = true")
+            self.logger.info("Enabled duckdb.force_execution for DuckDB query routing")
+
+        if self.postgres_scan_threads > 0:
+            cursor.execute(f"SET duckdb.threads_for_postgres_scan = {int(self.postgres_scan_threads)}")
+            self.logger.info(f"Set duckdb.threads_for_postgres_scan = {self.postgres_scan_threads}")
+
+        # Configure MotherDuck if in motherduck mode
+        if self.deployment_mode == "motherduck" and self.motherduck_token:
+            cursor.execute(
+                psycopg_sql.SQL("SET duckdb.motherduck_token = {}").format(psycopg_sql.Literal(self.motherduck_token))
+            )
+            self.logger.info("Configured MotherDuck token for hybrid queries")
+
+    def _apply_stream_session_state(self, connection: Any) -> None:
+        """Reapply pg_duckdb session GUCs to a fresh throughput-stream connection.
+
+        Without this, a stream connection built by the base
+        ``new_stream_connection`` would leave ``duckdb.force_execution`` unset
+        and route queries through vanilla PostgreSQL instead of DuckDB, silently
+        mismeasuring a multi-stream pg_duckdb run. Extension verification /
+        creation stays a one-time step in ``create_connection`` -- only the
+        session-scoped GUCs are reapplied here.
+        """
+        cursor = connection.cursor()
+        try:
+            self._apply_pgduckdb_session_gucs(cursor)
+        finally:
+            cursor.close()
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Apply pg_duckdb optimizations for benchmark type.
