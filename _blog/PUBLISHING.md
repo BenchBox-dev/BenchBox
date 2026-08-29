@@ -49,9 +49,30 @@ Create the post in `_blog/{series}/drafts/`. Follow the style guide:
 
 See `_blog/STYLE_GUIDE.md` for the full guide and `_blog/VOICE_REFERENCE.md` for a quick tone reference. Sentence craft is defined in VOICE_REFERENCE. Do not copy it here.
 
-### 2. Editorial check
+### 2. Editorial check and content validation
 
-`benchbox.release.content_validation` is not in this repository. Before publication, run the STYLE_GUIDE editorial checklist by hand (Voice, punctuation, limitations, citations). Do not record a validator pass.
+Run the automated blog content validator on your draft:
+
+```bash
+uv run python scripts/blog_content_validation.py _blog/{series}/drafts/{post}.md
+```
+
+Or validate all blog content:
+
+```bash
+uv run python scripts/blog_content_validation.py
+```
+
+The validator checks:
+- **Punctuation** (Error): Prohibits em-dashes (U+2014) and en-dashes (U+2013). Use ASCII hyphens or punctuation.
+- **Platform advocacy** (Error): Prohibits platform-winner claims (`"destroys the competition"`, `"clearly superior"`).
+- **Voice & tone** (Warning): Flags unsourced superlatives (`"revolutionary"`), vendor critiques (`"needs to fix"`), first-person pronouns (`"I think"`), and banned hedges (`"your mileage may vary"`, `"each platform has different strengths"`).
+- **LLM writing tells** (Warning): Flags conversational residue (`"good point"`, `"you're right"`), temporal filler (`"going forward"`), empty throat-clearing (`"in today's digital landscape"`, `"whether you're a seasoned developer"`), AI vocabulary clichés (`"delve"`, `"rich tapestry"`), and formulaic essay conclusions (`"In conclusion"`).
+- **Affirmation-denial couplets** (Advisory): Flags singleton denial echoes in post prose.
+
+Exceptions can be annotated with `<!-- content-ok: <category> -->` or `<!-- content-ok -->`.
+
+Before publication, also complete the `_blog/STYLE_GUIDE.md` editorial checklist by hand. Ensure that agent work on our writing (e.g. reviews, style checks, etc.) has not added LLM writing tells to our work.
 
 ### 3. Finalize the post
 

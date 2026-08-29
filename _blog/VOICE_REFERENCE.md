@@ -158,6 +158,7 @@ Do not use em-dashes (Unicode U+2014) or en-dashes (Unicode U+2013). Use ASCII h
 | "Platform X is best for"                    | "In our TPC-H runs, Platform X completed in..."      |
 | "obviously", "simply"                       | Remove (often condescending)                         |
 | "Vendor X needs to fix"                     | Focus on BenchBox's findings, not vendor advice      |
+| Conversational residue or LLM writing tells ("good point", "you're right", "going forward", "delve", "tapestry", "in today's landscape") | Remove conversational residue; state the point directly with concrete technical language |
 | If a denial only restates an adjacent affirmation, even once ("X is Y. X is not Z.") | State the point once. Keep negative scope when it adds a fact, legal meaning, or the news. |
 
 ---
