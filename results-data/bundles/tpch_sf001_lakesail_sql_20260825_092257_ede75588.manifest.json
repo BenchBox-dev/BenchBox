@@ -1,0 +1,8 @@
+{
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "funding": "unspecified",
+  "submitted_by": "maintainer",
+  "bundle_file": "tpch_sf001_lakesail_sql_20260825_092257_ede75588.json",
+  "bundle_hash": "ce50472259df46ce67777735c1c36d772e8d1b99bd8b5ba1e850a7c2c295bc8a"
+}

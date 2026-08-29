@@ -1,0 +1,8 @@
+{
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "funding": "unspecified",
+  "submitted_by": "maintainer",
+  "bundle_file": "ssb_sf001_duckdb_sql_20260825_172048_38133bb4.json",
+  "bundle_hash": "d1a130d1250d8154576401297ee38d22f19deb936aa2882be58c56e569e9b7a9"
+}

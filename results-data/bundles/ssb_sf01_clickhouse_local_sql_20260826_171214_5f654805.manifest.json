@@ -1,0 +1,8 @@
+{
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "funding": "unspecified",
+  "submitted_by": "maintainer",
+  "bundle_file": "ssb_sf01_clickhouse_local_sql_20260826_171214_5f654805.json",
+  "bundle_hash": "8f8c959e62a4f6c6b73b511756ff0a5abea077bcba494015eeceb481c6896ad8"
+}

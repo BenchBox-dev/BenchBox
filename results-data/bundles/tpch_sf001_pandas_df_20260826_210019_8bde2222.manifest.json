@@ -1,0 +1,8 @@
+{
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "funding": "unspecified",
+  "submitted_by": "maintainer",
+  "bundle_file": "tpch_sf001_pandas_df_20260826_210019_8bde2222.json",
+  "bundle_hash": "805d70480e77b42d2962dc5471d6e6a756e0180b017a519a750fdbb60059fab9"
+}
