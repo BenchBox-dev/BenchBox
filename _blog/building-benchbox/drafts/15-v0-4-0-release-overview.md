@@ -1,82 +1,156 @@
 ---
-title: "BenchBox v0.4.0: new home, DuckLake, provenance"
+blogpost: true
+status: draft
+date: August 27, 2026
+author: Joe Harris
 series: building-benchbox
 post_number: 15
 type: release-notes
-tags: [benchbox, release, ducklake, results-explorer, provenance, mcp]
-meta_description: "BenchBox v0.4.0 moves to BenchBox-dev, launches the Results Explorer preview, adds DuckLake beta, and explains breaking migrations and metric corrections."
-status: draft
+tags: benchbox, release, github-org, ducklake, results-explorer, provenance, mcp
+meta_description: "BenchBox v0.4.0 moves to BenchBox-dev, adds provenance labels to the Results Explorer preview, ships DuckLake beta, and corrects TPC throughput metrics."
+---
+# BenchBox v0.4.0: new org, DuckLake, and result provenance
+
+**TL;DR**: BenchBox now lives at [`BenchBox-dev/BenchBox`](https://github.com/BenchBox-dev/BenchBox). Published results can record who ran them and who paid, including a new `vendor-supplied` trust label, and the Results Explorer preview at [benchbox.dev/results/](https://benchbox.dev/results/) displays those fields. DuckLake lands as a beta platform. The bare `clickhouse` alias and the `databricks-connect` extra are gone; Throughput@Size figures from earlier releases need a rerun, not a re-export.
+
 ---
 
-# BenchBox v0.4.0: new home, DuckLake, provenance
+![Screenshot of the BenchBox Results Explorer curated preview, with ranked-only filters and a cross-benchmark leaderboard over published results](../images/results_explorer_preview.png)
 
-BenchBox has a new GitHub home at [`BenchBox-dev/BenchBox`](https://github.com/BenchBox-dev/BenchBox). v0.4.0 was tagged on August 27, 2026 in US Eastern time and published on August 28.[^release] The release also launches a curated Results Explorer preview, adds provenance and funding labels, and introduces DuckLake as a beta platform.
+BenchBox v0.4.0 was released on **August 27, 2026**.
 
-**TL;DR**: Check two breaking migrations before upgrading. The bare `clickhouse` platform selector and the `databricks-connect` install extra are gone. If you published TPC-H or TPC-DS Throughput@Size values from an earlier release, rerun the benchmark with v0.4.0. Re-exporting the old bundle will not correct its stored metric.
+The headline change is the move to its own GitHub organization. The repository name, the PyPI project `benchbox`, and `benchbox.dev` are unchanged, and old remotes keep redirecting. The project now has a home that does not depend on a personal account.
 
-## Before upgrading
+The second change is a vocabulary for published results: who produced a run, its trust label, and disclosed funding. The Results Explorer at [benchbox.dev/results/](https://benchbox.dev/results/) has been reachable since April 2026; this is the first tagged release that names the preview and shows those labels on it. It is a curated preview, not a complete or certified ranking. A home that is not a personal account, and labels for who produced a result, are both prerequisites for results from other people. The companion post, [How the Results Explorer qualifies comparisons](./16-results-explorer-qualifies-comparisons.md), covers eligibility and comparability.
 
-Most users can upgrade without changing commands. These are the exceptions:
+The third is DuckLake as `--platform ducklake`, still beta: Parquet table data with catalog metadata in a SQL database, and catalog backend and data path chosen independently.
 
-| Previous use | v0.4.0 action |
-| --- | --- |
-| `--platform clickhouse` | Choose `clickhouse-local`, `clickhouse-server`, or `clickhouse-cloud` |
-| `ch` shorthand | No change required; it now selects `clickhouse-local` |
-| `benchbox[databricks-connect]` | Use `benchbox[cloud-spark-databricks]` |
-| Earlier TPC-H or TPC-DS Throughput@Size | Rerun with v0.4.0 |
+## At a glance
 
-The ClickHouse change removes ambiguity about deployment mode. Passing bare `clickhouse` now raises an error that names the three replacements. The Databricks change only renames the BenchBox extra; it still installs the upstream `databricks-connect` package.
+| Area | What changed in v0.4.0 | Why it matters |
+| --- | --- | --- |
+| Project home | Repository moved to `github.com/BenchBox-dev/BenchBox` | Org-owned home; old links redirect; install command unchanged |
+| Provenance and funding | Source, trust label, and funding recorded, including `vendor-supplied` | A published number can say who ran it and who paid |
+| Results Explorer | Preview at `benchbox.dev/results/` now shows those labels | Not a launch: the site has been reachable since April 2026 |
+| DuckLake (beta) | `--platform ducklake` with independent catalog and data path | Four documented modes validated at TPC-H SF1 |
+| MCP transport | `benchbox-mcp --transport streamable-http` | Extra local path; stdio unchanged; hosted use unsupported |
+| TPC throughput | Throughput@Size counts every executed query | Corrects 22x (TPC-H) and 99x (TPC-DS) understatements |
+| TPC generators | Bundled tools are probed; source build if the loader refuses them | Unblocks generation on macOS 15 and earlier Apple Silicon |
+| Removals | Bare `clickhouse` alias and `databricks-connect` extra | Pre-announced shims with named replacements |
 
-The throughput correction is more important for published data. Earlier TPC-H and TPC-DS result versions understated Throughput@Size by 22x and 99x because the calculation did not include every executed query. The factors correspond to the 22 TPC-H queries and 99 TPC-DS queries omitted per stream. Historical bundles remain unchanged as records of what those versions produced. Re-exporting a bundle reuses its stored value, so a corrected figure requires a new run.[^changelog][^metrics]
+## A new home: BenchBox-dev
 
-## Results Explorer preview
-
-v0.4.0 launches the [Results Explorer preview](https://benchbox.dev/results/). It provides benchmark leaderboards, per-query timings, result details, comparison tools, and a SQL workbench over the published snapshot.
-
-The word *preview* matters. This is a curated set of results, not a complete or certified ranking. The interface separates results that can be displayed, compared, and ranked, and it explains exclusion reasons when a row does not qualify. The companion post, [How the Results Explorer qualifies comparisons](./16-results-explorer-qualifies-comparisons.md), covers that model and its limitations.
-
-Results can now record who produced a run, its trust label, and disclosed funding. The Explorer shows those fields in rankings, comparisons, and result details. Three producer sources are defined: internal, community, and vendor. They map to `maintainer-run`, `community-submission`, and `vendor-supplied` trust labels. A fourth label, `verified`, is reserved for future third-party attestation and no current path produces it. Community submissions can be visible without becoming ranking-eligible.[^provenance]
-
-The launch snapshot is not yet diverse: all 138 rows are labeled `maintainer-run`, with funding `unspecified`.[^snapshot] Provenance fields make those gaps visible; they do not fill them.
-
-## DuckLake beta
-
-DuckLake stores table data as Parquet while keeping catalog metadata in a SQL database. BenchBox now runs it with `--platform ducklake`.[^ducklake]
-
-The catalog and data location are independent choices. A DuckDB, SQLite, or PostgreSQL catalog can be paired with local or S3-backed Parquet data, giving six possible combinations. Four documented deployment modes passed TPC-H scale-factor-1 correctness validation: local, local catalog with S3 data, PostgreSQL catalog with local data, and PostgreSQL catalog with S3 data. SQLite catalogs are supported, but they were not one of those four validated modes. We are keeping the beta label visible rather than extrapolating those four runs to every combination, scale, and benchmark.
-
-DuckLake requires DuckDB 1.3 or later. Its first run also needs network access to install the DuckLake extension. Install and try the local path with:
-
-```bash
-uv add "benchbox[ducklake]"
-uv run benchbox run --platform ducklake --benchmark tpch --scale 0.01
-```
-
-BenchBox reuses an existing catalog by default. `--force` rebuilds catalog state and local data, but it does not recursively delete an S3 data prefix.
-
-## New GitHub organization
-
-The repository, issue and release tooling, CI, and package metadata now point to the `BenchBox-dev` organization. The repository name, PyPI project, and `benchbox.dev` domain are unchanged. Old GitHub repository URLs redirect, so updating a local remote is useful but not urgent:
+The repository, issue and release tooling, CI, and package metadata now point at [`github.com/BenchBox-dev/BenchBox`](https://github.com/BenchBox-dev/BenchBox). Existing remotes that still use `github.com/joeharris76/BenchBox.git` keep redirecting, so updating a local remote is useful but not urgent:
 
 ```bash
 git remote set-url origin https://github.com/BenchBox-dev/BenchBox.git
 ```
 
-This is an ownership and namespace move. It does not, by itself, announce a foundation, a new governance model, or a new maintainer team.
+What did not move is most of what a reader depends on. The repository name is still `BenchBox`. The PyPI project is still `benchbox`. The domain is still `benchbox.dev`. `uv add benchbox` is the same command it was.
 
-## Other v0.4.0 changes
+This is an ownership and namespace move. It does not announce a foundation, a new governance model, or a new maintainer team.
 
-- Local MCP clients can use `benchbox-mcp --transport streamable-http`; existing stdio integrations are unchanged. Authenticated non-local deployments support persistent jobs, but shared production deployment remains deferred and unsupported.[^mcp]
-- BenchBox now probes bundled TPC-H and TPC-DS data-generation tools before selecting them and compiles from source when a bundled binary cannot run. The bundled TPC-H generators were also rebuilt to support macOS 15.[^changelog]
+## Provenance labels, and where to see them
+
+v0.4.0 adds a canonical vocabulary for result source, trust label, and funding, plus a `benchbox run --funding` flag and an optional provenance block in result bundles. The `vendor-supplied` trust label is new. The preview at [benchbox.dev/results/](https://benchbox.dev/results/) displays those fields in rankings, comparisons, and result details.
+
+Ranked tables include maintainer-run, CI, and vendor-supplied results. Community submissions stay visible and are not ranked. The vendor label cannot be self-applied: it is derived from bundles under `results-data/bundles/vendor/`, and submission CI rejects non-maintainer PRs that touch that path. In the current preview snapshot, all 138 rows are still `maintainer-run` with funding `unspecified`. The labels are shipped vocabulary, not yet differentiated data.
+
+Accepted `--funding` values are `employer`, `personal`, `free-trial`, `vendor-sponsored`, `grant`, and `unspecified` (the default). Eligibility gates, the comparability receipt, and corpus curation belong in the companion post.
+
+## DuckLake beta
+
+DuckLake stores table data as Parquet while keeping catalog metadata in a SQL database. BenchBox now runs it with `--platform ducklake`. Catalog backend and data path are independent choices, so `catalog=duckdb|sqlite|postgres` composes with a local or `s3://` `data_path`. That is six possible combinations, not one blessed configuration.
+
+Four of those six passed TPC-H scale-factor-1 correctness validation: `local`, `local_catalog_s3`, `postgres_catalog`, and `postgres_catalog_s3`. SQLite catalogs are a supported option, not one of those four validated modes. We are keeping the beta label rather than extrapolating those four runs to every combination, scale, and benchmark.
+
+DuckLake requires DuckDB 1.3 or later. The first run also needs network access to `INSTALL` the DuckLake extension. Install and try the local path with:
+
+```bash
+uv add "benchbox[ducklake]"
+uv run -- benchbox run --platform ducklake --benchmark tpch --scale 0.01
+```
+
+A PostgreSQL catalog with S3-backed Parquet data uses the same command with extra platform options. Postgres plus S3 is one of the four SF1-validated modes; this snippet is the flag shape, not a claim that every scale has been exercised:
+
+```bash
+uv run -- benchbox run --platform ducklake --benchmark tpch --scale 0.01 \
+  --platform-option catalog=postgres \
+  --platform-option data_path=s3://bucket/prefix/
+```
+
+BenchBox reuses an existing catalog by default. `--force` rebuilds catalog state and local data, but it does not recursively delete an S3 data prefix.
+
+## Corrections worth knowing
+
+**TPC throughput was understated.** Throughput@Size now includes every executed query, correcting 22x (TPC-H) and 99x (TPC-DS) understatements in earlier result versions. Historical bundles are left unchanged as records of what those versions produced. Re-exporting an old bundle does not fix the number, because the exporter reuses a stored `throughput_at_size` when one is present. If you published a Throughput@Size figure from an earlier release, rerun the benchmark on v0.4.0.
+
+**`BENCHBOX_TUNING_ENABLED` never worked.** It set a config key nothing read at runtime, and the docs claimed it activated tuned runs in CI. It did not. Use `--tuning tuned` or `--tuning auto`; `BENCHBOX_TUNING_CONFIG` still works. If you set the old variable, delete it.
+
+**`--tuning auto` on SQL platforms is constraints-only.** Primary-key, foreign-key, unique, and check constraints, and nothing else. DataFrame platforms keep their smart defaults. This is a documentation correction, not a behavior change.
+
+## Other notable changes
+
+- Local MCP clients can use `benchbox-mcp --transport streamable-http`; existing stdio integrations are unchanged. Authenticated non-local deployments support persistent jobs, but shared production deployment remains deferred and unsupported.
+- BenchBox now probes a bundled TPC generator before selecting it and compiles from source when the loader refuses it. That unblocks TPC-H data generation on macOS 15 and earlier Apple Silicon. The shipped darwin-arm64 binaries still target a newer OS (`minos 26.0`); the fallback is a slower first run, not a rebuilt binary.
 - Secret redaction now covers more DuckLake, MotherDuck, export, and MCP paths. Backend-provided exception text can still repeat values, so credentials should not be placed in values a backend may echo.
 - Write and Transaction Primitives now detect staged data from the wrong scale factor and rebuild it automatically.
 
-Thanks to everyone who tested release candidates, reported problems, and helped make the release accounting more accurate. You can [browse the Explorer](https://benchbox.dev/results/), read the [full release notes](https://github.com/BenchBox-dev/BenchBox/releases/tag/v0.4.0), or [open an issue](https://github.com/BenchBox-dev/BenchBox/issues) if a result or migration note needs correction.
+## Changed behavior to be aware of
 
-[^release]: [BenchBox 0.4.0 release](https://github.com/BenchBox-dev/BenchBox/releases/tag/v0.4.0), published August 28, 2026. The tag commit was created August 27 in US Eastern time.
-[^changelog]: [BenchBox changelog at the post-publication accounting correction](https://github.com/BenchBox-dev/BenchBox/blob/7e76199d9e9a0a83266454d44a66a976876e4fc9/CHANGELOG.md#040---2026-08-27). This permalink captures the accounting correction made after publication; it did not change the tag or package.
-[^metrics]: [TPC throughput runner at the v0.4.0 tag commit](https://github.com/BenchBox-dev/BenchBox/blob/f841b85f1d40cc2396f16fb185d1dfbb371ac1a3/benchbox/core/throughput/runner.py#L396-L403).
-[^provenance]: [Result provenance vocabulary at the v0.4.0 tag commit](https://github.com/BenchBox-dev/BenchBox/blob/f841b85f1d40cc2396f16fb185d1dfbb371ac1a3/benchbox/core/results/provenance.py).
-[^snapshot]: [Deployed Results Explorer DuckDB snapshot](https://benchbox.dev/results/data/results.duckdb), read August 28, 2026. Captured SHA-256: `83cf3c7ffe56ad6f89c53944e66d9c18aa794d3985c89ae87588fb57a2398863`.
-[^ducklake]: [DuckLake platform documentation at the v0.4.0 tag commit](https://github.com/BenchBox-dev/BenchBox/blob/f841b85f1d40cc2396f16fb185d1dfbb371ac1a3/docs/platforms/ducklake.md).
-[^mcp]: [MCP server reference at the v0.4.0 tag commit](https://github.com/BenchBox-dev/BenchBox/blob/f841b85f1d40cc2396f16fb185d1dfbb371ac1a3/docs/reference/mcp.md).
+| Previous use | v0.4.0 action |
+| --- | --- |
+| `--platform clickhouse` | Choose `clickhouse-local`, `clickhouse-server`, or `clickhouse-cloud`; `clickhouse:local` / `:server` / `:cloud` also work |
+| `get_adapter("clickhouse")` | Same three names |
+| `ch` shorthand | No change required; it now selects `clickhouse-local` |
+| `benchbox[databricks-connect]` | Use `benchbox[cloud-spark-databricks]` |
+| Earlier TPC-H or TPC-DS Throughput@Size | Rerun with v0.4.0; re-exporting preserves the stored metric |
+
+The ClickHouse alias was added in v0.2.1 as a deprecation shim and removed on schedule. Passing bare `clickhouse` now raises a `ValueError` that names the replacements, rather than silently picking a deployment mode. The Databricks change renames only the BenchBox extra; it still installs the upstream `databricks-connect` package.
+
+## Try it yourself
+
+After upgrading to v0.4.0:
+
+1. Confirm the installed version:
+
+```bash
+benchbox --version
+```
+
+2. Run a smoke benchmark with an explicit funding disclosure:
+
+```bash
+uv add "benchbox[duckdb]"
+uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 \
+  --funding personal --non-interactive
+```
+
+3. If you used the bare ClickHouse selector, confirm a named deployment mode:
+
+```bash
+uv run -- benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01 \
+  --dry-run ./preview
+```
+
+4. Try the local DuckLake path:
+
+```bash
+uv add "benchbox[ducklake]"
+uv run -- benchbox run --platform ducklake --benchmark tpch --scale 0.01
+```
+
+5. Browse the Results Explorer preview at [benchbox.dev/results/](https://benchbox.dev/results/).
+
+v0.4.0 was a maintainer-driven cycle. If a result, label, or migration note needs correction, [open an issue](https://github.com/BenchBox-dev/BenchBox/issues).
+
+---
+
+## References
+
+- Changelog entry: `CHANGELOG.md` (`[0.4.0] - 2026-08-27`)
+- Release tag: [v0.4.0](https://github.com/BenchBox-dev/BenchBox/releases/tag/v0.4.0)
+- Companion post: [How the Results Explorer qualifies comparisons](./16-results-explorer-qualifies-comparisons.md)
+- DuckLake platform documentation: `docs/platforms/ducklake.md`
+- Provenance vocabulary: `benchbox/core/results/provenance.py`
+- MCP server reference: `docs/reference/mcp.md`

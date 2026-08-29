@@ -35,7 +35,7 @@
 
 | Series                  | Posts                                                                                                             | Status      | Notes                              |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------- |
-| Building BenchBox       | BenchBox v0.4.0: new home, DuckLake, provenance                                                                   | Full draft  | Editorial review needed            |
+| Building BenchBox       | BenchBox v0.4.0: new org, DuckLake, and result provenance                                                         | Full draft  | Editorial review needed            |
 | Building BenchBox       | How the Results Explorer qualifies comparisons                                                                    | Full draft  | Editorial and technical review needed |
 | Free Trial Benchmarking | 10 posts (Snowflake, Databricks, BigQuery, MotherDuck, Redshift, Starburst, ClickHouse, Fabric, Firebolt, Athena) | Full drafts | Time-sensitive; trial terms change |
 | Cloud Cost Controls     | 6 posts (AWS, GCP, Snowflake, Databricks, Azure, Free Tier)                                                       | Full drafts |                                    |

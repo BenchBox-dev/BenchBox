@@ -1,9 +1,9 @@
 ---
-title: "BenchBox v0.4.0: new home, DuckLake, provenance"
+title: "BenchBox v0.4.0: new org, DuckLake, and result provenance"
 series: building-benchbox
 post_number: 15
 type: release-notes
-tags: [benchbox, release, ducklake, results-explorer, provenance, mcp]
+tags: [benchbox, release, github-org, ducklake, results-explorer, provenance, mcp]
 status: DRAFTED
 ---
 
@@ -11,100 +11,96 @@ status: DRAFTED
 
 ## Purpose
 
-Help existing users upgrade safely, then explain the three reader-facing additions: the move to
-the `BenchBox-dev` GitHub organization, the Results Explorer preview, and DuckLake beta support.
+Release announcement in the post-13 overview shape: what shipped, why it
+matters, how to try it, then what breaks. Not a GitHub-release-notes page
+and not a tour of the Results Explorer. The Explorer deep dive is post 16.
 
 ## Audience
 
-- Existing BenchBox users upgrading from v0.3.1.
-- Users of the retired bare `clickhouse` selector or `databricks-connect` extra.
-- Data engineers interested in DuckLake or published benchmark evidence.
+- Existing BenchBox users deciding whether to upgrade from v0.3.1.
+- Data engineers evaluating lakehouse formats who want a reproducible DuckLake path.
+- Readers arriving from the Results Explorer who want to know what the tool behind it does.
 
 ## Thesis
 
-BenchBox v0.4.0 gives the project a new GitHub home, launches a curated Results Explorer preview,
-adds provenance labels, and introduces DuckLake as a beta platform. The release also contains two
-small but breaking migrations and one metric correction that requires a rerun rather than a
-re-export.
+v0.4.0 moves BenchBox out of a personal GitHub account into its own
+organization, gives published results a vocabulary for who ran them and who
+paid, and adds DuckLake as a beta platform.
+
+## Governing constraints
+
+- Do **not** say the Results Explorer launches, goes live, or is new. Phase 1
+  launched 2026-04-04; the README has linked `benchbox.dev/results/` since
+  v0.2.1. v0.4.0 is the first tagged release whose changelog names the
+  preview, and provenance and funding labels now appear in it. Nothing stronger.
+- Do **not** write that bundled TPC-H generators "now support macOS 15" or
+  "were rebuilt to support macOS 15". Shipped darwin-arm64 `dbgen`/`qgen`
+  still carry `LC_BUILD_VERSION minos 26.0`. Write the exec-probe fallback:
+  slower first run, not a binary fix.
+- Do **not** put the two BREAKING shims in the title, opening, or thesis.
+  They get one at-a-glance row and a late "Changed behavior" table.
+- Do **not** state the community ranking exclusion without the vendor
+  inclusion and the anti-self-application safeguard.
+- Do **not** tell readers to re-export to fix Throughput@Size. The remedy is
+  a rerun on v0.4.0.
+- Do **not** imply a foundation, new governance, or a new maintainer team.
+- Do **not** use Title Case after the colon. Follow post 13: sentence case.
+- Companion filename in this worktree:
+  `./16-results-explorer-qualifies-comparisons.md`. Do not retarget the
+  older handoff name `16-results-explorer-sharing-reliable-results.md`.
+- Smoke commands use `--scale 0.01`. TPC-H SF1 is the DuckLake *validation*
+  scale, not the try-it scale.
+- Prefer `uv run -- benchbox` for flag-heavy commands.
 
 ## Evidence boundary
 
-- Shipped code and package behavior: fully qualified tag `refs/tags/v0.4.0` and PyPI 0.4.0.
-- Publication: GitHub release published August 28, 2026; the tag commit was created August 27 in
-  US Eastern time.
-- Complete release accounting: current `develop` changelog, explicitly labeled as a
-  post-publication accounting correction. The tag and package were not changed.
-- Explorer figures: deployed `results.duckdb` snapshot checked August 28, 2026, captured as SHA-256
-  `83cf3c7ffe56ad6f89c53944e66d9c18aa794d3985c89ae87588fb57a2398863`.
-- Avoid claims about governance, certification, production-hosted MCP, or broad contribution
-  availability.
+- Shipped code and package: tag `refs/tags/v0.4.0` and PyPI 0.4.0.
+- Release date in the post: **August 27, 2026** (changelog/tag). GitHub
+  published the release page on August 28; do not turn that into a timezone
+  essay.
+- Complete accounting: `develop` changelog, labeled as a post-publication
+  accounting correction. The tag and package were not changed.
+- Explorer figures: deployed snapshot checked August 28, 2026, SHA-256
+  `83cf3c7ffe56ad6f89c53944e66d9c18aa794d3985c89ae87588fb57a2398863`
+  (138 rows, all `maintainer-run`, funding `unspecified`).
+- Hero image: live `https://benchbox.dev/results/` capture after the DuckDB
+  snapshot initialized, saved as `../images/results_explorer_preview.png`.
+  Alt text must describe what the image actually shows.
 
 ## Structure and word budget
 
-Target: 900-1,000 words.
+Target: 1,200-1,500 words. Analog is post 13, not the union of posts 8 and 9.
+No "Release highlights" list that duplicates At a glance. No mandatory
+"Bottom line" or "Quick upgrade checks" headings; use "Try it yourself"
+and "Changed behavior to be aware of".
 
-### 1. Opening and TL;DR, 100 words
-
-- Open with the new GitHub organization.
-- Say the release was tagged August 27 and published August 28.
-- Name the Explorer preview, provenance labels, and DuckLake beta.
-
-### 2. Before upgrading, 180 words
-
-Put the action items before feature detail.
-
-| Previous use | v0.4.0 action |
-| --- | --- |
-| `--platform clickhouse` | Choose `clickhouse-local`, `clickhouse-server`, or `clickhouse-cloud` |
-| `ch` | No change required; it now selects `clickhouse-local` |
-| `benchbox[databricks-connect]` | Use `benchbox[cloud-spark-databricks]` |
-| Historical TPC-H or TPC-DS Throughput@Size | Rerun with v0.4.0; re-exporting preserves the old stored metric |
-
-### 3. Results Explorer and provenance, 180 words
-
-- Present the Explorer as a v0.4.0 curated-preview launch.
-- Link to the Explorer root because direct client routes depend on static-host routing.
-- State that it is not a complete or certified ranking.
-- Explain the three producer sources (`internal`, `community`, and `vendor`), their trust-label
-  mappings, the reserved `verified` label, and the community ranking restriction.
-- Current snapshot caveat: all 138 rows are `maintainer-run` with funding `unspecified`.
-- Link to Post 16 for the eligibility and comparability model.
-
-### 4. DuckLake beta, 220 words
-
-- Define DuckLake: Parquet table data plus catalog metadata in a SQL database.
-- Three catalog backends and two data locations form six possible combinations.
-- Four documented modes passed TPC-H SF1 correctness validation. SQLite is supported but was not
-  one of those four validated modes.
-- Require DuckDB 1.3 or later; first extension install needs network access.
-- Mention catalog reuse and `--force`, without implying cloud object deletion.
-
-### 5. New project home, 100 words
-
-- Repository, issue tooling, CI, and package metadata use `BenchBox-dev/BenchBox`.
-- Old repository URLs redirect; the PyPI name and domain are unchanged.
-- Describe this as an ownership and namespace move, not a governance change.
-
-### 6. Other changes, 140 words
-
-- Local streamable HTTP for MCP; stdio unchanged; shared production deployment unsupported.
-- Bundled TPC-H and TPC-DS tools are probed and compiled from source if incompatible. The bundled
-  TPC-H generators were also rebuilt to support macOS 15.
-- Expanded secret redaction, with the residual backend-error caveat.
-
-### 7. Try it and thanks, 80 words
-
-- Install and run DuckLake beta.
-- Link to release notes and the Explorer.
-- Invite browsing, corrections, and issue reports. Keep the results CTA browse-only.
+1. Opening and TL;DR (~200 words): org, provenance, DuckLake. Connective
+   sentence once. Hero screenshot. Companion link.
+2. At a glance: 8-row Area / What changed / Why it matters table.
+3. A new home: BenchBox-dev (~200 words).
+4. Provenance labels, and where to see them (~250 words). Full ranking
+   policy. `--funding` values. Hand off to post 16.
+5. DuckLake beta (~250 words). 6 combinations, 4 validated at TPC-H SF1,
+   SQLite not one of them. Local smoke at 0.01, then catalog/data_path flags.
+6. Corrections worth knowing (~200 words): throughput rerun; dead
+   `BENCHBOX_TUNING_ENABLED`; `--tuning auto` constraints-only on SQL.
+7. Other notable changes (~120 words).
+8. Changed behavior to be aware of: migration table including
+   `get_adapter("clickhouse")` and `clickhouse:local`.
+9. Try it yourself: version, DuckDB smoke with `--funding personal`,
+   clickhouse-local dry-run, DuckLake 0.01, Explorer URL.
+10. References section, not SHA footnotes.
 
 ## Editorial risks
 
-- Do not call the Explorer certified, reliable, complete, or a universal leaderboard.
-- Do not use `origin/release..HEAD` as release authority.
-- Do not say re-exporting fixes historical Throughput@Size values.
-- Do not imply all six DuckLake combinations were validated.
-- Do not claim all links moved or that project governance changed.
-- Keep the results CTA browse-first. The public contribution page and Explorer invite submissions,
-  while the corpus README says contributions are closed and the public guide still names the old
-  repository. Describe that inconsistency instead of claiming the public instructions are closed.
+| Risk | Mitigation |
+| --- | --- |
+| Calling the Explorer new or launched | April 2026 + v0.2.1 README link; this release names the preview and adds labels |
+| Half ranking policy | Ranked: maintainer-run, CI, vendor-supplied. Not ranked: community. Vendor label cannot be self-applied |
+| Changelog macOS 15 sentence | Exec-probe fallback; `minos 26.0` still on shipped binaries |
+| Re-export as throughput fix | Rerun on v0.4.0 |
+| Org move as governance | Ownership and namespace only |
+| Explorer swallows the post | Labels, policy, 138/138 caveat, one screenshot, link to 16 |
+| SF1 as default try-it | Smoke at 0.01 |
+| Synthetic contributor thanks | Maintainer-driven cycle unless a named handle is verified |
+| In-tree outline reintroducing launch language | This outline is the source of truth for the next edit pass |
