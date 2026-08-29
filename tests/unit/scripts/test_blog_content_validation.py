@@ -7,12 +7,13 @@ from pathlib import Path
 import pytest
 
 from scripts.blog_content_validation import (
-    Finding,
     Severity,
     main,
     validate_content,
     validate_file,
 )
+
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 @pytest.fixture
