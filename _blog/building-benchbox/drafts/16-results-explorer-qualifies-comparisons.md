@@ -1,12 +1,14 @@
 ---
 title: "When two timings are not a comparison"
+blogpost: true
+status: draft
+date: August 27, 2026
+author: Joe Harris
 series: building-benchbox
 post_number: 16
 type: architecture-design
 tags: [benchbox, results-explorer, benchmarking, comparability, validation, duckdb-wasm]
 meta_description: "How BenchBox's Results Explorer separates display, comparison, and ranking, suppresses unsupported winner claims, and leaves recorded differences inspectable."
-status: draft
-author: Joe Harris
 ---
 
 # When two timings are not a comparison
@@ -23,17 +25,17 @@ One published result says 12 seconds. Another says 31. On a results site those t
 
 The site has to know the benchmark, scale factor, and phase; how many valid query timings they share; whether every query finished; and whether they ran as SQL or DataFrame. The Explorer's job is to keep those facts attached to the numbers.
 
-The [live snapshot](https://benchbox.dev/results/) has a clear case. On TPC-H at scale factor 1, power phase, DataFusion in SQL mode and Polars in DataFrame mode are both ranking-eligible.[^snapshot] They share a workload. Their execution modes differ. This post walks through that pair.
+The [live snapshot](https://benchbox.dev/results/) has a clear case. On TPC-H at scale factor 1, power phase, DataFusion in SQL mode and Polars in DataFrame mode are both ranking-eligible.[^snapshot] They share a workload. Their execution modes differ.
 
 ## What we tried
 
 A public results site can be a pre-rendered JSON leaderboard, a hosted submission API, or a static database that the browser queries. We shipped the third.
 
-JSON would start faster. The DuckDB snapshot gives visitors a SQL workbench over the same tables the pages use. A hosted API would make contribution feel instant, and it would be one more service to run. The curated preview and the planned pull-request path need no backend. We will add an API when the operational cost is worth it.
+JSON would start faster. The DuckDB snapshot gives visitors a SQL workbench over the same tables the pages use. A hosted API would make contribution feel instant, and it would be one more service to run. The curated preview and the planned pull-request path need no backend.
 
 We first treated leaderboards as vanity ranking. Visitors still want a platform-by-query matrix on the home page, so ranking stays, and ineligible rows stay visible with a named reason.
 
-Making environment a hard gate was tempting too. Only 11 of 138 launch rows record a complete environment, and none record a driver version, so that gate would empty most of the site. We gate benchmark, scale factor, phase, and shared valid timing coverage, and we show the rest as warnings.
+Making environment a hard gate was tempting too. On the August 28 snapshot, only 11 of 138 rows record a complete environment, and none record a driver version, so that gate would empty most of the site. We gate benchmark, scale factor, phase, and shared valid timing coverage, and we show the rest as warnings.
 
 ## Winner language with warnings, then a suppressed claim
 
@@ -41,7 +43,7 @@ Here is that TPC-H SF1 power pair on the Compare page, using the public short ID
 
 ![Compare page for TPC-H SF1 power: DataFusion SQL vs Polars DataFrame. Guardrails say the runs share benchmark, scale, and phase, with five receipt warnings including execution mode. Decision summary still names a winner.](../images/compare_mixed_mode_guardrails.png)
 
-Winner language still appears. The guardrail says the runs share benchmark, scale, and phase, and it lists five receipt warnings, including execution mode. The 1.23x sits next to those warnings. That is the example.
+Winner language still appears. The guardrail says the runs share benchmark, scale, and phase, and it lists five receipt warnings, including execution mode. The 1.23x sits next to those warnings.
 
 The receipt lists them:
 
@@ -126,7 +128,7 @@ admitted bundles -> static build -> results.duckdb -> DuckDB-WASM -> pages and S
                               `-> JSON bundles ------------------> individual downloads
 ```
 
-A database in the browser costs a cold start that pre-rendered JSON would skip. What it buys is a SQL workbench over the same tables the pages use. Browser tests treat those costs as CI thresholds: DuckDB-WASM cold init P50 4s / P95 6s, leaderboard data after init P50 1.5s / P95 2.5s, leaderboard render after data P50 0.5s / P95 1s, and query workbench first paint after init P50 0.6s / P95 1.2s.
+A database in the browser costs a cold start that pre-rendered JSON would skip. What it buys is a SQL workbench over the same tables the pages use. Browser tests treat those costs as CI thresholds. DuckDB-WASM cold init is P50 4s / P95 6s, leaderboard data after init P50 1.5s / P95 2.5s, leaderboard render after data P50 0.5s / P95 1s, and query workbench first paint after init P50 0.6s / P95 1.2s.
 
 When the browser cannot attach the snapshot, the site shows an error. A failed load and an empty table are different states.
 
@@ -181,7 +183,7 @@ ORDER BY validation_status, is_ranking_eligible;
 
 That returns 52 not-run and non-ranking results, 30 partial and non-ranking, one passed but non-ranking, and 55 passed and ranking-eligible.
 
-From there, open the two Compare URLs above, or open the same rows from a result detail. Check methodology, provenance, validation, query coverage, and environment. Download the JSON bundle if you want the evidence outside the browser. A fresh local run is independent corroboration. Hardware, software, configuration, background load, and data paths can all change the timing.
+From there, open the two Compare URLs above, or open the same rows from a result detail. Check methodology, provenance, validation, query coverage, and environment. Download the JSON bundle if you want the evidence outside the browser. Run a local copy if you want independent corroboration. Hardware, software, configuration, background load, and data paths can all change the timing.
 
 ## What the August 28 snapshot is
 

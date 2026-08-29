@@ -1,5 +1,5 @@
 ---
-title: "How the Results Explorer qualifies comparisons"
+title: "When two timings are not a comparison"
 series: building-benchbox
 post_number: 16
 type: architecture-design
@@ -7,13 +7,14 @@ tags: [benchbox, results-explorer, benchmarking, comparability, validation, duck
 status: DRAFTED
 ---
 
-# Outline: How the Results Explorer qualifies comparisons
+# Outline: When two timings are not a comparison
 
 ## Purpose
 
-Explain the engineering behind the Results Explorer preview launched with v0.4.0. Show how the
-site separates display, comparison, and ranking decisions without claiming that it certifies the
-underlying results.
+Explain the engineering behind the Results Explorer preview named in v0.4.0.
+Show how the site separates display, comparison, and ranking, and how recorded
+differences stay inspectable. Companion to the v0.4.0 release overview; this
+post is the eligibility and comparability deep dive, not a product tour.
 
 ## Audience
 
@@ -23,9 +24,9 @@ underlying results.
 
 ## Thesis
 
-A benchmark site should not turn every timing into a winner claim. BenchBox separates results that
-can be displayed, compared, and ranked; blocks winner claims when workload identity or timing
-coverage fails; shows recorded differences as warnings; and leaves missing evidence visible.
+The Results Explorer decides what may be displayed, compared, and ranked, and
+it leaves recorded differences visible. Two timings still have to earn a
+comparison.
 
 ## Evidence boundary
 
@@ -37,91 +38,72 @@ coverage fails; shows recorded differences as warnings; and leaves missing evide
 - Avoid calling warnings hard comparability gates. Benchmark, scale, phase, and timing coverage
   suppress winner claims; version, environment, validation, tuning, and cost differences are
   visible warnings.
+- Do not write an unbounded future API. The shipped preview and planned
+  pull-request path need no backend.
 
 ## Structure and word budget
 
-Target: 1,800-2,200 words.
+Target: 1,800-2,200 words. Series beats from
+`_blog/building-benchbox/outlines/series-plan.md`. H2s need not use the
+template labels.
 
-### 1. Two numbers are not yet a comparison, 180 words
+### 1. The problem — Which numbers belong together (~180 words)
 
-- Open with two plausible timings and the questions they omit.
-- Introduce the Explorer as a v0.4.0 curated preview.
-- State the thesis and non-certification boundary. Make clear that execution mode, environment,
-  validation, and funding context do not all act as hard gates.
+- Open with two plausible timings (12s vs 31s) and the questions they omit.
+- The Explorer keeps benchmark, scale, phase, shared valid timings, completion,
+  and SQL vs DataFrame attached to the numbers.
+- Concrete case: TPC-H SF1 power, DataFusion SQL vs Polars DataFrame, both
+  ranking-eligible on the August 28 snapshot.
 
-### 2. The launch snapshot, 220 words
+### 2. What we tried (~220 words)
 
-- 138 results: 134 displayable, 105 comparable, 55 rankable.
-- Validation: 56 passed, 30 partial, 52 not run.
-- Evidence gaps: 11 complete environment records and no recorded driver versions. Eight rows record
-  `notuning`, 130 record no tuning mode, and none records a tuned configuration.
-- All rows are maintainer-run with unspecified funding.
-- Uneven platform coverage. These figures are a dated snapshot, not permanent product claims.
+- Three architectures: pre-rendered JSON, hosted API, static DuckDB in the
+  browser. We shipped the third.
+- JSON would start faster; DuckDB gives a SQL workbench; an API would be
+  another service. The curated preview and planned pull-request path need no
+  backend. Do not promise a future API.
+- Vanity ranking was tempting; ranking stays, with ineligible rows visible and
+  named.
+- Environment as a hard gate would empty the August 28 snapshot (11 of 138
+  complete environments; no driver versions). Date that count where it is used.
 
-### 3. Four decisions, 320 words
+### 3. What we built (~900 words, three H2s)
 
-Explain admission, display, comparison, and ranking as distinct layers. Include named exclusion
-reasons, a compact decision diagram, and an implementation excerpt for the query-coverage floor.
-State that the rule does not guarantee identical query sets or identical geomean inputs.
+- Winner language with warnings, then a suppressed claim: live Compare
+  walkthroughs (`e3aaa125` vs `9187e38f`; DuckDB TPC-DS SF1 vs SF10).
+  Execution mode is a warning; scale factor is a hard gate. Screenshots and
+  receipt table.
+- Display, comparison, and ranking are separate decisions: admission, display,
+  comparison coverage floor, ranking policy. Include the TypeScript excerpt and
+  August 28 layer counts (138 / 134 / 105 / 55).
+- A database in the browser: 8,400,896-byte DuckDB snapshot, JSON bundles,
+  architecture diagram, CI thresholds as test budgets. A failed attach is an
+  error, not an empty table.
 
-### 4. Hard gates and visible warnings, 360 words
+### 4. What we learned — A validation pass on zero queries is a non-measurement (~360 words)
 
-| Check | Effect |
-| --- | --- |
-| Canonical benchmark, scale factor, phase | A mismatch suppresses winner and ranking claims |
-| Shared valid timings and minimum coverage | Insufficient overlap suppresses the comparison claim |
-| Platform or driver version | Difference is shown in the Comparability Receipt |
-| Validation, environment, execution mode, tuning, physical mechanisms, tuning-policy generation, cost | Recorded differences are warnings, not automatic blockers |
-| Missing values | Shown as not recorded; missing-only fields do not add a warning count |
+- August 24: withdraw 60 zero-query DataFrame non-measurements, then 17
+  truthful SQL bundles to keep the three-platform group floor.
+- List the exact affected scales. Lower-scale groups remain.
+- August 25: 52 retained bundles with passed/partial summaries and `NOT_RUN`
+  validation phase, normalized to `not_run`.
+- Admission now requires proof of execution. After corrections: 56 passed, 30
+  partial, 52 not run, 55 ranking-eligible.
 
-State explicitly that warnings may coexist with winner claims. The receipt helps readers judge a
-comparison; it is not certification. Use the mixed SQL/DataFrame TPC-H SF1 ranking as a concrete
-example of a warning class that does not suppress winner language.
+### 5. Try it yourself — Query the same table the pages use (~200 words)
 
-### 5. A static read path, 260 words
-
-- One 8,400,896-byte DuckDB snapshot is queried by DuckDB-WASM in the browser.
-- The site also publishes 138 downloadable JSON result bundles, one per launch-snapshot row, so do
-  not call the whole corpus one file.
-- No application API, authentication service, or database server sits in the Explorer read path.
-- Static hosting, CDN, build, and publication controls still matter.
-- Browser SQL is the main payoff; an attach failure appears as an error rather than an empty table.
-- Describe CI performance budgets as test thresholds, not production latency measurements.
-- Include the static-build-to-DuckDB-WASM and JSON-download architecture diagram.
-
-### 6. Corrections to the corpus, 360 words
-
-- August 24: withdraw 60 zero-query DataFrame non-measurements.
-- Withdraw 17 additional truthful SQL bundles to preserve the raw three-platform cohort floor;
-  do not call those 17 invalid.
-- List the exact affected scales. Do not imply that AMPLab, CoffeeShop, H2O-DB, or SSB disappeared
-  entirely when lower-scale groups remain.
-- August 25: normalize 52 retained bundles whose summary claimed passed or partial while the
-  validation phase was not run. Preserve timings and failure records; mark validation `not_run`.
-- Admission now rejects the same contradictory validation shape.
-- General lesson: passing validation must require evidence that work ran.
-
-### 7. Audit it yourself, 200 words
-
-- Start at the Explorer root and open Query from navigation.
-- Run a SQL count by `validation_status` and `is_ranking_eligible`.
-- Open a result detail, inspect methodology and provenance, then download its bundle.
-- Explain that rerunning provides independent corroboration, not guaranteed timing reproduction.
-- Keep the CTA browse-first; explain that the public submission guide and Explorer invite pull
-  requests while the corpus README says contributions are not yet open and the public guide names
-  the old repository.
-
-### 8. What the preview does not establish, 140 words
-
-- It does not cover all platforms, environments, benchmarks, or funding sources.
-- It does not make hardware-different results equivalent.
-- It does not certify every comparison shown.
-- Close on the principle: visible gaps are more useful than false precision.
+- Start at the Explorer root and open Query.
+- SQL for the TPC-H SF1 power ranking split and for validation/ranking counts.
+- Open Compare URLs or a result detail; download the JSON bundle.
+- Direct imperative: run a local copy for independent corroboration.
+- Closing snapshot section: 138 maintainer-run rows, uneven platform coverage,
+  dated August 28. Disclose the conflicting contribution surfaces.
 
 ## Editorial risks
 
 - Do not use "reliable" as an unqualified property of the results.
-- Do not say the Explorer predates v0.4.0; this post treats v0.4.0 as its public preview launch.
+- Do not say the Results Explorer launches, goes live, or is new in v0.4.0.
+  The site has been reachable since April 2026; this release names the preview.
 - Do not turn receipt warnings into eligibility gates.
 - Do not call 34 inventory benchmark-scale groups ranking cohorts.
 - Do not describe the static architecture as a security guarantee.
@@ -129,3 +111,6 @@ example of a warning class that does not suppress winner language.
 - Do not infer an exact implementation root cause for the zero-query validation issue.
 - Do not describe the public instructions as closed. Describe the conflicting submission surfaces
   and avoid promising that a submission automatically enters the Explorer.
+- Satisfy negative bounds by omission or by stating the affirmative scope once.
+  Do not render them as "This is Y. This is not X." Keep news-negation that is
+  the finding (title, zero-query non-measurement, missing evidence).

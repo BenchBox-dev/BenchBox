@@ -29,6 +29,9 @@ paid, and adds DuckLake as a beta platform.
 
 ## Governing constraints
 
+Satisfy these by omission or by stating the affirmative scope once. Do not
+render them as "This is Y. This is not X."
+
 - Do **not** say the Results Explorer launches, goes live, or is new. Phase 1
   launched 2026-04-04; the README has linked `benchbox.dev/results/` since
   v0.2.1. v0.4.0 is the first tagged release whose changelog names the

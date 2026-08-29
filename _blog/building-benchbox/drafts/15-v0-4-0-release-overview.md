@@ -19,9 +19,9 @@ meta_description: "BenchBox v0.4.0 moves to BenchBox-dev, adds provenance labels
 
 BenchBox v0.4.0 was released on **August 27, 2026**.
 
-The headline change is the move to its own GitHub organization. The repository name, the PyPI project `benchbox`, and `benchbox.dev` are unchanged, and old remotes keep redirecting. The project now has a home that does not depend on a personal account.
+The headline change is the move to its own GitHub organization. The repository name, the PyPI project `benchbox`, and `benchbox.dev` are unchanged, and old remotes keep redirecting. The project now lives in an organization account.
 
-The second change is a vocabulary for published results: who produced a run, its trust label, and disclosed funding. The Results Explorer at [benchbox.dev/results/](https://benchbox.dev/results/) has been reachable since April 2026; this is the first tagged release that names the preview and shows those labels on it. It is a curated preview, not a complete or certified ranking. A home that is not a personal account, and labels for who produced a result, are both prerequisites for results from other people. The companion post, [When two timings are not a comparison](./16-results-explorer-qualifies-comparisons.md), covers eligibility and comparability.
+The second change is a vocabulary for published results: who produced a run, its trust label, and disclosed funding. The Results Explorer at [benchbox.dev/results/](https://benchbox.dev/results/) has been reachable since April 2026; this tagged release is the first that names that preview and shows those labels on it. An organization account and labels for who produced a result are both prerequisites for results from other people. The companion post, [When two timings are not a comparison](./16-results-explorer-qualifies-comparisons.md), covers eligibility and comparability.
 
 The third is DuckLake as `--platform ducklake`, still beta: Parquet table data with catalog metadata in a SQL database, and catalog backend and data path chosen independently.
 
@@ -31,7 +31,7 @@ The third is DuckLake as `--platform ducklake`, still beta: Parquet table data w
 | --- | --- | --- |
 | Project home | Repository moved to `github.com/BenchBox-dev/BenchBox` | Org-owned home; old links redirect; install command unchanged |
 | Provenance and funding | Source, trust label, and funding recorded, including `vendor-supplied` | A published number can say who ran it and who paid |
-| Results Explorer | Preview at `benchbox.dev/results/` now shows those labels | Not a launch: the site has been reachable since April 2026 |
+| Results Explorer | Preview at `benchbox.dev/results/` now shows those labels | Reachable since April 2026; this release names the preview |
 | DuckLake (beta) | `--platform ducklake` with independent catalog and data path | Four documented modes validated at TPC-H SF1 |
 | MCP transport | `benchbox-mcp --transport streamable-http` | Extra local path; stdio unchanged; hosted use unsupported |
 | TPC throughput | Throughput@Size counts every executed query | Corrects 22x (TPC-H) and 99x (TPC-DS) understatements |
@@ -46,21 +46,19 @@ The repository, issue and release tooling, CI, and package metadata now point at
 git remote set-url origin https://github.com/BenchBox-dev/BenchBox.git
 ```
 
-What did not move is most of what a reader depends on. The repository name is still `BenchBox`. The PyPI project is still `benchbox`. The domain is still `benchbox.dev`. `uv add benchbox` is the same command it was.
-
-This is an ownership and namespace move. It does not announce a foundation, a new governance model, or a new maintainer team.
+The repository name, PyPI project, domain, and `uv add benchbox` command stay the same. This is an ownership and namespace move.
 
 ## Provenance labels, and where to see them
 
 v0.4.0 adds a canonical vocabulary for result source, trust label, and funding, plus a `benchbox run --funding` flag and an optional provenance block in result bundles. The `vendor-supplied` trust label is new. The preview at [benchbox.dev/results/](https://benchbox.dev/results/) displays those fields in rankings, comparisons, and result details.
 
-Ranked tables include maintainer-run, CI, and vendor-supplied results. Community submissions stay visible and are not ranked. The vendor label cannot be self-applied: it is derived from bundles under `results-data/bundles/vendor/`, and submission CI rejects non-maintainer PRs that touch that path. In the current preview snapshot, all 138 rows are still `maintainer-run` with funding `unspecified`. The labels are shipped vocabulary, not yet differentiated data.
+Ranked tables include maintainer-run, CI, and vendor-supplied results. Community submissions stay visible and are not ranked. The vendor label cannot be self-applied: it is derived from bundles under `results-data/bundles/vendor/`, and submission CI rejects non-maintainer PRs that touch that path. In the August 28 preview snapshot, all 138 rows are `maintainer-run` with funding `unspecified`.
 
 Accepted `--funding` values are `employer`, `personal`, `free-trial`, `vendor-sponsored`, `grant`, and `unspecified` (the default). Eligibility gates, the comparability receipt, and corpus curation belong in the companion post.
 
 ## DuckLake beta
 
-DuckLake stores table data as Parquet while keeping catalog metadata in a SQL database. BenchBox now runs it with `--platform ducklake`. Catalog backend and data path are independent choices, so `catalog=duckdb|sqlite|postgres` composes with a local or `s3://` `data_path`. That is six possible combinations, not one blessed configuration.
+DuckLake stores table data as Parquet while keeping catalog metadata in a SQL database. BenchBox now runs it with `--platform ducklake`. Catalog backend and data path are independent choices, so `catalog=duckdb|sqlite|postgres` composes with a local or `s3://` `data_path`. That is six possible combinations.
 
 Four of those six passed TPC-H scale-factor-1 correctness validation: `local`, `local_catalog_s3`, `postgres_catalog`, and `postgres_catalog_s3`. SQLite catalogs are a supported option, not one of those four validated modes. We are keeping the beta label rather than extrapolating those four runs to every combination, scale, and benchmark.
 
@@ -71,7 +69,7 @@ uv add "benchbox[ducklake]"
 uv run -- benchbox run --platform ducklake --benchmark tpch --scale 0.01
 ```
 
-A PostgreSQL catalog with S3-backed Parquet data uses the same command with extra platform options. Postgres plus S3 is one of the four SF1-validated modes; this snippet is the flag shape, not a claim that every scale has been exercised:
+A PostgreSQL catalog with S3-backed Parquet data uses the same command with extra platform options. Postgres plus S3 is one of the four SF1-validated modes; this snippet is the flag shape:
 
 ```bash
 uv run -- benchbox run --platform ducklake --benchmark tpch --scale 0.01 \
@@ -85,9 +83,9 @@ BenchBox reuses an existing catalog by default. `--force` rebuilds catalog state
 
 **TPC throughput was understated.** Throughput@Size now includes every executed query, correcting 22x (TPC-H) and 99x (TPC-DS) understatements in earlier result versions. Historical bundles are left unchanged as records of what those versions produced. Re-exporting an old bundle does not fix the number, because the exporter reuses a stored `throughput_at_size` when one is present. If you published a Throughput@Size figure from an earlier release, rerun the benchmark on v0.4.0.
 
-**`BENCHBOX_TUNING_ENABLED` never worked.** It set a config key nothing read at runtime, and the docs claimed it activated tuned runs in CI. It did not. Use `--tuning tuned` or `--tuning auto`; `BENCHBOX_TUNING_CONFIG` still works. If you set the old variable, delete it.
+**`BENCHBOX_TUNING_ENABLED` never worked.** It set a config key nothing read at runtime, and the docs claimed it activated tuned runs in CI. Use `--tuning tuned` or `--tuning auto`; `BENCHBOX_TUNING_CONFIG` still works. If you set the old variable, delete it.
 
-**`--tuning auto` on SQL platforms is constraints-only.** Primary-key, foreign-key, unique, and check constraints, and nothing else. DataFrame platforms keep their smart defaults. This is a documentation correction, not a behavior change.
+**`--tuning auto` on SQL platforms is constraints-only.** Primary-key, foreign-key, unique, and check constraints, and nothing else. DataFrame platforms keep their smart defaults. This documentation update describes the constraints `--tuning auto` already applied on SQL platforms.
 
 ## Other notable changes
 
