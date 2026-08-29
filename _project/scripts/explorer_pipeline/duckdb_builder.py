@@ -6,6 +6,7 @@ This file is loaded by DuckDB-WASM in the browser for filtering and analysis.
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import os
@@ -336,6 +337,7 @@ class DuckDBSnapshotBuilder:
                 self._create_metadata(con)
                 self._populate_supporting_tables(con, entries, details_map)
                 self._populate_results(con, entries, details_map, prefix)
+                self._populate_result_basis_availability(con, entries, details_map)
                 self._populate_query_display_timings(con, entries, details_map)
                 self._populate_query_executions(con, entries, details_map)
                 self._populate_benchmark_matrix_cells(con, summaries)
@@ -386,6 +388,16 @@ class DuckDBSnapshotBuilder:
                 phase      VARCHAR NOT NULL,
                 duration_s DOUBLE  NOT NULL,
                 PRIMARY KEY (result_id, phase)
+            )
+        """)
+        con.execute("""
+            CREATE TABLE result_basis_availability (
+                result_id               VARCHAR PRIMARY KEY,
+                has_warmup              BOOLEAN NOT NULL,
+                measurement_pass_count  INTEGER NOT NULL,
+                warmup_status           VARCHAR NOT NULL,
+                available_bases         VARCHAR NOT NULL,
+                varying_pass_queries    VARCHAR
             )
         """)
         con.execute("""
@@ -854,6 +866,41 @@ class DuckDBSnapshotBuilder:
         if rows:
             placeholders = ", ".join(["?"] * len(rows[0]))
             con.executemany(f"INSERT INTO results VALUES ({placeholders})", rows)
+
+    def _populate_result_basis_availability(
+        self,
+        con: Any,
+        entries: list[ManifestEntry],
+        details_map: dict[str, DetailResult],
+    ) -> None:
+        rows: list[tuple] = []
+        for entry in entries:
+            detail = details_map.get(entry.result_id)
+            basis_avail = detail.basis_availability if detail is not None else None
+            if basis_avail is None:
+                basis_avail = entry.basis_availability
+            if basis_avail is None:
+                from _project.scripts.explorer_pipeline.transformer import _compute_basis_availability
+
+                queries = detail.queries if detail is not None else []
+                basis_avail = _compute_basis_availability(queries)
+            varying_json = (
+                json.dumps(basis_avail.varying_pass_queries, sort_keys=True)
+                if basis_avail.varying_pass_queries
+                else None
+            )
+            rows.append(
+                (
+                    entry.result_id,
+                    basis_avail.has_warmup,
+                    basis_avail.measurement_pass_count,
+                    basis_avail.warmup_status,
+                    ",".join(basis_avail.available_bases),
+                    varying_json,
+                )
+            )
+        if rows:
+            con.executemany("INSERT INTO result_basis_availability VALUES (?, ?, ?, ?, ?, ?)", rows)
 
     def _populate_query_display_timings(
         self,
