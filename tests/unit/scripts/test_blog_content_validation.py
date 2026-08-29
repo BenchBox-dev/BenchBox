@@ -143,6 +143,39 @@ The maintenance phase status was marked as not_run.
     assert not any(f.category == "couplet" for f in result.findings)
 
 
+def test_affirmation_denial_couplet_same_line(tmp_blog_dir: Path) -> None:
+    """Same-line affirmation-plus-denial echo should emit an INFO finding."""
+    post_content = """# Architecture Overview
+
+BenchBox is an execution engine. It is not a database.
+"""
+    post_file = tmp_blog_dir / "couplet-same-line.md"
+    post_file.write_text(post_content, encoding="utf-8")
+
+    result = validate_file(post_file)
+    assert result.is_valid
+    couplet_findings = [f for f in result.findings if f.category == "couplet"]
+    assert len(couplet_findings) == 1
+    assert couplet_findings[0].severity == Severity.INFO
+
+
+def test_affirmation_denial_couplet_consecutive_lines(tmp_blog_dir: Path) -> None:
+    """Consecutive-line affirmation-plus-denial echo should emit an INFO finding."""
+    post_content = """# Lessons Learned
+
+Benchmark names define contracts.
+They are not marketing labels.
+"""
+    post_file = tmp_blog_dir / "couplet-consecutive.md"
+    post_file.write_text(post_content, encoding="utf-8")
+
+    result = validate_file(post_file)
+    assert result.is_valid
+    couplet_findings = [f for f in result.findings if f.category == "couplet"]
+    assert len(couplet_findings) == 1
+    assert couplet_findings[0].severity == Severity.INFO
+
+
 def test_guide_file_quotes_dont_passes(tmp_blog_dir: Path) -> None:
     """A guide file quoting banned phrases in Don't or Avoid sections must not fail."""
     guide_content = """# BenchBox Blog Style Guide

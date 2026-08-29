@@ -123,6 +123,20 @@ RE_ALLOWED_NEGATION = re.compile(
     re.IGNORECASE,
 )
 
+# Affirmation-plus-denial couplet patterns
+RE_SAME_LINE_AFFIRM_DENY = re.compile(
+    r"[.?!;]\s+(?:It|They|This|We|That|[A-Z][a-zA-Z0-9_-]*)\s+(?:is not|are not|was not|were not|does not|do not|did not|cannot)\b",
+    re.IGNORECASE,
+)
+RE_SAME_LINE_DENY_AFFIRM = re.compile(
+    r"\b(?:this|it|they) is not\b.*?\b(?:it is|they are)\b|\bnot just\b.*?\bbut (?:also\b)?",
+    re.IGNORECASE,
+)
+RE_LINE_START_DENIAL = re.compile(
+    r"^(?:It|They|This|We|That|[A-Z][a-zA-Z0-9_-]*)\s+(?:is not|are not|was not|were not|does not|do not|did not|cannot)\b",
+    re.IGNORECASE,
+)
+
 # Guide files where Avoid/Don't examples are legitimate
 GUIDE_FILENAME_PATTERNS = ("STYLE_GUIDE.md", "VOICE_REFERENCE.md", "PUBLISHING.md", "_guide.md", "_reference.md")
 
@@ -409,13 +423,19 @@ def check_llm_writing_tells(line: str, idx: int, path: Path) -> list[Finding]:
     return findings
 
 
-def check_affirmation_denial_couplet(line: str, stripped: str, idx: int, path: Path) -> list[Finding]:
+def check_affirmation_denial_couplet(
+    line: str,
+    stripped: str,
+    prev_line: str | None,
+    idx: int,
+    path: Path,
+) -> list[Finding]:
     """Advisory check for affirmation-plus-denial singleton couplets."""
     if stripped.startswith("#") or RE_ALLOWED_NEGATION.search(line):
         return []
-    if re.search(r"\bthis is not\b.*\bit is\b", line, re.IGNORECASE) or re.search(
-        r"\bnot just\b.*\bbut (?:also\b)?", line, re.IGNORECASE
-    ):
+
+    m_affirm_deny = RE_SAME_LINE_AFFIRM_DENY.search(line)
+    if m_affirm_deny:
         return [
             Finding(
                 file_path=path,
@@ -423,10 +443,43 @@ def check_affirmation_denial_couplet(line: str, stripped: str, idx: int, path: P
                 category="couplet",
                 severity=Severity.INFO,
                 message="Possible affirmation-plus-denial couplet. State the point once without echoing denial.",
-                matched_text=line.strip()[:60],
+                matched_text=m_affirm_deny.group(0).strip(".?!; "),
                 line_content=line,
             )
         ]
+
+    m_deny_affirm = RE_SAME_LINE_DENY_AFFIRM.search(line)
+    if m_deny_affirm:
+        return [
+            Finding(
+                file_path=path,
+                line_number=idx,
+                category="couplet",
+                severity=Severity.INFO,
+                message="Possible affirmation-plus-denial couplet. State the point once without echoing denial.",
+                matched_text=m_deny_affirm.group(0).strip(),
+                line_content=line,
+            )
+        ]
+
+    if prev_line and prev_line.rstrip()[-1:] in ".?!;" and RE_LINE_START_DENIAL.search(stripped):
+        m_start_denial = RE_LINE_START_DENIAL.search(stripped)
+        matched = m_start_denial.group(0) if m_start_denial else stripped[:30]
+        return [
+            Finding(
+                file_path=path,
+                line_number=idx,
+                category="couplet",
+                severity=Severity.INFO,
+                message=(
+                    "Possible affirmation-plus-denial couplet across adjacent lines. "
+                    "State the point once without echoing denial."
+                ),
+                matched_text=matched,
+                line_content=line,
+            )
+        ]
+
     return []
 
 
@@ -478,12 +531,14 @@ def validate_file(file_path: Path | str, repo_root: Path | str | None = None) ->
     is_guide = is_guide_file(path)
     guide_tracker = GuideContextTracker(is_guide=is_guide)
     pending_override: set[str] = set()
+    last_prose_line: str | None = None
 
     for idx, line in enumerate(lines, start=1):
         stripped = line.strip()
 
         if stripped.startswith("```"):
             in_code_block = not in_code_block
+            last_prose_line = None
             continue
 
         current_override = extract_content_ok_categories(line)
@@ -505,10 +560,12 @@ def validate_file(file_path: Path | str, repo_root: Path | str | None = None) ->
 
         # Skip prose rules inside code blocks
         if in_code_block:
+            last_prose_line = None
             continue
 
         prose_line = guide_tracker.filter_prose_line(line, stripped)
         if prose_line is None:
+            last_prose_line = None
             continue
 
         clean_prose = re.sub(r"`[^`]*`", "", prose_line)
@@ -539,7 +596,13 @@ def validate_file(file_path: Path | str, repo_root: Path | str | None = None) ->
 
         # Rule 8: Affirmation-plus-denial couplet advisory check - Info
         if not is_guide and not is_suppressed("couplet"):
-            result.findings.extend(check_affirmation_denial_couplet(clean_prose, stripped, idx, path))
+            result.findings.extend(check_affirmation_denial_couplet(clean_prose, stripped, last_prose_line, idx, path))
+
+        # Update last prose line for adjacent line couplet detection
+        if stripped and not stripped.startswith(("#", "```", "|", "- ", "* ", ">")):
+            last_prose_line = clean_prose.strip()
+        else:
+            last_prose_line = None
 
     return result
 
