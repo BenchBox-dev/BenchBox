@@ -21,7 +21,7 @@ BenchBox v0.4.0 was released on **August 27, 2026**.
 
 The headline change is the move to its own GitHub organization. The repository name, the PyPI project `benchbox`, and `benchbox.dev` are unchanged, and old remotes keep redirecting. The project now has a home that does not depend on a personal account.
 
-The second change is a vocabulary for published results: who produced a run, its trust label, and disclosed funding. The Results Explorer at [benchbox.dev/results/](https://benchbox.dev/results/) has been reachable since April 2026; this is the first tagged release that names the preview and shows those labels on it. It is a curated preview, not a complete or certified ranking. A home that is not a personal account, and labels for who produced a result, are both prerequisites for results from other people. The companion post, [How the Results Explorer qualifies comparisons](./16-results-explorer-qualifies-comparisons.md), covers eligibility and comparability.
+The second change is a vocabulary for published results: who produced a run, its trust label, and disclosed funding. The Results Explorer at [benchbox.dev/results/](https://benchbox.dev/results/) has been reachable since April 2026; this is the first tagged release that names the preview and shows those labels on it. It is a curated preview, not a complete or certified ranking. A home that is not a personal account, and labels for who produced a result, are both prerequisites for results from other people. The companion post, [When two timings are not a comparison](./16-results-explorer-qualifies-comparisons.md), covers eligibility and comparability.
 
 The third is DuckLake as `--platform ducklake`, still beta: Parquet table data with catalog metadata in a SQL database, and catalog backend and data path chosen independently.
 
@@ -150,7 +150,7 @@ v0.4.0 was a maintainer-driven cycle. If a result, label, or migration note need
 
 - Changelog entry: `CHANGELOG.md` (`[0.4.0] - 2026-08-27`)
 - Release tag: [v0.4.0](https://github.com/BenchBox-dev/BenchBox/releases/tag/v0.4.0)
-- Companion post: [How the Results Explorer qualifies comparisons](./16-results-explorer-qualifies-comparisons.md)
+- Companion post: [When two timings are not a comparison](./16-results-explorer-qualifies-comparisons.md)
 - DuckLake platform documentation: `docs/platforms/ducklake.md`
 - Provenance vocabulary: `benchbox/core/results/provenance.py`
 - MCP server reference: `docs/reference/mcp.md`

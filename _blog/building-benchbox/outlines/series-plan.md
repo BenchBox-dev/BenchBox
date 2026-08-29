@@ -42,7 +42,7 @@
 | 13  | BenchBox v0.3.0: JoinOrder fix, approximate analytics, and agent prompt composer | PUBLISHED | Release announcement: `/prompts/`, the JoinOrder data-contract fix, and deeper approximate/sketch coverage |
 | 14  | Reworking JoinOrder around the IMDb 2013 dataset | PUBLISHED | A user-raised benchmark bug drives the post: `joinorder` now means the full IMDb 2013 JOB dataset at SF=1, with 113 query IDs, manifest-backed data identity, provenance notes, and generated data renamed |
 | 15  | BenchBox v0.4.0: new org, DuckLake, and result provenance | DRAFTED | Org move, provenance labels on the existing Results Explorer preview, DuckLake beta, and a throughput correction that needs a rerun |
-| 16  | How the Results Explorer qualifies comparisons | DRAFTED | The Explorer separates display, comparison, and ranking, suppresses unsupported winner claims, and keeps missing evidence visible |
+| 16  | When two timings are not a comparison | DRAFTED | The Explorer separates display, comparison, and ranking, suppresses unsupported winner claims, and keeps missing evidence visible |
 
 ---
 
