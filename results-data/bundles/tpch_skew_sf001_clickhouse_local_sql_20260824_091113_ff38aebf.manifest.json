@@ -1,0 +1,8 @@
+{
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "funding": "unspecified",
+  "submitted_by": "maintainer",
+  "bundle_file": "tpch_skew_sf001_clickhouse_local_sql_20260824_091113_ff38aebf.json",
+  "bundle_hash": "71bc03c8afcb85b7b48635997b098d90c3dca96f3794da981c1e29def11f7bb1"
+}

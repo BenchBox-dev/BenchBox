@@ -1,0 +1,8 @@
+{
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "funding": "unspecified",
+  "submitted_by": "maintainer",
+  "bundle_file": "tpch_skew_sf01_polars_df_20260826_205813_b3ba4437.json",
+  "bundle_hash": "eff9eb1f2f128fbd834fa3d036352c5e3d26a151a2da0c08b05498cc0e1ab130"
+}

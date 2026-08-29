@@ -1,0 +1,8 @@
+{
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "funding": "unspecified",
+  "submitted_by": "maintainer",
+  "bundle_file": "tpch_sf001_starrocks_sql_20260825_103226_5cefdc41.json",
+  "bundle_hash": "91116d7e609152ccbb3ee93bb658ae508d6becead73628b56c3fa13e56d1ec98"
+}
