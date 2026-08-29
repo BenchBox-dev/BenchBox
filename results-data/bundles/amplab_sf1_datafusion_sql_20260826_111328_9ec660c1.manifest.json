@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "amplab_sf1_datafusion_sql_20260826_111328_9ec660c1.json",
+  "bundle_hash": "ecda747596ad07cf82d2e73e7a901c5a646d69ac059f6d6e6ab14f14a62d4d7b"
 }

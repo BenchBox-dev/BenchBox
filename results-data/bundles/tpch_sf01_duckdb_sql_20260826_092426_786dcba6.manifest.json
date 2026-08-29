@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "tpch_sf01_duckdb_sql_20260826_092426_786dcba6.json",
+  "bundle_hash": "f03944800712f721027fe90e2ab949d0203fb18363ccc62d77803ce5f010ee4a"
 }

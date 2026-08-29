@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "amplab_sf1_polars_df_20260826_204414_f27f59f4.json",
+  "bundle_hash": "2ca4b729285ecbf75b1c7734b2893e1d6949a2b0b75671a1a10f0e39133ed128"
 }

@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-08-29T15:15:24.061034+00:00",
+  "generated_at": "2026-08-29T19:01:50.310967+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
@@ -1326,7 +1326,7 @@
       "query_count": 309,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "50bb6f222a441ea2c2838f7e79a33124a339652f42010dafa27fc27904951c42"
+      "bundle_sha256": "79689a4f429517459a7bdcf4aa2d22e308445c3adf9f0423bd5e526456155cea"
     },
     {
       "file": "tpcds_sf1_polars_df_20260826_204334_bda76dd1.json",
@@ -1339,7 +1339,7 @@
       "query_count": 309,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "72f7e19bb68beaebf5338100dc9b0e0bdc19553e43d79c32388afb1ecf3c7ae7"
+      "bundle_sha256": "52accdd6308fe82b669fa812bc7d3a9753009d87e0d8ae2889e904b457443469"
     },
     {
       "file": "tpcds_sf1_sqlite_sql_20260824_083944_c6745a86.json",
@@ -1586,7 +1586,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "d9e83c253b51513791821cd25f49e49d0378ecdc639a0f0705d837955053b07b"
+      "bundle_sha256": "805d70480e77b42d2962dc5471d6e6a756e0180b017a519a750fdbb60059fab9"
     },
     {
       "file": "tpch_sf01_pandas_df_20260826_210239_77598616.json",
@@ -1599,7 +1599,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "cd94abd9ec2237114727b140eafe434824b68118a65bec3e9d678f1dfe98fb44"
+      "bundle_sha256": "89bcd922c9e563be454c5ee8b78f31d1834b78e0d4e11f7fc6200159b1da632d"
     },
     {
       "file": "tpch_sf001_polars_df_20260824_074104_51ccc406.json",
@@ -1625,7 +1625,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "5514c4c21b1be6a8c6f6a89d2be69c95cfcd55252d3d74ef2795fa68106e30c2"
+      "bundle_sha256": "ef948d3518b815fa694f8b5f21c27e6e55b96a25e907b1f915242fd1d0c0cff3"
     },
     {
       "file": "tpch_sf1_polars_df_20260824_193005_54a9e53f.json",
@@ -1638,7 +1638,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "2cb5d021ab9d8485b9f44707fc9afdca565f1b90e92c00c458221e8c4181e4b2"
+      "bundle_sha256": "4590f2972e50a2be3ff24f182e7dbf303fb44a951a25f8e59e17e02b938821e2"
     },
     {
       "file": "tpch_sf1_polars_df_20260825_184959_8ef4d6e2.json",
@@ -1664,7 +1664,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "a03d0bf12d6fe3256b2e59fc9fa83ddcd6fdd35b607a6e78f2184bdf44636fc4"
+      "bundle_sha256": "8ee1008b50b6241ceb26fdb552dc9db25c821ea12db0a11c0878a6d19dd3b3ef"
     },
     {
       "file": "tpch_sf1_pyspark_df_20260825_185531_14cd3451.json",
@@ -1964,84 +1964,6 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "2e9f90a9d448b6b84f014c5d8a1d54544d04784b75c8c8a3311fea6fb4a42aa7"
-    },
-    {
-      "file": "write_primitives_sf001_duckdb_sql_20260826_162702_20fb8a0a.json",
-      "benchmark": "write_primitives",
-      "benchmark_name": "Write Primitives",
-      "platform": "DuckDB",
-      "platform_version": "1.3.2",
-      "scale_factor": 0.01,
-      "timestamp": "2026-08-26T16:27:01.963875",
-      "query_count": 336,
-      "trust_label": "maintainer-run",
-      "funding": "unspecified",
-      "bundle_sha256": "cbd7e57744563cb90bd2b24af3b4b915ca21108df78d984d97fa74ee5d619017"
-    },
-    {
-      "file": "write_primitives_sf01_duckdb_sql_20260826_093045_f5ba9201.json",
-      "benchmark": "write_primitives",
-      "benchmark_name": "Write Primitives",
-      "platform": "DuckDB",
-      "platform_version": "1.3.2",
-      "scale_factor": 0.1,
-      "timestamp": "2026-08-26T09:30:45.947917",
-      "query_count": 336,
-      "trust_label": "maintainer-run",
-      "funding": "unspecified",
-      "bundle_sha256": "278eb66d7a6f92a50abdc4c67e0a865857b7453089f4d629a1254db85b2181a2"
-    },
-    {
-      "file": "write_primitives_sf001_sqlite_sql_20260826_174358_5c5fbfc3.json",
-      "benchmark": "write_primitives",
-      "benchmark_name": "Write Primitives",
-      "platform": "SQLite",
-      "platform_version": "3.53.1",
-      "scale_factor": 0.01,
-      "timestamp": "2026-08-26T17:43:58.244045",
-      "query_count": 336,
-      "trust_label": "maintainer-run",
-      "funding": "unspecified",
-      "bundle_sha256": "ed19a1ba3ac7a50205cb570fd40d2b59c2a1facbad248f250cc0b499560792c6"
-    },
-    {
-      "file": "write_primitives_sf01_sqlite_sql_20260826_115823_3f1acd48.json",
-      "benchmark": "write_primitives",
-      "benchmark_name": "Write Primitives",
-      "platform": "SQLite",
-      "platform_version": "3.53.1",
-      "scale_factor": 0.1,
-      "timestamp": "2026-08-26T11:58:22.971408",
-      "query_count": 112,
-      "trust_label": "maintainer-run",
-      "funding": "unspecified",
-      "bundle_sha256": "2be23c611313d6e9844a4a7ed3ca18b8b29fbe5fcf6f79970b377b569d2ad90b"
-    },
-    {
-      "file": "write_primitives_sf001_spark_sql_20260826_194746_3688edd9.json",
-      "benchmark": "write_primitives",
-      "benchmark_name": "Write Primitives",
-      "platform": "Spark",
-      "platform_version": "4.1.1",
-      "scale_factor": 0.01,
-      "timestamp": "2026-08-26T19:47:46.526343",
-      "query_count": 112,
-      "trust_label": "maintainer-run",
-      "funding": "unspecified",
-      "bundle_sha256": "2c0bf4d459287407a3d4df4ba973b6fd7302cc678f4c5b19604350234215bc7b"
-    },
-    {
-      "file": "write_primitives_sf01_spark_sql_20260826_194809_f9478be1.json",
-      "benchmark": "write_primitives",
-      "benchmark_name": "Write Primitives",
-      "platform": "Spark",
-      "platform_version": "4.1.1",
-      "scale_factor": 0.1,
-      "timestamp": "2026-08-26T19:48:08.830186",
-      "query_count": 112,
-      "trust_label": "maintainer-run",
-      "funding": "unspecified",
-      "bundle_sha256": "aefc10f62d61f2acb34da0886786db6b296fa5b81c7349cf7af00ed7da15af34"
     }
   ],
   "cohorts": {
@@ -2238,20 +2160,10 @@
       "DuckDB",
       "Polars",
       "SQLite"
-    ],
-    "write_primitives@sf0.01": [
-      "DuckDB",
-      "SQLite",
-      "Spark"
-    ],
-    "write_primitives@sf0.1": [
-      "DuckDB",
-      "SQLite",
-      "Spark"
     ]
   },
   "summary": {
-    "total_bundles": 157,
+    "total_bundles": 151,
     "by_benchmark": {
       "amplab": 18,
       "clickbench": 6,
@@ -2262,29 +2174,28 @@
       "ssb": 18,
       "tpcds": 13,
       "tpch": 29,
-      "tpch_skew": 15,
-      "write_primitives": 6
+      "tpch_skew": 15
     },
     "by_platform": {
       "CedarDB": 1,
       "ClickHouse Local": 23,
       "ClickHouse Server": 1,
       "DataFusion": 25,
-      "DuckDB": 28,
+      "DuckDB": 26,
       "DuckLake": 1,
       "LakeSail": 1,
       "Pandas": 17,
       "Polars": 24,
       "PySpark": 2,
-      "SQLite": 25,
-      "Spark": 8,
+      "SQLite": 23,
+      "Spark": 6,
       "StarRocks": 1
     },
     "by_trust_label": {
-      "maintainer-run": 157
+      "maintainer-run": 151
     },
     "by_funding": {
-      "unspecified": 157
+      "unspecified": 151
     }
   }
 }

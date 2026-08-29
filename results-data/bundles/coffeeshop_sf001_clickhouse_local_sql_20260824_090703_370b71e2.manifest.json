@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "coffeeshop_sf001_clickhouse_local_sql_20260824_090703_370b71e2.json",
+  "bundle_hash": "d5b4b7dc6ddd5e20735d34aa8192070a47ec9aba3a9c0b5397ab7887295757b7"
 }

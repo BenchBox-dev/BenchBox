@@ -118,7 +118,7 @@ To satisfy both the **SF1 mandate** and the **$\ge 3$ platforms per cohort** rul
 | **H2O-DB** (`h2odb`) | `0.01`, `0.1`, `1.0` | `duckdb`, `datafusion`, `sqlite`, `clickhouse-local`, `polars-df`, `pandas-df`, `spark` (7 platforms) | All 7 platforms |
 | **ClickBench** (`clickbench`) | `1.0` (fixed) | `duckdb`, `datafusion`, `sqlite`, `clickhouse-local`, `polars-df`, `spark` (6 platforms) | All 6 platforms |
 | **Read Primitives** (`read_primitives`) | `0.01`, `0.1`, `1.0` | `duckdb`, `datafusion`, `sqlite`, `polars-df`, `pandas-df`, `pyspark-df` (6 platforms) | All 6 platforms |
-| **Write Primitives** (`write_primitives`) | `0.01`, `0.1`, `1.0` | `duckdb`, `sqlite`, `polars-df`, `pandas-df`, `pyspark-df` (5 platforms) | All 5 platforms (DataFusion pruned per UAT DML rule) |
+| **Write Primitives** (`write_primitives`) | Deferred | No three-platform validated slice remained after removing all-zero runs; rerun before staging | Do not create a shallow cohort |
 | **TPC-DS** (`tpcds`) | `1.0` (integer) | `duckdb`, `datafusion`, `spark` (3 platforms) | `duckdb`, `datafusion`, `spark` (SQLite pruned per UAT loader rule) |
 | **JoinOrder** (`joinorder`) | `1.0` (fixed) | `duckdb`, `clickhouse-local`, `sqlite`, `spark` (4 platforms) | All 4 platforms |
 
@@ -191,6 +191,8 @@ sequenceDiagram
    ```json
    {
      "manifest_version": "1.0",
+     "bundle_file": "<bundle filename>.json",
+     "bundle_hash": "<sha256 of bundle bytes>",
      "result_source": "internal",
      "funding": "unspecified",
      "submitted_by": "maintainer"

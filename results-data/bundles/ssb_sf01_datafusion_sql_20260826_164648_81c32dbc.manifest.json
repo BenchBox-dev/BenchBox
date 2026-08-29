@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "ssb_sf01_datafusion_sql_20260826_164648_81c32dbc.json",
+  "bundle_hash": "4143b340c24b7d6e5a1f5c151f061c00cbfdc27766188e1dfce8c2523099dfa1"
 }

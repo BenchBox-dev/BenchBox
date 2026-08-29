@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "h2odb_sf1_clickhouse_local_sql_20260825_175439_252ba7d7.json",
+  "bundle_hash": "2fe8797748acd46d9116d8621703489e5372a381806bb895782ebd682966de35"
 }

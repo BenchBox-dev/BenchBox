@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "tpch_sf001_cedardb_sql_20260825_095330_cf0d9e4d.json",
+  "bundle_hash": "d73d32ea6360db170cfd59611505aa7e60fe1b9faf107667921f354b674d2878"
 }

@@ -1300,7 +1300,7 @@
     "tpc_metrics": {
       "power_at_size": 99309.09200970692
     },
-    "validation": "passed"
+    "validation": "not_run"
   },
   "tables": {
     "customer": {
@@ -1334,5 +1334,5 @@
       "rows": 10000
     }
   },
-  "version": "2.1"
+  "version": "2.2"
 }

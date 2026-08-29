@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "tpch_sf1_ducklake_sql_20260828_091755_137bc87e.json",
+  "bundle_hash": "025b183bbb43c912eb495e0caa4526c768a0130f3236f46e1e42a6b5d9d27dc9"
 }

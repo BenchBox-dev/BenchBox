@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "ssb_sf1_pandas_df_20260826_214148_96be5114.json",
+  "bundle_hash": "bf817993ab5b44e751af1e5570351440759b20f0b689809ffcc6b92370b4f36e"
 }

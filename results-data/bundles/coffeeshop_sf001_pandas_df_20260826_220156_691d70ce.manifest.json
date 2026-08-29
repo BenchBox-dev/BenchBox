@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "coffeeshop_sf001_pandas_df_20260826_220156_691d70ce.json",
+  "bundle_hash": "9101737592d27ba85660c2497e4762309bce38736f106ac62c85fe27b702fa8a"
 }

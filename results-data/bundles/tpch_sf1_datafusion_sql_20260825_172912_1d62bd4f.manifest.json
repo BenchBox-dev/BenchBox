@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "tpch_sf1_datafusion_sql_20260825_172912_1d62bd4f.json",
+  "bundle_hash": "2a04391f7e5a8abfc88bdee62f19c34ac3f2cdb56e3f744c32e7e1f92c368a8e"
 }

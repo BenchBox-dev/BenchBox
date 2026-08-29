@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "amplab_sf001_duckdb_sql_20260826_105810_c659ecff.json",
+  "bundle_hash": "77992750a09d5590a199d2116a52c4e1f24374695628344cce2b67b94b87d134"
 }

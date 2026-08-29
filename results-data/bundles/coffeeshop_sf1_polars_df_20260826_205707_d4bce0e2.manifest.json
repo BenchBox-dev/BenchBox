@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "coffeeshop_sf1_polars_df_20260826_205707_d4bce0e2.json",
+  "bundle_hash": "4f3e02b6abe054b0ca782cb6581105cff374dc4489635d4a011eba6bf972575d"
 }

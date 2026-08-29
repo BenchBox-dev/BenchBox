@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "amplab_sf001_sqlite_sql_20260826_173848_2eff93c9.json",
+  "bundle_hash": "13171f1f65557f20c40d89c7ceccea71cd953e6fab143b7a6a42bb73bf91cb0f"
 }

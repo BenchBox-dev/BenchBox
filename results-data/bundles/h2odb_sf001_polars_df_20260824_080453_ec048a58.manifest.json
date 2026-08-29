@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "h2odb_sf001_polars_df_20260824_080453_ec048a58.json",
+  "bundle_hash": "d729e7d07ad85bf7dae597ce871e96048a93beab610514243179b7c1e6d9de2f"
 }

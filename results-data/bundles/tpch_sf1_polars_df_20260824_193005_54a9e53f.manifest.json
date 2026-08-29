@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "tpch_sf1_polars_df_20260824_193005_54a9e53f.json",
+  "bundle_hash": "4590f2972e50a2be3ff24f182e7dbf303fb44a951a25f8e59e17e02b938821e2"
 }

@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "coffeeshop_sf1_duckdb_sql_20260826_110251_51016466.json",
+  "bundle_hash": "d7b5739c8d49fd22954f332161159d9ce05ea76afb07034db210dab46ce6b828"
 }

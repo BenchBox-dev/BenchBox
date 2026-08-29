@@ -2,5 +2,7 @@
   "manifest_version": "1.0",
   "result_source": "internal",
   "funding": "unspecified",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "bundle_file": "amplab_sf1_clickhouse_local_sql_20260824_090414_e3e40917.json",
+  "bundle_hash": "29fb9932a4ed1e310d50a4b824f4943ab957189f215f00ebf283d01a56f13db9"
 }
