@@ -75,6 +75,42 @@ future rerun may replace the `not_run` claim only when the validation phase
 records actual evidence. Submission admission also rejects a `passed` or
 `partial` summary claim paired with an unrun validation phase.
 
+## Pre-2026-08-23 results withdrawn (2026-08-28)
+
+All 130 bundles run before 2026-08-23 were removed from the develop corpus,
+together with their 114 `.manifest.json` sidecars (244 files). What remains is
+9 bundles across 3 cohorts.
+
+**This was a trust decision, not a soundness finding.** Unlike the 2026-07-16
+tuned drop (#1176 proved the tuning config never reached platform adapters) and
+the 2026-08-24 zero-query withdrawal (bundles claimed `passed` after executing
+nothing), no defect was found in the removed results. The maintainer no longer
+trusts measurements taken before 2026-08-23 and asked for them to be withdrawn.
+Do not go looking for a bug report; there isn't one.
+
+What went:
+
+- 12 bundles from the original 2026-04-03/04 corpus generation
+- 111 bundles from the 2026-05-02 maintainer UAT sweep (committed in #164)
+- 3 JoinOrder bundles from the 2026-05-12 canonical UAT
+- 4 SSB seed-lane bundles from 2026-07-30
+
+Removing them would have left TPC-H SF1 holding only Polars and PySpark, below
+the three-platform floor in `validate_corpus.py`. A fresh maintainer DuckDB run
+at TPC-H SF1 (DuckDB 1.3.2, 66 queries, 0 failed, validation PASSED) was added
+in the preceding commit to hold the cohort. It also gives that cohort a SQL
+reference point against two DataFrame-mode results.
+
+The three migration manifests in `bundles/` were deliberately kept:
+`path-privacy-migration.manifest.json` is the `DEFAULT_MANIFEST` in
+`_project/scripts/results_explorer_corpus_migrate.py` and is name-referenced by
+`sync-results-data-to-published.yml`. They are tooling audit records, excluded
+from bundle discovery by `COMPANION_SUFFIXES`.
+
+Restoring any withdrawn cohort means fresh runs, not reverting this commit.
+`REGENERATION.md` is the precedent for how to document what a restore needs.
+The removal commit carries the exact 244-path list.
+
 ## Public-path single-pass status (2026-08-05)
 
 Verified with `results_explorer_corpus_migrate.py` dry-run: 0/207 bundles changed under the current public anonymization pass. The `test_rederiv_fresh_public_pass_equals_curated_for_all_fields` gate pins the fixed point.

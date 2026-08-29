@@ -68,14 +68,20 @@ document already described in prose.
 
 ## Seed Corpus
 
-The current checked-in corpus covers 18 benchmarks across 44 cohorts. The
-maintainer-run seed lane (`seed-corpus.yml` workflow, manual
-`workflow_dispatch`) covers TPC-H and SSB at SF 0.01 / 0.1; UAT-sourced
-community-submission bundles extend coverage to amplab, clickbench,
-coffeeshop, datavault, flightdata, h2odb, metadata_primitives, nyctaxi,
-read_primitives, ssb, tpcdi, tpcds_obt, tpch_skew, tpchavoc, tsbs_devops,
-and write_primitives across SF 0.01 / 0.1 / 1.0 where platforms reached the
-≥3-platform cohort gate.
+The current checked-in corpus covers 2 benchmarks across 3 cohorts, all run
+on or after 2026-08-23:
+
+| Benchmark | Scale | Platforms |
+|---|---|---|
+| tpcds | 1.0 | DataFusion, DuckDB, Spark |
+| tpcds | 10.0 | DataFusion, DuckDB, Spark |
+| tpch | 1.0 | DuckDB, Polars, PySpark |
+
+Everything older was withdrawn on 2026-08-28 as a trust decision; see
+`CORPUS_NOTES.md`. The maintainer-run seed lane (`seed-corpus.yml` workflow,
+manual `workflow_dispatch`) targets TPC-H and SSB at SF 0.01 / 0.1, so its
+matrix no longer matches anything checked in — a dispatch is what refills
+those cohorts.
 
 For the up-to-date per-cohort breakdown, see
 `results-data/corpus-inventory.json` (regenerate via

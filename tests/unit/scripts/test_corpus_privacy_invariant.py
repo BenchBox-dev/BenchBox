@@ -244,7 +244,19 @@ def test_every_manifest_bundle_hash_matches_its_bundle() -> None:
     """
     mismatched, scanned = _manifest_hash_mismatches(RESULTS_DATA / "bundles")
 
-    assert scanned, "no sidecar manifests scanned - this gate would be vacuous"
+    if not scanned:
+        # A corpus can legitimately hold no bundle-declaring sidecars: a
+        # maintainer-committed bundle has none, and trust label derives from
+        # that absence. The 2026-08-28 pre-2026-08-23 withdrawal left exactly
+        # that state. Skip rather than fail, so the gate reports "nothing to
+        # check" instead of alarming on a correct corpus. It re-arms on its own
+        # the moment any sidecar lands, which is every submission path.
+        no_sidecars = not any(
+            isinstance(json.loads(path.read_text(encoding="utf-8")).get("bundle_file"), str)
+            for path in (RESULTS_DATA / "bundles").rglob("*.manifest.json")
+        )
+        assert no_sidecars, "sidecar manifests exist but none were scanned - this gate went vacuous"
+        pytest.skip("corpus holds no bundle-declaring sidecar manifests - nothing for this gate to check")
     assert not mismatched, (
         f"{len(mismatched)} sidecar manifest(s) do not match their bundle, so the mirror to "
         "published-results will refuse to open. Rerun "
