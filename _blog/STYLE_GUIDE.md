@@ -355,7 +355,7 @@ Use heading levels logically:
 - A title or heading whose news is a negation is allowed (for example: `# When two timings are not a comparison`).
 - Do not use first-person headings:
   - ❌ "How I optimized query performance"
-  - ✅ "Optimizing Query Performance" or "How we optimized query performance"
+  - ✅ "Optimizing Query Performance"
 - Avoid empty or clever headings that obscure the content.
 
 ---
