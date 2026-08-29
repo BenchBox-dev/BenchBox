@@ -1,5 +1,5 @@
 ---
-title: "When two timings are not a comparison"
+title: "How the Results Explorer qualifies comparisons"
 blogpost: true
 status: draft
 date: August 27, 2026
@@ -11,7 +11,7 @@ tags: [benchbox, results-explorer, benchmarking, comparability, validation, duck
 meta_description: "How BenchBox's Results Explorer separates display, comparison, and ranking, suppresses unsupported winner claims, and leaves recorded differences inspectable."
 ---
 
-# When two timings are not a comparison
+# How the Results Explorer qualifies comparisons
 
 > The Results Explorer decides what may be displayed, compared, and ranked, and it leaves recorded differences visible. Two timings still have to earn a comparison.
 

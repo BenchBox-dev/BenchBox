@@ -251,7 +251,7 @@ Acknowledge contributors, highlight community work, invite participation.
 
 **TL;DR**: [2-3 sentence summary]
 
-The pull quote and TL;DR state the finding. A bound belongs there when the summary would be misleading without it. Negative scope is allowed when it is the finding ("When two timings are not a comparison").
+The pull quote and TL;DR state the finding. A bound belongs there when the summary would be misleading without it. Negative scope is allowed when it is the finding ("Two timings still have to earn a comparison").
 
 ---
 

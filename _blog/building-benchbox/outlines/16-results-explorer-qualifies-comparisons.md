@@ -1,5 +1,5 @@
 ---
-title: "When two timings are not a comparison"
+title: "How the Results Explorer qualifies comparisons"
 series: building-benchbox
 post_number: 16
 type: architecture-design
@@ -7,7 +7,7 @@ tags: [benchbox, results-explorer, benchmarking, comparability, validation, duck
 status: DRAFTED
 ---
 
-# Outline: When two timings are not a comparison
+# Outline: How the Results Explorer qualifies comparisons
 
 ## Purpose
 
