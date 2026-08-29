@@ -4,7 +4,9 @@
 The matrix is intentionally operator-run: it creates four SF10 synthetic
 datasets once, then loads and measures each dataset with seven DuckDB package
 versions. Each power cell is a separate BenchBox invocation, repeated three times. Generated
-artifacts stay outside the checkout and are recorded in ``matrix-manifest.json``.
+artifacts stay outside the checkout and are recorded in ``matrix-manifest.json``. Run the
+analyzer with ``--explorer-bundles-dir`` to materialize one median bundle per cell for
+Results Explorer; the raw repetitions remain external.
 
 Run from the BenchBox checkout with:
 
@@ -25,10 +27,11 @@ import re
 import shlex
 import subprocess
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from benchbox.utils.clock import elapsed_seconds, mono_time
 
 VERSIONS = ("1.0.0", "1.1.3", "1.2.2", "1.3.2", "1.4.4", "1.5.5", "1.6.0.dev365")
 BENCHMARKS = (("tpch", 10.0), ("tpcds", 10.0), ("clickbench", 10.0), ("ssb", 10.0))
@@ -70,9 +73,9 @@ def _run_command(
         return 0, "", 0.0
 
     _append_log(log_path, f"$ {_command_text(command)}\n")
-    started = time.monotonic()
+    started = mono_time()
     completed = subprocess.run(command, cwd=cwd, env=env, capture_output=True, text=True, check=False)
-    elapsed = time.monotonic() - started
+    elapsed = elapsed_seconds(started)
     output = (completed.stdout or "") + (completed.stderr or "")
     _append_log(log_path, output)
     _append_log(log_path, f"[exit={completed.returncode} elapsed_s={elapsed:.3f}]\n")

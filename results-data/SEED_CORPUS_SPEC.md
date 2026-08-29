@@ -69,8 +69,10 @@ Operator-run version matrices may repeat a platform name at several versions. Th
 ordinary schema-v2 bundles under `results-data/bundles/`; Results Explorer disambiguates
 their rows by `platform.version` / resolved driver version. The DuckDB matrix runner is
 `scripts/run_duckdb_version_matrix.py`, and its median analyzer is
-`scripts/analyze_duckdb_version_matrix.py`. The current DuckDB matrix is documented in
-`results-data/CORPUS_NOTES.md` when its bundles are promoted.
+`scripts/analyze_duckdb_version_matrix.py`. The analyzer emits one median bundle per
+version/benchmark cell for promotion; raw repetitions stay outside the checkout. The
+current DuckDB matrix is documented in `results-data/CORPUS_NOTES.md` when its bundles
+are promoted.
 
 ## Benchmark Notes
 

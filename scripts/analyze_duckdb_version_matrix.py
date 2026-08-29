@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
+import hashlib
 import json
 import statistics
 from collections import defaultdict
@@ -52,7 +54,7 @@ def _total_ms(payload: dict[str, Any]) -> float:
     return float(value)
 
 
-def analyze(manifest_path: Path) -> dict[str, Any]:
+def _load_power_payloads(manifest_path: Path) -> dict[tuple[str, str], list[dict[str, Any]]]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if tuple(manifest.get("versions", ())) != EXPECTED_VERSIONS:
         raise ValueError(f"unexpected version matrix: {manifest.get('versions')}")
@@ -65,16 +67,124 @@ def analyze(manifest_path: Path) -> dict[str, Any]:
     if len(records) != expected_count:
         raise ValueError(f"expected {expected_count} power records, found {len(records)}")
 
+    grouped: defaultdict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     root = manifest_path.parent
-    cells: list[dict[str, Any]] = []
-    grouped: defaultdict[tuple[str, str], list[tuple[float, dict[str, float], dict[str, Any]]]] = defaultdict(list)
     for record in records:
         version = str(record["requested_version"])
         benchmark = str(record["benchmark"])
         payload = json.loads(_result_path(root, record).read_text(encoding="utf-8"))
         if payload.get("summary", {}).get("validation") != "passed":
             raise ValueError(f"non-passing validation in {record['path']}")
-        grouped[(version, benchmark)].append((_total_ms(payload), _query_medians(payload), payload))
+        grouped[(version, benchmark)].append(payload)
+    return grouped
+
+
+def _median_field(payloads: list[dict[str, Any]], path: tuple[str, ...]) -> float | None:
+    values: list[float] = []
+    for payload in payloads:
+        value: Any = payload
+        for key in path:
+            if not isinstance(value, dict):
+                return None
+            value = value.get(key)
+        if not isinstance(value, (int, float)):
+            return None
+        values.append(float(value))
+    return float(statistics.median(values)) if values else None
+
+
+def _query_key(query: dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        query.get("id"),
+        query.get("run_type"),
+        query.get("stream"),
+        query.get("iter"),
+        query.get("test_type"),
+    )
+
+
+def aggregate_payloads(payloads: list[dict[str, Any]], *, version: str, benchmark: str) -> dict[str, Any]:
+    """Create one Results Explorer bundle from the repetitions of one matrix cell."""
+    if len(payloads) != EXPECTED_REPETITIONS:
+        raise ValueError(f"expected {EXPECTED_REPETITIONS} repetitions for {version}/{benchmark}")
+    if any(payload.get("summary", {}).get("validation") != "passed" for payload in payloads):
+        raise ValueError(f"non-passing validation in {version}/{benchmark}")
+
+    aggregate = copy.deepcopy(payloads[0])
+    aggregate.setdefault("export", {})["aggregation"] = {
+        "method": "median",
+        "repetitions": len(payloads),
+        "source_run_ids": [str(payload.get("run", {}).get("id")) for payload in payloads],
+    }
+    source_ids = "|".join([version, benchmark, *aggregate["export"]["aggregation"]["source_run_ids"]])
+    aggregate.setdefault("run", {})["id"] = hashlib.sha256(source_ids.encode("utf-8")).hexdigest()[:8]
+
+    timing = aggregate.get("summary", {}).get("timing")
+    if isinstance(timing, dict):
+        for field in timing:
+            median = _median_field(payloads, ("summary", "timing", field))
+            if median is not None:
+                timing[field] = median
+
+    for path in (("summary", "data", "load_time_ms"), ("summary", "tpc_metrics", "power_at_size")):
+        median = _median_field(payloads, path)
+        if median is not None:
+            target: dict[str, Any] = aggregate
+            for key in path[:-1]:
+                value = target.get(key)
+                if not isinstance(value, dict):
+                    value = {}
+                    target[key] = value
+                target = value
+            target[path[-1]] = median
+
+    for field in ("query_time_ms", "total_duration_ms"):
+        median = _median_field(payloads, ("run", field))
+        if median is not None:
+            aggregate["run"][field] = median
+
+    query_maps = [
+        {_query_key(query): query for query in payload.get("queries", []) if isinstance(query, dict)}
+        for payload in payloads
+    ]
+    if any(set(query_map) != set(query_maps[0]) for query_map in query_maps[1:]):
+        raise ValueError(f"repetitions have different query sets for {version}/{benchmark}")
+    for query in aggregate.get("queries", []):
+        if not isinstance(query, dict) or query.get("run_type") != "measurement":
+            continue
+        samples = [query_map[_query_key(query)].get("ms") for query_map in query_maps]
+        if all(isinstance(value, (int, float)) for value in samples):
+            query["ms"] = float(statistics.median([float(value) for value in samples]))
+    return aggregate
+
+
+def _version_token(version: str) -> str:
+    return version.replace(".", "_")
+
+
+def _write_json(path: Path, payload: Any) -> None:
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def write_explorer_bundles(manifest_path: Path, output_dir: Path) -> list[Path]:
+    """Write one median bundle per version/benchmark cell for Explorer ingestion."""
+    if output_dir.exists() and any(output_dir.iterdir()):
+        raise ValueError(f"Explorer bundle output directory must be new or empty: {output_dir}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    grouped = _load_power_payloads(manifest_path)
+    paths: list[Path] = []
+    for version in EXPECTED_VERSIONS:
+        for benchmark in EXPECTED_BENCHMARKS:
+            aggregate = aggregate_payloads(grouped[(version, benchmark)], version=version, benchmark=benchmark)
+            path = output_dir / f"{benchmark}_sf10_duckdb_v{_version_token(version)}_median.json"
+            _write_json(path, aggregate)
+            paths.append(path)
+    return paths
+
+
+def analyze(manifest_path: Path) -> dict[str, Any]:
+    grouped = _load_power_payloads(manifest_path)
+    cells: list[dict[str, Any]] = []
 
     baseline: dict[str, float] = {}
     for version in EXPECTED_VERSIONS:
@@ -82,17 +192,18 @@ def analyze(manifest_path: Path) -> dict[str, Any]:
             samples = grouped[(version, benchmark)]
             if len(samples) != EXPECTED_REPETITIONS:
                 raise ValueError(f"expected {EXPECTED_REPETITIONS} repetitions for {version}/{benchmark}")
-            query_ids = sorted({query_id for _, queries, _ in samples for query_id in queries})
+            query_medians_by_sample = [_query_medians(payload) for payload in samples]
+            query_ids = sorted({query_id for queries in query_medians_by_sample for query_id in queries})
             query_medians = {
                 query_id: float(
-                    statistics.median([queries[query_id] for _, queries, _ in samples if query_id in queries])
+                    statistics.median([queries[query_id] for queries in query_medians_by_sample if query_id in queries])
                 )
                 for query_id in query_ids
             }
-            total_median = float(statistics.median([total for total, _, _ in samples]))
+            total_median = float(statistics.median([_total_ms(payload) for payload in samples]))
             power_scores = [
                 float(payload.get("summary", {}).get("tpc_metrics", {}).get("power_at_size"))
-                for _, _, payload in samples
+                for payload in samples
                 if isinstance(payload.get("summary", {}).get("tpc_metrics", {}).get("power_at_size"), (int, float))
             ]
             if version == EXPECTED_VERSIONS[0]:
@@ -142,13 +253,23 @@ def write_outputs(result: dict[str, Any], output_dir: Path) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path, help="matrix-manifest.json emitted by the runner")
+    parser.add_argument(
+        "--explorer-bundles-dir",
+        type=Path,
+        help="also write one median bundle per version/benchmark cell to this directory",
+    )
     args = parser.parse_args(argv)
     try:
         result = analyze(args.manifest)
         write_outputs(result, args.manifest.parent)
+        explorer_paths = (
+            write_explorer_bundles(args.manifest, args.explorer_bundles_dir) if args.explorer_bundles_dir else []
+        )
     except (OSError, ValueError, json.JSONDecodeError, KeyError, TypeError) as exc:
         parser.error(str(exc))
     print(f"Analyzed {len(result['cells'])} median cells")
+    if explorer_paths:
+        print(f"Wrote {len(explorer_paths)} median Explorer bundles to {args.explorer_bundles_dir}")
     return 0
 
 
