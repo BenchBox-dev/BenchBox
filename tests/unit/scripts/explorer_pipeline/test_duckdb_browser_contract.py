@@ -111,7 +111,16 @@ class TestG1SchemaContract:
             "physical_rendering_id",
             "tuning_policy_generation",
         },
-        "result_environment": {"result_id", "os", "arch", "cpu_count", "memory_gb", "python"},
+        "result_environment": {
+            "result_id",
+            "os",
+            "arch",
+            "cpu_count",
+            "memory_gb",
+            "python",
+            "cpu_model",
+            "cpu_family",
+        },
         "result_phase_durations": {"result_id", "phase", "duration_s"},
         "result_basis_availability": {
             "result_id",
@@ -276,6 +285,8 @@ class TestG1SchemaContract:
             "cpu_count",
             "memory_gb",
             "python",
+            "cpu_model",
+            "cpu_family",
         },
         "platform_index_rows": {
             "result_id",
@@ -434,10 +445,10 @@ class TestSourceFidelity:
     def test_environment_row_populated(self, db_path: Path) -> None:
         with _connect(db_path) as con:
             row = con.execute(
-                "SELECT os, arch, cpu_count, memory_gb, python FROM result_environment LIMIT 1"
+                "SELECT os, arch, cpu_count, memory_gb, python, cpu_model, cpu_family FROM result_environment LIMIT 1"
             ).fetchone()
         assert row is not None
-        os_val, arch, cpu_count, memory_gb, python_ver = row
+        os_val, arch, cpu_count, memory_gb, python_ver, cpu_model, cpu_family = row
         assert "macOS" in os_val
         assert arch == "arm64"
         assert cpu_count == 10

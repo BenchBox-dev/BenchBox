@@ -81,12 +81,26 @@ class ClientHostEnvironment:
     python: str | None = None
     machine_id: str | None = None
 
+    cpu_model: str | None = None
+    cpu_vendor: str | None = None
+
     @classmethod
     def from_system_profile(cls, system_profile: Mapping[str, Any] | None) -> ClientHostEnvironment:
         profile = system_profile or {}
         os_type = profile.get("os_type") or profile.get("os")
         os_release = profile.get("os_release")
         os_name = f"{os_type} {os_release}".strip() if os_type and os_release else os_type
+        cpu_model = profile.get("cpu_model")
+        cpu_vendor = profile.get("cpu_vendor")
+        if system_profile is None and (not cpu_model or not cpu_vendor):
+            from benchbox.utils.environment import detect_cpu_info
+
+            detected_model, detected_vendor = detect_cpu_info()
+            if not cpu_model:
+                cpu_model = detected_model
+            if not cpu_vendor:
+                cpu_vendor = detected_vendor
+
         return cls(
             os=os_name,
             arch=profile.get("architecture") or profile.get("arch"),
@@ -94,6 +108,8 @@ class ClientHostEnvironment:
             memory_gb=profile.get("memory_gb"),
             python=profile.get("python_version") or profile.get("python"),
             machine_id=profile.get("machine_id") or profile.get("anonymous_machine_id"),
+            cpu_model=cpu_model,
+            cpu_vendor=cpu_vendor,
         )
 
     def to_dict(self) -> dict[str, Any]:

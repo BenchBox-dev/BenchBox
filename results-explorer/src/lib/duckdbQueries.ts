@@ -189,6 +189,8 @@ export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_elig
   cpu_count: number | null;
   memory_gb: number | null;
   python: string | null;
+  cpu_model?: string | null;
+  cpu_family?: string | null;
   // ADR-2 §3: comma-joined, sorted physical tuning mechanisms (see
   // physical_mechanisms in DetailResult). Tri-state, preserved from the
   // pipeline: SQL NULL (-> null here) means no logical tuning profile was
@@ -705,6 +707,8 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
   if (wide.cpu_count !== null) environment.cpu_count = wide.cpu_count;
   if (wide.memory_gb !== null) environment.memory_gb = wide.memory_gb;
   if (wide.python !== null) environment.python = wide.python;
+  if (wide.cpu_model !== null && wide.cpu_model !== undefined) environment.cpu_model = wide.cpu_model;
+  if (wide.cpu_family !== null && wide.cpu_family !== undefined) environment.cpu_family = wide.cpu_family;
 
   const display_timings: QueryDisplayTiming[] = timingRows.map((r) => ({
     query_id: r.query_id,

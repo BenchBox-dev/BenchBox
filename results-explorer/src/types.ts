@@ -9,6 +9,8 @@ export interface Environment {
   cpu_count?: number;
   memory_gb?: number;
   python?: string;
+  cpu_model?: string;
+  cpu_family?: string;
   [key: string]: string | number | boolean | null | undefined;
 }
 

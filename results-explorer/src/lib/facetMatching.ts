@@ -6,7 +6,7 @@ import {
   NULL_TUNING_MODE_SENTINELS,
   dateWindowCutoffIso,
   type DateWindowFacet,
-  type FacetKey,
+  type ExplorerFacetKey,
   type FacetState,
 } from "@/lib/facetModel";
 import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
@@ -38,10 +38,13 @@ export interface FacetMatchRow {
   run_date?: string | null;
   /** ADR-2 §3 secondary facet (TPC benchmarks): physical rendering strategy. */
   physical_rendering_id?: string | null;
+  platform_version?: string | null;
+  arch?: string | null;
+  cpu_family?: string | null;
 }
 
 export interface FacetMatchOptions {
-  keys?: readonly FacetKey[];
+  keys?: readonly ExplorerFacetKey[];
   now?: Date;
 }
 
@@ -62,7 +65,7 @@ export function toDateWindowFacet(value: string): DateWindowFacet {
   return "all";
 }
 
-export function appendFacetParams(params: URLSearchParams, facets: FacetState, omit: ReadonlySet<FacetKey>) {
+export function appendFacetParams(params: URLSearchParams, facets: FacetState, omit: ReadonlySet<ExplorerFacetKey>) {
   for (const key of FACET_KEYS) {
     if (omit.has(key)) continue;
     const value = facets[key];
@@ -74,7 +77,7 @@ export function appendFacetParams(params: URLSearchParams, facets: FacetState, o
   }
 }
 
-export function hasActiveFacets(facets: FacetState, keys: readonly FacetKey[]): boolean {
+export function hasActiveFacets(facets: FacetState, keys: readonly ExplorerFacetKey[]): boolean {
   return keys.some((key) => {
     const value = facets[key];
     return Array.isArray(value) ? value.length > 0 : value !== "all";
@@ -96,7 +99,7 @@ export function matchesDateWindow(runDate: string | null | undefined, value: Dat
   return new Date(runDate).getTime() >= new Date(cutoff).getTime();
 }
 
-function matchesFacetKey(row: FacetMatchRow, facets: FacetState, key: FacetKey, now?: Date): boolean {
+function matchesFacetKey(row: FacetMatchRow, facets: FacetState, key: ExplorerFacetKey, now?: Date): boolean {
   switch (key) {
     case "benchmark":
       return matchesRequired(row.benchmark ? canonicalBenchmarkSlug(row.benchmark) : row.benchmark, facets.benchmark.map(canonicalBenchmarkSlug));
@@ -128,6 +131,12 @@ function matchesFacetKey(row: FacetMatchRow, facets: FacetState, key: FacetKey, 
       return matchesOptional(row.cost_status, facets.cost_status);
     case "date_window":
       return matchesDateWindow(row.run_date, facets.date_window, now);
+    case "platform_version":
+      return matchesOptional(row.platform_version, facets.platform_version);
+    case "arch":
+      return matchesOptional(row.arch, facets.arch);
+    case "cpu_family":
+      return matchesOptional(row.cpu_family, facets.cpu_family);
   }
 }
 

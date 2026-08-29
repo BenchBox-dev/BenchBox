@@ -130,6 +130,8 @@ export function RunReceipt({
       rows: [
         rowFromString("OS", detail.environment.os),
         rowFromString("Arch", detail.environment.arch),
+        rowFromString("CPU family", detail.environment.cpu_family),
+        rowFromString("CPU model", detail.environment.cpu_model),
         rowFromString("CPU count", detail.environment.cpu_count),
         memoryRow(detail.environment.memory_gb),
         rowFromString("Python", detail.environment.python),

@@ -26,6 +26,9 @@ export interface QueryFilterState {
   physicalRenderingIds: string[];
   hasCost: "all" | "yes" | "no";
   dateWindow: DateWindowFacet;
+  platformVersions?: string[];
+  archs?: string[];
+  cpuFamilies?: string[];
 }
 
 export interface QuerySort {
@@ -93,6 +96,8 @@ const ALLOWED_COLUMNS = new Set([
   "plans_published",
   "has_tuning",
   "bundle_download_url",
+  "arch",
+  "cpu_family",
 ]);
 
 function expandListFilter(
@@ -147,6 +152,26 @@ export function buildWhereClause(filters: QueryFilterState): BuiltQuery {
     params,
     true,
   );
+
+  if (filters.platformVersions && filters.platformVersions.length > 0) {
+    expandListFilter("platform_version", filters.platformVersions, clauses, params);
+  }
+  if (filters.archs && filters.archs.length > 0) {
+    clauses.push(
+      "result_id IN (SELECT result_id FROM bench.result_environment WHERE arch IN (" +
+        filters.archs.map(() => "?").join(", ") +
+        "))",
+    );
+    params.push(...filters.archs);
+  }
+  if (filters.cpuFamilies && filters.cpuFamilies.length > 0) {
+    clauses.push(
+      "result_id IN (SELECT result_id FROM bench.result_environment WHERE cpu_family IN (" +
+        filters.cpuFamilies.map(() => "?").join(", ") +
+        "))",
+    );
+    params.push(...filters.cpuFamilies);
+  }
 
   if (filters.hasCost === "yes") clauses.push("cost_usd IS NOT NULL");
   if (filters.hasCost === "no") clauses.push("cost_usd IS NULL");
@@ -214,6 +239,10 @@ export function buildFacetCountQuery(
       options.exclude === "physicalRenderingIds" ? [] : filters.physicalRenderingIds,
     hasCost: options.exclude === "hasCost" ? "all" : filters.hasCost,
     dateWindow: options.exclude === "dateWindow" ? "all" : filters.dateWindow,
+    platformVersions:
+      options.exclude === "platformVersions" ? [] : (filters.platformVersions ?? []),
+    archs: options.exclude === "archs" ? [] : (filters.archs ?? []),
+    cpuFamilies: options.exclude === "cpuFamilies" ? [] : (filters.cpuFamilies ?? []),
   };
   const where = buildWhereClause(effective);
 
