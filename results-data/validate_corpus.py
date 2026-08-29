@@ -2,9 +2,9 @@
 """Validate the seed corpus meets depth and schema requirements.
 
 `SEED_CORPUS_SPEC.md` states the hard requirement this enforces: every
-committed cohort must have at least 3 platforms. A one-platform cohort is not
-a comparison, so publishing it would put a row on the public leaderboard that
-nothing can be read against.
+committed cohort must have at least 3 distinct comparison identities. A
+one-identity cohort is not a comparison, so publishing it would put a row on
+the public leaderboard that nothing can be read against.
 
 Structured into functions so `tests/unit/scripts/test_corpus_cohort_depth.py`
 can import and assert the same rule instead of restating it. Before that, the
@@ -28,7 +28,7 @@ import sys
 COMPANION_SUFFIXES = (".manifest.json", ".plans.json", ".tuning.json", ".applied.json")
 LEGACY_MANIFEST_NAME = "submission-manifest.json"
 
-#: A cohort below this many distinct platforms is not a comparison.
+#: A cohort below this many distinct comparison identities is not a comparison.
 MINIMUM_PLATFORMS_PER_COHORT = 3
 
 CohortKey = tuple[str, str]
@@ -48,7 +48,13 @@ def discover_bundles(bundles_dir: pathlib.Path) -> list[pathlib.Path]:
 
 
 def cohort_platforms(bundles: list[pathlib.Path]) -> dict[CohortKey, set[str]]:
-    """Map (benchmark id, scale factor) to the distinct platforms present.
+    """Map a cohort to distinct platform/version comparison identities.
+
+    A version-over-version cohort legitimately repeats one platform name. A
+    reported version therefore participates in the identity when available;
+    duplicate runs of the same platform at the same version still count once.
+    Bundles without version metadata retain the historical platform-only
+    identity.
 
     Raises:
         CorpusReadError: if any bundle is unreadable or missing a key field.
@@ -63,10 +69,28 @@ def cohort_platforms(bundles: list[pathlib.Path]) -> dict[CohortKey, set[str]]:
                 payload = json.load(handle)
             benchmark_id = payload["benchmark"]["id"]
             scale_factor = str(payload["benchmark"].get("scale_factor", ""))
-            platform = payload["platform"]["name"]
+            platform_section = payload["platform"]
+            platform = platform_section["name"]
+            version = platform_section.get("version") or platform_section.get("client_version")
+            if str(platform).lower() == "duckdb":
+                execution = payload.get("execution", {})
+                if isinstance(execution, dict):
+                    for key in (
+                        "driver_version_resolved",
+                        "driver_version_requested",
+                        "driver_resolved_version",
+                        "driver_requested_version",
+                    ):
+                        candidate = execution.get(key)
+                        if candidate and str(candidate) != "unknown":
+                            version = candidate
+                            break
         except Exception as exc:  # noqa: BLE001 - any read failure is fatal here
             raise CorpusReadError(f"ERROR reading {bundle}: {exc}") from exc
-        cohorts[(benchmark_id, scale_factor)].add(platform)
+        identity = str(platform)
+        if version and str(version) != "unknown":
+            identity = f"{identity} v{str(version)[:120]}"
+        cohorts[(benchmark_id, scale_factor)].add(identity)
     return dict(cohorts)
 
 
@@ -89,15 +113,15 @@ def main(bundles_dir: pathlib.Path | None = None) -> int:
 
     print("\nCohorts:")
     for key, platforms in sorted(cohorts.items()):
-        status = "OK" if len(platforms) >= MINIMUM_PLATFORMS_PER_COHORT else "WARN (<3 platforms)"
-        print(f"  {key[0]} SF={key[1]}: {len(platforms)} platforms ({sorted(platforms)}) [{status}]")
+        status = "OK" if len(platforms) >= MINIMUM_PLATFORMS_PER_COHORT else "WARN (<3 identities)"
+        print(f"  {key[0]} SF={key[1]}: {len(platforms)} identities ({sorted(platforms)}) [{status}]")
 
     low = shallow_cohorts(cohorts)
     if low:
-        print(f"\nWARN: {len(low)} cohort(s) have <3 platforms: { {k: len(v) for k, v in low.items()} }")
+        print(f"\nWARN: {len(low)} cohort(s) have <3 comparison identities: { {k: len(v) for k, v in low.items()} }")
         return 1
 
-    print(f"\nAll {len(cohorts)} cohort(s) meet the >={MINIMUM_PLATFORMS_PER_COHORT}-platform depth criterion.")
+    print(f"\nAll {len(cohorts)} cohort(s) meet the >={MINIMUM_PLATFORMS_PER_COHORT}-identity depth criterion.")
     return 0
 
 

@@ -67,6 +67,12 @@ def test_tpch_rejects_undeclared_scale() -> None:
         validate_scale_factor("tpch", 0.5)
 
 
+@pytest.mark.parametrize("sf", [0.01, 0.1, 1.0, 10.0, 3.5])
+def test_clickbench_accepts_synthetic_scales(sf: float) -> None:
+    """ClickBench's synthetic generator accepts arbitrary scales above its floor."""
+    validate_scale_factor("clickbench", sf)
+
+
 def test_tpcds_obt_rejects_subscale() -> None:
     """tpcds_obt scale_options=[1.0] — same single-element pattern as joinorder."""
     with pytest.raises(ScaleFactorNotSupportedError, match=r"tpcds_obt accepts scale_factor in"):

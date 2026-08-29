@@ -173,6 +173,28 @@ def _query_count(bundle_data: dict) -> int:
     return len(bundle_data.get("queries", []))
 
 
+def _platform_version(data: dict) -> str:
+    """Return the comparison version, preserving DuckDB package identity."""
+    platform = data.get("platform", {})
+    execution = data.get("execution", {})
+    if isinstance(platform, dict) and str(platform.get("name", "")).lower() == "duckdb":
+        if isinstance(execution, dict):
+            for key in (
+                "driver_version_resolved",
+                "driver_version_requested",
+                "driver_resolved_version",
+                "driver_requested_version",
+            ):
+                value = execution.get(key)
+                if value and value != "unknown":
+                    return str(value)
+        value = platform.get("client_version") if isinstance(platform, dict) else None
+        if value and value != "unknown":
+            return str(value)
+    value = platform.get("version") if isinstance(platform, dict) else None
+    return str(value) if value and value != "unknown" else "unknown"
+
+
 def extract_metadata(bundle_path: Path, bundles_dir: Path) -> dict:
     """Extract inventory metadata from a bundle file."""
     try:
@@ -190,7 +212,7 @@ def extract_metadata(bundle_path: Path, bundles_dir: Path) -> dict:
         "benchmark": benchmark.get("id", "unknown"),
         "benchmark_name": benchmark.get("name", benchmark.get("id", "unknown")),
         "platform": platform.get("name", "unknown"),
-        "platform_version": platform.get("version", "unknown"),
+        "platform_version": _platform_version(data),
         "scale_factor": benchmark.get("scale_factor", 0),
         "timestamp": run.get("timestamp"),
         "query_count": _query_count(data),
@@ -232,7 +254,10 @@ def generate_inventory(bundles_dir: Path) -> dict:
     cohort_members: defaultdict[tuple[str, str], set[str]] = defaultdict(set)
     for entry in entries:
         key = (entry["benchmark"], str(entry["scale_factor"]))
-        cohort_members[key].add(entry["platform"])
+        identity = entry["platform"]
+        if entry["platform_version"] != "unknown":
+            identity = f"{identity} v{entry['platform_version']}"
+        cohort_members[key].add(identity)
 
     for (benchmark, scale_factor), platforms in sorted(cohort_members.items()):
         cohorts[f"{benchmark}@sf{scale_factor}"] = sorted(platforms)

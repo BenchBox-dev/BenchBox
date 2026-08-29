@@ -1,7 +1,7 @@
 """The corpus cohort-depth requirement must fail a PR, not just a manual run.
 
 `results-data/SEED_CORPUS_SPEC.md` states it as a hard requirement: every
-committed cohort must have at least 3 platforms. `results-data/validate_corpus.py`
+committed cohort must have at least 3 comparison identities. `results-data/validate_corpus.py`
 enforces it and exits 1 on violation.
 
 Nothing ran it. Every reference to that script in `.github/workflows` is a path
@@ -44,17 +44,27 @@ def _load_validator() -> ModuleType:
     return module
 
 
-def _write_bundle(directory: Path, name: str, *, benchmark: str, scale: float, platform: str) -> None:
+def _write_bundle(
+    directory: Path,
+    name: str,
+    *,
+    benchmark: str,
+    scale: float,
+    platform: str,
+    platform_version: str | None = None,
+    execution_version: str | None = None,
+) -> None:
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / name).write_text(
-        json.dumps(
-            {
-                "benchmark": {"id": benchmark, "scale_factor": scale},
-                "platform": {"name": platform},
-            }
-        ),
-        encoding="utf-8",
-    )
+    platform_payload = {"name": platform}
+    if platform_version is not None:
+        platform_payload["version"] = platform_version
+    payload = {
+        "benchmark": {"id": benchmark, "scale_factor": scale},
+        "platform": platform_payload,
+    }
+    if execution_version is not None:
+        payload["execution"] = {"driver_version_resolved": execution_version}
+    (directory / name).write_text(json.dumps(payload), encoding="utf-8")
 
 
 def test_every_committed_cohort_meets_the_platform_floor() -> None:
@@ -65,7 +75,7 @@ def test_every_committed_cohort_meets_the_platform_floor() -> None:
     assert cohorts, "no cohorts found - this gate would be vacuous"
     shallow = validator.shallow_cohorts(cohorts)
     assert not shallow, (
-        f"{len(shallow)} cohort(s) below {validator.MINIMUM_PLATFORMS_PER_COHORT} platforms; a one-platform "
+        f"{len(shallow)} cohort(s) below {validator.MINIMUM_PLATFORMS_PER_COHORT} identities; a one-identity "
         "cohort is not a comparison. See results-data/SEED_CORPUS_SPEC.md:\n  "
         + "\n  ".join(
             f"{benchmark} SF={scale}: {sorted(platforms)}" for (benchmark, scale), platforms in shallow.items()
@@ -94,6 +104,58 @@ def test_the_gate_accepts_a_full_cohort(tmp_path: Path) -> None:
         _write_bundle(tmp_path, f"{platform}.json", benchmark="tpcds", scale=10.0, platform=platform)
 
     assert validator.shallow_cohorts(validator.cohort_platforms(validator.discover_bundles(tmp_path))) == {}
+
+
+def test_the_gate_accepts_a_version_matrix_as_distinct_identities(tmp_path: Path) -> None:
+    """A version-over-version cohort may repeat one platform name."""
+    validator = _load_validator()
+    for index, version in enumerate(("1.0.0", "1.5.5", "1.6.0.dev365")):
+        _write_bundle(
+            tmp_path,
+            f"duckdb-{index}.json",
+            benchmark="tpch",
+            scale=10.0,
+            platform="DuckDB",
+            platform_version=version,
+        )
+
+    assert validator.shallow_cohorts(validator.cohort_platforms(validator.discover_bundles(tmp_path))) == {}
+
+
+def test_same_platform_version_does_not_pad_a_cohort(tmp_path: Path) -> None:
+    """Repeated runs at one version remain one comparison identity."""
+    validator = _load_validator()
+    for index in range(3):
+        _write_bundle(
+            tmp_path,
+            f"duckdb-{index}.json",
+            benchmark="tpch",
+            scale=10.0,
+            platform="DuckDB",
+            platform_version="1.5.5",
+        )
+
+    cohorts = validator.cohort_platforms(validator.discover_bundles(tmp_path))
+    assert cohorts == {("tpch", "10.0"): {"DuckDB v1.5.5"}}
+    assert validator.shallow_cohorts(cohorts) == cohorts
+
+
+def test_duckdb_package_version_overrides_internal_engine_version(tmp_path: Path) -> None:
+    """DuckDB development builds compare by package version, not engine string."""
+    validator = _load_validator()
+    _write_bundle(
+        tmp_path,
+        "duckdb-dev.json",
+        benchmark="tpch",
+        scale=10.0,
+        platform="DuckDB",
+        platform_version="2.0.0-alpha38615",
+        execution_version="1.6.0.dev365",
+    )
+
+    assert validator.cohort_platforms(validator.discover_bundles(tmp_path)) == {
+        ("tpch", "10.0"): {"DuckDB v1.6.0.dev365"}
+    }
 
 
 def test_companion_files_are_not_counted_as_bundles(tmp_path: Path) -> None:
