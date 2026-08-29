@@ -44,64 +44,18 @@ Create the post in `_blog/{series}/drafts/`. Follow the style guide:
 
 - **Voice**: Community-inclusive ("we" not "I"), enthusiastic but grounded
 - **Claims**: Back with data, not opinions ("2.3x faster" not "much faster")
-- **Platforms**: Neutral, no advocacy ("outperformed by 15%" not "crushes")
+- **Platforms**: Neutral, no advocacy ("In this run, [platform A] finished [query] in [time] on [hardware]; [platform B] finished the same query in [time]. Include benchmark, scale, and phase so readers can interpret the measurement.")
 - **Methodology**: Show your work, acknowledge limitations
 
-See `_blog/STYLE_GUIDE.md` for the full guide and `_blog/VOICE_REFERENCE.md` for a quick tone reference.
+See `_blog/STYLE_GUIDE.md` for the full guide and `_blog/VOICE_REFERENCE.md` for a quick tone reference. Sentence craft is defined in VOICE_REFERENCE. Do not copy it here.
 
-### 2. Run content validation
+### 2. Editorial check
 
-From the private repo root, validate the post against style rules:
-
-```python
-from benchbox.release.content_validation import validate_file
-from pathlib import Path
-
-violations = validate_file(
-    Path("_blog/{series}/drafts/{post}.md"),
-    repo_root=Path("."),
-)
-for v in violations:
-    print(v)
-```
-
-Or validate all blog content at once:
-
-```python
-from benchbox.release.content_validation import validate_content
-from pathlib import Path
-
-result = validate_content(Path("."), patterns=["_blog/**/*.md"], verbose=True)
-print(result.summary())
-for v in result.violations:
-    print(v)
-```
-
-**Severity levels:**
-
-| Level | Rule categories | Action |
-|-------|----------------|--------|
-| Error | `punctuation`, `platform_advocacy` | Must fix before publishing |
-| Warning | `vague_claims`, `marketing`, `voice`, `restricted_vendor` | Should fix |
-| Suggestion | `hedging`, `cliche` | Consider fixing |
-
-**Inline overrides** for intentional exceptions:
-
-```markdown
-<!-- content-ok: restricted_vendor -->
-Oracle's DeWitt clause restricts benchmark publication...
-```
-
-Use the same override when naming a vendor as the origin of a SQL dialect feature, not to imply platform support, but to provide accurate technical context:
-
-```markdown
-<!-- content-ok: restricted_vendor -->
-**Oracle DUAL table (1 failure)**: Q17_v4 references the `DUAL` table (an Oracle-ism).
-```
+`benchbox.release.content_validation` is not in this repository. Before publication, run the STYLE_GUIDE editorial checklist by hand (Voice, punctuation, limitations, citations). Do not record a validator pass.
 
 ### 3. Finalize the post
 
-Once validation passes and the post is reviewed:
+Once the editorial checklist is complete and the post is reviewed:
 
 1. Move (or copy) the draft to `_blog/{series}/published/` for archival
 2. Prepare the filename for publication: `YYYY-MM-DD-{slug}.md`
@@ -203,7 +157,7 @@ Note: `benchbox-sync` only syncs files under `ALLOWED_ROOT_FILES` (which include
 
 - [ ] Draft written in `_blog/{series}/drafts/`
 - [ ] Style guide followed (`STYLE_GUIDE.md`)
-- [ ] Content validation passes (no errors)
+- [ ] STYLE_GUIDE editorial checklist completed by hand
 - [ ] ABlog frontmatter added (`blogpost`, `date`, `author`, `tags`)
 - [ ] Filename follows convention: `YYYY-MM-DD-{slug}.md`
 - [ ] Post copied to `docs/blog/` in public repo

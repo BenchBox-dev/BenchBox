@@ -2,8 +2,8 @@
 
 > A guide for writing technical blog posts that educate, inform, and engage the data engineering community with a friendly, OSS-community voice.
 
-**Version**: 2.0
-**Last Updated**: 2026-01-22
+**Version**: 2.1
+**Last Updated**: 2026-08-29
 
 ---
 
@@ -24,15 +24,17 @@
 
 ## Voice & Tone
 
-The BenchBox voice is that of a **friendly community member sharing useful findings**. We're enthusiastic about what we've learned, rigorous about methodology, and neutral when comparing tools. We write to help readers make informed decisions, not to tell them what to think.
+The BenchBox voice is that of a **friendly community member sharing useful findings**. We're enthusiastic about what we've learned, rigorous about methodology, and neutral when comparing tools. We write so readers can make informed decisions.
 
 ### Core Voice: "Factual yet friendly, technical yet understandable"
+
+Drafting card: [_blog/VOICE_REFERENCE.md](VOICE_REFERENCE.md), including Sentence craft. Do not copy that section into this file.
 
 ### Voice Characteristics
 
 **1. Community-Inclusive**
 
-Use "we" to represent the project and community. Position yourself as a fellow practitioner sharing discoveries, not an authority pronouncing judgments.
+Write as a fellow practitioner sharing discoveries with the community.
 
 ✅ **Do**:
 - "We designed BenchBox's validation to check row counts, column types, and sort order..."
@@ -64,9 +66,11 @@ Celebrate findings with genuine enthusiasm, backed by data. Avoid empty superlat
 Show your work. Acknowledge limitations. Let methodology build credibility.
 
 ✅ **Do**:
-- "BenchBox's power phase uses cold cache between queries, we validated this adds ~2s overhead on c6i.4xlarge instances."
+- "BenchBox's power phase uses cold cache between queries."
 - "BenchBox currently supports analytical benchmarks (TPC-H, TPC-DS, SSB, ClickBench). Transactional benchmarks are not yet supported."
 - "Our DataFrame path has limitations: correlated subqueries and CASE expressions require manual translation."
+
+Name hardware and overhead in Methodology; do not invent a number here.
 
 ❌ **Don't**:
 - Make claims without specifying test conditions
@@ -75,31 +79,33 @@ Show your work. Acknowledge limitations. Let methodology build credibility.
 
 **4. Neutral on Platforms**
 
-When demonstrating BenchBox, present results without platform advocacy. Focus on what we learned about benchmarking, not which platform "wins."
+Report what the run shows about benchmarking. Ground every platform result in its conditions.
 
 ✅ **Do**:
 - "We ran BenchBox against three platforms to demonstrate multi-platform support."
-- "Results varied by query type, aggregations and joins showed different patterns."
+- "Results varied by query type. Aggregations and joins showed different patterns."
 - "Each platform required different dialect translation in BenchBox's SQL layer."
 
 ❌ **Don't**:
 - "Platform B is clearly inferior and should be avoided."
 - "Vendor X backed the wrong horse and needs to pivot."
 - "Anyone still using Y is making a mistake."
+- "Each platform has different strengths for different workloads."
 
 **5. Helpful and Educational**
 
-Frame content as sharing learnings, not lecturing. Invite readers to explore further.
+Share concrete lessons as one practitioner to another. Invite readers to explore further.
 
 ✅ **Do**:
 - "Here's what we learned about benchmark methodology from this exercise..."
-- "If you're building similar benchmarking pipelines, these patterns may help..."
-- "We'd love to hear about your experiences, open an issue to discuss."
+- "Here's how we approached TPC-H compliance in BenchBox."
+- "Open an issue to discuss."
 
 ❌ **Don't**:
-- "You must follow these steps exactly."
-- "The only correct approach is..."
-- "If you're not doing X, you're doing it wrong."
+- "You must follow TPC compliance exactly."
+- "The only correct way to benchmark is..."
+- "If you're not validating, you're wrong."
+- "you may want to consider; your mileage may vary"
 
 **6. Accessible Without Dumbing Down**
 
@@ -118,9 +124,9 @@ Layer explanations. Define terms naturally. Use examples to ground abstract conc
 
 | Content Type            | Tone                     | Example Opening                                                                             |
 | ----------------------- | ------------------------ | ------------------------------------------------------------------------------------------- |
-| **Architecture/Design** | Exploratory, educational | "Let's look at how BenchBox handles multi-platform dialect translation..."                  |
-| **Methodology Guide**   | Rigorous, helpful        | "Consistent benchmark results require careful methodology. Here's our approach..."          |
-| **Tutorial/How-To**     | Helpful, encouraging     | "Getting started with BenchBox is straightforward. Here's a quick guide..."                 |
+| **Architecture/Design** | Exploratory, educational | "BenchBox handles multi-platform dialect translation in the layers described below."        |
+| **Methodology Guide**   | Rigorous, helpful        | "Here is the protocol we use for cold cache between runs."                                  |
+| **Tutorial/How-To**     | Helpful, encouraging     | "Install BenchBox with `uv add benchbox`, then run TPC-H at SF 0.01 with the command below." |
 | **BenchBox in Action**  | Curious, evidence-based  | "We ran TPC-H at SF10 across three platforms. Here's what we learned about benchmarking..." |
 | **Release Notes**       | Celebratory, grateful    | "We're excited to release v0.2.0. Thanks to our 23 contributors..."                         |
 
@@ -137,6 +143,13 @@ Layer explanations. Define terms naturally. Use examples to ground abstract conc
 
 **Hedging Everything**
 > ❌ "It might possibly be the case that perhaps in some scenarios..." (Be clear about what you found)
+> ❌ "This is not a certification. It is not a complete ranking. It does not claim..."
+> ❌ "Each platform has different strengths for different workloads."
+> ❌ "Your mileage may vary."
+> ❌ "Platform results illustrate BenchBox. They are not a buying recommendation."
+> ❌ "We are community members, not analysts."
+
+State the finding once. Keep a negative bound only when it changes the claim or carries the news.
 
 **Forced Humor**
 > ❌ "OMG you won't BELIEVE these benchmark results! 🚀🔥 Database X got absolutely DESTROYED lol"
@@ -146,6 +159,8 @@ Layer explanations. Define terms naturally. Use examples to ground abstract conc
 ## Content Principles
 
 ### 1. Lead with Data, Not Opinions
+
+Lead with the point of the section. A measurement belongs in a results or methodology section; an architecture section may lead with the mechanism.
 
 ❌ **Don't**: "BenchBox is clearly the best benchmarking framework available."
 ✅ **Do**: "BenchBox completed TPC-H data generation and all 22 queries in under 10 minutes at SF1, with validation against reference answers."
@@ -200,12 +215,12 @@ Full configuration and raw results: [link to GitHub]
 ### 4. Explain the Trade-offs
 
 ❌ **Don't**: "SQL mode is better than DataFrame mode."
-✅ **Do**: "SQL mode supports all N queries. DataFrame mode currently covers N of M but offers better something."
+✅ **Do**: "SQL mode covers all queries in the spec set. DataFrame mode covers [N] of [M] queries and [named gain, with a number or condition]."
 
 **Always discuss**:
-- What scenarios favor each approach
-- Trade-offs (compliance vs. flexibility, setup complexity vs. reproducibility)
-- When results might differ (different scale factors, platforms, configurations)
+- When a reader should choose each approach, with a number or named condition
+- Trade-offs (compliance vs flexibility, setup cost vs reproducibility)
+- When results might differ (scale factor, platform, configuration)
 
 ### 5. Celebrate the Community
 
@@ -213,7 +228,7 @@ Acknowledge contributors, highlight community work, invite participation.
 
 - "Thanks to contributor @username for this improvement..."
 - "This finding came from a community discussion in issue #123..."
-- "We'd love your feedback, join the discussion at..."
+- "We'd love your feedback. Join the discussion at..."
 
 ---
 
@@ -227,6 +242,8 @@ Acknowledge contributors, highlight community work, invite participation.
 > [One-sentence summary of what readers will learn]
 
 **TL;DR**: [2-3 sentence summary]
+
+The pull quote and TL;DR state the finding. A bound belongs there when the summary would be misleading without it. Negative scope is allowed when it is the finding ("When two timings are not a comparison").
 
 ---
 
@@ -309,7 +326,7 @@ Acknowledge contributors, highlight community work, invite participation.
 
 ### 2. Define Technical Terms
 
-On first use, define or link to definitions:
+Define a term the first time it appears. Restate later if a skimming reader would miss the first definition.
 
 ```markdown
 BenchBox measures how vectorized execution (processing data in batches of
@@ -390,22 +407,22 @@ Don't use for:
 
 ### Em-dashes and En-dashes
 
-**Never use em-dashes (,) or en-dashes (-) in BenchBox content.** These characters create inconsistency across text editors, copy-paste operations, and rendering contexts.
+Do not use em-dashes (Unicode U+2014) or en-dashes (Unicode U+2013) in BenchBox content. These characters create inconsistency across text editors, copy-paste operations, and rendering contexts. Use ASCII hyphen `-` for ranges (10-20), commas or parentheses for asides, and a colon or a new sentence for an explanation. Do not replace a dash with a bare comma.
 
 | Character | Unicode | Status       |
 | --------- | ------- | ------------ |
-| Em-dash,  | U+2014  | ❌ Prohibited |
-| En-dash - | U+2013  | ❌ Prohibited |
-| Hyphen -  | U+002D  | ✅ Allowed    |
+| Em-dash   | U+2014  | ❌ Prohibited |
+| En-dash   | U+2013  | ❌ Prohibited |
+| Hyphen    | U+002D  | ✅ Allowed    |
 
 ### Alternatives
 
-| Instead of                | Use                   | Example                                |
-| ------------------------- | --------------------- | -------------------------------------- |
-| Parenthetical, like this, | Commas or parentheses | "Parenthetical, like this, works well" |
-| A statement,              | Colon                 | "A statement:"                         |
-| Number range 10-20        | Hyphen                | "10-20"                                |
-| Attribution, Author       | Colon or comma        | "Attribution: Author"                  |
+| Instead of                         | Use                   | Example                                |
+| ---------------------------------- | --------------------- | -------------------------------------- |
+| Em-dash or en-dash aside           | Commas or parentheses | "Parenthetical, like this, works well" |
+| Em-dash introducing an explanation | Colon or a new sentence | "A statement:"                       |
+| Number range written with en-dash  | ASCII hyphen          | "10-20"                                |
+| Attribution with em-dash           | Colon or comma        | "Attribution: Author"                  |
 
 **Why this rule?** Plain ASCII punctuation is more portable, accessible, and consistent across all editing environments and platforms.
 
@@ -562,13 +579,13 @@ Include 5-8 relevant tags:
 **Tone**: Curious, evidence-based, neutral on platform performance
 
 **Essential elements**:
-- Clear question about benchmarking methodology (not "which platform wins")
+- Clear question about benchmarking methodology
 - BenchBox commands used, fully reproducible
 - Results presented neutrally (no platform advocacy)
 - Focus on what we learned about the benchmarking process
 - Methodology details and limitations
 
-**Important**: This is NOT a platform comparison post. The focus is on demonstrating BenchBox's capabilities and sharing methodology insights. Platform results are presented as illustration, not as recommendations.
+**Important**: Use platform results to illustrate BenchBox methodology and reporting, with enough conditions for readers to interpret each measurement.
 
 **Example topics**:
 - Running TPC-H at scale: what happens from SF1 to SF100
@@ -609,6 +626,9 @@ Include 5-8 relevant tags:
 - [ ] Neutral on platforms (no platform advocacy or vendor criticism)
 - [ ] Helpful framing (sharing learnings, not lecturing)
 - [ ] Accessible explanations (terms defined, examples given)
+- [ ] How-to and Try-it-yourself steps use direct imperatives ("Run", "Open")
+- [ ] Em-dashes and en-dashes are absent (ASCII hyphen only)
+- [ ] Every negative bound adds a fact, legal boundary, or scope condition
 
 ### Technical Accuracy
 
@@ -664,6 +684,7 @@ This style guide is informed by analysis of OSS blog best practices from:
 
 | Version | Date       | Changes                                                                                                        |
 | ------- | ---------- | -------------------------------------------------------------------------------------------------------------- |
+| 2.1     | 2026-08-29 | Voice examples lead with what to write. Sentence craft lives in VOICE_REFERENCE. Hedge rewrites removed. Punctuation glyphs described by codepoint. Publishing steps no longer call a missing validator. |
 | 2.0     | 2026-01-22 | Complete rewrite for OSS community voice. Removed analyst/commentator tone. Added neutral comparison guidance. |
 | 1.2     | 2025-12-15 | Voice characteristics (removed from this guide)                                                                |
 | 1.1     | 2025-12-02 | Citations section                                                                                              |
@@ -671,4 +692,4 @@ This style guide is informed by analysis of OSS blog best practices from:
 
 ---
 
-*Last updated: 2026-01-22*
+*Last updated: 2026-08-29*
