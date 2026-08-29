@@ -53,12 +53,11 @@ second transfer. Every evidence record MUST resolve identity by API `id`
 as the source of truth) and MUST NOT assume the current `owner/name` is
 permanent.
 
-When querying GitHub APIs via `gh api` (which expands placeholders only for
-`{owner}`, `{repo}`, and `{branch}`), the collector resolves the stable
-numeric/node `id` to the currently observed `owner/name` to formulate the
-request path (e.g. `gh api /repos/{owner}/{repo}/pulls/{number}`), and then
-MUST validate that the returned payload's repository identity matches the
-expected repository `id` before using the response.
+When querying GitHub APIs, the collector resolves the stable numeric/node `id`
+to the currently observed `owner/name` to formulate the request URL. It records
+the exact list endpoint that supplied each PR (including query parameters and
+page), then validates that the returned payload's repository identity matches
+the expected repository `id` before using the response.
 
 ## 4. Evidence model (schema-versioned)
 
@@ -99,7 +98,7 @@ understands (`_project/specs/todo-db-tracker.md`).
       "merge_commit_sha": "def456...",
       "merge_commit_reachable_from_target_tip": true,
       "checked_at": "2026-08-26T00:00:00Z",
-      "source": "gh api /repos/{owner}/{repo}/pulls/1914"
+      "source": "GET https://api.github.com/repos/{owner}/{repo}/pulls?head={owner}%3Afix%2Fexample&state=all&per_page=100&page=1"
     }
   ],
   "task_run_evidence": {

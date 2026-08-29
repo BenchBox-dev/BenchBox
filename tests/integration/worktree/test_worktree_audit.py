@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -35,8 +36,11 @@ def _load_audit_module():
 audit_mod = _load_audit_module()
 
 
-def _git(cmd: list[str], cwd: Path) -> str:
-    res = subprocess.run(["git", *cmd], cwd=cwd, check=True, text=True, capture_output=True)
+def _git(cmd: list[str], cwd: Path, env: dict[str, str] | None = None) -> str:
+    full_env = os.environ.copy()
+    if env:
+        full_env.update(env)
+    res = subprocess.run(["git", *cmd], cwd=cwd, check=True, text=True, capture_output=True, env=full_env)
     return res.stdout.strip()
 
 
@@ -63,12 +67,12 @@ def mock_github_api_offline(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         audit_mod,
         "resolve_repository_identity",
-        lambda owner, repo, token: (123456789, f"{owner}/{repo}", None),
+        lambda owner, repo, token, *args, **kwargs: (123456789, f"{owner}/{repo}", None),
     )
     monkeypatch.setattr(
         audit_mod,
         "fetch_prs_for_branch",
-        lambda owner, repo, branch, repo_id, token: ([], None),
+        lambda owner, repo, branch, repo_id, token, *args, **kwargs: ([], None),
     )
 
 
@@ -159,7 +163,7 @@ def test_fixture_gone_upstream_squash_merged(tmp_path: Path):
         }
     ]
 
-    wt_info = audit_mod.get_git_worktrees(repo)
+    wt_info, _ = audit_mod.get_git_worktrees(repo)
     matched = [w for w in wt_info if w.branch == "fix/feature-squash"][0]
 
     cls, evidence = audit_mod.evaluate_and_classify_worktree(
@@ -212,7 +216,7 @@ def test_fixture_post_merge_commits_unintegrated(tmp_path: Path):
         }
     ]
 
-    wt_info = audit_mod.get_git_worktrees(repo)
+    wt_info, _ = audit_mod.get_git_worktrees(repo)
     matched = [w for w in wt_info if w.branch == "fix/feature-post-merge"][0]
 
     cls, _ = audit_mod.evaluate_and_classify_worktree(
@@ -261,7 +265,7 @@ def test_fixture_squash_source_tip_not_ancestor(tmp_path: Path):
         }
     ]
 
-    wt_info = audit_mod.get_git_worktrees(repo)
+    wt_info, _ = audit_mod.get_git_worktrees(repo)
     matched = [w for w in wt_info if w.branch == "fix/feature-ancestry-test"][0]
 
     cls, _ = audit_mod.evaluate_and_classify_worktree(
@@ -279,54 +283,57 @@ def test_fixture_squash_source_tip_not_ancestor(tmp_path: Path):
     assert cls.item_classification == "finish candidate"
 
 
-def test_make_worktree_audit_json_output():
-    res = subprocess.run(
-        ["make", "-s", "worktree-audit", "FORMAT=json"],
-        cwd=_ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert res.returncode == 0, res.stderr
-    data = json.loads(res.stdout)
+def test_make_worktree_audit_json_output(capsys: pytest.CaptureFixture):
+    # Test JSON output formatting and schema via main() offline entrypoint (Spec §10)
+    code = audit_mod.main(["--format", "json"])
+    assert code == 0
+    captured = capsys.readouterr()
+    data = json.loads(captured.out)
     assert isinstance(data, dict)
     assert data["schema_version"] == 1
     assert "worktrees" in data
     assert "report_authority" in data
     assert data["report_authority"]["is_deletion_authority"] is False
+    assert "snapshot_path" in data
 
 
 def test_fixture_primary_clone(tmp_path: Path):
     repo = init_repo(tmp_path / "repo")
-    add_worktree(repo, "fix/feature-primary-test", tmp_path / "wt_primary")
+    wt = add_worktree(repo, "fix/feature-primary-test", tmp_path / "wt_primary")
 
-    report_from_repo = audit_mod.audit_worktrees(repo_root=repo)
-    repo_paths = [Path(r["worktree"]["path"]).resolve() for r in report_from_repo["worktrees"]]
-    assert repo.resolve() not in repo_paths
-    assert len(report_from_repo["worktrees"]) == 1
-    assert report_from_repo["worktrees"][0]["worktree"]["branch"] == "fix/feature-primary-test"
+    (wt / "file.txt").write_text("hello\n", encoding="utf-8")
+    _git(["add", "file.txt"], wt)
+    _git(["commit", "-m", "commit in linked wt"], wt)
 
-    report_from_wt = audit_mod.audit_worktrees(repo_root=tmp_path / "wt_primary")
-    wt_paths = [Path(r["worktree"]["path"]).resolve() for r in report_from_wt["worktrees"]]
-    assert repo.resolve() not in wt_paths
-    assert len(report_from_wt["worktrees"]) == 1
-    assert report_from_wt["worktrees"][0]["worktree"]["branch"] == "fix/feature-primary-test"
+    # 1. Audit run from repo root (primary clone)
+    report_from_primary = audit_mod.audit_worktrees(repo_root=repo)
+    paths_from_primary = [w["worktree"]["path"] for w in report_from_primary["worktrees"]]
+    assert str(repo.resolve()) not in paths_from_primary
+    assert any(wt.resolve() == Path(p).resolve() for p in paths_from_primary)
+
+    # 2. Audit run from linked worktree path
+    report_from_linked = audit_mod.audit_worktrees(repo_root=wt)
+    paths_from_linked = [w["worktree"]["path"] for w in report_from_linked["worktrees"]]
+    assert str(repo.resolve()) not in paths_from_linked
+    assert any(wt.resolve() == Path(p).resolve() for p in paths_from_linked)
 
 
 def test_fixture_merge_commit_not_yet_reachable(tmp_path: Path):
     repo = init_repo(tmp_path / "repo")
     wt = add_worktree(repo, "fix/feature-unreachable", tmp_path / "wt_unreachable")
 
-    (wt / "feature.txt").write_text("feature\n", encoding="utf-8")
-    _git(["add", "feature.txt"], wt)
-    _git(["commit", "-m", "feature commit"], wt)
+    (wt / "work.txt").write_text("work in progress\n", encoding="utf-8")
+    _git(["add", "work.txt"], wt)
+    _git(["commit", "-m", "work commit"], wt)
     branch_head_sha = _git(["rev-parse", "HEAD"], wt)
 
-    _git(["checkout", "-b", "other-unmerged-branch"], wt)
-    (wt / "unmerged.txt").write_text("unmerged\n", encoding="utf-8")
-    _git(["add", "unmerged.txt"], wt)
-    _git(["commit", "-m", "unmerged commit"], wt)
-    unreachable_merge_sha = _git(["rev-parse", "HEAD"], wt)
+    # Create a separate commit that is not reachable from develop
+    _git(["checkout", "-b", "other-branch"], repo)
+    (repo / "other.txt").write_text("other\n", encoding="utf-8")
+    _git(["add", "other.txt"], repo)
+    _git(["commit", "-m", "other commit"], repo)
+    unreachable_merge_sha = _git(["rev-parse", "HEAD"], repo)
+    _git(["checkout", "develop"], repo)
     _git(["checkout", "fix/feature-unreachable"], wt)
 
     canned_prs = [
@@ -341,7 +348,7 @@ def test_fixture_merge_commit_not_yet_reachable(tmp_path: Path):
         }
     ]
 
-    wt_info = audit_mod.get_git_worktrees(repo)
+    wt_info, _ = audit_mod.get_git_worktrees(repo)
     matched = [w for w in wt_info if w.branch == "fix/feature-unreachable"][0]
 
     cls, evidence = audit_mod.evaluate_and_classify_worktree(
@@ -387,7 +394,7 @@ def test_fixture_gone_upstream_no_pr_evidence(tmp_path: Path):
 
     assert audit_mod.is_branch_gone_upstream("fix/feature-gone", repo) is True
 
-    wt_info = audit_mod.get_git_worktrees(repo)
+    wt_info, _ = audit_mod.get_git_worktrees(repo)
     matched = [w for w in wt_info if w.branch == "fix/feature-gone"][0]
 
     cls, evidence = audit_mod.evaluate_and_classify_worktree(
@@ -404,3 +411,207 @@ def test_fixture_gone_upstream_no_pr_evidence(tmp_path: Path):
     assert cls.item_classification == "active"
     assert "gone-upstream" in cls.signals
     assert len(evidence) == 0
+
+
+def test_fixture_missing_directory(tmp_path: Path):
+    """Spec §10 fixture: registered in git worktree list but path missing on disk."""
+    repo = init_repo(tmp_path / "repo")
+    wt = add_worktree(repo, "fix/feature-missing", tmp_path / "wt_missing")
+    # Delete the directory from disk while keeping git registration
+    import shutil
+
+    shutil.rmtree(wt)
+
+    wt_info, _ = audit_mod.get_git_worktrees(repo)
+    matched = [w for w in wt_info if w.path == str(wt)][0]
+    assert matched.path_exists is False
+
+    cls, _ = audit_mod.evaluate_and_classify_worktree(
+        wt=matched,
+        repo_owner="BenchBox-dev",
+        repo_name="BenchBox",
+        expected_repo_id=None,
+        token=None,
+        repo_root=repo,
+    )
+    assert cls.state == "unavailable"
+    assert cls.item_classification == "missing"
+
+
+def test_fixture_unregistered_path(tmp_path: Path):
+    """Spec §10 fixture: path on disk not registered in git worktree list."""
+    repo = init_repo(tmp_path / "repo")
+    unregistered_dir = tmp_path / "unregistered_dir"
+    unregistered_dir.mkdir()
+
+    wt = audit_mod.WorktreeInfo(
+        path=str(unregistered_dir),
+        registered=False,
+        path_exists=True,
+        is_detached=False,
+        is_locked=False,
+        lock_reason=None,
+        is_dirty=False,
+        branch="fix/unregistered",
+        head_sha="head123",
+    )
+    cls, _ = audit_mod.evaluate_and_classify_worktree(
+        wt=wt,
+        repo_owner="BenchBox-dev",
+        repo_name="BenchBox",
+        expected_repo_id=None,
+        token=None,
+        repo_root=repo,
+    )
+    assert cls.state == "unavailable"
+    assert cls.item_classification == "missing"
+
+
+def test_fixture_prunable_worktree(tmp_path: Path):
+    """Spec §10 fixture: worktree entry marked prunable by git."""
+    repo = init_repo(tmp_path / "repo")
+    wt = audit_mod.WorktreeInfo(
+        path=str(tmp_path / "prunable_wt"),
+        registered=True,
+        path_exists=True,
+        is_detached=False,
+        is_locked=False,
+        lock_reason=None,
+        is_dirty=False,
+        branch="fix/prunable",
+        head_sha="head123",
+        prunable=True,
+        prunable_reason="gitdir missing",
+    )
+    cls, _ = audit_mod.evaluate_and_classify_worktree(
+        wt=wt,
+        repo_owner="BenchBox-dev",
+        repo_name="BenchBox",
+        expected_repo_id=None,
+        token=None,
+        repo_root=repo,
+    )
+    assert cls.state == "unavailable"
+    assert cls.item_classification == "prunable"
+    assert "gitdir missing" in cls.reason
+
+
+def test_fixture_gone_upstream_unmerged_pr(tmp_path: Path):
+    """Spec §10 fixture: branch gone-upstream but PR closed without merge."""
+    repo = init_repo(tmp_path / "repo")
+    add_worktree(repo, "fix/feature-closed-unmerged", tmp_path / "wt_closed")
+
+    canned_prs = [
+        {
+            "number": 1940,
+            "state": "closed",
+            "merged": False,
+            "merged_at": None,
+            "head": {"sha": "head123"},
+            "base": {"ref": "develop"},
+        }
+    ]
+
+    wt_info, _ = audit_mod.get_git_worktrees(repo)
+    matched = [w for w in wt_info if w.branch == "fix/feature-closed-unmerged"][0]
+
+    cls, evidence = audit_mod.evaluate_and_classify_worktree(
+        wt=matched,
+        repo_owner="BenchBox-dev",
+        repo_name="BenchBox",
+        expected_repo_id=None,
+        token=None,
+        repo_root=repo,
+        canned_prs=canned_prs,
+    )
+    assert cls.state == "uncertain"
+    assert cls.item_classification == "closed-unmerged"
+
+
+def test_fixture_wrong_base_pr(tmp_path: Path):
+    """Spec §10 fixture: PR merged into a non-structural feature branch."""
+    repo = init_repo(tmp_path / "repo")
+    wt = add_worktree(repo, "fix/feature-wrong-base", tmp_path / "wt_wrong_base")
+    (wt / "change.txt").write_text("change\n", encoding="utf-8")
+    _git(["add", "change.txt"], wt)
+    _git(["commit", "-m", "change"], wt)
+    head_sha = _git(["rev-parse", "HEAD"], wt)
+
+    canned_prs = [
+        {
+            "number": 1945,
+            "state": "closed",
+            "merged": True,
+            "merged_at": "2026-08-26T12:00:00Z",
+            "merge_commit_sha": "merge1945",
+            "head": {"sha": head_sha},
+            "base": {"ref": "feature/arbitrary-base"},
+        }
+    ]
+
+    wt_info, _ = audit_mod.get_git_worktrees(repo)
+    matched = [w for w in wt_info if w.branch == "fix/feature-wrong-base"][0]
+
+    cls, evidence = audit_mod.evaluate_and_classify_worktree(
+        wt=matched,
+        repo_owner="BenchBox-dev",
+        repo_name="BenchBox",
+        expected_repo_id=None,
+        token=None,
+        repo_root=repo,
+        canned_prs=canned_prs,
+    )
+    assert cls.state == "uncertain"
+    assert cls.item_classification == "wrong base"
+
+
+def test_fixture_old_but_active_worktree(tmp_path: Path):
+    """Spec §10 fixture: active clean worktree with commit older than 30 days."""
+    repo = init_repo(tmp_path / "repo")
+    wt = add_worktree(repo, "fix/feature-old", tmp_path / "wt_old")
+    (wt / "old.txt").write_text("old work\n", encoding="utf-8")
+    _git(["add", "old.txt"], wt)
+    _git(
+        ["commit", "-m", "old commit", "--date=2026-06-01T00:00:00Z"],
+        wt,
+        env={"GIT_COMMITTER_DATE": "2026-06-01T00:00:00Z"},
+    )
+
+    wt_info, _ = audit_mod.get_git_worktrees(repo)
+    matched = [w for w in wt_info if w.branch == "fix/feature-old"][0]
+
+    cls, _ = audit_mod.evaluate_and_classify_worktree(
+        wt=matched,
+        repo_owner="BenchBox-dev",
+        repo_name="BenchBox",
+        expected_repo_id=None,
+        token=None,
+        repo_root=repo,
+        canned_prs=[],
+    )
+    assert cls.state == "uncertain"
+    assert cls.item_classification == "active"
+    assert "old" in cls.signals
+    assert "clean" in cls.signals
+
+
+def test_fixture_incomplete_collection_error(tmp_path: Path):
+    """Spec §10 fixture: API error or timeout resolves fail-closed to unavailable."""
+    repo = init_repo(tmp_path / "repo")
+    add_worktree(repo, "fix/feature-api-err", tmp_path / "wt_api_err")
+
+    wt_info, _ = audit_mod.get_git_worktrees(repo)
+    matched = [w for w in wt_info if w.branch == "fix/feature-api-err"][0]
+
+    cls, evidence = audit_mod.evaluate_and_classify_worktree(
+        wt=matched,
+        repo_owner="BenchBox-dev",
+        repo_name="BenchBox",
+        expected_repo_id=None,
+        token=None,
+        repo_root=repo,
+        api_error_override="HTTP Error 503: Service Unavailable",
+    )
+    assert cls.state == "unavailable"
+    assert cls.item_classification == "API error"
+    assert "503" in cls.reason

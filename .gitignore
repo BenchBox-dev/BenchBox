@@ -216,6 +216,9 @@ _project/verification-logs/*/
 _project/verification-logs/*.log
 _project/verification-logs/*.out
 
+# Ephemeral worktree lifecycle audit snapshots (Spec §9)
+_project/reports/worktree-lifecycle/
+
 # The _project/scripts environment now contains the released todo-db runtime.
 # Its lockfile is tracked so cutover, clean-clone, and CI commands resolve the
 # same immutable package instead of relying on a developer checkout or PATH.

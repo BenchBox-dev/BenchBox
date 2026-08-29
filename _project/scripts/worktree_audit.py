@@ -26,11 +26,13 @@ import subprocess
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 SCHEMA_VERSION = 1
 STRUCTURAL_BASES = {"develop", "release", "published-results"}
+_EVIDENCE_SOURCE_KEY = "_benchbox_evidence_source"
 
 REPORT_AUTHORITY = {
     "is_deletion_authority": False,
@@ -93,12 +95,21 @@ class Classification:
         }
 
 
+class GitCollectionError(RuntimeError):
+    """A Git command could not provide a trustworthy collection result."""
+
+
 # ---------------------------------------------------------------------------
 # Git interaction helpers (read-only)
 # ---------------------------------------------------------------------------
-def _run_git(args: List[str], cwd: Path) -> Tuple[int, str, str]:
-    proc = subprocess.run(["git", *args], capture_output=True, text=True, cwd=cwd)
-    return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
+def _run_git(args: List[str], cwd: Path, timeout: float = 30.0) -> Tuple[int, str, str]:
+    try:
+        proc = subprocess.run(["git", *args], capture_output=True, text=True, cwd=cwd, timeout=timeout)
+        return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
+    except subprocess.TimeoutExpired as exc:
+        raise GitCollectionError(f"git command timed out after {timeout}s: git {' '.join(args)}") from exc
+    except Exception as exc:
+        raise GitCollectionError(f"git command failed before producing a result: git {' '.join(args)}: {exc}") from exc
 
 
 def get_primary_clone_path(repo_root: Path) -> Optional[Path]:
@@ -157,19 +168,23 @@ def _parse_worktree_porcelain_entries(stdout: str) -> List[Dict[str, Any]]:
     return entries
 
 
-def get_git_worktrees(repo_root: Path, include_primary: bool = False) -> List[WorktreeInfo]:
+def get_git_worktrees(repo_root: Path, include_primary: bool = False) -> Tuple[List[WorktreeInfo], Optional[str]]:
     """Parse `git worktree list --porcelain` into structured WorktreeInfo list.
 
     By default, filters out the primary clone to report only linked worktrees
     per the evidence contract specification (§4, §10).
+
+    Returns (worktrees, error_message).
     """
-    code, stdout, _ = _run_git(["worktree", "list", "--porcelain"], repo_root)
-    if code != 0 or not stdout:
-        return []
+    code, stdout, stderr = _run_git(["worktree", "list", "--porcelain"], repo_root)
+    if code != 0:
+        return [], f"Failed to list git worktrees (exit {code}): {stderr or 'unknown error'}"
+    if not stdout:
+        return [], None
 
     entries = _parse_worktree_porcelain_entries(stdout)
     if not entries:
-        return []
+        return [], None
 
     primary_clone = get_primary_clone_path(repo_root) if not include_primary else None
     worktrees: List[WorktreeInfo] = []
@@ -183,11 +198,11 @@ def get_git_worktrees(repo_root: Path, include_primary: bool = False) -> List[Wo
                         continue
                 except Exception:
                     pass
-            if idx == 0:
+            elif idx == 0:
                 continue
         worktrees.append(info)
 
-    return worktrees
+    return worktrees, None
 
 
 def _build_worktree_info(entry: Dict[str, Any]) -> WorktreeInfo:
@@ -285,8 +300,10 @@ def is_branch_gone_upstream(branch: str, repo_root: Path) -> bool:
 # ---------------------------------------------------------------------------
 # GitHub API interaction helpers
 # ---------------------------------------------------------------------------
-def _github_api_request(url: str, token: Optional[str]) -> Tuple[Optional[Any], Optional[str]]:
-    """Execute authenticated GitHub REST request. Returns (parsed_json, error_message)."""
+def _github_api_request(
+    url: str, token: Optional[str]
+) -> Tuple[Optional[Any], Optional[Dict[str, str]], Optional[str]]:
+    """Execute authenticated GitHub REST request. Returns (parsed_json, response_headers, error_message)."""
     headers = {
         "Accept": "application/vnd.github+json",
         "User-Agent": "benchbox-worktree-audit",
@@ -297,22 +314,22 @@ def _github_api_request(url: str, token: Optional[str]) -> Tuple[Optional[Any], 
     req = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.load(resp), None
+            resp_headers = {k.lower(): v for k, v in resp.headers.items()}
+            return json.load(resp), resp_headers, None
     except urllib.error.HTTPError as err:
         if err.code == 404:
-            return None, "HTTP 404 Not Found"
-        return None, f"HTTP Error {err.code}: {err.reason}"
+            return None, None, "HTTP 404 Not Found"
+        return None, None, f"HTTP Error {err.code}: {err.reason}"
     except urllib.error.URLError as err:
-        return None, f"URL Error: {err.reason}"
+        return None, None, f"URL Error: {err.reason}"
     except Exception as err:
-        return None, f"Unexpected error: {err}"
+        return None, None, f"Unexpected error: {err}"
 
 
 def resolve_github_token() -> Optional[str]:
     """Resolve GitHub token from environment variables or `gh auth token` CLI."""
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    if token:
-        token = token.strip()
+    for variable in ("GH_TOKEN", "GITHUB_TOKEN"):
+        token = os.environ.get(variable, "").strip()
         if token:
             return token
 
@@ -331,20 +348,82 @@ def resolve_github_token() -> Optional[str]:
     return None
 
 
+def get_remote_repository_slug(repo_root: Path, preferred_remote: str = "origin") -> Optional[str]:
+    """Extract owner/repo slug from git remote URL as a plausibility check (Spec §3)."""
+    code, stdout, _ = _run_git(["remote", "get-url", preferred_remote], repo_root)
+    if code != 0 or not stdout:
+        code, remotes_out, _ = _run_git(["remote"], repo_root)
+        if code == 0 and remotes_out:
+            first_remote = remotes_out.splitlines()[0].strip()
+            code, stdout, _ = _run_git(["remote", "get-url", first_remote], repo_root)
+            if code != 0 or not stdout:
+                return None
+        else:
+            return None
+
+    url = stdout.strip().removesuffix(".git")
+    if "github.com/" in url:
+        return url.split("github.com/", 1)[1].strip("/")
+    if "github.com:" in url:
+        return url.split("github.com:", 1)[1].strip("/")
+    return None
+
+
 def resolve_repository_identity(
-    owner: str, repo: str, token: Optional[str]
+    owner: str,
+    repo: str,
+    token: Optional[str],
+    remote_slug: Optional[str] = None,
 ) -> Tuple[Optional[int], Optional[str], Optional[str]]:
-    """Resolve repository numeric ID and full name. Returns (id, full_name, error)."""
+    """Resolve repository numeric ID and full name with remote plausibility cross-check.
+
+    Returns (id, full_name, error).
+    """
     encoded_owner = urllib.parse.quote(owner, safe="")
     encoded_repo = urllib.parse.quote(repo, safe="")
     url = f"https://api.github.com/repos/{encoded_owner}/{encoded_repo}"
-    data, err = _github_api_request(url, token)
+    data, _, err = _github_api_request(url, token)
     if err or not isinstance(data, dict):
         return None, None, err or "Invalid repository payload"
     repo_id = data.get("id")
     if repo_id is None:
         return None, None, "Repository payload missing 'id'"
-    return repo_id, data.get("full_name", f"{owner}/{repo}"), None
+    full_name = data.get("full_name", f"{owner}/{repo}")
+
+    # Compare stable repository identities so redirects work without accepting
+    # an unrelated same-named fork (Spec §3).
+    if remote_slug:
+        if "/" not in remote_slug:
+            return None, None, f"Invalid GitHub remote repository slug: '{remote_slug}'"
+        remote_owner, remote_repo = remote_slug.split("/", 1)
+        encoded_remote_owner = urllib.parse.quote(remote_owner, safe="")
+        encoded_remote_repo = urllib.parse.quote(remote_repo, safe="")
+        remote_url = f"https://api.github.com/repos/{encoded_remote_owner}/{encoded_remote_repo}"
+        remote_data, _, remote_err = _github_api_request(remote_url, token)
+        if remote_err or not isinstance(remote_data, dict):
+            return None, None, f"Failed to resolve remote repository '{remote_slug}': {remote_err or 'invalid payload'}"
+        remote_repo_id = remote_data.get("id")
+        if remote_repo_id is None:
+            return None, None, f"Remote repository payload for '{remote_slug}' missing 'id'"
+        if remote_repo_id != repo_id:
+            return (
+                None,
+                None,
+                (
+                    f"Repository identity mismatch: remote '{remote_slug}' resolved to id {remote_repo_id}, "
+                    f"but requested repository '{full_name}' resolved to id {repo_id}"
+                ),
+            )
+
+    return repo_id, full_name, None
+
+
+def is_pr_merged(pr: Dict[str, Any]) -> bool:
+    """Return True if PR payload indicates merged state (supports both GET and LIST schemas)."""
+    if pr.get("merged") is True:
+        return True
+    # GitHub LIST PR endpoint omits 'merged: bool' and provides 'merged_at: timestamp'
+    return bool(pr.get("merged_at"))
 
 
 def fetch_prs_for_branch(
@@ -353,23 +432,49 @@ def fetch_prs_for_branch(
     branch: str,
     expected_repo_id: Optional[int],
     token: Optional[str],
+    max_pages: int = 10,
 ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
-    """Fetch PRs for branch, validating repository identity on each.
+    """Fetch PRs for branch, validating repository identity on each and handling pagination.
 
     Returns (prs_list, error_message).
     """
     encoded_owner = urllib.parse.quote(owner, safe="")
     encoded_repo = urllib.parse.quote(repo, safe="")
-    params = urllib.parse.urlencode({"head": f"{owner}:{branch}", "state": "all", "per_page": 100})
-    url = f"https://api.github.com/repos/{encoded_owner}/{encoded_repo}/pulls?{params}"
-    data, err = _github_api_request(url, token)
-    if err:
-        return [], err
-    if not isinstance(data, list):
-        return [], "Expected list of PRs from API"
+    all_prs: List[Tuple[Any, str]] = []
+    page = 1
+
+    while True:
+        params = urllib.parse.urlencode(
+            {
+                "head": f"{owner}:{branch}",
+                "state": "all",
+                "per_page": 100,
+                "page": page,
+            }
+        )
+        url = f"https://api.github.com/repos/{encoded_owner}/{encoded_repo}/pulls?{params}"
+        data, headers, err = _github_api_request(url, token)
+        if err:
+            return [], err
+        if not isinstance(data, list):
+            return [], "Expected list of PRs from API"
+
+        all_prs.extend((pr, url) for pr in data)
+
+        link_header = headers.get("link", "") if headers else ""
+        has_next = 'rel="next"' in link_header
+        if not has_next:
+            break
+
+        page += 1
+        if page > max_pages:
+            return [], f"PR listing pagination truncated: exceeded {max_pages} pages for branch '{branch}'"
+
+    if not all_prs:
+        return [], None
 
     validated_prs: List[Dict[str, Any]] = []
-    for pr in data:
+    for pr, source_url in all_prs:
         if not isinstance(pr, dict):
             continue
         base_repo = pr.get("base", {}).get("repo")
@@ -377,7 +482,15 @@ def fetch_prs_for_branch(
             base_repo_id = base_repo.get("id") if isinstance(base_repo, dict) else None
             if base_repo_id != expected_repo_id:
                 continue
-        validated_prs.append(pr)
+        validated_pr = dict(pr)
+        validated_pr[_EVIDENCE_SOURCE_KEY] = f"GET {source_url}"
+        validated_prs.append(validated_pr)
+
+    if all_prs and not validated_prs:
+        return [], (
+            f"All {len(all_prs)} PRs returned for branch '{branch}' failed repository identity validation "
+            f"(expected repo id {expected_repo_id})"
+        )
 
     return validated_prs, None
 
@@ -386,12 +499,21 @@ def fetch_prs_for_branch(
 # Core evaluation and classification logic (§5, §6, §7)
 # ---------------------------------------------------------------------------
 def _check_worktree_boundary_states(wt: WorktreeInfo, signals: List[str]) -> Optional[Classification]:
-    """Evaluate filesystem, registration, dirty, locked, and detached boundary states."""
+    """Evaluate filesystem, registration, dirty, locked, detached, and prunable boundary states."""
     if not wt.path_exists or not wt.registered:
         return Classification(
             state="unavailable",
             item_classification="missing",
             reason=f"Worktree path '{wt.path}' does not exist on disk or is not registered",
+            signals=signals,
+        )
+
+    if wt.prunable:
+        reason = f"Worktree is prunable ({wt.prunable_reason})" if wt.prunable_reason else "Worktree is prunable"
+        return Classification(
+            state="unavailable",
+            item_classification="prunable",
+            reason=reason,
             signals=signals,
         )
 
@@ -437,7 +559,7 @@ def _build_integration_evidence_list(
         pr_number = pr.get("number", 0)
         pr_head_sha = pr.get("head", {}).get("sha", "")
         pr_base_ref = pr.get("base", {}).get("ref", "")
-        is_merged = pr.get("merged", False) or bool(pr.get("merged_at"))
+        is_merged = is_pr_merged(pr)
         merge_commit_sha = pr.get("merge_commit_sha")
 
         target_tip = get_ref_commit_sha(f"origin/{pr_base_ref}", repo_root) or get_ref_commit_sha(
@@ -457,7 +579,7 @@ def _build_integration_evidence_list(
                 merge_commit_sha=merge_commit_sha,
                 merge_commit_reachable_from_target_tip=merge_reachable,
                 checked_at=checked_at,
-                source=f"gh api /repos/{repo_owner}/{repo_name}/pulls/{pr_number}",
+                source=str(pr.get(_EVIDENCE_SOURCE_KEY, "canned PR evidence")),
             )
         )
     return evidence_list
@@ -540,6 +662,19 @@ def _evaluate_merged_pr_integration(
     )
 
 
+def get_branch_age_days(branch: str, repo_root: Path) -> Optional[float]:
+    """Return age of latest commit on branch in days, or None if unresolvable."""
+    code, stdout, _ = _run_git(["log", "-1", "--format=%ct", f"refs/heads/{branch}"], repo_root)
+    if code != 0 or not stdout:
+        return None
+    try:
+        commit_ts = int(stdout.strip())
+        now_ts = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
+        return max(0.0, (now_ts - commit_ts) / 86400.0)
+    except Exception:
+        return None
+
+
 def evaluate_and_classify_worktree(
     wt: WorktreeInfo,
     repo_owner: str,
@@ -553,10 +688,14 @@ def evaluate_and_classify_worktree(
 ) -> Tuple[Classification, List[IntegrationEvidence]]:
     """Evaluate integration evidence and classify worktree according to evidence contract."""
     signals: List[str] = []
-    if not wt.is_dirty:
+    if wt.path_exists and not wt.is_dirty:
         signals.append("clean")
     if wt.branch and is_branch_gone_upstream(wt.branch, repo_root):
         signals.append("gone-upstream")
+    if wt.branch:
+        age_days = get_branch_age_days(wt.branch, repo_root)
+        if age_days is not None and age_days >= 30.0:
+            signals.append("old")
 
     if repo_identity_error:
         return (
@@ -618,7 +757,7 @@ def evaluate_and_classify_worktree(
     sorted_prs = sorted(prs, key=lambda p: p.get("number", 0), reverse=True)
     evidence_list = _build_integration_evidence_list(sorted_prs, repo_owner, repo_name, repo_root)
 
-    merged_prs = [p for p in sorted_prs if p.get("merged", False) or bool(p.get("merged_at"))]
+    merged_prs = [p for p in sorted_prs if is_pr_merged(p)]
     if merged_prs:
         latest_merged_cls: Optional[Classification] = None
         for p in merged_prs:
@@ -649,72 +788,140 @@ def audit_worktrees(
     repo_root: Path,
     repo_slug: str = "BenchBox-dev/BenchBox",
     token: Optional[str] = None,
+    initial_collection_errors: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Perform read-only inventory and audit across worktrees and local branches."""
     if token is None:
         token = resolve_github_token()
 
-    owner, repo = repo_slug.split("/", 1) if "/" in repo_slug else ("BenchBox-dev", repo_slug)
-    repo_id, full_name, repo_err = resolve_repository_identity(owner, repo, token)
-    effective_repo_err = repo_err if (repo_err or repo_id is None) else None
-    if repo_id is None and not effective_repo_err:
-        effective_repo_err = "Repository ID unavailable"
-
-    worktrees_info = get_git_worktrees(repo_root)
-    local_branches = get_local_branches(repo_root)
-
     generated_at = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    owner, repo = repo_slug.split("/", 1) if "/" in repo_slug else ("BenchBox-dev", repo_slug)
+    collection_errors = list(initial_collection_errors or [])
+    repo_id: Optional[int] = None
+    full_name: Optional[str] = repo_slug
+    effective_repo_err: Optional[str] = None
+    worktrees_info: List[WorktreeInfo] = []
+    local_branches: List[Dict[str, Any]] = []
+    wt_err: Optional[str] = None
+
+    try:
+        remote_slug = get_remote_repository_slug(repo_root)
+        repo_id, full_name, repo_err = resolve_repository_identity(owner, repo, token, remote_slug=remote_slug)
+        effective_repo_err = repo_err if (repo_err or repo_id is None) else None
+        if repo_id is None and not effective_repo_err:
+            effective_repo_err = "Repository ID unavailable"
+        if effective_repo_err:
+            collection_errors.append(f"Repository identity collection failed: {effective_repo_err}")
+
+        worktrees_info, wt_err = get_git_worktrees(repo_root)
+        if wt_err:
+            collection_errors.append(f"Git worktree enumeration failed: {wt_err}")
+        local_branches = get_local_branches(repo_root)
+    except GitCollectionError as err:
+        wt_err = str(err)
+        collection_errors.append(f"Git collection failed: {err}")
 
     worktree_records: List[Dict[str, Any]] = []
     finish_candidates = 0
     uncertain_count = 0
     unavailable_count = 0
 
-    for wt in worktrees_info:
-        classification, evidence = evaluate_and_classify_worktree(
-            wt=wt,
-            repo_owner=owner,
-            repo_name=repo,
-            expected_repo_id=repo_id,
-            token=token,
-            repo_root=repo_root,
-            repo_identity_error=effective_repo_err,
-        )
-
-        if classification.state == "verified-integrated":
-            finish_candidates += 1
-        elif classification.state == "unavailable":
-            unavailable_count += 1
-        else:
-            uncertain_count += 1
-
+    if wt_err:
+        # Collection failure in Git worktree enumeration fails closed to unavailable (Spec §5)
         record = {
             "schema_version": SCHEMA_VERSION,
             "generated_at": generated_at,
             "repository": {
                 "id": repo_id,
                 "full_name_observed": full_name or repo_slug,
-                "resolved_via": "gh api /repos/{owner}/{repo} --jq .id",
+                "resolved_via": f"https://api.github.com/repos/{owner}/{repo}",
             },
             "worktree": {
-                "path": wt.path,
-                "registered": wt.registered,
-                "path_exists": wt.path_exists,
-                "is_detached": wt.is_detached,
-                "is_locked": wt.is_locked,
-                "lock_reason": wt.lock_reason,
-                "is_dirty": wt.is_dirty,
-                "branch": wt.branch,
-                "head_sha": wt.head_sha,
+                "path": str(repo_root),
+                "registered": False,
+                "path_exists": repo_root.exists(),
+                "is_detached": False,
+                "is_locked": False,
+                "lock_reason": None,
+                "is_dirty": False,
+                "branch": None,
+                "head_sha": None,
+                "is_prunable": False,
+                "prunable_reason": None,
             },
-            "integration_evidence": [ev.to_dict() for ev in evidence],
+            "integration_evidence": [],
             "task_run_evidence": {
                 "available": False,
                 "reason": "no published Bossmode public JSON contract yet (see §8)",
             },
-            "classification": classification.to_dict(),
+            "classification": {
+                "state": "unavailable",
+                "item_classification": "Git error",
+                "reason": f"Git worktree enumeration failed: {wt_err}",
+                "signals": [],
+            },
         }
         worktree_records.append(record)
+        unavailable_count = 1
+    else:
+        for wt in worktrees_info:
+            try:
+                classification, evidence = evaluate_and_classify_worktree(
+                    wt=wt,
+                    repo_owner=owner,
+                    repo_name=repo,
+                    expected_repo_id=repo_id,
+                    token=token,
+                    repo_root=repo_root,
+                    repo_identity_error=effective_repo_err,
+                )
+            except GitCollectionError as err:
+                error = f"Git collection failed for worktree '{wt.path}': {err}"
+                collection_errors.append(error)
+                classification = Classification(
+                    state="unavailable",
+                    item_classification="Git error",
+                    reason=error,
+                    signals=[],
+                )
+                evidence = []
+
+            if classification.state == "verified-integrated":
+                finish_candidates += 1
+            elif classification.state == "unavailable":
+                unavailable_count += 1
+            else:
+                uncertain_count += 1
+
+            record = {
+                "schema_version": SCHEMA_VERSION,
+                "generated_at": generated_at,
+                "repository": {
+                    "id": repo_id,
+                    "full_name_observed": full_name or repo_slug,
+                    "resolved_via": f"https://api.github.com/repos/{owner}/{repo}",
+                },
+                "worktree": {
+                    "path": wt.path,
+                    "registered": wt.registered,
+                    "path_exists": wt.path_exists,
+                    "is_detached": wt.is_detached,
+                    "is_locked": wt.is_locked,
+                    "lock_reason": wt.lock_reason,
+                    "is_dirty": wt.is_dirty,
+                    "branch": wt.branch,
+                    "head_sha": wt.head_sha,
+                    "is_prunable": wt.prunable,
+                    "prunable_reason": wt.prunable_reason,
+                },
+                "integration_evidence": [ev.to_dict() for ev in evidence],
+                "task_run_evidence": {
+                    "available": False,
+                    "reason": "no published Bossmode public JSON contract yet (see §8)",
+                },
+                "classification": classification.to_dict(),
+            }
+            worktree_records.append(record)
 
     report = {
         "schema_version": SCHEMA_VERSION,
@@ -722,9 +929,10 @@ def audit_worktrees(
         "repository": {
             "id": repo_id,
             "full_name_observed": full_name or repo_slug,
-            "resolved_via": "gh api /repos/{owner}/{repo} --jq .id",
+            "resolved_via": f"https://api.github.com/repos/{owner}/{repo}",
         },
         "report_authority": REPORT_AUTHORITY,
+        "collection_errors": collection_errors,
         "worktrees": worktree_records,
         "local_branches": local_branches,
         "summary": {
@@ -733,9 +941,35 @@ def audit_worktrees(
             "finish_candidates": finish_candidates,
             "uncertain": uncertain_count,
             "unavailable": unavailable_count,
+            "collection_errors": len(collection_errors),
         },
     }
+
+    snapshot_error = _write_report_snapshot(report, repo_root)
+    if snapshot_error:
+        report["snapshot_path"] = None
+        collection_errors.append(snapshot_error)
+        report["collection_errors"] = collection_errors
+        report["summary"]["collection_errors"] = len(collection_errors)
+
     return report
+
+
+def _write_report_snapshot(report: Dict[str, Any], repo_root: Path) -> Optional[str]:
+    """Persist a collision-resistant report snapshot without overwriting an existing run."""
+    report_dir = repo_root / "_project" / "reports" / "worktree-lifecycle"
+    try:
+        report_dir.mkdir(parents=True, exist_ok=True)
+        ts_slug = str(report["generated_at"]).replace(":", "-")
+        snapshot_file = report_dir / f"{ts_slug}-{uuid.uuid4().hex}.json"
+        report["snapshot_path"] = str(snapshot_file)
+        with snapshot_file.open("x", encoding="utf-8") as handle:
+            json.dump(report, handle, indent=2)
+            handle.write("\n")
+    except Exception as err:
+        report["snapshot_path"] = None
+        return f"Snapshot persistence failed: {err}"
+    return None
 
 
 def render_text_report(report: Dict[str, Any]) -> str:
@@ -744,6 +978,8 @@ def render_text_report(report: Dict[str, Any]) -> str:
     lines.append("=== BenchBox Worktree Lifecycle Audit ===")
     lines.append(f"Generated at: {report.get('generated_at')}")
     lines.append(f"Repository:   {report.get('repository', {}).get('full_name_observed')}")
+    if report.get("snapshot_path"):
+        lines.append(f"Snapshot:     {report.get('snapshot_path')}")
     lines.append("")
 
     worktrees = report.get("worktrees", [])
@@ -771,7 +1007,10 @@ def render_text_report(report: Dict[str, Any]) -> str:
     lines.append(f"  Finish candidates:    {summary.get('finish_candidates', 0)}")
     lines.append(f"  Uncertain:            {summary.get('uncertain', 0)}")
     lines.append(f"  Unavailable:          {summary.get('unavailable', 0)}")
+    lines.append(f"  Collection errors:    {summary.get('collection_errors', 0)}")
     lines.append(f"  Local branches:       {summary.get('total_local_branches', 0)}")
+    for error in report.get("collection_errors", []):
+        lines.append(f"  - {error}")
     lines.append("")
     lines.append(f"Authority Note: {report.get('report_authority', {}).get('note')}")
     return "\n".join(lines)
@@ -793,21 +1032,40 @@ def main(argv: Optional[List[str]] = None) -> int:
         default=os.environ.get("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox"),
         help="GitHub repository slug owner/name (default: $GITHUB_REPOSITORY or BenchBox-dev/BenchBox)",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit with code 1 if any worktree is unavailable or collection fails",
+    )
     args = parser.parse_args(argv)
 
     token = resolve_github_token()
     repo_root = Path.cwd()
 
-    code, root_out, _ = _run_git(["rev-parse", "--show-toplevel"], repo_root)
-    if code == 0 and root_out:
-        repo_root = Path(root_out)
+    initial_collection_errors: List[str] = []
+    try:
+        code, root_out, _ = _run_git(["rev-parse", "--show-toplevel"], repo_root)
+        if code == 0 and root_out:
+            repo_root = Path(root_out)
+    except GitCollectionError as err:
+        initial_collection_errors.append(f"Git repository root collection failed: {err}")
 
-    report = audit_worktrees(repo_root=repo_root, repo_slug=args.repo, token=token)
+    report = audit_worktrees(
+        repo_root=repo_root,
+        repo_slug=args.repo,
+        token=token,
+        initial_collection_errors=initial_collection_errors,
+    )
 
     if args.format == "json":
         print(json.dumps(report, indent=2))
     else:
         print(render_text_report(report))
+
+    if args.strict and (
+        report.get("summary", {}).get("unavailable", 0) > 0 or report.get("summary", {}).get("collection_errors", 0) > 0
+    ):
+        return 1
 
     return 0
 
