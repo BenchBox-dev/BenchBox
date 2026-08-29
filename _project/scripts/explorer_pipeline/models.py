@@ -215,12 +215,25 @@ class ManifestEntry(BaseModel):
     instance_or_warehouse: str | None = None
     storage_format: str | None = None
     compliance_class: str | None = None
+    basis_availability: BasisAvailability | None = None
 
     @model_validator(mode="after")
     def _default_logical_query_count(self) -> ManifestEntry:
         if self.logical_query_count == 0 and self.query_count > 0:
             self.logical_query_count = self.query_count
         return self
+
+
+class BasisAvailability(BaseModel):
+    """Measurement basis availability for a result bundle."""
+
+    has_warmup: bool = False
+    measurement_pass_count: int = 0
+    warmup_status: str = "no_warmup_recorded"
+    available_bases: list[str] = Field(default_factory=list)
+    unavailable_bases: dict[str, str] = Field(default_factory=dict)
+    query_pass_counts: dict[str, int] = Field(default_factory=dict)
+    varying_pass_queries: dict[str, int] = Field(default_factory=dict)
 
 
 class QueryTiming(BaseModel):
@@ -459,6 +472,7 @@ class DetailResult(BaseModel):
     # mechanisms" mismatch instead of "nothing to compare".
     physical_mechanisms: list[str] | None = None
     physical_rendering_id: str | None = None
+    basis_availability: BasisAvailability | None = None
 
 
 # ---------------------------------------------------------------------------

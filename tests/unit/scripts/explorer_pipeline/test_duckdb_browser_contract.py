@@ -113,6 +113,14 @@ class TestG1SchemaContract:
         },
         "result_environment": {"result_id", "os", "arch", "cpu_count", "memory_gb", "python"},
         "result_phase_durations": {"result_id", "phase", "duration_s"},
+        "result_basis_availability": {
+            "result_id",
+            "has_warmup",
+            "measurement_pass_count",
+            "warmup_status",
+            "available_bases",
+            "varying_pass_queries",
+        },
         "query_display_timings": {
             "result_id",
             "query_id",
