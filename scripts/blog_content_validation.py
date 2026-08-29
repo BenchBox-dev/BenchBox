@@ -82,7 +82,7 @@ RE_VENDOR_SERMON = re.compile(
     r"\b(\w+ needs to fix|needs to rethink (?:their|its) architecture|clearly gouging|backed the wrong horse)\b",
     re.IGNORECASE,
 )
-RE_FIRST_PERSON = re.compile(r"\b(I(?!\s*/)|I'(?:m|ve|ll|d)|(?:[Mm]y|[Mm]e|[Mm]ine|[Mm]yself))\b")
+RE_FIRST_PERSON = re.compile(r"\b(I(?!\s*/)|I'(?:m|ve|ll|d)|my|My|me|Me|mine|Mine|myself|Myself)\b")
 RE_BANNED_HEDGE = re.compile(
     r"\b(your mileage may vary|worth considering|may help|each platform has different strengths)\b",
     re.IGNORECASE,
