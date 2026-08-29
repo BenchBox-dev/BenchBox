@@ -112,6 +112,48 @@ In our testing, DuckDB clearly destroys the competition on all analytical querie
     assert any(f.category == "platform_winner" for f in errors)
 
 
+def test_multiword_platform_winner_and_is_best_fails(tmp_blog_dir: Path) -> None:
+    """Multiword platform winner verdicts and 'is best for' must trigger an ERROR."""
+    post_content = """# Title
+
+This proves Platform X is the best choice for fast analytics.
+Platform X is best for analytical workloads.
+"""
+    post_file = tmp_blog_dir / "multiword-winner.md"
+    post_file.write_text(post_content, encoding="utf-8")
+
+    result = validate_file(post_file)
+    assert not result.is_valid
+    assert result.has_errors
+    errors = [f for f in result.findings if f.severity == Severity.ERROR]
+    assert len(errors) == 2
+    assert all(f.category == "platform_winner" for f in errors)
+
+
+def test_ordinary_first_person_singular_warns(tmp_blog_dir: Path) -> None:
+    """Ordinary first-person singular prose (I, my, me) must emit warnings."""
+    post_content = """# Title
+
+I ran the benchmark on my machine.
+Contact me with questions about these runs.
+The execution was I/O-bound across all disks.
+"""
+    post_file = tmp_blog_dir / "first-person-post.md"
+    post_file.write_text(post_content, encoding="utf-8")
+
+    result = validate_file(post_file)
+    assert result.is_valid
+    assert result.has_warnings
+    fp_findings = [f for f in result.findings if f.category == "first_person"]
+    assert len(fp_findings) >= 3
+    matched = [f.matched_text for f in fp_findings]
+    assert "I" in matched
+    assert "my" in matched
+    assert "me" in matched
+    # Ensure I/O was not matched
+    assert not any("I/O" in f.matched_text for f in fp_findings)
+
+
 def test_news_negation_title_passes(tmp_blog_dir: Path) -> None:
     """A title or H2 whose news is a negation must not be flagged as a couplet."""
     post_content = """# When two timings are not a comparison
@@ -217,7 +259,7 @@ def test_llm_writing_tells_warn(tmp_blog_dir: Path) -> None:
 
 Going forward, we should optimize our indexes.
 In today's fast-paced digital landscape, data generation matters.
-Let's delve into query execution plans.
+Let's delve into query execution plans for seamless integration.
 
 ## In conclusion
 
@@ -230,11 +272,12 @@ That concludes our findings.
     assert result.is_valid  # Warnings don't fail validation
     assert result.has_warnings
     tells = [f for f in result.findings if f.category == "llm_tells"]
-    assert len(tells) >= 4
+    assert len(tells) >= 5
     matched_texts = [f.matched_text.lower() for f in tells]
     assert any("good point" in t for t in matched_texts)
     assert any("going forward" in t for t in matched_texts)
     assert any("delve" in t for t in matched_texts)
+    assert any("seamless" in t for t in matched_texts)
 
 
 def test_content_ok_override(tmp_blog_dir: Path) -> None:

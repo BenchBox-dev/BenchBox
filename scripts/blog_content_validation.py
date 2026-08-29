@@ -66,7 +66,9 @@ RE_EM_DASH = re.compile(r"\u2014")
 RE_EN_DASH = re.compile(r"\u2013")
 RE_PLATFORM_WINNER = re.compile(
     r"\b(destroys? the competition|beats? the competition|clearly superior|clearly inferior|"
-    r"clear winner|undisputed winner|proves \w+ is the best|wins across the board)\b",
+    r"clear winner|undisputed winner|wins across the board|"
+    r"proves\s+(?:[\w-]+\s+){1,4}is\s+(?:the\s+)?best(?:\s+choice)?|"
+    r"platform\s+[\w-]+\s+is\s+best(?:\s+for)?)\b",
     re.IGNORECASE,
 )
 
@@ -80,10 +82,7 @@ RE_VENDOR_SERMON = re.compile(
     r"\b(\w+ needs to fix|needs to rethink (?:their|its) architecture|clearly gouging|backed the wrong horse)\b",
     re.IGNORECASE,
 )
-RE_FIRST_PERSON = re.compile(
-    r"\b(in my (?:opinion|view|experience)|I think|I believe|my take)\b",
-    re.IGNORECASE,
-)
+RE_FIRST_PERSON = re.compile(r"\b(I(?!\s*/)|I'(?:m|ve|ll|d)|(?:[Mm]y|[Mm]e|[Mm]ine|[Mm]yself))\b")
 RE_BANNED_HEDGE = re.compile(
     r"\b(your mileage may vary|worth considering|may help|each platform has different strengths)\b",
     re.IGNORECASE,
@@ -106,7 +105,7 @@ RE_LLM_CLICHE_OPENER = re.compile(
     re.IGNORECASE,
 )
 RE_LLM_BUZZWORDS = re.compile(
-    r"\b(delve|delving|delves|rich tapestry|stands? as a testament to|beacon of innovation)\b",
+    r"\b(delve|delving|delves|rich tapestry|stands? as a testament to|beacon of innovation|seamless(?:ly|ness)?)\b",
     re.IGNORECASE,
 )
 RE_LLM_FORMULAIC_CONCLUSION = re.compile(
@@ -313,9 +312,9 @@ def check_vendor_sermons(line: str, idx: int, path: Path) -> list[Finding]:
 
 def check_first_person(line: str, idx: int, path: Path) -> list[Finding]:
     """Check for first-person singular pronouns in post prose."""
-    match = RE_FIRST_PERSON.search(line)
-    if match:
-        return [
+    findings: list[Finding] = []
+    for match in RE_FIRST_PERSON.finditer(line):
+        findings.append(
             Finding(
                 file_path=path,
                 line_number=idx,
@@ -325,8 +324,8 @@ def check_first_person(line: str, idx: int, path: Path) -> list[Finding]:
                 matched_text=match.group(0),
                 line_content=line,
             )
-        ]
-    return []
+        )
+    return findings
 
 
 def check_banned_hedges(line: str, idx: int, path: Path) -> list[Finding]:
@@ -392,15 +391,17 @@ def check_llm_writing_tells(line: str, idx: int, path: Path) -> list[Finding]:
             )
         )
 
-    buzz_match = RE_LLM_BUZZWORDS.search(line)
-    if buzz_match:
+    for buzz_match in RE_LLM_BUZZWORDS.finditer(line):
         findings.append(
             Finding(
                 file_path=path,
                 line_number=idx,
                 category="llm_tells",
                 severity=Severity.WARNING,
-                message="AI vocabulary cliché detected ('delve', 'tapestry', 'testament to'). Use concrete plain verbs.",
+                message=(
+                    "AI vocabulary cliché detected ('delve', 'tapestry', 'testament to', 'seamless'). "
+                    "Use concrete plain verbs."
+                ),
                 matched_text=buzz_match.group(0),
                 line_content=line,
             )
