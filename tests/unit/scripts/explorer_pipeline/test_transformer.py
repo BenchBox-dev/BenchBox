@@ -304,8 +304,8 @@ class TestZeroDurationQuery:
         assert len(detail.queries) == 1
         assert detail.queries[0].duration_ms == pytest.approx(0.0)
 
-    def test_warmup_queries_excluded(self, tmp_path: Path) -> None:
-        """Warmup-typed queries must not appear in query timings."""
+    def test_warmup_queries_admitted_to_queries_but_excluded_from_display_timings(self, tmp_path: Path) -> None:
+        """Warmup queries appear in detail.queries for query_executions, but do not feed display_timings."""
         data = {**MINIMAL_BUNDLE}
         data["queries"] = [
             {"id": "Q1", "ms": 100.0, "iter": 0, "stream": 0, "run_type": "warmup", "status": "SUCCESS"},
@@ -318,8 +318,15 @@ class TestZeroDurationQuery:
         rid = transformer.result_id_from_bundle(bundle)
         detail = transformer.to_detail_result(bundle, rid)
 
-        assert len(detail.queries) == 1
-        assert detail.queries[0].duration_ms == pytest.approx(200.0)
+        # Both warmup and measurement appear in queries (for query_executions ingest)
+        assert len(detail.queries) == 2
+        run_types = {q.run_type for q in detail.queries}
+        assert run_types == {"warmup", "measurement"}
+
+        # But display_timings for Q1 must only use measurement (200.0)
+        dt_q1 = next(dt for dt in detail.display_timings if dt.query_id == "Q1")
+        assert dt_q1.display_ms == pytest.approx(200.0)
+        assert dt_q1.sample_count == 1
 
 
 class TestExtendedManifestFields:

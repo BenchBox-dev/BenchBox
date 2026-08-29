@@ -44,6 +44,15 @@ CREATE TABLE IF NOT EXISTS result_phase_durations (
     PRIMARY KEY (result_id, phase)
 );
 
+CREATE TABLE IF NOT EXISTS result_basis_availability (
+    result_id               VARCHAR PRIMARY KEY,
+    has_warmup              BOOLEAN NOT NULL,
+    measurement_pass_count  INTEGER NOT NULL,
+    warmup_status           VARCHAR NOT NULL,
+    available_bases         VARCHAR NOT NULL,
+    varying_pass_queries    VARCHAR
+);
+
 -- ---------------------------------------------------------------------------
 -- Table 1: results
 -- One row per result bundle. Extends the current 19-column stub to cover all

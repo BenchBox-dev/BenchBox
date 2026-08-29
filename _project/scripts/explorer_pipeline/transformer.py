@@ -11,11 +11,13 @@ import hashlib
 import json
 import logging
 import math
+from collections import Counter
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, cast
 
 from _project.scripts.explorer_pipeline.models import (
+    BasisAvailability,
     DetailResult,
     ManifestEntry,
     PercentileStats,
@@ -209,6 +211,10 @@ def _public_companion_bytes(
 
 # Status values that are considered passing for the query timing status field.
 _PASS_STATUSES = {"SUCCESS", "PASS", "pass", "success"}
+# Allowed run_type values for query execution rows ingested into query_executions.
+# Narrows the ingest filter to execution timings only (measurement + warmup),
+# explicitly excluding metadata and summary pseudo-rows.
+_ALLOWED_EXECUTION_RUN_TYPES: frozenset[str] = frozenset({"measurement", "warmup"})
 _COST_MODEL_SOURCE = "benchbox.core.cost.pricing"
 _COST_SCOPES: frozenset[str] = frozenset({"compute_only", "compute_plus_storage"})
 _COST_STATUSES: frozenset[str] = frozenset({"normalized", "not_applicable_local", "unavailable"})
@@ -1035,7 +1041,8 @@ def _platform_percentile_stats(display_timings: list[QueryDisplayTiming]) -> Per
 def _query_timings(data: dict[str, Any]) -> list[QueryTiming]:
     """Extract per-query timings from the queries list in a schema-v2 bundle.
 
-    Includes measurement-run-type queries (or those without a run_type).
+    Includes measurement and warmup execution queries (or those without a run_type).
+    Explicitly filters out non-execution pseudo-rows (metadata, summary).
     Preserves run_type, iter, and stream fields for provenance.
     """
     raw_queries: list[dict[str, Any]] = data.get("queries", [])
@@ -1044,7 +1051,11 @@ def _query_timings(data: dict[str, Any]) -> list[QueryTiming]:
         if not isinstance(q, dict):
             continue
         run_type = q.get("run_type")
-        if run_type is not None and run_type != "measurement":
+        # Ingest both measurement and warmup executions. Narrow the filter to an
+        # explicit allow-list; do not remove the check entirely, because the corpus
+        # carries "metadata" and "summary" pseudo-rows (ms=0, status=SKIPPED) that
+        # are not execution timings.
+        if run_type is not None and run_type not in _ALLOWED_EXECUTION_RUN_TYPES:
             continue
         query_id = q.get("id") or q.get("query_id", "")
         ms_raw = q.get("ms")
@@ -1080,8 +1091,9 @@ def _query_display_ms(query_timings: list[QueryTiming]) -> tuple[float | None, i
 
     Algorithm:
       1. Filter to passing (status == "pass") rows.
-      2. Prefer run_type == "measurement" rows; fall back to all passing rows
-         when no passing row has run_type == "measurement".
+      2. Prefer run_type == "measurement" rows; fall back to unlabelled legacy rows
+         (run_type is None) when no explicit measurement rows exist. Warmup rows
+         (run_type == "warmup") are NEVER used for display_ms or sample_count.
       3. Return (median duration_ms, sample_count).
       4. Return (None, 0) when no passing rows exist.
 
@@ -1092,7 +1104,15 @@ def _query_display_ms(query_timings: list[QueryTiming]) -> tuple[float | None, i
     if not passing:
         return None, 0
     measurement = [t for t in passing if t.run_type == "measurement"]
-    candidates = measurement if measurement else passing
+    # DECISION: Fall back to unlabelled legacy rows (run_type is None) only when
+    # no explicit measurement rows exist. Warmup rows (run_type == "warmup")
+    # must NEVER be picked up by the fallback branch; doing so would let warmup
+    # rows feed display_ms for bundles that recorded warmup without measurement
+    # or whose measurement executions failed.
+    legacy_unlabelled = [t for t in passing if t.run_type is None]
+    candidates = measurement if measurement else legacy_unlabelled
+    if not candidates:
+        return None, 0
     durations = sorted(t.duration_ms for t in candidates)
     mid = len(durations) // 2
     if len(durations) % 2 == 1:
@@ -1110,6 +1130,59 @@ def _build_display_timings(timings: list[QueryTiming]) -> list[QueryDisplayTimin
         display_ms, sample_count = _query_display_ms(qid_timings)
         result.append(QueryDisplayTiming(query_id=qid, display_ms=display_ms, sample_count=sample_count))
     return result
+
+
+def _compute_basis_availability(queries: list[QueryTiming]) -> BasisAvailability:
+    """Derive basis availability from query timings for a result bundle.
+
+    Surfaces whether warmup exists, measurement pass count, available bases,
+    and per-query pass count where it varies.
+    """
+    warmup_passing = [q for q in queries if q.run_type == "warmup" and q.status == "pass"]
+    has_warmup = len(warmup_passing) > 0
+    warmup_status = "available" if has_warmup else "no_warmup_recorded"
+
+    # Pre-initialize every attempted measurement query with 0 so completely failed queries
+    # are not silently dropped from varying_pass_queries
+    measurement_queries = [q for q in queries if q.run_type == "measurement" or q.run_type is None]
+    query_pass_counts: dict[str, int] = {q.query_id: 0 for q in measurement_queries}
+    for q in measurement_queries:
+        if q.status == "pass":
+            query_pass_counts[q.query_id] += 1
+
+    if query_pass_counts:
+        counts = list(query_pass_counts.values())
+        count_freq = Counter(counts)
+        nominal_count = sorted(count_freq.items(), key=lambda x: (x[1], x[0]), reverse=True)[0][0]
+        varying_pass_queries = {qid: cnt for qid, cnt in sorted(query_pass_counts.items()) if cnt != nominal_count}
+    else:
+        nominal_count = 0
+        varying_pass_queries = {}
+
+    available_bases: list[str] = ["default"]
+    unavailable_bases: dict[str, str] = {}
+
+    if has_warmup:
+        available_bases.append("warmup")
+    else:
+        unavailable_bases["warmup"] = "no_warmup_recorded"
+
+    if nominal_count > 0:
+        available_bases.append("all_warm")
+        for p in range(1, nominal_count + 1):
+            available_bases.append(f"warm_pass_{p}")
+    else:
+        unavailable_bases["all_warm"] = "no_measurement_executions"
+
+    return BasisAvailability(
+        has_warmup=has_warmup,
+        measurement_pass_count=nominal_count,
+        warmup_status=warmup_status,
+        available_bases=available_bases,
+        unavailable_bases=unavailable_bases,
+        query_pass_counts=query_pass_counts,
+        varying_pass_queries=varying_pass_queries,
+    )
 
 
 def _display_geomean_ms(display_timings: list[QueryDisplayTiming]) -> float | None:
@@ -1330,6 +1403,7 @@ class BundleTransformer:
             instance_or_warehouse=environment_facets["instance_or_warehouse"],
             storage_format=environment_facets["storage_format"],
             compliance_class=_compliance_class(bundle_data),
+            basis_availability=_compute_basis_availability(timings),
         )
         return entry.model_copy(update={"ranking_exclusion_reason": ranking_exclusion_reason(entry)})
 
@@ -1415,6 +1489,7 @@ class BundleTransformer:
             phase_durations=_phase_durations(bundle_data),
             physical_mechanisms=_physical_mechanisms(bundle_data),
             physical_rendering_id=_physical_rendering_id(bundle_data),
+            basis_availability=_compute_basis_availability(timings),
         )
         manifest_peer = ManifestEntry(
             result_id=result_id,

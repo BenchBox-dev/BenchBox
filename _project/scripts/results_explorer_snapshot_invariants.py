@@ -53,6 +53,13 @@ REQUIRED_COLUMNS: dict[str, set[str]] = {
         "comparison_exclusion_reason",
         "ranking_exclusion_reason",
     },
+    "result_basis_availability": {
+        "result_id",
+        "has_warmup",
+        "measurement_pass_count",
+        "warmup_status",
+        "available_bases",
+    },
 }
 
 # These are the same required non-empty scans used by the browser during
@@ -64,6 +71,7 @@ REQUIRED_NONEMPTY_SCANS: tuple[tuple[str, str], ...] = (
     ("benchmark_rankings", "SELECT COUNT(*) FROM benchmark_rankings"),
     ("benchmark_matrix_cells", "SELECT COUNT(*) FROM benchmark_matrix_cells"),
     ("result_detail_metrics", "SELECT COUNT(*) FROM result_detail_metrics"),
+    ("result_basis_availability", "SELECT COUNT(*) FROM result_basis_availability"),
 )
 
 
@@ -245,6 +253,61 @@ def check_snapshot(db_path: Path) -> list[str]:
                   AND rank IS NULL
                   AND metric_value IS NOT NULL
                   AND COALESCE(ranking_exclusion_reason, cohort_ranking_exclusion_reason) IS NULL
+                """,
+            ),
+            (
+                "snapshots claiming warmup basis availability must have passing warmup executions in query_executions",
+                """
+                SELECT COUNT(*)
+                FROM result_basis_availability rba
+                WHERE rba.has_warmup = TRUE
+                  AND NOT EXISTS (
+                    SELECT 1 FROM query_executions qe
+                    WHERE qe.result_id = rba.result_id
+                      AND qe.run_type = 'warmup'
+                      AND qe.status = 'pass'
+                  )
+                """,
+            ),
+            (
+                "results with passing warmup executions must report warmup as available",
+                """
+                SELECT COUNT(*)
+                FROM result_basis_availability rba
+                WHERE rba.has_warmup = FALSE
+                  AND EXISTS (
+                    SELECT 1 FROM query_executions qe
+                    WHERE qe.result_id = rba.result_id
+                      AND qe.run_type = 'warmup'
+                      AND qe.status = 'pass'
+                  )
+                """,
+            ),
+            (
+                "results without warmup executions must report warmup as unavailable",
+                """
+                SELECT COUNT(*)
+                FROM result_basis_availability rba
+                WHERE rba.has_warmup = FALSE
+                  AND rba.warmup_status = 'available'
+                """,
+            ),
+            (
+                "basis availability must cover every result in the snapshot",
+                """
+                SELECT COUNT(*)
+                FROM results r
+                LEFT JOIN result_basis_availability rba USING (result_id)
+                WHERE rba.result_id IS NULL
+                """,
+            ),
+            (
+                "query_executions must only contain allowed execution run types",
+                """
+                SELECT COUNT(*)
+                FROM query_executions
+                WHERE run_type IS NOT NULL
+                  AND run_type NOT IN ('measurement', 'warmup')
                 """,
             ),
         ]
