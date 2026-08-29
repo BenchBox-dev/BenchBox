@@ -358,9 +358,13 @@ Use heading levels logically:
 #### Minor Point (H4 - use sparingly)
 ```
 
-**Heading Style**: Use sharp short phrases not sentences
-- ❌ "How I optimized query performance"
-- ✅ "Optimizing Query Performance"
+**Heading Style**:
+- Use sharp, descriptive phrases or sentence-style headings that name the section's point (for example: `## The problem: SF=1 meant nothing in particular`).
+- A title or heading whose news is a negation is allowed (for example: `# When two timings are not a comparison`).
+- Do not use first-person headings:
+  - ❌ "How I optimized query performance"
+  - ✅ "Optimizing Query Performance"
+- Avoid empty or clever headings that obscure the content.
 
 ---
 
@@ -650,7 +654,7 @@ Include 5-8 relevant tags:
 
 ### Formatting
 
-- [ ] Heading hierarchy correct (H1 → H2 → H3)
+- [ ] Heading hierarchy correct (H1 → H2 → H3); headings name the section's point without first-person pronouns
 - [ ] Code formatted with language specified
 - [ ] Tables readable and not too wide
 - [ ] Numbers formatted consistently
