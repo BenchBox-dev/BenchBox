@@ -245,6 +245,16 @@ describe("available bases discovery", () => {
     const available = availableBasesForQueries(queries);
     expect(available.some((b) => b.passes.kind === "warm_pass" && b.passes.pass === 2)).toBe(false);
   });
+
+  it("does not offer warmup when every passing warmup duration is zero", () => {
+    const queries = [
+      { query_id: "Q1", duration_ms: 0, status: "pass", run_type: "warmup", iter: null } as any,
+      { query_id: "Q2", duration_ms: 0, status: "pass", run_type: "warmup", iter: null } as any,
+    ];
+
+    const available = availableBasesForQueries(queries);
+    expect(available.some((basis) => basis.passes.kind === "warmup")).toBe(false);
+  });
 });
 
 describe("within-run directional claims", () => {

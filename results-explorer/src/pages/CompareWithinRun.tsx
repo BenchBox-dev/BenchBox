@@ -137,7 +137,7 @@ export function availableBasesForQueries(queries: readonly QueryTiming[]): Measu
     list.push({ passes: ALL_WARM, statistic: "min" });
   }
 
-  const hasWarmup = queries.some((q) => q.run_type === "warmup" && q.status === "pass");
+  const hasWarmup = hasSamples(queries, WARMUP, 1);
   if (hasWarmup) {
     list.push({ passes: WARMUP, statistic: "median" });
     if (hasMultipleSamples(queries, WARMUP)) {
