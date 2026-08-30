@@ -43,9 +43,13 @@
     "arch": "arm64",
     "client_host": {
       "arch": "arm64",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
       "os": "Darwin",
       "python": "3.12.13"
     },
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
     "os": "Darwin",
     "platform_runtime": {
       "collection_status": "partial",
@@ -209,33 +213,12 @@
         "tuning_types": [
           "check_constraints",
           "foreign_keys",
-          "partitioning",
           "primary_keys",
           "sorting",
           "unique_constraints"
         ]
       },
       "hash": "cc86c8b53cd35c0cf56355c3ff88c1d38c62c6733a68725730c8c6325504da13",
-      "logical_profile": {
-        "coverage": {
-          "accepted_count": 6,
-          "dropped_low_evidence_count": 0,
-          "mapped_count": 16,
-          "required_count": 16,
-          "unmapped_count": 0,
-          "unsupported_count": 0,
-          "waived_count": 0
-        },
-        "id": "tpc-v1",
-        "physical_mechanisms": [
-          "partitioning",
-          "sorted_ingestion",
-          "sorting"
-        ],
-        "physical_rendering_id": "duckdb",
-        "template_hash": "cc86c8b53cd35c0c",
-        "version": "2026-05-26"
-      },
       "requested_config_hash": "cc86c8b53cd35c0cf56355c3ff88c1d38c62c6733a68725730c8c6325504da13",
       "source": "yaml",
       "tuning_policy_generation": "adr-003",

@@ -1,0 +1,82 @@
+{
+  "applied_ledger_hash": "78b52f53a5deb6ab96a543e43c1260f9976b67107ae6e2b46f6e71b6d74c308b",
+  "dropped": [
+    {
+      "redacted": true
+    }
+  ],
+  "receipt": {
+    "corroborated": false,
+    "dropped": [
+      {
+        "redacted": true
+      }
+    ],
+    "entries": [
+      {
+        "kind": "index",
+        "phase": "ddl",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "ddl",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "post_load",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "post_load",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      }
+    ],
+    "observed": [
+      {
+        "kind": "index",
+        "redacted": true
+      },
+      {
+        "kind": "index",
+        "redacted": true
+      }
+    ],
+    "platform": "duckdb",
+    "summary": {
+      "gate_relevant_total": 4,
+      "mismatch": 4
+    }
+  },
+  "statements": [
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "mechanism": "sort_index",
+      "phase": "post_load",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "mechanism": "sort_index",
+      "phase": "post_load",
+      "statement_redacted": true,
+      "status": "executed"
+    }
+  ],
+  "status": "applied_unverified"
+}

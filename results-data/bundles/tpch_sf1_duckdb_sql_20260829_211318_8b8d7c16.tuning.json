@@ -1,28 +1,6 @@
 {
   "applied_ledger_hash": "56eea0adbf3bc93c10c31a08280f7a79cfe3bf8b7fd8c8e7e87e19fb07ebef61",
   "hash": "cc86c8b53cd35c0cf56355c3ff88c1d38c62c6733a68725730c8c6325504da13",
-  "logical_profile": {
-    "logical_profile_coverage": {
-      "accepted_count": 6,
-      "dropped_low_evidence_count": 0,
-      "mapped_count": 16,
-      "required_count": 16,
-      "unmapped_count": 0,
-      "unsupported_count": 0,
-      "waived_count": 0
-    },
-    "logical_tuning_profile_id": "tpc-v1",
-    "logical_tuning_profile_version": "2026-05-26",
-    "physical_rendering_id": "duckdb",
-    "platform_physical_tuning_mechanisms": [
-      "partitioning",
-      "sorted_ingestion",
-      "sorting"
-    ],
-    "tuning_template_hash": "cc86c8b53cd35c0c",
-    "unmapped_logical_candidates": [],
-    "validation_status": "passed"
-  },
   "requested": {
     "constraints": {
       "check_constraints": {

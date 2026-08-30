@@ -1,0 +1,153 @@
+{
+  "attestation": "Operator attestation, not a measurement. This manifest extends the standing single-machine Apple M4 operator attestation recorded in cpu-identity-attestation.manifest.json to the five retained PR #1952 SQL additions. Each source bundle independently records a Darwin/arm64 client host; CPU identity was not captured because the historical capture path was defective. The attested fields below preserve that distinction from measured provenance.",
+  "bundles": [
+    {
+      "attested_fields": [
+        "environment.cpu_model",
+        "environment.cpu_vendor",
+        "environment.client_host.cpu_model",
+        "environment.client_host.cpu_vendor"
+      ],
+      "changed": true,
+      "companions": {
+        "amplab_sf1_duckdb_sql_20260829_214117_d88b37e5.applied.json": "1da63abe0d768ba06733237e42e0072e0ab9a15dffd0617a84fe1b947bcab7c3",
+        "amplab_sf1_duckdb_sql_20260829_214117_d88b37e5.tuning.json": "4f29c272106fc7c6f66c5a9b38761b92f8292c80f157395ecdaea83ebdeebd36"
+      },
+      "file": "amplab_sf1_duckdb_sql_20260829_214117_d88b37e5.json",
+      "had_client_host": true,
+      "manifest": {
+        "file": "amplab_sf1_duckdb_sql_20260829_214117_d88b37e5.manifest.json",
+        "sha256": "d87b06311b8139c9720cab5326fe8954a6056669fa6198992ec13250130a02b5"
+      },
+      "new_result_id": "amplab-duckdb-sf1.0-20260829-8ebbea23",
+      "new_sha256": "8ebbea231ce76387bc956ab0f6bccb54c73802eefab4739fd0cdaeec179fb35e",
+      "old_result_id": "amplab-duckdb-sf1.0-20260829-9995a6b5",
+      "old_sha256": "9995a6b5e691c9b0aff0bd6574335dbfd92ffa253b1abbdd80dd8173f0c33f60",
+      "recorded_client_host": {
+        "arch": "arm64",
+        "os": "Darwin"
+      }
+    },
+    {
+      "attested_fields": [
+        "environment.cpu_model",
+        "environment.cpu_vendor",
+        "environment.client_host.cpu_model",
+        "environment.client_host.cpu_vendor"
+      ],
+      "changed": true,
+      "companions": {
+        "clickbench_sf1_duckdb_sql_20260829_214129_1d33783f.applied.json": "0fc4e17aba1d8e1ee8a5b3adfe5d2857dc2d280663c585798c7e791f5112ff77",
+        "clickbench_sf1_duckdb_sql_20260829_214129_1d33783f.tuning.json": "3b807297fec908074c52bd9b28d0fcdaa9b008fbe38c6183614fa2aa3fd30bcc"
+      },
+      "file": "clickbench_sf1_duckdb_sql_20260829_214129_1d33783f.json",
+      "had_client_host": true,
+      "manifest": {
+        "file": "clickbench_sf1_duckdb_sql_20260829_214129_1d33783f.manifest.json",
+        "sha256": "a5426dd8f9b29bc6efee8277f1e5b24a3f8a1e91e39fa126959e1811bfde9fcf"
+      },
+      "new_result_id": "clickbench-duckdb-sf1.0-20260829-4c4ae55e",
+      "new_sha256": "4c4ae55e46f84f701a989fe24a00cc3d467211f75ccfbbc43d300176721d98a1",
+      "old_result_id": "clickbench-duckdb-sf1.0-20260829-d67ed181",
+      "old_sha256": "d67ed18191c2011b848631d48aa6700102f9360c1c7d5cf3ef4bbd8f8bd9635a",
+      "recorded_client_host": {
+        "arch": "arm64",
+        "os": "Darwin"
+      }
+    },
+    {
+      "attested_fields": [
+        "environment.cpu_model",
+        "environment.cpu_vendor",
+        "environment.client_host.cpu_model",
+        "environment.client_host.cpu_vendor"
+      ],
+      "changed": true,
+      "companions": {
+        "joinorder_sf1_duckdb_sql_20260829_214636_56cf7846.applied.json": "f6ff0129b34b07fc316e821f09af69e26b49267b3e80e532f6a6d7a8c3d01367",
+        "joinorder_sf1_duckdb_sql_20260829_214636_56cf7846.tuning.json": "d2d71dc37cd19e9ac0b47e2a98efd797181de9c1f84a9d75f5d2c18e6b1521dd"
+      },
+      "file": "joinorder_sf1_duckdb_sql_20260829_214636_56cf7846.json",
+      "had_client_host": true,
+      "manifest": {
+        "file": "joinorder_sf1_duckdb_sql_20260829_214636_56cf7846.manifest.json",
+        "sha256": "c06ceefd33faab62d84515aad8f81514fd40cf4b8c649d4273a302ab48dd6f4c"
+      },
+      "new_result_id": "joinorder-duckdb-sf1.0-20260829-34e0732e",
+      "new_sha256": "34e0732e5c4e4ddd901ecd706a821a646276cc9a65844a3cf11cfa24be7ad48c",
+      "old_result_id": "joinorder-duckdb-sf1.0-20260829-acc91086",
+      "old_sha256": "acc91086f15b781f8525c80eee75b4b261618e639b4d61d5cbc6d04308d4c58b",
+      "recorded_client_host": {
+        "arch": "arm64",
+        "os": "Darwin"
+      }
+    },
+    {
+      "attested_fields": [
+        "environment.cpu_model",
+        "environment.cpu_vendor",
+        "environment.client_host.cpu_model",
+        "environment.client_host.cpu_vendor"
+      ],
+      "changed": true,
+      "companions": {
+        "ssb_sf1_duckdb_sql_20260829_213516_5740ae6a.applied.json": "ab48793eeafdd787a6710d15154e45b581544b16e6e7a25c75b391369e2e4cd9",
+        "ssb_sf1_duckdb_sql_20260829_213516_5740ae6a.tuning.json": "9292b41d7d2ec272bfeb973307e959e4682aa971bace42c96e99758ac58754b6"
+      },
+      "file": "ssb_sf1_duckdb_sql_20260829_213516_5740ae6a.json",
+      "had_client_host": true,
+      "manifest": {
+        "file": "ssb_sf1_duckdb_sql_20260829_213516_5740ae6a.manifest.json",
+        "sha256": "5fadb8478b0e7750b01a01f41508fc3eb559fb351cbc8e734fd5b9ff3294d21d"
+      },
+      "new_result_id": "ssb-duckdb-sf1.0-20260829-c5b9c24c",
+      "new_sha256": "c5b9c24cdf0963cbd05a57607e3f4e836af8649f3fa3aa702f674523c55f4c05",
+      "old_result_id": "ssb-duckdb-sf1.0-20260829-635ee291",
+      "old_sha256": "635ee291d570b0ae69e42a7bc0e5c707167d8b69df43307339a08bf5285d2a72",
+      "recorded_client_host": {
+        "arch": "arm64",
+        "os": "Darwin"
+      }
+    },
+    {
+      "attested_fields": [
+        "environment.cpu_model",
+        "environment.cpu_vendor",
+        "environment.client_host.cpu_model",
+        "environment.client_host.cpu_vendor"
+      ],
+      "changed": true,
+      "companions": {
+        "tpch_sf1_duckdb_sql_20260829_211318_8b8d7c16.applied.json": "703e90cb1fc28a31dd7bd37ada967beb21c9afc361553dbb939d9094eef4fb88",
+        "tpch_sf1_duckdb_sql_20260829_211318_8b8d7c16.tuning.json": "b242a16562287ad5771b7c9b6ab9e84aa702188edce26a848e476c0b974ca516"
+      },
+      "file": "tpch_sf1_duckdb_sql_20260829_211318_8b8d7c16.json",
+      "had_client_host": true,
+      "manifest": {
+        "file": "tpch_sf1_duckdb_sql_20260829_211318_8b8d7c16.manifest.json",
+        "sha256": "d50731bf800106743fdb318ee03e56b4e1675c5cafd4d748b74f236cedd4afdd"
+      },
+      "new_result_id": "tpch-duckdb-sf1.0-20260829-88a7e7bc",
+      "new_sha256": "88a7e7bcc3727ac32c1732039e0421d2cba1c7a7e32e20f546a7ccdd99b29615",
+      "old_result_id": "tpch-duckdb-sf1.0-20260829-0b04600c",
+      "old_sha256": "0b04600ccce07408c3232e5b37912a814b5f33810c7868bc2f80cc6facaef400",
+      "recorded_client_host": {
+        "arch": "arm64",
+        "os": "Darwin"
+      }
+    }
+  ],
+  "cpu_model": "Apple M4",
+  "cpu_vendor": "Apple",
+  "parent_attestation": "cpu-identity-attestation.manifest.json",
+  "provenance": "operator-attested",
+  "scope": "retained PR #1952 tuned SQL additions",
+  "totals": {
+    "bundles": 5,
+    "changed": 5,
+    "had_client_host": 5,
+    "lacked_client_host": 0,
+    "result_ids_changed": 5
+  },
+  "transition_basis": "For each entry, old_sha256 and old_result_id identify the corpus-integrity-corrected bundle immediately before CPU identity was injected. new_sha256 and new_result_id identify the committed bundle after only the listed operator-attested CPU fields were added."
+}

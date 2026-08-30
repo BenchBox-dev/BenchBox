@@ -1,8 +1,12 @@
 {
+  "bundle_file": "tpch_sf1_duckdb_sql_20260829_211318_8b8d7c16.json",
+  "bundle_hash": "88a7e7bcc3727ac32c1732039e0421d2cba1c7a7e32e20f546a7ccdd99b29615",
+  "companion_hashes": {
+    "tpch_sf1_duckdb_sql_20260829_211318_8b8d7c16.applied.json": "703e90cb1fc28a31dd7bd37ada967beb21c9afc361553dbb939d9094eef4fb88",
+    "tpch_sf1_duckdb_sql_20260829_211318_8b8d7c16.tuning.json": "b242a16562287ad5771b7c9b6ab9e84aa702188edce26a848e476c0b974ca516"
+  },
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "tpch_sf1_duckdb_sql_20260829_211318_8b8d7c16.json",
-  "bundle_hash": "9138862eb1e2745c334ffe5d3f1932763c5fd42f92eefa4aa5d7f25d04429c10"
+  "submitted_by": "maintainer"
 }

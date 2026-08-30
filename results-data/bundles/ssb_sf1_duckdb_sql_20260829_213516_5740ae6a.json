@@ -43,9 +43,13 @@
     "arch": "arm64",
     "client_host": {
       "arch": "arm64",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
       "os": "Darwin",
       "python": "3.12.13"
     },
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
     "os": "Darwin",
     "platform_runtime": {
       "collection_status": "partial",
@@ -209,7 +213,6 @@
         "tuning_types": [
           "check_constraints",
           "foreign_keys",
-          "partitioning",
           "primary_keys",
           "sorting",
           "unique_constraints"
