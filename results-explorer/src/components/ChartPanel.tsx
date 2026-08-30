@@ -153,6 +153,13 @@ export function ChartPanel({
     const base = filterSummaryForChartDataset(summary, activeEligibilityClass);
     if (!queryFilter) return base;
     const filteredQueryIds = queryFilter.filter((q) => base.query_ids.includes(q));
+    // Invariant: compute aggregate geomeans over the query IDs valid across every platform in the cohort
+    const sharedValidQueryIds = filteredQueryIds.filter((q) =>
+      base.platforms.every((p) => {
+        const v = p.timings[q];
+        return v !== null && v !== undefined && Number.isFinite(v) && v > 0;
+      }),
+    );
     const filteredPlatforms = base.platforms.map((platform) => {
       const filteredTimings: Record<string, number | null> = {};
       for (const q of filteredQueryIds) {
@@ -160,10 +167,15 @@ export function ChartPanel({
           filteredTimings[q] = platform.timings[q] ?? null;
         }
       }
+      const geomean =
+        sharedValidQueryIds.length > 0
+          ? geomeanMs(sharedValidQueryIds.map((q) => platform.timings[q]!))
+          : null;
       return {
         ...platform,
         timings: filteredTimings,
-        display_geomean_ms: geomeanMs(Object.values(filteredTimings)),
+        display_geomean_ms: geomean,
+        sample_geomean_ms: geomean,
       };
     });
     return {

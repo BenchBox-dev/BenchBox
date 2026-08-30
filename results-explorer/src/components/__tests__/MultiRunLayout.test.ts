@@ -322,6 +322,24 @@ describe("competition ranking in standings", () => {
     expect(rows[1]!.rank).toBe("T-1");
     expect(rows[2]!.rank).toBe("3");
   });
+
+  it("keeps rank ties separate from baseline ties", () => {
+    const runs = [
+      run("base", [["Q1", 100]]),
+      run("cand1", [["Q1", 150]]),
+      run("cand2", [["Q1", 150.2]]),
+    ];
+    const { rows } = buildStandings(runs, 0, ["Base", "Cand1", "Cand2"]);
+    const cand1 = rows.find((r) => r.resultId === "cand1")!;
+    const cand2 = rows.find((r) => r.resultId === "cand2")!;
+    expect(cand1.rank).toBe("T-2");
+    expect(cand2.rank).toBe("T-2");
+    expect(cand1.rankTied).toBe(true);
+    expect(cand2.rankTied).toBe(true);
+    expect(cand1.tied).toBe(false);
+    expect(cand2.tied).toBe(false);
+    expect(cand1.ratioToBaseline).toBeCloseTo(1.5, 2);
+  });
 });
 
 describe("missing evidence reporting in heatmap", () => {
@@ -465,6 +483,43 @@ describe("measurement basis resolution for comparison", () => {
     const resolved = resolveResultsForBasis([rawRun], DEFAULT_BASIS);
     expect(resolved[0]!.display_timings[0]!.timing_exclusion_reason).toBe("missing_timing");
   });
+
+  it("recomputes timing eligibility when alternate basis has valid timings", () => {
+    const rawRun: DetailResult = {
+      ...runs[0]!,
+      has_display_timing: false,
+      valid_query_count: 0,
+      missing_query_count: 1,
+      display_exclusion_reason: "no_display_timings",
+      comparison_exclusion_reason: "no_comparable_timings",
+      display_timings: [
+        {
+          query_id: "Q1",
+          display_ms: null,
+          sample_count: 0,
+          is_valid_display_timing: false,
+          timing_exclusion_reason: "missing_timing",
+        },
+      ],
+      queries: [
+        {
+          query_id: "Q1",
+          duration_ms: 120,
+          status: "pass",
+          run_type: "warmup",
+          iter: null,
+          stream: 0,
+        },
+      ],
+    };
+
+    const resolvedWarmup = resolveResultsForBasis([rawRun], { passes: WARMUP, statistic: "median" });
+    expect(resolvedWarmup[0]!.has_display_timing).toBe(true);
+    expect(resolvedWarmup[0]!.valid_query_count).toBe(1);
+    expect(resolvedWarmup[0]!.missing_query_count).toBe(0);
+    expect(resolvedWarmup[0]!.display_exclusion_reason).toBeNull();
+    expect(resolvedWarmup[0]!.comparison_exclusion_reason).toBeNull();
+  });
 });
 
 describe("shared limiter query selection", () => {
@@ -486,6 +541,19 @@ describe("shared limiter query selection", () => {
 
   it("orders largest movement by greatest relative divergence", () => {
     const { queryIds } = selectQueryIdsForLimiter(threeRuns, 0, "movement", 20);
+    expect(queryIds[0]).toBe("Q1");
+  });
+
+  it("ranks movement by full multi-run disagreement spread across opposite-direction candidates", () => {
+    // base=100
+    // Q1: alt1=50 (0.5x), alt2=200 (2.0x) -> spread is 4x (2 bits)
+    // Q2: alt1=300 (3.0x), alt2=300 (3.0x) -> spread is 3x (1.585 bits)
+    const oppositeDirectionRuns = [
+      run("base", [["Q1", 100], ["Q2", 100]]),
+      run("alt1", [["Q1", 50], ["Q2", 300]]),
+      run("alt2", [["Q1", 200], ["Q2", 300]]),
+    ];
+    const { queryIds } = selectQueryIdsForLimiter(oppositeDirectionRuns, 0, "movement", 10);
     expect(queryIds[0]).toBe("Q1");
   });
 

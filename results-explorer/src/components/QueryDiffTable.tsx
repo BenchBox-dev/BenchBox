@@ -1,4 +1,5 @@
 import type { DetailResult } from "@/types";
+import { queryDisagreementSpread } from "@/lib/chartMath";
 import { isValidTimingValue, timingValueForQuery } from "@/lib/displayEligibility";
 import { formatSpeedup } from "@/lib/metricFormatters";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
@@ -120,7 +121,9 @@ export function selectQueryIdsForLimiter(
 
     const bestRatio = Math.min(...ratios);
     const worstRatio = Math.max(...ratios);
-    const maxDisagreement = Math.max(...ratios.map((r) => Math.abs(Math.log2(r))));
+    const maxDisagreement =
+      queryDisagreementSpread([1, ...ratios]) ??
+      Math.max(...ratios.map((r) => Math.abs(Math.log2(r))));
     const maxDelta = Math.max(...deltas.map((d) => Math.abs(d)));
 
     return {

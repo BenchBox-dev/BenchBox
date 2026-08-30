@@ -748,12 +748,55 @@ export function resolveResultsForBasis(
       });
 
     const newGeomean = geomeanByResultId.get(r.result_id) ?? null;
+    const isDefault = isDefaultBasis(basis);
+
+    const validQueryCount = isDefault
+      ? r.valid_query_count
+      : newDisplayTimings.filter((t) => t.is_valid_display_timing).length;
+    const missingQueryCount = isDefault
+      ? r.missing_query_count
+      : newDisplayTimings.filter((t) => !t.is_valid_display_timing).length;
+    const hasDisplayTiming = isDefault ? r.has_display_timing : validQueryCount > 0;
+
+    let displayExclusionReason = r.display_exclusion_reason;
+    let comparisonExclusionReason = r.comparison_exclusion_reason;
+    let rankingExclusionReason = r.ranking_exclusion_reason;
+
+    if (!isDefault) {
+      if (!hasDisplayTiming) {
+        displayExclusionReason = "no_display_timings";
+        comparisonExclusionReason = comparisonExclusionReason ?? "no_comparable_timings";
+        rankingExclusionReason = rankingExclusionReason ?? "no_rankable_timings";
+      } else {
+        if (displayExclusionReason === "no_display_timings") {
+          displayExclusionReason = null;
+        }
+        if (
+          comparisonExclusionReason === "no_comparable_timings" ||
+          comparisonExclusionReason === "no_display_timings"
+        ) {
+          comparisonExclusionReason = null;
+        }
+        if (
+          rankingExclusionReason === "no_rankable_timings" ||
+          rankingExclusionReason === "no_display_timings"
+        ) {
+          rankingExclusionReason = null;
+        }
+      }
+    }
 
     return {
       ...r,
       display_geomean_ms: newGeomean,
       display_timings: newDisplayTimings,
-      power_score: isDefaultBasis(basis) ? r.power_score : null,
+      power_score: isDefault ? r.power_score : null,
+      valid_query_count: validQueryCount,
+      missing_query_count: missingQueryCount,
+      has_display_timing: hasDisplayTiming,
+      display_exclusion_reason: displayExclusionReason,
+      comparison_exclusion_reason: comparisonExclusionReason,
+      ranking_exclusion_reason: rankingExclusionReason,
     };
   });
 }
