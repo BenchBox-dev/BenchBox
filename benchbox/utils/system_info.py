@@ -55,6 +55,24 @@ class SystemInfo:
         }
 
 
+def _proc_cpuinfo_model() -> str | None:
+    """Return the CPU model from /proc/cpuinfo, or None when unavailable.
+
+    Extracted so tests can neutralise exactly this read. Patching
+    ``builtins.open`` instead is too broad: psutil reads /proc on Linux (and
+    does not on macOS), so a blanket patch passes locally and then fails in CI
+    with FileNotFoundError escaping from an unrelated call.
+    """
+    try:
+        with open("/proc/cpuinfo", encoding="utf-8") as handle:
+            for line in handle:
+                if "model name" in line:
+                    return line.split(":")[1].strip()
+    except (FileNotFoundError, OSError):
+        return None
+    return None
+
+
 def get_system_info() -> SystemInfo:
     """Get current system information."""
     # Get memory info
@@ -85,14 +103,7 @@ def get_system_info() -> SystemInfo:
         try:
             cpu_model = platform.processor() or ""
             if not cpu_model:
-                try:
-                    with open("/proc/cpuinfo", encoding="utf-8") as f:
-                        for line in f:
-                            if "model name" in line:
-                                cpu_model = line.split(":")[1].strip()
-                                break
-                except (FileNotFoundError, OSError):
-                    cpu_model = ""
+                cpu_model = _proc_cpuinfo_model() or ""
         except Exception:
             cpu_model = ""
         if not cpu_model or cpu_model == platform.machine():

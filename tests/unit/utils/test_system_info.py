@@ -272,7 +272,7 @@ class TestGetSystemInfo:
 
         # Mock file not found for /proc/cpuinfo
         with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
-            with patch("builtins.open", side_effect=FileNotFoundError()):
+            with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
                 result = get_system_info()
 
         # With no detector, no processor string and no cpuinfo, the placeholder
@@ -320,7 +320,7 @@ class TestGetSystemInfo:
         # Silence the detector AND /proc/cpuinfo: both are real on a Linux
         # runner and would answer before the placeholder branch is reached.
         with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
-            with patch("builtins.open", side_effect=FileNotFoundError()):
+            with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
                 result = get_system_info()
 
         # Should fallback to machine + " CPU" on exception
@@ -697,7 +697,7 @@ class TestCpuIdentityCapture:
         # of this test pass on macOS and fail in CI.
         with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
             with patch("benchbox.utils.system_info.platform.processor", return_value=""):
-                with patch("builtins.open", side_effect=FileNotFoundError()):
+                with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
                     info = get_system_info()
         # A placeholder must be recognisable as one, not a bare arch string.
         assert info.cpu_model.endswith("CPU")
@@ -707,7 +707,7 @@ class TestCpuIdentityCapture:
 
         with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
             with patch("benchbox.utils.system_info.platform.processor", return_value=platform.machine()):
-                with patch("builtins.open", side_effect=FileNotFoundError()):
+                with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
                     info = get_system_info()
         assert info.cpu_model != platform.machine()
 
