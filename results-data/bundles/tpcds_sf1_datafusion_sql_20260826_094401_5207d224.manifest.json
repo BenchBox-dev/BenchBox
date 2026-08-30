@@ -1,8 +1,8 @@
 {
+  "bundle_file": "tpcds_sf1_datafusion_sql_20260826_094401_5207d224.json",
+  "bundle_hash": "29712ec71c07e54f24652904e024aea41922293edf2a46be9c2ed42a889070cc",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "tpcds_sf1_datafusion_sql_20260826_094401_5207d224.json",
-  "bundle_hash": "601fa19ba5fe329183bba2f5da8c356bc827346c83982c4ddc2fbe86ce2a4106"
+  "submitted_by": "maintainer"
 }

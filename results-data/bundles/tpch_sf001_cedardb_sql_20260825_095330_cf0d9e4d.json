@@ -55,6 +55,8 @@
     "arch": "arm64",
     "client_host": {
       "arch": "arm64",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
       "os": "Darwin",
       "python": "3.12.13"
     },
@@ -68,6 +70,8 @@
       "collection_status": "unavailable",
       "source": "unavailable"
     },
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
     "os": "Darwin",
     "platform_runtime": {
       "collection_error_class": "docker_not_found",

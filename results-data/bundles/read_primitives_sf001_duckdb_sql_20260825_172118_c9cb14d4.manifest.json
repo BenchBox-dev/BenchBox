@@ -1,8 +1,8 @@
 {
+  "bundle_file": "read_primitives_sf001_duckdb_sql_20260825_172118_c9cb14d4.json",
+  "bundle_hash": "99837638663f8292b250738d952a2778df94109ca75fb7a8159af9e5d4dcf531",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "read_primitives_sf001_duckdb_sql_20260825_172118_c9cb14d4.json",
-  "bundle_hash": "9ca19ac579a6031f6913a5e784163f9db67d0e8565fd423fee29b5c60f7eb70a"
+  "submitted_by": "maintainer"
 }

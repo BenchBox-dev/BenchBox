@@ -1,8 +1,8 @@
 {
+  "bundle_file": "clickbench_sf1_sqlite_sql_20260824_101152_6eb94fe6.json",
+  "bundle_hash": "f708a50979089ce9b92a222d1ab8ca7131c905ae96724cf0f80e7c6e4b168f6c",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "clickbench_sf1_sqlite_sql_20260824_101152_6eb94fe6.json",
-  "bundle_hash": "38a0b5342d18278e230f8d71d3d7d3e6d4f61f666f3a52f5673c5e9ec1b9a842"
+  "submitted_by": "maintainer"
 }

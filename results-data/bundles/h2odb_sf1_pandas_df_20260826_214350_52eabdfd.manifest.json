@@ -1,8 +1,8 @@
 {
+  "bundle_file": "h2odb_sf1_pandas_df_20260826_214350_52eabdfd.json",
+  "bundle_hash": "04f6e00e9d176e3a306f4009ca3424f9b71c557c3f1c3c0d82d8127853626a36",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "h2odb_sf1_pandas_df_20260826_214350_52eabdfd.json",
-  "bundle_hash": "bfad107d97abca16f2665752f356a85b0bd865a18aee6d5e34350b7f7ee9f580"
+  "submitted_by": "maintainer"
 }

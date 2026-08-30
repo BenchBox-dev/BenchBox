@@ -1,8 +1,8 @@
 {
+  "bundle_file": "amplab_sf001_datafusion_sql_20260826_111320_d8167419.json",
+  "bundle_hash": "b31345029df63548fc688e337f10e6bed9d5be3b0d6705caf43b5b43f5fa23de",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "amplab_sf001_datafusion_sql_20260826_111320_d8167419.json",
-  "bundle_hash": "6296f3393fd387640538e23d8c9b113ce46bd9f8ce52342e40f73b9c1b5c1f02"
+  "submitted_by": "maintainer"
 }
