@@ -200,8 +200,14 @@ export function QueryDiffTable({
     "table",
   );
   const allRows = buildQueryDiffRows(results, normalizedBaselineIndex, runLabels);
+  const rowsByQueryId = new Map<string, QueryDiffRow[]>();
+  for (const row of allRows) {
+    const list = rowsByQueryId.get(row.queryId) ?? [];
+    list.push(row);
+    rowsByQueryId.set(row.queryId, list);
+  }
   const rows = queryFilter
-    ? allRows.filter((row) => queryFilter.includes(row.queryId))
+    ? queryFilter.flatMap((queryId) => rowsByQueryId.get(queryId) ?? [])
     : applyQueryDiffLimiter(allRows, limiter, topN);
   const uncomparableShown = rows.filter((row) => !row.comparable).length;
 

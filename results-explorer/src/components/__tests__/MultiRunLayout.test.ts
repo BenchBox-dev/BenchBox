@@ -417,6 +417,21 @@ describe("measurement basis resolution for comparison", () => {
     expect(resolved[0]!.display_timings.find((t) => t.query_id === "Q1")!.display_ms).toBe(80);
     expect(resolved[1]!.display_timings.find((t) => t.query_id === "Q1")!.display_ms).toBe(40);
   });
+
+  it("preserves published power_score under default basis and nulls it out under alternate bases", () => {
+    const runsWithPower = [
+      { ...runs[0]!, power_score: 1500 },
+      { ...runs[1]!, power_score: 800 },
+    ] as DetailResult[];
+
+    const defaultResolved = resolveResultsForBasis(runsWithPower, DEFAULT_BASIS);
+    expect(defaultResolved[0]!.power_score).toBe(1500);
+    expect(defaultResolved[1]!.power_score).toBe(800);
+
+    const warmupResolved = resolveResultsForBasis(runsWithPower, { passes: WARMUP, statistic: "median" });
+    expect(warmupResolved[0]!.power_score).toBeNull();
+    expect(warmupResolved[1]!.power_score).toBeNull();
+  });
 });
 
 describe("shared limiter query selection", () => {
@@ -439,5 +454,13 @@ describe("shared limiter query selection", () => {
   it("orders largest movement by greatest relative divergence", () => {
     const { queryIds } = selectQueryIdsForLimiter(threeRuns, 0, "movement", 20);
     expect(queryIds[0]).toBe("Q1");
+  });
+
+  it("preserves queryFilter's rank order in heatmap and table rather than reverting to natural query order", () => {
+    const heatmapRows = buildHeatmapRows(threeRuns, 0);
+    const rowsByQueryId = new Map(heatmapRows.map((row) => [row.queryId, row]));
+    const filterOrder = ["Q2", "Q1"];
+    const orderedHeatmap = filterOrder.map((id) => rowsByQueryId.get(id)).filter(Boolean);
+    expect(orderedHeatmap.map((r: any) => r.queryId)).toEqual(["Q2", "Q1"]);
   });
 });

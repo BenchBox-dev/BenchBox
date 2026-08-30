@@ -747,6 +747,7 @@ export function resolveResultsForBasis(
       ...r,
       display_geomean_ms: newGeomean,
       display_timings: newDisplayTimings,
+      power_score: isDefaultBasis(basis) ? r.power_score : null,
     };
   });
 }

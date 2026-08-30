@@ -154,8 +154,9 @@ export function MultiRunHeatmap({
   if (results.length < 3) return null;
   const effectiveLimiter: QueryDiffLimiter = limiter ?? (orderByDisagreement ? "movement" : "all");
   const all = buildHeatmapRows(results, baselineIndex);
+  const rowsByQueryId = new Map(all.map((row) => [row.queryId, row]));
   const ordered = queryFilter
-    ? all.filter((row) => queryFilter.includes(row.queryId))
+    ? (queryFilter.map((id) => rowsByQueryId.get(id)).filter((r): r is HeatmapRow => r !== undefined))
     : filterHeatmapRows(all, effectiveLimiter, baselineIndex);
   const shown = queryFilter ? ordered : ordered.slice(0, limit);
   const runMissing = shown.reduce(

@@ -706,4 +706,38 @@ describe("ChartPanel", () => {
     expect(screen.getByText("Lowest geomean in ranking")).toBeTruthy();
     expect(screen.getByText(/ranking mismatch — not comparable/)).toBeTruthy();
   });
+
+  it("filters chartSummary queries and preserves queryFilter ranking order", () => {
+    const summary = makeSummary({
+      query_ids: ["Q1", "Q2", "Q3"],
+      platforms: [makePlatformRow({ timings: { Q1: 10, Q2: 20, Q3: 30 } })],
+    });
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary,
+        }}
+        queryFilter={["Q3", "Q1"]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Per-query" }));
+    expect(screen.getByText("Q3")).toBeTruthy();
+    expect(screen.getByText("Q1")).toBeTruthy();
+    expect(screen.queryByText("Q2")).toBeNull();
+  });
+
+  it("renders an explicit no-matching-queries message when queryFilter has no matches", () => {
+    const summary = makeSummary();
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary,
+        }}
+        queryFilter={["Q999"]}
+      />,
+    );
+    expect(screen.getByText("No queries match the selected filter.")).toBeTruthy();
+  });
 });

@@ -147,10 +147,29 @@ export function ChartPanel({
     !isBaselineControlled &&
     context.kind === "compare" &&
     (activeChart?.id === "normalized_speedup" || activeChart?.id === "diverging_bar");
-  const chartSummary = useMemo(
-    () => (summary ? filterSummaryForChartDataset(summary, activeEligibilityClass) : null),
-    [activeEligibilityClass, summary],
-  );
+  const chartSummary = useMemo(() => {
+    if (!summary) return null;
+    const base = filterSummaryForChartDataset(summary, activeEligibilityClass);
+    if (!queryFilter) return base;
+    const filteredQueryIds = queryFilter.filter((q) => base.query_ids.includes(q));
+    const filteredPlatforms = base.platforms.map((platform) => {
+      const filteredTimings: Record<string, number | null> = {};
+      for (const q of filteredQueryIds) {
+        if (q in platform.timings) {
+          filteredTimings[q] = platform.timings[q] ?? null;
+        }
+      }
+      return {
+        ...platform,
+        timings: filteredTimings,
+      };
+    });
+    return {
+      ...base,
+      query_ids: filteredQueryIds,
+      platforms: filteredPlatforms,
+    };
+  }, [activeEligibilityClass, summary, queryFilter]);
   const chartPlatformLabels = useMemo(
     () =>
       chartSummary
@@ -163,23 +182,17 @@ export function ChartPanel({
   );
   const compareRows = useMemo(() => {
     if (context.kind !== "compare" || !chartSummary) return [];
-    const queryIds = queryFilter
-      ? chartSummary.query_ids.filter((q) => queryFilter.includes(q))
-      : chartSummary.query_ids;
-    return queryIds.map((queryId) => ({
+    return chartSummary.query_ids.map((queryId) => ({
       queryId,
       timings: chartSummary.platforms.map((platform) => {
         const ms = platformTimingValue(platform, queryId);
         return ms !== null ? { ms, status: "pass" as const } : null;
       }),
     }));
-  }, [chartSummary, context, queryFilter]);
+  }, [chartSummary, context]);
   const compareGroups = useMemo(() => {
     if (context.kind !== "compare" || !chartSummary) return [];
-    const queryIds = queryFilter
-      ? chartSummary.query_ids.filter((q) => queryFilter.includes(q))
-      : chartSummary.query_ids;
-    return queryIds.map((queryId) => ({
+    return chartSummary.query_ids.map((queryId) => ({
       queryId,
       values: chartSummary.platforms.map((platform, index) => {
         const timing = platformTimingValue(platform, queryId);
@@ -190,7 +203,7 @@ export function ChartPanel({
         };
       }),
     }));
-  }, [chartPlatformLabels, chartSummary, context, queryFilter]);
+  }, [chartPlatformLabels, chartSummary, context]);
   const chartExclusionSummary = useMemo(
     () => (summary ? summarizeChartDatasetExclusions(summary.platforms, activeEligibilityClass) : []),
     [activeEligibilityClass, summary],
@@ -293,6 +306,10 @@ export function ChartPanel({
       <div id="chart-panel-chart" role="tabpanel" aria-label={`${activeGroup.label} chart`} data-chart-container>
         {chartDatasetEmpty ? (
           <ChartDatasetEmptyState chart={activeChart} summary={summary!} />
+        ) : queryFilter && chartSummary && chartSummary.query_ids.length === 0 ? (
+          <div class="panel-muted rounded p-6 text-center text-sm text-[var(--bb-data-fg-muted)]">
+            No queries match the selected filter.
+          </div>
         ) : (
           <>
             {renderChart(activeChart, {
@@ -495,16 +512,26 @@ function renderChart(
           })()}
           <GroupedQueryChart groups={compareGroups} />
         </div>
-      ) : null;
+      ) : (
+        <div class="panel-muted rounded p-6 text-center text-sm text-[var(--bb-data-fg-muted)]">
+          No queries match the selected filter.
+        </div>
+      );
     case "diverging_bar":
       return summary ? (
-        <DivergingBarChart
-          queries={compareRows}
-          results={summary.platforms.map((platform, index) => ({
-            platform: platformLabels[index] ?? platform.platform,
-          }))}
-          baselineIdx={baselineIdx}
-        />
+        compareRows.length > 0 ? (
+          <DivergingBarChart
+            queries={compareRows}
+            results={summary.platforms.map((platform, index) => ({
+              platform: platformLabels[index] ?? platform.platform,
+            }))}
+            baselineIdx={baselineIdx}
+          />
+        ) : (
+          <div class="panel-muted rounded p-6 text-center text-sm text-[var(--bb-data-fg-muted)]">
+            No queries match the selected filter.
+          </div>
+        )
       ) : null;
     case "summary_box":
       return (

@@ -49,7 +49,11 @@ import {
 } from "@/components/QueryDiffTable";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { vsSlowestRatio } from "@/lib/chartMath";
-import { buildCompareDecisionSummary, COMPARE_TIE_THRESHOLD } from "@/lib/compareSummary";
+import {
+  buildCompareDecisionSummary,
+  COMPARE_TIE_THRESHOLD,
+  type ComparePrimaryMetric,
+} from "@/lib/compareSummary";
 import { IdentityDiffStrip } from "@/components/IdentityDiffStrip";
 import { MultiRunHeatmap } from "@/components/MultiRunHeatmap";
 import { MultiRunStandings } from "@/components/MultiRunStandings";
@@ -61,6 +65,7 @@ import {
   DEFAULT_BASIS,
   basisSerde,
   isCollapsedStatistic,
+  isDefaultBasis,
   parseAvailablePassSelections,
   passSelectionsEqual,
   resolveResultsForBasis,
@@ -516,10 +521,19 @@ export function Compare({ url }: CompareProps) {
   // Primary metric is loaded async from DuckDB in the effect above; default
   // stays `display_geomean_ms` until the query resolves (matches Python's
   // `_DEFAULT_RANKING`).
-  const higherIsBetter = primaryMetric === "power_score";
+  // When a non-default basis is selected, power_score is not applicable because
+  // published power scores are strictly calibrated over the official measurement
+  // phases. Fall back to display_geomean_ms so rankings and summaries reflect
+  // the recomputed query timings under the active basis.
+  const effectivePrimaryMetric: ComparePrimaryMetric =
+    primaryMetric === "power_score" && !isDefaultBasis(basis)
+      ? "display_geomean_ms"
+      : (primaryMetric as ComparePrimaryMetric);
+
+  const higherIsBetter = effectivePrimaryMetric === "power_score";
 
   const primaries: (number | null)[] = resolvedResults.map((r) =>
-    primaryMetric === "power_score" ? r.power_score : r.display_geomean_ms,
+    effectivePrimaryMetric === "power_score" ? r.power_score : r.display_geomean_ms,
   );
   // Cohort-aware run identity labels for the decision summary headline +
   // winner card (finding #8). Using `formatRunIdentitiesForCohort` here means
@@ -545,7 +559,7 @@ export function Compare({ url }: CompareProps) {
     });
     return out;
   })();
-  const decisionSummary = buildCompareDecisionSummary(resolvedResults, primaryMetric, {
+  const decisionSummary = buildCompareDecisionSummary(resolvedResults, effectivePrimaryMetric, {
     suppressWinnerClaims: severeMismatchReason !== null,
     suppressionReason: severeMismatchReason ?? undefined,
     runLabels: summaryRunLabels,
@@ -722,7 +736,7 @@ export function Compare({ url }: CompareProps) {
       {rowCount > 0 && (
         <div class="mb-8">
           <ChartPanel
-            context={{ kind: "compare", results: resolvedResults, primaryMetric }}
+            context={{ kind: "compare", results: resolvedResults, primaryMetric: effectivePrimaryMetric }}
             baselineIndex={normalizedBaselineIndex}
             onBaselineIndexChange={setBaselineIndex}
             suppressWinnerClaims={decisionSummary.claimSuppressed}
@@ -785,17 +799,17 @@ export function Compare({ url }: CompareProps) {
               <dl class="space-y-1 text-sm">
                 <div class="flex justify-between">
                   <dt class="text-[var(--bb-data-fg-muted)]">
-                    {primaryMetric === "power_score" ? "Power score" : "Geomean query time"}
+                    {effectivePrimaryMetric === "power_score" ? "Power score" : "Geomean query time"}
                   </dt>
                   <dd class="font-mono font-medium">
-                    {primaryMetric === "power_score"
+                    {effectivePrimaryMetric === "power_score"
                       ? r.powerScore !== null
                         ? formatPowerScore(r.powerScore).valueText
                         : "-"
                       : fmtGeomean(r.displayGeomeanMs)}
                   </dd>
                 </div>
-                {primaryMetric === "power_score" && (
+                {effectivePrimaryMetric === "power_score" && (
                   <div class="flex justify-between">
                     <dt class="text-xs text-[var(--bb-data-fg-muted)]">Geomean</dt>
                     <dd class="font-mono text-xs text-[var(--bb-data-fg-muted)]">{fmtGeomean(r.displayGeomeanMs)}</dd>
