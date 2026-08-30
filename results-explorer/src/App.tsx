@@ -7,6 +7,7 @@ import { PlatformsIndex } from "./pages/PlatformsIndex";
 import { PlatformIndex } from "./pages/PlatformIndex";
 import { ResultDetail } from "./pages/ResultDetail";
 import { Compare } from "./pages/Compare";
+import { CompareWithinRun } from "./pages/CompareWithinRun";
 import { Query } from "./pages/Query";
 import { NotFound } from "./pages/NotFound";
 import { PickingStateProvider } from "./lib/pickingState";
@@ -26,6 +27,7 @@ export function App() {
           <PlatformsIndex path="/results/platforms" />
           <PlatformsIndex path="/results/platforms/" />
           <PlatformIndex path="/results/p/:platform/" />
+          <CompareWithinRun path="/results/r/:resultId/passes" />
           <ResultDetail path="/results/r/:resultId" />
           <BenchmarkIndex path="/results/:benchmark/" />
           <NotFound default />
