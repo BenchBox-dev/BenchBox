@@ -10,6 +10,8 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
+import { PassStrip } from "@/components/PassStrip";
+import { withinRunCompareHref } from "@/lib/resultLinks";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { TuningBadge } from "@/components/TuningBadge";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -435,6 +437,18 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
               </table>
             </div>
             {detail.queries.length > 0 && (
+              <>
+              <PassStrip queries={detail.queries} />
+              <p class="mb-6 text-sm">
+                <a
+                  class="link"
+                  href={withinRunCompareHref(detail.result_id, ["default", "warm_pass_1"], 0)}
+                  data-testid="within-run-compare-link"
+                >
+                  Compare measurement bases within this run
+                </a>
+              </p>
+
               <details class="mt-4">
                 <summary class="cursor-pointer select-none text-sm text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]">
                   Individual samples ({detail.queries.length})
@@ -485,6 +499,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                   </table>
                 </div>
               </details>
+              </>
             )}
             </section>
           )}

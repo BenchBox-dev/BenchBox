@@ -46,7 +46,7 @@ export function MethodologyDisclosure({ detail }: Props) {
         <dl class="mt-4 space-y-3 text-sm">
           <DisclosureRow
             label="Primary metric"
-            value="Geometric mean of per-query execution times (measurement runs only). Lower is faster."
+            value="Geometric mean of per-query median execution times (measurement runs only). Lower is faster."
           />
           <DisclosureRow label="Execution mode" value={modeLabel(detail.execution_mode)} />
           <DisclosureRow label="Test type" value={testTypeLabel(detail.test_type)} />
