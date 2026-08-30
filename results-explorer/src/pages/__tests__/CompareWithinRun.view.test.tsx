@@ -130,4 +130,24 @@ describe("CompareWithinRun page component", () => {
       expect(screen.getAllByRole("radio").length).toBe(3);
     });
   });
+
+  it("suppresses aggregate direction when only one query is comparable", async () => {
+    const detail = makeDetail();
+    (getDetailResult as any).mockResolvedValue({
+      ...detail,
+      queries: detail.queries.filter(
+        (query) => query.query_id === "Q1" || query.run_type !== "measurement" || query.iter !== 1,
+      ),
+    });
+    window.history.replaceState(null, "", "/results/r/res-123/passes?bases=default,warm_pass_1&ref=0");
+
+    render(<CompareWithinRun resultId="res-123" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("1 of 2 queries comparable")).toBeTruthy();
+    });
+    expect(screen.queryByText("faster")).toBeNull();
+    expect(screen.queryByText("slower")).toBeNull();
+    expect(screen.queryByText("parity")).toBeNull();
+  });
 });

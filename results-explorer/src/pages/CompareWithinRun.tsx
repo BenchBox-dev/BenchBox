@@ -400,7 +400,8 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
           const geomean = columnGeomeans[i] ?? null;
           const ratio = refGeomean !== null && geomean !== null && refGeomean > 0 ? geomean / refGeomean : null;
           const deltaMs = refGeomean !== null && geomean !== null ? geomean - refGeomean : null;
-          const comparisonStatus = withinRunComparisonStatus(ratio);
+          const comparisonStatus =
+            grid.sharedQueryIds.length >= 2 ? withinRunComparisonStatus(ratio) : null;
           const canRemove = bases.length > MIN_WITHIN_RUN_BASES;
 
           return (
