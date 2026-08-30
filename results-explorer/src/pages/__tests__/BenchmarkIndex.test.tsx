@@ -923,6 +923,24 @@ describe("BenchmarkIndex", () => {
     expect(screen.getByText("Showing 205 of 205 results for SF 0.1")).toBeTruthy();
   });
 
+  it("supports grouping rows by engine version in list view", async () => {
+    const listRows = [
+      { ...RESULT_ROWS[0]!, result_id: "r1", platform_version: "1.4.0", display_geomean_ms: 10 },
+      { ...RESULT_ROWS[1]!, result_id: "r2", platform_version: "1.3.2", display_geomean_ms: 20 },
+      { ...RESULT_ROWS[0]!, result_id: "r3", platform_version: "1.4.0", display_geomean_ms: 15 },
+    ];
+    vi.mocked(queryRows).mockImplementation(defaultImpl(listRows, RANKING_ROWS, CELL_ROWS));
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+    fireEvent.click(screen.getByText("List"));
+
+    await waitFor(() => expect(screen.getByTestId("benchmark-list-group-by")).toBeTruthy());
+    fireEvent.change(screen.getByTestId("benchmark-list-group-by"), { target: { value: "engine_version" } });
+    expect(screen.getByText(/1.4.0 \(2 results\)/)).toBeTruthy();
+    expect(screen.getByText(/1.3.2 \(1 result\)/)).toBeTruthy();
+  });
+
   // -----------------------------------------------------------------------
   // (b) Trust filter hides rows without refetching
   // -----------------------------------------------------------------------

@@ -64,7 +64,7 @@ export const HOME_SHELL_GEOMETRY_CLASSES = {
     "block min-w-0 truncate rounded-full bg-[var(--bb-bg-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--bb-fg-muted)]",
   rankingSelector:
     "mt-3 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-2 sm:mt-5 sm:p-3",
-  rankingGrid: "grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-4",
+  rankingGrid: "grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 xl:grid-cols-5",
   scopeDetails: "mt-2 border-t border-[var(--bb-border-default)] pt-2",
   scopeSummary:
     "cursor-pointer text-xs font-medium text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]",
@@ -317,6 +317,16 @@ export function Home(_: RoutableProps) {
     ? [...new Set(metaLeaderboard.cohorts.map((cohort) => cohort.phase))].sort()
     : [];
   const trustOptions = ["all", ...[...new Set(results.map((result) => result.trust_label))].sort()];
+  const platformVersionOptions = useMemo(() => {
+    const versions = new Set<string>();
+    for (const r of results) {
+      if (r.platform_version) {
+        versions.add(r.platform_version);
+      }
+    }
+    return [...versions].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [results]);
+  const platformVersionFilters = facets.platform_version;
   const recent = [...results]
     .sort((a, b) => b.run_date.localeCompare(a.run_date))
     .slice(0, 5);
@@ -452,6 +462,19 @@ export function Home(_: RoutableProps) {
                   current={phaseFilter}
                   onSelect={(value) => setFacet("phase", value === "all" ? [] : [value])}
                   format={(value) => (value === "all" ? "All phases" : value)}
+                />
+                <MultiSelectFilter
+                  label="Engine version"
+                  allLabel="All versions"
+                  options={platformVersionOptions}
+                  current={platformVersionFilters}
+                  onSelect={(value) =>
+                    setFacet(
+                      "platform_version",
+                      value === "all" ? [] : toggleFacetValue(platformVersionFilters, value),
+                    )
+                  }
+                  format={(value) => value}
                 />
                 <CoverageSummary />
               </div>
@@ -702,6 +725,7 @@ function HomeLoadingSkeleton({
               <SkeletonSelect label="Benchmark" />
               <SkeletonSelect label="Scale" />
               <SkeletonSelect label="Phase" />
+              <SkeletonSelect label="Engine version" />
               <CoverageSummary />
             </div>
             <div aria-hidden="true" class="sm:hidden">

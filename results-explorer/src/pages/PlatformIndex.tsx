@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import { route } from "preact-router";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
@@ -43,6 +43,11 @@ import { TrayAnnouncer } from "@/components/TrayAnnouncer";
 import type { SortState } from "@/types";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
+import {
+  COHORT_GROUP_BY_LABELS,
+  groupCohortRows,
+  type CohortGroupBy,
+} from "@/lib/queryFilters";
 
 interface PlatformIndexProps extends RoutableProps {
   platform?: string;
@@ -380,7 +385,15 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     if (bv === null) return -1;
     return dir * (av - bv);
   });
+  const [groupBy, setGroupBy] = useState<CohortGroupBy>("none");
   const visiblePlatformResults = platformResults.slice(0, visibleLimit);
+  const groupedPlatformResults = useMemo(() => {
+    return groupCohortRows<PlatformIndexRowRow>(
+      visiblePlatformResults,
+      groupBy,
+      (row) => row.driver_version ?? null,
+    );
+  }, [visiblePlatformResults, groupBy]);
   const runIdentityLabels = formatRunIdentitiesForCohort(platformResults, "table");
 
   function toggleSort(key: PlatformSortKey) {
@@ -710,9 +723,24 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       ) : (
         <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
-            <span>
-              Showing {visiblePlatformResults.length.toLocaleString()} of {platformResults.length.toLocaleString()} results
-            </span>
+            <div>
+              <span>Showing {visiblePlatformResults.length.toLocaleString()} of {platformResults.length.toLocaleString()} results</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-group-by">
+                Group by:
+              </label>
+              <select
+                id="platform-group-by"
+                data-testid="platform-group-by"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={groupBy}
+                onChange={(event) => setGroupBy((event.target as HTMLSelectElement).value as CohortGroupBy)}
+              >
+                <option value="none">{COHORT_GROUP_BY_LABELS.none}</option>
+                <option value="engine_version">{COHORT_GROUP_BY_LABELS.engine_version}</option>
+              </select>
+            </div>
           </div>
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-xs text-[var(--bb-data-fg-muted)]">
             <span>Rows are labelled by comparable ranking: benchmark, scale, phase, and primary metric.</span>
@@ -818,23 +846,56 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               </tr>
             </thead>
             <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
-              {visiblePlatformResults.map((r, index) => (
-                <PlatformRow
-                  key={r.result_id}
-                  entry={r}
-                  runIdentityLabel={runIdentityLabels[index] ?? r.platform}
-                  checked={selected.has(r.result_id)}
-                  onToggle={() => toggleSelect(r.result_id)}
-                  showMetricContract={showMetricContract}
-                  disabledReason={
-                    comparisonExclusionReason(r) ??
-                    cohortLockReason(r) ??
-                    (!selected.has(r.result_id) && selected.size >= MAX_COMPARE_SELECTIONS
-                      ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared.`
-                      : undefined)
-                  }
-                />
-              ))}
+              {groupBy === "none"
+                ? visiblePlatformResults.map((r, index) => (
+                    <PlatformRow
+                      key={r.result_id}
+                      entry={r}
+                      runIdentityLabel={runIdentityLabels[index] ?? r.platform}
+                      checked={selected.has(r.result_id)}
+                      onToggle={() => toggleSelect(r.result_id)}
+                      showMetricContract={showMetricContract}
+                      disabledReason={
+                        comparisonExclusionReason(r) ??
+                        cohortLockReason(r) ??
+                        (!selected.has(r.result_id) && selected.size >= MAX_COMPARE_SELECTIONS
+                          ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared.`
+                          : undefined)
+                      }
+                    />
+                  ))
+                : groupedPlatformResults.map((group) => (
+                    <>
+                      <tr
+                        key={`group-${group.key}`}
+                        class="bg-[var(--bb-surface-data-muted)] font-semibold text-xs text-[var(--bb-data-fg-primary)]"
+                      >
+                        <td colspan={platformColumnCount} class="px-4 py-2">
+                          {group.label} ({group.rows.length} {group.rows.length === 1 ? "result" : "results"})
+                        </td>
+                      </tr>
+                      {group.rows.map((r) => {
+                        const index = visiblePlatformResults.findIndex((row) => row.result_id === r.result_id);
+                        return (
+                          <PlatformRow
+                            key={r.result_id}
+                            entry={r}
+                            runIdentityLabel={runIdentityLabels[index] ?? r.platform}
+                            checked={selected.has(r.result_id)}
+                            onToggle={() => toggleSelect(r.result_id)}
+                            showMetricContract={showMetricContract}
+                            disabledReason={
+                              comparisonExclusionReason(r) ??
+                              cohortLockReason(r) ??
+                              (!selected.has(r.result_id) && selected.size >= MAX_COMPARE_SELECTIONS
+                                ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared.`
+                                : undefined)
+                            }
+                          />
+                        );
+                      })}
+                    </>
+                  ))}
             </tbody>
           </DataTable>
           </div>

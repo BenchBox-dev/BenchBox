@@ -1007,4 +1007,26 @@ describe("toggleFacetValue (w13)", () => {
     toggleFacetValue(input, "tpch");
     expect(input).toEqual(["tpch", "clickbench"]);
   });
+
+  it("renders Engine version selector in the ranking selector grid when results have engine versions", async () => {
+    const versionedRows = RESULT_ROWS.map((r, i) => ({
+      ...r,
+      platform_version: i === 0 ? "1.4.0" : "1.3.2",
+    }));
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.includes("FROM bench.results")) return versionedRows;
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        return META_LEADERBOARD_ROWS;
+      }
+      if (s.includes("FROM bench.cohort_metadata")) return COHORT_ROWS;
+      return [];
+    });
+
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    const grid = screen.getByTestId("home-ranking-selector-grid");
+    expect(within(grid).getByText("Engine version")).toBeTruthy();
+    expect(within(grid).getByText("All versions")).toBeTruthy();
+  });
 });

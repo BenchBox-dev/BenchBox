@@ -874,4 +874,17 @@ describe("PlatformIndex - sortable table headers", () => {
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
     expect(screen.getByTestId("provenance-legend")).toBeTruthy();
   });
+
+  it("supports grouping rows by engine version", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({ result_id: "r1", short_id: "s1", driver_version: "1.4.0", geomean_ms: 10 }),
+      makeRow({ result_id: "r2", short_id: "s2", driver_version: "1.3.2", geomean_ms: 20 }),
+      makeRow({ result_id: "r3", short_id: "s3", driver_version: "1.4.0", geomean_ms: 15 }),
+    ]);
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByTestId("platform-group-by")).toBeTruthy());
+    fireEvent.change(screen.getByTestId("platform-group-by"), { target: { value: "engine_version" } });
+    expect(screen.getByText(/1.4.0 \(2 results\)/)).toBeTruthy();
+    expect(screen.getByText(/1.3.2 \(1 result\)/)).toBeTruthy();
+  });
 });

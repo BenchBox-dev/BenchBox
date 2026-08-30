@@ -44,6 +44,11 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import { formatSelectedCount } from "@/lib/copyFormatters";
+import {
+  COHORT_GROUP_BY_LABELS,
+  groupCohortRows,
+  type CohortGroupBy,
+} from "@/lib/queryFilters";
 
 const BENCHMARK_SELECTION_LIMIT_REASON_ID = "benchmark-selection-limit";
 
@@ -980,7 +985,15 @@ function ListTable({
   const filtered = byScale
     .filter((row) => matchesFacetRow(row, facets, { keys: BENCHMARK_ROW_FACET_KEYS }))
     .sort((a, b) => compareListRows(a, b, sort));
+  const [groupBy, setGroupBy] = useState<CohortGroupBy>("none");
   const visibleRows = filtered.slice(0, visibleLimit);
+  const groupedRows = useMemo(() => {
+    return groupCohortRows(
+      visibleRows,
+      groupBy,
+      (row) => row.driver_version ?? row.platform_version ?? null,
+    );
+  }, [visibleRows, groupBy]);
   const runIdentityLabels = formatRunIdentitiesForCohort(filtered, "table");
 
   useEffect(() => {
@@ -1041,8 +1054,25 @@ function ListTable({
 
   return (
     <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
-      <div class="border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
-        Showing {visibleRows.length.toLocaleString()} of {filtered.length.toLocaleString()} results for SF {scaleFactor}
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
+        <span>
+          Showing {visibleRows.length.toLocaleString()} of {filtered.length.toLocaleString()} results for SF {scaleFactor}
+        </span>
+        <div class="flex items-center gap-2">
+          <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="benchmark-list-group-by">
+            Group by:
+          </label>
+          <select
+            id="benchmark-list-group-by"
+            data-testid="benchmark-list-group-by"
+            class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+            value={groupBy}
+            onChange={(e) => setGroupBy((e.target as HTMLSelectElement).value as CohortGroupBy)}
+          >
+            <option value="none">{COHORT_GROUP_BY_LABELS.none}</option>
+            <option value="engine_version">{COHORT_GROUP_BY_LABELS.engine_version}</option>
+          </select>
+        </div>
       </div>
       {/*
         The basis statement, per w3. A leaderboard that does not say what its
@@ -1090,21 +1120,14 @@ function ListTable({
               sortAnnouncement={sortAnnouncement}
               onSort={toggleSort}
             />
-            <th
-              class="p-0"
-              scope="col"
-              aria-sort={ariaSort("display_geomean_ms")}
-              title="Geometric mean of per-query median execution times (measurement runs only). Lower is faster."
-            >
-              <button
-                type="button"
-                class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left"
-                onClick={() => toggleSort("display_geomean_ms")}
-              >
-                Geomean latency{sortArrow("display_geomean_ms")}
-                {sortAnnouncement("display_geomean_ms")}
-              </button>
-            </th>
+            <ListSortHeader
+              label="Geomean"
+              sortKey="display_geomean_ms"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
             <ListSortHeader
               label="Queries"
               sortKey="query_count"
@@ -1113,14 +1136,33 @@ function ListTable({
               sortAnnouncement={sortAnnouncement}
               onSort={toggleSort}
             />
-            <th class="table-th">Source</th>
-            <th class="table-th" />
+            <th class="table-th text-left">Badges</th>
+            <th class="table-th text-right">Receipt</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
-          {visibleRows.map((r, index) => (
-            <BenchmarkRow key={r.result_id} entry={r} runIdentityLabel={runIdentityLabels[index] ?? r.platform} />
-          ))}
+          {groupBy === "none"
+            ? visibleRows.map((r, index) => (
+                <BenchmarkRow key={r.result_id} entry={r} runIdentityLabel={runIdentityLabels[index] ?? r.platform} />
+              ))
+            : groupedRows.map((group) => (
+                <>
+                  <tr
+                    key={`group-${group.key}`}
+                    class="bg-[var(--bb-surface-data-muted)] font-semibold text-xs text-[var(--bb-data-fg-primary)]"
+                  >
+                    <td colspan={8} class="px-4 py-2">
+                      {group.label} ({group.rows.length} {group.rows.length === 1 ? "result" : "results"})
+                    </td>
+                  </tr>
+                  {group.rows.map((r) => {
+                    const index = visibleRows.findIndex((row) => row.result_id === r.result_id);
+                    return (
+                      <BenchmarkRow key={r.result_id} entry={r} runIdentityLabel={runIdentityLabels[index] ?? r.platform} />
+                    );
+                  })}
+                </>
+              ))}
         </tbody>
       </table>
       {visibleRows.length < filtered.length && (
