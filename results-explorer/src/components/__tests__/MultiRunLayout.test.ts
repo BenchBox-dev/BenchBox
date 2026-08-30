@@ -553,6 +553,44 @@ describe("measurement basis resolution for comparison", () => {
     expect(resolved2[0]!.comparison_exclusion_reason).toBeNull();
     expect(resolved2[0]!.ranking_exclusion_reason).toBeNull();
   });
+
+  it("recomputes zero_timing_count and sets zero_timings_only for alternate basis", () => {
+    const rawRun: DetailResult = {
+      ...runs[0]!,
+      logical_query_count: 1,
+      has_display_timing: false,
+      valid_query_count: 0,
+      missing_query_count: 1,
+      zero_timing_count: 0,
+      display_exclusion_reason: "no_display_timings",
+      comparison_exclusion_reason: "no_comparable_timings",
+      ranking_exclusion_reason: "no_rankable_timings",
+      display_timings: [
+        {
+          query_id: "Q1",
+          display_ms: null,
+          sample_count: 1,
+          is_valid_display_timing: false,
+          timing_exclusion_reason: "missing_timing",
+        },
+      ],
+      queries: [
+        {
+          query_id: "Q1",
+          duration_ms: 0,
+          status: "pass",
+          run_type: "warmup",
+          iter: null,
+          stream: 0,
+        },
+      ],
+    };
+    const resolved = resolveResultsForBasis([rawRun], { passes: WARMUP, statistic: "median" });
+    expect(resolved[0]!.valid_query_count).toBe(0);
+    expect(resolved[0]!.zero_timing_count).toBe(1);
+    expect(resolved[0]!.missing_query_count).toBe(0);
+    expect(resolved[0]!.display_exclusion_reason).toBe("zero_timings_only");
+  });
 });
 
 describe("shared limiter query selection", () => {

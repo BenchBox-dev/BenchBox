@@ -229,15 +229,27 @@ export function MultiRunHeatmap({
                     style={cellStyle(cell.position)}
                     title={
                       cell.missingKind === "baseline_missing"
-                        ? `Baseline was not recorded for this query (${cell.timingMs !== null ? `${cell.timingMs.toFixed(1)} ms` : ""})`
+                        ? `Baseline was not recorded for this query; recorded candidate timing: ${cell.timingMs !== null ? `${cell.timingMs.toFixed(1)} ms` : "none"}`
                         : cell.missingKind === "run_missing"
                           ? "This run did not record this query"
                           : undefined
                     }
+                    aria-label={
+                      cell.missingKind === "baseline_missing" && cell.timingMs !== null
+                        ? `${cell.timingMs.toFixed(1)} ms (baseline missing, no ratio formed)`
+                        : undefined
+                    }
                     data-testid={`cell-${row.queryId}-${i}`}
                   >
                     {/* Value as text in every cell: colour is never the only encoding. */}
-                    {cellText(cell)}
+                    {cell.missingKind === "baseline_missing" && cell.timingMs !== null ? (
+                      <span>
+                        {cell.timingMs.toFixed(1)} ms{" "}
+                        <span class="text-[10px] text-[var(--bb-data-fg-subtle)]">(no base)</span>
+                      </span>
+                    ) : (
+                      cellText(cell)
+                    )}
                   </td>
                 ))}
               </tr>
