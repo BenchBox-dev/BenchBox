@@ -28,10 +28,10 @@ import {
   type MeasurementBasis,
 } from "@/lib/measurementBasis";
 
-const TPCH_DUCKDB = "tpch-duckdb-sf1.0-20260828-953eb39b";
-const TPCDS_SPARK_SF10 = "tpcds-spark-sf10.0-20260823-d5f866d2";
-const TPCDS_DUCKDB_SF10 = "tpcds-duckdb-sf10.0-20260823-fabf8953";
-const TPCH_SKEW_DATAFUSION = "tpch_skew-datafusion-sf1.0-20260826-b4f7cd7d";
+const TPCH_DUCKDB = "tpch-duckdb-sf1.0-20260828-ea150b8e";
+const TPCDS_SPARK_SF10 = "tpcds-spark-sf10.0-20260823-ace504c8";
+const TPCDS_DUCKDB_SF10 = "tpcds-duckdb-sf10.0-20260823-7cd05599";
+const TPCH_SKEW_DATAFUSION = "tpch_skew-datafusion-sf1.0-20260826-e4e3a903";
 
 /** The one query in the fixture whose every execution failed, warmup included. */
 const TOTAL_FAILURE_QUERY = "18";
