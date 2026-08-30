@@ -827,6 +827,47 @@ describe("Compare", () => {
     expect(queryDiff).toHaveTextContent("Not comparable");
   });
 
+  it("suppresses multi-run standings when fewer than two queries are shared", async () => {
+    setupUrl(["r1", "r2", "r3"]);
+    const results = {
+      r1: makeResult({
+        result_id: "r1",
+        platform: "DuckDB",
+        display_timings: [
+          { query_id: "Q1", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q2", display_ms: 20, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+        ],
+      }),
+      r2: makeResult({
+        result_id: "r2",
+        platform: "SQLite",
+        platform_id: "sqlite",
+        display_timings: [
+          { query_id: "Q1", display_ms: 20, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q3", display_ms: 30, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+        ],
+      }),
+      r3: makeResult({
+        result_id: "r3",
+        platform: "PostgreSQL",
+        platform_id: "postgres",
+        display_timings: [
+          { query_id: "Q1", display_ms: 30, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q4", display_ms: 40, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+        ],
+      }),
+    };
+    vi.mocked(getDetailResult).mockImplementation((id) => Promise.resolve(results[id as keyof typeof results]));
+
+    render(<Compare />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Standings" })).toBeTruthy());
+
+    const standings = screen.getByRole("heading", { name: "Standings" }).closest("section");
+    expect(standings).toHaveTextContent("Standings are unavailable because");
+    expect(standings).toHaveTextContent("Selected runs do not share at least two valid query timings");
+    expect(standings?.querySelector("table")).toBeNull();
+  });
+
   it("links compare warning counts to the Comparability Receipt and names warning classes", async () => {
     vi.mocked(getDetailResult).mockImplementation((id) =>
       id === "r1"
@@ -1068,7 +1109,7 @@ describe("Compare", () => {
     expect(summary).toHaveTextContent("DuckDB leads by 10.00x on power score.");
     expect(options).toEqual(["DuckDB", "SQLite", "PostgreSQL"]);
     expect(screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section")).toHaveTextContent(
-      "Showing 4 of 4 queries.",
+      "Showing 2 of 2 queries.",
     );
 
     fireEvent.change(select, { target: { value: "2" } });

@@ -32,8 +32,12 @@ export interface StandingRow {
   ratioToBaseline: number | null;
   queriesWon: number;
   isBaseline: boolean;
-  /** Inside the tie band, so neither faster nor slower may be claimed. */
+  /** Inside the tie band against the baseline, so neither faster nor slower may be claimed. */
   tied: boolean;
+  /** Inside a tie band with other runs for its rank position. */
+  rankTied: boolean;
+  /** Competition rank ("1", "T-1", or "—" when unranked). */
+  rank: string;
 }
 
 /** Queries every selected run can answer. */
@@ -45,30 +49,14 @@ export function sharedQueryIdsFor(results: readonly DetailResult[]): string[] {
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
-export function buildStandings(
-  results: readonly DetailResult[],
-  baselineIndex: number,
-  runLabels: readonly string[],
-): { rows: StandingRow[]; sharedQueryIds: string[]; totalQueryIds: number } {
-  const shared = sharedQueryIdsFor(results);
-  const all = new Set<string>();
-  for (const r of results) for (const t of r.display_timings) all.add(t.query_id);
-
-  const perRun = results.map((r) => shared.map((q) => timingValueForQuery(r, q)));
-  const geomeans = perRun.map((values) => geomeanMs(values));
-  const baseGeomean = geomeans[baselineIndex] ?? null;
-
-  // Queries won: for each shared query, the run with the lowest value takes it.
-  // Reuses RankTable's semantics -- lower is faster, ties award no win rather
-  // than awarding one to each, so the counts still sum to at most the query
-  // count and cannot overstate any run.
+function countWinsPerPlatform(results: readonly DetailResult[], shared: string[]): number[] {
   const wins = new Array(results.length).fill(0) as number[];
-  shared.forEach((_q, qi) => {
+  shared.forEach((q) => {
     let best: number | null = null;
     let bestRuns: number[] = [];
-    perRun.forEach((values, ri) => {
-      const v = values[qi];
-      if (v === null || v === undefined) return;
+    results.forEach((r, ri) => {
+      const v = timingValueForQuery(r, q);
+      if (v === null) return;
       if (best === null || v < best) {
         best = v;
         bestRuns = [ri];
@@ -81,10 +69,25 @@ export function buildStandings(
       wins[winner] = (wins[winner] ?? 0) + 1;
     }
   });
+  return wins;
+}
+
+export function buildStandings(
+  results: readonly DetailResult[],
+  baselineIndex: number,
+  runLabels: readonly string[],
+): { rows: StandingRow[]; sharedQueryIds: string[]; totalQueryIds: number } {
+  const shared = sharedQueryIdsFor(results);
+  const geomeans = results.map((r) => geomeanMs(shared.map((q) => timingValueForQuery(r, q)!)));
+  const baselineGeomean = geomeans[baselineIndex] ?? null;
+  const wins = countWinsPerPlatform(results, shared);
+
+  const all = new Set<string>();
+  for (const r of results) for (const t of r.display_timings) all.add(t.query_id);
 
   const rows: StandingRow[] = results.map((r, i) => {
     const g = geomeans[i] ?? null;
-    const ratio = g !== null && baseGeomean !== null && baseGeomean > 0 ? g / baseGeomean : null;
+    const ratio = g !== null && baselineGeomean !== null && baselineGeomean > 0 ? g / baselineGeomean : null;
     const hw = r.environment?.cpu_model
       ? r.environment.cpu_model
       : r.environment?.cpu_family
@@ -105,6 +108,8 @@ export function buildStandings(
       queriesWon: wins[i] ?? 0,
       isBaseline: i === baselineIndex,
       tied: ratio !== null && Math.abs(ratio - 1) < COMPARE_TIE_THRESHOLD,
+      rankTied: false,
+      rank: "—",
     };
   });
 
@@ -116,6 +121,38 @@ export function buildStandings(
     if (b.geomeanMs === null) return -1;
     return a.geomeanMs - b.geomeanMs;
   });
+
+  // Assign competition rank: tied rows receive "T-1", unranked rows receive "—".
+  // Tie groups are formed against the fixed group leader to prevent transitive chaining.
+  let i = 0;
+  while (i < rows.length) {
+    const leader = rows[i]!;
+    if (leader.geomeanMs === null) {
+      leader.rank = "—";
+      i++;
+      continue;
+    }
+
+    const leaderMs = leader.geomeanMs;
+    const rankNum = i + 1;
+    let j = i + 1;
+    while (
+      j < rows.length &&
+      rows[j]!.geomeanMs !== null &&
+      Math.abs(rows[j]!.geomeanMs! - leaderMs) / Math.min(rows[j]!.geomeanMs!, leaderMs) < COMPARE_TIE_THRESHOLD
+    ) {
+      j++;
+    }
+
+    const isTie = j > i + 1;
+    const rankLabel = isTie ? `T-${rankNum}` : String(rankNum);
+    for (let k = i; k < j; k++) {
+      rows[k]!.rank = rankLabel;
+      rows[k]!.rankTied = isTie;
+    }
+
+    i = j;
+  }
 
   return { rows, sharedQueryIds: shared, totalQueryIds: all.size };
 }
@@ -149,18 +186,18 @@ export function MultiRunStandings({ results, baselineIndex, runLabels }: MultiRu
         <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)] text-sm">
           <thead class="bg-[var(--bb-surface-data-muted)]">
             <tr>
-              <th class="table-th">Rank</th>
-              <th class="table-th">Run</th>
-              <th class="table-th">Hardware</th>
-              <th class="table-th">Geomean</th>
-              <th class="table-th">vs baseline</th>
-              <th class="table-th">Queries won</th>
+              <th scope="col" class="table-th">Rank</th>
+              <th scope="col" class="table-th">Run</th>
+              <th scope="col" class="table-th">Hardware</th>
+              <th scope="col" class="table-th">Geomean</th>
+              <th scope="col" class="table-th">vs baseline</th>
+              <th scope="col" class="table-th">Queries won</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
-            {rows.map((row, i) => (
+            {rows.map((row) => (
               <tr key={row.resultId} class="hover:bg-[var(--bb-surface-data-muted)]">
-                <td class="table-td font-mono">{i + 1}</td>
+                <td class="table-td font-mono">{row.rank}</td>
                 <td class="table-td">
                   {row.label}
                   {row.isBaseline ? (

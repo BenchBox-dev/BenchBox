@@ -22,11 +22,13 @@ import {
   parseAvailableBases,
   parseVaryingPassQueries,
   resolveQueryValue,
+  resolveResultsForBasis,
   sharedQueryGeomeans,
   warmPass,
   type BasisExecution,
   type MeasurementBasis,
 } from "@/lib/measurementBasis";
+import type { DetailResult } from "@/types";
 
 const TPCH_DUCKDB = "tpch-duckdb-sf1.0-20260828-ea150b8e";
 const TPCDS_SPARK_SF10 = "tpcds-spark-sf10.0-20260823-ace504c8";
@@ -326,6 +328,45 @@ describe("compared geomeans share one query set", () => {
     expect(sharedQueryIds).toEqual([]);
     expect(series.every((s) => s.geomeanMs === null)).toBe(true);
   });
+
+  it("preserves published default geomeans when every run has the same valid query set", () => {
+    const results = [
+      ({
+        result_id: "a",
+        display_geomean_ms: 10.000000000000002,
+        logical_query_count: 2,
+        valid_query_count: 1,
+        missing_query_count: 1,
+        zero_timing_count: 0,
+        has_display_timing: true,
+        display_timings: [
+          { query_id: "1", display_ms: 10, sample_count: 1, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "2", display_ms: null, sample_count: 0, is_valid_display_timing: false, timing_exclusion_reason: "failed_query" },
+        ],
+      } as unknown as DetailResult),
+      ({
+        result_id: "b",
+        display_geomean_ms: 20.000000000000004,
+        logical_query_count: 2,
+        valid_query_count: 1,
+        missing_query_count: 1,
+        zero_timing_count: 0,
+        has_display_timing: true,
+        display_timings: [
+          { query_id: "1", display_ms: 20, sample_count: 1, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "2", display_ms: null, sample_count: 0, is_valid_display_timing: false, timing_exclusion_reason: "failed_query" },
+        ],
+      } as unknown as DetailResult),
+    ];
+
+    const resolved = resolveResultsForBasis(results, DEFAULT_BASIS);
+
+    expect(resolved.map((result) => result.display_geomean_ms)).toEqual([
+      10.000000000000002,
+      20.000000000000004,
+    ]);
+    expect(resolved.map((result) => result.display_timings[0]?.sample_count)).toEqual([1, 1]);
+  });
 });
 
 describe("read-model bridge", () => {
@@ -402,6 +443,20 @@ describe("collapse reports the sample actually reduced", () => {
     const asMin = resolveQueryValue({ passes: WARMUP, statistic: "min" }, twoStreamWarmup);
     expect(asMedian).toEqual({ kind: "value", ms: 40, sampleCount: 2, collapsed: false });
     expect(asMin).toEqual({ kind: "value", ms: 30, sampleCount: 2, collapsed: false });
+  });
+
+  it("does not count a zero timing that was excluded from the reduction", () => {
+    const rows: BasisExecution[] = [
+      { query_id: "1", duration_ms: 0, status: "pass", run_type: "measurement", iter: 1 },
+      { query_id: "1", duration_ms: 10, status: "pass", run_type: "measurement", iter: 2 },
+    ];
+
+    expect(resolveQueryValue(MIN_ALL_WARM, rows)).toEqual({
+      kind: "value",
+      ms: 10,
+      sampleCount: 1,
+      collapsed: true,
+    });
   });
 });
 
