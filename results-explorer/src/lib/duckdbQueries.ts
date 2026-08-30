@@ -313,6 +313,7 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   platform: string;
   platform_id: string;
   driver_version: string | null;
+  platform_version?: string | null;
   run_date: string;
   power_score: number | null;
   total_duration_s: number;
@@ -1066,6 +1067,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.platform," +
     " r.platform_id," +
     " r.driver_version," +
+    " r.platform_version," +
     " r.run_date," +
     " r.power_score," +
     " r.total_duration_s," +

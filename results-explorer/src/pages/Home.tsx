@@ -19,6 +19,7 @@ import type { MetaLeaderboardMode } from "@/components/MetaLeaderboard";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import {
   FACET_KEYS,
+  facetsToWhereClause,
   useFacetState,
   type ExplorerFacetKey,
   type FacetState,
@@ -85,6 +86,7 @@ export function Home(_: RoutableProps) {
   const recentResultsScrollerRef = useRef<HTMLDivElement>(null);
   useDocumentTitle("Results · BenchBox");
   const [results, setResults] = useState<ResultRow[] | null>(null);
+  const [platformVersionDomainResults, setPlatformVersionDomainResults] = useState<ResultRow[] | null>(null);
   const [metaLeaderboard, setMetaLeaderboard] = useState<MetaLeaderboardData | null>(null);
   const [metaLeaderboardLoaded, setMetaLeaderboardLoaded] = useState(false);
   const retriedEmptyResults = useRef(false);
@@ -98,6 +100,28 @@ export function Home(_: RoutableProps) {
   const tuningFilter = singleFacetValue(facets.tuning_mode, "all");
   const trustFilter = singleFacetValue(facets.trust_tier, "all");
   const dateWindow = facets.date_window;
+  const platformVersionDomainWhere = useMemo(
+    () => facetsToWhereClause({ ...facets, platform_version: [] }),
+    [
+      facets.arch,
+      facets.benchmark,
+      facets.cloud_provider,
+      facets.cloud_region,
+      facets.cost_status,
+      facets.cpu_family,
+      facets.date_window,
+      facets.deployment_class,
+      facets.execution_mode,
+      facets.instance_or_warehouse,
+      facets.phase,
+      facets.platform,
+      facets.scale_factor,
+      facets.storage_format,
+      facets.trust_tier,
+      facets.tuning_mode,
+      facets.validation_status,
+    ],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -112,6 +136,24 @@ export function Home(_: RoutableProps) {
       cancelled = true;
     };
   }, [facetWhere]);
+
+  useEffect(() => {
+    if (facets.platform_version.length === 0) {
+      setPlatformVersionDomainResults(null);
+      return;
+    }
+    let cancelled = false;
+    listResults(platformVersionDomainWhere)
+      .then((rows) => {
+        if (!cancelled) setPlatformVersionDomainResults(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setPlatformVersionDomainResults(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [facets.platform_version, platformVersionDomainWhere]);
 
   useEffect(() => {
     let cancelled = false;
@@ -222,20 +264,28 @@ export function Home(_: RoutableProps) {
       return (cohort.platforms ?? []).length > 0;
     });
 
-    const visibleCohortKeys = new Set(visibleCohorts.map((cohort) => cohort.key));
     const visibleEvidencePlatformIds = new Set(
       visibleCohorts.flatMap((cohort) => (cohort.platforms ?? []).map((row) => row.platform_id)),
     );
     const platforms = metaLeaderboard.platforms
       .map((platform) => {
         const ranks = Object.fromEntries(
-          Object.entries(platform.ranks).filter(([cohortKey]) => {
-            if (!visibleCohortKeys.has(cohortKey)) return false;
-            const rows = cohortPlatformIndex.get(cohortKey)?.get(platform.platform_id) ?? [];
-            return rows.some((row) => {
+          visibleCohorts.flatMap((cohort) => {
+            const rows = cohortPlatformIndex.get(cohort.key)?.get(platform.platform_id) ?? [];
+            const rankedRows = rows
+              .filter((row) => {
               const result = resultById.get(row.result_id);
-              return row.rank !== null && result !== undefined && matchesFacetRow(result, facets);
-            });
+                return row.rank !== null && result !== undefined && matchesFacetRow(result, facets);
+              })
+              .sort((a, b) => (a.rank ?? Number.POSITIVE_INFINITY) - (b.rank ?? Number.POSITIVE_INFINITY));
+            const row = rankedRows[0];
+            if (!row || row.rank === null) return [];
+            return [[cohort.key, {
+              rank: row.rank,
+              total: cohort.cohort_ranked_count,
+              metric_value: row.metric_value,
+              speedup_vs_best: row.speedup_vs_best,
+            } satisfies MetaRank] as const];
           }),
         ) as Record<string, MetaRank>;
 
@@ -317,15 +367,15 @@ export function Home(_: RoutableProps) {
     ? [...new Set(metaLeaderboard.cohorts.map((cohort) => cohort.phase))].sort()
     : [];
   const trustOptions = ["all", ...[...new Set(results.map((result) => result.trust_label))].sort()];
-  const platformVersionOptions = useMemo(() => {
+  const platformVersionOptions = (() => {
     const versions = new Set<string>();
-    for (const r of results) {
+    for (const r of platformVersionDomainResults ?? results) {
       if (r.platform_version) {
         versions.add(r.platform_version);
       }
     }
     return [...versions].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  }, [results]);
+  })();
   const platformVersionFilters = facets.platform_version;
   const recent = [...results]
     .sort((a, b) => b.run_date.localeCompare(a.run_date))
@@ -463,19 +513,23 @@ export function Home(_: RoutableProps) {
                   onSelect={(value) => setFacet("phase", value === "all" ? [] : [value])}
                   format={(value) => (value === "all" ? "All phases" : value)}
                 />
-                <MultiSelectFilter
-                  label="Engine version"
-                  allLabel="All versions"
-                  options={platformVersionOptions}
-                  current={platformVersionFilters}
-                  onSelect={(value) =>
-                    setFacet(
-                      "platform_version",
-                      value === "all" ? [] : toggleFacetValue(platformVersionFilters, value),
-                    )
-                  }
-                  format={(value) => value}
-                />
+                {platformVersionOptions.length > 0 || platformVersionFilters.length > 0 ? (
+                  <MultiSelectFilter
+                    label="Engine version"
+                    allLabel="All versions"
+                    options={platformVersionOptions}
+                    current={platformVersionFilters}
+                    onSelect={(value) =>
+                      setFacet(
+                        "platform_version",
+                        value === "all" ? [] : toggleFacetValue(platformVersionFilters, value),
+                      )
+                    }
+                    format={(value) => value}
+                  />
+                ) : (
+                  <div aria-hidden="true" data-testid="home-engine-version-unavailable" />
+                )}
                 <CoverageSummary />
               </div>
 

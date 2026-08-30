@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import { route } from "preact-router";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
 import { getPlatformIndexRows } from "@/lib/duckdbQueries";
-import { useFacetState, type DateWindowFacet, type FacetKey, type FacetState } from "@/lib/facetModel";
+import { useFacetState, type DateWindowFacet, type ExplorerFacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue, toDateWindowFacet } from "@/lib/facetMatching";
 import { formatBenchmarkLabel, formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
 import {
@@ -79,7 +79,7 @@ const PLATFORM_ROUTE_ALIASES: Readonly<Record<string, string>> = {
   // corrupt legitimate platform or benchmark identifiers.
   clickhouse_local: "clickhouse-local",
 };
-const PLATFORM_RESULT_FACET_KEYS: FacetKey[] = [
+const PLATFORM_RESULT_FACET_KEYS: ExplorerFacetKey[] = [
   "benchmark",
   "scale_factor",
   "phase",
@@ -94,6 +94,7 @@ const PLATFORM_RESULT_FACET_KEYS: FacetKey[] = [
   "storage_format",
   "cost_status",
   "date_window",
+  "platform_version",
 ];
 
 interface TrendCohort {
@@ -178,6 +179,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [visibleLimit, setVisibleLimit] = useState(TABLE_RENDER_LIMIT);
+  const [groupBy, setGroupBy] = useState<CohortGroupBy>("none");
   const { facets, setFacet } = useFacetState();
   const tuningFilter = singleFacetValue(facets.tuning_mode, "all") ?? "all";
   const setTuningFilter = (value: string) => setFacet("tuning_mode", value === "all" ? [] : [value]);
@@ -190,21 +192,27 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const phaseFilter = singleFacetValue(facets.phase, "all") ?? "all";
   const trustFilter = singleFacetValue(facets.trust_tier, "all") ?? "all";
   const validationFilter = singleFacetValue(facets.validation_status, "all") ?? "all";
+  const platformVersionFilter = facets.platform_version.length === 0
+    ? "all"
+    : facets.platform_version.length === 1
+      ? facets.platform_version[0]!
+      : "__multiple__";
   const dateWindowFilter: DateWindowFacet = facets.date_window;
   // Helper for the five string-array facets that share the "all means
   // empty array" pattern. date_window has its own DateWindowFacet shape
   // and uses toDateWindowFacet directly.
   const setSingleArrayFacet = (
-    key: "benchmark" | "scale_factor" | "phase" | "trust_tier" | "validation_status",
+    key: "benchmark" | "scale_factor" | "phase" | "trust_tier" | "validation_status" | "platform_version",
     value: string,
   ) => setFacet(key, value === "all" ? [] : [value]);
-  const w5FilterKeys: FacetKey[] = [
+  const w5FilterKeys: ExplorerFacetKey[] = [
     "benchmark",
     "scale_factor",
     "phase",
     "trust_tier",
     "validation_status",
     "date_window",
+    "platform_version",
   ];
   const hasW5Filters = hasActiveFacets(facets, w5FilterKeys);
   const resetW5Filters = () => {
@@ -214,6 +222,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     setFacet("trust_tier", []);
     setFacet("validation_status", []);
     setFacet("date_window", "all");
+    setFacet("platform_version", []);
   };
   // Default: geomean_ms ascending (fastest first), nulls last. The empty-state
   // ordering is observable behaviour — must_preserve in the parent TODO.
@@ -275,6 +284,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     facets.storage_format,
     facets.cost_status,
     facets.date_window,
+    facets.platform_version,
     sort.key,
     sort.direction,
   ]);
@@ -344,7 +354,15 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         .filter((status): status is string => status !== null && status !== undefined),
     ),
   ].sort();
-  const showW5Filters = allPlatformResults.length >= 25;
+  const platformVersionOptions = [
+    ...new Set(
+      allPlatformResults
+        .map((r) => r.platform_version)
+        .filter((version): version is string => version !== null && version !== undefined),
+    ),
+  ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const showW5Filters =
+    allPlatformResults.length >= 25 || platformVersionFilter !== "all" || platformVersionOptions.length > 1;
 
   const platformResultsRaw = allPlatformResults.filter((row) =>
     matchesFacetRow(row, facets, { keys: PLATFORM_RESULT_FACET_KEYS }),
@@ -385,15 +403,12 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     if (bv === null) return -1;
     return dir * (av - bv);
   });
-  const [groupBy, setGroupBy] = useState<CohortGroupBy>("none");
   const visiblePlatformResults = platformResults.slice(0, visibleLimit);
-  const groupedPlatformResults = useMemo(() => {
-    return groupCohortRows<PlatformIndexRowRow>(
-      visiblePlatformResults,
-      groupBy,
-      (row) => row.driver_version ?? null,
-    );
-  }, [visiblePlatformResults, groupBy]);
+  const groupedPlatformResults = groupCohortRows<PlatformIndexRowRow>(
+    visiblePlatformResults,
+    groupBy,
+    (row) => row.platform_version ?? null,
+  );
   const runIdentityLabels = formatRunIdentitiesForCohort(platformResults, "table");
 
   function toggleSort(key: PlatformSortKey) {
@@ -631,6 +646,28 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   <option key={value} value={value}>
                     {formatValidationStatus(value)}
                   </option>
+                ))}
+              </select>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-version">
+                Engine version
+              </label>
+              <select
+                id="platform-filter-version"
+                data-testid="platform-filter-version"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={platformVersionFilter}
+                onChange={(event) =>
+                  setSingleArrayFacet("platform_version", (event.target as HTMLSelectElement).value)
+                }
+              >
+                <option value="all">All versions</option>
+                {platformVersionFilter === "__multiple__" && (
+                  <option value="__multiple__" disabled>{facets.platform_version.length} versions selected</option>
+                )}
+                {platformVersionOptions.map((value) => (
+                  <option key={value} value={value}>{value}</option>
                 ))}
               </select>
             </div>

@@ -6,7 +6,7 @@ import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getBenchmarkSummaryFromDuckDB, listBenchmarksWithPublicResults, listResults } from "@/lib/duckdbQueries";
 import { BENCHMARK_LABELS, humanizeBenchmark, isKnownBenchmark, fmtScore, fmtGeomean, errMsg, complianceLabel } from "@/utils";
-import { facetsToWhereClause, useFacetState, type FacetKey, type FacetState } from "@/lib/facetModel";
+import { facetsToWhereClause, useFacetState, type ExplorerFacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue } from "@/lib/facetMatching";
 import {
   buildCompareUrl,
@@ -64,7 +64,7 @@ function coerceViewMode(value: string): ViewMode {
 }
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
-const BENCHMARK_RESULT_FACET_KEYS: FacetKey[] = [
+const BENCHMARK_RESULT_FACET_KEYS: ExplorerFacetKey[] = [
   "platform",
   "execution_mode",
   "validation_status",
@@ -75,8 +75,9 @@ const BENCHMARK_RESULT_FACET_KEYS: FacetKey[] = [
   "storage_format",
   "cost_status",
   "date_window",
+  "platform_version",
 ];
-const BENCHMARK_ROW_FACET_KEYS: FacetKey[] = [
+const BENCHMARK_ROW_FACET_KEYS: ExplorerFacetKey[] = [
   "platform",
   "execution_mode",
   "tuning_mode",
@@ -89,6 +90,7 @@ const BENCHMARK_ROW_FACET_KEYS: FacetKey[] = [
   "storage_format",
   "cost_status",
   "date_window",
+  "platform_version",
 ];
 
 const TRUST_LABEL_ABBREV: Record<string, string> = {
@@ -152,6 +154,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const canonicalBenchmark = canonicalBenchmarkSlug(benchmark);
   const title = humanizeBenchmark(canonicalBenchmark);
   const [results, setResults] = useState<ResultRow[] | null>(null);
+  const [platformVersionDomainResults, setPlatformVersionDomainResults] = useState<ResultRow[] | null>(null);
   const [summary, setSummary] = useState<BenchmarkSummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -191,6 +194,11 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const requestedSf = singleFacetValue(facets.scale_factor);
   const phaseFilter = singleFacetValue(facets.phase, "power") ?? "power";
   const tuningFilter = singleFacetValue(facets.tuning_mode, "all") ?? "all";
+  const platformVersionFilter = facets.platform_version.length === 0
+    ? "all"
+    : facets.platform_version.length === 1
+      ? facets.platform_version[0]!
+      : "__multiple__";
   const trustFilter = facets.trust_tier.length === 0 ? null : new Set(facets.trust_tier);
   const benchmarkResultWhere = useMemo(
     () =>
@@ -202,6 +210,32 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         tuning_mode: [],
         trust_tier: [],
       }),
+    [
+      benchmark,
+      canonicalBenchmark,
+      facets.cloud_provider,
+      facets.cloud_region,
+      facets.cost_status,
+      facets.date_window,
+      facets.deployment_class,
+      facets.execution_mode,
+      facets.instance_or_warehouse,
+      facets.platform,
+      facets.platform_version,
+      facets.storage_format,
+      facets.validation_status,
+    ],
+  );
+  const benchmarkVersionDomainWhere = useMemo(
+    () => facetsToWhereClause({
+      ...facets,
+      benchmark: canonicalBenchmark ? [canonicalBenchmark] : [],
+      scale_factor: [],
+      phase: [],
+      tuning_mode: [],
+      trust_tier: [],
+      platform_version: [],
+    }),
     [
       benchmark,
       canonicalBenchmark,
@@ -253,6 +287,24 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       cancelled = true;
     };
   }, [benchmarkResultWhere]);
+
+  useEffect(() => {
+    if (facets.platform_version.length === 0) {
+      setPlatformVersionDomainResults(null);
+      return;
+    }
+    let cancelled = false;
+    listResults(benchmarkVersionDomainWhere)
+      .then((rows) => {
+        if (!cancelled) setPlatformVersionDomainResults(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setPlatformVersionDomainResults(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [benchmarkVersionDomainWhere, facets.platform_version]);
 
   // Derive available scale factors and phases from the loaded rows.
   const benchmarkResults = results?.filter((r) => canonicalBenchmarkSlug(r.benchmark) === canonicalBenchmark) ?? [];
@@ -413,6 +465,13 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const trustLabels = summaryWithResultMetadata
     ? [...new Set(summaryWithResultMetadata.platforms.map((p) => p.trust_label))].sort()
     : [];
+  const platformVersions = [
+    ...new Set(
+      (platformVersionDomainResults ?? benchmarkResults)
+        .map((result) => result.platform_version)
+        .filter((version): version is string => version !== null),
+    ),
+  ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   // Apply client-side filters (tuning + trust) to the summary platforms.
   const filteredSummary: BenchmarkSummary | null = summaryWithResultMetadata
@@ -584,6 +643,32 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
                   <option key={m} value={m}>
                     {tuningLabel(m)}
                   </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {(platformVersionFilter !== "all" || platformVersions.length > 1) && (
+            <div class="flex items-center gap-2">
+              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-version-filter">
+                Engine version:
+              </label>
+              <select
+                id="benchmark-version-filter"
+                data-testid="benchmark-version-filter"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
+                value={platformVersionFilter}
+                onChange={(event) => {
+                  const value = (event.target as HTMLSelectElement).value;
+                  setFacet("platform_version", value === "all" ? [] : [value]);
+                }}
+              >
+                <option value="all">All versions</option>
+                {platformVersionFilter === "__multiple__" && (
+                  <option value="__multiple__" disabled>{facets.platform_version.length} versions selected</option>
+                )}
+                {platformVersions.map((version) => (
+                  <option key={version} value={version}>{version}</option>
                 ))}
               </select>
             </div>
@@ -991,7 +1076,7 @@ function ListTable({
     return groupCohortRows(
       visibleRows,
       groupBy,
-      (row) => row.driver_version ?? row.platform_version ?? null,
+      (row) => row.platform_version ?? null,
     );
   }, [visibleRows, groupBy]);
   const runIdentityLabels = formatRunIdentitiesForCohort(filtered, "table");
@@ -1013,6 +1098,7 @@ function ListTable({
     facets.storage_format,
     facets.cost_status,
     facets.date_window,
+    facets.platform_version,
     sort.key,
     sort.direction,
   ]);

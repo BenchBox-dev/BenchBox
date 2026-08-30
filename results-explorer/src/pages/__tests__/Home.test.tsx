@@ -1029,4 +1029,37 @@ describe("toggleFacetValue (w13)", () => {
     expect(within(grid).getByText("Engine version")).toBeTruthy();
     expect(within(grid).getByText("All versions")).toBeTruthy();
   });
+
+  it("keeps sibling engine versions selectable and carries the facet into drill-down links", async () => {
+    window.history.replaceState(null, "", "/results/?version=1.4.0");
+    const versionedRows = RESULT_ROWS.map((row, index) => ({
+      ...row,
+      platform_version: index === 0 ? "1.4.0" : "1.3.2",
+    }));
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.includes("FROM bench.results")) {
+        return s.includes("platform_version IN")
+          ? versionedRows.filter((row) => row.platform_version === "1.4.0")
+          : versionedRows;
+      }
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        return META_LEADERBOARD_ROWS;
+      }
+      if (s.includes("FROM bench.cohort_metadata")) return COHORT_ROWS;
+      return [];
+    });
+
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    const versionControl = screen.getByRole("combobox", { name: "Engine version" });
+    expect(within(versionControl).getByRole("option", { name: "1.3.2" })).toBeTruthy();
+
+    const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
+    const cohortLink = within(grid).getByRole("link", { name: /^ClickBench SF0.1/ }) as HTMLAnchorElement;
+    expect(cohortLink.getAttribute("href")).toContain("version=1.4.0");
+    const platformLink = within(grid).getByRole("link", { name: "DuckDB" }) as HTMLAnchorElement;
+    expect(platformLink.getAttribute("href")).toContain("version=1.4.0");
+  });
 });

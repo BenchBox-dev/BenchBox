@@ -39,6 +39,7 @@ function makeRow(overrides: Partial<PlatformIndexRowRow> = {}): PlatformIndexRow
     platform: "DuckDB",
     platform_id: "duckdb",
     driver_version: null,
+    platform_version: null,
     run_date: "2026-04-01",
     power_score: 3000,
     total_duration_s: 60,
@@ -877,14 +878,27 @@ describe("PlatformIndex - sortable table headers", () => {
 
   it("supports grouping rows by engine version", async () => {
     vi.mocked(getPlatformIndexRows).mockResolvedValue([
-      makeRow({ result_id: "r1", short_id: "s1", driver_version: "1.4.0", geomean_ms: 10 }),
-      makeRow({ result_id: "r2", short_id: "s2", driver_version: "1.3.2", geomean_ms: 20 }),
-      makeRow({ result_id: "r3", short_id: "s3", driver_version: "1.4.0", geomean_ms: 15 }),
+      makeRow({ result_id: "r1", short_id: "s1", driver_version: "9.9.9", platform_version: "1.4.0", geomean_ms: 10 }),
+      makeRow({ result_id: "r2", short_id: "s2", driver_version: "9.9.9", platform_version: "1.3.2", geomean_ms: 20 }),
+      makeRow({ result_id: "r3", short_id: "s3", driver_version: "8.8.8", platform_version: "1.4.0", geomean_ms: 15 }),
     ]);
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByTestId("platform-group-by")).toBeTruthy());
     fireEvent.change(screen.getByTestId("platform-group-by"), { target: { value: "engine_version" } });
     expect(screen.getByText(/1.4.0 \(2 results\)/)).toBeTruthy();
     expect(screen.getByText(/1.3.2 \(1 result\)/)).toBeTruthy();
+  });
+
+  it("honors a version facet carried into the platform drill-down", async () => {
+    window.history.replaceState(null, "", "/results/p/duckdb/?version=1.4.0");
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({ result_id: "r14", short_id: "v140", platform_version: "1.4.0" }),
+      makeRow({ result_id: "r13", short_id: "v132", platform_version: "1.3.2" }),
+    ]);
+
+    const { container } = render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    expect(getRowOrder(container)).toEqual(["r14"]);
   });
 });
