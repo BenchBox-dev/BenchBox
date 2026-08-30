@@ -184,6 +184,28 @@ def backfill(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str
     }
 
     if write:
+        if manifest_path.exists():
+            # The manifest is the ONLY record of the old -> new result_id
+            # mapping. A second --write is a no-op on the bundles (the backfill
+            # is idempotent), but re-emitting the manifest would overwrite that
+            # record with a snapshot reporting current ids as both old and new,
+            # 0 changed and 0 lacking a client host -- destroying the very
+            # provenance the file exists to preserve.
+            #
+            # So: keep the original whenever this pass changed nothing, and
+            # refuse outright if it did change something, because that means
+            # the corpus moved and the standing manifest no longer describes
+            # it. Mirrors the refusal in results_explorer_corpus_migrate.py.
+            if summary["totals"]["changed"]:
+                raise FileExistsError(
+                    f"refusing to overwrite an existing attestation manifest while rewriting "
+                    f"{summary['totals']['changed']} bundle(s): {manifest_path}. "
+                    "Move the existing manifest aside deliberately if a re-attestation is intended."
+                )
+            for path, payload in pending_writes:
+                _atomic_write(path, payload)
+            return summary
+
         for path, payload in pending_writes:
             _atomic_write(path, payload)
         _atomic_write(manifest_path, canonical_json_bytes(summary))
