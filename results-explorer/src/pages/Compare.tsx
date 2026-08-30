@@ -63,7 +63,7 @@ import {
   type PassSelection,
 } from "@/lib/measurementBasis";
 import { formatDurationSeconds, formatPowerScore, formatSpeedup } from "@/lib/metricFormatters";
-import { isValidTimingValue } from "@/lib/displayEligibility";
+import { isValidTimingValue, timingValueForQuery } from "@/lib/displayEligibility";
 import {
   describeCompareExclusionReason,
   summarizeCompareExclusionReasons,
@@ -477,6 +477,30 @@ export function Compare({ url }: CompareProps) {
     : `SF ${scaleFactor}`;
   const rowCount = results.length;
 
+  /**
+   * How many queries every selected run can answer, and how many exist at all.
+   *
+   * Computed, not approximated. An earlier draft of the basis bar passed the
+   * RUN count for both numbers, so a two-run comparison announced "over 2 of 2
+   * queries" -- a sentence that looks precise and describes nothing. A stated
+   * denominator has to be the real one or it is worse than no denominator.
+   *
+   * Intersection, matching the model's same-query-set rule: a query any run
+   * cannot answer leaves every run's geomean, so it is not part of the set the
+   * figures are computed over.
+   */
+  const queryCoverage = useMemo(() => {
+    const allQueryIds = new Set<string>();
+    for (const result of results) {
+      for (const timing of result.display_timings) allQueryIds.add(timing.query_id);
+    }
+    let shared = 0;
+    for (const queryId of allQueryIds) {
+      if (results.every((result) => timingValueForQuery(result, queryId) !== null)) shared += 1;
+    }
+    return { shared, total: allQueryIds.size };
+  }, [results]);
+
   // Primary metric is loaded async from DuckDB in the effect above; default
   // stays `display_geomean_ms` until the query resolves (matches Python's
   // `_DEFAULT_RANKING`).
@@ -626,8 +650,8 @@ export function Compare({ url }: CompareProps) {
           basis={basis}
           onBasisChange={setBasis}
           availablePasses={availablePasses}
-          comparableQueryCount={rowCount}
-          totalQueryCount={rowCount}
+          comparableQueryCount={queryCoverage.shared}
+          totalQueryCount={queryCoverage.total}
           runCount={results.length}
           statisticCollapsed={isCollapsedStatistic(basis)}
         />
