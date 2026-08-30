@@ -10,6 +10,7 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
+import { PassStrip } from "@/components/PassStrip";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { TuningBadge } from "@/components/TuningBadge";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -435,6 +436,9 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
               </table>
             </div>
             {detail.queries.length > 0 && (
+              <>
+              <PassStrip queries={detail.queries} />
+
               <details class="mt-4">
                 <summary class="cursor-pointer select-none text-sm text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]">
                   Individual samples ({detail.queries.length})
@@ -485,6 +489,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                   </table>
                 </div>
               </details>
+              </>
             )}
             </section>
           )}
