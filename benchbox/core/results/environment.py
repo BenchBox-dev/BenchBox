@@ -93,6 +93,21 @@ class ClientHostEnvironment:
         cpu_model = profile.get("cpu_model")
         cpu_vendor = profile.get("cpu_vendor")
         if system_profile is None and (not cpu_model or not cpu_vendor):
+            # DELIBERATELY gated on a wholly absent profile.
+            #
+            # It is tempting to widen this to "fill whenever the value is
+            # missing", because every production caller passes a dict and this
+            # branch therefore almost never runs. That would be wrong: this
+            # constructor also runs on the LOAD path, where
+            # `_extract_system_profile` rebuilds a profile from a stored
+            # bundle. Detecting there would stamp the CPU of whatever machine
+            # happens to re-derive an old result onto that result's history --
+            # inventing hardware provenance for a run that executed elsewhere.
+            #
+            # The capture-time gap this was meant to close is fixed at its
+            # source instead: `benchbox.utils.system_info.get_system_info`
+            # now detects the real CPU and emits cpu_model/cpu_vendor, so the
+            # profile handed in already carries them.
             from benchbox.utils.environment import detect_cpu_info
 
             detected_model, detected_vendor = detect_cpu_info()

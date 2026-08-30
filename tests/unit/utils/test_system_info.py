@@ -70,11 +70,19 @@ class TestSystemInfo:
             "os_version": "21.6.0",
             "architecture": "arm64",
             "cpu_model": "Apple M1",
+            "cpu_vendor": None,
             "cpu_cores": 8,
             "total_memory_gb": 16.0,
             "available_memory_gb": 14.2,
             "python_version": "3.11.2",
             "hostname": "macbook-pro",
+            # Aliases for the spellings ClientHostEnvironment.from_system_profile
+            # actually reads. Emitted alongside the originals, not instead of
+            # them -- without these three the consumer silently dropped the
+            # CPU count, the memory size and the OS release from every bundle.
+            "cpu_count": 8,
+            "memory_gb": 16.0,
+            "os_release": "21.6.0",
         }
 
         assert result == expected
@@ -161,7 +169,12 @@ class TestGetSystemInfo:
         mock_python_version.return_value = "3.11.0"
         mock_node.return_value = "test-machine"
 
-        result = get_system_info()
+        # detect_cpu_info() is tried first now, and it reads real hardware --
+        # on a Linux CI runner it returns the runner's actual CPU and shadows
+        # the mocked processor string. Silence it so this test still exercises
+        # the legacy platform.processor() path it was written for.
+        with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
+            result = get_system_info()
 
         assert isinstance(result, SystemInfo)
         assert result.os_name == "Linux"
@@ -208,14 +221,18 @@ class TestGetSystemInfo:
         mock_python_version.return_value = "3.11.2"
         mock_node.return_value = "macbook"
 
-        with patch(
-            "builtins.open",
-            mock_open(read_data="model name\t: Apple M1\nother: value\n"),
-        ):
-            result = get_system_info()
+        with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
+            with patch(
+                "builtins.open",
+                mock_open(read_data="model name\t: Apple M1\nother: value\n"),
+            ):
+                result = get_system_info()
 
-        # Empty processor string gets converted to "Unknown" before fallback logic runs
-        assert result.cpu_model == "Unknown"
+        # An empty processor string must fall through to /proc/cpuinfo and use
+        # the model it finds. This previously asserted "Unknown": the old
+        # `platform.processor() or "Unknown"` short-circuited the fallback, so
+        # the cpuinfo data supplied right above was read and then discarded.
+        assert result.cpu_model == "Apple M1"
         assert result.os_name == "Darwin"
         assert result.architecture == "arm64"
 
@@ -254,11 +271,15 @@ class TestGetSystemInfo:
         mock_node.return_value = "windows-pc"
 
         # Mock file not found for /proc/cpuinfo
-        with patch("builtins.open", side_effect=FileNotFoundError()):
-            result = get_system_info()
+        with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
+            with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
+                result = get_system_info()
 
-        # None processor gets converted to "Unknown" before fallback logic runs
-        assert result.cpu_model == "Unknown"
+        # With no detector, no processor string and no cpuinfo, the placeholder
+        # must still be recognisable as one. "Unknown" said nothing about the
+        # machine; "AMD64 CPU" at least carries the architecture and cannot be
+        # mistaken for a real model by the cpu_family normalizer.
+        assert result.cpu_model == "AMD64 CPU"
         assert result.os_name == "Windows"
         assert result.architecture == "AMD64"
 
@@ -296,7 +317,11 @@ class TestGetSystemInfo:
         mock_python_version.return_value = "3.9.0"
         mock_node.return_value = "old-system"
 
-        result = get_system_info()
+        # Silence the detector AND /proc/cpuinfo: both are real on a Linux
+        # runner and would answer before the placeholder branch is reached.
+        with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
+            with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
+                result = get_system_info()
 
         # Should fallback to machine + " CPU" on exception
         assert result.cpu_model == "i686 CPU"
@@ -575,11 +600,16 @@ class TestSystemInfoIntegration:
             "os_version",
             "architecture",
             "cpu_model",
+            "cpu_vendor",
             "cpu_cores",
             "total_memory_gb",
             "available_memory_gb",
             "python_version",
             "hostname",
+            # Consumer-facing aliases; see test_system_info_to_dict.
+            "cpu_count",
+            "memory_gb",
+            "os_release",
         }
         assert set(system_dict.keys()) == expected_keys
 
@@ -638,3 +668,104 @@ class TestSystemInfoIntegration:
         # Memory info should work even if CPU info fails
         memory_info = get_memory_info()
         assert memory_info["total_gb"] == 8.0
+
+
+class TestCpuIdentityCapture:
+    """The CPU identity that reaches a published result bundle.
+
+    Regression cover for a capture defect: `get_system_info` sourced
+    `cpu_model` from `platform.processor()`, which on Darwin returns the bare
+    architecture ("arm"). That is not a CPU model -- the explorer's
+    `normalize_cpu_family` maps it to the family "unknown" -- so every run
+    published a hardware axis that said nothing, and `cpu_vendor`,
+    `cpu_count` and `memory_gb` never reached the bundle at all.
+    """
+
+    def test_cpu_model_is_never_the_bare_architecture(self) -> None:
+        import platform
+
+        info = get_system_info()
+        assert info.cpu_model
+        # "arm" / "x86_64" alone is an architecture, not a model. Publishing it
+        # normalizes to the cpu_family "unknown" and makes the axis useless.
+        assert info.cpu_model != platform.machine()
+        assert info.cpu_model != platform.processor() or info.cpu_model != platform.machine()
+
+    def test_falls_back_to_a_labelled_placeholder_when_detection_fails(self) -> None:
+        # /proc/cpuinfo must be mocked away too: it exists on Linux runners and
+        # answers before the placeholder branch, which made the first version
+        # of this test pass on macOS and fail in CI.
+        with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
+            with patch("benchbox.utils.system_info.platform.processor", return_value=""):
+                with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
+                    info = get_system_info()
+        # A placeholder must be recognisable as one, not a bare arch string.
+        assert info.cpu_model.endswith("CPU")
+
+    def test_never_publishes_the_arch_even_when_processor_returns_it(self) -> None:
+        import platform
+
+        with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
+            with patch("benchbox.utils.system_info.platform.processor", return_value=platform.machine()):
+                with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
+                    info = get_system_info()
+        assert info.cpu_model != platform.machine()
+
+    def test_rejects_an_architecture_alias_that_is_not_equal_to_machine(self) -> None:
+        # Regression for a review finding. On Apple Silicon platform.processor()
+        # returns "arm" while platform.machine() returns "arm64", so guarding
+        # with `cpu_model == platform.machine()` let "arm" straight through --
+        # reintroducing, whenever sysctl is unavailable or times out, the exact
+        # value this module exists to keep out of published results.
+        with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
+            with patch("benchbox.utils.system_info.platform.processor", return_value="arm"):
+                with patch("benchbox.utils.system_info.platform.machine", return_value="arm64"):
+                    with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
+                        info = get_system_info()
+        assert info.cpu_model == "arm64 CPU"
+
+    @pytest.mark.parametrize(
+        "processor,machine",
+        [
+            ("arm", "arm64"),
+            ("ARM", "arm64"),
+            ("x86_64", "x86_64"),
+            ("amd64", "x86_64"),
+            ("i686", "i686"),
+            ("aarch64", "aarch64"),
+            ("  arm  ", "arm64"),
+        ],
+    )
+    def test_no_architecture_token_is_ever_published_as_a_model(self, processor, machine) -> None:
+        with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
+            with patch("benchbox.utils.system_info.platform.processor", return_value=processor):
+                with patch("benchbox.utils.system_info.platform.machine", return_value=machine):
+                    with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
+                        info = get_system_info()
+        assert info.cpu_model == f"{machine} CPU"
+
+    def test_keeps_a_real_model_that_merely_contains_an_arch_word(self) -> None:
+        # The guard must reject architecture TOKENS, not any string mentioning
+        # one. "ARMv8 Neoverse-N1" is a real model and must survive.
+        with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
+            with patch("benchbox.utils.system_info.platform.processor", return_value="ARMv8 Neoverse-N1"):
+                with patch("benchbox.utils.system_info.platform.machine", return_value="aarch64"):
+                    with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
+                        info = get_system_info()
+        assert info.cpu_model == "ARMv8 Neoverse-N1"
+
+    def test_to_dict_emits_the_keys_the_environment_consumer_reads(self) -> None:
+        # ClientHostEnvironment.from_system_profile reads cpu_count, memory_gb
+        # and os_release. This dict previously emitted cpu_cores,
+        # total_memory_gb and os_version, so those three fields were silently
+        # dropped on the way into every bundle.
+        keys = get_system_info().to_dict().keys()
+        for consumed in ("cpu_model", "cpu_vendor", "cpu_count", "memory_gb", "os_release"):
+            assert consumed in keys, f"from_system_profile reads {consumed!r}"
+
+    def test_to_dict_keeps_its_original_key_names(self) -> None:
+        # Additive, not a rename: the original names are part of this dict's
+        # existing contract.
+        keys = get_system_info().to_dict().keys()
+        for original in ("cpu_cores", "total_memory_gb", "os_version", "os_type"):
+            assert original in keys
