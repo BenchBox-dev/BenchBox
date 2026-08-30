@@ -923,6 +923,38 @@ describe("BenchmarkIndex", () => {
     expect(screen.getByText("Showing 205 of 205 results for SF 0.1")).toBeTruthy();
   });
 
+  it("supports grouping rows by engine version in list view", async () => {
+    const listRows = [
+      { ...RESULT_ROWS[0]!, result_id: "r1", driver_version: "9.9.9", platform_version: "1.4.0", display_geomean_ms: 10 },
+      { ...RESULT_ROWS[1]!, result_id: "r2", driver_version: "9.9.9", platform_version: "1.3.2", display_geomean_ms: 20 },
+      { ...RESULT_ROWS[0]!, result_id: "r3", driver_version: "8.8.8", platform_version: "1.4.0", display_geomean_ms: 15 },
+    ];
+    vi.mocked(queryRows).mockImplementation(defaultImpl(listRows, RANKING_ROWS, CELL_ROWS));
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+    fireEvent.click(screen.getByText("List"));
+
+    await waitFor(() => expect(screen.getByTestId("benchmark-list-group-by")).toBeTruthy());
+    fireEvent.change(screen.getByTestId("benchmark-list-group-by"), { target: { value: "engine_version" } });
+    expect(screen.getByText(/1.4.0 \(2 results\)/)).toBeTruthy();
+    expect(screen.getByText(/1.3.2 \(1 result\)/)).toBeTruthy();
+  });
+
+  it("honors a version facet carried into the benchmark drill-down", async () => {
+    window.history.replaceState(null, "", "/results/tpch/?version=1.4.0&view=list");
+    const listRows = [
+      { ...RESULT_ROWS[0]!, result_id: "r1", platform_version: "1.4.0" },
+    ];
+    vi.mocked(queryRows).mockImplementation(defaultImpl(listRows, RANKING_ROWS, CELL_ROWS));
+
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+
+    expect(getRenderedResultOrder(container)).toEqual(["r1"]);
+    expect(vi.mocked(queryRows).mock.calls.some(([sql]) => String(sql).includes("platform_version IN (?)"))).toBe(true);
+  });
+
   // -----------------------------------------------------------------------
   // (b) Trust filter hides rows without refetching
   // -----------------------------------------------------------------------

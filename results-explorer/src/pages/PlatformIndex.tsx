@@ -3,7 +3,7 @@ import type { RoutableProps } from "preact-router";
 import { route } from "preact-router";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
 import { getPlatformIndexRows } from "@/lib/duckdbQueries";
-import { useFacetState, type DateWindowFacet, type FacetKey, type FacetState } from "@/lib/facetModel";
+import { useFacetState, type DateWindowFacet, type ExplorerFacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue, toDateWindowFacet } from "@/lib/facetMatching";
 import { formatBenchmarkLabel, formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
 import {
@@ -43,6 +43,11 @@ import { TrayAnnouncer } from "@/components/TrayAnnouncer";
 import type { SortState } from "@/types";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
+import {
+  COHORT_GROUP_BY_LABELS,
+  groupCohortRows,
+  type CohortGroupBy,
+} from "@/lib/queryFilters";
 
 interface PlatformIndexProps extends RoutableProps {
   platform?: string;
@@ -74,7 +79,7 @@ const PLATFORM_ROUTE_ALIASES: Readonly<Record<string, string>> = {
   // corrupt legitimate platform or benchmark identifiers.
   clickhouse_local: "clickhouse-local",
 };
-const PLATFORM_RESULT_FACET_KEYS: FacetKey[] = [
+const PLATFORM_RESULT_FACET_KEYS: ExplorerFacetKey[] = [
   "benchmark",
   "scale_factor",
   "phase",
@@ -89,6 +94,7 @@ const PLATFORM_RESULT_FACET_KEYS: FacetKey[] = [
   "storage_format",
   "cost_status",
   "date_window",
+  "platform_version",
 ];
 
 interface TrendCohort {
@@ -173,6 +179,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [visibleLimit, setVisibleLimit] = useState(TABLE_RENDER_LIMIT);
+  const [groupBy, setGroupBy] = useState<CohortGroupBy>("none");
   const { facets, setFacet } = useFacetState();
   const tuningFilter = singleFacetValue(facets.tuning_mode, "all") ?? "all";
   const setTuningFilter = (value: string) => setFacet("tuning_mode", value === "all" ? [] : [value]);
@@ -185,21 +192,27 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const phaseFilter = singleFacetValue(facets.phase, "all") ?? "all";
   const trustFilter = singleFacetValue(facets.trust_tier, "all") ?? "all";
   const validationFilter = singleFacetValue(facets.validation_status, "all") ?? "all";
+  const platformVersionFilter = facets.platform_version.length === 0
+    ? "all"
+    : facets.platform_version.length === 1
+      ? facets.platform_version[0]!
+      : "__multiple__";
   const dateWindowFilter: DateWindowFacet = facets.date_window;
   // Helper for the five string-array facets that share the "all means
   // empty array" pattern. date_window has its own DateWindowFacet shape
   // and uses toDateWindowFacet directly.
   const setSingleArrayFacet = (
-    key: "benchmark" | "scale_factor" | "phase" | "trust_tier" | "validation_status",
+    key: "benchmark" | "scale_factor" | "phase" | "trust_tier" | "validation_status" | "platform_version",
     value: string,
   ) => setFacet(key, value === "all" ? [] : [value]);
-  const w5FilterKeys: FacetKey[] = [
+  const w5FilterKeys: ExplorerFacetKey[] = [
     "benchmark",
     "scale_factor",
     "phase",
     "trust_tier",
     "validation_status",
     "date_window",
+    "platform_version",
   ];
   const hasW5Filters = hasActiveFacets(facets, w5FilterKeys);
   const resetW5Filters = () => {
@@ -209,6 +222,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     setFacet("trust_tier", []);
     setFacet("validation_status", []);
     setFacet("date_window", "all");
+    setFacet("platform_version", []);
   };
   // Default: geomean_ms ascending (fastest first), nulls last. The empty-state
   // ordering is observable behaviour — must_preserve in the parent TODO.
@@ -270,6 +284,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     facets.storage_format,
     facets.cost_status,
     facets.date_window,
+    facets.platform_version,
     sort.key,
     sort.direction,
   ]);
@@ -339,7 +354,15 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         .filter((status): status is string => status !== null && status !== undefined),
     ),
   ].sort();
-  const showW5Filters = allPlatformResults.length >= 25;
+  const platformVersionOptions = [
+    ...new Set(
+      allPlatformResults
+        .map((r) => r.platform_version)
+        .filter((version): version is string => version !== null && version !== undefined),
+    ),
+  ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const showW5Filters =
+    allPlatformResults.length >= 25 || platformVersionFilter !== "all" || platformVersionOptions.length > 1;
 
   const platformResultsRaw = allPlatformResults.filter((row) =>
     matchesFacetRow(row, facets, { keys: PLATFORM_RESULT_FACET_KEYS }),
@@ -381,6 +404,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     return dir * (av - bv);
   });
   const visiblePlatformResults = platformResults.slice(0, visibleLimit);
+  const groupedPlatformResults = groupCohortRows<PlatformIndexRowRow>(
+    visiblePlatformResults,
+    groupBy,
+    (row) => row.platform_version ?? null,
+  );
   const runIdentityLabels = formatRunIdentitiesForCohort(platformResults, "table");
 
   function toggleSort(key: PlatformSortKey) {
@@ -622,6 +650,28 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               </select>
             </div>
             <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-version">
+                Engine version
+              </label>
+              <select
+                id="platform-filter-version"
+                data-testid="platform-filter-version"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={platformVersionFilter}
+                onChange={(event) =>
+                  setSingleArrayFacet("platform_version", (event.target as HTMLSelectElement).value)
+                }
+              >
+                <option value="all">All versions</option>
+                {platformVersionFilter === "__multiple__" && (
+                  <option value="__multiple__" disabled>{facets.platform_version.length} versions selected</option>
+                )}
+                {platformVersionOptions.map((value) => (
+                  <option key={value} value={value}>{value}</option>
+                ))}
+              </select>
+            </div>
+            <div class="flex flex-col gap-1">
               <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-date-window">
                 Date window
               </label>
@@ -710,9 +760,24 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       ) : (
         <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
-            <span>
-              Showing {visiblePlatformResults.length.toLocaleString()} of {platformResults.length.toLocaleString()} results
-            </span>
+            <div>
+              <span>Showing {visiblePlatformResults.length.toLocaleString()} of {platformResults.length.toLocaleString()} results</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-group-by">
+                Group by:
+              </label>
+              <select
+                id="platform-group-by"
+                data-testid="platform-group-by"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={groupBy}
+                onChange={(event) => setGroupBy((event.target as HTMLSelectElement).value as CohortGroupBy)}
+              >
+                <option value="none">{COHORT_GROUP_BY_LABELS.none}</option>
+                <option value="engine_version">{COHORT_GROUP_BY_LABELS.engine_version}</option>
+              </select>
+            </div>
           </div>
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-xs text-[var(--bb-data-fg-muted)]">
             <span>Rows are labelled by comparable ranking: benchmark, scale, phase, and primary metric.</span>
@@ -818,23 +883,56 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               </tr>
             </thead>
             <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
-              {visiblePlatformResults.map((r, index) => (
-                <PlatformRow
-                  key={r.result_id}
-                  entry={r}
-                  runIdentityLabel={runIdentityLabels[index] ?? r.platform}
-                  checked={selected.has(r.result_id)}
-                  onToggle={() => toggleSelect(r.result_id)}
-                  showMetricContract={showMetricContract}
-                  disabledReason={
-                    comparisonExclusionReason(r) ??
-                    cohortLockReason(r) ??
-                    (!selected.has(r.result_id) && selected.size >= MAX_COMPARE_SELECTIONS
-                      ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared.`
-                      : undefined)
-                  }
-                />
-              ))}
+              {groupBy === "none"
+                ? visiblePlatformResults.map((r, index) => (
+                    <PlatformRow
+                      key={r.result_id}
+                      entry={r}
+                      runIdentityLabel={runIdentityLabels[index] ?? r.platform}
+                      checked={selected.has(r.result_id)}
+                      onToggle={() => toggleSelect(r.result_id)}
+                      showMetricContract={showMetricContract}
+                      disabledReason={
+                        comparisonExclusionReason(r) ??
+                        cohortLockReason(r) ??
+                        (!selected.has(r.result_id) && selected.size >= MAX_COMPARE_SELECTIONS
+                          ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared.`
+                          : undefined)
+                      }
+                    />
+                  ))
+                : groupedPlatformResults.map((group) => (
+                    <>
+                      <tr
+                        key={`group-${group.key}`}
+                        class="bg-[var(--bb-surface-data-muted)] font-semibold text-xs text-[var(--bb-data-fg-primary)]"
+                      >
+                        <td colspan={platformColumnCount} class="px-4 py-2">
+                          {group.label} ({group.rows.length} {group.rows.length === 1 ? "result" : "results"})
+                        </td>
+                      </tr>
+                      {group.rows.map((r) => {
+                        const index = visiblePlatformResults.findIndex((row) => row.result_id === r.result_id);
+                        return (
+                          <PlatformRow
+                            key={r.result_id}
+                            entry={r}
+                            runIdentityLabel={runIdentityLabels[index] ?? r.platform}
+                            checked={selected.has(r.result_id)}
+                            onToggle={() => toggleSelect(r.result_id)}
+                            showMetricContract={showMetricContract}
+                            disabledReason={
+                              comparisonExclusionReason(r) ??
+                              cohortLockReason(r) ??
+                              (!selected.has(r.result_id) && selected.size >= MAX_COMPARE_SELECTIONS
+                                ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared.`
+                                : undefined)
+                            }
+                          />
+                        );
+                      })}
+                    </>
+                  ))}
             </tbody>
           </DataTable>
           </div>
