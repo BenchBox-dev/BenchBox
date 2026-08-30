@@ -1,8 +1,8 @@
 {
+  "bundle_file": "tpch_sf001_sqlite_sql_20260825_180256_4eddc10f.json",
+  "bundle_hash": "ebba214ac3190f3b64ad077a5e9240875fbe8e5c75d33c5d987c4d344f0620da",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "tpch_sf001_sqlite_sql_20260825_180256_4eddc10f.json",
-  "bundle_hash": "8c7bb9fff95bf76b9f09676a00d1cc71d3d4e3f3d67d9a2ef704620201dd238e"
+  "submitted_by": "maintainer"
 }

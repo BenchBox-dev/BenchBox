@@ -1,8 +1,8 @@
 {
+  "bundle_file": "coffeeshop_sf01_clickhouse_local_sql_20260826_113300_975cb3a1.json",
+  "bundle_hash": "a2abd84921f8371922516004d5c15199a9680fb7b5b9da8175cf4bc9cf81a4c4",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "coffeeshop_sf01_clickhouse_local_sql_20260826_113300_975cb3a1.json",
-  "bundle_hash": "745cd79ac052c9106d2617a193aa93712591123bb3900c8ca1de0bfaafb0a73e"
+  "submitted_by": "maintainer"
 }

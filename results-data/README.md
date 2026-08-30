@@ -68,28 +68,20 @@ document already described in prose.
 
 ## Seed Corpus
 
-The current checked-in corpus covers 10 benchmarks across 24 cohorts and 151
-bundles. All bundles were run on or after 2026-08-23. The coverage matrix is
-derived from `corpus-inventory.json`:
+The current checked-in corpus covers 2 benchmarks across 3 cohorts, all run
+on or after 2026-08-23:
 
-| Benchmark | Cohorts | Bundles | Scale factors | Platforms |
-|---|---:|---:|---|---|
-| amplab | 3 | 18 | 0.01, 0.1, 1.0 | ClickHouse Local, DataFusion, DuckDB, Pandas, Polars, SQLite |
-| clickbench | 1 | 6 | 1.0 | ClickHouse Local, DataFusion, DuckDB, Pandas, Polars, SQLite |
-| coffeeshop | 3 | 17 | 0.01, 0.1, 1.0 | ClickHouse Local, DataFusion, DuckDB, Pandas, Polars, SQLite |
-| h2odb | 3 | 18 | 0.01, 0.1, 1.0 | ClickHouse Local, DataFusion, DuckDB, Pandas, Polars, SQLite |
-| joinorder | 1 | 5 | 1.0 | ClickHouse Local, DataFusion, DuckDB, Polars, SQLite |
-| read_primitives | 2 | 12 | 0.01, 0.1 | ClickHouse Local, DataFusion, DuckDB, Pandas, Polars, SQLite |
-| ssb | 3 | 18 | 0.01, 0.1, 1.0 | ClickHouse Local, DataFusion, DuckDB, Pandas, Polars, SQLite |
-| tpcds | 2 | 13 | 1.0, 10.0 | ClickHouse Local, DataFusion, DuckDB, Pandas, Polars, SQLite, Spark |
-| tpch | 3 | 29 | 0.01, 0.1, 1.0 | CedarDB, ClickHouse Local, ClickHouse Server, DataFusion, DuckDB, DuckLake, LakeSail, Pandas, Polars, PySpark, SQLite, Spark, StarRocks |
-| tpch_skew | 3 | 15 | 0.01, 0.1, 1.0 | ClickHouse Local, DataFusion, DuckDB, Polars, SQLite |
+| Benchmark | Scale | Platforms |
+|---|---|---|
+| tpcds | 1.0 | DataFusion, DuckDB, Spark |
+| tpcds | 10.0 | DataFusion, DuckDB, Spark |
+| tpch | 1.0 | DuckDB, Polars, PySpark |
 
 Everything older was withdrawn on 2026-08-28 as a trust decision; see
 `CORPUS_NOTES.md`. The maintainer-run seed lane (`seed-corpus.yml` workflow,
-manual `workflow_dispatch`) remains a refresh mechanism for its target matrix,
-which is documented in `SEED_CORPUS_SPEC.md`; it is not a complete description
-of the current checked-in corpus.
+manual `workflow_dispatch`) targets TPC-H and SSB at SF 0.01 / 0.1, so its
+matrix no longer matches anything checked in — a dispatch is what refills
+those cohorts.
 
 For the up-to-date per-cohort breakdown, see
 `results-data/corpus-inventory.json` (regenerate via

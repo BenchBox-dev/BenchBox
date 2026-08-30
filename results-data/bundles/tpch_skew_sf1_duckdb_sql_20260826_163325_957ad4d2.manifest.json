@@ -1,8 +1,8 @@
 {
+  "bundle_file": "tpch_skew_sf1_duckdb_sql_20260826_163325_957ad4d2.json",
+  "bundle_hash": "3bb1908ecba3f6b76f33d01371d1a90953e218b7c6a580096269c0d389cf365f",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "tpch_skew_sf1_duckdb_sql_20260826_163325_957ad4d2.json",
-  "bundle_hash": "35f8062bef9988ac36e4654656137516b84393d198382f9b06127af0102b3535"
+  "submitted_by": "maintainer"
 }

@@ -1,8 +1,8 @@
 {
+  "bundle_file": "coffeeshop_sf1_datafusion_sql_20260826_100331_e1266562.json",
+  "bundle_hash": "82460563b198d4e31af4e54dd1be9c306d057c9eee941ed54c23f7c18ca77c02",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "coffeeshop_sf1_datafusion_sql_20260826_100331_e1266562.json",
-  "bundle_hash": "c0204eca109076993b47704305024d6934ce4437cc421e69087eae6513276518"
+  "submitted_by": "maintainer"
 }

@@ -1,8 +1,8 @@
 {
+  "bundle_file": "amplab_sf01_sqlite_sql_20260826_173851_fc7e8195.json",
+  "bundle_hash": "2453165dbae4bede8e92767c2768b5d8dc89d37fecf7ae130bee3358de7dba49",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "amplab_sf01_sqlite_sql_20260826_173851_fc7e8195.json",
-  "bundle_hash": "33c1b446a595524f69a5e91746c0924a105702164cb7e718b2a2a070ed5d3783"
+  "submitted_by": "maintainer"
 }

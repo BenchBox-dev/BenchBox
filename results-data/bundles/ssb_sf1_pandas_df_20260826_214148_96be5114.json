@@ -21,6 +21,14 @@
     "total_usd": 0
   },
   "environment": {
+    "client_host": {
+      "cpu_identity_provenance": "user_attested",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple"
+    },
+    "cpu_identity_provenance": "user_attested",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
     "platform_runtime": {
       "collection_status": "partial",
       "runtime_type": "dataframe_process",
