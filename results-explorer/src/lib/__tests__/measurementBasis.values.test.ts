@@ -365,6 +365,7 @@ describe("compared geomeans share one query set", () => {
       10.000000000000002,
       20.000000000000004,
     ]);
+    expect(resolved.map((result) => result.display_timings[0]?.sample_count)).toEqual([1, 1]);
   });
 });
 

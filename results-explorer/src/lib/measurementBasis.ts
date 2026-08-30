@@ -741,12 +741,11 @@ export function resolveResultsForBasis(
             : val.kind === "unavailable"
               ? val.reason
               : null;
-        const sampleCount =
-          val.kind === "value"
+        const sampleCount = isDefaultBasis(basis)
+          ? (existing?.sample_count ?? 0)
+          : val.kind === "value"
             ? val.sampleCount
-            : isDefaultBasis(basis)
-              ? (existing?.sample_count ?? 0)
-              : 0;
+            : 0;
         return {
           query_id: queryId,
           display_ms: ms,
