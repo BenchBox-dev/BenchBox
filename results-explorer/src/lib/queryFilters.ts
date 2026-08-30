@@ -320,3 +320,73 @@ function renderSqlLiteral(value: unknown): string {
   const escaped = String(value).split("\\").join("\\\\").split("'").join("''");
   return `'${escaped}'`;
 }
+
+// ---------------------------------------------------------------------------
+// Presentation-only grouping for the cohort index tables
+// ---------------------------------------------------------------------------
+
+/**
+ * How to split cohort rows into labelled groups.
+ *
+ * PRESENTATION ONLY. Grouping rearranges rows; it never changes how a rank is
+ * computed or which rows are ranking-eligible. Ranking semantics are governed
+ * by a separate contract with its own release gate, and a grouping control that
+ * quietly reordered or re-filtered would become a second, hidden ranking policy.
+ */
+export type CohortGroupBy = "none" | "engine_version";
+
+export const COHORT_GROUP_BY_LABELS: Record<CohortGroupBy, string> = {
+  none: "No grouping",
+  engine_version: "Engine version",
+};
+
+export interface CohortGroup<T> {
+  key: string;
+  label: string;
+  rows: T[];
+}
+
+/** Rows lacking the grouping value collect here rather than vanishing. */
+export const UNGROUPED_LABEL = "Not recorded";
+
+/**
+ * Split rows into labelled groups, preserving input order within each group.
+ *
+ * Stability matters: the caller has already sorted by rank, so preserving
+ * order is what makes "grouping does not change ranking" true in the rendered
+ * output and not merely in principle.
+ *
+ * A row whose grouping value is absent goes to an explicit "Not recorded"
+ * group. Dropping it would let a filter silently shrink the cohort, and the
+ * per-group counts would then not sum to the total the page states.
+ */
+export function groupCohortRows<T>(
+  rows: readonly T[],
+  groupBy: CohortGroupBy,
+  readValue: (row: T) => string | null | undefined,
+): CohortGroup<T>[] {
+  if (groupBy === "none") {
+    return [{ key: "all", label: "All runs", rows: [...rows] }];
+  }
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const raw = readValue(row);
+    const key = raw === null || raw === undefined || raw === "" ? UNGROUPED_LABEL : raw;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(row);
+    else groups.set(key, [row]);
+  }
+  // "Not recorded" sorts last; everything else keeps a stable natural order.
+  return [...groups.entries()]
+    .sort(([a], [b]) => {
+      if (a === UNGROUPED_LABEL) return 1;
+      if (b === UNGROUPED_LABEL) return -1;
+      return a.localeCompare(b, undefined, { numeric: true });
+    })
+    .map(([key, groupRows]) => ({ key, label: key, rows: groupRows }));
+}
+
+/** Total across groups, for asserting the split lost nothing. */
+export function cohortGroupTotal<T>(groups: readonly CohortGroup<T>[]): number {
+  return groups.reduce((sum, group) => sum + group.rows.length, 0);
+}

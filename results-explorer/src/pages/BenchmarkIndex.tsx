@@ -1044,6 +1044,17 @@ function ListTable({
       <div class="border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
         Showing {visibleRows.length.toLocaleString()} of {filtered.length.toLocaleString()} results for SF {scaleFactor}
       </div>
+      {/*
+        The basis statement, per w3. A leaderboard that does not say what its
+        numbers mean is the same defect the compare work is fixing.
+
+        The median-or-min CONTROL is deferred, not forgotten -- see w0.log and
+        deferral #724 for the measurement and the reason.
+      */}
+      <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]" data-testid="basis-statement">
+        Every figure below uses the published measurement basis: the median of each run's warm
+        passes per query, then the geometric mean across queries. Warmup passes are excluded.
+      </p>
       <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
         <thead class="bg-[var(--bb-surface-data-muted)]">
           <tr>

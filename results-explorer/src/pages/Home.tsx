@@ -20,7 +20,7 @@ import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import {
   FACET_KEYS,
   useFacetState,
-  type FacetKey,
+  type ExplorerFacetKey,
   type FacetState,
 } from "@/lib/facetModel";
 import {
@@ -743,12 +743,31 @@ function SkeletonSelect({ label }: { label: string }) {
 }
 
 interface ActiveFacetSummary {
-  key: FacetKey;
+  // Widened to ExplorerFacetKey so the engine-version chip, which is a
+  // hardware facet key, can be summarized alongside the core ones.
+  key: ExplorerFacetKey;
   label: string;
   value: string;
 }
 
-const FACET_LABELS: Record<FacetKey, string> = {
+/**
+ * Facets rendered as active chips on this page.
+ *
+ * FACET_KEYS is the core set. `platform_version` is added because w0's coverage
+ * gate cleared it (7 populated buckets) and the state, URL and SQL plumbing for
+ * it already exist from the hardware read-model item -- only the rendering was
+ * missing.
+ *
+ * `arch` and `cpu_family` are DELIBERATELY absent. Each has exactly one
+ * populated bucket across the whole corpus, and a single-bucket chip implies a
+ * choice the data cannot offer. `cpu_family` is the sharper case: since the
+ * attestation backfill it reads "apple_silicon (151)", which looks like real
+ * coverage rather than like an empty facet, so a chip would actively mislead.
+ * They ship as columns instead -- see w0.log.
+ */
+const RENDERED_FACET_KEYS = [...FACET_KEYS, "platform_version"] as const;
+
+const FACET_LABELS: Record<ExplorerFacetKey, string> = {
   benchmark: "Benchmark",
   scale_factor: "Scale factor",
   phase: "Phase",
@@ -764,6 +783,12 @@ const FACET_LABELS: Record<FacetKey, string> = {
   storage_format: "Storage format",
   cost_status: "Cost status",
   date_window: "Date window",
+  platform_version: "Engine version",
+  // Labelled but NOT in RENDERED_FACET_KEYS: single-bucket facets ship as
+  // columns, not chips. The label exists so a URL that already carries one
+  // still summarizes readably.
+  arch: "Architecture",
+  cpu_family: "CPU family",
 };
 
 function ActiveLeaderboardSummary({
@@ -979,7 +1004,7 @@ function summarizeActiveFacets(
   platformIdToName: ReadonlyMap<string, string>,
 ): ActiveFacetSummary[] {
   const summaries: ActiveFacetSummary[] = [];
-  for (const key of FACET_KEYS) {
+  for (const key of RENDERED_FACET_KEYS) {
     const value = facets[key];
     if (Array.isArray(value)) {
       if (value.length === 0) continue;
@@ -1000,7 +1025,7 @@ function summarizeActiveFacets(
 }
 
 function formatFacetValue(
-  key: FacetKey,
+  key: ExplorerFacetKey,
   value: string,
   platformIdToName: ReadonlyMap<string, string>,
 ): string {

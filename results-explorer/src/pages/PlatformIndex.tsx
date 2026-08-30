@@ -724,6 +724,14 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             />
           </div>
           <div ref={resultsScrollerRef} class="overflow-x-auto" data-testid="platform-results-scroll-container">
+          {/*
+          Basis statement, per w3. Same wording as BenchmarkIndex so the two
+          leaderboards cannot describe the same reduction differently.
+          */}
+          <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]" data-testid="basis-statement">
+          Every figure below uses the published measurement basis: the median of each run's warm
+          passes per query, then the geometric mean across queries. Warmup passes are excluded.
+          </p>
           <DataTable
             ariaLabel={`${platformDisplayName} results`}
             ariaColCount={platformColumnCount}
