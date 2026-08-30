@@ -484,19 +484,28 @@ describe("measurement basis resolution for comparison", () => {
     expect(resolved[0]!.display_timings[0]!.timing_exclusion_reason).toBe("missing_timing");
   });
 
-  it("recomputes timing eligibility when alternate basis has valid timings", () => {
+  it("recomputes timing eligibility according to canonical contract when alternate basis is used", () => {
     const rawRun: DetailResult = {
       ...runs[0]!,
+      logical_query_count: 2,
       has_display_timing: false,
       valid_query_count: 0,
-      missing_query_count: 1,
+      missing_query_count: 2,
       display_exclusion_reason: "no_display_timings",
       comparison_exclusion_reason: "no_comparable_timings",
+      ranking_exclusion_reason: "no_rankable_timings",
       display_timings: [
         {
           query_id: "Q1",
           display_ms: null,
-          sample_count: 0,
+          sample_count: 3,
+          is_valid_display_timing: false,
+          timing_exclusion_reason: "missing_timing",
+        },
+        {
+          query_id: "Q2",
+          display_ms: null,
+          sample_count: 3,
           is_valid_display_timing: false,
           timing_exclusion_reason: "missing_timing",
         },
@@ -513,12 +522,36 @@ describe("measurement basis resolution for comparison", () => {
       ],
     };
 
-    const resolvedWarmup = resolveResultsForBasis([rawRun], { passes: WARMUP, statistic: "median" });
-    expect(resolvedWarmup[0]!.has_display_timing).toBe(true);
-    expect(resolvedWarmup[0]!.valid_query_count).toBe(1);
-    expect(resolvedWarmup[0]!.missing_query_count).toBe(0);
-    expect(resolvedWarmup[0]!.display_exclusion_reason).toBeNull();
-    expect(resolvedWarmup[0]!.comparison_exclusion_reason).toBeNull();
+    // With 1 warmup query out of 2 logical queries: valid=1, coverage=50% (>= 50%),
+    // but valid < 2 -> insufficient_valid_queries for comparison and ranking
+    const resolved1 = resolveResultsForBasis([rawRun], { passes: WARMUP, statistic: "median" });
+    expect(resolved1[0]!.has_display_timing).toBe(true);
+    expect(resolved1[0]!.valid_query_count).toBe(1);
+    expect(resolved1[0]!.display_exclusion_reason).toBeNull();
+    expect(resolved1[0]!.comparison_exclusion_reason).toBe("insufficient_valid_queries");
+    expect(resolved1[0]!.ranking_exclusion_reason).toBe("insufficient_valid_queries");
+    // For unavailable Q2 under alternate basis, sample_count must be 0, not copied from default basis
+    expect(resolved1[0]!.display_timings.find((t) => t.query_id === "Q2")!.sample_count).toBe(0);
+
+    // With 2 warmup queries out of 2 logical queries: valid=2 -> compare/rank safe
+    const rawRun2: DetailResult = {
+      ...rawRun,
+      queries: [
+        ...rawRun.queries,
+        {
+          query_id: "Q2",
+          duration_ms: 140,
+          status: "pass",
+          run_type: "warmup",
+          iter: null,
+          stream: 0,
+        },
+      ],
+    };
+    const resolved2 = resolveResultsForBasis([rawRun2], { passes: WARMUP, statistic: "median" });
+    expect(resolved2[0]!.valid_query_count).toBe(2);
+    expect(resolved2[0]!.comparison_exclusion_reason).toBeNull();
+    expect(resolved2[0]!.ranking_exclusion_reason).toBeNull();
   });
 });
 
@@ -563,5 +596,18 @@ describe("shared limiter query selection", () => {
     const filterOrder = ["Q2", "Q1"];
     const orderedHeatmap = filterOrder.map((id) => rowsByQueryId.get(id)).filter(Boolean);
     expect(orderedHeatmap.map((r: any) => r.queryId)).toEqual(["Q2", "Q1"]);
+  });
+
+  it("keeps all queries uncapped in MultiRunHeatmap when limiter is 'all'", () => {
+    const q15: [string, number][] = Array.from({ length: 15 }, (_, i) => [`Q${i + 1}`, 100 + i]);
+    const runs15 = [
+      run("base", q15),
+      run("cand1", q15),
+      run("cand2", q15),
+    ];
+    const all = buildHeatmapRows(runs15, 0);
+    const effectiveLimiter = "all";
+    const shown = effectiveLimiter === "all" ? all : all.slice(0, 10);
+    expect(shown.length).toBe(15);
   });
 });

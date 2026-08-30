@@ -65,6 +65,7 @@ import {
   BASIS_URL_KEY,
   DEFAULT_BASIS,
   basisSerde,
+  formatBasisLabel,
   isCollapsedStatistic,
   isDefaultBasis,
   parseAvailablePassSelections,
@@ -872,7 +873,7 @@ export function Compare({ url }: CompareProps) {
       </div>
 
       <p class="mb-6 text-xs text-[var(--bb-data-fg-subtle)]">
-        <strong>Geomean query time</strong> - geometric mean of per-query execution times (measurement runs only). More
+        <strong>Geomean query time</strong> - geometric mean of per-query execution times ({isDefaultBasis(basis) ? "measurement runs only" : `${formatBasisLabel(basis)} only`}). More
         comparable than wall-clock total when query counts differ. Lower is faster.
       </p>
 

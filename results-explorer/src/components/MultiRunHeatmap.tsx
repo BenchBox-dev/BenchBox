@@ -162,7 +162,7 @@ export function MultiRunHeatmap({
   const ordered = queryFilter
     ? (queryFilter.map((id) => rowsByQueryId.get(id)).filter((r): r is HeatmapRow => r !== undefined))
     : filterHeatmapRows(all, effectiveLimiter, baselineIndex);
-  const shown = queryFilter ? ordered : ordered.slice(0, limit);
+  const shown = queryFilter || effectiveLimiter === "all" ? ordered : ordered.slice(0, limit);
   const runMissing = shown.reduce(
     (n, row) => n + row.cells.filter((c) => c.missingKind === "run_missing").length,
     0,

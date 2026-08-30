@@ -738,10 +738,16 @@ export function resolveResultsForBasis(
             : val.kind === "unavailable"
               ? val.reason
               : null;
+        const sampleCount =
+          val.kind === "value"
+            ? val.sampleCount
+            : isDefaultBasis(basis)
+              ? (existing?.sample_count ?? 0)
+              : 0;
         return {
           query_id: queryId,
           display_ms: ms,
-          sample_count: val.kind === "value" ? val.sampleCount : (existing?.sample_count ?? 0),
+          sample_count: sampleCount,
           is_valid_display_timing: ms !== null,
           timing_exclusion_reason: timingExclusionReason,
         };
@@ -750,12 +756,16 @@ export function resolveResultsForBasis(
     const newGeomean = geomeanByResultId.get(r.result_id) ?? null;
     const isDefault = isDefaultBasis(basis);
 
+    const logicalCount =
+      r.logical_query_count !== undefined && r.logical_query_count > 0
+        ? r.logical_query_count
+        : newDisplayTimings.length;
     const validQueryCount = isDefault
       ? r.valid_query_count
       : newDisplayTimings.filter((t) => t.is_valid_display_timing).length;
     const missingQueryCount = isDefault
       ? r.missing_query_count
-      : newDisplayTimings.filter((t) => !t.is_valid_display_timing).length;
+      : Math.max(logicalCount - validQueryCount, 0);
     const hasDisplayTiming = isDefault ? r.has_display_timing : validQueryCount > 0;
 
     let displayExclusionReason = r.display_exclusion_reason;
@@ -763,26 +773,52 @@ export function resolveResultsForBasis(
     let rankingExclusionReason = r.ranking_exclusion_reason;
 
     if (!isDefault) {
-      if (!hasDisplayTiming) {
-        displayExclusionReason = "no_display_timings";
-        comparisonExclusionReason = comparisonExclusionReason ?? "no_comparable_timings";
-        rankingExclusionReason = rankingExclusionReason ?? "no_rankable_timings";
+      if (validQueryCount > 0) {
+        displayExclusionReason = null;
+      } else if (logicalCount <= 0) {
+        displayExclusionReason = "no_queries";
       } else {
-        if (displayExclusionReason === "no_display_timings") {
-          displayExclusionReason = null;
-        }
-        if (
-          comparisonExclusionReason === "no_comparable_timings" ||
-          comparisonExclusionReason === "no_display_timings"
-        ) {
-          comparisonExclusionReason = null;
-        }
-        if (
-          rankingExclusionReason === "no_rankable_timings" ||
-          rankingExclusionReason === "no_display_timings"
-        ) {
-          rankingExclusionReason = null;
-        }
+        displayExclusionReason = "no_valid_display_timing";
+      }
+
+      const independentCompareExclusions = new Set([
+        "visibility_not_comparable",
+        "benchmarks_differ",
+        "scales_differ",
+        "phases_differ",
+        "hidden_result",
+      ]);
+      if (r.comparison_exclusion_reason && independentCompareExclusions.has(r.comparison_exclusion_reason)) {
+        comparisonExclusionReason = r.comparison_exclusion_reason;
+      } else if (displayExclusionReason !== null) {
+        comparisonExclusionReason = displayExclusionReason;
+      } else if (validQueryCount < 2) {
+        comparisonExclusionReason = "insufficient_valid_queries";
+      } else if (logicalCount > 0 && validQueryCount * 2 < logicalCount) {
+        comparisonExclusionReason = "insufficient_query_coverage";
+      } else {
+        comparisonExclusionReason = null;
+      }
+
+      const independentRankingExclusions = new Set([
+        "visibility_not_rankable",
+        "trust_not_rankable",
+        "unofficial_compliance",
+        "compliance_not_rankable",
+        "failed_queries",
+        "validation_not_clean",
+        "hidden_result",
+      ]);
+      if (r.ranking_exclusion_reason && independentRankingExclusions.has(r.ranking_exclusion_reason)) {
+        rankingExclusionReason = r.ranking_exclusion_reason;
+      } else if (comparisonExclusionReason !== null) {
+        rankingExclusionReason = comparisonExclusionReason;
+      } else if (newGeomean === null) {
+        rankingExclusionReason = "missing_primary_metric";
+      } else if (!Number.isFinite(newGeomean) || newGeomean <= 0) {
+        rankingExclusionReason = "non_positive_primary_metric";
+      } else {
+        rankingExclusionReason = null;
       }
     }
 
