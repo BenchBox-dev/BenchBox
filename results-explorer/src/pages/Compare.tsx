@@ -881,25 +881,36 @@ export function Compare({ url }: CompareProps) {
         comparable than wall-clock total when query counts differ. Lower is faster.
       </p>
 
-      {shouldShowMultiRunStandings(
-        resolvedResults.map((r) => r.result_id),
-        decisionSummary.claimSuppressed,
-      ) && (
-        <MultiRunStandings
-          results={resolvedResults}
-          baselineIndex={normalizedBaselineIndex}
-          runLabels={cohortIdentitiesCompact}
-        />
-      )}
       {compareLayoutForSelection(resolvedResults.map((r) => r.result_id)).kind === "multi_run" && (
-        <MultiRunHeatmap
-          results={resolvedResults}
-          baselineIndex={normalizedBaselineIndex}
-          runLabels={cohortIdentitiesCompact}
-          limiter={queryLimiter}
-          orderByDisagreement={queryLimiter === "movement"}
-          queryFilter={queryLimiter === "all" ? undefined : limitedQueryIds}
-        />
+        <>
+          {shouldShowMultiRunStandings(
+            resolvedResults.map((r) => r.result_id),
+            decisionSummary.claimSuppressed,
+          ) ? (
+            <MultiRunStandings
+              results={resolvedResults}
+              baselineIndex={normalizedBaselineIndex}
+              runLabels={cohortIdentitiesCompact}
+            />
+          ) : (
+            <section class="card mb-8" aria-labelledby="standings-title">
+              <h2 id="standings-title" class="text-base font-semibold text-[var(--bb-data-fg-primary)]">
+                Standings
+              </h2>
+              <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]" role="status">
+                Standings are unavailable because {decisionSummary.claimSuppressionReason ?? "the selected runs are not comparable"}.
+              </p>
+            </section>
+          )}
+          <MultiRunHeatmap
+            results={resolvedResults}
+            baselineIndex={normalizedBaselineIndex}
+            runLabels={cohortIdentitiesCompact}
+            limiter={queryLimiter}
+            orderByDisagreement={queryLimiter === "movement"}
+            queryFilter={queryLimiter === "all" ? undefined : limitedQueryIds}
+          />
+        </>
       )}
 
       <QueryDiffTable
