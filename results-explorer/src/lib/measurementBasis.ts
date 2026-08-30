@@ -861,7 +861,7 @@ export function resolveResultsForBasis(
 /** True when median and minimum reduce the same single sample for every projected query. */
 export function resolvedStatisticsCollapsed(results: readonly DetailResult[]): boolean {
   return !results.some((result) =>
-    result.display_timings.some((timing) => timing.is_valid_display_timing && timing.sample_count > 1),
+    result.display_timings.some((timing) => timing.sample_count > 1),
   );
 }
 

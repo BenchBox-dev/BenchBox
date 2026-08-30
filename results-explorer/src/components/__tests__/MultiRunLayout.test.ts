@@ -474,6 +474,23 @@ describe("measurement basis resolution for comparison", () => {
     expect(resolvedStatisticsCollapsed(resolved)).toBe(false);
   });
 
+  it("keeps the statistic selectable when a multi-sample timing is excluded", () => {
+    const excludedRun = {
+      ...runs[0]!,
+      display_timings: [
+        {
+          ...runs[0]!.display_timings[0]!,
+          display_ms: null,
+          sample_count: 5,
+          is_valid_display_timing: false,
+          timing_exclusion_reason: "zero_timing",
+        },
+      ],
+    } as DetailResult;
+
+    expect(resolvedStatisticsCollapsed([excludedRun])).toBe(false);
+  });
+
   it("resolves warmup pass executions when warmup basis is selected", () => {
     const warmupBasis: MeasurementBasis = { passes: WARMUP, statistic: "median" };
     const resolved = resolveResultsForBasis(runs, warmupBasis);
