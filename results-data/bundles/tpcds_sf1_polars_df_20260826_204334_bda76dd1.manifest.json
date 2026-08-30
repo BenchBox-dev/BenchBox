@@ -1,0 +1,8 @@
+{
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "funding": "unspecified",
+  "submitted_by": "maintainer",
+  "bundle_file": "tpcds_sf1_polars_df_20260826_204334_bda76dd1.json",
+  "bundle_hash": "52accdd6308fe82b669fa812bc7d3a9753009d87e0d8ae2889e904b457443469"
+}
