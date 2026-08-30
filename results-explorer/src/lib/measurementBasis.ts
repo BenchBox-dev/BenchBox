@@ -389,6 +389,7 @@ export type BasisUnavailableReason =
   | "no_warm_passes_recorded"
   | "pass_not_recorded"
   | "no_passing_executions"
+  | "zero_timing"
   | "display_value_excluded";
 
 const UNAVAILABLE_LABELS: Record<BasisUnavailableReason, string> = {
@@ -396,6 +397,7 @@ const UNAVAILABLE_LABELS: Record<BasisUnavailableReason, string> = {
   no_warm_passes_recorded: "This run did not record any warm passes.",
   pass_not_recorded: "This run did not record that warm pass.",
   no_passing_executions: "No execution of this query passed under that basis.",
+  zero_timing: "Recorded execution timing was zero.",
   display_value_excluded: "The published value for this query is excluded from display evidence.",
 };
 
@@ -524,11 +526,12 @@ export function resolveQueryValue(
   const { rows: selected, missingReason } = selectExecutions(rows, basis.passes);
   if (missingReason !== null) return { kind: "unavailable", reason: missingReason };
 
-  const value = applyStatistic(
-    selected.map((r) => r.duration_ms).filter((ms) => Number.isFinite(ms) && ms > 0),
-    basis.statistic,
-  );
-  if (value === null) return { kind: "unavailable", reason: "no_passing_executions" };
+  const nonZero = selected.map((r) => r.duration_ms).filter((ms) => Number.isFinite(ms) && ms > 0);
+  const value = applyStatistic(nonZero, basis.statistic);
+  if (value === null) {
+    const hasZero = selected.some((r) => r.duration_ms === 0);
+    return { kind: "unavailable", reason: hasZero ? "zero_timing" : "no_passing_executions" };
+  }
   // Derived from the sample actually reduced, not from the pass kind. A
   // throughput run records one warmup execution PER STREAM, so a nominally
   // single-pass basis can still reduce several rows; and a run with only one
@@ -760,12 +763,15 @@ export function resolveResultsForBasis(
       r.logical_query_count !== undefined && r.logical_query_count > 0
         ? r.logical_query_count
         : newDisplayTimings.length;
+    const zeroTimingCount = isDefault
+      ? (r.zero_timing_count ?? 0)
+      : newDisplayTimings.filter((t) => t.timing_exclusion_reason === "zero_timing" || t.display_ms === 0).length;
     const validQueryCount = isDefault
       ? r.valid_query_count
       : newDisplayTimings.filter((t) => t.is_valid_display_timing).length;
     const missingQueryCount = isDefault
       ? r.missing_query_count
-      : Math.max(logicalCount - validQueryCount, 0);
+      : Math.max(logicalCount - validQueryCount - zeroTimingCount, 0);
     const hasDisplayTiming = isDefault ? r.has_display_timing : validQueryCount > 0;
 
     let displayExclusionReason = r.display_exclusion_reason;
@@ -777,6 +783,10 @@ export function resolveResultsForBasis(
         displayExclusionReason = null;
       } else if (logicalCount <= 0) {
         displayExclusionReason = "no_queries";
+      } else if (zeroTimingCount > 0 && missingQueryCount === 0) {
+        displayExclusionReason = "zero_timings_only";
+      } else if (missingQueryCount > 0 && zeroTimingCount === 0) {
+        displayExclusionReason = "missing_timings";
       } else {
         displayExclusionReason = "no_valid_display_timing";
       }
@@ -829,6 +839,7 @@ export function resolveResultsForBasis(
       power_score: isDefault ? r.power_score : null,
       valid_query_count: validQueryCount,
       missing_query_count: missingQueryCount,
+      zero_timing_count: zeroTimingCount,
       has_display_timing: hasDisplayTiming,
       display_exclusion_reason: displayExclusionReason,
       comparison_exclusion_reason: comparisonExclusionReason,

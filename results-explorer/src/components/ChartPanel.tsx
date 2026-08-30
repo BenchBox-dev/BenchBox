@@ -171,11 +171,18 @@ export function ChartPanel({
         sharedValidQueryIds.length > 0
           ? geomeanMs(sharedValidQueryIds.map((q) => platform.timings[q]!))
           : null;
+      const hasInsufficientQueries = Boolean(queryFilter && sharedValidQueryIds.length < 2);
       return {
         ...platform,
         timings: filteredTimings,
         display_geomean_ms: geomean,
         sample_geomean_ms: geomean,
+        comparison_exclusion_reason: hasInsufficientQueries
+          ? "insufficient_valid_queries"
+          : platform.comparison_exclusion_reason,
+        ranking_exclusion_reason: hasInsufficientQueries
+          ? "insufficient_valid_queries"
+          : platform.ranking_exclusion_reason,
       };
     });
     return {
