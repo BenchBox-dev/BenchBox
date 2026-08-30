@@ -74,6 +74,85 @@ export function applyQueryDiffLimiter(
 }
 
 /**
+ * Select and rank query IDs for a given limiter across comparison results.
+ *
+ * Provides a single shared query selection for the chart, the heatmap, and the table.
+ */
+export function selectQueryIdsForLimiter(
+  results: readonly DetailResult[],
+  baselineIndex: number,
+  limiter: QueryDiffLimiter,
+  topN: number = 20,
+): { queryIds: string[]; totalQueryCount: number } {
+  const allQueryIds = [
+    ...new Set(results.flatMap((r) => (r.display_timings ?? []).map((t) => t.query_id))),
+  ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+  if (limiter === "all" || results.length < 2) {
+    return { queryIds: allQueryIds, totalQueryCount: allQueryIds.length };
+  }
+
+  const normalizedBaselineIndex = normalizeBaselineIndex(results, baselineIndex);
+  const baseline = results[normalizedBaselineIndex];
+  const candidates = results.filter((_, i) => i !== normalizedBaselineIndex);
+
+  // Queries where baseline has a valid timing and at least one candidate has a valid timing
+  const comparable = allQueryIds.filter((queryId) => {
+    const baseMs = baseline ? timingValueForQuery(baseline, queryId) : null;
+    if (baseMs === null || baseMs <= 0) return false;
+    return candidates.some((c) => {
+      const ms = timingValueForQuery(c, queryId);
+      return ms !== null && ms > 0;
+    });
+  });
+
+  const scored = comparable.map((queryId) => {
+    const baseMs = timingValueForQuery(baseline!, queryId)!;
+    const candidateTimings = candidates
+      .map((c) => timingValueForQuery(c, queryId))
+      .filter((ms): ms is number => ms !== null && ms > 0);
+
+    const ratios = candidateTimings.map((ms) => ms / baseMs);
+    const deltas = candidateTimings.map((ms) => ms - baseMs);
+
+    const bestRatio = Math.min(...ratios);
+    const worstRatio = Math.max(...ratios);
+    const maxDisagreement = Math.max(...ratios.map((r) => Math.abs(Math.log2(r))));
+    const maxDelta = Math.max(...deltas.map((d) => Math.abs(d)));
+
+    return {
+      queryId,
+      bestRatio,
+      worstRatio,
+      maxDisagreement,
+      maxDelta,
+    };
+  });
+
+  let filtered: typeof scored = [];
+  switch (limiter) {
+    case "speedups":
+      filtered = scored
+        .filter((s) => s.bestRatio < 1.0)
+        .sort((a, b) => a.bestRatio - b.bestRatio);
+      break;
+    case "slowdowns":
+      filtered = scored
+        .filter((s) => s.worstRatio > 1.0)
+        .sort((a, b) => b.worstRatio - a.worstRatio);
+      break;
+    case "movement":
+      filtered = [...scored].sort((a, b) => b.maxDisagreement - a.maxDisagreement || b.maxDelta - a.maxDelta);
+      break;
+  }
+
+  return {
+    queryIds: filtered.slice(0, Math.max(0, topN)).map((s) => s.queryId),
+    totalQueryCount: allQueryIds.length,
+  };
+}
+
+/**
  * The sentence every limiter state must carry, including the empty one.
  *
  * "No queries match" without a denominator leaves a reader unable to tell an
@@ -93,6 +172,7 @@ interface QueryDiffTableProps {
   suppressionReason?: string | null;
   limiter?: QueryDiffLimiter;
   topN?: number;
+  queryFilter?: readonly string[];
 }
 
 export function QueryDiffTable({
@@ -101,6 +181,7 @@ export function QueryDiffTable({
   suppressionReason = null,
   limiter = "all",
   topN = 20,
+  queryFilter,
 }: QueryDiffTableProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   if (results.length < 2) return null;
@@ -119,7 +200,9 @@ export function QueryDiffTable({
     "table",
   );
   const allRows = buildQueryDiffRows(results, normalizedBaselineIndex, runLabels);
-  const rows = applyQueryDiffLimiter(allRows, limiter, topN);
+  const rows = queryFilter
+    ? allRows.filter((row) => queryFilter.includes(row.queryId))
+    : applyQueryDiffLimiter(allRows, limiter, topN);
   const uncomparableShown = rows.filter((row) => !row.comparable).length;
 
   return (
@@ -233,7 +316,7 @@ export function buildQueryDiffRows(
   });
 }
 
-function normalizeBaselineIndex(results: DetailResult[], baselineIndex: number) {
+function normalizeBaselineIndex(results: readonly DetailResult[], baselineIndex: number) {
   return results[baselineIndex] ? baselineIndex : 0;
 }
 

@@ -34,6 +34,8 @@ export interface StandingRow {
   isBaseline: boolean;
   /** Inside the tie band, so neither faster nor slower may be claimed. */
   tied: boolean;
+  /** Competition rank ("1", "T-1", or "—" when unranked). */
+  rank: string;
 }
 
 /** Queries every selected run can answer. */
@@ -105,6 +107,7 @@ export function buildStandings(
       queriesWon: wins[i] ?? 0,
       isBaseline: i === baselineIndex,
       tied: ratio !== null && Math.abs(ratio - 1) < COMPARE_TIE_THRESHOLD,
+      rank: "—",
     };
   });
 
@@ -116,6 +119,35 @@ export function buildStandings(
     if (b.geomeanMs === null) return -1;
     return a.geomeanMs - b.geomeanMs;
   });
+
+  // Assign competition rank: tied rows receive "T-1", unranked rows receive "—"
+  let currentRank = 1;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]!;
+    if (row.geomeanMs === null) {
+      row.rank = "—";
+      continue;
+    }
+    const prev = i > 0 ? rows[i - 1] : undefined;
+    const next = i < rows.length - 1 ? rows[i + 1] : undefined;
+    const prevMs = prev?.geomeanMs ?? null;
+    const nextMs = next?.geomeanMs ?? null;
+    const tiedPrev =
+      prevMs !== null &&
+      Math.abs(prevMs - row.geomeanMs) / Math.min(prevMs, row.geomeanMs) < COMPARE_TIE_THRESHOLD;
+    const tiedNext =
+      nextMs !== null &&
+      Math.abs(row.geomeanMs - nextMs) / Math.min(row.geomeanMs, nextMs) < COMPARE_TIE_THRESHOLD;
+
+    if (tiedPrev || tiedNext) {
+      row.rank = `T-${currentRank}`;
+    } else {
+      row.rank = String(currentRank);
+    }
+    if (!tiedNext) {
+      currentRank = i + 2;
+    }
+  }
 
   return { rows, sharedQueryIds: shared, totalQueryIds: all.size };
 }
@@ -149,18 +181,18 @@ export function MultiRunStandings({ results, baselineIndex, runLabels }: MultiRu
         <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)] text-sm">
           <thead class="bg-[var(--bb-surface-data-muted)]">
             <tr>
-              <th class="table-th">Rank</th>
-              <th class="table-th">Run</th>
-              <th class="table-th">Hardware</th>
-              <th class="table-th">Geomean</th>
-              <th class="table-th">vs baseline</th>
-              <th class="table-th">Queries won</th>
+              <th scope="col" class="table-th">Rank</th>
+              <th scope="col" class="table-th">Run</th>
+              <th scope="col" class="table-th">Hardware</th>
+              <th scope="col" class="table-th">Geomean</th>
+              <th scope="col" class="table-th">vs baseline</th>
+              <th scope="col" class="table-th">Queries won</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
-            {rows.map((row, i) => (
+            {rows.map((row) => (
               <tr key={row.resultId} class="hover:bg-[var(--bb-surface-data-muted)]">
-                <td class="table-td font-mono">{i + 1}</td>
+                <td class="table-td font-mono">{row.rank}</td>
                 <td class="table-td">
                   {row.label}
                   {row.isBaseline ? (

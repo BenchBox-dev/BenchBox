@@ -63,6 +63,7 @@ interface ChartPanelProps {
   // QueryHeatmap above the panel) pass the duplicated chart ids here so
   // the panel does not expose the same view as a redundant subtab.
   excludeChartIds?: readonly string[];
+  queryFilter?: readonly string[];
 }
 
 interface CompareQueryRow {
@@ -84,6 +85,7 @@ export function ChartPanel({
   suppressWinnerClaims = false,
   suppressionReason,
   excludeChartIds,
+  queryFilter,
 }: ChartPanelProps) {
   const charts = useMemo(() => {
     const applicable = applicableCharts(context);
@@ -161,17 +163,23 @@ export function ChartPanel({
   );
   const compareRows = useMemo(() => {
     if (context.kind !== "compare" || !chartSummary) return [];
-    return chartSummary.query_ids.map((queryId) => ({
+    const queryIds = queryFilter
+      ? chartSummary.query_ids.filter((q) => queryFilter.includes(q))
+      : chartSummary.query_ids;
+    return queryIds.map((queryId) => ({
       queryId,
       timings: chartSummary.platforms.map((platform) => {
         const ms = platformTimingValue(platform, queryId);
         return ms !== null ? { ms, status: "pass" as const } : null;
       }),
     }));
-  }, [chartSummary, context]);
+  }, [chartSummary, context, queryFilter]);
   const compareGroups = useMemo(() => {
     if (context.kind !== "compare" || !chartSummary) return [];
-    return chartSummary.query_ids.map((queryId) => ({
+    const queryIds = queryFilter
+      ? chartSummary.query_ids.filter((q) => queryFilter.includes(q))
+      : chartSummary.query_ids;
+    return queryIds.map((queryId) => ({
       queryId,
       values: chartSummary.platforms.map((platform, index) => {
         const timing = platformTimingValue(platform, queryId);
@@ -182,7 +190,7 @@ export function ChartPanel({
         };
       }),
     }));
-  }, [chartPlatformLabels, chartSummary, context]);
+  }, [chartPlatformLabels, chartSummary, context, queryFilter]);
   const chartExclusionSummary = useMemo(
     () => (summary ? summarizeChartDatasetExclusions(summary.platforms, activeEligibilityClass) : []),
     [activeEligibilityClass, summary],

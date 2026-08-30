@@ -19,6 +19,14 @@ import {
   orderRowsByDisagreement,
 } from "@/components/MultiRunHeatmap";
 import { buildStandings, sharedQueryIdsFor } from "@/components/MultiRunStandings";
+import {
+  DEFAULT_BASIS,
+  WARMUP,
+  ALL_WARM,
+  resolveResultsForBasis,
+  type MeasurementBasis,
+} from "@/lib/measurementBasis";
+import { selectQueryIdsForLimiter } from "@/components/QueryDiffTable";
 import type { DetailResult } from "@/types";
 
 function run(id: string, timings: [string, number | null][]): DetailResult {
@@ -274,5 +282,162 @@ describe("coordinated baseline re-basing across panels", () => {
     expect(speedupsB.map((r) => r.queryId)).not.toContain("Q2");
     // But Q1 relative to runB (20ms): runA is 10ms (0.5x, speedup!)
     expect(speedupsB.map((r) => r.queryId)).toContain("Q1");
+  });
+});
+
+describe("competition ranking in standings", () => {
+  it("assigns 'T-1' to tied runs and skips to 3", () => {
+    const tiedRuns = [
+      run("a", [["Q1", 100]]),
+      run("b", [["Q1", 100.2]]), // within 0.005 threshold
+      run("c", [["Q1", 200]]),
+    ];
+    const { rows } = buildStandings(tiedRuns, 0, ["A", "B", "C"]);
+    expect(rows[0]!.rank).toBe("T-1");
+    expect(rows[1]!.rank).toBe("T-1");
+    expect(rows[2]!.rank).toBe("3");
+  });
+
+  it("assigns '—' when shared query set is empty rather than false ranks 1, 2, 3", () => {
+    const withNull = [
+      run("a", [["Q1", 100]]),
+      run("b", [["Q1", 200]]),
+      run("empty", []),
+    ];
+    const { rows } = buildStandings(withNull, 0, ["A", "B", "Empty"]);
+    expect(rows.map((r) => r.rank)).toEqual(["—", "—", "—"]);
+  });
+});
+
+describe("missing evidence reporting in heatmap", () => {
+  it("distinguishes baseline_missing from run_missing", () => {
+    const results = [
+      run("base", [["Q1", 10], ["Q2", null]]), // base lacks Q2
+      run("alt", [["Q1", 20], ["Q2", 30]]),    // alt has Q2!
+      run("alt2", [["Q1", null], ["Q2", 40]]), // alt2 lacks Q1, has Q2
+    ];
+    const rows = buildHeatmapRows(results, 0);
+    const q1 = rows.find((r) => r.queryId === "Q1")!;
+    const q2 = rows.find((r) => r.queryId === "Q2")!;
+
+    // On Q1, alt2 has no timing -> run_missing
+    expect(q1.cells[2]!.missingKind).toBe("run_missing");
+
+    // On Q2, base has no timing, but alt has 30ms -> baseline_missing
+    expect(q2.cells[1]!.missingKind).toBe("baseline_missing");
+    expect(q2.cells[1]!.timingMs).toBe(30);
+  });
+});
+
+function runWithExecs(
+  id: string,
+  data: {
+    queryId: string;
+    displayMs: number | null;
+    warmupMs?: number;
+    pass1Ms?: number;
+    pass2Ms?: number;
+  }[],
+): DetailResult {
+  const queries: any[] = [];
+  const display_timings: any[] = [];
+  for (const d of data) {
+    display_timings.push({
+      query_id: d.queryId,
+      display_ms: d.displayMs,
+      sample_count: 2,
+      is_valid_display_timing: d.displayMs !== null,
+      timing_exclusion_reason: d.displayMs === null ? "missing" : null,
+    });
+    if (d.warmupMs !== undefined) {
+      queries.push({
+        query_id: d.queryId,
+        duration_ms: d.warmupMs,
+        status: "pass",
+        run_type: "warmup",
+        iter: null,
+      });
+    }
+    if (d.pass1Ms !== undefined) {
+      queries.push({
+        query_id: d.queryId,
+        duration_ms: d.pass1Ms,
+        status: "pass",
+        run_type: "measurement",
+        iter: 1,
+      });
+    }
+    if (d.pass2Ms !== undefined) {
+      queries.push({
+        query_id: d.queryId,
+        duration_ms: d.pass2Ms,
+        status: "pass",
+        run_type: "measurement",
+        iter: 2,
+      });
+    }
+  }
+  return {
+    result_id: id,
+    platform: id,
+    display_geomean_ms: 100,
+    display_timings,
+    queries,
+  } as unknown as DetailResult;
+}
+
+describe("measurement basis resolution for comparison", () => {
+  const runs = [
+    runWithExecs("run1", [
+      { queryId: "Q1", displayMs: 100, warmupMs: 150, pass1Ms: 120, pass2Ms: 80 },
+      { queryId: "Q2", displayMs: 200, warmupMs: 250, pass1Ms: 220, pass2Ms: 180 },
+    ]),
+    runWithExecs("run2", [
+      { queryId: "Q1", displayMs: 50, warmupMs: 70, pass1Ms: 60, pass2Ms: 40 },
+      { queryId: "Q2", displayMs: 100, warmupMs: 120, pass1Ms: 110, pass2Ms: 90 },
+    ]),
+  ];
+
+  it("preserves display_ms under default basis", () => {
+    const resolved = resolveResultsForBasis(runs, DEFAULT_BASIS);
+    expect(resolved[0]!.display_timings.find((t) => t.query_id === "Q1")!.display_ms).toBe(100);
+    expect(resolved[1]!.display_timings.find((t) => t.query_id === "Q1")!.display_ms).toBe(50);
+  });
+
+  it("resolves warmup pass executions when warmup basis is selected", () => {
+    const warmupBasis: MeasurementBasis = { passes: WARMUP, statistic: "median" };
+    const resolved = resolveResultsForBasis(runs, warmupBasis);
+    expect(resolved[0]!.display_timings.find((t) => t.query_id === "Q1")!.display_ms).toBe(150);
+    expect(resolved[1]!.display_timings.find((t) => t.query_id === "Q1")!.display_ms).toBe(70);
+  });
+
+  it("resolves minimum across passes when min statistic is selected", () => {
+    const minBasis: MeasurementBasis = { passes: ALL_WARM, statistic: "min" };
+    const resolved = resolveResultsForBasis(runs, minBasis);
+    expect(resolved[0]!.display_timings.find((t) => t.query_id === "Q1")!.display_ms).toBe(80);
+    expect(resolved[1]!.display_timings.find((t) => t.query_id === "Q1")!.display_ms).toBe(40);
+  });
+});
+
+describe("shared limiter query selection", () => {
+  const threeRuns = [
+    run("base", [["Q1", 100], ["Q2", 100], ["Q3", 100]]),
+    run("alt1", [["Q1", 50], ["Q2", 200], ["Q3", 100]]),
+    run("alt2", [["Q1", 40], ["Q2", 150], ["Q3", 100]]),
+  ];
+
+  it("selects speedup queries across all candidates", () => {
+    const { queryIds } = selectQueryIdsForLimiter(threeRuns, 0, "speedups", 20);
+    expect(queryIds).toEqual(["Q1"]);
+  });
+
+  it("selects slowdown queries across all candidates", () => {
+    const { queryIds } = selectQueryIdsForLimiter(threeRuns, 0, "slowdowns", 20);
+    expect(queryIds).toEqual(["Q2"]);
+  });
+
+  it("orders largest movement by greatest relative divergence", () => {
+    const { queryIds } = selectQueryIdsForLimiter(threeRuns, 0, "movement", 20);
+    expect(queryIds[0]).toBe("Q1");
   });
 });

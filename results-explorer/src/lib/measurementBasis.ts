@@ -284,6 +284,7 @@ export function basesInComparison(comparison: BasisComparison): MeasurementBasis
 
 import { geomeanMs } from "@/lib/chartMath";
 import type { UrlSerde } from "@/lib/useUrlState";
+import type { DetailResult, QueryDisplayTiming } from "@/types";
 
 export const BASIS_URL_KEY = "basis";
 export const BASES_URL_KEY = "bases";
@@ -649,8 +650,11 @@ export function sharedQueryGeomeans(
 ): SharedQueryGeomeans {
   const resolved = series.map((s) => {
     const displayByQuery = new Map((s.displayTimings ?? []).map((t) => [t.query_id, t]));
+    const execsByQuery = groupByQuery(s.executions ?? []);
+    const queryIds = new Set<string>([...execsByQuery.keys(), ...displayByQuery.keys()]);
     const values = new Map<string, number>();
-    for (const [queryId, rows] of groupByQuery(s.executions)) {
+    for (const queryId of queryIds) {
+      const rows = execsByQuery.get(queryId) ?? [];
       const timing = displayByQuery.get(queryId);
       const displayMs =
         timing && timing.is_valid_display_timing !== false ? (timing.display_ms ?? null) : null;
@@ -663,7 +667,10 @@ export function sharedQueryGeomeans(
   });
 
   const allQueryIds = new Set<string>();
-  for (const s of series) for (const row of s.executions) allQueryIds.add(row.query_id);
+  for (const s of series) {
+    for (const row of s.executions ?? []) allQueryIds.add(row.query_id);
+    for (const t of s.displayTimings ?? []) allQueryIds.add(t.query_id);
+  }
 
   const shared: string[] = [];
   const excluded: string[] = [];
@@ -680,6 +687,68 @@ export function sharedQueryGeomeans(
     sharedQueryIds: shared,
     excludedQueryIds: excluded,
   };
+}
+
+/**
+ * Projects a selection of DetailResult objects for a chosen MeasurementBasis.
+ *
+ * Recomputes `display_timings` for every query and `display_geomean_ms` over the
+ * intersected shared query set across all selected runs.
+ *
+ * For DEFAULT_BASIS, preserves precomputed display_ms directly while recalculating
+ * display_geomean_ms over the shared query set so no run averages over unshared queries.
+ *
+ * For non-default bases (warmup, individual warm passes, min), resolves each query's
+ * timing from raw execution rows according to the pass selection and statistic.
+ */
+export function resolveResultsForBasis(
+  results: readonly DetailResult[],
+  basis: MeasurementBasis,
+): DetailResult[] {
+  if (results.length === 0) return [];
+
+  const seriesInputs: BasisSeriesInput[] = results.map((r) => ({
+    key: r.result_id,
+    executions: r.queries ?? [],
+    displayTimings: r.display_timings ?? [],
+  }));
+  const geomeanData = sharedQueryGeomeans(basis, seriesInputs);
+  const geomeanByResultId = new Map(geomeanData.series.map((s) => [s.key, s.geomeanMs]));
+
+  return results.map((r) => {
+    const displayByQuery = new Map((r.display_timings ?? []).map((t) => [t.query_id, t]));
+    const execsByQuery = groupByQuery(r.queries ?? []);
+
+    const allQueryIds = new Set<string>();
+    for (const t of r.display_timings ?? []) allQueryIds.add(t.query_id);
+    for (const q of r.queries ?? []) allQueryIds.add(q.query_id);
+
+    const newDisplayTimings: QueryDisplayTiming[] = [...allQueryIds]
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .map((queryId) => {
+        const rows = execsByQuery.get(queryId) ?? [];
+        const existing = displayByQuery.get(queryId);
+        const displayMs =
+          existing && existing.is_valid_display_timing !== false ? (existing.display_ms ?? null) : null;
+        const val = resolveQueryValue(basis, rows, displayMs);
+        const ms = val.kind === "value" && Number.isFinite(val.ms) && val.ms > 0 ? val.ms : null;
+        return {
+          query_id: queryId,
+          display_ms: ms,
+          sample_count: val.kind === "value" ? val.sampleCount : 0,
+          is_valid_display_timing: ms !== null,
+          timing_exclusion_reason: val.kind === "unavailable" ? val.reason : null,
+        };
+      });
+
+    const newGeomean = geomeanByResultId.get(r.result_id) ?? null;
+
+    return {
+      ...r,
+      display_geomean_ms: newGeomean,
+      display_timings: newDisplayTimings,
+    };
+  });
 }
 
 /**

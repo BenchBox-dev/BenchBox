@@ -45,6 +45,7 @@ import {
   QueryDiffTable,
   QUERY_DIFF_LIMITER_LABELS,
   type QueryDiffLimiter,
+  selectQueryIdsForLimiter,
 } from "@/components/QueryDiffTable";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { vsSlowestRatio } from "@/lib/chartMath";
@@ -62,6 +63,7 @@ import {
   isCollapsedStatistic,
   parseAvailablePassSelections,
   passSelectionsEqual,
+  resolveResultsForBasis,
   type PassSelection,
 } from "@/lib/measurementBasis";
 import { formatDurationSeconds, formatPowerScore, formatSpeedup } from "@/lib/metricFormatters";
@@ -244,6 +246,14 @@ export function Compare({ url }: CompareProps) {
   }, [results, availabilityRows]);
   const primaryMetric = compareState?.primaryMetric ?? "display_geomean_ms";
   const normalizedBaselineIndex = results[baselineIndex] ? baselineIndex : 0;
+  const resolvedResults = useMemo(
+    () => resolveResultsForBasis(results, basis),
+    [results, basis],
+  );
+  const { queryIds: limitedQueryIds } = useMemo(
+    () => selectQueryIdsForLimiter(resolvedResults, normalizedBaselineIndex, queryLimiter, 20),
+    [resolvedResults, normalizedBaselineIndex, queryLimiter],
+  );
   useDocumentTitle(
     results.length > 0 ? `Compare (${results.length}) · BenchBox Results` : "Compare · BenchBox Results",
   );
@@ -493,22 +503,22 @@ export function Compare({ url }: CompareProps) {
    */
   const queryCoverage = useMemo(() => {
     const allQueryIds = new Set<string>();
-    for (const result of results) {
+    for (const result of resolvedResults) {
       for (const timing of result.display_timings) allQueryIds.add(timing.query_id);
     }
     let shared = 0;
     for (const queryId of allQueryIds) {
-      if (results.every((result) => timingValueForQuery(result, queryId) !== null)) shared += 1;
+      if (resolvedResults.every((result) => timingValueForQuery(result, queryId) !== null)) shared += 1;
     }
     return { shared, total: allQueryIds.size };
-  }, [results]);
+  }, [resolvedResults]);
 
   // Primary metric is loaded async from DuckDB in the effect above; default
   // stays `display_geomean_ms` until the query resolves (matches Python's
   // `_DEFAULT_RANKING`).
   const higherIsBetter = primaryMetric === "power_score";
 
-  const primaries: (number | null)[] = results.map((r) =>
+  const primaries: (number | null)[] = resolvedResults.map((r) =>
     primaryMetric === "power_score" ? r.power_score : r.display_geomean_ms,
   );
   // Cohort-aware run identity labels for the decision summary headline +
@@ -535,7 +545,7 @@ export function Compare({ url }: CompareProps) {
     });
     return out;
   })();
-  const decisionSummary = buildCompareDecisionSummary(results, primaryMetric, {
+  const decisionSummary = buildCompareDecisionSummary(resolvedResults, primaryMetric, {
     suppressWinnerClaims: severeMismatchReason !== null,
     suppressionReason: severeMismatchReason ?? undefined,
     runLabels: summaryRunLabels,
@@ -564,7 +574,7 @@ export function Compare({ url }: CompareProps) {
   const cohortIdentities = formatRunIdentitiesForCohort(identitySources, "table");
   const cohortIdentitiesCompact = formatRunIdentitiesForCohort(identitySources, "compact");
 
-  const rowData = results.map((r, idx) => ({
+  const rowData = resolvedResults.map((r, idx) => ({
     resultId: r.result_id,
     publicId: visibleResultIdForRow(r),
     label: cohortIdentities[idx]!,
@@ -685,14 +695,39 @@ export function Compare({ url }: CompareProps) {
         </div>
       )}
 
+      {results.length > 1 && (
+        <div class="panel mb-4 flex flex-wrap items-center justify-between gap-3 px-3 py-2 shadow-sm">
+          <div>
+            <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="query-limiter">
+              Queries shown
+            </label>
+            <p class="text-xs text-[var(--bb-data-fg-muted)]">
+              Applies to the chart and the table together.
+            </p>
+          </div>
+          <Select
+            id="query-limiter"
+            ariaLabel="Queries shown"
+            size="sm"
+            value={queryLimiter}
+            onChange={(value) => setQueryLimiter(value as QueryDiffLimiter)}
+            options={(Object.keys(QUERY_DIFF_LIMITER_LABELS) as QueryDiffLimiter[]).map((key) => ({
+              value: key,
+              label: QUERY_DIFF_LIMITER_LABELS[key],
+            }))}
+          />
+        </div>
+      )}
+
       {rowCount > 0 && (
         <div class="mb-8">
           <ChartPanel
-            context={{ kind: "compare", results, primaryMetric }}
+            context={{ kind: "compare", results: resolvedResults, primaryMetric }}
             baselineIndex={normalizedBaselineIndex}
             onBaselineIndexChange={setBaselineIndex}
             suppressWinnerClaims={decisionSummary.claimSuppressed}
             suppressionReason={decisionSummary.claimSuppressionReason ?? undefined}
+            queryFilter={queryLimiter === "all" ? undefined : limitedQueryIds}
           />
         </div>
       )}
@@ -821,50 +856,30 @@ export function Compare({ url }: CompareProps) {
         comparable than wall-clock total when query counts differ. Lower is faster.
       </p>
 
-      <div class="panel mb-4 flex flex-wrap items-center justify-between gap-3 px-3 py-2 shadow-sm">
-        <div>
-          <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="query-limiter">
-            Queries shown
-          </label>
-          <p class="text-xs text-[var(--bb-data-fg-muted)]">
-            Applies to the chart and the table together.
-          </p>
-        </div>
-        <Select
-          id="query-limiter"
-          ariaLabel="Queries shown"
-          size="sm"
-          value={queryLimiter}
-          onChange={(value) => setQueryLimiter(value as QueryDiffLimiter)}
-          options={(Object.keys(QUERY_DIFF_LIMITER_LABELS) as QueryDiffLimiter[]).map((key) => ({
-            value: key,
-            label: QUERY_DIFF_LIMITER_LABELS[key],
-          }))}
-        />
-      </div>
-
-      {compareLayoutForSelection(results.map((r) => r.result_id)).kind === "multi_run" && (
+      {compareLayoutForSelection(resolvedResults.map((r) => r.result_id)).kind === "multi_run" && (
         <>
           <MultiRunStandings
-            results={results}
+            results={resolvedResults}
             baselineIndex={normalizedBaselineIndex}
             runLabels={cohortIdentitiesCompact}
           />
           <MultiRunHeatmap
-            results={results}
+            results={resolvedResults}
             baselineIndex={normalizedBaselineIndex}
             runLabels={cohortIdentitiesCompact}
             limiter={queryLimiter}
             orderByDisagreement={queryLimiter === "movement"}
+            queryFilter={queryLimiter === "all" ? undefined : limitedQueryIds}
           />
         </>
       )}
 
       <QueryDiffTable
         limiter={queryLimiter}
-        results={results}
+        results={resolvedResults}
         baselineIndex={normalizedBaselineIndex}
         suppressionReason={decisionSummary.claimSuppressionReason}
+        queryFilter={queryLimiter === "all" ? undefined : limitedQueryIds}
       />
       <ComparabilityReceipt results={results} />
       <ProvenanceLegend />
