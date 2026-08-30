@@ -44,7 +44,8 @@ import { CompareSummary } from "@/components/CompareSummary";
 import { QueryDiffTable } from "@/components/QueryDiffTable";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { vsSlowestRatio } from "@/lib/chartMath";
-import { buildCompareDecisionSummary } from "@/lib/compareSummary";
+import { buildCompareDecisionSummary, COMPARE_TIE_THRESHOLD } from "@/lib/compareSummary";
+import { IdentityDiffStrip } from "@/components/IdentityDiffStrip";
 import { MeasurementBasisBar } from "@/components/MeasurementBasisBar";
 import { useUrlState } from "@/lib/useUrlState";
 import { getResultBasisAvailability } from "@/lib/duckdbQueries";
@@ -138,6 +139,20 @@ export type CompareLayout =
  * layout from a count the page never actually renders -- a five-id URL would
  * choose multi-run and then render four runs.
  */
+/**
+ * True when a ratio is close enough to 1.0 that calling it a win would be
+ * reading noise as a result.
+ *
+ * Reuses the decision summary's threshold rather than declaring a second one.
+ * Two thresholds would eventually disagree, and a page that headlines a win
+ * while its own summary calls the same pair a tie is worse than either
+ * behaviour on its own.
+ */
+export function isWithinTieBand(ratio: number | null): boolean {
+  if (ratio === null || !Number.isFinite(ratio)) return false;
+  return Math.abs(ratio - 1) < COMPARE_TIE_THRESHOLD;
+}
+
 export function compareLayoutForSelection(resultIds: readonly string[]): CompareLayout {
   const distinct: string[] = [];
   for (const id of resultIds) {
@@ -597,6 +612,7 @@ export function Compare({ url }: CompareProps) {
         suppressionReason={decisionSummary.claimSuppressionReason}
       />
       <CompareSummary summary={decisionSummary} />
+      <IdentityDiffStrip results={results} />
       {results.length > 1 && (
         <MeasurementBasisBar
           basis={basis}
@@ -708,7 +724,19 @@ export function Compare({ url }: CompareProps) {
                 {showPrimaryClaims && speedup !== null && (
                   <div class="flex justify-between">
                     <dt class="text-[var(--bb-data-fg-muted)]">{vsLabel}</dt>
-                    <dd class="font-mono">{formatSpeedup(speedup).valueText}</dd>
+                    {/*
+                      Inside the tie band a ratio is not a win in EITHER
+                      direction. Rendering the number alone would let a 1.002x
+                      read as an advantage once it is rounded to "1.00x" and
+                      sat under a "vs slowest" label.
+                    */}
+                    {isWithinTieBand(speedup) ? (
+                      <dd class="text-[var(--bb-data-fg-muted)]" data-testid="headline-tie">
+                        Tied
+                      </dd>
+                    ) : (
+                      <dd class="font-mono">{formatSpeedup(speedup).valueText}</dd>
+                    )}
                   </div>
                 )}
                 {r.executionMode && (

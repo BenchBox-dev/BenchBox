@@ -7,7 +7,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { compareLayoutForSelection } from "@/pages/Compare";
+import { compareLayoutForSelection, isWithinTieBand } from "@/pages/Compare";
+import { COMPARE_TIE_THRESHOLD } from "@/lib/compareSummary";
 
 describe("compareLayoutForSelection", () => {
   it("routes two distinct runs to the head-to-head layout", () => {
@@ -51,5 +52,39 @@ describe("compareLayoutForSelection", () => {
       kind: "head_to_head",
       runIds: ["b", "a"],
     });
+  });
+});
+
+describe("the headline tie band", () => {
+  it("treats a ratio that rounds to 1.00x as a tie", () => {
+    // The failure this prevents: a 1.002x rendered as "1.00x" under a
+    // "vs slowest" label reads as an advantage that the data does not support.
+    expect(isWithinTieBand(1.002)).toBe(true);
+    expect(isWithinTieBand(0.998)).toBe(true);
+    expect(isWithinTieBand(1)).toBe(true);
+  });
+
+  it("is symmetric, so neither direction is called a win inside the band", () => {
+    expect(isWithinTieBand(1 + COMPARE_TIE_THRESHOLD / 2)).toBe(true);
+    expect(isWithinTieBand(1 - COMPARE_TIE_THRESHOLD / 2)).toBe(true);
+  });
+
+  it("leaves a real difference alone", () => {
+    expect(isWithinTieBand(1.4)).toBe(false);
+    expect(isWithinTieBand(0.7)).toBe(false);
+  });
+
+  it("reuses the decision summary's threshold rather than a second one", () => {
+    // Two thresholds would eventually disagree, and a page that headlines a
+    // win while its own summary calls the same pair a tie is worse than
+    // either behaviour alone.
+    expect(isWithinTieBand(1 + COMPARE_TIE_THRESHOLD * 0.99)).toBe(true);
+    expect(isWithinTieBand(1 + COMPARE_TIE_THRESHOLD * 1.01)).toBe(false);
+  });
+
+  it("does not treat a missing or non-finite ratio as a tie", () => {
+    expect(isWithinTieBand(null)).toBe(false);
+    expect(isWithinTieBand(Number.NaN)).toBe(false);
+    expect(isWithinTieBand(Number.POSITIVE_INFINITY)).toBe(false);
   });
 });
