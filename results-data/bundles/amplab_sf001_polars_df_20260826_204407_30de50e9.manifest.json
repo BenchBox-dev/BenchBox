@@ -1,8 +1,8 @@
 {
+  "bundle_file": "amplab_sf001_polars_df_20260826_204407_30de50e9.json",
+  "bundle_hash": "5b22d7e38c55c537a8fab47953bfa6bb82cdfd33bcbaa1777e7a7de56d690c7d",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "amplab_sf001_polars_df_20260826_204407_30de50e9.json",
-  "bundle_hash": "b3ed816b770a05f97936f3aa526ec59830d6005b8309f5ad17af389b27405af5"
+  "submitted_by": "maintainer"
 }

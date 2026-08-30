@@ -1,8 +1,8 @@
 {
+  "bundle_file": "tpch_sf01_pandas_df_20260826_210239_77598616.json",
+  "bundle_hash": "0c6913e781487b6b459bf45bd43d2d660eadef7638bda6e7e79af2edcd329819",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "tpch_sf01_pandas_df_20260826_210239_77598616.json",
-  "bundle_hash": "89bcd922c9e563be454c5ee8b78f31d1834b78e0d4e11f7fc6200159b1da632d"
+  "submitted_by": "maintainer"
 }

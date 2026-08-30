@@ -1,8 +1,8 @@
 {
+  "bundle_file": "tpcds_sf1_clickhouse_local_sql_20260826_112830_c250741b.json",
+  "bundle_hash": "874c4381a85ab81b12a523581a488216426971bc02770b3e07d62e88653a856e",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "tpcds_sf1_clickhouse_local_sql_20260826_112830_c250741b.json",
-  "bundle_hash": "6ba7cbbd8bc02620350b1e5715d027cb8c99403a8b31bbedd1921a76afa3715e"
+  "submitted_by": "maintainer"
 }

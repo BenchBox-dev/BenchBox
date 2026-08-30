@@ -1,8 +1,8 @@
 {
+  "bundle_file": "tpch_skew_sf001_polars_df_20260824_080528_4e7cd354.json",
+  "bundle_hash": "074fd1e8b2f263ebf82fea1b52a16de65472e7ccf7b2ccfb9625926d151ac19e",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "tpch_skew_sf001_polars_df_20260824_080528_4e7cd354.json",
-  "bundle_hash": "e63920e9d17da279e7729a239b248b4e0776df78d16adf5bb1d7359ce038577d"
+  "submitted_by": "maintainer"
 }

@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-08-29T23:55:46.878305+00:00",
+  "generated_at": "2026-08-30T03:35:40.795951+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
@@ -13,7 +13,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "3e582e3180269469a3608172770957f522c850904a6e32d2db139856bd315d3e"
+      "bundle_sha256": "87b61fc3db9c0d3e2c9aab95f88eb52b4b75bbe5ef08759b2432ed9cc0c555c5"
     },
     {
       "file": "amplab_sf01_clickhouse_local_sql_20260826_113055_4d4d5bcd.json",
@@ -26,7 +26,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "3b1245c92486f5f6750088b4f3079986968a0bdfd4d93fb72fa01ca189a151f5"
+      "bundle_sha256": "3d417cd3eab37251f2a96523d71377caea611f137a79855ef792e85bdf29a62d"
     },
     {
       "file": "amplab_sf1_clickhouse_local_sql_20260824_090414_e3e40917.json",
@@ -39,7 +39,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "29fb9932a4ed1e310d50a4b824f4943ab957189f215f00ebf283d01a56f13db9"
+      "bundle_sha256": "f91ffa52798fc89f43452b5bd0e5ec58586a255722e590d9d74ce7b0c39cb64a"
     },
     {
       "file": "amplab_sf001_datafusion_sql_20260826_111320_d8167419.json",
@@ -52,7 +52,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "6296f3393fd387640538e23d8c9b113ce46bd9f8ce52342e40f73b9c1b5c1f02"
+      "bundle_sha256": "b31345029df63548fc688e337f10e6bed9d5be3b0d6705caf43b5b43f5fa23de"
     },
     {
       "file": "amplab_sf01_datafusion_sql_20260824_083211_fa4689a1.json",
@@ -65,7 +65,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "e6df278b726af6c282c13bfb7a84e90d31ad39e0d97c20611ca1b70141bee696"
+      "bundle_sha256": "3c3d5fd3b74cd7b5a7c62fa455f6bb12e39050efc16e527b97e2b1fb26f1d405"
     },
     {
       "file": "amplab_sf1_datafusion_sql_20260826_111328_9ec660c1.json",
@@ -78,7 +78,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "ecda747596ad07cf82d2e73e7a901c5a646d69ac059f6d6e6ab14f14a62d4d7b"
+      "bundle_sha256": "73904c7233c825ef722513c2827e65488f9ee30be4aede1723d05e2fef7d760b"
     },
     {
       "file": "amplab_sf001_duckdb_sql_20260826_105810_c659ecff.json",
@@ -91,7 +91,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "77992750a09d5590a199d2116a52c4e1f24374695628344cce2b67b94b87d134"
+      "bundle_sha256": "e4bd2a68fdb723c26895b42073b47a868a1ce470e42a8b76a1ac063779ca4962"
     },
     {
       "file": "amplab_sf01_duckdb_sql_20260826_105812_c6911989.json",
@@ -104,7 +104,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "2da41ddbde4ca29c58ad6fcd678580eb5760790a723b8ac825a6d4926cdc83c0"
+      "bundle_sha256": "5fe937a55cfc2e3c6bfe070a0a9e0c7dcdf21236377f878376ce32e7ddadcc27"
     },
     {
       "file": "amplab_sf1_duckdb_sql_20260824_081832_6c34d852.json",
@@ -117,7 +117,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "cbba50c533b8e5444261f8da6c52fbec7bcd6160a36b92f4749614bf1f0861e8"
+      "bundle_sha256": "9bc7412b3afae1c95c4d23dc0d164f56e9a10fb2a853f4a15f04e8d2cedd97b1"
     },
     {
       "file": "amplab_sf001_pandas_df_20260826_214354_23f0647f.json",
@@ -130,7 +130,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "b1e223612f9d74906e12f0ab4a8b907d8fbe2e8befd36cbe0ea079afea69f2dc"
+      "bundle_sha256": "4d7086a33626acb79281ae3eace9099d54fdff2c1e72423ac53740c61586bab8"
     },
     {
       "file": "amplab_sf01_pandas_df_20260826_214415_ce27d581.json",
@@ -143,7 +143,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "24d9afe5afb06098fb5b3853a39bc4cb7f2650bef20051263318722fbf11e2cb"
+      "bundle_sha256": "ee9b6c33476efe985caf42e93dc1ff424ba2c89dfac525ce7200c9f85cfaebb9"
     },
     {
       "file": "amplab_sf1_pandas_df_20260826_214740_b3ce3b8b.json",
@@ -156,7 +156,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "4bf12f20678638c19da2c95e19fcb98b13ad2f7266739a3b719b3633857eb3ce"
+      "bundle_sha256": "c7948dfc9e5a41b879dc9cf25deb3a5317e4abcb5ff81e05d814a83c06446f2c"
     },
     {
       "file": "amplab_sf001_polars_df_20260826_204407_30de50e9.json",
@@ -169,7 +169,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "b3ed816b770a05f97936f3aa526ec59830d6005b8309f5ad17af389b27405af5"
+      "bundle_sha256": "5b22d7e38c55c537a8fab47953bfa6bb82cdfd33bcbaa1777e7a7de56d690c7d"
     },
     {
       "file": "amplab_sf01_polars_df_20260826_204409_16bcf974.json",
@@ -182,7 +182,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "ce7c685d96604c34ab54e9be727f50336a945c421d079feb548786b069253ce1"
+      "bundle_sha256": "2291adbd1e042fd504710e60b74d10b1eb13e46efa78c84dc657d5d3f0d7a9d0"
     },
     {
       "file": "amplab_sf1_polars_df_20260826_204414_f27f59f4.json",
@@ -195,7 +195,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "2ca4b729285ecbf75b1c7734b2893e1d6949a2b0b75671a1a10f0e39133ed128"
+      "bundle_sha256": "6c753b9fcee8a95f7175915a54cc86e14c92ffd488279915ab2b4a8f841c2425"
     },
     {
       "file": "amplab_sf001_sqlite_sql_20260826_173848_2eff93c9.json",
@@ -208,7 +208,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "13171f1f65557f20c40d89c7ceccea71cd953e6fab143b7a6a42bb73bf91cb0f"
+      "bundle_sha256": "91350c8834042727b112b75727201e37753e2c5d26c1c6d65cb06957297082d8"
     },
     {
       "file": "amplab_sf01_sqlite_sql_20260826_173851_fc7e8195.json",
@@ -221,7 +221,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "33c1b446a595524f69a5e91746c0924a105702164cb7e718b2a2a070ed5d3783"
+      "bundle_sha256": "b4992142ba216cb4b7ab733e03bee97b00669e24285d29b1fb9f0c5d47a1f31d"
     },
     {
       "file": "amplab_sf1_sqlite_sql_20260826_173907_42b777c2.json",
@@ -234,7 +234,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "49f58798f7e4148f3441647b055fdfeedea24534c39994e24ef80a34580e9725"
+      "bundle_sha256": "73e1b59114c867469c096c612c0da47d3a90c8a9f3a18b1721af9a96161806e9"
     },
     {
       "file": "clickbench_sf1_clickhouse_local_sql_20260826_171228_3bd30206.json",
@@ -247,7 +247,7 @@
       "query_count": 129,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "a912d634da46d41ad2c5e4d03045b917049a07a7d197ee3ae427d49c9d0d907c"
+      "bundle_sha256": "a72112eb1c0f2c91bfb129d3bc41491aae98b9e18ed37157029e76ea99a5807b"
     },
     {
       "file": "clickbench_sf1_datafusion_sql_20260826_095102_8014d1c9.json",
@@ -260,7 +260,7 @@
       "query_count": 129,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "92ba6fc96155cd574023c94006a7c654afd604a0a23fa9e0650aa3b00dd1de42"
+      "bundle_sha256": "772e733f25217a9429478a65aba4d9ffeec401e872fb2c8f2046855e3cd17281"
     },
     {
       "file": "clickbench_sf1_duckdb_sql_20260826_092938_171d21fd.json",
@@ -273,7 +273,7 @@
       "query_count": 129,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "2b6fbae8c33cd4b56d9890c99f61e59159505e52da500e89d49099a6831cad41"
+      "bundle_sha256": "d0a818020aa8fe3911c0722318b2496e06f28a5b879ba1d8a9219b4f5fef181d"
     },
     {
       "file": "clickbench_sf1_pandas_df_20260826_214321_dc8a2b98.json",
@@ -286,7 +286,7 @@
       "query_count": 129,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "a7170c65d944452bbb634abccff020a57eb1e4a4aa51570fc5618f578b20e859"
+      "bundle_sha256": "4a73d17b8d089070862ce5bab103a67043b91199dc694486471cbdeafaf12fec"
     },
     {
       "file": "clickbench_sf1_polars_df_20260826_204353_032a315a.json",
@@ -299,7 +299,7 @@
       "query_count": 129,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "02234bd6c5658ea15cbcab6cafb7692dad13bb6dca6ce9d9ce5090fd4adf5043"
+      "bundle_sha256": "7e0243b31ae988e8b7d3efd641ed2d7487979aa14d2e3fdd13ed9395fda8f43c"
     },
     {
       "file": "clickbench_sf1_sqlite_sql_20260824_101152_6eb94fe6.json",
@@ -312,7 +312,7 @@
       "query_count": 129,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "38a0b5342d18278e230f8d71d3d7d3e6d4f61f666f3a52f5673c5e9ec1b9a842"
+      "bundle_sha256": "f708a50979089ce9b92a222d1ab8ca7131c905ae96724cf0f80e7c6e4b168f6c"
     },
     {
       "file": "coffeeshop_sf001_clickhouse_local_sql_20260824_090703_370b71e2.json",
@@ -325,7 +325,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "d5b4b7dc6ddd5e20735d34aa8192070a47ec9aba3a9c0b5397ab7887295757b7"
+      "bundle_sha256": "fc3a60cd34dbd81b09761f8cc6bdbef3f6cef6d32e84fc18075ebf072f9fc0c6"
     },
     {
       "file": "coffeeshop_sf01_clickhouse_local_sql_20260826_113300_975cb3a1.json",
@@ -338,7 +338,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "745cd79ac052c9106d2617a193aa93712591123bb3900c8ca1de0bfaafb0a73e"
+      "bundle_sha256": "b29fbf01d2291c4f35cd816b3aef8da4f75d39b6d8d1927d9caa9739ee064d66"
     },
     {
       "file": "coffeeshop_sf1_clickhouse_local_sql_20260826_171552_4ce8154e.json",
@@ -351,7 +351,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "971e4794dad8fc32b24f71649f81e63e036208f1f043ff841b8b3752169e55a1"
+      "bundle_sha256": "7a3987822aea3e37abd6a77f525de944a6ed16ad44e3a5839ae7f3c83879c04c"
     },
     {
       "file": "coffeeshop_sf001_datafusion_sql_20260826_112013_bb01b471.json",
@@ -364,7 +364,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "de962b4997ce16fe462884d0649b2873f3b0331667f0110e6ffd2c3663eaecfc"
+      "bundle_sha256": "dfac3b67b2a03a19fe54bfe30b52aa048fcde1b0f1f4b09f2838817fc5775e53"
     },
     {
       "file": "coffeeshop_sf01_datafusion_sql_20260824_083924_387c45c7.json",
@@ -377,7 +377,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "6d517cec06b2b3eff48ec7ce7ff049f1145b818be57e05542ba8871535c857a1"
+      "bundle_sha256": "3ef0ff0ddd20cb41c32b7a6a0d4133f610aa6d0ba9fef81f37eb476e98254c89"
     },
     {
       "file": "coffeeshop_sf1_datafusion_sql_20260826_100331_e1266562.json",
@@ -390,7 +390,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "c0204eca109076993b47704305024d6934ce4437cc421e69087eae6513276518"
+      "bundle_sha256": "883acde62e60cd492dff5520adea8286704e3626429ad38a020ed2adecac1935"
     },
     {
       "file": "coffeeshop_sf001_duckdb_sql_20260826_093549_59592938.json",
@@ -403,7 +403,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "f82ef9d07b9473b653263d28536121f270d89e8e929e36f0df02a52ea2ac7278"
+      "bundle_sha256": "c01d93dd137c2e0512a8daf746f9ac2d3812540911b87af8f5204e101c2200ac"
     },
     {
       "file": "coffeeshop_sf01_duckdb_sql_20260824_082354_21442642.json",
@@ -416,7 +416,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "8fbe71da1bd58afff3cc6e365acf74f67ec04698bb2f75b432686666b75bf30a"
+      "bundle_sha256": "143f4e7dbfadfe6d3729ce48483728911062f63cbba196dd7b7812bce1aa0d1b"
     },
     {
       "file": "coffeeshop_sf1_duckdb_sql_20260826_110251_51016466.json",
@@ -429,7 +429,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "d7b5739c8d49fd22954f332161159d9ce05ea76afb07034db210dab46ce6b828"
+      "bundle_sha256": "a5c6ba35ba8e6200026447aca529dfc66ec7ec8261b1ce2f8bba0273b4c3c644"
     },
     {
       "file": "coffeeshop_sf001_pandas_df_20260826_220156_691d70ce.json",
@@ -442,7 +442,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "9101737592d27ba85660c2497e4762309bce38736f106ac62c85fe27b702fa8a"
+      "bundle_sha256": "ae248089bee593fbb246eba797ccfa560a001225c5ae5505a3605b0868c55d93"
     },
     {
       "file": "coffeeshop_sf01_pandas_df_20260826_220335_0e1c4ecf.json",
@@ -455,7 +455,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "957f1e91bd3d20474550d558f6fca0834fda8671bc7a119c8e250be1e4952253"
+      "bundle_sha256": "c084fe94004b9d04cdb84054f64b688f28700cd7f99972ddd9dd1f7f1ed8d6a5"
     },
     {
       "file": "coffeeshop_sf001_polars_df_20260826_205651_e7002552.json",
@@ -468,7 +468,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "2eedc341af2eb876c46d437353e7707d458e23876c18e7154603c5c16394b145"
+      "bundle_sha256": "c3b5e7ce3ec994d3b74345435ab9cd15759c806472299e1c979db0c5fa9dbe3f"
     },
     {
       "file": "coffeeshop_sf01_polars_df_20260826_205654_48e58125.json",
@@ -481,7 +481,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "fd58f632265280c39a370df5e0f2a5e729f20088fa0d53fde9ab7c8adddcf57e"
+      "bundle_sha256": "7ef4e05286c85ef2a0e4ba695b0e7c7b591bf6c75ffd9242043de713d951ebd9"
     },
     {
       "file": "coffeeshop_sf1_polars_df_20260826_205707_d4bce0e2.json",
@@ -494,7 +494,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "4f3e02b6abe054b0ca782cb6581105cff374dc4489635d4a011eba6bf972575d"
+      "bundle_sha256": "7259852d2029c8db47d0ba8b06d701385457ebcd6f2852510554d8c8fb0a3e7a"
     },
     {
       "file": "coffeeshop_sf001_sqlite_sql_20260826_182548_16f67069.json",
@@ -507,7 +507,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "8153ae7deecf9097a245ef15907769e146cbb31a78d48904a35d87221f3e0eeb"
+      "bundle_sha256": "986eaeaf693d1e7fb68daae88634966e26b3b5cd59319628b36b5233b49ab6a8"
     },
     {
       "file": "coffeeshop_sf01_sqlite_sql_20260826_182615_3aadc9a8.json",
@@ -520,7 +520,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "616f0b3e3199cb6c937b14f81c93e88077f2352c29da95de9f4eb4de1d57abf7"
+      "bundle_sha256": "7fab051b202a913c855a47d2231559cd85d6d6aac1f9f0ec37c03a8f3b3325ea"
     },
     {
       "file": "coffeeshop_sf1_sqlite_sql_20260826_183039_5bd85b97.json",
@@ -533,7 +533,7 @@
       "query_count": 33,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "8171b14c9c257a371d5c93a3c8508c0b1f016b2e54129dc00275719c3d3d4c58"
+      "bundle_sha256": "ddee5a29bb6d26b946a77cf683d4bc0dbd732b8694a6e30a1f4ed2b27e4d41f8"
     },
     {
       "file": "h2odb_sf001_clickhouse_local_sql_20260826_113044_c45bba08.json",
@@ -546,7 +546,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "b5d25f298e672814ed41c85858078c1811d839901812e43f0ab1ceff5e6db458"
+      "bundle_sha256": "c7d351a013e1a81a090724a036ffa821eb8dee8f2d85e8b5cccaa5abeeacab26"
     },
     {
       "file": "h2odb_sf01_clickhouse_local_sql_20260826_113046_9dcc57ae.json",
@@ -559,7 +559,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "f899ee1c34c829555690c28d1959394fc74da2af63d1a3aa359fa9f9100b2f50"
+      "bundle_sha256": "bb96b492cb3d188353a0a035c93b3ec4f65f45d2843ee74e3d4deb84340d0188"
     },
     {
       "file": "h2odb_sf1_clickhouse_local_sql_20260825_175439_252ba7d7.json",
@@ -572,7 +572,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "2fe8797748acd46d9116d8621703489e5372a381806bb895782ebd682966de35"
+      "bundle_sha256": "b0984980ade146fde5a38fd12101100075ec721c57d32cdc216df9baf4c495bb"
     },
     {
       "file": "h2odb_sf001_datafusion_sql_20260826_095104_070a3162.json",
@@ -585,7 +585,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "004e8d5baa2f2f5604eb5302b383165b68f078c2d4962af5d67fb875d1a35d2d"
+      "bundle_sha256": "856ad51ac177880cba5d903bd79f30d1ab816ac6ad1edfe96c61067392d42f09"
     },
     {
       "file": "h2odb_sf01_datafusion_sql_20260826_111303_14b4960d.json",
@@ -598,7 +598,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "37de2252e31566b254eb3fd72600b6ebd31b6edbac2205691497815c6e2366f8"
+      "bundle_sha256": "d9b2a6cb1900091626c12db5067943fb4632c522e5259d25506295c50269ff70"
     },
     {
       "file": "h2odb_sf1_datafusion_sql_20260826_164731_03d5179d.json",
@@ -611,7 +611,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "24803c0a84e3bdd1d50a280195cb963c0229c1ead1425d1db32727fe792f93b1"
+      "bundle_sha256": "e90abadfaf9e8c40f71d7780936419907507a1a31ac2d8a443cae2f3ae6b976d"
     },
     {
       "file": "h2odb_sf001_duckdb_sql_20260826_092940_c1acd649.json",
@@ -624,7 +624,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "ff5a8dd1336e7e3f7594757a316689aa9a511df76d3311985cc3e1d8dbbd0ea4"
+      "bundle_sha256": "54a686cd832d7ab7e54258ba1933f3e5dccf97f59f193bb78a2343e9d81b5fa3"
     },
     {
       "file": "h2odb_sf01_duckdb_sql_20260826_105804_b1354257.json",
@@ -637,7 +637,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "26d57ae48984caece496c405a7f250ef9ead501902d151dd4f3a2239dfd59be6"
+      "bundle_sha256": "d2e5ba28402664da8dd2de568e0576550907bc48f6a94dc2351ebdc93c465cc6"
     },
     {
       "file": "h2odb_sf1_duckdb_sql_20260826_162604_723ed963.json",
@@ -650,7 +650,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "9e1d51787999c6ef8dbfa8ce7e78a258e55c88b488e4390790480430c59ee930"
+      "bundle_sha256": "d921aa7d9860213ba5ce173400f693d6774907044eaea2f2fb075b7b448fab23"
     },
     {
       "file": "h2odb_sf001_pandas_df_20260826_214323_e4026556.json",
@@ -663,7 +663,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "26bf445d3756a4297b8c86cb09c55fb2e47b1d04440afc2bdd3604f4bb80e825"
+      "bundle_sha256": "d2387e82cfd5339fefec1666fc1ec00ffc0f0970982578aaea2e5cc7a460b81e"
     },
     {
       "file": "h2odb_sf01_pandas_df_20260826_214326_b8cb56ef.json",
@@ -676,7 +676,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "f0acf89c6941e2077f41783191189db925e8d5e07b8970a4f313effe3d61c802"
+      "bundle_sha256": "ad6b3ca01a6670f67eb671330106d4fdb2e4bd20c882eb82d03f6b01c3faf1cb"
     },
     {
       "file": "h2odb_sf1_pandas_df_20260826_214350_52eabdfd.json",
@@ -689,7 +689,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "bfad107d97abca16f2665752f356a85b0bd865a18aee6d5e34350b7f7ee9f580"
+      "bundle_sha256": "04f6e00e9d176e3a306f4009ca3424f9b71c557c3f1c3c0d82d8127853626a36"
     },
     {
       "file": "h2odb_sf001_polars_df_20260824_080453_ec048a58.json",
@@ -702,7 +702,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "d729e7d07ad85bf7dae597ce871e96048a93beab610514243179b7c1e6d9de2f"
+      "bundle_sha256": "daa40aebafc5d499ba5b4e2fa1ac507aad1027ca080b66039a0e369f1f8c0445"
     },
     {
       "file": "h2odb_sf01_polars_df_20260826_204357_ef349725.json",
@@ -715,7 +715,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "3a2a5025d00f02b37656be8f23c9161c95c101eff3a551ddbe44add8d73ec2b4"
+      "bundle_sha256": "c5f3e661bf07a0315c1e5f4ef4856709cf31d39a947c1ca661f5f74a5fa610a1"
     },
     {
       "file": "h2odb_sf1_polars_df_20260826_204405_5ff08b52.json",
@@ -728,7 +728,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "a1924b0c83b8ed6838dfac2563748fd7d2aacff31b05dbadfb097365f359f23a"
+      "bundle_sha256": "0a9d47a9a921f9a0ab4cf9e32d0c58c5256123e99075cd56913621d99a38fb55"
     },
     {
       "file": "h2odb_sf001_sqlite_sql_20260824_101155_75c9d5df.json",
@@ -741,7 +741,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "baed2d71533f8e71e28953c251c0122e1bd19846f0efffac249471a7ecb836ee"
+      "bundle_sha256": "10c919b289973f57e85354e4e59f610daaf3d78972d53ff32d8ad9b969367be6"
     },
     {
       "file": "h2odb_sf01_sqlite_sql_20260826_173507_2f578a88.json",
@@ -754,7 +754,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "fa9c470ae74ca4e327fcd778c6a009d46e80b217399f0d930a8ab2e4283387bd"
+      "bundle_sha256": "10441d09c04010f16ca3d72b6bfacfd98d07abea3643344a19ab7470ec0f8a48"
     },
     {
       "file": "h2odb_sf1_sqlite_sql_20260826_173846_911ddfd1.json",
@@ -767,7 +767,7 @@
       "query_count": 30,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "851e8308f3be09fb6099ecd0b67e51fb3e24ba49c4087fac39c9bfc2873ddb24"
+      "bundle_sha256": "fd582cf249585daaf153bbea4a5160fa31d7d76dc9670329d64a0cd0fdd5b66d"
     },
     {
       "file": "joinorder_sf1_clickhouse_local_sql_20260825_175643_45832acd.json",
@@ -780,7 +780,7 @@
       "query_count": 339,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "6d04fb26e5483abee8d07b4c2a7a913596327160195f543055b5ecf0c3aef1d2"
+      "bundle_sha256": "58ea78daeb814dc97e1169071d4a8905ddc7b7efae569aa5fa9c2660ab7af51f"
     },
     {
       "file": "joinorder_sf1_datafusion_sql_20260826_165807_7e4fefa1.json",
@@ -793,7 +793,7 @@
       "query_count": 339,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "83ebc338671f9f52e76c6b959cbff104a3ddf4b1f433cd50f654e25e602fde05"
+      "bundle_sha256": "daf09f6bf580da72a856994c53c1aa674e7ee0f91db2760181ef30793d523683"
     },
     {
       "file": "joinorder_sf1_duckdb_sql_20260826_093546_ba71254a.json",
@@ -806,7 +806,7 @@
       "query_count": 339,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "b0eecef938f483f3f70df4b7bd84ce3351ffbeb66c4b9f0473ea06a51142fd3a"
+      "bundle_sha256": "34f3227f840b8989560c9e2060d4cc6bec37affb0745f19601668367e0397f82"
     },
     {
       "file": "joinorder_sf1_polars_df_20260826_205647_3a63a4cb.json",
@@ -819,7 +819,7 @@
       "query_count": 339,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "9743ae3bc7e8361c061462d6e0cb8454bd7f9bbc1b5c733562a73938ce0f3e58"
+      "bundle_sha256": "8f2ca6123f89dfd0e66ce24973248da4e8b377e8a7d41966c80827946b0e2566"
     },
     {
       "file": "joinorder_sf1_sqlite_sql_20260826_182543_788c3eb2.json",
@@ -832,7 +832,7 @@
       "query_count": 339,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "5429fd50859ea866104b8e4cff9889253e9a63bf05b764ad3feb06b4afa2b912"
+      "bundle_sha256": "259e62db4cbe0fcb3d2674ba9b9756388b1d01a0a832a10baccdd31ccb306e20"
     },
     {
       "file": "read_primitives_sf001_clickhouse_local_sql_20260826_113104_3465d4f3.json",
@@ -845,7 +845,7 @@
       "query_count": 441,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "a8e846a9eb6733cbb8cb83d1d073c59f63abda29e7e504418547ccc227a04460"
+      "bundle_sha256": "a9dc19ce3d232547fd8dca4758544b841e0ce086f824106dc9f178b84044ecb8"
     },
     {
       "file": "read_primitives_sf01_clickhouse_local_sql_20260825_175504_c1aeca88.json",
@@ -858,7 +858,7 @@
       "query_count": 441,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "2c6e118ea74879ab87cacb1eb6402012bc773c8e987c7ec6b3e733b1e7a0f349"
+      "bundle_sha256": "4c12ec7c3fc14bd0b4b4f52b7b2c3cb95f1bf934f10964c1736424e5b2bab951"
     },
     {
       "file": "read_primitives_sf001_datafusion_sql_20260825_173248_cb4cfcba.json",
@@ -871,7 +871,7 @@
       "query_count": 414,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "856bc69ca29ebca0636f94eb3004596f819a3a6b4b79e02fc532daf8d67853c8"
+      "bundle_sha256": "27b406b8dda9c1a3d59ae646792bf34d6f2f4052f4753cd41c193be44fe9c5df"
     },
     {
       "file": "read_primitives_sf01_datafusion_sql_20260826_095258_1cdd70ad.json",
@@ -884,7 +884,7 @@
       "query_count": 414,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "137e1f4d99a56608c07bf479a3d6555eaec9e1e842045039c6224f175c69c230"
+      "bundle_sha256": "ff5279aeab699ecb13a6d8259c042cf5ece169149a89849e72fcc9de080f36c0"
     },
     {
       "file": "read_primitives_sf001_duckdb_sql_20260825_172118_c9cb14d4.json",
@@ -897,7 +897,7 @@
       "query_count": 459,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "9ca19ac579a6031f6913a5e784163f9db67d0e8565fd423fee29b5c60f7eb70a"
+      "bundle_sha256": "99837638663f8292b250738d952a2778df94109ca75fb7a8159af9e5d4dcf531"
     },
     {
       "file": "read_primitives_sf01_duckdb_sql_20260826_093016_78dfffa8.json",
@@ -910,7 +910,7 @@
       "query_count": 459,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "eff7cee41060d7eed2e1e5fcb2037f979f49012b5841a8f75a9edff7a62bbe25"
+      "bundle_sha256": "ead1ba1049cf2e9de14fbca009f6eb2bbc0c3cb68eb1f154f45569572f0dc99d"
     },
     {
       "file": "read_primitives_sf001_pandas_df_20260826_214757_e401da5d.json",
@@ -923,7 +923,7 @@
       "query_count": 456,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "1a9fbb1c594e5d52912642af23e01be6a01b7d4984248394d6e596f685517c81"
+      "bundle_sha256": "209a66981d9a578be1025063ee3b6fc3b18d51f06f00babece088928cca46494"
     },
     {
       "file": "read_primitives_sf01_pandas_df_20260826_215034_c4051838.json",
@@ -936,7 +936,7 @@
       "query_count": 456,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "436cf66fc259d128a189ab8c8d001c097a2a85125fd9c0a7be7a03cdf2044439"
+      "bundle_sha256": "4257415008d132a5e7891c5658ccc88060757d5aee45511c03d400625e153f71"
     },
     {
       "file": "read_primitives_sf001_polars_df_20260826_204417_398621ca.json",
@@ -949,7 +949,7 @@
       "query_count": 447,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "44dadccecc8f3a15d09e674ea4d3fcf8cab7e60ccd49a957bcef9cb3b01de608"
+      "bundle_sha256": "a3eb2d4d2c497ba6dd7ea530ab047f9e0e276e1e971b3c88ec5cf993459f08f8"
     },
     {
       "file": "read_primitives_sf01_polars_df_20260826_204428_35d580c6.json",
@@ -962,7 +962,7 @@
       "query_count": 447,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "6ac7d00230c965ad5214de48d77faa04a69ca23e4062cf7a4b57885481784dc0"
+      "bundle_sha256": "22213d95685a938d9bd1cf7d3bcf1ba117aacbf3ce3dd0a83ce17b70d137ec3f"
     },
     {
       "file": "read_primitives_sf001_sqlite_sql_20260826_115059_7fa6915c.json",
@@ -975,7 +975,7 @@
       "query_count": 456,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "98010bb1cb21bb5011d37998b0c6f5fb17ffdf6b99cd731ef50baffe54b61516"
+      "bundle_sha256": "ffc8120efbb0b41a45cc57e23a58a1a5dff7b861431aa3401f3e1214e72d9123"
     },
     {
       "file": "read_primitives_sf01_sqlite_sql_20260826_115513_688f04bb.json",
@@ -988,7 +988,7 @@
       "query_count": 456,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "8a4ba74653aaadbdb4d3d1ded8b4c2acf7688dc72c377ffb6647026364142fce"
+      "bundle_sha256": "7bab7b9b60b2fb201d2dfc4e4a6c570b08e14a58d5d94914f93bfc8f67f678c0"
     },
     {
       "file": "ssb_sf001_clickhouse_local_sql_20260825_175415_374cef00.json",
@@ -1001,7 +1001,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "5e3276c90d95b3f8faba0edab721e491c5ce98d31447041630b8c296ac1caeaa"
+      "bundle_sha256": "2b637df0bff37b66d508c1f1f35c215e5f6e046555af1d06fa2ec228de51f396"
     },
     {
       "file": "ssb_sf01_clickhouse_local_sql_20260826_171214_5f654805.json",
@@ -1014,7 +1014,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "8f8c959e62a4f6c6b73b511756ff0a5abea077bcba494015eeceb481c6896ad8"
+      "bundle_sha256": "b62d3c0c36617ac2867b961401a0cbd6bde8334231098248e5cf7bed861a88a8"
     },
     {
       "file": "ssb_sf1_clickhouse_local_sql_20260825_175425_7134f926.json",
@@ -1027,7 +1027,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "9273895f30af2672e2fc18625ff2d70a04fccaf76af03d932f6d70e4f176105c"
+      "bundle_sha256": "b06f88e7263ad9b38feeb55ac88bd24bc6577415b6b17a6687cc5f62e2e3f9ff"
     },
     {
       "file": "ssb_sf001_datafusion_sql_20260826_111238_82531925.json",
@@ -1040,7 +1040,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "c610a1067ab8f352e2897c16a9628de4cfa9da73b2d1f98535ba92a3b198550a"
+      "bundle_sha256": "669fa1c4f3609bd15aba057da8eca28731273115a0bb70a710109e67f9d8cd91"
     },
     {
       "file": "ssb_sf01_datafusion_sql_20260826_164648_81c32dbc.json",
@@ -1053,7 +1053,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "4143b340c24b7d6e5a1f5c151f061c00cbfdc27766188e1dfce8c2523099dfa1"
+      "bundle_sha256": "bd2d583054760cb637447627e7608c4bdbb388afa8184fc8052d77ac226f16fd"
     },
     {
       "file": "ssb_sf1_datafusion_sql_20260826_111249_677be683.json",
@@ -1066,7 +1066,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "c6f98f9a8275da3dade28313f30f6afbf5718191fe1fdae818a174a9ca076088"
+      "bundle_sha256": "5d079c8be56fb48f24fc61f6ce0dae685443165b622914047aea2702ec5a28f1"
     },
     {
       "file": "ssb_sf001_duckdb_sql_20260825_172048_38133bb4.json",
@@ -1079,7 +1079,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "d1a130d1250d8154576401297ee38d22f19deb936aa2882be58c56e569e9b7a9"
+      "bundle_sha256": "f0c4cfcd00cece0bacb8720e8542353bf0609c01f10ed248e5bc8fde179280f2"
     },
     {
       "file": "ssb_sf01_duckdb_sql_20260826_092930_fdc9380c.json",
@@ -1092,7 +1092,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "670d1a6b51a27806100d8f2832bd2307e1740110920f2a8623c286cc5a0f1f75"
+      "bundle_sha256": "33f04d76ef70978440e96fd395553bcb79d36708f3bee949a02fd43ae5038517"
     },
     {
       "file": "ssb_sf1_duckdb_sql_20260826_105755_0c58dd8e.json",
@@ -1105,7 +1105,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "5f6d7603ef3e21da869d60e318b7a3a4ecf785ca3a6048878a2678a23a3735d8"
+      "bundle_sha256": "8d507131d5acc0bff058daa78bfd5678a1eeaa5983238ea4669aeed6b395f1ae"
     },
     {
       "file": "ssb_sf001_pandas_df_20260826_213835_c9150a2d.json",
@@ -1118,7 +1118,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "803798e1388ae516d524600b70c8e17969a5598d90bab8ebc59616af855b7c29"
+      "bundle_sha256": "de1cc3493e1b3f84cb5401626e9b335240a05f223f19a30ff290c88efb585cbf"
     },
     {
       "file": "ssb_sf01_pandas_df_20260826_213846_b71ebc6d.json",
@@ -1131,7 +1131,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "16a95376fc66fe31f4b2374113fecf0abf602df9eab979ee770a1fd08526392e"
+      "bundle_sha256": "0b3ea0582ad4e8009d2926ba710246c2b41b16199bafbf4363672f1e150d78f1"
     },
     {
       "file": "ssb_sf1_pandas_df_20260826_214148_96be5114.json",
@@ -1144,7 +1144,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "bf817993ab5b44e751af1e5570351440759b20f0b689809ffcc6b92370b4f36e"
+      "bundle_sha256": "c771dd61b3b0b73daeb7513c6220ace7c1cabb8a0e99984840430c30bdebb406"
     },
     {
       "file": "ssb_sf001_polars_df_20260824_080435_f630b76f.json",
@@ -1157,7 +1157,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "d93a5c9156a0c1344efa62d68887b06c93a9e657b0ae4fb57d3372516190df89"
+      "bundle_sha256": "418df1b3b91b4172cb96eb7c1dde87ee230a09e30fa8fc59a3970b3a6432863a"
     },
     {
       "file": "ssb_sf01_polars_df_20260826_204340_362af719.json",
@@ -1170,7 +1170,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "7f3a13285658aca41a30f8bcca354735892c3914342ee1a8ac524cb9fb391f03"
+      "bundle_sha256": "d171fbef38940c37403586db78bdaf5827ce7209ef2a3298329d158e1454888d"
     },
     {
       "file": "ssb_sf1_polars_df_20260826_204347_d84b9d93.json",
@@ -1183,7 +1183,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "45553fb574961d632ceacd549b1fd0cc7c8a7d10282491dde1409eca7dd4bb7a"
+      "bundle_sha256": "9dceedd39bf85ea5cc6cd36b23d04c14972a81dd7e22107ce029f16604bf42b2"
     },
     {
       "file": "ssb_sf001_sqlite_sql_20260825_192615_dbc2a34e.json",
@@ -1196,7 +1196,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "55cef3094181ee42a0b6062d514effe4afd8b1f2bf828a7cf7be9f9f4ea2bdaa"
+      "bundle_sha256": "331c12f9f2082a8075a41cacb43245efc3639f3ba383f015406bff2e71460921"
     },
     {
       "file": "ssb_sf01_sqlite_sql_20260825_192631_9f5ef60f.json",
@@ -1209,7 +1209,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "0827fd41b66f77856ca36098a1bfd3d41c5282af5672b8646d3acfa916a1b9d2"
+      "bundle_sha256": "269c5fa8815c134bc4499d7678b30c4a8710008ad31fb0ab7fc0f6eebfdaa2c5"
     },
     {
       "file": "ssb_sf1_sqlite_sql_20260826_173350_a6b8db82.json",
@@ -1222,7 +1222,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "3a8ac94f0d027611b6a2ac1845b2ba357cb2313d2d4c4dcdaa78148d5f10a22c"
+      "bundle_sha256": "6445d397933271b10ae3f490dce0d68fb078b76fa63171294694e080f6342c2c"
     },
     {
       "file": "tpcds_sf1_clickhouse_local_sql_20260826_112830_c250741b.json",
@@ -1235,7 +1235,7 @@
       "query_count": 309,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "6ba7cbbd8bc02620350b1e5715d027cb8c99403a8b31bbedd1921a76afa3715e"
+      "bundle_sha256": "874c4381a85ab81b12a523581a488216426971bc02770b3e07d62e88653a856e"
     },
     {
       "file": "tpcds_sf1_datafusion_sql_20260823_101453_f8619d78.json",
@@ -1248,7 +1248,7 @@
       "query_count": 309,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "aad593edff54b5809e6f5c157b8ded13367668d733f7f198da11be50d8e3359c"
+      "bundle_sha256": "c5d8d60361a87dce1944e8cf95ba1a0171fb0fac56f95acef5e9234f3d28b0a9"
     },
     {
       "file": "tpcds_sf1_datafusion_sql_20260826_094401_5207d224.json",
@@ -1261,7 +1261,7 @@
       "query_count": 309,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "601fa19ba5fe329183bba2f5da8c356bc827346c83982c4ddc2fbe86ce2a4106"
+      "bundle_sha256": "29712ec71c07e54f24652904e024aea41922293edf2a46be9c2ed42a889070cc"
     },
     {
       "file": "tpcds_sf10_datafusion_sql_20260823_225543_15b41887.json",
@@ -1274,7 +1274,7 @@
       "query_count": 309,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "ad566ba8dd00ffb0c286a92148d6d1d0bf8335753cc778aad3c30dad05bda286"
+      "bundle_sha256": "36f3ba49488318ce66a7bac13f87231ab891fe01d94111a0f4d5bee710d80651"
     },
     {
       "file": "tpcds_sf1_duckdb_sql_20260823_101350_f8fa74b3.json",
@@ -1287,7 +1287,7 @@
       "query_count": 309,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "7a7de8e430002fda854d9be4b84e56d1eec5d671b607c20c76078a54d7b92ef2"
+      "bundle_sha256": "3e6482b75f3b033e8c7ae268b718a8d492202a95c7e810de168bd421d7a45e24"
     },
     {
       "file": "tpcds_sf1_duckdb_sql_20260825_171849_be435b62.json",
@@ -1300,7 +1300,7 @@
       "query_count": 309,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "e8b4e73e59182a661db7acd81a23bbc67a6c85bb11887d3d36c9e667a557df86"
+      "bundle_sha256": "461e4a4fe5d005a536e802b67cd886d5e846078ea430533f14e4313c990495ad"
     },
     {
       "file": "tpcds_sf10_duckdb_sql_20260823_173729_11fd39df.json",
@@ -1313,7 +1313,7 @@
       "query_count": 309,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "fabf89532cfa272c511ac09bc873d5e0aad7bb2de1ed0613e2704c8f3fca6079"
+      "bundle_sha256": "7cd05599f901baf50ae78e865b4d6f8db89cf1f9d7c861f27852b44a02022e15"
     },
     {
       "file": "tpcds_sf1_pandas_df_20260826_213757_708c3f7a.json",
@@ -1326,7 +1326,7 @@
       "query_count": 309,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "79689a4f429517459a7bdcf4aa2d22e308445c3adf9f0423bd5e526456155cea"
+      "bundle_sha256": "14160b7bcb9a4513f74a1ddf3e2f46a01b67b006417525615e936f9b017f8586"
     },
     {
       "file": "tpcds_sf1_polars_df_20260826_204334_bda76dd1.json",
@@ -1339,7 +1339,7 @@
       "query_count": 309,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "52accdd6308fe82b669fa812bc7d3a9753009d87e0d8ae2889e904b457443469"
+      "bundle_sha256": "8f4b8635f28ef31785379ef852f3eb492f7f3da93b643adf30cee28e3c92dfee"
     },
     {
       "file": "tpcds_sf1_sqlite_sql_20260824_083944_c6745a86.json",
@@ -1352,7 +1352,7 @@
       "query_count": 3,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "f8aeecb4c5cb0092472c107d4dccbe9c7750da493cc205e9cf6181e8de420505"
+      "bundle_sha256": "1c036079d65016d03905df4bee86ed9c1fa43c4d27399fcbcb7c579626d02341"
     },
     {
       "file": "tpcds_sf1_spark_sql_20260823_102343_1d9231a1.json",
@@ -1365,7 +1365,7 @@
       "query_count": 309,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "fa34ed33212f9f33b6e1b415f950718383fe5f06714b6248b09c6d64488c1fc4"
+      "bundle_sha256": "820d7bde61742a154f9d22abdd7fedecf41cb9f236852e1482a6d8f12a0d1f25"
     },
     {
       "file": "tpcds_sf1_spark_sql_20260826_193418_5bc78a3d.json",
@@ -1378,7 +1378,7 @@
       "query_count": 309,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "59c4c7d57cb63d88e8578ae499d47f7b827e0ee0d5d029bc7668f5ef50d4a19e"
+      "bundle_sha256": "e7882da4372c2e24417c55e983a4f58957cd4347cc9589519517a90d06e5ebe3"
     },
     {
       "file": "tpcds_sf10_spark_sql_20260823_233540_e9faf36f.json",
@@ -1391,7 +1391,7 @@
       "query_count": 309,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "d5f866d204f3da7d30c8eef5bb58c6cb84efac78671f1dbe8342260c512b5f20"
+      "bundle_sha256": "ace504c8ba72ba69281932489359adcb9f1dff12843f0ec51533c3903f95f179"
     },
     {
       "file": "tpch_sf001_cedardb_sql_20260825_095330_cf0d9e4d.json",
@@ -1404,7 +1404,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "d73d32ea6360db170cfd59611505aa7e60fe1b9faf107667921f354b674d2878"
+      "bundle_sha256": "00903ff4d5424d8fcf0038f048dba3e373295ebf38206d3a7a7e2e70bdc81f54"
     },
     {
       "file": "tpch_sf001_clickhouse_local_sql_20260826_100627_7ae478d5.json",
@@ -1417,7 +1417,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "89ccd67b5e48e6b3f621657963feda4e6c495bd6fbea928d2fc4f619aa65da5f"
+      "bundle_sha256": "19b5b8ed3fb73ae4ccb1963eb8d6e6f0c6e3384492a8f4869411e2dcec7ed6c3"
     },
     {
       "file": "tpch_sf01_clickhouse_local_sql_20260826_170326_1d1e2b2e.json",
@@ -1430,7 +1430,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "1a11b5519aad011f5a947bed6514af7eda4eb2d30bf9324c17d6539d3c76f0c5"
+      "bundle_sha256": "82263b3a732365a2fd5e4f3a1aa676e89790c09fd3dbdc2ee4972d9aace29f0d"
     },
     {
       "file": "tpch_sf1_clickhouse_local_sql_20260825_174747_a4d8447f.json",
@@ -1443,7 +1443,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "c9a22b6fbafef8c77f83493008dc3c214cfdc6af5fad65605bf25e53ae67bf95"
+      "bundle_sha256": "c9b5e6c236e8501bc45c1c0876ba18d3716d8655978d16f3139956f776df008c"
     },
     {
       "file": "tpch_sf001_clickhouse_server_sql_20260825_092429_4cd12ac0.json",
@@ -1456,7 +1456,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "305c40ab6a07250e80353aa67d42ec5407094af3666e1ba93c201cc7b224058f"
+      "bundle_sha256": "f41e0c69a875e1709acb4b03aed033960f683021cae4ddf25c3fb442bcf50f4e"
     },
     {
       "file": "tpch_sf001_datafusion_sql_20260826_110608_e8a7d048.json",
@@ -1469,7 +1469,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "4eb88ea5f6d8f30a8c7ef215e10e03f9f522e0552e6b971b4fd62b825f68884e"
+      "bundle_sha256": "00b2bd7ae5ec38417d1765073daef21fdb3e25a9e064a666b1bf09844a770cce"
     },
     {
       "file": "tpch_sf01_datafusion_sql_20260824_082755_adcfb35e.json",
@@ -1482,7 +1482,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "57265cb9bd7c8c47344bf727e2238eeca2be30858a60e0adb7fba03577e0363e"
+      "bundle_sha256": "55560f068d4b277beb8b6fcaea821c1befe63fdd03b4034d5ad5e361ed77d178"
     },
     {
       "file": "tpch_sf1_datafusion_sql_20260825_172912_1d62bd4f.json",
@@ -1495,7 +1495,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "2a04391f7e5a8abfc88bdee62f19c34ac3f2cdb56e3f744c32e7e1f92c368a8e"
+      "bundle_sha256": "ae25aefb696b2e562612e0249838b5ef8ef6470fd874078c8851add7034fd387"
     },
     {
       "file": "tpch_sf001_duckdb_sql_20260826_105325_8a57a5a8.json",
@@ -1508,7 +1508,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "a20c633f5bbe02bbac06663084936a707fc1a7815df9ba7e1eacee0a4b74f97a"
+      "bundle_sha256": "1263a65001b912a656a061528aea4a2a8339c8106a6a2241dc641ca0df0d7530"
     },
     {
       "file": "tpch_sf01_duckdb_sql_20260826_092426_786dcba6.json",
@@ -1521,7 +1521,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "f03944800712f721027fe90e2ab949d0203fb18363ccc62d77803ce5f010ee4a"
+      "bundle_sha256": "2654828269807cf42e3dcd97748751a44ee39c35ccb79da65d04bc56d19830eb"
     },
     {
       "file": "tpch_sf1_duckdb_sql_20260826_162117_67e59fb6.json",
@@ -1534,7 +1534,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "3f4ec9e6dc9aa2fa48918692d97a4755517541ea6a09bedd294d264100520c22"
+      "bundle_sha256": "d868338f6e684ab3038d17bd209fc124796a7f0e170a3a39ede732c604accad6"
     },
     {
       "file": "tpch_sf1_duckdb_sql_20260828_213108_3bd92bcc.json",
@@ -1547,7 +1547,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "953eb39ba96b21f1e4808d385ead26452c016245355982873e20ff639db49efc"
+      "bundle_sha256": "ea150b8e67b785f28a86dc9308f7efaeff16c319b8f09254d8616d6f6bd9b99b"
     },
     {
       "file": "tpch_sf1_ducklake_sql_20260828_091755_137bc87e.json",
@@ -1560,7 +1560,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "025b183bbb43c912eb495e0caa4526c768a0130f3236f46e1e42a6b5d9d27dc9"
+      "bundle_sha256": "8a11e73ea2570cf50882c0f39327274abd4b78b77c940222f340ec5374321fa9"
     },
     {
       "file": "tpch_sf001_lakesail_sql_20260825_092257_ede75588.json",
@@ -1573,7 +1573,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "ce50472259df46ce67777735c1c36d772e8d1b99bd8b5ba1e850a7c2c295bc8a"
+      "bundle_sha256": "22d005ad14a2a370c2bb3d55ea572c5f7b78767eec23e1837d36a33b0abaae8d"
     },
     {
       "file": "tpch_sf001_pandas_df_20260826_210019_8bde2222.json",
@@ -1586,7 +1586,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "805d70480e77b42d2962dc5471d6e6a756e0180b017a519a750fdbb60059fab9"
+      "bundle_sha256": "584ac16f9e750caba0be7a6ea1616e97f66d38efcadbdace4bcabb117be95460"
     },
     {
       "file": "tpch_sf01_pandas_df_20260826_210239_77598616.json",
@@ -1599,7 +1599,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "89bcd922c9e563be454c5ee8b78f31d1834b78e0d4e11f7fc6200159b1da632d"
+      "bundle_sha256": "0c6913e781487b6b459bf45bd43d2d660eadef7638bda6e7e79af2edcd329819"
     },
     {
       "file": "tpch_sf001_polars_df_20260824_074104_51ccc406.json",
@@ -1612,7 +1612,7 @@
       "query_count": 3,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "d6f0c4f7fa43e874b583848f1053e06234cbee30b305b83a93b7a01bc65d9777"
+      "bundle_sha256": "a02e5ff8d86c7d0b757a1393679526fe2d962476e51ccf43d560c25129788c9a"
     },
     {
       "file": "tpch_sf01_polars_df_20260826_204211_f659fcbf.json",
@@ -1625,7 +1625,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "ef948d3518b815fa694f8b5f21c27e6e55b96a25e907b1f915242fd1d0c0cff3"
+      "bundle_sha256": "8bb9c980ac0154824e120b8fff222da5270648a317217551fa92b332713341f0"
     },
     {
       "file": "tpch_sf1_polars_df_20260824_193005_54a9e53f.json",
@@ -1638,7 +1638,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "4590f2972e50a2be3ff24f182e7dbf303fb44a951a25f8e59e17e02b938821e2"
+      "bundle_sha256": "1f774f1fb3d04933b7c648864a4d2326474e316af397fc5cfaa113868d39e425"
     },
     {
       "file": "tpch_sf1_polars_df_20260825_184959_8ef4d6e2.json",
@@ -1651,7 +1651,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "22bf606cb2f9a53e44baddf61f4f5bd3ede43d9d47800053b3cb84e7969b1b8b"
+      "bundle_sha256": "6223e90a251910375fe1957cd473ed04aa3d67313c4ced0041a1afbb26bcdefe"
     },
     {
       "file": "tpch_sf001_pyspark_df_20260825_184252_42abb28d.json",
@@ -1664,7 +1664,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "8ee1008b50b6241ceb26fdb552dc9db25c821ea12db0a11c0878a6d19dd3b3ef"
+      "bundle_sha256": "902900d94ac3a529dd870db8afad42068dcd3e40227c0b4107ef1276a9202a0c"
     },
     {
       "file": "tpch_sf1_pyspark_df_20260825_185531_14cd3451.json",
@@ -1677,7 +1677,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "86b7aa836c76b3b20ae6184cf49b998b5031abbb925c004dfd571f7b107fd27d"
+      "bundle_sha256": "a950f22a2d88ed4815f715288dcbff34524163ec128cff772b396750514815c4"
     },
     {
       "file": "tpch_sf001_sqlite_sql_20260825_180256_4eddc10f.json",
@@ -1690,7 +1690,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "8c7bb9fff95bf76b9f09676a00d1cc71d3d4e3f3d67d9a2ef704620201dd238e"
+      "bundle_sha256": "9beb3a40373e12dba9025754c44f0488f10542f8bb8a7a088a9951ec7608642d"
     },
     {
       "file": "tpch_sf01_sqlite_sql_20260826_113913_3bf2ac41.json",
@@ -1703,7 +1703,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "c9f2e045eb1cc81f456864d222e62d015cc0e50fa3512c040811bb409ff491bc"
+      "bundle_sha256": "ff943375f9831aed2d9d2fb524a2ee369f6b1f5e26438d76c11356c974414993"
     },
     {
       "file": "tpch_sf1_sqlite_sql_20260825_180529_b9fdd7ba.json",
@@ -1716,7 +1716,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "2a35ec5853a339c6df89123cd42e2ed1cf7aff8a10ba04f0e567f6f4930724a0"
+      "bundle_sha256": "48ef737a55197763d58346bfa37500415d91ee9014273a5bf8555fb2c779de76"
     },
     {
       "file": "tpch_sf001_spark_sql_20260826_191913_2fd3b12b.json",
@@ -1729,7 +1729,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "f7314c0d8be41a3c8ad846a1976713ad9a8aa5efa500b2869eacf62190d3d606"
+      "bundle_sha256": "f32e904ce256f1831106fef147b73e4f356c91c4fe8326e025ae1cb3ff64d7bb"
     },
     {
       "file": "tpch_sf01_spark_sql_20260826_192036_6f8737a4.json",
@@ -1742,7 +1742,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "4c50cfa8bd56b5d0ebffff19d64c6b19046bbbc22aa97ee958855eb0bc013ff1"
+      "bundle_sha256": "37a7267532dcb690857ab5a6f27ba1e5f24a4859f7047168015d5fd49c13db5a"
     },
     {
       "file": "tpch_sf1_spark_sql_20260826_192249_7478c401.json",
@@ -1755,7 +1755,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "e6d0991fec7be3c973c0a9abdad08d41e0dee71285ecbe1f073d11df58bfd277"
+      "bundle_sha256": "9f453ee02da0a47ab25e08c7248792ace8b2b0c38bef611c792264895f5b77e4"
     },
     {
       "file": "tpch_sf001_starrocks_sql_20260825_103226_5cefdc41.json",
@@ -1768,7 +1768,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "91116d7e609152ccbb3ee93bb658ae508d6becead73628b56c3fa13e56d1ec98"
+      "bundle_sha256": "b5919afb45e6d46fbbe89681adf415a0a41901f0cd10d3781d9017c38abca54e"
     },
     {
       "file": "tpch_skew_sf001_clickhouse_local_sql_20260824_091113_ff38aebf.json",
@@ -1781,7 +1781,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "71bc03c8afcb85b7b48635997b098d90c3dca96f3794da981c1e29def11f7bb1"
+      "bundle_sha256": "e2606e3142900e253218c898b8b84ef2a57d077664b8f96c254c5532aea14e1f"
     },
     {
       "file": "tpch_skew_sf01_clickhouse_local_sql_20260826_172139_d17b65c3.json",
@@ -1794,7 +1794,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "24c1fc4ec67fb99666ddd75651f2a22a15512fe205e538fa7d5c58140e49aa2c"
+      "bundle_sha256": "d57750ab925aa7ee4bf1668ccd991519a259b250a0e5d1cf125e61574f9969e5"
     },
     {
       "file": "tpch_skew_sf1_clickhouse_local_sql_20260825_180038_276e9fdd.json",
@@ -1807,7 +1807,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "39f504be9c769884233aeb7eddddf10da29e856f5341bb564bbc2ae8a79f3428"
+      "bundle_sha256": "4d153d2a24df709ac44e193bbf71cc2ad1357e6113bfd9b28472efce5d06bd0c"
     },
     {
       "file": "tpch_skew_sf001_datafusion_sql_20260824_084108_70eb699a.json",
@@ -1820,7 +1820,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "4c55b3fdecc674508a06a5075b8986a26c9659f7395c6110c191fd823a10da30"
+      "bundle_sha256": "33ac3f33e44ee28aeccd4168dd96207afd5d9f81eb21e1ce6cd3d78f228a0bc1"
     },
     {
       "file": "tpch_skew_sf01_datafusion_sql_20260825_174044_16785577.json",
@@ -1833,7 +1833,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "d9ff872ded3665097c41715d9f286b47c797944ac3530f33e792dbb33f95afaf"
+      "bundle_sha256": "e316285e75d76a8b1b1faf45c887efdff206ac914ae6c8d5de637dee5aa6afe3"
     },
     {
       "file": "tpch_skew_sf1_datafusion_sql_20260826_112159_2b46b000.json",
@@ -1846,7 +1846,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "b4f7cd7dbe97c7280cf15d334cec30763855f3e9c4553274192e82bbc90a7173"
+      "bundle_sha256": "e4e3a903c1ae48145cf3adac83632ce7919f5ed85b7d6cbff882921692b603c4"
     },
     {
       "file": "tpch_skew_sf001_duckdb_sql_20260824_082549_fea46d50.json",
@@ -1859,7 +1859,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "9cf48148c8f97c1235bf88e8e0a45e0226083514b91d376fc3ad01fe01c0382a"
+      "bundle_sha256": "9d7ad37fe51a2309dedf96b26f3e8f8c859fcfaab050f8b49f4ec6b6511f78e9"
     },
     {
       "file": "tpch_skew_sf01_duckdb_sql_20260824_082553_b8859d6b.json",
@@ -1872,7 +1872,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "de208e07bfecf52bf7175bb5e3303349e79bd31bc50f66edebacbd25c7b213cf"
+      "bundle_sha256": "0a9c49a79765197ca2cb0fd392ab9d746669b88fe66c61995d5d4ab89039e9cd"
     },
     {
       "file": "tpch_skew_sf1_duckdb_sql_20260826_163325_957ad4d2.json",
@@ -1885,7 +1885,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "35f8062bef9988ac36e4654656137516b84393d198382f9b06127af0102b3535"
+      "bundle_sha256": "f4320613e9281730b4b3ba77b4861fc86ddefd30ce3f7b919ba50183e10d552a"
     },
     {
       "file": "tpch_skew_sf001_polars_df_20260824_080528_4e7cd354.json",
@@ -1898,7 +1898,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "e63920e9d17da279e7729a239b248b4e0776df78d16adf5bb1d7359ce038577d"
+      "bundle_sha256": "074fd1e8b2f263ebf82fea1b52a16de65472e7ccf7b2ccfb9625926d151ac19e"
     },
     {
       "file": "tpch_skew_sf01_polars_df_20260826_205813_b3ba4437.json",
@@ -1911,7 +1911,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "eff9eb1f2f128fbd834fa3d036352c5e3d26a151a2da0c08b05498cc0e1ab130"
+      "bundle_sha256": "ffa3aa5c8cd27f26ee6da679be48b6dd3ff8b9b04edb4e956b46b2fff161e0e7"
     },
     {
       "file": "tpch_skew_sf1_polars_df_20260826_205821_acce9704.json",
@@ -1924,7 +1924,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "9ab2ce9571281e640a579f613af08461d87c1444d73cee1bbf57e0fc6e2c1f90"
+      "bundle_sha256": "90be5279aa189c7274c8662e3a2d58acb9c42b4e78aaf679d772b84ca6088455"
     },
     {
       "file": "tpch_skew_sf001_sqlite_sql_20260826_191236_5087d732.json",
@@ -1937,7 +1937,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "0162158b588a8beb4b14da02cfc2bf9f1be3c770eb1ca7e1a52c493218cf48fd"
+      "bundle_sha256": "00cd64ca5ffc7c3ea7849fd72720132f4d046b1e30d522b6a991fec95813414d"
     },
     {
       "file": "tpch_skew_sf01_sqlite_sql_20260826_191257_0792588d.json",
@@ -1950,7 +1950,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "cc21b3af28c4365ff8697401269039745c831bc07280ca9c272133089c5a4444"
+      "bundle_sha256": "762b7040a29521203533b5c51093bbb7d91467eda6b5f27450355c568d806304"
     },
     {
       "file": "tpch_skew_sf1_sqlite_sql_20260826_191543_bf2bedb1.json",
@@ -1963,7 +1963,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "2e9f90a9d448b6b84f014c5d8a1d54544d04784b75c8c8a3311fea6fb4a42aa7"
+      "bundle_sha256": "952725eba7190b0021cab14802a91535a01425d0581b312845dc6f180623c4bf"
     }
   ],
   "cohorts": {

@@ -1,8 +1,8 @@
 {
+  "bundle_file": "amplab_sf001_pandas_df_20260826_214354_23f0647f.json",
+  "bundle_hash": "4d7086a33626acb79281ae3eace9099d54fdff2c1e72423ac53740c61586bab8",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "amplab_sf001_pandas_df_20260826_214354_23f0647f.json",
-  "bundle_hash": "b1e223612f9d74906e12f0ab4a8b907d8fbe2e8befd36cbe0ea079afea69f2dc"
+  "submitted_by": "maintainer"
 }

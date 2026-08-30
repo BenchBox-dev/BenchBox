@@ -1,8 +1,8 @@
 {
+  "bundle_file": "coffeeshop_sf01_pandas_df_20260826_220335_0e1c4ecf.json",
+  "bundle_hash": "c084fe94004b9d04cdb84054f64b688f28700cd7f99972ddd9dd1f7f1ed8d6a5",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "coffeeshop_sf01_pandas_df_20260826_220335_0e1c4ecf.json",
-  "bundle_hash": "957f1e91bd3d20474550d558f6fca0834fda8671bc7a119c8e250be1e4952253"
+  "submitted_by": "maintainer"
 }

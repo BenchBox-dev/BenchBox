@@ -1,8 +1,8 @@
 {
+  "bundle_file": "h2odb_sf01_clickhouse_local_sql_20260826_113046_9dcc57ae.json",
+  "bundle_hash": "bb96b492cb3d188353a0a035c93b3ec4f65f45d2843ee74e3d4deb84340d0188",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "h2odb_sf01_clickhouse_local_sql_20260826_113046_9dcc57ae.json",
-  "bundle_hash": "f899ee1c34c829555690c28d1959394fc74da2af63d1a3aa359fa9f9100b2f50"
+  "submitted_by": "maintainer"
 }

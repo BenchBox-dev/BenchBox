@@ -1,8 +1,8 @@
 {
+  "bundle_file": "ssb_sf001_datafusion_sql_20260826_111238_82531925.json",
+  "bundle_hash": "669fa1c4f3609bd15aba057da8eca28731273115a0bb70a710109e67f9d8cd91",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "ssb_sf001_datafusion_sql_20260826_111238_82531925.json",
-  "bundle_hash": "c610a1067ab8f352e2897c16a9628de4cfa9da73b2d1f98535ba92a3b198550a"
+  "submitted_by": "maintainer"
 }

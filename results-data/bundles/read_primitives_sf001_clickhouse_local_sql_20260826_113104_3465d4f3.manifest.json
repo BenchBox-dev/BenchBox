@@ -1,8 +1,8 @@
 {
+  "bundle_file": "read_primitives_sf001_clickhouse_local_sql_20260826_113104_3465d4f3.json",
+  "bundle_hash": "a9dc19ce3d232547fd8dca4758544b841e0ce086f824106dc9f178b84044ecb8",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "read_primitives_sf001_clickhouse_local_sql_20260826_113104_3465d4f3.json",
-  "bundle_hash": "a8e846a9eb6733cbb8cb83d1d073c59f63abda29e7e504418547ccc227a04460"
+  "submitted_by": "maintainer"
 }

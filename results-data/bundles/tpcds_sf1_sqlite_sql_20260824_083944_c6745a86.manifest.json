@@ -1,8 +1,8 @@
 {
+  "bundle_file": "tpcds_sf1_sqlite_sql_20260824_083944_c6745a86.json",
+  "bundle_hash": "1c036079d65016d03905df4bee86ed9c1fa43c4d27399fcbcb7c579626d02341",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "tpcds_sf1_sqlite_sql_20260824_083944_c6745a86.json",
-  "bundle_hash": "f8aeecb4c5cb0092472c107d4dccbe9c7750da493cc205e9cf6181e8de420505"
+  "submitted_by": "maintainer"
 }

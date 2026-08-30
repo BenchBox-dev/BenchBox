@@ -1,8 +1,8 @@
 {
+  "bundle_file": "joinorder_sf1_polars_df_20260826_205647_3a63a4cb.json",
+  "bundle_hash": "8f2ca6123f89dfd0e66ce24973248da4e8b377e8a7d41966c80827946b0e2566",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "joinorder_sf1_polars_df_20260826_205647_3a63a4cb.json",
-  "bundle_hash": "9743ae3bc7e8361c061462d6e0cb8454bd7f9bbc1b5c733562a73938ce0f3e58"
+  "submitted_by": "maintainer"
 }
