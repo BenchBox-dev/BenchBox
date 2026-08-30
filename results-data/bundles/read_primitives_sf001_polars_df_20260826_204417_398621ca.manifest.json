@@ -1,8 +1,8 @@
 {
+  "bundle_file": "read_primitives_sf001_polars_df_20260826_204417_398621ca.json",
+  "bundle_hash": "a3eb2d4d2c497ba6dd7ea530ab047f9e0e276e1e971b3c88ec5cf993459f08f8",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "read_primitives_sf001_polars_df_20260826_204417_398621ca.json",
-  "bundle_hash": "44dadccecc8f3a15d09e674ea4d3fcf8cab7e60ccd49a957bcef9cb3b01de608"
+  "submitted_by": "maintainer"
 }

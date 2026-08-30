@@ -1,0 +1,2093 @@
+{
+  "attestation": "Operator attestation, not a measurement. Every run in this corpus executed on a single machine -- natively, or driving Apple container Linux images whose engines share that host CPU. No other machine has been used in the project's development. Corroborating recorded evidence: every bundle that records a client host records Darwin/arm64, and the raw local archive shows a single machine_id. The CPU itself was never captured, because the capture path was defective (see fix/cpu-identity-capture-source).",
+  "bundles": [
+    {
+      "changed": true,
+      "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.manifest.json",
+        "new_sha256": "a1a11b5a26739b23b8f3e0f0ece7b7b2b443cb1fc7858f87c47f4521930a47b9",
+        "old_sha256": "223d8d97879cf0d5765ab3d11be977d22c2524543e0b55a2a3b0678588e9781b"
+      },
+      "new_result_id": "amplab-clickhouse-local-sf0.01-20260825-87b61fc3",
+      "new_sha256": "87b61fc3db9c0d3e2c9aab95f88eb52b4b75bbe5ef08759b2432ed9cc0c555c5",
+      "old_result_id": "amplab-clickhouse-local-sf0.01-20260825-3e582e31",
+      "old_sha256": "3e582e3180269469a3608172770957f522c850904a6e32d2db139856bd315d3e"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf001_datafusion_sql_20260826_111320_d8167419.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "amplab_sf001_datafusion_sql_20260826_111320_d8167419.manifest.json",
+        "new_sha256": "79b9f876cbe4c94f3ff87cac69e49e5fc2809715dda393c256dec09a2a69caa6",
+        "old_sha256": "ce47ef0bdbe894de91a1af456dea3e772a8578908a5a564686e76e9594c3b9eb"
+      },
+      "new_result_id": "amplab-datafusion-sf0.01-20260826-b3134502",
+      "new_sha256": "b31345029df63548fc688e337f10e6bed9d5be3b0d6705caf43b5b43f5fa23de",
+      "old_result_id": "amplab-datafusion-sf0.01-20260826-6296f339",
+      "old_sha256": "6296f3393fd387640538e23d8c9b113ce46bd9f8ce52342e40f73b9c1b5c1f02"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf001_duckdb_sql_20260826_105810_c659ecff.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "amplab_sf001_duckdb_sql_20260826_105810_c659ecff.manifest.json",
+        "new_sha256": "744a5c1aa77ae53cf527e5a3f395ff46f9cef124d8364c73df6f96661e40ff65",
+        "old_sha256": "4afff4bc0cf34ac3d854aa5b0f4d3fdbd6cd75bb6f79b55ca9153623af24cd4a"
+      },
+      "new_result_id": "amplab-duckdb-sf0.01-20260826-e4bd2a68",
+      "new_sha256": "e4bd2a68fdb723c26895b42073b47a868a1ce470e42a8b76a1ac063779ca4962",
+      "old_result_id": "amplab-duckdb-sf0.01-20260826-77992750",
+      "old_sha256": "77992750a09d5590a199d2116a52c4e1f24374695628344cce2b67b94b87d134"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf001_pandas_df_20260826_214354_23f0647f.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "amplab_sf001_pandas_df_20260826_214354_23f0647f.manifest.json",
+        "new_sha256": "be71b5dce97cbbff4479d4825ae5e194d8d6bf6c3767b4b3763be3653470d3d5",
+        "old_sha256": "d2a50676fbaeec14e9d2545df8faa54d3b7d5c960c7c12324a234e78d584ffa4"
+      },
+      "new_result_id": "amplab-pandas-sf0.01-20260826-4d7086a3",
+      "new_sha256": "4d7086a33626acb79281ae3eace9099d54fdff2c1e72423ac53740c61586bab8",
+      "old_result_id": "amplab-pandas-sf0.01-20260826-b1e22361",
+      "old_sha256": "b1e223612f9d74906e12f0ab4a8b907d8fbe2e8befd36cbe0ea079afea69f2dc"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf001_polars_df_20260826_204407_30de50e9.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "amplab_sf001_polars_df_20260826_204407_30de50e9.manifest.json",
+        "new_sha256": "844101d532143eda66a238b24e06684c915b1a3e4a1f126c46d824a9f4fe6783",
+        "old_sha256": "b9e11e3c5af4eb721d59b0846b1b8feab282db48b5247637314921aa1c219f5c"
+      },
+      "new_result_id": "amplab-polars-sf0.01-20260826-5b22d7e3",
+      "new_sha256": "5b22d7e38c55c537a8fab47953bfa6bb82cdfd33bcbaa1777e7a7de56d690c7d",
+      "old_result_id": "amplab-polars-sf0.01-20260826-b3ed816b",
+      "old_sha256": "b3ed816b770a05f97936f3aa526ec59830d6005b8309f5ad17af389b27405af5"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf001_sqlite_sql_20260826_173848_2eff93c9.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "amplab_sf001_sqlite_sql_20260826_173848_2eff93c9.manifest.json",
+        "new_sha256": "5dd21b6b6750bd7e82c38701772218c9e252e396e84a1b472e47793e63abe7d7",
+        "old_sha256": "2c1dffef2f50d3b5e2e43d2ad44b0cca41640f77da7eb73fe278e414f329b6f2"
+      },
+      "new_result_id": "amplab-sqlite-sf0.01-20260826-91350c88",
+      "new_sha256": "91350c8834042727b112b75727201e37753e2c5d26c1c6d65cb06957297082d8",
+      "old_result_id": "amplab-sqlite-sf0.01-20260826-13171f1f",
+      "old_sha256": "13171f1f65557f20c40d89c7ceccea71cd953e6fab143b7a6a42bb73bf91cb0f"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf01_clickhouse_local_sql_20260826_113055_4d4d5bcd.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "amplab_sf01_clickhouse_local_sql_20260826_113055_4d4d5bcd.manifest.json",
+        "new_sha256": "132530f4c4f096aa67303e7405d9bd02ddd0a814e0a424ec763607ef8a374811",
+        "old_sha256": "5183280e51a72cc48404f785674233f61cb35e6cb78508600cb6dc5cdafb8466"
+      },
+      "new_result_id": "amplab-clickhouse-local-sf0.1-20260826-3d417cd3",
+      "new_sha256": "3d417cd3eab37251f2a96523d71377caea611f137a79855ef792e85bdf29a62d",
+      "old_result_id": "amplab-clickhouse-local-sf0.1-20260826-3b1245c9",
+      "old_sha256": "3b1245c92486f5f6750088b4f3079986968a0bdfd4d93fb72fa01ca189a151f5"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf01_datafusion_sql_20260824_083211_fa4689a1.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "amplab_sf01_datafusion_sql_20260824_083211_fa4689a1.manifest.json",
+        "new_sha256": "289a46ee8e4e5f53832b73680b373803c47d38f5574881392b6b5aa89b32ea48",
+        "old_sha256": "9ede5cdfc868c5e0d154541d9cf49e769c9b7cd474d1384d2767784fda617aab"
+      },
+      "new_result_id": "amplab-datafusion-sf0.1-20260824-3c3d5fd3",
+      "new_sha256": "3c3d5fd3b74cd7b5a7c62fa455f6bb12e39050efc16e527b97e2b1fb26f1d405",
+      "old_result_id": "amplab-datafusion-sf0.1-20260824-e6df278b",
+      "old_sha256": "e6df278b726af6c282c13bfb7a84e90d31ad39e0d97c20611ca1b70141bee696"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf01_duckdb_sql_20260826_105812_c6911989.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "amplab_sf01_duckdb_sql_20260826_105812_c6911989.manifest.json",
+        "new_sha256": "1f362f1d4a10d7433d9e51d79c22ce1943f88be3143eeb3fc98340607f566a7e",
+        "old_sha256": "00c7dea44e2cd751ba347b4b02830f5eda6dbce047f06036c67e5c476ab29fd4"
+      },
+      "new_result_id": "amplab-duckdb-sf0.1-20260826-5fe937a5",
+      "new_sha256": "5fe937a55cfc2e3c6bfe070a0a9e0c7dcdf21236377f878376ce32e7ddadcc27",
+      "old_result_id": "amplab-duckdb-sf0.1-20260826-2da41ddb",
+      "old_sha256": "2da41ddbde4ca29c58ad6fcd678580eb5760790a723b8ac825a6d4926cdc83c0"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf01_pandas_df_20260826_214415_ce27d581.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "amplab_sf01_pandas_df_20260826_214415_ce27d581.manifest.json",
+        "new_sha256": "02c21a03cc3b5bfaba850081c3fc4ee4b338570ba204cf0e5885b7ddad6c1864",
+        "old_sha256": "a37030d47d39dbbd02c302189bc8bc34afa94d5da709c8380c3eafbebb46d01d"
+      },
+      "new_result_id": "amplab-pandas-sf0.1-20260826-ee9b6c33",
+      "new_sha256": "ee9b6c33476efe985caf42e93dc1ff424ba2c89dfac525ce7200c9f85cfaebb9",
+      "old_result_id": "amplab-pandas-sf0.1-20260826-24d9afe5",
+      "old_sha256": "24d9afe5afb06098fb5b3853a39bc4cb7f2650bef20051263318722fbf11e2cb"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf01_polars_df_20260826_204409_16bcf974.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "amplab_sf01_polars_df_20260826_204409_16bcf974.manifest.json",
+        "new_sha256": "37ae156806d9a4179a63b76ff108af00d50ec11cb22f57aac8030a8763ce2afc",
+        "old_sha256": "0e9be46111ccea7457f6a3aefe2095361ee1f4755036eb0a6194bad9b34c99f4"
+      },
+      "new_result_id": "amplab-polars-sf0.1-20260826-2291adbd",
+      "new_sha256": "2291adbd1e042fd504710e60b74d10b1eb13e46efa78c84dc657d5d3f0d7a9d0",
+      "old_result_id": "amplab-polars-sf0.1-20260826-ce7c685d",
+      "old_sha256": "ce7c685d96604c34ab54e9be727f50336a945c421d079feb548786b069253ce1"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf01_sqlite_sql_20260826_173851_fc7e8195.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "amplab_sf01_sqlite_sql_20260826_173851_fc7e8195.manifest.json",
+        "new_sha256": "43cb6cfd13ad8b9ed098e7a20beaf8380b094cc3e0cf995234f6484c00e6f1ba",
+        "old_sha256": "83077121f94c96bdd2e33bf1d463a2c5ec25aa990eeb483400e119fa5420ea56"
+      },
+      "new_result_id": "amplab-sqlite-sf0.1-20260826-b4992142",
+      "new_sha256": "b4992142ba216cb4b7ab733e03bee97b00669e24285d29b1fb9f0c5d47a1f31d",
+      "old_result_id": "amplab-sqlite-sf0.1-20260826-33c1b446",
+      "old_sha256": "33c1b446a595524f69a5e91746c0924a105702164cb7e718b2a2a070ed5d3783"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf1_clickhouse_local_sql_20260824_090414_e3e40917.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "amplab_sf1_clickhouse_local_sql_20260824_090414_e3e40917.manifest.json",
+        "new_sha256": "941bdd3053c4bfaae593d18ba10a69b0093e3429ed6cb99f149e917ce4254e67",
+        "old_sha256": "a9d25ae116b8a4bb79bea17f445739a9df3646807b969fe1e9f0316dbe4bea23"
+      },
+      "new_result_id": "amplab-clickhouse-local-sf1.0-20260824-f91ffa52",
+      "new_sha256": "f91ffa52798fc89f43452b5bd0e5ec58586a255722e590d9d74ce7b0c39cb64a",
+      "old_result_id": "amplab-clickhouse-local-sf1.0-20260824-29fb9932",
+      "old_sha256": "29fb9932a4ed1e310d50a4b824f4943ab957189f215f00ebf283d01a56f13db9"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf1_datafusion_sql_20260826_111328_9ec660c1.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "amplab_sf1_datafusion_sql_20260826_111328_9ec660c1.manifest.json",
+        "new_sha256": "92134bb62513585af8fbe8130ee8a19f9199485a71fe09067a1364702d663dd0",
+        "old_sha256": "460fa610482518882b5678c61fd98123dd72a06f6659fca8154cb42c22bea4b1"
+      },
+      "new_result_id": "amplab-datafusion-sf1.0-20260826-73904c72",
+      "new_sha256": "73904c7233c825ef722513c2827e65488f9ee30be4aede1723d05e2fef7d760b",
+      "old_result_id": "amplab-datafusion-sf1.0-20260826-ecda7475",
+      "old_sha256": "ecda747596ad07cf82d2e73e7a901c5a646d69ac059f6d6e6ab14f14a62d4d7b"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf1_duckdb_sql_20260824_081832_6c34d852.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "amplab_sf1_duckdb_sql_20260824_081832_6c34d852.manifest.json",
+        "new_sha256": "2e2f72fa496269223b22c722fe869f25ab1c4f07c34aa9e48e61f2b9f6e3c6cc",
+        "old_sha256": "a7756b98c671bcdfb246f4c637586776f19725dd82defe17ed69e1a49fa00090"
+      },
+      "new_result_id": "amplab-duckdb-sf1.0-20260824-9bc7412b",
+      "new_sha256": "9bc7412b3afae1c95c4d23dc0d164f56e9a10fb2a853f4a15f04e8d2cedd97b1",
+      "old_result_id": "amplab-duckdb-sf1.0-20260824-cbba50c5",
+      "old_sha256": "cbba50c533b8e5444261f8da6c52fbec7bcd6160a36b92f4749614bf1f0861e8"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf1_pandas_df_20260826_214740_b3ce3b8b.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "amplab_sf1_pandas_df_20260826_214740_b3ce3b8b.manifest.json",
+        "new_sha256": "2a9ba1a6e2a5a26dbf52f2bcb30f3b1c88be9455c1d8ac994402c831ff1182e5",
+        "old_sha256": "6bc6bc2fcf35b37dae60c728362d3f8f8dd8401865df11aae65bd9e3018ae6ec"
+      },
+      "new_result_id": "amplab-pandas-sf1.0-20260826-c7948dfc",
+      "new_sha256": "c7948dfc9e5a41b879dc9cf25deb3a5317e4abcb5ff81e05d814a83c06446f2c",
+      "old_result_id": "amplab-pandas-sf1.0-20260826-4bf12f20",
+      "old_sha256": "4bf12f20678638c19da2c95e19fcb98b13ad2f7266739a3b719b3633857eb3ce"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf1_polars_df_20260826_204414_f27f59f4.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "amplab_sf1_polars_df_20260826_204414_f27f59f4.manifest.json",
+        "new_sha256": "e89db32515ceba2b81dc7eaee118eefafc3a7f226336ebf3f2516b1dacc96bfe",
+        "old_sha256": "810dac39259d86b9d23a4e7412edbd0125cbcf25a0589c40e59bfcb8a8c05e92"
+      },
+      "new_result_id": "amplab-polars-sf1.0-20260826-6c753b9f",
+      "new_sha256": "6c753b9fcee8a95f7175915a54cc86e14c92ffd488279915ab2b4a8f841c2425",
+      "old_result_id": "amplab-polars-sf1.0-20260826-2ca4b729",
+      "old_sha256": "2ca4b729285ecbf75b1c7734b2893e1d6949a2b0b75671a1a10f0e39133ed128"
+    },
+    {
+      "changed": true,
+      "file": "amplab_sf1_sqlite_sql_20260826_173907_42b777c2.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "amplab_sf1_sqlite_sql_20260826_173907_42b777c2.manifest.json",
+        "new_sha256": "3ae06ef3ecb9bda1d5dae8c137ede9b130872907eda5691615620227b5cc7fab",
+        "old_sha256": "83dfeadc20d16a699b2faa42d8dcf6d042ece3337ea61fc07f6268d1a4cb96f1"
+      },
+      "new_result_id": "amplab-sqlite-sf1.0-20260826-73e1b591",
+      "new_sha256": "73e1b59114c867469c096c612c0da47d3a90c8a9f3a18b1721af9a96161806e9",
+      "old_result_id": "amplab-sqlite-sf1.0-20260826-49f58798",
+      "old_sha256": "49f58798f7e4148f3441647b055fdfeedea24534c39994e24ef80a34580e9725"
+    },
+    {
+      "changed": true,
+      "file": "clickbench_sf1_clickhouse_local_sql_20260826_171228_3bd30206.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "clickbench_sf1_clickhouse_local_sql_20260826_171228_3bd30206.manifest.json",
+        "new_sha256": "270b0f0899d95cb705e635c02c880f3ea7f46b488ce7abf107c0a042e9ad0cfc",
+        "old_sha256": "203f6739944bae31b5b7c68b1d842134dda3ffdbd4a64fc200ef7fc13db68b68"
+      },
+      "new_result_id": "clickbench-clickhouse-local-sf1.0-20260826-a72112eb",
+      "new_sha256": "a72112eb1c0f2c91bfb129d3bc41491aae98b9e18ed37157029e76ea99a5807b",
+      "old_result_id": "clickbench-clickhouse-local-sf1.0-20260826-a912d634",
+      "old_sha256": "a912d634da46d41ad2c5e4d03045b917049a07a7d197ee3ae427d49c9d0d907c"
+    },
+    {
+      "changed": true,
+      "file": "clickbench_sf1_datafusion_sql_20260826_095102_8014d1c9.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "clickbench_sf1_datafusion_sql_20260826_095102_8014d1c9.manifest.json",
+        "new_sha256": "e03444f2083a1f3fb3cc455373037b435e0f35581824ae8314b1853d4c66916b",
+        "old_sha256": "828cf50255b7f27843ec08ce6e0412080ed27bd2ef76d1d8528b708fbbc85c09"
+      },
+      "new_result_id": "clickbench-datafusion-sf1.0-20260826-772e733f",
+      "new_sha256": "772e733f25217a9429478a65aba4d9ffeec401e872fb2c8f2046855e3cd17281",
+      "old_result_id": "clickbench-datafusion-sf1.0-20260826-92ba6fc9",
+      "old_sha256": "92ba6fc96155cd574023c94006a7c654afd604a0a23fa9e0650aa3b00dd1de42"
+    },
+    {
+      "changed": true,
+      "file": "clickbench_sf1_duckdb_sql_20260826_092938_171d21fd.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "clickbench_sf1_duckdb_sql_20260826_092938_171d21fd.manifest.json",
+        "new_sha256": "f6fd5ceabb6c02be713ccd23e4690475a8ad46b1a1b057376a80b36916dd5cf7",
+        "old_sha256": "a9fa89125bc0f54d6cd9f2ec7169e3951bfee9d5bcc87590a1db0b2f9a4e36d7"
+      },
+      "new_result_id": "clickbench-duckdb-sf1.0-20260826-d0a81802",
+      "new_sha256": "d0a818020aa8fe3911c0722318b2496e06f28a5b879ba1d8a9219b4f5fef181d",
+      "old_result_id": "clickbench-duckdb-sf1.0-20260826-2b6fbae8",
+      "old_sha256": "2b6fbae8c33cd4b56d9890c99f61e59159505e52da500e89d49099a6831cad41"
+    },
+    {
+      "changed": true,
+      "file": "clickbench_sf1_pandas_df_20260826_214321_dc8a2b98.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "clickbench_sf1_pandas_df_20260826_214321_dc8a2b98.manifest.json",
+        "new_sha256": "ad46ac99b1a3dfcd90a72154289edf5e59489515785f69fff85e52611ff3a619",
+        "old_sha256": "d7317e48183aa99f3fe4c588d21797ac4fe326f4a065e000163244a758ebe10e"
+      },
+      "new_result_id": "clickbench-pandas-sf1.0-20260826-4a73d17b",
+      "new_sha256": "4a73d17b8d089070862ce5bab103a67043b91199dc694486471cbdeafaf12fec",
+      "old_result_id": "clickbench-pandas-sf1.0-20260826-a7170c65",
+      "old_sha256": "a7170c65d944452bbb634abccff020a57eb1e4a4aa51570fc5618f578b20e859"
+    },
+    {
+      "changed": true,
+      "file": "clickbench_sf1_polars_df_20260826_204353_032a315a.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "clickbench_sf1_polars_df_20260826_204353_032a315a.manifest.json",
+        "new_sha256": "46d70aa5488c0dea0aad34fdd1c3a1fc7ceec57053c15a5b664657a752cf4233",
+        "old_sha256": "7a6ce499d2ec30ae01ba97607d18ebf69478be149d369a8b07204eba6d275c08"
+      },
+      "new_result_id": "clickbench-polars-sf1.0-20260826-7e0243b3",
+      "new_sha256": "7e0243b31ae988e8b7d3efd641ed2d7487979aa14d2e3fdd13ed9395fda8f43c",
+      "old_result_id": "clickbench-polars-sf1.0-20260826-02234bd6",
+      "old_sha256": "02234bd6c5658ea15cbcab6cafb7692dad13bb6dca6ce9d9ce5090fd4adf5043"
+    },
+    {
+      "changed": true,
+      "file": "clickbench_sf1_sqlite_sql_20260824_101152_6eb94fe6.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "clickbench_sf1_sqlite_sql_20260824_101152_6eb94fe6.manifest.json",
+        "new_sha256": "28dceb8f6268c52146d10c66065d555400c2e4ab0859a586a8cb73be2d2626e4",
+        "old_sha256": "7d96e744bead8a6769bdba331e69b97f445349194ccb375663ef2f529e81be6a"
+      },
+      "new_result_id": "clickbench-sqlite-sf1.0-20260824-f708a509",
+      "new_sha256": "f708a50979089ce9b92a222d1ab8ca7131c905ae96724cf0f80e7c6e4b168f6c",
+      "old_result_id": "clickbench-sqlite-sf1.0-20260824-38a0b534",
+      "old_sha256": "38a0b5342d18278e230f8d71d3d7d3e6d4f61f666f3a52f5673c5e9ec1b9a842"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf001_clickhouse_local_sql_20260824_090703_370b71e2.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "coffeeshop_sf001_clickhouse_local_sql_20260824_090703_370b71e2.manifest.json",
+        "new_sha256": "5425b8a3cb528503f4db6322f04f208843b4681f03ae4f03176b603ae5845541",
+        "old_sha256": "b407f45f74bd6f84b3b2f319d70a0fb3fd5052dda4b083543e70e0a75517aa5a"
+      },
+      "new_result_id": "coffeeshop-clickhouse-local-sf0.01-20260824-fc3a60cd",
+      "new_sha256": "fc3a60cd34dbd81b09761f8cc6bdbef3f6cef6d32e84fc18075ebf072f9fc0c6",
+      "old_result_id": "coffeeshop-clickhouse-local-sf0.01-20260824-d5b4b7dc",
+      "old_sha256": "d5b4b7dc6ddd5e20735d34aa8192070a47ec9aba3a9c0b5397ab7887295757b7"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf001_datafusion_sql_20260826_112013_bb01b471.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "coffeeshop_sf001_datafusion_sql_20260826_112013_bb01b471.manifest.json",
+        "new_sha256": "bfa1d55b72257ccc05ef1f60503ec35b3cefddaad3fa1fa760a8c45a3d16dee4",
+        "old_sha256": "d37bf123fed34ef37153bafaac622ed2e4648d061197c7e9734dc2f580d3d3fe"
+      },
+      "new_result_id": "coffeeshop-datafusion-sf0.01-20260826-dfac3b67",
+      "new_sha256": "dfac3b67b2a03a19fe54bfe30b52aa048fcde1b0f1f4b09f2838817fc5775e53",
+      "old_result_id": "coffeeshop-datafusion-sf0.01-20260826-de962b49",
+      "old_sha256": "de962b4997ce16fe462884d0649b2873f3b0331667f0110e6ffd2c3663eaecfc"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf001_duckdb_sql_20260826_093549_59592938.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "coffeeshop_sf001_duckdb_sql_20260826_093549_59592938.manifest.json",
+        "new_sha256": "84c75657538eace6709cb0ee23d62d499cf552b14eec9ef31b5646ab0d05ea5f",
+        "old_sha256": "f3b928400103d9b42f27bb6bf3ec81e8271a785abb99ba4fe88a3f7c5521f46c"
+      },
+      "new_result_id": "coffeeshop-duckdb-sf0.01-20260826-c01d93dd",
+      "new_sha256": "c01d93dd137c2e0512a8daf746f9ac2d3812540911b87af8f5204e101c2200ac",
+      "old_result_id": "coffeeshop-duckdb-sf0.01-20260826-f82ef9d0",
+      "old_sha256": "f82ef9d07b9473b653263d28536121f270d89e8e929e36f0df02a52ea2ac7278"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf001_pandas_df_20260826_220156_691d70ce.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "coffeeshop_sf001_pandas_df_20260826_220156_691d70ce.manifest.json",
+        "new_sha256": "8259aaed93c91d1e8fc038ef9c44ea68dab7704488a059eba37184a0757f9477",
+        "old_sha256": "481605f85f746caa97b7908f5a909502136e2b56ef1a0ac9632acbee2b8dec77"
+      },
+      "new_result_id": "coffeeshop-pandas-sf0.01-20260826-ae248089",
+      "new_sha256": "ae248089bee593fbb246eba797ccfa560a001225c5ae5505a3605b0868c55d93",
+      "old_result_id": "coffeeshop-pandas-sf0.01-20260826-91017375",
+      "old_sha256": "9101737592d27ba85660c2497e4762309bce38736f106ac62c85fe27b702fa8a"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf001_polars_df_20260826_205651_e7002552.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "coffeeshop_sf001_polars_df_20260826_205651_e7002552.manifest.json",
+        "new_sha256": "5b176448fa025cfc41de2d950292477f80329352a5f9c983f284bbdbdbb1df5d",
+        "old_sha256": "6795cd258dace8d78a8268dd8ebab3e694b235e04f465905a30b5dcdd5f6c54f"
+      },
+      "new_result_id": "coffeeshop-polars-sf0.01-20260826-c3b5e7ce",
+      "new_sha256": "c3b5e7ce3ec994d3b74345435ab9cd15759c806472299e1c979db0c5fa9dbe3f",
+      "old_result_id": "coffeeshop-polars-sf0.01-20260826-2eedc341",
+      "old_sha256": "2eedc341af2eb876c46d437353e7707d458e23876c18e7154603c5c16394b145"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf001_sqlite_sql_20260826_182548_16f67069.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "coffeeshop_sf001_sqlite_sql_20260826_182548_16f67069.manifest.json",
+        "new_sha256": "10040ef282fe2ee3f4047a1901d69b1b72338f946a590c2894af929a4b6a695e",
+        "old_sha256": "2c555c3bc98df98fe23753a261be66c3a473941468f8a8de92ca75cd2c4b1cfb"
+      },
+      "new_result_id": "coffeeshop-sqlite-sf0.01-20260826-986eaeaf",
+      "new_sha256": "986eaeaf693d1e7fb68daae88634966e26b3b5cd59319628b36b5233b49ab6a8",
+      "old_result_id": "coffeeshop-sqlite-sf0.01-20260826-8153ae7d",
+      "old_sha256": "8153ae7deecf9097a245ef15907769e146cbb31a78d48904a35d87221f3e0eeb"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf01_clickhouse_local_sql_20260826_113300_975cb3a1.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "coffeeshop_sf01_clickhouse_local_sql_20260826_113300_975cb3a1.manifest.json",
+        "new_sha256": "6018ecb30b9f2de5072a14afdaaffa516fcf1cb02519bef45440629d4f186512",
+        "old_sha256": "61b96dff6f01484ddfca9050c583ead05d193c864dcf4e6a14ffdcb7a77c8f14"
+      },
+      "new_result_id": "coffeeshop-clickhouse-local-sf0.1-20260826-b29fbf01",
+      "new_sha256": "b29fbf01d2291c4f35cd816b3aef8da4f75d39b6d8d1927d9caa9739ee064d66",
+      "old_result_id": "coffeeshop-clickhouse-local-sf0.1-20260826-745cd79a",
+      "old_sha256": "745cd79ac052c9106d2617a193aa93712591123bb3900c8ca1de0bfaafb0a73e"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf01_datafusion_sql_20260824_083924_387c45c7.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "coffeeshop_sf01_datafusion_sql_20260824_083924_387c45c7.manifest.json",
+        "new_sha256": "4993d9c8b1b998b5982c7e9ceafd3c00cc211542949f8f78eb0cb507971f5272",
+        "old_sha256": "73de18b8cf6b2e0dfd40121372146131ad5056e21bad93e39ef9fc97fca0c333"
+      },
+      "new_result_id": "coffeeshop-datafusion-sf0.1-20260824-3ef0ff0d",
+      "new_sha256": "3ef0ff0ddd20cb41c32b7a6a0d4133f610aa6d0ba9fef81f37eb476e98254c89",
+      "old_result_id": "coffeeshop-datafusion-sf0.1-20260824-6d517cec",
+      "old_sha256": "6d517cec06b2b3eff48ec7ce7ff049f1145b818be57e05542ba8871535c857a1"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf01_duckdb_sql_20260824_082354_21442642.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "coffeeshop_sf01_duckdb_sql_20260824_082354_21442642.manifest.json",
+        "new_sha256": "eaf2eb2f5a59f08a66988c807e06c85a3d424bb24a92473226c2d81d69d20e13",
+        "old_sha256": "f455de35979750247e2de1df2edfe8876b118529abcf70e6db0fbac7559e68e5"
+      },
+      "new_result_id": "coffeeshop-duckdb-sf0.1-20260824-143f4e7d",
+      "new_sha256": "143f4e7dbfadfe6d3729ce48483728911062f63cbba196dd7b7812bce1aa0d1b",
+      "old_result_id": "coffeeshop-duckdb-sf0.1-20260824-8fbe71da",
+      "old_sha256": "8fbe71da1bd58afff3cc6e365acf74f67ec04698bb2f75b432686666b75bf30a"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf01_pandas_df_20260826_220335_0e1c4ecf.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "coffeeshop_sf01_pandas_df_20260826_220335_0e1c4ecf.manifest.json",
+        "new_sha256": "d34e14bf11fbad1ee87064c1334e1fddc6157d07528d82e1c7dca15a3c874769",
+        "old_sha256": "04b46bcbf84bd98d63b7fcbf2ed49742777fd11f1cee4d9702d5b3f3db65fca2"
+      },
+      "new_result_id": "coffeeshop-pandas-sf0.1-20260826-c084fe94",
+      "new_sha256": "c084fe94004b9d04cdb84054f64b688f28700cd7f99972ddd9dd1f7f1ed8d6a5",
+      "old_result_id": "coffeeshop-pandas-sf0.1-20260826-957f1e91",
+      "old_sha256": "957f1e91bd3d20474550d558f6fca0834fda8671bc7a119c8e250be1e4952253"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf01_polars_df_20260826_205654_48e58125.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "coffeeshop_sf01_polars_df_20260826_205654_48e58125.manifest.json",
+        "new_sha256": "42f48eaab991f6cbd0e75f2c5e57e07f44d037074ad5ea86c47dd350f5312ea0",
+        "old_sha256": "1069b54163a3f6492b0931b3f10947dc6ee1b4bceab854559e91ce409a136b28"
+      },
+      "new_result_id": "coffeeshop-polars-sf0.1-20260826-7ef4e052",
+      "new_sha256": "7ef4e05286c85ef2a0e4ba695b0e7c7b591bf6c75ffd9242043de713d951ebd9",
+      "old_result_id": "coffeeshop-polars-sf0.1-20260826-fd58f632",
+      "old_sha256": "fd58f632265280c39a370df5e0f2a5e729f20088fa0d53fde9ab7c8adddcf57e"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf01_sqlite_sql_20260826_182615_3aadc9a8.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "coffeeshop_sf01_sqlite_sql_20260826_182615_3aadc9a8.manifest.json",
+        "new_sha256": "70bf70564dde1b1d3bbdc2e945cfed2d33b7314c859a5356255a4fa0392ced7b",
+        "old_sha256": "050139d3834559f5133a10f1a6744fc9f382c9b657ccc65ea7ed7a811acc316e"
+      },
+      "new_result_id": "coffeeshop-sqlite-sf0.1-20260826-7fab051b",
+      "new_sha256": "7fab051b202a913c855a47d2231559cd85d6d6aac1f9f0ec37c03a8f3b3325ea",
+      "old_result_id": "coffeeshop-sqlite-sf0.1-20260826-616f0b3e",
+      "old_sha256": "616f0b3e3199cb6c937b14f81c93e88077f2352c29da95de9f4eb4de1d57abf7"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf1_clickhouse_local_sql_20260826_171552_4ce8154e.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "coffeeshop_sf1_clickhouse_local_sql_20260826_171552_4ce8154e.manifest.json",
+        "new_sha256": "3bd0a1cea37039ddf56b40cbda9cd3f28ba9f47e776460eb3aaeac779951c478",
+        "old_sha256": "973f1e9bc9c4051483a98997d1dc08e7e5d6e341ea5f27ff5476b13cc3905904"
+      },
+      "new_result_id": "coffeeshop-clickhouse-local-sf1.0-20260826-7a398782",
+      "new_sha256": "7a3987822aea3e37abd6a77f525de944a6ed16ad44e3a5839ae7f3c83879c04c",
+      "old_result_id": "coffeeshop-clickhouse-local-sf1.0-20260826-971e4794",
+      "old_sha256": "971e4794dad8fc32b24f71649f81e63e036208f1f043ff841b8b3752169e55a1"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf1_datafusion_sql_20260826_100331_e1266562.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "coffeeshop_sf1_datafusion_sql_20260826_100331_e1266562.manifest.json",
+        "new_sha256": "90a3880b32df901d8868503f276c51d035685f22210907b2a9969b841d12af44",
+        "old_sha256": "e8147b7cf418d98b7c3b22326cbaac989e06d86b77cd1ca58ba8d676af003606"
+      },
+      "new_result_id": "coffeeshop-datafusion-sf1.0-20260826-883acde6",
+      "new_sha256": "883acde62e60cd492dff5520adea8286704e3626429ad38a020ed2adecac1935",
+      "old_result_id": "coffeeshop-datafusion-sf1.0-20260826-c0204eca",
+      "old_sha256": "c0204eca109076993b47704305024d6934ce4437cc421e69087eae6513276518"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf1_duckdb_sql_20260826_110251_51016466.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "coffeeshop_sf1_duckdb_sql_20260826_110251_51016466.manifest.json",
+        "new_sha256": "bd567b8b99f102376f952addaf6386085e8092ca9378430dfeeae4250a54570c",
+        "old_sha256": "cdcbc699f42187d7b50b8a323b64d3845b20682374bee34db4ae20ee637b8fc6"
+      },
+      "new_result_id": "coffeeshop-duckdb-sf1.0-20260826-a5c6ba35",
+      "new_sha256": "a5c6ba35ba8e6200026447aca529dfc66ec7ec8261b1ce2f8bba0273b4c3c644",
+      "old_result_id": "coffeeshop-duckdb-sf1.0-20260826-d7b5739c",
+      "old_sha256": "d7b5739c8d49fd22954f332161159d9ce05ea76afb07034db210dab46ce6b828"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf1_polars_df_20260826_205707_d4bce0e2.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "coffeeshop_sf1_polars_df_20260826_205707_d4bce0e2.manifest.json",
+        "new_sha256": "b4f03488feb2614def407580eda7308ac764db8374a042a634d1cf92e782a934",
+        "old_sha256": "baab6fea6c4e100a525c74baa8eb9a2540980bdc90f3bf8d4d8f761261592feb"
+      },
+      "new_result_id": "coffeeshop-polars-sf1.0-20260826-7259852d",
+      "new_sha256": "7259852d2029c8db47d0ba8b06d701385457ebcd6f2852510554d8c8fb0a3e7a",
+      "old_result_id": "coffeeshop-polars-sf1.0-20260826-4f3e02b6",
+      "old_sha256": "4f3e02b6abe054b0ca782cb6581105cff374dc4489635d4a011eba6bf972575d"
+    },
+    {
+      "changed": true,
+      "file": "coffeeshop_sf1_sqlite_sql_20260826_183039_5bd85b97.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "coffeeshop_sf1_sqlite_sql_20260826_183039_5bd85b97.manifest.json",
+        "new_sha256": "9ffd53332ec4ce090afed5a4d35afc6d315af796d2a4d19d6d76104418e13ae0",
+        "old_sha256": "45e225bfd4e6b2b973345bca4a52d1414a894510d7177f474fc28a3c7765a77d"
+      },
+      "new_result_id": "coffeeshop-sqlite-sf1.0-20260826-ddee5a29",
+      "new_sha256": "ddee5a29bb6d26b946a77cf683d4bc0dbd732b8694a6e30a1f4ed2b27e4d41f8",
+      "old_result_id": "coffeeshop-sqlite-sf1.0-20260826-8171b14c",
+      "old_sha256": "8171b14c9c257a371d5c93a3c8508c0b1f016b2e54129dc00275719c3d3d4c58"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf001_clickhouse_local_sql_20260826_113044_c45bba08.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "h2odb_sf001_clickhouse_local_sql_20260826_113044_c45bba08.manifest.json",
+        "new_sha256": "ccce2c487de36874fa3daa906e8762fcb9d303829b2245b18e933a69a77c7b0d",
+        "old_sha256": "4140ef8f100d280470d9673789a7c85ffe7b9a281ff8d8da8f20c7d9342711e8"
+      },
+      "new_result_id": "h2odb-clickhouse-local-sf0.01-20260826-c7d351a0",
+      "new_sha256": "c7d351a013e1a81a090724a036ffa821eb8dee8f2d85e8b5cccaa5abeeacab26",
+      "old_result_id": "h2odb-clickhouse-local-sf0.01-20260826-b5d25f29",
+      "old_sha256": "b5d25f298e672814ed41c85858078c1811d839901812e43f0ab1ceff5e6db458"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf001_datafusion_sql_20260826_095104_070a3162.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "h2odb_sf001_datafusion_sql_20260826_095104_070a3162.manifest.json",
+        "new_sha256": "6a58a44094f9a8346c1bebbca76d560d913ad87ebc23371d7c8c09dabd62a9ac",
+        "old_sha256": "0e510726751b62efe3911df91a88b386f08e89de6c603ea4a513bbb530557ee8"
+      },
+      "new_result_id": "h2odb-datafusion-sf0.01-20260826-856ad51a",
+      "new_sha256": "856ad51ac177880cba5d903bd79f30d1ab816ac6ad1edfe96c61067392d42f09",
+      "old_result_id": "h2odb-datafusion-sf0.01-20260826-004e8d5b",
+      "old_sha256": "004e8d5baa2f2f5604eb5302b383165b68f078c2d4962af5d67fb875d1a35d2d"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf001_duckdb_sql_20260826_092940_c1acd649.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "h2odb_sf001_duckdb_sql_20260826_092940_c1acd649.manifest.json",
+        "new_sha256": "285883dbf1859ddcf44377f2d3582d61f92277856205420b7018e98042e3bf52",
+        "old_sha256": "2e171181df1405091d13535070020e72e539fe64dadca387f27d011fd019448c"
+      },
+      "new_result_id": "h2odb-duckdb-sf0.01-20260826-54a686cd",
+      "new_sha256": "54a686cd832d7ab7e54258ba1933f3e5dccf97f59f193bb78a2343e9d81b5fa3",
+      "old_result_id": "h2odb-duckdb-sf0.01-20260826-ff5a8dd1",
+      "old_sha256": "ff5a8dd1336e7e3f7594757a316689aa9a511df76d3311985cc3e1d8dbbd0ea4"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf001_pandas_df_20260826_214323_e4026556.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "h2odb_sf001_pandas_df_20260826_214323_e4026556.manifest.json",
+        "new_sha256": "8fd8ed8e7713a166db19a5516df48f5577c23b3ad20c800a7ba8d5e47641ba23",
+        "old_sha256": "badbe47a5a032ea29eb584c6cfdc821d940dec7f0882c93f5110ac3a909b633a"
+      },
+      "new_result_id": "h2odb-pandas-sf0.01-20260826-d2387e82",
+      "new_sha256": "d2387e82cfd5339fefec1666fc1ec00ffc0f0970982578aaea2e5cc7a460b81e",
+      "old_result_id": "h2odb-pandas-sf0.01-20260826-26bf445d",
+      "old_sha256": "26bf445d3756a4297b8c86cb09c55fb2e47b1d04440afc2bdd3604f4bb80e825"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf001_polars_df_20260824_080453_ec048a58.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "h2odb_sf001_polars_df_20260824_080453_ec048a58.manifest.json",
+        "new_sha256": "e22787da1ac9fcb9dbd1092caab255b17e7c3f52ce305d5a7656e59bee9b5084",
+        "old_sha256": "648a1b9a0b53503a93890865a74e9c3bd6f7b458092f10882ff75a12fdd470c5"
+      },
+      "new_result_id": "h2odb-polars-sf0.01-20260824-daa40aeb",
+      "new_sha256": "daa40aebafc5d499ba5b4e2fa1ac507aad1027ca080b66039a0e369f1f8c0445",
+      "old_result_id": "h2odb-polars-sf0.01-20260824-d729e7d0",
+      "old_sha256": "d729e7d07ad85bf7dae597ce871e96048a93beab610514243179b7c1e6d9de2f"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf001_sqlite_sql_20260824_101155_75c9d5df.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "h2odb_sf001_sqlite_sql_20260824_101155_75c9d5df.manifest.json",
+        "new_sha256": "6680a51951da5bdfef21a65d12326c16d51098df1dd145f12228d258b23a8555",
+        "old_sha256": "dc7a57eecba7f37c1294f3d71794f6e5004559facba89d1caacb9548ac51cb10"
+      },
+      "new_result_id": "h2odb-sqlite-sf0.01-20260824-10c919b2",
+      "new_sha256": "10c919b289973f57e85354e4e59f610daaf3d78972d53ff32d8ad9b969367be6",
+      "old_result_id": "h2odb-sqlite-sf0.01-20260824-baed2d71",
+      "old_sha256": "baed2d71533f8e71e28953c251c0122e1bd19846f0efffac249471a7ecb836ee"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf01_clickhouse_local_sql_20260826_113046_9dcc57ae.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "h2odb_sf01_clickhouse_local_sql_20260826_113046_9dcc57ae.manifest.json",
+        "new_sha256": "cf3fac76b7c33714bc9d5c97ebdeded735b505054e92c8d0e8707f9c7666bbdd",
+        "old_sha256": "8ccbd1e648157e38731e509d70a83de3311d254015140ce7268e48d406c1ca32"
+      },
+      "new_result_id": "h2odb-clickhouse-local-sf0.1-20260826-bb96b492",
+      "new_sha256": "bb96b492cb3d188353a0a035c93b3ec4f65f45d2843ee74e3d4deb84340d0188",
+      "old_result_id": "h2odb-clickhouse-local-sf0.1-20260826-f899ee1c",
+      "old_sha256": "f899ee1c34c829555690c28d1959394fc74da2af63d1a3aa359fa9f9100b2f50"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf01_datafusion_sql_20260826_111303_14b4960d.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "h2odb_sf01_datafusion_sql_20260826_111303_14b4960d.manifest.json",
+        "new_sha256": "e1e9ec693318ebbc18e9c0c6109cd253d914c350d50984745df4270c3e43a86a",
+        "old_sha256": "37fb0b14b2ef484746baf9febdda03543c02915515b0e7357ccb54376049dd4f"
+      },
+      "new_result_id": "h2odb-datafusion-sf0.1-20260826-d9b2a6cb",
+      "new_sha256": "d9b2a6cb1900091626c12db5067943fb4632c522e5259d25506295c50269ff70",
+      "old_result_id": "h2odb-datafusion-sf0.1-20260826-37de2252",
+      "old_sha256": "37de2252e31566b254eb3fd72600b6ebd31b6edbac2205691497815c6e2366f8"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf01_duckdb_sql_20260826_105804_b1354257.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "h2odb_sf01_duckdb_sql_20260826_105804_b1354257.manifest.json",
+        "new_sha256": "23ad7bbc0e5e6ebfd67322e953a6116f182ea71b6f7e468ddcb5f6a7b2ed6cfc",
+        "old_sha256": "691057081ce691f307e7161fbb26c7a5f95617d8879b257f3fa981d410dedabd"
+      },
+      "new_result_id": "h2odb-duckdb-sf0.1-20260826-d2e5ba28",
+      "new_sha256": "d2e5ba28402664da8dd2de568e0576550907bc48f6a94dc2351ebdc93c465cc6",
+      "old_result_id": "h2odb-duckdb-sf0.1-20260826-26d57ae4",
+      "old_sha256": "26d57ae48984caece496c405a7f250ef9ead501902d151dd4f3a2239dfd59be6"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf01_pandas_df_20260826_214326_b8cb56ef.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "h2odb_sf01_pandas_df_20260826_214326_b8cb56ef.manifest.json",
+        "new_sha256": "37fe97fdbee481c40ff2a4f3caf8cb064388da079986ececd8dcd3d0a78dfd2c",
+        "old_sha256": "73ff1714dddef314af25421b97cfe7929246cfa810e848cb421380bad48b6e06"
+      },
+      "new_result_id": "h2odb-pandas-sf0.1-20260826-ad6b3ca0",
+      "new_sha256": "ad6b3ca01a6670f67eb671330106d4fdb2e4bd20c882eb82d03f6b01c3faf1cb",
+      "old_result_id": "h2odb-pandas-sf0.1-20260826-f0acf89c",
+      "old_sha256": "f0acf89c6941e2077f41783191189db925e8d5e07b8970a4f313effe3d61c802"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf01_polars_df_20260826_204357_ef349725.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "h2odb_sf01_polars_df_20260826_204357_ef349725.manifest.json",
+        "new_sha256": "6dbf8d7413d828474ff85902fa201ee7698b9a6cc783bd97f3a79d102cfdd81f",
+        "old_sha256": "2fd8aba80808667cc5a47a36df330deaf4986c4fa8ae68ccbf9089a6d1e63357"
+      },
+      "new_result_id": "h2odb-polars-sf0.1-20260826-c5f3e661",
+      "new_sha256": "c5f3e661bf07a0315c1e5f4ef4856709cf31d39a947c1ca661f5f74a5fa610a1",
+      "old_result_id": "h2odb-polars-sf0.1-20260826-3a2a5025",
+      "old_sha256": "3a2a5025d00f02b37656be8f23c9161c95c101eff3a551ddbe44add8d73ec2b4"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf01_sqlite_sql_20260826_173507_2f578a88.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "h2odb_sf01_sqlite_sql_20260826_173507_2f578a88.manifest.json",
+        "new_sha256": "54a316d23f3e9627c586afacc1894abd742791aeb4cc30a7d2e3f8f7d31f93f7",
+        "old_sha256": "5f248085965852595da9c93ff216e8ebd189c8f116c53989fce9111dcfcb5527"
+      },
+      "new_result_id": "h2odb-sqlite-sf0.1-20260826-10441d09",
+      "new_sha256": "10441d09c04010f16ca3d72b6bfacfd98d07abea3643344a19ab7470ec0f8a48",
+      "old_result_id": "h2odb-sqlite-sf0.1-20260826-fa9c470a",
+      "old_sha256": "fa9c470ae74ca4e327fcd778c6a009d46e80b217399f0d930a8ab2e4283387bd"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf1_clickhouse_local_sql_20260825_175439_252ba7d7.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "h2odb_sf1_clickhouse_local_sql_20260825_175439_252ba7d7.manifest.json",
+        "new_sha256": "b70fcca78e0e01ad4a4310bc6f6cdd3ced0e92cdf596eacd616e43832e447a2a",
+        "old_sha256": "4373a5d951c019b436cf6e5f72ba445b307a18b22c553f404a98e80a23505970"
+      },
+      "new_result_id": "h2odb-clickhouse-local-sf1.0-20260825-b0984980",
+      "new_sha256": "b0984980ade146fde5a38fd12101100075ec721c57d32cdc216df9baf4c495bb",
+      "old_result_id": "h2odb-clickhouse-local-sf1.0-20260825-2fe87977",
+      "old_sha256": "2fe8797748acd46d9116d8621703489e5372a381806bb895782ebd682966de35"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf1_datafusion_sql_20260826_164731_03d5179d.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "h2odb_sf1_datafusion_sql_20260826_164731_03d5179d.manifest.json",
+        "new_sha256": "fd19ba999aa8c1822e9c23784c537e6a17a7ef27b7f491199056abd3b6791267",
+        "old_sha256": "30d362b841cf0ee392a9907041a2823e26c6b92f2b26c3044b18b8a435ca83fb"
+      },
+      "new_result_id": "h2odb-datafusion-sf1.0-20260826-e90abadf",
+      "new_sha256": "e90abadfaf9e8c40f71d7780936419907507a1a31ac2d8a443cae2f3ae6b976d",
+      "old_result_id": "h2odb-datafusion-sf1.0-20260826-24803c0a",
+      "old_sha256": "24803c0a84e3bdd1d50a280195cb963c0229c1ead1425d1db32727fe792f93b1"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf1_duckdb_sql_20260826_162604_723ed963.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "h2odb_sf1_duckdb_sql_20260826_162604_723ed963.manifest.json",
+        "new_sha256": "a08ea156104f48ad07ae8ad512c6e8b4f8048a78bfe4f4b7104d9aef8188cac0",
+        "old_sha256": "a657d213d4b4170248139da958a4d24549180b23a837098c58abba2a722b1e58"
+      },
+      "new_result_id": "h2odb-duckdb-sf1.0-20260826-d921aa7d",
+      "new_sha256": "d921aa7d9860213ba5ce173400f693d6774907044eaea2f2fb075b7b448fab23",
+      "old_result_id": "h2odb-duckdb-sf1.0-20260826-9e1d5178",
+      "old_sha256": "9e1d51787999c6ef8dbfa8ce7e78a258e55c88b488e4390790480430c59ee930"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf1_pandas_df_20260826_214350_52eabdfd.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "h2odb_sf1_pandas_df_20260826_214350_52eabdfd.manifest.json",
+        "new_sha256": "afc18c1f3d6cde4bb50cf05dd70a67bb62ae77394ac021a461aea2045677a534",
+        "old_sha256": "5cef2c5719d52425b44dee397942643b5d0c7a7484d00521bd2bb9e1e11ff36e"
+      },
+      "new_result_id": "h2odb-pandas-sf1.0-20260826-04f6e00e",
+      "new_sha256": "04f6e00e9d176e3a306f4009ca3424f9b71c557c3f1c3c0d82d8127853626a36",
+      "old_result_id": "h2odb-pandas-sf1.0-20260826-bfad107d",
+      "old_sha256": "bfad107d97abca16f2665752f356a85b0bd865a18aee6d5e34350b7f7ee9f580"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf1_polars_df_20260826_204405_5ff08b52.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "h2odb_sf1_polars_df_20260826_204405_5ff08b52.manifest.json",
+        "new_sha256": "177becc36fbf2e410bf8031ae7e7ffc3169dce43b558c4c099a16b5fb38094c5",
+        "old_sha256": "efddc60bd1594dbf021d60c56158e5f0682293320142476ced5adcbf7d80a14c"
+      },
+      "new_result_id": "h2odb-polars-sf1.0-20260826-0a9d47a9",
+      "new_sha256": "0a9d47a9a921f9a0ab4cf9e32d0c58c5256123e99075cd56913621d99a38fb55",
+      "old_result_id": "h2odb-polars-sf1.0-20260826-a1924b0c",
+      "old_sha256": "a1924b0c83b8ed6838dfac2563748fd7d2aacff31b05dbadfb097365f359f23a"
+    },
+    {
+      "changed": true,
+      "file": "h2odb_sf1_sqlite_sql_20260826_173846_911ddfd1.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "h2odb_sf1_sqlite_sql_20260826_173846_911ddfd1.manifest.json",
+        "new_sha256": "267a2e0812974479344ee5f872a77f2a40b334809931af75ca353e59dd17f48d",
+        "old_sha256": "dba00d9885a11c50bcf800fb3bad7fb754075113a62c539621df31159362be6f"
+      },
+      "new_result_id": "h2odb-sqlite-sf1.0-20260826-fd582cf2",
+      "new_sha256": "fd582cf249585daaf153bbea4a5160fa31d7d76dc9670329d64a0cd0fdd5b66d",
+      "old_result_id": "h2odb-sqlite-sf1.0-20260826-851e8308",
+      "old_sha256": "851e8308f3be09fb6099ecd0b67e51fb3e24ba49c4087fac39c9bfc2873ddb24"
+    },
+    {
+      "changed": true,
+      "file": "joinorder_sf1_clickhouse_local_sql_20260825_175643_45832acd.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "joinorder_sf1_clickhouse_local_sql_20260825_175643_45832acd.manifest.json",
+        "new_sha256": "91e2bccff2c57ac27dab39dee608de2d81c7dfe85fa9ee981b8ac2aa8274044b",
+        "old_sha256": "f3c63549ea3f7fc7d5b0112a59e734442436c51717ea9c2cd4a1dad28a200a6e"
+      },
+      "new_result_id": "joinorder-clickhouse-local-sf1.0-20260825-58ea78da",
+      "new_sha256": "58ea78daeb814dc97e1169071d4a8905ddc7b7efae569aa5fa9c2660ab7af51f",
+      "old_result_id": "joinorder-clickhouse-local-sf1.0-20260825-6d04fb26",
+      "old_sha256": "6d04fb26e5483abee8d07b4c2a7a913596327160195f543055b5ecf0c3aef1d2"
+    },
+    {
+      "changed": true,
+      "file": "joinorder_sf1_datafusion_sql_20260826_165807_7e4fefa1.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "joinorder_sf1_datafusion_sql_20260826_165807_7e4fefa1.manifest.json",
+        "new_sha256": "fa3c5bbdd0f6d8d2bd4d48d20ea4fc9d4f0f67750a1027aae45829f71245c127",
+        "old_sha256": "4fb99b4e83dbe97cb58eaf7d35e29bbc394a3256875e83ad8279d69089349dbb"
+      },
+      "new_result_id": "joinorder-datafusion-sf1.0-20260826-daf09f6b",
+      "new_sha256": "daf09f6bf580da72a856994c53c1aa674e7ee0f91db2760181ef30793d523683",
+      "old_result_id": "joinorder-datafusion-sf1.0-20260826-83ebc338",
+      "old_sha256": "83ebc338671f9f52e76c6b959cbff104a3ddf4b1f433cd50f654e25e602fde05"
+    },
+    {
+      "changed": true,
+      "file": "joinorder_sf1_duckdb_sql_20260826_093546_ba71254a.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "joinorder_sf1_duckdb_sql_20260826_093546_ba71254a.manifest.json",
+        "new_sha256": "b73aeaf5f2b7fb566105a05ad2de66873b68754714cee4734a4e8b8de162ae35",
+        "old_sha256": "145d8a92c1685d34b36680d0b705ecc5d7add1db0d930694c3680df5a0bd1ede"
+      },
+      "new_result_id": "joinorder-duckdb-sf1.0-20260826-34f3227f",
+      "new_sha256": "34f3227f840b8989560c9e2060d4cc6bec37affb0745f19601668367e0397f82",
+      "old_result_id": "joinorder-duckdb-sf1.0-20260826-b0eecef9",
+      "old_sha256": "b0eecef938f483f3f70df4b7bd84ce3351ffbeb66c4b9f0473ea06a51142fd3a"
+    },
+    {
+      "changed": true,
+      "file": "joinorder_sf1_polars_df_20260826_205647_3a63a4cb.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "joinorder_sf1_polars_df_20260826_205647_3a63a4cb.manifest.json",
+        "new_sha256": "274a809f6f6832fae36a557713dc2ba0a54ae76fa61f1ce9267d212cada8d1e4",
+        "old_sha256": "d5178b73787bb90517e19cdcb4cba8c77bd3074735ab8813663a28b28857ca8f"
+      },
+      "new_result_id": "joinorder-polars-sf1.0-20260826-8f2ca612",
+      "new_sha256": "8f2ca6123f89dfd0e66ce24973248da4e8b377e8a7d41966c80827946b0e2566",
+      "old_result_id": "joinorder-polars-sf1.0-20260826-9743ae3b",
+      "old_sha256": "9743ae3bc7e8361c061462d6e0cb8454bd7f9bbc1b5c733562a73938ce0f3e58"
+    },
+    {
+      "changed": true,
+      "file": "joinorder_sf1_sqlite_sql_20260826_182543_788c3eb2.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "joinorder_sf1_sqlite_sql_20260826_182543_788c3eb2.manifest.json",
+        "new_sha256": "a50c976e7a5883fedcdf30c89a4e93fd37d9cf86c4c37f42355e778e8def4cd4",
+        "old_sha256": "a58c0a5c6cd6159ee21274d37677925f4d6c83b5843845fb6b203b2b4abb1b25"
+      },
+      "new_result_id": "joinorder-sqlite-sf1.0-20260826-259e62db",
+      "new_sha256": "259e62db4cbe0fcb3d2674ba9b9756388b1d01a0a832a10baccdd31ccb306e20",
+      "old_result_id": "joinorder-sqlite-sf1.0-20260826-5429fd50",
+      "old_sha256": "5429fd50859ea866104b8e4cff9889253e9a63bf05b764ad3feb06b4afa2b912"
+    },
+    {
+      "changed": true,
+      "file": "read_primitives_sf001_clickhouse_local_sql_20260826_113104_3465d4f3.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "read_primitives_sf001_clickhouse_local_sql_20260826_113104_3465d4f3.manifest.json",
+        "new_sha256": "59c0c932f06296b6cbbf1f69e01a6319be1928482c22ea82bbeea64f6872b654",
+        "old_sha256": "baab00e2e17c8f3942dc7ce064241cf8305b9e24ea683370e52e8e4cace2799e"
+      },
+      "new_result_id": "read_primitives-clickhouse-local-sf0.01-20260826-a9dc19ce",
+      "new_sha256": "a9dc19ce3d232547fd8dca4758544b841e0ce086f824106dc9f178b84044ecb8",
+      "old_result_id": "read_primitives-clickhouse-local-sf0.01-20260826-a8e846a9",
+      "old_sha256": "a8e846a9eb6733cbb8cb83d1d073c59f63abda29e7e504418547ccc227a04460"
+    },
+    {
+      "changed": true,
+      "file": "read_primitives_sf001_datafusion_sql_20260825_173248_cb4cfcba.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "read_primitives_sf001_datafusion_sql_20260825_173248_cb4cfcba.manifest.json",
+        "new_sha256": "570d453dfbd431e2acbf7f3b9a868dd3d5bc7517c461f85d5dc7d69cfae03e0d",
+        "old_sha256": "28d2c77d8be4aa8945046601a9b6d06684d64e55e45eb375813e5cc02d9b60d2"
+      },
+      "new_result_id": "read_primitives-datafusion-sf0.01-20260825-27b406b8",
+      "new_sha256": "27b406b8dda9c1a3d59ae646792bf34d6f2f4052f4753cd41c193be44fe9c5df",
+      "old_result_id": "read_primitives-datafusion-sf0.01-20260825-856bc69c",
+      "old_sha256": "856bc69ca29ebca0636f94eb3004596f819a3a6b4b79e02fc532daf8d67853c8"
+    },
+    {
+      "changed": true,
+      "file": "read_primitives_sf001_duckdb_sql_20260825_172118_c9cb14d4.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "read_primitives_sf001_duckdb_sql_20260825_172118_c9cb14d4.manifest.json",
+        "new_sha256": "e31a7239ec9bacba1d5f406f0d7e529778daa100a3d14149db07baedb77657e1",
+        "old_sha256": "f0629a24738193c1557a0fbee395b817434adeb428821901666c80f510385e05"
+      },
+      "new_result_id": "read_primitives-duckdb-sf0.01-20260825-99837638",
+      "new_sha256": "99837638663f8292b250738d952a2778df94109ca75fb7a8159af9e5d4dcf531",
+      "old_result_id": "read_primitives-duckdb-sf0.01-20260825-9ca19ac5",
+      "old_sha256": "9ca19ac579a6031f6913a5e784163f9db67d0e8565fd423fee29b5c60f7eb70a"
+    },
+    {
+      "changed": true,
+      "file": "read_primitives_sf001_pandas_df_20260826_214757_e401da5d.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "read_primitives_sf001_pandas_df_20260826_214757_e401da5d.manifest.json",
+        "new_sha256": "a5fc079ef6cceb914a02c9d04eb208b04bc6dd3f09c21f45a816cb5bb62fac14",
+        "old_sha256": "83d5c172d159307430abe9c28600f0948d409305be716e7f413f252485e52de7"
+      },
+      "new_result_id": "read_primitives-pandas-sf0.01-20260826-209a6698",
+      "new_sha256": "209a66981d9a578be1025063ee3b6fc3b18d51f06f00babece088928cca46494",
+      "old_result_id": "read_primitives-pandas-sf0.01-20260826-1a9fbb1c",
+      "old_sha256": "1a9fbb1c594e5d52912642af23e01be6a01b7d4984248394d6e596f685517c81"
+    },
+    {
+      "changed": true,
+      "file": "read_primitives_sf001_polars_df_20260826_204417_398621ca.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "read_primitives_sf001_polars_df_20260826_204417_398621ca.manifest.json",
+        "new_sha256": "491ed325f22733efa4198987a94a7f5be6d52ec5f6b8915295542296b38f25c2",
+        "old_sha256": "e6b67eee50f9070a0343ea45f93b8decf4170225024ec090366d13102e04f8f5"
+      },
+      "new_result_id": "read_primitives-polars-sf0.01-20260826-a3eb2d4d",
+      "new_sha256": "a3eb2d4d2c497ba6dd7ea530ab047f9e0e276e1e971b3c88ec5cf993459f08f8",
+      "old_result_id": "read_primitives-polars-sf0.01-20260826-44dadcce",
+      "old_sha256": "44dadccecc8f3a15d09e674ea4d3fcf8cab7e60ccd49a957bcef9cb3b01de608"
+    },
+    {
+      "changed": true,
+      "file": "read_primitives_sf001_sqlite_sql_20260826_115059_7fa6915c.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "read_primitives_sf001_sqlite_sql_20260826_115059_7fa6915c.manifest.json",
+        "new_sha256": "c9711ca359d07a0e658dbb4ed333811953c283f41349f3fdf7a84e39e9cdce26",
+        "old_sha256": "0d9e64f1bff56138eb1acae511feca0b6bdc75176845e01450d15218b0529503"
+      },
+      "new_result_id": "read_primitives-sqlite-sf0.01-20260826-ffc8120e",
+      "new_sha256": "ffc8120efbb0b41a45cc57e23a58a1a5dff7b861431aa3401f3e1214e72d9123",
+      "old_result_id": "read_primitives-sqlite-sf0.01-20260826-98010bb1",
+      "old_sha256": "98010bb1cb21bb5011d37998b0c6f5fb17ffdf6b99cd731ef50baffe54b61516"
+    },
+    {
+      "changed": true,
+      "file": "read_primitives_sf01_clickhouse_local_sql_20260825_175504_c1aeca88.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "read_primitives_sf01_clickhouse_local_sql_20260825_175504_c1aeca88.manifest.json",
+        "new_sha256": "1814c559fdd6be0f96db159a3cc226ed305bfb3a6345fdb174d70432b8b52c2f",
+        "old_sha256": "a8503a708ba130a8fc39f1c04ecfe83a5e001a213659f611b83f13c7940da531"
+      },
+      "new_result_id": "read_primitives-clickhouse-local-sf0.1-20260825-4c12ec7c",
+      "new_sha256": "4c12ec7c3fc14bd0b4b4f52b7b2c3cb95f1bf934f10964c1736424e5b2bab951",
+      "old_result_id": "read_primitives-clickhouse-local-sf0.1-20260825-2c6e118e",
+      "old_sha256": "2c6e118ea74879ab87cacb1eb6402012bc773c8e987c7ec6b3e733b1e7a0f349"
+    },
+    {
+      "changed": true,
+      "file": "read_primitives_sf01_datafusion_sql_20260826_095258_1cdd70ad.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "read_primitives_sf01_datafusion_sql_20260826_095258_1cdd70ad.manifest.json",
+        "new_sha256": "c0f69c33790958750b0ada770e7741f153a202f495b2ec7c92b0cc2504441209",
+        "old_sha256": "f5c00d56ff4399646f3be96b7ab2770792469e38c5484af364a746972e5d0d79"
+      },
+      "new_result_id": "read_primitives-datafusion-sf0.1-20260826-ff5279ae",
+      "new_sha256": "ff5279aeab699ecb13a6d8259c042cf5ece169149a89849e72fcc9de080f36c0",
+      "old_result_id": "read_primitives-datafusion-sf0.1-20260826-137e1f4d",
+      "old_sha256": "137e1f4d99a56608c07bf479a3d6555eaec9e1e842045039c6224f175c69c230"
+    },
+    {
+      "changed": true,
+      "file": "read_primitives_sf01_duckdb_sql_20260826_093016_78dfffa8.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "read_primitives_sf01_duckdb_sql_20260826_093016_78dfffa8.manifest.json",
+        "new_sha256": "d678f9ef6dc5f5daa9f8f4283924631a338a6e0d6bbfe61f7bf82426ad092af9",
+        "old_sha256": "48b4f3272c9557c4a12882d5a0be92452ada7404fef9234dc38a35981e62ccda"
+      },
+      "new_result_id": "read_primitives-duckdb-sf0.1-20260826-ead1ba10",
+      "new_sha256": "ead1ba1049cf2e9de14fbca009f6eb2bbc0c3cb68eb1f154f45569572f0dc99d",
+      "old_result_id": "read_primitives-duckdb-sf0.1-20260826-eff7cee4",
+      "old_sha256": "eff7cee41060d7eed2e1e5fcb2037f979f49012b5841a8f75a9edff7a62bbe25"
+    },
+    {
+      "changed": true,
+      "file": "read_primitives_sf01_pandas_df_20260826_215034_c4051838.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "read_primitives_sf01_pandas_df_20260826_215034_c4051838.manifest.json",
+        "new_sha256": "b985c0a4814d61691c09c47e30a5c9658377ca94566258b17a87ae15c5be6158",
+        "old_sha256": "44c84bf5898218e0ecd39e6b50f5014458acce55948e17e52b78890058c604fa"
+      },
+      "new_result_id": "read_primitives-pandas-sf0.1-20260826-42574150",
+      "new_sha256": "4257415008d132a5e7891c5658ccc88060757d5aee45511c03d400625e153f71",
+      "old_result_id": "read_primitives-pandas-sf0.1-20260826-436cf66f",
+      "old_sha256": "436cf66fc259d128a189ab8c8d001c097a2a85125fd9c0a7be7a03cdf2044439"
+    },
+    {
+      "changed": true,
+      "file": "read_primitives_sf01_polars_df_20260826_204428_35d580c6.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "read_primitives_sf01_polars_df_20260826_204428_35d580c6.manifest.json",
+        "new_sha256": "ba5671089ec3bfb5a9748664e3bf9ffe38f48bd04ba7707d1b968a6db35713c1",
+        "old_sha256": "d141971b154aceb0e1060e8d686d750012cc85da8911cfe19070978d6e488205"
+      },
+      "new_result_id": "read_primitives-polars-sf0.1-20260826-22213d95",
+      "new_sha256": "22213d95685a938d9bd1cf7d3bcf1ba117aacbf3ce3dd0a83ce17b70d137ec3f",
+      "old_result_id": "read_primitives-polars-sf0.1-20260826-6ac7d002",
+      "old_sha256": "6ac7d00230c965ad5214de48d77faa04a69ca23e4062cf7a4b57885481784dc0"
+    },
+    {
+      "changed": true,
+      "file": "read_primitives_sf01_sqlite_sql_20260826_115513_688f04bb.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "read_primitives_sf01_sqlite_sql_20260826_115513_688f04bb.manifest.json",
+        "new_sha256": "689d2baba54bbb92201d3ee79e8e168b36b24697bdf3743f6f3ebf9e38e93367",
+        "old_sha256": "c9341c5b04528f4612b7d3a61b3436dc3c301c0d718e5dcfff69949e291ac330"
+      },
+      "new_result_id": "read_primitives-sqlite-sf0.1-20260826-7bab7b9b",
+      "new_sha256": "7bab7b9b60b2fb201d2dfc4e4a6c570b08e14a58d5d94914f93bfc8f67f678c0",
+      "old_result_id": "read_primitives-sqlite-sf0.1-20260826-8a4ba746",
+      "old_sha256": "8a4ba74653aaadbdb4d3d1ded8b4c2acf7688dc72c377ffb6647026364142fce"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf001_clickhouse_local_sql_20260825_175415_374cef00.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "ssb_sf001_clickhouse_local_sql_20260825_175415_374cef00.manifest.json",
+        "new_sha256": "768d33a83418119a0480e65101d00c4dfece5f5b74c8503fa6b8487836849b21",
+        "old_sha256": "1f850e101b9301278bc2b98bd80836010c178dd8c84f8ff8224afdf8fe1dae41"
+      },
+      "new_result_id": "ssb-clickhouse-local-sf0.01-20260825-2b637df0",
+      "new_sha256": "2b637df0bff37b66d508c1f1f35c215e5f6e046555af1d06fa2ec228de51f396",
+      "old_result_id": "ssb-clickhouse-local-sf0.01-20260825-5e3276c9",
+      "old_sha256": "5e3276c90d95b3f8faba0edab721e491c5ce98d31447041630b8c296ac1caeaa"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf001_datafusion_sql_20260826_111238_82531925.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "ssb_sf001_datafusion_sql_20260826_111238_82531925.manifest.json",
+        "new_sha256": "fd9fb00b155ea1b86e3028179743f37cd3a2a6d880349f69c9817f75ef32f577",
+        "old_sha256": "95ead317e235cf65b5d025aefbcdd0cea237b556c12ef0f6dff2b1fc2f070701"
+      },
+      "new_result_id": "ssb-datafusion-sf0.01-20260826-669fa1c4",
+      "new_sha256": "669fa1c4f3609bd15aba057da8eca28731273115a0bb70a710109e67f9d8cd91",
+      "old_result_id": "ssb-datafusion-sf0.01-20260826-c610a106",
+      "old_sha256": "c610a1067ab8f352e2897c16a9628de4cfa9da73b2d1f98535ba92a3b198550a"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf001_duckdb_sql_20260825_172048_38133bb4.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "ssb_sf001_duckdb_sql_20260825_172048_38133bb4.manifest.json",
+        "new_sha256": "ddd71b5ffde6f3cc81460f85524ad0ff0fbe433dc05060bbdf27afefcddaa0d0",
+        "old_sha256": "7cc3cfbf76f6a12fb362145cd7ed7fe0ec5925d0ded85dd54134551afc80e070"
+      },
+      "new_result_id": "ssb-duckdb-sf0.01-20260825-f0c4cfcd",
+      "new_sha256": "f0c4cfcd00cece0bacb8720e8542353bf0609c01f10ed248e5bc8fde179280f2",
+      "old_result_id": "ssb-duckdb-sf0.01-20260825-d1a130d1",
+      "old_sha256": "d1a130d1250d8154576401297ee38d22f19deb936aa2882be58c56e569e9b7a9"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf001_pandas_df_20260826_213835_c9150a2d.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "ssb_sf001_pandas_df_20260826_213835_c9150a2d.manifest.json",
+        "new_sha256": "19f89c330da199756fa82196c5ce7afdf35f0a5f8943332674caed4792a476a4",
+        "old_sha256": "bebe90a366a5eaca1f3381e3bf7652aabcc35ff8de9af49fd0117e842fe22850"
+      },
+      "new_result_id": "ssb-pandas-sf0.01-20260826-de1cc349",
+      "new_sha256": "de1cc3493e1b3f84cb5401626e9b335240a05f223f19a30ff290c88efb585cbf",
+      "old_result_id": "ssb-pandas-sf0.01-20260826-803798e1",
+      "old_sha256": "803798e1388ae516d524600b70c8e17969a5598d90bab8ebc59616af855b7c29"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf001_polars_df_20260824_080435_f630b76f.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "ssb_sf001_polars_df_20260824_080435_f630b76f.manifest.json",
+        "new_sha256": "eef8b32403aca4f2a5744878d0be04666d97fb6456a62ea6bbd2cb686dadc5a6",
+        "old_sha256": "bd7094087d2685d92488ebc9ef979cf9d8fd3f901348da8c4a96472f4a2a5af3"
+      },
+      "new_result_id": "ssb-polars-sf0.01-20260824-418df1b3",
+      "new_sha256": "418df1b3b91b4172cb96eb7c1dde87ee230a09e30fa8fc59a3970b3a6432863a",
+      "old_result_id": "ssb-polars-sf0.01-20260824-d93a5c91",
+      "old_sha256": "d93a5c9156a0c1344efa62d68887b06c93a9e657b0ae4fb57d3372516190df89"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf001_sqlite_sql_20260825_192615_dbc2a34e.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "ssb_sf001_sqlite_sql_20260825_192615_dbc2a34e.manifest.json",
+        "new_sha256": "c89306d40e08293e7305dc55579e22ffa00b4aea1e9d81eb1815e3843ddd15fd",
+        "old_sha256": "555c9995dcd090556e2e61f91be8784e25f9e7d419f945cf73a04d57b05d4e38"
+      },
+      "new_result_id": "ssb-sqlite-sf0.01-20260825-331c12f9",
+      "new_sha256": "331c12f9f2082a8075a41cacb43245efc3639f3ba383f015406bff2e71460921",
+      "old_result_id": "ssb-sqlite-sf0.01-20260825-55cef309",
+      "old_sha256": "55cef3094181ee42a0b6062d514effe4afd8b1f2bf828a7cf7be9f9f4ea2bdaa"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf01_clickhouse_local_sql_20260826_171214_5f654805.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "ssb_sf01_clickhouse_local_sql_20260826_171214_5f654805.manifest.json",
+        "new_sha256": "12123aa5a4aff1547e960d834b2abba67234e1e536ea4852e23c8436aa03d3ea",
+        "old_sha256": "19d86d41aa77b97e12fff53b63b20bc3a9df0e44f0f7a5e4566b801894ae79b5"
+      },
+      "new_result_id": "ssb-clickhouse-local-sf0.1-20260826-b62d3c0c",
+      "new_sha256": "b62d3c0c36617ac2867b961401a0cbd6bde8334231098248e5cf7bed861a88a8",
+      "old_result_id": "ssb-clickhouse-local-sf0.1-20260826-8f8c959e",
+      "old_sha256": "8f8c959e62a4f6c6b73b511756ff0a5abea077bcba494015eeceb481c6896ad8"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf01_datafusion_sql_20260826_164648_81c32dbc.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "ssb_sf01_datafusion_sql_20260826_164648_81c32dbc.manifest.json",
+        "new_sha256": "097785f4cb2e991d19eb2e02357e844cbf42d70beee31ab412f6ffef1d60ecd1",
+        "old_sha256": "f8e2d9c5641bad5a4edef3d2e73f14b36d6008bffcdb3a208edb7d7ff0292081"
+      },
+      "new_result_id": "ssb-datafusion-sf0.1-20260826-bd2d5830",
+      "new_sha256": "bd2d583054760cb637447627e7608c4bdbb388afa8184fc8052d77ac226f16fd",
+      "old_result_id": "ssb-datafusion-sf0.1-20260826-4143b340",
+      "old_sha256": "4143b340c24b7d6e5a1f5c151f061c00cbfdc27766188e1dfce8c2523099dfa1"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf01_duckdb_sql_20260826_092930_fdc9380c.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "ssb_sf01_duckdb_sql_20260826_092930_fdc9380c.manifest.json",
+        "new_sha256": "efbc96788e41de46a7c96a3308ee7e3350d434271219a53ab3f3c1e61f499610",
+        "old_sha256": "4c8feca33137f056ec7eae11242e318cf1ae8c8253fd7e0bad845fb417e668bd"
+      },
+      "new_result_id": "ssb-duckdb-sf0.1-20260826-33f04d76",
+      "new_sha256": "33f04d76ef70978440e96fd395553bcb79d36708f3bee949a02fd43ae5038517",
+      "old_result_id": "ssb-duckdb-sf0.1-20260826-670d1a6b",
+      "old_sha256": "670d1a6b51a27806100d8f2832bd2307e1740110920f2a8623c286cc5a0f1f75"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf01_pandas_df_20260826_213846_b71ebc6d.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "ssb_sf01_pandas_df_20260826_213846_b71ebc6d.manifest.json",
+        "new_sha256": "123d5df19851311c64e5f2e20beb1657c0eb7d7dc61f7142bd52fe02dea5c818",
+        "old_sha256": "b0d35e768d60533f5bc02c16d5bb82d63efcf123279df099b227c346dae089c0"
+      },
+      "new_result_id": "ssb-pandas-sf0.1-20260826-0b3ea058",
+      "new_sha256": "0b3ea0582ad4e8009d2926ba710246c2b41b16199bafbf4363672f1e150d78f1",
+      "old_result_id": "ssb-pandas-sf0.1-20260826-16a95376",
+      "old_sha256": "16a95376fc66fe31f4b2374113fecf0abf602df9eab979ee770a1fd08526392e"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf01_polars_df_20260826_204340_362af719.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "ssb_sf01_polars_df_20260826_204340_362af719.manifest.json",
+        "new_sha256": "44e00116ec22126965246d4610f4b07b1395ad838185ca071b46479a538f31a2",
+        "old_sha256": "5c82906de221d767e6fd75925bd24f467e2c7d0435a51276816eb45938042980"
+      },
+      "new_result_id": "ssb-polars-sf0.1-20260826-d171fbef",
+      "new_sha256": "d171fbef38940c37403586db78bdaf5827ce7209ef2a3298329d158e1454888d",
+      "old_result_id": "ssb-polars-sf0.1-20260826-7f3a1328",
+      "old_sha256": "7f3a13285658aca41a30f8bcca354735892c3914342ee1a8ac524cb9fb391f03"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf01_sqlite_sql_20260825_192631_9f5ef60f.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "ssb_sf01_sqlite_sql_20260825_192631_9f5ef60f.manifest.json",
+        "new_sha256": "6fe50a3e4cb4b82a7de80507925b6677e774e059141599a32a849f346aba1047",
+        "old_sha256": "680ad95700d9e6888d4270d390c1c994b26bd691a994bb335fde3aeec3f6aaac"
+      },
+      "new_result_id": "ssb-sqlite-sf0.1-20260825-269c5fa8",
+      "new_sha256": "269c5fa8815c134bc4499d7678b30c4a8710008ad31fb0ab7fc0f6eebfdaa2c5",
+      "old_result_id": "ssb-sqlite-sf0.1-20260825-0827fd41",
+      "old_sha256": "0827fd41b66f77856ca36098a1bfd3d41c5282af5672b8646d3acfa916a1b9d2"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf1_clickhouse_local_sql_20260825_175425_7134f926.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "ssb_sf1_clickhouse_local_sql_20260825_175425_7134f926.manifest.json",
+        "new_sha256": "6f63c0d203e6bd1d2ee572aa66126fb8f5c51ef9c11be2dfd4735d5cbc9ef2c2",
+        "old_sha256": "51ea0a554408d40e716732cb12d364059172347f740d17dc8eace9fd00cad3ef"
+      },
+      "new_result_id": "ssb-clickhouse-local-sf1.0-20260825-b06f88e7",
+      "new_sha256": "b06f88e7263ad9b38feeb55ac88bd24bc6577415b6b17a6687cc5f62e2e3f9ff",
+      "old_result_id": "ssb-clickhouse-local-sf1.0-20260825-9273895f",
+      "old_sha256": "9273895f30af2672e2fc18625ff2d70a04fccaf76af03d932f6d70e4f176105c"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf1_datafusion_sql_20260826_111249_677be683.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "ssb_sf1_datafusion_sql_20260826_111249_677be683.manifest.json",
+        "new_sha256": "ed25ecf0ed2ccef40ac628170937a86faf979ccf2e55a6a5e9128868f29d01c1",
+        "old_sha256": "af7cc238a8ba46572dddeb67b0f484f56f8f7bdbaa0a9c0566d85aea54c187ba"
+      },
+      "new_result_id": "ssb-datafusion-sf1.0-20260826-5d079c8b",
+      "new_sha256": "5d079c8be56fb48f24fc61f6ce0dae685443165b622914047aea2702ec5a28f1",
+      "old_result_id": "ssb-datafusion-sf1.0-20260826-c6f98f9a",
+      "old_sha256": "c6f98f9a8275da3dade28313f30f6afbf5718191fe1fdae818a174a9ca076088"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf1_duckdb_sql_20260826_105755_0c58dd8e.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "ssb_sf1_duckdb_sql_20260826_105755_0c58dd8e.manifest.json",
+        "new_sha256": "8c5c51ac87475d5776c60a9db4378deaeec5008a39a5f5c11e15d4869b9bc20f",
+        "old_sha256": "4894669f95dc2582c452bdff4ab9bfaa055f4f2db4cb9d4ac268a5b294e80e60"
+      },
+      "new_result_id": "ssb-duckdb-sf1.0-20260826-8d507131",
+      "new_sha256": "8d507131d5acc0bff058daa78bfd5678a1eeaa5983238ea4669aeed6b395f1ae",
+      "old_result_id": "ssb-duckdb-sf1.0-20260826-5f6d7603",
+      "old_sha256": "5f6d7603ef3e21da869d60e318b7a3a4ecf785ca3a6048878a2678a23a3735d8"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf1_pandas_df_20260826_214148_96be5114.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "ssb_sf1_pandas_df_20260826_214148_96be5114.manifest.json",
+        "new_sha256": "83837d41843915add9e2a5a84439b88db3b2b9c2eeb7e0e7fefab6027583b7f3",
+        "old_sha256": "55f57129c54f360584980cac505fbd721bfdd4840e060d02344465f7bda6bda9"
+      },
+      "new_result_id": "ssb-pandas-sf1.0-20260826-c771dd61",
+      "new_sha256": "c771dd61b3b0b73daeb7513c6220ace7c1cabb8a0e99984840430c30bdebb406",
+      "old_result_id": "ssb-pandas-sf1.0-20260826-bf817993",
+      "old_sha256": "bf817993ab5b44e751af1e5570351440759b20f0b689809ffcc6b92370b4f36e"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf1_polars_df_20260826_204347_d84b9d93.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "ssb_sf1_polars_df_20260826_204347_d84b9d93.manifest.json",
+        "new_sha256": "ed09f7fdadace6fbe302bfab1eac86673f2d330524a5d0846fe682219f7c3971",
+        "old_sha256": "082c0bcc437fe5b8633fda738eca109ff4c72202122492967d9c1806bad2c415"
+      },
+      "new_result_id": "ssb-polars-sf1.0-20260826-9dceedd3",
+      "new_sha256": "9dceedd39bf85ea5cc6cd36b23d04c14972a81dd7e22107ce029f16604bf42b2",
+      "old_result_id": "ssb-polars-sf1.0-20260826-45553fb5",
+      "old_sha256": "45553fb574961d632ceacd549b1fd0cc7c8a7d10282491dde1409eca7dd4bb7a"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf1_sqlite_sql_20260826_173350_a6b8db82.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "ssb_sf1_sqlite_sql_20260826_173350_a6b8db82.manifest.json",
+        "new_sha256": "cd2fc5519d2a62a7ffa56c1850e71a3ca7b92b769425f83be328881cdc38945c",
+        "old_sha256": "de9960a04e643bd3da86a38c721b712b4fc0f5c6f07b9a0dacc713bd700525f4"
+      },
+      "new_result_id": "ssb-sqlite-sf1.0-20260826-6445d397",
+      "new_sha256": "6445d397933271b10ae3f490dce0d68fb078b76fa63171294694e080f6342c2c",
+      "old_result_id": "ssb-sqlite-sf1.0-20260826-3a8ac94f",
+      "old_sha256": "3a8ac94f0d027611b6a2ac1845b2ba357cb2313d2d4c4dcdaa78148d5f10a22c"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf10_datafusion_sql_20260823_225543_15b41887.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpcds-datafusion-sf10.0-20260823-36f3ba49",
+      "new_sha256": "36f3ba49488318ce66a7bac13f87231ab891fe01d94111a0f4d5bee710d80651",
+      "old_result_id": "tpcds-datafusion-sf10.0-20260823-ad566ba8",
+      "old_sha256": "ad566ba8dd00ffb0c286a92148d6d1d0bf8335753cc778aad3c30dad05bda286"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf10_duckdb_sql_20260823_173729_11fd39df.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpcds-duckdb-sf10.0-20260823-7cd05599",
+      "new_sha256": "7cd05599f901baf50ae78e865b4d6f8db89cf1f9d7c861f27852b44a02022e15",
+      "old_result_id": "tpcds-duckdb-sf10.0-20260823-fabf8953",
+      "old_sha256": "fabf89532cfa272c511ac09bc873d5e0aad7bb2de1ed0613e2704c8f3fca6079"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf10_spark_sql_20260823_233540_e9faf36f.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpcds-spark-sf10.0-20260823-ace504c8",
+      "new_sha256": "ace504c8ba72ba69281932489359adcb9f1dff12843f0ec51533c3903f95f179",
+      "old_result_id": "tpcds-spark-sf10.0-20260823-d5f866d2",
+      "old_sha256": "d5f866d204f3da7d30c8eef5bb58c6cb84efac78671f1dbe8342260c512b5f20"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf1_clickhouse_local_sql_20260826_112830_c250741b.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpcds_sf1_clickhouse_local_sql_20260826_112830_c250741b.manifest.json",
+        "new_sha256": "9721d3f29a32af7a05b4bf43d527325fa1a1ffad65ec234b13ef2969dfc015bd",
+        "old_sha256": "570905ec4d7bb7dae5d87dbed9f8bce5ef57cce78f32387385c02bde92283433"
+      },
+      "new_result_id": "tpcds-clickhouse-local-sf1.0-20260826-874c4381",
+      "new_sha256": "874c4381a85ab81b12a523581a488216426971bc02770b3e07d62e88653a856e",
+      "old_result_id": "tpcds-clickhouse-local-sf1.0-20260826-6ba7cbbd",
+      "old_sha256": "6ba7cbbd8bc02620350b1e5715d027cb8c99403a8b31bbedd1921a76afa3715e"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf1_datafusion_sql_20260823_101453_f8619d78.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpcds-datafusion-sf1.0-20260823-c5d8d603",
+      "new_sha256": "c5d8d60361a87dce1944e8cf95ba1a0171fb0fac56f95acef5e9234f3d28b0a9",
+      "old_result_id": "tpcds-datafusion-sf1.0-20260823-aad593ed",
+      "old_sha256": "aad593edff54b5809e6f5c157b8ded13367668d733f7f198da11be50d8e3359c"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf1_datafusion_sql_20260826_094401_5207d224.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpcds_sf1_datafusion_sql_20260826_094401_5207d224.manifest.json",
+        "new_sha256": "b7d0fa5d738b677c0987d4b53bff14b7c6b8f49d03d8210641c72c02176158d5",
+        "old_sha256": "e9c743267b76ad6ca6406a3158af198b749f237d06ce89f438111e7129da24f3"
+      },
+      "new_result_id": "tpcds-datafusion-sf1.0-20260826-29712ec7",
+      "new_sha256": "29712ec71c07e54f24652904e024aea41922293edf2a46be9c2ed42a889070cc",
+      "old_result_id": "tpcds-datafusion-sf1.0-20260826-601fa19b",
+      "old_sha256": "601fa19ba5fe329183bba2f5da8c356bc827346c83982c4ddc2fbe86ce2a4106"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf1_duckdb_sql_20260823_101350_f8fa74b3.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpcds-duckdb-sf1.0-20260823-3e6482b7",
+      "new_sha256": "3e6482b75f3b033e8c7ae268b718a8d492202a95c7e810de168bd421d7a45e24",
+      "old_result_id": "tpcds-duckdb-sf1.0-20260823-7a7de8e4",
+      "old_sha256": "7a7de8e430002fda854d9be4b84e56d1eec5d671b607c20c76078a54d7b92ef2"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf1_duckdb_sql_20260825_171849_be435b62.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpcds_sf1_duckdb_sql_20260825_171849_be435b62.manifest.json",
+        "new_sha256": "637f35056b1fb8f9070acd283a69b698d5c64569c83525efc70de64cdc52467d",
+        "old_sha256": "5869c0b5eed2861707784e1eb47eaa7581a3741c79b49babdd741cb2f79c6ce8"
+      },
+      "new_result_id": "tpcds-duckdb-sf1.0-20260825-461e4a4f",
+      "new_sha256": "461e4a4fe5d005a536e802b67cd886d5e846078ea430533f14e4313c990495ad",
+      "old_result_id": "tpcds-duckdb-sf1.0-20260825-e8b4e73e",
+      "old_sha256": "e8b4e73e59182a661db7acd81a23bbc67a6c85bb11887d3d36c9e667a557df86"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf1_pandas_df_20260826_213757_708c3f7a.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "tpcds_sf1_pandas_df_20260826_213757_708c3f7a.manifest.json",
+        "new_sha256": "8e2df58966e335deba1f198a9a7e3f5300ca45ae9b3a3b030c0f58347d4f7e33",
+        "old_sha256": "49520fabdec3c4ef5fde3dcf879f7e89a9463410a5abb988bbdd4d0157ed804b"
+      },
+      "new_result_id": "tpcds-pandas-sf1.0-20260826-14160b7b",
+      "new_sha256": "14160b7bcb9a4513f74a1ddf3e2f46a01b67b006417525615e936f9b017f8586",
+      "old_result_id": "tpcds-pandas-sf1.0-20260826-79689a4f",
+      "old_sha256": "79689a4f429517459a7bdcf4aa2d22e308445c3adf9f0423bd5e526456155cea"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf1_polars_df_20260826_204334_bda76dd1.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "tpcds_sf1_polars_df_20260826_204334_bda76dd1.manifest.json",
+        "new_sha256": "ea67cc61e934315edf4eafc1b724ab8b1d29aee6b2e7c8d729a25e59f73d363f",
+        "old_sha256": "26e40ea2fba7234aa626deffbe1e700d3b214982f73943b462a31175d551d4df"
+      },
+      "new_result_id": "tpcds-polars-sf1.0-20260826-8f4b8635",
+      "new_sha256": "8f4b8635f28ef31785379ef852f3eb492f7f3da93b643adf30cee28e3c92dfee",
+      "old_result_id": "tpcds-polars-sf1.0-20260826-52accdd6",
+      "old_sha256": "52accdd6308fe82b669fa812bc7d3a9753009d87e0d8ae2889e904b457443469"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf1_spark_sql_20260823_102343_1d9231a1.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpcds-spark-sf1.0-20260823-820d7bde",
+      "new_sha256": "820d7bde61742a154f9d22abdd7fedecf41cb9f236852e1482a6d8f12a0d1f25",
+      "old_result_id": "tpcds-spark-sf1.0-20260823-fa34ed33",
+      "old_sha256": "fa34ed33212f9f33b6e1b415f950718383fe5f06714b6248b09c6d64488c1fc4"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf1_spark_sql_20260826_193418_5bc78a3d.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpcds_sf1_spark_sql_20260826_193418_5bc78a3d.manifest.json",
+        "new_sha256": "701c33bf5d25020d21ad9cf4295e3c802357a4652a2205ad11b0dbf8bb30445a",
+        "old_sha256": "022f8e82c512dc70399246ece2d2061f68f9c6f460cc40ce87aa52e925398400"
+      },
+      "new_result_id": "tpcds-spark-sf1.0-20260826-e7882da4",
+      "new_sha256": "e7882da4372c2e24417c55e983a4f58957cd4347cc9589519517a90d06e5ebe3",
+      "old_result_id": "tpcds-spark-sf1.0-20260826-59c4c7d5",
+      "old_sha256": "59c4c7d57cb63d88e8578ae499d47f7b827e0ee0d5d029bc7668f5ef50d4a19e"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf1_sqlite_sql_20260824_083944_c6745a86.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpcds_sf1_sqlite_sql_20260824_083944_c6745a86.manifest.json",
+        "new_sha256": "66403b138ecef262e2e3e15690e814f38fe29f65ad92d7c9c590102c95f76b4d",
+        "old_sha256": "350a7adefcd0c5239bba7a11a11a1568f972538b9ddb980bfbc45ec40500d2a8"
+      },
+      "new_result_id": "tpcds-sqlite-sf1.0-20260824-1c036079",
+      "new_sha256": "1c036079d65016d03905df4bee86ed9c1fa43c4d27399fcbcb7c579626d02341",
+      "old_result_id": "tpcds-sqlite-sf1.0-20260824-f8aeecb4",
+      "old_sha256": "f8aeecb4c5cb0092472c107d4dccbe9c7750da493cc205e9cf6181e8de420505"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf001_cedardb_sql_20260825_095330_cf0d9e4d.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf001_cedardb_sql_20260825_095330_cf0d9e4d.manifest.json",
+        "new_sha256": "312216b96b1c80fcd461d71d7d8862a3f74a1d35ed4702b1b3a710b194a2b9cf",
+        "old_sha256": "3bda1ed635b4903e8d976bc24b9e5af2dc68afa8e1db5aba56eccac6de34c4f7"
+      },
+      "new_result_id": "tpch-cedardb-sf0.01-20260825-00903ff4",
+      "new_sha256": "00903ff4d5424d8fcf0038f048dba3e373295ebf38206d3a7a7e2e70bdc81f54",
+      "old_result_id": "tpch-cedardb-sf0.01-20260825-d73d32ea",
+      "old_sha256": "d73d32ea6360db170cfd59611505aa7e60fe1b9faf107667921f354b674d2878"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf001_clickhouse_local_sql_20260826_100627_7ae478d5.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf001_clickhouse_local_sql_20260826_100627_7ae478d5.manifest.json",
+        "new_sha256": "487be5da678511af2ce100a5203bcfe86801db26b844b307fc076404c4582030",
+        "old_sha256": "bc429d619d2835fd9da3fa0ff56d276e25bd8c564bf3ac30e5ff588b4bd80687"
+      },
+      "new_result_id": "tpch-clickhouse-local-sf0.01-20260826-19b5b8ed",
+      "new_sha256": "19b5b8ed3fb73ae4ccb1963eb8d6e6f0c6e3384492a8f4869411e2dcec7ed6c3",
+      "old_result_id": "tpch-clickhouse-local-sf0.01-20260826-89ccd67b",
+      "old_sha256": "89ccd67b5e48e6b3f621657963feda4e6c495bd6fbea928d2fc4f619aa65da5f"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf001_clickhouse_server_sql_20260825_092429_4cd12ac0.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf001_clickhouse_server_sql_20260825_092429_4cd12ac0.manifest.json",
+        "new_sha256": "93e6ea8a024386746631db6effb169cee03ca047549ef2bc10844d7b960255b6",
+        "old_sha256": "25d475eaece194cd1e0e380d57208d4092ac2a346b239a77fb380fe8fc95f142"
+      },
+      "new_result_id": "tpch-clickhouse-server-sf0.01-20260825-f41e0c69",
+      "new_sha256": "f41e0c69a875e1709acb4b03aed033960f683021cae4ddf25c3fb442bcf50f4e",
+      "old_result_id": "tpch-clickhouse-server-sf0.01-20260825-305c40ab",
+      "old_sha256": "305c40ab6a07250e80353aa67d42ec5407094af3666e1ba93c201cc7b224058f"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf001_datafusion_sql_20260826_110608_e8a7d048.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf001_datafusion_sql_20260826_110608_e8a7d048.manifest.json",
+        "new_sha256": "f708dccc78926f7e465cc512dc119d1596a3d2946df646ddcb3b2f63bfa1ed87",
+        "old_sha256": "502e11b5860abb69609726a678646a2b09d65a68a0505f0b4bda64740ca287d6"
+      },
+      "new_result_id": "tpch-datafusion-sf0.01-20260826-00b2bd7a",
+      "new_sha256": "00b2bd7ae5ec38417d1765073daef21fdb3e25a9e064a666b1bf09844a770cce",
+      "old_result_id": "tpch-datafusion-sf0.01-20260826-4eb88ea5",
+      "old_sha256": "4eb88ea5f6d8f30a8c7ef215e10e03f9f522e0552e6b971b4fd62b825f68884e"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf001_duckdb_sql_20260826_105325_8a57a5a8.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf001_duckdb_sql_20260826_105325_8a57a5a8.manifest.json",
+        "new_sha256": "391c2e9cd76cf7443f080a13c7b12a20c86c72e00ca8cb1225b83a528d32b66b",
+        "old_sha256": "dfcd5410f884a6ff642931f4383d52799bdf910d212e8e4368e72a26cda7897d"
+      },
+      "new_result_id": "tpch-duckdb-sf0.01-20260826-1263a650",
+      "new_sha256": "1263a65001b912a656a061528aea4a2a8339c8106a6a2241dc641ca0df0d7530",
+      "old_result_id": "tpch-duckdb-sf0.01-20260826-a20c633f",
+      "old_sha256": "a20c633f5bbe02bbac06663084936a707fc1a7815df9ba7e1eacee0a4b74f97a"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf001_lakesail_sql_20260825_092257_ede75588.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf001_lakesail_sql_20260825_092257_ede75588.manifest.json",
+        "new_sha256": "0a7ca3213af7d8a4113b1172da280a1fd5334c24fec85f1540f21b0418304dc2",
+        "old_sha256": "41c923dda58b42bbbc09904acc9ebb91e7f4baf51c7eedc0c5ef60707e7d9d97"
+      },
+      "new_result_id": "tpch-lakesail-sf0.01-20260825-22d005ad",
+      "new_sha256": "22d005ad14a2a370c2bb3d55ea572c5f7b78767eec23e1837d36a33b0abaae8d",
+      "old_result_id": "tpch-lakesail-sf0.01-20260825-ce504722",
+      "old_sha256": "ce50472259df46ce67777735c1c36d772e8d1b99bd8b5ba1e850a7c2c295bc8a"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf001_pandas_df_20260826_210019_8bde2222.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "tpch_sf001_pandas_df_20260826_210019_8bde2222.manifest.json",
+        "new_sha256": "d9c9af5d888a6b7719268e225ec104414a0a612eafa8d3395ca060e3fd1c921e",
+        "old_sha256": "fe32d1ded33ae09d36e8dc3588a6513fa4adcbe63b84709af8b2d6e526dec222"
+      },
+      "new_result_id": "tpch-pandas-sf0.01-20260826-584ac16f",
+      "new_sha256": "584ac16f9e750caba0be7a6ea1616e97f66d38efcadbdace4bcabb117be95460",
+      "old_result_id": "tpch-pandas-sf0.01-20260826-805d7048",
+      "old_sha256": "805d70480e77b42d2962dc5471d6e6a756e0180b017a519a750fdbb60059fab9"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf001_polars_df_20260824_074104_51ccc406.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "tpch_sf001_polars_df_20260824_074104_51ccc406.manifest.json",
+        "new_sha256": "6019f083ecf48739eeffe217a0acf5fae736a14f658283020b858ea3e36ceac1",
+        "old_sha256": "d5196134f6fc59bdb78fa609420eddbcd2788bb2816d993c218a81e7a96ddf5b"
+      },
+      "new_result_id": "tpch-polars-sf0.01-20260824-a02e5ff8",
+      "new_sha256": "a02e5ff8d86c7d0b757a1393679526fe2d962476e51ccf43d560c25129788c9a",
+      "old_result_id": "tpch-polars-sf0.01-20260824-d6f0c4f7",
+      "old_sha256": "d6f0c4f7fa43e874b583848f1053e06234cbee30b305b83a93b7a01bc65d9777"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf001_pyspark_df_20260825_184252_42abb28d.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "tpch_sf001_pyspark_df_20260825_184252_42abb28d.manifest.json",
+        "new_sha256": "20dd9dc52d91e8a31dcb48fcfdca7094b705b434a5da6cc6381c5c78812b5222",
+        "old_sha256": "761e7df75122ab32e1627235aff482c04b99b33f9c98f4f8a6992f138701615c"
+      },
+      "new_result_id": "tpch-pyspark-sf0.01-20260825-902900d9",
+      "new_sha256": "902900d94ac3a529dd870db8afad42068dcd3e40227c0b4107ef1276a9202a0c",
+      "old_result_id": "tpch-pyspark-sf0.01-20260825-8ee1008b",
+      "old_sha256": "8ee1008b50b6241ceb26fdb552dc9db25c821ea12db0a11c0878a6d19dd3b3ef"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf001_spark_sql_20260826_191913_2fd3b12b.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf001_spark_sql_20260826_191913_2fd3b12b.manifest.json",
+        "new_sha256": "a3cd18d307c1cd2c1a7be5a86d38d8468241b1c167bf9ec9e7c836c6b625ba3b",
+        "old_sha256": "cf1f66985a8aa15eea92b298dc9c292d1aeb56038cfe931e6c08eb14b4bf0086"
+      },
+      "new_result_id": "tpch-spark-sf0.01-20260826-f32e904c",
+      "new_sha256": "f32e904ce256f1831106fef147b73e4f356c91c4fe8326e025ae1cb3ff64d7bb",
+      "old_result_id": "tpch-spark-sf0.01-20260826-f7314c0d",
+      "old_sha256": "f7314c0d8be41a3c8ad846a1976713ad9a8aa5efa500b2869eacf62190d3d606"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf001_sqlite_sql_20260825_180256_4eddc10f.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf001_sqlite_sql_20260825_180256_4eddc10f.manifest.json",
+        "new_sha256": "ed36327e30658f0b258ef269dd5ae4af4b45cf5305d83f1f1b061d1804692b9d",
+        "old_sha256": "03a31dad1311e8015e41a50adfb9fe864f516c6f565af075d476feb8222f1d30"
+      },
+      "new_result_id": "tpch-sqlite-sf0.01-20260825-9beb3a40",
+      "new_sha256": "9beb3a40373e12dba9025754c44f0488f10542f8bb8a7a088a9951ec7608642d",
+      "old_result_id": "tpch-sqlite-sf0.01-20260825-8c7bb9ff",
+      "old_sha256": "8c7bb9fff95bf76b9f09676a00d1cc71d3d4e3f3d67d9a2ef704620201dd238e"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf001_starrocks_sql_20260825_103226_5cefdc41.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf001_starrocks_sql_20260825_103226_5cefdc41.manifest.json",
+        "new_sha256": "b0124cff390a0020cfb2b814362c1cd0abe28070bd8f2fce5f47917e9da768b9",
+        "old_sha256": "a3749463999e7cde82933ea15b34f8907143623c9c52632e54e41bae48434706"
+      },
+      "new_result_id": "tpch-starrocks-sf0.01-20260825-b5919afb",
+      "new_sha256": "b5919afb45e6d46fbbe89681adf415a0a41901f0cd10d3781d9017c38abca54e",
+      "old_result_id": "tpch-starrocks-sf0.01-20260825-91116d7e",
+      "old_sha256": "91116d7e609152ccbb3ee93bb658ae508d6becead73628b56c3fa13e56d1ec98"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf01_clickhouse_local_sql_20260826_170326_1d1e2b2e.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf01_clickhouse_local_sql_20260826_170326_1d1e2b2e.manifest.json",
+        "new_sha256": "4451446588a745993c73c338473586d49d3b43e7d6b7f0bd89c1d7baf8cf586b",
+        "old_sha256": "d92e936ced0be63bb5954e46b01460551be8c48c7fa110cf7b6dedc23f6ac6bf"
+      },
+      "new_result_id": "tpch-clickhouse-local-sf0.1-20260826-82263b3a",
+      "new_sha256": "82263b3a732365a2fd5e4f3a1aa676e89790c09fd3dbdc2ee4972d9aace29f0d",
+      "old_result_id": "tpch-clickhouse-local-sf0.1-20260826-1a11b551",
+      "old_sha256": "1a11b5519aad011f5a947bed6514af7eda4eb2d30bf9324c17d6539d3c76f0c5"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf01_datafusion_sql_20260824_082755_adcfb35e.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf01_datafusion_sql_20260824_082755_adcfb35e.manifest.json",
+        "new_sha256": "5015622b6720d75f6060e6c400e2db7794fff459e35c2dffd883760d52f70ad4",
+        "old_sha256": "dee81206d6f64c2f72b419f9a63fbfae7f6877dd7c26cf556e53529999c772f0"
+      },
+      "new_result_id": "tpch-datafusion-sf0.1-20260824-55560f06",
+      "new_sha256": "55560f068d4b277beb8b6fcaea821c1befe63fdd03b4034d5ad5e361ed77d178",
+      "old_result_id": "tpch-datafusion-sf0.1-20260824-57265cb9",
+      "old_sha256": "57265cb9bd7c8c47344bf727e2238eeca2be30858a60e0adb7fba03577e0363e"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf01_duckdb_sql_20260826_092426_786dcba6.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf01_duckdb_sql_20260826_092426_786dcba6.manifest.json",
+        "new_sha256": "2522d9295cd3a30002cb303d0718f02571f0baf9231c85892191a108b9cd7e9a",
+        "old_sha256": "c79193345da7ed18d93e408cc917841583693f94e0b502c8f65a62b47dcee952"
+      },
+      "new_result_id": "tpch-duckdb-sf0.1-20260826-26548282",
+      "new_sha256": "2654828269807cf42e3dcd97748751a44ee39c35ccb79da65d04bc56d19830eb",
+      "old_result_id": "tpch-duckdb-sf0.1-20260826-f0394480",
+      "old_sha256": "f03944800712f721027fe90e2ab949d0203fb18363ccc62d77803ce5f010ee4a"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf01_pandas_df_20260826_210239_77598616.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "tpch_sf01_pandas_df_20260826_210239_77598616.manifest.json",
+        "new_sha256": "c1d2ae0609e208fa44341a8a9cd055ab6161c2b2f267e82e853bcfd2a300a21a",
+        "old_sha256": "ae6b483df3bfdf2b06e2d31913c2349e8554c620ec2b97c669b333218c687656"
+      },
+      "new_result_id": "tpch-pandas-sf0.1-20260826-0c6913e7",
+      "new_sha256": "0c6913e781487b6b459bf45bd43d2d660eadef7638bda6e7e79af2edcd329819",
+      "old_result_id": "tpch-pandas-sf0.1-20260826-89bcd922",
+      "old_sha256": "89bcd922c9e563be454c5ee8b78f31d1834b78e0d4e11f7fc6200159b1da632d"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf01_polars_df_20260826_204211_f659fcbf.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "tpch_sf01_polars_df_20260826_204211_f659fcbf.manifest.json",
+        "new_sha256": "c818f45367da8f05bcf11d6d5d49ce862f6bff151a16d3fb52d4f851e03f5f63",
+        "old_sha256": "042be3c82951238be15ce51bdcf7f34271cdaf689524cc7ebc0d1f101e2ed767"
+      },
+      "new_result_id": "tpch-polars-sf0.1-20260826-8bb9c980",
+      "new_sha256": "8bb9c980ac0154824e120b8fff222da5270648a317217551fa92b332713341f0",
+      "old_result_id": "tpch-polars-sf0.1-20260826-ef948d35",
+      "old_sha256": "ef948d3518b815fa694f8b5f21c27e6e55b96a25e907b1f915242fd1d0c0cff3"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf01_spark_sql_20260826_192036_6f8737a4.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf01_spark_sql_20260826_192036_6f8737a4.manifest.json",
+        "new_sha256": "d574f152f84255ddbd6546d131c1cb41e6a035a83168ea445b34611fc1e4d603",
+        "old_sha256": "58ce8a633925b24d95302fd427f8994b28b635d820eb080b4a646eaa3909b6ff"
+      },
+      "new_result_id": "tpch-spark-sf0.1-20260826-37a72675",
+      "new_sha256": "37a7267532dcb690857ab5a6f27ba1e5f24a4859f7047168015d5fd49c13db5a",
+      "old_result_id": "tpch-spark-sf0.1-20260826-4c50cfa8",
+      "old_sha256": "4c50cfa8bd56b5d0ebffff19d64c6b19046bbbc22aa97ee958855eb0bc013ff1"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf01_sqlite_sql_20260826_113913_3bf2ac41.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf01_sqlite_sql_20260826_113913_3bf2ac41.manifest.json",
+        "new_sha256": "ec6f73a9262e74a865de7d09272bda73f5236c1ff1e66b35be0cedc7c85b3c28",
+        "old_sha256": "61673118a9b514fe0778f5e4ac2f27ca9ff8f4df3ae59e85fe049d703972b901"
+      },
+      "new_result_id": "tpch-sqlite-sf0.1-20260826-ff943375",
+      "new_sha256": "ff943375f9831aed2d9d2fb524a2ee369f6b1f5e26438d76c11356c974414993",
+      "old_result_id": "tpch-sqlite-sf0.1-20260826-c9f2e045",
+      "old_sha256": "c9f2e045eb1cc81f456864d222e62d015cc0e50fa3512c040811bb409ff491bc"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf1_clickhouse_local_sql_20260825_174747_a4d8447f.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf1_clickhouse_local_sql_20260825_174747_a4d8447f.manifest.json",
+        "new_sha256": "933ba3a1cc5679b9f8849fea3cabe3c2eb2c99d09b41c6ac281cc688cd928777",
+        "old_sha256": "961ad1d7b32e8b380f7f3e4aeba46e479094f8d6e68be628d26aa804c483cb8d"
+      },
+      "new_result_id": "tpch-clickhouse-local-sf1.0-20260825-c9b5e6c2",
+      "new_sha256": "c9b5e6c236e8501bc45c1c0876ba18d3716d8655978d16f3139956f776df008c",
+      "old_result_id": "tpch-clickhouse-local-sf1.0-20260825-c9a22b6f",
+      "old_sha256": "c9a22b6fbafef8c77f83493008dc3c214cfdc6af5fad65605bf25e53ae67bf95"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf1_datafusion_sql_20260825_172912_1d62bd4f.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf1_datafusion_sql_20260825_172912_1d62bd4f.manifest.json",
+        "new_sha256": "59215b4f3035a98da1f49f3909b8c9ee507c7ec5524ff086b69b134afd06d6ff",
+        "old_sha256": "bb1f0947fb33f35ef2511cc84c8aa93609e1608e3a5ad74cd298550322446314"
+      },
+      "new_result_id": "tpch-datafusion-sf1.0-20260825-ae25aefb",
+      "new_sha256": "ae25aefb696b2e562612e0249838b5ef8ef6470fd874078c8851add7034fd387",
+      "old_result_id": "tpch-datafusion-sf1.0-20260825-2a04391f",
+      "old_sha256": "2a04391f7e5a8abfc88bdee62f19c34ac3f2cdb56e3f744c32e7e1f92c368a8e"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf1_duckdb_sql_20260826_162117_67e59fb6.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf1_duckdb_sql_20260826_162117_67e59fb6.manifest.json",
+        "new_sha256": "1846c83da3d5f05edf3871cac4ad79db1306ac9119b0e75b3cad366a024387c4",
+        "old_sha256": "79cbb280b5978cf80baabc70093ad4c08b20a3847a2d72db79e23f565ce6335f"
+      },
+      "new_result_id": "tpch-duckdb-sf1.0-20260826-d868338f",
+      "new_sha256": "d868338f6e684ab3038d17bd209fc124796a7f0e170a3a39ede732c604accad6",
+      "old_result_id": "tpch-duckdb-sf1.0-20260826-3f4ec9e6",
+      "old_sha256": "3f4ec9e6dc9aa2fa48918692d97a4755517541ea6a09bedd294d264100520c22"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf1_duckdb_sql_20260828_213108_3bd92bcc.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpch-duckdb-sf1.0-20260828-ea150b8e",
+      "new_sha256": "ea150b8e67b785f28a86dc9308f7efaeff16c319b8f09254d8616d6f6bd9b99b",
+      "old_result_id": "tpch-duckdb-sf1.0-20260828-953eb39b",
+      "old_sha256": "953eb39ba96b21f1e4808d385ead26452c016245355982873e20ff639db49efc"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf1_ducklake_sql_20260828_091755_137bc87e.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf1_ducklake_sql_20260828_091755_137bc87e.manifest.json",
+        "new_sha256": "6eff0dc1e62ecd015424ceb3f3731a0c2663ecadd7711f1654d52e1ff0a435d4",
+        "old_sha256": "4f7005be9b22421cf0490774ce6301d10bfef47662034e382686a547a49de43b"
+      },
+      "new_result_id": "tpch-ducklake-sf1.0-20260828-8a11e73e",
+      "new_sha256": "8a11e73ea2570cf50882c0f39327274abd4b78b77c940222f340ec5374321fa9",
+      "old_result_id": "tpch-ducklake-sf1.0-20260828-025b183b",
+      "old_sha256": "025b183bbb43c912eb495e0caa4526c768a0130f3236f46e1e42a6b5d9d27dc9"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf1_polars_df_20260824_193005_54a9e53f.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "tpch_sf1_polars_df_20260824_193005_54a9e53f.manifest.json",
+        "new_sha256": "7197f05ba0f2e60b9aa8771ec0b69b2741cfce82448e00eb411b3449fd34a784",
+        "old_sha256": "3fd66add5dfc9ff33bf1b3498b6cf25125818026560ec45836580da15a80a98f"
+      },
+      "new_result_id": "tpch-polars-sf1.0-20260824-1f774f1f",
+      "new_sha256": "1f774f1fb3d04933b7c648864a4d2326474e316af397fc5cfaa113868d39e425",
+      "old_result_id": "tpch-polars-sf1.0-20260824-4590f297",
+      "old_sha256": "4590f2972e50a2be3ff24f182e7dbf303fb44a951a25f8e59e17e02b938821e2"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf1_polars_df_20260825_184959_8ef4d6e2.json",
+      "had_client_host": false,
+      "manifest_change": null,
+      "new_result_id": "tpch-polars-sf1.0-20260825-6223e90a",
+      "new_sha256": "6223e90a251910375fe1957cd473ed04aa3d67313c4ced0041a1afbb26bcdefe",
+      "old_result_id": "tpch-polars-sf1.0-20260825-22bf606c",
+      "old_sha256": "22bf606cb2f9a53e44baddf61f4f5bd3ede43d9d47800053b3cb84e7969b1b8b"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf1_pyspark_df_20260825_185531_14cd3451.json",
+      "had_client_host": false,
+      "manifest_change": null,
+      "new_result_id": "tpch-pyspark-sf1.0-20260825-a950f22a",
+      "new_sha256": "a950f22a2d88ed4815f715288dcbff34524163ec128cff772b396750514815c4",
+      "old_result_id": "tpch-pyspark-sf1.0-20260825-86b7aa83",
+      "old_sha256": "86b7aa836c76b3b20ae6184cf49b998b5031abbb925c004dfd571f7b107fd27d"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf1_spark_sql_20260826_192249_7478c401.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf1_spark_sql_20260826_192249_7478c401.manifest.json",
+        "new_sha256": "6adb35927be4c830334563988b70a098fdd2985ccc7cd955a5e1313944ad1565",
+        "old_sha256": "c51b3d5889743fd24790d68cac0d02284042d33a268a360d00dfc20061865e57"
+      },
+      "new_result_id": "tpch-spark-sf1.0-20260826-9f453ee0",
+      "new_sha256": "9f453ee02da0a47ab25e08c7248792ace8b2b0c38bef611c792264895f5b77e4",
+      "old_result_id": "tpch-spark-sf1.0-20260826-e6d0991f",
+      "old_sha256": "e6d0991fec7be3c973c0a9abdad08d41e0dee71285ecbe1f073d11df58bfd277"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf1_sqlite_sql_20260825_180529_b9fdd7ba.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_sf1_sqlite_sql_20260825_180529_b9fdd7ba.manifest.json",
+        "new_sha256": "e3d183503932cc69f4d9609dc11509f82e3d4fb5ceb93173edb87a87aaa4541d",
+        "old_sha256": "eb887d89de6f0ff28f740f9bc994729742a346371f4771922022461ea3c3ec56"
+      },
+      "new_result_id": "tpch-sqlite-sf1.0-20260825-48ef737a",
+      "new_sha256": "48ef737a55197763d58346bfa37500415d91ee9014273a5bf8555fb2c779de76",
+      "old_result_id": "tpch-sqlite-sf1.0-20260825-2a35ec58",
+      "old_sha256": "2a35ec5853a339c6df89123cd42e2ed1cf7aff8a10ba04f0e567f6f4930724a0"
+    },
+    {
+      "changed": true,
+      "file": "tpch_skew_sf001_clickhouse_local_sql_20260824_091113_ff38aebf.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_skew_sf001_clickhouse_local_sql_20260824_091113_ff38aebf.manifest.json",
+        "new_sha256": "2949b79f313e70f9fe051e110470888c4a7fecbad4d2fa51f44772c65ea0f3ee",
+        "old_sha256": "37cd7151374e3b002d79eb9e0af0424c6dbc50b892c494a72871fcff4046ae50"
+      },
+      "new_result_id": "tpch_skew-clickhouse-local-sf0.01-20260824-e2606e31",
+      "new_sha256": "e2606e3142900e253218c898b8b84ef2a57d077664b8f96c254c5532aea14e1f",
+      "old_result_id": "tpch_skew-clickhouse-local-sf0.01-20260824-71bc03c8",
+      "old_sha256": "71bc03c8afcb85b7b48635997b098d90c3dca96f3794da981c1e29def11f7bb1"
+    },
+    {
+      "changed": true,
+      "file": "tpch_skew_sf001_datafusion_sql_20260824_084108_70eb699a.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_skew_sf001_datafusion_sql_20260824_084108_70eb699a.manifest.json",
+        "new_sha256": "38cc41201adcbb6cba9c7071ca200643f1611020f5ec55f2c6d1ba34f6f91791",
+        "old_sha256": "d9e80f476692a9ac94ff130182ba4e8b3c527b1b280d4c6ec8eaa82bbae902f5"
+      },
+      "new_result_id": "tpch_skew-datafusion-sf0.01-20260824-33ac3f33",
+      "new_sha256": "33ac3f33e44ee28aeccd4168dd96207afd5d9f81eb21e1ce6cd3d78f228a0bc1",
+      "old_result_id": "tpch_skew-datafusion-sf0.01-20260824-4c55b3fd",
+      "old_sha256": "4c55b3fdecc674508a06a5075b8986a26c9659f7395c6110c191fd823a10da30"
+    },
+    {
+      "changed": true,
+      "file": "tpch_skew_sf001_duckdb_sql_20260824_082549_fea46d50.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_skew_sf001_duckdb_sql_20260824_082549_fea46d50.manifest.json",
+        "new_sha256": "9b4e658f143fda39d22a76170c7c7e7c6b1845b791a732b38b9001b857ba240c",
+        "old_sha256": "73adf61c9c67a21a4248fc50659f457dc495051e08aa05297d8b938b3cfa5f32"
+      },
+      "new_result_id": "tpch_skew-duckdb-sf0.01-20260824-9d7ad37f",
+      "new_sha256": "9d7ad37fe51a2309dedf96b26f3e8f8c859fcfaab050f8b49f4ec6b6511f78e9",
+      "old_result_id": "tpch_skew-duckdb-sf0.01-20260824-9cf48148",
+      "old_sha256": "9cf48148c8f97c1235bf88e8e0a45e0226083514b91d376fc3ad01fe01c0382a"
+    },
+    {
+      "changed": true,
+      "file": "tpch_skew_sf001_polars_df_20260824_080528_4e7cd354.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "tpch_skew_sf001_polars_df_20260824_080528_4e7cd354.manifest.json",
+        "new_sha256": "a347591767f027a75ca21fbf61a5ea79f6ba361e4e747c570c8a3284b9ee8052",
+        "old_sha256": "03c855ba93ed3d622a4eb06b79c2d33b2cbaf0811d45bc12d163993a51da4f1b"
+      },
+      "new_result_id": "tpch_skew-polars-sf0.01-20260824-074fd1e8",
+      "new_sha256": "074fd1e8b2f263ebf82fea1b52a16de65472e7ccf7b2ccfb9625926d151ac19e",
+      "old_result_id": "tpch_skew-polars-sf0.01-20260824-e63920e9",
+      "old_sha256": "e63920e9d17da279e7729a239b248b4e0776df78d16adf5bb1d7359ce038577d"
+    },
+    {
+      "changed": true,
+      "file": "tpch_skew_sf001_sqlite_sql_20260826_191236_5087d732.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_skew_sf001_sqlite_sql_20260826_191236_5087d732.manifest.json",
+        "new_sha256": "91aab16dc10cb337d60f14f4d06d81fafb4aafd99088303858198e567c22fb7e",
+        "old_sha256": "ae83b7a2f87518a8dd4331e7a06a0560826daa5a8bab1872327d520c9fb2e928"
+      },
+      "new_result_id": "tpch_skew-sqlite-sf0.01-20260826-00cd64ca",
+      "new_sha256": "00cd64ca5ffc7c3ea7849fd72720132f4d046b1e30d522b6a991fec95813414d",
+      "old_result_id": "tpch_skew-sqlite-sf0.01-20260826-0162158b",
+      "old_sha256": "0162158b588a8beb4b14da02cfc2bf9f1be3c770eb1ca7e1a52c493218cf48fd"
+    },
+    {
+      "changed": true,
+      "file": "tpch_skew_sf01_clickhouse_local_sql_20260826_172139_d17b65c3.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_skew_sf01_clickhouse_local_sql_20260826_172139_d17b65c3.manifest.json",
+        "new_sha256": "399089020a4a95ad7dadc34da88f867e7ffce3754be67a23d8cb82d8eb03fa5a",
+        "old_sha256": "e213dc641fc5885977947634911d1fb374ef36c927514d933b4c84d36fca4f70"
+      },
+      "new_result_id": "tpch_skew-clickhouse-local-sf0.1-20260826-d57750ab",
+      "new_sha256": "d57750ab925aa7ee4bf1668ccd991519a259b250a0e5d1cf125e61574f9969e5",
+      "old_result_id": "tpch_skew-clickhouse-local-sf0.1-20260826-24c1fc4e",
+      "old_sha256": "24c1fc4ec67fb99666ddd75651f2a22a15512fe205e538fa7d5c58140e49aa2c"
+    },
+    {
+      "changed": true,
+      "file": "tpch_skew_sf01_datafusion_sql_20260825_174044_16785577.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_skew_sf01_datafusion_sql_20260825_174044_16785577.manifest.json",
+        "new_sha256": "85276a3d7503060c23a39ad741562ba072157e6392cb48a8b4a99c045e6d1bf0",
+        "old_sha256": "2dda669729c4a8790ea1079debceeeb1896ad970a84694d4e4d89384b4e8005b"
+      },
+      "new_result_id": "tpch_skew-datafusion-sf0.1-20260825-e316285e",
+      "new_sha256": "e316285e75d76a8b1b1faf45c887efdff206ac914ae6c8d5de637dee5aa6afe3",
+      "old_result_id": "tpch_skew-datafusion-sf0.1-20260825-d9ff872d",
+      "old_sha256": "d9ff872ded3665097c41715d9f286b47c797944ac3530f33e792dbb33f95afaf"
+    },
+    {
+      "changed": true,
+      "file": "tpch_skew_sf01_duckdb_sql_20260824_082553_b8859d6b.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_skew_sf01_duckdb_sql_20260824_082553_b8859d6b.manifest.json",
+        "new_sha256": "e2cab7be8633933eb87b0743df61bb3f5948a0c78869d38d5a07b4ca8e5d11db",
+        "old_sha256": "1ecf473887521d5e0f71de8c9db7464c0debf607feb553d93fdd1d8fc474e03c"
+      },
+      "new_result_id": "tpch_skew-duckdb-sf0.1-20260824-0a9c49a7",
+      "new_sha256": "0a9c49a79765197ca2cb0fd392ab9d746669b88fe66c61995d5d4ab89039e9cd",
+      "old_result_id": "tpch_skew-duckdb-sf0.1-20260824-de208e07",
+      "old_sha256": "de208e07bfecf52bf7175bb5e3303349e79bd31bc50f66edebacbd25c7b213cf"
+    },
+    {
+      "changed": true,
+      "file": "tpch_skew_sf01_polars_df_20260826_205813_b3ba4437.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "tpch_skew_sf01_polars_df_20260826_205813_b3ba4437.manifest.json",
+        "new_sha256": "1eb4dd818685cf001ef810a1d3e1c707f4bfdbe5f4c73679504aec0589d152e6",
+        "old_sha256": "17b4e050776d02fc9c1b97525ea88887f97e5bb77a58dbd02965d11a10baff4b"
+      },
+      "new_result_id": "tpch_skew-polars-sf0.1-20260826-ffa3aa5c",
+      "new_sha256": "ffa3aa5c8cd27f26ee6da679be48b6dd3ff8b9b04edb4e956b46b2fff161e0e7",
+      "old_result_id": "tpch_skew-polars-sf0.1-20260826-eff9eb1f",
+      "old_sha256": "eff9eb1f2f128fbd834fa3d036352c5e3d26a151a2da0c08b05498cc0e1ab130"
+    },
+    {
+      "changed": true,
+      "file": "tpch_skew_sf01_sqlite_sql_20260826_191257_0792588d.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_skew_sf01_sqlite_sql_20260826_191257_0792588d.manifest.json",
+        "new_sha256": "ade741f5ff3583724481ef87d39f4b66f50812fd5ebfc9a782c48ccd931aaa5b",
+        "old_sha256": "a14ec10e89c4fff7007d9db948c737bd543defe8e155d2f277936cb19dda48c6"
+      },
+      "new_result_id": "tpch_skew-sqlite-sf0.1-20260826-762b7040",
+      "new_sha256": "762b7040a29521203533b5c51093bbb7d91467eda6b5f27450355c568d806304",
+      "old_result_id": "tpch_skew-sqlite-sf0.1-20260826-cc21b3af",
+      "old_sha256": "cc21b3af28c4365ff8697401269039745c831bc07280ca9c272133089c5a4444"
+    },
+    {
+      "changed": true,
+      "file": "tpch_skew_sf1_clickhouse_local_sql_20260825_180038_276e9fdd.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_skew_sf1_clickhouse_local_sql_20260825_180038_276e9fdd.manifest.json",
+        "new_sha256": "ff0ba551104a6fed91ae426b4c7dfcabb1e38f75f1edd924198f9c1f6a88ab95",
+        "old_sha256": "2aaecf534d03aae33101cc0bd96371d154b4fa2322874bc1994eab08d456f59c"
+      },
+      "new_result_id": "tpch_skew-clickhouse-local-sf1.0-20260825-4d153d2a",
+      "new_sha256": "4d153d2a24df709ac44e193bbf71cc2ad1357e6113bfd9b28472efce5d06bd0c",
+      "old_result_id": "tpch_skew-clickhouse-local-sf1.0-20260825-39f504be",
+      "old_sha256": "39f504be9c769884233aeb7eddddf10da29e856f5341bb564bbc2ae8a79f3428"
+    },
+    {
+      "changed": true,
+      "file": "tpch_skew_sf1_datafusion_sql_20260826_112159_2b46b000.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_skew_sf1_datafusion_sql_20260826_112159_2b46b000.manifest.json",
+        "new_sha256": "965b0b12f4b24590d02fbad349844ba5786fa7d9fe39e2e01859d02b028ce081",
+        "old_sha256": "e5c0067f27364002c82fccc368231df81b87617417eadfd6c6a20318da1b2cfb"
+      },
+      "new_result_id": "tpch_skew-datafusion-sf1.0-20260826-e4e3a903",
+      "new_sha256": "e4e3a903c1ae48145cf3adac83632ce7919f5ed85b7d6cbff882921692b603c4",
+      "old_result_id": "tpch_skew-datafusion-sf1.0-20260826-b4f7cd7d",
+      "old_sha256": "b4f7cd7dbe97c7280cf15d334cec30763855f3e9c4553274192e82bbc90a7173"
+    },
+    {
+      "changed": true,
+      "file": "tpch_skew_sf1_duckdb_sql_20260826_163325_957ad4d2.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_skew_sf1_duckdb_sql_20260826_163325_957ad4d2.manifest.json",
+        "new_sha256": "b6ee17b0a0a8bbe1d596132c88efb426cc12f2ff7f1a5d5c7c7f46aeb7498e0b",
+        "old_sha256": "c3e5c5e53f66e90536d229600f2a7fbcbd676a69e571e7999fe0cbe8f658f43c"
+      },
+      "new_result_id": "tpch_skew-duckdb-sf1.0-20260826-f4320613",
+      "new_sha256": "f4320613e9281730b4b3ba77b4861fc86ddefd30ce3f7b919ba50183e10d552a",
+      "old_result_id": "tpch_skew-duckdb-sf1.0-20260826-35f8062b",
+      "old_sha256": "35f8062bef9988ac36e4654656137516b84393d198382f9b06127af0102b3535"
+    },
+    {
+      "changed": true,
+      "file": "tpch_skew_sf1_polars_df_20260826_205821_acce9704.json",
+      "had_client_host": false,
+      "manifest_change": {
+        "file": "tpch_skew_sf1_polars_df_20260826_205821_acce9704.manifest.json",
+        "new_sha256": "b41a563e4d95a17d199659bbf65cef11846384cb1581eebfb970b858292df3de",
+        "old_sha256": "60f293d7563d1c1f56bc82ff90adb9cebd814cca1caf782d372e35f4bd3d75ab"
+      },
+      "new_result_id": "tpch_skew-polars-sf1.0-20260826-90be5279",
+      "new_sha256": "90be5279aa189c7274c8662e3a2d58acb9c42b4e78aaf679d772b84ca6088455",
+      "old_result_id": "tpch_skew-polars-sf1.0-20260826-9ab2ce95",
+      "old_sha256": "9ab2ce9571281e640a579f613af08461d87c1444d73cee1bbf57e0fc6e2c1f90"
+    },
+    {
+      "changed": true,
+      "file": "tpch_skew_sf1_sqlite_sql_20260826_191543_bf2bedb1.json",
+      "had_client_host": true,
+      "manifest_change": {
+        "file": "tpch_skew_sf1_sqlite_sql_20260826_191543_bf2bedb1.manifest.json",
+        "new_sha256": "2f6a678f1af4bcc253d09875a05b0da9362ab040b0e9fdfc544e42e5036e114e",
+        "old_sha256": "0772c01d162f378f47c71c6696e7274a9544496aefd0045a2d40258ce519abd4"
+      },
+      "new_result_id": "tpch_skew-sqlite-sf1.0-20260826-952725eb",
+      "new_sha256": "952725eba7190b0021cab14802a91535a01425d0581b312845dc6f180623c4bf",
+      "old_result_id": "tpch_skew-sqlite-sf1.0-20260826-2e9f90a9",
+      "old_sha256": "2e9f90a9d448b6b84f014c5d8a1d54544d04784b75c8c8a3311fea6fb4a42aa7"
+    }
+  ],
+  "cpu_model": "Apple M4",
+  "cpu_vendor": "Apple",
+  "provenance": "operator-attested",
+  "totals": {
+    "bundles": 151,
+    "changed": 151,
+    "had_client_host": 108,
+    "lacked_client_host": 43,
+    "result_ids_changed": 151
+  }
+}

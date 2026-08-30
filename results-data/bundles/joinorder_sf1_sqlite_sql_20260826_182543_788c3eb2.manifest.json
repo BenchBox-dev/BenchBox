@@ -1,8 +1,8 @@
 {
+  "bundle_file": "joinorder_sf1_sqlite_sql_20260826_182543_788c3eb2.json",
+  "bundle_hash": "259e62db4cbe0fcb3d2674ba9b9756388b1d01a0a832a10baccdd31ccb306e20",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "joinorder_sf1_sqlite_sql_20260826_182543_788c3eb2.json",
-  "bundle_hash": "5429fd50859ea866104b8e4cff9889253e9a63bf05b764ad3feb06b4afa2b912"
+  "submitted_by": "maintainer"
 }

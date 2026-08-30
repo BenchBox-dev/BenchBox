@@ -1,8 +1,8 @@
 {
+  "bundle_file": "read_primitives_sf001_sqlite_sql_20260826_115059_7fa6915c.json",
+  "bundle_hash": "ffc8120efbb0b41a45cc57e23a58a1a5dff7b861431aa3401f3e1214e72d9123",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "read_primitives_sf001_sqlite_sql_20260826_115059_7fa6915c.json",
-  "bundle_hash": "98010bb1cb21bb5011d37998b0c6f5fb17ffdf6b99cd731ef50baffe54b61516"
+  "submitted_by": "maintainer"
 }

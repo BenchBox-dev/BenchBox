@@ -1,8 +1,8 @@
 {
+  "bundle_file": "tpch_skew_sf01_sqlite_sql_20260826_191257_0792588d.json",
+  "bundle_hash": "762b7040a29521203533b5c51093bbb7d91467eda6b5f27450355c568d806304",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "tpch_skew_sf01_sqlite_sql_20260826_191257_0792588d.json",
-  "bundle_hash": "cc21b3af28c4365ff8697401269039745c831bc07280ca9c272133089c5a4444"
+  "submitted_by": "maintainer"
 }

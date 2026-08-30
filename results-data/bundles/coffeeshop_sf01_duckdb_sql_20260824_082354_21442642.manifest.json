@@ -1,8 +1,8 @@
 {
+  "bundle_file": "coffeeshop_sf01_duckdb_sql_20260824_082354_21442642.json",
+  "bundle_hash": "143f4e7dbfadfe6d3729ce48483728911062f63cbba196dd7b7812bce1aa0d1b",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "coffeeshop_sf01_duckdb_sql_20260824_082354_21442642.json",
-  "bundle_hash": "8fbe71da1bd58afff3cc6e365acf74f67ec04698bb2f75b432686666b75bf30a"
+  "submitted_by": "maintainer"
 }

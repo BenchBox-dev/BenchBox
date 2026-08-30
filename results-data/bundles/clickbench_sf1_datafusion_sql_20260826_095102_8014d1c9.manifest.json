@@ -1,8 +1,8 @@
 {
+  "bundle_file": "clickbench_sf1_datafusion_sql_20260826_095102_8014d1c9.json",
+  "bundle_hash": "772e733f25217a9429478a65aba4d9ffeec401e872fb2c8f2046855e3cd17281",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "clickbench_sf1_datafusion_sql_20260826_095102_8014d1c9.json",
-  "bundle_hash": "92ba6fc96155cd574023c94006a7c654afd604a0a23fa9e0650aa3b00dd1de42"
+  "submitted_by": "maintainer"
 }

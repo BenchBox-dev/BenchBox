@@ -159,3 +159,64 @@ policy was not expanded beyond empty optional map omission.
   `client_host` objects remain in primary bundles).
 - Spot check: `rg -n '"client_host": \{\}' results-data/bundles` should not
   match residual hollow maps in primary result JSON.
+
+
+## CPU identity backfill (2026-08-29) — OPERATOR ATTESTATION, NOT MEASURED
+
+Every bundle in this corpus now carries `cpu_model: "Apple M4"` and
+`cpu_vendor: "Apple"`, which the Explorer read model normalizes to the family
+`apple_silicon`. **These values were not measured. They are an operator
+attestation.**
+
+### Why no measured value exists
+
+The capture path was defective, in three independent ways:
+
+1. `get_system_info` sourced `cpu_model` from `platform.processor()`, which on
+   Darwin returns the bare architecture `"arm"`. `normalize_cpu_family("arm")`
+   is `"unknown"`, so even where a value was recorded it said nothing.
+2. `SystemInfo.to_dict` emitted `cpu_cores` / `total_memory_gb` / `os_version`
+   while `ClientHostEnvironment.from_system_profile` reads `cpu_count` /
+   `memory_gb` / `os_release`, so those three were silently dropped from every
+   bundle, and `cpu_vendor` was never produced at all.
+3. The DataFrame adapters descend from a hierarchy that never runs the SQL
+   path's environment capture, so 43 of these 151 bundles recorded no client
+   host whatsoever.
+
+Defects 1 and 2 are fixed in `fix/cpu-identity-capture-source`. Defect 3 is
+tracked as `dataframe-client-host-capture-gap`. Across the 3,845 raw local
+results only 4 carry a CPU, and all four post-date those fixes — so there was
+nothing in the archive to recover.
+
+### The attestation
+
+The project maintainer attests that every run in this corpus executed on a
+single machine — natively, or driving Apple container Linux images whose
+engines share that host's CPU. No other machine has been used in the project's
+development.
+
+Recorded evidence is consistent with it but does not by itself establish the
+model: every bundle that records a client host records `Darwin`/`arm64`, and
+the raw local archive shows a single `machine_id`. `arm64` + `Darwin` implies
+Apple Silicon; it does not distinguish an M1 from an M4. The specific model
+rests on the attestation alone.
+
+### What was and was not written
+
+Only `cpu_model` and `cpu_vendor` were written. For the 43 DataFrame bundles
+that had no client host, `os`, `arch` and `python` were **not** synthesized:
+the attestation covers which machine ran the corpus, not a given run's OS
+release or interpreter version. That gap closes forward, not retroactively.
+
+### Result IDs were renumbered
+
+`result_id` embeds a SHA-256 prefix of the raw bundle bytes, so all 151 were
+renumbered. Precedent: `path-privacy-migration` and `unread-identifier-field-drop`
+each renumbered all 207 entries of the corpus of their day. Every old → new
+mapping is recorded in `results-data/bundles/cpu-identity-attestation.manifest.json`,
+which is also where a reader distinguishes attested values from measured ones.
+
+Reproduce with:
+
+    uv run -- python _project/scripts/results_explorer_cpu_attestation_backfill.py
+    # add --write to apply

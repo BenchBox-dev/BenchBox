@@ -1,8 +1,8 @@
 {
+  "bundle_file": "read_primitives_sf001_pandas_df_20260826_214757_e401da5d.json",
+  "bundle_hash": "209a66981d9a578be1025063ee3b6fc3b18d51f06f00babece088928cca46494",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "read_primitives_sf001_pandas_df_20260826_214757_e401da5d.json",
-  "bundle_hash": "1a9fbb1c594e5d52912642af23e01be6a01b7d4984248394d6e596f685517c81"
+  "submitted_by": "maintainer"
 }
