@@ -939,8 +939,10 @@ export function formatBasisLabel(basis: MeasurementBasis): string {
     case "all_warm":
       return basis.statistic === "median" ? "published median" : "fastest warm pass";
     case "warmup":
-      return "warmup pass";
+      return basis.statistic === "median" ? "warmup pass" : "warmup pass (min)";
     case "warm_pass":
-      return `warm pass ${basis.passes.pass}`;
+      return basis.statistic === "median"
+        ? `warm pass ${basis.passes.pass}`
+        : `warm pass ${basis.passes.pass} (min)`;
   }
 }

@@ -21,10 +21,12 @@ import {
   decodeBasis,
   encodeBasis,
   formatBasisLabel,
+  passSelectionsEqual,
   resolveQueryValue,
   warmPass,
   type BasisExecution,
   type MeasurementBasis,
+  type PassSelection,
 } from "@/lib/measurementBasis";
 
 /**
@@ -71,15 +73,61 @@ export function parseBasesParam(search: string): { bases: MeasurementBasis[]; re
   return { bases, referenceIndex: clampReferenceIndex(refRaw, bases.length) };
 }
 
+function hasMultipleSamples(queries: readonly QueryTiming[], passes: PassSelection): boolean {
+  const counts = new Map<string, number>();
+  for (const q of queries) {
+    if (q.status !== "pass") continue;
+    let matches = false;
+    if (passes.kind === "all_warm") {
+      matches = q.run_type === "iteration" || q.run_type === "warm";
+    } else if (passes.kind === "warmup") {
+      matches = q.run_type === "warmup";
+    } else if (passes.kind === "warm_pass") {
+      matches = (q.run_type === "iteration" || q.run_type === "warm") && q.iter === passes.pass;
+    }
+    if (matches) {
+      const c = (counts.get(q.query_id) ?? 0) + 1;
+      if (c > 1) return true;
+      counts.set(q.query_id, c);
+    }
+  }
+  return false;
+}
+
+export function formatWithinRunBasisLabel(
+  basis: MeasurementBasis,
+  allBases?: readonly MeasurementBasis[],
+): string {
+  const hasSiblingWithDiffStat = allBases?.some(
+    (b) => passSelectionsEqual(b.passes, basis.passes) && b.statistic !== basis.statistic,
+  );
+  if (hasSiblingWithDiffStat) {
+    if (basis.passes.kind === "warmup") {
+      return `warmup pass (${basis.statistic})`;
+    }
+    if (basis.passes.kind === "warm_pass") {
+      return `warm pass ${basis.passes.pass} (${basis.statistic})`;
+    }
+    if (basis.passes.kind === "all_warm") {
+      return basis.statistic === "min" ? "fastest warm pass" : "warm passes (median)";
+    }
+  }
+  return formatBasisLabel(basis);
+}
+
 export function availableBasesForQueries(queries: readonly QueryTiming[]): MeasurementBasis[] {
   const list: MeasurementBasis[] = [];
   list.push(DEFAULT_BASIS);
-  list.push({ passes: ALL_WARM, statistic: "min" });
+  if (hasMultipleSamples(queries, ALL_WARM)) {
+    list.push({ passes: ALL_WARM, statistic: "min" });
+  }
 
   const hasWarmup = queries.some((q) => q.run_type === "warmup" && q.status === "pass");
   if (hasWarmup) {
     list.push({ passes: WARMUP, statistic: "median" });
-    list.push({ passes: WARMUP, statistic: "min" });
+    if (hasMultipleSamples(queries, WARMUP)) {
+      list.push({ passes: WARMUP, statistic: "min" });
+    }
   }
 
   const iters = new Set<number>();
@@ -90,9 +138,10 @@ export function availableBasesForQueries(queries: readonly QueryTiming[]): Measu
   }
   const sortedIters = [...iters].sort((a, b) => a - b);
   for (const iter of sortedIters) {
-    list.push({ passes: warmPass(iter), statistic: "median" });
-    if (sortedIters.length > 1) {
-      list.push({ passes: warmPass(iter), statistic: "min" });
+    const p = warmPass(iter);
+    list.push({ passes: p, statistic: "median" });
+    if (hasMultipleSamples(queries, p)) {
+      list.push({ passes: p, statistic: "min" });
     }
   }
 
@@ -189,6 +238,11 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
   const parsed = useMemo(() => parseBasesParam(search), [search]);
   const [bases, setBases] = useState<MeasurementBasis[]>(parsed.bases);
   const [referenceIndex, setReferenceIndex] = useState<number>(parsed.referenceIndex);
+
+  useEffect(() => {
+    setBases(parsed.bases);
+    setReferenceIndex(parsed.referenceIndex);
+  }, [parsed]);
 
   useEffect(() => {
     let cancelled = false;
@@ -314,7 +368,7 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
             {`${grid.sharedQueryIds.length} of ${grid.rows.length} queries comparable`}
           </StatusBadge>
           <StatusBadge role="comparison" tone="neutral">
-            {`Reference: ${formatBasisLabel(reference)}`}
+            {`Reference: ${formatWithinRunBasisLabel(reference, bases)}`}
           </StatusBadge>
           <StatusBadge role="comparison" tone="neutral">
             {`${passSummaries.length} queries in this run`}
@@ -345,10 +399,10 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
                     name="within-run-reference-radio"
                     checked={isRef}
                     onChange={() => handleSetReference(i)}
-                    aria-label={`Set ${formatBasisLabel(basis)} as reference`}
+                    aria-label={`Set ${formatWithinRunBasisLabel(basis, bases)} as reference`}
                     data-testid={`reference-radio-${encodeBasis(basis)}`}
                   />
-                  <span>{formatBasisLabel(basis)}</span>
+                  <span>{formatWithinRunBasisLabel(basis, bases)}</span>
                 </label>
                 <div class="flex items-center gap-1">
                   {isRef ? (
@@ -366,7 +420,7 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
                       type="button"
                       class="text-xs text-[var(--bb-data-fg-subtle)] hover:text-[var(--bb-tone-critical-fg)] px-1 rounded"
                       onClick={() => handleRemoveBasis(i)}
-                      aria-label={`Remove ${formatBasisLabel(basis)}`}
+                      aria-label={`Remove ${formatWithinRunBasisLabel(basis, bases)}`}
                       title="Remove column"
                     >
                       ✕
@@ -424,7 +478,7 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
               onChange={setSelectedAddKey}
               options={addableBases.map((b) => ({
                 value: encodeBasis(b),
-                label: formatBasisLabel(b),
+                label: formatWithinRunBasisLabel(b, availableBases),
               }))}
             />
             <button
@@ -448,7 +502,7 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
                 {bases.map((basis, i) => (
                   <th key={encodeBasis(basis)} scope="col" class="table-th text-right">
                     <div class="flex items-center justify-end gap-1.5">
-                      <span>{formatBasisLabel(basis)}</span>
+                      <span>{formatWithinRunBasisLabel(basis, bases)}</span>
                       {i === referenceIndex && (
                         <StatusBadge role="ranking" tone="info">ref</StatusBadge>
                       )}
