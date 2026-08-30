@@ -538,7 +538,7 @@ export function resolveQueryValue(
   // warm pass collapses under `all_warm` even though the basis is multi-pass.
   // Either way, median and min over one value are the same number and a
   // surface must not offer them as a live choice.
-  return { kind: "value", ms: value, sampleCount: selected.length, collapsed: selected.length <= 1 };
+  return { kind: "value", ms: value, sampleCount: nonZero.length, collapsed: nonZero.length <= 1 };
 }
 
 // ---------------------------------------------------------------------------

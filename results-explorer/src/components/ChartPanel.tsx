@@ -90,7 +90,10 @@ export function ChartPanel({
 }: ChartPanelProps) {
   const charts = useMemo(() => {
     const exclude = new Set(excludeChartIds ?? []);
-    if (queryFilter) exclude.add("power_bar");
+    if (queryFilter) {
+      exclude.add("power_bar");
+      exclude.add("cost_scatter");
+    }
     const applicable = applicableCharts(context);
     if (exclude.size === 0) return applicable;
     return applicable.filter((entry) => !exclude.has(entry.id));

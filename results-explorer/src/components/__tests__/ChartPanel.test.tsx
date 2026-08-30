@@ -826,6 +826,7 @@ describe("ChartPanel", () => {
 
     expect(screen.queryByText(/5,000/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Power@Size Bar" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Cost" })).toBeNull();
   });
 
   it("keeps a baseline bound to its result after an earlier platform is filtered", () => {

@@ -444,6 +444,20 @@ describe("collapse reports the sample actually reduced", () => {
     expect(asMedian).toEqual({ kind: "value", ms: 40, sampleCount: 2, collapsed: false });
     expect(asMin).toEqual({ kind: "value", ms: 30, sampleCount: 2, collapsed: false });
   });
+
+  it("does not count a zero timing that was excluded from the reduction", () => {
+    const rows: BasisExecution[] = [
+      { query_id: "1", duration_ms: 0, status: "pass", run_type: "measurement", iter: 1 },
+      { query_id: "1", duration_ms: 10, status: "pass", run_type: "measurement", iter: 2 },
+    ];
+
+    expect(resolveQueryValue(MIN_ALL_WARM, rows)).toEqual({
+      kind: "value",
+      ms: 10,
+      sampleCount: 1,
+      collapsed: true,
+    });
+  });
 });
 
 
