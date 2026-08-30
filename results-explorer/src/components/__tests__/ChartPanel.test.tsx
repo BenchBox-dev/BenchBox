@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
-import { ChartPanel, remapBaselineIndex } from "@/components/ChartPanel";
+import { ChartPanel } from "@/components/ChartPanel";
 import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
 import type {
   BenchmarkSummary,
@@ -825,21 +825,16 @@ describe("ChartPanel", () => {
     );
 
     expect(screen.queryByText(/5,000/)).toBeNull();
-    expect(screen.queryByRole("button", { name: "Power@Size Bar" })).toBeNull();
-    expect(screen.queryByRole("tab", { name: "Cost" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Power" })).toBeNull();
   });
 
-  it("keeps a baseline bound to its result after an earlier platform is filtered", () => {
-    const summary = makeSummary({
-      platforms: [
-        makePlatformRow({ result_id: "excluded" }),
-        makePlatformRow({ result_id: "candidate" }),
-        makePlatformRow({ result_id: "baseline" }),
-      ],
-    });
-    const filtered = { ...summary, platforms: summary.platforms.slice(1) };
-
-    expect(remapBaselineIndex(summary, filtered, 2)).toBe(1);
-    expect(remapBaselineIndex(summary, filtered, 0)).toBeNull();
+  it("hides whole-run normalized cost charts under an active queryFilter", () => {
+    render(
+      <ChartPanel
+        context={{ kind: "summary", summary: makeSummary() }}
+        queryFilter={["Q1"]}
+      />,
+    );
+    expect(screen.queryByRole("tab", { name: "Cost" })).toBeNull();
   });
 });

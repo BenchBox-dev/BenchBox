@@ -66,7 +66,7 @@ import {
   DEFAULT_BASIS,
   basisSerde,
   formatBasisLabel,
-  isCollapsedStatistic,
+  resolvedStatisticsCollapsed,
   isDefaultBasis,
   parseAvailablePassSelections,
   passSelectionsEqual,
@@ -166,6 +166,10 @@ export type CompareLayout =
 export function isWithinTieBand(ratio: number | null): boolean {
   if (ratio === null || !Number.isFinite(ratio)) return false;
   return Math.abs(ratio - 1) < COMPARE_TIE_THRESHOLD;
+}
+
+export function shouldShowMultiRunStandings(resultIds: readonly string[], claimSuppressed: boolean): boolean {
+  return !claimSuppressed && compareLayoutForSelection(resultIds).kind === "multi_run";
 }
 
 export function compareLayoutForSelection(resultIds: readonly string[]): CompareLayout {
@@ -691,7 +695,7 @@ export function Compare({ url }: CompareProps) {
           comparableQueryCount={queryCoverage.shared}
           totalQueryCount={queryCoverage.total}
           runCount={results.length}
-          statisticCollapsed={isCollapsedStatistic(basis)}
+          statisticCollapsed={resolvedStatisticsCollapsed(resolvedResults)}
         />
       )}
       {results.length > 1 && (
@@ -879,7 +883,16 @@ export function Compare({ url }: CompareProps) {
 
       {compareLayoutForSelection(resolvedResults.map((r) => r.result_id)).kind === "multi_run" && (
         <>
-          {decisionSummary.claimSuppressed ? (
+          {shouldShowMultiRunStandings(
+            resolvedResults.map((r) => r.result_id),
+            decisionSummary.claimSuppressed,
+          ) ? (
+            <MultiRunStandings
+              results={resolvedResults}
+              baselineIndex={normalizedBaselineIndex}
+              runLabels={cohortIdentitiesCompact}
+            />
+          ) : (
             <section class="card mb-8" aria-labelledby="standings-title">
               <h2 id="standings-title" class="text-base font-semibold text-[var(--bb-data-fg-primary)]">
                 Standings
@@ -888,12 +901,6 @@ export function Compare({ url }: CompareProps) {
                 Standings are unavailable because {decisionSummary.claimSuppressionReason ?? "the selected runs are not comparable"}.
               </p>
             </section>
-          ) : (
-            <MultiRunStandings
-              results={resolvedResults}
-              baselineIndex={normalizedBaselineIndex}
-              runLabels={cohortIdentitiesCompact}
-            />
           )}
           <MultiRunHeatmap
             results={resolvedResults}

@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { compareLayoutForSelection, isWithinTieBand } from "@/pages/Compare";
+import { compareLayoutForSelection, isWithinTieBand, shouldShowMultiRunStandings } from "@/pages/Compare";
 import { COMPARE_TIE_THRESHOLD } from "@/lib/compareSummary";
 
 describe("compareLayoutForSelection", () => {
@@ -86,5 +86,12 @@ describe("the headline tie band", () => {
     expect(isWithinTieBand(null)).toBe(false);
     expect(isWithinTieBand(Number.NaN)).toBe(false);
     expect(isWithinTieBand(Number.POSITIVE_INFINITY)).toBe(false);
+  });
+});
+
+describe("multi-run standings claims", () => {
+  it("suppresses numbered standings when comparison claims are suppressed", () => {
+    expect(shouldShowMultiRunStandings(["a", "b", "c"], true)).toBe(false);
+    expect(shouldShowMultiRunStandings(["a", "b", "c"], false)).toBe(true);
   });
 });

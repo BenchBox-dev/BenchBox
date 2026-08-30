@@ -845,6 +845,8 @@ export function resolveResultsForBasis(
       display_geomean_ms: preservedGeomean,
       display_timings: newDisplayTimings,
       power_score: isDefault ? r.power_score : null,
+      normalized_cost_usd: isDefault ? r.normalized_cost_usd : null,
+      cost_status: isDefault ? r.cost_status : "unavailable",
       valid_query_count: validQueryCount,
       missing_query_count: missingQueryCount,
       zero_timing_count: zeroTimingCount,
@@ -854,6 +856,13 @@ export function resolveResultsForBasis(
       ranking_exclusion_reason: rankingExclusionReason,
     };
   });
+}
+
+/** True when median and minimum reduce the same single sample for every projected query. */
+export function resolvedStatisticsCollapsed(results: readonly DetailResult[]): boolean {
+  return !results.some((result) =>
+    result.display_timings.some((timing) => timing.sample_count > 1),
+  );
 }
 
 /**
@@ -947,8 +956,10 @@ export function formatBasisLabel(basis: MeasurementBasis): string {
     case "all_warm":
       return basis.statistic === "median" ? "published median" : "fastest warm pass";
     case "warmup":
-      return "warmup pass";
+      return basis.statistic === "median" ? "warmup pass" : "warmup pass (min)";
     case "warm_pass":
-      return `warm pass ${basis.passes.pass}`;
+      return basis.statistic === "median"
+        ? `warm pass ${basis.passes.pass}`
+        : `warm pass ${basis.passes.pass} (min)`;
   }
 }

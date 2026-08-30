@@ -24,6 +24,7 @@ import {
   WARMUP,
   ALL_WARM,
   resolveResultsForBasis,
+  resolvedStatisticsCollapsed,
   type MeasurementBasis,
 } from "@/lib/measurementBasis";
 import { selectQueryIdsForLimiter } from "@/components/QueryDiffTable";
@@ -437,6 +438,59 @@ describe("measurement basis resolution for comparison", () => {
     expect(resolved[1]!.display_timings.find((t) => t.query_id === "Q1")!.display_ms).toBe(50);
   });
 
+  it("preserves published sample counts under the default basis without raw executions", () => {
+    const rawRun = {
+      ...runs[0]!,
+      queries: [],
+      display_timings: [{ ...runs[0]!.display_timings[0]!, sample_count: 3 }],
+    } as DetailResult;
+    const resolved = resolveResultsForBasis([rawRun], DEFAULT_BASIS);
+    expect(resolved[0]!.display_timings[0]!.sample_count).toBe(3);
+  });
+
+  it("counts only finite positive samples reduced for an alternate basis", () => {
+    const rawRun = {
+      ...runs[0]!,
+      queries: [
+        { query_id: "Q1", duration_ms: 10, status: "pass", run_type: "warmup", iter: null, stream: 0 },
+        { query_id: "Q1", duration_ms: 0, status: "pass", run_type: "warmup", iter: null, stream: 1 },
+      ],
+      display_timings: [{ ...runs[0]!.display_timings[0]!, sample_count: 2 }],
+    } as DetailResult;
+    const resolved = resolveResultsForBasis([rawRun], { passes: WARMUP, statistic: "median" });
+    expect(resolved[0]!.display_timings[0]!.sample_count).toBe(1);
+  });
+
+  it("keeps the statistic selectable when a projected pass reduces multiple stream samples", () => {
+    const rawRun = {
+      ...runs[0]!,
+      queries: [
+        { query_id: "Q1", duration_ms: 10, status: "pass", run_type: "warmup", iter: null, stream: 0 },
+        { query_id: "Q1", duration_ms: 20, status: "pass", run_type: "warmup", iter: null, stream: 1 },
+      ],
+      display_timings: [{ ...runs[0]!.display_timings[0]! }],
+    } as DetailResult;
+    const resolved = resolveResultsForBasis([rawRun], { passes: WARMUP, statistic: "median" });
+    expect(resolvedStatisticsCollapsed(resolved)).toBe(false);
+  });
+
+  it("keeps the statistic selectable when a multi-sample timing is excluded", () => {
+    const excludedRun = {
+      ...runs[0]!,
+      display_timings: [
+        {
+          ...runs[0]!.display_timings[0]!,
+          display_ms: null,
+          sample_count: 5,
+          is_valid_display_timing: false,
+          timing_exclusion_reason: "zero_timing",
+        },
+      ],
+    } as DetailResult;
+
+    expect(resolvedStatisticsCollapsed([excludedRun])).toBe(false);
+  });
+
   it("resolves warmup pass executions when warmup basis is selected", () => {
     const warmupBasis: MeasurementBasis = { passes: WARMUP, statistic: "median" };
     const resolved = resolveResultsForBasis(runs, warmupBasis);
@@ -451,19 +505,23 @@ describe("measurement basis resolution for comparison", () => {
     expect(resolved[1]!.display_timings.find((t) => t.query_id === "Q1")!.display_ms).toBe(40);
   });
 
-  it("preserves published power_score under default basis and nulls it out under alternate bases", () => {
+  it("preserves whole-run scores and costs only under the default basis", () => {
     const runsWithPower = [
-      { ...runs[0]!, power_score: 1500 },
-      { ...runs[1]!, power_score: 800 },
+      { ...runs[0]!, power_score: 1500, normalized_cost_usd: 1.5, cost_status: "normalized" as const },
+      { ...runs[1]!, power_score: 800, normalized_cost_usd: 0.8, cost_status: "normalized" as const },
     ] as DetailResult[];
 
     const defaultResolved = resolveResultsForBasis(runsWithPower, DEFAULT_BASIS);
     expect(defaultResolved[0]!.power_score).toBe(1500);
     expect(defaultResolved[1]!.power_score).toBe(800);
+    expect(defaultResolved[0]!.normalized_cost_usd).toBe(1.5);
+    expect(defaultResolved[0]!.cost_status).toBe("normalized");
 
     const warmupResolved = resolveResultsForBasis(runsWithPower, { passes: WARMUP, statistic: "median" });
     expect(warmupResolved[0]!.power_score).toBeNull();
     expect(warmupResolved[1]!.power_score).toBeNull();
+    expect(warmupResolved[0]!.normalized_cost_usd).toBeNull();
+    expect(warmupResolved[0]!.cost_status).toBe("unavailable");
   });
 
   it("preserves published display_geomean_ms exactly when all queries are shared under default basis", () => {
