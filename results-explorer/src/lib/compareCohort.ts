@@ -1,4 +1,10 @@
 import { canonicalBenchmarkSlug, canonicalPhase, formatBenchmarkLabel } from "@/lib/displayLabels";
+import {
+  basesEqual,
+  formatBasisLabel,
+  parseAvailableBases,
+  type MeasurementBasis,
+} from "@/lib/measurementBasis";
 
 /**
  * Extract the trailing short-hash token from a result id for a11y disambiguation.
@@ -19,9 +25,25 @@ export interface CompareCohortSignature {
   phase: string;
   /** Nullable because generic `bench.results` rows are result-level, not ranking rows. */
   primaryMetric: string | null;
+  /**
+   * The measurement basis in force for this comparison, or null before one is
+   * locked.
+   *
+   * The basis belongs in the cohort signature for the same reason benchmark
+   * and scale do: it is a property the whole comparison must agree on, and a
+   * run that cannot answer it is not comparable here. Recording it in the lock
+   * also means a shared link reproduces the cohort AND the reduction, not just
+   * the cohort.
+   */
+  basis: MeasurementBasis | null;
 }
 
-export type CompareCohortField = "benchmark" | "scale" | "phase" | "primary metric";
+export type CompareCohortField =
+  | "benchmark"
+  | "scale"
+  | "phase"
+  | "primary metric"
+  | "measurement basis";
 
 export interface CompareCohortRow {
   benchmark?: unknown;
@@ -29,6 +51,13 @@ export interface CompareCohortRow {
   phase?: unknown;
   test_type?: unknown;
   primary_metric?: unknown;
+  /**
+   * `result_basis_availability.available_bases` for this run, when the caller
+   * has it. Absent means "unknown", which is treated as compatible: a snapshot
+   * built before the basis columns existed must not have every row declared
+   * incompatible.
+   */
+  available_bases?: unknown;
 }
 
 function asText(value: unknown): string {
@@ -45,13 +74,34 @@ function asText(value: unknown): string {
  * same-benchmark lock keeps the Compare page's primary metric stable through
  * the benchmark registry rather than through per-row ranking metadata.
  */
-export function compareCohortSignatureForRow(row: CompareCohortRow): CompareCohortSignature {
+export function compareCohortSignatureForRow(
+  row: CompareCohortRow,
+  basis: MeasurementBasis | null = null,
+): CompareCohortSignature {
   return {
     benchmark: canonicalBenchmarkSlug(asText(row.benchmark)),
     scaleFactor: asText(row.scale_factor),
     phase: canonicalPhase(asText(row.phase ?? row.test_type)),
     primaryMetric: asText(row.primary_metric) || null,
+    basis,
   };
+}
+
+/**
+ * Whether a run can serve the basis a cohort has locked.
+ *
+ * Unknown availability is compatible, not incompatible. A row that simply does
+ * not carry `available_bases` -- an older snapshot, or a caller that did not
+ * fetch it -- must not be filtered out of every comparison; the honest
+ * response to "we do not know" is to let the value resolution report
+ * unavailability per query, where it can name the reason.
+ */
+export function rowAnswersBasis(row: CompareCohortRow, basis: MeasurementBasis | null): boolean {
+  if (basis === null) return true;
+  if (row.available_bases === undefined || row.available_bases === null) return true;
+  const available = parseAvailableBases(asText(row.available_bases));
+  if (available.length === 0) return true;
+  return available.some((candidate) => basesEqual(candidate, basis));
 }
 
 export function compareCohortMismatches(
@@ -70,6 +120,7 @@ export function compareCohortMismatches(
   ) {
     mismatches.push("primary metric");
   }
+  if (!rowAnswersBasis(row, signature.basis)) mismatches.push("measurement basis");
   return mismatches;
 }
 
@@ -77,7 +128,40 @@ export function compareCohortSummary(signature: CompareCohortSignature): string 
   const parts = [formatBenchmarkLabel(signature.benchmark)];
   if (signature.scaleFactor !== "") parts.push(`SF ${signature.scaleFactor}`);
   if (signature.phase !== "") parts.push(signature.phase);
+  if (signature.basis !== null) parts.push(`at ${formatBasisLabel(signature.basis)}`);
   return parts.join(" ");
+}
+
+/**
+ * Lock the single basis a cross-run comparison reads.
+ *
+ * The type system already makes a heterogeneous cross-run comparison
+ * unrepresentable (see measurementBasis.ts). This is the same rule at the
+ * runtime boundary, where bases arrive as untyped strings from a URL or from
+ * user selection and a surface could otherwise assemble a list before the
+ * types ever see it. Reporting it here puts it in the same place as every
+ * other cohort violation, so a surface handles one kind of failure rather
+ * than two.
+ *
+ * An empty list is not an error: nothing is locked yet.
+ */
+export function lockCrossRunBasis(
+  bases: readonly MeasurementBasis[],
+): { ok: true; basis: MeasurementBasis | null } | { ok: false; reason: string } {
+  const distinct: MeasurementBasis[] = [];
+  for (const basis of bases) {
+    if (!distinct.some((b) => basesEqual(b, basis))) distinct.push(basis);
+  }
+  if (distinct.length === 0) return { ok: true, basis: null };
+  if (distinct.length === 1) return { ok: true, basis: distinct[0]! };
+  return {
+    ok: false,
+    reason:
+      "A comparison across runs reads every run through one measurement basis. " +
+      `This selection carries ${distinct.length}: ` +
+      `${distinct.map(formatBasisLabel).join(", ")}. ` +
+      "Comparing one run's basis against another's measures the basis, not the engine.",
+  };
 }
 
 export function compareCohortLockReason(
