@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import type { BenchmarkSummary } from "@/types";
+import type { BenchmarkSummary, RankingConfig } from "@/types";
 import {
   applicableCharts,
   buildRenderableSummary,
@@ -176,10 +176,20 @@ export function ChartPanel({
         timings: filteredTimings,
         display_geomean_ms: geomean,
         sample_geomean_ms: geomean,
+        power_score: queryFilter ? null : platform.power_score,
       };
     });
+    const ranking: RankingConfig | null =
+      queryFilter && base.ranking && base.ranking.primary_metric === "power_score"
+        ? {
+            primary_metric: "display_geomean_ms",
+            secondary_metric: base.ranking.secondary_metric,
+            primary_order: "asc",
+          }
+        : base.ranking;
     return {
       ...base,
+      ranking,
       query_ids: filteredQueryIds,
       platforms: filteredPlatforms,
     };

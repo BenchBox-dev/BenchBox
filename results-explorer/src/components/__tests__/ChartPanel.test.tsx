@@ -787,4 +787,43 @@ describe("ChartPanel", () => {
     );
     expect(screen.getByText("No queries match the selected filter.")).toBeTruthy();
   });
+
+  it("clears power_score and switches power ranking to geomean latency under active queryFilter", () => {
+    const summary = makeSummary({
+      ranking: {
+        primary_metric: "power_score",
+        secondary_metric: "display_geomean_ms",
+        primary_order: "desc",
+      },
+      platforms: [
+        makePlatformRow({
+          result_id: "p1",
+          platform: "Platform 1",
+          power_score: 5000,
+          display_geomean_ms: 100,
+          timings: { Q1: 10, Q2: 20 },
+        }),
+        makePlatformRow({
+          result_id: "p2",
+          platform: "Platform 2",
+          power_score: 1000,
+          display_geomean_ms: 20,
+          timings: { Q1: 5, Q2: 10 },
+        }),
+      ],
+      query_ids: ["Q1", "Q2"],
+    });
+
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary,
+        }}
+        queryFilter={["Q1"]}
+      />,
+    );
+
+    expect(screen.queryByText(/5,000/)).toBeNull();
+  });
 });

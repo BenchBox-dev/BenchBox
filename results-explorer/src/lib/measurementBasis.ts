@@ -832,9 +832,14 @@ export function resolveResultsForBasis(
       }
     }
 
+    const preservedGeomean =
+      isDefault && geomeanData.excludedQueryIds.length === 0 && r.display_geomean_ms !== null
+        ? r.display_geomean_ms
+        : newGeomean;
+
     return {
       ...r,
-      display_geomean_ms: newGeomean,
+      display_geomean_ms: preservedGeomean,
       display_timings: newDisplayTimings,
       power_score: isDefault ? r.power_score : null,
       valid_query_count: validQueryCount,
