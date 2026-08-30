@@ -54,21 +54,52 @@ const DEFAULT_CONFIG: TuningEntry = {
   title: "Non-standard tuning configuration",
 };
 
-function resolveConfig(tuningMode: string | null | undefined): TuningEntry {
+const CUSTOM_REQUESTED_CONFIG: TuningEntry = {
+  label: "Custom Tuning Requested",
+  tone: "warning",
+  title: "A custom tuning configuration was requested, but applied tuning evidence was not recorded",
+};
+
+const CUSTOM_NOOP_CONFIG: TuningEntry = {
+  label: "No Tuning Applied",
+  tone: "neutral",
+  title: "A custom tuning configuration was requested, but execution recorded no applied tuning operations",
+};
+
+const CUSTOM_FAILED_CONFIG: TuningEntry = {
+  label: "Tuning Failed",
+  tone: "danger",
+  title: "A custom tuning configuration was requested, but the tuning apply path failed",
+};
+
+const APPLIED_TUNING_STATUSES = new Set(["applied_unverified", "applied_verified"]);
+
+function resolveConfig(
+  tuningMode: string | null | undefined,
+  tuningValidationStatus?: string | null,
+): TuningEntry {
   if (tuningMode === null || tuningMode === undefined) return NOT_RECORDED_CONFIG;
+  if (tuningMode === "custom") {
+    if (APPLIED_TUNING_STATUSES.has(tuningValidationStatus ?? "")) return TUNING_CONFIG.custom!;
+    if (tuningValidationStatus === "noop" || tuningValidationStatus === "not_applicable") return CUSTOM_NOOP_CONFIG;
+    if (tuningValidationStatus === "failed") return CUSTOM_FAILED_CONFIG;
+    return CUSTOM_REQUESTED_CONFIG;
+  }
   return TUNING_CONFIG[tuningMode] ?? DEFAULT_CONFIG;
 }
 
 export function tuningLabel(tuningMode: string | null | undefined): string {
+  if (tuningMode === "custom") return TUNING_CONFIG.custom!.label;
   return resolveConfig(tuningMode).label;
 }
 
 interface TuningBadgeProps {
   tuningMode: string | null | undefined;
+  tuningValidationStatus?: string | null;
 }
 
-export function TuningBadge({ tuningMode }: TuningBadgeProps) {
-  const config = resolveConfig(tuningMode);
+export function TuningBadge({ tuningMode, tuningValidationStatus }: TuningBadgeProps) {
+  const config = resolveConfig(tuningMode, tuningValidationStatus);
   return (
     <StatusBadge role="computed" tone={config.tone} title={config.title}>
       {config.label}

@@ -2,12 +2,12 @@
 
 **Author:** Muse Code (Muse Spark) — takeover from `agy` conversation `a344e6e2-918f-4808-b058-0f15760445dc`
 **Date:** 2026-08-29
-**Status:** Executed with a host-limited validated subset; see §11 for evidence and blocked cells
+**Status:** Historical candidate plan; the 2026-08-29 sweep did not validate an optimal/helpful 22-cell corpus. See §11.
 **Related:** `results-data/REGENERATION.md` (tuned purge 2026-07-16, #1176), `results-data/CORPUS_NOTES.md` (trust cut 2026-08-23), `_project/planning/plan-repopulate-results-explorer-corpus-sf1.md` (untuned SF1 repopulation, now 151 bundles / 24 cohorts on PR #1945)
 
 ## 1. Goal and Non-Goal
 
-**Goal:** Create a *tuned* counterpart to the untuned baseline corpus that is *optimal* — every `(platform, benchmark, scale)` in it must have a credible expectation that `--tuning tuned` will change the physical plan and measurably help the workload. No filler.
+**Historical goal:** Evaluate a *tuned* counterpart to the untuned baseline corpus. The word *optimal* was a hypothesis and admission target, not an achieved result. A cell is publishable as helpful only after matched, repeated A/B evidence shows material tuning was applied and improved the workload. A requested template or `tuning_mode` label is not sufficient evidence.
 
 **Non-goals:**
 - Do not repopulate filler `tuned` rows where the template is `basic_constraints` (no-op) or where the platform renders the tuning type as `none` (preview-only, never applied at execution).
@@ -16,12 +16,12 @@
 
 ## 2. Tuning-Helpfulness Criteria (the filter)
 
-A `(platform, benchmark, scale)` is *in* the tuning corpus iff **all** of these hold:
+A `(platform, benchmark, scale)` was proposed for the candidate sweep only if **all** of these planning criteria held. Passing this filter did not establish material application or helpfulness:
 
 1. **Template exists and is not basic-constraints.** `benchbox tuning show tuned --platform <p> --benchmark <b>` resolves to a `tuned_template` (rank 2) per `benchbox/core/tuning/coverage.yaml`, not `basic_constraints` (rank 1). File must live at `examples/tunings/<platform>/<benchmark>_tuned.yaml` or `benchbox/core/tuning/templates/<platform>/<benchmark>_tuned.yaml` (parity-checked by `test_tuning_resolution.py`).
 2. **Capability is rendered, not `none`.** `benchbox/core/tuning/capability_registry.py:PLATFORM_TUNING_CAPABILITIES[<platform>][<TuningType>].rendered_via != "none"` for at least one table-layout type (partitioning/clustering/distribution/sorting or z_ordering/liquid_clustering). See DuckDB `post_load: duckdb_ctas_sort` vs. `none: duckdb_copy_to_hint_only`; ClickHouse `partitioning: none` is a documented gap.
-3. **Workload benefits.** Benchmark's tables have columns that appear in the TPC logical profile (`benchbox/core/tuning/profiles/tpc.yaml`) with query evidence at the target scale. E.g., TPC-H `lineitem.l_shipdate`, `orders.o_orderdate`, TPC-DS `store_sales.ss_sold_date_sk`; the profile's `accepted baseline columns` vs. `low-evidence candidates` determines whether a column is worth sorting/partitioning.
-4. **Scale large enough.** SF1 (1 GB) minimum; SF10 preferred where the platform can load it within the 1200s cell budget. SF0.01 (10 MB) and SF0.1 (100 MB) are excluded for tuned — the CTAS reorder and constraint cost dominates, and prior UAT showed no measurable win at those scales.
+3. **Hypothesized workload benefit.** Benchmark tables have columns that appear in the TPC logical profile (`benchbox/core/tuning/profiles/tpc.yaml`) with query evidence at the target scale. For example, TPC-H `lineitem.l_shipdate`, `orders.o_orderdate`, and TPC-DS `store_sales.ss_sold_date_sk` supplied a mechanism hypothesis to test, not measured benefit.
+4. **Selected scale.** SF1 (1 GB) minimum; SF10 preferred where the platform could load it within the 1200s cell budget. SF0.01 (10 MB) and SF0.1 (100 MB) were excluded as a planning choice and were not revalidated by this sweep.
 5. **Platform locally runnable and not pruned at SF1.** Per `tests/uat/compatibility.py:_RELEASE_GATE_RUNTIME_ENVELOPES` and the SF1 mandate table in the SF1 repopulation plan: DataFusion `datavault` SF1 (OOM at 16 GiB), SQLite `tpcds`/`tpcds_obt` SF1 (1391s load), and all Docker OLTP at SF1 are pruned — do not schedule tuned there either.
 
 If any criterion fails, the cell is **out**. This is why the plan is small by design.
@@ -41,13 +41,13 @@ From `uv run -- benchbox platforms check` on this host (Apple Silicon, mocker pr
 | `dask-df`, `datafusion-df`, `modin-df` | 2 DataFrame | ✅/❌ (Dask Ready, Modin missing) | ❌ `write_manager: none` per `compatibility.py:92` | `none` |
 | `ducklake`, `motherduck` | 1 Native SQL (extensions) | ✅ Ready | ❌ No tuned templates | `none` |
 
-**Conclusion for tuning corpus:** Only `duckdb`, `spark` (via `databricks` alias), and `polars`/`pandas`/`pyspark` with explicit DataFrame optimized templates satisfy criteria 1–2. All others fail criterion 1 (no `tuned_template`) and are **excluded entirely** from the tuning corpus — staging them as `tuned` would be indistinguishable from `notuning` and would pollute the `tuning_mode` facet.
+**Candidate-scope conclusion:** Only `duckdb`, `spark` (via the `databricks` alias), and `polars`/`pandas`/`pyspark` with explicit DataFrame profiles passed the template/capability prefilter. That made them eligible to test, not validated tuning-corpus members. Platforms without a material rendering path remained out of scope because a `tuned` label would not establish applied tuning.
 
-## 4. Optimal Tuning Matrix (only where tuning helps)
+## 4. Candidate Tuning Matrix (hypotheses, not validated outcomes)
 
 Scales: **SF1 (1 GB) mandatory**, **SF10 (10 GB) where the platform can load it within 1200s**. SF0.01/SF0.1 intentionally omitted for tuned (baseline corpus already covers them untuned for scaling curves).
 
-| # | Benchmark | Scale | Platform | Template (resolved) | Why tuning helps (workload + mechanism) | Pruning note |
+| # | Benchmark | Scale | Platform | Template (resolved) | Hypothesized workload mechanism | Pruning note |
 |---|---|---|---|---|---:|---|
 | 1 | `tpch` | 1.0 | `duckdb` | `duckdb/tpch_tuned.yaml` | TPC-H `lineitem` (6M rows at SF1) sorted on `l_shipdate`/`l_orderkey`; DuckDB `post_load` CTAS reorder makes Q1, Q6, Q12 range scans sequential. Profile has accepted baseline columns at SF1. | None |
 | 2 | `tpch` | 10.0 | `duckdb` | `duckdb/tpch_tuned.yaml` | Same as SF1, amplified at 10 GB (60M rows); sort cost amortized, constraint-enabled optimizations (PK/FK) help optimizer at scale. | Host has 64 GiB; DuckDB SF10 tpch is within budget (prior SF10 runs exist) |
@@ -79,7 +79,7 @@ Scales: **SF1 (1 GB) mandatory**, **SF10 (10 GB) where the platform can load it 
 - `dask-df`, `datafusion-df`, `modin-df` for `write_primitives` — `write_manager: none` per `compatibility.py:92`.
 - All SF0.01/SF0.1 for tuned — baseline corpus already provides the scaling curve untuned; tuned at 10 MB is noise.
 
-**Total tuned corpus size:** 22 cells (12 DuckDB, 6 Spark, and 4 DataFrame) covering 9 benchmarks at SF1 (and 6 of them also at SF10 where the scale exists). Each cell will have a *pair* — `notuning` baseline already in the 151-bundle corpus + `tuned` new — so the tuned facet will have a true A/B.
+**Candidate matrix size:** 22 proposed cells (12 DuckDB, 6 Spark, and 4 DataFrame). This count describes the plan only. It is not a count of executed, validated, helpful, or publishable cells. Existing independent `notuning` bundles are comparison references, not matched A/B proof.
 
 ## 5. Template and Scale Details
 
@@ -139,8 +139,8 @@ uv run -- pytest tests/unit/platforms/test_tuning_config_forwarding.py -k test_f
 ## 7. Staging, Validation, and Provenance (the gates)
 
 1. **Zero-query and timing guard** (from `CORPUS_NOTES.md` 2026-08-24): Reject any bundle where `summary.queries.total == 0` or `summary.timing.geometric_mean_ms == 0`.
-2. **Tuning-verified gate:** For SQL `tuned` bundles, require `platform.tuning.validation_status` in `{"applied_verified", "applied_unverified"}` and reject `failed`/`noop`. Explicit DataFrame profiles are a separate canonical `custom` mode and are accepted only when `config.tuning_config` contains the non-default profile and the run has nonzero query/timing evidence; their SQL ledger status is `noop` because no SQL tuning ledger applies.
-3. **Cohort depth:** `results-data/validate_corpus.py` requires every `(benchmark, scale)` cohort to have ≥3 platforms. The tuning corpus is a *facet* within each cohort, not a separate cohort — so a cohort like `tpch SF=1.0` must have ≥3 platforms *in total* (which it does: 12 untuned + up to 8 tuned), and within it the `tuned` facet must have ≥2 platforms to be a comparison (DuckDB + Spark satisfies).
+2. **Material-tuning gate:** For both `tuned` and explicit DataFrame `custom` bundles, require execution-derived `platform.tuning.validation_status` in `{"applied_verified", "applied_unverified"}`. Reject `failed`, `noop`, `not_applicable`, and missing status for tuning claims. A serialized custom profile proves request intent only; it does not prove that the adapter applied a non-default setting.
+3. **Cohort depth:** `results-data/validate_corpus.py` requires every `(benchmark, scale)` cohort to have ≥3 platforms. Tuning is a facet within each cohort, not a separate cohort. The candidate matrix anticipated DuckDB plus Spark for tuned comparisons, but the host sweep did not produce that cross-platform pair.
 4. **Provenance sidecar:** For each staged `tuned` bundle, create sibling `<stem>.tuning.json` already emitted by `benchbox run --tuning tuned` and a submission sidecar `<stem>.manifest.json` with `{"result_source":"internal","funding":"unspecified"}` so `generate_corpus_inventory.py` derives `trust_label: maintainer-run` (same as the SF1 repopulation).
 5. **Inventory and build:**
 ```bash
@@ -148,7 +148,7 @@ uv run -- python scripts/generate_corpus_inventory.py --write
 uv run -- python results-data/validate_corpus.py
 uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data --output results-explorer/dist/data
 ```
-The tuned bundles will appear under the `tuning_mode: tuned` facet in the Explorer (see `results-explorer/src/components/TuningBadge.tsx` and `ComparabilityReceipt.tsx` for the `tuned` vs. `notuning` comparison logic).
+Explorer preserves the recorded mode as provenance, but public tuning badges and ranking eligibility must not treat a `custom` label as applied tuning without an execution-derived applied status.
 
 ## 8. Resource and Time Budget
 
@@ -166,30 +166,61 @@ The tuned bundles will appear under the `tuning_mode: tuned` facet in the Explor
 
 ## 10. Success Criteria
 
-- 22 new `tuned` bundles staged (12 DuckDB + 6 Spark SF1/SF10 + 4 DataFrame SF1), each with a sibling `.tuning.json` and tuning metadata showing the run was actually tuned.
-- `corpus-inventory.json` grows from 151 to ~173 bundles, still `validate_corpus.py` passes (no shallow cohorts introduced).
-- Explorer build `results.duckdb` shows the `tuning_mode` facet with both `tuned` and `notuning` under the same `(benchmark, scale)` cohorts, and the `TuningBadge`/`ComparabilityReceipt` correctly surfaces the `requested_config_hash` and `physical_mechanisms` for each.
+- Execute matched, repeated, forced-clean tuned/notuning pairs with the same engine version, seed, memory, phases, and host basis.
+- Admit only cells with nonzero and scale-consistent data, clean run validation, execution-derived applied tuning evidence, and retained replay artifacts.
+- Report regressions and exclusions alongside improvements. Do not rename a candidate as helpful from template intent, a single cross-run comparison, or corpus-depth validation.
+- Explorer may expose the recorded request mode, but a custom tuning badge and ranking eligibility require `applied_unverified` or `applied_verified` status.
 
-## 11. Execution Outcome on the 2026-08-29 Host Run
+## 11. Execution and Review Outcome for the 2026-08-29 Sweep
 
-The fixed 22-cell plan was executed serialized with the documented commands. Eight
-validated bundles were imported: six SQL bundles in the `tuned` facet and two
-explicit DataFrame bundles in the canonical `custom` facet. The DataFrame mode is
-intentional: ADR-2 distinguishes explicit profiles from the keyword `tuned`, and
-the result payload preserves the actual profile under `config.tuning_config`.
+Commit `50ae8f360` initially staged eight candidate primary bundles. Review did not validate 22 cells and found that three of the eight were not admissible tuning evidence:
 
-| Cells | Outcome |
-|---|---|
-| DuckDB `tpch` SF1, `tpcds` SF10, `ssb` SF1, `amplab` SF1, `clickbench` SF1, `joinorder` SF1 | Imported and validated |
-| Polars `tpch` SF1 and `ssb` SF1 | Imported and validated as explicit DataFrame `custom` profiles |
-| DuckDB `tpch` SF10 and `ssb` SF10 | Failed during the host run before producing a valid result bundle |
-| DuckDB `tpcds` SF1 | Rejected by duplicate primary keys in the generated data |
-| DuckDB `h2odb` SF1 | Result had `platform.tuning.validation_status=failed`, so it was not staged |
-| DuckDB `read_primitives` SF1 | Benchmark rejects SF1; supported scales are SF0.01 and SF0.1 |
-| DuckDB `tpchavoc` SF1 | Valid run withheld because it would create a one-platform shallow cohort |
-| Spark six cells | Local Spark could not execute the tuned path on this host: `spark` has no auto-discovered template, while the Databricks connector extra is unavailable and the installed Java 26 is outside PySpark's supported range |
-| Pandas `tpch` SF1 and PySpark `tpch` SF1 | Pandas exceeded the 1200-second budget; PySpark failed before producing a valid result |
+| Candidate | Recorded evidence | Review disposition |
+|---|---|---|
+| DuckDB `tpcds` SF10 | Generation `NOT_RUN`, effectively zero load evidence, scale-inconsistent query results, and `unofficial_nonstandard` compliance despite `summary.validation=passed` | Excluded as an invalid SF10 measurement |
+| Polars `tpch` SF1 | `tuning_mode=custom`, but `platform.tuning.validation_status=noop` | Excluded from applied-tuning claims and ranking |
+| Polars `ssb` SF1 | `tuning_mode=custom`, `platform.tuning.validation_status=noop`, and `summary.validation=not_run` | Excluded from applied-tuning claims, ranking, and validated corpus evidence |
 
-The corpus therefore grows from 151 to 159 bundles and remains validator-clean;
-the remaining planned cells are recorded as host/environment or benchmark-data
-blockers rather than fabricated or relabeled results.
+Five DuckDB SF1 candidate artifacts remain for `tpch`, `ssb`, `amplab`, `clickbench`, and `joinorder`. Their bundles record clean query validation and `applied_unverified` tuning status, which proves that the execution path recorded at least one tuning operation. It does **not** prove introspection corroboration, causality, or workload benefit.
+
+The available same-engine corpus references point in mixed directions and are not matched repeated A/B trials:
+
+| Candidate | Candidate geomean | Existing notuning reference | Direction |
+|---|---:|---:|---|
+| DuckDB `tpch` SF1 | 64.7 ms | 35.3 ms | Regression |
+| DuckDB `ssb` SF1 | 8.2 ms | 6.8 ms | Regression |
+| DuckDB `amplab` SF1 | 7.8 ms | 5.8 ms | Regression |
+| DuckDB `clickbench` SF1 | 2.2 ms | 2.1 ms | Slight regression |
+| DuckDB `joinorder` SF1 | 56.0 ms | 78.4 ms | Improvement in this cross-run reference only |
+
+These values are durable observations, not causal tuning conclusions. The other 14 planned cells did not produce admitted artifacts in the initial sweep. Earlier notes named host, scale, data, timeout, or shallow-cohort blockers, but did not retain per-cell logs, exit statuses, or checksums. They therefore remain **not evidenced**, not validated failures and not validated exclusions.
+
+### Replayable evidence
+
+The initial candidate artifacts remain inspectable even after exclusion because they are pinned to `50ae8f360`:
+
+```bash
+# List the eight primary candidates originally staged by the sweep.
+git diff --name-only --diff-filter=A 50ae8f360^ 50ae8f360 -- \
+  'results-data/bundles/*.json' | grep -vE '\.(manifest|tuning|applied)\.json$'
+
+# Inspect the invalid TPC-DS generation/load/validation evidence from the pinned commit.
+git show 50ae8f360:results-data/bundles/tpcds_sf10_duckdb_sql_20260829_213451_4a4b106f.json | \
+  jq '{benchmark, phases, tables, summary, compliance: .benchmark.compliance}'
+
+# Inspect the two Polars execution-derived noop statuses and run validation.
+for stem in tpch_sf1_polars_df_20260829_221741_248f01a9 \
+            ssb_sf1_polars_df_20260829_221811_96166b3a; do
+  git show "50ae8f360:results-data/bundles/${stem}.json" | \
+    jq '{mode: (.config.tuning_mode // .execution.tuning_mode), tuning: .platform.tuning.validation_status, validation: .summary.validation}'
+done
+
+# Reproduce the candidate/reference geomeans from primary bundles only.
+for file in results-data/bundles/{tpch,ssb,amplab,clickbench,joinorder}_sf1_duckdb_sql_*.json; do
+  case "$file" in *.manifest.json|*.tuning.json|*.applied.json) continue ;; esac
+  printf '%s: ' "$(basename "$file")"
+  jq '.summary.timing.geometric_mean_ms' "$file"
+done
+```
+
+Structural corpus validation and an Explorer build remain necessary checks, but they do not establish fresh data, material tuning, or performance helpfulness.

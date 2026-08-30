@@ -332,6 +332,7 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   funding: string;
   validation_status?: string | null;
   tuning_mode: string | null;
+  tuning_validation_status?: string | null;
   execution_mode: string | null;
   compliance_class: string | null;
   cost_usd: number | null;
@@ -1084,6 +1085,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.funding," +
     " r.validation_status," +
     " r.tuning_mode," +
+    " r.tuning_validation_status," +
     " r.execution_mode," +
     " r.compliance_class," +
     " r.cost_usd," +
