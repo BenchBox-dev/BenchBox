@@ -149,5 +149,7 @@ describe("CompareWithinRun page component", () => {
     expect(screen.queryByText("faster")).toBeNull();
     expect(screen.queryByText("slower")).toBeNull();
     expect(screen.queryByText("parity")).toBeNull();
+    expect(screen.queryByText("0.50x")).toBeNull();
+    expect(screen.queryByText("0.50x (-50.0 ms)")).toBeNull();
   });
 });

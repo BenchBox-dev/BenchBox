@@ -348,6 +348,7 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
     [grid.rows, grid.sharedQueryIds],
   );
   const refGeomean = columnGeomeans[referenceIndex] ?? null;
+  const hasSufficientAggregateEvidence = grid.sharedQueryIds.length >= 2;
 
   if (loading) return <CompareSummarySkeleton />;
   if (error) return <ErrorMessage message={error} />;
@@ -398,10 +399,15 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
           const color = paletteColor(i);
           const isRef = i === referenceIndex;
           const geomean = columnGeomeans[i] ?? null;
-          const ratio = refGeomean !== null && geomean !== null && refGeomean > 0 ? geomean / refGeomean : null;
-          const deltaMs = refGeomean !== null && geomean !== null ? geomean - refGeomean : null;
-          const comparisonStatus =
-            grid.sharedQueryIds.length >= 2 ? withinRunComparisonStatus(ratio) : null;
+          const ratio =
+            hasSufficientAggregateEvidence && refGeomean !== null && geomean !== null && refGeomean > 0
+              ? geomean / refGeomean
+              : null;
+          const deltaMs =
+            hasSufficientAggregateEvidence && refGeomean !== null && geomean !== null
+              ? geomean - refGeomean
+              : null;
+          const comparisonStatus = withinRunComparisonStatus(ratio);
           const canRemove = bases.length > MIN_WITHIN_RUN_BASES;
 
           return (
@@ -584,8 +590,14 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
                 </td>
                 {columnGeomeans.map((g, i) => {
                   const isRef = i === referenceIndex;
-                  const ratio = refGeomean !== null && g !== null && refGeomean > 0 ? g / refGeomean : null;
-                  const deltaMs = refGeomean !== null && g !== null ? g - refGeomean : null;
+                  const ratio =
+                    hasSufficientAggregateEvidence && refGeomean !== null && g !== null && refGeomean > 0
+                      ? g / refGeomean
+                      : null;
+                  const deltaMs =
+                    hasSufficientAggregateEvidence && refGeomean !== null && g !== null
+                      ? g - refGeomean
+                      : null;
                   return (
                     <td key={i} class="table-td font-mono text-right">
                       {g !== null ? (
