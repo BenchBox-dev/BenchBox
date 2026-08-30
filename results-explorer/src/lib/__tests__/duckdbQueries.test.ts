@@ -172,6 +172,8 @@ describe("duckdbQueries - SQL targets and parameters", () => {
         cpu_count: null,
         memory_gb: null,
         python: null,
+        cpu_model: null,
+        cpu_family: null,
         physical_mechanisms: null,
         ...overrides,
       };
@@ -185,6 +187,40 @@ describe("duckdbQueries - SQL targets and parameters", () => {
       mockedQueryRows.mockResolvedValueOnce([]);
       return getDetailResult(resultId);
     }
+
+    it("carries CPU identity from the wide row through to the environment", async () => {
+      // Regression: the wide-row type declared cpu_model/cpu_family optional
+      // and RESULT_DETAIL_METRICS_COLUMNS never selected them, so both were
+      // undefined for every result and RunReceipt / ComparabilityReceipt
+      // reported the CPU as not recorded even on snapshots that had it.
+      const detail = await fetchDetail(
+        "with-cpu",
+        makeWideRow({
+          result_id: "with-cpu",
+          cpu_model: "Apple M1 Max",
+          cpu_family: "apple_silicon",
+        }),
+      );
+      expect(detail?.environment.cpu_model).toBe("Apple M1 Max");
+      expect(detail?.environment.cpu_family).toBe("apple_silicon");
+    });
+
+    it("omits CPU identity when the snapshot recorded none", async () => {
+      const detail = await fetchDetail("no-cpu", makeWideRow({ result_id: "no-cpu" }));
+      expect(detail?.environment.cpu_model).toBeUndefined();
+      expect(detail?.environment.cpu_family).toBeUndefined();
+    });
+
+    it("selects the CPU columns it reads", async () => {
+      // The defect above was invisible to every behavioural test that built
+      // its own wide row: the projection and the reads drifted apart with
+      // nothing comparing them. This asserts the actual SQL.
+      await fetchDetail("sql-check", makeWideRow({ result_id: "sql-check" }));
+      const detailSql = String(mockedQueryRows.mock.calls[0]?.[0] ?? "");
+      expect(detailSql).toContain("result_detail_metrics");
+      expect(detailSql).toContain("cpu_model");
+      expect(detailSql).toContain("cpu_family");
+    });
 
     it("a legacy row (no logical_profile recorded -> NULL) yields undefined, not []", async () => {
       const legacy = await fetchDetail("legacy", makeWideRow({ result_id: "legacy", physical_mechanisms: null }));

@@ -60,6 +60,16 @@ REQUIRED_COLUMNS: dict[str, set[str]] = {
         "warmup_status",
         "available_bases",
     },
+    "result_environment": {
+        "result_id",
+        "os",
+        "arch",
+        "cpu_count",
+        "memory_gb",
+        "python",
+        "cpu_model",
+        "cpu_family",
+    },
 }
 
 # These are the same required non-empty scans used by the browser during
@@ -308,6 +318,36 @@ def check_snapshot(db_path: Path) -> list[str]:
                 FROM query_executions
                 WHERE run_type IS NOT NULL
                   AND run_type NOT IN ('measurement', 'warmup')
+                """,
+            ),
+            (
+                "result_environment cpu_family must belong to closed vocabulary or be NULL",
+                """
+                SELECT COUNT(*)
+                FROM result_environment
+                WHERE cpu_family IS NOT NULL
+                  AND cpu_family NOT IN (
+                    'apple_silicon', 'graviton', 'intel_xeon', 'intel_core',
+                    'amd_epyc', 'amd_ryzen', 'ampere_altra', 'arm_neoverse', 'unknown'
+                  )
+                """,
+            ),
+            (
+                "if cpu_model is present, cpu_family must be populated",
+                """
+                SELECT COUNT(*)
+                FROM result_environment
+                WHERE cpu_model IS NOT NULL
+                  AND cpu_family IS NULL
+                """,
+            ),
+            (
+                "if cpu_model is NULL, cpu_family must be NULL",
+                """
+                SELECT COUNT(*)
+                FROM result_environment
+                WHERE cpu_model IS NULL
+                  AND cpu_family IS NOT NULL
                 """,
             ),
         ]

@@ -34,7 +34,9 @@ CREATE TABLE IF NOT EXISTS result_environment (
     arch             VARCHAR,
     cpu_count        INTEGER,
     memory_gb        DOUBLE,
-    python           VARCHAR
+    python           VARCHAR,
+    cpu_model        VARCHAR,
+    cpu_family       VARCHAR
 );
 
 CREATE TABLE IF NOT EXISTS result_phase_durations (
@@ -245,7 +247,9 @@ SELECT
     e.arch,
     e.cpu_count,
     e.memory_gb,
-    e.python
+    e.python,
+    e.cpu_model,
+    e.cpu_family
 FROM results r
 LEFT JOIN result_environment e USING (result_id);
 

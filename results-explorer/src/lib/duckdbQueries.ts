@@ -189,6 +189,12 @@ export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_elig
   cpu_count: number | null;
   memory_gb: number | null;
   python: string | null;
+  // Required, not optional. An optional marker here is what previously let the
+  // projection omit both columns while `getDetailResult` still compiled: the
+  // reads were `undefined` forever and every receipt reported the CPU as not
+  // recorded. Required means the omission is a type error.
+  cpu_model: string | null;
+  cpu_family: string | null;
   // ADR-2 §3: comma-joined, sorted physical tuning mechanisms (see
   // physical_mechanisms in DetailResult). Tri-state, preserved from the
   // pipeline: SQL NULL (-> null here) means no logical tuning profile was
@@ -500,6 +506,8 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   "cpu_count",
   "memory_gb",
   "python",
+  "cpu_model",
+  "cpu_family",
 ].join(", ");
 
 const COHORT_METADATA_COLUMNS = [
@@ -705,6 +713,8 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
   if (wide.cpu_count !== null) environment.cpu_count = wide.cpu_count;
   if (wide.memory_gb !== null) environment.memory_gb = wide.memory_gb;
   if (wide.python !== null) environment.python = wide.python;
+  if (wide.cpu_model !== null) environment.cpu_model = wide.cpu_model;
+  if (wide.cpu_family !== null) environment.cpu_family = wide.cpu_family;
 
   const display_timings: QueryDisplayTiming[] = timingRows.map((r) => ({
     query_id: r.query_id,
