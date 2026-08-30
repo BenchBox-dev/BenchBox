@@ -76,7 +76,7 @@ def system_profile_snapshot(system_profile: Any | None) -> dict[str, Any]:
     if isinstance(system_profile, Mapping):
         return dict(system_profile)
     if hasattr(system_profile, "model_dump"):
-        dumped = system_profile.model_dump(mode="python")
+        dumped = system_profile.model_dump(mode="json")
         return dict(dumped) if isinstance(dumped, Mapping) else {}
     return {}
 
@@ -104,6 +104,7 @@ class ClientHostEnvironment:
         os_name = f"{os_type} {os_release}".strip() if os_type and os_release else os_type
         cpu_model = profile.get("cpu_model")
         cpu_vendor = profile.get("cpu_vendor")
+        cpu_identity_provenance = profile.get("cpu_identity_provenance")
         if system_profile is None and (not cpu_model or not cpu_vendor):
             # DELIBERATELY gated on a wholly absent profile.
             #
@@ -125,6 +126,8 @@ class ClientHostEnvironment:
             detected_model, detected_vendor = detect_cpu_info()
             if not cpu_model:
                 cpu_model = detected_model
+                if detected_model:
+                    cpu_identity_provenance = "measured"
             if not cpu_vendor:
                 cpu_vendor = detected_vendor
 
@@ -137,7 +140,7 @@ class ClientHostEnvironment:
             machine_id=profile.get("machine_id") or profile.get("anonymous_machine_id"),
             cpu_model=cpu_model,
             cpu_vendor=cpu_vendor,
-            cpu_identity_provenance=profile.get("cpu_identity_provenance"),
+            cpu_identity_provenance=cpu_identity_provenance,
         )
 
     def to_dict(self) -> dict[str, Any]:

@@ -573,4 +573,11 @@ describe("RunReceipt applied-tuning receipt drill-down", () => {
     expect(within(receipt).getByText("CPU family")).toBeTruthy();
     expect(within(receipt).getByText("CPU model")).toBeTruthy();
   });
+
+  it("does not mislabel an unsupported CPU evidence value as inferred", () => {
+    render(<RunReceipt detail={makeDetail({ environment: { ...makeDetail().environment, cpu_identity_provenance: "typo" as never } })} />);
+
+    expect(screen.getByText("Unknown")).toBeInTheDocument();
+    expect(screen.queryByText("Inferred")).toBeNull();
+  });
 });

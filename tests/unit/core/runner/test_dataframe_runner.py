@@ -11,6 +11,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
+import json
 import types
 from datetime import datetime
 from pathlib import Path
@@ -222,6 +223,7 @@ class TestRunDataframeBenchmark:
         )
 
         assert result.system_profile["cpu_model"] == "Snapshot CPU"
+        json.dumps(result.system_profile)
         assert result.execution_environment["client_host"]["os"] == "SnapshotOS 9"
         assert result.execution_environment["client_host"]["cpu_count"] == 4
         # Verify DataFrame mode is indicated in platform_info

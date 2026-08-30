@@ -43,6 +43,15 @@ def test_dataframe_profile_yields_a_populated_client_host() -> None:
         assert field in host, f"DataFrame client_host is missing {field!r}"
 
 
+def test_capture_time_cpu_detection_records_measured_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("benchbox.utils.environment.detect_cpu_info", lambda: ("Detected CPU", "Detected Vendor"))
+
+    host = _client_host(None)
+
+    assert host["cpu_model"] == "Detected CPU"
+    assert host["cpu_identity_provenance"] == "measured"
+
+
 def test_dataframe_and_sql_record_the_same_client_host_fields() -> None:
     # The SQL path builds its profile from get_system_info().to_dict()
     # (base/adapter.py -> result_capture._build_execution_metadata). Comparing
