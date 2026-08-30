@@ -466,6 +466,16 @@ describe("measurement basis resolution for comparison", () => {
     expect(warmupResolved[1]!.power_score).toBeNull();
   });
 
+  it("preserves published display_geomean_ms exactly when all queries are shared under default basis", () => {
+    const runsWithGeomean = [
+      { ...runs[0]!, display_geomean_ms: 123.4567890123 },
+      { ...runs[1]!, display_geomean_ms: 98.7654321098 },
+    ] as DetailResult[];
+    const resolved = resolveResultsForBasis(runsWithGeomean, DEFAULT_BASIS);
+    expect(resolved[0]!.display_geomean_ms).toBe(123.4567890123);
+    expect(resolved[1]!.display_geomean_ms).toBe(98.7654321098);
+  });
+
   it("preserves published timing_exclusion_reason for default basis", () => {
     const rawRun: DetailResult = {
       ...runs[0]!,
