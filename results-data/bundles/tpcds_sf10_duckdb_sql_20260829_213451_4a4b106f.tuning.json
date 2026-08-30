@@ -1,0 +1,277 @@
+{
+  "applied_ledger_hash": "b22574002bbff8854f27a09bc33050ba8c5a8fe49edc3a88cb85cb9415139736",
+  "hash": "e55ff41e47018ce286c6bf9ab0fa8b7e99596da7aad84b11d6877481238cc1f3",
+  "logical_profile": {
+    "logical_profile_coverage": {
+      "accepted_count": 16,
+      "dropped_low_evidence_count": 2,
+      "mapped_count": 32,
+      "required_count": 32,
+      "unmapped_count": 0,
+      "unsupported_count": 0,
+      "waived_count": 0
+    },
+    "logical_tuning_profile_id": "tpc-v1",
+    "logical_tuning_profile_version": "2026-05-26",
+    "physical_rendering_id": "duckdb",
+    "platform_physical_tuning_mechanisms": [
+      "partitioning",
+      "sorted_ingestion",
+      "sorting"
+    ],
+    "tuning_template_hash": "e55ff41e47018ce2",
+    "unmapped_logical_candidates": [],
+    "validation_status": "passed"
+  },
+  "requested": {
+    "constraints": {
+      "check_constraints": {
+        "enabled": true,
+        "enforce_on_insert": true,
+        "enforce_on_update": true
+      },
+      "foreign_keys": {
+        "enabled": true,
+        "enforce_referential_integrity": true,
+        "on_delete_action": "CASCADE",
+        "on_update_action": "RESTRICT"
+      },
+      "primary_keys": {
+        "enabled": true,
+        "enforce_uniqueness": true,
+        "nullable": false
+      },
+      "unique_constraints": {
+        "enabled": true,
+        "ignore_nulls": false
+      }
+    },
+    "table_tunings": {
+      "table_0cd78b002ad1": {
+        "sorting": [
+          {
+            "name": "column_46110a7713ff",
+            "order": 1,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_345416a8999f",
+            "order": 2,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_1b54525bda25",
+            "order": 3,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_0cd78b002ad1"
+      },
+      "table_0f5dac5b1c76": {
+        "partitioning": [
+          {
+            "name": "column_141df37e5b6a",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "sorting": [
+          {
+            "name": "column_57d482a92e20",
+            "order": 1,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_62ea97dee531",
+            "order": 2,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_e42d2d610fad",
+            "order": 3,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_4a86e66a8f32",
+            "order": 4,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_d64c4de1fa28",
+            "order": 5,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_0f5dac5b1c76"
+      },
+      "table_1c8b83e217b5": {
+        "sorting": [
+          {
+            "name": "column_d6a0ed34e8a0",
+            "order": 1,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_d4ba2a72803f",
+            "order": 2,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_75971c491d68",
+            "order": 3,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_1c8b83e217b5"
+      },
+      "table_3721862e0245": {
+        "partitioning": [
+          {
+            "name": "column_064719442e0d",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "sorting": [
+          {
+            "name": "column_a199efd4d33f",
+            "order": 1,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_b5dce5bcaa12",
+            "order": 2,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_3721862e0245"
+      },
+      "table_84710ac384ee": {
+        "partitioning": [
+          {
+            "name": "column_0eeba6d1026f",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "sorting": [
+          {
+            "name": "column_13108c44f216",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_84710ac384ee"
+      },
+      "table_b95218ea6686": {
+        "sorting": [
+          {
+            "name": "column_deff300a8e2e",
+            "order": 1,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_4c2b79439f74",
+            "order": 2,
+            "type": "VARCHAR"
+          },
+          {
+            "name": "column_59dd9600c609",
+            "order": 3,
+            "type": "VARCHAR"
+          }
+        ],
+        "table_name": "table_b95218ea6686"
+      },
+      "table_c0aa499e6f25": {
+        "partitioning": [
+          {
+            "name": "column_b6434c008f0e",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "sorting": [
+          {
+            "name": "column_68fc6da84baa",
+            "order": 1,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_10d99d59ea6d",
+            "order": 2,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_077b62ac637c",
+            "order": 3,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_c82e5977383d",
+            "order": 4,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_c0aa499e6f25"
+      },
+      "table_e8023165472f": {
+        "partitioning": [
+          {
+            "name": "column_aff0cb10b0c7",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "sorting": [
+          {
+            "name": "column_f90530b8c641",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_e8023165472f"
+      },
+      "table_f007c7c25f7d": {
+        "partitioning": [
+          {
+            "name": "column_8e035999c156",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "sorting": [
+          {
+            "name": "column_d8dce8e8e9c7",
+            "order": 1,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_e17a990293cd",
+            "order": 2,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_f48b1b45303d",
+            "order": 3,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_b5ef963febb6",
+            "order": 4,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_f007c7c25f7d"
+      }
+    }
+  },
+  "requested_config_hash": "e55ff41e47018ce286c6bf9ab0fa8b7e99596da7aad84b11d6877481238cc1f3",
+  "run_id": "4a4b106f",
+  "source": "yaml",
+  "source_file": "examples/tunings/duckdb/tpcds_tuned.yaml",
+  "tuning_policy_generation": "adr-003",
+  "tuning_source": "auto_discovered",
+  "validation_status": "applied_unverified",
+  "version": "2.2"
+}

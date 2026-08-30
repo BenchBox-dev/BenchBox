@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 
@@ -328,3 +328,47 @@ class TestSortedIngestionCapabilityAndGuardrails:
 
         with pytest.raises(ValueError, match="method 'liquid_clustering' is not supported"):
             adapter.resolve_sorted_ingestion_strategy()
+
+
+class TestFkSafeCtasSort:
+    """Regression coverage for DuckDB's FK-preserving CTAS-sort path."""
+
+    def _make_adapter_and_config(self):
+        adapter = _SortedIngestionStrategyAdapter(
+            "duckdb", ctas_sql="CREATE OR REPLACE TABLE lineitem AS SELECT * FROM lineitem"
+        )
+        config = _make_tuning_config({"lineitem": _make_table_tuning_with_sort(["l_orderkey"])})
+        config.foreign_keys = Mock(enabled=True)
+        return adapter, config
+
+    def test_fk_enabled_uses_atomic_in_place_rewrite(self):
+        adapter, tuning_config = self._make_adapter_and_config()
+        connection = Mock()
+        metadata = Mock()
+        metadata.fetchall.return_value = []
+        connection.execute.return_value = metadata
+
+        assert adapter.apply_ctas_sort("lineitem", tuning_config, connection) is True
+
+        assert connection.execute.call_args_list[0] == call("BEGIN TRANSACTION;")
+        assert connection.execute.call_args_list[2:] == [
+            call('CREATE TEMP TABLE "lineitem__ctas_sort" AS SELECT * FROM "lineitem" ORDER BY "l_orderkey";'),
+            call('DELETE FROM "lineitem";'),
+            call('INSERT INTO "lineitem" SELECT * FROM "lineitem__ctas_sort";'),
+            call('DROP TABLE "lineitem__ctas_sort";'),
+        ]
+        connection.commit.assert_called_once_with()
+        connection.rollback.assert_not_called()
+
+    def test_fk_enabled_rewrite_rolls_back_after_a_statement_failure(self):
+        adapter, tuning_config = self._make_adapter_and_config()
+        connection = Mock()
+        metadata = Mock()
+        metadata.fetchall.return_value = []
+        connection.execute.side_effect = [None, metadata, None, None, RuntimeError("insert failed")]
+
+        with pytest.raises(RuntimeError, match="insert failed"):
+            adapter.apply_ctas_sort("lineitem", tuning_config, connection)
+
+        connection.rollback.assert_called_once_with()
+        connection.commit.assert_not_called()

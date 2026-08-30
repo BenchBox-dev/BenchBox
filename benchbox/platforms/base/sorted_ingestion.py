@@ -139,7 +139,49 @@ class SortedIngestionMixin:
             return False
 
         statements = ctas_sort_sql if isinstance(ctas_sort_sql, list) else [ctas_sort_sql]
-        return self._execute_ctas_sort(table_name, validated_table, sorted_columns, statements, connection)
+        fk_safe = self._requires_fk_safe_ctas_sort and self._has_fk_constraints(tuning_config)
+        if fk_safe:
+            statements = self._build_fk_safe_ctas_sort_sql(validated_table, sorted_columns)
+        return self._execute_ctas_sort(
+            table_name, validated_table, sorted_columns, statements, connection, atomic=fk_safe
+        )
+
+    @property
+    def _requires_fk_safe_ctas_sort(self) -> bool:
+        """Whether this platform enforces FK constraints and requires in-place CTAS sorting."""
+        platform_key = getattr(self, "platform_name", "").strip().lower()
+        return platform_key in ("duckdb", "motherduck")
+
+    def _has_fk_constraints(self, tuning_config: Any) -> bool:
+        """Check if foreign key constraints are active in the tuning configuration."""
+        if tuning_config is not None:
+            fk_cfg = getattr(tuning_config, "foreign_keys", None)
+            if fk_cfg is not None:
+                enabled = getattr(fk_cfg, "enabled", False)
+                if enabled is True:
+                    return True
+        get_constraint = getattr(self, "_get_constraint_configuration", None)
+        if callable(get_constraint):
+            try:
+                _pk, fk = get_constraint()
+                if fk is True:
+                    return True
+            except Exception:
+                pass
+        return False
+
+    def _build_fk_safe_ctas_sort_sql(
+        self, validated_table: str, sorted_columns: list[TuningColumn]
+    ) -> list[str] | None:
+        """Build in-place sort SQL that preserves table identity and constraints."""
+        temp_table = f"{validated_table}__ctas_sort"
+        order_by = ", ".join(f'"{col.name}"' for col in sorted_columns)
+        return [
+            f'CREATE TEMP TABLE "{temp_table}" AS SELECT * FROM "{validated_table}" ORDER BY {order_by};',
+            f'DELETE FROM "{validated_table}";',
+            f'INSERT INTO "{validated_table}" SELECT * FROM "{temp_table}";',
+            f'DROP TABLE "{temp_table}";',
+        ]
 
     def _resolve_ctas_sort_columns(self, table_name: str, tuning_config: Any) -> list | None:
         """Resolve sort columns for CTAS sort, returning None if not applicable."""
@@ -174,7 +216,14 @@ class SortedIngestionMixin:
         return sort_columns
 
     def _execute_ctas_sort(
-        self, table_name: str, validated_table: str, sorted_columns: list, statements: list[str], connection: Any
+        self,
+        table_name: str,
+        validated_table: str,
+        sorted_columns: list,
+        statements: list[str],
+        connection: Any,
+        *,
+        atomic: bool = False,
     ) -> bool:
         """Execute CTAS sort statements or capture them in dry-run mode."""
         apply_start = mono_time()
@@ -188,13 +237,79 @@ class SortedIngestionMixin:
             self._sorted_ingestion_applied_tables.append(validated_table)
             return True
 
-        for statement in statements:
-            self._execute_sql_statement(connection, statement)
+        transaction_started = False
+        if atomic:
+            self._execute_sql_statement(connection, "BEGIN TRANSACTION;")
+            transaction_started = True
+        try:
+            if atomic and self._has_populated_fk_dependents(connection, validated_table):
+                self._rollback_transaction(connection)
+                self.logger.info(
+                    "Skipping FK-safe CTAS sort for %s because populated dependent rows prevent an in-place rewrite",
+                    table_name,
+                )
+                return False
+            for statement in statements:
+                self._execute_sql_statement(connection, statement)
+            if atomic:
+                commit_method = getattr(connection, "commit", None)
+                if callable(commit_method):
+                    commit_method()
+                else:
+                    self._execute_sql_statement(connection, "COMMIT;")
+        except Exception:
+            if transaction_started:
+                rollback_method = getattr(connection, "rollback", None)
+                try:
+                    if callable(rollback_method):
+                        rollback_method()
+                    else:
+                        self._execute_sql_statement(connection, "ROLLBACK;")
+                except Exception as rollback_error:  # pragma: no cover - defensive cleanup path
+                    self.logger.warning(f"Failed to roll back FK-safe CTAS sort for {table_name}: {rollback_error}")
+            raise
         self._sorted_ingestion_applied_tables.append(validated_table)
         self._sorted_ingestion_total_apply_seconds += elapsed_seconds(apply_start)
         sorted_col_names = ", ".join(column.name for column in sorted_columns)
         self.log_verbose(f"Applied CTAS sorting to {table_name}: {sorted_col_names}")
         return True
+
+    def _has_populated_fk_dependents(self, connection: Any, validated_table: str) -> bool:
+        """Return whether populated child rows prevent a safe in-place rewrite.
+
+        DuckDB enforces foreign keys during ``DELETE``. A populated parent table
+        therefore cannot be rewritten in place while dependent constraints are
+        attached, and DuckDB does not support ``ALTER TABLE ... DROP CONSTRAINT``.
+        In that case the only safe operation is to leave the existing physical
+        layout unchanged and preserve the dependent rows and constraints.
+        """
+        execute_method = getattr(connection, "execute", None)
+        if not callable(execute_method):
+            return False
+
+        metadata = execute_method(
+            "SELECT table_name, constraint_name, constraint_column_names, "
+            "referenced_table, referenced_column_names "
+            "FROM duckdb_constraints() WHERE constraint_type = 'FOREIGN KEY';"
+        )
+        rows = metadata.fetchall()
+        for row in rows:
+            child_table, _constraint_name, _child_columns, referenced_table, _referenced_columns = row
+            if not referenced_table or str(referenced_table).lower() != validated_table.lower():
+                continue
+            child_name = validate_sql_identifier(str(child_table), "referencing table")
+            count_result = execute_method(f'SELECT COUNT(*) FROM "{child_name}";')
+            if count_result.fetchone()[0] > 0:
+                return True
+        return False
+
+    def _rollback_transaction(self, connection: Any) -> None:
+        """Roll back a transaction started for an in-place rewrite."""
+        rollback_method = getattr(connection, "rollback", None)
+        if callable(rollback_method):
+            rollback_method()
+        else:
+            self._execute_sql_statement(connection, "ROLLBACK;")
 
     @staticmethod
     def _execute_sql_statement(connection: Any, statement: str) -> None:

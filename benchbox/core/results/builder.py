@@ -174,7 +174,7 @@ class RunConfigInput:
     query_subset: list[str] | None = None
     parallelism: int | None = None
     tuning_mode: str | None = None
-    tuning_config: dict[str, Any] | None = None
+    tuning_config: Any | None = None
     platform_options: dict[str, Any] | None = None
     platform_option_sources: dict[str, str] | None = None
     table_mode: str | None = None
@@ -198,7 +198,7 @@ class RunConfigInput:
         if self.tuning_mode:
             data["tuning_mode"] = self.tuning_mode
         if self.tuning_config:
-            data["tuning_config"] = self.tuning_config
+            data["tuning_config"] = sanitize_platform_options({"tuning_config": self.tuning_config})["tuning_config"]
         if self.platform_options:
             data["platform_options"] = self.platform_options
         if self.platform_option_sources:

@@ -1,0 +1,8 @@
+{
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "funding": "unspecified",
+  "submitted_by": "maintainer",
+  "bundle_file": "clickbench_sf1_duckdb_sql_20260829_214129_1d33783f.json",
+  "bundle_hash": "db399b0dd046f76be3b8b5592fcf6478f8efb94e610165e476a07c7c67104a41"
+}

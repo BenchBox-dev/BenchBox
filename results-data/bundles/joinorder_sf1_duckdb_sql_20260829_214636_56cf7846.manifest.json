@@ -1,0 +1,8 @@
+{
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "funding": "unspecified",
+  "submitted_by": "maintainer",
+  "bundle_file": "joinorder_sf1_duckdb_sql_20260829_214636_56cf7846.json",
+  "bundle_hash": "acc91086f15b781f8525c80eee75b4b261618e639b4d61d5cbc6d04308d4c58b"
+}
