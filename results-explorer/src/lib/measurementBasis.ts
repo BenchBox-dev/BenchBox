@@ -88,13 +88,22 @@ export function isCollapsedStatistic(basis: MeasurementBasis): boolean {
   return basis.passes.kind !== "all_warm";
 }
 
-export function basesEqual(a: MeasurementBasis, b: MeasurementBasis): boolean {
-  if (a.statistic !== b.statistic) return false;
-  if (a.passes.kind !== b.passes.kind) return false;
-  if (a.passes.kind === "warm_pass" && b.passes.kind === "warm_pass") {
-    return a.passes.pass === b.passes.pass;
-  }
+/**
+ * Whether two bases select the same executions, ignoring the statistic.
+ *
+ * Availability is a property of the PASS SELECTION alone: a run either
+ * recorded those executions or it did not. The statistic is applied
+ * client-side over whatever the selection yields, so a run that can serve
+ * `all_warm` can serve both the median and the min over it.
+ */
+export function passSelectionsEqual(a: PassSelection, b: PassSelection): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "warm_pass" && b.kind === "warm_pass") return a.pass === b.pass;
   return true;
+}
+
+export function basesEqual(a: MeasurementBasis, b: MeasurementBasis): boolean {
+  return a.statistic === b.statistic && passSelectionsEqual(a.passes, b.passes);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,21 +252,31 @@ export function basesInComparison(comparison: BasisComparison): MeasurementBasis
 // shared link reproduces exactly the figures the sender saw:
 //
 //   basis-token := "default"
-//                | "all_warm" [":" statistic]
-//                | "warmup"
-//                | "warm_pass_" <positive integer>
+//                | ("all_warm" | "warmup" | "warm_pass_" <positive integer>)
+//                  [":" statistic]
 //   statistic   := "median" | "min"
 //
-// The vocabulary is deliberately the same as the read model's
+// The pass vocabulary is deliberately the same as the read model's
 // `result_basis_availability.available_bases`, so an availability check is a
-// token comparison rather than a translation.
+// token comparison rather than a translation. The read model publishes pass
+// selections only; the statistic is a client-side choice and is spelled here.
 //
-// `all_warm:median` is canonicalised to `default` on encode: they denote the
-// same basis, and one spelling keeps shared links stable and comparable.
+// `median` is the default and is left implicit, so `all_warm:median` and
+// `warmup:median` canonicalise to `default` and `warmup` on encode. One
+// spelling per basis keeps shared links stable and comparable.
 //
-// A statistic suffix on a single-pass token is REJECTED rather than ignored.
-// Over a sample of one, median and min are the same number, so accepting
-// `warmup:min` would let a link imply a choice the data cannot express.
+// EVERY pass selection takes a statistic suffix, including the single-pass
+// ones. An earlier version of this grammar rejected `warmup:min` on the
+// reasoning that median and min over a sample of one are the same number --
+// but nothing guarantees a sample of one. A throughput run records one warmup
+// execution PER STREAM, so `warmup` can select several rows and median and min
+// genuinely differ. Dropping the statistic there made `{warmup, min}`
+// encode to `warmup` and decode back as `{warmup, median}`, so a shared link
+// silently showed different numbers than the sender saw -- exactly the
+// must-preserve rule this grammar exists to satisfy.
+//
+// `default` names one specific basis, so it takes no suffix; write
+// `all_warm:min` for the other statistic over the same passes.
 //
 // Cross-run surfaces carry ONE `basis` parameter. The `bases` list parameter
 // belongs only to the within-run route -- the URL grammar mirrors the type
@@ -272,21 +291,28 @@ export const BASES_URL_KEY = "bases";
 const STATISTICS: readonly BasisStatistic[] = ["median", "min"];
 const WARM_PASS_TOKEN = /^warm_pass_(\d+)$/;
 
-export function encodeBasis(basis: MeasurementBasis): string {
-  if (isDefaultBasis(basis)) return "default";
-  switch (basis.passes.kind) {
+function passToken(passes: PassSelection): string {
+  switch (passes.kind) {
     case "all_warm":
-      return `all_warm:${basis.statistic}`;
+      return "all_warm";
     case "warmup":
       return "warmup";
     case "warm_pass":
-      return `warm_pass_${basis.passes.pass}`;
+      return `warm_pass_${passes.pass}`;
   }
 }
 
+export function encodeBasis(basis: MeasurementBasis): string {
+  if (isDefaultBasis(basis)) return "default";
+  const token = passToken(basis.passes);
+  // median is implicit; anything else must be spelled or the link lies.
+  return basis.statistic === "median" ? token : `${token}:${basis.statistic}`;
+}
+
 export function decodeBasis(raw: string): MeasurementBasis | null {
-  const [passToken, statisticToken, ...rest] = raw.split(":");
-  if (rest.length > 0 || passToken === undefined) return null;
+  const [passTokenRaw, statisticToken, ...rest] = raw.split(":");
+  if (rest.length > 0 || passTokenRaw === undefined) return null;
+  const passToken = passTokenRaw;
 
   if (statisticToken !== undefined && !STATISTICS.includes(statisticToken as BasisStatistic)) {
     return null;
@@ -294,22 +320,16 @@ export function decodeBasis(raw: string): MeasurementBasis | null {
   const statistic = (statisticToken ?? "median") as BasisStatistic;
 
   if (passToken === "default") {
-    // `default` names one basis; a suffix would either be redundant or a lie.
+    // `default` names one specific basis; a suffix would be redundant or a lie.
     return statisticToken === undefined ? DEFAULT_BASIS : null;
   }
-  if (passToken === "all_warm") {
-    return { passes: ALL_WARM, statistic };
-  }
-  // Single-pass selections collapse the statistic, so they take no suffix.
-  if (statisticToken !== undefined) return null;
-  if (passToken === "warmup") {
-    return { passes: WARMUP, statistic: "median" };
-  }
+  if (passToken === "all_warm") return { passes: ALL_WARM, statistic };
+  if (passToken === "warmup") return { passes: WARMUP, statistic };
   const match = WARM_PASS_TOKEN.exec(passToken);
   if (match?.[1] !== undefined) {
     const pass = Number(match[1]);
     if (!Number.isInteger(pass) || pass < 1) return null;
-    return { passes: warmPass(pass), statistic: "median" };
+    return { passes: warmPass(pass), statistic };
   }
   return null;
 }
@@ -686,6 +706,21 @@ function geomeanOf(values: readonly number[]): number | null {
  * pipeline may name a basis this client does not implement yet, and the right
  * response is to offer the bases we do understand, not to blank the control.
  */
+/**
+ * Parse `available_bases` into the PASS SELECTIONS a run can serve.
+ *
+ * This is the honest shape of what the read model publishes. The pipeline
+ * records which executions exist; which statistic to reduce them with is a
+ * client-side choice that needs no snapshot support.
+ */
+export function parseAvailablePassSelections(raw: string | null | undefined): PassSelection[] {
+  const out: PassSelection[] = [];
+  for (const basis of parseAvailableBases(raw)) {
+    if (!out.some((p) => passSelectionsEqual(p, basis.passes))) out.push(basis.passes);
+  }
+  return out;
+}
+
 export function parseAvailableBases(raw: string | null | undefined): MeasurementBasis[] {
   if (!raw) return [];
   const out: MeasurementBasis[] = [];

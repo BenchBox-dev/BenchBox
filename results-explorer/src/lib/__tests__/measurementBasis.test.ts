@@ -132,12 +132,46 @@ describe("URL grammar", () => {
     }
   });
 
-  it("rejects a statistic suffix on a single-pass basis rather than ignoring it", () => {
-    // Over a sample of one, median and min are the same number. Accepting
-    // `warmup:min` would let a link imply a choice the data cannot express.
-    expect(decodeBasis("warmup:min")).toBeNull();
-    expect(decodeBasis("warm_pass_2:median")).toBeNull();
+  it("spells the statistic on every pass selection, including single-pass ones", () => {
+    // Regression for a review finding. This grammar previously rejected
+    // `warmup:min`, reasoning that median and min over a sample of one are the
+    // same number -- but nothing guarantees a sample of one. A throughput run
+    // records one warmup execution PER STREAM, so `warmup` can select several
+    // rows and the two statistics genuinely differ. Dropping the statistic
+    // made {warmup, min} encode to "warmup" and decode back as
+    // {warmup, median}: a shared link showing different numbers than the
+    // sender saw.
+    const minWarmup: MeasurementBasis = { passes: WARMUP, statistic: "min" };
+    const minPass2: MeasurementBasis = { passes: warmPass(2), statistic: "min" };
+    expect(encodeBasis(minWarmup)).toBe("warmup:min");
+    expect(encodeBasis(minPass2)).toBe("warm_pass_2:min");
+    expect(decodeBasis("warmup:min")).toEqual(minWarmup);
+    expect(decodeBasis("warm_pass_2:min")).toEqual(minPass2);
+  });
+
+  it("leaves the median implicit so each basis has one spelling", () => {
+    expect(encodeBasis(WARMUP_BASIS)).toBe("warmup");
+    expect(decodeBasis("warmup:median")).toEqual(WARMUP_BASIS);
+    expect(encodeBasis(decodeBasis("warmup:median")!)).toBe("warmup");
+    expect(encodeBasis(decodeBasis("warm_pass_2:median")!)).toBe("warm_pass_2");
+  });
+
+  it("still refuses a suffix on `default`, which names one specific basis", () => {
     expect(decodeBasis("default:min")).toBeNull();
+    expect(decodeBasis("default:median")).toBeNull();
+  });
+
+  it("round-trips every basis the model can construct", () => {
+    // The must-preserve rule: a shared link reproduces exactly the figures the
+    // sender saw. That holds only if encode/decode is lossless for every
+    // (passes, statistic) pair, not just the ones a control happens to offer.
+    const selections = [ALL_WARM, WARMUP, warmPass(1), warmPass(2), warmPass(17)];
+    for (const passes of selections) {
+      for (const statistic of ["median", "min"] as const) {
+        const basis: MeasurementBasis = { passes, statistic };
+        expect(decodeBasis(encodeBasis(basis))).toEqual(basis);
+      }
+    }
   });
 
   it("rejects malformed tokens instead of falling back to the default", () => {

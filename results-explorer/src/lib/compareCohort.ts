@@ -2,7 +2,8 @@ import { canonicalBenchmarkSlug, canonicalPhase, formatBenchmarkLabel } from "@/
 import {
   basesEqual,
   formatBasisLabel,
-  parseAvailableBases,
+  parseAvailablePassSelections,
+  passSelectionsEqual,
   type MeasurementBasis,
 } from "@/lib/measurementBasis";
 
@@ -90,6 +91,14 @@ export function compareCohortSignatureForRow(
 /**
  * Whether a run can serve the basis a cohort has locked.
  *
+ * Matched on the PASS SELECTION, not the whole basis. Availability is a
+ * property of which executions a run recorded; the statistic is reduced
+ * client-side over whatever the selection yields, and the read model does not
+ * publish a per-statistic token. Comparing whole bases here rejected every row
+ * in the corpus the moment a cohort locked `all_warm:min`: the pipeline
+ * publishes `all_warm`, which parses as the median basis, so `basesEqual`
+ * reported a mismatch for a run that had every execution the minimum needs.
+ *
  * Unknown availability is compatible, not incompatible. A row that simply does
  * not carry `available_bases` -- an older snapshot, or a caller that did not
  * fetch it -- must not be filtered out of every comparison; the honest
@@ -99,9 +108,9 @@ export function compareCohortSignatureForRow(
 export function rowAnswersBasis(row: CompareCohortRow, basis: MeasurementBasis | null): boolean {
   if (basis === null) return true;
   if (row.available_bases === undefined || row.available_bases === null) return true;
-  const available = parseAvailableBases(asText(row.available_bases));
+  const available = parseAvailablePassSelections(asText(row.available_bases));
   if (available.length === 0) return true;
-  return available.some((candidate) => basesEqual(candidate, basis));
+  return available.some((candidate) => passSelectionsEqual(candidate, basis.passes));
 }
 
 export function compareCohortMismatches(

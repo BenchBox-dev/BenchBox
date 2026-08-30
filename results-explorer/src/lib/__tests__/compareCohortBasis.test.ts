@@ -111,6 +111,33 @@ describe("unknown availability is compatible, not incompatible", () => {
   it("treats default and all_warm:median as the same locked basis", () => {
     expect(rowAnswersBasis(cohortRow({ available_bases: "all_warm" }), DEFAULT_BASIS)).toBe(true);
   });
+
+  it("serves a non-default statistic over an available pass selection", () => {
+    // Regression for a review finding. Availability is a property of the PASS
+    // SELECTION: the pipeline publishes `all_warm`, never `all_warm:min`,
+    // because the statistic is reduced client-side over rows the run already
+    // recorded. Matching whole bases rejected every row in the corpus the
+    // moment a cohort locked the minimum.
+    expect(rowAnswersBasis(cohortRow(), MIN_ALL_WARM)).toBe(true);
+    expect(rowAnswersBasis(cohortRow(), { passes: WARMUP, statistic: "min" })).toBe(true);
+    expect(rowAnswersBasis(cohortRow(), { passes: warmPass(3), statistic: "min" })).toBe(true);
+  });
+
+  it("still rejects a pass selection the run does not publish, at either statistic", () => {
+    expect(rowAnswersBasis(cohortRow(), PASS_4)).toBe(false);
+    expect(rowAnswersBasis(cohortRow(), { passes: warmPass(4), statistic: "min" })).toBe(false);
+    expect(rowAnswersBasis(cohortRow({ available_bases: NO_WARMUP_BASES }), WARMUP_BASIS)).toBe(false);
+  });
+
+  it("does not partition a min-statistic cohort into an empty compatible set", () => {
+    // The user-visible shape of the bug: locking the minimum emptied the
+    // comparison, with every row hidden as incompatible.
+    const signature = compareCohortSignatureForRow(cohortRow(), MIN_ALL_WARM);
+    const rows = [cohortRow({ id: 1 }), cohortRow({ id: 2 }), cohortRow({ id: 3 })];
+    const { compatible, incompatible } = compareCohortPartition(rows, signature);
+    expect(compatible).toHaveLength(3);
+    expect(incompatible).toHaveLength(0);
+  });
 });
 
 describe("a cross-run comparison locks exactly one basis", () => {
