@@ -12,6 +12,7 @@ from _project.scripts.explorer_pipeline import transformer as transformer_module
 from _project.scripts.explorer_pipeline.models import DetailResult, ManifestEntry
 from _project.scripts.explorer_pipeline.transformer import BundleTransformer
 from benchbox.core.cost.models import DeploymentMetadata, NormalizedCost
+from benchbox.validation.bundle import is_primary_bundle_file
 from tests.unit.scripts.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -1342,7 +1343,7 @@ class TestPublishedCorpusResolvesExecutionMode:
         unresolved = []
         total = 0
         for path in sorted(corpus.rglob("*.json")):
-            if path.name.endswith(".manifest.json"):
+            if not is_primary_bundle_file(path):
                 continue
             total += 1
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -1360,7 +1361,7 @@ class TestPublishedCorpusResolvesExecutionMode:
 
         mismatches = []
         for path in sorted(corpus.rglob("*.json")):
-            if path.name.endswith(".manifest.json"):
+            if not is_primary_bundle_file(path):
                 continue
             if "_df_" in path.name:
                 expected = "dataframe"
