@@ -12,6 +12,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 from __future__ import annotations
 
 import types
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -30,7 +31,7 @@ from benchbox.core.runner.dataframe_runner import (
     _get_queries_for_benchmark,
     run_dataframe_benchmark,
 )
-from benchbox.core.schemas import BenchmarkConfig
+from benchbox.core.schemas import BenchmarkConfig, SystemProfile
 
 pytestmark = [
     pytest.mark.unit,
@@ -192,6 +193,37 @@ class TestRunDataframeBenchmark:
         assert isinstance(result, BenchmarkResults)
         assert result.benchmark_name == "TPC-H"
         assert "Polars" in result.platform
+
+    def test_preserves_caller_supplied_typed_system_profile(self):
+        adapter = MagicMock()
+        adapter.platform_name = "Polars"
+        adapter.create_context.return_value = MagicMock()
+        adapter.get_standard_platform_info.return_value = PlatformInfoInput(name="Polars", execution_mode="dataframe")
+        profile = SystemProfile(
+            os_name="SnapshotOS",
+            os_version="9",
+            architecture="snapshot-arch",
+            cpu_model="Snapshot CPU",
+            cpu_identity_provenance="measured",
+            cpu_cores_physical=2,
+            cpu_cores_logical=4,
+            memory_total_gb=12.0,
+            memory_available_gb=8.0,
+            python_version="3.13.1",
+            disk_space_gb=50.0,
+            timestamp=datetime(2026, 8, 30),
+        )
+
+        result = run_dataframe_benchmark(
+            benchmark_config=BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01),
+            adapter=adapter,
+            system_profile=profile,
+            phases=DataFramePhases(load=False, execute=False),
+        )
+
+        assert result.system_profile["cpu_model"] == "Snapshot CPU"
+        assert result.execution_environment["client_host"]["os"] == "SnapshotOS 9"
+        assert result.execution_environment["client_host"]["cpu_count"] == 4
         # Verify DataFrame mode is indicated in platform_info
         assert result.platform_info.get("execution_mode") == "dataframe"
 

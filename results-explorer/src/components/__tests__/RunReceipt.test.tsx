@@ -28,6 +28,7 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
       arch: "arm64",
       cpu_family: "apple_silicon",
       cpu_model: "Apple M1 Max",
+      cpu_identity_provenance: "measured",
       cpu_count: 10,
       memory_gb: 64,
       python: "3.12.4",

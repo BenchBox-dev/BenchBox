@@ -132,6 +132,9 @@ export function RunReceipt({
         rowFromString("Arch", detail.environment.arch),
         rowFromString("CPU family", detail.environment.cpu_family),
         rowFromString("CPU model", detail.environment.cpu_model),
+        rowFromString("CPU evidence", detail.environment.cpu_identity_provenance, (value) =>
+          value === "user_attested" ? "User attested" : value === "measured" ? "Measured" : "Inferred",
+        ),
         rowFromString("CPU count", detail.environment.cpu_count),
         memoryRow(detail.environment.memory_gb),
         rowFromString("Python", detail.environment.python),

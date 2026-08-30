@@ -45,6 +45,7 @@ from benchbox.core.results import (
     normalize_query_result,
 )
 from benchbox.core.results.builder import RunConfigInput, normalize_benchmark_id
+from benchbox.core.results.environment import system_profile_snapshot
 from benchbox.core.results.models import (
     BenchmarkResults,
     TableLoadingStats,
@@ -162,13 +163,12 @@ def _client_host_profile(system_profile: Any) -> dict[str, Any]:
 
     Collected the same way the SQL path collects it, so both families produce
     the same client_host field set. A caller-supplied mapping is honoured as
-    is; a typed SystemProfile is deliberately NOT reshaped here, because its
-    field names (os_name / cpu_cores_logical / memory_total_gb) are not the
-    ones ClientHostEnvironment.from_system_profile reads -- passing it through
-    would reintroduce exactly the silent key mismatch this seam already had.
+    is. A typed SystemProfile is serialized from the supplied snapshot rather
+    than replaced with a fresh observation of the current host.
     """
-    if isinstance(system_profile, dict):
-        return dict(system_profile)
+    supplied = system_profile_snapshot(system_profile)
+    if supplied:
+        return supplied
     from benchbox.utils.system_info import get_system_info
 
     return get_system_info().to_dict()
