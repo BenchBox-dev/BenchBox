@@ -18,15 +18,90 @@ export interface QueryDiffRow {
   ratio: number | null;
   deltaMs: number | null;
   status: QueryDiffStatus;
+  /** Executions behind each side's value under the current basis. */
+  baselineSamples: number | null;
+  candidateSamples: number | null;
+  /**
+   * False when one side cannot answer the current basis.
+   *
+   * The row is still rendered. A query dropped for being unanswerable is a
+   * query the reader never learns was excluded, and the count they see stops
+   * matching the corpus.
+   */
+  comparable: boolean;
+}
+
+/**
+ * Which subset of the per-query rows to show.
+ *
+ * Applied to the chart and the table through this ONE function, so the two can
+ * never show different subsets of the same comparison.
+ */
+export type QueryDiffLimiter = "all" | "speedups" | "slowdowns" | "movement";
+
+export const QUERY_DIFF_LIMITER_LABELS: Record<QueryDiffLimiter, string> = {
+  all: "All queries",
+  speedups: "Largest speedups",
+  slowdowns: "Largest slowdowns",
+  movement: "Largest movement",
+};
+
+/**
+ * Rank and cap the rows for a limiter.
+ *
+ * Rows that cannot be compared under the current basis are never ranked into a
+ * "largest" view -- they have no magnitude to rank by -- but `all` keeps them,
+ * so they stay visible and marked rather than disappearing.
+ */
+export function applyQueryDiffLimiter(
+  rows: readonly QueryDiffRow[],
+  limiter: QueryDiffLimiter,
+  topN: number,
+): QueryDiffRow[] {
+  if (limiter === "all") return [...rows];
+  const ranked = rows.filter((row) => row.comparable && row.deltaMs !== null);
+  const sorted = (() => {
+    switch (limiter) {
+      case "speedups":
+        return ranked.filter((r) => (r.deltaMs ?? 0) < 0).sort((a, b) => (a.deltaMs ?? 0) - (b.deltaMs ?? 0));
+      case "slowdowns":
+        return ranked.filter((r) => (r.deltaMs ?? 0) > 0).sort((a, b) => (b.deltaMs ?? 0) - (a.deltaMs ?? 0));
+      case "movement":
+        return [...ranked].sort((a, b) => Math.abs(b.deltaMs ?? 0) - Math.abs(a.deltaMs ?? 0));
+    }
+  })();
+  return sorted.slice(0, Math.max(0, topN));
+}
+
+/**
+ * The sentence every limiter state must carry, including the empty one.
+ *
+ * "No queries match" without a denominator leaves a reader unable to tell an
+ * empty filter from an empty comparison.
+ */
+export function queryDiffCountSentence(shown: number, total: number, limiter: QueryDiffLimiter): string {
+  if (total === 0) return "No queries to compare.";
+  if (shown === 0) {
+    return `No queries match ${QUERY_DIFF_LIMITER_LABELS[limiter].toLowerCase()} — showing 0 of ${total}.`;
+  }
+  return `Showing ${shown} of ${total} ${total === 1 ? "query" : "queries"}.`;
 }
 
 interface QueryDiffTableProps {
   results: DetailResult[];
   baselineIndex?: number;
   suppressionReason?: string | null;
+  limiter?: QueryDiffLimiter;
+  topN?: number;
 }
 
-export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason = null }: QueryDiffTableProps) {
+export function QueryDiffTable({
+  results,
+  baselineIndex = 0,
+  suppressionReason = null,
+  limiter = "all",
+  topN = 20,
+}: QueryDiffTableProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   if (results.length < 2) return null;
   const normalizedBaselineIndex = normalizeBaselineIndex(results, baselineIndex);
@@ -43,7 +118,9 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
     })),
     "table",
   );
-  const rows = buildQueryDiffRows(results, normalizedBaselineIndex, runLabels);
+  const allRows = buildQueryDiffRows(results, normalizedBaselineIndex, runLabels);
+  const rows = applyQueryDiffLimiter(allRows, limiter, topN);
+  const uncomparableShown = rows.filter((row) => !row.comparable).length;
 
   return (
     <section class="card mb-8" aria-labelledby="query-diff-title">
@@ -57,13 +134,23 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
             candidate is faster than baseline.
           </p>
         </div>
-        <StatusBadge role="comparison" tone="neutral">{rows.length} comparisons</StatusBadge>
+        <StatusBadge role="comparison" tone="neutral" title={queryDiffCountSentence(rows.length, allRows.length, limiter)}>
+          {queryDiffCountSentence(rows.length, allRows.length, limiter)}
+        </StatusBadge>
       </div>
 
       {suppressionReason && (
         <div class="mb-4 rounded-md tone-warning border border-[var(--bb-data-border)] px-3 py-2 text-xs">
           Winner claims are suppressed because {suppressionReason}; use these query values as raw evidence only.
         </div>
+      )}
+
+      {uncomparableShown > 0 && (
+        <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]" data-testid="uncomparable-note">
+          {uncomparableShown === 1
+            ? "1 query is marked not comparable: one run cannot answer it under the current basis. It is shown rather than dropped, and is excluded from every geomean."
+            : `${uncomparableShown} queries are marked not comparable: one run cannot answer them under the current basis. They are shown rather than dropped, and are excluded from every geomean.`}
+        </p>
       )}
 
       <TableScrollHint scrollerRef={scrollerRef} testId="query-diff-scroll-hint" />
@@ -75,6 +162,7 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
               <th class="table-th">Candidate</th>
               <th class="table-th">Baseline latency</th>
               <th class="table-th">Candidate latency</th>
+              <th class="table-th">Passes</th>
               <th class="table-th">Ratio</th>
               <th class="table-th">Delta</th>
               <th class="table-th">Status</th>
@@ -87,10 +175,17 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
                 <td class="table-td">{row.candidatePlatform}</td>
                 <td class="table-td font-mono">{formatMsCell(row.baselineMs)}</td>
                 <td class="table-td font-mono">{formatMsCell(row.candidateMs)}</td>
+                <td class="table-td font-mono text-xs">{formatPasses(row)}</td>
                 <td class="table-td font-mono">{row.ratio !== null ? formatSpeedup(row.ratio).valueText : "-"}</td>
                 <td class="table-td font-mono">{formatDelta(row.deltaMs)}</td>
                 <td class="table-td">
-                  <StatusBadge role="comparison" tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge>
+                  {row.comparable ? (
+                    <StatusBadge role="comparison" tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge>
+                  ) : (
+                    <StatusBadge role="comparison" tone="danger" title="One run cannot answer this query under the current basis">
+                      Not comparable
+                    </StatusBadge>
+                  )}
                 </td>
               </tr>
             ))}
@@ -130,6 +225,9 @@ export function buildQueryDiffRows(
         ratio: isValidTimingValue(baselineMs) && isValidTimingValue(candidateMs) ? candidateMs / baselineMs : null,
         deltaMs,
         status: diffStatus(deltaMs),
+        baselineSamples: sampleCountForQuery(baseline, queryId),
+        candidateSamples: sampleCountForQuery(candidate, queryId),
+        comparable: baselineMs !== null && candidateMs !== null,
       };
     });
   });
@@ -143,6 +241,11 @@ function displayMsForQuery(result: DetailResult, queryId: string): number | null
   return timingValueForQuery(result, queryId);
 }
 
+function sampleCountForQuery(result: DetailResult, queryId: string): number | null {
+  const timing = result.display_timings.find((t) => t.query_id === queryId);
+  return timing ? timing.sample_count : null;
+}
+
 function diffStatus(deltaMs: number | null): QueryDiffStatus {
   if (deltaMs === null) return "missing";
   if (Math.abs(deltaMs) < 1e-9) return "tie";
@@ -151,6 +254,13 @@ function diffStatus(deltaMs: number | null): QueryDiffStatus {
 
 function formatMsCell(ms: number | null) {
   return ms !== null ? fmtMs(ms) : <span class="text-[var(--bb-data-fg-subtle)]">-</span>;
+}
+
+function formatPasses(row: QueryDiffRow) {
+  const base = row.baselineSamples;
+  const cand = row.candidateSamples;
+  if (base === null && cand === null) return "-";
+  return `${base ?? "-"} / ${cand ?? "-"}`;
 }
 
 function formatDelta(deltaMs: number | null) {

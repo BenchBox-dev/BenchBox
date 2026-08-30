@@ -41,12 +41,29 @@ import {
   comparabilityWarningFields,
 } from "@/components/ComparabilityReceipt";
 import { CompareSummary } from "@/components/CompareSummary";
-import { QueryDiffTable } from "@/components/QueryDiffTable";
+import {
+  QueryDiffTable,
+  QUERY_DIFF_LIMITER_LABELS,
+  type QueryDiffLimiter,
+} from "@/components/QueryDiffTable";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { vsSlowestRatio } from "@/lib/chartMath";
-import { buildCompareDecisionSummary } from "@/lib/compareSummary";
+import { buildCompareDecisionSummary, COMPARE_TIE_THRESHOLD } from "@/lib/compareSummary";
+import { IdentityDiffStrip } from "@/components/IdentityDiffStrip";
+import { MeasurementBasisBar } from "@/components/MeasurementBasisBar";
+import { useUrlState } from "@/lib/useUrlState";
+import { getResultBasisAvailability } from "@/lib/duckdbQueries";
+import {
+  BASIS_URL_KEY,
+  DEFAULT_BASIS,
+  basisSerde,
+  isCollapsedStatistic,
+  parseAvailablePassSelections,
+  passSelectionsEqual,
+  type PassSelection,
+} from "@/lib/measurementBasis";
 import { formatDurationSeconds, formatPowerScore, formatSpeedup } from "@/lib/metricFormatters";
-import { isValidTimingValue } from "@/lib/displayEligibility";
+import { isValidTimingValue, timingValueForQuery } from "@/lib/displayEligibility";
 import {
   describeCompareExclusionReason,
   summarizeCompareExclusionReasons,
@@ -101,6 +118,57 @@ function appendCompareNotice(current: string | null, next: string): string {
   return current ? `${current} ${next}` : next;
 }
 
+/**
+ * Which layout a compare selection renders.
+ *
+ * Selection COUNT picks the layout, so nobody has to choose a page before
+ * choosing runs, and the existing `?ids=` grammar keeps working untouched.
+ *
+ * Deliberately keyed on DISTINCT runs, not on the raw id list. Two ids that
+ * alias to one result are one run and belong on the within-run route, not in a
+ * head-to-head that would compare a run against itself.
+ */
+export type CompareLayout =
+  | { readonly kind: "empty" }
+  | { readonly kind: "within_run"; readonly resultId: string }
+  | { readonly kind: "head_to_head"; readonly runIds: readonly [string, string] }
+  | { readonly kind: "multi_run"; readonly runIds: readonly string[] };
+
+/**
+ * Choose the layout for a recovered selection.
+ *
+ * MUST be called on the RECOVERED set, never on the raw `?ids=` list: recovery
+ * resolves aliases, drops duplicates and unavailable ids, and caps the
+ * selection at MAX_COMPARE_SELECTIONS. Routing on the raw list would pick a
+ * layout from a count the page never actually renders -- a five-id URL would
+ * choose multi-run and then render four runs.
+ */
+/**
+ * True when a ratio is close enough to 1.0 that calling it a win would be
+ * reading noise as a result.
+ *
+ * Reuses the decision summary's threshold rather than declaring a second one.
+ * Two thresholds would eventually disagree, and a page that headlines a win
+ * while its own summary calls the same pair a tie is worse than either
+ * behaviour on its own.
+ */
+export function isWithinTieBand(ratio: number | null): boolean {
+  if (ratio === null || !Number.isFinite(ratio)) return false;
+  return Math.abs(ratio - 1) < COMPARE_TIE_THRESHOLD;
+}
+
+export function compareLayoutForSelection(resultIds: readonly string[]): CompareLayout {
+  const distinct: string[] = [];
+  for (const id of resultIds) {
+    if (id && !distinct.includes(id)) distinct.push(id);
+  }
+  const [first, second] = distinct;
+  if (first === undefined) return { kind: "empty" };
+  if (second === undefined) return { kind: "within_run", resultId: first };
+  if (distinct.length === 2) return { kind: "head_to_head", runIds: [first, second] };
+  return { kind: "multi_run", runIds: distinct };
+}
+
 export function Compare({ url }: CompareProps) {
   const activeUrl = currentCompareUrl(url);
   const [compareState, setCompareState] = useState<CompareState | null>(null);
@@ -108,6 +176,15 @@ export function Compare({ url }: CompareProps) {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [baselineIndex, setBaselineIndex] = useState(0);
+  // Through the model's serde, not a hand-rolled parser: the grammar is the
+  // model's to define, and a shared link has to reproduce the sender's figures
+  // exactly. One `basis` parameter, because a cross-run comparison carries
+  // exactly one basis -- the URL grammar mirrors the type grammar.
+  const [basis, setBasis] = useUrlState(BASIS_URL_KEY, DEFAULT_BASIS, basisSerde);
+  // ONE limiter drives the chart and the table. Two independent controls would
+  // let the page show a chart of one subset above a table of another, which
+  // reads as a data error rather than as two filters.
+  const [queryLimiter, setQueryLimiter] = useState<QueryDiffLimiter>("all");
   // Builder mode: rendered when 0 ids are supplied, or when 1 id is supplied
   // (single-result entry from ResultDetail "Compare this result" button).
   // Was previously an error string ("No result IDs provided. Add ?ids=...")
@@ -119,6 +196,50 @@ export function Compare({ url }: CompareProps) {
   const [preserveRequestedIds, setPreserveRequestedIds] = useState(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const results = compareState?.results ?? EMPTY_RESULTS;
+  const [availabilityRows, setAvailabilityRows] = useState<Record<string, string>>({});
+
+  // Read the pipeline's precomputed availability rather than deriving it from
+  // raw executions: the read model already holds the answer, and pulling every
+  // execution row for a 103-query run to re-derive it would be a large
+  // download to reach a value we already have.
+  useEffect(() => {
+    let cancelled = false;
+    const ids = results.map((r) => r.result_id);
+    if (ids.length === 0) return;
+    void Promise.all(ids.map((id) => getResultBasisAvailability(id).catch(() => null))).then((rows) => {
+      if (cancelled) return;
+      const next: Record<string, string> = {};
+      rows.forEach((row, i) => {
+        const id = ids[i];
+        if (row && id) next[id] = row.available_bases;
+      });
+      setAvailabilityRows(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [results]);
+
+  /**
+   * Pass selections EVERY selected run can serve.
+   *
+   * Intersected, not unioned. Offering a pass one run cannot answer would put
+   * a control on the page that empties half the comparison the moment it is
+   * used. A run whose availability is unknown (an older snapshot, or a failed
+   * read) does not narrow the set -- value resolution reports unavailability
+   * per query, where it can name the reason.
+   */
+  const availablePasses = useMemo<PassSelection[]>(() => {
+    const perRun = results
+      .map((r) => availabilityRows[r.result_id])
+      .filter((raw): raw is string => typeof raw === "string" && raw.length > 0)
+      .map((raw) => parseAvailablePassSelections(raw));
+    if (perRun.length === 0) return [DEFAULT_BASIS.passes];
+    const [first, ...rest] = perRun;
+    return (first ?? []).filter((candidate) =>
+      rest.every((other) => other.some((p) => passSelectionsEqual(p, candidate))),
+    );
+  }, [results, availabilityRows]);
   const primaryMetric = compareState?.primaryMetric ?? "display_geomean_ms";
   const normalizedBaselineIndex = results[baselineIndex] ? baselineIndex : 0;
   useDocumentTitle(
@@ -356,6 +477,30 @@ export function Compare({ url }: CompareProps) {
     : `SF ${scaleFactor}`;
   const rowCount = results.length;
 
+  /**
+   * How many queries every selected run can answer, and how many exist at all.
+   *
+   * Computed, not approximated. An earlier draft of the basis bar passed the
+   * RUN count for both numbers, so a two-run comparison announced "over 2 of 2
+   * queries" -- a sentence that looks precise and describes nothing. A stated
+   * denominator has to be the real one or it is worse than no denominator.
+   *
+   * Intersection, matching the model's same-query-set rule: a query any run
+   * cannot answer leaves every run's geomean, so it is not part of the set the
+   * figures are computed over.
+   */
+  const queryCoverage = useMemo(() => {
+    const allQueryIds = new Set<string>();
+    for (const result of results) {
+      for (const timing of result.display_timings) allQueryIds.add(timing.query_id);
+    }
+    let shared = 0;
+    for (const queryId of allQueryIds) {
+      if (results.every((result) => timingValueForQuery(result, queryId) !== null)) shared += 1;
+    }
+    return { shared, total: allQueryIds.size };
+  }, [results]);
+
   // Primary metric is loaded async from DuckDB in the effect above; default
   // stays `display_geomean_ms` until the query resolves (matches Python's
   // `_DEFAULT_RANKING`).
@@ -499,6 +644,18 @@ export function Compare({ url }: CompareProps) {
         suppressionReason={decisionSummary.claimSuppressionReason}
       />
       <CompareSummary summary={decisionSummary} />
+      <IdentityDiffStrip results={results} />
+      {results.length > 1 && (
+        <MeasurementBasisBar
+          basis={basis}
+          onBasisChange={setBasis}
+          availablePasses={availablePasses}
+          comparableQueryCount={queryCoverage.shared}
+          totalQueryCount={queryCoverage.total}
+          runCount={results.length}
+          statisticCollapsed={isCollapsedStatistic(basis)}
+        />
+      )}
       {results.length > 1 && (
         <div class="panel mb-4 flex flex-wrap items-center justify-between gap-3 px-3 py-2 shadow-sm">
           <div>
@@ -599,7 +756,19 @@ export function Compare({ url }: CompareProps) {
                 {showPrimaryClaims && speedup !== null && (
                   <div class="flex justify-between">
                     <dt class="text-[var(--bb-data-fg-muted)]">{vsLabel}</dt>
-                    <dd class="font-mono">{formatSpeedup(speedup).valueText}</dd>
+                    {/*
+                      Inside the tie band a ratio is not a win in EITHER
+                      direction. Rendering the number alone would let a 1.002x
+                      read as an advantage once it is rounded to "1.00x" and
+                      sat under a "vs slowest" label.
+                    */}
+                    {isWithinTieBand(speedup) ? (
+                      <dd class="text-[var(--bb-data-fg-muted)]" data-testid="headline-tie">
+                        Tied
+                      </dd>
+                    ) : (
+                      <dd class="font-mono">{formatSpeedup(speedup).valueText}</dd>
+                    )}
                   </div>
                 )}
                 {r.executionMode && (
@@ -631,7 +800,30 @@ export function Compare({ url }: CompareProps) {
         comparable than wall-clock total when query counts differ. Lower is faster.
       </p>
 
+      <div class="panel mb-4 flex flex-wrap items-center justify-between gap-3 px-3 py-2 shadow-sm">
+        <div>
+          <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="query-limiter">
+            Queries shown
+          </label>
+          <p class="text-xs text-[var(--bb-data-fg-muted)]">
+            Applies to the chart and the table together.
+          </p>
+        </div>
+        <Select
+          id="query-limiter"
+          ariaLabel="Queries shown"
+          size="sm"
+          value={queryLimiter}
+          onChange={(value) => setQueryLimiter(value as QueryDiffLimiter)}
+          options={(Object.keys(QUERY_DIFF_LIMITER_LABELS) as QueryDiffLimiter[]).map((key) => ({
+            value: key,
+            label: QUERY_DIFF_LIMITER_LABELS[key],
+          }))}
+        />
+      </div>
+
       <QueryDiffTable
+        limiter={queryLimiter}
         results={results}
         baselineIndex={normalizedBaselineIndex}
         suppressionReason={decisionSummary.claimSuppressionReason}
