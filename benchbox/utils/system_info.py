@@ -29,7 +29,7 @@ class SystemInfo:
     # existing positional construction of SystemInfo keeps working, and a
     # producer that cannot determine the vendor simply omits it.
     cpu_vendor: str | None = None
-    cpu_identity_provenance: str | None = "measured"
+    cpu_identity_provenance: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for compatibility."""

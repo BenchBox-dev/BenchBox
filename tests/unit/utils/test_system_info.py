@@ -71,7 +71,7 @@ class TestSystemInfo:
             "architecture": "arm64",
             "cpu_model": "Apple M1",
             "cpu_vendor": None,
-            "cpu_identity_provenance": "measured",
+            "cpu_identity_provenance": None,
             "cpu_cores": 8,
             "total_memory_gb": 16.0,
             "available_memory_gb": 14.2,
