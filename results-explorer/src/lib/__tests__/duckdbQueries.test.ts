@@ -174,6 +174,7 @@ describe("duckdbQueries - SQL targets and parameters", () => {
         python: null,
         cpu_model: null,
         cpu_family: null,
+        cpu_identity_provenance: null,
         physical_mechanisms: null,
         ...overrides,
       };
@@ -199,10 +200,12 @@ describe("duckdbQueries - SQL targets and parameters", () => {
           result_id: "with-cpu",
           cpu_model: "Apple M1 Max",
           cpu_family: "apple_silicon",
+          cpu_identity_provenance: "measured",
         }),
       );
       expect(detail?.environment.cpu_model).toBe("Apple M1 Max");
       expect(detail?.environment.cpu_family).toBe("apple_silicon");
+      expect(detail?.environment.cpu_identity_provenance).toBe("measured");
     });
 
     it("omits CPU identity when the snapshot recorded none", async () => {
@@ -220,6 +223,7 @@ describe("duckdbQueries - SQL targets and parameters", () => {
       expect(detailSql).toContain("result_detail_metrics");
       expect(detailSql).toContain("cpu_model");
       expect(detailSql).toContain("cpu_family");
+      expect(detailSql).toContain("cpu_identity_provenance");
     });
 
     it("a legacy row (no logical_profile recorded -> NULL) yields undefined, not []", async () => {

@@ -17,10 +17,7 @@ evidence: every bundle carrying a client host records ``Darwin``/``arm64`` and
 the raw archive shows a single ``machine_id``.
 
 The attestation is recorded in the emitted manifest and in
-``results-data/CORPUS_NOTES.md``. It is deliberately NOT written as an in-band
-per-bundle provenance flag: that would require a bundle-schema field, a read
-model version bump and a public-contract change, for a one-time historical
-backfill. A reader distinguishing attested from measured consults the manifest.
+``results-data/CORPUS_NOTES.md`` and as typed in-band CPU identity provenance.
 
 Default mode is a dry run. ``--write`` rewrites bundles, companions and
 manifests atomically and emits the migration manifest.
@@ -58,7 +55,7 @@ from benchbox.core.results.canonical_json import canonical_json_bytes
 from benchbox.validation.bundle import discover_bundles
 
 BUNDLES_DIR = Path("results-data/bundles")
-DEFAULT_MANIFEST = BUNDLES_DIR / "cpu-identity-attestation.manifest.json"
+DEFAULT_MANIFEST = BUNDLES_DIR / "cpu-identity-provenance-v2.manifest.json"
 
 ATTESTED_CPU_MODEL = "Apple M4"
 ATTESTED_CPU_VENDOR = "Apple"
@@ -98,10 +95,12 @@ def _inject_cpu(data: dict[str, Any]) -> dict[str, Any]:
         client_host = {}
     client_host["cpu_model"] = ATTESTED_CPU_MODEL
     client_host["cpu_vendor"] = ATTESTED_CPU_VENDOR
+    client_host["cpu_identity_provenance"] = "user_attested"
     env["client_host"] = dict(sorted(client_host.items()))
 
     env["cpu_model"] = ATTESTED_CPU_MODEL
     env["cpu_vendor"] = ATTESTED_CPU_VENDOR
+    env["cpu_identity_provenance"] = "user_attested"
     out["environment"] = dict(sorted(env.items()))
     return out
 
@@ -177,6 +176,7 @@ def backfill(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str
         "totals": {
             "bundles": len(entries),
             "changed": sum(1 for e in entries if e["changed"]),
+            "manifest_changes": sum(1 for e in entries if e["manifest_change"] is not None),
             "result_ids_changed": sum(1 for e in entries if e["old_result_id"] != e["new_result_id"]),
             "had_client_host": sum(1 for e in entries if e["had_client_host"]),
             "lacked_client_host": sum(1 for e in entries if not e["had_client_host"]),
@@ -196,14 +196,13 @@ def backfill(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str
             # refuse outright if it did change something, because that means
             # the corpus moved and the standing manifest no longer describes
             # it. Mirrors the refusal in results_explorer_corpus_migrate.py.
-            if summary["totals"]["changed"]:
+            if pending_writes:
                 raise FileExistsError(
-                    f"refusing to overwrite an existing attestation manifest while rewriting "
-                    f"{summary['totals']['changed']} bundle(s): {manifest_path}. "
+                    "refusing to mutate managed corpus artifacts while preserving an existing "
+                    f"attestation manifest: bundles={summary['totals']['changed']}, "
+                    f"manifests={summary['totals']['manifest_changes']}: {manifest_path}. "
                     "Move the existing manifest aside deliberately if a re-attestation is intended."
                 )
-            for path, payload in pending_writes:
-                _atomic_write(path, payload)
             return summary
 
         for path, payload in pending_writes:

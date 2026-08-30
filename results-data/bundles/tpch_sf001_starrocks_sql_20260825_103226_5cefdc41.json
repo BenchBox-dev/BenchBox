@@ -47,6 +47,7 @@
     "arch": "arm64",
     "client_host": {
       "arch": "arm64",
+      "cpu_identity_provenance": "user_attested",
       "cpu_model": "Apple M4",
       "cpu_vendor": "Apple",
       "os": "Darwin",
@@ -62,6 +63,7 @@
       "collection_status": "unavailable",
       "source": "unavailable"
     },
+    "cpu_identity_provenance": "user_attested",
     "cpu_model": "Apple M4",
     "cpu_vendor": "Apple",
     "os": "Darwin",

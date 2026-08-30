@@ -443,7 +443,7 @@ class ResultBuilder:
         entry.update(extra)
         self._phase_status[phase] = entry
 
-    def set_system_profile(self, profile: dict[str, Any]) -> None:
+    def set_system_profile(self, profile: Any) -> None:
         """Set system profile information."""
         self._system_profile = profile
 

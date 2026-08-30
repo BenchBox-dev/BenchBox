@@ -163,10 +163,10 @@ policy was not expanded beyond empty optional map omission.
 
 ## CPU identity backfill (2026-08-29) — OPERATOR ATTESTATION, NOT MEASURED
 
-Every bundle in this corpus now carries `cpu_model: "Apple M4"` and
-`cpu_vendor: "Apple"`, which the Explorer read model normalizes to the family
-`apple_silicon`. **These values were not measured. They are an operator
-attestation.**
+Every bundle in this corpus now carries `cpu_model: "Apple M4"`,
+`cpu_vendor: "Apple"`, and `cpu_identity_provenance: "user_attested"`, which
+the Explorer read model normalizes to the family `apple_silicon`. **These values
+were not measured. They are an operator attestation.**
 
 ### Why no measured value exists
 
@@ -203,7 +203,7 @@ rests on the attestation alone.
 
 ### What was and was not written
 
-Only `cpu_model` and `cpu_vendor` were written. For the 43 DataFrame bundles
+Only the CPU identity and its typed provenance were written. For the 43 DataFrame bundles
 that had no client host, `os`, `arch` and `python` were **not** synthesized:
 the attestation covers which machine ran the corpus, not a given run's OS
 release or interpreter version. That gap closes forward, not retroactively.
@@ -213,8 +213,11 @@ release or interpreter version. That gap closes forward, not retroactively.
 `result_id` embeds a SHA-256 prefix of the raw bundle bytes, so all 151 were
 renumbered. Precedent: `path-privacy-migration` and `unread-identifier-field-drop`
 each renumbered all 207 entries of the corpus of their day. Every old → new
-mapping is recorded in `results-data/bundles/cpu-identity-attestation.manifest.json`,
-which is also where a reader distinguishes attested values from measured ones.
+mapping is recorded in `results-data/bundles/cpu-identity-attestation.manifest.json`.
+The later in-band provenance migration and its second result-ID mapping are
+recorded in `results-data/bundles/cpu-identity-provenance-v2.manifest.json`.
+Readers distinguish attested values from measured ones through the typed
+`cpu_identity_provenance` field rather than by guessing from historical context.
 
 Reproduce with:
 

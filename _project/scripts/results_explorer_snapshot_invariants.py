@@ -69,6 +69,7 @@ REQUIRED_COLUMNS: dict[str, set[str]] = {
         "python",
         "cpu_model",
         "cpu_family",
+        "cpu_identity_provenance",
     },
 }
 

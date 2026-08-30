@@ -35,9 +35,11 @@ class SystemProfiler:
         if HAS_PSUTIL:
             cpu_cores_physical = psutil.cpu_count(logical=False) or cpu_cores_logical
             cpu_model = self._get_cpu_model()
+            cpu_identity_provenance = "inferred" if cpu_model in {"Unknown CPU", f"{architecture} CPU"} else "measured"
         else:
             cpu_cores_physical = cpu_cores_logical
             cpu_model = f"{architecture} CPU"
+            cpu_identity_provenance = "inferred"
 
         # Memory info
         if HAS_PSUTIL:
@@ -60,6 +62,7 @@ class SystemProfiler:
             os_version=os_version,
             architecture=architecture,
             cpu_model=cpu_model,
+            cpu_identity_provenance=cpu_identity_provenance,
             cpu_cores_physical=cpu_cores_physical,
             cpu_cores_logical=cpu_cores_logical,
             memory_total_gb=memory_total_gb,

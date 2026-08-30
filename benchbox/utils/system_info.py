@@ -29,6 +29,7 @@ class SystemInfo:
     # existing positional construction of SystemInfo keeps working, and a
     # producer that cannot determine the vendor simply omits it.
     cpu_vendor: str | None = None
+    cpu_identity_provenance: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for compatibility."""
@@ -38,6 +39,7 @@ class SystemInfo:
             "architecture": self.architecture,
             "cpu_model": self.cpu_model,
             "cpu_vendor": self.cpu_vendor,
+            "cpu_identity_provenance": self.cpu_identity_provenance,
             "cpu_cores": self.cpu_cores,
             # `cpu_count` and `memory_gb` are the spellings
             # ClientHostEnvironment.from_system_profile reads. They are emitted
@@ -136,6 +138,7 @@ def get_system_info() -> SystemInfo:
     # brand string (sysctl on Darwin, /proc/cpuinfo on Linux, wmic on Windows)
     # and degrades to None rather than to a placeholder.
     cpu_vendor: str | None = None
+    cpu_identity_provenance = "measured"
     try:
         from benchbox.utils.environment import detect_cpu_info
 
@@ -144,6 +147,7 @@ def get_system_info() -> SystemInfo:
         cpu_model = None
 
     if not cpu_model:
+        cpu_identity_provenance = "inferred"
         # Legacy fallback chain, kept for platforms detect_cpu_info() cannot
         # answer. platform.processor() is still consulted last rather than not
         # at all: on several Linux distributions it does return a real model.
@@ -163,6 +167,7 @@ def get_system_info() -> SystemInfo:
         architecture=platform.machine(),
         cpu_model=cpu_model,
         cpu_vendor=cpu_vendor,
+        cpu_identity_provenance=cpu_identity_provenance,
         cpu_cores=psutil.cpu_count(),
         total_memory_gb=total_memory_gb,
         available_memory_gb=available_memory_gb,

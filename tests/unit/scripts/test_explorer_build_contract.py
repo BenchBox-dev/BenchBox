@@ -33,7 +33,7 @@ def test_explorer_build_contract_matches_duckdb_only_output_contract() -> None:
     # Independent migration pin: a version bump must update this reviewed
     # expectation and the compatibility matrix deliberately, not just copy a
     # changed production constant into another consumer.
-    current_read_model_version = 8
+    current_read_model_version = 9
 
     assert EXPLORER_BUILD_CONTRACT["version"] == "6"
     assert EXPLORER_BUILD_CONTRACT["read_model_version"] == current_read_model_version
