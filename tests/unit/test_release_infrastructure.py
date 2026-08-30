@@ -1425,6 +1425,24 @@ class TestBetaReleaseSurface:
             "If the extra was renamed or removed, update this test and all install docs."
         )
 
+    def test_duckdb_runtime_floor_supports_constrained_sorted_ingestion(self):
+        """Package and platform metadata must reject DuckDB's stale-index releases."""
+        pyproject_path = self.REPO_ROOT / "pyproject.toml"
+        with open(pyproject_path, "rb") as f:
+            config = tomllib.load(f)
+
+        optional_deps = config["project"]["optional-dependencies"]
+        dependency_groups = config["dependency-groups"]
+        expected = "duckdb>=1.3.0,<2.0.0"
+        assert optional_deps["duckdb"] == [expected]
+        assert expected in optional_deps["dev"]
+        assert expected in optional_deps["mcp"]
+        assert expected in dependency_groups["dev"]
+
+        from benchbox.core.platform_manifest import get_platform_manifest_entry
+
+        assert get_platform_manifest_entry("duckdb").metadata["requirements"] == (expected,)
+
     def test_experimental_not_in_benchbox_all(self):
         """benchbox.experimental must not be re-exported via benchbox.__all__."""
         import benchbox
