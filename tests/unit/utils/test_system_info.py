@@ -169,7 +169,12 @@ class TestGetSystemInfo:
         mock_python_version.return_value = "3.11.0"
         mock_node.return_value = "test-machine"
 
-        result = get_system_info()
+        # detect_cpu_info() is tried first now, and it reads real hardware --
+        # on a Linux CI runner it returns the runner's actual CPU and shadows
+        # the mocked processor string. Silence it so this test still exercises
+        # the legacy platform.processor() path it was written for.
+        with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
+            result = get_system_info()
 
         assert isinstance(result, SystemInfo)
         assert result.os_name == "Linux"
@@ -312,7 +317,11 @@ class TestGetSystemInfo:
         mock_python_version.return_value = "3.9.0"
         mock_node.return_value = "old-system"
 
-        result = get_system_info()
+        # Silence the detector AND /proc/cpuinfo: both are real on a Linux
+        # runner and would answer before the placeholder branch is reached.
+        with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
+            with patch("builtins.open", side_effect=FileNotFoundError()):
+                result = get_system_info()
 
         # Should fallback to machine + " CPU" on exception
         assert result.cpu_model == "i686 CPU"
@@ -683,9 +692,13 @@ class TestCpuIdentityCapture:
         assert info.cpu_model != platform.processor() or info.cpu_model != platform.machine()
 
     def test_falls_back_to_a_labelled_placeholder_when_detection_fails(self) -> None:
+        # /proc/cpuinfo must be mocked away too: it exists on Linux runners and
+        # answers before the placeholder branch, which made the first version
+        # of this test pass on macOS and fail in CI.
         with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
-            with patch("platform.processor", return_value=""):
-                info = get_system_info()
+            with patch("benchbox.utils.system_info.platform.processor", return_value=""):
+                with patch("builtins.open", side_effect=FileNotFoundError()):
+                    info = get_system_info()
         # A placeholder must be recognisable as one, not a bare arch string.
         assert info.cpu_model.endswith("CPU")
 
@@ -693,8 +706,9 @@ class TestCpuIdentityCapture:
         import platform
 
         with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
-            with patch("platform.processor", return_value=platform.machine()):
-                info = get_system_info()
+            with patch("benchbox.utils.system_info.platform.processor", return_value=platform.machine()):
+                with patch("builtins.open", side_effect=FileNotFoundError()):
+                    info = get_system_info()
         assert info.cpu_model != platform.machine()
 
     def test_to_dict_emits_the_keys_the_environment_consumer_reads(self) -> None:
