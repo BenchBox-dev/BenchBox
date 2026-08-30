@@ -166,9 +166,8 @@ def _client_host_profile(system_profile: Any) -> dict[str, Any]:
     is. A typed SystemProfile is serialized from the supplied snapshot rather
     than replaced with a fresh observation of the current host.
     """
-    supplied = system_profile_snapshot(system_profile)
-    if supplied:
-        return supplied
+    if system_profile is not None:
+        return system_profile_snapshot(system_profile)
     from benchbox.utils.system_info import get_system_info
 
     return get_system_info().to_dict()

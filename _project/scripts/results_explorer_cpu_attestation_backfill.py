@@ -55,7 +55,7 @@ from benchbox.core.results.canonical_json import canonical_json_bytes
 from benchbox.validation.bundle import discover_bundles
 
 BUNDLES_DIR = Path("results-data/bundles")
-DEFAULT_MANIFEST = BUNDLES_DIR / "cpu-identity-attestation.manifest.json"
+DEFAULT_MANIFEST = BUNDLES_DIR / "cpu-identity-provenance-v2.manifest.json"
 
 ATTESTED_CPU_MODEL = "Apple M4"
 ATTESTED_CPU_VENDOR = "Apple"

@@ -58,6 +58,14 @@ def test_a_caller_supplied_mapping_is_honoured_verbatim() -> None:
     assert _client_host_profile(supplied) == supplied
 
 
+def test_an_explicitly_empty_profile_is_preserved_without_recollection(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_recollection() -> None:
+        raise AssertionError("an explicitly supplied unknown profile must not recollect the current host")
+
+    monkeypatch.setattr("benchbox.utils.system_info.get_system_info", fail_recollection)
+    assert _client_host_profile({}) == {}
+
+
 def test_a_typed_profile_snapshot_is_preserved_and_mapped() -> None:
     supplied = SystemProfile(
         os_name="SnapshotOS",
