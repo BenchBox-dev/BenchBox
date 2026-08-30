@@ -825,5 +825,16 @@ describe("ChartPanel", () => {
     );
 
     expect(screen.queryByText(/5,000/)).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Power" })).toBeNull();
+  });
+
+  it("hides whole-run normalized cost charts under an active queryFilter", () => {
+    render(
+      <ChartPanel
+        context={{ kind: "summary", summary: makeSummary() }}
+        queryFilter={["Q1"]}
+      />,
+    );
+    expect(screen.queryByRole("tab", { name: "Cost" })).toBeNull();
   });
 });

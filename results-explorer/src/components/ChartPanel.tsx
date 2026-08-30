@@ -90,10 +90,14 @@ export function ChartPanel({
 }: ChartPanelProps) {
   const charts = useMemo(() => {
     const applicable = applicableCharts(context);
-    if (!excludeChartIds || excludeChartIds.length === 0) return applicable;
-    const exclude = new Set(excludeChartIds);
+    const exclude = new Set(excludeChartIds ?? []);
+    if (queryFilter) {
+      exclude.add("cost_scatter");
+      exclude.add("power_bar");
+    }
+    if (exclude.size === 0) return applicable;
     return applicable.filter((entry) => !exclude.has(entry.id));
-  }, [context, excludeChartIds]);
+  }, [context, excludeChartIds, queryFilter]);
   const chartGroups = useMemo(() => groupChartsByQuestion(charts), [charts]);
   const summary = useMemo(() => buildRenderableSummary(context), [context]);
   const historical = useMemo(
@@ -176,7 +180,9 @@ export function ChartPanel({
         timings: filteredTimings,
         display_geomean_ms: geomean,
         sample_geomean_ms: geomean,
-        power_score: queryFilter ? null : platform.power_score,
+        power_score: null,
+        normalized_cost_usd: null,
+        cost_status: "unavailable" as const,
       };
     });
     const ranking: RankingConfig | null =

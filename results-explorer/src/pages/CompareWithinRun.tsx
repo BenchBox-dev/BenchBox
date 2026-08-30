@@ -12,6 +12,7 @@ import { summarizeQueryPasses } from "@/components/PassStrip";
 import { clampReferenceIndex, withinRunCompareHref, MAX_WITHIN_RUN_BASES, MIN_WITHIN_RUN_BASES } from "@/lib/resultLinks";
 import { paletteColor } from "@/lib/chartTheme";
 import { geomeanMs } from "@/lib/chartMath";
+import { COMPARE_TIE_THRESHOLD } from "@/lib/compareSummary";
 import {
   ALL_WARM,
   DEFAULT_BASIS,
@@ -70,28 +71,42 @@ export function parseBasesParam(search: string): { bases: MeasurementBasis[]; re
       ? unique.slice(0, MAX_WITHIN_RUN_BASES)
       : [DEFAULT_BASIS, { passes: warmPass(1), statistic: "median" as const }];
   const refRaw = Number(params.get("ref") ?? "0");
-  return { bases, referenceIndex: clampReferenceIndex(refRaw, bases.length) };
+  const referencedBasis = decoded?.[clampReferenceIndex(refRaw, decoded.length)];
+  const deduplicatedReferenceIndex = referencedBasis
+    ? bases.findIndex((basis) => basesEqual(basis, referencedBasis))
+    : -1;
+  return {
+    bases,
+    referenceIndex:
+      deduplicatedReferenceIndex >= 0
+        ? deduplicatedReferenceIndex
+        : clampReferenceIndex(refRaw, bases.length),
+  };
+}
+
+function hasSamples(queries: readonly QueryTiming[], passes: PassSelection, minimum: number): boolean {
+  const byQuery = new Map<string, QueryTiming[]>();
+  for (const q of queries) {
+    const bucket = byQuery.get(q.query_id);
+    if (bucket) bucket.push(q);
+    else byQuery.set(q.query_id, [q]);
+  }
+  const basis: MeasurementBasis = { passes, statistic: "min" };
+  for (const queryRows of byQuery.values()) {
+    const value = resolveQueryValue(basis, queryRows, null);
+    if (value.kind === "value" && value.sampleCount >= minimum) return true;
+  }
+  return false;
 }
 
 function hasMultipleSamples(queries: readonly QueryTiming[], passes: PassSelection): boolean {
-  const counts = new Map<string, number>();
-  for (const q of queries) {
-    if (q.status !== "pass") continue;
-    let matches = false;
-    if (passes.kind === "all_warm") {
-      matches = q.run_type === "iteration" || q.run_type === "warm";
-    } else if (passes.kind === "warmup") {
-      matches = q.run_type === "warmup";
-    } else if (passes.kind === "warm_pass") {
-      matches = (q.run_type === "iteration" || q.run_type === "warm") && q.iter === passes.pass;
-    }
-    if (matches) {
-      const c = (counts.get(q.query_id) ?? 0) + 1;
-      if (c > 1) return true;
-      counts.set(q.query_id, c);
-    }
-  }
-  return false;
+  return hasSamples(queries, passes, 2);
+}
+
+export function withinRunComparisonStatus(ratio: number | null): "faster" | "slower" | "parity" | null {
+  if (ratio === null || !Number.isFinite(ratio) || ratio <= 0) return null;
+  if (Math.abs(ratio - 1) < COMPARE_TIE_THRESHOLD) return "parity";
+  return ratio < 1 ? "faster" : "slower";
 }
 
 export function formatWithinRunBasisLabel(
@@ -139,6 +154,7 @@ export function availableBasesForQueries(queries: readonly QueryTiming[]): Measu
   const sortedIters = [...iters].sort((a, b) => a - b);
   for (const iter of sortedIters) {
     const p = warmPass(iter);
+    if (!hasSamples(queries, p, 1)) continue;
     list.push({ passes: p, statistic: "median" });
     if (hasMultipleSamples(queries, p)) {
       list.push({ passes: p, statistic: "min" });
@@ -384,6 +400,7 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
           const geomean = columnGeomeans[i] ?? null;
           const ratio = refGeomean !== null && geomean !== null && refGeomean > 0 ? geomean / refGeomean : null;
           const deltaMs = refGeomean !== null && geomean !== null ? geomean - refGeomean : null;
+          const comparisonStatus = withinRunComparisonStatus(ratio);
           const canRemove = bases.length > MIN_WITHIN_RUN_BASES;
 
           return (
@@ -407,18 +424,18 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
                 <div class="flex items-center gap-1">
                   {isRef ? (
                     <StatusBadge role="ranking" tone="info">reference</StatusBadge>
-                  ) : ratio !== null ? (
+                  ) : comparisonStatus !== null ? (
                     <StatusBadge
                       role="ranking"
-                      tone={ratio < 1 ? "success" : ratio > 1 ? "neutral" : "neutral"}
+                      tone={comparisonStatus === "faster" ? "success" : "neutral"}
                     >
-                      {ratio < 1 ? "faster" : ratio > 1 ? "slower" : "parity"}
+                      {comparisonStatus}
                     </StatusBadge>
                   ) : null}
                   {canRemove && (
                     <button
                       type="button"
-                      class="text-xs text-[var(--bb-data-fg-subtle)] hover:text-[var(--bb-tone-critical-fg)] px-1 rounded"
+                      class="text-xs text-[var(--bb-data-fg-subtle)] hover:text-[var(--bb-tone-danger-fg)] px-1 rounded"
                       onClick={() => handleRemoveBasis(i)}
                       aria-label={`Remove ${formatWithinRunBasisLabel(basis, bases)}`}
                       title="Remove column"

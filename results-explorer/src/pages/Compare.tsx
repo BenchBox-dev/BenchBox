@@ -66,7 +66,7 @@ import {
   DEFAULT_BASIS,
   basisSerde,
   formatBasisLabel,
-  isCollapsedStatistic,
+  resolvedStatisticsCollapsed,
   isDefaultBasis,
   parseAvailablePassSelections,
   passSelectionsEqual,
@@ -166,6 +166,10 @@ export type CompareLayout =
 export function isWithinTieBand(ratio: number | null): boolean {
   if (ratio === null || !Number.isFinite(ratio)) return false;
   return Math.abs(ratio - 1) < COMPARE_TIE_THRESHOLD;
+}
+
+export function shouldShowMultiRunStandings(resultIds: readonly string[], claimSuppressed: boolean): boolean {
+  return !claimSuppressed && compareLayoutForSelection(resultIds).kind === "multi_run";
 }
 
 export function compareLayoutForSelection(resultIds: readonly string[]): CompareLayout {
@@ -691,7 +695,7 @@ export function Compare({ url }: CompareProps) {
           comparableQueryCount={queryCoverage.shared}
           totalQueryCount={queryCoverage.total}
           runCount={results.length}
-          statisticCollapsed={isCollapsedStatistic(basis)}
+          statisticCollapsed={resolvedStatisticsCollapsed(resolvedResults)}
         />
       )}
       {results.length > 1 && (
@@ -877,22 +881,25 @@ export function Compare({ url }: CompareProps) {
         comparable than wall-clock total when query counts differ. Lower is faster.
       </p>
 
+      {shouldShowMultiRunStandings(
+        resolvedResults.map((r) => r.result_id),
+        decisionSummary.claimSuppressed,
+      ) && (
+        <MultiRunStandings
+          results={resolvedResults}
+          baselineIndex={normalizedBaselineIndex}
+          runLabels={cohortIdentitiesCompact}
+        />
+      )}
       {compareLayoutForSelection(resolvedResults.map((r) => r.result_id)).kind === "multi_run" && (
-        <>
-          <MultiRunStandings
-            results={resolvedResults}
-            baselineIndex={normalizedBaselineIndex}
-            runLabels={cohortIdentitiesCompact}
-          />
-          <MultiRunHeatmap
-            results={resolvedResults}
-            baselineIndex={normalizedBaselineIndex}
-            runLabels={cohortIdentitiesCompact}
-            limiter={queryLimiter}
-            orderByDisagreement={queryLimiter === "movement"}
-            queryFilter={queryLimiter === "all" ? undefined : limitedQueryIds}
-          />
-        </>
+        <MultiRunHeatmap
+          results={resolvedResults}
+          baselineIndex={normalizedBaselineIndex}
+          runLabels={cohortIdentitiesCompact}
+          limiter={queryLimiter}
+          orderByDisagreement={queryLimiter === "movement"}
+          queryFilter={queryLimiter === "all" ? undefined : limitedQueryIds}
+        />
       )}
 
       <QueryDiffTable
