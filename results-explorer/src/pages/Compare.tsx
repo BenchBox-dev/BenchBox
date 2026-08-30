@@ -45,6 +45,18 @@ import { QueryDiffTable } from "@/components/QueryDiffTable";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { vsSlowestRatio } from "@/lib/chartMath";
 import { buildCompareDecisionSummary } from "@/lib/compareSummary";
+import { MeasurementBasisBar } from "@/components/MeasurementBasisBar";
+import { useUrlState } from "@/lib/useUrlState";
+import { getResultBasisAvailability } from "@/lib/duckdbQueries";
+import {
+  BASIS_URL_KEY,
+  DEFAULT_BASIS,
+  basisSerde,
+  isCollapsedStatistic,
+  parseAvailablePassSelections,
+  passSelectionsEqual,
+  type PassSelection,
+} from "@/lib/measurementBasis";
 import { formatDurationSeconds, formatPowerScore, formatSpeedup } from "@/lib/metricFormatters";
 import { isValidTimingValue } from "@/lib/displayEligibility";
 import {
@@ -101,6 +113,43 @@ function appendCompareNotice(current: string | null, next: string): string {
   return current ? `${current} ${next}` : next;
 }
 
+/**
+ * Which layout a compare selection renders.
+ *
+ * Selection COUNT picks the layout, so nobody has to choose a page before
+ * choosing runs, and the existing `?ids=` grammar keeps working untouched.
+ *
+ * Deliberately keyed on DISTINCT runs, not on the raw id list. Two ids that
+ * alias to one result are one run and belong on the within-run route, not in a
+ * head-to-head that would compare a run against itself.
+ */
+export type CompareLayout =
+  | { readonly kind: "empty" }
+  | { readonly kind: "within_run"; readonly resultId: string }
+  | { readonly kind: "head_to_head"; readonly runIds: readonly [string, string] }
+  | { readonly kind: "multi_run"; readonly runIds: readonly string[] };
+
+/**
+ * Choose the layout for a recovered selection.
+ *
+ * MUST be called on the RECOVERED set, never on the raw `?ids=` list: recovery
+ * resolves aliases, drops duplicates and unavailable ids, and caps the
+ * selection at MAX_COMPARE_SELECTIONS. Routing on the raw list would pick a
+ * layout from a count the page never actually renders -- a five-id URL would
+ * choose multi-run and then render four runs.
+ */
+export function compareLayoutForSelection(resultIds: readonly string[]): CompareLayout {
+  const distinct: string[] = [];
+  for (const id of resultIds) {
+    if (id && !distinct.includes(id)) distinct.push(id);
+  }
+  const [first, second] = distinct;
+  if (first === undefined) return { kind: "empty" };
+  if (second === undefined) return { kind: "within_run", resultId: first };
+  if (distinct.length === 2) return { kind: "head_to_head", runIds: [first, second] };
+  return { kind: "multi_run", runIds: distinct };
+}
+
 export function Compare({ url }: CompareProps) {
   const activeUrl = currentCompareUrl(url);
   const [compareState, setCompareState] = useState<CompareState | null>(null);
@@ -108,6 +157,11 @@ export function Compare({ url }: CompareProps) {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [baselineIndex, setBaselineIndex] = useState(0);
+  // Through the model's serde, not a hand-rolled parser: the grammar is the
+  // model's to define, and a shared link has to reproduce the sender's figures
+  // exactly. One `basis` parameter, because a cross-run comparison carries
+  // exactly one basis -- the URL grammar mirrors the type grammar.
+  const [basis, setBasis] = useUrlState(BASIS_URL_KEY, DEFAULT_BASIS, basisSerde);
   // Builder mode: rendered when 0 ids are supplied, or when 1 id is supplied
   // (single-result entry from ResultDetail "Compare this result" button).
   // Was previously an error string ("No result IDs provided. Add ?ids=...")
@@ -119,6 +173,50 @@ export function Compare({ url }: CompareProps) {
   const [preserveRequestedIds, setPreserveRequestedIds] = useState(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const results = compareState?.results ?? EMPTY_RESULTS;
+  const [availabilityRows, setAvailabilityRows] = useState<Record<string, string>>({});
+
+  // Read the pipeline's precomputed availability rather than deriving it from
+  // raw executions: the read model already holds the answer, and pulling every
+  // execution row for a 103-query run to re-derive it would be a large
+  // download to reach a value we already have.
+  useEffect(() => {
+    let cancelled = false;
+    const ids = results.map((r) => r.result_id);
+    if (ids.length === 0) return;
+    void Promise.all(ids.map((id) => getResultBasisAvailability(id).catch(() => null))).then((rows) => {
+      if (cancelled) return;
+      const next: Record<string, string> = {};
+      rows.forEach((row, i) => {
+        const id = ids[i];
+        if (row && id) next[id] = row.available_bases;
+      });
+      setAvailabilityRows(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [results]);
+
+  /**
+   * Pass selections EVERY selected run can serve.
+   *
+   * Intersected, not unioned. Offering a pass one run cannot answer would put
+   * a control on the page that empties half the comparison the moment it is
+   * used. A run whose availability is unknown (an older snapshot, or a failed
+   * read) does not narrow the set -- value resolution reports unavailability
+   * per query, where it can name the reason.
+   */
+  const availablePasses = useMemo<PassSelection[]>(() => {
+    const perRun = results
+      .map((r) => availabilityRows[r.result_id])
+      .filter((raw): raw is string => typeof raw === "string" && raw.length > 0)
+      .map((raw) => parseAvailablePassSelections(raw));
+    if (perRun.length === 0) return [DEFAULT_BASIS.passes];
+    const [first, ...rest] = perRun;
+    return (first ?? []).filter((candidate) =>
+      rest.every((other) => other.some((p) => passSelectionsEqual(p, candidate))),
+    );
+  }, [results, availabilityRows]);
   const primaryMetric = compareState?.primaryMetric ?? "display_geomean_ms";
   const normalizedBaselineIndex = results[baselineIndex] ? baselineIndex : 0;
   useDocumentTitle(
@@ -499,6 +597,17 @@ export function Compare({ url }: CompareProps) {
         suppressionReason={decisionSummary.claimSuppressionReason}
       />
       <CompareSummary summary={decisionSummary} />
+      {results.length > 1 && (
+        <MeasurementBasisBar
+          basis={basis}
+          onBasisChange={setBasis}
+          availablePasses={availablePasses}
+          comparableQueryCount={rowCount}
+          totalQueryCount={rowCount}
+          runCount={results.length}
+          statisticCollapsed={isCollapsedStatistic(basis)}
+        />
+      )}
       {results.length > 1 && (
         <div class="panel mb-4 flex flex-wrap items-center justify-between gap-3 px-3 py-2 shadow-sm">
           <div>
