@@ -1,7 +1,14 @@
 import { render, screen } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 import type { DetailResult } from "@/types";
-import { QueryDiffTable, applyQueryDiffLimiter, buildQueryDiffRows, queryDiffCountSentence, type QueryDiffRow } from "@/components/QueryDiffTable";
+import {
+  DEFAULT_QUERY_DIFF_LIMIT,
+  QueryDiffTable,
+  applyQueryDiffLimiter,
+  buildQueryDiffRows,
+  queryDiffCountSentence,
+  type QueryDiffRow,
+} from "@/components/QueryDiffTable";
 
 function makeResult(overrides: Partial<DetailResult> = {}): DetailResult {
   return {
@@ -239,6 +246,24 @@ describe("QueryDiffTable", () => {
     // described wrongly.
     expect(table).toHaveTextContent("Not comparable");
   });
+
+  it("counts logical queries rather than candidate rows in multi-run comparisons", () => {
+    render(
+      <QueryDiffTable
+        results={[
+          makeResult({ result_id: "baseline" }),
+          makeResult({ result_id: "candidate-a", platform: "SQLite", platform_id: "sqlite" }),
+          makeResult({ result_id: "candidate-b", platform: "PostgreSQL", platform_id: "postgresql" }),
+        ]}
+        queryFilter={["Q1", "Q2"]}
+        limiter="movement"
+      />,
+    );
+
+    const table = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
+    expect(table).toHaveTextContent("Showing 2 of 3 queries.");
+    expect(table).not.toHaveTextContent("Showing 4 of 6 queries.");
+  });
 });
 
 describe("the Top-N limiter", () => {
@@ -257,6 +282,10 @@ describe("the Top-N limiter", () => {
   });
 
   const rows = [row("Q1", -50), row("Q2", 30), row("Q3", -5), row("Q4", 80), row("Q5", null, false)];
+
+  it("pins the product limit to the requested ten queries", () => {
+    expect(DEFAULT_QUERY_DIFF_LIMIT).toBe(10);
+  });
 
   it("returns everything for 'all', including rows that cannot be compared", () => {
     // The uncomparable row must survive: dropping it hides an exclusion the

@@ -120,33 +120,38 @@ export function buildStandings(
     return a.geomeanMs - b.geomeanMs;
   });
 
-  // Assign competition rank: tied rows receive "T-1", unranked rows receive "—"
-  let currentRank = 1;
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]!;
-    if (row.geomeanMs === null) {
-      row.rank = "—";
+  // Assign competition rank: tied rows receive "T-1", unranked rows receive "—".
+  // Tie groups are formed against the fixed group leader to prevent transitive chaining.
+  let i = 0;
+  while (i < rows.length) {
+    const leader = rows[i]!;
+    if (leader.geomeanMs === null) {
+      leader.rank = "—";
+      i++;
       continue;
     }
-    const prev = i > 0 ? rows[i - 1] : undefined;
-    const next = i < rows.length - 1 ? rows[i + 1] : undefined;
-    const prevMs = prev?.geomeanMs ?? null;
-    const nextMs = next?.geomeanMs ?? null;
-    const tiedPrev =
-      prevMs !== null &&
-      Math.abs(prevMs - row.geomeanMs) / Math.min(prevMs, row.geomeanMs) < COMPARE_TIE_THRESHOLD;
-    const tiedNext =
-      nextMs !== null &&
-      Math.abs(row.geomeanMs - nextMs) / Math.min(row.geomeanMs, nextMs) < COMPARE_TIE_THRESHOLD;
 
-    if (tiedPrev || tiedNext) {
-      row.rank = `T-${currentRank}`;
-    } else {
-      row.rank = String(currentRank);
+    const leaderMs = leader.geomeanMs;
+    const rankNum = i + 1;
+    let j = i + 1;
+    while (
+      j < rows.length &&
+      rows[j]!.geomeanMs !== null &&
+      Math.abs(rows[j]!.geomeanMs! - leaderMs) / Math.min(rows[j]!.geomeanMs!, leaderMs) < COMPARE_TIE_THRESHOLD
+    ) {
+      j++;
     }
-    if (!tiedNext) {
-      currentRank = i + 2;
+
+    const isTie = j > i + 1;
+    const rankLabel = isTie ? `T-${rankNum}` : String(rankNum);
+    for (let k = i; k < j; k++) {
+      rows[k]!.rank = rankLabel;
+      if (isTie) {
+        rows[k]!.tied = true;
+      }
     }
+
+    i = j;
   }
 
   return { rows, sharedQueryIds: shared, totalQueryIds: all.size };

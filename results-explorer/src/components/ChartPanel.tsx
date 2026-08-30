@@ -32,6 +32,7 @@ import {
 } from "@/lib/runIdentity";
 import {
   buildLatencyBarScale,
+  geomeanMs,
   latencyScaleFraction,
   latencyScaleTicks,
 } from "@/lib/chartMath";
@@ -162,6 +163,7 @@ export function ChartPanel({
       return {
         ...platform,
         timings: filteredTimings,
+        display_geomean_ms: geomeanMs(Object.values(filteredTimings)),
       };
     });
     return {
@@ -322,6 +324,7 @@ export function ChartPanel({
               platformLabels: chartPlatformLabels,
               suppressWinnerClaims,
               suppressionReason,
+              queryFilter,
             })}
             {summary && chartSummary && chartSummary.platforms.length > 0 && chartExclusionSummary.length > 0 && (
               <ChartDatasetExclusionSummary
@@ -450,6 +453,7 @@ function renderChart(
     platformLabels,
     suppressWinnerClaims = false,
     suppressionReason,
+    queryFilter,
   }: {
     context: ChartContext;
     summary: BenchmarkSummary | null;
@@ -460,6 +464,7 @@ function renderChart(
     platformLabels: string[];
     suppressWinnerClaims?: boolean;
     suppressionReason?: string;
+    queryFilter?: readonly string[];
   },
 ) {
   switch (chart.id) {
@@ -470,9 +475,13 @@ function renderChart(
     case "distribution_box":
       return summary ? <DistributionBox summary={summary} /> : null;
     case "query_heatmap":
-      return summary ? <QueryHeatmap summary={summary} /> : null;
+      return summary ? (
+        <QueryHeatmap summary={summary} preserveOrder={Boolean(queryFilter)} />
+      ) : null;
     case "query_histogram":
-      return summary ? <QueryHistogram summary={summary} /> : null;
+      return summary ? (
+        <QueryHistogram summary={summary} preserveOrder={Boolean(queryFilter)} />
+      ) : null;
     case "cost_scatter":
       return summary ? <CostScatter summary={summary} /> : null;
     case "time_series":
@@ -585,7 +594,9 @@ function renderChart(
     case "cdf_chart":
       return summary ? <CDFChart summary={summary} /> : null;
     case "rank_table":
-      return summary ? <RankTable summary={summary} /> : null;
+      return summary ? (
+        <RankTable summary={summary} preserveOrder={Boolean(queryFilter)} />
+      ) : null;
     default:
       return null;
   }

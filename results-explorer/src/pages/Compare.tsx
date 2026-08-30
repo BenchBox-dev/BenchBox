@@ -42,6 +42,7 @@ import {
 } from "@/components/ComparabilityReceipt";
 import { CompareSummary } from "@/components/CompareSummary";
 import {
+  DEFAULT_QUERY_DIFF_LIMIT,
   QueryDiffTable,
   QUERY_DIFF_LIMITER_LABELS,
   type QueryDiffLimiter,
@@ -256,7 +257,12 @@ export function Compare({ url }: CompareProps) {
     [results, basis],
   );
   const { queryIds: limitedQueryIds } = useMemo(
-    () => selectQueryIdsForLimiter(resolvedResults, normalizedBaselineIndex, queryLimiter, 20),
+    () => selectQueryIdsForLimiter(
+      resolvedResults,
+      normalizedBaselineIndex,
+      queryLimiter,
+      DEFAULT_QUERY_DIFF_LIMIT,
+    ),
     [resolvedResults, normalizedBaselineIndex, queryLimiter],
   );
   useDocumentTitle(

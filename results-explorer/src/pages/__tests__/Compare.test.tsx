@@ -1068,7 +1068,7 @@ describe("Compare", () => {
     expect(summary).toHaveTextContent("DuckDB leads by 10.00x on power score.");
     expect(options).toEqual(["DuckDB", "SQLite", "PostgreSQL"]);
     expect(screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section")).toHaveTextContent(
-      "Showing 4 of 4 queries.",
+      "Showing 2 of 2 queries.",
     );
 
     fireEvent.change(select, { target: { value: "2" } });

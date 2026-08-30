@@ -727,6 +727,53 @@ describe("ChartPanel", () => {
     expect(screen.queryByText("Q2")).toBeNull();
   });
 
+  it("recomputes multi-run comparison-bar geomeans over the shared query filter", () => {
+    const details = [
+      makeDetail({
+        result_id: "a",
+        platform: "A",
+        display_geomean_ms: 999,
+        display_timings: [
+          { query_id: "Q1", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q2", display_ms: 100, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+        ],
+      }),
+      makeDetail({
+        result_id: "b",
+        platform: "B",
+        display_geomean_ms: 999,
+        display_timings: [
+          { query_id: "Q1", display_ms: 20, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q2", display_ms: 100, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+        ],
+      }),
+      makeDetail({
+        result_id: "c",
+        platform: "C",
+        display_geomean_ms: 999,
+        display_timings: [
+          { query_id: "Q1", display_ms: 40, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q2", display_ms: 100, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+        ],
+      }),
+    ];
+    const { container } = render(
+      <ChartPanel
+        context={{ kind: "compare", results: details, primaryMetric: "display_geomean_ms" }}
+        queryFilter={["Q1"]}
+      />,
+    );
+
+    const titles = Array.from(container.querySelectorAll("rect title")).map((title) => title.textContent ?? "");
+    expect(titles.some((title) => title.includes("A") && title.includes("10 ms"))).toBe(true);
+    expect(titles.some((title) => title.includes("B") && title.includes("20 ms"))).toBe(true);
+    expect(titles.some((title) => title.includes("C") && title.includes("40 ms"))).toBe(true);
+    expect(titles.every((title) => !title.includes("999 ms"))).toBe(true);
+    // Compare summaries intentionally carry no persisted percentile statistics,
+    // so the global basis selector cannot expose a stale percentile ladder.
+    expect(screen.queryByRole("button", { name: "Percentile Ladder" })).toBeNull();
+  });
+
   it("renders an explicit no-matching-queries message when queryFilter has no matches", () => {
     const summary = makeSummary();
     render(

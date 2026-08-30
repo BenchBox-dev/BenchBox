@@ -307,6 +307,21 @@ describe("competition ranking in standings", () => {
     const { rows } = buildStandings(withNull, 0, ["A", "B", "Empty"]);
     expect(rows.map((r) => r.rank)).toEqual(["—", "—", "—"]);
   });
+
+  it("does not transitively chain ties across non-tied endpoints", () => {
+    // 100 vs 100.4 is 0.4% (tied).
+    // 100.4 vs 100.8 is 0.398% (tied if pairwise).
+    // BUT 100 vs 100.8 is 0.8% (> 0.5% threshold: not tied with leader).
+    const chainedRuns = [
+      run("a", [["Q1", 100]]),
+      run("b", [["Q1", 100.4]]),
+      run("c", [["Q1", 100.8]]),
+    ];
+    const { rows } = buildStandings(chainedRuns, 0, ["A", "B", "C"]);
+    expect(rows[0]!.rank).toBe("T-1");
+    expect(rows[1]!.rank).toBe("T-1");
+    expect(rows[2]!.rank).toBe("3");
+  });
 });
 
 describe("missing evidence reporting in heatmap", () => {
@@ -431,6 +446,24 @@ describe("measurement basis resolution for comparison", () => {
     const warmupResolved = resolveResultsForBasis(runsWithPower, { passes: WARMUP, statistic: "median" });
     expect(warmupResolved[0]!.power_score).toBeNull();
     expect(warmupResolved[1]!.power_score).toBeNull();
+  });
+
+  it("preserves published timing_exclusion_reason for default basis", () => {
+    const rawRun: DetailResult = {
+      ...runs[0]!,
+      display_timings: [
+        {
+          query_id: "Q1",
+          display_ms: null,
+          sample_count: 0,
+          is_valid_display_timing: false,
+          timing_exclusion_reason: "missing_timing",
+        },
+      ],
+      queries: [],
+    };
+    const resolved = resolveResultsForBasis([rawRun], DEFAULT_BASIS);
+    expect(resolved[0]!.display_timings[0]!.timing_exclusion_reason).toBe("missing_timing");
   });
 });
 

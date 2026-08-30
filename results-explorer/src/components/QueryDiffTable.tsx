@@ -46,6 +46,9 @@ export const QUERY_DIFF_LIMITER_LABELS: Record<QueryDiffLimiter, string> = {
   movement: "Largest movement",
 };
 
+/** Product contract: largest-query views show at most ten logical queries. */
+export const DEFAULT_QUERY_DIFF_LIMIT = 10;
+
 /**
  * Rank and cap the rows for a limiter.
  *
@@ -82,7 +85,7 @@ export function selectQueryIdsForLimiter(
   results: readonly DetailResult[],
   baselineIndex: number,
   limiter: QueryDiffLimiter,
-  topN: number = 20,
+  topN: number = DEFAULT_QUERY_DIFF_LIMIT,
 ): { queryIds: string[]; totalQueryCount: number } {
   const allQueryIds = [
     ...new Set(results.flatMap((r) => (r.display_timings ?? []).map((t) => t.query_id))),
@@ -180,7 +183,7 @@ export function QueryDiffTable({
   baselineIndex = 0,
   suppressionReason = null,
   limiter = "all",
-  topN = 20,
+  topN = DEFAULT_QUERY_DIFF_LIMIT,
   queryFilter,
 }: QueryDiffTableProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -209,7 +212,11 @@ export function QueryDiffTable({
   const rows = queryFilter
     ? queryFilter.flatMap((queryId) => rowsByQueryId.get(queryId) ?? [])
     : applyQueryDiffLimiter(allRows, limiter, topN);
-  const uncomparableShown = rows.filter((row) => !row.comparable).length;
+  const shownQueryCount = new Set(rows.map((row) => row.queryId)).size;
+  const totalQueryCount = rowsByQueryId.size;
+  const uncomparableShown = new Set(
+    rows.filter((row) => !row.comparable).map((row) => row.queryId),
+  ).size;
 
   return (
     <section class="card mb-8" aria-labelledby="query-diff-title">
@@ -223,8 +230,8 @@ export function QueryDiffTable({
             candidate is faster than baseline.
           </p>
         </div>
-        <StatusBadge role="comparison" tone="neutral" title={queryDiffCountSentence(rows.length, allRows.length, limiter)}>
-          {queryDiffCountSentence(rows.length, allRows.length, limiter)}
+        <StatusBadge role="comparison" tone="neutral" title={queryDiffCountSentence(shownQueryCount, totalQueryCount, limiter)}>
+          {queryDiffCountSentence(shownQueryCount, totalQueryCount, limiter)}
         </StatusBadge>
       </div>
 

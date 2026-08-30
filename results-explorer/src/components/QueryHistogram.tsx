@@ -24,19 +24,21 @@ const PADDING_TOP = 8;
 
 interface Props {
   summary: BenchmarkSummary;
+  /** When true, keeps query_ids in caller-provided order (e.g. limiter ranking). */
+  preserveOrder?: boolean;
 }
 
 function fmtMs(ms: number): string {
   return formatLatencyMs(ms, { subMillisecond: "compact" }).valueText;
 }
 
-export function QueryHistogram({ summary }: Props) {
+export function QueryHistogram({ summary, preserveOrder = false }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize(300);
   const w = Math.max(containerWidth, 300);
 
   const { platforms, query_ids } = summary;
   if (platforms.length === 0 || query_ids.length === 0) return null;
-  const sortedQueryIds = sortQueryIds(query_ids);
+  const sortedQueryIds = preserveOrder ? query_ids : sortQueryIds(query_ids);
 
   // Split into panels
   const panels: string[][] = [];

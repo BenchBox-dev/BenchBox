@@ -732,12 +732,18 @@ export function resolveResultsForBasis(
           existing && existing.is_valid_display_timing !== false ? (existing.display_ms ?? null) : null;
         const val = resolveQueryValue(basis, rows, displayMs);
         const ms = val.kind === "value" && Number.isFinite(val.ms) && val.ms > 0 ? val.ms : null;
+        const timingExclusionReason =
+          isDefaultBasis(basis) && existing?.timing_exclusion_reason
+            ? existing.timing_exclusion_reason
+            : val.kind === "unavailable"
+              ? val.reason
+              : null;
         return {
           query_id: queryId,
           display_ms: ms,
-          sample_count: val.kind === "value" ? val.sampleCount : 0,
+          sample_count: val.kind === "value" ? val.sampleCount : (existing?.sample_count ?? 0),
           is_valid_display_timing: ms !== null,
-          timing_exclusion_reason: val.kind === "unavailable" ? val.reason : null,
+          timing_exclusion_reason: timingExclusionReason,
         };
       });
 

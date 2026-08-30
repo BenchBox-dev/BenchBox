@@ -1,6 +1,10 @@
 import type { DetailResult } from "@/types";
 import { StatusBadge } from "@/components/StatusBadge";
-import { type QueryDiffLimiter, QUERY_DIFF_LIMITER_LABELS } from "@/components/QueryDiffTable";
+import {
+  DEFAULT_QUERY_DIFF_LIMIT,
+  type QueryDiffLimiter,
+  QUERY_DIFF_LIMITER_LABELS,
+} from "@/components/QueryDiffTable";
 import {
   DIVERGING_RATIO_CLAMP,
   divergingRatioPosition,
@@ -146,7 +150,7 @@ export function MultiRunHeatmap({
   results,
   baselineIndex,
   runLabels,
-  limit = 20,
+  limit = DEFAULT_QUERY_DIFF_LIMIT,
   limiter,
   orderByDisagreement = false,
   queryFilter,
