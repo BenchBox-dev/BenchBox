@@ -97,6 +97,48 @@ describe("runs without CPU data", () => {
   });
 });
 
+describe("multi-run identity matrix (N > 2 runs)", () => {
+  it("renders a matrix with one row per axis and one column per run", () => {
+    const r1 = run({ result_id: "r1", platform_version: "1.0.0" });
+    const r2 = run({ result_id: "r2", platform_version: "2.0.0" });
+    const r3 = run({ result_id: "r3", platform_version: "1.0.0" });
+    render(<IdentityDiffStrip results={[r1, r2, r3]} baselineIndex={0} runLabels={["Run 1", "Run 2", "Run 3"]} />);
+
+    expect(screen.getByText("Run 1 (baseline)")).toBeTruthy();
+    expect(screen.getByText("Run 2")).toBeTruthy();
+    expect(screen.getByText("Run 3")).toBeTruthy();
+    expect(screen.getByText("Engine version")).toBeTruthy();
+    expect(screen.getByText("Architecture")).toBeTruthy();
+    expect(screen.getByText(/1 of 6 axis varies across the whole selection/)).toBeTruthy();
+  });
+
+  it("marks differing cells relative to baseline and identifies matching cells", () => {
+    const r1 = run({ result_id: "r1", platform_version: "1.0.0" });
+    const r2 = run({ result_id: "r2", platform_version: "2.0.0" });
+    const r3 = run({ result_id: "r3", platform_version: "1.0.0" });
+    render(<IdentityDiffStrip results={[r1, r2, r3]} baselineIndex={0} runLabels={["Run 1", "Run 2", "Run 3"]} />);
+
+    const cellDiff = screen.getByTestId("matrix-cell-Platform version-1");
+    expect(cellDiff.textContent).toContain("Differs");
+    expect(cellDiff.textContent).toContain("2.0.0");
+
+    const cellMatch = screen.getByTestId("matrix-cell-Platform version-2");
+    expect(cellMatch.textContent).toContain("Same");
+    expect(cellMatch.textContent).toContain("1.0.0");
+  });
+
+  it("renders 'not recorded' rather than 'differs' when a run lacks CPU data", () => {
+    const r1 = run({ result_id: "r1" });
+    const r2 = run({ result_id: "r2", environment: { arch: "arm64" } as any });
+    const r3 = run({ result_id: "r3" });
+    render(<IdentityDiffStrip results={[r1, r2, r3]} baselineIndex={0} />);
+
+    const missingCell = screen.getByTestId("matrix-cell-CPU family-1");
+    expect(missingCell.textContent).toContain("Not recorded");
+    expect(missingCell.textContent).not.toContain("Differs");
+  });
+});
+
 describe("rendering guards", () => {
   it("renders nothing for a single run", () => {
     const { container } = render(<IdentityDiffStrip results={[run()]} />);

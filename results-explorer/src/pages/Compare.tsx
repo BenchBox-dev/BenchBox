@@ -50,6 +50,8 @@ import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { vsSlowestRatio } from "@/lib/chartMath";
 import { buildCompareDecisionSummary, COMPARE_TIE_THRESHOLD } from "@/lib/compareSummary";
 import { IdentityDiffStrip } from "@/components/IdentityDiffStrip";
+import { MultiRunHeatmap } from "@/components/MultiRunHeatmap";
+import { MultiRunStandings } from "@/components/MultiRunStandings";
 import { MeasurementBasisBar } from "@/components/MeasurementBasisBar";
 import { useUrlState } from "@/lib/useUrlState";
 import { getResultBasisAvailability } from "@/lib/duckdbQueries";
@@ -577,6 +579,7 @@ export function Compare({ url }: CompareProps) {
     totalDurationS: r.total_duration_s,
     driverVersion: r.driver_version,
   }));
+  const isMultiRun = compareLayoutForSelection(results.map((r) => r.result_id)).kind === "multi_run";
 
   function handleShare() {
     navigator.clipboard
@@ -644,7 +647,11 @@ export function Compare({ url }: CompareProps) {
         suppressionReason={decisionSummary.claimSuppressionReason}
       />
       <CompareSummary summary={decisionSummary} />
-      <IdentityDiffStrip results={results} />
+      <IdentityDiffStrip
+        results={results}
+        baselineIndex={normalizedBaselineIndex}
+        runLabels={cohortIdentitiesCompact}
+      />
       {results.length > 1 && (
         <MeasurementBasisBar
           basis={basis}
@@ -713,7 +720,21 @@ export function Compare({ url }: CompareProps) {
               style={{ borderTopColor: color, borderTopWidth: "3px" }}
             >
               <div class="mb-2 flex items-center justify-between">
-                <span class="font-semibold text-[var(--bb-data-fg-primary)]">{r.label}</span>
+                {isMultiRun ? (
+                  <label class="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-[var(--bb-data-fg-primary)]">
+                    <input
+                      type="radio"
+                      name="compare-baseline-radio"
+                      checked={i === normalizedBaselineIndex}
+                      onChange={() => setBaselineIndex(i)}
+                      aria-label={`Set ${r.label} as baseline`}
+                      data-testid={`baseline-radio-${r.resultId}`}
+                    />
+                    <span class="font-semibold">{r.label}</span>
+                  </label>
+                ) : (
+                  <span class="font-semibold text-[var(--bb-data-fg-primary)]">{r.label}</span>
+                )}
                 <div class="flex flex-wrap gap-1">
                   <TrustBadge trustLabel={r.trustLabel} compact />
                   <FundingChip funding={r.funding} compact />
@@ -821,6 +842,23 @@ export function Compare({ url }: CompareProps) {
           }))}
         />
       </div>
+
+      {compareLayoutForSelection(results.map((r) => r.result_id)).kind === "multi_run" && (
+        <>
+          <MultiRunStandings
+            results={results}
+            baselineIndex={normalizedBaselineIndex}
+            runLabels={cohortIdentitiesCompact}
+          />
+          <MultiRunHeatmap
+            results={results}
+            baselineIndex={normalizedBaselineIndex}
+            runLabels={cohortIdentitiesCompact}
+            limiter={queryLimiter}
+            orderByDisagreement={queryLimiter === "movement"}
+          />
+        </>
+      )}
 
       <QueryDiffTable
         limiter={queryLimiter}
