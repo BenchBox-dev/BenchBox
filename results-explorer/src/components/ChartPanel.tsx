@@ -168,21 +168,14 @@ export function ChartPanel({
         }
       }
       const geomean =
-        sharedValidQueryIds.length > 0
+        sharedValidQueryIds.length >= 2
           ? geomeanMs(sharedValidQueryIds.map((q) => platform.timings[q]!))
           : null;
-      const hasInsufficientQueries = Boolean(queryFilter && sharedValidQueryIds.length < 2);
       return {
         ...platform,
         timings: filteredTimings,
         display_geomean_ms: geomean,
         sample_geomean_ms: geomean,
-        comparison_exclusion_reason: hasInsufficientQueries
-          ? "insufficient_valid_queries"
-          : platform.comparison_exclusion_reason,
-        ranking_exclusion_reason: hasInsufficientQueries
-          ? "insufficient_valid_queries"
-          : platform.ranking_exclusion_reason,
       };
     });
     return {
@@ -341,8 +334,13 @@ export function ChartPanel({
               compareGroups,
               baselineIdx,
               platformLabels: chartPlatformLabels,
-              suppressWinnerClaims,
-              suppressionReason,
+              suppressWinnerClaims:
+                suppressWinnerClaims || Boolean(queryFilter && (chartSummary?.query_ids.length ?? 0) < 2),
+              suppressionReason:
+                suppressionReason ??
+                (Boolean(queryFilter && (chartSummary?.query_ids.length ?? 0) < 2)
+                  ? "Winner claims suppressed when fewer than 2 valid queries are selected"
+                  : undefined),
               queryFilter,
             })}
             {summary && chartSummary && chartSummary.platforms.length > 0 && chartExclusionSummary.length > 0 && (
