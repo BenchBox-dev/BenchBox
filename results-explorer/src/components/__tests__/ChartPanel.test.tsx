@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
-import { ChartPanel } from "@/components/ChartPanel";
+import { ChartPanel, remapBaselineIndex } from "@/components/ChartPanel";
 import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
 import type {
   BenchmarkSummary,
@@ -825,5 +825,20 @@ describe("ChartPanel", () => {
     );
 
     expect(screen.queryByText(/5,000/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Power@Size Bar" })).toBeNull();
+  });
+
+  it("keeps a baseline bound to its result after an earlier platform is filtered", () => {
+    const summary = makeSummary({
+      platforms: [
+        makePlatformRow({ result_id: "excluded" }),
+        makePlatformRow({ result_id: "candidate" }),
+        makePlatformRow({ result_id: "baseline" }),
+      ],
+    });
+    const filtered = { ...summary, platforms: summary.platforms.slice(1) };
+
+    expect(remapBaselineIndex(summary, filtered, 2)).toBe(1);
+    expect(remapBaselineIndex(summary, filtered, 0)).toBeNull();
   });
 });

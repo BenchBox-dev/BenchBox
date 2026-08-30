@@ -22,11 +22,13 @@ import {
   parseAvailableBases,
   parseVaryingPassQueries,
   resolveQueryValue,
+  resolveResultsForBasis,
   sharedQueryGeomeans,
   warmPass,
   type BasisExecution,
   type MeasurementBasis,
 } from "@/lib/measurementBasis";
+import type { DetailResult } from "@/types";
 
 const TPCH_DUCKDB = "tpch-duckdb-sf1.0-20260828-ea150b8e";
 const TPCDS_SPARK_SF10 = "tpcds-spark-sf10.0-20260823-ace504c8";
@@ -325,6 +327,44 @@ describe("compared geomeans share one query set", () => {
     ]);
     expect(sharedQueryIds).toEqual([]);
     expect(series.every((s) => s.geomeanMs === null)).toBe(true);
+  });
+
+  it("preserves published default geomeans when every run has the same valid query set", () => {
+    const results = [
+      ({
+        result_id: "a",
+        display_geomean_ms: 10.000000000000002,
+        logical_query_count: 2,
+        valid_query_count: 1,
+        missing_query_count: 1,
+        zero_timing_count: 0,
+        has_display_timing: true,
+        display_timings: [
+          { query_id: "1", display_ms: 10, sample_count: 1, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "2", display_ms: null, sample_count: 0, is_valid_display_timing: false, timing_exclusion_reason: "failed_query" },
+        ],
+      } as unknown as DetailResult),
+      ({
+        result_id: "b",
+        display_geomean_ms: 20.000000000000004,
+        logical_query_count: 2,
+        valid_query_count: 1,
+        missing_query_count: 1,
+        zero_timing_count: 0,
+        has_display_timing: true,
+        display_timings: [
+          { query_id: "1", display_ms: 20, sample_count: 1, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "2", display_ms: null, sample_count: 0, is_valid_display_timing: false, timing_exclusion_reason: "failed_query" },
+        ],
+      } as unknown as DetailResult),
+    ];
+
+    const resolved = resolveResultsForBasis(results, DEFAULT_BASIS);
+
+    expect(resolved.map((result) => result.display_geomean_ms)).toEqual([
+      10.000000000000002,
+      20.000000000000004,
+    ]);
   });
 });
 

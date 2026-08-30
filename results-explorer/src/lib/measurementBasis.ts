@@ -832,10 +832,14 @@ export function resolveResultsForBasis(
       }
     }
 
+    const validQueryIds = newDisplayTimings
+      .filter((timing) => timing.is_valid_display_timing)
+      .map((timing) => timing.query_id);
+    const usesSharedQuerySet =
+      validQueryIds.length === geomeanData.sharedQueryIds.length &&
+      validQueryIds.every((queryId) => geomeanData.sharedQueryIds.includes(queryId));
     const preservedGeomean =
-      isDefault && geomeanData.excludedQueryIds.length === 0 && r.display_geomean_ms !== null
-        ? r.display_geomean_ms
-        : newGeomean;
+      isDefault && usesSharedQuerySet && r.display_geomean_ms !== null ? r.display_geomean_ms : newGeomean;
 
     return {
       ...r,

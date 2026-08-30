@@ -89,11 +89,12 @@ export function ChartPanel({
   queryFilter,
 }: ChartPanelProps) {
   const charts = useMemo(() => {
+    const exclude = new Set(excludeChartIds ?? []);
+    if (queryFilter) exclude.add("power_bar");
     const applicable = applicableCharts(context);
-    if (!excludeChartIds || excludeChartIds.length === 0) return applicable;
-    const exclude = new Set(excludeChartIds);
+    if (exclude.size === 0) return applicable;
     return applicable.filter((entry) => !exclude.has(entry.id));
-  }, [context, excludeChartIds]);
+  }, [context, excludeChartIds, queryFilter]);
   const chartGroups = useMemo(() => groupChartsByQuestion(charts), [charts]);
   const summary = useMemo(() => buildRenderableSummary(context), [context]);
   const historical = useMemo(
@@ -233,6 +234,10 @@ export function ChartPanel({
     [activeEligibilityClass, summary],
   );
   const chartDatasetEmpty = shouldShowChartDatasetEmpty(activeEligibilityClass, summary, chartSummary);
+  const chartBaselineIdx = remapBaselineIndex(summary, chartSummary, baselineIdx);
+  const selectedBaselineId = summary?.platforms[baselineIdx]?.result_id ?? null;
+  const baselineChartActive = activeChart?.id === "normalized_speedup" || activeChart?.id === "diverging_bar";
+  const selectedBaselineExcluded = baselineChartActive && selectedBaselineId !== null && chartBaselineIdx === null;
 
   if (activeChart === null || activeGroup === null) return null;
 
@@ -330,6 +335,15 @@ export function ChartPanel({
       <div id="chart-panel-chart" role="tabpanel" aria-label={`${activeGroup.label} chart`} data-chart-container>
         {chartDatasetEmpty ? (
           <ChartDatasetEmptyState chart={activeChart} summary={summary!} />
+        ) : selectedBaselineExcluded ? (
+          <div
+            role="status"
+            aria-label={`${activeChart.title} unavailable`}
+            class="panel-muted rounded p-6 text-center text-sm text-[var(--bb-data-fg-muted)]"
+          >
+            The selected baseline is excluded from this chart's comparable dataset. Choose a comparable baseline or
+            restore the full query selection.
+          </div>
         ) : queryFilter && chartSummary && chartSummary.query_ids.length === 0 ? (
           <div class="panel-muted rounded p-6 text-center text-sm text-[var(--bb-data-fg-muted)]">
             No queries match the selected filter.
@@ -342,7 +356,7 @@ export function ChartPanel({
               historical,
               compareRows,
               compareGroups,
-              baselineIdx,
+              baselineIdx: chartBaselineIdx ?? 0,
               platformLabels: chartPlatformLabels,
               suppressWinnerClaims:
                 suppressWinnerClaims || Boolean(queryFilter && (chartSummary?.query_ids.length ?? 0) < 2),
@@ -374,6 +388,17 @@ function chartButtonLabel(chart: ChartRegistryEntry): string {
 
 function normalizeBaselineIndex(platformCount: number, baselineIndex: number) {
   return baselineIndex >= 0 && baselineIndex < platformCount ? baselineIndex : 0;
+}
+
+export function remapBaselineIndex(
+  summary: BenchmarkSummary | null,
+  chartSummary: BenchmarkSummary | null,
+  baselineIndex: number,
+): number | null {
+  const selectedBaselineId = summary?.platforms[baselineIndex]?.result_id;
+  if (!selectedBaselineId || !chartSummary) return null;
+  const chartIndex = chartSummary.platforms.findIndex((platform) => platform.result_id === selectedBaselineId);
+  return chartIndex >= 0 ? chartIndex : null;
 }
 
 function shouldShowChartDatasetEmpty(
