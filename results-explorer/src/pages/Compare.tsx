@@ -41,7 +41,11 @@ import {
   comparabilityWarningFields,
 } from "@/components/ComparabilityReceipt";
 import { CompareSummary } from "@/components/CompareSummary";
-import { QueryDiffTable } from "@/components/QueryDiffTable";
+import {
+  QueryDiffTable,
+  QUERY_DIFF_LIMITER_LABELS,
+  type QueryDiffLimiter,
+} from "@/components/QueryDiffTable";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { vsSlowestRatio } from "@/lib/chartMath";
 import { buildCompareDecisionSummary, COMPARE_TIE_THRESHOLD } from "@/lib/compareSummary";
@@ -177,6 +181,10 @@ export function Compare({ url }: CompareProps) {
   // exactly. One `basis` parameter, because a cross-run comparison carries
   // exactly one basis -- the URL grammar mirrors the type grammar.
   const [basis, setBasis] = useUrlState(BASIS_URL_KEY, DEFAULT_BASIS, basisSerde);
+  // ONE limiter drives the chart and the table. Two independent controls would
+  // let the page show a chart of one subset above a table of another, which
+  // reads as a data error rather than as two filters.
+  const [queryLimiter, setQueryLimiter] = useState<QueryDiffLimiter>("all");
   // Builder mode: rendered when 0 ids are supplied, or when 1 id is supplied
   // (single-result entry from ResultDetail "Compare this result" button).
   // Was previously an error string ("No result IDs provided. Add ?ids=...")
@@ -768,7 +776,30 @@ export function Compare({ url }: CompareProps) {
         comparable than wall-clock total when query counts differ. Lower is faster.
       </p>
 
+      <div class="panel mb-4 flex flex-wrap items-center justify-between gap-3 px-3 py-2 shadow-sm">
+        <div>
+          <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="query-limiter">
+            Queries shown
+          </label>
+          <p class="text-xs text-[var(--bb-data-fg-muted)]">
+            Applies to the chart and the table together.
+          </p>
+        </div>
+        <Select
+          id="query-limiter"
+          ariaLabel="Queries shown"
+          size="sm"
+          value={queryLimiter}
+          onChange={(value) => setQueryLimiter(value as QueryDiffLimiter)}
+          options={(Object.keys(QUERY_DIFF_LIMITER_LABELS) as QueryDiffLimiter[]).map((key) => ({
+            value: key,
+            label: QUERY_DIFF_LIMITER_LABELS[key],
+          }))}
+        />
+      </div>
+
       <QueryDiffTable
+        limiter={queryLimiter}
         results={results}
         baselineIndex={normalizedBaselineIndex}
         suppressionReason={decisionSummary.claimSuppressionReason}

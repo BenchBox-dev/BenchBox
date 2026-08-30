@@ -816,9 +816,15 @@ describe("Compare", () => {
     expect(summary).toHaveTextContent("Claims suppressed");
     expect(summary).toHaveTextContent("Insufficient comparable query evidence");
     expect(summary).toHaveTextContent("Selected runs do not share at least two valid query timings");
-    expect(queryDiff).toHaveTextContent("3 comparisons");
+    // w4: the badge now names how many of how many are shown, so an empty
+    // filter is distinguishable from an empty comparison.
+    expect(queryDiff).toHaveTextContent("Showing 3 of 3 queries.");
     expect(queryDiff).toHaveTextContent("Winner claims are suppressed because Selected runs do not share at least two valid query timings");
-    expect(queryDiff).toHaveTextContent("Missing");
+    // w4 replaced the generic "Missing" badge with an explicit
+    // not-comparable marker. The pinned behaviour this test exists for is
+    // unchanged: the rows are still SHOWN rather than dropped, which is what
+    // keeps the reader aware of the exclusion.
+    expect(queryDiff).toHaveTextContent("Not comparable");
   });
 
   it("links compare warning counts to the Comparability Receipt and names warning classes", async () => {
@@ -1062,7 +1068,7 @@ describe("Compare", () => {
     expect(summary).toHaveTextContent("DuckDB leads by 10.00x on power score.");
     expect(options).toEqual(["DuckDB", "SQLite", "PostgreSQL"]);
     expect(screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section")).toHaveTextContent(
-      "4 comparisons",
+      "Showing 4 of 4 queries.",
     );
 
     fireEvent.change(select, { target: { value: "2" } });
