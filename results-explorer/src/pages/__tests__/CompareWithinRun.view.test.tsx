@@ -152,4 +152,31 @@ describe("CompareWithinRun page component", () => {
     expect(screen.queryByText("0.50x")).toBeNull();
     expect(screen.queryByText("0.50x (-50.0 ms)")).toBeNull();
   });
+
+  it("does not style tie-band query ratios as faster", async () => {
+    const detail = makeDetail();
+    (getDetailResult as any).mockResolvedValue({
+      ...detail,
+      queries: detail.queries.map((query) => {
+        if (query.run_type !== "measurement" || query.iter !== 1) return query;
+        return {
+          ...query,
+          duration_ms: query.query_id === "Q1" ? 14.97 : 34.93,
+        };
+      }),
+    });
+    window.history.replaceState(null, "", "/results/r/res-123/passes?bases=default,warm_pass_1&ref=0");
+
+    render(<CompareWithinRun resultId="res-123" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("DuckDB — measurement bases compared")).toBeTruthy();
+    });
+    const displayedTieRatios = screen.getAllByText(/^1\.00x \(/);
+    expect(displayedTieRatios.length).toBeGreaterThan(0);
+    for (const ratio of displayedTieRatios) {
+      expect(ratio.className).not.toContain("bb-tone-success-fg");
+      expect(ratio.className).not.toContain("font-medium");
+    }
+  });
 });

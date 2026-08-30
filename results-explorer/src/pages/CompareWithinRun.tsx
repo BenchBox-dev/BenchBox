@@ -544,6 +544,7 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
                     {row.cells.map((cell, i) => {
                       const isRef = i === referenceIndex;
                       const { ratio, deltaMs } = calculateCellDelta(cell.ms, refCell?.ms ?? null);
+                      const comparisonStatus = withinRunComparisonStatus(ratio);
                       return (
                         <td key={i} class="table-td font-mono text-right">
                           {cell.ms !== null ? (
@@ -554,9 +555,9 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
                               {!isRef && ratio !== null && deltaMs !== null && (
                                 <div
                                   class={`text-xs ${
-                                    ratio < 1
+                                    comparisonStatus === "faster"
                                       ? "text-[var(--bb-tone-success-fg)] font-medium"
-                                      : ratio > 1
+                                      : comparisonStatus === "slower"
                                         ? "text-[var(--bb-data-fg-muted)]"
                                         : "text-[var(--bb-data-fg-subtle)]"
                                   }`}
