@@ -14,6 +14,7 @@ from unittest.mock import Mock, call
 
 import pytest
 
+from benchbox.core.tuning.applied_ledger import STATEMENT_FAILED, AppliedTuningLedger
 from benchbox.platforms.base import PlatformAdapter
 
 pytestmark = [
@@ -153,10 +154,12 @@ class TestPlatformAdapterApplyCtasSort:
 
     def test_returns_false_when_platform_hook_returns_none(self):
         adapter = _BaseCtasTestAdapter(ctas_sql=None)
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
         tuning_config = _make_tuning_config({"lineitem": _make_table_tuning_with_sort(["l_shipdate"])})
 
         assert adapter.apply_ctas_sort("lineitem", tuning_config, self.connection) is False
         self.connection.execute.assert_not_called()
+        assert adapter._applied_tuning_ledger.dropped[0].intent == "sorted_ingestion lineitem ORDER BY l_shipdate"
 
     def test_executes_statements_via_cursor_when_connection_has_no_execute(self):
         adapter = _BaseCtasTestAdapter(ctas_sql=["SELECT 1", "SELECT 2"])
@@ -330,18 +333,18 @@ class TestSortedIngestionCapabilityAndGuardrails:
             adapter.resolve_sorted_ingestion_strategy()
 
 
-class TestFkSafeCtasSort:
-    """Regression coverage for DuckDB's FK-preserving CTAS-sort path."""
+class TestConstraintPreservingCtasSort:
+    """Regression coverage for DuckDB's constraint-preserving CTAS-sort path."""
 
     def _make_adapter_and_config(self):
         adapter = _SortedIngestionStrategyAdapter(
             "duckdb", ctas_sql="CREATE OR REPLACE TABLE lineitem AS SELECT * FROM lineitem"
         )
         config = _make_tuning_config({"lineitem": _make_table_tuning_with_sort(["l_orderkey"])})
-        config.foreign_keys = Mock(enabled=True)
+        config.foreign_keys = Mock(enabled=False)
         return adapter, config
 
-    def test_fk_enabled_uses_atomic_in_place_rewrite(self):
+    def test_duckdb_uses_in_place_rewrite_without_config_constraint_gate(self):
         adapter, tuning_config = self._make_adapter_and_config()
         connection = Mock()
         metadata = Mock()
@@ -360,15 +363,97 @@ class TestFkSafeCtasSort:
         connection.commit.assert_called_once_with()
         connection.rollback.assert_not_called()
 
-    def test_fk_enabled_rewrite_rolls_back_after_a_statement_failure(self):
+    def test_rewrite_rolls_back_and_records_failure_after_statement_error(self):
         adapter, tuning_config = self._make_adapter_and_config()
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
         connection = Mock()
         metadata = Mock()
         metadata.fetchall.return_value = []
         connection.execute.side_effect = [None, metadata, None, None, RuntimeError("insert failed")]
 
-        with pytest.raises(RuntimeError, match="insert failed"):
-            adapter.apply_ctas_sort("lineitem", tuning_config, connection)
+        assert adapter.apply_ctas_sort("lineitem", tuning_config, connection) is False
 
         connection.rollback.assert_called_once_with()
         connection.commit.assert_not_called()
+        statement = adapter._applied_tuning_ledger.statements[0]
+        assert statement.status == STATEMENT_FAILED
+        assert statement.mechanism == "sorted_ingestion"
+        assert statement.table == "lineitem"
+        assert statement.error == "insert failed"
+
+    def test_rewrite_raises_when_rollback_cannot_restore_safety(self):
+        adapter, tuning_config = self._make_adapter_and_config()
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
+        connection = Mock()
+        metadata = Mock()
+        metadata.fetchall.return_value = []
+        connection.execute.side_effect = [None, metadata, None, None, RuntimeError("insert failed")]
+        connection.rollback.side_effect = RuntimeError("rollback failed")
+
+        with pytest.raises(RuntimeError, match="could not be rolled back"):
+            adapter.apply_ctas_sort("lineitem", tuning_config, connection)
+
+        statement = adapter._applied_tuning_ledger.statements[0]
+        assert statement.status == STATEMENT_FAILED
+        assert "rollback failed" in statement.error
+
+    def test_active_caller_transaction_is_not_committed_or_rolled_back(self):
+        adapter, tuning_config = self._make_adapter_and_config()
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
+        connection = Mock()
+        connection.transaction_active = True
+
+        assert adapter.apply_ctas_sort("lineitem", tuning_config, connection) is False
+
+        connection.execute.assert_not_called()
+        connection.commit.assert_not_called()
+        connection.rollback.assert_not_called()
+        assert len(adapter._applied_tuning_ledger.dropped) == 1
+        assert "active transaction" in adapter._applied_tuning_ledger.dropped[0].reason
+
+    def test_duckdb_1_0_constraint_shape_ignores_nullable_and_unrelated_rows(self):
+        adapter, _tuning_config = self._make_adapter_and_config()
+        connection = Mock()
+        metadata = Mock()
+        metadata.fetchall.return_value = [
+            ("child", ["parent_id"], "FOREIGN KEY (parent_id) REFERENCES lineitem(l_orderkey)"),
+            ("lineitem", ["parent_id"], ""),
+            ("other_child", ["other_id"], "FOREIGN KEY (other_id) REFERENCES other(id)"),
+        ]
+        nullable_child = Mock()
+        nullable_child.fetchone.return_value = None
+        nullable_self_reference = Mock()
+        nullable_self_reference.fetchone.return_value = None
+        connection.execute.side_effect = [metadata, nullable_child, nullable_self_reference]
+
+        assert adapter._has_populated_fk_dependents(connection, "lineitem") is False
+
+        metadata_query = connection.execute.call_args_list[0].args[0]
+        assert "constraint_text" in metadata_query
+        assert "referenced_table" not in metadata_query
+        assert "referenced_column_names" not in metadata_query
+        assert connection.execute.call_args_list[1] == call(
+            'SELECT 1 FROM "child" WHERE "parent_id" IS NOT NULL LIMIT 1;'
+        )
+        assert connection.execute.call_args_list[2] == call(
+            'SELECT 1 FROM "lineitem" WHERE "parent_id" IS NOT NULL LIMIT 1;'
+        )
+
+    def test_populated_non_null_fk_dependent_skips_and_records_intent(self):
+        adapter, tuning_config = self._make_adapter_and_config()
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
+        connection = Mock()
+        metadata = Mock()
+        metadata.fetchall.return_value = [
+            ("orders", ["lineitem_id"], "FOREIGN KEY (lineitem_id) REFERENCES lineitem(l_orderkey)")
+        ]
+        dependent = Mock()
+        dependent.fetchone.return_value = (1,)
+        connection.execute.side_effect = [None, metadata, dependent]
+
+        assert adapter.apply_ctas_sort("lineitem", tuning_config, connection) is False
+
+        connection.rollback.assert_called_once_with()
+        connection.commit.assert_not_called()
+        assert len(adapter._applied_tuning_ledger.dropped) == 1
+        assert "foreign-key dependents" in adapter._applied_tuning_ledger.dropped[0].reason

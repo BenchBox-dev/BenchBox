@@ -32,6 +32,7 @@ from pathlib import Path
 import pytest
 
 from benchbox.core.tpch.benchmark import TPCHBenchmark
+from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
 from benchbox.core.tuning.interface import TableTuning, TuningColumn, UnifiedTuningConfiguration
 from benchbox.platforms.duckdb import DuckDBAdapter
 
@@ -175,7 +176,7 @@ def test_populated_parent_rewrite_preserves_dependents_and_fk_enforcement(tmp_pa
     conn.execute("INSERT INTO child VALUES (100, 1)")
     tuning_config = UnifiedTuningConfiguration.from_dict(
         {
-            "foreign_keys": {"enabled": True, "enforce_referential_integrity": True},
+            "foreign_keys": {"enabled": False, "enforce_referential_integrity": False},
             "table_tunings": {
                 "parent": {
                     "table_name": "parent",
@@ -184,10 +185,80 @@ def test_populated_parent_rewrite_preserves_dependents_and_fk_enforcement(tmp_pa
             },
         }
     )
+    adapter._applied_tuning_ledger = AppliedTuningLedger()
 
     assert adapter.apply_ctas_sort("parent", tuning_config, conn) is False
     assert conn.execute("SELECT * FROM child").fetchall() == [(100, 1)]
     assert set(conn.execute("SELECT id FROM parent").fetchall()) == {(1,), (2,)}
     with pytest.raises(Exception, match="[Ff]oreign key"):
         conn.execute("INSERT INTO child VALUES (101, 999)")
+    assert len(adapter._applied_tuning_ledger.dropped) == 1
+    conn.close()
+
+
+def test_physical_pk_not_null_and_fk_constraints_survive_sort_when_config_flags_are_off(tmp_path: Path):
+    """Physical constraints, not requested flags, determine whether table identity must be preserved."""
+    adapter = DuckDBAdapter(database_path=str(tmp_path / "physical_constraints.duckdb"))
+    conn = adapter.create_connection()
+    conn.execute("CREATE TABLE parent (id INTEGER PRIMARY KEY, required_value INTEGER NOT NULL)")
+    conn.execute("CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent(id))")
+    conn.execute("INSERT INTO parent VALUES (2, 20), (1, 10)")
+    tuning_config = UnifiedTuningConfiguration.from_dict(
+        {
+            "primary_keys": {"enabled": False, "enforce_uniqueness": False},
+            "foreign_keys": {"enabled": False, "enforce_referential_integrity": False},
+            "table_tunings": {
+                "parent": {
+                    "table_name": "parent",
+                    "sorting": [{"name": "id", "type": "INTEGER", "order": 1}],
+                }
+            },
+        }
+    )
+    constraints_before = conn.execute(
+        "SELECT table_name, constraint_type, constraint_text FROM duckdb_constraints() "
+        "WHERE table_name IN ('parent', 'child') ORDER BY table_name, constraint_index"
+    ).fetchall()
+
+    assert adapter.apply_ctas_sort("parent", tuning_config, conn) is True
+
+    constraints_after = conn.execute(
+        "SELECT table_name, constraint_type, constraint_text FROM duckdb_constraints() "
+        "WHERE table_name IN ('parent', 'child') ORDER BY table_name, constraint_index"
+    ).fetchall()
+    assert constraints_after == constraints_before
+    assert conn.execute("SELECT * FROM parent").fetchall() == [(1, 10), (2, 20)]
+    with pytest.raises(Exception, match="[Pp]rimary key|[Dd]uplicate"):
+        conn.execute("INSERT INTO parent VALUES (1, 99)")
+    with pytest.raises(Exception, match="(?i)not null"):
+        conn.execute("INSERT INTO parent VALUES (3, NULL)")
+    with pytest.raises(Exception, match="[Ff]oreign key"):
+        conn.execute("INSERT INTO child VALUES (1, 999)")
+    conn.close()
+
+
+def test_active_caller_transaction_is_preserved_without_nested_begin(tmp_path: Path):
+    """Sorted ingestion must not abort, commit, or roll back a caller-owned transaction."""
+    adapter = DuckDBAdapter(database_path=str(tmp_path / "active_transaction.duckdb"))
+    adapter._applied_tuning_ledger = AppliedTuningLedger()
+    conn = adapter.create_connection()
+    conn.execute("CREATE TABLE items (id INTEGER PRIMARY KEY)")
+    conn.execute("INSERT INTO items VALUES (2), (1)")
+    tuning_config = UnifiedTuningConfiguration.from_dict(
+        {
+            "table_tunings": {
+                "items": {
+                    "table_name": "items",
+                    "sorting": [{"name": "id", "type": "INTEGER", "order": 1}],
+                }
+            }
+        }
+    )
+
+    conn.execute("BEGIN")
+    assert adapter.apply_ctas_sort("items", tuning_config, conn) is False
+    assert conn.execute("SELECT COUNT(*) FROM items").fetchone() == (2,)
+    conn.execute("ROLLBACK")
+    assert len(adapter._applied_tuning_ledger.dropped) == 1
+    assert "active transaction" in adapter._applied_tuning_ledger.dropped[0].reason
     conn.close()
