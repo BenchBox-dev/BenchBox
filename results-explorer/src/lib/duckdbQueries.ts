@@ -228,6 +228,25 @@ export interface QueryExecutionRow {
   stream: number | null;
 }
 
+/**
+ * One row of `bench.result_basis_availability`, the pipeline's precomputed
+ * answer to "which measurement bases can this run serve?".
+ *
+ * `available_bases` is a comma-separated token list in the same vocabulary the
+ * URL grammar uses (see measurementBasis.ts), so an availability check is a
+ * token comparison rather than a translation. `varying_pass_queries` is a JSON
+ * object mapping query_id to that query's usable pass count, present only when
+ * a run's queries disagree; it is null for the common uniform case.
+ */
+export interface ResultBasisAvailabilityRow {
+  result_id: string;
+  has_warmup: boolean;
+  measurement_pass_count: number;
+  warmup_status: string;
+  available_bases: string;
+  varying_pass_queries: string | null;
+}
+
 export interface BenchmarkMatrixCellRow {
   benchmark: string;
   scale_factor: number;
@@ -689,6 +708,32 @@ export async function getQueryExecutions(resultId: string): Promise<QueryExecuti
       " CASE WHEN iter IS NULL THEN 0 ELSE iter END",
     [resultId],
   );
+}
+
+/**
+ * Read a run's precomputed basis availability.
+ *
+ * Surfaces use this rather than deriving availability from raw executions:
+ * the pipeline has already made the determination, and pulling every
+ * execution row for a 103-query run just to re-derive it would be a large
+ * download to reach an answer the read model already holds. The pure
+ * `basisAvailability` helper in measurementBasis.ts remains the authority for
+ * per-query detail once those rows are in hand.
+ *
+ * Returns null for a result the table does not cover, which is the honest
+ * answer for a snapshot built before the basis columns existed.
+ */
+export async function getResultBasisAvailability(
+  resultId: string,
+): Promise<ResultBasisAvailabilityRow | null> {
+  const rows = await queryRows<ResultBasisAvailabilityRow>(
+    "SELECT result_id, has_warmup, measurement_pass_count, warmup_status," +
+      " available_bases, varying_pass_queries" +
+      " FROM bench.result_basis_availability" +
+      " WHERE result_id = ?",
+    [resultId],
+  );
+  return rows[0] ?? null;
 }
 
 /**
