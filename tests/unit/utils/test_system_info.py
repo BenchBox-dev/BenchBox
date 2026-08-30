@@ -711,6 +711,49 @@ class TestCpuIdentityCapture:
                     info = get_system_info()
         assert info.cpu_model != platform.machine()
 
+    def test_rejects_an_architecture_alias_that_is_not_equal_to_machine(self) -> None:
+        # Regression for a review finding. On Apple Silicon platform.processor()
+        # returns "arm" while platform.machine() returns "arm64", so guarding
+        # with `cpu_model == platform.machine()` let "arm" straight through --
+        # reintroducing, whenever sysctl is unavailable or times out, the exact
+        # value this module exists to keep out of published results.
+        with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
+            with patch("benchbox.utils.system_info.platform.processor", return_value="arm"):
+                with patch("benchbox.utils.system_info.platform.machine", return_value="arm64"):
+                    with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
+                        info = get_system_info()
+        assert info.cpu_model == "arm64 CPU"
+
+    @pytest.mark.parametrize(
+        "processor,machine",
+        [
+            ("arm", "arm64"),
+            ("ARM", "arm64"),
+            ("x86_64", "x86_64"),
+            ("amd64", "x86_64"),
+            ("i686", "i686"),
+            ("aarch64", "aarch64"),
+            ("  arm  ", "arm64"),
+        ],
+    )
+    def test_no_architecture_token_is_ever_published_as_a_model(self, processor, machine) -> None:
+        with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
+            with patch("benchbox.utils.system_info.platform.processor", return_value=processor):
+                with patch("benchbox.utils.system_info.platform.machine", return_value=machine):
+                    with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
+                        info = get_system_info()
+        assert info.cpu_model == f"{machine} CPU"
+
+    def test_keeps_a_real_model_that_merely_contains_an_arch_word(self) -> None:
+        # The guard must reject architecture TOKENS, not any string mentioning
+        # one. "ARMv8 Neoverse-N1" is a real model and must survive.
+        with patch("benchbox.utils.environment.detect_cpu_info", return_value=(None, None)):
+            with patch("benchbox.utils.system_info.platform.processor", return_value="ARMv8 Neoverse-N1"):
+                with patch("benchbox.utils.system_info.platform.machine", return_value="aarch64"):
+                    with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
+                        info = get_system_info()
+        assert info.cpu_model == "ARMv8 Neoverse-N1"
+
     def test_to_dict_emits_the_keys_the_environment_consumer_reads(self) -> None:
         # ClientHostEnvironment.from_system_profile reads cpu_count, memory_gb
         # and os_release. This dict previously emitted cpu_cores,

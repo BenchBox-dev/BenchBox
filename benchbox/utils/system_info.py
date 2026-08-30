@@ -55,6 +55,53 @@ class SystemInfo:
         }
 
 
+# Values platform.processor() returns that name an ARCHITECTURE, not a CPU
+# model. Comparing against platform.machine() alone is not enough: on Apple
+# Silicon processor() returns "arm" while machine() returns "arm64", so an
+# equality check lets "arm" through -- which is precisely the value that
+# normalizes to the cpu_family "unknown" and the defect this module exists to
+# prevent.
+_ARCHITECTURE_TOKENS = frozenset(
+    {
+        "aarch64",
+        "amd64",
+        "arm",
+        "arm64",
+        "armv6l",
+        "armv7l",
+        "armv8",
+        "i386",
+        "i486",
+        "i586",
+        "i686",
+        "mips",
+        "mips64",
+        "ppc",
+        "ppc64",
+        "ppc64le",
+        "riscv64",
+        "s390x",
+        "x86",
+        "x86_64",
+    }
+)
+
+
+def _is_architecture_token(value: str, machine: str) -> bool:
+    """True when *value* names an architecture rather than a CPU model.
+
+    Publishing an architecture as if it were a model is the failure this guard
+    exists to stop: it normalizes to the cpu_family "unknown", which looks
+    populated and says nothing.
+    """
+    cleaned = value.strip().lower()
+    if not cleaned:
+        return True
+    if cleaned == machine.strip().lower():
+        return True
+    return cleaned in _ARCHITECTURE_TOKENS
+
+
 def _proc_cpuinfo_model() -> str | None:
     """Return the CPU model from /proc/cpuinfo, or None when unavailable.
 
@@ -106,7 +153,7 @@ def get_system_info() -> SystemInfo:
                 cpu_model = _proc_cpuinfo_model() or ""
         except Exception:
             cpu_model = ""
-        if not cpu_model or cpu_model == platform.machine():
+        if not cpu_model or _is_architecture_token(cpu_model, platform.machine()):
             # Never publish the architecture as if it were a CPU model.
             cpu_model = f"{platform.machine()} CPU"
 
