@@ -879,11 +879,22 @@ export function Compare({ url }: CompareProps) {
 
       {compareLayoutForSelection(resolvedResults.map((r) => r.result_id)).kind === "multi_run" && (
         <>
-          <MultiRunStandings
-            results={resolvedResults}
-            baselineIndex={normalizedBaselineIndex}
-            runLabels={cohortIdentitiesCompact}
-          />
+          {decisionSummary.claimSuppressed ? (
+            <section class="card mb-8" aria-labelledby="standings-title">
+              <h2 id="standings-title" class="text-base font-semibold text-[var(--bb-data-fg-primary)]">
+                Standings
+              </h2>
+              <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]" role="status">
+                Standings are unavailable because {decisionSummary.claimSuppressionReason ?? "the selected runs are not comparable"}.
+              </p>
+            </section>
+          ) : (
+            <MultiRunStandings
+              results={resolvedResults}
+              baselineIndex={normalizedBaselineIndex}
+              runLabels={cohortIdentitiesCompact}
+            />
+          )}
           <MultiRunHeatmap
             results={resolvedResults}
             baselineIndex={normalizedBaselineIndex}
