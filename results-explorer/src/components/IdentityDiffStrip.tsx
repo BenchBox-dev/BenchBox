@@ -20,10 +20,12 @@ import { buildComparabilityFields, type ComparabilityField } from "@/components/
  */
 export interface IdentityDiffStripProps {
   results: DetailResult[];
+  baselineIndex?: number;
+  runLabels?: readonly string[];
 }
 
 /** The axes this strip reports, in reading order, by their receipt labels. */
-const STRIP_AXES = [
+export const STRIP_AXES = [
   "Platform version",
   "Driver version",
   "Architecture",
@@ -32,7 +34,7 @@ const STRIP_AXES = [
   "Memory",
 ] as const;
 
-const AXIS_DISPLAY_LABEL: Record<(typeof STRIP_AXES)[number], string> = {
+export const AXIS_DISPLAY_LABEL: Record<(typeof STRIP_AXES)[number], string> = {
   "Platform version": "Engine version",
   "Driver version": "Driver",
   Architecture: "Architecture",
@@ -40,6 +42,23 @@ const AXIS_DISPLAY_LABEL: Record<(typeof STRIP_AXES)[number], string> = {
   "CPU model": "CPU model",
   Memory: "Memory",
 };
+
+export function axisValueForRun(axis: (typeof STRIP_AXES)[number], result: DetailResult): string {
+  switch (axis) {
+    case "Platform version":
+      return result.platform_version && result.platform_version !== "" ? result.platform_version : "Not recorded";
+    case "Driver version":
+      return result.driver_version && result.driver_version !== "" ? result.driver_version : "Not recorded";
+    case "Architecture":
+      return result.environment?.arch && result.environment.arch !== "" ? result.environment.arch : "Not recorded";
+    case "CPU family":
+      return result.environment?.cpu_family && result.environment.cpu_family !== "" ? result.environment.cpu_family : "Not recorded";
+    case "CPU model":
+      return result.environment?.cpu_model && result.environment.cpu_model !== "" ? result.environment.cpu_model : "Not recorded";
+    case "Memory":
+      return result.environment?.memory_gb !== undefined ? `${result.environment.memory_gb} GB` : "Not recorded";
+  }
+}
 
 export function identityStripFields(results: DetailResult[]): ComparabilityField[] {
   if (results.length === 0) return [];
@@ -66,11 +85,77 @@ function statusWord(status: ComparabilityField["status"]): string {
   return "Same";
 }
 
-export function IdentityDiffStrip({ results }: IdentityDiffStripProps) {
+export function IdentityDiffStrip({ results, baselineIndex = 0, runLabels }: IdentityDiffStripProps) {
   if (results.length < 2) return null;
   const fields = identityStripFields(results);
   if (fields.length === 0) return null;
   const diffCount = fields.filter((f) => f.status === "diff").length;
+
+  if (results.length > 2) {
+    const baseIndex = results[baselineIndex] ? baselineIndex : 0;
+    const baselineRun = results[baseIndex];
+
+    return (
+      <section class="panel mb-4 px-3 py-2 shadow-sm" aria-label="Engine and hardware identity">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">Engine and hardware</h2>
+          <p class="text-xs text-[var(--bb-data-fg-muted)]">
+            {diffCount === 0
+              ? "These runs match on every axis below, so the difference is not explained by them."
+              : `${diffCount} of ${fields.length} ${diffCount === 1 ? "axis varies" : "axes vary"} across the whole selection.`}
+          </p>
+        </div>
+        <div class="mt-2 overflow-x-auto">
+          <table role="table" class="min-w-full w-max divide-y divide-[var(--bb-data-border)] text-sm">
+            <thead class="bg-[var(--bb-surface-data-muted)]">
+              <tr>
+                <th class="table-th">Axis</th>
+                {results.map((r, i) => (
+                  <th key={r.result_id} class="table-th">
+                    {runLabels?.[i] ?? r.platform}
+                    {i === baseIndex ? " (baseline)" : ""}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
+              {fields.map((field) => {
+                const axis = field.label as (typeof STRIP_AXES)[number];
+                const baseVal = baselineRun ? axisValueForRun(axis, baselineRun) : "Not recorded";
+                return (
+                  <tr key={field.label}>
+                    <td class="table-td font-medium text-[var(--bb-data-fg-primary)]">
+                      {AXIS_DISPLAY_LABEL[axis] ?? field.label}
+                    </td>
+                    {results.map((r, i) => {
+                      const val = axisValueForRun(axis, r);
+                      const isBase = i === baseIndex;
+                      const isMissing = val === "Not recorded" || baseVal === "Not recorded";
+                      const isDiff = !isBase && !isMissing && val !== baseVal;
+                      const status = isBase ? "baseline" : isMissing ? "missing" : isDiff ? "diff" : "match";
+                      return (
+                        <td key={r.result_id} class="table-td text-xs" data-testid={`matrix-cell-${axis}-${i}`}>
+                          <div class="flex items-center justify-between gap-2">
+                            <span class="break-words font-mono text-[var(--bb-data-fg-primary)]">{val}</span>
+                            <StatusBadge
+                              role="comparison"
+                              tone={status === "diff" ? "warning" : status === "match" ? "success" : "neutral"}
+                            >
+                              {status === "baseline" ? "Baseline" : statusWord(status)}
+                            </StatusBadge>
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section class="panel mb-4 px-3 py-2 shadow-sm" aria-label="Engine and hardware identity">
