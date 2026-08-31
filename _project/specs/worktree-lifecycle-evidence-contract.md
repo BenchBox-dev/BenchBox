@@ -1,8 +1,9 @@
 # BenchBox worktree lifecycle evidence contract
 
-Status: draft specification (2026-08-26). Defines the non-destructive
-contract only. No cleanup, reaper, or mutation behavior is authorized by
-this document, and none is implemented against it yet.
+Status: draft specification (2026-08-26) as amended 2026-08-31 to authorize
+`make branch-prune-merged` — an explicit, operator-driven, `gh`-based reaper
+limited to worktree-less local branches still at their merged PR head. No
+worktree reaper is authorized; see §2.
 
 ## 1. Problem
 
@@ -26,8 +27,13 @@ deletion path and changes no runtime behavior.
 
 ## 2. Non-goals
 
-- No bulk reaper, sweep, or auto-cleanup command. Any future mutation stays
-  single-target and operator-driven, exactly like `worktree-remove` today.
+- No worktree reaper, sweep, or auto-cleanup command. Worktree removal stays
+  exact-path and operator-driven via `make worktree-remove` only
+  (`docs/operations/dev-loop-worktrees.md`). The single authorized exception is
+  `make branch-prune-merged`, which reaps only worktree-less local branches
+  still at their merged `headRefOid` (operator-driven, `gh`-based, with
+  `DRY_RUN=1` preview). Any other future mutation stays single-target and
+  operator-driven, exactly like `worktree-remove` today.
 - No new destructive Git operation and no change to `worktree-remove`'s
   existing refusal rules.
 - No parsing of `.bossmode/control.db` (or any other worktree's copy of it),

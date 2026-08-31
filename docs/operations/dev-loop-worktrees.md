@@ -50,6 +50,21 @@ git worktree unlock /absolute/path/to/worktree
 Never unlock or prune a worktree while its `.git` directory is mounted by a
 container.
 
+Local branches created with plain `git checkout -b` (no worktree) are not
+swept by `worktree-remove`. After the PR merges, preview and sweep only those
+worktree-less branches still at the exact commit GitHub merged:
+
+```bash
+make branch-prune-merged DRY_RUN=1   # preview (requires gh)
+make branch-prune-merged             # delete only exact merged heads
+```
+
+`branch-prune-merged` skips the current branch, `develop`/`main`/`release`/
+`published-results`, and any branch still attached to a worktree. It checks
+`gh pr list` state (not ancestry, since PRs squash-merge) and additionally
+requires the local tip to equal the PR's `headRefOid`, so a branch re-created
+under an old merged name or carrying post-merge commits is reported and kept.
+
 ## Inspection
 
 Use native Git and the read-only audit tool for inspection:
@@ -58,6 +73,7 @@ Use native Git and the read-only audit tool for inspection:
 make worktree-list
 make worktree-audit
 make worktree-audit FORMAT=json
+make branch-prune-merged DRY_RUN=1
 git -C /absolute/path/to/worktree status --short
 ```
 

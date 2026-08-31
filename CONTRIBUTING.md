@@ -97,10 +97,12 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → (wh
 
    `make pr-ready` (or `READY=1`) is the only arm path: `auto-merge-on-open.yml` is revoke-only and never arms — not on `opened` / `reopened` / `synchronize`, and not on draft → ready (`ready_for_review` is not even a trigger; the historical workflow arm point never fired once and was deleted). Once armed, the PR squash-merges when required checks turn green — don't poll. Soundness-critical paths and the `no-auto-merge` hold label stay withheld pending review (see `docs/operations/repo-admin-settings.md`).
 
-6. **After merge**, remove the clean linked worktree. The remote branch normally auto-deletes through the repository setting; clean local branches separately:
+6. **After merge**, remove the clean linked worktree. The remote branch normally auto-deletes through the repository setting; sweep stale local branches separately:
 
    ```bash
-   make worktree-remove WORKTREE_PATH="$WORKTREE_PATH"
+   make worktree-remove WORKTREE_PATH="$WORKTREE_PATH"   # removes the linked worktree
+   make branch-prune-merged DRY_RUN=1                      # preview worktree-less branches still at their merged PR head (requires gh)
+   make branch-prune-merged                                # delete only those exact heads
    ```
 
    Inspect open PRs at any time with `make pr-status`.

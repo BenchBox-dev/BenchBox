@@ -1252,7 +1252,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight .pr-preflight-route pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
+.PHONY: pr-preflight .pr-preflight-route pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
@@ -1634,6 +1634,72 @@ dev-loop-metrics:
 include $(BENCHBOX_MAKEFILE_ROOT)make/worktrees.mk
 
 include $(BENCHBOX_MAKEFILE_ROOT)make/worktree-maintenance.mk
+
+## branch-prune-merged: delete local branches whose PR already merged into
+## develop but that have no worktree attached. worktree-remove only sweeps
+## branches tied to a worktree, so plain `git checkout -b` leftovers in a
+## long-lived clone are never cleaned by it.
+##
+## Requires `gh`. PRs squash-merge, so a merged branch's tip is never an
+## ancestor of develop and ancestry cannot tell merged from diverged; PR
+## state is the only reliable signal (same as worktree-audit's integration
+## evidence model — §7 in the evidence contract).
+##
+## Deletes only when the local tip is still the exact commit GitHub merged
+## (headRefOid). A branch re-created under an old merged branch's name, or
+## carrying commits pushed after the merge, is reported and kept rather
+## than force-deleted -- name alone is not proof the local work merged.
+## A local branch left behind the merged head is likewise kept.
+##
+## Run with DRY_RUN=1 to preview without deleting anything.
+branch-prune-merged:
+	@command -v gh >/dev/null 2>&1 || { echo "gh CLI required for branch-prune-merged" >&2; exit 1; }
+	@pr_table=$$(gh pr list --state all --base develop --limit 1000 \
+		--json headRefName,state,headRefOid \
+		--template '{{range .}}{{.headRefName}}{{"\t"}}{{.state}}{{"\t"}}{{.headRefOid}}{{"\n"}}{{end}}' 2>/dev/null); \
+	if [ -z "$$pr_table" ]; then \
+		echo "gh pr list returned no data; refusing to prune without PR-state visibility" >&2; \
+		exit 1; \
+	fi; \
+	current=$$(git branch --show-current); \
+	worktree_branches=$$(git worktree list --porcelain | awk '/^branch /{print $$2}'); \
+	deleted=0; kept=0; \
+	for br in $$(git for-each-ref --format='%(refname:short)' refs/heads); do \
+		case "$$br" in develop|main|release|published-results) continue ;; esac; \
+		[ "$$br" = "$$current" ] && continue; \
+		if printf '%s\n' "$$worktree_branches" | grep -qxF "refs/heads/$$br"; then \
+			echo "skip $$br: attached to a worktree (use worktree-remove)"; \
+			continue; \
+		fi; \
+		row=$$(printf '%s\n' "$$pr_table" | awk -F'\t' -v b="$$br" '$$1 == b {print; exit}'); \
+		if [ -z "$$row" ]; then \
+			row=$$(gh pr list --head "$$br" --state all --base develop --limit 1 \
+				--json headRefName,state,headRefOid \
+				--template '{{range .}}{{.headRefName}}{{"\t"}}{{.state}}{{"\t"}}{{.headRefOid}}{{"\n"}}{{end}}' 2>/dev/null); \
+		fi; \
+		[ -n "$$row" ] || continue; \
+		pr_state=$$(printf '%s\n' "$$row" | cut -f2); \
+		merged_oid=$$(printf '%s\n' "$$row" | cut -f3); \
+		[ "$$pr_state" = "MERGED" ] || continue; \
+		local_oid=$$(git rev-parse --verify --quiet "refs/heads/$$br") || continue; \
+		if [ "$$local_oid" != "$$merged_oid" ]; then \
+			echo "keep $$br: local tip $$(printf "%.8s" "$$local_oid") is not the merged head $$(printf "%.8s" "$$merged_oid") (re-created or diverged)"; \
+			kept=$$((kept + 1)); \
+			continue; \
+		fi; \
+		if [ "$(DRY_RUN)" = "1" ]; then \
+			echo "would delete $$br (PR MERGED at $$(printf "%.8s" "$$merged_oid"))"; \
+		else \
+			echo "delete $$br (PR MERGED at $$(printf "%.8s" "$$merged_oid"))"; \
+			git branch -D "$$br" >/dev/null; \
+		fi; \
+		deleted=$$((deleted + 1)); \
+	done; \
+	if [ "$(DRY_RUN)" = "1" ]; then \
+		echo "Dry run: would delete $$deleted branch(es); $$kept kept (not the merged head)."; \
+	else \
+		echo "Deleted $$deleted branch(es); $$kept kept (not the merged head)."; \
+	fi
 
 # ----------------------------------------------------------------------
 # UAT framework (tests/uat/) — see _project/specs/uat-framework.md.
