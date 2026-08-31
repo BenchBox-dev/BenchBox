@@ -88,6 +88,10 @@ SOUNDNESS_FILES = (
     "scripts/generate_corpus_inventory.py",
     "scripts/validate_submission.py",
     ".github/workflows/validate-submission.yml",
+    # Current production Pages authority. Until the independent compositor is
+    # cut over, this workflow holds deployment credentials and publishes the
+    # complete site and Explorer, so changes require the same manual review.
+    ".github/workflows/docs.yml",
     "_project/scripts/auto_merge_soundness_paths.py",
     ".github/workflows/auto-merge-on-open.yml",
     ".github/workflows/release.yml",

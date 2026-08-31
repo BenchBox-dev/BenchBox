@@ -177,8 +177,10 @@ benchbox result withdraw --submission-id X
   public and ranking read models
 - Reserves, deploys, and probes a new generation (target: < 15 minutes); status becomes
   `withdrawn` only when a matching live receipt confirms public suppression
-- Bundle is retained for 90 days in case the actor wants to resubmit after
-  correcting an error
+- Accepted source bytes remain in the accepted archive indefinitely. Withdrawal
+  suppresses presentation and ranking only; it does not start a purge clock.
+  Unaccepted staging data may be retained for 90 days in case the actor wants to
+  resubmit after correcting an error, then purged by staging lifecycle policy.
 
 **Admin-forced withdrawal** (any result; triggered by abuse, false data, or
 legal request):
@@ -191,7 +193,10 @@ benchbox admin withdraw --submission-id X --reason abuse|false_data|legal|policy
 - Triggers an immediate candidate-index rebuild and controlled deployment; status becomes
   `withdrawn` only after the matching live receipt confirms public suppression
 - Actor is notified by email within 24 hours with the reason code
-- Bundle is retained for 180 days for audit purposes, then purged
+- Accepted source bytes remain in the accepted archive indefinitely for audit and
+  lineage. A 180-day purge applies only to unaccepted staging data. Deleting an
+  accepted bundle requires the separately approved erasure exception and evidence
+  plan defined by the independent-publication operations contract.
 
 ### Audit Log Schema
 

@@ -20,6 +20,7 @@ HOSTED_CONTRACT = ROOT / "docs/reference/hosted-results-contract.md"
 PHASE3_THREAT_MODEL = ROOT / "docs/reference/threat-model.md"
 PUBLIC_ID_ADR = ROOT / "docs/development/adr/adr-public-result-id-permanence.md"
 PHASE3_RUNBOOK = ROOT / "docs/operations/results-phase-3-runbook.md"
+PHASE2_RUNBOOK = ROOT / "docs/operations/results-phase-2-runbook.md"
 
 
 def _text(path: Path) -> str:
@@ -191,3 +192,14 @@ def test_phase3_threat_model_extends_cross_phase_contract() -> None:
     assert "vendor-supplied" in text
     assert "manual maintainer review with no auto-merge" in text
     assert "one explicit authorized-maintainer approval" in text
+
+
+def test_freeze_preserves_accepted_archive_bytes_during_rollback_and_withdrawal() -> None:
+    phase2 = _normalized(PHASE2_RUNBOOK)
+    phase3 = _normalized(PHASE3_RUNBOOK)
+
+    assert "For an accepted bundle, do **not** run `git revert` against `published-results`" in phase2
+    assert "Removing those bytes requires a separately approved erasure exception" in phase2
+    assert "Accepted source bytes remain in the accepted archive indefinitely" in phase3
+    assert "Withdrawal suppresses presentation and ranking only" in phase3
+    assert "A 180-day purge applies only to unaccepted staging data" in phase3

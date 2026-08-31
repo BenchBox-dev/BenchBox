@@ -30,6 +30,7 @@ _project/scripts/explorer_pipeline/ranking.py @joeharris76
 scripts/generate_corpus_inventory.py @joeharris76
 scripts/validate_submission.py @joeharris76
 .github/workflows/validate-submission.yml @joeharris76
+.github/workflows/docs.yml @joeharris76
 # Self-protection: the review-gate machinery and the PyPI-publishing
 # workflow. In-workflow checks are attacker-controlled for same-repo PRs
 # (GitHub runs the PR's own copy of a pull_request-triggered workflow).

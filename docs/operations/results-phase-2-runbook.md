@@ -286,8 +286,17 @@ result IDs from the *published* bytes, so regenerate the inventory afterwards
 
 ## 5. Rolling Back a Bad Merge
 
-Use a fresh branch off the affected target branch. Set `REMOTE` to the repo you are
-operating against.
+First classify whether the merge introduced an accepted bundle. During the A0
+freeze, an accepted bundle must remain in the archive tip and remain recoverable.
+For an accepted bundle, do **not** run `git revert` against `published-results`.
+Request presentation withdrawal, deploy the suppression generation, and retain
+the accepted source bytes. Removing those bytes requires a separately approved
+erasure exception and evidence plan.
+
+The archive-reversing procedure below is reserved for a merge that changed only
+unaccepted staging or non-corpus material, or for an explicitly approved erasure
+exception. Use a fresh branch off the affected target branch. Set `REMOTE` to the
+repo you are operating against.
 
 ```bash
 REMOTE=public
@@ -299,8 +308,9 @@ git revert -m 1 "${MERGE_SHA%% *}"
 git push "$REMOTE" HEAD:published-results
 ```
 
-Then comment on the reverted PR explaining whether the bundle was broken or merely
-misleading, and whether a corrected resubmission is welcome.
+Then comment on the reverted PR explaining why archive reversal was permitted,
+whether the material was broken or merely misleading, and whether a corrected
+resubmission is welcome. Record the erasure approval when that exception was used.
 
 ## 6. Re-triggering an Explorer Rebuild
 
