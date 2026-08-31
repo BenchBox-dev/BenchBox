@@ -47,6 +47,7 @@ const EXCLUSION_LABELS: Record<string, string> = {
   non_positive_timing: "Timing is not positive.",
   partial_query_coverage: "Result has partial query coverage.",
   trust_not_rankable: "Trust policy excludes this result from ranking.",
+  tuning_not_applied: "Custom tuning was requested but no applied tuning evidence was recorded.",
   validation_not_clean: "Validation status excludes this result from ranking.",
   visibility_not_comparable: "Visibility policy excludes this result from comparison.",
   visibility_not_rankable: "Visibility policy excludes this result from ranking.",

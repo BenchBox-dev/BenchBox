@@ -11,7 +11,8 @@
  *       "Not Recorded" badge (never "Custom Tuning")
  *   (g) tuned-fallback (ADR-2) renders its own warning-tone badge, distinct
  *       from both "Tuned" and the generic unknown-mode fallback
- *   (h) custom is a pinned vocabulary entry, not the generic unknown-mode bucket
+ *   (h) custom is a pinned vocabulary entry, but its public claim depends on
+ *       execution-derived applied tuning evidence
  */
 
 import { render } from "@testing-library/preact";
@@ -115,12 +116,29 @@ describe("TuningBadge", () => {
     expect(badge?.getAttribute("title")).toMatch(/no platform\/benchmark template|ADR-2/i);
   });
 
-  it("custom is a pinned vocabulary entry with its own title, not the generic unknown-mode fallback", () => {
-    const { container } = render(<TuningBadge tuningMode="custom" />);
+  it("custom with applied evidence renders the pinned Custom Tuning badge", () => {
+    const { container } = render(
+      <TuningBadge tuningMode="custom" tuningValidationStatus="applied_unverified" />,
+    );
     const badge = container.querySelector(".badge");
     expect(badge?.getAttribute("data-tone")).toBe("warning");
     expect(badge?.textContent).toBe("Custom Tuning");
     expect(badge?.getAttribute("title")).toBe("User-supplied tuning configuration file");
+  });
+
+  it("custom noop does not claim Custom Tuning was applied", () => {
+    const { container } = render(<TuningBadge tuningMode="custom" tuningValidationStatus="noop" />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.getAttribute("data-tone")).toBe("neutral");
+    expect(badge?.textContent).toBe("No Tuning Applied");
+    expect(badge?.getAttribute("title")).toMatch(/recorded no applied tuning operations/i);
+  });
+
+  it("custom without applied evidence is labeled as requested rather than applied", () => {
+    const { container } = render(<TuningBadge tuningMode="custom" />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.getAttribute("data-tone")).toBe("warning");
+    expect(badge?.textContent).toBe("Custom Tuning Requested");
   });
 
   it("tuningLabel() recognizes tuned-fallback and custom as pinned vocabulary", () => {

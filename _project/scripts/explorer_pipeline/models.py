@@ -140,6 +140,8 @@ UNOFFICIAL_COMPLIANCE_CLASSES: frozenset[str] = frozenset(
     }
 )
 
+APPLIED_TUNING_STATUSES: frozenset[str] = frozenset({"applied_unverified", "applied_verified"})
+
 
 class ManifestEntry(BaseModel):
     """One result row in the explorer browser read model."""
@@ -488,8 +490,20 @@ def is_ranking_eligible(entry: ManifestEntry) -> bool:
         and entry.compliance_class not in UNOFFICIAL_COMPLIANCE_CLASSES
         and entry.failed_query_count == 0
         and not validation_status_is_non_clean(entry.validation_status)
+        and custom_tuning_is_materially_applied(entry)
         and entry.comparison_exclusion_reason is None
     )
+
+
+def custom_tuning_is_materially_applied(entry: ManifestEntry) -> bool:
+    """Return whether a custom-mode run has execution-derived applied tuning evidence.
+
+    ``custom`` records how tuning was requested, not whether the adapter changed
+    physical execution.  Fail closed for legacy/unknown, noop, and failed custom
+    runs so a configuration label alone cannot create a ranked tuning claim.
+    Other canonical modes retain their existing ranking policy.
+    """
+    return entry.tuning_mode != "custom" or entry.tuning_validation_status in APPLIED_TUNING_STATUSES
 
 
 def ranking_exclusion_reason(entry: ManifestEntry, primary_metric: str | None = None) -> str | None:
@@ -504,6 +518,8 @@ def ranking_exclusion_reason(entry: ManifestEntry, primary_metric: str | None = 
         return "failed_queries"
     if validation_status_is_non_clean(entry.validation_status):
         return "validation_not_clean"
+    if not custom_tuning_is_materially_applied(entry):
+        return "tuning_not_applied"
     if entry.comparison_exclusion_reason is not None:
         return entry.comparison_exclusion_reason
 

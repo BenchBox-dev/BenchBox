@@ -43,6 +43,22 @@ def test_official_entry_is_ranking_eligible() -> None:
     assert ranking_exclusion_reason(_rankable_entry()) is None
 
 
+@pytest.mark.parametrize("status", [None, "not_applicable", "noop", "failed", "not_validated"])
+def test_custom_tuning_without_applied_evidence_is_not_ranked(status: str | None) -> None:
+    entry = _rankable_entry(tuning_mode="custom", tuning_validation_status=status)
+
+    assert not is_ranking_eligible(entry)
+    assert ranking_exclusion_reason(entry) == "tuning_not_applied"
+
+
+@pytest.mark.parametrize("status", ["applied_unverified", "applied_verified"])
+def test_custom_tuning_with_applied_evidence_remains_rankable(status: str) -> None:
+    entry = _rankable_entry(tuning_mode="custom", tuning_validation_status=status)
+
+    assert is_ranking_eligible(entry)
+    assert ranking_exclusion_reason(entry) is None
+
+
 @pytest.mark.parametrize("compliance", ["unofficial_nonstandard", "unofficial_subscale"])
 def test_unofficial_compliance_is_never_ranked(compliance: str) -> None:
     # Even with a ranking-eligible trust label, an unofficial-compliance result

@@ -1,0 +1,55 @@
+{
+  "applied_ledger_hash": "4f14ae169820fc89b05a649488f985b2534ee4d25eaf78870808381fc68a5531",
+  "dropped": [
+    {
+      "redacted": true
+    }
+  ],
+  "receipt": {
+    "corroborated": false,
+    "dropped": [
+      {
+        "redacted": true
+      }
+    ],
+    "entries": [
+      {
+        "kind": "index",
+        "phase": "ddl",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "post_load",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      }
+    ],
+    "observed": [
+      {
+        "kind": "index",
+        "redacted": true
+      }
+    ],
+    "platform": "duckdb",
+    "summary": {
+      "gate_relevant_total": 2,
+      "mismatch": 2
+    }
+  },
+  "statements": [
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "mechanism": "sort_index",
+      "phase": "post_load",
+      "statement_redacted": true,
+      "status": "executed"
+    }
+  ],
+  "status": "applied_unverified"
+}

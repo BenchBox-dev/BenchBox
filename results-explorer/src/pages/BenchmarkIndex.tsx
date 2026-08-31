@@ -1285,7 +1285,12 @@ function BenchmarkRow({ entry, runIdentityLabel }: { entry: ResultRow; runIdenti
           <TrustBadge trustLabel={entry.trust_label} compact />
           <FundingChip funding={entry.funding} compact />
           <ValidationBadge validationStatus={entry.validation_status} showMissing />
-          {entry.tuning_mode && <TuningBadge tuningMode={entry.tuning_mode} />}
+          {entry.tuning_mode && (
+            <TuningBadge
+              tuningMode={entry.tuning_mode}
+              tuningValidationStatus={entry.tuning_validation_status}
+            />
+          )}
         </div>
       </td>
       <td class="table-td text-right">

@@ -12,6 +12,7 @@ default returns None so unsupported platforms are safely skipped.
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING, Any
 
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -24,6 +25,12 @@ try:
     from benchbox.core.tuning.interface import TuningType
 except ImportError:
     TuningType = None
+
+
+_REFERENCED_TABLE_RE = re.compile(
+    r"\bREFERENCES\s+(?P<table>\"(?:[^\"]|\"\")*\"|[A-Za-z_][A-Za-z0-9_$]*)\s*\(",
+    re.IGNORECASE,
+)
 
 
 class SortedIngestionMixin:
@@ -132,14 +139,50 @@ class SortedIngestionMixin:
         sorted_columns = sorted(sort_columns, key=lambda column: column.order)
         for column in sorted_columns:
             validate_sql_identifier(column.name, "sort column")
-        ctas_sort_sql = self._build_ctas_sort_sql(validated_table, sorted_columns)
+        intent_statement = self._sorted_ingestion_intent(validated_table, sorted_columns)
+        try:
+            ctas_sort_sql = self._build_ctas_sort_sql(validated_table, sorted_columns)
+        except Exception as exc:
+            self._record_sorted_ingestion_failure(intent_statement, validated_table, exc)
+            raise
 
         if ctas_sort_sql is None:
-            self.logger.debug(f"{self.platform_name} does not support CTAS sort for {table_name}; skipping")
+            reason = f"{self.platform_name} does not support CTAS sort"
+            self._record_sorted_ingestion_skip(validated_table, sorted_columns, reason)
+            self.logger.debug(f"{reason} for {table_name}; skipping")
             return False
 
         statements = ctas_sort_sql if isinstance(ctas_sort_sql, list) else [ctas_sort_sql]
-        return self._execute_ctas_sort(table_name, validated_table, sorted_columns, statements, connection)
+        constraint_preserving = self._requires_constraint_preserving_ctas_sort
+        if constraint_preserving:
+            statements = self._build_fk_safe_ctas_sort_sql(validated_table, sorted_columns)
+        return self._execute_ctas_sort(
+            table_name,
+            validated_table,
+            sorted_columns,
+            statements,
+            connection,
+            atomic=constraint_preserving,
+        )
+
+    @property
+    def _requires_constraint_preserving_ctas_sort(self) -> bool:
+        """Whether CTAS sorting must preserve the existing physical table definition."""
+        platform_key = getattr(self, "platform_name", "").strip().lower()
+        return platform_key in ("duckdb", "motherduck")
+
+    def _build_fk_safe_ctas_sort_sql(
+        self, validated_table: str, sorted_columns: list[TuningColumn]
+    ) -> list[str] | None:
+        """Build in-place sort SQL that preserves table identity and constraints."""
+        temp_table = f"{validated_table}__ctas_sort"
+        order_by = ", ".join(f'"{col.name}"' for col in sorted_columns)
+        return [
+            f'CREATE TEMP TABLE "{temp_table}" AS SELECT * FROM "{validated_table}" ORDER BY {order_by};',
+            f'DELETE FROM "{validated_table}";',
+            f'INSERT INTO "{validated_table}" SELECT * FROM "{temp_table}";',
+            f'DROP TABLE "{temp_table}";',
+        ]
 
     def _resolve_ctas_sort_columns(self, table_name: str, tuning_config: Any) -> list | None:
         """Resolve sort columns for CTAS sort, returning None if not applicable."""
@@ -174,7 +217,14 @@ class SortedIngestionMixin:
         return sort_columns
 
     def _execute_ctas_sort(
-        self, table_name: str, validated_table: str, sorted_columns: list, statements: list[str], connection: Any
+        self,
+        table_name: str,
+        validated_table: str,
+        sorted_columns: list,
+        statements: list[str],
+        connection: Any,
+        *,
+        atomic: bool = False,
     ) -> bool:
         """Execute CTAS sort statements or capture them in dry-run mode."""
         apply_start = mono_time()
@@ -188,13 +238,171 @@ class SortedIngestionMixin:
             self._sorted_ingestion_applied_tables.append(validated_table)
             return True
 
-        for statement in statements:
-            self._execute_sql_statement(connection, statement)
+        ledger_statement = "\n".join(statements)
+        transaction_started = False
+        try:
+            if atomic:
+                if self._connection_has_active_transaction(connection):
+                    reason = "connection already has an active transaction owned by the caller"
+                    self._record_sorted_ingestion_skip(validated_table, sorted_columns, reason)
+                    self.logger.info("Skipping constraint-preserving CTAS sort for %s: %s", table_name, reason)
+                    return False
+                self._execute_sql_statement(connection, "BEGIN TRANSACTION;")
+                transaction_started = True
+            if atomic and self._has_populated_fk_dependents(connection, validated_table):
+                self._rollback_transaction(connection)
+                transaction_started = False
+                reason = "populated foreign-key dependents prevent an in-place rewrite"
+                self._record_sorted_ingestion_skip(validated_table, sorted_columns, reason)
+                self.logger.info(
+                    "Skipping constraint-preserving CTAS sort for %s because %s",
+                    table_name,
+                    reason,
+                )
+                return False
+            for statement in statements:
+                self._execute_sql_statement(connection, statement)
+            if atomic:
+                commit_method = getattr(connection, "commit", None)
+                if callable(commit_method):
+                    commit_method()
+                else:
+                    self._execute_sql_statement(connection, "COMMIT;")
+                transaction_started = False
+        except Exception as exc:
+            rollback_error: Exception | None = None
+            if transaction_started:
+                try:
+                    self._rollback_transaction(connection)
+                except Exception as cleanup_error:  # pragma: no cover - defensive cleanup path
+                    rollback_error = cleanup_error
+                    self.logger.warning(
+                        f"Failed to roll back constraint-preserving CTAS sort for {table_name}: {cleanup_error}"
+                    )
+            if rollback_error is not None:
+                unsafe_error = RuntimeError(
+                    f"Constraint-preserving CTAS sort for {table_name} failed and could not be rolled back: "
+                    f"{rollback_error}"
+                )
+                self._record_sorted_ingestion_failure(ledger_statement, validated_table, unsafe_error)
+                raise unsafe_error from exc
+            self._record_sorted_ingestion_failure(ledger_statement, validated_table, exc)
+            if atomic:
+                self.logger.warning(
+                    "Constraint-preserving CTAS sort for %s failed safely and was rolled back: %s", table_name, exc
+                )
+                return False
+            raise
         self._sorted_ingestion_applied_tables.append(validated_table)
         self._sorted_ingestion_total_apply_seconds += elapsed_seconds(apply_start)
         sorted_col_names = ", ".join(column.name for column in sorted_columns)
         self.log_verbose(f"Applied CTAS sorting to {table_name}: {sorted_col_names}")
         return True
+
+    def _has_populated_fk_dependents(self, connection: Any, validated_table: str) -> bool:
+        """Return whether populated child rows prevent a safe in-place rewrite.
+
+        DuckDB enforces foreign keys during ``DELETE``. A populated parent table
+        therefore cannot be rewritten in place while dependent constraints are
+        attached, and DuckDB does not support ``ALTER TABLE ... DROP CONSTRAINT``.
+        In that case the only safe operation is to leave the existing physical
+        layout unchanged and preserve the dependent rows and constraints.
+        """
+        execute_method = getattr(connection, "execute", None)
+        if not callable(execute_method):
+            return False
+
+        metadata = execute_method(
+            "SELECT table_name, constraint_column_names, constraint_text "
+            "FROM duckdb_constraints() WHERE constraint_type = 'FOREIGN KEY';"
+        )
+        rows = metadata.fetchall()
+        for row in rows:
+            child_table, child_columns, constraint_text = row
+            child_name = validate_sql_identifier(str(child_table), "referencing table")
+            referenced_table = self._referenced_table_from_constraint(str(constraint_text or ""))
+            if referenced_table is None:
+                # DuckDB 1.0 reports an empty constraint_text for self-referential FKs.
+                if child_name.lower() != validated_table.lower():
+                    continue
+            elif referenced_table.lower() != validated_table.lower():
+                continue
+            validated_columns = [validate_sql_identifier(str(column), "foreign key column") for column in child_columns]
+            if not validated_columns:
+                continue
+            non_null_predicate = " AND ".join(f'"{column}" IS NOT NULL' for column in validated_columns)
+            dependent = execute_method(f'SELECT 1 FROM "{child_name}" WHERE {non_null_predicate} LIMIT 1;')
+            if dependent.fetchone() is not None:
+                return True
+        return False
+
+    @staticmethod
+    def _referenced_table_from_constraint(constraint_text: str) -> str | None:
+        """Extract a referenced table from DuckDB 1.0-compatible constraint metadata."""
+        match = _REFERENCED_TABLE_RE.search(constraint_text)
+        if match is None:
+            return None
+        table = match.group("table")
+        if table.startswith('"') and table.endswith('"'):
+            table = table[1:-1].replace('""', '"')
+        return validate_sql_identifier(table, "referenced table")
+
+    @staticmethod
+    def _connection_has_active_transaction(connection: Any) -> bool:
+        """Detect a caller-owned DuckDB transaction without attempting a nested BEGIN."""
+        tracked_state = getattr(connection, "transaction_active", None)
+        if isinstance(tracked_state, bool):
+            return tracked_state
+
+        if not type(connection).__module__.startswith("duckdb"):
+            return False
+        execute_method = getattr(connection, "execute", None)
+        if not callable(execute_method):
+            return True
+        try:
+            first = execute_method("SELECT txid_current();").fetchone()
+            second = execute_method("SELECT txid_current();").fetchone()
+        except Exception:
+            # Unknown transaction ownership is not safe for a multi-statement rewrite.
+            return True
+        return bool(first and second and first[0] == second[0])
+
+    def _record_sorted_ingestion_failure(self, statement: str, table: str, error: Exception) -> None:
+        """Record a safely rolled-back or propagated physical sort failure."""
+        ledger = getattr(self, "_applied_tuning_ledger", None)
+        if ledger is None:
+            return
+        from benchbox.core.tuning.applied_ledger import PHASE_POST_LOAD, STATEMENT_FAILED
+
+        ledger.record(
+            statement,
+            PHASE_POST_LOAD,
+            status=STATEMENT_FAILED,
+            mechanism="sorted_ingestion",
+            table=table,
+            error=error,
+        )
+
+    def _record_sorted_ingestion_skip(self, table: str, sorted_columns: list, reason: str) -> None:
+        """Record requested sorted ingestion that was skipped to preserve safety."""
+        ledger = getattr(self, "_applied_tuning_ledger", None)
+        if ledger is None:
+            return
+        ledger.record_dropped(self._sorted_ingestion_intent(table, sorted_columns), reason)
+
+    @staticmethod
+    def _sorted_ingestion_intent(table: str, sorted_columns: list) -> str:
+        """Return a stable textual representation of requested sorted ingestion."""
+        columns = ", ".join(column.name for column in sorted_columns)
+        return f"sorted_ingestion {table} ORDER BY {columns}"
+
+    def _rollback_transaction(self, connection: Any) -> None:
+        """Roll back a transaction started for an in-place rewrite."""
+        rollback_method = getattr(connection, "rollback", None)
+        if callable(rollback_method):
+            rollback_method()
+        else:
+            self._execute_sql_statement(connection, "ROLLBACK;")
 
     @staticmethod
     def _execute_sql_statement(connection: Any, statement: str) -> None:

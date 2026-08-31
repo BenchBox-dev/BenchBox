@@ -54,7 +54,10 @@ export function MethodologyDisclosure({ detail }: Props) {
             <dt class="w-36 flex-shrink-0 text-[var(--bb-data-fg-muted)]">Tuning state</dt>
             <dd>
               {detail.tuning_mode ? (
-                <TuningBadge tuningMode={detail.tuning_mode} />
+                <TuningBadge
+                  tuningMode={detail.tuning_mode}
+                  tuningValidationStatus={detail.tuning_validation_status}
+                />
               ) : (
                 <span class="text-[var(--bb-data-fg-primary)]">Not recorded</span>
               )}

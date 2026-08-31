@@ -441,7 +441,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
         "local"
       ],
       "id": "duckdb",
-      "install_command": "uv add duckdb",
+      "install_command": "uv add 'duckdb>=1.3,<2'",
       "interfaces": [
         "sql"
       ],

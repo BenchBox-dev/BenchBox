@@ -293,9 +293,9 @@ _PLATFORM_MANIFEST_JSON = """[
       }
     ],
     "requirements": [
-      "duckdb>=0.8.0"
+      "duckdb>=1.3.0,<2.0.0"
     ],
-    "installation_command": "uv add duckdb",
+    "installation_command": "uv add 'duckdb>=1.3,<2'",
     "adoption": "mainstream",
     "supports": [
       "olap",

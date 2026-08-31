@@ -1,0 +1,219 @@
+{
+  "applied_ledger_hash": "28e039c68455f56966abb7c3761a6a19721437aa93a73b4cad8b13680cab63de",
+  "dropped": [
+    {
+      "redacted": true
+    }
+  ],
+  "receipt": {
+    "corroborated": false,
+    "dropped": [
+      {
+        "redacted": true
+      }
+    ],
+    "entries": [
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "kind": "index",
+        "phase": "ddl",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "ddl",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "ddl",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "ddl",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "ddl",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "post_load",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "post_load",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "post_load",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "post_load",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "post_load",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      }
+    ],
+    "observed": [
+      {
+        "kind": "index",
+        "redacted": true
+      },
+      {
+        "kind": "index",
+        "redacted": true
+      },
+      {
+        "kind": "index",
+        "redacted": true
+      },
+      {
+        "kind": "index",
+        "redacted": true
+      },
+      {
+        "kind": "index",
+        "redacted": true
+      }
+    ],
+    "platform": "duckdb",
+    "summary": {
+      "gate_relevant_total": 15,
+      "mismatch": 10,
+      "unverifiable": 5
+    }
+  },
+  "statements": [
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "mechanism": "sort_index",
+      "phase": "post_load",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "mechanism": "sort_index",
+      "phase": "post_load",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "mechanism": "sort_index",
+      "phase": "post_load",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "mechanism": "sort_index",
+      "phase": "post_load",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "mechanism": "sort_index",
+      "phase": "post_load",
+      "statement_redacted": true,
+      "status": "executed"
+    }
+  ],
+  "status": "applied_unverified"
+}

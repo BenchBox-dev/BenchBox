@@ -261,7 +261,12 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
               {!isPassingValidationStatus(detail.validation_status) && (
                 <ValidationBadge validationStatus={detail.validation_status} showMissing />
               )}
-              {detail.tuning_mode && <TuningBadge tuningMode={detail.tuning_mode} />}
+              {detail.tuning_mode && (
+                <TuningBadge
+                  tuningMode={detail.tuning_mode}
+                  tuningValidationStatus={detail.tuning_validation_status}
+                />
+              )}
               {detail.visibility === "public-curated" && (
                 <StatusBadge role="visibility" tone="success">curated</StatusBadge>
               )}
@@ -343,7 +348,10 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                 {detail.tuning_mode ? (
                   <div class="flex items-center gap-2">
                     <span class="text-[var(--bb-data-fg-muted)]">Mode:</span>
-                    <TuningBadge tuningMode={detail.tuning_mode} />
+                    <TuningBadge
+                      tuningMode={detail.tuning_mode}
+                      tuningValidationStatus={detail.tuning_validation_status}
+                    />
                   </div>
                 ) : (
                   <p class="text-[var(--bb-data-fg-muted)]">Tuning mode not recorded.</p>

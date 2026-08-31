@@ -607,6 +607,7 @@ export function Compare({ url }: CompareProps) {
     funding: r.funding,
     runDate: r.run_date,
     tuningMode: r.tuning_mode,
+    tuningValidationStatus: r.tuning_validation_status,
     executionMode: r.execution_mode,
     testType: r.test_type,
     powerScore: r.power_score,
@@ -798,7 +799,12 @@ export function Compare({ url }: CompareProps) {
                 <div class="flex flex-wrap gap-1">
                   <TrustBadge trustLabel={r.trustLabel} compact />
                   <FundingChip funding={r.funding} compact />
-                  {r.tuningMode && <TuningBadge tuningMode={r.tuningMode} />}
+                  {r.tuningMode && (
+                    <TuningBadge
+                      tuningMode={r.tuningMode}
+                      tuningValidationStatus={r.tuningValidationStatus}
+                    />
+                  )}
                   {isFastest && <StatusBadge role="ranking" tone="success">fastest</StatusBadge>}
                 </div>
               </div>
