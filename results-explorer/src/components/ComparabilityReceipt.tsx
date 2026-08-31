@@ -65,6 +65,9 @@ export function ComparabilityReceipt({ results }: ComparabilityReceiptProps) {
           <ComparabilityFieldRow key={field.label} field={field} />
         ))}
       </div>
+      <span class="sr-only">
+        Environment: {formatPerPlatform(results.map((r) => ({ platform: r.platform, value: formatEnvironment(r.environment) })))}
+      </span>
     </section>
   );
 }
@@ -83,7 +86,15 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
     compareValues("Execution mode", results, (result) => valueOrMissing(result.execution_mode)),
     buildTuningField(results),
     compareValues("Validation", results, (result) => valueOrMissing(result.validation_status)),
-    buildEnvironmentField(results),
+    compareHardwareValues("Architecture", results, (result) => valueOrMissing(result.environment?.arch)),
+    compareHardwareValues("CPU family", results, (result) => valueOrMissing(result.environment?.cpu_family)),
+    compareHardwareValues("CPU model", results, (result) => valueOrMissing(result.environment?.cpu_model)),
+    compareHardwareValues("CPU count", results, (result) =>
+      result.environment?.cpu_count !== undefined ? `${result.environment.cpu_count} CPU` : "Not recorded",
+    ),
+    compareHardwareValues("Memory", results, (result) =>
+      result.environment?.memory_gb !== undefined ? `${result.environment.memory_gb} GB` : "Not recorded",
+    ),
     compareValues("Normalized cost", results, normalizedCostLabel),
     compareValues("Cost model", results, costModelSummary),
     compareValues("Cost scope", results, costScopeSummary),
@@ -272,8 +283,52 @@ function buildDateWindowField(results: DetailResult[]): ComparabilityField {
   };
 }
 
-function buildEnvironmentField(results: DetailResult[]): ComparabilityField {
-  return compareValues("Environment", results, (result) => formatEnvironment(result.environment));
+function compareHardwareValues(
+  label: string,
+  results: DetailResult[],
+  readValue: (result: DetailResult) => string,
+): ComparabilityField {
+  const entries = results.map((result) => ({
+    platform: result.platform,
+    value: readValue(result),
+  }));
+  const values = entries.map((entry) => entry.value);
+  const uniqueValues = [...new Set(values)];
+  const allMissing = values.every((value) => value === "Not recorded");
+  if (allMissing) {
+    return {
+      label,
+      status: "missing",
+      summary: "Not recorded",
+    };
+  }
+
+  // Pin no-flip guarantee: if any run lacks metadata on this hardware axis,
+  // report status "missing" ("Not recorded") rather than "diff" ("Differs").
+  const anyMissing = values.some((value) => value === "Not recorded");
+  if (anyMissing) {
+    return {
+      label,
+      status: "missing",
+      summary: "Not recorded",
+      detail: formatPerPlatform(entries),
+    };
+  }
+
+  if (uniqueValues.length === 1) {
+    return {
+      label,
+      status: "match",
+      summary: uniqueValues[0]!,
+    };
+  }
+
+  return {
+    label,
+    status: "diff",
+    summary: `${uniqueValues.length} values differ`,
+    detail: formatPerPlatform(entries),
+  };
 }
 
 function queryCount(result: DetailResult) {

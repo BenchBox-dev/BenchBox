@@ -41,9 +41,15 @@
     "arch": "arm64",
     "client_host": {
       "arch": "arm64",
+      "cpu_identity_provenance": "user_attested",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
       "os": "Darwin",
       "python": "3.12.13"
     },
+    "cpu_identity_provenance": "user_attested",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
     "os": "Darwin",
     "platform_runtime": {
       "collection_status": "partial",
@@ -225,7 +231,7 @@
     {
       "id": "1.2",
       "iter": 0,
-      "ms": 28.2,
+      "ms": 28.6,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -234,7 +240,7 @@
     {
       "id": "1.3",
       "iter": 0,
-      "ms": 22.1,
+      "ms": 22.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -252,7 +258,7 @@
     {
       "id": "2.2",
       "iter": 0,
-      "ms": 87.2,
+      "ms": 88.2,
       "rows": 56,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -261,7 +267,7 @@
     {
       "id": "2.3",
       "iter": 0,
-      "ms": 63.3,
+      "ms": 64.1,
       "rows": 7,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -288,7 +294,7 @@
     {
       "id": "3.3",
       "iter": 0,
-      "ms": 54.6,
+      "ms": 54.7,
       "rows": 24,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -297,7 +303,7 @@
     {
       "id": "3.4",
       "iter": 0,
-      "ms": 36.3,
+      "ms": 35.6,
       "rows": 4,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -306,7 +312,7 @@
     {
       "id": "4.1",
       "iter": 0,
-      "ms": 146.2,
+      "ms": 145.8,
       "rows": 35,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -315,7 +321,7 @@
     {
       "id": "4.2",
       "iter": 0,
-      "ms": 99.6,
+      "ms": 100.9,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",

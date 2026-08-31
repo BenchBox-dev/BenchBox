@@ -76,7 +76,7 @@ def test_run_command_uses_repository_monotonic_clock(tmp_path: Path, monkeypatch
     assert elapsed_starts == [10.0]
 
 
-def _matrix_payload(run_id: str, total_ms: float, query_ms: float) -> dict:
+def _matrix_payload(run_id: str, total_ms: float, query_ms: float, warmup_ms: float = 99.0) -> dict:
     return {
         "export": {"anonymized": True},
         "run": {"id": run_id, "query_time_ms": total_ms, "total_duration_ms": total_ms + 100},
@@ -88,7 +88,7 @@ def _matrix_payload(run_id: str, total_ms: float, query_ms: float) -> dict:
             "validation": "passed",
         },
         "queries": [
-            {"id": "1", "iter": 0, "ms": 99.0, "run_type": "warmup", "status": "SUCCESS", "stream": 0},
+            {"id": "1", "iter": 0, "ms": warmup_ms, "run_type": "warmup", "status": "SUCCESS", "stream": 0},
             {"id": "1", "iter": 1, "ms": query_ms, "run_type": "measurement", "status": "SUCCESS", "stream": 0},
         ],
     }
@@ -96,7 +96,11 @@ def _matrix_payload(run_id: str, total_ms: float, query_ms: float) -> dict:
 
 def test_aggregate_payloads_medians_measurements_and_run_metrics() -> None:
     aggregate = analyzer.aggregate_payloads(
-        [_matrix_payload("one", 30.0, 3.0), _matrix_payload("two", 10.0, 1.0), _matrix_payload("three", 20.0, 2.0)],
+        [
+            _matrix_payload("one", 30.0, 3.0, 900.0),
+            _matrix_payload("two", 10.0, 1.0, 100.0),
+            _matrix_payload("three", 20.0, 2.0, 500.0),
+        ],
         version="1.5.5",
         benchmark="tpch",
     )
@@ -107,7 +111,7 @@ def test_aggregate_payloads_medians_measurements_and_run_metrics() -> None:
     assert aggregate["summary"]["timing"] == {"avg_ms": 2.0, "total_ms": 20.0}
     assert aggregate["summary"]["data"]["load_time_ms"] == 30.0
     assert aggregate["summary"]["tpc_metrics"]["power_at_size"] == 50.0
-    assert [query["ms"] for query in aggregate["queries"]] == [99.0, 2.0]
+    assert [query["ms"] for query in aggregate["queries"]] == [500.0, 2.0]
     assert aggregate["export"]["aggregation"] == {
         "method": "median",
         "repetitions": 3,

@@ -12,6 +12,7 @@ from _project.scripts.explorer_pipeline import transformer as transformer_module
 from _project.scripts.explorer_pipeline.models import DetailResult, ManifestEntry
 from _project.scripts.explorer_pipeline.transformer import BundleTransformer
 from benchbox.core.cost.models import DeploymentMetadata, NormalizedCost
+from benchbox.validation.bundle import is_primary_bundle_file
 from tests.unit.scripts.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -60,8 +61,8 @@ class TestToManifestEntry:
 
         assert entry.driver_version == "1.2.0"
 
-    def test_duckdb_dev_build_uses_resolved_package_version(self, tmp_path: Path) -> None:
-        """DuckDB's internal dev-build string must not hide the wheel version."""
+    def test_duckdb_dev_build_keeps_engine_and_package_versions_separate(self, tmp_path: Path) -> None:
+        """DuckDB's engine identity must remain distinct from its wheel version."""
         data = copy.deepcopy(MINIMAL_BUNDLE)
         data["platform"].update(
             {
@@ -81,7 +82,7 @@ class TestToManifestEntry:
         entry = BundleTransformer().to_manifest_entry(bundle)
 
         assert entry.driver_version == "1.6.0.dev365"
-        assert entry.platform_version == "1.6.0.dev365"
+        assert entry.platform_version == "2.0.0-alpha38615"
 
     def test_result_id_injected(self, bundle_file: Path) -> None:
         transformer = BundleTransformer()
@@ -1365,7 +1366,7 @@ class TestPublishedCorpusResolvesExecutionMode:
         unresolved = []
         total = 0
         for path in sorted(corpus.rglob("*.json")):
-            if path.name.endswith(".manifest.json"):
+            if not is_primary_bundle_file(path):
                 continue
             total += 1
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -1383,7 +1384,7 @@ class TestPublishedCorpusResolvesExecutionMode:
 
         mismatches = []
         for path in sorted(corpus.rglob("*.json")):
-            if path.name.endswith(".manifest.json"):
+            if not is_primary_bundle_file(path):
                 continue
             if "_df_" in path.name:
                 expected = "dataframe"

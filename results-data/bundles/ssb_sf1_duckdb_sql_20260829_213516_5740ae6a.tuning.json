@@ -1,0 +1,95 @@
+{
+  "applied_ledger_hash": "28e039c68455f56966abb7c3761a6a19721437aa93a73b4cad8b13680cab63de",
+  "hash": "8fa307f3855f31802646c0e22afe5084008160140fe90c6219a8542992c13a0c",
+  "requested": {
+    "constraints": {
+      "check_constraints": {
+        "enabled": true,
+        "enforce_on_insert": true,
+        "enforce_on_update": true
+      },
+      "foreign_keys": {
+        "enabled": true,
+        "enforce_referential_integrity": true,
+        "on_delete_action": "CASCADE",
+        "on_update_action": "RESTRICT"
+      },
+      "primary_keys": {
+        "enabled": true,
+        "enforce_uniqueness": true,
+        "nullable": false
+      },
+      "unique_constraints": {
+        "enabled": true,
+        "ignore_nulls": false
+      }
+    },
+    "table_tunings": {
+      "table_3f2ca988952c": {
+        "sorting": [
+          {
+            "name": "column_0635d92772ee",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_3f2ca988952c"
+      },
+      "table_710456b43f0d": {
+        "partitioning": [
+          {
+            "name": "column_5fe41b23bf72",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "sorting": [
+          {
+            "name": "column_988986949869",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_710456b43f0d"
+      },
+      "table_924cc103ced7": {
+        "sorting": [
+          {
+            "name": "column_fdde610954be",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_924cc103ced7"
+      },
+      "table_d428d6636977": {
+        "sorting": [
+          {
+            "name": "column_ec05513005a7",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_d428d6636977"
+      },
+      "table_e86bf5e2ac6b": {
+        "sorting": [
+          {
+            "name": "column_c13a3fd7ff66",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_e86bf5e2ac6b"
+      }
+    }
+  },
+  "requested_config_hash": "8fa307f3855f31802646c0e22afe5084008160140fe90c6219a8542992c13a0c",
+  "run_id": "5740ae6a",
+  "source": "yaml",
+  "source_file": "examples/tunings/duckdb/ssb_tuned.yaml",
+  "tuning_policy_generation": "adr-003",
+  "tuning_source": "auto_discovered",
+  "validation_status": "applied_unverified",
+  "version": "2.2"
+}

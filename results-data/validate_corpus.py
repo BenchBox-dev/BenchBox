@@ -50,11 +50,11 @@ def discover_bundles(bundles_dir: pathlib.Path) -> list[pathlib.Path]:
 def cohort_platforms(bundles: list[pathlib.Path]) -> dict[CohortKey, set[str]]:
     """Map a cohort to distinct platform/version comparison identities.
 
-    A version-over-version cohort legitimately repeats one platform name. A
-    reported version therefore participates in the identity when available;
-    duplicate runs of the same platform at the same version still count once.
-    Bundles without version metadata retain the historical platform-only
-    identity.
+    An explicitly segregated version-over-version corpus legitimately repeats
+    one platform name. Only bundles under ``duckdb-version-matrix/`` therefore
+    include a reported version in their identity. Ordinary cohorts retain the
+    historical platform-only identity so three versions of one engine cannot
+    weaken the cross-platform admission floor.
 
     Raises:
         CorpusReadError: if any bundle is unreadable or missing a key field.
@@ -71,8 +71,9 @@ def cohort_platforms(bundles: list[pathlib.Path]) -> dict[CohortKey, set[str]]:
             scale_factor = str(payload["benchmark"].get("scale_factor", ""))
             platform_section = payload["platform"]
             platform = platform_section["name"]
-            version = platform_section.get("version") or platform_section.get("client_version")
-            if str(platform).lower() == "duckdb":
+            version = None
+            if bundle.parent.name == "duckdb-version-matrix":
+                version = platform_section.get("version") or platform_section.get("client_version")
                 execution = payload.get("execution", {})
                 if isinstance(execution, dict):
                     for key in (

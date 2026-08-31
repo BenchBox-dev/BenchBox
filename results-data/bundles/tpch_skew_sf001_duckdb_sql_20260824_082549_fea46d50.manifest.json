@@ -1,0 +1,8 @@
+{
+  "bundle_file": "tpch_skew_sf001_duckdb_sql_20260824_082549_fea46d50.json",
+  "bundle_hash": "95de857c52dd467a5773636d00263895c3f288c70c029a591f7eb04f653953aa",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

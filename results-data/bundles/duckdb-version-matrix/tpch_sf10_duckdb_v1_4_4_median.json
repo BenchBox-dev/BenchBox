@@ -41,9 +41,15 @@
     "arch": "arm64",
     "client_host": {
       "arch": "arm64",
+      "cpu_identity_provenance": "user_attested",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
       "os": "Darwin",
       "python": "3.12.13"
     },
+    "cpu_identity_provenance": "user_attested",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
     "os": "Darwin",
     "platform_runtime": {
       "collection_status": "partial",
@@ -216,7 +222,7 @@
     {
       "id": "14",
       "iter": 0,
-      "ms": 131.6,
+      "ms": 137.3,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -226,7 +232,7 @@
     {
       "id": "2",
       "iter": 0,
-      "ms": 68.3,
+      "ms": 74.0,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -236,7 +242,7 @@
     {
       "id": "9",
       "iter": 0,
-      "ms": 428.6,
+      "ms": 410.0,
       "rows": 175,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -246,7 +252,7 @@
     {
       "id": "20",
       "iter": 0,
-      "ms": 165.9,
+      "ms": 158.2,
       "rows": 1804,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -256,7 +262,7 @@
     {
       "id": "6",
       "iter": 0,
-      "ms": 79.1,
+      "ms": 85.3,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -266,7 +272,7 @@
     {
       "id": "17",
       "iter": 0,
-      "ms": 139.9,
+      "ms": 146.8,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -276,7 +282,7 @@
     {
       "id": "18",
       "iter": 0,
-      "ms": 274.6,
+      "ms": 281.6,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -286,7 +292,7 @@
     {
       "id": "8",
       "iter": 0,
-      "ms": 183.6,
+      "ms": 192.5,
       "rows": 2,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -296,7 +302,7 @@
     {
       "id": "21",
       "iter": 0,
-      "ms": 380.7,
+      "ms": 382.3,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -306,7 +312,7 @@
     {
       "id": "13",
       "iter": 0,
-      "ms": 446.5,
+      "ms": 444.9,
       "rows": 46,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -316,7 +322,7 @@
     {
       "id": "3",
       "iter": 0,
-      "ms": 142.4,
+      "ms": 145.1,
       "rows": 10,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -326,7 +332,7 @@
     {
       "id": "22",
       "iter": 0,
-      "ms": 105.1,
+      "ms": 107.4,
       "rows": 7,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -336,7 +342,7 @@
     {
       "id": "16",
       "iter": 0,
-      "ms": 116.4,
+      "ms": 124.9,
       "rows": 27840,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -346,7 +352,7 @@
     {
       "id": "4",
       "iter": 0,
-      "ms": 146.3,
+      "ms": 151.3,
       "rows": 5,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -356,7 +362,7 @@
     {
       "id": "11",
       "iter": 0,
-      "ms": 71.2,
+      "ms": 76.7,
       "rows": 8685,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -366,7 +372,7 @@
     {
       "id": "15",
       "iter": 0,
-      "ms": 109.4,
+      "ms": 112.1,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -376,7 +382,7 @@
     {
       "id": "1",
       "iter": 0,
-      "ms": 301.4,
+      "ms": 304.2,
       "rows": 4,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -386,7 +392,7 @@
     {
       "id": "10",
       "iter": 0,
-      "ms": 226.9,
+      "ms": 228.1,
       "rows": 20,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -406,7 +412,7 @@
     {
       "id": "5",
       "iter": 0,
-      "ms": 155.6,
+      "ms": 158.9,
       "rows": 5,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -416,7 +422,7 @@
     {
       "id": "7",
       "iter": 0,
-      "ms": 156.2,
+      "ms": 156.6,
       "rows": 4,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -426,7 +432,7 @@
     {
       "id": "12",
       "iter": 0,
-      "ms": 151.0,
+      "ms": 153.7,
       "rows": 2,
       "run_type": "warmup",
       "status": "SUCCESS",

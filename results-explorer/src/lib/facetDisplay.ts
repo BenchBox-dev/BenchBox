@@ -24,6 +24,18 @@ const COST_STATUS_LABELS: Record<string, string> = {
   unavailable: "unavailable",
 };
 
+const CPU_FAMILY_LABELS: Record<string, string> = {
+  apple_silicon: "Apple Silicon",
+  graviton: "AWS Graviton",
+  intel_xeon: "Intel Xeon",
+  intel_core: "Intel Core",
+  amd_epyc: "AMD EPYC",
+  amd_ryzen: "AMD Ryzen",
+  ampere_altra: "Ampere Altra",
+  arm_neoverse: "ARM Neoverse",
+  unknown: "Unknown CPU",
+};
+
 export function formatFacetDisplayValue(
   key: FacetKey | string,
   value: string,
@@ -42,6 +54,14 @@ export function formatFacetDisplayValue(
 
   if (key === "cost_status") {
     return COST_STATUS_LABELS[trimmed.toLowerCase()] ?? fallbackLabel ?? readableToken(trimmed);
+  }
+
+  if (key === "cpu_family") {
+    return CPU_FAMILY_LABELS[trimmed.toLowerCase()] ?? fallbackLabel ?? readableToken(trimmed);
+  }
+
+  if (key === "arch") {
+    return trimmed;
   }
 
   if (key === "date_window") {

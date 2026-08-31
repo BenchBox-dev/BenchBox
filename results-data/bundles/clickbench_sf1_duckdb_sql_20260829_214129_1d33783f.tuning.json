@@ -1,0 +1,60 @@
+{
+  "applied_ledger_hash": "4f14ae169820fc89b05a649488f985b2534ee4d25eaf78870808381fc68a5531",
+  "hash": "907cb06a7f92a2555971600e1f4bc59f391f40125a52539df9fa5186aabca246",
+  "requested": {
+    "constraints": {
+      "check_constraints": {
+        "enabled": true,
+        "enforce_on_insert": true,
+        "enforce_on_update": true
+      },
+      "foreign_keys": {
+        "enabled": false,
+        "enforce_referential_integrity": false,
+        "on_delete_action": "RESTRICT",
+        "on_update_action": "RESTRICT"
+      },
+      "primary_keys": {
+        "enabled": false,
+        "enforce_uniqueness": false,
+        "nullable": false
+      },
+      "unique_constraints": {
+        "enabled": false,
+        "ignore_nulls": false
+      }
+    },
+    "table_tunings": {
+      "table_da603521ee0c": {
+        "partitioning": [
+          {
+            "name": "column_8fa8056a103e",
+            "order": 1,
+            "type": "DATE"
+          }
+        ],
+        "sorting": [
+          {
+            "name": "column_cbc92915d4e0",
+            "order": 1,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_a8c2fe8dc0d9",
+            "order": 2,
+            "type": "TIMESTAMP"
+          }
+        ],
+        "table_name": "table_da603521ee0c"
+      }
+    }
+  },
+  "requested_config_hash": "907cb06a7f92a2555971600e1f4bc59f391f40125a52539df9fa5186aabca246",
+  "run_id": "1d33783f",
+  "source": "yaml",
+  "source_file": "examples/tunings/duckdb/clickbench_tuned.yaml",
+  "tuning_policy_generation": "adr-003",
+  "tuning_source": "auto_discovered",
+  "validation_status": "applied_unverified",
+  "version": "2.2"
+}

@@ -25,6 +25,8 @@ export { preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
 interface Props {
   summary: BenchmarkSummary;
+  /** When true, keeps query_ids in caller-provided order (e.g. limiter ranking). */
+  preserveOrder?: boolean;
 }
 
 function ordinal(n: number): string {
@@ -33,10 +35,10 @@ function ordinal(n: number): string {
   return `${n}${suffixes[(v - 20) % 10] ?? suffixes[v] ?? suffixes[0]}`;
 }
 
-export function RankTable({ summary }: Props) {
+export function RankTable({ summary, preserveOrder = false }: Props) {
   const { platforms, query_ids } = summary;
   if (platforms.length === 0 || query_ids.length === 0) return null;
-  const sortedQueryIds = sortQueryIds(query_ids);
+  const sortedQueryIds = preserveOrder ? query_ids : sortQueryIds(query_ids);
   const rankableCellCount = countRankableTimingCells(platforms, sortedQueryIds);
 
   if (rankableCellCount === 0) {

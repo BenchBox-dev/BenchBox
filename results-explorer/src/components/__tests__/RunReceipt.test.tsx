@@ -26,6 +26,9 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
     environment: {
       os: "macOS",
       arch: "arm64",
+      cpu_family: "apple_silicon",
+      cpu_model: "Apple M1 Max",
+      cpu_identity_provenance: "measured",
       cpu_count: 10,
       memory_gb: 64,
       python: "3.12.4",
@@ -232,7 +235,15 @@ describe("RunReceipt", () => {
           execution_mode: null,
           tuning_mode: null,
           tuning_hash: null,
-          environment: { os: undefined, arch: undefined, cpu_count: undefined, memory_gb: undefined, python: undefined },
+          environment: {
+            os: undefined,
+            arch: undefined,
+            cpu_family: undefined,
+            cpu_model: undefined,
+            cpu_count: undefined,
+            memory_gb: undefined,
+            python: undefined,
+          },
           test_type: null,
           validation_status: null,
           compliance_class: null,
@@ -527,5 +538,46 @@ describe("RunReceipt applied-tuning receipt drill-down", () => {
     fireEvent.click(within(receipt).getByRole("button", { name: /Show missing metadata/ }));
     expect(within(receipt).getByText("Tuning verification")).toBeTruthy();
     expect(within(receipt).getAllByText("Not recorded").length).toBeGreaterThan(0);
+  });
+
+  it("renders CPU family and CPU model when recorded, and hides them when missing", () => {
+    // Recorded run
+    const { unmount } = render(<RunReceipt detail={makeDetail()} />);
+    let receipt = screen.getByRole("region", { name: "Run receipt" });
+    expect(within(receipt).getByText("CPU family")).toBeTruthy();
+    expect(within(receipt).getByText("apple_silicon")).toBeTruthy();
+    expect(within(receipt).getByText("CPU model")).toBeTruthy();
+    expect(within(receipt).getByText("Apple M1 Max")).toBeTruthy();
+    unmount();
+
+    // Run without CPU metadata
+    render(
+      <RunReceipt
+        detail={makeDetail({
+          environment: {
+            os: "Linux",
+            arch: "x86_64",
+            cpu_count: 8,
+            memory_gb: 32,
+            python: "3.12",
+          },
+        })}
+      />,
+    );
+    receipt = screen.getByRole("region", { name: "Run receipt" });
+    expect(within(receipt).queryByText("CPU family")).toBeNull();
+    expect(within(receipt).queryByText("CPU model")).toBeNull();
+
+    // Expand disclosure
+    fireEvent.click(within(receipt).getByRole("button", { name: /Show missing metadata/ }));
+    expect(within(receipt).getByText("CPU family")).toBeTruthy();
+    expect(within(receipt).getByText("CPU model")).toBeTruthy();
+  });
+
+  it("does not mislabel an unsupported CPU evidence value as inferred", () => {
+    render(<RunReceipt detail={makeDetail({ environment: { ...makeDetail().environment, cpu_identity_provenance: "typo" as never } })} />);
+
+    expect(screen.getByText("Unknown")).toBeInTheDocument();
+    expect(screen.queryByText("Inferred")).toBeNull();
   });
 });

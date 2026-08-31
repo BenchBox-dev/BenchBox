@@ -189,6 +189,13 @@ export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_elig
   cpu_count: number | null;
   memory_gb: number | null;
   python: string | null;
+  // Required, not optional. An optional marker here is what previously let the
+  // projection omit both columns while `getDetailResult` still compiled: the
+  // reads were `undefined` forever and every receipt reported the CPU as not
+  // recorded. Required means the omission is a type error.
+  cpu_model: string | null;
+  cpu_family: string | null;
+  cpu_identity_provenance: "measured" | "user_attested" | "inferred" | null;
   // ADR-2 §3: comma-joined, sorted physical tuning mechanisms (see
   // physical_mechanisms in DetailResult). Tri-state, preserved from the
   // pipeline: SQL NULL (-> null here) means no logical tuning profile was
@@ -220,6 +227,25 @@ export interface QueryExecutionRow {
   run_type: string | null;
   iter: number | null;
   stream: number | null;
+}
+
+/**
+ * One row of `bench.result_basis_availability`, the pipeline's precomputed
+ * answer to "which measurement bases can this run serve?".
+ *
+ * `available_bases` is a comma-separated token list in the same vocabulary the
+ * URL grammar uses (see measurementBasis.ts), so an availability check is a
+ * token comparison rather than a translation. `varying_pass_queries` is a JSON
+ * object mapping query_id to that query's usable pass count, present only when
+ * a run's queries disagree; it is null for the common uniform case.
+ */
+export interface ResultBasisAvailabilityRow {
+  result_id: string;
+  has_warmup: boolean;
+  measurement_pass_count: number;
+  warmup_status: string;
+  available_bases: string;
+  varying_pass_queries: string | null;
 }
 
 export interface BenchmarkMatrixCellRow {
@@ -288,6 +314,7 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   platform: string;
   platform_id: string;
   driver_version: string | null;
+  platform_version?: string | null;
   run_date: string;
   power_score: number | null;
   total_duration_s: number;
@@ -307,6 +334,7 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   funding: string;
   validation_status?: string | null;
   tuning_mode: string | null;
+  tuning_validation_status?: string | null;
   execution_mode: string | null;
   compliance_class: string | null;
   cost_usd: number | null;
@@ -500,6 +528,9 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   "cpu_count",
   "memory_gb",
   "python",
+  "cpu_model",
+  "cpu_family",
+  "cpu_identity_provenance",
 ].join(", ");
 
 const COHORT_METADATA_COLUMNS = [
@@ -684,6 +715,32 @@ export async function getQueryExecutions(resultId: string): Promise<QueryExecuti
 }
 
 /**
+ * Read a run's precomputed basis availability.
+ *
+ * Surfaces use this rather than deriving availability from raw executions:
+ * the pipeline has already made the determination, and pulling every
+ * execution row for a 103-query run just to re-derive it would be a large
+ * download to reach an answer the read model already holds. The pure
+ * `basisAvailability` helper in measurementBasis.ts remains the authority for
+ * per-query detail once those rows are in hand.
+ *
+ * Returns null for a result the table does not cover, which is the honest
+ * answer for a snapshot built before the basis columns existed.
+ */
+export async function getResultBasisAvailability(
+  resultId: string,
+): Promise<ResultBasisAvailabilityRow | null> {
+  const rows = await queryRows<ResultBasisAvailabilityRow>(
+    "SELECT result_id, has_warmup, measurement_pass_count, warmup_status," +
+      " available_bases, varying_pass_queries" +
+      " FROM bench.result_basis_availability" +
+      " WHERE result_id = ?",
+    [resultId],
+  );
+  return rows[0] ?? null;
+}
+
+/**
  * Compose a DetailResult from the canonical DuckDB tables.
  *
  * Returns null when the result_id is not present in `result_detail_metrics`.
@@ -705,6 +762,9 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
   if (wide.cpu_count !== null) environment.cpu_count = wide.cpu_count;
   if (wide.memory_gb !== null) environment.memory_gb = wide.memory_gb;
   if (wide.python !== null) environment.python = wide.python;
+  if (wide.cpu_model !== null) environment.cpu_model = wide.cpu_model;
+  if (wide.cpu_family !== null) environment.cpu_family = wide.cpu_family;
+  if (wide.cpu_identity_provenance !== null) environment.cpu_identity_provenance = wide.cpu_identity_provenance;
 
   const display_timings: QueryDisplayTiming[] = timingRows.map((r) => ({
     query_id: r.query_id,
@@ -1011,6 +1071,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.platform," +
     " r.platform_id," +
     " r.driver_version," +
+    " r.platform_version," +
     " r.run_date," +
     " r.power_score," +
     " r.total_duration_s," +
@@ -1029,6 +1090,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.funding," +
     " r.validation_status," +
     " r.tuning_mode," +
+    " r.tuning_validation_status," +
     " r.execution_mode," +
     " r.compliance_class," +
     " r.cost_usd," +

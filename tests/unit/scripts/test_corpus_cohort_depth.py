@@ -109,9 +109,10 @@ def test_the_gate_accepts_a_full_cohort(tmp_path: Path) -> None:
 def test_the_gate_accepts_a_version_matrix_as_distinct_identities(tmp_path: Path) -> None:
     """A version-over-version cohort may repeat one platform name."""
     validator = _load_validator()
+    matrix_dir = tmp_path / "duckdb-version-matrix"
     for index, version in enumerate(("1.0.0", "1.5.5", "1.6.0.dev365")):
         _write_bundle(
-            tmp_path,
+            matrix_dir,
             f"duckdb-{index}.json",
             benchmark="tpch",
             scale=10.0,
@@ -122,12 +123,31 @@ def test_the_gate_accepts_a_version_matrix_as_distinct_identities(tmp_path: Path
     assert validator.shallow_cohorts(validator.cohort_platforms(validator.discover_bundles(tmp_path))) == {}
 
 
+def test_versions_do_not_pad_an_ordinary_cross_platform_cohort(tmp_path: Path) -> None:
+    """Version identity is reserved for the explicitly segregated matrix corpus."""
+    validator = _load_validator()
+    for index, version in enumerate(("1.0", "2.0", "3.0")):
+        _write_bundle(
+            tmp_path,
+            f"datafusion-{index}.json",
+            benchmark="tpch",
+            scale=10.0,
+            platform="DataFusion",
+            platform_version=version,
+        )
+
+    cohorts = validator.cohort_platforms(validator.discover_bundles(tmp_path))
+    assert cohorts == {("tpch", "10.0"): {"DataFusion"}}
+    assert validator.shallow_cohorts(cohorts) == cohorts
+
+
 def test_same_platform_version_does_not_pad_a_cohort(tmp_path: Path) -> None:
     """Repeated runs at one version remain one comparison identity."""
     validator = _load_validator()
+    matrix_dir = tmp_path / "duckdb-version-matrix"
     for index in range(3):
         _write_bundle(
-            tmp_path,
+            matrix_dir,
             f"duckdb-{index}.json",
             benchmark="tpch",
             scale=10.0,
@@ -143,8 +163,9 @@ def test_same_platform_version_does_not_pad_a_cohort(tmp_path: Path) -> None:
 def test_duckdb_package_version_overrides_internal_engine_version(tmp_path: Path) -> None:
     """DuckDB development builds compare by package version, not engine string."""
     validator = _load_validator()
+    matrix_dir = tmp_path / "duckdb-version-matrix"
     _write_bundle(
-        tmp_path,
+        matrix_dir,
         "duckdb-dev.json",
         benchmark="tpch",
         scale=10.0,

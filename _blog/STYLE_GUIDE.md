@@ -154,6 +154,14 @@ State the finding once. Keep a negative bound only when it changes the claim or 
 **Forced Humor**
 > ❌ "OMG you won't BELIEVE these benchmark results! 🚀🔥 Database X got absolutely DESTROYED lol"
 
+**LLM Writing Tells**
+> ❌ "Good point! Going forward, let's delve into the ever-evolving data landscape..."
+> ❌ "In today's fast-paced digital world..."
+> ❌ "Whether you're a seasoned data engineer or just starting out..."
+> ❌ "It stands as a testament to the seamless integration of..."
+
+Avoid conversational residue ("good point", "you're right", "going forward"), empty throat-clearing openers ("in today's landscape"), and AI vocabulary clichés ("delve", "rich tapestry", "seamless"). State the technical finding or action directly.
+
 ---
 
 ## Content Principles
@@ -350,9 +358,13 @@ Use heading levels logically:
 #### Minor Point (H4 - use sparingly)
 ```
 
-**Heading Style**: Use sharp short phrases not sentences
-- ❌ "How I optimized query performance"
-- ✅ "Optimizing Query Performance"
+**Heading Style**:
+- Use sharp, descriptive phrases or sentence-style headings that name the section's point (for example: `## The problem: SF=1 meant nothing in particular`).
+- A title or heading whose news is a negation is allowed (for example: `# When two timings are not a comparison`).
+- Do not use first-person headings:
+  - ❌ "How I optimized query performance"
+  - ✅ "Optimizing Query Performance"
+- Avoid empty or clever headings that obscure the content.
 
 ---
 
@@ -629,6 +641,7 @@ Include 5-8 relevant tags:
 - [ ] How-to and Try-it-yourself steps use direct imperatives ("Run", "Open")
 - [ ] Em-dashes and en-dashes are absent (ASCII hyphen only)
 - [ ] Every negative bound adds a fact, legal boundary, or scope condition
+- [ ] Ensure that agent work on our writing (e.g. reviews, style checks, etc.) has not added LLM writing tells to our work
 
 ### Technical Accuracy
 
@@ -641,7 +654,7 @@ Include 5-8 relevant tags:
 
 ### Formatting
 
-- [ ] Heading hierarchy correct (H1 → H2 → H3)
+- [ ] Heading hierarchy correct (H1 → H2 → H3); headings name the section's point without first-person pronouns
 - [ ] Code formatted with language specified
 - [ ] Tables readable and not too wide
 - [ ] Numbers formatted consistently

@@ -9,6 +9,9 @@ export interface Environment {
   cpu_count?: number;
   memory_gb?: number;
   python?: string;
+  cpu_model?: string;
+  cpu_family?: string;
+  cpu_identity_provenance?: "measured" | "user_attested" | "inferred";
   [key: string]: string | number | boolean | null | undefined;
 }
 

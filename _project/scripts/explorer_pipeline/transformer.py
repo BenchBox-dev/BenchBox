@@ -11,6 +11,7 @@ import hashlib
 import json
 import logging
 import math
+import re
 from collections import Counter
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -37,6 +38,61 @@ from benchbox.core.tuning.modes import is_canonical_mode
 from benchbox.validation.bundle import APPLIED_COMPANION_MAX_BYTES, APPLIED_RECEIPT_MAX_ENTRIES, COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Closed CPU-family vocabulary and normalization rules
+# ---------------------------------------------------------------------------
+
+CLOSED_CPU_FAMILIES: frozenset[str] = frozenset(
+    {
+        "apple_silicon",
+        "graviton",
+        "intel_xeon",
+        "intel_core",
+        "amd_epyc",
+        "amd_ryzen",
+        "ampere_altra",
+        "arm_neoverse",
+        "unknown",
+    }
+)
+
+_CPU_FAMILY_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    # Apple Silicon: Apple M1/M2/M3/M4, Apple A-series
+    (re.compile(r"\bapple\s+(?:m\d|a\d)", re.IGNORECASE), "apple_silicon"),
+    # AWS Graviton
+    (re.compile(r"\bgraviton", re.IGNORECASE), "graviton"),
+    # Intel Xeon
+    (re.compile(r"\bxeon\b", re.IGNORECASE), "intel_xeon"),
+    # Intel Core
+    (re.compile(r"\b(?:intel.*core|core\(tm\))\b", re.IGNORECASE), "intel_core"),
+    # AMD EPYC
+    (re.compile(r"\bepyc\b", re.IGNORECASE), "amd_epyc"),
+    # AMD Ryzen / Threadripper
+    (re.compile(r"\b(?:ryzen|threadripper)\b", re.IGNORECASE), "amd_ryzen"),
+    # Ampere Altra
+    (re.compile(r"\b(?:ampere|altra)\b", re.IGNORECASE), "ampere_altra"),
+    # ARM Neoverse
+    (re.compile(r"\bneoverse\b", re.IGNORECASE), "arm_neoverse"),
+)
+
+
+def normalize_cpu_family(raw_model: str | None) -> str | None:
+    """Normalize a raw CPU model string to the closed CPU family vocabulary.
+
+    Returns None if raw_model is None or empty ('not recorded').
+    Returns 'unknown' if raw_model is populated but does not match any known family.
+    Never guesses based on architecture.
+    """
+    if raw_model is None:
+        return None
+    cleaned = raw_model.strip()
+    if not cleaned:
+        return None
+    for pattern, family in _CPU_FAMILY_PATTERNS:
+        if pattern.search(cleaned):
+            return family
+    return "unknown"
 
 
 class CompanionPrivacyError(Exception):
@@ -367,21 +423,6 @@ def _platform_version(data: dict[str, Any]) -> str | None:
     platform = data.get("platform", {})
     if not isinstance(platform, dict):
         return None
-    if str(platform.get("name", "")).lower() == "duckdb":
-        execution = data.get("execution", {})
-        if isinstance(execution, dict):
-            for key in (
-                "driver_version_resolved",
-                "driver_version_requested",
-                "driver_resolved_version",
-                "driver_requested_version",
-            ):
-                value = execution.get(key)
-                if value and isinstance(value, str):
-                    return value
-        client_version = platform.get("client_version")
-        if client_version and client_version != "unknown":
-            return str(client_version)
     val = platform.get("version")
     return str(val) if val and val != "unknown" else None
 
@@ -1431,7 +1472,15 @@ class BundleTransformer:
 
         environment: dict[str, Any] = {}
         if isinstance(bundle_data.get("environment"), dict):
-            environment = bundle_data["environment"]
+            environment = dict(bundle_data["environment"])
+            raw_cpu = environment.get("cpu_model")
+            cleaned_cpu = raw_cpu.strip() if isinstance(raw_cpu, str) else None
+            if cleaned_cpu:
+                environment["cpu_model"] = cleaned_cpu
+                environment["cpu_family"] = normalize_cpu_family(cleaned_cpu)
+            else:
+                environment["cpu_model"] = None
+                environment["cpu_family"] = None
 
         # Detect companion files relative to bundle
         stem = bundle_path.stem

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import type { UrlSerde } from "@/lib/useUrlState";
 import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
 
-export const FACET_KEYS = [
+export const CORE_FACET_KEYS = [
   "benchmark",
   "scale_factor",
   "phase",
@@ -20,7 +20,18 @@ export const FACET_KEYS = [
   "date_window",
 ] as const;
 
+export const HARDWARE_FACET_KEYS = [
+  "platform_version",
+  "arch",
+  "cpu_family",
+] as const;
+
+export const FACET_KEYS = CORE_FACET_KEYS;
+export const ALL_FACET_KEYS = [...CORE_FACET_KEYS, ...HARDWARE_FACET_KEYS] as const;
+
 export type FacetKey = (typeof FACET_KEYS)[number];
+export type HardwareFacetKey = (typeof HARDWARE_FACET_KEYS)[number];
+export type ExplorerFacetKey = FacetKey | HardwareFacetKey;
 export type DateWindowFacet = "all" | "30d" | "90d" | "365d";
 
 /**
@@ -71,10 +82,13 @@ export interface FacetState {
   storage_format: string[];
   cost_status: string[];
   date_window: DateWindowFacet;
+  platform_version: string[];
+  arch: string[];
+  cpu_family: string[];
 }
 
 export type PartialFacetState = Partial<{
-  [K in FacetKey]: FacetState[K];
+  [K in ExplorerFacetKey]: FacetState[K];
 }>;
 
 export interface FacetWhereClause {
@@ -85,7 +99,7 @@ export interface FacetWhereClause {
 export interface UseFacetStateResult {
   facets: FacetState;
   where: FacetWhereClause;
-  setFacet: <K extends FacetKey>(key: K, value: FacetState[K]) => void;
+  setFacet: <K extends ExplorerFacetKey>(key: K, value: FacetState[K]) => void;
   resetFacets: () => void;
 }
 
@@ -105,9 +119,12 @@ export const DEFAULT_FACETS: FacetState = {
   storage_format: [],
   cost_status: [],
   date_window: "all",
+  platform_version: [],
+  arch: [],
+  cpu_family: [],
 };
 
-export const FACET_URL_KEYS: Record<FacetKey, string> = {
+export const FACET_URL_KEYS: Record<ExplorerFacetKey, string> = {
   benchmark: "benchmark",
   scale_factor: "sf",
   phase: "phase",
@@ -123,9 +140,12 @@ export const FACET_URL_KEYS: Record<FacetKey, string> = {
   storage_format: "storage_format",
   cost_status: "cost_status",
   date_window: "window",
+  platform_version: "version",
+  arch: "arch",
+  cpu_family: "cpu_family",
 };
 
-export const FACET_URL_ALIASES: Partial<Record<FacetKey, readonly string[]>> = {
+export const FACET_URL_ALIASES: Partial<Record<ExplorerFacetKey, readonly string[]>> = {
   benchmark: ["bm"],
   scale_factor: ["scale_factor"],
   execution_mode: ["execution_mode"],
@@ -134,6 +154,9 @@ export const FACET_URL_ALIASES: Partial<Record<FacetKey, readonly string[]>> = {
   deployment_class: ["deployment_class"],
   instance_or_warehouse: ["instance_type", "warehouse_size"],
   date_window: ["date_window"],
+  platform_version: ["platform_version", "engine_version"],
+  arch: ["architecture"],
+  cpu_family: ["cpu", "cpu_model"],
 };
 
 const DATE_WINDOWS = new Set<DateWindowFacet>(["all", "30d", "90d", "365d"]);
@@ -142,7 +165,7 @@ const DATE_WINDOW_DAYS: Record<Exclude<DateWindowFacet, "all">, number> = {
   "90d": 90,
   "365d": 365,
 };
-const LEGACY_ALL_SENTINEL_KEYS = new Set<FacetKey>(["phase", "tuning_mode", "trust_tier"]);
+const LEGACY_ALL_SENTINEL_KEYS = new Set<ExplorerFacetKey>(["phase", "tuning_mode", "trust_tier"]);
 const FACET_FILTER_COLUMNS = {
   deployment_class: "deployment_class",
   cloud_provider: "cloud_provider",
@@ -150,7 +173,7 @@ const FACET_FILTER_COLUMNS = {
   instance_or_warehouse: "instance_or_warehouse",
   storage_format: "storage_format",
   cost_status: "cost_status",
-} as const satisfies Partial<Record<FacetKey, string>>;
+} as const satisfies Partial<Record<ExplorerFacetKey, string>>;
 
 const multiValueSerde: UrlSerde<string[]> = {
   encode: (values) => normalizeStringList(values).join(","),
@@ -178,7 +201,10 @@ export const FACET_URL_SERDES = {
   storage_format: multiValueSerde,
   cost_status: multiValueSerde,
   date_window: dateWindowSerde,
-} satisfies { [K in FacetKey]: UrlSerde<FacetState[K]> };
+  platform_version: multiValueSerde,
+  arch: multiValueSerde,
+  cpu_family: multiValueSerde,
+} satisfies { [K in ExplorerFacetKey]: UrlSerde<FacetState[K]> };
 
 export function normalizeFacetState(input: PartialFacetState = {}): FacetState {
   return {
@@ -208,10 +234,16 @@ export function normalizeFacetState(input: PartialFacetState = {}): FacetState {
     date_window: DATE_WINDOWS.has(input.date_window as DateWindowFacet)
       ? (input.date_window as DateWindowFacet)
       : DEFAULT_FACETS.date_window,
+    platform_version: normalizeFacetList(
+      "platform_version",
+      input.platform_version ?? DEFAULT_FACETS.platform_version,
+    ),
+    arch: normalizeFacetList("arch", input.arch ?? DEFAULT_FACETS.arch),
+    cpu_family: normalizeFacetList("cpu_family", input.cpu_family ?? DEFAULT_FACETS.cpu_family),
   };
 }
 
-export function readFacetParam<K extends FacetKey>(
+export function readFacetParam<K extends ExplorerFacetKey>(
   params: URLSearchParams,
   key: K,
 ): FacetState[K] {
@@ -278,6 +310,9 @@ export function useFacetState(): UseFacetStateResult {
   const [storageFormat, setStorageFormat] = useFacetUrlState("storage_format");
   const [costStatus, setCostStatus] = useFacetUrlState("cost_status");
   const [dateWindow, setDateWindow] = useFacetUrlState("date_window");
+  const [platformVersion, setPlatformVersion] = useFacetUrlState("platform_version");
+  const [arch, setArch] = useFacetUrlState("arch");
+  const [cpuFamily, setCpuFamily] = useFacetUrlState("cpu_family");
 
   const facets = useMemo<FacetState>(
     () => ({
@@ -296,18 +331,24 @@ export function useFacetState(): UseFacetStateResult {
       storage_format: storageFormat,
       cost_status: costStatus,
       date_window: dateWindow,
+      platform_version: platformVersion,
+      arch,
+      cpu_family: cpuFamily,
     }),
     [
+      arch,
       benchmark,
       cloudProvider,
       cloudRegion,
       costStatus,
+      cpuFamily,
       dateWindow,
       deploymentClass,
       executionMode,
       instanceOrWarehouse,
       phase,
       platform,
+      platformVersion,
       scaleFactor,
       storageFormat,
       trustTier,
@@ -317,7 +358,7 @@ export function useFacetState(): UseFacetStateResult {
   );
   const where = useMemo(() => facetsToWhereClause(facets), [facets]);
 
-  function setFacet<K extends FacetKey>(key: K, value: FacetState[K]) {
+  function setFacet<K extends ExplorerFacetKey>(key: K, value: FacetState[K]) {
     const setters = {
       benchmark: setBenchmark,
       scale_factor: setScaleFactor,
@@ -334,12 +375,15 @@ export function useFacetState(): UseFacetStateResult {
       storage_format: setStorageFormat,
       cost_status: setCostStatus,
       date_window: setDateWindow,
-    } satisfies { [Facet in FacetKey]: (next: FacetState[Facet]) => void };
+      platform_version: setPlatformVersion,
+      arch: setArch,
+      cpu_family: setCpuFamily,
+    } satisfies { [Facet in ExplorerFacetKey]: (next: FacetState[Facet]) => void };
     (setters[key] as (next: FacetState[K]) => void)(value);
   }
 
   function resetFacets() {
-    for (const key of FACET_KEYS) {
+    for (const key of ALL_FACET_KEYS) {
       setFacet(key, defaultFacetValue(key));
     }
   }
@@ -347,7 +391,7 @@ export function useFacetState(): UseFacetStateResult {
   return { facets, where, setFacet, resetFacets };
 }
 
-export function useFacetField<K extends FacetKey>(key: K): [FacetState[K], (value: FacetState[K]) => void] {
+export function useFacetField<K extends ExplorerFacetKey>(key: K): [FacetState[K], (value: FacetState[K]) => void] {
   return useFacetUrlState(key);
 }
 
@@ -373,6 +417,23 @@ export function facetsToWhereClause(
   addListClause(FACET_FILTER_COLUMNS.instance_or_warehouse, facets.instance_or_warehouse, clauses, params);
   addListClause(FACET_FILTER_COLUMNS.storage_format, facets.storage_format, clauses, params);
   addListClause(FACET_FILTER_COLUMNS.cost_status, facets.cost_status, clauses, params);
+  addListClause("platform_version", facets.platform_version, clauses, params);
+  if (facets.arch.length > 0) {
+    clauses.push(
+      "result_id IN (SELECT result_id FROM bench.result_environment WHERE arch IN (" +
+        facets.arch.map(() => "?").join(", ") +
+        "))",
+    );
+    params.push(...facets.arch);
+  }
+  if (facets.cpu_family.length > 0) {
+    clauses.push(
+      "result_id IN (SELECT result_id FROM bench.result_environment WHERE cpu_family IN (" +
+        facets.cpu_family.map(() => "?").join(", ") +
+        "))",
+    );
+    params.push(...facets.cpu_family);
+  }
 
   const cutoff = dateWindowCutoffIso(facets.date_window, options.now);
   if (cutoff !== null) {
@@ -419,18 +480,18 @@ function normalizeStringList(values: readonly string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
-function normalizeFacetList(key: FacetKey, values: readonly string[]): string[] {
+function normalizeFacetList(key: ExplorerFacetKey, values: readonly string[]): string[] {
   const normalized = normalizeStringList(values);
   if (!LEGACY_ALL_SENTINEL_KEYS.has(key)) return normalized;
   return normalized.filter((value) => value !== "all");
 }
 
-function normalizeFacetValue<K extends FacetKey>(key: K, value: FacetState[K]): FacetState[K] {
+function normalizeFacetValue<K extends ExplorerFacetKey>(key: K, value: FacetState[K]): FacetState[K] {
   if (!Array.isArray(value)) return value;
   return normalizeFacetList(key, value) as FacetState[K];
 }
 
-function useFacetUrlState<K extends FacetKey>(key: K): [FacetState[K], (value: FacetState[K]) => void] {
+function useFacetUrlState<K extends ExplorerFacetKey>(key: K): [FacetState[K], (value: FacetState[K]) => void] {
   const [value, setValueRaw] = useState<FacetState[K]>(() => initialFacetValue(key));
 
   useEffect(() => {
@@ -458,17 +519,17 @@ function useFacetUrlState<K extends FacetKey>(key: K): [FacetState[K], (value: F
   return [value, setValue];
 }
 
-function initialFacetValue<K extends FacetKey>(key: K): FacetState[K] {
+function initialFacetValue<K extends ExplorerFacetKey>(key: K): FacetState[K] {
   if (typeof window === "undefined") return defaultFacetValue(key);
   return readFacetParam(new URLSearchParams(window.location.search), key);
 }
 
-function defaultFacetValue<K extends FacetKey>(key: K): FacetState[K] {
+function defaultFacetValue<K extends ExplorerFacetKey>(key: K): FacetState[K] {
   const value = DEFAULT_FACETS[key];
   return (Array.isArray(value) ? [...value] : value) as FacetState[K];
 }
 
-function writeFacetParam<K extends FacetKey>(key: K, value: FacetState[K]) {
+function writeFacetParam<K extends ExplorerFacetKey>(key: K, value: FacetState[K]) {
   if (typeof window === "undefined") return;
   const params = new URLSearchParams(window.location.search);
   const originalSearch = params.toString();

@@ -1,0 +1,65 @@
+{
+  "applied_ledger_hash": "78b52f53a5deb6ab96a543e43c1260f9976b67107ae6e2b46f6e71b6d74c308b",
+  "hash": "ad05d4d048df623a97403f22c71a1c04edbce9edcde501e7fcd9cb30c66e5780",
+  "requested": {
+    "constraints": {
+      "check_constraints": {
+        "enabled": true,
+        "enforce_on_insert": true,
+        "enforce_on_update": true
+      },
+      "foreign_keys": {
+        "enabled": false,
+        "enforce_referential_integrity": false,
+        "on_delete_action": "RESTRICT",
+        "on_update_action": "RESTRICT"
+      },
+      "primary_keys": {
+        "enabled": false,
+        "enforce_uniqueness": false,
+        "nullable": false
+      },
+      "unique_constraints": {
+        "enabled": false,
+        "ignore_nulls": false
+      }
+    },
+    "table_tunings": {
+      "table_175f8aff709e": {
+        "sorting": [
+          {
+            "name": "column_093184f03117",
+            "order": 1,
+            "type": "REAL"
+          }
+        ],
+        "table_name": "table_175f8aff709e"
+      },
+      "table_67550096cfd7": {
+        "partitioning": [
+          {
+            "name": "column_9ad995940fcc",
+            "order": 1,
+            "type": "VARCHAR"
+          }
+        ],
+        "sorting": [
+          {
+            "name": "column_474f66c9babc",
+            "order": 1,
+            "type": "VARCHAR"
+          }
+        ],
+        "table_name": "table_67550096cfd7"
+      }
+    }
+  },
+  "requested_config_hash": "ad05d4d048df623a97403f22c71a1c04edbce9edcde501e7fcd9cb30c66e5780",
+  "run_id": "d88b37e5",
+  "source": "yaml",
+  "source_file": "examples/tunings/duckdb/amplab_tuned.yaml",
+  "tuning_policy_generation": "adr-003",
+  "tuning_source": "auto_discovered",
+  "validation_status": "applied_unverified",
+  "version": "2.2"
+}

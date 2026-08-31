@@ -73,6 +73,12 @@ def test_clickbench_accepts_synthetic_scales(sf: float) -> None:
     validate_scale_factor("clickbench", sf)
 
 
+@pytest.mark.parametrize("sf", [float("nan"), float("inf"), float("-inf")])
+def test_clickbench_rejects_non_finite_scales(sf: float) -> None:
+    with pytest.raises(ValueError, match="finite scale_factor"):
+        validate_scale_factor("clickbench", sf)
+
+
 def test_tpcds_obt_rejects_subscale() -> None:
     """tpcds_obt scale_options=[1.0] — same single-element pattern as joinorder."""
     with pytest.raises(ScaleFactorNotSupportedError, match=r"tpcds_obt accepts scale_factor in"):

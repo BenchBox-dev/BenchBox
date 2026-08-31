@@ -45,6 +45,7 @@ from benchbox.core.results import (
     normalize_query_result,
 )
 from benchbox.core.results.builder import RunConfigInput, normalize_benchmark_id
+from benchbox.core.results.environment import system_profile_snapshot
 from benchbox.core.results.models import (
     BenchmarkResults,
     TableLoadingStats,
@@ -155,6 +156,21 @@ class DataLoadingError(RuntimeError):
         super().__init__(message)
         self.table_stats = table_stats or {}
         self.per_table_stats = per_table_stats or {}
+
+
+def _client_host_profile(system_profile: Any) -> dict[str, Any]:
+    """Return the client-host profile dict for a DataFrame run.
+
+    Collected the same way the SQL path collects it, so both families produce
+    the same client_host field set. A caller-supplied mapping is honoured as
+    is. A typed SystemProfile is serialized from the supplied snapshot rather
+    than replaced with a fresh observation of the current host.
+    """
+    if system_profile is not None:
+        return system_profile_snapshot(system_profile)
+    from benchbox.utils.system_info import get_system_info
+
+    return get_system_info().to_dict()
 
 
 class BenchmarkExecutionMixin:
@@ -298,6 +314,15 @@ class BenchmarkExecutionMixin:
         )
         builder.mark_started()
         builder.set_validation_status("NOT_RUN")
+        # Record the client host, exactly as the SQL adapters do in
+        # benchbox/platforms/base/adapter.py::_build_execution_metadata.
+        #
+        # The DataFrame families descend from this mixin rather than from that
+        # adapter, so without this call `result.system_profile` stays unset,
+        # `_build_environment_block` produces an empty client_host, and
+        # `_compact` drops it -- which is why every DataFrame bundle published
+        # only a `platform_runtime` block and no host at all.
+        builder.set_system_profile(_client_host_profile(system_profile))
 
         # Reset per-run plan-capture failure state (qpc-05 / F4.4 follow-up):
         # ExpressionFamilyAdapter doesn't inherit the SQL mixin's

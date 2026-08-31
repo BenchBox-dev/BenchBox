@@ -383,6 +383,7 @@ class SystemProfile(BaseModel):
     os_version: str
     architecture: str
     cpu_model: str
+    cpu_identity_provenance: Optional[Literal["measured", "user_attested", "inferred"]] = None
     cpu_cores_physical: int
     cpu_cores_logical: int
     memory_total_gb: float

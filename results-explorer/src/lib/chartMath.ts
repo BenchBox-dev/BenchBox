@@ -489,3 +489,73 @@ export function computePercentile(values: number[], p: number): number | null {
   if (f === c) return sorted[Math.round(k)]!;
   return sorted[f]! * (c - k) + sorted[c]! * (k - f);
 }
+
+// ---------------------------------------------------------------------------
+// Diverging ratio scale (multi-run heatmap)
+//
+// NO PYTHON COUNTERPART, deliberately. `chartMath.parity.test.ts` asserts the
+// helpers above are byte-identical to their Python references; this one is
+// additive and has no reference to match, because the multi-run heatmap is a
+// browser-only surface with no ASCII equivalent. Stated here so a future reader
+// does not go looking for the Python side and conclude it was lost.
+// ---------------------------------------------------------------------------
+
+/**
+ * Ratio at which the diverging scale saturates, in either direction.
+ *
+ * 4x matches the point where per-query differences stop being informative and
+ * start being outliers: beyond it the cell is already unambiguous, and letting
+ * the ramp keep going would compress everything nearer parity into a narrow
+ * band of indistinguishable colour.
+ */
+export const DIVERGING_RATIO_CLAMP = 4;
+
+/**
+ * Map a baseline-relative ratio to [-1, 1] for a two-hue diverging scale.
+ *
+ *   ratio < 1  (faster than baseline) -> negative
+ *   ratio = 1  (parity)               -> 0, the neutral midpoint
+ *   ratio > 1  (slower than baseline) -> positive
+ *
+ * SYMMETRIC IN LOG SPACE, which is the property that makes the chart honest: a
+ * 2x slowdown and a 2x speedup are the same distance from the midpoint in
+ * opposite directions. On a linear ratio scale they would not be -- 0.5 is 0.5
+ * below parity while 2.0 is 1.0 above it -- so a linear mapping would render
+ * slowdowns as visually larger than the equivalent speedups.
+ *
+ * Returns null for a ratio that is not a positive finite number, so an
+ * unanswerable cell can be rendered as unrecorded rather than as parity.
+ * Defaulting it to 0 would paint "we do not know" in the same colour as
+ * "identical to baseline", which is the specific misreading this chart must
+ * not invite.
+ */
+export function divergingRatioPosition(
+  ratio: number | null | undefined,
+  clamp: number = DIVERGING_RATIO_CLAMP,
+): number | null {
+  if (ratio === null || ratio === undefined) return null;
+  if (!Number.isFinite(ratio) || ratio <= 0) return null;
+  const limit = Math.log2(Math.max(clamp, 1 + Number.EPSILON));
+  const position = Math.log2(ratio) / limit;
+  return Math.max(-1, Math.min(1, position));
+}
+
+/**
+ * How much the runs disagree on a query, as the spread of their ratios.
+ *
+ * Log-space again, for the same reason: the disagreement between 0.5x and 2.0x
+ * is the same magnitude as between 1x and 4x, and a linear spread would rank
+ * the second as twice the first.
+ *
+ * Returns null when fewer than two runs produced a usable ratio -- a query only
+ * one run could answer has no disagreement to measure, and reporting 0 would
+ * rank it as perfect consensus.
+ */
+export function queryDisagreementSpread(ratios: readonly (number | null | undefined)[]): number | null {
+  const usable = ratios.filter(
+    (r): r is number => r !== null && r !== undefined && Number.isFinite(r) && r > 0,
+  );
+  if (usable.length < 2) return null;
+  const logs = usable.map((r) => Math.log2(r));
+  return Math.max(...logs) - Math.min(...logs);
+}

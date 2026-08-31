@@ -20,6 +20,7 @@ MetadataSource: TypeAlias = Literal[
     "inferred",
     "unavailable",
 ]
+CPUIdentityProvenance: TypeAlias = Literal["measured", "user_attested", "inferred"]
 CollectionStatus: TypeAlias = Literal["available", "partial", "unavailable", "error", "not_requested"]
 RuntimeType: TypeAlias = Literal[
     "local_process",
@@ -70,6 +71,16 @@ def _metadata_dict(value: Any) -> dict[str, Any]:
     return {}
 
 
+def system_profile_snapshot(system_profile: Any | None) -> dict[str, Any]:
+    """Serialize a caller-supplied profile without recollecting the current host."""
+    if isinstance(system_profile, Mapping):
+        return dict(system_profile)
+    if hasattr(system_profile, "model_dump"):
+        dumped = system_profile.model_dump(mode="json")
+        return dict(dumped) if isinstance(dumped, Mapping) else {}
+    return {}
+
+
 @dataclass
 class ClientHostEnvironment:
     """BenchBox client process host profile."""
@@ -81,19 +92,55 @@ class ClientHostEnvironment:
     python: str | None = None
     machine_id: str | None = None
 
+    cpu_model: str | None = None
+    cpu_vendor: str | None = None
+    cpu_identity_provenance: CPUIdentityProvenance | None = None
+
     @classmethod
-    def from_system_profile(cls, system_profile: Mapping[str, Any] | None) -> ClientHostEnvironment:
-        profile = system_profile or {}
-        os_type = profile.get("os_type") or profile.get("os")
-        os_release = profile.get("os_release")
+    def from_system_profile(cls, system_profile: Any | None) -> ClientHostEnvironment:
+        profile = system_profile_snapshot(system_profile)
+        os_type = profile.get("os_type") or profile.get("os") or profile.get("os_name")
+        os_release = profile.get("os_release") or profile.get("os_version")
         os_name = f"{os_type} {os_release}".strip() if os_type and os_release else os_type
+        cpu_model = profile.get("cpu_model")
+        cpu_vendor = profile.get("cpu_vendor")
+        cpu_identity_provenance = profile.get("cpu_identity_provenance")
+        if system_profile is None and (not cpu_model or not cpu_vendor):
+            # DELIBERATELY gated on a wholly absent profile.
+            #
+            # It is tempting to widen this to "fill whenever the value is
+            # missing", because every production caller passes a dict and this
+            # branch therefore almost never runs. That would be wrong: this
+            # constructor also runs on the LOAD path, where
+            # `_extract_system_profile` rebuilds a profile from a stored
+            # bundle. Detecting there would stamp the CPU of whatever machine
+            # happens to re-derive an old result onto that result's history --
+            # inventing hardware provenance for a run that executed elsewhere.
+            #
+            # The capture-time gap this was meant to close is fixed at its
+            # source instead: `benchbox.utils.system_info.get_system_info`
+            # now detects the real CPU and emits cpu_model/cpu_vendor, so the
+            # profile handed in already carries them.
+            from benchbox.utils.environment import detect_cpu_info
+
+            detected_model, detected_vendor = detect_cpu_info()
+            if not cpu_model:
+                cpu_model = detected_model
+                if detected_model:
+                    cpu_identity_provenance = "measured"
+            if not cpu_vendor:
+                cpu_vendor = detected_vendor
+
         return cls(
             os=os_name,
             arch=profile.get("architecture") or profile.get("arch"),
-            cpu_count=profile.get("cpu_count"),
-            memory_gb=profile.get("memory_gb"),
+            cpu_count=profile.get("cpu_count") or profile.get("cpu_cores_logical") or profile.get("cpu_cores"),
+            memory_gb=profile.get("memory_gb") or profile.get("memory_total_gb") or profile.get("total_memory_gb"),
             python=profile.get("python_version") or profile.get("python"),
             machine_id=profile.get("machine_id") or profile.get("anonymous_machine_id"),
+            cpu_model=cpu_model,
+            cpu_vendor=cpu_vendor,
+            cpu_identity_provenance=cpu_identity_provenance,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -236,7 +283,7 @@ class PlatformStorageMetadata:
 
 def build_environment_payload(
     *,
-    system_profile: Mapping[str, Any] | None,
+    system_profile: Any | None,
     execution_environment: NormalizedExecutionEnvironment | Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     """Build the result ``environment`` payload with legacy flat keys plus normalized blocks."""

@@ -28,6 +28,7 @@ from _project.scripts.explorer_pipeline.models import (
     timing_exclusion_reason,
 )
 from _project.scripts.explorer_pipeline.ranking import rank_platforms
+from _project.scripts.explorer_pipeline.transformer import normalize_cpu_family
 
 logger = logging.getLogger(__name__)
 
@@ -374,12 +375,15 @@ class DuckDBSnapshotBuilder:
         """Create all canonical tables and views in one pass."""
         con.execute("""
             CREATE TABLE result_environment (
-                result_id  VARCHAR PRIMARY KEY,
-                os         VARCHAR,
-                arch       VARCHAR,
-                cpu_count  INTEGER,
-                memory_gb  DOUBLE,
-                python     VARCHAR
+                result_id   VARCHAR PRIMARY KEY,
+                os          VARCHAR,
+                arch        VARCHAR,
+                cpu_count   INTEGER,
+                memory_gb   DOUBLE,
+                python      VARCHAR,
+                cpu_model   VARCHAR,
+                cpu_family  VARCHAR,
+                cpu_identity_provenance VARCHAR
             )
         """)
         con.execute("""
@@ -549,7 +553,10 @@ class DuckDBSnapshotBuilder:
                 e.arch,
                 e.cpu_count,
                 e.memory_gb,
-                e.python
+                e.python,
+                e.cpu_model,
+                e.cpu_family,
+                e.cpu_identity_provenance
             FROM results r
             LEFT JOIN result_environment e USING (result_id)
         """)
@@ -767,6 +774,13 @@ class DuckDBSnapshotBuilder:
             if detail is None:
                 continue
             env = detail.environment or {}
+            raw_cpu_model = env.get("cpu_model")
+            if isinstance(raw_cpu_model, str):
+                raw_cpu_model = raw_cpu_model.strip() or None
+            cpu_family = env.get("cpu_family") or normalize_cpu_family(raw_cpu_model)
+            if not raw_cpu_model:
+                raw_cpu_model = None
+                cpu_family = None
             env_rows.append(
                 (
                     entry.result_id,
@@ -775,6 +789,9 @@ class DuckDBSnapshotBuilder:
                     env.get("cpu_count"),
                     env.get("memory_gb"),
                     env.get("python"),
+                    raw_cpu_model,
+                    cpu_family,
+                    env.get("cpu_identity_provenance"),
                 )
             )
             if detail.phase_durations:
@@ -782,7 +799,7 @@ class DuckDBSnapshotBuilder:
                     phase_rows.append((entry.result_id, phase, duration_s))
 
         if env_rows:
-            con.executemany("INSERT INTO result_environment VALUES (?, ?, ?, ?, ?, ?)", env_rows)
+            con.executemany("INSERT INTO result_environment VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", env_rows)
         if phase_rows:
             con.executemany("INSERT INTO result_phase_durations VALUES (?, ?, ?)", phase_rows)
 

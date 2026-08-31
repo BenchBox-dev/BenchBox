@@ -111,7 +111,17 @@ class TestG1SchemaContract:
             "physical_rendering_id",
             "tuning_policy_generation",
         },
-        "result_environment": {"result_id", "os", "arch", "cpu_count", "memory_gb", "python"},
+        "result_environment": {
+            "result_id",
+            "os",
+            "arch",
+            "cpu_count",
+            "memory_gb",
+            "python",
+            "cpu_model",
+            "cpu_family",
+            "cpu_identity_provenance",
+        },
         "result_phase_durations": {"result_id", "phase", "duration_s"},
         "result_basis_availability": {
             "result_id",
@@ -276,6 +286,8 @@ class TestG1SchemaContract:
             "cpu_count",
             "memory_gb",
             "python",
+            "cpu_model",
+            "cpu_family",
         },
         "platform_index_rows": {
             "result_id",
@@ -434,10 +446,10 @@ class TestSourceFidelity:
     def test_environment_row_populated(self, db_path: Path) -> None:
         with _connect(db_path) as con:
             row = con.execute(
-                "SELECT os, arch, cpu_count, memory_gb, python FROM result_environment LIMIT 1"
+                "SELECT os, arch, cpu_count, memory_gb, python, cpu_model, cpu_family FROM result_environment LIMIT 1"
             ).fetchone()
         assert row is not None
-        os_val, arch, cpu_count, memory_gb, python_ver = row
+        os_val, arch, cpu_count, memory_gb, python_ver, cpu_model, cpu_family = row
         assert "macOS" in os_val
         assert arch == "arm64"
         assert cpu_count == 10
@@ -1048,6 +1060,16 @@ class TestSchemaDocMatchesBuiltSchema:
             "  (order matters: the doc mirrors the builder's declaration order)"
         )
 
+    def test_result_environment_table_columns_match(self, db_path: Path) -> None:
+        documented = _doc_block_columns(self._doc_text(), "CREATE TABLE IF NOT EXISTS result_environment (", "\n);")
+        with _connect(db_path) as con:
+            actual = [row[0] for row in con.execute("DESCRIBE result_environment").fetchall()]
+        assert documented == actual, (
+            "browser-duckdb-schema.sql `result_environment` is out of sync with duckdb_builder.py.\n"
+            f"  undocumented columns: {[c for c in actual if c not in documented]}\n"
+            f"  documented but absent: {[c for c in documented if c not in actual]}"
+        )
+
     def test_result_detail_metrics_view_columns_match(self, db_path: Path) -> None:
         documented = _doc_block_columns(
             self._doc_text(),
@@ -1061,6 +1083,23 @@ class TestSchemaDocMatchesBuiltSchema:
         actual = [column for column in view_columns if column in results_columns]
         assert documented == actual, (
             "browser-duckdb-schema.sql `result_detail_metrics` is out of sync with duckdb_builder.py.\n"
+            f"  undocumented projections: {[c for c in actual if c not in documented]}\n"
+            f"  documented but absent: {[c for c in documented if c not in actual]}"
+        )
+
+    def test_result_detail_metrics_environment_columns_match(self, db_path: Path) -> None:
+        documented = _doc_block_columns(
+            self._doc_text(),
+            "CREATE VIEW IF NOT EXISTS result_detail_metrics AS",
+            "FROM results r",
+            prefix="e.",
+        )
+        with _connect(db_path) as con:
+            view_columns = [row[0] for row in con.execute("DESCRIBE result_detail_metrics").fetchall()]
+            environment_columns = {row[0] for row in con.execute("DESCRIBE result_environment").fetchall()}
+        actual = [column for column in view_columns if column in environment_columns and column != "result_id"]
+        assert documented == actual, (
+            "browser-duckdb-schema.sql `result_detail_metrics` environment projections are out of sync.\n"
             f"  undocumented projections: {[c for c in actual if c not in documented]}\n"
             f"  documented but absent: {[c for c in documented if c not in actual]}"
         )

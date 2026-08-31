@@ -41,9 +41,15 @@
     "arch": "arm64",
     "client_host": {
       "arch": "arm64",
+      "cpu_identity_provenance": "user_attested",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
       "os": "Darwin",
       "python": "3.12.13"
     },
+    "cpu_identity_provenance": "user_attested",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
     "os": "Darwin",
     "platform_runtime": {
       "collection_status": "partial",
@@ -216,7 +222,7 @@
     {
       "id": "1.1",
       "iter": 0,
-      "ms": 36.8,
+      "ms": 37.9,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -225,7 +231,7 @@
     {
       "id": "1.2",
       "iter": 0,
-      "ms": 28.4,
+      "ms": 28.5,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -243,7 +249,7 @@
     {
       "id": "2.1",
       "iter": 0,
-      "ms": 103.2,
+      "ms": 103.8,
       "rows": 280,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -252,7 +258,7 @@
     {
       "id": "2.2",
       "iter": 0,
-      "ms": 86.0,
+      "ms": 86.2,
       "rows": 56,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -261,7 +267,7 @@
     {
       "id": "2.3",
       "iter": 0,
-      "ms": 103.4,
+      "ms": 104.1,
       "rows": 7,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -270,7 +276,7 @@
     {
       "id": "3.1",
       "iter": 0,
-      "ms": 105.1,
+      "ms": 105.5,
       "rows": 150,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -288,7 +294,7 @@
     {
       "id": "3.3",
       "iter": 0,
-      "ms": 54.9,
+      "ms": 55.0,
       "rows": 24,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -306,7 +312,7 @@
     {
       "id": "4.1",
       "iter": 0,
-      "ms": 139.8,
+      "ms": 139.5,
       "rows": 35,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -315,7 +321,7 @@
     {
       "id": "4.2",
       "iter": 0,
-      "ms": 95.1,
+      "ms": 94.8,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",

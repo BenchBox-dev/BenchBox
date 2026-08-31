@@ -42,9 +42,15 @@
     "arch": "arm64",
     "client_host": {
       "arch": "arm64",
+      "cpu_identity_provenance": "user_attested",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
       "os": "Darwin",
       "python": "3.12.13"
     },
+    "cpu_identity_provenance": "user_attested",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
     "os": "Darwin",
     "platform_runtime": {
       "collection_status": "partial",
@@ -228,7 +234,7 @@
     {
       "id": "99",
       "iter": 0,
-      "ms": 60.2,
+      "ms": 59.4,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -238,7 +244,7 @@
     {
       "id": "93",
       "iter": 0,
-      "ms": 151.0,
+      "ms": 142.9,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -258,7 +264,7 @@
     {
       "id": "95",
       "iter": 0,
-      "ms": 580.8,
+      "ms": 567.1,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -278,7 +284,7 @@
     {
       "id": "92",
       "iter": 0,
-      "ms": 10.1,
+      "ms": 9.9,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -288,7 +294,7 @@
     {
       "id": "94",
       "iter": 0,
-      "ms": 17.9,
+      "ms": 17.6,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -298,7 +304,7 @@
     {
       "id": "96",
       "iter": 0,
-      "ms": 20.4,
+      "ms": 20.2,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -308,7 +314,7 @@
     {
       "id": "1",
       "iter": 0,
-      "ms": 40.7,
+      "ms": 39.2,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -318,7 +324,7 @@
     {
       "id": "2",
       "iter": 0,
-      "ms": 173.3,
+      "ms": 173.8,
       "rows": 2513,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -328,7 +334,7 @@
     {
       "id": "3",
       "iter": 0,
-      "ms": 17.1,
+      "ms": 17.3,
       "rows": 94,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -338,7 +344,7 @@
     {
       "id": "4",
       "iter": 0,
-      "ms": 765.0,
+      "ms": 759.4,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -348,7 +354,7 @@
     {
       "id": "5",
       "iter": 0,
-      "ms": 75.4,
+      "ms": 74.4,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -358,7 +364,7 @@
     {
       "id": "6",
       "iter": 0,
-      "ms": 80.9,
+      "ms": 81.6,
       "rows": 51,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -368,7 +374,7 @@
     {
       "id": "7",
       "iter": 0,
-      "ms": 52.7,
+      "ms": 52.0,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -378,7 +384,7 @@
     {
       "id": "8",
       "iter": 0,
-      "ms": 35.2,
+      "ms": 35.7,
       "rows": 4,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -408,7 +414,7 @@
     {
       "id": "11",
       "iter": 0,
-      "ms": 396.6,
+      "ms": 400.4,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -428,7 +434,7 @@
     {
       "id": "13",
       "iter": 0,
-      "ms": 87.4,
+      "ms": 87.7,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -438,7 +444,7 @@
     {
       "id": "14a",
       "iter": 0,
-      "ms": 826.9,
+      "ms": 787.5,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -468,7 +474,7 @@
     {
       "id": "16",
       "iter": 0,
-      "ms": 38.7,
+      "ms": 38.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -478,7 +484,7 @@
     {
       "id": "17",
       "iter": 0,
-      "ms": 96.2,
+      "ms": 94.9,
       "rows": 7,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -498,7 +504,7 @@
     {
       "id": "19",
       "iter": 0,
-      "ms": 39.9,
+      "ms": 40.0,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -508,7 +514,7 @@
     {
       "id": "20",
       "iter": 0,
-      "ms": 31.1,
+      "ms": 31.6,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -518,7 +524,7 @@
     {
       "id": "21",
       "iter": 0,
-      "ms": 55.5,
+      "ms": 53.2,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -538,7 +544,7 @@
     {
       "id": "23a",
       "iter": 0,
-      "ms": 15244.0,
+      "ms": 15408.5,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -548,7 +554,7 @@
     {
       "id": "23b",
       "iter": 0,
-      "ms": 14453.7,
+      "ms": 16738.4,
       "rows": 0,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -558,7 +564,7 @@
     {
       "id": "24a",
       "iter": 0,
-      "ms": 290.6,
+      "ms": 253.7,
       "rows": 2,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -568,7 +574,7 @@
     {
       "id": "24b",
       "iter": 0,
-      "ms": 205.4,
+      "ms": 194.9,
       "rows": 5,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -578,7 +584,7 @@
     {
       "id": "25",
       "iter": 0,
-      "ms": 134.0,
+      "ms": 122.2,
       "rows": 4,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -588,7 +594,7 @@
     {
       "id": "26",
       "iter": 0,
-      "ms": 111.6,
+      "ms": 102.4,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -598,7 +604,7 @@
     {
       "id": "27",
       "iter": 0,
-      "ms": 110.2,
+      "ms": 96.0,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -618,7 +624,7 @@
     {
       "id": "29",
       "iter": 0,
-      "ms": 79.6,
+      "ms": 81.0,
       "rows": 3,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -638,7 +644,7 @@
     {
       "id": "31",
       "iter": 0,
-      "ms": 160.7,
+      "ms": 153.1,
       "rows": 288,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -658,7 +664,7 @@
     {
       "id": "33",
       "iter": 0,
-      "ms": 64.9,
+      "ms": 61.2,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -668,7 +674,7 @@
     {
       "id": "34",
       "iter": 0,
-      "ms": 41.1,
+      "ms": 40.9,
       "rows": 4653,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -678,7 +684,7 @@
     {
       "id": "35",
       "iter": 0,
-      "ms": 144.8,
+      "ms": 147.2,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -708,7 +714,7 @@
     {
       "id": "38",
       "iter": 0,
-      "ms": 119.7,
+      "ms": 120.4,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -718,7 +724,7 @@
     {
       "id": "39a",
       "iter": 0,
-      "ms": 281.2,
+      "ms": 283.6,
       "rows": 2533,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -738,7 +744,7 @@
     {
       "id": "40",
       "iter": 0,
-      "ms": 80.8,
+      "ms": 83.2,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -758,7 +764,7 @@
     {
       "id": "42",
       "iter": 0,
-      "ms": 20.0,
+      "ms": 21.3,
       "rows": 11,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -768,7 +774,7 @@
     {
       "id": "43",
       "iter": 0,
-      "ms": 45.9,
+      "ms": 47.5,
       "rows": 17,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -778,7 +784,7 @@
     {
       "id": "44",
       "iter": 0,
-      "ms": 33.2,
+      "ms": 34.9,
       "rows": 0,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -788,7 +794,7 @@
     {
       "id": "45",
       "iter": 0,
-      "ms": 40.9,
+      "ms": 42.8,
       "rows": 36,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -798,7 +804,7 @@
     {
       "id": "46",
       "iter": 0,
-      "ms": 86.8,
+      "ms": 87.8,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -808,7 +814,7 @@
     {
       "id": "47",
       "iter": 0,
-      "ms": 521.5,
+      "ms": 537.7,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -828,7 +834,7 @@
     {
       "id": "49",
       "iter": 0,
-      "ms": 120.6,
+      "ms": 113.4,
       "rows": 45,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -848,7 +854,7 @@
     {
       "id": "51",
       "iter": 0,
-      "ms": 637.3,
+      "ms": 654.9,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -868,7 +874,7 @@
     {
       "id": "53",
       "iter": 0,
-      "ms": 34.0,
+      "ms": 34.2,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -878,7 +884,7 @@
     {
       "id": "54",
       "iter": 0,
-      "ms": 45.4,
+      "ms": 45.1,
       "rows": 0,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -888,7 +894,7 @@
     {
       "id": "55",
       "iter": 0,
-      "ms": 22.6,
+      "ms": 22.9,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -908,7 +914,7 @@
     {
       "id": "57",
       "iter": 0,
-      "ms": 270.9,
+      "ms": 277.7,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -928,7 +934,7 @@
     {
       "id": "59",
       "iter": 0,
-      "ms": 410.3,
+      "ms": 411.9,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -948,7 +954,7 @@
     {
       "id": "61",
       "iter": 0,
-      "ms": 63.3,
+      "ms": 65.1,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -958,7 +964,7 @@
     {
       "id": "62",
       "iter": 0,
-      "ms": 27.7,
+      "ms": 28.3,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -978,7 +984,7 @@
     {
       "id": "64",
       "iter": 0,
-      "ms": 348.6,
+      "ms": 352.5,
       "rows": 19,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -988,7 +994,7 @@
     {
       "id": "65",
       "iter": 0,
-      "ms": 184.8,
+      "ms": 190.9,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1008,7 +1014,7 @@
     {
       "id": "67",
       "iter": 0,
-      "ms": 1830.7,
+      "ms": 1992.0,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1028,7 +1034,7 @@
     {
       "id": "69",
       "iter": 0,
-      "ms": 13.9,
+      "ms": 15.0,
       "rows": 0,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1058,7 +1064,7 @@
     {
       "id": "72",
       "iter": 0,
-      "ms": 229.2,
+      "ms": 230.6,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1098,7 +1104,7 @@
     {
       "id": "76",
       "iter": 0,
-      "ms": 45.2,
+      "ms": 45.7,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1108,7 +1114,7 @@
     {
       "id": "77",
       "iter": 0,
-      "ms": 47.7,
+      "ms": 50.4,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1118,7 +1124,7 @@
     {
       "id": "78",
       "iter": 0,
-      "ms": 499.0,
+      "ms": 511.4,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1128,7 +1134,7 @@
     {
       "id": "79",
       "iter": 0,
-      "ms": 47.4,
+      "ms": 47.9,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1138,7 +1144,7 @@
     {
       "id": "80",
       "iter": 0,
-      "ms": 272.5,
+      "ms": 276.0,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1158,7 +1164,7 @@
     {
       "id": "82",
       "iter": 0,
-      "ms": 173.2,
+      "ms": 174.3,
       "rows": 10,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1168,7 +1174,7 @@
     {
       "id": "83",
       "iter": 0,
-      "ms": 17.5,
+      "ms": 17.7,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1178,7 +1184,7 @@
     {
       "id": "84",
       "iter": 0,
-      "ms": 19.0,
+      "ms": 18.0,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1198,7 +1204,7 @@
     {
       "id": "86",
       "iter": 0,
-      "ms": 23.9,
+      "ms": 23.8,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1208,7 +1214,7 @@
     {
       "id": "87",
       "iter": 0,
-      "ms": 135.3,
+      "ms": 135.9,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1218,7 +1224,7 @@
     {
       "id": "88",
       "iter": 0,
-      "ms": 165.8,
+      "ms": 166.8,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1228,7 +1234,7 @@
     {
       "id": "89",
       "iter": 0,
-      "ms": 48.1,
+      "ms": 48.3,
       "rows": 100,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1238,7 +1244,7 @@
     {
       "id": "90",
       "iter": 0,
-      "ms": 13.6,
+      "ms": 13.1,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -1248,7 +1254,7 @@
     {
       "id": "91",
       "iter": 0,
-      "ms": 11.4,
+      "ms": 11.8,
       "rows": 11,
       "run_type": "warmup",
       "status": "SUCCESS",

@@ -12,6 +12,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import importlib
+import math
 from collections import Counter
 from dataclasses import dataclass
 from importlib import resources
@@ -508,8 +509,14 @@ def validate_scale_factor(
         raise ValueError(f"Unknown benchmark '{benchmark_id}'. Available: {available}")
 
     if benchmark_id == "clickbench":
+        try:
+            sf = float(scale_factor)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"CLICKBENCH requires a finite scale_factor (got {scale_factor}).") from exc
+        if not math.isfinite(sf):
+            raise ValueError(f"CLICKBENCH requires a finite scale_factor (got {scale_factor}).")
         min_scale = meta.get("min_scale")
-        if min_scale is not None and scale_factor < min_scale:
+        if min_scale is not None and sf < min_scale:
             raise ValueError(f"{benchmark_id.upper()} requires scale_factor >= {min_scale} (got {scale_factor}).")
         return
 

@@ -5,7 +5,9 @@ const SHORT_DUCKDB = fixtureIds.shortIds.duckdb;
 const SHORT_DATAFUSION = fixtureIds.shortIds.datafusion;
 const DETAIL_ID = fixtureIds.ids.duckdb;
 
-// Desktop/wide use maxY = viewport.height (900); mobile/tablet use 1200 (1.33x).
+// Desktop/wide use maxY = viewport.height (900). Tablet uses 1200 (1.33x),
+// while mobile allows 1220 so the required engine-version facet can occupy its
+// own compact grid row without making the first leaderboard row fail by 14px.
 // PR #276 originally tightened the desktop intro spacing to fit
 // `query-results-panel.top` under 900 when `query-visible-columns` rendered
 // above the table at desktop via `lg:order-1`. PRs #277 and #291 dropped
@@ -16,7 +18,7 @@ const DETAIL_ID = fixtureIds.ids.duckdb;
 // `results-explorer-query-visible-columns-desktop-order-vs-test-name`
 // (PR #291).
 const VIEWPORTS = [
-  { name: "mobile", width: 390, height: 900, maxY: 1200 },
+  { name: "mobile", width: 390, height: 900, maxY: 1220 },
   { name: "tablet", width: 768, height: 900, maxY: 1200 },
   { name: "desktop", width: 1280, height: 900, maxY: 900 },
   { name: "wide", width: 1600, height: 900, maxY: 900 },

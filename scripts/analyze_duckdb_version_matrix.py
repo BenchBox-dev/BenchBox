@@ -150,7 +150,7 @@ def aggregate_payloads(payloads: list[dict[str, Any]], *, version: str, benchmar
     if any(set(query_map) != set(query_maps[0]) for query_map in query_maps[1:]):
         raise ValueError(f"repetitions have different query sets for {version}/{benchmark}")
     for query in aggregate.get("queries", []):
-        if not isinstance(query, dict) or query.get("run_type") != "measurement":
+        if not isinstance(query, dict):
             continue
         samples = [query_map[_query_key(query)].get("ms") for query_map in query_maps]
         if all(isinstance(value, (int, float)) for value in samples):

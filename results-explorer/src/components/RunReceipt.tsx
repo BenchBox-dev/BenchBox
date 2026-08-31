@@ -52,6 +52,13 @@ function rowFromSummary(label: string, value: string): ReceiptRow {
   return recordedRow(label, value);
 }
 
+function formatCpuIdentityProvenance(value: string): string {
+  if (value === "user_attested") return "User attested";
+  if (value === "measured") return "Measured";
+  if (value === "inferred") return "Inferred";
+  return "Unknown";
+}
+
 /**
  * Row for a full-length identity hash (ADR-1 requested-config / applied-ledger
  * SHA-256). Renders a monospace prefix for readability while the full value
@@ -130,6 +137,9 @@ export function RunReceipt({
       rows: [
         rowFromString("OS", detail.environment.os),
         rowFromString("Arch", detail.environment.arch),
+        rowFromString("CPU family", detail.environment.cpu_family),
+        rowFromString("CPU model", detail.environment.cpu_model),
+        rowFromString("CPU evidence", detail.environment.cpu_identity_provenance, formatCpuIdentityProvenance),
         rowFromString("CPU count", detail.environment.cpu_count),
         memoryRow(detail.environment.memory_gb),
         rowFromString("Python", detail.environment.python),

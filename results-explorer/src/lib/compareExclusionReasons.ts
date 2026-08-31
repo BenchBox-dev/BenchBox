@@ -123,6 +123,13 @@ const REASON_COPY: Record<string, CompareExclusionReasonCopy> = {
     recoveryHint: "Choose a run with clean validation status.",
     category: "rank",
   },
+  tuning_not_applied: {
+    code: "tuning_not_applied",
+    shortText: "Tuning not applied",
+    detailText: "The custom tuning request has no execution-derived applied tuning evidence.",
+    recoveryHint: "Choose a run whose tuning receipt records applied tuning operations.",
+    category: "rank",
+  },
   display_metric_unavailable: {
     code: "display_metric_unavailable",
     shortText: "Display metric unavailable",

@@ -1,0 +1,8 @@
+{
+  "bundle_file": "tpch_sf001_duckdb_sql_20260826_105325_8a57a5a8.json",
+  "bundle_hash": "c0122c880529afcde02747721223fa2bba1ee73400bea3df673d81d3753b576e",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

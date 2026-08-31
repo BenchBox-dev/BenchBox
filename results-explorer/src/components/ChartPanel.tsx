@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import type { BenchmarkSummary } from "@/types";
+import type { BenchmarkSummary, RankingConfig } from "@/types";
 import {
   applicableCharts,
   buildRenderableSummary,
@@ -32,6 +32,7 @@ import {
 } from "@/lib/runIdentity";
 import {
   buildLatencyBarScale,
+  geomeanMs,
   latencyScaleFraction,
   latencyScaleTicks,
 } from "@/lib/chartMath";
@@ -63,6 +64,7 @@ interface ChartPanelProps {
   // QueryHeatmap above the panel) pass the duplicated chart ids here so
   // the panel does not expose the same view as a redundant subtab.
   excludeChartIds?: readonly string[];
+  queryFilter?: readonly string[];
 }
 
 interface CompareQueryRow {
@@ -84,13 +86,18 @@ export function ChartPanel({
   suppressWinnerClaims = false,
   suppressionReason,
   excludeChartIds,
+  queryFilter,
 }: ChartPanelProps) {
   const charts = useMemo(() => {
     const applicable = applicableCharts(context);
-    if (!excludeChartIds || excludeChartIds.length === 0) return applicable;
-    const exclude = new Set(excludeChartIds);
+    const exclude = new Set(excludeChartIds ?? []);
+    if (queryFilter) {
+      exclude.add("cost_scatter");
+      exclude.add("power_bar");
+    }
+    if (exclude.size === 0) return applicable;
     return applicable.filter((entry) => !exclude.has(entry.id));
-  }, [context, excludeChartIds]);
+  }, [context, excludeChartIds, queryFilter]);
   const chartGroups = useMemo(() => groupChartsByQuestion(charts), [charts]);
   const summary = useMemo(() => buildRenderableSummary(context), [context]);
   const historical = useMemo(
@@ -145,10 +152,54 @@ export function ChartPanel({
     !isBaselineControlled &&
     context.kind === "compare" &&
     (activeChart?.id === "normalized_speedup" || activeChart?.id === "diverging_bar");
-  const chartSummary = useMemo(
-    () => (summary ? filterSummaryForChartDataset(summary, activeEligibilityClass) : null),
-    [activeEligibilityClass, summary],
-  );
+  const chartSummary = useMemo(() => {
+    if (!summary) return null;
+    const base = filterSummaryForChartDataset(summary, activeEligibilityClass);
+    if (!queryFilter) return base;
+    const filteredQueryIds = queryFilter.filter((q) => base.query_ids.includes(q));
+    // Invariant: compute aggregate geomeans over the query IDs valid across every platform in the cohort
+    const sharedValidQueryIds = filteredQueryIds.filter((q) =>
+      base.platforms.every((p) => {
+        const v = p.timings[q];
+        return v !== null && v !== undefined && Number.isFinite(v) && v > 0;
+      }),
+    );
+    const filteredPlatforms = base.platforms.map((platform) => {
+      const filteredTimings: Record<string, number | null> = {};
+      for (const q of filteredQueryIds) {
+        if (q in platform.timings) {
+          filteredTimings[q] = platform.timings[q] ?? null;
+        }
+      }
+      const geomean =
+        sharedValidQueryIds.length >= 2
+          ? geomeanMs(sharedValidQueryIds.map((q) => platform.timings[q]!))
+          : null;
+      return {
+        ...platform,
+        timings: filteredTimings,
+        display_geomean_ms: geomean,
+        sample_geomean_ms: geomean,
+        power_score: null,
+        normalized_cost_usd: null,
+        cost_status: "unavailable" as const,
+      };
+    });
+    const ranking: RankingConfig | null =
+      queryFilter && base.ranking && base.ranking.primary_metric === "power_score"
+        ? {
+            primary_metric: "display_geomean_ms",
+            secondary_metric: base.ranking.secondary_metric,
+            primary_order: "asc",
+          }
+        : base.ranking;
+    return {
+      ...base,
+      ranking,
+      query_ids: filteredQueryIds,
+      platforms: filteredPlatforms,
+    };
+  }, [activeEligibilityClass, summary, queryFilter]);
   const chartPlatformLabels = useMemo(
     () =>
       chartSummary
@@ -285,6 +336,10 @@ export function ChartPanel({
       <div id="chart-panel-chart" role="tabpanel" aria-label={`${activeGroup.label} chart`} data-chart-container>
         {chartDatasetEmpty ? (
           <ChartDatasetEmptyState chart={activeChart} summary={summary!} />
+        ) : queryFilter && chartSummary && chartSummary.query_ids.length === 0 ? (
+          <div class="panel-muted rounded p-6 text-center text-sm text-[var(--bb-data-fg-muted)]">
+            No queries match the selected filter.
+          </div>
         ) : (
           <>
             {renderChart(activeChart, {
@@ -295,8 +350,14 @@ export function ChartPanel({
               compareGroups,
               baselineIdx,
               platformLabels: chartPlatformLabels,
-              suppressWinnerClaims,
-              suppressionReason,
+              suppressWinnerClaims:
+                suppressWinnerClaims || Boolean(queryFilter && (chartSummary?.query_ids.length ?? 0) < 2),
+              suppressionReason:
+                suppressionReason ??
+                (Boolean(queryFilter && (chartSummary?.query_ids.length ?? 0) < 2)
+                  ? "Winner claims suppressed when fewer than 2 valid queries are selected"
+                  : undefined),
+              queryFilter,
             })}
             {summary && chartSummary && chartSummary.platforms.length > 0 && chartExclusionSummary.length > 0 && (
               <ChartDatasetExclusionSummary
@@ -425,6 +486,7 @@ function renderChart(
     platformLabels,
     suppressWinnerClaims = false,
     suppressionReason,
+    queryFilter,
   }: {
     context: ChartContext;
     summary: BenchmarkSummary | null;
@@ -435,6 +497,7 @@ function renderChart(
     platformLabels: string[];
     suppressWinnerClaims?: boolean;
     suppressionReason?: string;
+    queryFilter?: readonly string[];
   },
 ) {
   switch (chart.id) {
@@ -445,9 +508,13 @@ function renderChart(
     case "distribution_box":
       return summary ? <DistributionBox summary={summary} /> : null;
     case "query_heatmap":
-      return summary ? <QueryHeatmap summary={summary} /> : null;
+      return summary ? (
+        <QueryHeatmap summary={summary} preserveOrder={Boolean(queryFilter)} />
+      ) : null;
     case "query_histogram":
-      return summary ? <QueryHistogram summary={summary} /> : null;
+      return summary ? (
+        <QueryHistogram summary={summary} preserveOrder={Boolean(queryFilter)} />
+      ) : null;
     case "cost_scatter":
       return summary ? <CostScatter summary={summary} /> : null;
     case "time_series":
@@ -487,16 +554,26 @@ function renderChart(
           })()}
           <GroupedQueryChart groups={compareGroups} />
         </div>
-      ) : null;
+      ) : (
+        <div class="panel-muted rounded p-6 text-center text-sm text-[var(--bb-data-fg-muted)]">
+          No queries match the selected filter.
+        </div>
+      );
     case "diverging_bar":
       return summary ? (
-        <DivergingBarChart
-          queries={compareRows}
-          results={summary.platforms.map((platform, index) => ({
-            platform: platformLabels[index] ?? platform.platform,
-          }))}
-          baselineIdx={baselineIdx}
-        />
+        compareRows.length > 0 ? (
+          <DivergingBarChart
+            queries={compareRows}
+            results={summary.platforms.map((platform, index) => ({
+              platform: platformLabels[index] ?? platform.platform,
+            }))}
+            baselineIdx={baselineIdx}
+          />
+        ) : (
+          <div class="panel-muted rounded p-6 text-center text-sm text-[var(--bb-data-fg-muted)]">
+            No queries match the selected filter.
+          </div>
+        )
       ) : null;
     case "summary_box":
       return (
@@ -550,7 +627,9 @@ function renderChart(
     case "cdf_chart":
       return summary ? <CDFChart summary={summary} /> : null;
     case "rank_table":
-      return summary ? <RankTable summary={summary} /> : null;
+      return summary ? (
+        <RankTable summary={summary} preserveOrder={Boolean(queryFilter)} />
+      ) : null;
     default:
       return null;
   }

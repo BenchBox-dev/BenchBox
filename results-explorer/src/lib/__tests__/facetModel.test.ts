@@ -1,21 +1,23 @@
 import { act, renderHook } from "@testing-library/preact";
 import { describe, expect, it, beforeEach } from "vitest";
 import {
+  ALL_FACET_KEYS,
   DEFAULT_FACETS,
   FACET_KEYS,
   FACET_URL_KEYS,
   FACET_URL_SERDES,
+  HARDWARE_FACET_KEYS,
   facetsToWhereClause,
   normalizeFacetState,
   readFacetParam,
   useFacetField,
-  type FacetKey,
+  type ExplorerFacetKey,
   type FacetState,
 } from "@/lib/facetModel";
 import { matchesFacetRow } from "@/lib/facetMatching";
 import { useUrlState, type UrlSerde } from "@/lib/useUrlState";
 
-const SAMPLE_VALUES: { [K in FacetKey]: FacetState[K] } = {
+const SAMPLE_VALUES: { [K in ExplorerFacetKey]: FacetState[K] } = {
   benchmark: ["tpch", "star_schema"],
   scale_factor: ["0.01", "1"],
   phase: ["power", "throughput"],
@@ -31,13 +33,16 @@ const SAMPLE_VALUES: { [K in FacetKey]: FacetState[K] } = {
   storage_format: ["parquet"],
   cost_status: ["normalized"],
   date_window: "90d",
+  platform_version: ["1.1.0", "1.2.0"],
+  arch: ["arm64", "x86_64"],
+  cpu_family: ["apple_silicon", "graviton"],
 };
 
 function clearSearch() {
   window.history.replaceState(null, "", "/");
 }
 
-function renderFacetUrlState(key: FacetKey) {
+function renderFacetUrlState(key: ExplorerFacetKey) {
   return renderHook(() =>
     useUrlState<unknown>(
       FACET_URL_KEYS[key],
@@ -70,9 +75,18 @@ describe("facet URL contract", () => {
       "cost_status",
       "date_window",
     ]);
+    expect(HARDWARE_FACET_KEYS).toStrictEqual([
+      "platform_version",
+      "arch",
+      "cpu_family",
+    ]);
+    expect(ALL_FACET_KEYS).toStrictEqual([
+      ...FACET_KEYS,
+      ...HARDWARE_FACET_KEYS,
+    ]);
   });
 
-  for (const key of FACET_KEYS) {
+  for (const key of ALL_FACET_KEYS) {
     it(`round-trips ${key} through useUrlState`, () => {
       const sample = SAMPLE_VALUES[key];
       const first = renderFacetUrlState(key);
@@ -235,5 +249,95 @@ describe("facetsToWhereClause", () => {
       keys: ["phase"],
     });
     expect(rowMatches).toBe(true);
+  });
+
+  describe("hardware identity and engine version facets", () => {
+    it("reads platform_version, arch, and cpu_family from URL aliases", () => {
+      const params = new URLSearchParams(
+        "engine_version=1.2.0&architecture=arm64&cpu=apple_silicon",
+      );
+
+      expect(readFacetParam(params, "platform_version")).toEqual(["1.2.0"]);
+      expect(readFacetParam(params, "arch")).toEqual(["arm64"]);
+      expect(readFacetParam(params, "cpu_family")).toEqual(["apple_silicon"]);
+    });
+
+    it("reads canonical URL parameters for platform_version, arch, and cpu_family", () => {
+      const params = new URLSearchParams(
+        "version=1.1.0,1.2.0&arch=arm64,x86_64&cpu_family=apple_silicon,graviton",
+      );
+
+      expect(readFacetParam(params, "platform_version")).toEqual(["1.1.0", "1.2.0"]);
+      expect(readFacetParam(params, "arch")).toEqual(["arm64", "x86_64"]);
+      expect(readFacetParam(params, "cpu_family")).toEqual(["apple_silicon", "graviton"]);
+    });
+
+    it("degrades gracefully to all-inclusive when parameters are missing or empty", () => {
+      const emptyParams = new URLSearchParams("");
+      expect(readFacetParam(emptyParams, "platform_version")).toEqual([]);
+      expect(readFacetParam(emptyParams, "arch")).toEqual([]);
+      expect(readFacetParam(emptyParams, "cpu_family")).toEqual([]);
+
+      const blankParams = new URLSearchParams("version=&arch=&cpu_family=");
+      expect(readFacetParam(blankParams, "platform_version")).toEqual([]);
+      expect(readFacetParam(blankParams, "arch")).toEqual([]);
+      expect(readFacetParam(blankParams, "cpu_family")).toEqual([]);
+    });
+
+    it("generates correct WHERE clauses for hardware facets", () => {
+      const { sql, params } = facetsToWhereClause({
+        platform_version: ["1.2.0"],
+        arch: ["arm64"],
+        cpu_family: ["apple_silicon"],
+      });
+
+      expect(sql).toContain("platform_version IN (?)");
+      expect(sql).toContain("result_id IN (SELECT result_id FROM bench.result_environment WHERE arch IN (?))");
+      expect(sql).toContain("result_id IN (SELECT result_id FROM bench.result_environment WHERE cpu_family IN (?))");
+      expect(params).toEqual(["1.2.0", "arm64", "apple_silicon"]);
+    });
+
+    it("matches in-memory rows for hardware facets in matchesFacetRow", () => {
+      const row = {
+        platform_version: "1.2.0",
+        arch: "arm64",
+        cpu_family: "apple_silicon",
+      };
+
+      expect(
+        matchesFacetRow(row, normalizeFacetState({ platform_version: ["1.2.0"] }), {
+          keys: ["platform_version"],
+        }),
+      ).toBe(true);
+      expect(
+        matchesFacetRow(row, normalizeFacetState({ arch: ["arm64"] }), {
+          keys: ["arch"],
+        }),
+      ).toBe(true);
+      expect(
+        matchesFacetRow(row, normalizeFacetState({ cpu_family: ["apple_silicon"] }), {
+          keys: ["cpu_family"],
+        }),
+      ).toBe(true);
+
+      // Missing candidate in row does not match non-empty filter
+      const emptyRow = {
+        platform_version: null,
+        arch: null,
+        cpu_family: null,
+      };
+      expect(
+        matchesFacetRow(emptyRow, normalizeFacetState({ arch: ["arm64"] }), {
+          keys: ["arch"],
+        }),
+      ).toBe(false);
+
+      // Empty filter matches any row (all-inclusive)
+      expect(
+        matchesFacetRow(emptyRow, normalizeFacetState({}), {
+          keys: ["platform_version", "arch", "cpu_family"],
+        }),
+      ).toBe(true);
+    });
   });
 });

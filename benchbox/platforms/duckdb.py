@@ -1007,12 +1007,14 @@ class DuckDBAdapter(PlatformAdapter):
     def apply_ctas_sort(self, table_name: str, tuning_config: Any, connection: Any) -> bool:
         """CTAS-sort a table, then re-create its sort index so the footprint survives.
 
-        The shared CTAS sort issues ``CREATE OR REPLACE TABLE ... ORDER BY``,
-        which drops the ``idx_<table>_sort`` index ``apply_table_tunings`` built
-        pre-load. Left there, post-load introspection finds no catalog footprint
-        (``duckdb_indexes()`` is empty for the table) and the run stays
-        ``applied_unverified`` even though it physically sorted. Re-create the
-        index post-CTAS so introspection can corroborate it.
+        The normal shared CTAS sort issues ``CREATE OR REPLACE TABLE ... ORDER BY``
+        and can drop the ``idx_<table>_sort`` index ``apply_table_tunings`` built
+        pre-load. When foreign keys are enabled, the shared path instead uses an
+        atomic in-place rewrite that preserves the table and index identity. If
+        populated dependent rows make that rewrite unsafe, the shared helper
+        leaves the table unchanged rather than violating referential integrity.
+        The re-create remains idempotent and covers the normal replacement path
+        so introspection can corroborate the physical sort.
         """
         applied = super().apply_ctas_sort(table_name, tuning_config, connection)
         if applied and not self.dry_run_mode:
