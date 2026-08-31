@@ -1,0 +1,9 @@
+{
+  "bundle_file": "tpcds_sf10_duckdb_v1_4_4_median.json",
+  "bundle_hash": "06d0b8139b7f57c5bacc86166c0c3d1f0e8723c8f10f29d40a89250dc91562ed",
+  "companion_hashes": {},
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}
