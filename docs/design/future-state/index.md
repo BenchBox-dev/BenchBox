@@ -16,7 +16,11 @@ obligations must be measured before a distribution or extraction decision is
 treated as actionable. The support-tier freeze is
 `_project/decisions/architecture-support-tier-commitment.md`. Current extraction
 evidence is
-`_project/decisions/future-state-extraction-evidence-2026-08-13.md`.
+`_project/decisions/future-state-extraction-evidence-2026-08-13.md`. Current
+CI-burden evidence is separately bounded in
+[`_project/analysis/ci-waste-remeasure-2026-08-31.md`](../../_project/analysis/ci-waste-remeasure-2026-08-31.md);
+it does not authorize extraction and the candidates below remain blocked on
+their stated evidence gates.
 
 ## Sequencing and Priority
 

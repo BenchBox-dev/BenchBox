@@ -116,6 +116,11 @@ two PRs can each pass against the same older base and exceed an invariant when
 merged in sequence. The tradeoff is deliberate: when `develop` advances, an
 otherwise-green PR must refresh its required checks before it can merge.
 
+The latest bounded, read-only wall and runner-minute remeasure is recorded in
+[`_project/analysis/ci-waste-remeasure-2026-08-31.md`](../../_project/analysis/ci-waste-remeasure-2026-08-31.md).
+It keeps `pull_request` and `merge_group` event evidence separate and does
+not authorize changing required contexts or skipping jobs.
+
 `refresh-shadow` (added with the strict-base refresh shadow rollout) is the
 observational job in `.github/workflows/develop-refresh-shadow.yml`. It is
 **not a required** context. It classifies exact `develop` refreshes using the
