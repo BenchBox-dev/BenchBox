@@ -470,9 +470,17 @@
         background-color: hsl(205 80% var(--cell-lightness, 92%) / 0.38);
     }
 
+    .multi-run-heatmap-cell {
+        background-color: hsl(var(--cell-hue, 205) 60% var(--cell-lightness, 95%));
+    }
+
     :root[data-bb-theme="dark"] .heatmap-cell,
     :root[data-bb-theme="dark"] .meta-heatmap-cell {
         background-color: hsl(205 70% var(--cell-lightness, 72%) / 0.42);
+    }
+
+    :root[data-bb-theme="dark"] .multi-run-heatmap-cell {
+        background-color: hsl(var(--cell-hue, 205) 45% var(--cell-dark-lightness, 22%));
     }
 
     /* Reduced-color / high-contrast mode switches to grayscale lightness steps.
@@ -486,10 +494,24 @@
         background-color: hsl(0 0% var(--cell-lightness, 95%) / 0.62);
     }
 
+    .heatmap-reduced-color .multi-run-heatmap-cell {
+        background-color: hsl(0 0% var(--cell-lightness, 95%));
+    }
+
+    :root[data-bb-theme="dark"] .heatmap-reduced-color .multi-run-heatmap-cell {
+        background-color: hsl(0 0% var(--cell-dark-lightness, 22%));
+    }
+
     @media (prefers-contrast: more) {
         .heatmap-cell,
         .meta-heatmap-cell {
             background-color: hsl(0 0% var(--cell-lightness, 95%) / 0.62);
+        }
+
+
+        .multi-run-heatmap-cell {
+            background-color: var(--bb-surface-data-muted);
+            outline: 1px solid var(--bb-data-border-strong);
         }
     }
 

@@ -15,6 +15,7 @@ import {
   UNGROUPED_LABEL,
   cohortGroupTotal,
   groupCohortRows,
+  limitCohortGroups,
 } from "@/lib/queryFilters";
 
 interface Row {
@@ -113,5 +114,58 @@ describe("group composition", () => {
     // w0's coverage gate cleared engine version alone; architecture and CPU
     // are single-bucket and are not offered as grouping axes.
     expect(Object.keys(COHORT_GROUP_BY_LABELS).sort()).toEqual(["engine_version", "none"]);
+  });
+});
+
+describe("render-window limiting", () => {
+  it("computes group counts from the complete cohort before limiting rows", () => {
+    const many = Array.from({ length: 250 }, (_, index): Row => ({
+      id: `row-${index}`,
+      rank: index + 1,
+      engine: index < 225 ? "1.0" : "2.0",
+      eligible: true,
+    }));
+    const limited = limitCohortGroups(groupCohortRows(many, "engine_version", byEngine), many, 200);
+
+    expect(limited).toHaveLength(1);
+    expect(limited[0]!.rows).toHaveLength(200);
+    expect(limited[0]!.totalRows).toBe(225);
+  });
+
+  it("carries exact counts for every partially rendered group", () => {
+    const many = Array.from({ length: 250 }, (_, index): Row => ({
+      id: `row-${index}`,
+      rank: index + 1,
+      engine: index < 150 ? "1.0" : "2.0",
+      eligible: true,
+    }));
+    const limited = limitCohortGroups(groupCohortRows(many, "engine_version", byEngine), many, 200);
+
+    expect(limited.map((group) => [group.label, group.rows.length, group.totalRows])).toEqual([
+      ["1.0", 150, 150],
+      ["2.0", 50, 100],
+    ]);
+  });
+
+  it("preserves the global sorted window when grouping rearranges interleaved rows", () => {
+    const interleaved = Array.from({ length: 250 }, (_, index): Row => ({
+      id: `row-${index}`,
+      rank: index + 1,
+      engine: index % 2 === 0 ? "2.0" : "1.0",
+      eligible: true,
+    }));
+    const limited = limitCohortGroups(
+      groupCohortRows(interleaved, "engine_version", byEngine),
+      interleaved,
+      200,
+    );
+
+    expect(limited.flatMap((group) => group.rows).map((row) => row.id).sort()).toEqual(
+      interleaved.slice(0, 200).map((row) => row.id).sort(),
+    );
+    expect(limited.map((group) => [group.label, group.rows.length, group.totalRows])).toEqual([
+      ["1.0", 100, 125],
+      ["2.0", 100, 125],
+    ]);
   });
 });

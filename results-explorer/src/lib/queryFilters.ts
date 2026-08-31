@@ -346,6 +346,11 @@ export interface CohortGroup<T> {
   rows: T[];
 }
 
+export interface LimitedCohortGroup<T> extends CohortGroup<T> {
+  /** Full group size before the rendering window is applied. */
+  totalRows: number;
+}
+
 /** Rows lacking the grouping value collect here rather than vanishing. */
 export const UNGROUPED_LABEL = "Not recorded";
 
@@ -389,4 +394,21 @@ export function groupCohortRows<T>(
 /** Total across groups, for asserting the split lost nothing. */
 export function cohortGroupTotal<T>(groups: readonly CohortGroup<T>[]): number {
   return groups.reduce((sum, group) => sum + group.rows.length, 0);
+}
+
+/**
+ * Apply the caller's global sorted rendering window after complete groups and
+ * counts are known. Group labels may rearrange those rows, but must not change
+ * which rows the ungrouped view admitted to the window.
+ */
+export function limitCohortGroups<T>(
+  groups: readonly CohortGroup<T>[],
+  rankedRows: readonly T[],
+  limit: number,
+): LimitedCohortGroup<T>[] {
+  const admitted = new Set(rankedRows.slice(0, Math.max(0, Math.floor(limit))));
+  return groups.flatMap((group) => {
+    const rows = group.rows.filter((row) => admitted.has(row));
+    return rows.length > 0 ? [{ ...group, rows, totalRows: group.rows.length }] : [];
+  });
 }

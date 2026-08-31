@@ -47,6 +47,7 @@ import { formatSelectedCount } from "@/lib/copyFormatters";
 import {
   COHORT_GROUP_BY_LABELS,
   groupCohortRows,
+  limitCohortGroups,
   type CohortGroupBy,
 } from "@/lib/queryFilters";
 
@@ -1073,12 +1074,16 @@ function ListTable({
   const [groupBy, setGroupBy] = useState<CohortGroupBy>("none");
   const visibleRows = filtered.slice(0, visibleLimit);
   const groupedRows = useMemo(() => {
-    return groupCohortRows(
-      visibleRows,
-      groupBy,
-      (row) => row.platform_version ?? null,
+    return limitCohortGroups(
+      groupCohortRows(
+        filtered,
+        groupBy,
+        (row) => row.platform_version ?? null,
+      ),
+      filtered,
+      visibleLimit,
     );
-  }, [visibleRows, groupBy]);
+  }, [filtered, groupBy, visibleLimit]);
   const runIdentityLabels = formatRunIdentitiesForCohort(filtered, "table");
 
   useEffect(() => {
@@ -1238,11 +1243,11 @@ function ListTable({
                     class="bg-[var(--bb-surface-data-muted)] font-semibold text-xs text-[var(--bb-data-fg-primary)]"
                   >
                     <td colspan={8} class="px-4 py-2">
-                      {group.label} ({group.rows.length} {group.rows.length === 1 ? "result" : "results"})
+                      {group.label} ({group.totalRows} {group.totalRows === 1 ? "result" : "results"})
                     </td>
                   </tr>
                   {group.rows.map((r) => {
-                    const index = visibleRows.findIndex((row) => row.result_id === r.result_id);
+                    const index = filtered.findIndex((row) => row.result_id === r.result_id);
                     return (
                       <BenchmarkRow key={r.result_id} entry={r} runIdentityLabel={runIdentityLabels[index] ?? r.platform} />
                     );

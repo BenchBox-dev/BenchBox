@@ -17,6 +17,7 @@ except ImportError:
     HAS_PSUTIL = False
 
 from benchbox.core.schemas import SystemProfile
+from benchbox.utils.environment import detect_cpu_info, is_cpu_architecture_token
 
 
 class SystemProfiler:
@@ -34,12 +35,10 @@ class SystemProfiler:
         cpu_cores_logical = os.cpu_count() or 1
         if HAS_PSUTIL:
             cpu_cores_physical = psutil.cpu_count(logical=False) or cpu_cores_logical
-            cpu_model = self._get_cpu_model()
-            cpu_identity_provenance = "inferred" if cpu_model in {"Unknown CPU", f"{architecture} CPU"} else "measured"
         else:
             cpu_cores_physical = cpu_cores_logical
-            cpu_model = f"{architecture} CPU"
-            cpu_identity_provenance = "inferred"
+        cpu_model = self._get_cpu_model()
+        cpu_identity_provenance = "measured" if cpu_model else None
 
         # Memory info
         if HAS_PSUTIL:
@@ -73,31 +72,16 @@ class SystemProfiler:
             hostname=platform.node(),
         )
 
-    def _get_cpu_model(self) -> str:
-        """Get CPU model name."""
-        if platform.system() == "Darwin":
-            try:
-                import subprocess
-
-                result = subprocess.run(
-                    ["sysctl", "-n", "machdep.cpu.brand_string"],
-                    capture_output=True,
-                    text=True,
-                )
-                return result.stdout.strip() if result.returncode == 0 else "Unknown CPU"
-            except Exception:
-                return f"{platform.machine()} CPU"
-        elif platform.system() == "Linux":
-            try:
-                with open("/proc/cpuinfo", encoding="utf-8") as f:
-                    for line in f:
-                        if line.startswith("model name"):
-                            return line.split(":", 1)[1].strip()
-            except Exception:
-                pass
-            return f"{platform.machine()} CPU"
-        else:
-            return f"{platform.machine()} CPU"
+    def _get_cpu_model(self) -> str | None:
+        """Get a measured CPU model name, or ``None`` when detection fails."""
+        try:
+            model, _vendor = detect_cpu_info()
+        except Exception:
+            return None
+        normalized = model.strip() if model else ""
+        if not normalized or is_cpu_architecture_token(normalized, platform.machine()):
+            return None
+        return normalized
 
 
 def recommend_max_scale_factor(available_bytes: int) -> float:

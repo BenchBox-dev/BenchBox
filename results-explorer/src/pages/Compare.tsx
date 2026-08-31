@@ -919,13 +919,15 @@ export function Compare({ url }: CompareProps) {
         </>
       )}
 
-      <QueryDiffTable
-        limiter={queryLimiter}
-        results={resolvedResults}
-        baselineIndex={normalizedBaselineIndex}
-        suppressionReason={decisionSummary.claimSuppressionReason}
-        queryFilter={queryLimiter === "all" ? undefined : limitedQueryIds}
-      />
+      {!isMultiRun && (
+        <QueryDiffTable
+          limiter={queryLimiter}
+          results={resolvedResults}
+          baselineIndex={normalizedBaselineIndex}
+          suppressionReason={decisionSummary.claimSuppressionReason}
+          queryFilter={queryLimiter === "all" ? undefined : limitedQueryIds}
+        />
+      )}
       <ComparabilityReceipt results={results} />
       <ProvenanceLegend />
 </div>

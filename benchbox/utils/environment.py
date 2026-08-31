@@ -29,6 +29,41 @@ _ARM_PARTS: dict[str, str] = {
     "0xd4f": "Neoverse-V2",
 }
 
+_CPU_ARCHITECTURE_TOKENS = frozenset(
+    {
+        "aarch64",
+        "amd64",
+        "arm",
+        "arm64",
+        "armv6l",
+        "armv7l",
+        "armv8",
+        "i386",
+        "i486",
+        "i586",
+        "i686",
+        "mips",
+        "mips64",
+        "ppc",
+        "ppc64",
+        "ppc64le",
+        "riscv64",
+        "s390x",
+        "x86",
+        "x86_64",
+    }
+)
+
+
+def is_cpu_architecture_token(value: str, machine: str) -> bool:
+    """Return whether *value* names an architecture rather than a CPU model."""
+    cleaned = value.strip().lower()
+    if not cleaned:
+        return True
+    if cleaned in {machine.strip().lower(), f"{machine.strip().lower()} cpu", "unknown cpu"}:
+        return True
+    return cleaned in _CPU_ARCHITECTURE_TOKENS
+
 
 def detect_cpu_info() -> Tuple[str | None, str | None]:
     """Detect CPU model and vendor using platform-appropriate standard tools.
@@ -41,12 +76,16 @@ def detect_cpu_info() -> Tuple[str | None, str | None]:
     """
     sys_name = platform.system()
     if sys_name == "Darwin":
-        return _detect_darwin_cpu()
+        model, vendor = _detect_darwin_cpu()
     elif sys_name == "Linux":
-        return _detect_linux_cpu()
+        model, vendor = _detect_linux_cpu()
     elif sys_name == "Windows":
-        return _detect_windows_cpu()
-    return None, None
+        model, vendor = _detect_windows_cpu()
+    else:
+        return None, None
+    if model and is_cpu_architecture_token(model, platform.machine()):
+        model = None
+    return model, vendor
 
 
 def _detect_darwin_cpu() -> Tuple[str | None, str | None]:

@@ -10,7 +10,7 @@ import {
   divergingRatioPosition,
   queryDisagreementSpread,
 } from "@/lib/chartMath";
-import { timingValueForQuery } from "@/lib/displayEligibility";
+import { formatTimingExclusion, timingValueForQuery } from "@/lib/displayEligibility";
 
 /**
  * Query x run heatmap of ratios against the chosen baseline.
@@ -47,6 +47,10 @@ export interface HeatmapCell {
   position: number | null;
   timingMs: number | null;
   missingKind: "none" | "run_missing" | "baseline_missing";
+  evidenceKind: "available" | "failed" | "excluded" | "unrecorded";
+  unavailableReason: string | null;
+  baselineEvidenceKind: "failed" | "excluded" | "unrecorded" | null;
+  baselineUnavailableReason: string | null;
 }
 
 export interface HeatmapRow {
@@ -54,6 +58,34 @@ export interface HeatmapRow {
   cells: HeatmapCell[];
   /** Log-space spread across runs; null when fewer than two could answer. */
   disagreement: number | null;
+}
+
+function unavailableEvidence(
+  result: DetailResult,
+  queryId: string,
+): Pick<HeatmapCell, "evidenceKind" | "unavailableReason"> {
+  const timing = result.display_timings.find((row) => row.query_id === queryId);
+  const executions = result.queries.filter((row) => row.query_id === queryId);
+  const measurement = executions.filter((row) => row.run_type === "measurement");
+  const basisExecutions = measurement.length > 0
+    ? measurement
+    : executions.filter((row) => row.run_type === null);
+  const allBasisExecutionsFailed = basisExecutions.length > 0
+    && basisExecutions.every((row) => row.status !== "pass");
+  const reason = timing?.timing_exclusion_reason ?? null;
+  const basisWasNotRecorded = reason === "pass_not_recorded"
+    || reason === "no_warmup_recorded"
+    || reason === "no_warm_passes_recorded"
+    || (reason === "missing_timing" && basisExecutions.length === 0);
+  if (basisWasNotRecorded || (!timing && basisExecutions.length === 0)) {
+    return { evidenceKind: "unrecorded", unavailableReason: null };
+  }
+  return {
+    evidenceKind: allBasisExecutionsFailed || reason?.includes("fail") || reason === "no_passing_executions"
+      ? "failed"
+      : "excluded",
+    unavailableReason: reason,
+  };
 }
 
 export function buildHeatmapRows(
@@ -68,6 +100,9 @@ export function buildHeatmapRows(
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     .map((queryId) => {
       const baseMs = baseline ? timingValueForQuery(baseline, queryId) : null;
+      const baselineEvidence = baseline && baseMs === null
+        ? unavailableEvidence(baseline, queryId)
+        : { evidenceKind: "available" as const, unavailableReason: null };
       const cells: HeatmapCell[] = results.map((r) => {
         const ms = timingValueForQuery(r, queryId);
         let missingKind: "none" | "run_missing" | "baseline_missing" = "none";
@@ -77,7 +112,22 @@ export function buildHeatmapRows(
           missingKind = "baseline_missing";
         }
         const ratio = ms !== null && baseMs !== null && baseMs > 0 ? ms / baseMs : null;
-        return { ratio, position: divergingRatioPosition(ratio), timingMs: ms, missingKind };
+        const evidence = ms === null
+          ? unavailableEvidence(r, queryId)
+          : { evidenceKind: "available" as const, unavailableReason: null };
+        return {
+          ratio,
+          position: divergingRatioPosition(ratio),
+          timingMs: ms,
+          missingKind,
+          ...evidence,
+          baselineEvidenceKind: missingKind === "baseline_missing"
+            ? baselineEvidence.evidenceKind as "failed" | "excluded" | "unrecorded"
+            : null,
+          baselineUnavailableReason: missingKind === "baseline_missing"
+            ? baselineEvidence.unavailableReason
+            : null,
+        };
       });
       return {
         queryId,
@@ -131,19 +181,38 @@ export function filterHeatmapRows(
   return [...rows];
 }
 
-function cellStyle(position: number | null): string {
+export function heatmapCellStyle(position: number | null): string {
   if (position === null) return "";
   // Two hues around a neutral midpoint. Emitted as CSS custom properties for
   // the same reason QueryHeatmap does it: dark mode and prefers-contrast
   // override without touching this component.
   const hue = position < 0 ? 150 : 15;
   const lightness = 95 - Math.abs(position) * 35;
-  return `--cell-hue:${hue}; --cell-lightness:${lightness.toFixed(1)}%; background-color: hsl(${hue} 60% ${lightness.toFixed(1)}%);`;
+  const darkLightness = 22 + Math.abs(position) * 18;
+  return `--cell-hue:${hue}; --cell-lightness:${lightness.toFixed(1)}%; --cell-dark-lightness:${darkLightness.toFixed(1)}%;`;
 }
 
 function cellText(cell: HeatmapCell): string {
   if (cell.ratio === null) return "—";
   return `${cell.ratio.toFixed(2)}x`;
+}
+
+function unavailableCellDescription(cell: HeatmapCell): string | undefined {
+  if (cell.missingKind === "baseline_missing") {
+    const baselineState = cell.baselineEvidenceKind === "unrecorded"
+      ? "was not recorded"
+      : cell.baselineEvidenceKind === "failed"
+        ? "failed"
+        : "was excluded";
+    const reason = cell.baselineUnavailableReason
+      ? ` — ${formatTimingExclusion(cell.baselineUnavailableReason)}`
+      : "";
+    return `Baseline ${baselineState} for this query; recorded candidate timing: ${cell.timingMs?.toFixed(1)} ms${reason}`;
+  }
+  if (cell.missingKind !== "run_missing") return undefined;
+  return cell.evidenceKind === "unrecorded"
+    ? "This run did not record this query under the current basis"
+    : formatTimingExclusion(cell.unavailableReason);
 }
 
 export function MultiRunHeatmap({
@@ -163,14 +232,11 @@ export function MultiRunHeatmap({
     ? (queryFilter.map((id) => rowsByQueryId.get(id)).filter((r): r is HeatmapRow => r !== undefined))
     : filterHeatmapRows(all, effectiveLimiter, baselineIndex);
   const shown = queryFilter || effectiveLimiter === "all" ? ordered : ordered.slice(0, limit);
-  const runMissing = shown.reduce(
-    (n, row) => n + row.cells.filter((c) => c.missingKind === "run_missing").length,
-    0,
-  );
-  const baselineMissing = shown.reduce(
-    (n, row) => n + row.cells.filter((c) => c.missingKind === "baseline_missing").length,
-    0,
-  );
+  const unavailableCounts = {
+    failed: shown.reduce((n, row) => n + row.cells.filter((c) => c.evidenceKind === "failed").length, 0),
+    excluded: shown.reduce((n, row) => n + row.cells.filter((c) => c.evidenceKind === "excluded").length, 0),
+    unrecorded: shown.reduce((n, row) => n + row.cells.filter((c) => c.evidenceKind === "unrecorded").length, 0),
+  };
 
   return (
     <section class="card mb-8" aria-labelledby="multi-run-heatmap-title">
@@ -190,16 +256,21 @@ export function MultiRunHeatmap({
         </StatusBadge>
       </div>
 
-      {(runMissing > 0 || baselineMissing > 0) && (
+      {(unavailableCounts.failed > 0 || unavailableCounts.excluded > 0 || unavailableCounts.unrecorded > 0) && (
         <div class="mb-2 space-y-1 text-xs text-[var(--bb-data-fg-subtle)]" data-testid="heatmap-unrecorded-note">
-          {runMissing > 0 && (
+          {unavailableCounts.failed > 0 && (
             <p>
-              {`${runMissing} ${runMissing === 1 ? "cell is" : "cells are"} unrecorded: that run cannot answer the query under the current basis. Unrecorded is not parity, and is left uncoloured.`}
+              {`${unavailableCounts.failed} ${unavailableCounts.failed === 1 ? "cell has" : "cells have"} failed execution evidence and cannot form a ratio.`}
             </p>
           )}
-          {baselineMissing > 0 && (
+          {unavailableCounts.excluded > 0 && (
             <p>
-              {`${baselineMissing} ${baselineMissing === 1 ? "cell cannot" : "cells cannot"} form a ratio: the baseline did not record this query.`}
+              {`${unavailableCounts.excluded} ${unavailableCounts.excluded === 1 ? "cell has" : "cells have"} recorded timing evidence that is excluded from comparison.`}
+            </p>
+          )}
+          {unavailableCounts.unrecorded > 0 && (
+            <p>
+              {`${unavailableCounts.unrecorded} ${unavailableCounts.unrecorded === 1 ? "cell is" : "cells are"} unrecorded under the current basis.`}
             </p>
           )}
         </div>
@@ -225,20 +296,10 @@ export function MultiRunHeatmap({
                 {row.cells.map((cell, i) => (
                   <td
                     key={i}
-                    class="table-td font-mono text-xs"
-                    style={cellStyle(cell.position)}
-                    title={
-                      cell.missingKind === "baseline_missing"
-                        ? `Baseline was not recorded for this query; recorded candidate timing: ${cell.timingMs !== null ? `${cell.timingMs.toFixed(1)} ms` : "none"}`
-                        : cell.missingKind === "run_missing"
-                          ? "This run did not record this query"
-                          : undefined
-                    }
-                    aria-label={
-                      cell.missingKind === "baseline_missing" && cell.timingMs !== null
-                        ? `${cell.timingMs.toFixed(1)} ms (baseline missing, no ratio formed)`
-                        : undefined
-                    }
+                    class={`table-td font-mono text-xs${cell.position === null ? "" : " multi-run-heatmap-cell"}`}
+                    style={heatmapCellStyle(cell.position)}
+                    title={unavailableCellDescription(cell)}
+                    aria-label={cell.ratio !== null ? `${cell.ratio.toFixed(2)} times baseline` : unavailableCellDescription(cell)}
                     data-testid={`cell-${row.queryId}-${i}`}
                   >
                     {/* Value as text in every cell: colour is never the only encoding. */}

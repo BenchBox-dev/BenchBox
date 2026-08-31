@@ -866,6 +866,8 @@ describe("Compare", () => {
     expect(standings).toHaveTextContent("Standings are unavailable because");
     expect(standings).toHaveTextContent("Selected runs do not share at least two valid query timings");
     expect(standings?.querySelector("table")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Query by run" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Query-Level Diff" })).toBeNull();
   });
 
   it("links compare warning counts to the Comparability Receipt and names warning classes", async () => {
@@ -1108,17 +1110,18 @@ describe("Compare", () => {
 
     expect(summary).toHaveTextContent("DuckDB leads by 10.00x on power score.");
     expect(options).toEqual(["DuckDB", "SQLite", "PostgreSQL"]);
-    expect(screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section")).toHaveTextContent(
+    expect(screen.getByRole("heading", { name: "Query by run" }).closest("section")).toHaveTextContent(
       "Showing 2 of 2 queries.",
     );
+    expect(screen.queryByRole("heading", { name: "Query-Level Diff" })).toBeNull();
 
     fireEvent.change(select, { target: { value: "2" } });
 
-    const queryDiff = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
+    const queryGrid = screen.getByRole("heading", { name: "Query by run" }).closest("section");
     expect(select.value).toBe("2");
-    expect(queryDiff).toHaveTextContent("Baseline: PostgreSQL");
-    expect(queryDiff).toHaveTextContent("DuckDB");
-    expect(queryDiff).toHaveTextContent("SQLite");
+    expect(queryGrid).toHaveTextContent("Ratio against PostgreSQL");
+    expect(screen.getByTestId("cell-Q1-0")).toHaveTextContent("0.20x");
+    expect(screen.getByTestId("cell-Q1-2")).toHaveTextContent("1.00x");
     expect(new URL(window.location.href).searchParams.get("ids")).toBe(beforeIds);
   });
 

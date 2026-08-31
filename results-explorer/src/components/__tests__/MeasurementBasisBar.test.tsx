@@ -41,7 +41,8 @@ describe("the shared basis lock", () => {
 
   it("names what is measured and over how many comparable queries", () => {
     renderBar({ comparableQueryCount: 22, totalQueryCount: 22 });
-    expect(screen.getByText(/over 22 of 22 queries both runs can answer/)).toBeTruthy();
+    expect(screen.getByText(/over 22 of 22 queries every selected run can answer/)).toBeTruthy();
+    expect(screen.getByText(/wall-clock totals and phase durations remain run-wide context/)).toBeTruthy();
   });
 
   it("says why queries were excluded when the shared set is smaller", () => {

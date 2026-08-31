@@ -11,6 +11,8 @@ from typing import Any
 
 import psutil
 
+from benchbox.utils.environment import is_cpu_architecture_token
+
 
 @dataclass
 class SystemInfo:
@@ -19,7 +21,7 @@ class SystemInfo:
     os_name: str
     os_version: str
     architecture: str
-    cpu_model: str
+    cpu_model: str | None
     cpu_cores: int
     total_memory_gb: float
     available_memory_gb: float
@@ -57,53 +59,6 @@ class SystemInfo:
         }
 
 
-# Values platform.processor() returns that name an ARCHITECTURE, not a CPU
-# model. Comparing against platform.machine() alone is not enough: on Apple
-# Silicon processor() returns "arm" while machine() returns "arm64", so an
-# equality check lets "arm" through -- which is precisely the value that
-# normalizes to the cpu_family "unknown" and the defect this module exists to
-# prevent.
-_ARCHITECTURE_TOKENS = frozenset(
-    {
-        "aarch64",
-        "amd64",
-        "arm",
-        "arm64",
-        "armv6l",
-        "armv7l",
-        "armv8",
-        "i386",
-        "i486",
-        "i586",
-        "i686",
-        "mips",
-        "mips64",
-        "ppc",
-        "ppc64",
-        "ppc64le",
-        "riscv64",
-        "s390x",
-        "x86",
-        "x86_64",
-    }
-)
-
-
-def _is_architecture_token(value: str, machine: str) -> bool:
-    """True when *value* names an architecture rather than a CPU model.
-
-    Publishing an architecture as if it were a model is the failure this guard
-    exists to stop: it normalizes to the cpu_family "unknown", which looks
-    populated and says nothing.
-    """
-    cleaned = value.strip().lower()
-    if not cleaned:
-        return True
-    if cleaned == machine.strip().lower():
-        return True
-    return cleaned in _ARCHITECTURE_TOKENS
-
-
 def _proc_cpuinfo_model() -> str | None:
     """Return the CPU model from /proc/cpuinfo, or None when unavailable.
 
@@ -138,16 +93,19 @@ def get_system_info() -> SystemInfo:
     # brand string (sysctl on Darwin, /proc/cpuinfo on Linux, wmic on Windows)
     # and degrades to None rather than to a placeholder.
     cpu_vendor: str | None = None
-    cpu_identity_provenance = "measured"
+    cpu_identity_provenance: str | None = None
     try:
         from benchbox.utils.environment import detect_cpu_info
 
         cpu_model, cpu_vendor = detect_cpu_info()
+        if cpu_model and not is_cpu_architecture_token(cpu_model, platform.machine()):
+            cpu_identity_provenance = "measured"
+        else:
+            cpu_model = None
     except Exception:
         cpu_model = None
 
     if not cpu_model:
-        cpu_identity_provenance = "inferred"
         # Legacy fallback chain, kept for platforms detect_cpu_info() cannot
         # answer. platform.processor() is still consulted last rather than not
         # at all: on several Linux distributions it does return a real model.
@@ -157,9 +115,12 @@ def get_system_info() -> SystemInfo:
                 cpu_model = _proc_cpuinfo_model() or ""
         except Exception:
             cpu_model = ""
-        if not cpu_model or _is_architecture_token(cpu_model, platform.machine()):
-            # Never publish the architecture as if it were a CPU model.
-            cpu_model = f"{platform.machine()} CPU"
+        if not cpu_model or is_cpu_architecture_token(cpu_model, platform.machine()):
+            # Absence is evidence. Never turn an architecture into a model-like
+            # placeholder that downstream surfaces can mistake for identity.
+            cpu_model = None
+        else:
+            cpu_identity_provenance = "inferred"
 
     return SystemInfo(
         os_name=platform.system(),

@@ -367,6 +367,7 @@ describe("ComparabilityReceipt", () => {
             arch: "arm64",
             cpu_family: "apple_silicon",
             cpu_model: "Apple M1 Max",
+            cpu_identity_provenance: "measured",
             cpu_count: 10,
             memory_gb: 64,
             python: "3.12",
@@ -381,6 +382,7 @@ describe("ComparabilityReceipt", () => {
             arch: "arm64",
             cpu_family: "apple_silicon",
             cpu_model: "Apple M1 Max",
+            cpu_identity_provenance: "measured",
             cpu_count: 10,
             memory_gb: 64,
             python: "3.12",
@@ -393,6 +395,7 @@ describe("ComparabilityReceipt", () => {
       expect(labels).toContain("Architecture");
       expect(labels).toContain("CPU family");
       expect(labels).toContain("CPU model");
+      expect(labels).toContain("CPU evidence");
       expect(labels).toContain("CPU count");
       expect(labels).toContain("Memory");
       expect(labels).not.toContain("Environment");
@@ -408,6 +411,10 @@ describe("ComparabilityReceipt", () => {
       expect(fields.find((f) => f.label === "CPU model")).toMatchObject({
         status: "match",
         summary: "Apple M1 Max",
+      });
+      expect(fields.find((f) => f.label === "CPU evidence")).toMatchObject({
+        status: "match",
+        summary: "Measured",
       });
       expect(fields.find((f) => f.label === "CPU count")).toMatchObject({
         status: "match",

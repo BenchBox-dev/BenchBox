@@ -430,15 +430,14 @@ function isPassing(row: BasisExecution): boolean {
  * warmup figure stand in for a measurement one in bundles whose measurement
  * executions all failed.
  */
-function warmExecutions(rows: readonly BasisExecution[]): BasisExecution[] {
-  const passing = rows.filter(isPassing);
-  const measurement = passing.filter((r) => r.run_type === "measurement");
+function warmExecutionCandidates(rows: readonly BasisExecution[]): BasisExecution[] {
+  const measurement = rows.filter((r) => r.run_type === "measurement");
   if (measurement.length > 0) return measurement;
-  return passing.filter((r) => r.run_type === null);
+  return rows.filter((r) => r.run_type === null);
 }
 
-function warmupExecutions(rows: readonly BasisExecution[]): BasisExecution[] {
-  return rows.filter((r) => isPassing(r) && r.run_type === "warmup");
+function warmExecutions(rows: readonly BasisExecution[]): BasisExecution[] {
+  return warmExecutionCandidates(rows).filter(isPassing);
 }
 
 /**
@@ -470,18 +469,24 @@ function selectExecutions(
 ): { rows: BasisExecution[]; missingReason: BasisUnavailableReason | null } {
   switch (passes.kind) {
     case "all_warm": {
-      const warm = warmExecutions(rows);
-      return { rows: warm, missingReason: warm.length === 0 ? "no_warm_passes_recorded" : null };
+      const recorded = warmExecutionCandidates(rows);
+      if (recorded.length === 0) return { rows: [], missingReason: "no_warm_passes_recorded" };
+      const passing = recorded.filter(isPassing);
+      return { rows: passing, missingReason: passing.length === 0 ? "no_passing_executions" : null };
     }
     case "warmup": {
-      const warmup = warmupExecutions(rows);
-      return { rows: warmup, missingReason: warmup.length === 0 ? "no_warmup_recorded" : null };
+      const recorded = rows.filter((r) => r.run_type === "warmup");
+      if (recorded.length === 0) return { rows: [], missingReason: "no_warmup_recorded" };
+      const passing = recorded.filter(isPassing);
+      return { rows: passing, missingReason: passing.length === 0 ? "no_passing_executions" : null };
     }
     case "warm_pass": {
-      const warm = warmExecutions(rows);
-      if (warm.length === 0) return { rows: [], missingReason: "no_warm_passes_recorded" };
-      const named = warm.filter((r) => r.iter === passes.pass);
-      return { rows: named, missingReason: named.length === 0 ? "pass_not_recorded" : null };
+      const recorded = warmExecutionCandidates(rows);
+      if (recorded.length === 0) return { rows: [], missingReason: "no_warm_passes_recorded" };
+      const named = recorded.filter((r) => r.iter === passes.pass);
+      if (named.length === 0) return { rows: [], missingReason: "pass_not_recorded" };
+      const passing = named.filter(isPassing);
+      return { rows: passing, missingReason: passing.length === 0 ? "no_passing_executions" : null };
     }
   }
 }
@@ -517,10 +522,8 @@ export function resolveQueryValue(
     // "the pipeline excluded the published value" (a zero timing, say) is a
     // property of that one query's evidence. Neither is answered by
     // substituting some other basis's number.
-    return {
-      kind: "unavailable",
-      reason: warm.length === 0 ? "no_warm_passes_recorded" : "display_value_excluded",
-    };
+    const { missingReason } = selectExecutions(rows, ALL_WARM);
+    return { kind: "unavailable", reason: missingReason ?? "display_value_excluded" };
   }
 
   const { rows: selected, missingReason } = selectExecutions(rows, basis.passes);
@@ -607,6 +610,104 @@ export function basisAvailability(
     };
   }
   return { available: true, reason: null, unansweredQueries: unanswered.sort() };
+}
+
+function basisHasSamples(
+  executions: readonly BasisExecution[],
+  passes: PassSelection,
+  minimum: number,
+): boolean {
+  const basis: MeasurementBasis = { passes, statistic: "min" };
+  for (const queryRows of groupByQuery(executions).values()) {
+    const value = resolveQueryValue(basis, queryRows, null);
+    if (value.kind === "value" && value.sampleCount >= minimum) return true;
+  }
+  return false;
+}
+
+/** Bases this run can actually answer, in the order used by within-run navigation. */
+export function availableBasesForExecutions(
+  executions: readonly BasisExecution[],
+  displayTimings?: readonly BasisDisplayTiming[],
+): MeasurementBasis[] {
+  const list: MeasurementBasis[] = [];
+  const defaultAvailable = displayTimings === undefined || displayTimings.some(
+    (timing) => timing.is_valid_display_timing !== false
+      && timing.display_ms !== null
+      && Number.isFinite(timing.display_ms)
+      && timing.display_ms > 0,
+  );
+  if (defaultAvailable) list.push(DEFAULT_BASIS);
+  if (basisHasSamples(executions, ALL_WARM, 2)) {
+    list.push({ passes: ALL_WARM, statistic: "min" });
+  }
+
+  if (basisHasSamples(executions, WARMUP, 1)) {
+    list.push({ passes: WARMUP, statistic: "median" });
+    if (basisHasSamples(executions, WARMUP, 2)) {
+      list.push({ passes: WARMUP, statistic: "min" });
+    }
+  }
+
+  const iterations = new Set<number>();
+  for (const row of executions) {
+    if (row.status === "pass" && typeof row.iter === "number" && row.iter > 0) iterations.add(row.iter);
+  }
+  for (const iteration of [...iterations].sort((a, b) => a - b)) {
+    const passes = warmPass(iteration);
+    if (!basisHasSamples(executions, passes, 1)) continue;
+    list.push({ passes, statistic: "median" });
+    if (basisHasSamples(executions, passes, 2)) list.push({ passes, statistic: "min" });
+  }
+
+  return list.filter((basis, index) => !list.slice(0, index).some((earlier) => basesEqual(earlier, basis)));
+}
+
+function answeredQueriesForBasis(
+  basis: MeasurementBasis,
+  executions: readonly BasisExecution[],
+  displayTimings: readonly BasisDisplayTiming[],
+): Set<string> {
+  const executionsByQuery = groupByQuery(executions);
+  const displayByQuery = new Map(displayTimings.map((timing) => [timing.query_id, timing]));
+  const queryIds = new Set([...executionsByQuery.keys(), ...displayByQuery.keys()]);
+  const answered = new Set<string>();
+  for (const queryId of queryIds) {
+    const timing = displayByQuery.get(queryId);
+    const displayMs = timing && timing.is_valid_display_timing !== false ? timing.display_ms : null;
+    const value = resolveQueryValue(basis, executionsByQuery.get(queryId) ?? [], displayMs ?? null);
+    if (value.kind === "value") answered.add(queryId);
+  }
+  return answered;
+}
+
+/** Select the first available pair with at least one query both bases answer. */
+export function selectComparableBasisPair(
+  executions: readonly BasisExecution[],
+  displayTimings: readonly BasisDisplayTiming[],
+  preferred: readonly MeasurementBasis[] = [],
+): [MeasurementBasis, MeasurementBasis] | null {
+  const available = availableBasesForExecutions(executions, displayTimings);
+  const ordered = [
+    ...preferred.filter((basis) => available.some((candidate) => basesEqual(candidate, basis))),
+    ...available,
+  ].filter((basis, index, list) => !list.slice(0, index).some((earlier) => basesEqual(earlier, basis)));
+  const answered = new Map(
+    ordered.map((basis) => [encodeBasis(basis), answeredQueriesForBasis(basis, executions, displayTimings)]),
+  );
+
+  for (let left = 0; left < ordered.length; left++) {
+    for (let right = left + 1; right < ordered.length; right++) {
+      const leftBasis = ordered[left]!;
+      const rightBasis = ordered[right]!;
+      const leftQueries = answered.get(encodeBasis(leftBasis))!;
+      const rightQueries = answered.get(encodeBasis(rightBasis))!;
+      if ([...leftQueries].some((queryId) => rightQueries.has(queryId))) {
+        return [leftBasis, rightBasis];
+      }
+    }
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------

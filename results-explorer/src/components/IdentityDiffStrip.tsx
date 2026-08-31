@@ -1,9 +1,10 @@
 import type { DetailResult } from "@/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { buildComparabilityFields, type ComparabilityField } from "@/components/ComparabilityReceipt";
+import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
 
 /**
- * The six-axis engine-and-hardware strip for a head-to-head comparison.
+ * The engine-and-hardware strip for a head-to-head comparison.
  *
  * Answers one question at a glance: of the things that could explain a
  * difference in these numbers, which ones ACTUALLY differ between these two
@@ -11,7 +12,7 @@ import { buildComparabilityFields, type ComparabilityField } from "@/components/
  * differ, or the hardware does, or only the engine version.
  *
  * It does NOT replace or duplicate the ComparabilityReceipt, which stays on
- * the page and remains the full record. The strip is a six-axis summary of the
+ * the page and remains the full record. The strip summarizes the
  * axes most likely to confound an engine comparison; the receipt covers
  * benchmark, scale, phase, query scope, dates, tuning, validation and cost as
  * well. Both read the SAME `buildComparabilityFields` output, so the strip can
@@ -31,6 +32,7 @@ export const STRIP_AXES = [
   "Architecture",
   "CPU family",
   "CPU model",
+  "CPU evidence",
   "Memory",
 ] as const;
 
@@ -40,6 +42,7 @@ export const AXIS_DISPLAY_LABEL: Record<(typeof STRIP_AXES)[number], string> = {
   Architecture: "Architecture",
   "CPU family": "CPU family",
   "CPU model": "CPU model",
+  "CPU evidence": "CPU evidence",
   Memory: "Memory",
 };
 
@@ -55,6 +58,8 @@ export function axisValueForRun(axis: (typeof STRIP_AXES)[number], result: Detai
       return result.environment?.cpu_family && result.environment.cpu_family !== "" ? result.environment.cpu_family : "Not recorded";
     case "CPU model":
       return result.environment?.cpu_model && result.environment.cpu_model !== "" ? result.environment.cpu_model : "Not recorded";
+    case "CPU evidence":
+      return formatCpuIdentityProvenance(result.environment?.cpu_identity_provenance);
     case "Memory":
       return result.environment?.memory_gb !== undefined ? `${result.environment.memory_gb} GB` : "Not recorded";
   }
@@ -130,9 +135,18 @@ export function IdentityDiffStrip({ results, baselineIndex = 0, runLabels }: Ide
                     {results.map((r, i) => {
                       const val = axisValueForRun(axis, r);
                       const isBase = i === baseIndex;
-                      const isMissing = val === "Not recorded" || baseVal === "Not recorded";
-                      const isDiff = !isBase && !isMissing && val !== baseVal;
-                      const status = isBase ? "baseline" : isMissing ? "missing" : isDiff ? "diff" : "match";
+                      const candidateMissing = val === "Not recorded";
+                      const baselineMissing = baseVal === "Not recorded";
+                      const isDiff = !isBase && !candidateMissing && !baselineMissing && val !== baseVal;
+                      const status = isBase
+                        ? "baseline"
+                        : candidateMissing
+                          ? "missing"
+                          : baselineMissing
+                            ? "indeterminate"
+                            : isDiff
+                              ? "diff"
+                              : "match";
                       return (
                         <td key={r.result_id} class="table-td text-xs" data-testid={`matrix-cell-${axis}-${i}`}>
                           <div class="flex items-center justify-between gap-2">
@@ -141,7 +155,11 @@ export function IdentityDiffStrip({ results, baselineIndex = 0, runLabels }: Ide
                               role="comparison"
                               tone={status === "diff" ? "warning" : status === "match" ? "success" : "neutral"}
                             >
-                              {status === "baseline" ? "Baseline" : statusWord(status)}
+                              {status === "baseline"
+                                ? "Baseline"
+                                : status === "indeterminate"
+                                  ? "No baseline"
+                                  : statusWord(status)}
                             </StatusBadge>
                           </div>
                         </td>

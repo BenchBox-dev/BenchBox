@@ -276,11 +276,10 @@ class TestGetSystemInfo:
             with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
                 result = get_system_info()
 
-        # With no detector, no processor string and no cpuinfo, the placeholder
-        # must still be recognisable as one. "Unknown" said nothing about the
-        # machine; "AMD64 CPU" at least carries the architecture and cannot be
-        # mistaken for a real model by the cpu_family normalizer.
-        assert result.cpu_model == "AMD64 CPU"
+        # With no detector, no processor string and no cpuinfo, preserve
+        # absence instead of manufacturing an architecture-shaped model.
+        assert result.cpu_model is None
+        assert result.cpu_identity_provenance is None
         assert result.os_name == "Windows"
         assert result.architecture == "AMD64"
 
@@ -324,8 +323,8 @@ class TestGetSystemInfo:
             with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
                 result = get_system_info()
 
-        # Should fallback to machine + " CPU" on exception
-        assert result.cpu_model == "i686 CPU"
+        assert result.cpu_model is None
+        assert result.cpu_identity_provenance is None
         assert result.os_name == "Linux"
         assert result.cpu_cores == 1
         assert result.total_memory_gb == 2.0
@@ -693,7 +692,7 @@ class TestCpuIdentityCapture:
         assert info.cpu_model != platform.machine()
         assert info.cpu_model != platform.processor() or info.cpu_model != platform.machine()
 
-    def test_falls_back_to_a_labelled_placeholder_when_detection_fails(self) -> None:
+    def test_preserves_absence_when_detection_fails(self) -> None:
         # /proc/cpuinfo must be mocked away too: it exists on Linux runners and
         # answers before the placeholder branch, which made the first version
         # of this test pass on macOS and fail in CI.
@@ -701,8 +700,17 @@ class TestCpuIdentityCapture:
             with patch("benchbox.utils.system_info.platform.processor", return_value=""):
                 with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
                     info = get_system_info()
-        # A placeholder must be recognisable as one, not a bare arch string.
-        assert info.cpu_model.endswith("CPU")
+        assert info.cpu_model is None
+        assert info.cpu_identity_provenance is None
+
+    def test_rejects_architecture_returned_by_primary_detector(self) -> None:
+        with patch("benchbox.utils.environment.detect_cpu_info", return_value=("arm", "ARM")):
+            with patch("benchbox.utils.system_info.platform.machine", return_value="arm64"):
+                with patch("benchbox.utils.system_info.platform.processor", return_value=""):
+                    with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
+                        info = get_system_info()
+        assert info.cpu_model is None
+        assert info.cpu_identity_provenance is None
 
     def test_never_publishes_the_arch_even_when_processor_returns_it(self) -> None:
         import platform
@@ -724,7 +732,8 @@ class TestCpuIdentityCapture:
                 with patch("benchbox.utils.system_info.platform.machine", return_value="arm64"):
                     with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
                         info = get_system_info()
-        assert info.cpu_model == "arm64 CPU"
+        assert info.cpu_model is None
+        assert info.cpu_identity_provenance is None
 
     @pytest.mark.parametrize(
         "processor,machine",
@@ -744,7 +753,8 @@ class TestCpuIdentityCapture:
                 with patch("benchbox.utils.system_info.platform.machine", return_value=machine):
                     with patch("benchbox.utils.system_info._proc_cpuinfo_model", return_value=None):
                         info = get_system_info()
-        assert info.cpu_model == f"{machine} CPU"
+        assert info.cpu_model is None
+        assert info.cpu_identity_provenance is None
 
     def test_keeps_a_real_model_that_merely_contains_an_arch_word(self) -> None:
         # The guard must reject architecture TOKENS, not any string mentioning

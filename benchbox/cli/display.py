@@ -29,7 +29,7 @@ class StandardDisplays:
         # Basic information
         table.add_row("OS", f"{profile.os_name} {profile.os_version}")
         table.add_row("Architecture", profile.architecture)
-        table.add_row("CPU", profile.cpu_model)
+        table.add_row("CPU", profile.cpu_model or "Not recorded")
         table.add_row(
             "CPU Cores",
             f"{profile.cpu_cores_physical} physical, {profile.cpu_cores_logical} logical",
