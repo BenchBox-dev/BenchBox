@@ -180,4 +180,4 @@ proof needed to apply that rule.
 |---|---|
 | w0 | This ADR |
 | w1 | Contract format + collision text aligned with mint |
-| w2 | Alias/redirect = not needed until first public deploy (this section) |
+| w2 | Post-live id rotation requires explicit compatibility handling (this section) |

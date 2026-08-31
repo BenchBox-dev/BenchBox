@@ -97,40 +97,53 @@ compatibility mechanism — see the ADR.
 | `submission_id` | UUID, stable per bundle | 3 | API tracking |
 | `public_result_id` | Slug, permanent | 1+ | Public URLs, index |
 
-### 1.2 Ingest Status Model
+### 1.2 Submission and Publication State Model
 
-Every submitted result moves through a defined set of statuses. The status
-determines whether the result appears in the public corpus and what actions are
-available.
+Submission processing, archive acceptance, presentation policy, and observed
+deployment are separate state dimensions. No single `published` flag determines
+whether a result is accepted, visible, ranking-eligible, or live. The normative
+authority is
+[`adr-independent-publication-authorities.md`](../development/adr/adr-independent-publication-authorities.md).
 
 #### Status Definitions
 
-| Status | Meaning | Visible to public |
+| State | Meaning | Visible to public |
 |---|---|---|
 | `pending` | Received; awaiting validation | No |
-| `validated` | Passed all automated checks; awaiting publication decision | No |
-| `published` | Live in the public corpus with a `public_result_id` | Yes |
+| `validated` | Passed automated checks; awaiting acceptance | No |
+| `accepted` | Validator-clean input exists at the pinned accepted-archive revision | Controlled independently |
+| `promotion_pending` | Desired state names accepted input without a matching live receipt | Previous live state remains |
+| `live` | A fresh attested receipt proves the intended artifact and corpus are publicly observable | According to visibility policy |
+| `promotion_failed` | Build, deploy, or observation failed to produce a matching receipt | Previous live state remains |
 | `rejected` | Failed validation or declined by maintainer; includes a reason string | No |
-| `withdrawn` | Removed from public index at submitter or admin request | No (tombstone only) |
+| `withdrawn` | Suppressed from public presentation and ranking by authorized policy | No (tombstone where supported) |
 
 #### Status Transition Rules
 
 ```
-pending → validated → published
+pending → validated → accepted → promotion_pending → live
 pending → rejected
 validated → rejected
-published → withdrawn
+promotion_pending → promotion_failed
+accepted|live → withdrawn
 ```
 
-Transitions are unidirectional. A `rejected` or `withdrawn` result cannot be
-re-promoted; the submitter must open a new submission.
+Acceptance remains an audit fact when promotion fails or presentation is
+withdrawn. Withdrawal must be carried into later desired state so ordinary
+promotion cannot resurrect it. Re-admission requires a new authorized policy
+event, not a contributor-controlled field.
+
+`published` is retained only as a legacy API compatibility term. New contracts
+must use `accepted`, `promotion_pending`, `live`, `promotion_failed`, and
+`withdrawn`, and must never translate a Git merge directly into `live`.
 
 Additional rules:
 
 - **Idempotent re-upload:** Submitting a bundle whose `bundle_hash` already maps
-  to a `published` result returns the existing `public_result_id` and a
-  `200 OK` response with `"status": "already_published"` in the body. No new
-  `submission_id` is created.
+  to an accepted result returns the existing identifiers and no new
+  `submission_id`. A legacy `"already_published"` API response may be returned
+  only when a matching live receipt exists; otherwise the response reports the
+  orthogonal acceptance and promotion state.
 - **Rejection reason:** Every `rejected` transition must carry a human-readable
   `reason` string. Reasons are visible to the submitter but not to the public.
 - **Withdrawn tombstone:** In Phases 1-2, withdrawal removes the entry entirely
@@ -140,13 +153,16 @@ Additional rules:
 
 #### Phase Assignment
 
-| Status | Phase 1 | Phase 2 | Phase 3 |
+| State | Phase 1 | Phase 2 | Phase 3 |
 |---|---|---|---|
 | `pending` | Not used (no ingest) | PR open, CI running | API received |
 | `validated` | Not used | CI passed, awaiting merge | Async validation passed |
-| `published` | On commit to `results-data/` | On PR merge | On promotion |
+| `accepted` | Maintainer input accepted into the archive | Valid PR merged to `published-results` | Ingest acceptance committed |
+| `promotion_pending` | Desired manifest lacks matching receipt | Same | Same |
+| `live` | Matching attested public receipt | Same | Same |
+| `promotion_failed` | Promotion ended without matching receipt | Same | Same |
 | `rejected` | Not used | CI failed or PR closed without merge | Validation failed |
-| `withdrawn` | Admin removes from `results-data/` | Same | API call or admin action |
+| `withdrawn` | Authorized presentation policy | Same | API or admin policy event |
 
 ---
 
@@ -154,8 +170,12 @@ Additional rules:
 
 ### 2.1 Visibility States
 
-Five visibility states control who can see a result and whether it appears in
+Six visibility states control who can see a result and whether it appears in
 search indexes or compare views.
+
+Visibility is orthogonal to archive acceptance, provenance trust, withdrawal,
+ranking eligibility, and deployment state. Changing visibility does not create
+a second accepted-corpus authority on `develop`.
 
 | State | Who can see it | Indexed | Phase available |
 |---|---|---|---|
@@ -265,7 +285,7 @@ explains the distinction.
 
 #### Phase 3
 
-All five visibility states apply. The full label spectrum is rendered. The
+All six visibility states apply. The full label spectrum is rendered. The
 explorer must handle the case where a compare view contains results with
 different trust labels and display a per-result label badge rather than a
 single cohort-level label.

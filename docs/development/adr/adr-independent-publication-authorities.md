@@ -31,9 +31,9 @@ authority.
 
 | Surface | Authority | Contract |
 |---|---|---|
-| Package releases | Protected `release` branch, signed/tagged release process, and package registry receipt | Package validation and publication remain independent of site and corpus promotion. |
+| Package releases | Protected `release` branch, validated `v*` tag workflow, exact built wheel, and package registry receipt | Package validation and publication remain independent of site and corpus promotion. |
 | Prose and site content | `develop` source plus the publication manifest's pinned source SHA | The manifest selects exact reviewed content. A live receipt proves what was served. |
-| Versioned API documentation | The package/version source selected on `develop`, pinned by the publication manifest | API docs are versioned artifacts. They do not inherit corpus acceptance or package-registry state. |
+| Versioned API documentation | Exact tested release wheel plus its matching immutable tag/source commit, pinned by artifact digest and publication manifest | API docs document released package bytes. They do not import unreleased `develop` code or inherit corpus state. |
 | Explorer application artifacts | Explorer code and build/admission policy on `develop`, pinned by exact SHA and artifact digest | Application code is trusted control-plane input. It never makes result data trusted merely by rendering it. |
 | Accepted corpus archive | `published-results` | Every valid result merged to `published-results` is accepted production input by default. The complete accepted archive, including published-only paths, is preserved. |
 | Publication desired state | Reviewed publication manifest in the trusted control plane | The manifest pins exact `develop` and `published-results` SHAs, builder identity, policy version, and intended target. It requests publication but does not prove it happened. |

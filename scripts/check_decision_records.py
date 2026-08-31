@@ -7,6 +7,8 @@ ADR = ROOT / "docs/development/adr/adr-independent-publication-authorities.md"
 ADR_INDEX = ROOT / "docs/development/adr/README.md"
 THREAT_MODEL = ROOT / "docs/development/independent-publication-threat-model.md"
 OPERATIONS = ROOT / "docs/operations/independent-publication-contract.md"
+HOSTED_CONTRACT = ROOT / "docs/reference/hosted-results-contract.md"
+PHASE3_THREAT_MODEL = ROOT / "docs/reference/threat-model.md"
 
 
 def _normalized(path: Path) -> str:
@@ -65,6 +67,32 @@ def main() -> int:
         )
     )
     failures.extend(_require(ADR_INDEX, ("adr-independent-publication-authorities.md",)))
+    failures.extend(
+        _require(
+            HOSTED_CONTRACT,
+            (
+                "No single `published` flag",
+                "`accepted`",
+                "`promotion_pending`",
+                "`live`",
+                "must never translate a Git merge directly into `live`",
+                "Visibility is orthogonal to archive acceptance",
+                "All six visibility states apply",
+            ),
+        )
+    )
+    failures.extend(
+        _require(
+            PHASE3_THREAT_MODEL,
+            (
+                "independent-publication-threat-model.md",
+                "public-vendor-reported",
+                "vendor-supplied",
+                "manual maintainer review with no auto-merge",
+                "one explicit authorized-maintainer approval",
+            ),
+        )
+    )
 
     if failures:
         print("Publication architecture decision validation failed:")

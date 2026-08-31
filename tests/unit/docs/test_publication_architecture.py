@@ -5,6 +5,8 @@ ADR = ROOT / "docs/development/adr/adr-independent-publication-authorities.md"
 THREAT_MODEL = ROOT / "docs/development/independent-publication-threat-model.md"
 OPERATIONS = ROOT / "docs/operations/independent-publication-contract.md"
 ADR_INDEX = ROOT / "docs/development/adr/README.md"
+HOSTED_CONTRACT = ROOT / "docs/reference/hosted-results-contract.md"
+PHASE3_THREAT_MODEL = ROOT / "docs/reference/threat-model.md"
 
 
 def _text(path: Path) -> str:
@@ -76,3 +78,26 @@ def test_manual_review_and_single_maintainer_contract() -> None:
 def test_adr_is_indexed_and_accepted() -> None:
     assert "Accepted (2026-08-31)" in _text(ADR)
     assert "adr-independent-publication-authorities.md" in _text(ADR_INDEX)
+
+
+def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
+    text = _normalized(HOSTED_CONTRACT)
+
+    assert "No single `published` flag" in text
+    assert "must never translate a Git merge directly into `live`" in text
+    assert "Visibility is orthogonal to archive acceptance" in text
+    assert "All six visibility states apply" in text
+    assert "All five visibility states apply" not in text
+    assert "| `accepted` |" in _text(HOSTED_CONTRACT)
+    assert "| `live` |" in _text(HOSTED_CONTRACT)
+    assert "| `published` | On commit" not in _text(HOSTED_CONTRACT)
+
+
+def test_phase3_threat_model_extends_cross_phase_contract() -> None:
+    text = _normalized(PHASE3_THREAT_MODEL)
+
+    assert "independent-publication-threat-model.md" in text
+    assert "public-vendor-reported" in text
+    assert "vendor-supplied" in text
+    assert "manual maintainer review with no auto-merge" in text
+    assert "one explicit authorized-maintainer approval" in text
