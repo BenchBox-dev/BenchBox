@@ -1,4 +1,13 @@
+"""Keep independent-publication authority documents aligned."""
+
 from pathlib import Path
+
+import pytest
+
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.fast,
+]
 
 ROOT = Path(__file__).resolve().parents[3]
 ADR = ROOT / "docs/development/adr/adr-independent-publication-authorities.md"
