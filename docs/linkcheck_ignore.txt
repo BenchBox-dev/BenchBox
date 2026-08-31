@@ -52,4 +52,4 @@ https://www\.hammerdb\.com/.*
 # GitHub blob/issues links in blog posts intermittently return 404/429 to
 # unauthenticated CI requests once rate-limited; verified reachable (200) from
 # an authenticated/non-rate-limited client.
-https://github\.com/joeharris76/BenchBox/(blob|issues).*
+https://github\.com/(joeharris76|BenchBox-dev)/BenchBox/(blob|issues).*
