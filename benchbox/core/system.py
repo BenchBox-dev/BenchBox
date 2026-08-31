@@ -39,7 +39,8 @@ class SystemProfiler:
             cpu_cores_physical = cpu_cores_logical
 
         # Two-stage provenance mirroring benchbox/utils/system_info.get_system_info:
-        # detect_cpu_info() is "measured" (real brand string via sysctl / /proc / wmic);
+        # detect_cpu_info() is "measured" (real brand string via sysctl, /proc,
+        # or Windows CIM hardware inventory);
         # the platform.processor() fallback is "inferred" (often the architecture
         # or a less reliable brand string). Absence stays None so downstream
         # surfaces never mistake an architecture token for identity.

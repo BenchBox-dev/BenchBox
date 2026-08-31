@@ -413,9 +413,23 @@ export function limitCohortGroups<T>(
     String((row as any).result_id ?? (row as any).id ?? (row as any).key ?? JSON.stringify(row)),
 ): LimitedCohortGroup<T>[] {
   const window = rankedRows.slice(0, Math.max(0, Math.floor(limit)));
-  const admitted = new Set(window.map(keyOf));
+  const groupedReferences = new Set(groups.flatMap((group) => group.rows));
+  const admittedReferences = new Set(window.filter((row) => groupedReferences.has(row)));
+  const admittedCloneCounts = new Map<string, number>();
+  for (const row of window) {
+    if (admittedReferences.has(row)) continue;
+    const key = keyOf(row);
+    admittedCloneCounts.set(key, (admittedCloneCounts.get(key) ?? 0) + 1);
+  }
   return groups.flatMap((group) => {
-    const rows = group.rows.filter((row) => admitted.has(keyOf(row)));
+    const rows = group.rows.filter((row) => {
+      if (admittedReferences.has(row)) return true;
+      const key = keyOf(row);
+      const remaining = admittedCloneCounts.get(key) ?? 0;
+      if (remaining === 0) return false;
+      admittedCloneCounts.set(key, remaining - 1);
+      return true;
+    });
     return rows.length > 0 ? [{ ...group, rows, totalRows: group.rows.length }] : [];
   });
 }

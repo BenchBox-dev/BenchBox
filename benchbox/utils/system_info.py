@@ -90,7 +90,7 @@ def get_system_info() -> SystemInfo:
     # platform.processor() returns the bare architecture ("arm"), which is not
     # a CPU model at all -- it normalizes to the cpu_family "unknown" and makes
     # the published hardware axis useless. detect_cpu_info() reads the real
-    # brand string (sysctl on Darwin, /proc/cpuinfo on Linux, wmic on Windows)
+    # brand string (sysctl on Darwin, /proc/cpuinfo on Linux, Windows CIM)
     # and degrades to None rather than to a placeholder.
     cpu_vendor: str | None = None
     cpu_identity_provenance: str | None = None

@@ -272,7 +272,16 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
     const hasUnavailableSelection = bases.some(
       (basis) => !availableBases.some((candidate) => basesEqual(candidate, basis)),
     );
-    if (parsed.hasExplicitBases && !hasUnavailableSelection) return;
+    const displayMsByQuery = new Map<string, number | null>(
+      detail.display_timings.map((timing) => [
+        timing.query_id,
+        timing.is_valid_display_timing ? timing.display_ms : null,
+      ]),
+    );
+    const explicitSelectionHasSharedEvidence =
+      bases.length >= MIN_WITHIN_RUN_BASES &&
+      buildWithinRunRows(detail.queries, displayMsByQuery, bases).sharedQueryIds.length > 0;
+    if (parsed.hasExplicitBases && !hasUnavailableSelection && explicitSelectionHasSharedEvidence) return;
     if (comparablePair && (bases.length !== 2 || !comparablePair.every((basis, index) => basesEqual(basis, bases[index]!)))) {
       updateBasesAndRef(comparablePair, Math.min(referenceIndex, 1));
     }
