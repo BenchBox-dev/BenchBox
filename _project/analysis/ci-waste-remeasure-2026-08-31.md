@@ -2,23 +2,47 @@
 
 ## Provenance and bounded cohort
 
-Collected read-only from `BenchBox-dev/BenchBox` on 2026-08-31 UTC after
-fast-forwarding this worktree to `origin/develop` (`0f9f6682754a824cc18567fbc71295dfed503eec`).
-The pull-request collector command was:
+Collected read-only from `BenchBox-dev/BenchBox` on 2026-08-31 UTC against
+`origin/develop` at `0f9f6682754a824cc18567fbc71295dfed503eec`.
+The exact cohort is committed in
+[`ci-waste-remeasure-2026-08-31-manifest.json`](ci-waste-remeasure-2026-08-31-manifest.json).
+It pins the pull-request and merge-group snapshot timestamps, every PR number
+and head SHA, the `develop` base ref, every PR's merge timestamp and changed
+filenames, the code-routed classification, every selected workflow run ID and
+event, and every selected check-suite ID. No PR in this cohort had a
+manifest-forced code path. Replay it read-only with:
 
 ```text
-uv run -- python _project/scripts/dev_loop_pr_metrics.py --days 1 --event-fanout --json
+uv run -- python _project/analysis/replay_ci_waste_remeasure.py
 ```
 
-Its isolated raw JSON is retained at
-`/tmp/ci-waste-event-fanout-pr-isolated.json` (13 merged PRs: #1977, #1973,
-#1976, #1972, #1971, #1936, #1969, #1946, #1952, #1964, #1966, #1965,
-#1962). The 11 code-routed PR IDs are #1977, #1973, #1972, #1971, #1969,
-#1966, #1965, #1964, #1962, #1952, and #1946. The separate `merge_group`
-query used the existing `GitHubClient`,
-`correlate_runs_by_head`, and `event_fanout_metrics` helpers, was limited to
-the five newest distinct heads, and is retained at
-`/tmp/ci-waste-event-fanout-merge-group.json`.
+For each head, the replay first discovers all Actions runs by `head_sha`,
+applies the cohort's event filter and snapshot cutoff, and requires the exact
+run/event/suite set to equal the manifest. It then fetches those exact run
+records and jobs. It retains only `pull_request` and `pull_request_target` runs
+for PR rows, only `merge_group` runs for merge rows, and only commit check-runs
+whose suite IDs match the selected runs. For PRs, it also requires the live PR
+to remain merged with the exact pinned head SHA, merge timestamp, and
+`develop` base. The live immutable file list must equal the manifest; replay
+then recomputes `needs_code_ci` with the unchanged
+`scripts/path_filter_decision.py` rules and requires it to equal `code_routed`.
+
+The replay calls the existing `event_fanout_metrics` contract and checks every
+published metric plus merge-unblock, queue-delay availability and distribution,
+public runner cost, cancelled/incomplete job counts, schema, and the full
+setup/execution distributions. Its offline regression includes negative
+controls for an omitted eligible run, altered routing, and an altered expected
+metric or PR identity:
+
+```text
+uv run -- python _project/analysis/replay_ci_waste_remeasure.py --self-test
+```
+
+The cohort contains 13 merged PRs: #1977, #1973, #1976, #1972, #1971,
+#1936, #1969, #1946, #1952, #1964, #1966, #1965, and #1962. The 11
+code-routed PRs are #1977, #1973, #1972, #1971, #1969, #1966, #1965,
+#1964, #1962, #1952, and #1946. The merge-group cohort is the five exact
+heads in the manifest; it is not a moving "newest heads" query.
 
 ## Results
 
@@ -53,7 +77,8 @@ Setup/execution runner-minute medians were 13.52 / 83.27 for the code-routed
 `pull_request` cohort, 13.40 / 80.12 for all pull requests, and 11.60 / 69.45
 for `merge_group`. Public standard-runner dollar cost remains 0. Queue delay
 is not applicable to the merge-group heads because they have no PR
-`merged_at` timestamp.
+`merged_at` timestamp; replay asserts zero recorded and five unrecorded
+merge-group queue-delay values.
 
 ## Definitions and limitations
 
@@ -69,10 +94,9 @@ run suite IDs. These definitions and the `event_fanout_v1` contract come from
 `_project/decisions/strict-base-refresh-ci-profile-2026-08-14.md` and the
 existing collector.
 
-This is a one-day, bounded observational sample, not a causal estimate and
-not an authorization to skip, demote, extract, or remove CI coverage. The
+This is a pinned, bounded observational sample, not a causal estimate and not
+an authorization to skip, demote, extract, or remove CI coverage. The
 merge-group cohort has only five heads and required-check availability can
-vary by head. Commit check-runs were filtered to the exact selected
-`merge_group` run `check_suite_id` set (28/51, 28/45, 27/56, 28/53, and
-28/29 retained respectively); missing/incomplete observations remain visible
-in the raw JSON.
+vary by head. The manifest records the expected aggregates; the replay's
+suite filter prevents unrelated check-runs on the same commit from entering
+the measurement.
