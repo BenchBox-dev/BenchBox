@@ -37,8 +37,25 @@ class SystemProfiler:
             cpu_cores_physical = psutil.cpu_count(logical=False) or cpu_cores_logical
         else:
             cpu_cores_physical = cpu_cores_logical
+
+        # Two-stage provenance mirroring benchbox/utils/system_info.get_system_info:
+        # detect_cpu_info() is "measured" (real brand string via sysctl / /proc / wmic);
+        # the platform.processor() fallback is "inferred" (often the architecture
+        # or a less reliable brand string). Absence stays None so downstream
+        # surfaces never mistake an architecture token for identity.
         cpu_model = self._get_cpu_model()
-        cpu_identity_provenance = "measured" if cpu_model else None
+        if cpu_model:
+            cpu_identity_provenance: str | None = "measured"
+        else:
+            cpu_identity_provenance = None
+            try:
+                fallback = platform.processor() or ""
+                cleaned = fallback.strip()
+                if cleaned and not is_cpu_architecture_token(cleaned, architecture):
+                    cpu_model = cleaned
+                    cpu_identity_provenance = "inferred"
+            except Exception:
+                pass
 
         # Memory info
         if HAS_PSUTIL:

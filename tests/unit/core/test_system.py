@@ -54,3 +54,32 @@ class TestGetCpuModel:
             profile = SystemProfiler().get_system_profile()
         assert profile.cpu_model is None
         assert profile.cpu_identity_provenance is None
+
+    def test_profile_marks_fallback_model_as_inferred(self):
+        with (
+            patch("benchbox.core.system.detect_cpu_info", return_value=(None, None)),
+            patch("benchbox.core.system.platform.machine", return_value="x86_64"),
+            patch("benchbox.core.system.platform.processor", return_value="Intel(R) Core(TM) i7-9750H"),
+        ):
+            profile = SystemProfiler().get_system_profile()
+        assert profile.cpu_model == "Intel(R) Core(TM) i7-9750H"
+        assert profile.cpu_identity_provenance == "inferred"
+
+    def test_profile_still_marks_detected_model_as_measured(self):
+        with (
+            patch("benchbox.core.system.detect_cpu_info", return_value=("Apple M4", "Apple")),
+            patch("benchbox.core.system.platform.machine", return_value="arm64"),
+        ):
+            profile = SystemProfiler().get_system_profile()
+        assert profile.cpu_model == "Apple M4"
+        assert profile.cpu_identity_provenance == "measured"
+
+    def test_profile_prefers_measured_over_inferred_when_both_available(self):
+        with (
+            patch("benchbox.core.system.detect_cpu_info", return_value=("Apple M4", "Apple")),
+            patch("benchbox.core.system.platform.machine", return_value="arm64"),
+            patch("benchbox.core.system.platform.processor", return_value="Intel fallback should be ignored"),
+        ):
+            profile = SystemProfiler().get_system_profile()
+        assert profile.cpu_model == "Apple M4"
+        assert profile.cpu_identity_provenance == "measured"
