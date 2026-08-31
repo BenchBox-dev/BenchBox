@@ -63,12 +63,19 @@ replication:
 | Recurring maintainer seed and curated release-preview corpus | `develop` |
 | Complete accepted Phase 2 archive, including direct operator and community submissions | `published-results` |
 | Corpus inventory | Generated independently from each branch's own bundle tree |
-| Current static Results Explorer | Curated `release` snapshot sourced from `develop`, not the complete Phase 2 archive |
+| Independent publication input | Exact `published-results` SHA pinned by a reviewed publication manifest; every validator-clean accepted result is input by default |
+| Explorer code, admission policy, visibility, trust, withdrawal, and ranking policy | `develop` |
+| Current static Results Explorer | Legacy curated `release` snapshot sourced from `develop` until the independent-publication migration gates pass |
 
 Published-only bundles are therefore expected archive growth, not missing
-backports. There is no automatic `published-results` to `develop` sync. A
-bundle enters the curated release preview only through a separate, reviewed
-promotion onto `develop`.
+backports. There is no automatic `published-results` to `develop` sync. The legacy
+curated release preview uses develop-side data today, but the accepted future-state
+contract is
+[`adr-independent-publication-authorities.md`](adr-independent-publication-authorities.md):
+a reviewed publication manifest pins an exact `published-results` SHA and every valid
+accepted result is publication input by default. Orthogonal visibility, trust,
+withdrawal, and ranking fields on `develop` control presentation without creating a
+second corpus authority.
 
 ### Allowlist
 

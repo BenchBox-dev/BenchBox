@@ -254,9 +254,14 @@ accidentally reclassifies the results explorer as shipping content.
 ## Amendment 2026-08-13 — curated Results Explorer preview
 
 The Results Explorer is now an intentional curated-preview publication
-surface. The release branch retains the corpus under `results-data/`, the
-static application under `results-explorer/`, and only the three build-time
-helpers required by `.github/workflows/docs.yml`:
+surface in the legacy release-driven implementation. The accepted independent-publication
+authority contract is
+[`docs/development/adr/adr-independent-publication-authorities.md`](../../docs/development/adr/adr-independent-publication-authorities.md):
+`published-results` owns the accepted archive; reviewed manifests pin its exact SHA;
+every valid accepted result is publication input by default; and only an attested live
+receipt proves deployment. The release branch retains the corpus under `results-data/`,
+the static application under `results-explorer/`, and only the three build-time helpers
+required by `.github/workflows/docs.yml`:
 
 - `_project/scripts/explorer_pipeline/`
 - `_project/scripts/explorer_publish.py`
@@ -271,9 +276,10 @@ These release-shipped paths extend the curation guard's allowlist:
 
 All other `_project/` content remains development-only and is removed by
 `make release-cut`. The browser, seed, submission, and corpus-sync workflows
-remain development-only; publication uses the existing protected `release`
-push through `.github/workflows/docs.yml`. This is a curated preview and does
-not make a broad leaderboard or full-cohort coverage claim.
+remain development-only; the legacy preview uses the existing protected `release`
+push through `.github/workflows/docs.yml`. This implementation does not make `release`
+a corpus authority, does not make a merge or successful build live, and does not make a
+broad leaderboard or full-cohort coverage claim.
 
 ## Amendment 2026-07-09 — v0.3.1 recovery release; Phase 4 closed, Phase 8 retired
 

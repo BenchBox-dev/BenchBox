@@ -9,11 +9,19 @@ release workflow is the only path that can rebuild and deploy the static Explore
 no hosted API is involved.
 
 Authority is split by surface: `develop` owns code, validators, generators,
-the recurring maintainer seed, and the curated release-preview corpus;
-`published-results` owns the complete accepted Phase 2 archive. Each branch
-generates its inventory from its own tree. Published-only submissions are
-expected and are not automatically backported into the curated Explorer
-source.
+Explorer admission and presentation policy, the recurring maintainer seed, and the
+legacy curated release-preview corpus; `published-results` owns the complete accepted
+Phase 2 archive. Each branch generates its inventory from its own tree. Published-only
+submissions are expected and are not automatically backported into the legacy curated
+Explorer source.
+
+For independent publication, the accepted contract is
+[`independent-publication-contract.md`](independent-publication-contract.md): a reviewed
+manifest pins an exact `published-results` SHA, and every validator-clean result at that
+SHA is publication input by default. Visibility, trust, withdrawal, and ranking
+eligibility are orthogonal presentation fields owned with policy on `develop`; they do
+not create another corpus authority. A merge to `published-results` proves acceptance,
+not live deployment. Only an attested live receipt proves publication.
 
 ## 1. Submission Lifecycle
 
@@ -89,11 +97,14 @@ remediation, takedown, mistaken publish):
 3. Regenerate inventory on that branch:
    `uv run -- python scripts/generate_corpus_inventory.py --write`, then
    stage `results-data/corpus-inventory.json` with the path removals.
-4. Merge after review. Leave develop in sync if the same path still exists
-   there (delete on develop in a separate PR if the seed/corpus copy must go
-   too); the next develop→published mirror will not resurrect a path that is
-   already gone from both trees, and will not re-delete other published-only
-   paths.
+4. Merge after review. One authorized maintainer may approve this emergency
+   takedown path. Leave develop in sync if the same path still exists there (delete on
+   develop in a separate PR if the seed/corpus copy must go too); the next
+   develop→published mirror will not resurrect a path that is already gone from both
+   trees, and will not re-delete other published-only paths.
+5. Treat the merge as accepted-archive state, not proof of public removal. Update
+   independent publication desired state, deploy, probe externally, and require an
+   attested live receipt before reporting the takedown live.
 
 If the workflow's heuristics ever miss a path (or a one-off mirror is
 needed outside the trigger conditions), trigger it manually via
