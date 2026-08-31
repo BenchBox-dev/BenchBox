@@ -21,7 +21,7 @@ BenchBox v0.4.0 was released on **August 28, 2026**.
 
 The headline change is the move to its own GitHub organization. The repository name, the PyPI project `benchbox`, and `benchbox.dev` are unchanged, and old remotes keep redirecting. The project now lives in an organization account.
 
-The second change is a vocabulary for published results: who produced a run, its trust label, and disclosed funding. The Results Explorer at [benchbox.dev/results/](https://benchbox.dev/results/) has been reachable since April 2026; this tagged release is the first that names that preview and shows those labels on it. An organization account and labels for who produced a result are both prerequisites for results from other people. A separate WIP post covers eligibility and comparability.
+The second change is a vocabulary for published results: who produced a run, its trust label, and disclosed funding. The Results Explorer at [benchbox.dev/results/](https://benchbox.dev/results/) has been reachable since April 2026; this tagged release is the first that names that preview and shows those labels on it. An organization account and labels for who produced a result are both prerequisites for results from other people.
 
 The third is DuckLake as `--platform ducklake`, still beta: Parquet table data with catalog metadata in a SQL database, and catalog backend and data path chosen independently.
 

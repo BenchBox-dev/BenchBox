@@ -13,7 +13,7 @@ meta_description: "Explore public BenchBox results, compare per-query evidence, 
 
 # Announcing the BenchBox Results Explorer preview
 
-**TL;DR**: The [BenchBox Results Explorer](https://benchbox.dev/results/) turns public result bundles into browsable benchmark evidence. You can find runs by benchmark and scale, compare per-query timings, inspect recorded methodology and provenance, query the public snapshot with SQL, and download the underlying bundles. The experience draws on Geekbench and public AI evaluation leaderboards. Contributors can package a complete validated run with `benchbox submit` and propose it through the `published-results` branch.
+**TL;DR**: The [BenchBox Results Explorer](https://benchbox.dev/results/) turns public result bundles into browsable benchmark evidence. You can find runs by benchmark and scale, compare per-query timings, inspect recorded methodology and provenance, query the public snapshot with SQL, and download the underlying bundles. The experience draws on Geekbench and public AI evaluation leaderboards. Contributors can upload a complete validated run through the hosted service or package it for a `published-results` pull request.
 
 ---
 
@@ -21,9 +21,9 @@ meta_description: "Explore public BenchBox results, compare per-query evidence, 
 
 BenchBox has produced structured result files since its earliest releases. Those files work well for the person who ran the benchmark: the CLI can summarize them, render charts, and retain the data needed for later inspection. They become harder to use when someone else wants to answer a simple question such as, "Which published TPC-H runs used the same scale and phase as mine?"
 
-The Results Explorer gives those files a public reading surface. Open [benchbox.dev/results/](https://benchbox.dev/results/) to browse the curated preview, select runs, inspect the context recorded with each result, and work with the same public data behind the pages. BenchBox v0.4.0 is the first tagged release to name the preview.[^release] The first static Explorer became reachable in April 2026.[^launch]
+The Results Explorer gives those files a public reading surface. Open [benchbox.dev/results/](https://benchbox.dev/results/) to browse the curated preview, select runs, inspect the context recorded with each result, and work with the same public data behind the pages. BenchBox v0.4.0 is the first tagged release to name the preview.[^release] The first static Explorer became reachable in April 2026.[^launch] For the wider release, see [BenchBox v0.4.0: new org, DuckLake, and result provenance](../published/15-v0-4-0-release-overview.md).
 
-The current site is a curated preview rather than a complete or certified ranking. That scope lets us test the browsing, comparison, and contribution workflows while keeping each published number connected to reviewable evidence.
+The current site is a curated preview rather than a complete or certified ranking. That scope lets us test the browsing, comparison, and contribution workflows while keeping each published number connected to reviewable evidence. The story behind the preview starts with the products that inspired it, moves through the choice to build a separate public site, and ends with the ways readers and contributors can use it today.
 
 ## Inspiration: public results need a destination
 
@@ -33,7 +33,7 @@ That pattern maps well to BenchBox because it joins three reader actions in one 
 
 Public AI evaluation projects provided a second set of references. The Open LLM Leaderboard presents an interactive table with sorting, filtering, model search, and pinned comparisons.[^open-llm] HELM supplied a related lesson about evaluation context: its framework standardizes benchmarks and metrics, exposes individual prompts and responses, and publishes leaderboards across models and benchmarks.[^helm]
 
-Database benchmarks need their own version of that experience. A single universal score would hide too much. The benchmark, scale factor, execution phase, query coverage, and recorded run context all affect what a timing means. BenchBox therefore starts with a familiar browse-and-compare flow, then keeps per-query evidence and methodology close to the number.
+Database benchmarks need a version of that experience that preserves workload context because benchmark, scale factor, execution phase, query coverage, and recorded run details all affect what a timing means. BenchBox combines the familiar browse-and-compare flow with per-query evidence and methodology so readers can interpret each timing within its workload.
 
 These references gave us a practical design direction: give each result a stable page, make comparison a first-class action, and let readers inspect how the evaluation was produced.
 
@@ -45,7 +45,14 @@ The Explorer closes the gap between "BenchBox produced a result" and "another pe
 
 We also wanted the preview to fit the infrastructure BenchBox already operates. The build pipeline transforms curated bundles into static assets, including a DuckDB snapshot and downloadable JSON. DuckDB-WASM runs queries in the browser, so the read path does not require an application server, account system, or hosted database. GitHub Pages serves the site, while the browser performs the interactive analysis.
 
-The contribution path uses the same bias toward simple, inspectable infrastructure. Contributors package a result locally, GitHub provides identity and review, and CI validates the proposed bundle. A hosted submission service can wait until contribution volume demonstrates that the additional operational work would create enough value.
+```text
+curated result bundles -> static build -> results.duckdb -> Explorer pages and Query
+                                  `-> JSON bundles -> individual downloads
+```
+
+This architecture keeps the public evidence portable. A reader can use the prepared views, query the snapshot directly, or leave the site with the canonical bundle.
+
+The submission paths use the same canonical bundle and keep the static read architecture intact. A hosted upload can publish through the BenchBox ingest service, while the pull-request path uses GitHub identity, review, and CI validation to add a bundle to the community archive. Browsing the Explorer still depends only on the generated static assets.
 
 ## Four ways to use the Explorer
 
@@ -57,15 +64,11 @@ Start with a benchmark, then choose the scale factor and phase that match your q
 
 The platform-by-query matrix shows where behavior changes across a workload. A headline aggregate can tell you that two runs differ overall. The matrix shows whether the difference is broad or concentrated in a few queries.
 
-Ranked views use a shared scope based on benchmark, scale, phase, and sufficient timing coverage. Results that do not qualify for a ranked view can still remain visible with the reason. The detailed rules live in [How the Results Explorer qualifies comparisons](./17-results-explorer-qualifies-comparisons.md).
+Ranked views group results by benchmark, scale, phase, and sufficient timing coverage, and each visible row explains its standing in that scope.
 
 ### Understand why two runs differ
 
-Select compatible runs and open Compare. The page puts per-query timings beside recorded differences in platform version, execution mode, tuning, validation, environment, run date, and cost.
-
-Those fields are shown when recorded. If a result does not contain a driver version or complete environment description, the Explorer leaves that evidence visibly missing. It does not infer a value or silently treat two unknown environments as identical.
-
-This is useful even when the comparison remains valid enough to display. One run may use SQL while another uses a DataFrame implementation. Two runs may share a benchmark and scale but record different platform versions. The comparison view keeps those facts available so the reader can decide how much weight to place on the result.
+Select compatible runs and open Compare. The page pairs per-query timings with recorded platform version, execution mode, tuning, validation, environment, run date, and cost. When a field is absent, the page marks it as not recorded, preserving the distinction between known matches and missing evidence. This context lets readers weigh comparisons that span SQL and DataFrame implementations or different platform versions.
 
 ### Audit one published result
 
@@ -90,7 +93,7 @@ This turns the Explorer from a fixed collection of charts into an analysis surfa
 
 ## Submit your own result
 
-Community contributions use a pull request against the `published-results` branch. The full contract lives in the [contribution guide](https://benchbox.dev/docs/contributing-results.html); the sequence below shows the complete path.
+BenchBox supports two submission destinations. `--service` uploads a canonical bundle to the hosted ingest API, while `--output` creates a local package for the `published-results` pull-request flow. Both begin with the same complete benchmark result and public-submission privacy prerequisite. The [hosted submission guide](https://benchbox.dev/docs/guides/hosted-submission.html) covers the service workflow, while the [current contribution guide source](https://github.com/BenchBox-dev/BenchBox/blob/develop/docs/contributing-results.md) contains the full pull-request contract, and the sequence below shows both paths.
 
 First, install BenchBox with the extra for your platform and run a complete benchmark suite. This example uses DuckDB and TPC-H at scale factor 0.01:
 
@@ -105,16 +108,29 @@ Before the first public submission, set `BENCHBOX_MACHINE_ID_SALT` to a stable, 
 export BENCHBOX_MACHINE_ID_SALT="<stable-private-random-value>"
 ```
 
-Preview the package, then write it to a local directory:
+Preview the bundle that would be submitted:
 
 ```bash
-uv run -- benchbox submit --last --dry-run
+uv run -- benchbox submit --last --service --dry-run
+```
+
+For the hosted path, authenticate once, then upload the latest result. The default `--wait` behavior returns after the service publishes or rejects the submission, and `benchbox results --submitted` lists the recorded hosted submissions.
+
+```bash
+uv run -- benchbox auth login
+uv run -- benchbox submit --last --service
+uv run -- benchbox results --submitted
+```
+
+Hosted upload is optional. To use the public pull-request workflow instead, write the package to a local directory:
+
+```bash
 uv run -- benchbox submit --last --output ./submission
 ```
 
 If the latest result is not the one you want, list exact paths with `uv run -- benchbox results --paths --limit 25` and pass the selected result file to `benchbox submit`.
 
-The generated package contains the canonical result under `submission/bundle/`, any captured plan or tuning companions, a per-bundle manifest with a SHA-256 hash, and contribution instructions. Inspect those files before publishing them.
+The generated PR package contains the canonical result under `submission/bundle/`, any captured plan or tuning companions, a per-bundle manifest with a SHA-256 hash, and contribution instructions. Inspect those files before publishing them.
 
 Fork [`BenchBox-dev/BenchBox`](https://github.com/BenchBox-dev/BenchBox), check out its `published-results` branch, and copy `submission/bundle/*` into `results-data/bundles/`. Copy `submission/<result>.manifest.json` alongside the bundle files. Community submissions belong directly under `results-data/bundles/`, not its `vendor/` directory.
 
@@ -134,17 +150,23 @@ CI checks the schema, manifest hash, timing sanity, metadata, and inventory drif
 
 ## What the preview is teaching us
 
-A public results site becomes useful when it supports several levels of inspection. The benchmark page helps readers discover relevant runs. Compare keeps per-query evidence and recorded differences together. The result page provides a stable receipt. Raw downloads and the SQL workbench let readers continue the analysis elsewhere.
+A useful public results site needs several levels of inspection working together. The benchmark page helps readers discover relevant runs, while Compare keeps per-query evidence and recorded differences together. A result page provides a stable receipt, and raw downloads plus the SQL workbench let readers continue the analysis elsewhere. Each surface answers a different question without forcing every visitor to learn the result schema first.
 
-The static architecture has also been a useful constraint. It lets us improve the public reading experience and contribution workflow without operating another authenticated service. The repository, CI checks, and generated snapshot remain visible parts of the system.
+The static architecture has also been a useful constraint. It lets us improve the public reading experience without putting an authenticated service on the Explorer's read path. The repository, CI checks, and generated snapshot remain visible parts of the system, so changes to the public corpus leave a review trail.
 
-Curation is part of the product too. Adding more rows does not automatically create better comparisons. Coverage needs depth within the same benchmark, scale, and phase, and each result needs enough evidence for readers to understand what was measured. The preview gives us a place to learn which benchmarks, platforms, and scales the community wants to deepen next.
+Curation shapes the usefulness of each comparison: depth within the same benchmark, scale, and phase gives readers enough evidence to understand what was measured. The preview helps us identify which benchmarks, platforms, and scales the community wants to deepen next, along with the context fields that matter most during review.
 
 ## Try it yourself
 
-Open the [Results Explorer](https://benchbox.dev/results/), choose a benchmark and scale, then select two compatible runs and open Compare. Visit one result page, download its bundle, and use Query to ask a question the built-in views do not cover.
+Open the [Results Explorer](https://benchbox.dev/results/) and follow one result from summary to source:
 
-When you have a complete validated run to share, package it with the commands above and open a `published-results` pull request. Open a [BenchBox issue](https://github.com/BenchBox-dev/BenchBox/issues) if the Explorer leaves an important comparison question unanswered.
+1. Choose a benchmark, scale, and phase.
+2. Select two compatible runs and open Compare.
+3. Open one result page and download its bundle.
+4. Use Query to answer a question the built-in views do not cover.
+5. Submit a complete validated local run through the hosted service or PR path when you are ready to contribute.
+
+Start a [BenchBox discussion](https://github.com/BenchBox-dev/BenchBox/discussions) if an important comparison question remains hard to answer. Feedback on missing context is especially useful during the preview.
 
 ## References
 
