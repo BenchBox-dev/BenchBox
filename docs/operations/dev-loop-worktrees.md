@@ -56,14 +56,19 @@ worktree-less branches still at the exact commit GitHub merged:
 
 ```bash
 make branch-prune-merged DRY_RUN=1   # preview (requires gh)
-make branch-prune-merged             # delete only exact merged heads
+make branch-prune-merged             # delete only historically proven merge-time heads
 ```
 
 `branch-prune-merged` skips the current branch, `develop`/`main`/`release`/
-`published-results`, and any branch still attached to a worktree. It checks
-`gh pr list` state (not ancestry, since PRs squash-merge) and additionally
-requires the local tip to equal the PR's `headRefOid`, so a branch re-created
-under an old merged name or carrying post-merge commits is reported and kept.
+`published-results`, and any branch still attached to a worktree. It fetches
+`origin/develop`, proves the latest PR's historical merge-time head from the
+GitHub timeline plus paginated PR commit list, requires the local tip to equal
+that immutable head, and verifies the PR merge commit is reachable from the
+fresh target. A branch re-created under an old merged name, carrying post-merge
+commits, or lacking complete evidence is reported and kept. Evidence collection
+or branch deletion failures return nonzero rather than reporting false success.
+The final ref deletion is an expected-OID compare-and-swap, so a branch changed
+after evidence collection is preserved.
 
 ## Inspection
 

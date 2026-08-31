@@ -2,7 +2,7 @@
 
 Status: draft specification (2026-08-26) as amended 2026-08-31 to authorize
 `make branch-prune-merged` — an explicit, operator-driven, `gh`-based reaper
-limited to worktree-less local branches still at their merged PR head. No
+limited to worktree-less local branches still at their historical merge-time PR head. No
 worktree reaper is authorized; see §2.
 
 ## 1. Problem
@@ -19,11 +19,12 @@ intentionally holds unrelated reporting targets (`blind-spots-*`,
 operator-driven" — so there is no existing durable record of *which* linked
 worktrees carry finished, integrated work versus active work.
 
-Before any future item designs cleanup or reporting behavior on top of that
-gap, this spec fixes: what evidence is recorded, what it can and cannot
-prove, how uncertainty is classified, who is allowed to produce which part
-of it, and what a report is (and is not) authorized to do. This item adds no
-deletion path and changes no runtime behavior.
+This spec fixes what evidence is recorded, what it can and cannot prove, how
+uncertainty is classified, who is allowed to produce which part of it, and
+what a report is (and is not) authorized to do. The read-only audit adds no
+deletion authority. The separately invoked `branch-prune-merged` exception in
+§2 adds a destructive local-branch path only after independently recollecting
+the complete §7 evidence; it never consumes an audit snapshot as authority.
 
 ## 2. Non-goals
 
@@ -31,11 +32,12 @@ deletion path and changes no runtime behavior.
   exact-path and operator-driven via `make worktree-remove` only
   (`docs/operations/dev-loop-worktrees.md`). The single authorized exception is
   `make branch-prune-merged`, which reaps only worktree-less local branches
-  still at their merged `headRefOid` (operator-driven, `gh`-based, with
+  still at their historically proven merge-time PR head (operator-driven, `gh`-based, with
   `DRY_RUN=1` preview). Any other future mutation stays single-target and
   operator-driven, exactly like `worktree-remove` today.
-- No new destructive Git operation and no change to `worktree-remove`'s
-  existing refusal rules.
+- No destructive **worktree** operation and no change to `worktree-remove`'s
+  existing refusal rules. `branch-prune-merged` is the sole authorized new
+  destructive Git operation and deletes local branch refs only.
 - No parsing of `.bossmode/control.db` (or any other worktree's copy of it),
   anywhere, by any future phase built on this contract.
 - No binding to Bossmode's current `bossmode reconcile` / `run show` /
@@ -215,7 +217,13 @@ following hold for at least one PR:
       this precedence order, stopping at the first source that resolves it:
       1. **PR event history** (the GitHub PR API's own head-ref timeline) —
          authoritative and durable for as long as the PR exists, independent
-         of the local clone's state. Check this source first.
+         of the local clone's state. Check this source first. A destructive
+         branch operation MUST additionally corroborate the final timeline
+         head against the PR's paginated commit list and verify that the
+         timeline's merged event names the same merge commit as the PR record.
+         After rechecking worktree attachment, deletion MUST use an atomic
+         expected-old-OID ref update so a concurrent branch change is refused
+         rather than deleting the newly written commit.
       2. **Local reflog** — used only when PR event history is unavailable or
          inconclusive. The reflog is local-only and is pruned by `git gc`,
          by ordinary reflog expiry, or simply absent on a fresh clone, so it

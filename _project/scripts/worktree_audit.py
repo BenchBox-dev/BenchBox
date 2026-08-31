@@ -236,7 +236,7 @@ def _build_worktree_info(entry: Dict[str, Any]) -> WorktreeInfo:
 
 def get_local_branches(repo_root: Path) -> List[Dict[str, Any]]:
     """Query local branch refs and their upstream tracking status."""
-    fmt = "%(refname:short)|%(objectname)|%(upstream:short)|%(upstream:track)|%(committerdate:iso8601)"
+    fmt = "%(refname:lstrip=2)|%(objectname)|%(upstream:short)|%(upstream:track)|%(committerdate:iso8601)"
     code, stdout, _ = _run_git(["for-each-ref", f"--format={fmt}", "refs/heads/"], repo_root)
     if code != 0 or not stdout:
         return []

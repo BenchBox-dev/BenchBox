@@ -101,8 +101,8 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → (wh
 
    ```bash
    make worktree-remove WORKTREE_PATH="$WORKTREE_PATH"   # removes the linked worktree
-   make branch-prune-merged DRY_RUN=1                      # preview worktree-less branches still at their merged PR head (requires gh)
-   make branch-prune-merged                                # delete only those exact heads
+   make branch-prune-merged DRY_RUN=1                      # preview branches with complete historical merge evidence (requires gh)
+   make branch-prune-merged                                # delete only exact, merge-reachable historical heads
    ```
 
    Inspect open PRs at any time with `make pr-status`.
