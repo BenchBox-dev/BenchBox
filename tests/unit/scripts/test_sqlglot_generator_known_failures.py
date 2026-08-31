@@ -221,6 +221,39 @@ def test_artifact_metadata_must_match_policy_entry(tmp_path: Path) -> None:
     assert "artifact metadata 'seed' does not match the policy entry" in errors
 
 
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"seed": "42"}, "failure_artifact.seed: must be a non-negative integer"),
+        ({"case_index": {"value": 0}}, "failure_artifact.case_index: must be a non-negative integer"),
+        ({"case_seed": [42]}, "failure_artifact.case_seed: must be a non-negative integer"),
+        ({"failing_shapes": [["target_to_target"]]}, "artifact failing_shapes is invalid"),
+        ({"outcomes": ["target_to_target"]}, "artifact outcomes must contain both call shapes"),
+        (
+            {
+                "outcomes": {
+                    "target_to_target": {"status": [], "error_type": "ParseError", "error": "ParseError: bad"},
+                    "postgres_to_target": {"status": "pass", "error_type": None, "error": None},
+                }
+            },
+            "artifact outcome for target_to_target is invalid",
+        ),
+    ],
+)
+def test_malformed_artifact_scalar_and_container_types_are_rejected_deterministically(
+    tmp_path: Path, overrides: dict[str, object], message: str
+) -> None:
+    failure = _known_failure(failure_artifact="artifacts/malformed-types.json")
+    _write_artifact(tmp_path, failure, **overrides)
+    policy = _policy(failure)
+
+    first = _errors(policy, repo_root=tmp_path)
+    second = _errors(policy, repo_root=tmp_path)
+
+    assert first == second
+    assert message in "\n".join(first)
+
+
 def test_artifact_replay_command_must_match_portable_policy_template(tmp_path: Path) -> None:
     failure = _known_failure(failure_artifact="artifacts/stale-command.json")
     _write_artifact(tmp_path, failure, replay_command="uv run generator.py --failure-artifact /runner/temp/file.json")

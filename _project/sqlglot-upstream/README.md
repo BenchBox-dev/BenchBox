@@ -28,8 +28,11 @@ remaining `FAIL` lines indicate the workaround in BenchBox is still load-bearing
 
 ## Generated-case known-failure policy
 
-Generator failures are advisory only while they are explicit, reproducible,
-and younger than seven calendar days. Validate the policy with:
+The generator is advisory at the program level: it runs only in a non-required
+nightly job and stays outside develop post-merge auto-revert. A generated-case
+discovery still leaves that nightly job red after its evidence is validated.
+Known failures must remain explicit, reproducible, and younger than seven
+calendar days. Validate the policy with:
 
 ```bash
 uv run -- python scripts/check_sqlglot_generator_known_failures.py --policy _project/sqlglot-upstream/generator-policy.json
@@ -64,17 +67,18 @@ case before writing its JSON evidence.
 
 Exit status `0` means the bounded cohort was clean, `1` means a generated case
 was discovered or exactly reproduced, and statuses `2` and above mean the
-generator's contract or infrastructure failed. The nightly workflow translates
-status `1` only after a separate validation of the summary and failure evidence;
-a bare process exit cannot become advisory. The policy guard and every other
-nonzero status remain blocking; the job itself does not use
+generator's contract or infrastructure failed. For status `1`, the nightly
+workflow separately validates the summary and failure evidence and then
+propagates the nonzero status, so the non-required nightly job remains red. A
+bare process exit cannot be treated as a valid discovery. The policy guard and
+every other nonzero status also remain blocking; the job does not use
 `continue-on-error`. Summary and failure evidence are retained as workflow
 artifacts for 14 days. Nightly remains outside develop post-merge auto-revert
 and no required PR lane invokes the generator.
 
-The workflow keeps policy shape, age, artifact, and other infrastructure
-validation failures blocking. Only a new generated-case discovery is
-advisory; do not make the whole job continue on error.
+The workflow keeps policy shape, age, artifact, discovery, and other
+infrastructure failures red. A generated-case discovery is advisory only in
+its program placement; it does not make the nightly job green.
 
 ### Wrapper-call-shape convention
 
