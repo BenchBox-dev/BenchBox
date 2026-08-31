@@ -1,8 +1,8 @@
 {
+  "bundle_file": "amplab_sf01_clickhouse_local_sql_20260826_113055_4d4d5bcd.json",
+  "bundle_hash": "be8ac63737cb51b77ab887601c0de3f456bcf67ca9b2352a6178b2e3e1a635e4",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "amplab_sf01_clickhouse_local_sql_20260826_113055_4d4d5bcd.json",
-  "bundle_hash": "3b1245c92486f5f6750088b4f3079986968a0bdfd4d93fb72fa01ca189a151f5"
+  "submitted_by": "maintainer"
 }

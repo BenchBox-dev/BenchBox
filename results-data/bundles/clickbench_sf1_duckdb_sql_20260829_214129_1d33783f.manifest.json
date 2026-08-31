@@ -1,0 +1,12 @@
+{
+  "bundle_file": "clickbench_sf1_duckdb_sql_20260829_214129_1d33783f.json",
+  "bundle_hash": "4c4ae55e46f84f701a989fe24a00cc3d467211f75ccfbbc43d300176721d98a1",
+  "companion_hashes": {
+    "clickbench_sf1_duckdb_sql_20260829_214129_1d33783f.applied.json": "0fc4e17aba1d8e1ee8a5b3adfe5d2857dc2d280663c585798c7e791f5112ff77",
+    "clickbench_sf1_duckdb_sql_20260829_214129_1d33783f.tuning.json": "3b807297fec908074c52bd9b28d0fcdaa9b008fbe38c6183614fa2aa3fd30bcc"
+  },
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

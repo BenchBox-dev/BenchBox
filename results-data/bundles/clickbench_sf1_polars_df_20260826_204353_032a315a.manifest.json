@@ -1,8 +1,8 @@
 {
+  "bundle_file": "clickbench_sf1_polars_df_20260826_204353_032a315a.json",
+  "bundle_hash": "622b20c2c290b1bb759e0bb918637dfe59a13fbed515123f21eee657e3c20182",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "clickbench_sf1_polars_df_20260826_204353_032a315a.json",
-  "bundle_hash": "02234bd6c5658ea15cbcab6cafb7692dad13bb6dca6ce9d9ce5090fd4adf5043"
+  "submitted_by": "maintainer"
 }

@@ -1,8 +1,8 @@
 {
+  "bundle_file": "coffeeshop_sf01_polars_df_20260826_205654_48e58125.json",
+  "bundle_hash": "b4dc5ad4d90da2e3a00745e3c2abe72ebe8555c9653e23dfe1c2347d20b2e745",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "coffeeshop_sf01_polars_df_20260826_205654_48e58125.json",
-  "bundle_hash": "fd58f632265280c39a370df5e0f2a5e729f20088fa0d53fde9ab7c8adddcf57e"
+  "submitted_by": "maintainer"
 }

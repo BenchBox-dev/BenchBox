@@ -1,8 +1,8 @@
 {
+  "bundle_file": "h2odb_sf01_datafusion_sql_20260826_111303_14b4960d.json",
+  "bundle_hash": "3d65ba8e037840638c8ba22bb1bb1b41e49cfc4d00c67789ce13906f7f1213cc",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "h2odb_sf01_datafusion_sql_20260826_111303_14b4960d.json",
-  "bundle_hash": "37de2252e31566b254eb3fd72600b6ebd31b6edbac2205691497815c6e2366f8"
+  "submitted_by": "maintainer"
 }

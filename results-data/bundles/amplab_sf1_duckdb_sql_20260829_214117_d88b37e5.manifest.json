@@ -1,0 +1,12 @@
+{
+  "bundle_file": "amplab_sf1_duckdb_sql_20260829_214117_d88b37e5.json",
+  "bundle_hash": "8ebbea231ce76387bc956ab0f6bccb54c73802eefab4739fd0cdaeec179fb35e",
+  "companion_hashes": {
+    "amplab_sf1_duckdb_sql_20260829_214117_d88b37e5.applied.json": "1da63abe0d768ba06733237e42e0072e0ab9a15dffd0617a84fe1b947bcab7c3",
+    "amplab_sf1_duckdb_sql_20260829_214117_d88b37e5.tuning.json": "4f29c272106fc7c6f66c5a9b38761b92f8292c80f157395ecdaea83ebdeebd36"
+  },
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

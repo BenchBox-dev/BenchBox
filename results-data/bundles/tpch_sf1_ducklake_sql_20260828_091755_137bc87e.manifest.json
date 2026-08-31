@@ -1,8 +1,8 @@
 {
+  "bundle_file": "tpch_sf1_ducklake_sql_20260828_091755_137bc87e.json",
+  "bundle_hash": "e325d60187a6924f8cc54124da537130815c6bf1d1ffb87f3e5f3cb1ac51b74a",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "tpch_sf1_ducklake_sql_20260828_091755_137bc87e.json",
-  "bundle_hash": "025b183bbb43c912eb495e0caa4526c768a0130f3236f46e1e42a6b5d9d27dc9"
+  "submitted_by": "maintainer"
 }

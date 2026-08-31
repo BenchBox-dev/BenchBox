@@ -1,0 +1,73 @@
+{
+  "applied_ledger_hash": "9230c16fa10b218862795b57dc9da2c877484d05fb370ec7b31e65b039a61841",
+  "hash": "000aa3988d661e4ed5ae3ad7a105c8deae565eade817787372bee1472ffea959",
+  "requested": {
+    "constraints": {
+      "check_constraints": {
+        "enabled": true,
+        "enforce_on_insert": true,
+        "enforce_on_update": true
+      },
+      "foreign_keys": {
+        "enabled": true,
+        "enforce_referential_integrity": true,
+        "on_delete_action": "CASCADE",
+        "on_update_action": "RESTRICT"
+      },
+      "primary_keys": {
+        "enabled": true,
+        "enforce_uniqueness": true,
+        "nullable": false
+      },
+      "unique_constraints": {
+        "enabled": true,
+        "ignore_nulls": false
+      }
+    },
+    "table_tunings": {
+      "table_92537425d669": {
+        "sorting": [
+          {
+            "name": "column_a17f4b0442b9",
+            "order": 1,
+            "type": "INTEGER"
+          },
+          {
+            "name": "column_3773bdc8d1e7",
+            "order": 2,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_92537425d669"
+      },
+      "table_93aab137c936": {
+        "sorting": [
+          {
+            "name": "column_78fcca5ae60d",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_93aab137c936"
+      },
+      "table_97ae6ce34bbe": {
+        "sorting": [
+          {
+            "name": "column_a17f4b0442b9",
+            "order": 1,
+            "type": "INTEGER"
+          }
+        ],
+        "table_name": "table_97ae6ce34bbe"
+      }
+    }
+  },
+  "requested_config_hash": "000aa3988d661e4ed5ae3ad7a105c8deae565eade817787372bee1472ffea959",
+  "run_id": "56cf7846",
+  "source": "yaml",
+  "source_file": "examples/tunings/duckdb/joinorder_tuned.yaml",
+  "tuning_policy_generation": "adr-003",
+  "tuning_source": "auto_discovered",
+  "validation_status": "applied_unverified",
+  "version": "2.2"
+}
