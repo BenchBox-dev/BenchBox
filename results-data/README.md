@@ -68,14 +68,24 @@ document already described in prose.
 
 ## Seed Corpus
 
-The current checked-in corpus covers 2 benchmarks across 3 cohorts, all run
-on or after 2026-08-23:
+The current checked-in corpus covers 4 benchmark families across 6 cohorts, all
+run on or after 2026-08-23:
 
 | Benchmark | Scale | Platforms |
 |---|---|---|
 | tpcds | 1.0 | DataFusion, DuckDB, Spark |
-| tpcds | 10.0 | DataFusion, DuckDB, Spark |
+| tpcds | 10.0 | DataFusion, DuckDB versions 1.0.0–1.6.0.dev365, Spark |
 | tpch | 1.0 | DuckDB, Polars, PySpark |
+| tpch | 10.0 | DuckDB versions 1.0.0–1.6.0.dev365 |
+| clickbench | 10.0 | DuckDB versions 1.0.0–1.6.0.dev365 |
+| ssb | 10.0 | DuckDB versions 1.0.0–1.6.0.dev365 |
+
+The DuckDB version matrix uses three independent power repetitions per cell and
+reports medians. The corpus promotes one median bundle per version/benchmark
+cell; the 84 raw repetitions and analysis outputs remain in the external operator
+output directory. ClickBench uses BenchBox's synthetic generator, whose record count
+scales linearly with the scale factor; this matrix therefore uses SF10 like
+the other workloads. See `CORPUS_NOTES.md` for the operator-run details.
 
 Everything older was withdrawn on 2026-08-28 as a trust decision; see
 `CORPUS_NOTES.md`. The maintainer-run seed lane (`seed-corpus.yml` workflow,
