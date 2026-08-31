@@ -129,8 +129,16 @@ pending → rejected
 validated → rejected
 Promotion: not_requested → promotion_pending → live
 Promotion: promotion_pending → promotion_failed
+Promotion: promotion_failed → promotion_pending
+Promotion: live → promotion_pending
 Presentation: active → withdrawal_requested → withdrawn
 ```
+
+Promotion state is scoped to the latest target generation. A failed target may be retried
+or replaced by returning to `promotion_pending`. A receipt-confirmed live result may start
+a newer target generation by moving the latest attempt to `promotion_pending`; the prior
+`current_live_generation` and receipt remain observed live until the new target receives a
+matching receipt.
 
 Acceptance remains an audit fact when promotion fails or presentation is
 withdrawn. Withdrawal must be carried into later desired state so ordinary

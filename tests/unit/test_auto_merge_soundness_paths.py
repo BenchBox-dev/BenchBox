@@ -46,6 +46,15 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "benchbox/core/results/anonymization.py",
         "benchbox/core/results/anonymization_specs.yaml",
         "benchbox/core/results/provenance.py",
+        "benchbox/validation/bundle.py",
+        "benchbox/core/publishing/admission.py",
+        "benchbox/core/publishing/bundle_publisher.py",
+        "_project/scripts/explorer_pipeline/models.py",
+        "_project/scripts/explorer_pipeline/pipeline.py",
+        "_project/scripts/explorer_pipeline/ranking.py",
+        "scripts/generate_corpus_inventory.py",
+        "scripts/validate_submission.py",
+        ".github/workflows/validate-submission.yml",
         # Self-protection: the review-gate machinery and the PyPI-publishing
         # workflow. In-workflow checks are attacker-controlled for same-repo
         # PRs; the CODEOWNERS/ruleset layer this feeds is the durable control.
@@ -207,6 +216,15 @@ def test_codeowners_covers_soundness_paths() -> None:
     assert "benchbox/sql_compat/decision.py @joeharris76" in codeowners
     assert "benchbox/sql_compat/rules/_registration.py @joeharris76" in codeowners
     assert "benchbox/core/results/provenance.py @joeharris76" in codeowners
+    assert "benchbox/validation/bundle.py @joeharris76" in codeowners
+    assert "benchbox/core/publishing/admission.py @joeharris76" in codeowners
+    assert "benchbox/core/publishing/bundle_publisher.py @joeharris76" in codeowners
+    assert "_project/scripts/explorer_pipeline/models.py @joeharris76" in codeowners
+    assert "_project/scripts/explorer_pipeline/pipeline.py @joeharris76" in codeowners
+    assert "_project/scripts/explorer_pipeline/ranking.py @joeharris76" in codeowners
+    assert "scripts/generate_corpus_inventory.py @joeharris76" in codeowners
+    assert "scripts/validate_submission.py @joeharris76" in codeowners
+    assert ".github/workflows/validate-submission.yml @joeharris76" in codeowners
     assert "_project/scripts/auto_merge_soundness_paths.py @joeharris76" in codeowners
     assert ".github/workflows/auto-merge-on-open.yml @joeharris76" in codeowners
     assert ".github/workflows/release.yml @joeharris76" in codeowners

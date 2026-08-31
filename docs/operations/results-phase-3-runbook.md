@@ -218,9 +218,13 @@ metadata DB (write-once object store or managed audit logging service).
 |---|---|
 | `submitted` | Actor via submission API |
 | `validated` | Ingest pipeline (automated) |
-| `published` | Ingest pipeline (result becomes public-self-reported) |
+| `accepted` | Ingest pipeline commits validator-clean input to the accepted archive |
+| `promotion-requested` | Publication controller reserves a target generation |
+| `promotion-failed` | Build, deployment, or observation ends without a matching receipt |
+| `live-receipt-issued` | Attestor confirms the target generation at the public endpoint |
 | `rejected` | Ingest pipeline or admin |
-| `withdrawn` | Actor or admin |
+| `withdrawal-requested` | Actor or admin records desired presentation suppression |
+| `withdrawn` | Attestor confirms suppression in a matching live receipt |
 | `trust-promoted` | Admin |
 | `trust-revoked` | Admin |
 | `redacted` | Admin (sensitive field removed; bundle hash invalidated) |
@@ -273,10 +277,10 @@ post-publish; incorrect query timings attributed to wrong platform.
 **Severity:** P2 (High)
 
 **Detection signals:**
-- Automated bundle-hash re-verification job fails for a published result
+- Automated bundle-hash re-verification job fails for a receipt-confirmed live result
 - Community report via GitHub issue or email to security@benchbox.dev
-- Ingest pipeline audit log shows unexpected `validated` → `published` transition
-  for a result with a known-bad hash
+- Audit log shows `live-receipt-issued` for a known-bad hash or without matching
+  `accepted`, `promotion-requested`, and receipt-evidence events
 
 **Response steps:**
 

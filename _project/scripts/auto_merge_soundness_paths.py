@@ -77,6 +77,17 @@ SOUNDNESS_FILES = (
     # and ranking eligibility are defined here. A silent change alters public
     # presentation and leaderboard membership without changing the authority docs.
     "benchbox/core/results/provenance.py",
+    # Admission and read-model policy surfaces. These execute the public trust,
+    # vendor, visibility, and ranking decisions defined by the A1 contract.
+    "benchbox/validation/bundle.py",
+    "benchbox/core/publishing/admission.py",
+    "benchbox/core/publishing/bundle_publisher.py",
+    "_project/scripts/explorer_pipeline/models.py",
+    "_project/scripts/explorer_pipeline/pipeline.py",
+    "_project/scripts/explorer_pipeline/ranking.py",
+    "scripts/generate_corpus_inventory.py",
+    "scripts/validate_submission.py",
+    ".github/workflows/validate-submission.yml",
     "_project/scripts/auto_merge_soundness_paths.py",
     ".github/workflows/auto-merge-on-open.yml",
     ".github/workflows/release.yml",

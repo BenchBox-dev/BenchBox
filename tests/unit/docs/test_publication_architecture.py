@@ -139,6 +139,10 @@ def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
     assert "| `withdrawn` | Removed by actor or admin" not in _text(PHASE3_RUNBOOK)
     assert "is withdrawn pending investigation" not in _text(PHASE3_RUNBOOK)
     assert "Withdrawal is an orthogonal presentation state, not a trust tier" in _normalized(PHASE3_RUNBOOK)
+    assert "| `published` | Ingest pipeline" not in _text(PHASE3_RUNBOOK)
+    assert "`validated` → `published`" not in _text(PHASE3_RUNBOOK)
+    assert "| `accepted` | Ingest pipeline commits validator-clean input" in _text(PHASE3_RUNBOOK)
+    assert "| `live-receipt-issued` | Attestor confirms" in _text(PHASE3_RUNBOOK)
     for forbidden in (
         "immediate presentation withdrawal",
         "add `withdrawn` to desired state",
@@ -170,6 +174,9 @@ def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
     assert "Acceptance or policy state" not in _text(HOSTED_CONTRACT)
     assert "tombstone remains in the index" not in _text(HOSTED_CONTRACT)
     assert "Presentation: active → withdrawal_requested → withdrawn" in text
+    assert "Promotion: promotion_failed → promotion_pending" in text
+    assert "Promotion: live → promotion_pending" in text
+    assert "the prior `current_live_generation` and receipt remain observed live" in text
     assert "separate tombstone lookup registry" in text
     assert "| `accepted` |" in _text(HOSTED_CONTRACT)
     assert "| `live` |" in _text(HOSTED_CONTRACT)

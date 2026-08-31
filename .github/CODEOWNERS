@@ -21,6 +21,15 @@ benchbox/sql_compat/rules/_registration.py @joeharris76
 benchbox/core/results/anonymization.py @joeharris76
 benchbox/core/results/anonymization_specs.yaml @joeharris76
 benchbox/core/results/provenance.py @joeharris76
+benchbox/validation/bundle.py @joeharris76
+benchbox/core/publishing/admission.py @joeharris76
+benchbox/core/publishing/bundle_publisher.py @joeharris76
+_project/scripts/explorer_pipeline/models.py @joeharris76
+_project/scripts/explorer_pipeline/pipeline.py @joeharris76
+_project/scripts/explorer_pipeline/ranking.py @joeharris76
+scripts/generate_corpus_inventory.py @joeharris76
+scripts/validate_submission.py @joeharris76
+.github/workflows/validate-submission.yml @joeharris76
 # Self-protection: the review-gate machinery and the PyPI-publishing
 # workflow. In-workflow checks are attacker-controlled for same-repo PRs
 # (GitHub runs the PR's own copy of a pull_request-triggered workflow).
