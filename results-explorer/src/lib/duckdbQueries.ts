@@ -195,6 +195,7 @@ export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_elig
   // recorded. Required means the omission is a type error.
   cpu_model: string | null;
   cpu_family: string | null;
+  cpu_identity_provenance: "measured" | "user_attested" | "inferred" | null;
   // ADR-2 §3: comma-joined, sorted physical tuning mechanisms (see
   // physical_mechanisms in DetailResult). Tri-state, preserved from the
   // pipeline: SQL NULL (-> null here) means no logical tuning profile was
@@ -313,6 +314,7 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   platform: string;
   platform_id: string;
   driver_version: string | null;
+  platform_version?: string | null;
   run_date: string;
   power_score: number | null;
   total_duration_s: number;
@@ -528,6 +530,7 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   "python",
   "cpu_model",
   "cpu_family",
+  "cpu_identity_provenance",
 ].join(", ");
 
 const COHORT_METADATA_COLUMNS = [
@@ -761,6 +764,7 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
   if (wide.python !== null) environment.python = wide.python;
   if (wide.cpu_model !== null) environment.cpu_model = wide.cpu_model;
   if (wide.cpu_family !== null) environment.cpu_family = wide.cpu_family;
+  if (wide.cpu_identity_provenance !== null) environment.cpu_identity_provenance = wide.cpu_identity_provenance;
 
   const display_timings: QueryDisplayTiming[] = timingRows.map((r) => ({
     query_id: r.query_id,
@@ -1067,6 +1071,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.platform," +
     " r.platform_id," +
     " r.driver_version," +
+    " r.platform_version," +
     " r.run_date," +
     " r.power_score," +
     " r.total_duration_s," +

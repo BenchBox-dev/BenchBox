@@ -1,6 +1,10 @@
 import type { DetailResult } from "@/types";
 import { StatusBadge } from "@/components/StatusBadge";
-import { type QueryDiffLimiter, QUERY_DIFF_LIMITER_LABELS } from "@/components/QueryDiffTable";
+import {
+  DEFAULT_QUERY_DIFF_LIMIT,
+  type QueryDiffLimiter,
+  QUERY_DIFF_LIMITER_LABELS,
+} from "@/components/QueryDiffTable";
 import {
   DIVERGING_RATIO_CLAMP,
   divergingRatioPosition,
@@ -33,12 +37,16 @@ export interface MultiRunHeatmapProps {
   limiter?: QueryDiffLimiter;
   /** Order rows by where the runs disagree most, rather than by query id. */
   orderByDisagreement?: boolean;
+  /** Explicit query IDs to display (from shared limiter selection). */
+  queryFilter?: readonly string[];
 }
 
 export interface HeatmapCell {
   ratio: number | null;
   /** [-1, 1] position on the diverging scale, or null when unanswerable. */
   position: number | null;
+  timingMs: number | null;
+  missingKind: "none" | "run_missing" | "baseline_missing";
 }
 
 export interface HeatmapRow {
@@ -62,8 +70,14 @@ export function buildHeatmapRows(
       const baseMs = baseline ? timingValueForQuery(baseline, queryId) : null;
       const cells: HeatmapCell[] = results.map((r) => {
         const ms = timingValueForQuery(r, queryId);
+        let missingKind: "none" | "run_missing" | "baseline_missing" = "none";
+        if (ms === null || ms <= 0) {
+          missingKind = "run_missing";
+        } else if (baseMs === null || baseMs <= 0) {
+          missingKind = "baseline_missing";
+        }
         const ratio = ms !== null && baseMs !== null && baseMs > 0 ? ms / baseMs : null;
-        return { ratio, position: divergingRatioPosition(ratio) };
+        return { ratio, position: divergingRatioPosition(ratio), timingMs: ms, missingKind };
       });
       return {
         queryId,
@@ -136,17 +150,25 @@ export function MultiRunHeatmap({
   results,
   baselineIndex,
   runLabels,
-  limit = 25,
+  limit = DEFAULT_QUERY_DIFF_LIMIT,
   limiter,
   orderByDisagreement = false,
+  queryFilter,
 }: MultiRunHeatmapProps) {
   if (results.length < 3) return null;
   const effectiveLimiter: QueryDiffLimiter = limiter ?? (orderByDisagreement ? "movement" : "all");
   const all = buildHeatmapRows(results, baselineIndex);
-  const ordered = filterHeatmapRows(all, effectiveLimiter, baselineIndex);
-  const shown = ordered.slice(0, limit);
-  const unrecorded = shown.reduce(
-    (n, row) => n + row.cells.filter((c) => c.ratio === null).length,
+  const rowsByQueryId = new Map(all.map((row) => [row.queryId, row]));
+  const ordered = queryFilter
+    ? (queryFilter.map((id) => rowsByQueryId.get(id)).filter((r): r is HeatmapRow => r !== undefined))
+    : filterHeatmapRows(all, effectiveLimiter, baselineIndex);
+  const shown = queryFilter || effectiveLimiter === "all" ? ordered : ordered.slice(0, limit);
+  const runMissing = shown.reduce(
+    (n, row) => n + row.cells.filter((c) => c.missingKind === "run_missing").length,
+    0,
+  );
+  const baselineMissing = shown.reduce(
+    (n, row) => n + row.cells.filter((c) => c.missingKind === "baseline_missing").length,
     0,
   );
 
@@ -168,19 +190,28 @@ export function MultiRunHeatmap({
         </StatusBadge>
       </div>
 
-      {unrecorded > 0 ? (
-        <p class="mb-2 text-xs text-[var(--bb-data-fg-subtle)]" data-testid="heatmap-unrecorded-note">
-          {`${unrecorded} ${unrecorded === 1 ? "cell is" : "cells are"} unrecorded: that run cannot answer the query under the current basis. Unrecorded is not parity, and is left uncoloured.`}
-        </p>
-      ) : null}
+      {(runMissing > 0 || baselineMissing > 0) && (
+        <div class="mb-2 space-y-1 text-xs text-[var(--bb-data-fg-subtle)]" data-testid="heatmap-unrecorded-note">
+          {runMissing > 0 && (
+            <p>
+              {`${runMissing} ${runMissing === 1 ? "cell is" : "cells are"} unrecorded: that run cannot answer the query under the current basis. Unrecorded is not parity, and is left uncoloured.`}
+            </p>
+          )}
+          {baselineMissing > 0 && (
+            <p>
+              {`${baselineMissing} ${baselineMissing === 1 ? "cell cannot" : "cells cannot"} form a ratio: the baseline did not record this query.`}
+            </p>
+          )}
+        </div>
+      )}
 
       <div class="overflow-x-auto">
-        <table role="grid" class="min-w-full w-max divide-y divide-[var(--bb-data-border)] text-sm">
+        <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)] text-sm">
           <thead class="bg-[var(--bb-surface-data-muted)]">
-            <tr role="row">
-              <th role="columnheader" class="table-th">Query</th>
+            <tr>
+              <th scope="col" class="table-th">Query</th>
               {results.map((r, i) => (
-                <th key={r.result_id} role="columnheader" class="table-th">
+                <th key={r.result_id} scope="col" class="table-th">
                   {runLabels[i] ?? r.platform}
                   {i === baselineIndex ? " (baseline)" : ""}
                 </th>
@@ -189,18 +220,36 @@ export function MultiRunHeatmap({
           </thead>
           <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
             {shown.map((row) => (
-              <tr role="row" key={row.queryId}>
-                <td class="table-td font-mono font-medium">{row.queryId}</td>
+              <tr key={row.queryId}>
+                <th scope="row" class="table-td font-mono font-medium text-left">{row.queryId}</th>
                 {row.cells.map((cell, i) => (
                   <td
                     key={i}
-                    role="gridcell"
                     class="table-td font-mono text-xs"
                     style={cellStyle(cell.position)}
+                    title={
+                      cell.missingKind === "baseline_missing"
+                        ? `Baseline was not recorded for this query; recorded candidate timing: ${cell.timingMs !== null ? `${cell.timingMs.toFixed(1)} ms` : "none"}`
+                        : cell.missingKind === "run_missing"
+                          ? "This run did not record this query"
+                          : undefined
+                    }
+                    aria-label={
+                      cell.missingKind === "baseline_missing" && cell.timingMs !== null
+                        ? `${cell.timingMs.toFixed(1)} ms (baseline missing, no ratio formed)`
+                        : undefined
+                    }
                     data-testid={`cell-${row.queryId}-${i}`}
                   >
                     {/* Value as text in every cell: colour is never the only encoding. */}
-                    {cellText(cell)}
+                    {cell.missingKind === "baseline_missing" && cell.timingMs !== null ? (
+                      <span>
+                        {cell.timingMs.toFixed(1)} ms{" "}
+                        <span class="text-[10px] text-[var(--bb-data-fg-subtle)]">(no base)</span>
+                      </span>
+                    ) : (
+                      cellText(cell)
+                    )}
                   </td>
                 ))}
               </tr>

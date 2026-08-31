@@ -66,7 +66,7 @@ export function toDateWindowFacet(value: string): DateWindowFacet {
 }
 
 export function appendFacetParams(params: URLSearchParams, facets: FacetState, omit: ReadonlySet<ExplorerFacetKey>) {
-  for (const key of FACET_KEYS) {
+  for (const key of [...FACET_KEYS, "platform_version"] as const) {
     if (omit.has(key)) continue;
     const value = facets[key];
     if (Array.isArray(value)) {

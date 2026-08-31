@@ -284,6 +284,7 @@ export function basesInComparison(comparison: BasisComparison): MeasurementBasis
 
 import { geomeanMs } from "@/lib/chartMath";
 import type { UrlSerde } from "@/lib/useUrlState";
+import type { DetailResult, QueryDisplayTiming } from "@/types";
 
 export const BASIS_URL_KEY = "basis";
 export const BASES_URL_KEY = "bases";
@@ -388,6 +389,7 @@ export type BasisUnavailableReason =
   | "no_warm_passes_recorded"
   | "pass_not_recorded"
   | "no_passing_executions"
+  | "zero_timing"
   | "display_value_excluded";
 
 const UNAVAILABLE_LABELS: Record<BasisUnavailableReason, string> = {
@@ -395,6 +397,7 @@ const UNAVAILABLE_LABELS: Record<BasisUnavailableReason, string> = {
   no_warm_passes_recorded: "This run did not record any warm passes.",
   pass_not_recorded: "This run did not record that warm pass.",
   no_passing_executions: "No execution of this query passed under that basis.",
+  zero_timing: "Recorded execution timing was zero.",
   display_value_excluded: "The published value for this query is excluded from display evidence.",
 };
 
@@ -523,18 +526,19 @@ export function resolveQueryValue(
   const { rows: selected, missingReason } = selectExecutions(rows, basis.passes);
   if (missingReason !== null) return { kind: "unavailable", reason: missingReason };
 
-  const value = applyStatistic(
-    selected.map((r) => r.duration_ms).filter((ms) => Number.isFinite(ms) && ms > 0),
-    basis.statistic,
-  );
-  if (value === null) return { kind: "unavailable", reason: "no_passing_executions" };
+  const nonZero = selected.map((r) => r.duration_ms).filter((ms) => Number.isFinite(ms) && ms > 0);
+  const value = applyStatistic(nonZero, basis.statistic);
+  if (value === null) {
+    const hasZero = selected.some((r) => r.duration_ms === 0);
+    return { kind: "unavailable", reason: hasZero ? "zero_timing" : "no_passing_executions" };
+  }
   // Derived from the sample actually reduced, not from the pass kind. A
   // throughput run records one warmup execution PER STREAM, so a nominally
   // single-pass basis can still reduce several rows; and a run with only one
   // warm pass collapses under `all_warm` even though the basis is multi-pass.
   // Either way, median and min over one value are the same number and a
   // surface must not offer them as a live choice.
-  return { kind: "value", ms: value, sampleCount: selected.length, collapsed: selected.length <= 1 };
+  return { kind: "value", ms: value, sampleCount: nonZero.length, collapsed: nonZero.length <= 1 };
 }
 
 // ---------------------------------------------------------------------------
@@ -649,8 +653,11 @@ export function sharedQueryGeomeans(
 ): SharedQueryGeomeans {
   const resolved = series.map((s) => {
     const displayByQuery = new Map((s.displayTimings ?? []).map((t) => [t.query_id, t]));
+    const execsByQuery = groupByQuery(s.executions ?? []);
+    const queryIds = new Set<string>([...execsByQuery.keys(), ...displayByQuery.keys()]);
     const values = new Map<string, number>();
-    for (const [queryId, rows] of groupByQuery(s.executions)) {
+    for (const queryId of queryIds) {
+      const rows = execsByQuery.get(queryId) ?? [];
       const timing = displayByQuery.get(queryId);
       const displayMs =
         timing && timing.is_valid_display_timing !== false ? (timing.display_ms ?? null) : null;
@@ -663,7 +670,10 @@ export function sharedQueryGeomeans(
   });
 
   const allQueryIds = new Set<string>();
-  for (const s of series) for (const row of s.executions) allQueryIds.add(row.query_id);
+  for (const s of series) {
+    for (const row of s.executions ?? []) allQueryIds.add(row.query_id);
+    for (const t of s.displayTimings ?? []) allQueryIds.add(t.query_id);
+  }
 
   const shared: string[] = [];
   const excluded: string[] = [];
@@ -680,6 +690,179 @@ export function sharedQueryGeomeans(
     sharedQueryIds: shared,
     excludedQueryIds: excluded,
   };
+}
+
+/**
+ * Projects a selection of DetailResult objects for a chosen MeasurementBasis.
+ *
+ * Recomputes `display_timings` for every query and `display_geomean_ms` over the
+ * intersected shared query set across all selected runs.
+ *
+ * For DEFAULT_BASIS, preserves precomputed display_ms directly while recalculating
+ * display_geomean_ms over the shared query set so no run averages over unshared queries.
+ *
+ * For non-default bases (warmup, individual warm passes, min), resolves each query's
+ * timing from raw execution rows according to the pass selection and statistic.
+ */
+export function resolveResultsForBasis(
+  results: readonly DetailResult[],
+  basis: MeasurementBasis,
+): DetailResult[] {
+  if (results.length === 0) return [];
+
+  const seriesInputs: BasisSeriesInput[] = results.map((r) => ({
+    key: r.result_id,
+    executions: r.queries ?? [],
+    displayTimings: r.display_timings ?? [],
+  }));
+  const geomeanData = sharedQueryGeomeans(basis, seriesInputs);
+  const geomeanByResultId = new Map(geomeanData.series.map((s) => [s.key, s.geomeanMs]));
+
+  return results.map((r) => {
+    const displayByQuery = new Map((r.display_timings ?? []).map((t) => [t.query_id, t]));
+    const execsByQuery = groupByQuery(r.queries ?? []);
+
+    const allQueryIds = new Set<string>();
+    for (const t of r.display_timings ?? []) allQueryIds.add(t.query_id);
+    for (const q of r.queries ?? []) allQueryIds.add(q.query_id);
+
+    const newDisplayTimings: QueryDisplayTiming[] = [...allQueryIds]
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .map((queryId) => {
+        const rows = execsByQuery.get(queryId) ?? [];
+        const existing = displayByQuery.get(queryId);
+        const displayMs =
+          existing && existing.is_valid_display_timing !== false ? (existing.display_ms ?? null) : null;
+        const val = resolveQueryValue(basis, rows, displayMs);
+        const ms = val.kind === "value" && Number.isFinite(val.ms) && val.ms > 0 ? val.ms : null;
+        const timingExclusionReason =
+          isDefaultBasis(basis) && existing?.timing_exclusion_reason
+            ? existing.timing_exclusion_reason
+            : val.kind === "unavailable"
+              ? val.reason
+              : null;
+        const sampleCount = isDefaultBasis(basis)
+          ? (existing?.sample_count ?? 0)
+          : val.kind === "value"
+            ? val.sampleCount
+            : 0;
+        return {
+          query_id: queryId,
+          display_ms: ms,
+          sample_count: sampleCount,
+          is_valid_display_timing: ms !== null,
+          timing_exclusion_reason: timingExclusionReason,
+        };
+      });
+
+    const newGeomean = geomeanByResultId.get(r.result_id) ?? null;
+    const isDefault = isDefaultBasis(basis);
+
+    const logicalCount =
+      r.logical_query_count !== undefined && r.logical_query_count > 0
+        ? r.logical_query_count
+        : newDisplayTimings.length;
+    const zeroTimingCount = isDefault
+      ? (r.zero_timing_count ?? 0)
+      : newDisplayTimings.filter((t) => t.timing_exclusion_reason === "zero_timing" || t.display_ms === 0).length;
+    const validQueryCount = isDefault
+      ? r.valid_query_count
+      : newDisplayTimings.filter((t) => t.is_valid_display_timing).length;
+    const missingQueryCount = isDefault
+      ? r.missing_query_count
+      : Math.max(logicalCount - validQueryCount - zeroTimingCount, 0);
+    const hasDisplayTiming = isDefault ? r.has_display_timing : validQueryCount > 0;
+
+    let displayExclusionReason = r.display_exclusion_reason;
+    let comparisonExclusionReason = r.comparison_exclusion_reason;
+    let rankingExclusionReason = r.ranking_exclusion_reason;
+
+    if (!isDefault) {
+      if (validQueryCount > 0) {
+        displayExclusionReason = null;
+      } else if (logicalCount <= 0) {
+        displayExclusionReason = "no_queries";
+      } else if (zeroTimingCount > 0 && missingQueryCount === 0) {
+        displayExclusionReason = "zero_timings_only";
+      } else if (missingQueryCount > 0 && zeroTimingCount === 0) {
+        displayExclusionReason = "missing_timings";
+      } else {
+        displayExclusionReason = "no_valid_display_timing";
+      }
+
+      const independentCompareExclusions = new Set([
+        "visibility_not_comparable",
+        "benchmarks_differ",
+        "scales_differ",
+        "phases_differ",
+        "hidden_result",
+      ]);
+      if (r.comparison_exclusion_reason && independentCompareExclusions.has(r.comparison_exclusion_reason)) {
+        comparisonExclusionReason = r.comparison_exclusion_reason;
+      } else if (displayExclusionReason !== null) {
+        comparisonExclusionReason = displayExclusionReason;
+      } else if (validQueryCount < 2) {
+        comparisonExclusionReason = "insufficient_valid_queries";
+      } else if (logicalCount > 0 && validQueryCount * 2 < logicalCount) {
+        comparisonExclusionReason = "insufficient_query_coverage";
+      } else {
+        comparisonExclusionReason = null;
+      }
+
+      const independentRankingExclusions = new Set([
+        "visibility_not_rankable",
+        "trust_not_rankable",
+        "unofficial_compliance",
+        "compliance_not_rankable",
+        "failed_queries",
+        "validation_not_clean",
+        "hidden_result",
+      ]);
+      if (r.ranking_exclusion_reason && independentRankingExclusions.has(r.ranking_exclusion_reason)) {
+        rankingExclusionReason = r.ranking_exclusion_reason;
+      } else if (comparisonExclusionReason !== null) {
+        rankingExclusionReason = comparisonExclusionReason;
+      } else if (newGeomean === null) {
+        rankingExclusionReason = "missing_primary_metric";
+      } else if (!Number.isFinite(newGeomean) || newGeomean <= 0) {
+        rankingExclusionReason = "non_positive_primary_metric";
+      } else {
+        rankingExclusionReason = null;
+      }
+    }
+
+    const validQueryIds = newDisplayTimings
+      .filter((timing) => timing.is_valid_display_timing)
+      .map((timing) => timing.query_id);
+    const usesSharedQuerySet =
+      validQueryIds.length === geomeanData.sharedQueryIds.length &&
+      validQueryIds.every((queryId) => geomeanData.sharedQueryIds.includes(queryId));
+    const preservedGeomean =
+      isDefault && usesSharedQuerySet && r.display_geomean_ms !== null ? r.display_geomean_ms : newGeomean;
+
+    return {
+      ...r,
+      display_geomean_ms: preservedGeomean,
+      display_timings: newDisplayTimings,
+      power_score: isDefault ? r.power_score : null,
+      normalized_cost_usd: isDefault ? r.normalized_cost_usd : null,
+      cost_status: isDefault ? r.cost_status : "unavailable",
+      valid_query_count: validQueryCount,
+      missing_query_count: missingQueryCount,
+      zero_timing_count: zeroTimingCount,
+      has_display_timing: hasDisplayTiming,
+      display_exclusion_reason: displayExclusionReason,
+      comparison_exclusion_reason: comparisonExclusionReason,
+      ranking_exclusion_reason: rankingExclusionReason,
+    };
+  });
+}
+
+/** True when median and minimum reduce the same single sample for every projected query. */
+export function resolvedStatisticsCollapsed(results: readonly DetailResult[]): boolean {
+  return !results.some((result) =>
+    result.display_timings.some((timing) => timing.sample_count > 1),
+  );
 }
 
 /**
@@ -773,8 +956,10 @@ export function formatBasisLabel(basis: MeasurementBasis): string {
     case "all_warm":
       return basis.statistic === "median" ? "published median" : "fastest warm pass";
     case "warmup":
-      return "warmup pass";
+      return basis.statistic === "median" ? "warmup pass" : "warmup pass (min)";
     case "warm_pass":
-      return `warm pass ${basis.passes.pass}`;
+      return basis.statistic === "median"
+        ? `warm pass ${basis.passes.pass}`
+        : `warm pass ${basis.passes.pass} (min)`;
   }
 }

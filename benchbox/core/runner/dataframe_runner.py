@@ -56,6 +56,7 @@ from benchbox.core.results import (
     normalize_query_result,
 )
 from benchbox.core.results.builder import RunConfigInput, normalize_benchmark_id
+from benchbox.core.results.environment import system_profile_snapshot
 from benchbox.core.results.models import (
     BenchmarkResults,
     TableLoadingStats,
@@ -244,6 +245,8 @@ def run_dataframe_benchmark(
     )
     builder.mark_started()
     builder.set_validation_status("NOT_RUN")
+    if system_profile is not None:
+        builder.set_system_profile(system_profile_snapshot(system_profile))
 
     options_map = getattr(benchmark_config, "options", {}) or {}
     builder.set_run_config(

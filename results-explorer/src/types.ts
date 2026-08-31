@@ -11,6 +11,7 @@ export interface Environment {
   python?: string;
   cpu_model?: string;
   cpu_family?: string;
+  cpu_identity_provenance?: "measured" | "user_attested" | "inferred";
   [key: string]: string | number | boolean | null | undefined;
 }
 

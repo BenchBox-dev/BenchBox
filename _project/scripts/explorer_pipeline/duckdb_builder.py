@@ -382,7 +382,8 @@ class DuckDBSnapshotBuilder:
                 memory_gb   DOUBLE,
                 python      VARCHAR,
                 cpu_model   VARCHAR,
-                cpu_family  VARCHAR
+                cpu_family  VARCHAR,
+                cpu_identity_provenance VARCHAR
             )
         """)
         con.execute("""
@@ -554,7 +555,8 @@ class DuckDBSnapshotBuilder:
                 e.memory_gb,
                 e.python,
                 e.cpu_model,
-                e.cpu_family
+                e.cpu_family,
+                e.cpu_identity_provenance
             FROM results r
             LEFT JOIN result_environment e USING (result_id)
         """)
@@ -789,6 +791,7 @@ class DuckDBSnapshotBuilder:
                     env.get("python"),
                     raw_cpu_model,
                     cpu_family,
+                    env.get("cpu_identity_provenance"),
                 )
             )
             if detail.phase_durations:
@@ -796,7 +799,7 @@ class DuckDBSnapshotBuilder:
                     phase_rows.append((entry.result_id, phase, duration_s))
 
         if env_rows:
-            con.executemany("INSERT INTO result_environment VALUES (?, ?, ?, ?, ?, ?, ?, ?)", env_rows)
+            con.executemany("INSERT INTO result_environment VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", env_rows)
         if phase_rows:
             con.executemany("INSERT INTO result_phase_durations VALUES (?, ?, ?)", phase_rows)
 

@@ -110,6 +110,8 @@ interface QueryHeatmapProps {
    * `prefers-contrast: more` media query.
    */
   highContrast?: boolean;
+  /** When true, keeps query_ids in caller-provided order (e.g. limiter ranking). */
+  preserveOrder?: boolean;
 }
 
 const MOBILE_OUTLIER_LIMIT = 3;
@@ -137,9 +139,13 @@ export function QueryHeatmap({
   onSelectionChange,
   selectionLimitReasonId,
   highContrast = false,
+  preserveOrder = false,
 }: QueryHeatmapProps) {
   const { query_ids, platforms, ranking } = summary;
-  const sortedQueryIds = useMemo(() => sortQueryIds(query_ids), [query_ids]);
+  const sortedQueryIds = useMemo(
+    () => (preserveOrder ? [...query_ids] : sortQueryIds(query_ids)),
+    [query_ids, preserveOrder],
+  );
   const hasSelection = onSelectionChange !== undefined;
   const selectionAtCap = selectedIds !== undefined && selectedIds.size >= MAX_COMPARE_SELECTIONS;
   const gridRef = useRef<HTMLTableElement>(null);

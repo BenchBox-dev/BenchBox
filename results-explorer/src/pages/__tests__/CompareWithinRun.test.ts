@@ -11,10 +11,18 @@ import { describe, expect, it } from "vitest";
 import {
   WITHIN_RUN_FIGURES_ARE_RANKABLE,
   buildWithinRunRows,
+  deduplicateBases,
+  parseBasesParam,
+  availableBasesForQueries,
+  calculateColumnGeomeans,
+  calculateCellDelta,
+  formatWithinRunBasisLabel,
+  withinRunComparisonStatus,
 } from "@/pages/CompareWithinRun";
 import { clampReferenceIndex, withinRunCompareHref } from "@/lib/resultLinks";
 import { ALL_WARM, DEFAULT_BASIS, WARMUP, warmPass, type BasisExecution, type MeasurementBasis } from "@/lib/measurementBasis";
 import { geomeanMs } from "@/lib/chartMath";
+import { COMPARE_TIE_THRESHOLD } from "@/lib/compareSummary";
 
 const exec = (
   query_id: string,
@@ -155,5 +163,201 @@ describe("the route URL", () => {
     // cross-run one-basis invariant to be relaxed "just for this case".
     expect(withinRunCompareHref("r1", ["default", "warmup"])).toContain("/results/r/r1/passes");
     expect(withinRunCompareHref("r1", ["default", "warmup"])).not.toContain("/results/compare");
+  });
+});
+
+describe("deduplication and bases parsing", () => {
+  it("deduplicates identical basis specifications", () => {
+    const dups = [DEFAULT_BASIS, DEFAULT_BASIS, { passes: warmPass(1), statistic: "median" as const }];
+    const unique = deduplicateBases(dups);
+    expect(unique).toHaveLength(2);
+    expect(unique[0]).toEqual(DEFAULT_BASIS);
+    expect(unique[1]).toEqual({ passes: warmPass(1), statistic: "median" });
+  });
+
+  it("deduplicates basis tokens in URL query params", () => {
+    const { bases } = parseBasesParam("?bases=default,default,warm_pass_1");
+    expect(bases).toHaveLength(2);
+    expect(bases[0]).toEqual(DEFAULT_BASIS);
+    expect(bases[1]).toEqual({ passes: warmPass(1), statistic: "median" });
+  });
+
+  it("falls back to 2 distinct default bases and preserves the referenced duplicate", () => {
+    const { bases, referenceIndex } = parseBasesParam("?bases=default,default&ref=5");
+    expect(bases).toHaveLength(2);
+    expect(bases[0]).toEqual(DEFAULT_BASIS);
+    expect(referenceIndex).toBe(0);
+  });
+
+  it("preserves the referenced basis when duplicate URL columns are removed", () => {
+    const { bases, referenceIndex } = parseBasesParam("?bases=default,warm_pass_1,default&ref=2");
+    expect(bases).toEqual([DEFAULT_BASIS, { passes: warmPass(1), statistic: "median" }]);
+    expect(referenceIndex).toBe(0);
+  });
+});
+
+describe("available bases discovery", () => {
+  it("discovers warmup and multiple warm passes from query executions", () => {
+    const queries = [
+      { query_id: "Q1", duration_ms: 15, status: "pass", run_type: "warmup", iter: null } as any,
+      { query_id: "Q1", duration_ms: 10, status: "pass", run_type: "measurement", iter: 1 } as any,
+      { query_id: "Q1", duration_ms: 12, status: "pass", run_type: "measurement", iter: 2 } as any,
+    ];
+    const available = availableBasesForQueries(queries);
+    // Should include default, all_warm:min, warmup:median, warmup:min, warm_pass_1, warm_pass_2
+    expect(available.some((b) => b.passes.kind === "warmup")).toBe(true);
+    expect(available.some((b) => b.passes.kind === "warm_pass" && b.passes.pass === 1)).toBe(true);
+    expect(available.some((b) => b.passes.kind === "warm_pass" && b.passes.pass === 2)).toBe(true);
+  });
+
+  it("offers collapsed statistics for repeated measurement executions", () => {
+    const queries = [
+      { query_id: "Q1", duration_ms: 10, status: "pass", run_type: "measurement", iter: 1 } as any,
+      { query_id: "Q1", duration_ms: 12, status: "pass", run_type: "measurement", iter: 2 } as any,
+    ];
+    const available = availableBasesForQueries(queries);
+    expect(available).toContainEqual({ passes: ALL_WARM, statistic: "min" });
+  });
+
+  it("offers collapsed statistics for repeated legacy unlabelled executions", () => {
+    const queries = [
+      { query_id: "Q1", duration_ms: 10, status: "pass", run_type: null, iter: 1 } as any,
+      { query_id: "Q1", duration_ms: 12, status: "pass", run_type: null, iter: 2 } as any,
+    ];
+    const available = availableBasesForQueries(queries);
+    expect(available).toContainEqual({ passes: ALL_WARM, statistic: "min" });
+  });
+
+  it("does not combine legacy rows with preferred measurement rows when counting samples", () => {
+    const queries = [
+      { query_id: "Q1", duration_ms: 10, status: "pass", run_type: "measurement", iter: 1 } as any,
+      { query_id: "Q1", duration_ms: 12, status: "pass", run_type: null, iter: 2 } as any,
+    ];
+    const available = availableBasesForQueries(queries);
+    expect(available).not.toContainEqual({ passes: ALL_WARM, statistic: "min" });
+  });
+
+  it("does not offer a legacy-only pass ignored by measurement precedence", () => {
+    const queries = [
+      { query_id: "Q1", duration_ms: 10, status: "pass", run_type: "measurement", iter: 1 } as any,
+      { query_id: "Q1", duration_ms: 12, status: "pass", run_type: null, iter: 2 } as any,
+    ];
+    const available = availableBasesForQueries(queries);
+    expect(available.some((b) => b.passes.kind === "warm_pass" && b.passes.pass === 2)).toBe(false);
+  });
+
+  it("does not offer warmup when every passing warmup duration is zero", () => {
+    const queries = [
+      { query_id: "Q1", duration_ms: 0, status: "pass", run_type: "warmup", iter: null } as any,
+      { query_id: "Q2", duration_ms: 0, status: "pass", run_type: "warmup", iter: null } as any,
+    ];
+
+    const available = availableBasesForQueries(queries);
+    expect(available.some((basis) => basis.passes.kind === "warmup")).toBe(false);
+  });
+});
+
+describe("within-run directional claims", () => {
+  it("applies the existing comparison tie band before faster or slower labels", () => {
+    expect(withinRunComparisonStatus(1 - COMPARE_TIE_THRESHOLD / 2)).toBe("parity");
+    expect(withinRunComparisonStatus(1 + COMPARE_TIE_THRESHOLD / 2)).toBe("parity");
+    expect(withinRunComparisonStatus(1 - COMPARE_TIE_THRESHOLD * 2)).toBe("faster");
+    expect(withinRunComparisonStatus(1 + COMPARE_TIE_THRESHOLD * 2)).toBe("slower");
+  });
+});
+
+describe("column geometric means over shared queries", () => {
+  it("calculates geomean strictly over queries comparable across all columns", () => {
+    const rows = [
+      {
+        queryId: "Q1",
+        cells: [{ ms: 10, unavailableReason: null }, { ms: 20, unavailableReason: null }],
+        comparable: true,
+      },
+      {
+        queryId: "Q2",
+        cells: [{ ms: 40, unavailableReason: null }, { ms: 80, unavailableReason: null }],
+        comparable: true,
+      },
+      {
+        queryId: "Q3",
+        cells: [{ ms: 100, unavailableReason: null }, { ms: null, unavailableReason: "no_pass" }],
+        comparable: false,
+      },
+    ];
+    const sharedQueryIds = ["Q1", "Q2"];
+    const geomeans = calculateColumnGeomeans(rows, sharedQueryIds);
+    expect(geomeans).toHaveLength(2);
+    // Col 0: geomean(10, 40) = 20
+    expect(geomeans[0]).toBeCloseTo(20, 5);
+    // Col 1: geomean(20, 80) = 40
+    expect(geomeans[1]).toBeCloseTo(40, 5);
+  });
+});
+
+describe("cell delta and ratio calculation", () => {
+  it("calculates speedup ratio and delta ms relative to reference cell", () => {
+    const { ratio, deltaMs } = calculateCellDelta(50, 100);
+    expect(ratio).toBe(0.5);
+    expect(deltaMs).toBe(-50);
+  });
+
+  it("returns null when either cell is unrecorded or non-positive", () => {
+    expect(calculateCellDelta(null, 100)).toEqual({ ratio: null, deltaMs: null });
+    expect(calculateCellDelta(50, null)).toEqual({ ratio: null, deltaMs: null });
+    expect(calculateCellDelta(0, 100)).toEqual({ ratio: null, deltaMs: null });
+  });
+});
+
+describe("statistic selection based on sample counts", () => {
+  it("suppresses min for passes where each query has only 1 execution", () => {
+    const singleExecQueries = [
+      { query_id: "q1", duration_ms: 10, status: "pass", run_type: "warmup", iter: 0 },
+      { query_id: "q1", duration_ms: 20, status: "pass", run_type: "measurement", iter: 1 },
+      { query_id: "q2", duration_ms: 30, status: "pass", run_type: "warmup", iter: 0 },
+      { query_id: "q2", duration_ms: 40, status: "pass", run_type: "measurement", iter: 1 },
+    ];
+    const available = availableBasesForQueries(singleExecQueries as any);
+    // warmup has 1 execution per query -> only warmup median
+    expect(available.some((b) => b.passes.kind === "warmup" && b.statistic === "median")).toBe(true);
+    expect(available.some((b) => b.passes.kind === "warmup" && b.statistic === "min")).toBe(false);
+    // warm_pass 1 has 1 execution per query -> only pass 1 median
+    expect(available.some((b) => b.passes.kind === "warm_pass" && b.statistic === "median")).toBe(true);
+    expect(available.some((b) => b.passes.kind === "warm_pass" && b.statistic === "min")).toBe(false);
+  });
+
+  it("offers min for passes where queries have multiple executions (throughput)", () => {
+    const multiExecQueries = [
+      { query_id: "q1", duration_ms: 10, status: "pass", run_type: "warmup", iter: 0 },
+      { query_id: "q1", duration_ms: 12, status: "pass", run_type: "warmup", iter: 0 },
+      { query_id: "q1", duration_ms: 20, status: "pass", run_type: "measurement", iter: 1 },
+      { query_id: "q1", duration_ms: 25, status: "pass", run_type: "measurement", iter: 1 },
+    ];
+    const available = availableBasesForQueries(multiExecQueries as any);
+    // warmup has >1 execution -> both median and min
+    expect(available.some((b) => b.passes.kind === "warmup" && b.statistic === "median")).toBe(true);
+    expect(available.some((b) => b.passes.kind === "warmup" && b.statistic === "min")).toBe(true);
+    // warm_pass 1 has >1 execution -> both median and min
+    expect(available.some((b) => b.passes.kind === "warm_pass" && b.statistic === "median")).toBe(true);
+    expect(available.some((b) => b.passes.kind === "warm_pass" && b.statistic === "min")).toBe(true);
+  });
+});
+
+describe("within-run basis label formatting", () => {
+  it("disambiguates statistic when siblings with the same pass exist", () => {
+    const bases: MeasurementBasis[] = [
+      { passes: WARMUP, statistic: "median" },
+      { passes: WARMUP, statistic: "min" },
+    ];
+    expect(formatWithinRunBasisLabel(bases[0]!, bases)).toBe("warmup pass (median)");
+    expect(formatWithinRunBasisLabel(bases[1]!, bases)).toBe("warmup pass (min)");
+  });
+
+  it("keeps standard label when no sibling statistic exists", () => {
+    const bases: MeasurementBasis[] = [
+      DEFAULT_BASIS,
+      { passes: WARMUP, statistic: "median" },
+    ];
+    expect(formatWithinRunBasisLabel(bases[1]!, bases)).toBe("warmup pass");
   });
 });

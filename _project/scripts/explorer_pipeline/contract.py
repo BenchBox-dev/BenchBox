@@ -36,7 +36,9 @@ EXPLORER_BUILD_CONTRACT_VERSION = "6"
 #     -- instead of the intended rebuild message. #1947 added its columns
 #     under v7 without bumping; this bump covers both changes, so v8 means "has
 #     pass provenance AND CPU identity".
-EXPLORER_READ_MODEL_VERSION = 8
+# v9: result_environment/result_detail_metrics gained cpu_identity_provenance,
+#     which the detail receipt selects unconditionally.
+EXPLORER_READ_MODEL_VERSION = 9
 EXPLORER_READ_MODEL_COMPATIBILITY = {
     "minimum_supported": EXPLORER_READ_MODEL_VERSION,
     "newer_policy": "warn-and-continue",

@@ -28,6 +28,7 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
       arch: "arm64",
       cpu_family: "apple_silicon",
       cpu_model: "Apple M1 Max",
+      cpu_identity_provenance: "measured",
       cpu_count: 10,
       memory_gb: 64,
       python: "3.12.4",
@@ -571,5 +572,12 @@ describe("RunReceipt applied-tuning receipt drill-down", () => {
     fireEvent.click(within(receipt).getByRole("button", { name: /Show missing metadata/ }));
     expect(within(receipt).getByText("CPU family")).toBeTruthy();
     expect(within(receipt).getByText("CPU model")).toBeTruthy();
+  });
+
+  it("does not mislabel an unsupported CPU evidence value as inferred", () => {
+    render(<RunReceipt detail={makeDetail({ environment: { ...makeDetail().environment, cpu_identity_provenance: "typo" as never } })} />);
+
+    expect(screen.getByText("Unknown")).toBeInTheDocument();
+    expect(screen.queryByText("Inferred")).toBeNull();
   });
 });
