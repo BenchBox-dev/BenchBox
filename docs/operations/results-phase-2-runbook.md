@@ -84,27 +84,24 @@ exists only on `published-results`, it becomes **published-only** and is kept
 on the next mirror. That protects community submissions the automated sync
 must never wipe.
 
-When a maintainer must remove a path from the public corpus (privacy
-remediation, takedown, mistaken publish):
+During the A0 migration freeze, privacy remediation, takedown, or mistaken
+publication authorizes presentation withdrawal and artifact-access suppression,
+not accepted-archive deletion:
 
-1. **Do not** reintroduce a wipe-then-checkout of `results-data/bundles/` on
-   the sync workflow, and **do not** run a full-tree wipe of published bundles
-   while any published-only paths should survive. A full wipe would delete
-   every community submission that is not on develop.
-2. Open a **manual PR against `published-results`** that deletes only the
-   intended path(s) under `results-data/bundles/` (and any related docs if
-   needed).
-3. Regenerate inventory on that branch:
-   `uv run -- python scripts/generate_corpus_inventory.py --write`, then
-   stage `results-data/corpus-inventory.json` with the path removals.
-4. Merge after review. One authorized maintainer may approve this emergency
-   takedown path. Leave develop in sync if the same path still exists there (delete on
-   develop in a separate PR if the seed/corpus copy must go too); the next
-   develop→published mirror will not resurrect a path that is already gone from both
-   trees, and will not re-delete other published-only paths.
-5. Treat the merge as accepted-archive state, not proof of public removal. Update
-   independent publication desired state, deploy, probe externally, and require an
-   attested live receipt before reporting the takedown live.
+1. Record the authorized withdrawal, affected public IDs, actor, reason, and time.
+2. Carry the withdrawal into publication desired state, rebuild presentation without the
+   affected rows, deploy, probe externally, and require an attested live receipt before
+   reporting the takedown live.
+3. Suppress accessible derived artifacts where the provider permits, without claiming
+   that Git history or accepted source bytes were erased.
+4. **Do not** delete a path from `published-results` or `develop` while the A0 freeze is
+   active. One-maintainer takedown authority does not supersede the preservation floor.
+
+Irreversible source-byte erasure requires a separately approved incident plan that either
+releases the applicable A0 preservation gate or explicitly supersedes it. That plan must
+inventory Git history, workflow artifacts, caches, mirrors, and inventory consequences.
+Only then may operators use a narrow reviewed deletion PR; a full-tree wipe remains
+forbidden, and the deletion merge is never proof that public bytes are gone.
 
 If the workflow's heuristics ever miss a path (or a one-off mirror is
 needed outside the trigger conditions), trigger it manually via

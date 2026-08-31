@@ -85,6 +85,10 @@ def main() -> int:
                 "All six visibility states apply",
                 "Accepted source bytes remain preserved during the A0 freeze",
                 "Accepted-but-not-live results must not be described as already published",
+                "In every phase, a withdrawn result retains its",
+                '"presentation_status": "<active|withdrawal_requested|withdrawn>"',
+                "Presentation: active → withdrawal_requested → withdrawn",
+                "separate tombstone lookup registry",
             ),
         )
     )

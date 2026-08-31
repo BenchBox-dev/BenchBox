@@ -107,25 +107,29 @@ authority is
 
 #### Status Definitions
 
-| State | Meaning | Visible to public |
+| Dimension and state | Meaning | Visible to public |
 |---|---|---|
-| `pending` | Received; awaiting validation | No |
-| `validated` | Passed automated checks; awaiting acceptance | No |
-| `accepted` | Validator-clean input exists at the pinned accepted-archive revision | Controlled independently |
-| `promotion_pending` | Desired state names accepted input without a matching live receipt | Previous live state remains |
-| `live` | A fresh attested receipt proves the intended artifact and corpus are publicly observable | According to visibility policy |
-| `promotion_failed` | Build, deploy, or observation failed to produce a matching receipt | Previous live state remains |
-| `rejected` | Failed validation or declined by maintainer; includes a reason string | No |
-| `withdrawn` | Suppressed from public presentation and ranking by authorized policy | No (tombstone where supported) |
+| Acceptance: `pending` | Received; awaiting validation | No |
+| Acceptance: `validated` | Passed automated checks; awaiting acceptance | No |
+| Acceptance: `accepted` | Validator-clean input exists at the pinned accepted-archive revision | Controlled independently |
+| Acceptance: `rejected` | Failed validation or declined by maintainer; includes a reason string | No |
+| Promotion: `not_requested` | No desired-state promotion currently targets the accepted input | Previous live state remains |
+| Promotion: `promotion_pending` | Desired state names accepted input without a matching live receipt | Previous live state remains |
+| Promotion: `live` | A fresh attested receipt proves the intended artifact and corpus are publicly observable | According to visibility policy |
+| Promotion: `promotion_failed` | Build, deploy, or observation failed to produce a matching receipt | Previous live state remains |
+| Presentation: `active` | Normal visibility and ranking policy applies | According to visibility policy |
+| Presentation: `withdrawal_requested` | Authorized suppression is desired but not yet receipt-confirmed | Previous live state remains |
+| Presentation: `withdrawn` | A receipt confirms suppression from public presentation and ranking | Tombstone only |
 
 #### Status Transition Rules
 
 ```
-pending → validated → accepted → promotion_pending → live
+Acceptance: pending → validated → accepted
 pending → rejected
 validated → rejected
-promotion_pending → promotion_failed
-accepted|live → withdrawn
+Promotion: not_requested → promotion_pending → live
+Promotion: promotion_pending → promotion_failed
+Presentation: active → withdrawal_requested → withdrawn
 ```
 
 Acceptance remains an audit fact when promotion fails or presentation is
@@ -134,8 +138,8 @@ promotion cannot resurrect it. Re-admission requires a new authorized policy
 event, not a contributor-controlled field.
 
 `published` is retained only as a legacy API compatibility term. New contracts
-must use `accepted`, `promotion_pending`, `live`, `promotion_failed`, and
-`withdrawn`, and must never translate a Git merge directly into `live`.
+must report acceptance, promotion, and presentation separately, and must never
+translate a Git merge directly into `live`.
 
 Additional rules:
 
@@ -146,10 +150,9 @@ Additional rules:
   orthogonal acceptance and promotion state.
 - **Rejection reason:** Every `rejected` transition must carry a human-readable
   `reason` string. Reasons are visible to the submitter but not to the public.
-- **Withdrawn tombstone:** In Phases 1-2, withdrawal removes the entry entirely
-  from the index (no tombstone is retained). In Phase 3, a `withdrawn` result
-  retains its `public_result_id` in the index as a tombstone stub with all
-  content fields redacted. See Section 4.4.
+- **Withdrawn tombstone:** In every phase, a withdrawn result retains its
+  `public_result_id` as a stable tombstone stub with content fields redacted.
+  Public detail routes return `410 Gone`. See Section 4.4.
 
 #### Phase Assignment
 
@@ -162,7 +165,7 @@ Additional rules:
 | `live` | Matching attested public receipt | Same | Same |
 | `promotion_failed` | Promotion ended without matching receipt | Same | Same |
 | `rejected` | Not used | CI failed or PR closed without merge | Validation failed |
-| `withdrawn` | Authorized presentation policy | Same | API or admin policy event |
+| Presentation: `withdrawal_requested` / `withdrawn` | Authorized policy and receipt-confirmed suppression | Same | API or admin policy event |
 
 ---
 
@@ -450,11 +453,12 @@ no deadline. Withdrawal is available before and after publication.
 
 **Effect of withdrawal:**
 
-1. The result is removed from the public manifest index and all browse/compare
-   views within 7 days of the withdrawal request.
+1. The result is removed from active browse, search, ranking, and compare indexes within
+   7 days of the withdrawal request. Its stable ID remains in a separate tombstone lookup
+   registry.
 2. Derived public read models suppress the result. Accepted source bytes remain under the
    A0 preservation floor unless a separately approved erasure incident supersedes it.
-3. A **tombstone** remains in the index indefinitely. The
+3. A **tombstone** remains in the separate lookup registry indefinitely. The
    tombstone contains only: `public_result_id`, `status: withdrawn`, and
    `withdrawn_at` (date). All other fields are redacted. The detail page at
    the stable URL returns the tombstone with a `410 Gone` HTTP status.
@@ -612,7 +616,8 @@ Response:
   "submission_id": "<uuid>",
   "bundle_hash": "<sha256>",
   "acceptance_status": "<pending|validated|accepted|rejected>",
-  "promotion_status": "<not_requested|promotion_pending|live|promotion_failed|withdrawn>",
+  "promotion_status": "<not_requested|promotion_pending|live|promotion_failed>",
+  "presentation_status": "<active|withdrawal_requested|withdrawn>",
   "public_result_id": "<slug or null>",
   "rejection_reason": "<string or null>",
   "updated_at": "<ISO 8601>"
@@ -780,7 +785,8 @@ resolved by this contract:
 | Acceptance state: `pending` / `validated` | No | Yes (PR states) | Yes |
 | Acceptance state: `accepted` | Yes | Yes | Yes |
 | Promotion state: `promotion_pending` / `live` / `promotion_failed` | Yes | Yes | Yes |
-| Acceptance or policy state: `rejected` / `withdrawn` | Admin only | Yes | Yes |
+| Acceptance state: `rejected` | Admin only | Yes | Yes |
+| Presentation state: `withdrawal_requested` / `withdrawn` | Admin only | Yes | Yes |
 | Visibility: `public-curated` | Yes | Yes | Yes |
 | Visibility: `public-self-reported` | No | Yes | Yes |
 | Visibility: `private` / `unlisted` | No | No | Yes |

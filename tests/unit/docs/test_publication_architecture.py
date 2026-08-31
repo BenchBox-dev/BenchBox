@@ -110,11 +110,15 @@ def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
     assert "Accepted source bytes remain preserved during the A0 freeze" in text
     assert "Accepted-but-not-live results must not be described as already published" in text
     assert '"acceptance_status": "<pending|validated|accepted|rejected>"' in _text(HOSTED_CONTRACT)
-    assert '"promotion_status": "<not_requested|promotion_pending|live|promotion_failed|withdrawn>"' in _text(
-        HOSTED_CONTRACT
-    )
+    assert '"promotion_status": "<not_requested|promotion_pending|live|promotion_failed>"' in _text(HOSTED_CONTRACT)
+    assert '"presentation_status": "<active|withdrawal_requested|withdrawn>"' in _text(HOSTED_CONTRACT)
     assert "Ingest status: `published`" not in _text(HOSTED_CONTRACT)
     assert "Withdrawn result URL behavior (Phases 1-2)" not in _text(HOSTED_CONTRACT)
+    assert "accepted|live → withdrawn" not in _text(HOSTED_CONTRACT)
+    assert "Acceptance or policy state" not in _text(HOSTED_CONTRACT)
+    assert "tombstone remains in the index" not in _text(HOSTED_CONTRACT)
+    assert "Presentation: active → withdrawal_requested → withdrawn" in text
+    assert "separate tombstone lookup registry" in text
     assert "| `accepted` |" in _text(HOSTED_CONTRACT)
     assert "| `live` |" in _text(HOSTED_CONTRACT)
     assert "| `published` | On commit" not in _text(HOSTED_CONTRACT)

@@ -51,6 +51,17 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "_project/scripts/auto_merge_soundness_paths.py",
         ".github/workflows/auto-merge-on-open.yml",
         ".github/workflows/release.yml",
+        # Independent-publication authority and trust-policy contract.
+        "_project/decisions/independent-publication-a0-freeze-2026-08-31.md",
+        "docs/development/adr/adr-independent-publication-authorities.md",
+        "docs/development/adr/adr-public-result-id-permanence.md",
+        "docs/development/adr/adr-published-results-slim-corpus-branch.md",
+        "docs/development/independent-publication-threat-model.md",
+        "docs/operations/independent-publication-contract.md",
+        "docs/operations/results-phase-2-runbook.md",
+        "docs/reference/hosted-results-contract.md",
+        "docs/reference/threat-model.md",
+        "scripts/check_decision_records.py",
     ],
 )
 def test_soundness_predicate_matches_review_required_paths(path: str) -> None:
@@ -196,6 +207,11 @@ def test_codeowners_covers_soundness_paths() -> None:
     assert "_project/scripts/auto_merge_soundness_paths.py @joeharris76" in codeowners
     assert ".github/workflows/auto-merge-on-open.yml @joeharris76" in codeowners
     assert ".github/workflows/release.yml @joeharris76" in codeowners
+    assert "docs/development/adr/adr-independent-publication-authorities.md @joeharris76" in codeowners
+    assert "docs/development/independent-publication-threat-model.md @joeharris76" in codeowners
+    assert "docs/operations/independent-publication-contract.md @joeharris76" in codeowners
+    assert "docs/reference/hosted-results-contract.md @joeharris76" in codeowners
+    assert "scripts/check_decision_records.py @joeharris76" in codeowners
 
 
 def test_codeowners_matches_soundness_prefixes_1to1() -> None:

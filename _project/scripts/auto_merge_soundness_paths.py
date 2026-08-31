@@ -76,6 +76,20 @@ SOUNDNESS_FILES = (
     "_project/scripts/auto_merge_soundness_paths.py",
     ".github/workflows/auto-merge-on-open.yml",
     ".github/workflows/release.yml",
+    # Independent-publication authority and trust-policy surfaces. The accepted
+    # A1 contract requires manual maintainer review and forbids auto-merge for
+    # changes that redefine archive authority, live-state evidence, withdrawal,
+    # ranking/trust policy, or their enforcement checker.
+    "_project/decisions/independent-publication-a0-freeze-2026-08-31.md",
+    "docs/development/adr/adr-independent-publication-authorities.md",
+    "docs/development/adr/adr-public-result-id-permanence.md",
+    "docs/development/adr/adr-published-results-slim-corpus-branch.md",
+    "docs/development/independent-publication-threat-model.md",
+    "docs/operations/independent-publication-contract.md",
+    "docs/operations/results-phase-2-runbook.md",
+    "docs/reference/hosted-results-contract.md",
+    "docs/reference/threat-model.md",
+    "scripts/check_decision_records.py",
 )
 _VALIDATION_RE = re.compile(r"^benchbox/core/(?:.+/)?validation\.py$")
 
