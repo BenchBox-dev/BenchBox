@@ -6,9 +6,10 @@ control changes.
 
 ## Capture
 
-Prerequisites are authenticated read access through `gh`, fetched
-`origin/develop`, `origin/release`, and `origin/published-results` refs, and HTTPS
-access to `benchbox.dev`.
+Prerequisites are authenticated read access through `gh`, fetch access to the
+three remote branches, and HTTPS access to `benchbox.dev`. Capture fetches each
+branch into `FETCH_HEAD` and enumerates the corpus from that exact captured SHA;
+it does not rely on potentially stale remote-tracking refs.
 
 ```bash
 uv run python scripts/publication/capture_baseline.py
@@ -21,8 +22,10 @@ committed snapshot without refreshing it.
 
 ## Interpretation
 
-- `accepted_path_union` is the preservation contract. Counts and bytes are
-  diagnostics only.
+- `accepted_path_union` and `accepted_objects` are the preservation contract.
+  The latter records every path's Git blob identity and keeps both variants when
+  the accepted branches contain different bytes at the same path. Counts and
+  bytes are diagnostics only.
 - `published_only_paths` are expected accepted archive history and must not be
   discarded because they are absent from `develop`.
 - Artifact `size_in_bytes` is stored compressed artifact size. It is not Pages

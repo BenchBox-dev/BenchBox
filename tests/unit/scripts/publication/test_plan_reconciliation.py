@@ -22,8 +22,17 @@ def test_all_controlling_surfaces_and_gates_are_named() -> None:
 
 
 def test_planned_tracker_ids_filters_requested_prefix() -> None:
-    text = "`independent-publication-a0-baseline` and `unrelated`"
+    text = "`independent-publication-a1-later` then `independent-publication-a0-first` and `unrelated`"
 
     assert reconciliation.planned_tracker_ids(text, "independent-publication-") == [
-        "independent-publication-a0-baseline"
+        "independent-publication-a1-later",
+        "independent-publication-a0-first",
     ]
+
+
+def test_decision_names_exact_ordered_tracker_sequence() -> None:
+    text = reconciliation.DECISION.read_text()
+
+    assert reconciliation.planned_tracker_ids(text, "independent-publication-") == list(
+        reconciliation.REQUIRED_TRACKER_IDS
+    )

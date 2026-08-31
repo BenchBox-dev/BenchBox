@@ -25,10 +25,24 @@ REQUIRED_GATES = (
     "G4 ownership",
     "G5 final reconciliation",
 )
+REQUIRED_TRACKER_IDS = (
+    "independent-publication-a0-baseline-and-freeze",
+    "independent-publication-a1-authority-and-threat-contract",
+    "independent-publication-a2-corpus-trust-isolation",
+    "independent-publication-a3-control-plane-and-artifact-contract",
+    "independent-publication-a4-hermetic-build-and-shadow-assembly",
+    "independent-publication-a5-noop-deploy-and-automatic-rollback",
+    "independent-publication-a6-site-and-api-docs-lane",
+    "independent-publication-a7-explorer-application-lane",
+    "independent-publication-a8-published-results-gate-and-shadow-promotion",
+    "independent-publication-a9-corpus-production-cutover",
+    "independent-publication-a10-release-and-mirror-retirement",
+    "independent-publication-a11-operations-canaries-and-closeout",
+)
 
 
 def planned_tracker_ids(text: str, prefix: str) -> list[str]:
-    return sorted(set(re.findall(rf"`({re.escape(prefix)}[a-z0-9-]+)`", text)))
+    return list(dict.fromkeys(re.findall(rf"`({re.escape(prefix)}[a-z0-9-]+)`", text)))
 
 
 def main() -> int:
@@ -39,11 +53,9 @@ def main() -> int:
     missing = [surface for surface in REQUIRED_SURFACES if surface not in text]
     missing.extend(gate for gate in REQUIRED_GATES if gate not in text)
     tracker_ids = planned_tracker_ids(text, args.todo_prefix)
-    if not tracker_ids or tracker_ids[0] != "independent-publication-a0-baseline-and-freeze":
-        missing.append("current A0 tracker priority")
-    for stage in ("a1-", "a2-", "a3-", "a4-"):
-        if not any(item_id.startswith(f"{args.todo_prefix}{stage}") for item_id in tracker_ids):
-            missing.append(f"planned tracker stage {stage.removesuffix('-').upper()}")
+    expected_ids = [item_id for item_id in REQUIRED_TRACKER_IDS if item_id.startswith(args.todo_prefix)]
+    if tracker_ids != expected_ids:
+        missing.append("exact ordered A0-A11 tracker sequence")
     if missing:
         for value in missing:
             print(f"ERROR: unreconciled publication surface: {value}")

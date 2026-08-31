@@ -23,26 +23,82 @@ def run(*args: str) -> str:
     return subprocess.run(args, cwd=ROOT, check=True, text=True, capture_output=True).stdout.strip()
 
 
+def run_raw(*args: str) -> str:
+    return subprocess.run(args, cwd=ROOT, check=True, text=True, capture_output=True).stdout
+
+
 def gh(path: str) -> Any:
     return json.loads(run("gh", "api", path))
 
 
-def branch_sha(branch: str) -> str:
-    line = run("git", "ls-remote", "origin", f"refs/heads/{branch}")
-    if not line:
-        raise RuntimeError(f"origin/{branch} does not exist")
-    return line.split()[0]
+def fetch_branch_sha(branch: str) -> str:
+    """Fetch a branch without updating its remote-tracking ref and return the fetched SHA."""
+    run("git", "fetch", "--no-tags", "origin", f"refs/heads/{branch}")
+    return run("git", "rev-parse", "FETCH_HEAD")
 
 
-def tree_paths(ref: str, prefix: str = CORPUS_PREFIX) -> dict[str, int]:
-    output = run("git", "ls-tree", "-r", "--long", ref, "--", prefix)
-    paths: dict[str, int] = {}
-    for line in output.splitlines():
+def tree_objects(ref: str, prefix: str = CORPUS_PREFIX) -> dict[str, dict[str, Any]]:
+    output = run_raw("git", "ls-tree", "-r", "--long", "-z", ref, "--", prefix)
+    objects: dict[str, dict[str, Any]] = {}
+    for line in output.split("\0"):
+        if not line:
+            continue
         metadata, path = line.split("\t", 1)
-        size = metadata.split()[3]
+        mode, object_type, object_id, size = metadata.split()
         if size != "-":
-            paths[path] = int(size)
-    return paths
+            objects[path] = {
+                "mode": mode,
+                "type": object_type,
+                "object_id": object_id,
+                "size": int(size),
+            }
+    return objects
+
+
+def accepted_objects(trees: dict[str, dict[str, dict[str, Any]]]) -> list[dict[str, Any]]:
+    accepted: list[dict[str, Any]] = []
+    for path in sorted(set(trees["develop"]) | set(trees["published-results"])):
+        variants: dict[tuple[str, str, str, int], list[str]] = {}
+        for branch in ("develop", "published-results"):
+            item = trees[branch].get(path)
+            if item is None:
+                continue
+            key = (item["mode"], item["type"], item["object_id"], item["size"])
+            variants.setdefault(key, []).append(branch)
+        accepted.append(
+            {
+                "path": path,
+                "variants": [
+                    {
+                        "mode": key[0],
+                        "type": key[1],
+                        "object_id": key[2],
+                        "size": key[3],
+                        "branches": branches,
+                    }
+                    for key, branches in variants.items()
+                ],
+            }
+        )
+    return accepted
+
+
+def current_successful_deployment(deployments: list[dict[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Return the newest release deployment whose latest status is successful."""
+    candidates = sorted(
+        (item for item in deployments if item["ref"] == "release"),
+        key=lambda item: item["created_at"],
+        reverse=True,
+    )
+    for deployment in candidates:
+        statuses = sorted(
+            gh(f"repos/{REPOSITORY}/deployments/{deployment['id']}/statuses"),
+            key=lambda item: item["created_at"],
+            reverse=True,
+        )
+        if statuses and statuses[0]["state"] == "success":
+            return deployment, statuses[0]
+    raise RuntimeError("no current successful release deployment found")
 
 
 def sha256_url(url: str) -> tuple[str, int, dict[str, str]]:
@@ -63,9 +119,10 @@ def iso_duration_seconds(start: str, end: str) -> int:
 
 def capture() -> dict[str, Any]:
     captured_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    shas = {branch: branch_sha(branch) for branch in BRANCHES}
-    trees = {branch: tree_paths(f"origin/{branch}") for branch in BRANCHES}
+    shas = {branch: fetch_branch_sha(branch) for branch in BRANCHES}
+    trees = {branch: tree_objects(shas[branch]) for branch in BRANCHES}
     accepted = sorted(set(trees["develop"]) | set(trees["published-results"]))
+    accepted_inventory = accepted_objects(trees)
     published_only = sorted(set(trees["published-results"]) - set(trees["develop"]))
 
     pages = gh(f"repos/{REPOSITORY}/pages")
@@ -73,9 +130,7 @@ def capture() -> dict[str, Any]:
     branch_rules = {branch: gh(f"repos/{REPOSITORY}/rules/branches/{branch}") for branch in BRANCHES}
     environments = gh(f"repos/{REPOSITORY}/environments")["environments"]
     deployments = gh(f"repos/{REPOSITORY}/deployments?environment=github-pages&per_page=10")
-    current = next(item for item in deployments if item["ref"] == "release")
-    statuses = gh(f"repos/{REPOSITORY}/deployments/{current['id']}/statuses")
-    successful_status = next(item for item in statuses if item["state"] == "success")
+    current, successful_status = current_successful_deployment(deployments)
     run_id = int(successful_status["log_url"].split("/runs/")[1].split("/")[0])
     run = gh(f"repos/{REPOSITORY}/actions/runs/{run_id}")
     artifacts = gh(f"repos/{REPOSITORY}/actions/runs/{run_id}/artifacts")["artifacts"]
@@ -83,7 +138,7 @@ def capture() -> dict[str, Any]:
     database_sha, database_bytes, database_headers = sha256_url("https://benchbox.dev/results/data/results.duckdb")
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "captured_at": captured_at,
         "repository": REPOSITORY,
         "repository_policy": {"workflow_permissions": workflow_permissions, "branch_rules": branch_rules},
@@ -131,14 +186,24 @@ def capture() -> dict[str, Any]:
         },
         "corpus": {
             "path_semantics": "set union, never a target count",
-            "develop": {"file_count": len(trees["develop"]), "bytes": sum(trees["develop"].values())},
+            "branch_source_shas": shas,
+            "branch_objects": trees,
+            "develop": {
+                "file_count": len(trees["develop"]),
+                "bytes": sum(item["size"] for item in trees["develop"].values()),
+            },
             "published_results": {
                 "file_count": len(trees["published-results"]),
-                "bytes": sum(trees["published-results"].values()),
+                "bytes": sum(item["size"] for item in trees["published-results"].values()),
             },
-            "release": {"file_count": len(trees["release"]), "bytes": sum(trees["release"].values())},
+            "release": {
+                "file_count": len(trees["release"]),
+                "bytes": sum(item["size"] for item in trees["release"].values()),
+            },
             "accepted_path_union": accepted,
             "accepted_path_union_count": len(accepted),
+            "accepted_objects": accepted_inventory,
+            "conflicting_paths": [item["path"] for item in accepted_inventory if len(item["variants"]) > 1],
             "published_only_paths": published_only,
             "published_only_count": len(published_only),
         },
@@ -168,14 +233,60 @@ def capture() -> dict[str, Any]:
     }
 
 
-def validate(data: dict[str, Any]) -> list[str]:
+def validate_corpus(corpus: dict[str, Any], branches: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    if data.get("corpus", {}).get("path_semantics") != "set union, never a target count":
+    if corpus.get("path_semantics") != "set union, never a target count":
         errors.append("corpus inventory must declare set-union semantics")
-    accepted = set(data.get("corpus", {}).get("accepted_path_union", []))
-    published_only = set(data.get("corpus", {}).get("published_only_paths", []))
+    branch_objects = corpus.get("branch_objects", {})
+    branch_source_shas = corpus.get("branch_source_shas", {})
+    develop_objects = branch_objects.get("develop", {})
+    published_objects = branch_objects.get("published-results", {})
+    release_objects = branch_objects.get("release", {})
+    accepted = set(corpus.get("accepted_path_union", []))
+    expected_accepted = set(develop_objects) | set(published_objects)
+    published_only = set(corpus.get("published_only_paths", []))
+    expected_published_only = set(published_objects) - set(develop_objects)
+    if branch_source_shas != {branch: branches.get(branch, {}).get("sha") for branch in BRANCHES}:
+        errors.append("corpus branch inventories must identify their exact captured source SHAs")
+    if accepted != expected_accepted:
+        errors.append("accepted path union must exactly match develop and published-results branch objects")
     if not published_only <= accepted:
         errors.append("published-only paths must be contained in the accepted union")
+    if published_only != expected_published_only:
+        errors.append("published-only paths must exactly match the published-results branch difference")
+    if corpus.get("accepted_path_union_count") != len(accepted):
+        errors.append("accepted path union count does not match the accepted paths")
+    if corpus.get("published_only_count") != len(published_only):
+        errors.append("published-only count does not match the published-only paths")
+    for key, objects in (
+        ("develop", develop_objects),
+        ("published_results", published_objects),
+        ("release", release_objects),
+    ):
+        summary = corpus.get(key, {})
+        if summary.get("file_count") != len(objects):
+            errors.append(f"{key} file count does not match its branch objects")
+        if summary.get("bytes") != sum(item.get("size", -1) for item in objects.values()):
+            errors.append(f"{key} byte count does not match its branch objects")
+        for path, item in objects.items():
+            if item.get("type") != "blob" or not item.get("object_id") or item.get("mode") != "100644":
+                errors.append(f"{key} object identity is invalid: {path}")
+    expected_inventory = accepted_objects(
+        {"develop": develop_objects, "published-results": published_objects, "release": release_objects}
+    )
+    if corpus.get("accepted_objects") != expected_inventory:
+        errors.append("accepted object inventory must preserve every branch object identity")
+    expected_conflicts = [item["path"] for item in expected_inventory if len(item["variants"]) > 1]
+    if corpus.get("conflicting_paths") != expected_conflicts:
+        errors.append("conflicting paths must exactly identify multi-object accepted paths")
+    return errors
+
+
+def validate(data: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    if data.get("schema_version") != 2:
+        errors.append("publication baseline schema version must be 2")
+    errors.extend(validate_corpus(data.get("corpus", {}), data.get("branches", {})))
     if data.get("workflow", {}).get("head_sha") != data.get("branches", {}).get("release", {}).get("sha"):
         errors.append("deployed workflow SHA must equal the captured release SHA")
     if data.get("pages", {}).get("deployment", {}).get("state") != "success":

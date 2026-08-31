@@ -69,17 +69,23 @@ probe can satisfy G2 or G3.
 
 ## Tracker sequence and readiness
 
-A0 is the only live tracker item with the `independent-publication-` prefix at
-capture time. Later work must be created in this order and depend on the prior
-stage's evidence:
+A0-A11 are live tracker items and must proceed in this dependency-aware order:
 
-1. `independent-publication-a1-archive-preservation-and-restore`
-2. `independent-publication-a2-dual-publish-and-equivalence`
-3. `independent-publication-a3-cutover-and-rollback-drill`
-4. `independent-publication-a4-legacy-retirement-and-freeze-close`
+1. `independent-publication-a0-baseline-and-freeze`
+2. `independent-publication-a1-authority-and-threat-contract`
+3. `independent-publication-a2-corpus-trust-isolation`
+4. `independent-publication-a3-control-plane-and-artifact-contract`
+5. `independent-publication-a4-hermetic-build-and-shadow-assembly`
+6. `independent-publication-a5-noop-deploy-and-automatic-rollback`
+7. `independent-publication-a6-site-and-api-docs-lane`
+8. `independent-publication-a7-explorer-application-lane`
+9. `independent-publication-a8-published-results-gate-and-shadow-promotion`
+10. `independent-publication-a9-corpus-production-cutover`
+11. `independent-publication-a10-release-and-mirror-retirement`
+12. `independent-publication-a11-operations-canaries-and-closeout`
 
 A later TODO is not ready merely because it exists. Its predecessor's named gate
-must have fresh evidence, and A4 may not retire legacy surfaces until G1-G5 pass.
+must have fresh evidence, and A10 may not retire legacy surfaces until G1-G5 pass.
 
 ## Rollback floor
 
