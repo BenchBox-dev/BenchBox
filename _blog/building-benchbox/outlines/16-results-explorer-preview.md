@@ -1,7 +1,7 @@
 ---
 title: "Announcing the BenchBox Results Explorer preview"
 series: building-benchbox
-post_number: 17
+post_number: 16
 type: architecture-design
 tags: [benchbox, results-explorer, benchmarking, methodology, provenance, duckdb-wasm]
 status: DRAFTED
@@ -18,7 +18,7 @@ Announce the Results Explorer preview named in BenchBox v0.4.0 and explain the p
 3. How readers can use the Explorer to answer practical comparison and audit questions.
 4. How contributors can package and submit their own results through the public pull-request workflow.
 
-Keep the existing comparability article as a separate engineering deep dive (published post 16). This post may link to it, but it should not inherit its gate-by-gate structure or corpus-correction narrative.
+Keep the existing comparability article as a separate engineering deep dive (post 17). This post may link to it, but it should not inherit its gate-by-gate structure or corpus-correction narrative.
 
 ## Audience
 
@@ -50,7 +50,7 @@ Architecture/Design preview announcement, 1,800-2,200 words. Follow the series b
 - Geekbench inspiration: strategy reference matrix at `docs/development/benchbox-results-platform-strategy.md:486-493`; cite [Geekbench Browser](https://browser.geekbench.com/) as a primary external source in the draft.
 - AI evaluation inspiration: cite primary sources rather than treating every AI leaderboard as the same product. Use [Hugging Face Open LLM Leaderboard](https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard) for public model evaluation tables and [Stanford HELM](https://crfm.stanford.edu/helm/) for evaluation context and transparent scenario reporting. Verify the exact UI claims against the live sources at draft time. Do not add Chatbot Arena unless its distinct pairwise, human-preference methodology is relevant to a specific sentence.
 - Explorer architecture and product intent: `docs/development/benchbox-results-platform-strategy.md`, especially Product Intent, Revised UX Surfaces, and Phase 1 Architecture.
-- Current Explorer behavior: released `v0.4.0` source plus the deployed snapshot named in published post 16. Date every corpus count and re-read it at draft time.
+- Current Explorer behavior: released `v0.4.0` source plus the deployed snapshot named in post 17. Date every corpus count and re-read it at draft time.
 - Submission flow: `docs/contributing-results.md`, `results-data/README.md`, `benchbox/cli/commands/submit.py`, and `.github/workflows/validate-submission.yml` on the current release branch.
 - Submission privacy prerequisite: `benchbox/core/results/anonymization.py:115-165` and `docs/development/adr/adr-published-identifier-field-set.md:87-130`. `benchbox submit` requires a stable, private, non-empty `BENCHBOX_MACHINE_ID_SALT` before the first public submission.
 - Environment disclosure: describe hardware, driver, tuning, validation, and related fields as visible **when recorded**. Missing fields remain visible as missing evidence. Do not claim every bundle contains a complete environment.
@@ -63,7 +63,7 @@ Architecture/Design preview announcement, 1,800-2,200 words. Follow the series b
 - State the reader outcome in the first paragraph: browse benchmark results, compare selected runs per query, inspect methodology and provenance, query the public snapshot, and download the underlying bundle.
 - Set the bound once: the site contains a curated preview, not a complete or certified ranking.
 - Briefly preview the four threads in their actual section order: inspiration, reason, value, contribution.
-- Link the release overview (post 15) for the wider v0.4.0 changes and the comparison deep dive (published post 16) for eligibility mechanics.
+- Link the release overview (post 15) for the wider v0.4.0 changes and the comparison deep dive (post 17) for eligibility mechanics.
 
 Proposed TL;DR direction:
 
@@ -120,7 +120,7 @@ Organize this around reader jobs, not component names.
 - Select runs and open Compare.
 - The comparison view shows per-query timings and keeps recorded differences in platform version, execution mode, tuning, validation, environment, date, and cost visible.
 - Describe these fields as present when recorded. A missing driver version or incomplete environment remains visible as missing evidence rather than being silently filled.
-- Link published post 16 for the detailed distinction between display, comparison, warnings, and ranking.
+- Link post 17 for the detailed distinction between display, comparison, warnings, and ranking.
 
 #### Audit one published run
 
@@ -188,7 +188,7 @@ uv run -- python scripts/generate_corpus_inventory.py --write
 - A useful public results site needs enough context to support interpretation, and it should keep absent context visible.
 - Stable pages, per-query comparison, raw downloads, and a query workbench serve different reader questions; none replaces the others.
 - A static site and PR contribution path can test community demand before operational complexity grows.
-- Corpus curation is part of the product. Keep this concise and link published post 16 for the zero-query withdrawal and eligibility details rather than repeating its full correction history.
+- Corpus curation is part of the product. Keep this concise and link post 17 for the zero-query withdrawal and eligibility details rather than repeating its full correction history.
 - Name the current open question positively: which benchmarks, platforms, and scales should the community help deepen next?
 
 ### 6. Try it yourself (~125 words)
@@ -210,7 +210,7 @@ Close by inviting feedback through the BenchBox issue tracker and contributions 
 | --- | --- |
 | Calling the preview a new v0.4.0 launch | Say v0.4.0 names the preview; Phase 1 became reachable in April 2026 |
 | Turning inspiration into unsupported product history | Use primary-source footnotes and distinguish Geekbench, Open LLM Leaderboard, and HELM |
-| Repeating published post 16 | Keep eligibility mechanics and corpus correction detail in the published deep dive; link it |
+| Repeating post 17 | Keep eligibility mechanics and corpus correction detail in the comparison deep dive; link it |
 | Claiming complete environment data | Use “when recorded” and keep missing fields visible |
 | Describing ranked tables with the coined term `cohort-aware` | State the actual shared benchmark, scale, phase, and timing scope |
 | Giving an incomplete submit command | Include `BENCHBOX_MACHINE_ID_SALT`, complete-run requirements, manifest placement, inventory regeneration, and target branch |

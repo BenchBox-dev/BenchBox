@@ -5,7 +5,7 @@ status: draft
 date: August 31, 2026
 author: Joe Harris
 series: building-benchbox
-post_number: 17
+post_number: 16
 type: architecture-design
 tags: [benchbox, results-explorer, benchmarking, methodology, provenance, duckdb-wasm]
 meta_description: "Explore public BenchBox results, compare per-query evidence, inspect provenance, query the dataset, and submit a complete validated community benchmark run."
@@ -57,7 +57,7 @@ Start with a benchmark, then choose the scale factor and phase that match your q
 
 The platform-by-query matrix shows where behavior changes across a workload. A headline aggregate can tell you that two runs differ overall. The matrix shows whether the difference is broad or concentrated in a few queries.
 
-Ranked views use a shared scope based on benchmark, scale, phase, and sufficient timing coverage. Results that do not qualify for a ranked view can still remain visible with the reason. The detailed rules live in [How the Results Explorer qualifies comparisons](https://github.com/BenchBox-dev/BenchBox/blob/develop/_blog/building-benchbox/published/16-results-explorer-qualifies-comparisons.md).
+Ranked views use a shared scope based on benchmark, scale, phase, and sufficient timing coverage. Results that do not qualify for a ranked view can still remain visible with the reason. The detailed rules live in [How the Results Explorer qualifies comparisons](./17-results-explorer-qualifies-comparisons.md).
 
 ### Understand why two runs differ
 

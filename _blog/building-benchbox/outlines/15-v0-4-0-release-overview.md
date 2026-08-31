@@ -13,7 +13,7 @@ status: DRAFTED
 
 Release announcement in the post-13 overview shape: what shipped, why it
 matters, how to try it, then what breaks. Not a GitHub-release-notes page
-and not a tour of the Results Explorer. The Explorer deep dive is post 16.
+and not a tour of the Results Explorer. The preview announcement is post 16, and the comparison deep dive remains WIP as post 17.
 
 ## Audience
 
@@ -49,7 +49,7 @@ render them as "This is Y. This is not X."
 - Do **not** imply a foundation, new governance, or a new maintainer team.
 - Do **not** use Title Case after the colon. Follow post 13: sentence case.
 - Companion filename in this worktree:
-  `./16-results-explorer-qualifies-comparisons.md`. Do not retarget the
+  `./16-results-explorer-preview.md`. Do not retarget the
   older handoff name `16-results-explorer-sharing-reliable-results.md`.
 - Smoke commands use `--scale 0.01`. TPC-H SF1 is the DuckLake *validation*
   scale, not the try-it scale.
