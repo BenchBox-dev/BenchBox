@@ -34,18 +34,25 @@ The operator configures the merge queue within the `develop-squash-only` ruleset
   "type": "merge_queue",
   "parameters": {
     "merge_method": "SQUASH",
-    "min_bdr": 1,
-    "max_bdr": 5,
-    "grouping_strategy": "ONLY_NON_FAILING",
-    "check_response_timeout_minutes": 45,
-    "max_entries_to_build": 5
+    "min_entries_to_merge": 1,
+    "max_entries_to_merge": 5,
+    "grouping_strategy": "ALLGREEN",
+    "check_response_timeout_minutes": 60,
+    "max_entries_to_build": 5,
+    "min_entries_to_merge_wait_minutes": 0
   }
 }
 ```
 
 - **`merge_method: SQUASH`**: Guarantees atomic, single-commit integration.
-- **`grouping_strategy: ONLY_NON_FAILING`**: Speculatively groups non-failing PRs. If a PR fails in a group, GitHub isolates the failure and retries remaining PRs independently.
-- **`check_response_timeout_minutes: 45`**: Accommodates the `medium-test` wall (~20–31 min) while preventing hung runners from stalling the queue.
+- **`grouping_strategy: ALLGREEN`**: Groups only entries whose required checks are green.
+- **`check_response_timeout_minutes: 60`**: Provides the live queue timeout while preventing hung runners from stalling the queue.
+- **`max_entries_to_build: 5`** and **`max_entries_to_merge: 5`**: Bound speculative builds and queue merges at five entries each.
+- **`min_entries_to_merge: 1`** and **`min_entries_to_merge_wait_minutes: 0`**: Permit immediate single-entry merges without an artificial wait.
+
+Slow-marked reproducer jobs remain required PR CI through `ci-required-result`.
+Post-merge provides fast and medium lanes but no slow-signature lane, so these
+reproducers must remain in the required PR lane.
 
 ---
 
