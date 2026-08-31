@@ -47,7 +47,7 @@ Target: 1,800-2,200 words. Series beats from
 `_blog/building-benchbox/outlines/series-plan.md`. H2s need not use the
 template labels.
 
-### 1. The problem — Which numbers belong together (~180 words)
+### 1. The problem - Which numbers belong together (~180 words)
 
 - Open with two plausible timings (12s vs 31s) and the questions they omit.
 - The Explorer keeps benchmark, scale, phase, shared valid timings, completion,
@@ -80,7 +80,7 @@ template labels.
   architecture diagram, CI thresholds as test budgets. A failed attach is an
   error, not an empty table.
 
-### 4. What we learned — A validation pass on zero queries is a non-measurement (~360 words)
+### 4. What we learned - A validation pass on zero queries is a non-measurement (~360 words)
 
 - August 24: withdraw 60 zero-query DataFrame non-measurements, then 17
   truthful SQL bundles to keep the three-platform group floor.
@@ -90,7 +90,7 @@ template labels.
 - Admission now requires proof of execution. After corrections: 56 passed, 30
   partial, 52 not run, 55 ranking-eligible.
 
-### 5. Try it yourself — Query the same table the pages use (~200 words)
+### 5. Try it yourself - Query the same table the pages use (~200 words)
 
 - Start at the Explorer root and open Query.
 - SQL for the TPC-H SF1 power ranking split and for validation/ranking counts.
