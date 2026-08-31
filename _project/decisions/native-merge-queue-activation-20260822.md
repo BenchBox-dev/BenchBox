@@ -28,6 +28,32 @@ This decision record establishes the formal architecture, parameter bounds, soun
 
 ## 2. Decision & Operational Architecture
 
+### 2.0 Governance amendment (verified 2026-08-31)
+
+**Selected outcome: `AMEND_GOVERNANCE`.** Live ruleset verification for
+`15611785` found the queue active with `ALLGREEN`, a 60-minute response
+timeout, `max_entries_to_build: 5`, `max_entries_to_merge: 5`, `SQUASH`,
+`min_entries_to_merge: 1`, and `min_entries_to_merge_wait_minutes: 0`.
+The governance documentation is amended to match that live state and the
+current `.github/workflows/pr.yml` `ci-required-result` `needs` contract.
+The original activation decision and its historical 45-minute/
+`ONLY_NON_FAILING` bounds remain below as historical context; they are not
+silently rewritten.
+
+This amendment records the configuration already active in GitHub and does
+not change the ruleset. The operator-facing activation runbook has recorded
+the `ALLGREEN`/60-minute direction since PR #1814; current evidence does not
+justify a protected-settings rollback within this documentation-only item.
+
+Slow-marked reproducer jobs remain required PR CI through
+`ci-required-result`: post-merge has fast and medium lanes but no slow-signature
+lane, so removing them from required PR CI would remove their only required
+execution path.
+
+`scripts/ruleset_drift_check.py` verifies the required-check contract but does
+not inspect merge-queue parameters. Extending that checker remains a separate
+follow-up rather than part of this amendment.
+
 The project will adopt GitHub Native Merge Queue for `refs/heads/develop` under the following strict configuration:
 
 ### A. Queue Parameters
@@ -35,11 +61,17 @@ The project will adopt GitHub Native Merge Queue for `refs/heads/develop` under 
 | Parameter | Value | Rationale |
 |---|---|---|
 | **Merge Method** | `SQUASH` | Strictly enforces single-commit integration per PR matching repository policy. |
-| **Grouping Strategy** | `ONLY_NON_FAILING` | Avoids speculative batch failures cascading across independent PRs. |
-| **Minimum Batch Size** | `1` | Ensures zero artificial latency when queue depth is low. |
-| **Maximum Batch Size** | `5` | Bounds the CI concurrency footprint and failure bifurcation tree. |
-| **Check Timeout** | `45 minutes` | Accommodates the ~20–31 minute `medium-test` wall with safety margin. |
+| **Grouping Strategy** | `ALLGREEN` | Matches the active ruleset; entries are grouped only when required checks are green. |
+| **Minimum Entries to Merge** | `1` | Ensures zero artificial latency when queue depth is low. |
+| **Maximum Entries to Merge** | `5` | Bounds the CI concurrency footprint and failure bifurcation tree. |
+| **Check Timeout** | `60 minutes` | Matches the active ruleset response timeout. |
 | **Max Concurrent Builds** | `5` | Matches runner concurrency budget. |
+| **Minimum Merge Wait** | `0 minutes` | Allows immediate merge when the minimum entry count is met. |
+
+The initial 2026-08-22 activation bounds recorded `ONLY_NON_FAILING` and a
+45-minute timeout. Those historical values are retained here for auditability;
+the 2026-08-31 amendment above records the live configuration now governing
+the queue.
 
 ### B. Required Status Checks Contract
 
