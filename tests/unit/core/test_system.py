@@ -65,6 +65,17 @@ class TestGetCpuModel:
         assert profile.cpu_model == "Intel(R) Core(TM) i7-9750H"
         assert profile.cpu_identity_provenance == "inferred"
 
+    def test_windows_platform_processor_fallback_is_inferred(self):
+        with (
+            patch("benchbox.core.system.platform.system", return_value="Windows"),
+            patch("benchbox.core.system.platform.machine", return_value="AMD64"),
+            patch("benchbox.core.system.detect_cpu_info", return_value=(None, None)),
+            patch("benchbox.core.system.platform.processor", return_value="Intel(R) Core(TM) i7-9750H"),
+        ):
+            profile = SystemProfiler().get_system_profile()
+        assert profile.cpu_model == "Intel(R) Core(TM) i7-9750H"
+        assert profile.cpu_identity_provenance == "inferred"
+
     def test_profile_still_marks_detected_model_as_measured(self):
         with (
             patch("benchbox.core.system.detect_cpu_info", return_value=("Apple M4", "Apple")),

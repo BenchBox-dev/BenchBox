@@ -192,4 +192,29 @@ describe("render-window limiting", () => {
       ["2.0", 50, 100],
     ]);
   });
+
+  it("never exceeds the rendering window when logical keys collide", () => {
+    const duplicated: Row[] = [
+      { id: "same", rank: 1, engine: "2.0", eligible: true },
+      { id: "same", rank: 2, engine: "1.0", eligible: true },
+    ];
+    const limited = limitCohortGroups(groupCohortRows(duplicated, "engine_version", byEngine), duplicated, 1);
+
+    expect(limited.flatMap((group) => group.rows)).toEqual([duplicated[0]]);
+  });
+
+  it("preserves the ranked occurrence when cloned rows share a logical key", () => {
+    const duplicated: Row[] = [
+      { id: "same", rank: 1, engine: "2.0", eligible: true },
+      { id: "same", rank: 2, engine: "1.0", eligible: true },
+    ];
+    const groups = groupCohortRows(duplicated, "engine_version", byEngine).map((group) => ({
+      ...group,
+      rows: group.rows.map((row) => ({ ...row })),
+    }));
+    const ranked = duplicated.map((row) => ({ ...row }));
+    const limited = limitCohortGroups(groups, ranked, 1);
+
+    expect(limited.flatMap((group) => group.rows)).toEqual([ranked[0]]);
+  });
 });

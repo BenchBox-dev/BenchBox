@@ -6,6 +6,7 @@ using standard platform utilities without adding external runtime dependencies.
 
 from __future__ import annotations
 
+import json
 import os
 import platform
 import subprocess
@@ -172,16 +173,33 @@ def _detect_linux_cpu() -> Tuple[str | None, str | None]:
 
 
 def _detect_windows_cpu() -> Tuple[str | None, str | None]:
-    """Detect CPU model and vendor on Windows."""
+    """Detect CPU model and vendor from Windows' hardware inventory."""
     try:
-        processor = platform.processor() or None
-        identifier = os.environ.get("PROCESSOR_IDENTIFIER", "")
-        vendor = None
-        if "GenuineIntel" in identifier or "Intel" in (processor or ""):
-            vendor = "Intel"
-        elif "AuthenticAMD" in identifier or "AMD" in (processor or ""):
-            vendor = "AMD"
-        return processor, vendor
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Get-CimInstance Win32_Processor | Select-Object -First 1 Name,Manufacturer | ConvertTo-Json -Compress",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            payload = json.loads(result.stdout)
+            model = str(payload.get("Name") or "").strip() or None
+            manufacturer = str(payload.get("Manufacturer") or "").strip()
+            vendor = None
+            if "intel" in manufacturer.lower() or "intel" in (model or "").lower():
+                vendor = "Intel"
+            elif "amd" in manufacturer.lower() or "amd" in (model or "").lower():
+                vendor = "AMD"
+            elif manufacturer:
+                vendor = manufacturer
+            return model, vendor
     except Exception:
         pass
     return None, None

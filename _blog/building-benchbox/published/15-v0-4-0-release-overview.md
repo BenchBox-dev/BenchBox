@@ -1,6 +1,6 @@
 ---
 blogpost: true
-status: draft
+status: published
 date: August 31, 2026
 author: Joe Harris
 series: building-benchbox

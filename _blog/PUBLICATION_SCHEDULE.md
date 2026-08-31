@@ -1,7 +1,7 @@
 # Publication Schedule
 
 > BenchBox blog publication queue.
-> **Last updated:** 2026-08-28
+> **Last updated:** 2026-08-31
 
 ---
 
@@ -19,6 +19,8 @@
 | Splitting approximate analytics across BenchBox read and write benchmarks | Building BenchBox | May 18, 2026 |
 | BenchBox v0.3.0: JoinOrder fix, approximate analytics, and agent prompt composer | Building BenchBox | May 18, 2026 |
 | Reworking JoinOrder around the IMDb 2013 dataset | Building BenchBox | May 18, 2026 |
+| BenchBox v0.4.0: new org, DuckLake, and result provenance | Building BenchBox | Aug 31, 2026 |
+| How the Results Explorer qualifies comparisons | Building BenchBox | Aug 31, 2026 |
 
 ---
 
@@ -35,8 +37,6 @@
 
 | Series                  | Posts                                                                                                             | Status      | Notes                              |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------- |
-| Building BenchBox       | BenchBox v0.4.0: new org, DuckLake, and result provenance                                                         | Full draft  | Editorial review needed            |
-| Building BenchBox       | How the Results Explorer qualifies comparisons                                                                    | Full draft  | Structural rewrite after dual review |
 | Free Trial Benchmarking | 10 posts (Snowflake, Databricks, BigQuery, MotherDuck, Redshift, Starburst, ClickHouse, Fabric, Firebolt, Athena) | Full drafts | Time-sensitive; trial terms change |
 | Cloud Cost Controls     | 6 posts (AWS, GCP, Snowflake, Databricks, Azure, Free Tier)                                                       | Full drafts |                                    |
 

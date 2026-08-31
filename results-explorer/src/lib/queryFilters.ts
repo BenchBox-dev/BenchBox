@@ -402,8 +402,8 @@ export function cohortGroupTotal<T>(groups: readonly CohortGroup<T>[]): number {
  * which rows the ungrouped view admitted to the window.
  *
  * Cloned cohorts (e.g. a test that deep-copies rows) have different object
- * identities but the same logical identity, so the window is keyed by a
- * stable id rather than reference equality.
+ * identities but the same logical identity, so the window uses a stable id
+ * plus a full-row fingerprint to disambiguate colliding ids.
  */
 export function limitCohortGroups<T>(
   groups: readonly CohortGroup<T>[],
@@ -411,11 +411,31 @@ export function limitCohortGroups<T>(
   limit: number,
   keyOf: (row: T) => string = (row: any) =>
     String((row as any).result_id ?? (row as any).id ?? (row as any).key ?? JSON.stringify(row)),
+  fingerprintOf: (row: T) => string = (row) => JSON.stringify(row),
 ): LimitedCohortGroup<T>[] {
   const window = rankedRows.slice(0, Math.max(0, Math.floor(limit)));
-  const admitted = new Set(window.map(keyOf));
+  const groupedReferences = new Set(groups.flatMap((group) => group.rows));
+  const admittedReferences = new Set(window.filter((row) => groupedReferences.has(row)));
+  const admittedCloneCounts = new Map<string, Map<string, number>>();
+  for (const row of window) {
+    if (admittedReferences.has(row)) continue;
+    const key = keyOf(row);
+    const fingerprint = fingerprintOf(row);
+    const byFingerprint = admittedCloneCounts.get(key) ?? new Map<string, number>();
+    byFingerprint.set(fingerprint, (byFingerprint.get(fingerprint) ?? 0) + 1);
+    admittedCloneCounts.set(key, byFingerprint);
+  }
   return groups.flatMap((group) => {
-    const rows = group.rows.filter((row) => admitted.has(keyOf(row)));
+    const rows = group.rows.filter((row) => {
+      if (admittedReferences.has(row)) return true;
+      const key = keyOf(row);
+      const fingerprint = fingerprintOf(row);
+      const byFingerprint = admittedCloneCounts.get(key);
+      const remaining = byFingerprint?.get(fingerprint) ?? 0;
+      if (!byFingerprint || remaining === 0) return false;
+      byFingerprint.set(fingerprint, remaining - 1);
+      return true;
+    });
     return rows.length > 0 ? [{ ...group, rows, totalRows: group.rows.length }] : [];
   });
 }

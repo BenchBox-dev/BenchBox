@@ -1,16 +1,16 @@
 # Blog Publishing Workflow
 
-> How to move a blog post from draft in the private repo to live on [benchbox.dev/blog](https://benchbox.dev/blog/).
+> How to move a blog post from draft to live on [benchbox.dev/blog](https://benchbox.dev/blog/).
 
 ## Overview
 
-Blog content is developed entirely in the **private** BenchBox repo under `_blog/`. When a post is ready, it is copied to the **public** repo at `docs/blog/`, where CI/CD builds and deploys it via GitHub Pages.
+Blog content is developed under `_blog/` in the single `BenchBox-dev/BenchBox` repository. When a post is ready, archive the final source under `_blog/{series}/published/` and place its ABlog copy under `docs/blog/` in the same change.
 
-The `_blog/` directory is **not** part of the sync/release process. Blog posts must be explicitly published by placing them in `docs/blog/` in the public repo.
+The release branch excludes `_blog/` but retains `docs/blog/`. A pull request to `develop` validates the post and assembled public site. GitHub Pages deploys only after the content reaches the protected `release` branch through the release flow.
 
 ## Directory Structure
 
-### Private repo (`_blog/`)
+### Editorial source (`_blog/`)
 
 Each blog series has a consistent structure:
 
@@ -26,7 +26,7 @@ _blog/
     archived/             # Deprecated versions
 ```
 
-### Public repo (`docs/blog/`)
+### Published site source (`docs/blog/`)
 
 Published posts only, with ABlog frontmatter:
 
@@ -107,18 +107,23 @@ Post content...
 | `author` | Author name (must match `blog_authors` in `docs/conf.py`) | `Joe Harris` |
 | `tags` | Comma-separated | `benchmarking, tpc-h, methodology` |
 
-### 5. Place the post in the public repo
+### 5. Place the post in the published site tree
 
-Copy the finalized post to `docs/blog/` in the public repo:
+Copy the finalized post to `docs/blog/` in the same repository:
 
 ```bash
 cp _blog/{series}/published/{post}.md \
-   ../BenchBox-public/docs/blog/YYYY-MM-DD-{slug}.md
+   docs/blog/YYYY-MM-DD-{slug}.md
 ```
+
+Then adapt relative links for the destination. `_blog/{series}/published/` uses
+`../images/{image}.png`, while `docs/blog/` uses `./images/{image}.png`.
+Companion-post links in `docs/blog/` must include the companion's date-prefixed
+filename. Do not rely on a blind copy when either form appears in the source.
 
 ### 6. Register the post in the blog index
 
-Edit `docs/blog/index.rst` in the public repo. Add the post filename (without extension) to the `toctree`:
+Edit `docs/blog/index.rst`. Add the post filename (without extension) to the `toctree`:
 
 ```rst
 .. toctree::
@@ -131,20 +136,33 @@ Edit `docs/blog/index.rst` in the public repo. Add the post filename (without ex
 
 The `postlist::` directive at the top of the index will automatically pick up the new post for the recent posts listing.
 
-### 7. Commit and push
+### 7. Open the development pull request
 
-In the public repo, commit the new post and the updated index:
+Commit the archive copy, published copy, images, and index on a topic branch,
+then open a pull request against `develop`. The Documentation workflow builds
+Sphinx and ABlog, assembles the public site, runs link checks, and exercises the
+public-site browser gate.
 
 ```bash
-cd ../BenchBox-public
-git add docs/blog/YYYY-MM-DD-{slug}.md docs/blog/index.rst
-git commit -m "Publish blog post: {title}"
-git push origin main
+git add _blog/{series}/published/{post}.md \
+  docs/blog/YYYY-MM-DD-{slug}.md docs/blog/images/{image}.png \
+  docs/blog/index.rst
+git commit -m "docs(blog): publish {title}"
 ```
 
-### 8. CI/CD deploys automatically
+### 8. Release deploys GitHub Pages
 
-The GitHub Actions workflow (`.github/workflows/docs.yml`) triggers on pushes to `main` that touch `docs/**`. It:
+After the development PR merges, carry `develop` through the version-branch
+release flow in `docs/operations/release-guide.md`:
+
+```bash
+make release-cut VERSION=X.Y.Z
+# review and merge the release PR after its required checks
+make release-finalize VERSION=X.Y.Z
+```
+
+The Documentation workflow builds on `develop` and `release`, but its deploy
+job runs only for a push to `release`. It:
 
 1. Builds Sphinx + ABlog documentation
 2. Assembles the site: landing page at `/`, docs at `/docs/`, blog at `/blog/`
@@ -157,23 +175,6 @@ The post will appear at `https://benchbox.dev/blog/YYYY-MM-DD-{slug}/` and will 
 - Archives (organized by date)
 - RSS feed (`blog/atom.xml`)
 
-## Using benchbox-sync (Alternative)
-
-If the post is already in `docs/blog/` in the private repo (not `_blog/`), the sync tool handles copying:
-
-```bash
-# Preview what would sync
-benchbox-sync status
-
-# Push all changes to public repo (creates a commit)
-benchbox-sync push --message "Publish blog post: {title}"
-
-# Then push the commit to GitHub
-cd ../BenchBox-public && git push origin main
-```
-
-Note: `benchbox-sync` only syncs files under `ALLOWED_ROOT_FILES` (which includes `docs/`). The `_blog/` directory is never synced.
-
 ## Quick Checklist
 
 - [ ] Draft written in `_blog/{series}/drafts/`
@@ -181,7 +182,10 @@ Note: `benchbox-sync` only syncs files under `ALLOWED_ROOT_FILES` (which include
 - [ ] STYLE_GUIDE editorial checklist completed by hand
 - [ ] ABlog frontmatter added (`blogpost`, `date`, `author`, `tags`)
 - [ ] Filename follows convention: `YYYY-MM-DD-{slug}.md`
-- [ ] Post copied to `docs/blog/` in public repo
+- [ ] `_blog/` archive keeps `../images/` links; `docs/blog/` copy uses `./images/`
+- [ ] Companion links use exact date-prefixed filenames in `docs/blog/`
+- [ ] Post copied to `docs/blog/` in the same repository
 - [ ] Post added to `docs/blog/index.rst` toctree
-- [ ] Committed and pushed to `main`
+- [ ] Development PR checks pass against `develop`
+- [ ] Content reaches `release` through the release flow
 - [ ] Verified live at `https://benchbox.dev/blog/`

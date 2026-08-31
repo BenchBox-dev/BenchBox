@@ -1,7 +1,7 @@
 ---
 title: "How the Results Explorer qualifies comparisons"
 blogpost: true
-status: draft
+status: published
 date: August 31, 2026
 author: Joe Harris
 series: building-benchbox
@@ -41,19 +41,19 @@ Making environment a hard gate was tempting too. On the August 28 snapshot, only
 
 Here is that TPC-H SF1 power pair on the Compare page, using the public short IDs `e3aaa125` (DataFusion SQL) and `9187e38f` (Polars DataFrame):[^compare-urls]
 
-![Compare page for TPC-H SF1 power: DataFusion SQL vs Polars DataFrame. Guardrails say the runs share benchmark, scale, and phase, with five receipt warnings including execution mode. Decision summary still names a winner.](../images/compare_mixed_mode_guardrails.png)
+![Compare page for TPC-H SF1 power: DataFusion SQL vs Polars DataFrame. Guardrails say the runs share benchmark, scale, and phase, with five receipt warnings including execution mode. Decision summary still names a winner.](./images/compare_mixed_mode_guardrails.png)
 
 Winner language still appears. The guardrail says the runs share benchmark, scale, and phase, and it lists five receipt warnings, including execution mode. The 1.23x sits next to those warnings.
 
 The receipt lists them:
 
-![Comparability Receipt for the same pair. Benchmark, scale factor, and phase match. Execution mode differs (sql vs dataframe). Driver version is Not recorded and does not add to the warning count.](../images/compare_mixed_mode_receipt.png)
+![Comparability Receipt for the same pair. Benchmark, scale factor, and phase match. Execution mode differs (sql vs dataframe). Driver version is Not recorded and does not add to the warning count.](./images/compare_mixed_mode_receipt.png)
 
 Benchmark, scale factor, and phase match. Execution mode differs: `sql` versus `dataframe`. Both runs omit a driver version, so that field shows "Not recorded" and stays out of the warning count.
 
 Execution mode is a warning. Scale factor is a hard gate. Same engine, same benchmark family, different scale: DuckDB TPC-DS power at SF 1 versus SF 10 (`f552fd5d` and `aa8b0fad`):
 
-![Compare page for DuckDB TPC-DS SF1 vs SF10. Guardrails state that winner claims are suppressed because scale factors differ. Decision summary shows Winner: Not claimed, and a Claims suppressed badge.](../images/compare_scale_mismatch.png)
+![Compare page for DuckDB TPC-DS SF1 vs SF10. Guardrails state that winner claims are suppressed because scale factors differ. Decision summary shows Winner: Not claimed, and a Claims suppressed badge.](./images/compare_scale_mismatch.png)
 
 Per-query evidence stays on the page. The decision summary leaves the winner unclaimed. Scale factor suppressed the ranking language. Execution mode would have left it in place.
 

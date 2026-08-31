@@ -205,6 +205,6 @@ stage, re-run `pre-commit install` once so the pre-push hook is installed too.
 
 ## Questions?
 
-Open an [issue](https://github.com/BenchBox-dev/BenchBox/issues) or start a [discussion](https://github.com/BenchBox-dev/BenchBox/discussions).
+Start a [discussion](https://github.com/BenchBox-dev/BenchBox/discussions) if you need help with a submission or want to report a correction.
 
 Maintainers: see [Phase 2 Results Operations Runbook](operations/results-phase-2-runbook.md).
