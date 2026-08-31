@@ -154,6 +154,58 @@ describe("ResultDetail - median-first contract", () => {
     expect(screen.getAllByText(/^Duration/i).length).toBeGreaterThan(0);
   });
 
+  it("links to two measurement bases the run can actually answer", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({
+      queries: [
+        { query_id: "Q1", duration_ms: 10, status: "pass", run_type: "measurement", iter: 3, stream: null },
+      ],
+      display_timings: [
+        { query_id: "Q1", display_ms: 10, sample_count: 1, is_valid_display_timing: true, timing_exclusion_reason: null },
+      ],
+    }));
+
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    expect(screen.getByTestId("within-run-compare-link")).toHaveAttribute(
+      "href",
+      "/results/r/r1/passes?bases=default%2Cwarm_pass_3&ref=0",
+    );
+  });
+
+  it("hides within-run comparison when a warmup-only run has fewer than two usable bases", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({
+      queries: [
+        { query_id: "Q1", duration_ms: 10, status: "pass", run_type: "warmup", iter: 0, stream: null },
+      ],
+      display_timings: [
+        { query_id: "Q1", display_ms: null, sample_count: 0, is_valid_display_timing: false, timing_exclusion_reason: "missing_timing" },
+      ],
+    }));
+
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    expect(screen.queryByTestId("within-run-compare-link")).toBeNull();
+    expect(screen.getByText(/Individual samples \(1\)/i)).toBeTruthy();
+  });
+
+  it("hides within-run comparison when available bases have no shared query", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({
+      queries: [
+        { query_id: "Q2", duration_ms: 20, status: "pass", run_type: "warmup", iter: 0, stream: null },
+      ],
+      display_timings: [
+        { query_id: "Q1", display_ms: 10, sample_count: 1, is_valid_display_timing: true, timing_exclusion_reason: null },
+      ],
+    }));
+
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    expect(screen.queryByTestId("within-run-compare-link")).toBeNull();
+  });
+
   it("announces sort state on native median and raw table controls", async () => {
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());

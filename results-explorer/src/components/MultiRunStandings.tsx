@@ -4,6 +4,7 @@ import { geomeanMs } from "@/lib/chartMath";
 import { timingValueForQuery } from "@/lib/displayEligibility";
 import { COMPARE_TIE_THRESHOLD } from "@/lib/compareSummary";
 import { fmtGeomean } from "@/utils";
+import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
 
 /**
  * Standings for a three-to-four run comparison.
@@ -27,6 +28,7 @@ export interface StandingRow {
   label: string;
   engine: string;
   hardware: string;
+  cpuEvidence: string;
   geomeanMs: number | null;
   /** Ratio against the baseline: <1 faster, >1 slower. */
   ratioToBaseline: number | null;
@@ -103,6 +105,7 @@ export function buildStandings(
       label: runLabels[i] ?? r.platform,
       engine,
       hardware,
+      cpuEvidence: formatCpuIdentityProvenance(r.environment?.cpu_identity_provenance),
       geomeanMs: g,
       ratioToBaseline: ratio,
       queriesWon: wins[i] ?? 0,
@@ -189,6 +192,7 @@ export function MultiRunStandings({ results, baselineIndex, runLabels }: MultiRu
               <th scope="col" class="table-th">Rank</th>
               <th scope="col" class="table-th">Run</th>
               <th scope="col" class="table-th">Hardware</th>
+              <th scope="col" class="table-th">CPU evidence</th>
               <th scope="col" class="table-th">Geomean</th>
               <th scope="col" class="table-th">vs baseline</th>
               <th scope="col" class="table-th">Queries won</th>
@@ -209,6 +213,7 @@ export function MultiRunStandings({ results, baselineIndex, runLabels }: MultiRu
                 <td class="table-td text-xs text-[var(--bb-data-fg-muted)]">
                   {row.hardware}
                 </td>
+                <td class="table-td text-xs text-[var(--bb-data-fg-muted)]">{row.cpuEvidence}</td>
                 <td class="table-td font-mono">
                   {row.geomeanMs !== null ? fmtGeomean(row.geomeanMs) : "—"}
                 </td>

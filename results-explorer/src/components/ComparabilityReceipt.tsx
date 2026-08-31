@@ -3,6 +3,7 @@ import { humanizeBenchmark, shortHash } from "@/utils";
 import { costModelSummary, costScopeSummary, normalizedCostLabel } from "@/lib/costDisplay";
 import { formatCount, formatWarningCount } from "@/lib/copyFormatters";
 import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
+import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
 
 interface ComparabilityReceiptProps {
   results: DetailResult[];
@@ -89,6 +90,9 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
     compareHardwareValues("Architecture", results, (result) => valueOrMissing(result.environment?.arch)),
     compareHardwareValues("CPU family", results, (result) => valueOrMissing(result.environment?.cpu_family)),
     compareHardwareValues("CPU model", results, (result) => valueOrMissing(result.environment?.cpu_model)),
+    compareHardwareValues("CPU evidence", results, (result) =>
+      formatCpuIdentityProvenance(result.environment?.cpu_identity_provenance),
+    ),
     compareHardwareValues("CPU count", results, (result) =>
       result.environment?.cpu_count !== undefined ? `${result.environment.cpu_count} CPU` : "Not recorded",
     ),

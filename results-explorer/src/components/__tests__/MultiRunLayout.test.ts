@@ -16,6 +16,7 @@ import {
 import {
   buildHeatmapRows,
   filterHeatmapRows,
+  heatmapCellStyle,
   orderRowsByDisagreement,
 } from "@/components/MultiRunHeatmap";
 import { buildStandings, sharedQueryIdsFor } from "@/components/MultiRunStandings";
@@ -34,6 +35,7 @@ function run(id: string, timings: [string, number | null][]): DetailResult {
   return {
     result_id: id,
     platform: id,
+    queries: [],
     display_timings: timings.map(([query_id, display_ms]) => ({
       query_id,
       display_ms,
@@ -117,6 +119,73 @@ describe("the heatmap grid", () => {
     const q2 = rows.find((r) => r.queryId === "Q2")!;
     expect(q2.cells[2]!.ratio).toBeNull();
     expect(q2.cells[2]!.position).toBeNull();
+    expect(q2.cells[2]!.evidenceKind).toBe("unrecorded");
+  });
+
+  it("distinguishes failed, excluded, and absent query evidence", () => {
+    const failed = run("failed", [["Q1", null]]);
+    failed.queries = [
+      { query_id: "Q1", duration_ms: 0, status: "fail", run_type: "warmup", iter: 0, stream: null },
+      { query_id: "Q1", duration_ms: 0, status: "fail", run_type: "measurement", iter: 1, stream: null },
+    ];
+    // The publisher currently uses this generic reason even when every raw
+    // execution failed, so failure classification must inspect those rows.
+    failed.display_timings[0]!.timing_exclusion_reason = "missing_timing";
+    const excluded = run("excluded", [["Q1", null]]);
+    excluded.display_timings[0]!.timing_exclusion_reason = "zero_timing";
+    const absent = run("absent", []);
+    const rows = buildHeatmapRows([run("base", [["Q1", 10]]), failed, excluded, absent], 0);
+
+    expect(rows[0]!.cells.map((cell) => cell.evidenceKind)).toEqual([
+      "available",
+      "failed",
+      "excluded",
+      "unrecorded",
+    ]);
+  });
+
+  it("classifies default-basis failure from measurement rows even when warmup passed", () => {
+    const failed = run("failed", [["Q1", null]]);
+    failed.queries = [
+      { query_id: "Q1", duration_ms: 50, status: "pass", run_type: "warmup", iter: 0, stream: null },
+      { query_id: "Q1", duration_ms: 0, status: "fail", run_type: "measurement", iter: 1, stream: null },
+      { query_id: "Q1", duration_ms: 0, status: "fail", run_type: "measurement", iter: 2, stream: null },
+    ];
+
+    const rows = buildHeatmapRows([run("base", [["Q1", 10]]), failed], 0);
+
+    expect(rows[0]!.cells[1]!.evidenceKind).toBe("failed");
+  });
+
+  it("keeps recorded candidates available when only the baseline failed", () => {
+    const failedBaseline = run("base", [["Q1", null]]);
+    failedBaseline.queries = [
+      { query_id: "Q1", duration_ms: 0, status: "fail", run_type: "measurement", iter: 1, stream: null },
+    ];
+
+    const rows = buildHeatmapRows([failedBaseline, run("b", [["Q1", 20]]), run("c", [["Q1", 30]])], 0);
+
+    expect(rows[0]!.cells.map((cell) => cell.evidenceKind)).toEqual(["failed", "available", "available"]);
+    expect(rows[0]!.cells.map((cell) => cell.baselineEvidenceKind)).toEqual([null, "failed", "failed"]);
+  });
+
+  it("classifies a projected but unrecorded requested pass as unrecorded", () => {
+    const projected = run("projected", [["Q1", null]]);
+    projected.display_timings[0]!.timing_exclusion_reason = "pass_not_recorded";
+    projected.queries = [
+      { query_id: "Q1", duration_ms: 10, status: "pass", run_type: "measurement", iter: 1, stream: null },
+    ];
+
+    const rows = buildHeatmapRows([run("base", [["Q1", 10]]), projected], 0);
+
+    expect(rows[0]!.cells[1]!.evidenceKind).toBe("unrecorded");
+  });
+
+  it("leaves theme-dependent background colour to CSS", () => {
+    const style = heatmapCellStyle(0.5);
+    expect(style).toContain("--cell-hue:");
+    expect(style).toContain("--cell-dark-lightness:");
+    expect(style).not.toContain("background-color");
   });
 
   it("orders by disagreement when asked, with unanswerable rows last", () => {
@@ -188,7 +257,7 @@ describe("standings", () => {
       {
         ...results[0],
         platform_version: "1.2.0",
-        environment: { arch: "arm64", cpu_model: "Apple M4", memory_gb: 16 },
+        environment: { arch: "arm64", cpu_model: "Apple M4", memory_gb: 16, cpu_identity_provenance: "measured" },
       } as DetailResult,
       results[1]!,
       results[2]!,
@@ -197,6 +266,7 @@ describe("standings", () => {
     const first = rows.find((r) => r.resultId === "fast")!;
     expect(first.engine).toBe("fast v1.2.0");
     expect(first.hardware).toBe("Apple M4 · 16 GB");
+    expect(first.cpuEvidence).toBe("Measured");
   });
 });
 

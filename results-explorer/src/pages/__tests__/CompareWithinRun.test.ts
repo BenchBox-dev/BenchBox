@@ -66,7 +66,7 @@ describe("the same-query-set rule across columns", () => {
     const q2 = rows.find((r) => r.queryId === "Q2")!;
     expect(q2.cells[0]!.ms).toBe(200);
     expect(q2.cells[1]!.ms).toBeNull();
-    expect(q2.cells[1]!.unavailableReason).toBe("pass_not_recorded");
+    expect(q2.cells[1]!.unavailableReason).toBe("no_passing_executions");
   });
 
   it("excludes it from EVERY column's shared set, not just its own", () => {
@@ -108,6 +108,19 @@ describe("the same-query-set rule across columns", () => {
       [DEFAULT_BASIS, MIN_ALL_WARM],
     );
     expect(sharedQueryIds).toEqual(["Q1", "Q2"]);
+  });
+
+  it("keeps a published display query even when raw execution rows are absent", () => {
+    const { rows } = buildWithinRunRows(
+      [],
+      new Map([["Q-published", 42]]),
+      [DEFAULT_BASIS, MIN_ALL_WARM],
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.queryId).toBe("Q-published");
+    expect(rows[0]!.cells[0]!.ms).toBe(42);
+    expect(rows[0]!.cells[1]!.ms).toBeNull();
   });
 });
 
@@ -194,9 +207,32 @@ describe("deduplication and bases parsing", () => {
     expect(bases).toEqual([DEFAULT_BASIS, { passes: warmPass(1), statistic: "median" }]);
     expect(referenceIndex).toBe(0);
   });
+
+  it.each(["?bases=nonsense", "?bases=default,default", "?bases=default"]) (
+    "treats an invalid or underspecified bases parameter as fallback state: %s",
+    (search) => {
+      expect(parseBasesParam(search).hasExplicitBases).toBe(false);
+    },
+  );
+
+  it("recognizes a valid two-basis parameter as explicit", () => {
+    expect(parseBasesParam("?bases=default,warm_pass_1").hasExplicitBases).toBe(true);
+  });
 });
 
 describe("available bases discovery", () => {
+  it("omits the published default when explicit display timings contain no usable value", () => {
+    const queries = [
+      { query_id: "Q1", duration_ms: 15, status: "pass", run_type: "warmup", iter: 0 } as any,
+    ];
+    const available = availableBasesForQueries(queries, [
+      { query_id: "Q1", display_ms: null, is_valid_display_timing: false },
+    ]);
+
+    expect(available).not.toContainEqual(DEFAULT_BASIS);
+    expect(available).toContainEqual({ passes: WARMUP, statistic: "median" });
+  });
+
   it("discovers warmup and multiple warm passes from query executions", () => {
     const queries = [
       { query_id: "Q1", duration_ms: 15, status: "pass", run_type: "warmup", iter: null } as any,
@@ -281,7 +317,7 @@ describe("column geometric means over shared queries", () => {
       },
       {
         queryId: "Q3",
-        cells: [{ ms: 100, unavailableReason: null }, { ms: null, unavailableReason: "no_pass" }],
+        cells: [{ ms: 100, unavailableReason: null }, { ms: null, unavailableReason: "no_passing_executions" as const }],
         comparable: false,
       },
     ];

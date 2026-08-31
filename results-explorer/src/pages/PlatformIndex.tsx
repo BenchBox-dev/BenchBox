@@ -46,6 +46,7 @@ import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import {
   COHORT_GROUP_BY_LABELS,
   groupCohortRows,
+  limitCohortGroups,
   type CohortGroupBy,
 } from "@/lib/queryFilters";
 
@@ -404,10 +405,14 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     return dir * (av - bv);
   });
   const visiblePlatformResults = platformResults.slice(0, visibleLimit);
-  const groupedPlatformResults = groupCohortRows<PlatformIndexRowRow>(
-    visiblePlatformResults,
-    groupBy,
-    (row) => row.platform_version ?? null,
+  const groupedPlatformResults = limitCohortGroups(
+    groupCohortRows<PlatformIndexRowRow>(
+      platformResults,
+      groupBy,
+      (row) => row.platform_version ?? null,
+    ),
+    platformResults,
+    visibleLimit,
   );
   const runIdentityLabels = formatRunIdentitiesForCohort(platformResults, "table");
 
@@ -908,11 +913,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                         class="bg-[var(--bb-surface-data-muted)] font-semibold text-xs text-[var(--bb-data-fg-primary)]"
                       >
                         <td colspan={platformColumnCount} class="px-4 py-2">
-                          {group.label} ({group.rows.length} {group.rows.length === 1 ? "result" : "results"})
+                          {group.label} ({group.totalRows} {group.totalRows === 1 ? "result" : "results"})
                         </td>
                       </tr>
                       {group.rows.map((r) => {
-                        const index = visiblePlatformResults.findIndex((row) => row.result_id === r.result_id);
+                        const index = platformResults.findIndex((row) => row.result_id === r.result_id);
                         return (
                           <PlatformRow
                             key={r.result_id}

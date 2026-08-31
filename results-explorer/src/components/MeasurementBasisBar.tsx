@@ -98,10 +98,13 @@ export function MeasurementBasisBar({
           </StatusBadge>
         </div>
         <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
-          {`Every figure is ${measuring}, over ${comparableQueryCount} of ${totalQueryCount} queries both runs can answer.`}
+          {`Query-derived latency figures use ${measuring}, over ${comparableQueryCount} of ${totalQueryCount} queries every selected run can answer.`}
           {excluded > 0
             ? ` ${excluded} ${excluded === 1 ? "query is" : "queries are"} excluded from every run so the geomeans compare like with like.`
             : ""}
+        </p>
+        <p class="mt-1 text-xs text-[var(--bb-data-fg-subtle)]">
+          Whole-run wall-clock totals and phase durations remain run-wide context.
         </p>
         {unavailableReason ? (
           <p class="mt-1 text-xs text-[var(--bb-data-fg-subtle)]">{basisUnavailableLabel(unavailableReason)}</p>

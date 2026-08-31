@@ -2,7 +2,7 @@
  * Value-resolution tests for the measurement-basis model.
  *
  * The fixture these assert against is not invented: it is the real committed
- * corpus, captured straight from a rebuilt read-model-v7 snapshot by work unit
+ * corpus, captured straight from a rebuilt read-model snapshot by work unit
  * w0. See _project/verification-logs/explorer-basis-frontend-model-and-invariant/
  * w0.log for provenance, for why these three results were chosen, and for the
  * measured CPython/V8 divergence that fixes the tolerances used below.
@@ -30,10 +30,10 @@ import {
 } from "@/lib/measurementBasis";
 import type { DetailResult } from "@/types";
 
-const TPCH_DUCKDB = "tpch-duckdb-sf1.0-20260828-ea150b8e";
-const TPCDS_SPARK_SF10 = "tpcds-spark-sf10.0-20260823-ace504c8";
-const TPCDS_DUCKDB_SF10 = "tpcds-duckdb-sf10.0-20260823-7cd05599";
-const TPCH_SKEW_DATAFUSION = "tpch_skew-datafusion-sf1.0-20260826-e4e3a903";
+const TPCH_DUCKDB = "tpch-duckdb-sf1.0-20260828-0e8c1781";
+const TPCDS_SPARK_SF10 = "tpcds-spark-sf10.0-20260823-5293ac3a";
+const TPCDS_DUCKDB_SF10 = "tpcds-duckdb-sf10.0-20260823-ab8df093";
+const TPCH_SKEW_DATAFUSION = "tpch_skew-datafusion-sf1.0-20260826-2a83322c";
 
 /** The one query in the fixture whose every execution failed, warmup included. */
 const TOTAL_FAILURE_QUERY = "18";
@@ -195,7 +195,7 @@ describe("the uneven corpus query", () => {
 
   it("cannot answer warm_pass_2, because that execution failed", () => {
     const value = resolveQueryValue(PASS_2, rows());
-    expect(value).toEqual({ kind: "unavailable", reason: "pass_not_recorded" });
+    expect(value).toEqual({ kind: "unavailable", reason: "no_passing_executions" });
   });
 });
 
@@ -475,19 +475,19 @@ describe("the total-failure corpus query", () => {
   it("is unavailable under every basis, not just the warm ones", () => {
     expect(resolveQueryValue(DEFAULT_BASIS, rows(), null)).toEqual({
       kind: "unavailable",
-      reason: "no_warm_passes_recorded",
+      reason: "no_passing_executions",
     });
     expect(resolveQueryValue({ passes: ALL_WARM, statistic: "min" }, rows())).toEqual({
       kind: "unavailable",
-      reason: "no_warm_passes_recorded",
+      reason: "no_passing_executions",
     });
     expect(resolveQueryValue(WARMUP_BASIS, rows())).toEqual({
       kind: "unavailable",
-      reason: "no_warmup_recorded",
+      reason: "no_passing_executions",
     });
     expect(resolveQueryValue(PASS_2, rows())).toEqual({
       kind: "unavailable",
-      reason: "no_warm_passes_recorded",
+      reason: "no_passing_executions",
     });
   });
 

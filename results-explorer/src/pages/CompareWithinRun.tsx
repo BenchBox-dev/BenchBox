@@ -1,7 +1,7 @@
 import type { RoutableProps } from "preact-router";
 import { useEffect, useMemo, useState } from "preact/hooks";
 
-import type { DetailResult, QueryTiming } from "@/types";
+import type { DetailResult } from "@/types";
 import { getDetailResult } from "@/lib/duckdbQueries";
 import { errMsg, fmtMs } from "@/utils";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -14,9 +14,9 @@ import { paletteColor } from "@/lib/chartTheme";
 import { geomeanMs } from "@/lib/chartMath";
 import { COMPARE_TIE_THRESHOLD } from "@/lib/compareSummary";
 import {
-  ALL_WARM,
   DEFAULT_BASIS,
-  WARMUP,
+  availableBasesForExecutions,
+  basisUnavailableLabel,
   basesEqual,
   basesSerde,
   decodeBasis,
@@ -24,10 +24,11 @@ import {
   formatBasisLabel,
   passSelectionsEqual,
   resolveQueryValue,
+  selectComparableBasisPair,
   warmPass,
+  type BasisUnavailableReason,
   type BasisExecution,
   type MeasurementBasis,
-  type PassSelection,
 } from "@/lib/measurementBasis";
 
 /**
@@ -61,7 +62,11 @@ export function deduplicateBases(bases: readonly MeasurementBasis[]): Measuremen
   return unique;
 }
 
-export function parseBasesParam(search: string): { bases: MeasurementBasis[]; referenceIndex: number } {
+export function parseBasesParam(search: string): {
+  bases: MeasurementBasis[];
+  referenceIndex: number;
+  hasExplicitBases: boolean;
+} {
   const params = new URLSearchParams(search);
   const raw = params.get("bases");
   const decoded = raw !== null ? basesSerde.decode(raw) : null;
@@ -77,30 +82,12 @@ export function parseBasesParam(search: string): { bases: MeasurementBasis[]; re
     : -1;
   return {
     bases,
+    hasExplicitBases: decoded !== null && unique.length >= MIN_WITHIN_RUN_BASES,
     referenceIndex:
       deduplicatedReferenceIndex >= 0
         ? deduplicatedReferenceIndex
         : clampReferenceIndex(refRaw, bases.length),
   };
-}
-
-function hasSamples(queries: readonly QueryTiming[], passes: PassSelection, minimum: number): boolean {
-  const byQuery = new Map<string, QueryTiming[]>();
-  for (const q of queries) {
-    const bucket = byQuery.get(q.query_id);
-    if (bucket) bucket.push(q);
-    else byQuery.set(q.query_id, [q]);
-  }
-  const basis: MeasurementBasis = { passes, statistic: "min" };
-  for (const queryRows of byQuery.values()) {
-    const value = resolveQueryValue(basis, queryRows, null);
-    if (value.kind === "value" && value.sampleCount >= minimum) return true;
-  }
-  return false;
-}
-
-function hasMultipleSamples(queries: readonly QueryTiming[], passes: PassSelection): boolean {
-  return hasSamples(queries, passes, 2);
 }
 
 export function withinRunComparisonStatus(ratio: number | null): "faster" | "slower" | "parity" | null {
@@ -130,43 +117,20 @@ export function formatWithinRunBasisLabel(
   return formatBasisLabel(basis);
 }
 
-export function availableBasesForQueries(queries: readonly QueryTiming[]): MeasurementBasis[] {
-  const list: MeasurementBasis[] = [];
-  list.push(DEFAULT_BASIS);
-  if (hasMultipleSamples(queries, ALL_WARM)) {
-    list.push({ passes: ALL_WARM, statistic: "min" });
-  }
-
-  const hasWarmup = hasSamples(queries, WARMUP, 1);
-  if (hasWarmup) {
-    list.push({ passes: WARMUP, statistic: "median" });
-    if (hasMultipleSamples(queries, WARMUP)) {
-      list.push({ passes: WARMUP, statistic: "min" });
-    }
-  }
-
-  const iters = new Set<number>();
-  for (const q of queries) {
-    if (q.status === "pass" && typeof q.iter === "number" && q.iter > 0) {
-      iters.add(q.iter);
-    }
-  }
-  const sortedIters = [...iters].sort((a, b) => a - b);
-  for (const iter of sortedIters) {
-    const p = warmPass(iter);
-    if (!hasSamples(queries, p, 1)) continue;
-    list.push({ passes: p, statistic: "median" });
-    if (hasMultipleSamples(queries, p)) {
-      list.push({ passes: p, statistic: "min" });
-    }
-  }
-
-  return deduplicateBases(list);
-}
+export const availableBasesForQueries = availableBasesForExecutions;
 
 export interface WithinRunCell {
   ms: number | null;
-  unavailableReason: string | null;
+  unavailableReason: BasisUnavailableReason | null;
+}
+
+export function withinRunUnavailableKind(
+  reason: BasisUnavailableReason | null,
+): "failed" | "excluded" | "unrecorded" {
+  if (reason === null || reason === "no_warmup_recorded" || reason === "no_warm_passes_recorded" || reason === "pass_not_recorded") {
+    return "unrecorded";
+  }
+  return reason === "no_passing_executions" ? "failed" : "excluded";
 }
 
 export interface WithinRunRow {
@@ -179,7 +143,7 @@ export interface WithinRunRow {
 /**
  * Build the grid, enforcing the same-query-set rule across columns.
  *
- * A query any column cannot answer is marked unrecorded in that column AND
+ * A query any column cannot answer is marked with its evidence state in that column AND
  * excluded from every column's geomean. This is the case that produced a wrong
  * 1.18x reading in the design prototype: each column had silently averaged over
  * whichever queries it happened to have.
@@ -196,9 +160,11 @@ export function buildWithinRunRows(
     else byQuery.set(row.query_id, [row]);
   }
 
-  const rows: WithinRunRow[] = [...byQuery.entries()]
-    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
-    .map(([queryId, queryRows]) => {
+  const queryIds = new Set([...byQuery.keys(), ...displayMsByQuery.keys()]);
+  const rows: WithinRunRow[] = [...queryIds]
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+    .map((queryId) => {
+      const queryRows = byQuery.get(queryId) ?? [];
       const cells = bases.map((basis) => {
         const value = resolveQueryValue(basis, queryRows, displayMsByQuery.get(queryId) ?? null);
         return value.kind === "value"
@@ -293,9 +259,24 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
   }
 
   const availableBases = useMemo(
-    () => (detail ? availableBasesForQueries(detail.queries) : []),
+    () => (detail ? availableBasesForQueries(detail.queries, detail.display_timings) : []),
     [detail],
   );
+  const comparablePair = useMemo(
+    () => (detail ? selectComparableBasisPair(detail.queries, detail.display_timings, bases) : null),
+    [bases, detail],
+  );
+
+  useEffect(() => {
+    if (!detail) return;
+    const hasUnavailableSelection = bases.some(
+      (basis) => !availableBases.some((candidate) => basesEqual(candidate, basis)),
+    );
+    if (parsed.hasExplicitBases && !hasUnavailableSelection) return;
+    if (comparablePair && (bases.length !== 2 || !comparablePair.every((basis, index) => basesEqual(basis, bases[index]!)))) {
+      updateBasesAndRef(comparablePair, Math.min(referenceIndex, 1));
+    }
+  }, [availableBases, bases, comparablePair, detail, parsed.hasExplicitBases, referenceIndex]);
   const addableBases = useMemo(
     () => availableBases.filter((b) => !bases.some((existing) => basesEqual(existing, b))),
     [availableBases, bases],
@@ -353,6 +334,9 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
   if (loading) return <CompareSummarySkeleton />;
   if (error) return <ErrorMessage message={error} />;
   if (!detail) return <ErrorMessage message="Result not found." />;
+  if (comparablePair === null) {
+    return <ErrorMessage message="This run does not have two measurement bases with shared query evidence." />;
+  }
 
   const passSummaries = summarizeQueryPasses(detail.queries);
   const reference = bases[referenceIndex] ?? bases[0]!;
@@ -573,8 +557,12 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
                               )}
                             </div>
                           ) : (
-                            <span class="text-[var(--bb-data-fg-subtle)]" data-testid="unrecorded-cell">
-                              unrecorded
+                            <span
+                              class="text-[var(--bb-data-fg-subtle)]"
+                              data-testid={`${withinRunUnavailableKind(cell.unavailableReason)}-cell`}
+                              title={cell.unavailableReason ? basisUnavailableLabel(cell.unavailableReason) : undefined}
+                            >
+                              {withinRunUnavailableKind(cell.unavailableReason)}
                             </span>
                           )}
                         </td>

@@ -1,5 +1,5 @@
 /**
- * The six-axis engine-and-hardware strip.
+ * The engine-and-hardware strip.
  *
  * Answers one question: of the things that could explain a difference in these
  * numbers, which ones actually differ? It must not replace or duplicate the
@@ -36,15 +36,16 @@ function run(overrides: Partial<DetailResult> = {}): DetailResult {
 }
 
 describe("axis selection", () => {
-  it("reports exactly six axes", () => {
+  it("reports the seven selected identity axes", () => {
     const fields = identityStripFields([run(), run({ result_id: "r2" })]);
-    expect(fields).toHaveLength(6);
+    expect(fields).toHaveLength(7);
     expect(fields.map((f) => f.label)).toEqual([
       "Platform version",
       "Driver version",
       "Architecture",
       "CPU family",
       "CPU model",
+      "CPU evidence",
       "Memory",
     ]);
   });
@@ -74,13 +75,13 @@ describe("marking which axes differ", () => {
 
   it("reports the differing count with correct grammar", () => {
     render(<IdentityDiffStrip results={[run(), run({ result_id: "r2", platform_version: "1.5.0" })]} />);
-    expect(screen.getByText(/1 of 6 axis differs/)).toBeTruthy();
+    expect(screen.getByText(/1 of 7 axis differs/)).toBeTruthy();
   });
 
   it("pluralises for several differing axes", () => {
     const other = run({ result_id: "r2", platform_version: "1.5.0", driver_version: "9.9.9" });
     render(<IdentityDiffStrip results={[run(), other]} />);
-    expect(screen.getByText(/2 of 6 axes differ/)).toBeTruthy();
+    expect(screen.getByText(/2 of 7 axes differ/)).toBeTruthy();
   });
 });
 
@@ -109,7 +110,7 @@ describe("multi-run identity matrix (N > 2 runs)", () => {
     expect(screen.getByText("Run 3")).toBeTruthy();
     expect(screen.getByText("Engine version")).toBeTruthy();
     expect(screen.getByText("Architecture")).toBeTruthy();
-    expect(screen.getByText(/1 of 6 axis varies across the whole selection/)).toBeTruthy();
+    expect(screen.getByText(/1 of 7 axis varies across the whole selection/)).toBeTruthy();
   });
 
   it("marks differing cells relative to baseline and identifies matching cells", () => {
@@ -136,6 +137,18 @@ describe("multi-run identity matrix (N > 2 runs)", () => {
     const missingCell = screen.getByTestId("matrix-cell-CPU family-1");
     expect(missingCell.textContent).toContain("Not recorded");
     expect(missingCell.textContent).not.toContain("Differs");
+  });
+
+  it("keeps a recorded candidate value visible when only the baseline is missing", () => {
+    const baseline = run({ result_id: "r1", environment: { arch: "arm64" } as any });
+    const candidate = run({ result_id: "r2" });
+    const third = run({ result_id: "r3" });
+    render(<IdentityDiffStrip results={[baseline, candidate, third]} baselineIndex={0} />);
+
+    const candidateCell = screen.getByTestId("matrix-cell-CPU model-1");
+    expect(candidateCell).toHaveTextContent("Apple M4");
+    expect(candidateCell).toHaveTextContent("No baseline");
+    expect(candidateCell).not.toHaveTextContent("Not recorded");
   });
 });
 

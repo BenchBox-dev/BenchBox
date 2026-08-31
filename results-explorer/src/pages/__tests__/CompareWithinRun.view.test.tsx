@@ -82,6 +82,90 @@ describe("CompareWithinRun page component", () => {
     expect(screen.getAllByText(/Geomean query time/i).length).toBeGreaterThan(0);
   });
 
+  it("reconciles a bare route to passes the run actually recorded", async () => {
+    const detail = makeDetail();
+    (getDetailResult as any).mockResolvedValue({
+      ...detail,
+      queries: [
+        { query_id: "Q1", duration_ms: 20, status: "pass", run_type: "measurement", iter: 3, stream: 0 },
+        { query_id: "Q2", duration_ms: 40, status: "pass", run_type: "measurement", iter: 3, stream: 0 },
+      ],
+    });
+
+    render(<CompareWithinRun resultId="res-123" />);
+
+    await waitFor(() => expect(screen.getByTestId("reference-radio-warm_pass_3")).toBeTruthy());
+    expect(screen.queryByTestId("reference-radio-warm_pass_1")).toBeNull();
+    expect(window.location.search).toContain("warm_pass_3");
+  });
+
+  it("labels failed basis evidence as failed rather than unrecorded", async () => {
+    const detail = makeDetail();
+    (getDetailResult as any).mockResolvedValue({
+      ...detail,
+      queries: detail.queries.map((query) =>
+        query.query_id === "Q2" && query.run_type === "measurement" && query.iter === 1
+          ? { ...query, status: "fail" }
+          : query,
+      ),
+    });
+    window.history.replaceState(null, "", "/results/r/res-123/passes?bases=default,warm_pass_1&ref=0");
+
+    render(<CompareWithinRun resultId="res-123" />);
+
+    await waitFor(() => expect(screen.getByTestId("failed-cell")).toHaveTextContent("failed"));
+    expect(screen.getByTestId("failed-cell")).toHaveAttribute(
+      "title",
+      "No execution of this query passed under that basis.",
+    );
+  });
+
+  it("shows an unavailable state when no two bases share query evidence", async () => {
+    const detail = makeDetail();
+    (getDetailResult as any).mockResolvedValue({
+      ...detail,
+      queries: [
+        { query_id: "Q2", duration_ms: 20, status: "pass", run_type: "warmup", iter: 0, stream: 0 },
+      ],
+      display_timings: [
+        { query_id: "Q1", display_ms: 10, is_valid_display_timing: true, timing_exclusion_reason: null, sample_count: 1 },
+      ],
+    });
+
+    render(<CompareWithinRun resultId="res-123" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("This run does not have two measurement bases with shared query evidence.")).toBeTruthy();
+    });
+    expect(screen.queryByText("measurement bases compared")).toBeNull();
+  });
+
+  it.each(["nonsense", "default,default"])(
+    "repairs malformed or duplicate fallback bases to a shared pair: %s",
+    async (rawBases) => {
+      const detail = makeDetail();
+      (getDetailResult as any).mockResolvedValue({
+        ...detail,
+        queries: [
+          { query_id: "Q2", duration_ms: 20, status: "pass", run_type: "measurement", iter: 1, stream: 0 },
+          { query_id: "Q2", duration_ms: 30, status: "pass", run_type: "measurement", iter: 2, stream: 0 },
+        ],
+        display_timings: [
+          { query_id: "Q1", display_ms: 10, is_valid_display_timing: true, timing_exclusion_reason: null, sample_count: 1 },
+        ],
+      });
+      window.history.replaceState(null, "", `/results/r/res-123/passes?bases=${rawBases}`);
+
+      render(<CompareWithinRun resultId="res-123" />);
+
+      await waitFor(() => expect(screen.getByTestId("reference-radio-all_warm:min")).toBeTruthy());
+      expect(screen.getByTestId("reference-radio-warm_pass_1")).toBeTruthy();
+      expect(screen.queryByTestId("reference-radio-default")).toBeNull();
+      expect(window.location.search).toContain("warm_pass_1");
+      expect(window.location.search).toContain("all_warm%3Amin");
+    },
+  );
+
   it("changes reference basis when clicking the reference radio button", async () => {
     window.history.replaceState(null, "", "/results/r/res-123/passes?bases=default,warm_pass_1&ref=0");
     render(<CompareWithinRun resultId="res-123" />);

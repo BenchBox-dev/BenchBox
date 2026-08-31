@@ -12,6 +12,7 @@ import { FundingChip } from "@/components/FundingChip";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { PassStrip } from "@/components/PassStrip";
 import { withinRunCompareHref } from "@/lib/resultLinks";
+import { encodeBasis, selectComparableBasisPair } from "@/lib/measurementBasis";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { TuningBadge } from "@/components/TuningBadge";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -229,6 +230,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   const plansUrl = planDownloadUrl(detail);
   const showSidebar = showTuningSection || (detail.has_plans && !plansUrl);
   const hasTimings = detail.display_timings.length > 0 || detail.queries.length > 0;
+  const withinRunBases = selectComparableBasisPair(detail.queries, detail.display_timings);
   const hasPrimaryMetric = primaryMetric === "power_score"
     ? detail.power_score !== null && detail.power_score !== undefined
     : detail.display_geomean_ms !== null && detail.display_geomean_ms !== undefined;
@@ -447,15 +449,17 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             {detail.queries.length > 0 && (
               <>
               <PassStrip queries={detail.queries} />
-              <p class="mb-6 text-sm">
-                <a
-                  class="link"
-                  href={withinRunCompareHref(detail.result_id, ["default", "warm_pass_1"], 0)}
-                  data-testid="within-run-compare-link"
-                >
-                  Compare measurement bases within this run
-                </a>
-              </p>
+              {withinRunBases !== null && (
+                <p class="mb-6 text-sm">
+                  <a
+                    class="link"
+                    href={withinRunCompareHref(detail.result_id, withinRunBases.map(encodeBasis), 0)}
+                    data-testid="within-run-compare-link"
+                  >
+                    Compare measurement bases within this run
+                  </a>
+                </p>
+              )}
 
               <details class="mt-4">
                 <summary class="cursor-pointer select-none text-sm text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]">

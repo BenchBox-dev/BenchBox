@@ -11,6 +11,7 @@ import {
 } from "@/lib/displayLabels";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TuningVerificationBadge } from "@/components/TuningVerificationBadge";
+import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
 
 interface RunReceiptProps {
   detail: DetailResult;
@@ -50,13 +51,6 @@ function rowFromString(
 function rowFromSummary(label: string, value: string): ReceiptRow {
   if (value === MISSING_PLACEHOLDER) return missingRow(label);
   return recordedRow(label, value);
-}
-
-function formatCpuIdentityProvenance(value: string): string {
-  if (value === "user_attested") return "User attested";
-  if (value === "measured") return "Measured";
-  if (value === "inferred") return "Inferred";
-  return "Unknown";
 }
 
 /**
