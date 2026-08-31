@@ -166,6 +166,27 @@ describe("CompareWithinRun page component", () => {
     },
   );
 
+  it("repairs explicit bases that are available but share no query evidence", async () => {
+    const detail = makeDetail();
+    (getDetailResult as any).mockResolvedValue({
+      ...detail,
+      queries: [
+        { query_id: "Q1", duration_ms: 50, status: "pass", run_type: "warmup", iter: null, stream: 0 },
+        { query_id: "Q2", duration_ms: 40, status: "pass", run_type: "measurement", iter: 1, stream: 0 },
+      ],
+      display_timings: [
+        { query_id: "Q1", display_ms: 50, is_valid_display_timing: true, timing_exclusion_reason: null, sample_count: 1 },
+      ],
+    });
+    window.history.replaceState(null, "", "/results/r/res-123/passes?bases=warmup%3Amedian,warm_pass_1&ref=0");
+
+    render(<CompareWithinRun resultId="res-123" />);
+
+    await waitFor(() => expect(window.location.search).toContain("default"));
+    expect(screen.getByText("DuckDB — measurement bases compared")).toBeTruthy();
+    expect(screen.getByText("1 of 2 queries comparable")).toBeTruthy();
+  });
+
   it("changes reference basis when clicking the reference radio button", async () => {
     window.history.replaceState(null, "", "/results/r/res-123/passes?bases=default,warm_pass_1&ref=0");
     render(<CompareWithinRun resultId="res-123" />);

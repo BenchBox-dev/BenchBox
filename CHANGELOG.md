@@ -773,7 +773,7 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01
 ### Links
 
 - **Documentation**: [GitHub Repository](https://github.com/BenchBox-dev/BenchBox)
-- **Issues**: [Report bugs and request features](https://github.com/BenchBox-dev/BenchBox/issues)
+- **Discussions**: [Ask questions and request features](https://github.com/BenchBox-dev/BenchBox/discussions)
 - **PyPI**: [pypi.org/project/benchbox](https://pypi.org/project/benchbox/)
 
 [Unreleased]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.0...HEAD

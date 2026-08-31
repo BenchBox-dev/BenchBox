@@ -1,11 +1,11 @@
 ---
 title: "How the Results Explorer qualifies comparisons"
 blogpost: true
-status: draft
+status: published
 date: August 31, 2026
 author: Joe Harris
 series: building-benchbox
-post_number: 17
+post_number: 16
 type: architecture-design
 tags: [benchbox, results-explorer, benchmarking, comparability, validation, duckdb-wasm]
 meta_description: "How BenchBox's Results Explorer separates display, comparison, and ranking, suppresses unsupported winner claims, and leaves recorded differences inspectable."

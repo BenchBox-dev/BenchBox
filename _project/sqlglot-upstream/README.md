@@ -11,6 +11,7 @@ https://github.com/tobymao/sqlglot/issues.
 | Path | What it is |
 |------|------------|
 | `repros/repro_all.py` | Single-file Python harness covering all candidates; pinned to `sqlglot==30.6.0` |
+| `repros/generator.py` | Deterministic nightly translation generator and seed-replay entrypoint |
 | `issues/02-sqlite-interval-date-arithmetic.md` | Drafted bug report (Tier A) |
 | `issues/03-sqlite-extract-not-lowered-to-strftime.md` | Drafted bug report (Tier B confirmed) |
 | `issues/05-mysql-percentile-cont-extra-case-decorator.md` | Drafted bug report (Tier A) |
@@ -24,6 +25,56 @@ uv run --with sqlglot==30.6.0 python _project/sqlglot-upstream/repros/repro_all.
 
 Exit code is zero only if every defect has been resolved upstream; any
 remaining `FAIL` lines indicate the workaround in BenchBox is still load-bearing.
+
+## Generated-case known-failure policy
+
+Generator failures are advisory only while they are explicit, reproducible,
+and younger than seven calendar days. Validate the policy with:
+
+```bash
+uv run -- python scripts/check_sqlglot_generator_known_failures.py --policy _project/sqlglot-upstream/generator-policy.json
+```
+
+An entry added to `generator-policy.json` must include its owner, canonical
+`https://github.com/tobymao/sqlglot/issues/<number>` issue, first-known date,
+failure artifact, SQLGlot version, source and target dialects, and non-negative
+seed. Replay values must use the guard's narrow shell-safe token grammar. The
+entry is valid on days 0 through 6 and fails the guard on day 7. Its artifact
+must be an existing regular JSON file inside the repository, with top-level
+`id`, `seed`, `sqlglot_version`, `source_dialect`, and `target_dialect` values
+that exactly match the entry. Use `--today YYYY-MM-DD` for deterministic
+boundary checks.
+
+The policy's replay template invokes
+`_project/sqlglot-upstream/repros/generator.py`. Replay a failure by
+substituting the stored version, seed, dialects, and repository-relative
+artifact path without changing any value. The template passes that path to
+both `--failure-artifact` and explicit `--replay`; a missing replay file is an
+infrastructure error rather than a new campaign. The path-independent template
+travels inside the artifact, and the policy guard validates it after the
+downloaded artifact is moved into its repository policy path.
+
+The nightly pilot runs 1,024 DuckDB cases with a five-minute internal deadline
+inside a ten-minute job. Its GitHub run ID is the deterministic seed, so every
+discovery has an exact replay value while successive scheduled runs explore
+new cases. Each case calls BenchBox's real `translate_sql_query` helper with
+`strict=True` for both `duckdb -> duckdb` and `postgres -> duckdb`, then parses
+the translated output in the target dialect. The generator minimizes a failing
+case before writing its JSON evidence.
+
+Exit status `0` means the bounded cohort was clean, `1` means a generated case
+was discovered or exactly reproduced, and statuses `2` and above mean the
+generator's contract or infrastructure failed. The nightly workflow translates
+status `1` only after a separate validation of the summary and failure evidence;
+a bare process exit cannot become advisory. The policy guard and every other
+nonzero status remain blocking; the job itself does not use
+`continue-on-error`. Summary and failure evidence are retained as workflow
+artifacts for 14 days. Nightly remains outside develop post-merge auto-revert
+and no required PR lane invokes the generator.
+
+The workflow keeps policy shape, age, artifact, and other infrastructure
+validation failures blocking. Only a new generated-case discovery is
+advisory; do not make the whole job continue on error.
 
 ### Wrapper-call-shape convention
 
