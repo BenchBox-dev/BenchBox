@@ -1,8 +1,8 @@
 {
+  "bundle_file": "ssb_sf1_sqlite_sql_20260826_173350_a6b8db82.json",
+  "bundle_hash": "0f7dac407862742403cca3253a5b47465320eb1262052236fdd67bcf1201769f",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "ssb_sf1_sqlite_sql_20260826_173350_a6b8db82.json",
-  "bundle_hash": "3a8ac94f0d027611b6a2ac1845b2ba357cb2313d2d4c4dcdaa78148d5f10a22c"
+  "submitted_by": "maintainer"
 }

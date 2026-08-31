@@ -1,8 +1,8 @@
 {
+  "bundle_file": "read_primitives_sf01_datafusion_sql_20260826_095258_1cdd70ad.json",
+  "bundle_hash": "d81e7cdae32515c68ec307e0bbe09a4f23c428ecee2ee35845f3df4f1db33c91",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "read_primitives_sf01_datafusion_sql_20260826_095258_1cdd70ad.json",
-  "bundle_hash": "137e1f4d99a56608c07bf479a3d6555eaec9e1e842045039c6224f175c69c230"
+  "submitted_by": "maintainer"
 }

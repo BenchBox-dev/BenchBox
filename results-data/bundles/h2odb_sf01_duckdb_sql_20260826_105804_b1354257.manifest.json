@@ -1,8 +1,8 @@
 {
+  "bundle_file": "h2odb_sf01_duckdb_sql_20260826_105804_b1354257.json",
+  "bundle_hash": "2920ab54de65a8f5fec59795f9c2244a63e87598a6030a44450beecff6a88499",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "h2odb_sf01_duckdb_sql_20260826_105804_b1354257.json",
-  "bundle_hash": "26d57ae48984caece496c405a7f250ef9ead501902d151dd4f3a2239dfd59be6"
+  "submitted_by": "maintainer"
 }

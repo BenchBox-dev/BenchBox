@@ -1,0 +1,332 @@
+{
+  "applied_ledger_hash": "9230c16fa10b218862795b57dc9da2c877484d05fb370ec7b31e65b039a61841",
+  "dropped": [],
+  "receipt": {
+    "corroborated": false,
+    "entries": [
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "phase": "ddl",
+        "reason_redacted": true,
+        "statement_redacted": true,
+        "verdict": "unverifiable"
+      },
+      {
+        "kind": "index",
+        "phase": "ddl",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "ddl",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "ddl",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "post_load",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "post_load",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      },
+      {
+        "kind": "index",
+        "phase": "post_load",
+        "statement_redacted": true,
+        "verdict": "mismatch"
+      }
+    ],
+    "observed": [
+      {
+        "kind": "index",
+        "redacted": true
+      },
+      {
+        "kind": "index",
+        "redacted": true
+      },
+      {
+        "kind": "index",
+        "redacted": true
+      }
+    ],
+    "platform": "duckdb",
+    "summary": {
+      "gate_relevant_total": 27,
+      "mismatch": 6,
+      "unverifiable": 21
+    }
+  },
+  "statements": [
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "phase": "ddl",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "mechanism": "sort_index",
+      "phase": "post_load",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "mechanism": "sort_index",
+      "phase": "post_load",
+      "statement_redacted": true,
+      "status": "executed"
+    },
+    {
+      "mechanism": "sort_index",
+      "phase": "post_load",
+      "statement_redacted": true,
+      "status": "executed"
+    }
+  ],
+  "status": "applied_unverified"
+}

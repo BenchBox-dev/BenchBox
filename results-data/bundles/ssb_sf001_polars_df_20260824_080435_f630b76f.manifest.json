@@ -1,8 +1,8 @@
 {
+  "bundle_file": "ssb_sf001_polars_df_20260824_080435_f630b76f.json",
+  "bundle_hash": "dc1be5040d25df896be4c95ba224e673b610965a0fcedc9f828e5eb009f8fd99",
+  "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "funding": "unspecified",
-  "submitted_by": "maintainer",
-  "bundle_file": "ssb_sf001_polars_df_20260824_080435_f630b76f.json",
-  "bundle_hash": "d93a5c9156a0c1344efa62d68887b06c93a9e657b0ae4fb57d3372516190df89"
+  "submitted_by": "maintainer"
 }
