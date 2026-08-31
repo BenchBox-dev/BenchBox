@@ -400,15 +400,22 @@ export function cohortGroupTotal<T>(groups: readonly CohortGroup<T>[]): number {
  * Apply the caller's global sorted rendering window after complete groups and
  * counts are known. Group labels may rearrange those rows, but must not change
  * which rows the ungrouped view admitted to the window.
+ *
+ * Cloned cohorts (e.g. a test that deep-copies rows) have different object
+ * identities but the same logical identity, so the window is keyed by a
+ * stable id rather than reference equality.
  */
 export function limitCohortGroups<T>(
   groups: readonly CohortGroup<T>[],
   rankedRows: readonly T[],
   limit: number,
+  keyOf: (row: T) => string = (row: any) =>
+    String((row as any).result_id ?? (row as any).id ?? (row as any).key ?? JSON.stringify(row)),
 ): LimitedCohortGroup<T>[] {
-  const admitted = new Set(rankedRows.slice(0, Math.max(0, Math.floor(limit))));
+  const window = rankedRows.slice(0, Math.max(0, Math.floor(limit)));
+  const admitted = new Set(window.map(keyOf));
   return groups.flatMap((group) => {
-    const rows = group.rows.filter((row) => admitted.has(row));
+    const rows = group.rows.filter((row) => admitted.has(keyOf(row)));
     return rows.length > 0 ? [{ ...group, rows, totalRows: group.rows.length }] : [];
   });
 }
