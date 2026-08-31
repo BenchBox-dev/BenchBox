@@ -12,6 +12,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import importlib
+import math
 from collections import Counter
 from dataclasses import dataclass
 from importlib import resources
@@ -475,6 +476,9 @@ def validate_scale_factor(
        ``[1.0]`` reject everything else, multi-element lists like
        tpch's development subscales plus official TPC scale ladder reject
        any non-canonical SF.
+       ClickBench is the exception: its synthetic generator accepts any
+       scale factor at or above ``min_scale``; its list is for common CLI
+       choices, not an exhaustive restriction.
     3. Otherwise fall back to the legacy ``min_scale`` key, which only
        enforces a lower bound.
 
@@ -503,6 +507,18 @@ def validate_scale_factor(
     if meta is None:
         available = ", ".join(list_benchmark_ids())
         raise ValueError(f"Unknown benchmark '{benchmark_id}'. Available: {available}")
+
+    if benchmark_id == "clickbench":
+        try:
+            sf = float(scale_factor)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"CLICKBENCH requires a finite scale_factor (got {scale_factor}).") from exc
+        if not math.isfinite(sf):
+            raise ValueError(f"CLICKBENCH requires a finite scale_factor (got {scale_factor}).")
+        min_scale = meta.get("min_scale")
+        if min_scale is not None and sf < min_scale:
+            raise ValueError(f"{benchmark_id.upper()} requires scale_factor >= {min_scale} (got {scale_factor}).")
+        return
 
     scale_options = meta.get("scale_options")
     if scale_options:

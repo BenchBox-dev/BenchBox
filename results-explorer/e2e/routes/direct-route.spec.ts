@@ -85,7 +85,10 @@ test.describe("direct route parity", () => {
   });
 
   test("direct route compare warning copy uses singular and plural labels", async ({ page }) => {
-    await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DATAFUSION}`);
+    // Native and tuned DuckDB runs share platform and driver versions, so
+    // tuning remains the sole comparability warning. Cross-engine comparison
+    // now also exposes the distinct platform and driver version evidence.
+    await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DUCKDB_TUNED}`);
     await waitForShell(page);
     await waitForDataElement(page, page.getByRole("heading", { name: /^TPC-H Comparison$/ }));
     const guardrails = page.getByRole("region", { name: "Compare guardrails" });
@@ -97,8 +100,8 @@ test.describe("direct route parity", () => {
 
     await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DUCKDB_TUNED},${SHORT_DATAFUSION}`);
     await waitForDataElement(page, page.getByRole("heading", { name: /^TPC-H Comparison$/ }));
-    await expect(guardrails).toContainText("2 warnings");
-    await expect(receipt).toContainText("2 warnings");
+    await expect(guardrails).toContainText("3 warnings");
+    await expect(receipt).toContainText("3 warnings");
     await expect(guardrails).not.toContainText(/coverage\.\./i);
   });
 });

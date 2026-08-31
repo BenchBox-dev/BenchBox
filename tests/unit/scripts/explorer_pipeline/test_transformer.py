@@ -61,6 +61,29 @@ class TestToManifestEntry:
 
         assert entry.driver_version == "1.2.0"
 
+    def test_duckdb_dev_build_keeps_engine_and_package_versions_separate(self, tmp_path: Path) -> None:
+        """DuckDB's engine identity must remain distinct from its wheel version."""
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["platform"].update(
+            {
+                "version": "2.0.0-alpha38615",
+                "client_version": "1.6.0.dev365",
+            }
+        )
+        data["execution"].update(
+            {
+                "driver_actual_version": "2.0.0-alpha38615",
+                "driver_resolved_version": "1.6.0.dev365",
+            }
+        )
+        bundle = tmp_path / "duckdb-dev.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        entry = BundleTransformer().to_manifest_entry(bundle)
+
+        assert entry.driver_version == "1.6.0.dev365"
+        assert entry.platform_version == "2.0.0-alpha38615"
+
     def test_result_id_injected(self, bundle_file: Path) -> None:
         transformer = BundleTransformer()
         explicit_id = "my-explicit-id"

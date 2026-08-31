@@ -317,11 +317,40 @@ def _run_date_from_timestamp(timestamp: str) -> str:
 
 
 def _driver_version(data: dict[str, Any]) -> str | None:
-    """Extract driver version from schema-v2 bundle, preferring actual over requested."""
+    """Extract the package version used to identify a DuckDB run.
+
+    DuckDB development wheels can report an internal engine build string from
+    ``SELECT version()`` that is unrelated to the wheel version (for example,
+    ``1.6.0.dev365`` reports ``2.0.0-alpha...``). The resolved package version
+    is the stable comparison identity; the raw bundle still retains the actual
+    engine string for auditability.
+    """
     execution = data.get("execution", {})
     if not isinstance(execution, dict):
-        return None
-    for key in ("driver_actual_version", "driver_resolved_version", "driver_requested_version"):
+        execution = {}
+    platform = data.get("platform", {})
+    is_duckdb = isinstance(platform, dict) and str(platform.get("name", "")).lower() == "duckdb"
+    if is_duckdb:
+        for key in (
+            "driver_version_resolved",
+            "driver_version_requested",
+            "driver_resolved_version",
+            "driver_requested_version",
+        ):
+            val = execution.get(key)
+            if val and isinstance(val, str):
+                return val
+        client_version = platform.get("client_version") if isinstance(platform, dict) else None
+        if client_version and isinstance(client_version, str) and client_version != "unknown":
+            return client_version
+    for key in (
+        "driver_version_actual",
+        "driver_version_resolved",
+        "driver_version_requested",
+        "driver_actual_version",
+        "driver_resolved_version",
+        "driver_requested_version",
+    ):
         val = execution.get(key)
         if val and isinstance(val, str):
             return val
