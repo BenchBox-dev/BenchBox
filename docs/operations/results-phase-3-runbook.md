@@ -2,7 +2,8 @@
 
 **Created:** 2026-04-01
 **Phase scope:** Phase 3 (Hosted API at `api.benchbox.dev`)
-**Prerequisite reading:** `docs/reference/threat-model.md`
+**Prerequisite reading:** `docs/reference/threat-model.md` and
+`docs/reference/hosted-results-contract.md`
 
 Phase 1 and Phase 2 have no hosted services. This runbook applies exclusively to
 Phase 3. Until Phase 3 launches, file GitHub issues for any anomalies found in
@@ -135,7 +136,9 @@ the original byte or entry count in the stored receipt.
 | `self-reported` | Actor-submitted; not independently verified | Automatic on successful ingest |
 | `public-curated` | Reviewed and approved by a maintainer | Manual promotion via admin CLI |
 | `rejected` | Failed validation or maintainer review | Set by ingest pipeline or admin |
-| `withdrawn` | Removed by actor or admin | Set via withdrawal API or admin CLI |
+
+Withdrawal is an orthogonal presentation state, not a trust tier. The API or admin CLI
+records `withdrawal_requested`; only a matching live receipt records `withdrawn`.
 
 ### Trust Promotion Path (self-reported → curated)
 
@@ -170,9 +173,10 @@ the original byte or entry count in the stored receipt.
 benchbox result withdraw --submission-id X
 ```
 
-- Sets status to `withdrawn` immediately
-- Removes the result from the public index within one read model rebuild cycle
-  (target: < 15 minutes)
+- Records `withdrawal_requested` immediately and excludes the result from the candidate
+  public and ranking read models
+- Reserves, deploys, and probes a new generation (target: < 15 minutes); status becomes
+  `withdrawn` only when a matching live receipt confirms public suppression
 - Bundle is retained for 90 days in case the actor wants to resubmit after
   correcting an error
 
@@ -183,8 +187,9 @@ legal request):
 benchbox admin withdraw --submission-id X --reason abuse|false_data|legal|policy_violation
 ```
 
-- Sets status to `withdrawn` with force-withdrawal flag and reason code
-- Triggers immediate removal from public index (synchronous rebuild)
+- Records `withdrawal_requested` with a force-withdrawal flag and reason code
+- Triggers an immediate candidate-index rebuild and controlled deployment; status becomes
+  `withdrawn` only after the matching live receipt confirms public suppression
 - Actor is notified by email within 24 hours with the reason code
 - Bundle is retained for 180 days for audit purposes, then purged
 
@@ -275,18 +280,20 @@ post-publish; incorrect query timings attributed to wrong platform.
 
 **Response steps:**
 
-1. **Withdraw affected result(s) immediately** (target: < 1 hour from detection)
+1. **Request withdrawal of affected result(s) immediately** (target: < 1 hour from detection)
    ```
    benchbox admin withdraw --submission-id X --reason false_data
    ```
-   Confirm result is removed from public index and explorer rebuild is triggered.
+   Confirm the request is recorded and the candidate public-index rebuild is triggered. Do
+   not claim public removal until external probes and a matching live receipt confirm it.
 
 2. **Re-verify all results published in the same time window** (± 2 hours around
    the affected result's publish timestamp). Use:
    ```
    benchbox admin verify-window --from <ts> --to <ts>
    ```
-   Any result that fails hash verification is withdrawn pending investigation.
+   Any result that fails hash verification receives `withdrawal_requested` pending
+   investigation and becomes `withdrawn` only after matching receipt confirmation.
 
 3. **Identify root cause.** Three categories:
    - Storage tampering: compare bundle in object store against original ingest

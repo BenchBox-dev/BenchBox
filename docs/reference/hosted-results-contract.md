@@ -596,7 +596,7 @@ Expected responses:
 | HTTP status | Meaning | CLI behavior |
 |---|---|---|
 | `202 Accepted` | Submission received; `submission_id` in body | Print submission_id and poll URL |
-| `200 OK` | `bundle_hash` already accepted; body includes `public_result_id`, `acceptance_status`, and `promotion_status` | Print acceptance and live-state details, exit 0 |
+| `200 OK` | `bundle_hash` already accepted; body uses the complete status payload below, including presentation and current-live receipt fields | Print acceptance, latest promotion attempt, and independently observed live state; exit 0 |
 | `409 Conflict` | Bundle in `pending` or `validated` state; `submission_id` in body | Print status and poll URL |
 | `422 Unprocessable` | Schema or hash validation failed; `errors` array in body | Print errors, exit non-zero |
 | `429 Too Many Requests` | Rate limited; `Retry-After` in headers | Print wait time, exit non-zero |
@@ -618,11 +618,30 @@ Response:
   "acceptance_status": "<pending|validated|accepted|rejected>",
   "promotion_status": "<not_requested|promotion_pending|live|promotion_failed>",
   "presentation_status": "<active|withdrawal_requested|withdrawn>",
+  "target_generation": "<integer or null>",
+  "current_live_generation": "<integer or null>",
+  "current_live_receipt": "<receipt identifier or null>",
+  "current_live_observed_at": "<ISO 8601 or null>",
   "public_result_id": "<slug or null>",
   "rejection_reason": "<string or null>",
   "updated_at": "<ISO 8601>"
 }
 ```
+
+The idempotent `POST /v1/submissions` `200 OK` response MUST return this same status
+payload, with `submission_id` null when no submission record exists. It must not return a
+reduced acceptance-and-promotion response because the CLI exits without polling on this
+path and would otherwise lose the prior observed live generation.
+
+`promotion_status` describes the latest requested target generation. It does not replace
+the currently observed live generation while that target is pending or failed.
+`current_live_generation`, `current_live_receipt`, and `current_live_observed_at` identify
+the last receipt-confirmed generation independently; all three are null when no generation
+has ever been proven live. After a successful promotion they advance atomically to the
+target generation. This lets consumers report both a failed or pending promotion attempt
+and the prior generation that remains publicly live. `presentation_status` remains an
+independent policy and observation dimension: `withdrawal_requested` is desired
+suppression, while `withdrawn` requires a matching receipt that confirms suppression.
 
 The CLI polls with exponential backoff (initial 5s, max 60s, up to 10 attempts)
 and prints the final status to stdout.

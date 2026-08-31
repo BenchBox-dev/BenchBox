@@ -15,7 +15,8 @@ workflow or modify the A0 freeze.
 | deployed | Provider acknowledgement names the exact artifact, target, and generation. |
 | live | Fresh attested live receipt matches the manifest, artifact, target, generation, and required public probes. |
 | promotion_failed | The build, deployment, or observation lane ended without a valid matching live receipt. |
-| withdrawn | Authorized withdrawal event is present in desired state and excluded from public and ranking read models. |
+| withdrawal_requested | Authorized withdrawal event is present in desired state and excluded from candidate public and ranking read models. |
+| withdrawn | A matching live receipt confirms that the deployed generation suppresses the result from public presentation and ranking. |
 
 Only an attested live receipt proves publication. Only `live` permits an operator or
 document to say a publication succeeded. A `published-results` merge proves acceptance
@@ -78,14 +79,17 @@ One authorized maintainer may initiate emergency takedown.
 
 1. Record actor, reason, time, affected public IDs or archive paths, and whether the
    action is presentation withdrawal or a request for source-byte erasure.
-2. For presentation withdrawal, add `withdrawn` to desired state. Exclude affected rows
-   from public and ranking read models, reserve a generation, deploy, and obtain a fresh
-   live receipt. Ordinary promotion must carry the withdrawal forward.
+2. For presentation withdrawal, add `withdrawal_requested` to desired state. Exclude
+   affected rows from the candidate public and ranking read models, reserve a generation,
+   deploy, and obtain a fresh live receipt. Keep desired state at `withdrawal_requested`
+   while deployment or external probes are pending or failed. Record `withdrawn` only in
+   observed live state after the matching receipt confirms suppression. Ordinary promotion
+   must carry the withdrawal request or receipt-confirmed withdrawal forward.
 3. During the A0 migration freeze, do not delete accepted source bytes. For a privacy or
-   legal incident, withdraw presentation immediately, suppress accessible artifacts where
-   the provider permits, and open a separately approved erasure plan covering Git history,
-   workflow artifacts, caches, mirrors, and inventory consequences. A branch deletion is
-   not proof of erasure.
+   legal incident, record the withdrawal request immediately, suppress candidate output and
+   accessible artifacts where the provider permits, and open a separately approved erasure
+   plan covering Git history, workflow artifacts, caches, mirrors, and inventory
+   consequences. A branch deletion is not proof of erasure.
 4. Preserve non-sensitive audit evidence. Do not claim public removal until external
    probes and a live receipt confirm it.
 

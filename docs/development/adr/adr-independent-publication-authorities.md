@@ -59,8 +59,9 @@ The following concepts change independently and MUST NOT be collapsed into one s
   corpus at the public endpoint.
 - **Failure:** `promotion_failed` means the requested build, deploy, or observation did
   not produce a matching receipt. Accepted input remains accepted.
-- **Withdrawal:** `withdrawn` suppresses a result from public presentation and ranking
-  without rewriting the historical acceptance fact or audit record.
+- **Withdrawal:** `withdrawal_requested` records desired suppression. `withdrawn` means a
+  matching live receipt confirms suppression from public presentation and ranking. Neither
+  state rewrites the historical acceptance fact or audit record.
 - **Visibility:** controls discoverability and direct presentation independently of
   trust, ranking eligibility, and deployment state.
 - **Trust:** describes provenance or review confidence. It is never supplied by
@@ -71,7 +72,8 @@ The following concepts change independently and MUST NOT be collapsed into one s
   a manifest and artifact, not for the truthfulness of an individual benchmark claim.
 
 A result can therefore be accepted but hidden, visible but ranking-ineligible, trusted
-but withdrawn, or included in a built artifact that never became live.
+but awaiting or under receipt-confirmed withdrawal, or included in a built artifact that
+never became live.
 
 ### 3. Desired, built, deployed, and observed transitions
 
@@ -107,13 +109,14 @@ policy.
   tree without matching provenance is not the same rollback object.
 - Automatic rollback is bounded by the last known-good attested receipt. It must not
   advance desired state or accept new input.
-- Emergency takedown fails closed for presentation: an authorized maintainer may mark
-  affected results withdrawn and republish without waiting for a second approver.
+- Emergency takedown fails closed for the candidate presentation: an authorized maintainer
+  may record `withdrawal_requested` and republish without waiting for a second approver.
+  The result becomes `withdrawn` only when a matching live receipt confirms suppression.
 - Takedown does not rewrite Git history or destroy the accepted archive. During the A0
-  freeze, privacy or legal incidents use immediate presentation withdrawal and access
-  suppression; any irreversible source-byte erasure requires a separately approved
-  incident plan that inventories Git history, artifacts, caches, and preservation-law
-  constraints. A branch deletion alone must never be described as erasure.
+  freeze, privacy or legal incidents record an immediate withdrawal request and apply
+  candidate/artifact-access suppression; any irreversible source-byte erasure requires a
+  separately approved incident plan that inventories Git history, artifacts, caches, and
+  preservation-law constraints. A branch deletion alone must never be described as erasure.
 - Manifests, build provenance, deploy acknowledgements, live receipts, withdrawal events,
   and rollback events are append-only audit evidence and are retained independently of
   replaceable read models.

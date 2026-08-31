@@ -99,12 +99,14 @@ accept new corpus input, or select an unattested artifact.
 delays urgent privacy response, or a later promotion resurrects withdrawn data.
 
 **Controls:** One authorized maintainer may order emergency takedown. The event records
-actor, reason, scope, timestamp, and affected identifiers. Presentation fails closed:
-withdrawn results are excluded from visible and ranking views before republish. Desired
-state carries the withdrawal set forward, so ordinary promotions cannot resurrect it.
+actor, reason, scope, timestamp, and affected identifiers. Candidate presentation fails
+closed: `withdrawal_requested` results are excluded from the candidate visible and ranking
+views before republish. Desired state carries the withdrawal request forward, so ordinary
+promotions cannot resurrect it. The result is recorded as `withdrawn` only after a matching
+live receipt confirms suppression at the public endpoint.
 The accepted archive and audit history are not rewritten by a visibility takedown.
-During the A0 migration freeze, a privacy or legal incident triggers immediate
-presentation withdrawal and artifact-access suppression, not accepted-source deletion.
+During the A0 migration freeze, a privacy or legal incident triggers an immediate
+withdrawal request and candidate/artifact-access suppression, not accepted-source deletion.
 Any later irreversible erasure requires a separately approved incident plan covering Git
 history, workflow artifacts, caches, mirrors, inventory effects, and non-sensitive audit
 retention.

@@ -87,6 +87,7 @@ SOUNDNESS_FILES = (
     "docs/development/independent-publication-threat-model.md",
     "docs/operations/independent-publication-contract.md",
     "docs/operations/results-phase-2-runbook.md",
+    "docs/operations/results-phase-3-runbook.md",
     "docs/reference/hosted-results-contract.md",
     "docs/reference/threat-model.md",
     "scripts/check_decision_records.py",

@@ -1,5 +1,7 @@
 """Keep independent-publication authority documents aligned."""
 
+import json
+import re
 from pathlib import Path
 
 import pytest
@@ -17,6 +19,7 @@ ADR_INDEX = ROOT / "docs/development/adr/README.md"
 HOSTED_CONTRACT = ROOT / "docs/reference/hosted-results-contract.md"
 PHASE3_THREAT_MODEL = ROOT / "docs/reference/threat-model.md"
 PUBLIC_ID_ADR = ROOT / "docs/development/adr/adr-public-result-id-permanence.md"
+PHASE3_RUNBOOK = ROOT / "docs/operations/results-phase-3-runbook.md"
 
 
 def _text(path: Path) -> str:
@@ -101,6 +104,10 @@ def test_adr_is_indexed_and_accepted() -> None:
 
 def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
     text = _normalized(HOSTED_CONTRACT)
+    operations = _normalized(OPERATIONS)
+    policy_text = " ".join(
+        _normalized(path) for path in (ADR, THREAT_MODEL, OPERATIONS, HOSTED_CONTRACT, PHASE3_RUNBOOK)
+    )
 
     assert "No single `published` flag" in text
     assert "must never translate a Git merge directly into `live`" in text
@@ -112,6 +119,48 @@ def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
     assert '"acceptance_status": "<pending|validated|accepted|rejected>"' in _text(HOSTED_CONTRACT)
     assert '"promotion_status": "<not_requested|promotion_pending|live|promotion_failed>"' in _text(HOSTED_CONTRACT)
     assert '"presentation_status": "<active|withdrawal_requested|withdrawn>"' in _text(HOSTED_CONTRACT)
+    assert '"current_live_generation": "<integer or null>"' in _text(HOSTED_CONTRACT)
+    assert '"current_live_receipt": "<receipt identifier or null>"' in _text(HOSTED_CONTRACT)
+    assert "does not replace the currently observed live generation" in text
+    assert "Keep desired state at `withdrawal_requested`" in operations
+    assert "Record `withdrawn` only in observed live state" in operations
+    assert "| withdrawal_requested | Authorized withdrawal event is present in desired state" in _text(OPERATIONS)
+    assert "| withdrawn | A matching live receipt confirms" in _text(OPERATIONS)
+    assert "affected results withdrawn and republish" not in _text(ADR)
+    assert "withdrawn results are excluded from visible and ranking views before republish" not in _text(THREAT_MODEL)
+    assert "The result is recorded as `withdrawn` only after a matching live receipt" in _normalized(THREAT_MODEL)
+    assert "The idempotent `POST /v1/submissions` `200 OK` response MUST return this same status payload" in text
+    assert "including presentation and current-live receipt fields" in text
+    assert "Sets status to `withdrawn` immediately" not in _text(PHASE3_RUNBOOK)
+    assert "status becomes `withdrawn` only when a matching live receipt" in _normalized(PHASE3_RUNBOOK)
+    assert "| `withdrawn` | Removed by actor or admin" not in _text(PHASE3_RUNBOOK)
+    assert "is withdrawn pending investigation" not in _text(PHASE3_RUNBOOK)
+    assert "Withdrawal is an orthogonal presentation state, not a trust tier" in _normalized(PHASE3_RUNBOOK)
+    for forbidden in (
+        "immediate presentation withdrawal",
+        "add `withdrawn` to desired state",
+        "mark affected results withdrawn",
+        "Sets status to `withdrawn` immediately",
+        "withdrawn results are excluded from visible and ranking views before republish",
+    ):
+        assert forbidden not in policy_text
+
+    polling_match = re.search(
+        r"#### Status polling contract.*?Response:\s*```json\s*(\{.*?\})\s*```",
+        _text(HOSTED_CONTRACT),
+        re.DOTALL,
+    )
+    assert polling_match is not None
+    status_payload = json.loads(polling_match.group(1))
+    assert {
+        "acceptance_status",
+        "promotion_status",
+        "presentation_status",
+        "target_generation",
+        "current_live_generation",
+        "current_live_receipt",
+        "current_live_observed_at",
+    } <= status_payload.keys()
     assert "Ingest status: `published`" not in _text(HOSTED_CONTRACT)
     assert "Withdrawn result URL behavior (Phases 1-2)" not in _text(HOSTED_CONTRACT)
     assert "accepted|live → withdrawn" not in _text(HOSTED_CONTRACT)

@@ -43,6 +43,7 @@ docs/development/adr/adr-published-results-slim-corpus-branch.md @joeharris76
 docs/development/independent-publication-threat-model.md @joeharris76
 docs/operations/independent-publication-contract.md @joeharris76
 docs/operations/results-phase-2-runbook.md @joeharris76
+docs/operations/results-phase-3-runbook.md @joeharris76
 docs/reference/hosted-results-contract.md @joeharris76
 docs/reference/threat-model.md @joeharris76
 scripts/check_decision_records.py @joeharris76
