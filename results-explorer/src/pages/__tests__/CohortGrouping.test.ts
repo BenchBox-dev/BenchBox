@@ -168,4 +168,28 @@ describe("render-window limiting", () => {
       ["2.0", 100, 125],
     ]);
   });
+
+  it("remains stable when cohorts are cloned before rendering", () => {
+    // A caller that deep-copies the cohort (e.g. for immutability) keeps the
+    // same logical rows but loses object identity. The window must be keyed
+    // by id, not by reference.
+    const many = Array.from({ length: 250 }, (_, index): Row => ({
+      id: `row-${index}`,
+      rank: index + 1,
+      engine: index < 150 ? "1.0" : "2.0",
+      eligible: true,
+    }));
+    const groups = groupCohortRows(many, "engine_version", byEngine);
+    const clonedGroups = groups.map((g) => ({
+      ...g,
+      rows: g.rows.map((r) => ({ ...r })),
+    }));
+    const clonedRanked = many.map((r) => ({ ...r }));
+    const limited = limitCohortGroups(clonedGroups, clonedRanked, 200);
+
+    expect(limited.map((group) => [group.label, group.rows.length, group.totalRows])).toEqual([
+      ["1.0", 150, 150],
+      ["2.0", 50, 100],
+    ]);
+  });
 });

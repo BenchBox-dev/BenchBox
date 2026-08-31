@@ -68,11 +68,20 @@ wall minutes by workflow when judging savings; the next-slowest sibling can
 dominate remaining wall time after `pr.yml` jobs are skipped.
 
 `ci-required-result` is the umbrella job in `.github/workflows/pr.yml`
-that aggregates the required-lane jobs: `ci-paths`, `content-guard`,
-`code-lint`, `code-test`, `correctness-gate`, `plan-capture-gate`,
-`medium-test` (added 2026-07-11, #1139 — the medium tier now gates code
-PRs pre-merge via the same umbrella, no ruleset change needed),
-`explorer-tokens`, `audit-sha`, `package-smoke`, and `dependency-audit`.
+that aggregates the jobs in its `needs` contract: `ci-paths`,
+`tpch-binary-framing`, `content-guard`, `skill-integrity`, `code-lint`,
+`code-test`, `correctness-gate`, `plan-capture-gate`, `medium-test`
+(added 2026-07-11, #1139 — the medium tier now gates code PRs pre-merge via
+the same umbrella, no ruleset change needed), `explorer-tokens`,
+`site-theme-tokens`, `explorer-vitest`, `audit-sha`, `package-smoke`,
+`dependency-audit`, and `parity-check`. This list intentionally mirrors the
+`needs` list in `.github/workflows/pr.yml`; path-filtered jobs report as
+skipped where their classifier says they are not applicable.
+
+Slow-marked reproducer jobs remain required PR CI through this umbrella. The
+post-merge workflow has fast and medium lanes but no slow-signature lane, so
+moving those reproducers out of required PR CI would remove their only
+required execution path.
 
 `Results Explorer browser gate` (added 2026-08-03) is the umbrella job in
 `.github/workflows/results-explorer-browser.yml`. It is required because the
@@ -154,7 +163,7 @@ When Native Merge Queue is activated on `develop-squash-only` (ruleset id `15611
     "check_response_timeout_minutes": 60,
     "grouping_strategy": "ALLGREEN",
     "max_entries_to_build": 5,
-    "max_entries_to_merge": 1,
+    "max_entries_to_merge": 5,
     "merge_method": "SQUASH",
     "min_entries_to_merge": 1,
     "min_entries_to_merge_wait_minutes": 0

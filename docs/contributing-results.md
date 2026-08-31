@@ -67,7 +67,7 @@ you prefer not to set git config or want a different attribution.
 
 ### 3. Fork and open a PR
 
-1. Fork the [BenchBox repository](https://github.com/joeharris76/BenchBox) on GitHub (or use your existing fork)
+1. Fork the [BenchBox repository](https://github.com/BenchBox-dev/BenchBox) on GitHub (or use your existing fork)
 2. Copy the contents of `submission/bundle/` into `results-data/bundles/` in your fork
 3. Copy `submission/<result>.manifest.json` alongside the bundle files (the per-bundle manifest filename inherits the bundle stem so two contributors submitting the same week cannot collide)
 4. Regenerate the inventory before you commit:
@@ -76,7 +76,7 @@ you prefer not to set git config or want a different attribution.
    uv run -- python scripts/generate_corpus_inventory.py --write
    ```
 
-5. Commit and open a pull request against the `published-results` branch of [`joeharris76/BenchBox`](https://github.com/joeharris76/BenchBox) (the public repository)
+5. Commit and open a pull request against the `published-results` branch of [`BenchBox-dev/BenchBox`](https://github.com/BenchBox-dev/BenchBox) (the public repository)
 
 Use this PR title format:
 
@@ -205,6 +205,6 @@ stage, re-run `pre-commit install` once so the pre-push hook is installed too.
 
 ## Questions?
 
-Open an [issue](https://github.com/joeharris76/BenchBox/issues) or start a [discussion](https://github.com/joeharris76/BenchBox/discussions).
+Open an [issue](https://github.com/BenchBox-dev/BenchBox/issues) or start a [discussion](https://github.com/BenchBox-dev/BenchBox/discussions).
 
 Maintainers: see [Phase 2 Results Operations Runbook](operations/results-phase-2-runbook.md).
