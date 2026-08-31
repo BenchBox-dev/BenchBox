@@ -94,6 +94,9 @@ def test_existing_public_ids_are_already_compatibility_contracts() -> None:
 
     assert "Link permanence attached when those routes first became publicly available" in text
     assert "The A0 observed baseline proves the initial protected surface" in text
+    assert "The A0 observed baseline is the initial freeze line" in text
+    assert "they do not postpone the compatibility obligation" in text
+    assert "post-receipt id rotations" not in text
     assert "until an attested live receipt" not in text
 
 

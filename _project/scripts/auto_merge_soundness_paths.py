@@ -73,6 +73,10 @@ SOUNDNESS_FILES = (
     "benchbox/sql_compat/rules/_registration.py",
     "benchbox/core/results/anonymization.py",
     "benchbox/core/results/anonymization_specs.yaml",
+    # Executable publication policy: source-to-trust labels, visibility defaults,
+    # and ranking eligibility are defined here. A silent change alters public
+    # presentation and leaderboard membership without changing the authority docs.
+    "benchbox/core/results/provenance.py",
     "_project/scripts/auto_merge_soundness_paths.py",
     ".github/workflows/auto-merge-on-open.yml",
     ".github/workflows/release.yml",

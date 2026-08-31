@@ -20,6 +20,7 @@ benchbox/sql_compat/rules/_registration.py @joeharris76
 # Widened after PR #1512.
 benchbox/core/results/anonymization.py @joeharris76
 benchbox/core/results/anonymization_specs.yaml @joeharris76
+benchbox/core/results/provenance.py @joeharris76
 # Self-protection: the review-gate machinery and the PyPI-publishing
 # workflow. In-workflow checks are attacker-controlled for same-repo PRs
 # (GitHub runs the PR's own copy of a pull_request-triggered workflow).

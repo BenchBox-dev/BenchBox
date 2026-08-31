@@ -148,7 +148,7 @@ or workflow state alone never proves public availability.
 | Permanence attaches at local run / commit of private capture | Private bytes and paths are not the public artifact; hashing them would fingerprint non-public content and diverge from downloadable bundles |
 | Keep format without `sha8` and resolve collisions with `-{n}` | Diverges from implemented mint; sequential suffixes are not content-addressed and break deterministic re-derivation |
 | Freeze ids independently of content (assign once, never recompute) | Loses verifiability ("anyone holding the published bundle can recompute the id") and forces a registry service before Phase 1 needs one |
-| Ship alias/redirect tables now for pre-deploy rotations | No external links to protect; cost without benefit |
+| Ship alias/redirect tables before the first deploy | No external links existed at that decision point; the A0 observed baseline now protects the routes that subsequently became public |
 
 ## Consequences
 
@@ -156,8 +156,10 @@ or workflow state alone never proves public availability.
   format and fail-closed / skip-identical collision rules.
 - Explorer pipeline code remains the mint authority; docs follow code.
 - Content-addressed permanence is preserved (must-preserve for this TODO).
-- Attested live publication becomes the freeze line for external link stability;
-  ops should treat post-receipt id rotations as a compatibility event.
+- The A0 observed baseline is the initial freeze line for external link stability. Existing
+  baseline IDs already require aliases or tombstones for any rotation. Later attested live
+  receipts extend that protected set generation by generation; they do not postpone the
+  compatibility obligation until receipt infrastructure exists.
 - Strategy doc identity table remains non-authoritative relative to this
   ADR and the hosted contract (out of scope for the immediate contract fix;
   update when that doc is next edited for identity).

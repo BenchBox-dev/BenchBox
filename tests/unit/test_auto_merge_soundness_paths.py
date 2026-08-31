@@ -45,6 +45,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         # dropping an entry there is a silent leak with no code diff to review.
         "benchbox/core/results/anonymization.py",
         "benchbox/core/results/anonymization_specs.yaml",
+        "benchbox/core/results/provenance.py",
         # Self-protection: the review-gate machinery and the PyPI-publishing
         # workflow. In-workflow checks are attacker-controlled for same-repo
         # PRs; the CODEOWNERS/ruleset layer this feeds is the durable control.
@@ -59,6 +60,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "docs/development/independent-publication-threat-model.md",
         "docs/operations/independent-publication-contract.md",
         "docs/operations/results-phase-2-runbook.md",
+        "docs/operations/results-phase-3-runbook.md",
         "docs/reference/hosted-results-contract.md",
         "docs/reference/threat-model.md",
         "scripts/check_decision_records.py",
@@ -204,6 +206,7 @@ def test_codeowners_covers_soundness_paths() -> None:
     assert "benchbox/sql_compat/resolver.py @joeharris76" in codeowners
     assert "benchbox/sql_compat/decision.py @joeharris76" in codeowners
     assert "benchbox/sql_compat/rules/_registration.py @joeharris76" in codeowners
+    assert "benchbox/core/results/provenance.py @joeharris76" in codeowners
     assert "_project/scripts/auto_merge_soundness_paths.py @joeharris76" in codeowners
     assert ".github/workflows/auto-merge-on-open.yml @joeharris76" in codeowners
     assert ".github/workflows/release.yml @joeharris76" in codeowners
