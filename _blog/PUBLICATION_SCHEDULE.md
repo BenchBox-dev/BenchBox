@@ -1,7 +1,7 @@
 # Publication Schedule
 
 > BenchBox blog publication queue.
-> **Last updated:** 2026-08-28
+> **Last updated:** 2026-08-31
 
 ---
 
@@ -36,7 +36,7 @@
 | Series                  | Posts                                                                                                             | Status      | Notes                              |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------- |
 | Building BenchBox       | BenchBox v0.4.0: new org, DuckLake, and result provenance                                                         | Full draft  | Editorial review needed            |
-| Building BenchBox       | How the Results Explorer qualifies comparisons                                                                    | Full draft  | Structural rewrite after dual review |
+| Building BenchBox       | How the Results Explorer qualifies comparisons                                                                    | Full draft  | Renumbered as post 17; editorial review needed |
 | Free Trial Benchmarking | 10 posts (Snowflake, Databricks, BigQuery, MotherDuck, Redshift, Starburst, ClickHouse, Fabric, Firebolt, Athena) | Full drafts | Time-sensitive; trial terms change |
 | Cloud Cost Controls     | 6 posts (AWS, GCP, Snowflake, Databricks, Azure, Free Tier)                                                       | Full drafts |                                    |
 
@@ -46,6 +46,7 @@
 
 | Series        | Posts                                            | Status            |
 | ------------- | ------------------------------------------------ | ----------------- |
+| Building BenchBox | Announcing the BenchBox Results Explorer preview | Post 16 outlined; needs drafting |
 | Table Formats | 5 posts (Parquet, Delta, Iceberg, DuckLake; Vortex blocked) | Post 0 drafted, needs critique; post 1 draft in progress; SF1 local data measured |
 
 ---

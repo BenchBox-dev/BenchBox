@@ -117,11 +117,12 @@ Community contributions use the PR-based flow documented in
 `docs/contributing-results.md`. At a high level:
 
 1. Run your benchmark: `benchbox run --platform <platform> --benchmark <benchmark> --scale <sf>`
-2. Package the result: `benchbox submit --output ./submission/`
-3. Open a PR against the `published-results` branch of `BenchBox-dev/BenchBox` touching `results-data/bundles/`
-4. Regenerate the inventory: `uv run -- python scripts/generate_corpus_inventory.py --write`
-5. CI validates schema conformance, bundle integrity, cohort compatibility, and inventory drift
-6. A maintainer reviews and merges
+2. Set a stable private `BENCHBOX_MACHINE_ID_SALT` for public submission
+3. Package the result: `benchbox submit --output ./submission/`
+4. Open a PR against the `published-results` branch of `BenchBox-dev/BenchBox` touching `results-data/bundles/`
+5. Regenerate the inventory: `uv run -- python scripts/generate_corpus_inventory.py --write`
+6. CI validates schema conformance, bundle integrity, cohort compatibility, and inventory drift
+7. A maintainer reviews and merges
 
 See `docs/contributing-results.md` for the full submission flow and
 `docs/development/benchbox-results-platform-strategy.md` for the Phase 2

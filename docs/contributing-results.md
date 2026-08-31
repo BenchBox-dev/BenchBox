@@ -6,6 +6,9 @@ Thank you for contributing to the BenchBox community results dataset! Community-
 
 1. **Install BenchBox** - follow the [Getting Started](usage/getting-started.md) guide
 2. **Run a benchmark** - you need a complete benchmark result to submit
+3. **Configure a private public-submission salt** - set a stable, non-empty
+   `BENCHBOX_MACHINE_ID_SALT` before the first `benchbox submit`; store and
+   reuse it through a secret manager or protected local environment config
 
 ## Step-by-Step Submission Flow
 
@@ -31,7 +34,23 @@ when tuning clauses are applied. `benchbox submit` packages either
 companion automatically when it sits next to the result JSON, so missing
 companion files do not make a default submission incomplete.
 
-### 2. Package the submission
+### 2. Configure the public-submission salt
+
+`benchbox submit` pseudonymizes retained public identifiers and refuses to
+package a public contribution when `BENCHBOX_MACHINE_ID_SALT` is unset or
+empty. Before your first public submission, set it to a stable, private,
+non-empty random value:
+
+```bash
+export BENCHBOX_MACHINE_ID_SALT="<stable-private-random-value>"
+```
+
+Store and reuse the value through a secret manager or protected local
+environment configuration. Do not commit it, include it in the submission
+package, or paste it into the pull request. Setting a new value for every run
+would make pseudonymous identifiers inconsistent across your submissions.
+
+### 3. Package the submission
 
 Use `uv run -- benchbox submit` to create a submission package:
 
@@ -65,7 +84,7 @@ If that is empty (e.g. a fresh sandbox or CI runner), `benchbox submit` warns
 and writes the field as `""`. Override with `--submitted-by "Your Name"` if
 you prefer not to set git config or want a different attribution.
 
-### 3. Fork and open a PR
+### 4. Fork and open a PR
 
 1. Fork the [BenchBox repository](https://github.com/BenchBox-dev/BenchBox) on GitHub (or use your existing fork)
 2. Copy the contents of `submission/bundle/` into `results-data/bundles/` in your fork
@@ -86,7 +105,7 @@ results: <benchmark> <platform> sf<scale>
 
 Example: `results: tpch DuckDB sf1.0`
 
-### 4. CI validation
+### 5. CI validation
 
 When your PR is opened, the **Validate Submission** workflow runs automatically. It checks:
 
@@ -108,7 +127,7 @@ If that check fails, rerun:
 uv run -- python scripts/generate_corpus_inventory.py --write
 ```
 
-### 5. Review and merge
+### 6. Review and merge
 
 A maintainer reviews the submission for quality and environment consistency.
 Once approved and merged into `published-results`, the bundle enters the
