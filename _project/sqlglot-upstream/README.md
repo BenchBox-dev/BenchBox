@@ -25,6 +25,35 @@ uv run --with sqlglot==30.6.0 python _project/sqlglot-upstream/repros/repro_all.
 Exit code is zero only if every defect has been resolved upstream; any
 remaining `FAIL` lines indicate the workaround in BenchBox is still load-bearing.
 
+## Generated-case known-failure policy
+
+Generator failures are advisory only while they are explicit, reproducible,
+and younger than seven calendar days. Validate the policy with:
+
+```bash
+uv run -- python scripts/check_sqlglot_generator_known_failures.py --policy _project/sqlglot-upstream/generator-policy.json
+```
+
+An entry added to `generator-policy.json` must include its owner, canonical
+`https://github.com/tobymao/sqlglot/issues/<number>` issue, first-known date,
+failure artifact, SQLGlot version, source and target dialects, and non-negative
+seed. Replay values must use the guard's narrow shell-safe token grammar. The
+entry is valid on days 0 through 6 and fails the guard on day 7. Its artifact
+must be an existing regular JSON file inside the repository, with top-level
+`id`, `seed`, `sqlglot_version`, `source_dialect`, and `target_dialect` values
+that exactly match the entry. Use `--today YYYY-MM-DD` for deterministic
+boundary checks.
+
+The policy's replay template is the contract for a future generator at
+`_project/sqlglot-upstream/repros/generator.py`. Replay a failure by
+substituting the stored version, seed, dialects, and artifact path without
+changing any value. There is no generator or workflow job in this change;
+nightly remains advisory and outside develop post-merge auto-revert.
+
+Future workflow wiring must keep policy shape, age, artifact, and other
+infrastructure validation failures blocking. Only a new generated-case
+discovery is advisory; do not make the whole job continue on error.
+
 ### Wrapper-call-shape convention
 
 Any new repro for an item that lives in
