@@ -38,8 +38,7 @@ comparison.
 - Avoid calling warnings hard comparability gates. Benchmark, scale, phase, and timing coverage
   suppress winner claims; version, environment, validation, tuning, and cost differences are
   visible warnings.
-- Do not write an unbounded future API. The shipped preview and planned
-  pull-request path need no backend.
+- Discuss only the shipped preview and current pull-request contribution path.
 
 ## Structure and word budget
 
@@ -57,11 +56,11 @@ template labels.
 
 ### 2. What we tried (~220 words)
 
-- Three architectures: pre-rendered JSON, hosted API, static DuckDB in the
-  browser. We shipped the third.
-- JSON would start faster; DuckDB gives a SQL workbench; an API would be
-  another service. The curated preview and planned pull-request path need no
-  backend. Do not promise a future API.
+- Two static architectures: pre-rendered JSON and static DuckDB in the
+  browser. We shipped the second.
+- Pre-rendered JSON starts with fewer moving parts; DuckDB adds a SQL
+  workbench over the same public data. The curated preview and pull-request
+  contribution path need no backend.
 - Vanity ranking was tempting; ranking stays, with ineligible rows visible and
   named.
 - Environment as a hard gate would empty the August 28 snapshot (11 of 138

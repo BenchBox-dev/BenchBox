@@ -29,9 +29,9 @@ The [live snapshot](https://benchbox.dev/results/) has a clear case. On TPC-H at
 
 ## What we tried
 
-A public results site can be a pre-rendered JSON leaderboard, a hosted submission API, or a static database that the browser queries. We shipped the third.
+A public results site can use pre-rendered JSON pages or a static database that the browser queries. We shipped the second.
 
-JSON would start faster. The DuckDB snapshot gives visitors a SQL workbench over the same tables the pages use. A hosted API would make contribution feel instant, and it would be one more service to run. The curated preview and the planned pull-request path need no backend.
+Pre-rendered JSON would start with fewer moving parts, while the DuckDB snapshot gives visitors a SQL workbench over the same tables the pages use. The static database approach preserves that analytical flexibility without adding a backend to the curated preview or pull-request contribution path.
 
 We first treated leaderboards as vanity ranking. Visitors still want a platform-by-query matrix on the home page, so ranking stays, and ineligible rows stay visible with a named reason.
 

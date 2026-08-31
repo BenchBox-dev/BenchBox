@@ -13,7 +13,7 @@ meta_description: "Explore public BenchBox results, compare per-query evidence, 
 
 # Announcing the BenchBox Results Explorer preview
 
-**TL;DR**: The [BenchBox Results Explorer](https://benchbox.dev/results/) turns public result bundles into browsable benchmark evidence. You can find runs by benchmark and scale, compare per-query timings, inspect recorded methodology and provenance, query the public snapshot with SQL, and download the underlying bundles. The experience draws on Geekbench and public AI evaluation leaderboards. Contributors can upload a complete validated run through the hosted service or package it for a `published-results` pull request.
+**TL;DR**: The [BenchBox Results Explorer](https://benchbox.dev/results/) turns public result bundles into browsable benchmark evidence. You can find runs by benchmark and scale, compare per-query timings, inspect recorded methodology and provenance, query the public snapshot with SQL, and download the underlying bundles. The experience draws on Geekbench and public AI evaluation leaderboards. Contributors can package a complete validated run with `benchbox submit` and propose it through the `published-results` branch.
 
 ---
 
@@ -43,7 +43,7 @@ A directory of JSON bundles is an evidence store, but it is not a good discovery
 
 The Explorer closes the gap between "BenchBox produced a result" and "another person can find, interpret, and challenge that result." It provides public navigation across benchmarks and platforms, stable links for sharing, and a visual route from a summary table to per-query timings and run details. That route also makes a benchmark discussion easier to ground in a specific, downloadable artifact instead of a detached screenshot.
 
-We also wanted the preview to fit the infrastructure BenchBox already operates. The build pipeline transforms curated bundles into static assets, including a DuckDB snapshot and downloadable JSON. DuckDB-WASM runs queries in the browser, so the read path does not require an application server, account system, or hosted database. GitHub Pages serves the site, while the browser performs the interactive analysis.
+We also wanted the preview to fit the infrastructure BenchBox already operates. The build pipeline transforms curated bundles into static assets, including a DuckDB snapshot and downloadable JSON. DuckDB-WASM runs queries in the browser, so the read path does not require an application server, account system, or server-side database. GitHub Pages serves the site, while the browser performs the interactive analysis.
 
 ```text
 curated result bundles -> static build -> results.duckdb -> Explorer pages and Query
@@ -52,7 +52,7 @@ curated result bundles -> static build -> results.duckdb -> Explorer pages and Q
 
 This architecture keeps the public evidence portable. A reader can use the prepared views, query the snapshot directly, or leave the site with the canonical bundle.
 
-The submission paths use the same canonical bundle and keep the static read architecture intact. A hosted upload can publish through the BenchBox ingest service, while the pull-request path uses GitHub identity, review, and CI validation to add a bundle to the community archive. Browsing the Explorer still depends only on the generated static assets.
+The contribution path uses the same canonical bundle and keeps the static read architecture intact. GitHub provides contributor identity and pull-request review, while CI validates each proposed bundle before it enters the community archive. Browsing the Explorer still depends only on the generated static assets.
 
 ## Four ways to use the Explorer
 
@@ -93,7 +93,7 @@ This turns the Explorer from a fixed collection of charts into an analysis surfa
 
 ## Submit your own result
 
-BenchBox supports two submission destinations. `--service` uploads a canonical bundle to the hosted ingest API, while `--output` creates a local package for the `published-results` pull-request flow. Both begin with the same complete benchmark result and public-submission privacy prerequisite. The [hosted submission guide](https://benchbox.dev/docs/guides/hosted-submission.html) covers the service workflow, while the [current contribution guide source](https://github.com/BenchBox-dev/BenchBox/blob/develop/docs/contributing-results.md) contains the full pull-request contract, and the sequence below shows both paths.
+Community contributions use a pull request against the `published-results` branch. The [current contribution guide source](https://github.com/BenchBox-dev/BenchBox/blob/develop/docs/contributing-results.md) contains the full contract, and the sequence below shows the complete path.
 
 First, install BenchBox with the extra for your platform and run a complete benchmark suite. This example uses DuckDB and TPC-H at scale factor 0.01:
 
@@ -102,29 +102,16 @@ uv add benchbox --extra duckdb
 uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01
 ```
 
-Before the first public submission, set `BENCHBOX_MACHINE_ID_SALT` to a stable, private, non-empty random value. BenchBox uses the salt to pseudonymize retained public identifiers, and `benchbox submit` refuses to package a public contribution when the value is absent. Store it in a secret manager or protected local environment configuration. Reuse it for later submissions, and never commit it or paste it into a pull request.
+Before the first public submission, set `BENCHBOX_MACHINE_ID_SALT` to a non-empty secret. Generate it randomly, store it in a secret manager or protected local environment configuration, and reuse the same value for later submissions. BenchBox uses the salt to pseudonymize retained public identifiers, and `benchbox submit` refuses to package a public contribution when the value is absent or empty. Never commit it or paste it into a pull request.
 
 ```bash
-export BENCHBOX_MACHINE_ID_SALT="<stable-private-random-value>"
+export BENCHBOX_MACHINE_ID_SALT="<private-random-secret>"
 ```
 
-Preview the bundle that would be submitted:
+Preview the package, then write it to a local directory:
 
 ```bash
-uv run -- benchbox submit --last --service --dry-run
-```
-
-For the hosted path, authenticate once, then upload the latest result. The default `--wait` behavior returns after the service publishes or rejects the submission, and `benchbox results --submitted` lists the recorded hosted submissions.
-
-```bash
-uv run -- benchbox auth login
-uv run -- benchbox submit --last --service
-uv run -- benchbox results --submitted
-```
-
-Hosted upload is optional. To use the public pull-request workflow instead, write the package to a local directory:
-
-```bash
+uv run -- benchbox submit --last --dry-run
 uv run -- benchbox submit --last --output ./submission
 ```
 
@@ -152,7 +139,7 @@ CI checks the schema, manifest hash, timing sanity, metadata, and inventory drif
 
 A useful public results site needs several levels of inspection working together. The benchmark page helps readers discover relevant runs, while Compare keeps per-query evidence and recorded differences together. A result page provides a stable receipt, and raw downloads plus the SQL workbench let readers continue the analysis elsewhere. Each surface answers a different question without forcing every visitor to learn the result schema first.
 
-The static architecture has also been a useful constraint. It lets us improve the public reading experience without putting an authenticated service on the Explorer's read path. The repository, CI checks, and generated snapshot remain visible parts of the system, so changes to the public corpus leave a review trail.
+The static architecture has also been a useful constraint. It lets us improve the public reading experience while keeping the Explorer's read path entirely static. The repository, CI checks, and generated snapshot remain visible parts of the system, so changes to the public corpus leave a review trail.
 
 Curation shapes the usefulness of each comparison: depth within the same benchmark, scale, and phase gives readers enough evidence to understand what was measured. The preview helps us identify which benchmarks, platforms, and scales the community wants to deepen next, along with the context fields that matter most during review.
 
@@ -164,7 +151,7 @@ Open the [Results Explorer](https://benchbox.dev/results/) and follow one result
 2. Select two compatible runs and open Compare.
 3. Open one result page and download its bundle.
 4. Use Query to answer a question the built-in views do not cover.
-5. Submit a complete validated local run through the hosted service or PR path when you are ready to contribute.
+5. Package a complete validated local run and open a `published-results` pull request when you are ready to contribute.
 
 Start a [BenchBox discussion](https://github.com/BenchBox-dev/BenchBox/discussions) if an important comparison question remains hard to answer. Feedback on missing context is especially useful during the preview.
 
