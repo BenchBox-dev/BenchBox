@@ -1252,7 +1252,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight .pr-preflight-route pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
+.PHONY: pr-preflight .pr-preflight-route pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
@@ -1634,6 +1634,29 @@ dev-loop-metrics:
 include $(BENCHBOX_MAKEFILE_ROOT)make/worktrees.mk
 
 include $(BENCHBOX_MAKEFILE_ROOT)make/worktree-maintenance.mk
+
+## branch-prune-merged: delete local branches whose PR already merged into
+## develop but that have no worktree attached. worktree-remove removes only
+## the exact worktree registration and deliberately leaves its local branch,
+## while plain `git checkout -b` branches have no worktree to remove.
+##
+## Requires `gh`. PRs squash-merge, so source-tip ancestry cannot prove
+## integration. The helper instead verifies the historical PR head from the
+## PR timeline plus commit list and requires the PR merge commit to be
+## reachable from a freshly fetched origin/develop (§7 in the evidence
+## contract).
+##
+## Deletes only when the local tip equals the historically proven PR head at
+## merge time. A branch re-created under an old merged branch's name, or
+## carrying commits pushed after the merge, is reported and kept rather
+## than force-deleted -- name alone is not proof the local work merged.
+## A local branch left behind that historical head is likewise kept.
+##
+## Run with DRY_RUN=1 to preview without deleting anything.
+branch-prune-merged:
+	@command -v gh >/dev/null 2>&1 || { echo "gh CLI required for branch-prune-merged" >&2; exit 1; }
+	@DRY_RUN='$(if $(filter 1,$(DRY_RUN)),1,$(if $(strip $(DRY_RUN)),invalid,))' \
+		uv run -- python scripts/branch_prune_merged.py
 
 # ----------------------------------------------------------------------
 # UAT framework (tests/uat/) — see _project/specs/uat-framework.md.
