@@ -15,7 +15,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 def _known_failure(**overrides: object) -> dict[str, object]:
     failure: dict[str, object] = {
-        "id": "postgres-to-duckdb-seed-42",
+        "id": "postgres-to-duckdb-seed-42-case-0",
         "known_fail_since": "2026-08-25",
         "owner": "@joeharris76",
         "issue_url": "https://github.com/tobymao/sqlglot/issues/9999",
@@ -51,6 +51,25 @@ def _write_artifact(repo_root: Path, failure: dict[str, object], **overrides: ob
     artifact = {
         field: failure[field] for field in ("id", "seed", "sqlglot_version", "source_dialect", "target_dialect")
     }
+    artifact.update(
+        {
+            "schema": "sqlglot-generator-failure-v1",
+            "case_index": 0,
+            "case_seed": failure["seed"],
+            "input_sql": "SELECT 1",
+            "minimized_sql": "SELECT 1",
+            "failing_shapes": ["target_to_target"],
+            "outcomes": {
+                "target_to_target": {
+                    "status": "fail",
+                    "error_type": "ParseError",
+                    "error": "ParseError: synthetic",
+                },
+                "postgres_to_target": {"status": "pass", "error_type": None, "error": None},
+            },
+            "replay_command": EXPECTED_REPLAY_COMMAND_TEMPLATE,
+        }
+    )
     artifact.update(overrides)
     path = repo_root / str(failure["failure_artifact"])
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -173,7 +192,9 @@ def test_issue_url_must_be_a_canonical_sqlglot_issue(issue_url: str) -> None:
 
 def test_duplicate_ids_are_rejected() -> None:
     duplicate = copy.deepcopy(_known_failure())
-    assert "duplicate id 'postgres-to-duckdb-seed-42'" in "\n".join(_errors(_policy(_known_failure(), duplicate)))
+    assert "duplicate id 'postgres-to-duckdb-seed-42-case-0'" in "\n".join(
+        _errors(_policy(_known_failure(), duplicate))
+    )
 
 
 def test_future_known_failure_date_is_rejected() -> None:
@@ -198,6 +219,14 @@ def test_artifact_metadata_must_match_policy_entry(tmp_path: Path) -> None:
     _write_artifact(tmp_path, failure, seed=99)
     errors = "\n".join(_errors(_policy(failure), repo_root=tmp_path))
     assert "artifact metadata 'seed' does not match the policy entry" in errors
+
+
+def test_artifact_replay_command_must_match_portable_policy_template(tmp_path: Path) -> None:
+    failure = _known_failure(failure_artifact="artifacts/stale-command.json")
+    _write_artifact(tmp_path, failure, replay_command="uv run generator.py --failure-artifact /runner/temp/file.json")
+
+    errors = "\n".join(_errors(_policy(failure), repo_root=tmp_path))
+    assert "artifact replay command does not match the policy template" in errors
 
 
 def test_artifact_must_be_valid_json_object_with_required_metadata(tmp_path: Path) -> None:

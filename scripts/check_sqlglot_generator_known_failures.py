@@ -20,7 +20,7 @@ EXPECTED_MAX_AGE_DAYS = 7
 EXPECTED_REPLAY_COMMAND_TEMPLATE = (
     "uv run --with sqlglot=={sqlglot_version} -- python _project/sqlglot-upstream/repros/generator.py "
     "--seed {seed} --source-dialect {source_dialect} --target-dialect {target_dialect} "
-    "--failure-artifact {failure_artifact}"
+    "--failure-artifact {failure_artifact} --replay {failure_artifact}"
 )
 
 _TOP_LEVEL_FIELDS = frozenset(
@@ -47,6 +47,25 @@ _KNOWN_FAILURE_FIELDS = frozenset(
     }
 )
 _ARTIFACT_METADATA_FIELDS = ("id", "seed", "sqlglot_version", "source_dialect", "target_dialect")
+_ARTIFACT_SCHEMA = "sqlglot-generator-failure-v1"
+_ARTIFACT_FIELDS = frozenset(
+    {
+        "schema",
+        "id",
+        "seed",
+        "case_index",
+        "case_seed",
+        "sqlglot_version",
+        "source_dialect",
+        "target_dialect",
+        "input_sql",
+        "minimized_sql",
+        "failing_shapes",
+        "outcomes",
+        "replay_command",
+    }
+)
+_SHAPES = frozenset({"target_to_target", "postgres_to_target"})
 _ISO_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _SAFE_VERSION_RE = re.compile(r"[0-9][A-Za-z0-9._+-]*")
 _SAFE_DIALECT_RE = re.compile(r"[a-z][a-z0-9_]*")
@@ -162,6 +181,52 @@ def _resolve_artifact_path(value: object, field: str, repo_root: Path, errors: l
     return resolved_artifact
 
 
+def _validate_artifact_replay_payload(artifact: dict[str, object], field: str, errors: list[str]) -> None:
+    missing = sorted(_ARTIFACT_FIELDS - set(artifact))
+    if missing:
+        errors.append(f"{field}: artifact is missing replay fields: {', '.join(missing)}")
+    if artifact.get("replay_command") != EXPECTED_REPLAY_COMMAND_TEMPLATE:
+        errors.append(f"{field}: artifact replay command does not match the policy template")
+    if missing:
+        return
+    if artifact["schema"] != _ARTIFACT_SCHEMA:
+        errors.append(f"{field}: artifact schema must be {_ARTIFACT_SCHEMA!r}")
+    index = artifact["case_index"]
+    if isinstance(index, bool) or not isinstance(index, int) or index < 0:
+        errors.append(f"{field}: artifact case_index must be a non-negative integer")
+    else:
+        expected_id = (
+            f"{artifact['source_dialect']}-to-{artifact['target_dialect']}-seed-{artifact['seed']}-case-{index}"
+        )
+        if artifact["id"] != expected_id or artifact["case_seed"] != artifact["seed"] + index:
+            errors.append(f"{field}: artifact id or case seed is inconsistent")
+    for sql_field in ("input_sql", "minimized_sql"):
+        if not isinstance(artifact[sql_field], str) or not artifact[sql_field]:
+            errors.append(f"{field}: artifact {sql_field} must be non-empty SQL")
+    failing = artifact["failing_shapes"]
+    outcomes = artifact["outcomes"]
+    if not isinstance(failing, list) or not failing or not set(failing) <= _SHAPES:
+        errors.append(f"{field}: artifact failing_shapes is invalid")
+        return
+    if not isinstance(outcomes, dict) or set(outcomes) != _SHAPES:
+        errors.append(f"{field}: artifact outcomes must contain both call shapes")
+        return
+    recorded_failures: set[str] = set()
+    for shape in sorted(_SHAPES):
+        outcome = outcomes[shape]
+        if not isinstance(outcome, dict) or outcome.get("status") not in {"pass", "fail"}:
+            errors.append(f"{field}: artifact outcome for {shape} is invalid")
+            continue
+        if outcome["status"] == "fail":
+            if not isinstance(outcome.get("error_type"), str) or not isinstance(outcome.get("error"), str):
+                errors.append(f"{field}: artifact failure for {shape} lacks an exact error signature")
+            recorded_failures.add(shape)
+        elif outcome.get("error_type") is not None or outcome.get("error") is not None:
+            errors.append(f"{field}: artifact pass for {shape} has an error signature")
+    if set(failing) != recorded_failures:
+        errors.append(f"{field}: artifact failing_shapes disagrees with outcomes")
+
+
 def _validate_artifact_metadata(
     artifact_path: Path,
     known_failure: Mapping[str, object],
@@ -186,6 +251,7 @@ def _validate_artifact_metadata(
         actual = artifact[metadata_field]
         if type(actual) is not type(expected) or actual != expected:
             errors.append(f"{field}: artifact metadata {metadata_field!r} does not match the policy entry")
+    _validate_artifact_replay_payload(artifact, field, errors)
 
 
 def _validate_known_failure(

@@ -158,6 +158,76 @@ jobs:
             uvx pip-audit
           fi
 
+  sqlglot-generator:
+    name: SQLGlot generated translation pilot
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Validate generated-case disposition policy
+        run: >-
+          uv run -- python scripts/check_sqlglot_generator_known_failures.py
+          --policy _project/sqlglot-upstream/generator-policy.json
+
+      - name: Run deterministic generated translation cases
+        id: generator
+        shell: bash
+        env:
+          FAILURE_ARTIFACT: ${{ runner.temp }}/sqlglot-generator-failure.json
+          SUMMARY_ARTIFACT: ${{ runner.temp }}/sqlglot-generator-summary.json
+        run: |
+          set +e
+          uv run -- python _project/sqlglot-upstream/repros/generator.py \
+            --seed "${GITHUB_RUN_ID}" \
+            --source-dialect postgres \
+            --target-dialect duckdb \
+            --cases 1024 \
+            --deadline-seconds 300 \
+            --failure-artifact "${FAILURE_ARTIFACT}" \
+            --summary-artifact "${SUMMARY_ARTIFACT}"
+          status=$?
+          set -e
+
+          if [ "${status}" -eq 1 ]; then
+            uv run -- python _project/sqlglot-upstream/repros/generator.py \
+              --seed "${GITHUB_RUN_ID}" \
+              --source-dialect postgres \
+              --target-dialect duckdb \
+              --failure-artifact "${FAILURE_ARTIFACT}" \
+              --summary-artifact "${SUMMARY_ARTIFACT}" \
+              --validate-advisory-evidence
+            echo "::warning::SQLGlot generated translation case discovered; replay artifact uploaded."
+            exit 0
+          fi
+          if [ "${status}" -ne 0 ]; then
+            echo "::error::SQLGlot generator infrastructure or contract failure (exit ${status})."
+            exit "${status}"
+          fi
+
+      - name: Upload generated translation evidence
+        if: ${{ !cancelled() && steps.generator.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sqlglot-generator-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/sqlglot-generator-summary.json
+            ${{ runner.temp }}/sqlglot-generator-failure.json
+          if-no-files-found: warn
+          retention-days: 14
+
   integration-smoke:
     runs-on: ${{ matrix.os }}
     strategy:
