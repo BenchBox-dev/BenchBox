@@ -49,7 +49,7 @@ https://amplab\.cs\.berkeley\.edu/.*
 # HammerDB site intermittently returns 502 / connect timeouts
 https://www\.hammerdb\.com/.*
 
-# GitHub blob/issues links in blog posts intermittently return 404/429 to
-# unauthenticated CI requests once rate-limited; verified reachable (200) from
-# an authenticated/non-rate-limited client.
-https://github\.com/(joeharris76|BenchBox-dev)/BenchBox/(blob|issues).*
+# Historical links under the former owner intermittently return 404/429 to
+# unauthenticated CI after redirecting. Current BenchBox-dev links are checked
+# normally so moved or restricted first-party destinations cannot be masked.
+https://github\.com/joeharris76/BenchBox/(blob|issues).*

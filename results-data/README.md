@@ -113,19 +113,26 @@ regeneration procedure once the tuned path is fixed and verified
 
 ## Contributing via Pull Request (Phase 2)
 
-Community contributions use the PR-based flow documented in
-`docs/contributing-results.md`. At a high level:
+Community contributions use a pull request against the slim
+`published-results` branch. That branch intentionally does not contain the full
+documentation tree, so the complete runnable flow is included here:
 
-1. Run your benchmark: `benchbox run --platform <platform> --benchmark <benchmark> --scale <sf>`
-2. Package the result: `benchbox submit --output ./submission/`
-3. Open a PR against the `published-results` branch of `BenchBox-dev/BenchBox` touching `results-data/bundles/`
-4. Regenerate the inventory: `uv run -- python scripts/generate_corpus_inventory.py --write`
-5. CI validates schema conformance, bundle integrity, cohort compatibility, and inventory drift
-6. A maintainer reviews and merges
+1. Install BenchBox with the extra for your platform, then run a complete suite:
+   `uv run -- benchbox run --platform <platform> --benchmark <benchmark> --scale <sf>`.
+2. Package the latest result: `uv run -- benchbox submit --last --output ./submission`.
+3. Fork [`BenchBox-dev/BenchBox`](https://github.com/BenchBox-dev/BenchBox), check out its
+   `published-results` branch, and copy `submission/bundle/` plus the generated
+   `submission/<result>.manifest.json` into `results-data/bundles/`.
+4. Regenerate the inventory:
+   `uv run -- python scripts/generate_corpus_inventory.py --write`.
+5. Commit the bundle, manifest, and inventory, then open a PR against
+   `BenchBox-dev/BenchBox:published-results` titled
+   `results: <benchmark> <platform> sf<scale>`.
+6. CI validates schema conformance, hashes, bundle integrity, cohort
+   compatibility, and inventory drift before maintainer review.
 
-See `docs/contributing-results.md` for the full submission flow and
-`docs/development/benchbox-results-platform-strategy.md` for the Phase 2
-design.
+The full maintained guide is published at
+<https://benchbox.dev/docs/contributing-results.html>.
 
 ## Reproducibility
 
