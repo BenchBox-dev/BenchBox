@@ -53,3 +53,9 @@ https://www\.hammerdb\.com/.*
 # unauthenticated CI after redirecting. Current BenchBox-dev links are checked
 # normally so moved or restricted first-party destinations cannot be masked.
 https://github\.com/joeharris76/BenchBox/(blob|issues).*
+
+# GitHub Pages serves Results Explorer deep links through the root SPA fallback
+# with HTTP 404. Browsers still render the comparison route, but Sphinx
+# linkcheck correctly sees the transport status. Keep this exception limited to
+# the published two-result comparison receipt links.
+https://benchbox\.dev/results/compare\?ids=[0-9a-f]{8},[0-9a-f]{8}$
