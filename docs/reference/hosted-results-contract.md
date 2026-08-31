@@ -386,9 +386,8 @@ not a ranked table.
 
 ### 4.1 Public Fields
 
-The following fields are always public for any result with a `published` status
-and a public visibility state. They cannot be redacted by the submitter or
-admin.
+The following fields are always public for any `live` result with a public
+visibility state. They cannot be redacted by the submitter or admin.
 
 | Field | Notes |
 |---|---|
@@ -397,8 +396,8 @@ admin.
 | `scale_factor` | Numeric scale factor (e.g., `1.0`) |
 | `query_timings` | Per-query execution time in milliseconds |
 | `validation_status` | Per-query validation result (passed/failed/skipped) |
-| `submission_date` | Date the result was published to the corpus |
-| `trust_label` | The trust label assigned at publication |
+| `submission_date` | Date the result was accepted into the archive |
+| `trust_label` | The server-controlled provenance label assigned by policy |
 | `funding` | How the run was funded (see Section 2.4); `unspecified` when not declared |
 | `public_result_id` | The stable permalink slug |
 | `query_subset` | Which queries were run (full set or named subset) |
@@ -419,33 +418,33 @@ public-facing views.
 | `contributor_email` | Submitter or admin | Only collected in Phase 3; display name is shown instead |
 | `ip_address` | Admin only (never public) | Stored for abuse detection; never exposed |
 
-Redaction of a published field does not change the result's `published` status
-or `public_result_id`. The result remains in the public index; only the
-specific field value is hidden.
+Redaction of a public field does not change archive acceptance or the
+`public_result_id`. Presentation visibility and ranking remain separate policy
+decisions; only the specific field value is hidden.
 
 ### 4.3 Retention Policy
 
-| Status | Retention |
+| State or asset | Retention |
 |---|---|
-| `published` | Retained indefinitely by default. No automatic expiry. |
+| Accepted source bundle | Retained indefinitely by default under the A0 preservation floor. No automatic expiry. |
 | `pending` / `validated` | Retained for 90 days from submission date, then purged if not promoted. |
 | `rejected` | Retained for 30 days from rejection date, then purged. |
-| `withdrawn` | Public index tombstone retained indefinitely. Raw bundle purged within 30 days of withdrawal. |
+| `withdrawn` presentation | Public tombstone and non-sensitive audit evidence retained indefinitely. Accepted source bytes remain preserved during the A0 freeze. |
 
-The indefinite retention of `published` results is the default. Submitters may
-request withdrawal at any time (see Section 4.4); the platform does not
-proactively expire published results.
+The accepted archive is retained independently of public presentation. Submitters may
+request withdrawal at any time (see Section 4.4); withdrawal does not silently rewrite
+the historical acceptance record or authorize source-byte deletion.
 
 ### 4.4 Data Removal
 
-Submitters may request withdrawal of a published result at any time. There is
+Submitters may request withdrawal of an accepted or live result at any time. There is
 no deadline. Withdrawal is available before and after publication.
 
 **Withdrawal process:**
 
-- Phase 1: File an issue or contact maintainers. The maintainer removes the
-  bundle from `results-data/` and triggers a rebuild.
-- Phase 2: Same as Phase 1, or close the original PR (if not yet merged).
+- Phase 1: File an issue or contact maintainers. The maintainer records the
+  withdrawal policy and republishes presentation without deleting accepted source bytes.
+- Phase 2: Same as Phase 1, or close the original PR if acceptance has not occurred.
 - Phase 3: Call `DELETE /v1/results/{public_result_id}` with a valid auth token,
   or contact support.
 
@@ -453,16 +452,14 @@ no deadline. Withdrawal is available before and after publication.
 
 1. The result is removed from the public manifest index and all browse/compare
    views within 7 days of the withdrawal request.
-2. The raw bundle and all derived read models are purged from storage within
-   30 days of the withdrawal request.
-3. **Phase 3 only:** A **tombstone** remains in the index indefinitely. The
+2. Derived public read models suppress the result. Accepted source bytes remain under the
+   A0 preservation floor unless a separately approved erasure incident supersedes it.
+3. A **tombstone** remains in the index indefinitely. The
    tombstone contains only: `public_result_id`, `status: withdrawn`, and
    `withdrawn_at` (date). All other fields are redacted. The detail page at
    the stable URL returns the tombstone with a `410 Gone` HTTP status.
-   In Phases 1-2, withdrawal removes the entry entirely from the index; no
-   tombstone is retained (the stable URL returns `404 Not Found`).
 
-In Phase 3, the tombstone ensures that existing links and citations do not
+The tombstone ensures that existing links and citations do not
 silently resolve to a different result. External parties who bookmarked the URL
 see a clear signal that the result was withdrawn rather than a 404 or an
 unrelated result.
@@ -595,7 +592,7 @@ Expected responses:
 | HTTP status | Meaning | CLI behavior |
 |---|---|---|
 | `202 Accepted` | Submission received; `submission_id` in body | Print submission_id and poll URL |
-| `200 OK` | `bundle_hash` already published; body includes `"status": "already_published"` and `public_result_id` | Print existing result URL, exit 0 |
+| `200 OK` | `bundle_hash` already accepted; body includes `public_result_id`, `acceptance_status`, and `promotion_status` | Print acceptance and live-state details, exit 0 |
 | `409 Conflict` | Bundle in `pending` or `validated` state; `submission_id` in body | Print status and poll URL |
 | `422 Unprocessable` | Schema or hash validation failed; `errors` array in body | Print errors, exit non-zero |
 | `429 Too Many Requests` | Rate limited; `Retry-After` in headers | Print wait time, exit non-zero |
@@ -614,7 +611,8 @@ Response:
 {
   "submission_id": "<uuid>",
   "bundle_hash": "<sha256>",
-  "status": "<pending|validated|published|rejected>",
+  "acceptance_status": "<pending|validated|accepted|rejected>",
+  "promotion_status": "<not_requested|promotion_pending|live|promotion_failed|withdrawn>",
   "public_result_id": "<slug or null>",
   "rejection_reason": "<string or null>",
   "updated_at": "<ISO 8601>"
@@ -623,6 +621,10 @@ Response:
 
 The CLI polls with exponential backoff (initial 5s, max 60s, up to 10 attempts)
 and prints the final status to stdout.
+
+For compatibility, a legacy `"status": "already_published"` response may be emitted
+only when a matching attested live receipt exists. Accepted-but-not-live results must not
+be described as already published.
 
 ### 5.2 API Contract (Phase 3)
 
@@ -760,8 +762,6 @@ resolved by this contract:
 - **Cross-visibility cohort comparisons:** Whether results in different
   visibility states (e.g., `private` and `public-curated`) may be included in
   the same compare cohort.
-- **Withdrawn result URL behavior (Phases 1-2):** Return `404 Not Found` or a
-  dedicated "result withdrawn" page at the stable URL.
 - **Private result access control model:** Submitter-only access, or
   organisation-based sharing (e.g., all members of the submitter's GitHub org)?
 - **Ranking eligibility rules for mixed-visibility cohorts:** Whether a cohort
@@ -777,9 +777,10 @@ resolved by this contract:
 | `bundle_hash` computed and tracked | No | Yes (CI check) | Yes (API) |
 | `submission_id` issued | No | No | Yes |
 | `public_result_id` minted | Yes | Yes | Yes |
-| Ingest status: `pending` / `validated` | No | Yes (PR states) | Yes |
-| Ingest status: `published` | Yes | Yes | Yes |
-| Ingest status: `rejected` / `withdrawn` | Admin only | Yes | Yes |
+| Acceptance state: `pending` / `validated` | No | Yes (PR states) | Yes |
+| Acceptance state: `accepted` | Yes | Yes | Yes |
+| Promotion state: `promotion_pending` / `live` / `promotion_failed` | Yes | Yes | Yes |
+| Acceptance or policy state: `rejected` / `withdrawn` | Admin only | Yes | Yes |
 | Visibility: `public-curated` | Yes | Yes | Yes |
 | Visibility: `public-self-reported` | No | Yes | Yes |
 | Visibility: `private` / `unlisted` | No | No | Yes |
@@ -790,8 +791,8 @@ resolved by this contract:
 | Soft warning cohort display | Yes | Yes | Yes |
 | Ranking eligibility rules | Yes (all curated) | Yes | Yes |
 | Redactable fields supported | No | Partial (no auth) | Yes |
-| Data removal / withdrawal | Admin git operation | Admin or PR close | Self-service API |
-| Tombstone on withdrawal | No | No | Yes |
+| Presentation withdrawal request | Admin policy operation | Admin or PR close before acceptance | Self-service API |
+| Stable tombstone on withdrawal | Yes | Yes | Yes |
 | `benchbox submit --output` | No | Yes | Yes |
 | `benchbox submit` → API | No | No | Yes |
 | Status polling | No | No | Yes |

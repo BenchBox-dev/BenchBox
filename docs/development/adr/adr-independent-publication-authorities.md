@@ -109,9 +109,11 @@ policy.
   advance desired state or accept new input.
 - Emergency takedown fails closed for presentation: an authorized maintainer may mark
   affected results withdrawn and republish without waiting for a second approver.
-- Takedown does not rewrite Git history or destroy the accepted archive. Privacy or legal
-  deletion of public bytes follows the narrow manual `published-results` removal path,
-  while audit records retain non-sensitive identifiers, reasons, actors, and timestamps.
+- Takedown does not rewrite Git history or destroy the accepted archive. During the A0
+  freeze, privacy or legal incidents use immediate presentation withdrawal and access
+  suppression; any irreversible source-byte erasure requires a separately approved
+  incident plan that inventories Git history, artifacts, caches, and preservation-law
+  constraints. A branch deletion alone must never be described as erasure.
 - Manifests, build provenance, deploy acknowledgements, live receipts, withdrawal events,
   and rollback events are append-only audit evidence and are retained independently of
   replaceable read models.
@@ -145,7 +147,9 @@ emergency takedown abuse or delay.
 | `_project/decisions/single-repo-migration.md` | Extended: its current release-driven preview describes the legacy implementation, not proof of future publication authority or live state. |
 | `_project/decisions/independent-publication-a0-freeze-2026-08-31.md` | Reused: desired, built, deployed, and observed remain separate; A0 freezes destructive migration until its gates pass. |
 | `docs/operations/results-phase-2-runbook.md` | Extended: accepted archive and takedown operations follow this authority model. |
-| `adr-public-result-id-permanence.md` | Clarified: the attested live receipt, not a merge or build, is the publication boundary for external link permanence. |
+| `adr-public-result-id-permanence.md` | Clarified: public serving creates the external link contract; the A0 observed baseline protects existing routes and later receipts identify subsequent generations. |
+| `docs/reference/hosted-results-contract.md` | Extended: acceptance, promotion, liveness, visibility, and withdrawal are orthogonal; a merge never directly means live. |
+| `docs/reference/threat-model.md` | Extended: Phase 3 adds hosted-service threats without replacing the cross-phase publication threat model or one-maintainer approval rule. |
 
 ## Alternatives rejected
 

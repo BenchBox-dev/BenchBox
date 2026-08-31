@@ -77,13 +77,15 @@ replace it with tested evidence.
 One authorized maintainer may initiate emergency takedown.
 
 1. Record actor, reason, time, affected public IDs or archive paths, and whether the
-   action is presentation withdrawal or public-byte deletion.
+   action is presentation withdrawal or a request for source-byte erasure.
 2. For presentation withdrawal, add `withdrawn` to desired state. Exclude affected rows
    from public and ranking read models, reserve a generation, deploy, and obtain a fresh
    live receipt. Ordinary promotion must carry the withdrawal forward.
-3. For privacy or legal deletion of public bytes, follow the narrow manual
-   `published-results` deletion and inventory-regeneration procedure in
-   [`results-phase-2-runbook.md`](results-phase-2-runbook.md). Never use a full-tree wipe.
+3. During the A0 migration freeze, do not delete accepted source bytes. For a privacy or
+   legal incident, withdraw presentation immediately, suppress accessible artifacts where
+   the provider permits, and open a separately approved erasure plan covering Git history,
+   workflow artifacts, caches, mirrors, and inventory consequences. A branch deletion is
+   not proof of erasure.
 4. Preserve non-sensitive audit evidence. Do not claim public removal until external
    probes and a live receipt confirm it.
 
@@ -91,8 +93,10 @@ One authorized maintainer may initiate emergency takedown.
 
 Retain manifests, approvals, provenance, artifact digests, deployment acknowledgements,
 live receipts, failures, withdrawal events, and rollback events independently of derived
-indexes. The accepted archive remains recoverable subject to an explicit privacy/legal
-removal. Derived Explorer databases, pages, indexes, and caches are replaceable.
+indexes. The accepted archive remains recoverable under the A0 preservation floor. Any
+later privacy/legal erasure exception must explicitly supersede that freeze through an
+audited incident decision. Derived Explorer databases, pages, indexes, and caches are
+replaceable.
 
 The operational record must allow a reviewer to answer who approved which exact source
 SHAs, what was built, what was deployed, what was observed publicly, which policy was in

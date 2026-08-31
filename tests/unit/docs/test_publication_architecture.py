@@ -7,6 +7,7 @@ OPERATIONS = ROOT / "docs/operations/independent-publication-contract.md"
 ADR_INDEX = ROOT / "docs/development/adr/README.md"
 HOSTED_CONTRACT = ROOT / "docs/reference/hosted-results-contract.md"
 PHASE3_THREAT_MODEL = ROOT / "docs/reference/threat-model.md"
+PUBLIC_ID_ADR = ROOT / "docs/development/adr/adr-public-result-id-permanence.md"
 
 
 def _text(path: Path) -> str:
@@ -73,6 +74,15 @@ def test_manual_review_and_single_maintainer_contract() -> None:
     assert "One authorized maintainer may approve normal promotion" in combined
     assert "One authorized maintainer may also order an emergency takedown" in combined
     assert "require manual maintainer review and MUST NOT auto-merge" in combined
+    assert "A branch deletion alone must never be described as erasure" in combined
+
+
+def test_existing_public_ids_are_already_compatibility_contracts() -> None:
+    text = _normalized(PUBLIC_ID_ADR)
+
+    assert "Link permanence attached when those routes first became publicly available" in text
+    assert "The A0 observed baseline proves the initial protected surface" in text
+    assert "until an attested live receipt" not in text
 
 
 def test_adr_is_indexed_and_accepted() -> None:
@@ -88,6 +98,14 @@ def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
     assert "Visibility is orthogonal to archive acceptance" in text
     assert "All six visibility states apply" in text
     assert "All five visibility states apply" not in text
+    assert "Accepted source bytes remain preserved during the A0 freeze" in text
+    assert "Accepted-but-not-live results must not be described as already published" in text
+    assert '"acceptance_status": "<pending|validated|accepted|rejected>"' in _text(HOSTED_CONTRACT)
+    assert '"promotion_status": "<not_requested|promotion_pending|live|promotion_failed|withdrawn>"' in _text(
+        HOSTED_CONTRACT
+    )
+    assert "Ingest status: `published`" not in _text(HOSTED_CONTRACT)
+    assert "Withdrawn result URL behavior (Phases 1-2)" not in _text(HOSTED_CONTRACT)
     assert "| `accepted` |" in _text(HOSTED_CONTRACT)
     assert "| `live` |" in _text(HOSTED_CONTRACT)
     assert "| `published` | On commit" not in _text(HOSTED_CONTRACT)

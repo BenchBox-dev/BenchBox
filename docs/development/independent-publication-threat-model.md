@@ -103,8 +103,11 @@ actor, reason, scope, timestamp, and affected identifiers. Presentation fails cl
 withdrawn results are excluded from visible and ranking views before republish. Desired
 state carries the withdrawal set forward, so ordinary promotions cannot resurrect it.
 The accepted archive and audit history are not rewritten by a visibility takedown.
-Privacy or legal deletion of public bytes uses the narrow manual removal procedure on
-`published-results`; non-sensitive audit evidence remains.
+During the A0 migration freeze, a privacy or legal incident triggers immediate
+presentation withdrawal and artifact-access suppression, not accepted-source deletion.
+Any later irreversible erasure requires a separately approved incident plan covering Git
+history, workflow artifacts, caches, mirrors, inventory effects, and non-sensitive audit
+retention.
 
 ### Receipt forgery and false liveness
 

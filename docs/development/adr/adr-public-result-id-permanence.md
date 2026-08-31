@@ -54,15 +54,15 @@ Because the id is content-addressed over published bytes:
   are a hard failure (`DuplicateResultIdError`), not a silent `-{n}` rename.
 
 The current public Explorer serves result detail URLs, so the earlier pre-deploy
-assumption is stale. Link permanence attaches to the first attested live receipt that
-includes the relevant published bytes and routes. A merge, build artifact, provider
-deployment record, or un-attested probe does not establish that boundary. Corpus
-rotations before that receipt changed ids in Git and CI artifacts only; rotations after
-an attested live receipt are compatibility events.
+assumption is stale. Link permanence attached when those routes first became publicly
+available to consumers. The A0 observed-site baseline is the preservation floor for the
+currently served corpus; future attested live receipts provide stronger, generation-specific
+proof without postponing compatibility for URLs that are already public.
 
-The remaining operational question is which historical and future ids are covered by a
-matching live receipt. The written format and collision contract remain authoritative,
-and alias or redirect handling follows the receipt-backed compatibility rule below.
+The remaining operational question is which ids belong to each later receipt-backed
+generation. The A0 observed baseline already protects the currently served ids. The
+written format and collision contract remain authoritative, and alias or redirect
+handling follows the compatibility rule below.
 
 ## Decision
 
@@ -80,11 +80,10 @@ Consequences:
   the public id.
 - Re-deriving the same published bytes yields the same id (content
   address).
-- Deliberately changing published bytes (privacy fix, schema projection,
-  field-set drop) is allowed to change ids until an attested live receipt first binds
-  those bytes and result routes to the public product. After that receipt, any further
-  rotation must either preserve ids for unchanged published bytes (the normal
-  content-address path) or ship an explicit alias/redirect map for ids that change.
+- Deliberately changing published bytes (privacy fix, schema projection, field-set drop)
+  after their result route has become public is a compatibility event. It must either
+  preserve ids for unchanged published bytes (the normal content-address path) or ship
+  an explicit alias/redirect map for ids that change.
 - Permanent does **not** mean "immune to content change." It means "the same
   published bytes always map to the same id, and once that id is live in
   the public product, links keep resolving."
@@ -117,30 +116,30 @@ format that diverges from this slug without a new ADR.
 `public_result_id` in the hosted contract and `result_id` in the explorer
 pipeline refer to the same slug today.
 
-### 3. Alias / redirect at the attested-live boundary
+### 3. Alias / redirect at the public-link boundary
 
-No alias or redirect mechanism was required for rotations completed before an attested
-live receipt bound result detail routes. The public Explorer now serves those routes, so
-operators must use receipt evidence to determine whether a specific id has crossed the
-external compatibility boundary.
+No alias or redirect mechanism was required before result detail routes were publicly
+available. The public Explorer now serves those routes, so operators must treat the A0
+observed corpus and every later receipt-backed generation as external compatibility
+surfaces.
 
 Rationale and current posture:
 
 1. The format mismatch lived in documentation only. Minted ids have always included
    `sha8` in code and unit tests.
-2. Rotations completed before an attested live receipt needed no redirect table because
-   no receipt had established the affected ids as an external contract.
-3. The public Explorer now serves result detail routes. For any future rotation,
-   operators must inspect live receipts to identify ids whose compatibility boundary has
-   been crossed.
-4. Redirect or deprecation handling is required only for affected already-live ids, not
-   invented retroactively for pre-receipt artifacts.
+2. Rotations completed before the first public Explorer deployment needed no redirect
+   table because consumers could not yet link to those routes.
+3. The public Explorer now serves result detail routes. The A0 observed baseline protects
+   currently served ids, and later live receipts identify the exact ids in each promoted
+   generation.
+4. Redirect or deprecation handling is required only for affected already-public ids, not
+   invented retroactively for artifacts that were never publicly served.
 
-**Trigger now in force:** once an attested live receipt includes Explorer result detail
-URLs as a linkable public surface, any id-changing re-derivation of those already-live
-published bytes needs an alias/redirect or an explicit deprecation notice, decided in a
-follow-up ADR or operations change. The receipt, not branch or workflow state, is the
-proof needed to apply that rule.
+**Trigger now in force:** any id-changing re-derivation of bytes whose result route has
+already been publicly served needs an alias/redirect or an explicit deprecation notice,
+decided in a follow-up ADR or operations change. The A0 observed baseline proves the
+initial protected surface; later attested receipts prove subsequent generations. Branch
+or workflow state alone never proves public availability.
 
 ## Alternatives rejected
 

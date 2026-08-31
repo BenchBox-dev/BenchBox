@@ -40,6 +40,7 @@ def main() -> int:
                 "visibility, trust, withdrawal, and ranking",
                 "One authorized maintainer may approve normal promotion",
                 "require manual maintainer review and MUST NOT auto-merge",
+                "A branch deletion alone must never be described as erasure",
             ),
         )
     )
@@ -51,6 +52,8 @@ def main() -> int:
                 "A `published-results` merge proves acceptance only",
                 "compare-and-set",
                 "One authorized maintainer may initiate emergency takedown",
+                "During the A0 migration freeze, do not delete accepted source bytes",
+                "A branch deletion is not proof of erasure",
             ),
         )
     )
@@ -63,6 +66,8 @@ def main() -> int:
                 "Promotion races and stale completion",
                 "Rollback confusion and downgrade",
                 "Takedown abuse, delay, and resurrection",
+                "During the A0 migration freeze",
+                "separately approved incident plan",
             ),
         )
     )
@@ -78,6 +83,8 @@ def main() -> int:
                 "must never translate a Git merge directly into `live`",
                 "Visibility is orthogonal to archive acceptance",
                 "All six visibility states apply",
+                "Accepted source bytes remain preserved during the A0 freeze",
+                "Accepted-but-not-live results must not be described as already published",
             ),
         )
     )
