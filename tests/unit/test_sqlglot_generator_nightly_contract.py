@@ -26,7 +26,7 @@ def test_generator_is_nightly_only_and_preserves_required_pr_workflow() -> None:
     assert "_project/sqlglot-upstream/repros/generator.py" not in pr_workflow
 
 
-def test_policy_and_infrastructure_failures_stay_blocking() -> None:
+def test_policy_discovery_and_infrastructure_failures_stay_blocking() -> None:
     workflow = NIGHTLY.read_text(encoding="utf-8")
     job = _job_block(workflow, "sqlglot-generator", "integration-smoke")
 
@@ -35,9 +35,12 @@ def test_policy_and_infrastructure_failures_stay_blocking() -> None:
     advisory = job.index('if [ "${status}" -eq 1 ]')
     evidence_validation = job.index("--validate-advisory-evidence")
     infrastructure = job.index('if [ "${status}" -ne 0 ]')
+    discovery_branch = job[advisory:infrastructure]
 
     assert guard < generator < advisory < evidence_validation < infrastructure
     assert "continue-on-error" not in job
+    assert "exit 0" not in discovery_branch
+    assert 'exit "${status}"' in discovery_branch
     assert 'exit "${status}"' in job
 
 

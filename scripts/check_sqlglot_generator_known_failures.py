@@ -98,6 +98,13 @@ def _nonempty_string(value: object, field: str, errors: list[str]) -> str | None
     return value
 
 
+def _non_negative_integer(value: object, field: str, errors: list[str]) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        errors.append(f"{field}: must be a non-negative integer")
+        return None
+    return value
+
+
 def _iso_date(value: object, field: str, errors: list[str]) -> date | None:
     text = _nonempty_string(value, field, errors)
     if text is None:
@@ -181,6 +188,27 @@ def _resolve_artifact_path(value: object, field: str, repo_root: Path, errors: l
     return resolved_artifact
 
 
+def _validate_artifact_identity(artifact: dict[str, object], field: str, errors: list[str]) -> None:
+    failure_id = _nonempty_string(artifact["id"], f"{field}.id", errors)
+    seed = _non_negative_integer(artifact["seed"], f"{field}.seed", errors)
+    index = _non_negative_integer(artifact["case_index"], f"{field}.case_index", errors)
+    case_seed = _non_negative_integer(artifact["case_seed"], f"{field}.case_seed", errors)
+    _nonempty_string(artifact["sqlglot_version"], f"{field}.sqlglot_version", errors)
+    source_dialect = _nonempty_string(artifact["source_dialect"], f"{field}.source_dialect", errors)
+    target_dialect = _nonempty_string(artifact["target_dialect"], f"{field}.target_dialect", errors)
+    if (
+        failure_id is not None
+        and seed is not None
+        and index is not None
+        and case_seed is not None
+        and source_dialect is not None
+        and target_dialect is not None
+    ):
+        expected_id = f"{source_dialect}-to-{target_dialect}-seed-{seed}-case-{index}"
+        if failure_id != expected_id or case_seed != seed + index:
+            errors.append(f"{field}: artifact id or case seed is inconsistent")
+
+
 def _validate_artifact_replay_payload(artifact: dict[str, object], field: str, errors: list[str]) -> None:
     missing = sorted(_ARTIFACT_FIELDS - set(artifact))
     if missing:
@@ -191,39 +219,41 @@ def _validate_artifact_replay_payload(artifact: dict[str, object], field: str, e
         return
     if artifact["schema"] != _ARTIFACT_SCHEMA:
         errors.append(f"{field}: artifact schema must be {_ARTIFACT_SCHEMA!r}")
-    index = artifact["case_index"]
-    if isinstance(index, bool) or not isinstance(index, int) or index < 0:
-        errors.append(f"{field}: artifact case_index must be a non-negative integer")
-    else:
-        expected_id = (
-            f"{artifact['source_dialect']}-to-{artifact['target_dialect']}-seed-{artifact['seed']}-case-{index}"
-        )
-        if artifact["id"] != expected_id or artifact["case_seed"] != artifact["seed"] + index:
-            errors.append(f"{field}: artifact id or case seed is inconsistent")
+    _validate_artifact_identity(artifact, field, errors)
     for sql_field in ("input_sql", "minimized_sql"):
         if not isinstance(artifact[sql_field], str) or not artifact[sql_field]:
             errors.append(f"{field}: artifact {sql_field} must be non-empty SQL")
     failing = artifact["failing_shapes"]
     outcomes = artifact["outcomes"]
-    if not isinstance(failing, list) or not failing or not set(failing) <= _SHAPES:
+    failing_names: set[str] | None = None
+    if not isinstance(failing, list) or not failing:
         errors.append(f"{field}: artifact failing_shapes is invalid")
-        return
-    if not isinstance(outcomes, dict) or set(outcomes) != _SHAPES:
+    else:
+        validated_failing = [name for name in failing if isinstance(name, str) and name in _SHAPES]
+        if len(validated_failing) != len(failing) or len(set(validated_failing)) != len(validated_failing):
+            errors.append(f"{field}: artifact failing_shapes is invalid")
+        else:
+            failing_names = set(validated_failing)
+    if not isinstance(outcomes, dict) or set(outcomes.keys()) != _SHAPES:
         errors.append(f"{field}: artifact outcomes must contain both call shapes")
         return
     recorded_failures: set[str] = set()
     for shape in sorted(_SHAPES):
         outcome = outcomes[shape]
-        if not isinstance(outcome, dict) or outcome.get("status") not in {"pass", "fail"}:
+        if not isinstance(outcome, dict):
             errors.append(f"{field}: artifact outcome for {shape} is invalid")
             continue
-        if outcome["status"] == "fail":
+        status = outcome.get("status")
+        if not isinstance(status, str) or status not in ("pass", "fail"):
+            errors.append(f"{field}: artifact outcome for {shape} is invalid")
+            continue
+        if status == "fail":
             if not isinstance(outcome.get("error_type"), str) or not isinstance(outcome.get("error"), str):
                 errors.append(f"{field}: artifact failure for {shape} lacks an exact error signature")
             recorded_failures.add(shape)
         elif outcome.get("error_type") is not None or outcome.get("error") is not None:
             errors.append(f"{field}: artifact pass for {shape} has an error signature")
-    if set(failing) != recorded_failures:
+    if failing_names is not None and failing_names != recorded_failures:
         errors.append(f"{field}: artifact failing_shapes disagrees with outcomes")
 
 
