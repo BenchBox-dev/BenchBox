@@ -23,9 +23,14 @@ def _changed_bundle_discovery_script() -> str:
     run = step["run"]
     start = run.index("CHANGED=$(git diff")
     end = run.index('if [ -z "$CHANGED" ]')
-    return (
-        run[start:end].replace("${{ github.event.pull_request.base.sha }}", "$BASE_SHA") + 'printf "%s\\n" "$CHANGED"\n'
-    )
+    snippet = run[start:end]
+    # Handle both pre-A2 (github event) and A2 w2+ (env) placeholders, plus EFFECTIVE fallback
+    snippet = snippet.replace("${{ github.event.pull_request.base.sha }}", "$BASE_SHA")
+    snippet = snippet.replace("${{ env.BASE_SHA }}", "$BASE_SHA")
+    snippet = snippet.replace("${{ env.MERGE_SHA }}", "${MERGE_SHA:-HEAD}")
+    snippet = snippet.replace("$EFFECTIVE_MERGE", "${MERGE_SHA:-HEAD}")
+    snippet = snippet.replace("$EFFECTIVE_BASE", "$BASE_SHA")
+    return snippet + 'printf "%s\\n" "$CHANGED"\n'
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -111,7 +116,8 @@ def test_applied_companion_derivation_is_deletion_aware() -> None:
     assert "--diff-filter=ACMRD" in script
     assert "CHANGED_APPLIED" in script
     assert 'awk -v stem="$stem"' in script
-    assert 'git cat-file -e "HEAD:${bundle}"' in script
+    # A2 w2+ uses MERGE_SHA (or EFFECTIVE_MERGE -> HEAD fallback) instead of HEAD
+    assert 'git cat-file -e "' in script and ':${bundle}"' in script
 
 
 def test_applied_companion_rename_discovers_the_source_primary_bundle(tmp_path: Path) -> None:

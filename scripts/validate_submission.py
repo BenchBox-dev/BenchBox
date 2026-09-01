@@ -253,6 +253,46 @@ def executable_mode(path: Path) -> bool:
     return bool(mode & 0o111)
 
 
+def _validate_corpus_changed_paths_file(
+    corpus_changed_paths_file: Path | None,
+) -> int | None:
+    """Backwards-compatible alias for w4 parity tests (A2 w4).
+
+    The canonical gate is :func:`corpus_permit_rejections`; this wrapper exists
+    so ``tests/unit/publication/test_validator_parity.py::test_validate_submission_corpus_flag_exists``
+    (written against the w4 branch) continues to import. Contract:
+    - ``None`` -> ``None`` (no corpus gate)
+    - missing file -> ``1`` (fail-closed)
+    - empty file -> ``None`` (no corpus changes)
+    - non-empty with allowlist rejections -> ``1``
+    - otherwise -> ``None``
+    """
+    if corpus_changed_paths_file is None:
+        return None
+    if not corpus_changed_paths_file.exists():
+        print(
+            f"::error::--corpus-changed-paths file missing: {corpus_changed_paths_file}",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        lines = [ln.strip() for ln in corpus_changed_paths_file.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    except OSError as exc:
+        print(
+            f"Error: cannot read --corpus-changed-paths file: {exc}",
+            file=sys.stderr,
+        )
+        return 1
+    if not lines:
+        return None
+    rejected = corpus_permit_rejections(lines)
+    if rejected:
+        for reason in rejected:
+            print(f"ERROR: disallowed corpus path: {reason}", file=sys.stderr)
+        return 1
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     args = argv if argv is not None else sys.argv[1:]
     pr_comment_path: Path | None = None

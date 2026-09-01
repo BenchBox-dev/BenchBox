@@ -37,8 +37,10 @@ def _vendor_gate_step() -> dict:
 
 def test_workflow_targets_published_results_submission_prs() -> None:
     workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
-    # PyYAML parses the `on:` key as the boolean True.
-    trigger = workflow[True]["pull_request"]
+    # PyYAML parses the `on:` key as the boolean True. A2 w2 migrates to
+    # pull_request_target for trusted base checkout; allow either during migration.
+    trigger = workflow[True].get("pull_request_target") or workflow[True].get("pull_request")
+    assert trigger is not None
     assert "published-results" in trigger["branches"]
     assert any("results-data/bundles/" in p for p in trigger["paths"])
 

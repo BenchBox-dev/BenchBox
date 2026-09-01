@@ -39,10 +39,16 @@ WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "validate-submission.yml"
 # The real validator invocation inside the step, replaced with a stub whose exit
 # status we control. Everything else about the block -- the shell options, the
 # `| tee` pipe, the manifest-waiver branch -- is executed verbatim.
+# A2 w2 adds $CORPUS_ARG (via --corpus-changed-paths) before --pr-comment; allow both.
 _VALIDATOR_CALL = (
     "xargs -d '\\n' uv run -- python scripts/validate_submission.py "
     "$REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt"
 )
+_VALIDATOR_CALL_WITH_CORPUS = (
+    "xargs -d '\\n' uv run -- python scripts/validate_submission.py "
+    "$REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION $CORPUS_ARG --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt"
+)
+# Accept either the pre-w2 or w2+ form; test will try both
 
 
 def _validate_step() -> dict:
@@ -59,12 +65,14 @@ def _run_step_with_validator_exiting(status: int, tmp_path: Path):
     exact "red for the wrong reason" trap this suite is meant to avoid.
     """
     script = _validate_step()["run"]
-    assert _VALIDATOR_CALL in script, (
+    # Accept either corpus-arg or non-corpus form (w2 migration)
+    matched = _VALIDATOR_CALL_WITH_CORPUS if _VALIDATOR_CALL_WITH_CORPUS in script else _VALIDATOR_CALL
+    assert matched in script, (
         "the validator invocation in validate-submission.yml no longer matches what this test "
         "substitutes; update _VALIDATOR_CALL so the rung keeps exercising the real block"
     )
     # `exit N | tee` preserves the pipeline shape the bug lived in.
-    script = script.replace(_VALIDATOR_CALL, f"(exit {status})")
+    script = script.replace(matched, f"(exit {status})")
     # Mirror GitHub's default `run:` interpreter: bash with -e and no pipefail.
     return run_posix_shell(
         f"set -e\n{script}",
@@ -121,8 +129,12 @@ def test_corpus_inventory_step_is_gated_on_the_validate_outcome() -> None:
     While the step above was fail-open that condition was permanently true, so
     the inventory check silently lost its skip-on-failure behaviour too. Pinned
     here so the coupling is visible to whoever edits either step.
+    A2 w4 adds corpus-only gating (success || corpus-only) — accept either.
     """
     workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
     step = next(s for s in workflow["jobs"]["validate"]["steps"] if s.get("name") == "Check corpus inventory")
 
-    assert step["if"] == "steps.validate.outcome == 'success'"
+    assert step["if"] in (
+        "steps.validate.outcome == 'success'",
+        "steps.validate.outcome == 'success' || steps.changed.outputs.has_bundles == 'corpus-only'",
+    )
