@@ -88,6 +88,19 @@ SOUNDNESS_FILES = (
     "_project/scripts/explorer_pipeline/pipeline.py",
     "_project/scripts/explorer_pipeline/ranking.py",
     "_project/scripts/explorer_pipeline/transformer.py",
+    # Ranking/identity support: these are directly imported by the gated
+    # pipeline, transformer, and ranking modules. duckdb_builder builds the
+    # authoritative DuckDB snapshot, results_explorer_snapshot_invariants is
+    # the production snapshot guard, canonical_json defines the canonical
+    # bytes that public_result_id's sha8 is computed over, and compare_math
+    # computes the public speedups that rankings rank by. A change to any of
+    # them can rotate every content-addressed public_result_id, alter emitted
+    # ranks/speedups, or weaken the live snapshot guard while retaining
+    # auto-merge, so they belong in the same manual-review gate.
+    "_project/scripts/explorer_pipeline/duckdb_builder.py",
+    "_project/scripts/explorer_pipeline/compare_math.py",
+    "_project/scripts/results_explorer_snapshot_invariants.py",
+    "benchbox/core/results/canonical_json.py",
     "benchbox/core/results/schema_policy.py",
     "_project/scripts/explorer_publish.py",
     "scripts/generate_corpus_inventory.py",

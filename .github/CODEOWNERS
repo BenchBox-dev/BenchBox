@@ -30,6 +30,10 @@ _project/scripts/explorer_pipeline/models.py @joeharris76
 _project/scripts/explorer_pipeline/pipeline.py @joeharris76
 _project/scripts/explorer_pipeline/ranking.py @joeharris76
 _project/scripts/explorer_pipeline/transformer.py @joeharris76
+_project/scripts/explorer_pipeline/duckdb_builder.py @joeharris76
+_project/scripts/explorer_pipeline/compare_math.py @joeharris76
+_project/scripts/results_explorer_snapshot_invariants.py @joeharris76
+benchbox/core/results/canonical_json.py @joeharris76
 benchbox/core/results/schema_policy.py @joeharris76
 _project/scripts/explorer_publish.py @joeharris76
 scripts/generate_corpus_inventory.py @joeharris76

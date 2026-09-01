@@ -55,6 +55,10 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "_project/scripts/explorer_pipeline/pipeline.py",
         "_project/scripts/explorer_pipeline/ranking.py",
         "_project/scripts/explorer_pipeline/transformer.py",
+        "_project/scripts/explorer_pipeline/duckdb_builder.py",
+        "_project/scripts/explorer_pipeline/compare_math.py",
+        "_project/scripts/results_explorer_snapshot_invariants.py",
+        "benchbox/core/results/canonical_json.py",
         "benchbox/core/results/schema_policy.py",
         "_project/scripts/explorer_publish.py",
         "scripts/generate_corpus_inventory.py",
@@ -232,6 +236,10 @@ def test_codeowners_covers_soundness_paths() -> None:
     assert "_project/scripts/explorer_pipeline/pipeline.py @joeharris76" in codeowners
     assert "_project/scripts/explorer_pipeline/ranking.py @joeharris76" in codeowners
     assert "_project/scripts/explorer_pipeline/transformer.py @joeharris76" in codeowners
+    assert "_project/scripts/explorer_pipeline/duckdb_builder.py @joeharris76" in codeowners
+    assert "_project/scripts/explorer_pipeline/compare_math.py @joeharris76" in codeowners
+    assert "_project/scripts/results_explorer_snapshot_invariants.py @joeharris76" in codeowners
+    assert "benchbox/core/results/canonical_json.py @joeharris76" in codeowners
     assert "benchbox/core/results/schema_policy.py @joeharris76" in codeowners
     assert "scripts/generate_corpus_inventory.py @joeharris76" in codeowners
     assert "scripts/validate_submission.py @joeharris76" in codeowners
