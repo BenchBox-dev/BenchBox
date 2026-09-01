@@ -72,6 +72,19 @@ def test_live_tracker_ids_ignores_items_outside_prefix() -> None:
     assert reconciliation.live_tracker_ids(payload, PREFIX) == ["independent-publication-a0-baseline-and-freeze"]
 
 
+def test_live_tracker_ids_excludes_dropped_items() -> None:
+    payload = [
+        {"id": "independent-publication-a0-baseline-and-freeze", "state": "done"},
+        {"id": "independent-publication-a1-authority-and-threat-contract", "state": "active"},
+        {"id": "independent-publication-a2-corpus-trust-isolation", "state": "dropped"},
+    ]
+
+    assert reconciliation.live_tracker_ids(payload, PREFIX) == [
+        "independent-publication-a0-baseline-and-freeze",
+        "independent-publication-a1-authority-and-threat-contract",
+    ]
+
+
 def test_decision_names_exact_live_ordered_tracker_sequence() -> None:
     text = reconciliation.DECISION.read_text()
     payload = [{"id": item_id} for item_id in reversed(LIVE_A0_A11)]

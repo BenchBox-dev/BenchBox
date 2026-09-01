@@ -49,8 +49,18 @@ def _phase_key(item_id: str, prefix: str) -> tuple[int, str]:
 
 
 def live_tracker_ids(items: list[dict], prefix: str) -> list[str]:
-    """Order tracker items matching ``prefix`` by their numeric A-phase (a0..a11)."""
-    matches = [item["id"] for item in items if str(item.get("id", "")).startswith(prefix)]
+    """Order non-dropped tracker items matching ``prefix`` by their numeric A-phase (a0..a11).
+
+    ``list`` returns items across all lifecycle states, so a step moved to
+    ``dropped`` still appears in output and would otherwise be counted as part
+    of the live sequence. Exclude dropped items so the reconciliation cannot
+    pass while a step of the migration has been dropped.
+    """
+    matches = [
+        item["id"]
+        for item in items
+        if str(item.get("id", "")).startswith(prefix) and str(item.get("state", "")).lower() != "dropped"
+    ]
     return sorted(matches, key=lambda item_id: _phase_key(item_id, prefix))
 
 
