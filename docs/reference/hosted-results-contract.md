@@ -119,8 +119,8 @@ authority is
 | Promotion: `promotion_failed` | Build, deploy, or observation failed to produce a matching receipt | Previous live state remains |
 | Presentation: `active` | Normal visibility and ranking policy applies | According to visibility policy |
 | Presentation: `withdrawal_requested` | Authorized suppression is desired but not yet receipt-confirmed | Previous live state remains |
-| Presentation: `withdrawn` | A receipt confirms suppression from public presentation and ranking | Tombstone only |
-| Presentation: `readmission_requested` | Authorized restoration is desired but not yet receipt-confirmed | Tombstone only |
+| Presentation: `withdrawn` | A receipt confirms suppression from public presentation and ranking | Tombstone only if a public ID existed; otherwise no public surface |
+| Presentation: `readmission_requested` | Authorized restoration is desired but not yet receipt-confirmed | Existing tombstone if a public ID existed; otherwise no public surface |
 
 #### Status Transition Rules
 
@@ -447,7 +447,7 @@ decisions; only the specific field value is hidden.
 | Accepted source bundle | Retained indefinitely by default under the A0 preservation floor. No automatic expiry. |
 | `pending` / `validated` | Retained for 90 days from submission date, then purged if not promoted. |
 | `rejected` | Retained for 30 days from rejection date, then purged. |
-| `withdrawn` presentation | Public tombstone and non-sensitive audit evidence retained indefinitely. Accepted source bytes remain preserved during the A0 freeze. |
+| `withdrawn` presentation | For a previously public result, its tombstone is retained indefinitely. For a never-public private result, no public tombstone exists. Non-sensitive audit evidence is retained indefinitely. Accepted source bytes remain preserved during the A0 freeze. |
 
 The accepted archive is retained independently of public presentation. Submitters may
 request withdrawal at any time (see Section 4.4); withdrawal does not silently rewrite
@@ -790,9 +790,11 @@ The frontend enforces cohort rules before rendering:
   in a muted color (e.g., gray italic text). They are not hidden entirely.
 - The detail page must not display fields that are absent from the result JSON
   (some results omit optional fields entirely; this is distinct from redaction).
-- Withdrawn results (tombstone) render a dedicated "Result Withdrawn" page at
-  the stable URL with the tombstone data and a brief explanation. HTTP 410 is
-  returned for API consumers; the frontend shows a human-readable message.
+- Withdrawn results that had a public ID render a dedicated "Result Withdrawn"
+  page at the stable URL with tombstone data and a brief explanation. HTTP 410
+  is returned for API consumers; the frontend shows a human-readable message.
+- A never-public private result has no public route or frontend tombstone. Its
+  withdrawal status is visible only through its authenticated submission record.
 
 ### Open Questions (Phase 3)
 

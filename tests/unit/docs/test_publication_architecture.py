@@ -195,8 +195,12 @@ def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
     assert "Withdraw a never-public private result" in text
     assert "Yes, except never-public `private` results" in text
     assert "Yes for minted public IDs; no for never-public `private` results" in text
+    assert "Tombstone only if a public ID existed; otherwise no public surface" in text
+    assert "For a never-public private result, no public tombstone exists" in text
+    assert "A never-public private result has no public route or frontend tombstone" in text
     assert "In every phase, a withdrawn result retains its" not in text
     assert "| Stable tombstone on withdrawal | Yes | Yes | Yes |" not in _text(HOSTED_CONTRACT)
+    assert "Withdrawn results (tombstone) render" not in text
     assert "| `accepted` |" in _text(HOSTED_CONTRACT)
     assert "| `live` |" in _text(HOSTED_CONTRACT)
     assert "| `published` | On commit" not in _text(HOSTED_CONTRACT)

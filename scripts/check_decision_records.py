@@ -102,6 +102,9 @@ def main() -> int:
                 "Withdraw a never-public private result",
                 "Yes, except never-public `private` results",
                 "Yes for minted public IDs; no for never-public `private` results",
+                "Tombstone only if a public ID existed; otherwise no public surface",
+                "For a never-public private result, no public tombstone exists",
+                "A never-public private result has no public route or frontend tombstone",
             ),
         )
     )
