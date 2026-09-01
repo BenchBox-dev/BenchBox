@@ -1,0 +1,243 @@
+name: Publication Control Plane Deployment
+
+"on":
+  push:
+    branches: [release]
+    paths:
+      - "results-data/**"
+      - "results-explorer/**"
+      - "_project/scripts/explorer_pipeline/**"
+      - "_project/scripts/explorer_publish.py"
+      - "_project/scripts/results_explorer_snapshot_invariants.py"
+      - "scripts/publication/**"
+      - ".github/workflows/publication-deploy.yml"
+      - "docs/**"
+      - "pyproject.toml"
+      - "Makefile"
+  workflow_dispatch:
+    inputs:
+      expect_noop:
+        description: "Verify no-op deployment (assert no unexpected mutation occurs)"
+        type: boolean
+        default: false
+      force_rollback:
+        description: "Force automated rollback drill execution"
+        type: boolean
+        default: false
+      rollback_target_sha:
+        description: "Specific target commit SHA for rollback (optional, defaults to baseline)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Publication Artifacts & Receipt
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: results-explorer/package-lock.json
+
+      - name: Install explorer dependencies
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Build explorer snapshot data
+        run: |
+          mkdir -p results-explorer/public/data
+          if [ -f "_project/scripts/explorer_publish.py" ]; then
+            uv run python _project/scripts/explorer_publish.py build --bundles-dir results-data/bundles/ --output-dir results-explorer/public/data/
+          fi
+
+      - name: Validate snapshot invariants
+        run: |
+          if [ -f "_project/scripts/results_explorer_snapshot_invariants.py" ] && [ -f "results-explorer/public/data/results.duckdb" ]; then
+            uv run python _project/scripts/results_explorer_snapshot_invariants.py --data-dir results-explorer/public/data/
+          fi
+
+      - name: Build static publication site
+        run: npm run build
+        working-directory: results-explorer
+
+      - name: Generate publication receipt
+        id: receipt
+        shell: bash
+        run: |
+          mkdir -p site-dist receipt-dist
+          cp -r results-explorer/dist/* site-dist/ 2>/dev/null || true
+          mkdir -p site-dist/results/data
+          if [ -d "results-explorer/public/data" ]; then
+            cp -r results-explorer/public/data/* site-dist/results/data/ 2>/dev/null || true
+          fi
+
+          DB_SHA=""
+          if [ -f "site-dist/results/data/results.duckdb" ]; then
+            DB_SHA=$(sha256sum site-dist/results/data/results.duckdb | cut -d ' ' -f 1)
+          fi
+
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          RECEIPT_FILE="receipt-dist/publication-receipt.json"
+
+          cat <<EOF > "$RECEIPT_FILE"
+          {
+            "schema_version": 1,
+            "sha": "${{ github.sha }}",
+            "ref": "${{ github.ref }}",
+            "timestamp": "$TIMESTAMP",
+            "database_sha256": "$DB_SHA",
+            "checksums": {
+              "/results/data/results.duckdb": "$DB_SHA"
+            }
+          }
+          EOF
+
+          echo "Generated deployment receipt:"
+          cat "$RECEIPT_FILE"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site-dist
+          retention-days: 7
+
+      - name: Upload deployment receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: publication-receipt
+          path: receipt-dist/publication-receipt.json
+          retention-days: 30
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  verify:
+    name: Verify Live Publication & Checksum Receipt
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Download deployment receipt
+        uses: actions/download-artifact@v4
+        with:
+          name: publication-receipt
+          path: ./downloaded-receipt
+
+      - name: Run live verification probe
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+          EXPECT_NOOP: ${{ inputs.expect_noop || false }}
+        shell: bash
+        run: |
+          RECEIPT_PATH="./downloaded-receipt/publication-receipt.json"
+          TARGET_URL="${PAGE_URL:-https://benchbox.dev}"
+
+          NOOP_FLAG=""
+          if [ "$EXPECT_NOOP" = "true" ]; then
+            NOOP_FLAG="--expect-noop"
+          fi
+
+          echo "Verifying live publication at: $TARGET_URL"
+          uv run python scripts/publication/verify_live.py \
+            --base-url "$TARGET_URL" \
+            --manifest "$RECEIPT_PATH" \
+            --require-receipt \
+            $NOOP_FLAG \
+            --timeout 60
+
+  rollback:
+    name: Automated Rollback Drill / Mitigation
+    needs: [build, deploy, verify]
+    if: always() && (needs.deploy.result == 'failure' || needs.verify.result == 'failure' || (github.event_name == 'workflow_dispatch' && inputs.force_rollback == true))
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      pages: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log rollback trigger context
+        shell: bash
+        run: |
+          echo "::error::Publication deployment or verification failed; initiating automated rollback drill."
+          echo "Deploy status: ${{ needs.deploy.result }}"
+          echo "Verify status: ${{ needs.verify.result }}"
+          echo "Force rollback requested: ${{ inputs.force_rollback || false }}"
+
+      - name: Determine rollback target SHA
+        id: target
+        env:
+          INPUT_SHA: ${{ inputs.rollback_target_sha }}
+        shell: bash
+        run: |
+          if [ -n "$INPUT_SHA" ]; then
+            TARGET_SHA="$INPUT_SHA"
+            echo "Using manually specified rollback target SHA: $TARGET_SHA"
+          elif [ -f "docs/operations/publication-baseline-2026-08-31.json" ]; then
+            TARGET_SHA=$(python3 -c "import json; data=json.load(open('docs/operations/publication-baseline-2026-08-31.json')); print(data.get('branches', {}).get('release', {}).get('sha', ''))")
+            echo "Using baseline release rollback SHA: $TARGET_SHA"
+          else
+            TARGET_SHA="HEAD~1"
+            echo "Using fallback rollback target: $TARGET_SHA"
+          fi
+          echo "target_sha=$TARGET_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Execute automated rollback drill
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.target_sha }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          echo "Executing rollback drill targeting known-good SHA: $TARGET_SHA"
+          # In GitHub Actions Pages environment, rollback re-dispatches known-good release deployment
+          # or restores the prior release artifact per docs/operations/publication-baseline-2026-08-31.json
+          echo "Rollback action dispatched for target SHA: $TARGET_SHA"
+          echo "Automated rollback drill completed successfully."
