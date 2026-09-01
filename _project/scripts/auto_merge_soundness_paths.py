@@ -73,9 +73,62 @@ SOUNDNESS_FILES = (
     "benchbox/sql_compat/rules/_registration.py",
     "benchbox/core/results/anonymization.py",
     "benchbox/core/results/anonymization_specs.yaml",
+    # Executable publication policy: source-to-trust labels, visibility defaults,
+    # and ranking eligibility are defined here. A silent change alters public
+    # presentation and leaderboard membership without changing the authority docs.
+    "benchbox/core/results/provenance.py",
+    "benchbox/core/results/status.py",
+    "benchbox/core/results/query_status.py",
+    # Admission and read-model policy surfaces. These execute the public trust,
+    # vendor, visibility, and ranking decisions defined by the A1 contract.
+    "benchbox/validation/bundle.py",
+    "benchbox/core/publishing/admission.py",
+    "benchbox/core/publishing/bundle_publisher.py",
+    "_project/scripts/explorer_pipeline/models.py",
+    "_project/scripts/explorer_pipeline/pipeline.py",
+    "_project/scripts/explorer_pipeline/ranking.py",
+    "_project/scripts/explorer_pipeline/transformer.py",
+    # Ranking/identity support: these are directly imported by the gated
+    # pipeline, transformer, and ranking modules. duckdb_builder builds the
+    # authoritative DuckDB snapshot, results_explorer_snapshot_invariants is
+    # the production snapshot guard, canonical_json defines the canonical
+    # bytes that public_result_id's sha8 is computed over, and compare_math
+    # computes the public speedups that rankings rank by. A change to any of
+    # them can rotate every content-addressed public_result_id, alter emitted
+    # ranks/speedups, or weaken the live snapshot guard while retaining
+    # auto-merge, so they belong in the same manual-review gate.
+    "_project/scripts/explorer_pipeline/duckdb_builder.py",
+    "_project/scripts/explorer_pipeline/compare_math.py",
+    "_project/scripts/results_explorer_snapshot_invariants.py",
+    "benchbox/core/results/canonical_json.py",
+    "benchbox/core/results/schema_policy.py",
+    "_project/scripts/explorer_publish.py",
+    "scripts/generate_corpus_inventory.py",
+    "scripts/validate_submission.py",
+    ".github/workflows/validate-submission.yml",
+    ".github/workflows/sync-results-data-to-published.yml",
+    # Current production Pages authority. Until the independent compositor is
+    # cut over, this workflow holds deployment credentials and publishes the
+    # complete site and Explorer, so changes require the same manual review.
+    ".github/workflows/docs.yml",
     "_project/scripts/auto_merge_soundness_paths.py",
     ".github/workflows/auto-merge-on-open.yml",
     ".github/workflows/release.yml",
+    # Independent-publication authority and trust-policy surfaces. The accepted
+    # A1 contract requires manual maintainer review and forbids auto-merge for
+    # changes that redefine archive authority, live-state evidence, withdrawal,
+    # ranking/trust policy, or their enforcement checker.
+    "_project/decisions/independent-publication-a0-freeze-2026-08-31.md",
+    "docs/development/adr/adr-independent-publication-authorities.md",
+    "docs/development/adr/adr-public-result-id-permanence.md",
+    "docs/development/adr/adr-published-results-slim-corpus-branch.md",
+    "docs/development/independent-publication-threat-model.md",
+    "docs/operations/independent-publication-contract.md",
+    "docs/operations/results-phase-2-runbook.md",
+    "docs/operations/results-phase-3-runbook.md",
+    "docs/reference/hosted-results-contract.md",
+    "docs/reference/threat-model.md",
+    "scripts/check_decision_records.py",
 )
 _VALIDATION_RE = re.compile(r"^benchbox/core/(?:.+/)?validation\.py$")
 

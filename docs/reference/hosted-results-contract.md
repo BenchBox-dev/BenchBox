@@ -97,56 +97,91 @@ compatibility mechanism — see the ADR.
 | `submission_id` | UUID, stable per bundle | 3 | API tracking |
 | `public_result_id` | Slug, permanent | 1+ | Public URLs, index |
 
-### 1.2 Ingest Status Model
+### 1.2 Submission and Publication State Model
 
-Every submitted result moves through a defined set of statuses. The status
-determines whether the result appears in the public corpus and what actions are
-available.
+Submission processing, archive acceptance, presentation policy, and observed
+deployment are separate state dimensions. No single `published` flag determines
+whether a result is accepted, visible, ranking-eligible, or live. The normative
+authority is
+[`adr-independent-publication-authorities.md`](../development/adr/adr-independent-publication-authorities.md).
 
 #### Status Definitions
 
-| Status | Meaning | Visible to public |
+| Dimension and state | Meaning | Visible to public |
 |---|---|---|
-| `pending` | Received; awaiting validation | No |
-| `validated` | Passed all automated checks; awaiting publication decision | No |
-| `published` | Live in the public corpus with a `public_result_id` | Yes |
-| `rejected` | Failed validation or declined by maintainer; includes a reason string | No |
-| `withdrawn` | Removed from public index at submitter or admin request | No (tombstone only) |
+| Acceptance: `pending` | Received; awaiting validation | No |
+| Acceptance: `validated` | Passed automated checks; awaiting acceptance | No |
+| Acceptance: `accepted` | Validator-clean input exists at the pinned accepted-archive revision | Controlled independently |
+| Acceptance: `rejected` | Failed validation or declined by maintainer; includes a reason string | No |
+| Promotion: `not_requested` | No desired-state promotion currently targets the accepted input | Previous live state remains |
+| Promotion: `promotion_pending` | Desired state names accepted input without a matching live receipt | Previous live state remains |
+| Promotion: `live` | A fresh attested receipt proves the intended artifact and corpus are publicly observable | According to visibility policy |
+| Promotion: `promotion_failed` | Build, deploy, or observation failed to produce a matching receipt | Previous live state remains |
+| Presentation: `active` | Normal visibility and ranking policy applies | According to visibility policy |
+| Presentation: `withdrawal_requested` | Authorized suppression is desired but not yet receipt-confirmed | Previous live state remains |
+| Presentation: `withdrawn` | A receipt confirms suppression from public presentation and ranking | Tombstone only if a public ID existed; otherwise no public surface |
+| Presentation: `readmission_requested` | Authorized restoration is desired but not yet receipt-confirmed | Existing tombstone if a public ID existed; otherwise no public surface |
 
 #### Status Transition Rules
 
 ```
-pending → validated → published
+Acceptance: pending → validated → accepted
 pending → rejected
 validated → rejected
-published → withdrawn
+Promotion: not_requested → promotion_pending → live
+Promotion: promotion_pending → promotion_failed
+Promotion: promotion_failed → promotion_pending
+Promotion: live → promotion_pending
+Presentation: active → withdrawal_requested → withdrawn
+Presentation: withdrawn → readmission_requested → active
 ```
 
-Transitions are unidirectional. A `rejected` or `withdrawn` result cannot be
-re-promoted; the submitter must open a new submission.
+Promotion state is scoped to the latest target generation. A failed target may be retried
+or replaced by returning to `promotion_pending`. A receipt-confirmed live result may start
+a newer target generation by moving the latest attempt to `promotion_pending`; the prior
+`current_live_generation` and receipt remain observed live until the new target receives a
+matching receipt.
+
+Acceptance remains an audit fact when promotion fails or presentation is
+withdrawn. Withdrawal must be carried into later desired state so ordinary
+promotion cannot resurrect it. Re-admission requires a new authorized policy
+event, not a contributor-controlled field. That event records
+`readmission_requested`; the result remains suppressed until a matching live
+receipt confirms the restoration generation, at which point presentation returns
+to `active`. A prior public ID keeps its tombstone while readmission is pending;
+a never-public private result continues to have no public surface.
+
+`published` is retained only as a legacy API compatibility term. New contracts
+must report acceptance, promotion, and presentation separately, and must never
+translate a Git merge directly into `live`.
 
 Additional rules:
 
 - **Idempotent re-upload:** Submitting a bundle whose `bundle_hash` already maps
-  to a `published` result returns the existing `public_result_id` and a
-  `200 OK` response with `"status": "already_published"` in the body. No new
-  `submission_id` is created.
+  to an accepted result returns the existing identifiers and no new
+  `submission_id`. A legacy `"already_published"` API response may be returned
+  only when a matching live receipt exists; otherwise the response reports the
+  orthogonal acceptance and promotion state.
 - **Rejection reason:** Every `rejected` transition must carry a human-readable
   `reason` string. Reasons are visible to the submitter but not to the public.
-- **Withdrawn tombstone:** In Phases 1-2, withdrawal removes the entry entirely
-  from the index (no tombstone is retained). In Phase 3, a `withdrawn` result
-  retains its `public_result_id` in the index as a tombstone stub with all
-  content fields redacted. See Section 4.4.
+- **Withdrawn tombstone:** A withdrawn result that previously had a
+  `public_result_id` retains it as a stable tombstone stub with content fields
+  redacted, and its public detail route returns `410 Gone`. A never-public
+  `private` result has no public ID or route, so its withdrawal is recorded only
+  in the authenticated submission status. See Section 4.4.
 
 #### Phase Assignment
 
-| Status | Phase 1 | Phase 2 | Phase 3 |
+| State | Phase 1 | Phase 2 | Phase 3 |
 |---|---|---|---|
 | `pending` | Not used (no ingest) | PR open, CI running | API received |
 | `validated` | Not used | CI passed, awaiting merge | Async validation passed |
-| `published` | On commit to `results-data/` | On PR merge | On promotion |
+| `accepted` | Maintainer input accepted into the archive | Valid PR merged to `published-results` | Ingest acceptance committed |
+| `promotion_pending` | Desired manifest lacks matching receipt | Same | Same |
+| `live` | Matching attested public receipt | Same | Same |
+| `promotion_failed` | Promotion ended without matching receipt | Same | Same |
 | `rejected` | Not used | CI failed or PR closed without merge | Validation failed |
-| `withdrawn` | Admin removes from `results-data/` | Same | API call or admin action |
+| Presentation: `withdrawal_requested` / `withdrawn` / `readmission_requested` | Authorized policy and receipt-confirmed suppression or restoration | Same | API or admin policy event |
 
 ---
 
@@ -154,8 +189,12 @@ Additional rules:
 
 ### 2.1 Visibility States
 
-Five visibility states control who can see a result and whether it appears in
+Six visibility states control who can see a result and whether it appears in
 search indexes or compare views.
+
+Visibility is orthogonal to archive acceptance, provenance trust, withdrawal,
+ranking eligibility, and deployment state. Changing visibility does not create
+a second accepted-corpus authority on `develop`.
 
 | State | Who can see it | Indexed | Phase available |
 |---|---|---|---|
@@ -265,7 +304,7 @@ explains the distinction.
 
 #### Phase 3
 
-All five visibility states apply. The full label spectrum is rendered. The
+All six visibility states apply. The full label spectrum is rendered. The
 explorer must handle the case where a compare view contains results with
 different trust labels and display a per-result label badge rather than a
 single cohort-level label.
@@ -366,9 +405,8 @@ not a ranked table.
 
 ### 4.1 Public Fields
 
-The following fields are always public for any result with a `published` status
-and a public visibility state. They cannot be redacted by the submitter or
-admin.
+The following fields are always public for any `live` result with a public
+visibility state. They cannot be redacted by the submitter or admin.
 
 | Field | Notes |
 |---|---|
@@ -377,8 +415,8 @@ admin.
 | `scale_factor` | Numeric scale factor (e.g., `1.0`) |
 | `query_timings` | Per-query execution time in milliseconds |
 | `validation_status` | Per-query validation result (passed/failed/skipped) |
-| `submission_date` | Date the result was published to the corpus |
-| `trust_label` | The trust label assigned at publication |
+| `submission_date` | Date the result was accepted into the archive |
+| `trust_label` | The server-controlled provenance label assigned by policy |
 | `funding` | How the run was funded (see Section 2.4); `unspecified` when not declared |
 | `public_result_id` | The stable permalink slug |
 | `query_subset` | Which queries were run (full set or named subset) |
@@ -399,50 +437,63 @@ public-facing views.
 | `contributor_email` | Submitter or admin | Only collected in Phase 3; display name is shown instead |
 | `ip_address` | Admin only (never public) | Stored for abuse detection; never exposed |
 
-Redaction of a published field does not change the result's `published` status
-or `public_result_id`. The result remains in the public index; only the
-specific field value is hidden.
+Redaction does not change archive acceptance. Redaction before publication is
+reflected in the anonymized published bytes and therefore in the minted
+`public_result_id` (the `sha8` is `sha256` over published bytes). Redaction of
+an already-live result that changes published bytes (replacing a field with
+`"[redacted]"`) is a compatibility event per
+`docs/development/adr/adr-public-result-id-permanence.md`: it mints a new
+content-addressed `public_result_id` (new `sha8`) and the old URL is preserved
+via an explicit alias or redirect to the new bundle, so existing links remain
+resolvable. Presentation visibility and ranking remain separate policy decisions;
+only the specific field value is hidden.
 
 ### 4.3 Retention Policy
 
-| Status | Retention |
+| State or asset | Retention |
 |---|---|
-| `published` | Retained indefinitely by default. No automatic expiry. |
+| Accepted source bundle | Retained indefinitely by default under the A0 preservation floor. No automatic expiry. |
 | `pending` / `validated` | Retained for 90 days from submission date, then purged if not promoted. |
 | `rejected` | Retained for 30 days from rejection date, then purged. |
-| `withdrawn` | Public index tombstone retained indefinitely. Raw bundle purged within 30 days of withdrawal. |
+| `withdrawn` presentation | For a previously public result, its tombstone is retained indefinitely. For a never-public private result, no public tombstone exists. Non-sensitive audit evidence is retained indefinitely. Accepted source bytes remain preserved during the A0 freeze. |
 
-The indefinite retention of `published` results is the default. Submitters may
-request withdrawal at any time (see Section 4.4); the platform does not
-proactively expire published results.
+The accepted archive is retained independently of public presentation. Submitters may
+request withdrawal at any time (see Section 4.4); withdrawal does not silently rewrite
+the historical acceptance record or authorize source-byte deletion.
 
 ### 4.4 Data Removal
 
-Submitters may request withdrawal of a published result at any time. There is
+Submitters may request withdrawal of an accepted or live result at any time. There is
 no deadline. Withdrawal is available before and after publication.
 
 **Withdrawal process:**
 
-- Phase 1: File an issue or contact maintainers. The maintainer removes the
-  bundle from `results-data/` and triggers a rebuild.
-- Phase 2: Same as Phase 1, or close the original PR (if not yet merged).
-- Phase 3: Call `DELETE /v1/results/{public_result_id}` with a valid auth token,
-  or contact support.
+- Phase 1: File an issue or contact maintainers. The maintainer records the
+  withdrawal policy and republishes presentation without deleting accepted source bytes.
+- Phase 2: Same as Phase 1, or close the original PR if acceptance has not occurred.
+- Phase 3: For a result with a minted public ID, call
+  `DELETE /v1/results/{public_result_id}` with a valid auth token. For a
+  never-public `private` result, call `DELETE /v1/submissions/{submission_id}`.
+  Either path may also be initiated through support.
 
 **Effect of withdrawal:**
 
-1. The result is removed from the public manifest index and all browse/compare
-   views within 7 days of the withdrawal request.
-2. The raw bundle and all derived read models are purged from storage within
-   30 days of the withdrawal request.
-3. **Phase 3 only:** A **tombstone** remains in the index indefinitely. The
-   tombstone contains only: `public_result_id`, `status: withdrawn`, and
-   `withdrawn_at` (date). All other fields are redacted. The detail page at
-   the stable URL returns the tombstone with a `410 Gone` HTTP status.
-   In Phases 1-2, withdrawal removes the entry entirely from the index; no
-   tombstone is retained (the stable URL returns `404 Not Found`).
+1. A result with a minted public ID is removed from active browse, search, ranking, and
+   compare indexes within 7 days of the withdrawal request. Its stable ID remains in a
+   separate tombstone lookup registry.
+2. A never-public `private` result is addressed only by authenticated `submission_id`.
+   Withdrawal must not mint or expose a `public_result_id`. A matching receipt confirms
+   that no public-ID mapping, public route, or public index membership exists; only then is
+   presentation recorded as `withdrawn` for the submitter. Because no public URL ever
+   existed, no public tombstone is created.
+3. Derived public read models suppress the result. Accepted source bytes remain under the
+   A0 preservation floor unless a separately approved erasure incident supersedes it.
+4. For a result that had a public ID, a **tombstone** remains in the separate lookup
+   registry indefinitely. The tombstone contains only: `public_result_id`,
+   `status: withdrawn`, and `withdrawn_at` (date). All other fields are redacted. The
+   detail page at the stable URL returns the tombstone with a `410 Gone` HTTP status.
 
-In Phase 3, the tombstone ensures that existing links and citations do not
+For results that had public IDs, the tombstone ensures that existing links and citations do not
 silently resolve to a different result. External parties who bookmarked the URL
 see a clear signal that the result was withdrawn rather than a 404 or an
 unrelated result.
@@ -575,7 +626,7 @@ Expected responses:
 | HTTP status | Meaning | CLI behavior |
 |---|---|---|
 | `202 Accepted` | Submission received; `submission_id` in body | Print submission_id and poll URL |
-| `200 OK` | `bundle_hash` already published; body includes `"status": "already_published"` and `public_result_id` | Print existing result URL, exit 0 |
+| `200 OK` | `bundle_hash` already accepted; body uses the complete status payload below, including presentation and current-live receipt fields | Print acceptance, latest promotion attempt, and independently observed live state; exit 0 |
 | `409 Conflict` | Bundle in `pending` or `validated` state; `submission_id` in body | Print status and poll URL |
 | `422 Unprocessable` | Schema or hash validation failed; `errors` array in body | Print errors, exit non-zero |
 | `429 Too Many Requests` | Rate limited; `Retry-After` in headers | Print wait time, exit non-zero |
@@ -594,15 +645,40 @@ Response:
 {
   "submission_id": "<uuid>",
   "bundle_hash": "<sha256>",
-  "status": "<pending|validated|published|rejected>",
+  "acceptance_status": "<pending|validated|accepted|rejected>",
+  "promotion_status": "<not_requested|promotion_pending|live|promotion_failed>",
+  "presentation_status": "<active|withdrawal_requested|withdrawn|readmission_requested>",
+  "target_generation": "<integer or null>",
+  "current_live_generation": "<integer or null>",
+  "current_live_receipt": "<receipt identifier or null>",
+  "current_live_observed_at": "<ISO 8601 or null>",
   "public_result_id": "<slug or null>",
   "rejection_reason": "<string or null>",
   "updated_at": "<ISO 8601>"
 }
 ```
 
+The idempotent `POST /v1/submissions` `200 OK` response MUST return this same status
+payload, with `submission_id` null when no submission record exists. It must not return a
+reduced acceptance-and-promotion response because the CLI exits without polling on this
+path and would otherwise lose the prior observed live generation.
+
+`promotion_status` describes the latest requested target generation. It does not replace
+the currently observed live generation while that target is pending or failed.
+`current_live_generation`, `current_live_receipt`, and `current_live_observed_at` identify
+the last receipt-confirmed generation independently; all three are null when no generation
+has ever been proven live. After a successful promotion they advance atomically to the
+target generation. This lets consumers report both a failed or pending promotion attempt
+and the prior generation that remains publicly live. `presentation_status` remains an
+independent policy and observation dimension: `withdrawal_requested` is desired
+suppression, while `withdrawn` requires a matching receipt that confirms suppression.
+
 The CLI polls with exponential backoff (initial 5s, max 60s, up to 10 attempts)
 and prints the final status to stdout.
+
+For compatibility, a legacy `"status": "already_published"` response may be emitted
+only when a matching attested live receipt exists. Accepted-but-not-live results must not
+be described as already published.
 
 ### 5.2 API Contract (Phase 3)
 
@@ -617,6 +693,7 @@ The hosted API is available at `api.benchbox.dev`.
 | `GET` | `/v1/results` | No | List published results (paginated) |
 | `GET` | `/v1/results/{public_result_id}` | No | Get result detail |
 | `DELETE` | `/v1/results/{public_result_id}` | Yes (owner or admin) | Withdraw a result |
+| `DELETE` | `/v1/submissions/{submission_id}` | Yes (owner or admin) | Withdraw a never-public private result |
 | `GET` | `/v1/cohorts` | No | List available cohorts (benchmark + scale combinations) |
 | `GET` | `/v1/compare` | No | Compare results by IDs (cohort validation enforced) |
 
@@ -721,9 +798,11 @@ The frontend enforces cohort rules before rendering:
   in a muted color (e.g., gray italic text). They are not hidden entirely.
 - The detail page must not display fields that are absent from the result JSON
   (some results omit optional fields entirely; this is distinct from redaction).
-- Withdrawn results (tombstone) render a dedicated "Result Withdrawn" page at
-  the stable URL with the tombstone data and a brief explanation. HTTP 410 is
-  returned for API consumers; the frontend shows a human-readable message.
+- Withdrawn results that had a public ID render a dedicated "Result Withdrawn"
+  page at the stable URL with tombstone data and a brief explanation. HTTP 410
+  is returned for API consumers; the frontend shows a human-readable message.
+- A never-public private result has no public route or frontend tombstone. Its
+  withdrawal status is visible only through its authenticated submission record.
 
 ### Open Questions (Phase 3)
 
@@ -740,8 +819,6 @@ resolved by this contract:
 - **Cross-visibility cohort comparisons:** Whether results in different
   visibility states (e.g., `private` and `public-curated`) may be included in
   the same compare cohort.
-- **Withdrawn result URL behavior (Phases 1-2):** Return `404 Not Found` or a
-  dedicated "result withdrawn" page at the stable URL.
 - **Private result access control model:** Submitter-only access, or
   organisation-based sharing (e.g., all members of the submitter's GitHub org)?
 - **Ranking eligibility rules for mixed-visibility cohorts:** Whether a cohort
@@ -756,10 +833,12 @@ resolved by this contract:
 |---|---|---|---|
 | `bundle_hash` computed and tracked | No | Yes (CI check) | Yes (API) |
 | `submission_id` issued | No | No | Yes |
-| `public_result_id` minted | Yes | Yes | Yes |
-| Ingest status: `pending` / `validated` | No | Yes (PR states) | Yes |
-| Ingest status: `published` | Yes | Yes | Yes |
-| Ingest status: `rejected` / `withdrawn` | Admin only | Yes | Yes |
+| `public_result_id` minted | Yes | Yes | Yes, except never-public `private` results |
+| Acceptance state: `pending` / `validated` | No | Yes (PR states) | Yes |
+| Acceptance state: `accepted` | Yes | Yes | Yes |
+| Promotion state: `promotion_pending` / `live` / `promotion_failed` | Yes | Yes | Yes |
+| Acceptance state: `rejected` | Admin only | Yes | Yes |
+| Presentation state: `withdrawal_requested` / `withdrawn` / `readmission_requested` | Admin only | Yes | Yes |
 | Visibility: `public-curated` | Yes | Yes | Yes |
 | Visibility: `public-self-reported` | No | Yes | Yes |
 | Visibility: `private` / `unlisted` | No | No | Yes |
@@ -770,8 +849,8 @@ resolved by this contract:
 | Soft warning cohort display | Yes | Yes | Yes |
 | Ranking eligibility rules | Yes (all curated) | Yes | Yes |
 | Redactable fields supported | No | Partial (no auth) | Yes |
-| Data removal / withdrawal | Admin git operation | Admin or PR close | Self-service API |
-| Tombstone on withdrawal | No | No | Yes |
+| Presentation withdrawal request | Admin policy operation | Admin or PR close before acceptance | Self-service API |
+| Stable tombstone on withdrawal | Yes | Yes | Yes for minted public IDs; no for never-public `private` results |
 | `benchbox submit --output` | No | Yes | Yes |
 | `benchbox submit` → API | No | No | Yes |
 | Status polling | No | No | Yes |

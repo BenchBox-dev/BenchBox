@@ -20,6 +20,27 @@ benchbox/sql_compat/rules/_registration.py @joeharris76
 # Widened after PR #1512.
 benchbox/core/results/anonymization.py @joeharris76
 benchbox/core/results/anonymization_specs.yaml @joeharris76
+benchbox/core/results/provenance.py @joeharris76
+benchbox/core/results/status.py @joeharris76
+benchbox/core/results/query_status.py @joeharris76
+benchbox/validation/bundle.py @joeharris76
+benchbox/core/publishing/admission.py @joeharris76
+benchbox/core/publishing/bundle_publisher.py @joeharris76
+_project/scripts/explorer_pipeline/models.py @joeharris76
+_project/scripts/explorer_pipeline/pipeline.py @joeharris76
+_project/scripts/explorer_pipeline/ranking.py @joeharris76
+_project/scripts/explorer_pipeline/transformer.py @joeharris76
+_project/scripts/explorer_pipeline/duckdb_builder.py @joeharris76
+_project/scripts/explorer_pipeline/compare_math.py @joeharris76
+_project/scripts/results_explorer_snapshot_invariants.py @joeharris76
+benchbox/core/results/canonical_json.py @joeharris76
+benchbox/core/results/schema_policy.py @joeharris76
+_project/scripts/explorer_publish.py @joeharris76
+scripts/generate_corpus_inventory.py @joeharris76
+scripts/validate_submission.py @joeharris76
+.github/workflows/validate-submission.yml @joeharris76
+.github/workflows/sync-results-data-to-published.yml @joeharris76
+.github/workflows/docs.yml @joeharris76
 # Self-protection: the review-gate machinery and the PyPI-publishing
 # workflow. In-workflow checks are attacker-controlled for same-repo PRs
 # (GitHub runs the PR's own copy of a pull_request-triggered workflow).
@@ -33,3 +54,17 @@ benchbox/core/results/anonymization_specs.yaml @joeharris76
 _project/scripts/auto_merge_soundness_paths.py @joeharris76
 .github/workflows/auto-merge-on-open.yml @joeharris76
 .github/workflows/release.yml @joeharris76
+# Independent-publication authority and trust-policy surfaces. These exact
+# paths mirror SOUNDNESS_FILES so policy changes route to manual maintainer
+# review and cannot retain auto-merge.
+_project/decisions/independent-publication-a0-freeze-2026-08-31.md @joeharris76
+docs/development/adr/adr-independent-publication-authorities.md @joeharris76
+docs/development/adr/adr-public-result-id-permanence.md @joeharris76
+docs/development/adr/adr-published-results-slim-corpus-branch.md @joeharris76
+docs/development/independent-publication-threat-model.md @joeharris76
+docs/operations/independent-publication-contract.md @joeharris76
+docs/operations/results-phase-2-runbook.md @joeharris76
+docs/operations/results-phase-3-runbook.md @joeharris76
+docs/reference/hosted-results-contract.md @joeharris76
+docs/reference/threat-model.md @joeharris76
+scripts/check_decision_records.py @joeharris76

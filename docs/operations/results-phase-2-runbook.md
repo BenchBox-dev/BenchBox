@@ -9,11 +9,19 @@ release workflow is the only path that can rebuild and deploy the static Explore
 no hosted API is involved.
 
 Authority is split by surface: `develop` owns code, validators, generators,
-the recurring maintainer seed, and the curated release-preview corpus;
-`published-results` owns the complete accepted Phase 2 archive. Each branch
-generates its inventory from its own tree. Published-only submissions are
-expected and are not automatically backported into the curated Explorer
-source.
+Explorer admission and presentation policy, the recurring maintainer seed, and the
+legacy curated release-preview corpus; `published-results` owns the complete accepted
+Phase 2 archive. Each branch generates its inventory from its own tree. Published-only
+submissions are expected and are not automatically backported into the legacy curated
+Explorer source.
+
+For independent publication, the accepted contract is
+[`independent-publication-contract.md`](independent-publication-contract.md): a reviewed
+manifest pins an exact `published-results` SHA, and every validator-clean result at that
+SHA is publication input by default. Visibility, trust, withdrawal, and ranking
+eligibility are orthogonal presentation fields owned with policy on `develop`; they do
+not create another corpus authority. A merge to `published-results` proves acceptance,
+not live deployment. Only an attested live receipt proves publication.
 
 ## 1. Submission Lifecycle
 
@@ -76,24 +84,24 @@ exists only on `published-results`, it becomes **published-only** and is kept
 on the next mirror. That protects community submissions the automated sync
 must never wipe.
 
-When a maintainer must remove a path from the public corpus (privacy
-remediation, takedown, mistaken publish):
+During the A0 migration freeze, privacy remediation, takedown, or mistaken
+publication authorizes presentation withdrawal and artifact-access suppression,
+not accepted-archive deletion:
 
-1. **Do not** reintroduce a wipe-then-checkout of `results-data/bundles/` on
-   the sync workflow, and **do not** run a full-tree wipe of published bundles
-   while any published-only paths should survive. A full wipe would delete
-   every community submission that is not on develop.
-2. Open a **manual PR against `published-results`** that deletes only the
-   intended path(s) under `results-data/bundles/` (and any related docs if
-   needed).
-3. Regenerate inventory on that branch:
-   `uv run -- python scripts/generate_corpus_inventory.py --write`, then
-   stage `results-data/corpus-inventory.json` with the path removals.
-4. Merge after review. Leave develop in sync if the same path still exists
-   there (delete on develop in a separate PR if the seed/corpus copy must go
-   too); the next develop→published mirror will not resurrect a path that is
-   already gone from both trees, and will not re-delete other published-only
-   paths.
+1. Record the authorized withdrawal, affected public IDs, actor, reason, and time.
+2. Carry the withdrawal into publication desired state, rebuild presentation without the
+   affected rows, deploy, probe externally, and require an attested live receipt before
+   reporting the takedown live.
+3. Suppress accessible derived artifacts where the provider permits, without claiming
+   that Git history or accepted source bytes were erased.
+4. **Do not** delete a path from `published-results` or `develop` while the A0 freeze is
+   active. One-maintainer takedown authority does not supersede the preservation floor.
+
+Irreversible source-byte erasure requires a separately approved incident plan that either
+releases the applicable A0 preservation gate or explicitly supersedes it. That plan must
+inventory Git history, workflow artifacts, caches, mirrors, and inventory consequences.
+Only then may operators use a narrow reviewed deletion PR; a full-tree wipe remains
+forbidden, and the deletion merge is never proof that public bytes are gone.
 
 If the workflow's heuristics ever miss a path (or a one-off mirror is
 needed outside the trigger conditions), trigger it manually via
@@ -278,21 +286,35 @@ result IDs from the *published* bytes, so regenerate the inventory afterwards
 
 ## 5. Rolling Back a Bad Merge
 
-Use a fresh branch off the affected target branch. Set `REMOTE` to the repo you are
-operating against.
+First classify whether the merge introduced an accepted bundle. During the A0
+freeze, an accepted bundle must remain in the archive tip and remain recoverable.
+For an accepted bundle, do **not** run `git revert` against `published-results`.
+Request presentation withdrawal, deploy the suppression generation, and retain
+the accepted source bytes. Removing those bytes requires a separately approved
+erasure exception and evidence plan.
+
+The archive-reversing procedure below is reserved for a merge that changed only
+unaccepted staging or non-corpus material, or for an explicitly approved erasure
+exception. Use a fresh branch off the affected target branch. Set `REMOTE` to the
+repo you are operating against. Because `published-results` uses squash merges,
+select the exact merged PR commit and inspect it before reverting. Do not use
+`git log --merges` or `git revert -m`.
 
 ```bash
 REMOTE=public
+PR_NUMBER=<published-results-pr-number>
 git fetch "$REMOTE" published-results
 git switch -c rollback-results "$REMOTE/published-results"
-MERGE_SHA="$(git log --merges --oneline -n 1)"
-echo "$MERGE_SHA"
-git revert -m 1 "${MERGE_SHA%% *}"
+BAD_SHA="$(gh pr view "$PR_NUMBER" --repo BenchBox-dev/BenchBox --json mergeCommit --jq '.mergeCommit.oid')"
+git show --stat --oneline "$BAD_SHA"
+# Stop unless this is the exact non-accepted change approved for archive reversal.
+git revert "$BAD_SHA"
 git push "$REMOTE" HEAD:published-results
 ```
 
-Then comment on the reverted PR explaining whether the bundle was broken or merely
-misleading, and whether a corrected resubmission is welcome.
+Then comment on the reverted PR explaining why archive reversal was permitted,
+whether the material was broken or merely misleading, and whether a corrected
+resubmission is welcome. Record the erasure approval when that exception was used.
 
 ## 6. Re-triggering an Explorer Rebuild
 

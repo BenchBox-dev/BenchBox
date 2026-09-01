@@ -1,11 +1,15 @@
 # BenchBox Results Platform - Threat Model
 
 **Created:** 2026-04-01
-**Phase scope:** Phase 3 (Hosted API at `api.benchbox.dev`)
+**Phase scope:** Phase 3 hosted API extensions at `api.benchbox.dev`
 **Input:** `benchbox-results-platform-strategy.md`, `operate-results-platform-security-observability-and-abuse-controls.yaml`
 
-Phase 1 (static explorer) and Phase 2 (PR-based contributions) have no hosted
-services. This threat model applies exclusively to Phase 3.
+The accepted
+[`independent-publication-threat-model.md`](../development/independent-publication-threat-model.md)
+governs the live Phase 1 static Explorer, Phase 2 PR contributions, publication
+control plane, artifacts, deployment, receipts, rollback, and takedown. This
+document adds the Phase 3 hosted API, metadata database, object-store, and auth
+service threats. Its controls must not weaken the cross-phase authority contract.
 
 ---
 
@@ -39,9 +43,10 @@ This threat model references visibility states and trust labels defined in
 the governance contract (`hosted-results-contract.md`, Section 2). In brief:
 
 - Visibility states control access and indexing: `private`, `unlisted`,
-  `public-self-reported`, `public-curated`, `public-verified`.
+  `public-self-reported`, `public-vendor-reported`, `public-curated`, and
+  `public-verified`.
 - Trust labels communicate provenance: `maintainer-run`, `community-submission`,
-  `verified` (reserved for future third-party attestation).
+  `vendor-supplied`, and `verified` (reserved for future third-party attestation).
 
 Trust labels are server-controlled. No actor API endpoint permits self-promotion.
 Promotion from `community-submission` to `maintainer-run` requires explicit
@@ -62,8 +67,8 @@ admin action recorded in the audit log.
 | **Denial of Service** | Flooding the submission endpoint with large bundles to exhaust storage and compute | High | Med | High | Per-actor rate limiting (burst + daily cap); hard bundle size cap (50 MB); async ingest with queue depth limit; reject before writing to storage |
 | **Elevation of Privilege** | Low-trust actor promoting their own result to `public-curated` status without maintainer approval | Low | High | Med | Trust labels are server-controlled; actors have no API endpoint to self-promote; promotion is an admin-only action requiring explicit maintainer token scope |
 | **Denial of Service** | Abusing the 7-day grace period for new actors (3x burst, no storage quota) by creating throwaway accounts for unlimited storage consumption | Med | High | Med-High | Cap grace-period storage at 2 GB per actor (not unlimited); require email verification before token issuance to raise throwaway account cost; monitor for multiple accounts from the same IP range; auto-revoke grace-period actors exceeding the bounded exemption |
-| **Tampering** | Compromised CI dependency (poisoned GitHub Action, malicious Python package) injecting tampered bundles or exfiltrating credentials, bypassing all server-side validations | Low | High | Med | Pin all CI dependencies by hash (actions and pip packages); enable Dependabot / supply-chain alerts; run ingest pipeline in a minimal, audited container image; require two-maintainer review for CI workflow changes; verify bundle signatures end-to-end independent of pipeline |
-| **Elevation of Privilege** | Compromised maintainer account (GitHub or admin CLI token) used to promote malicious results, revoke legitimate tokens, or withdraw valid results | Low | Critical | Med-High | Require hardware security keys for maintainer GitHub access; rotate admin tokens quarterly or after any personnel change; require two-admin approval for trust promotion; log all admin actions to immutable audit trail |
+| **Tampering** | Compromised CI dependency (poisoned GitHub Action, malicious Python package) injecting tampered bundles or exfiltrating credentials, bypassing all server-side validations | Low | High | Med | Pin all CI dependencies by hash (actions and pip packages); enable Dependabot / supply-chain alerts; run ingest pipeline in a minimal, audited container image; require manual maintainer review with no auto-merge for workflow or trust-policy changes; verify bundle signatures end-to-end independent of pipeline |
+| **Elevation of Privilege** | Compromised maintainer account (GitHub or admin CLI token) used to promote malicious results, revoke legitimate tokens, or withdraw valid results | Low | Critical | Med-High | Require hardware security keys for maintainer GitHub access; rotate admin tokens quarterly or after any personnel change; require one explicit authorized-maintainer approval for trust promotion or takedown; log all admin actions to an immutable audit trail |
 
 ### Storage Layer
 

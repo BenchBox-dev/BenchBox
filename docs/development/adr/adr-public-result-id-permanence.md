@@ -53,14 +53,16 @@ Because the id is content-addressed over published bytes:
 - two distinct published payloads that collide on the 32-bit `sha8` prefix
   are a hard failure (`DuplicateResultIdError`), not a silent `-{n}` rename.
 
-There is no deployed public Explorer that has advertised the documented
-(wrong) format. Corpus rotations such as #1537 changed ids in git and CI
-artifacts only. External bookmarks of `/results/r/{public_result_id}` do not
-yet exist as a product surface.
+The current public Explorer serves result detail URLs, so the earlier pre-deploy
+assumption is stale. Link permanence attached when those routes first became publicly
+available to consumers. The A0 observed-site baseline is the preservation floor for the
+currently served corpus; future attested live receipts provide stronger, generation-specific
+proof without postponing compatibility for URLs that are already public.
 
-The open questions that remain are when permanence freezes relative to
-corpus motion, whether the written contract must match the mint, and whether
-an alias/redirect table is required before first public deploy.
+The remaining operational question is which ids belong to each later receipt-backed
+generation. The A0 observed baseline already protects the currently served ids. The
+written format and collision contract remain authoritative, and alias or redirect
+handling follows the compatibility rule below.
 
 ## Decision
 
@@ -78,12 +80,10 @@ Consequences:
   the public id.
 - Re-deriving the same published bytes yields the same id (content
   address).
-- Deliberately changing published bytes (privacy fix, schema projection,
-  field-set drop) is allowed to change ids **until the first public deploy
-  that treats Explorer URLs as a consumer contract**. After that deploy,
-  any further rotation must either preserve ids for unchanged published
-  bytes (the normal content-address path) or ship an explicit
-  alias/redirect map for ids that change.
+- Deliberately changing published bytes (privacy fix, schema projection, field-set drop)
+  after their result route has become public is a compatibility event. It must either
+  preserve ids for unchanged published bytes (the normal content-address path) or ship
+  an explicit alias/redirect map for ids that change.
 - Permanent does **not** mean "immune to content change." It means "the same
   published bytes always map to the same id, and once that id is live in
   the public product, links keep resolving."
@@ -116,27 +116,30 @@ format that diverges from this slug without a new ADR.
 `public_result_id` in the hosted contract and `result_id` in the explorer
 pipeline refer to the same slug today.
 
-### 3. Alias / redirect before first public deploy: not needed
+### 3. Alias / redirect at the public-link boundary
 
-**No alias or redirect mechanism is required before the first public
-Explorer deploy.**
+No alias or redirect mechanism was required before result detail routes were publicly
+available. The public Explorer now serves those routes, so operators must treat the A0
+observed corpus and every later receipt-backed generation as external compatibility
+surfaces.
 
-Rationale:
+Rationale and current posture:
 
-1. The format mismatch lived in documentation only. Minted ids have always
-   included `sha8` in code and unit tests.
-2. No public product surface has served `/results/r/{id}` under either the
-   wrong or the right format as a stable external contract.
-3. Prior corpus-wide id rotations (#1537 and related privacy work) therefore
-   had zero external link breakage cost.
-4. Building redirect tables now would invent infrastructure for a consumer
-   that does not exist yet.
+1. The format mismatch lived in documentation only. Minted ids have always included
+   `sha8` in code and unit tests.
+2. Rotations completed before the first public Explorer deployment needed no redirect
+   table because consumers could not yet link to those routes.
+3. The public Explorer now serves result detail routes. The A0 observed baseline protects
+   currently served ids, and later live receipts identify the exact ids in each promoted
+   generation.
+4. Redirect or deprecation handling is required only for affected already-public ids, not
+   invented retroactively for artifacts that were never publicly served.
 
-**Trigger for revisiting:** the first release that publishes Explorer result
-detail URLs as a documented, linkable public surface. After that point,
-any id-changing re-derivation of already-public published bytes needs an
-alias/redirect (or an explicit deprecation notice), decided in a follow-up
-ADR or ops runbook change — not assumed free.
+**Trigger now in force:** any id-changing re-derivation of bytes whose result route has
+already been publicly served needs an alias/redirect or an explicit deprecation notice,
+decided in a follow-up ADR or operations change. The A0 observed baseline proves the
+initial protected surface; later attested receipts prove subsequent generations. Branch
+or workflow state alone never proves public availability.
 
 ## Alternatives rejected
 
@@ -145,7 +148,7 @@ ADR or ops runbook change — not assumed free.
 | Permanence attaches at local run / commit of private capture | Private bytes and paths are not the public artifact; hashing them would fingerprint non-public content and diverge from downloadable bundles |
 | Keep format without `sha8` and resolve collisions with `-{n}` | Diverges from implemented mint; sequential suffixes are not content-addressed and break deterministic re-derivation |
 | Freeze ids independently of content (assign once, never recompute) | Loses verifiability ("anyone holding the published bundle can recompute the id") and forces a registry service before Phase 1 needs one |
-| Ship alias/redirect tables now for pre-deploy rotations | No external links to protect; cost without benefit |
+| Ship alias/redirect tables before the first deploy | No external links existed at that decision point; the A0 observed baseline now protects the routes that subsequently became public |
 
 ## Consequences
 
@@ -153,8 +156,10 @@ ADR or ops runbook change — not assumed free.
   format and fail-closed / skip-identical collision rules.
 - Explorer pipeline code remains the mint authority; docs follow code.
 - Content-addressed permanence is preserved (must-preserve for this TODO).
-- First public deploy becomes the freeze line for external link stability;
-  ops should treat post-deploy id rotations as a compatibility event.
+- The A0 observed baseline is the initial freeze line for external link stability. Existing
+  baseline IDs already require aliases or tombstones for any rotation. Later attested live
+  receipts extend that protected set generation by generation; they do not postpone the
+  compatibility obligation until receipt infrastructure exists.
 - Strategy doc identity table remains non-authoritative relative to this
   ADR and the hosted contract (out of scope for the immediate contract fix;
   update when that doc is next edited for identity).
@@ -176,4 +181,4 @@ ADR or ops runbook change — not assumed free.
 |---|---|
 | w0 | This ADR |
 | w1 | Contract format + collision text aligned with mint |
-| w2 | Alias/redirect = not needed until first public deploy (this section) |
+| w2 | Post-live id rotation requires explicit compatibility handling (this section) |
