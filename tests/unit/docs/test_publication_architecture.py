@@ -236,3 +236,18 @@ def test_freeze_preserves_accepted_archive_bytes_during_rollback_and_withdrawal(
     assert "Rejection is valid only before archive acceptance" in phase3
     assert "rejection must never purge accepted source bytes" in phase3
     assert "The bundle is retained for 30 days" not in phase3
+
+
+def test_a0_a1_tracker_completion_evidence_decision_record() -> None:
+    decision_path = ROOT / "_project/decisions/independent-publication-a0-a1-tracker-completion-evidence-2026-09-01.md"
+    assert decision_path.is_file()
+    text = _normalized(decision_path)
+    assert "Accepted" in text
+    assert "PR #1984" in text
+    assert "171a665fb" in text
+    assert "PR #1987" in text
+    assert "independent-publication-a0-baseline-and-freeze" in text
+    assert "independent-publication-a1-authority-and-threat-contract" in text
+    assert "Terminal State Immutability" in text
+    assert "sha256-chain-v2" in text
+    assert "Post-Merge Completion Operational Invariant" in text
