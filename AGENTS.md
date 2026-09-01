@@ -41,7 +41,8 @@ read-only except for local capture. Do not remediate, commit, push, open a PR,
 or write hosted tracker state without authorization. A bundled request to review
 and fix remains review-only; remediation requires a later user message, sent
 after the findings, that explicitly authorizes it. Its immediate action is
-findings only, without changing tracked worktree content; zero tracked worktree-content changes; do not review and then edit locally in the same turn. Implementation requests authorize the
+findings only, with zero tracked worktree-content changes; do not review and
+then edit locally in the same turn. Implementation requests authorize the
 narrow implementation workflow, not unrelated cleanup or external actions.
 
 `[WRITE-CLOSEOUT-001]` An authorized write workflow closes at a named branch, a
