@@ -103,9 +103,10 @@ event alone does not restore public presentation.
 2. Reserve a new generation, restore the result only in the candidate public and ranking
    read models allowed by current visibility, trust, and ranking policy, then deploy and
    run fresh external probes.
-3. Keep observed presentation `withdrawn` and retain the public tombstone while deployment
-   or probes are pending or failed. Record presentation `active` only after a matching live
-   receipt confirms the restoration generation.
+3. Keep observed presentation `withdrawn` while deployment or probes are pending or failed.
+   Retain the public tombstone when a public ID previously existed; a never-public private
+   result continues to have no public route or tombstone. Record presentation `active` only
+   after a matching live receipt confirms the restoration generation.
 4. Preserve the readmission event, deployment evidence, probe observations, and receipt in
    the append-only audit record. Readmission does not erase prior withdrawal evidence.
 

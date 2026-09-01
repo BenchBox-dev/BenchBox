@@ -42,7 +42,8 @@ def main() -> int:
                 "require manual maintainer review and MUST NOT auto-merge",
                 "A branch deletion alone must never be described as erasure",
                 "`readmission_requested` records an authorized desired restoration",
-                "remains suppressed and tombstoned until a matching live receipt confirms",
+                "previously had a public ID retains its tombstone while readmission is pending",
+                "never-public private result continues to have no public surface",
             ),
         )
     )
@@ -57,7 +58,8 @@ def main() -> int:
                 "During the A0 migration freeze, do not delete accepted source bytes",
                 "A branch deletion is not proof of erasure",
                 "## Authorized readmission",
-                "Keep observed presentation `withdrawn` and retain the public tombstone",
+                "Retain the public tombstone when a public ID previously existed",
+                "a never-public private result continues to have no public route or tombstone",
                 "Record presentation `active` only after a matching live receipt confirms",
             ),
         )
@@ -92,7 +94,8 @@ def main() -> int:
                 "Accepted-but-not-live results must not be described as already published",
                 '"presentation_status": "<active|withdrawal_requested|withdrawn|readmission_requested>"',
                 "Presentation: withdrawn → readmission_requested → active",
-                "the result remains suppressed and tombstoned until a matching live receipt",
+                "A prior public ID keeps its tombstone while readmission is pending",
+                "a never-public private result continues to have no public surface",
                 "Presentation: active → withdrawal_requested → withdrawn",
                 "separate tombstone lookup registry",
                 "`DELETE /v1/submissions/{submission_id}`",

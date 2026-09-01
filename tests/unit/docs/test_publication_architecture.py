@@ -178,11 +178,14 @@ def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
     assert "tombstone remains in the index" not in _text(HOSTED_CONTRACT)
     assert "Presentation: active → withdrawal_requested → withdrawn" in text
     assert "Presentation: withdrawn → readmission_requested → active" in text
-    assert "the result remains suppressed and tombstoned until a matching live receipt" in text
+    assert "A prior public ID keeps its tombstone while readmission is pending" in text
+    assert "a never-public private result continues to have no public surface" in text
     assert "`readmission_requested` records an authorized desired restoration" in _normalized(ADR)
-    assert "remains suppressed and tombstoned until a matching live receipt confirms" in _normalized(ADR)
+    assert "previously had a public ID retains its tombstone while readmission is pending" in _normalized(ADR)
+    assert "never-public private result continues to have no public surface" in _normalized(ADR)
     assert "## Authorized readmission" in _text(OPERATIONS)
-    assert "Keep observed presentation `withdrawn` and retain the public tombstone" in operations
+    assert "Retain the public tombstone when a public ID previously existed" in operations
+    assert "a never-public private result continues to have no public route or tombstone" in operations
     assert "Record presentation `active` only after a matching live receipt confirms" in operations
     assert "Promotion: promotion_failed → promotion_pending" in text
     assert "Promotion: live → promotion_pending" in text

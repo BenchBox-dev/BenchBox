@@ -63,9 +63,11 @@ The following concepts change independently and MUST NOT be collapsed into one s
   matching live receipt confirms suppression from public presentation and ranking. Neither
   state rewrites the historical acceptance fact or audit record.
 - **Readmission:** `readmission_requested` records an authorized desired restoration after
-  receipt-confirmed withdrawal. The result remains suppressed and tombstoned until a matching
-  live receipt confirms the restoration generation, then presentation returns to `active`.
-  Readmission does not rewrite the historical acceptance fact or prior withdrawal evidence.
+  receipt-confirmed withdrawal. The result remains suppressed until a matching live receipt
+  confirms the restoration generation, then presentation returns to `active`. A result that
+  previously had a public ID retains its tombstone while readmission is pending; a never-public
+  private result continues to have no public surface. Readmission does not rewrite the historical
+  acceptance fact or prior withdrawal evidence.
 - **Visibility:** controls discoverability and direct presentation independently of
   trust, ranking eligibility, and deployment state.
 - **Trust:** describes provenance or review confidence. It is never supplied by

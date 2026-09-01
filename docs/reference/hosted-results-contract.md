@@ -146,9 +146,10 @@ Acceptance remains an audit fact when promotion fails or presentation is
 withdrawn. Withdrawal must be carried into later desired state so ordinary
 promotion cannot resurrect it. Re-admission requires a new authorized policy
 event, not a contributor-controlled field. That event records
-`readmission_requested`; the result remains suppressed and tombstoned until a
-matching live receipt confirms the restoration generation, at which point
-presentation returns to `active`.
+`readmission_requested`; the result remains suppressed until a matching live
+receipt confirms the restoration generation, at which point presentation returns
+to `active`. A prior public ID keeps its tombstone while readmission is pending;
+a never-public private result continues to have no public surface.
 
 `published` is retained only as a legacy API compatibility term. New contracts
 must report acceptance, promotion, and presentation separately, and must never
