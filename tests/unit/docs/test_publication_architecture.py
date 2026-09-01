@@ -183,6 +183,9 @@ def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
     assert "`readmission_requested` records an authorized desired restoration" in _normalized(ADR)
     assert "previously had a public ID retains its tombstone while readmission is pending" in _normalized(ADR)
     assert "never-public private result continues to have no public surface" in _normalized(ADR)
+    assert "previously minted public ID retains its tombstone while pending" in _normalized(ADR)
+    assert "never-public private result retains no public surface" in _normalized(ADR)
+    assert "presentation remains tombstoned until a matching live receipt" not in _normalized(ADR)
     assert "## Authorized readmission" in _text(OPERATIONS)
     assert "Retain the public tombstone when a public ID previously existed" in operations
     assert "a never-public private result continues to have no public route or tombstone" in operations

@@ -119,8 +119,9 @@ policy.
   may record `withdrawal_requested` and republish without waiting for a second approver.
   The result becomes `withdrawn` only when a matching live receipt confirms suppression.
 - Reversing a withdrawal requires a new authorized `readmission_requested` event. Public
-  presentation remains tombstoned until a matching live receipt confirms restoration; a
-  failed or pending restoration must not expose the result.
+  presentation remains suppressed until a matching live receipt confirms restoration. A
+  previously minted public ID retains its tombstone while pending; a never-public private
+  result retains no public surface. A failed or pending restoration must not expose the result.
 - Takedown does not rewrite Git history or destroy the accepted archive. During the A0
   freeze, privacy or legal incidents record an immediate withdrawal request and apply
   candidate/artifact-access suppression; any irreversible source-byte erasure requires a

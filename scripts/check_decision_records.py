@@ -44,6 +44,8 @@ def main() -> int:
                 "`readmission_requested` records an authorized desired restoration",
                 "previously had a public ID retains its tombstone while readmission is pending",
                 "never-public private result continues to have no public surface",
+                "previously minted public ID retains its tombstone while pending",
+                "never-public private result retains no public surface",
             ),
         )
     )
