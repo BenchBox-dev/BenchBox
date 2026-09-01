@@ -163,9 +163,11 @@ Additional rules:
   orthogonal acceptance and promotion state.
 - **Rejection reason:** Every `rejected` transition must carry a human-readable
   `reason` string. Reasons are visible to the submitter but not to the public.
-- **Withdrawn tombstone:** In every phase, a withdrawn result retains its
-  `public_result_id` as a stable tombstone stub with content fields redacted.
-  Public detail routes return `410 Gone`. See Section 4.4.
+- **Withdrawn tombstone:** A withdrawn result that previously had a
+  `public_result_id` retains it as a stable tombstone stub with content fields
+  redacted, and its public detail route returns `410 Gone`. A never-public
+  `private` result has no public ID or route, so its withdrawal is recorded only
+  in the authenticated submission status. See Section 4.4.
 
 #### Phase Assignment
 
@@ -683,6 +685,7 @@ The hosted API is available at `api.benchbox.dev`.
 | `GET` | `/v1/results` | No | List published results (paginated) |
 | `GET` | `/v1/results/{public_result_id}` | No | Get result detail |
 | `DELETE` | `/v1/results/{public_result_id}` | Yes (owner or admin) | Withdraw a result |
+| `DELETE` | `/v1/submissions/{submission_id}` | Yes (owner or admin) | Withdraw a never-public private result |
 | `GET` | `/v1/cohorts` | No | List available cohorts (benchmark + scale combinations) |
 | `GET` | `/v1/compare` | No | Compare results by IDs (cohort validation enforced) |
 
@@ -820,12 +823,12 @@ resolved by this contract:
 |---|---|---|---|
 | `bundle_hash` computed and tracked | No | Yes (CI check) | Yes (API) |
 | `submission_id` issued | No | No | Yes |
-| `public_result_id` minted | Yes | Yes | Yes |
+| `public_result_id` minted | Yes | Yes | Yes, except never-public `private` results |
 | Acceptance state: `pending` / `validated` | No | Yes (PR states) | Yes |
 | Acceptance state: `accepted` | Yes | Yes | Yes |
 | Promotion state: `promotion_pending` / `live` / `promotion_failed` | Yes | Yes | Yes |
 | Acceptance state: `rejected` | Admin only | Yes | Yes |
-| Presentation state: `withdrawal_requested` / `withdrawn` | Admin only | Yes | Yes |
+| Presentation state: `withdrawal_requested` / `withdrawn` / `readmission_requested` | Admin only | Yes | Yes |
 | Visibility: `public-curated` | Yes | Yes | Yes |
 | Visibility: `public-self-reported` | No | Yes | Yes |
 | Visibility: `private` / `unlisted` | No | No | Yes |
@@ -837,7 +840,7 @@ resolved by this contract:
 | Ranking eligibility rules | Yes (all curated) | Yes | Yes |
 | Redactable fields supported | No | Partial (no auth) | Yes |
 | Presentation withdrawal request | Admin policy operation | Admin or PR close before acceptance | Self-service API |
-| Stable tombstone on withdrawal | Yes | Yes | Yes |
+| Stable tombstone on withdrawal | Yes | Yes | Yes for minted public IDs; no for never-public `private` results |
 | `benchbox submit --output` | No | Yes | Yes |
 | `benchbox submit` → API | No | No | Yes |
 | Status polling | No | No | Yes |

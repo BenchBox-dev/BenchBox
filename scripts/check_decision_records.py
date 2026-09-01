@@ -90,7 +90,6 @@ def main() -> int:
                 "All six visibility states apply",
                 "Accepted source bytes remain preserved during the A0 freeze",
                 "Accepted-but-not-live results must not be described as already published",
-                "In every phase, a withdrawn result retains its",
                 '"presentation_status": "<active|withdrawal_requested|withdrawn|readmission_requested>"',
                 "Presentation: withdrawn → readmission_requested → active",
                 "the result remains suppressed and tombstoned until a matching live receipt",
@@ -99,6 +98,10 @@ def main() -> int:
                 "`DELETE /v1/submissions/{submission_id}`",
                 "Withdrawal must not mint or expose a `public_result_id`",
                 "Because no public URL ever existed, no public tombstone is created",
+                "A withdrawn result that previously had a",
+                "Withdraw a never-public private result",
+                "Yes, except never-public `private` results",
+                "Yes for minted public IDs; no for never-public `private` results",
             ),
         )
     )

@@ -191,6 +191,12 @@ def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
     assert "`DELETE /v1/submissions/{submission_id}`" in text
     assert "Withdrawal must not mint or expose a `public_result_id`" in text
     assert "Because no public URL ever existed, no public tombstone is created" in text
+    assert "A withdrawn result that previously had a" in text
+    assert "Withdraw a never-public private result" in text
+    assert "Yes, except never-public `private` results" in text
+    assert "Yes for minted public IDs; no for never-public `private` results" in text
+    assert "In every phase, a withdrawn result retains its" not in text
+    assert "| Stable tombstone on withdrawal | Yes | Yes | Yes |" not in _text(HOSTED_CONTRACT)
     assert "| `accepted` |" in _text(HOSTED_CONTRACT)
     assert "| `live` |" in _text(HOSTED_CONTRACT)
     assert "| `published` | On commit" not in _text(HOSTED_CONTRACT)
