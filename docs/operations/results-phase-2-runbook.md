@@ -296,15 +296,19 @@ erasure exception and evidence plan.
 The archive-reversing procedure below is reserved for a merge that changed only
 unaccepted staging or non-corpus material, or for an explicitly approved erasure
 exception. Use a fresh branch off the affected target branch. Set `REMOTE` to the
-repo you are operating against.
+repo you are operating against. Because `published-results` uses squash merges,
+select the exact merged PR commit and inspect it before reverting. Do not use
+`git log --merges` or `git revert -m`.
 
 ```bash
 REMOTE=public
+PR_NUMBER=<published-results-pr-number>
 git fetch "$REMOTE" published-results
 git switch -c rollback-results "$REMOTE/published-results"
-MERGE_SHA="$(git log --merges --oneline -n 1)"
-echo "$MERGE_SHA"
-git revert -m 1 "${MERGE_SHA%% *}"
+BAD_SHA="$(gh pr view "$PR_NUMBER" --repo BenchBox-dev/BenchBox --json mergeCommit --jq '.mergeCommit.oid')"
+git show --stat --oneline "$BAD_SHA"
+# Stop unless this is the exact non-accepted change approved for archive reversal.
+git revert "$BAD_SHA"
 git push "$REMOTE" HEAD:published-results
 ```
 

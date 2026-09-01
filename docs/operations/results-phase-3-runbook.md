@@ -161,9 +161,11 @@ records `withdrawal_requested`; only a matching live receipt records `withdrawn`
    ```
    benchbox admin reject --submission-id X --reason schema_invalid|cohort_mismatch|sanity_fail|manual_review
    ```
-   Status is set to `rejected` with the reason code. The actor receives an
-   email notification (if contact on file). The bundle is retained for 30 days,
-   then purged by lifecycle policy.
+   Rejection is valid only before archive acceptance. Status is set to `rejected`
+   with the reason code. The actor receives an email notification (if contact on
+   file). Unaccepted staging data is retained for 30 days, then purged by staging
+   lifecycle policy. Once a bundle is accepted, maintainers must use presentation
+   withdrawal; rejection must never purge accepted source bytes.
 
 ### Takedown Process
 

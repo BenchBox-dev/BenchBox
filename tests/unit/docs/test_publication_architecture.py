@@ -200,6 +200,11 @@ def test_freeze_preserves_accepted_archive_bytes_during_rollback_and_withdrawal(
 
     assert "For an accepted bundle, do **not** run `git revert` against `published-results`" in phase2
     assert "Removing those bytes requires a separately approved erasure exception" in phase2
+    assert "`published-results` uses squash merges" in phase2
+    assert "Do not use `git log --merges` or `git revert -m`" in phase2
     assert "Accepted source bytes remain in the accepted archive indefinitely" in phase3
     assert "Withdrawal suppresses presentation and ranking only" in phase3
     assert "A 180-day purge applies only to unaccepted staging data" in phase3
+    assert "Rejection is valid only before archive acceptance" in phase3
+    assert "rejection must never purge accepted source bytes" in phase3
+    assert "The bundle is retained for 30 days" not in phase3
