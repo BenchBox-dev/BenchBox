@@ -28,6 +28,16 @@ tests; -m "fast and not (slow or stress or resource_heavy or live_integration)";
 --cov-fail-under=70
 ```
 
+Historical source evidence needed to interpret the observed runs is preserved
+in `ci-waste-fast-lane-overlap-2026-08-31-sources.json` (SHA-256
+`cafe063fb8aea28ef17f2ac200b73852ccdba947e6ba0e6951099ecd2796ef49`).
+It records the exact relevant workflow and Makefile excerpts, their source
+commit/path/line provenance, the original full-file hashes, and a SHA-256 for
+each reconstructed excerpt. Every manifest cell names its applicable excerpts.
+The replay verifies the snapshot and excerpt hashes, checks that each excerpt
+is bound to the cell's source SHA, and matches its command/configuration anchors
+against the retained job log. It does not need the historical Git objects.
+
 `Makefile:784-787` owns the canonical `make ci-test` form. `pr.yml:736-739`
 and `nightly.yml:61-64` inline the equivalent pytest invocation.
 
@@ -109,12 +119,16 @@ observational; its runner-minute totals are not a causal estimate.
 ```text
 git rev-parse HEAD
 shasum -a 256 Makefile .github/workflows/pr.yml .github/workflows/develop-post-merge.yml .github/workflows/nightly.yml _project/config/fast_test_lane_policy.json _project/scripts/timing_policy_check.py _project/analysis/ci-waste-remeasure-2026-08-31-manifest.json
+shasum -a 256 _project/analysis/ci-waste-fast-lane-overlap-2026-08-31-sources.json
 gh api repos/BenchBox-dev/BenchBox/actions/runs/<run-id>
 gh api repos/BenchBox-dev/BenchBox/actions/runs/<run-id>/jobs?per_page=100
 NO_COLOR=1 GH_PAGER=cat gh run view <run-id> --job <job-id> --log
 uv run -- python _project/analysis/replay_ci_waste_remeasure.py
 uv run -- python _project/analysis/replay_ci_waste_fast_lane_overlap.py --self-check
 uv run -- python _project/analysis/replay_ci_waste_fast_lane_overlap.py
+empty_object_dir="$(mktemp -d)"
+GIT_OBJECT_DIRECTORY="$empty_object_dir" git cat-file -e 'c2de6c302688247d5d79f31b8386cceb4a429749^{commit}'  # expected to fail
+GIT_OBJECT_DIRECTORY="$empty_object_dir" uv run -- python _project/analysis/replay_ci_waste_fast_lane_overlap.py
 ```
 
 The API calls provide run metadata and the named-step timestamps; `gh run view`
