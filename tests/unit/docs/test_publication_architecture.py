@@ -179,6 +179,11 @@ def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
     assert "Presentation: active → withdrawal_requested → withdrawn" in text
     assert "Presentation: withdrawn → readmission_requested → active" in text
     assert "the result remains suppressed and tombstoned until a matching live receipt" in text
+    assert "`readmission_requested` records an authorized desired restoration" in _normalized(ADR)
+    assert "remains suppressed and tombstoned until a matching live receipt confirms" in _normalized(ADR)
+    assert "## Authorized readmission" in _text(OPERATIONS)
+    assert "Keep observed presentation `withdrawn` and retain the public tombstone" in operations
+    assert "Record presentation `active` only after a matching live receipt confirms" in operations
     assert "Promotion: promotion_failed → promotion_pending" in text
     assert "Promotion: live → promotion_pending" in text
     assert "the prior `current_live_generation` and receipt remain observed live" in text

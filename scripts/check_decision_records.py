@@ -41,6 +41,8 @@ def main() -> int:
                 "One authorized maintainer may approve normal promotion",
                 "require manual maintainer review and MUST NOT auto-merge",
                 "A branch deletion alone must never be described as erasure",
+                "`readmission_requested` records an authorized desired restoration",
+                "remains suppressed and tombstoned until a matching live receipt confirms",
             ),
         )
     )
@@ -54,6 +56,9 @@ def main() -> int:
                 "One authorized maintainer may initiate emergency takedown",
                 "During the A0 migration freeze, do not delete accepted source bytes",
                 "A branch deletion is not proof of erasure",
+                "## Authorized readmission",
+                "Keep observed presentation `withdrawn` and retain the public tombstone",
+                "Record presentation `active` only after a matching live receipt confirms",
             ),
         )
     )

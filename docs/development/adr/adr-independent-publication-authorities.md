@@ -62,6 +62,10 @@ The following concepts change independently and MUST NOT be collapsed into one s
 - **Withdrawal:** `withdrawal_requested` records desired suppression. `withdrawn` means a
   matching live receipt confirms suppression from public presentation and ranking. Neither
   state rewrites the historical acceptance fact or audit record.
+- **Readmission:** `readmission_requested` records an authorized desired restoration after
+  receipt-confirmed withdrawal. The result remains suppressed and tombstoned until a matching
+  live receipt confirms the restoration generation, then presentation returns to `active`.
+  Readmission does not rewrite the historical acceptance fact or prior withdrawal evidence.
 - **Visibility:** controls discoverability and direct presentation independently of
   trust, ranking eligibility, and deployment state.
 - **Trust:** describes provenance or review confidence. It is never supplied by
@@ -112,6 +116,9 @@ policy.
 - Emergency takedown fails closed for the candidate presentation: an authorized maintainer
   may record `withdrawal_requested` and republish without waiting for a second approver.
   The result becomes `withdrawn` only when a matching live receipt confirms suppression.
+- Reversing a withdrawal requires a new authorized `readmission_requested` event. Public
+  presentation remains tombstoned until a matching live receipt confirms restoration; a
+  failed or pending restoration must not expose the result.
 - Takedown does not rewrite Git history or destroy the accepted archive. During the A0
   freeze, privacy or legal incidents record an immediate withdrawal request and apply
   candidate/artifact-access suppression; any irreversible source-byte erasure requires a

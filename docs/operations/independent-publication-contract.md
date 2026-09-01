@@ -93,6 +93,22 @@ One authorized maintainer may initiate emergency takedown.
 4. Preserve non-sensitive audit evidence. Do not claim public removal until external
    probes and a live receipt confirm it.
 
+## Authorized readmission
+
+One authorized maintainer may reverse a mistaken or temporary withdrawal, but the policy
+event alone does not restore public presentation.
+
+1. Record actor, reason, time, affected public IDs, prior withdrawal receipt, and
+   `readmission_requested` in desired state.
+2. Reserve a new generation, restore the result only in the candidate public and ranking
+   read models allowed by current visibility, trust, and ranking policy, then deploy and
+   run fresh external probes.
+3. Keep observed presentation `withdrawn` and retain the public tombstone while deployment
+   or probes are pending or failed. Record presentation `active` only after a matching live
+   receipt confirms the restoration generation.
+4. Preserve the readmission event, deployment evidence, probe observations, and receipt in
+   the append-only audit record. Readmission does not erase prior withdrawal evidence.
+
 ## Retention and audit
 
 Retain manifests, approvals, provenance, artifact digests, deployment acknowledgements,
