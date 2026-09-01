@@ -194,4 +194,12 @@ describe("ValidationBadge", () => {
     const shown = render(<ValidationBadge validationStatus={null} showMissing />);
     expect(shown.getByText("validation n/a")).toBeTruthy();
   });
+
+  it("renders not_run with a warning tone, not the neutral fallback", () => {
+    const { container } = render(<ValidationBadge validationStatus="not_run" />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.getAttribute("data-tone")).toBe("warning");
+    expect(badge?.textContent).toBe("not_run");
+    expect(badge?.getAttribute("title")).toContain("Validation status: not_run");
+  });
 });

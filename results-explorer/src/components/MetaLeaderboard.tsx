@@ -441,10 +441,14 @@ export function MetaLeaderboard({
                         ) : (
                           renderCellValue(cellState, cohort, mode)
                         )}
-                        {metadata && cellState.kind === "ranked" && (
+                        {metadata && cellState.kind !== "missing" && (
                           <div class="mt-0.5 flex flex-wrap justify-center gap-1">
-                            <TrustBadge trustLabel={metadata.trust_label} compact />
-                            <FundingChip funding={metadata.funding} compact />
+                            {cellState.kind === "ranked" && (
+                              <>
+                                <TrustBadge trustLabel={metadata.trust_label} compact />
+                                <FundingChip funding={metadata.funding} compact />
+                              </>
+                            )}
                             {metadata.validation_status?.trim().toLowerCase() !== "passed" && (
                               <ValidationBadge validationStatus={metadata.validation_status} showMissing />
                             )}
