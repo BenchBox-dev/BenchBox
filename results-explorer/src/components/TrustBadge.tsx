@@ -137,6 +137,10 @@ function validationTone(status: string): StatusTone {
     return "info";
   }
   if (status === "loose" || status === "range") return "warning";
+  // Validation never executed for this result (e.g. DataFrame-mode "not_run").
+  // That is not a pass, so it must not read as the least-alarming ("neutral")
+  // tone - treat it the same as other incomplete-validation statuses above.
+  if (status === "not_run") return "warning";
   return "neutral";
 }
 

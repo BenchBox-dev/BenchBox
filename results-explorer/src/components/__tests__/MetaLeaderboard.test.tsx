@@ -708,6 +708,70 @@ describe("MetaLeaderboard", () => {
     expect(passedCell.textContent).toContain("Community");
   });
 
+  it("shows a validation badge for an unranked not_run result (non-clean status excluded from ranking)", () => {
+    const data: MetaLeaderboardData = {
+      ...DATA,
+      cohorts: [
+        {
+          ...DATA.cohorts[0]!,
+          key: "tpch-sf0.1-power",
+          benchmark: "tpch",
+          label: "TPC-H SF0.1",
+          href: "/results/tpch/",
+          primary_metric: "power_score",
+          primary_order: "desc" as const,
+          platforms: [
+            {
+              platform_id: "polars",
+              platform: "Polars",
+              result_id: "polars-tpch-r1",
+              rank: null,
+              metric_value: null,
+              speedup_vs_best: null,
+              primary_metric: "power_score",
+              primary_order: "desc" as const,
+              ...META_TIMING_ELIGIBLE,
+              ranking_exclusion_reason: "validation_not_clean",
+            },
+          ],
+        },
+      ],
+      platforms: [
+        {
+          platform_id: "polars",
+          platform: "Polars",
+          ranks: {},
+          avg_rank: null,
+          n_cohorts: 0,
+        },
+      ],
+    };
+    render(
+      <MetaLeaderboard
+        data={data}
+        mode="times"
+        onModeChange={vi.fn()}
+        resultMetadataById={new Map([
+          ["polars-tpch-r1", { trust_label: "community-submission", validation_status: "not_run" }],
+        ])}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "1 more platform has published results but nothing ranked — Show them",
+      }),
+    );
+    const cell = screen.getByRole("gridcell", { name: /Polars has published evidence for TPC-H SF0\.1/ });
+    // Unranked (never a "ranked" cellState), so trust/funding stay hidden here -
+    // but the validation badge, the one signal that flags a non-clean result,
+    // must still surface.
+    expect(cell.querySelector('[data-role="trust"]')).toBeNull();
+    const badge = cell.querySelector('[data-role="validation"]');
+    expect(badge?.textContent).toBe("not_run");
+    expect(badge?.getAttribute("data-tone")).toBe("warning");
+  });
+
   it("explains an all-excluded ranking and preserves distinct exclusion reasons", () => {
     const excludedPlatforms = [
       {
