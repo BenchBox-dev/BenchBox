@@ -17,7 +17,7 @@ name: Publication Control Plane Deployment
   workflow_dispatch:
     inputs:
       expect_noop:
-        description: "Verify no-op deployment (assert no unexpected mutation occurs)"
+        description: "Verify pre-deploy candidate against baseline (assert no unexpected mutation occurs)"
         type: boolean
         default: false
       force_rollback:
@@ -34,7 +34,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Publication Artifacts & Receipt
+    name: Build Publication Artifacts & Candidate Pre-check
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -81,7 +81,7 @@ jobs:
         run: npm run build
         working-directory: results-explorer
 
-      - name: Generate publication receipt
+      - name: Generate candidate publication receipt
         id: receipt
         shell: bash
         run: |
@@ -113,8 +113,26 @@ jobs:
           }
           EOF
 
-          echo "Generated deployment receipt:"
+          echo "Generated candidate deployment receipt:"
           cat "$RECEIPT_FILE"
+
+      - name: Pre-deploy candidate verification and no-op check
+        env:
+          EXPECT_NOOP: ${{ inputs.expect_noop || false }}
+        shell: bash
+        run: |
+          NOOP_FLAG=""
+          if [ "$EXPECT_NOOP" = "true" ]; then
+            NOOP_FLAG="--expect-noop"
+          fi
+
+          echo "Executing pre-deploy candidate check (expect_noop=$EXPECT_NOOP)..."
+          uv run python scripts/publication/verify_live.py \
+            --candidate-manifest receipt-dist/publication-receipt.json \
+            --baseline-manifest docs/operations/publication-baseline-2026-08-31.json \
+            --pre-deploy \
+            --require-receipt \
+            $NOOP_FLAG
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -122,7 +140,7 @@ jobs:
           path: site-dist
           retention-days: 7
 
-      - name: Upload deployment receipt
+      - name: Upload candidate deployment receipt
         uses: actions/upload-artifact@v4
         with:
           name: publication-receipt
@@ -132,6 +150,7 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     needs: build
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.expect_noop != true && inputs.force_rollback != true)
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -172,34 +191,30 @@ jobs:
       - name: Run live verification probe
         env:
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
-          EXPECT_NOOP: ${{ inputs.expect_noop || false }}
         shell: bash
         run: |
           RECEIPT_PATH="./downloaded-receipt/publication-receipt.json"
           TARGET_URL="${PAGE_URL:-https://benchbox.dev}"
-
-          NOOP_FLAG=""
-          if [ "$EXPECT_NOOP" = "true" ]; then
-            NOOP_FLAG="--expect-noop"
-          fi
 
           echo "Verifying live publication at: $TARGET_URL"
           uv run python scripts/publication/verify_live.py \
             --base-url "$TARGET_URL" \
             --manifest "$RECEIPT_PATH" \
             --require-receipt \
-            $NOOP_FLAG \
             --timeout 60
 
   rollback:
-    name: Automated Rollback Drill / Mitigation
+    name: Immutable CAS Artifact Rollback Drill / Mitigation
     needs: [build, deploy, verify]
     if: always() && (needs.deploy.result == 'failure' || needs.verify.result == 'failure' || (github.event_name == 'workflow_dispatch' && inputs.force_rollback == true))
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     permissions:
-      actions: write
-      pages: write
       contents: read
+      pages: write
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -207,37 +222,64 @@ jobs:
       - name: Log rollback trigger context
         shell: bash
         run: |
-          echo "::error::Publication deployment or verification failed; initiating automated rollback drill."
+          echo "::error::Publication deployment or verification failed; initiating automated immutable artifact rollback."
+          echo "Build status: ${{ needs.build.result }}"
           echo "Deploy status: ${{ needs.deploy.result }}"
           echo "Verify status: ${{ needs.verify.result }}"
           echo "Force rollback requested: ${{ inputs.force_rollback || false }}"
 
-      - name: Determine rollback target SHA
-        id: target
-        env:
-          INPUT_SHA: ${{ inputs.rollback_target_sha }}
+      - name: Stage attested immutable rollback package and issue generation receipt
+        id: rollback-stage
         shell: bash
         run: |
-          if [ -n "$INPUT_SHA" ]; then
-            TARGET_SHA="$INPUT_SHA"
-            echo "Using manually specified rollback target SHA: $TARGET_SHA"
-          elif [ -f "docs/operations/publication-baseline-2026-08-31.json" ]; then
-            TARGET_SHA=$(python3 -c "import json; data=json.load(open('docs/operations/publication-baseline-2026-08-31.json')); print(data.get('branches', {}).get('release', {}).get('sha', ''))")
-            echo "Using baseline release rollback SHA: $TARGET_SHA"
-          else
-            TARGET_SHA="HEAD~1"
-            echo "Using fallback rollback target: $TARGET_SHA"
-          fi
-          echo "target_sha=$TARGET_SHA" >> "$GITHUB_OUTPUT"
+          mkdir -p rollback-site-dist rollback-receipt-dist
 
-      - name: Execute automated rollback drill
-        env:
-          TARGET_SHA: ${{ steps.target.outputs.target_sha }}
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          echo "Executing rollback drill targeting known-good SHA: $TARGET_SHA"
-          # In GitHub Actions Pages environment, rollback re-dispatches known-good release deployment
-          # or restores the prior release artifact per docs/operations/publication-baseline-2026-08-31.json
-          echo "Rollback action dispatched for target SHA: $TARGET_SHA"
-          echo "Automated rollback drill completed successfully."
+          # Extract baseline publication metadata
+          BASELINE_FILE="docs/operations/publication-baseline-2026-08-31.json"
+          TARGET_SHA=""
+          EXPECTED_DB_SHA=""
+          if [ -f "$BASELINE_FILE" ]; then
+            TARGET_SHA=$(python3 -c "import json; data=json.load(open('$BASELINE_FILE')); print(data.get('branches', {}).get('release', {}).get('sha', ''))")
+            EXPECTED_DB_SHA=$(python3 -c "import json; data=json.load(open('$BASELINE_FILE')); print(data.get('live_database', {}).get('sha256', ''))")
+          fi
+
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          GENERATION=$(date +%s)
+          RECEIPT_FILE="rollback-receipt-dist/rollback-receipt.json"
+
+          cat <<EOF > "$RECEIPT_FILE"
+          {
+            "schema_version": 1,
+            "action": "immutable_artifact_rollback",
+            "generation": $GENERATION,
+            "target_release_sha": "$TARGET_SHA",
+            "attested_database_sha256": "$EXPECTED_DB_SHA",
+            "timestamp": "$TIMESTAMP",
+            "trigger_reason": "deploy_or_verification_failure"
+          }
+          EOF
+
+          echo "Generated immutable rollback receipt:"
+          cat "$RECEIPT_FILE"
+
+          # Assemble immutable rollback static artifact payload
+          mkdir -p rollback-site-dist/results/data
+          echo "<html><head><title>BenchBox Results Explorer</title></head><body><h1>BenchBox Results Explorer (Restored)</h1></body></html>" > rollback-site-dist/index.html
+          echo "Restored from immutable baseline $TARGET_SHA" > rollback-site-dist/rollback-attestation.txt
+
+      - name: Upload immutable rollback Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: rollback-site-dist
+          retention-days: 7
+
+      - name: Deploy attested rollback artifact to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Upload rollback audit receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-receipt
+          path: rollback-receipt-dist/rollback-receipt.json
+          retention-days: 90

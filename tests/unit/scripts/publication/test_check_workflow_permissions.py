@@ -92,7 +92,7 @@ def test_publication_deploy_permissions_valid_structure(tmp_path: Path) -> None:
                 "steps": [],
             },
             "rollback": {
-                "permissions": {"actions": "write", "pages": "write", "contents": "read"},
+                "permissions": {"pages": "write", "id-token": "write", "contents": "read"},
                 "runs-on": "ubuntu-latest",
                 "steps": [],
             },
@@ -120,7 +120,7 @@ def test_publication_deploy_permissions_detects_build_write(tmp_path: Path) -> N
             "build": {"permissions": {"contents": "write"}},
             "deploy": {"permissions": {"pages": "write", "id-token": "write"}},
             "verify": {"permissions": {"contents": "read"}},
-            "rollback": {"permissions": {"actions": "write"}},
+            "rollback": {"permissions": {"pages": "write", "id-token": "write"}},
         },
     }
     errors = checker.check_publication_deploy_permissions(wf, data)
@@ -135,11 +135,26 @@ def test_publication_deploy_permissions_detects_missing_deploy_pages_write(tmp_p
             "build": {"permissions": {"contents": "read"}},
             "deploy": {"permissions": {"contents": "read", "id-token": "write"}},  # missing pages: write
             "verify": {"permissions": {"contents": "read"}},
-            "rollback": {"permissions": {"actions": "write"}},
+            "rollback": {"permissions": {"pages": "write", "id-token": "write"}},
         },
     }
     errors = checker.check_publication_deploy_permissions(wf, data)
     assert any("missing required 'pages: write'" in err for err in errors)
+
+
+def test_publication_deploy_permissions_detects_rollback_actions_write(tmp_path: Path) -> None:
+    wf = tmp_path / "publication-deploy.yml"
+    data = {
+        "name": "Disallowed Actions Write Rollback",
+        "jobs": {
+            "build": {"permissions": {"contents": "read"}},
+            "deploy": {"permissions": {"pages": "write", "id-token": "write"}},
+            "verify": {"permissions": {"contents": "read"}},
+            "rollback": {"permissions": {"actions": "write", "pages": "write", "id-token": "write"}},
+        },
+    }
+    errors = checker.check_publication_deploy_permissions(wf, data)
+    assert any("unneeded write permissions" in err and "rollback" in err for err in errors)
 
 
 def test_repo_publication_deploy_passes_audit() -> None:

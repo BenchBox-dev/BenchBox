@@ -61,11 +61,12 @@ def test_workflow_permissions_follow_least_privilege() -> None:
     # verify job: strictly read-only
     assert jobs["verify"]["permissions"] == {"contents": "read"}
 
-    # rollback job: actions write and pages write only
+    # rollback job: immutable CAS deployment needs only pages and id-token write
     rollback_perms = jobs["rollback"]["permissions"]
-    assert rollback_perms.get("actions") == "write"
     assert rollback_perms.get("pages") == "write"
+    assert rollback_perms.get("id-token") == "write"
     assert rollback_perms.get("contents") == "read"
+    assert "actions" not in rollback_perms
 
 
 def test_workflow_job_dependencies_and_ordering() -> None:
@@ -81,7 +82,19 @@ def test_workflow_job_dependencies_and_ordering() -> None:
     assert jobs["rollback"]["needs"] == ["build", "deploy", "verify"]
 
 
-def test_verify_step_invokes_verify_live_with_receipt_and_noop() -> None:
+def test_build_step_includes_pre_deploy_candidate_and_noop_check() -> None:
+    steps = _workflow()["jobs"]["build"]["steps"]
+    precheck_step = next(s for s in steps if s.get("name") == "Pre-deploy candidate verification and no-op check")
+    run_cmd = precheck_step["run"]
+
+    assert "scripts/publication/verify_live.py" in run_cmd
+    assert "--candidate-manifest" in run_cmd
+    assert "--baseline-manifest" in run_cmd
+    assert "--pre-deploy" in run_cmd
+    assert "--require-receipt" in run_cmd
+
+
+def test_verify_step_invokes_verify_live_with_receipt() -> None:
     steps = _workflow()["jobs"]["verify"]["steps"]
     verify_step = next(s for s in steps if s.get("name") == "Run live verification probe")
     run_cmd = verify_step["run"]
@@ -90,7 +103,16 @@ def test_verify_step_invokes_verify_live_with_receipt_and_noop() -> None:
     assert "--require-receipt" in run_cmd
     assert "--manifest" in run_cmd
     assert "--base-url" in run_cmd
-    assert "--expect-noop" in run_cmd or "NOOP_FLAG" in run_cmd
+
+
+def test_rollback_deploys_attested_immutable_artifact() -> None:
+    steps = _workflow()["jobs"]["rollback"]["steps"]
+    step_names = [s.get("name") for s in steps]
+
+    assert "Stage attested immutable rollback package and issue generation receipt" in step_names
+    assert "Upload immutable rollback Pages artifact" in step_names
+    assert "Deploy attested rollback artifact to GitHub Pages" in step_names
+    assert "Upload rollback audit receipt" in step_names
 
 
 def test_rollback_condition_covers_all_failure_modes_and_drills() -> None:
@@ -120,7 +142,6 @@ def test_simulated_rollback_trigger_logic(
     expected_rollback: bool,
 ) -> None:
     """Simulate GitHub Actions expression evaluation for the rollback conditional."""
-    # Simulates: always() && (needs.deploy.result == 'failure' || needs.verify.result == 'failure' || force_rollback)
     deploy_failed = deploy_result == "failure"
     verify_failed = verify_result == "failure"
     should_rollback = deploy_failed or verify_failed or force_rollback

@@ -178,13 +178,17 @@ def _check_rollback_job_perms(file_path: Path, jobs: dict[str, Any]) -> list[str
     rollback_job = jobs.get("rollback", {})
     rollback_perm = _normalize_permissions(rollback_job.get("permissions"))
     if isinstance(rollback_perm, dict):
+        if rollback_perm.get("pages") != "write":
+            errors.append(f"{file_path.name} (job 'rollback'): missing required 'pages: write' permission")
+        if rollback_perm.get("id-token") != "write":
+            errors.append(f"{file_path.name} (job 'rollback'): missing required 'id-token: write' permission")
         disallowed_writes = [
-            k
-            for k, v in rollback_perm.items()
-            if v == "write" and k not in {"actions", "pages", "deployments", "contents", "statuses"}
+            k for k, v in rollback_perm.items() if v == "write" and k not in {"pages", "id-token", "deployments"}
         ]
         if disallowed_writes:
-            errors.append(f"{file_path.name} (job 'rollback'): unneeded write permissions: {disallowed_writes}")
+            errors.append(
+                f"{file_path.name} (job 'rollback'): unneeded write permissions (disallowed in immutable rollback): {disallowed_writes}"
+            )
     elif rollback_perm is None:
         errors.append(f"{file_path.name} (job 'rollback'): must declare explicit per-job permissions")
     return errors

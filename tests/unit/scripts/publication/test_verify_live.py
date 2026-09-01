@@ -243,3 +243,67 @@ def test_verify_live_main_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
         ]
     )
     assert rc == 0
+
+
+def test_pre_deploy_candidate_matching_baseline(tmp_path: Path) -> None:
+    sha = "1111222233334444555566667777888899990000111122223333444455556666"
+    cand_file = tmp_path / "candidate.json"
+    cand_file.write_text(json.dumps({"checksums": {"/results/data/results.duckdb": sha}}))
+
+    base_file = tmp_path / "baseline.json"
+    base_file.write_text(json.dumps({"live_database": {"sha256": sha}}))
+
+    report = verify_live_mod.verify_live(
+        candidate_manifest=cand_file,
+        baseline_manifest=base_file,
+        expect_noop=True,
+        require_receipt=True,
+        skip_live_probes=True,
+    )
+
+    assert report.ok is True
+    assert report.pre_deploy_check_performed is True
+    assert len(report.errors) == 0
+    assert "/results/data/results.duckdb" in report.matched_checksums
+
+
+def test_pre_deploy_candidate_differs_fails_on_expect_noop(tmp_path: Path) -> None:
+    cand_file = tmp_path / "candidate.json"
+    cand_file.write_text(json.dumps({"checksums": {"/results/data/results.duckdb": "new_candidate_sha"}}))
+
+    base_file = tmp_path / "baseline.json"
+    base_file.write_text(json.dumps({"live_database": {"sha256": "old_baseline_sha"}}))
+
+    report = verify_live_mod.verify_live(
+        candidate_manifest=cand_file,
+        baseline_manifest=base_file,
+        expect_noop=True,
+        require_receipt=True,
+        skip_live_probes=True,
+    )
+
+    assert report.ok is False
+    assert report.pre_deploy_check_performed is True
+    assert any("Pre-deploy no-op check failed" in err for err in report.errors)
+
+
+def test_pre_deploy_cli_main(tmp_path: Path) -> None:
+    sha = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+    cand_file = tmp_path / "candidate.json"
+    cand_file.write_text(json.dumps({"checksums": {"/results/data/results.duckdb": sha}}))
+
+    base_file = tmp_path / "baseline.json"
+    base_file.write_text(json.dumps({"live_database": {"sha256": sha}}))
+
+    rc = verify_live_mod.main(
+        [
+            "--candidate-manifest",
+            str(cand_file),
+            "--baseline-manifest",
+            str(base_file),
+            "--pre-deploy",
+            "--expect-noop",
+            "--require-receipt",
+        ]
+    )
+    assert rc == 0

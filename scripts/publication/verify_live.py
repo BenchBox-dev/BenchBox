@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""Verify live publication endpoints, receipts, and no-op deployment invariants.
+"""Verify live publication endpoints, candidate receipts, and no-op deployment invariants.
 
-This script inspects live publication endpoints (e.g. public documentation,
-Results Explorer, and the public DuckDB database), comparing live checksums
-and headers against a deployment receipt or publication baseline.
+This script inspects live publication endpoints and pre-deploy candidate receipts
+(e.g. public documentation, Results Explorer, and the public DuckDB database),
+comparing live and candidate checksums and headers against a deployment receipt
+or publication baseline.
 
 Contract:
-- Probes required publication endpoints for responsiveness (200 OK) and latency.
+- Pre-deploy candidate check: when --candidate-manifest or --candidate-digest is
+  provided, compares candidate checksums against --baseline-manifest / --baseline-digest.
+  If --expect-noop is set, fails immediately if the candidate mutates baseline state.
+- Live probe check: probes required publication endpoints for responsiveness (200 OK),
+  latency, and checksum equality.
 - When --require-receipt is provided, requires a valid manifest/receipt and
-  verifies that live endpoint hashes match expected values.
-- When --expect-noop is provided, verifies that live deployment checksums match
-  the baseline/receipt and no unexpected mutation occurred.
+  verifies that endpoint or candidate hashes match expected values.
 - Outputs structured diagnostic summary with timing and status codes.
 
 Exit codes:
@@ -59,10 +62,12 @@ class EndpointProbeResult:
 
 @dataclass
 class VerificationReport:
-    base_url: str
+    base_url: str | None = None
     ok: bool = True
     expect_noop: bool = False
     require_receipt: bool = False
+    pre_deploy_check_performed: bool = False
+    live_probes_performed: bool = False
     errors: list[str] = field(default_factory=list)
     probes: list[EndpointProbeResult] = field(default_factory=list)
     matched_checksums: dict[str, str] = field(default_factory=dict)
@@ -74,6 +79,8 @@ class VerificationReport:
             "ok": self.ok,
             "expect_noop": self.expect_noop,
             "require_receipt": self.require_receipt,
+            "pre_deploy_check_performed": self.pre_deploy_check_performed,
+            "live_probes_performed": self.live_probes_performed,
             "errors": self.errors,
             "matched_checksums": self.matched_checksums,
             "mismatched_checksums": self.mismatched_checksums,
@@ -89,7 +96,7 @@ def extract_expected_checksums(manifest_data: dict[str, Any]) -> dict[str, str]:
     if "live_database" in manifest_data and isinstance(manifest_data["live_database"], dict):
         db_info = manifest_data["live_database"]
         if "sha256" in db_info and db_info["sha256"]:
-            expected["/results/data/results.duckdb"] = db_info["sha256"]
+            expected["/results/data/results.duckdb"] = str(db_info["sha256"]).strip()
 
     # Format 2: Direct receipt format with checksums / files mapping
     if "checksums" in manifest_data and isinstance(manifest_data["checksums"], dict):
@@ -108,6 +115,45 @@ def extract_expected_checksums(manifest_data: dict[str, Any]) -> dict[str, str]:
                 expected[norm_p] = str(artifact["sha256"]).strip()
 
     return expected
+
+
+def load_manifest_checksums(manifest_path: Path) -> dict[str, str]:
+    """Read a manifest JSON file and extract checksums."""
+    manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    return extract_expected_checksums(manifest_data)
+
+
+def compare_candidate_against_baseline(
+    candidate_checksums: dict[str, str],
+    baseline_checksums: dict[str, str],
+    expect_noop: bool = False,
+) -> tuple[dict[str, str], dict[str, dict[str, str]], list[str]]:
+    """Compare candidate checksums against baseline checksums."""
+    matched: dict[str, str] = {}
+    mismatched: dict[str, dict[str, str]] = {}
+    errors: list[str] = []
+
+    for path, cand_sha in candidate_checksums.items():
+        base_sha = baseline_checksums.get(path)
+        if base_sha is None:
+            if expect_noop:
+                errors.append(f"Pre-deploy no-op violation: candidate contains unexpected new path '{path}'")
+                mismatched[path] = {"expected": "(none)", "actual": cand_sha}
+            continue
+
+        if cand_sha.lower() == base_sha.lower():
+            matched[path] = cand_sha
+        else:
+            mismatched[path] = {"expected": base_sha, "actual": cand_sha}
+            if expect_noop:
+                errors.append(
+                    f"Pre-deploy no-op check failed for '{path}': "
+                    f"candidate digest {cand_sha} differs from baseline digest {base_sha}"
+                )
+            else:
+                errors.append(f"Candidate checksum mismatch for '{path}': expected {base_sha}, got {cand_sha}")
+
+    return matched, mismatched, errors
 
 
 def probe_endpoint(
@@ -171,41 +217,83 @@ def probe_endpoint(
     return result
 
 
-def verify_live(
-    base_url: str,
-    manifest_path: Path | None = None,
-    require_receipt: bool = False,
-    expect_noop: bool = False,
-    timeout: float = DEFAULT_TIMEOUT,
-    endpoints: list[str] | None = None,
-) -> VerificationReport:
-    """Perform comprehensive live verification against base_url and manifest."""
-    report = VerificationReport(
-        base_url=base_url,
-        expect_noop=expect_noop,
-        require_receipt=require_receipt,
-    )
-
-    expected_checksums: dict[str, str] = {}
+def _resolve_candidate_checksums(
+    manifest_path: Path | None, digest: str | None, report: VerificationReport
+) -> dict[str, str]:
+    checksums: dict[str, str] = {}
     if manifest_path is not None:
         if not manifest_path.is_file():
             report.ok = False
-            report.errors.append(f"Manifest file not found: {manifest_path}")
-            return report
+            report.errors.append(f"Candidate manifest not found: {manifest_path}")
+            return checksums
         try:
-            manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
-            expected_checksums = extract_expected_checksums(manifest_data)
+            checksums = load_manifest_checksums(manifest_path)
         except Exception as exc:
             report.ok = False
-            report.errors.append(f"Failed to parse manifest {manifest_path}: {exc}")
-            return report
-    elif require_receipt:
-        report.ok = False
-        report.errors.append("Receipt verification was required (--require-receipt), but no --manifest was provided.")
-        return report
+            report.errors.append(f"Failed to parse candidate manifest {manifest_path}: {exc}")
+            return checksums
 
+    if digest:
+        checksums["/results/data/results.duckdb"] = digest.strip()
+    return checksums
+
+
+def _resolve_baseline_checksums(
+    manifest_path: Path | None, digest: str | None, report: VerificationReport
+) -> dict[str, str]:
+    checksums: dict[str, str] = {}
+    if manifest_path is not None:
+        if not manifest_path.is_file():
+            report.ok = False
+            report.errors.append(f"Baseline manifest not found: {manifest_path}")
+            return checksums
+        try:
+            checksums = load_manifest_checksums(manifest_path)
+        except Exception as exc:
+            report.ok = False
+            report.errors.append(f"Failed to parse baseline manifest {manifest_path}: {exc}")
+            return checksums
+
+    if digest:
+        checksums["/results/data/results.duckdb"] = digest.strip()
+    return checksums
+
+
+def _run_pre_deploy_check(
+    candidate: dict[str, str],
+    baseline: dict[str, str],
+    report: VerificationReport,
+    expect_noop: bool,
+    require_receipt: bool,
+) -> None:
+    if candidate and baseline:
+        report.pre_deploy_check_performed = True
+        matched, mismatched, cmp_errors = compare_candidate_against_baseline(
+            candidate, baseline, expect_noop=expect_noop
+        )
+        report.matched_checksums.update(matched)
+        report.mismatched_checksums.update(mismatched)
+        if cmp_errors:
+            report.ok = False
+            report.errors.extend(cmp_errors)
+    elif candidate and require_receipt and not baseline:
+        report.ok = False
+        report.errors.append("Candidate manifest provided with --require-receipt, but baseline manifest is missing.")
+    elif require_receipt and not candidate and not baseline:
+        report.ok = False
+        report.errors.append("Receipt verification was required (--require-receipt), but no manifest was provided.")
+
+
+def _run_live_probes(
+    base_url: str,
+    expected_checksums: dict[str, str],
+    report: VerificationReport,
+    timeout: float,
+    endpoints: list[str] | None,
+    expect_noop: bool,
+) -> None:
+    report.live_probes_performed = True
     paths_to_probe = list(endpoints or DEFAULT_ENDPOINTS)
-    # Ensure any endpoints named in manifest are also probed
     for path in expected_checksums:
         if path not in paths_to_probe:
             paths_to_probe.append(path)
@@ -222,7 +310,6 @@ def verify_live(
                 f"Endpoint probe failed for {probe.path}: {probe.error or f'HTTP {probe.status_code}'}"
             )
 
-    # Check receipt / checksum invariants
     if expected_checksums:
         for path, exp_sha in expected_checksums.items():
             probe = probe_map.get(path)
@@ -235,10 +322,7 @@ def verify_live(
                 report.matched_checksums[path] = probe.sha256
             else:
                 report.ok = False
-                report.mismatched_checksums[path] = {
-                    "expected": exp_sha,
-                    "actual": probe.sha256,
-                }
+                report.mismatched_checksums[path] = {"expected": exp_sha, "actual": probe.sha256}
                 if expect_noop:
                     report.errors.append(
                         f"Unexpected mutation detected during no-op verification for {path}: "
@@ -248,10 +332,38 @@ def verify_live(
                     report.errors.append(
                         f"Receipt checksum mismatch for {path}: expected {exp_sha}, got {probe.sha256}"
                     )
-    elif require_receipt:
-        report.ok = False
-        report.errors.append("No expected checksums found in manifest to satisfy --require-receipt.")
 
+
+def verify_live(
+    base_url: str | None = None,
+    manifest_path: Path | None = None,
+    candidate_manifest: Path | None = None,
+    candidate_digest: str | None = None,
+    baseline_manifest: Path | None = None,
+    baseline_digest: str | None = None,
+    require_receipt: bool = False,
+    expect_noop: bool = False,
+    timeout: float = DEFAULT_TIMEOUT,
+    endpoints: list[str] | None = None,
+    skip_live_probes: bool = False,
+) -> VerificationReport:
+    """Perform comprehensive pre-deploy candidate and/or live verification."""
+    report = VerificationReport(
+        base_url=base_url,
+        expect_noop=expect_noop,
+        require_receipt=require_receipt,
+    )
+
+    candidate_checksums = _resolve_candidate_checksums(candidate_manifest, candidate_digest, report)
+    baseline_checksums = _resolve_baseline_checksums(baseline_manifest or manifest_path, baseline_digest, report)
+
+    _run_pre_deploy_check(candidate_checksums, baseline_checksums, report, expect_noop, require_receipt)
+
+    if skip_live_probes or base_url is None or not report.ok:
+        return report
+
+    expected_live_checksums = candidate_checksums or baseline_checksums
+    _run_live_probes(base_url, expected_live_checksums, report, timeout, endpoints, expect_noop)
     return report
 
 
@@ -272,14 +384,43 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to deployment receipt or publication baseline JSON file",
     )
     parser.add_argument(
+        "--candidate-manifest",
+        type=Path,
+        default=None,
+        help="Path to candidate deployment receipt JSON file",
+    )
+    parser.add_argument(
+        "--candidate-digest",
+        type=str,
+        default=None,
+        help="Candidate SHA-256 digest",
+    )
+    parser.add_argument(
+        "--baseline-manifest",
+        type=Path,
+        default=None,
+        help="Path to baseline publication receipt JSON file",
+    )
+    parser.add_argument(
+        "--baseline-digest",
+        type=str,
+        default=None,
+        help="Baseline SHA-256 digest",
+    )
+    parser.add_argument(
         "--require-receipt",
         action="store_true",
-        help="Require valid receipt and verify endpoint checksums match exactly",
+        help="Require valid receipt and verify endpoint/candidate checksums match exactly",
     )
     parser.add_argument(
         "--expect-noop",
         action="store_true",
         help="Assert that no unexpected mutation occurred against the manifest/baseline",
+    )
+    parser.add_argument(
+        "--pre-deploy",
+        action="store_true",
+        help="Run only pre-deploy candidate vs baseline check without probing live URLs",
     )
     parser.add_argument(
         "--timeout",
@@ -306,27 +447,37 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     report = verify_live(
-        base_url=args.base_url,
+        base_url=args.base_url if not args.pre_deploy else None,
         manifest_path=args.manifest,
+        candidate_manifest=args.candidate_manifest,
+        candidate_digest=args.candidate_digest,
+        baseline_manifest=args.baseline_manifest,
+        baseline_digest=args.baseline_digest,
         require_receipt=args.require_receipt,
         expect_noop=args.expect_noop,
         timeout=args.timeout,
         endpoints=args.endpoints,
+        skip_live_probes=args.pre_deploy,
     )
 
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))
     else:
-        print(f"=== Live Publication Verification for {args.base_url} ===")
+        print("=== Publication Verification ===")
         print(f"Status: {'PASS' if report.ok else 'FAIL'}")
-        print(f"Mode: expect_noop={args.expect_noop}, require_receipt={args.require_receipt}")
-        print("\nEndpoint Probes:")
-        for p in report.probes:
-            status_desc = f"HTTP {p.status_code}" if p.status_code else "ERR"
-            hash_desc = f" (sha256: {p.sha256[:12]}...)" if p.sha256 else ""
-            print(f"  [{'OK' if p.ok else 'FAIL'}] {p.path} -> {status_desc} ({p.latency_ms:.1f}ms){hash_desc}")
-            if p.error:
-                print(f"       Error: {p.error}")
+        print(
+            f"Mode: expect_noop={args.expect_noop}, require_receipt={args.require_receipt}, "
+            f"pre_deploy={report.pre_deploy_check_performed}, live_probes={report.live_probes_performed}"
+        )
+
+        if report.probes:
+            print("\nEndpoint Probes:")
+            for p in report.probes:
+                status_desc = f"HTTP {p.status_code}" if p.status_code else "ERR"
+                hash_desc = f" (sha256: {p.sha256[:12]}...)" if p.sha256 else ""
+                print(f"  [{'OK' if p.ok else 'FAIL'}] {p.path} -> {status_desc} ({p.latency_ms:.1f}ms){hash_desc}")
+                if p.error:
+                    print(f"       Error: {p.error}")
 
         if report.matched_checksums:
             print("\nVerified Checksums:")
