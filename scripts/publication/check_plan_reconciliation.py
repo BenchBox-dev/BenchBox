@@ -284,7 +284,9 @@ def main() -> int:
             # between the initial list and the per-item show reads. A concurrent
             # change (e.g., A0's deps modified after its show, or a new A12
             # added after the list) could otherwise assemble a mixed snapshot
-            # that still matches EXPECTED_DEPS.
+            # that still matches EXPECTED_DEPS. Use a trailing revision check
+            # via re-reading the list and deps after the second sweep so the
+            # window ends with an atomic list comparison, not with per-item reads.
             live_items_after = load_live_items()
             if live_items_after is None:
                 missing.append("exact ordered A0-A11 tracker sequence (live tracker unavailable on re-read)")
@@ -304,6 +306,25 @@ def main() -> int:
                         missing.append(
                             "exact ordered A0-A11 tracker sequence (live dependency graph changed during check)"
                         )
+                    else:
+                        # Final revision check after the second sweep: ensures no
+                        # new phase or state change slipped in after the last show.
+                        live_items_final = load_live_items()
+                        if live_items_final is None:
+                            missing.append(
+                                "exact ordered A0-A11 tracker sequence (live tracker unavailable on final re-read)"
+                            )
+                        else:
+                            prefix_final = [
+                                item
+                                for item in live_items_final
+                                if str(item.get("id", "")).startswith(args.todo_prefix)
+                            ]
+                            final_map = {item["id"]: str(item.get("state", "")).lower() for item in prefix_final}
+                            if final_map != before_map:
+                                missing.append(
+                                    "exact ordered A0-A11 tracker sequence (live tracker changed after dependency reads)"
+                                )
             live_item_ids = sorted(live_ids, key=lambda item_id: _phase_key(item_id, args.todo_prefix))
             expected_sorted = sorted(EXPECTED_DEPS.keys(), key=lambda item_id: _phase_key(item_id, args.todo_prefix))
             # Require every pinned phase to be present in both sequences.
