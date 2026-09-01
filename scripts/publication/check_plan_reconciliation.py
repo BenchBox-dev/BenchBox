@@ -269,7 +269,9 @@ def main() -> int:
         live_scope = [
             item
             for item in live_items
-            if str(item.get("id", "")).startswith(args.todo_prefix) and str(item.get("state", "")).lower() != "dropped"
+            if str(item.get("id", "")).startswith(args.todo_prefix)
+            and str(item.get("state", "")).lower() != "dropped"
+            and item.get("id") in EXPECTED_DEPS
         ]
         live_ids = [item["id"] for item in live_scope]
         live_deps = load_live_deps(live_ids)
