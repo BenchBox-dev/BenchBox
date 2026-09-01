@@ -1,8 +1,14 @@
+---
+name: agent-execution
+description: Select model tiers, map reasoning effort, and dispatch delegated work through native or external agent harnesses. Use when a workflow must choose an agent model or effort level, or launch a manager, worker, or independent reviewer; do not use for direct, undelegated tool calls.
+---
+
 # Agent Execution
 
-Read this reference when pairing the Manager or selecting a Worker or
-Independent Reviewer. Bossmode retains ownership of decomposition,
-authorization, workspace isolation, and acceptance criteria.
+Use this component when another skill delegates work and needs a consistent
+model tier, reasoning effort, or agent harness configuration. The calling skill
+continues to own task decomposition, authorization, workspace isolation, and
+acceptance criteria.
 
 ## Model Tiers
 
@@ -12,9 +18,9 @@ task complexity and risk.
 *Selection Rule*: Pick the tier here. For native dispatch, choose the listed
 tier model directly. When an external harness is selected, take its exact
 harness-specific identifier from
-[external-harnesses.md](external-harnesses.md). Default reasoning effort to
-`medium`. Use maximum effort only for Tier 1 adversarial review; use `low` for
-mechanical bulk work.
+[references/external-harnesses.md](references/external-harnesses.md). Default
+reasoning effort to `medium`. Use maximum effort only for Tier 1 adversarial
+review; use `low` for mechanical bulk work.
 
 - **Tier 1: Strategic**
   - Models: `gpt-5.6-sol`, `claude-fable-5`, `grok-4.6`, `gemini-3.7-flash-high`
@@ -39,8 +45,8 @@ mechanical bulk work.
 | **prime-agent** | `--thinking <level>` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
 
 For `jcode`, `opencode`, `hermes`, `goose`, and `aider`, effort is selected via
-model variants such as `gemini-3.7-flash-tiered`, a `:thinking` suffix, or
-provider settings.
+model variants (e.g. `gemini-3.7-flash-tiered`, `:thinking` suffix) or provider
+settings.
 
 ## Dispatch Rules
 
@@ -68,10 +74,13 @@ Choose the dispatch mode from the delegated role:
   requires explicit findings-only instructions that forbid edits, commits,
   pushes, and other mutations.
 
-Only when selecting an external or headless harness, read
-[external-harnesses.md](external-harnesses.md), choose the documented command
-for the role, and use it directly.
+When selecting an external or headless harness, read
+[references/external-harnesses.md](references/external-harnesses.md), choose the
+documented command for the role, and use it directly.
 
 Headless Worker dispatch may automate confirmations only when write scope is
 already bounded by a sandbox, workspace flag, or dedicated worktree. Never add
 flags that remove workspace, sandbox, or tool boundaries.
+
+The external harness reference contains the worker and reviewer commands, model
+identifiers, and hard-versus-soft read-only classifications.
