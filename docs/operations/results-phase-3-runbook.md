@@ -232,6 +232,7 @@ metadata DB (write-once object store or managed audit logging service).
 | `rejected` | Ingest pipeline or admin |
 | `withdrawal-requested` | Actor or admin records desired presentation suppression |
 | `withdrawn` | Attestor confirms suppression in a matching live receipt |
+| `readmission-requested` | Admin records authorized desired restoration after receipt-confirmed withdrawal |
 | `trust-promoted` | Admin |
 | `trust-revoked` | Admin |
 | `redacted` | Admin (sensitive field removed; bundle hash invalidated) |

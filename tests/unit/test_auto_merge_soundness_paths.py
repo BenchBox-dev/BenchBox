@@ -46,6 +46,8 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "benchbox/core/results/anonymization.py",
         "benchbox/core/results/anonymization_specs.yaml",
         "benchbox/core/results/provenance.py",
+        "benchbox/core/results/status.py",
+        "benchbox/core/results/query_status.py",
         "benchbox/validation/bundle.py",
         "benchbox/core/publishing/admission.py",
         "benchbox/core/publishing/bundle_publisher.py",
@@ -219,6 +221,8 @@ def test_codeowners_covers_soundness_paths() -> None:
     assert "benchbox/sql_compat/decision.py @joeharris76" in codeowners
     assert "benchbox/sql_compat/rules/_registration.py @joeharris76" in codeowners
     assert "benchbox/core/results/provenance.py @joeharris76" in codeowners
+    assert "benchbox/core/results/status.py @joeharris76" in codeowners
+    assert "benchbox/core/results/query_status.py @joeharris76" in codeowners
     assert "benchbox/validation/bundle.py @joeharris76" in codeowners
     assert "benchbox/core/publishing/admission.py @joeharris76" in codeowners
     assert "benchbox/core/publishing/bundle_publisher.py @joeharris76" in codeowners

@@ -21,6 +21,8 @@ benchbox/sql_compat/rules/_registration.py @joeharris76
 benchbox/core/results/anonymization.py @joeharris76
 benchbox/core/results/anonymization_specs.yaml @joeharris76
 benchbox/core/results/provenance.py @joeharris76
+benchbox/core/results/status.py @joeharris76
+benchbox/core/results/query_status.py @joeharris76
 benchbox/validation/bundle.py @joeharris76
 benchbox/core/publishing/admission.py @joeharris76
 benchbox/core/publishing/bundle_publisher.py @joeharris76

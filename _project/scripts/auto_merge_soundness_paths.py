@@ -77,6 +77,8 @@ SOUNDNESS_FILES = (
     # and ranking eligibility are defined here. A silent change alters public
     # presentation and leaderboard membership without changing the authority docs.
     "benchbox/core/results/provenance.py",
+    "benchbox/core/results/status.py",
+    "benchbox/core/results/query_status.py",
     # Admission and read-model policy surfaces. These execute the public trust,
     # vendor, visibility, and ranking decisions defined by the A1 contract.
     "benchbox/validation/bundle.py",
