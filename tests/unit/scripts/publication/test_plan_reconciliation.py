@@ -114,3 +114,35 @@ def test_load_live_items_returns_none_on_invalid_json() -> None:
     cmd = [sys.executable, "-c", "print('not json')"]
 
     assert reconciliation.load_live_items(cmd) is None
+
+
+def test_main_fails_closed_when_live_tracker_unavailable(monkeypatch) -> None:
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
+    monkeypatch.setattr(reconciliation, "load_live_items", lambda: None)
+
+    assert reconciliation.main() == 1
+
+
+def test_main_fails_when_live_sequence_does_not_match(monkeypatch) -> None:
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
+    live_items = [
+        {"id": "independent-publication-a0-baseline-and-freeze"},
+        {"id": "independent-publication-a1-authority-and-threat-contract"},
+    ]
+    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
+
+    assert reconciliation.main() == 1
+
+
+def test_main_succeeds_when_live_sequence_matches_decision(monkeypatch) -> None:
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
+    live_items = [{"id": item_id} for item_id in LIVE_A0_A11]
+    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
+
+    assert reconciliation.main() == 0

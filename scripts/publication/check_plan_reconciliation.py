@@ -3,9 +3,10 @@
 
 The A0-A11 tracker sequence is sourced from the live tracker (the todo CLI)
 rather than a hard-coded list, so the check cannot silently pass on a stale
-expected sequence. When the live tracker is unreachable (no credential or
-offline), the check degrades to advisory mode and reports that live
-reconciliation was skipped instead of asserting a hard-coded expectation.
+expected sequence. The check fails closed: if the live tracker cannot be
+reached (no credential or offline), reconciliation is a hard failure rather
+than an advisory pass, because without live evidence the gate cannot prove
+the plan matches the currently pending migration order.
 """
 
 from __future__ import annotations
@@ -81,9 +82,10 @@ def main() -> int:
 
     if live_items is None:
         print(
-            "WARNING: live tracker unavailable; skipping live A0-A11 reconciliation (advisory mode)",
+            "ERROR: live tracker unavailable; cannot reconcile the A0-A11 sequence (fail closed)",
             file=sys.stderr,
         )
+        missing.append("exact ordered A0-A11 tracker sequence (live tracker unavailable)")
     else:
         expected_ids = live_tracker_ids(live_items, args.todo_prefix)
         if tracker_ids != expected_ids:
@@ -92,9 +94,8 @@ def main() -> int:
         for value in missing:
             print(f"ERROR: unreconciled publication surface: {value}")
         return 1
-    authority = "live tracker" if live_items is not None else "advisory (document-only)"
     print(
-        f"publication plan reconciled against {authority}: "
+        f"publication plan reconciled against live tracker: "
         f"{len(REQUIRED_SURFACES)} prior surfaces, {len(REQUIRED_GATES)} gates, {len(tracker_ids)} tracker priorities"
     )
     return 0
