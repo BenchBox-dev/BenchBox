@@ -460,3 +460,43 @@ def test_dependency_violations_fails_on_unpinned_phase() -> None:
     violations = reconciliation.dependency_violations(plan, drifted)
 
     assert any("is not pinned in EXPECTED_DEPS" in v and "a12-new-phase" in v for v in violations)
+
+
+def test_main_fails_when_pinned_phase_missing_from_both(monkeypatch) -> None:
+    import sys
+
+    omitted = LIVE_A0_A11[:-1]  # omit A11
+    live_items = [{"id": item_id, "state": "done"} for item_id in omitted]
+
+    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
+    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
+    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: REAL_DEPS.get(iid, []) for iid in ids})
+    monkeypatch.setattr(reconciliation, "planned_tracker_ids", lambda text, prefix: omitted)
+
+    assert reconciliation.main() == 1
+
+
+def test_main_fails_when_pinned_phase_missing_from_plan(monkeypatch) -> None:
+    import sys
+
+    omitted = LIVE_A0_A11[:-1]
+    live_items = [{"id": item_id} for item_id in LIVE_A0_A11]
+
+    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
+    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
+    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: REAL_DEPS.get(iid, []) for iid in ids})
+    monkeypatch.setattr(reconciliation, "planned_tracker_ids", lambda text, prefix: omitted)
+
+    assert reconciliation.main() == 1
+
+
+def test_main_fails_when_pinned_phase_missing_from_live(monkeypatch) -> None:
+    import sys
+
+    live_items = [{"id": item_id, "state": "done"} for item_id in LIVE_A0_A11[:-1]]
+
+    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
+    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
+    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: REAL_DEPS.get(iid, []) for iid in ids})
+
+    assert reconciliation.main() == 1

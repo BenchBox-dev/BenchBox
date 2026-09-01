@@ -281,6 +281,15 @@ def main() -> int:
             missing.append("exact ordered A0-A11 tracker sequence (dependency graph unavailable)")
         else:
             live_item_ids = sorted(live_ids, key=lambda item_id: _phase_key(item_id, args.todo_prefix))
+            expected_sorted = sorted(EXPECTED_DEPS.keys(), key=lambda item_id: _phase_key(item_id, args.todo_prefix))
+            # Require every pinned phase to be present in both sequences.
+            # Without this, both the plan and live could omit a terminal phase
+            # (e.g., A11) and still match (11 vs 11) while the dependency loop
+            # never visits the missing key.
+            if tracker_ids != expected_sorted:
+                missing.append("exact ordered A0-A11 tracker sequence (plan missing expected phases)")
+            if live_item_ids != expected_sorted:
+                missing.append("exact ordered A0-A11 tracker sequence (live missing expected phases)")
             if tracker_ids != live_item_ids:
                 missing.append("exact ordered A0-A11 tracker sequence (live tracker)")
             missing.extend(dependency_violations(tracker_ids, live_deps))
