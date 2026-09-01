@@ -146,14 +146,25 @@ def dependency_violations(plan_order: list[str], deps: dict[str, list[str]]) -> 
     violation, as is an unexpected in-set edge. This closes the "last prior
     edge" gap where only orphan detection would fire.
 
-    ``deps`` maps each plan item to its live dependency ids (only those within
-    the plan set are considered).
+    Dependencies outside the A0-A11 set are also validated: any live edge to
+    an item not in the plan's ordered set is an unexpected external
+    dependency, because readiness requires every predecessor to be done.
+
+    ``deps`` maps each plan item to its live dependency ids (all deps are
+    validated; only in-set edges are checked for order/missing/unexpected).
     """
     rank = {item_id: i for i, item_id in enumerate(plan_order)}
     order_set = set(plan_order)
     violations: list[str] = []
     for item_id in plan_order:
-        item_deps = [dep for dep in deps.get(item_id, []) if dep in order_set]
+        live_all = deps.get(item_id, []) or []
+        # External dependencies (outside A0-A11) must be explicitly pinned;
+        # any such edge is drift because the plan's total order cannot
+        # justify it and readiness would require the external predecessor.
+        for dep in live_all:
+            if dep not in order_set:
+                violations.append(f"{item_id} has unexpected external dependency on {dep}")
+        item_deps = [dep for dep in live_all if dep in order_set]
         for dep in item_deps:
             if rank[dep] >= rank[item_id]:
                 violations.append(f"{item_id} depends on {dep}, which the plan orders after it")
@@ -176,6 +187,11 @@ def load_live_deps(item_ids: list[str], todo_cmd: list[str] | None = None) -> di
     ``todo list`` does not expose dependencies, so each item is read with
     ``show <id> --json``. Deps come from the tracker's authoritative graph; an
     unavailable read is treated as a failure so the gate cannot pass without it.
+
+    The lifecycle state is also re-checked from the ``show`` response: if a
+    required phase flipped to ``dropped`` after the initial ``list`` call,
+    the ``show`` payload carries the fresher state and the gate must fail
+    rather than using the stale non-dropped state from the list.
     """
     shim_cmd = todo_cmd if todo_cmd is not None else [str(TODO_SHIM)]
     deps: dict[str, list[str]] = {}
@@ -186,6 +202,8 @@ def load_live_deps(item_ids: list[str], todo_cmd: list[str] | None = None) -> di
             )
             item = json.loads(result.stdout)
         except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, json.JSONDecodeError):
+            return None
+        if str(item.get("state", "")).lower() == "dropped":
             return None
         deps[item_id] = item.get("deps") or []
     return deps

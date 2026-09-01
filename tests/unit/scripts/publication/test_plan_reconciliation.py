@@ -404,3 +404,49 @@ def test_main_fails_when_dropped_phase_omitted_from_decision(monkeypatch) -> Non
     monkeypatch.setattr(reconciliation, "planned_tracker_ids", lambda text, prefix: omitted_tracker)
 
     assert reconciliation.main() == 1
+
+
+def test_dependency_violations_fails_on_external_dependency() -> None:
+    drifted = dict(REAL_DEPS)
+    drifted["independent-publication-a3-control-plane-and-artifact-contract"] = [
+        "independent-publication-a1-authority-and-threat-contract",
+        "independent-publication-a2-corpus-trust-isolation",
+        "external-tracker-item",
+    ]
+
+    violations = reconciliation.dependency_violations(LIVE_A0_A11, drifted)
+
+    assert any("has unexpected external dependency" in v and "external-tracker-item" in v for v in violations)
+
+
+def test_load_live_deps_returns_none_when_show_is_dropped() -> None:
+    import json
+    import sys
+
+    payload = {
+        "id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
+        "state": "dropped",
+        "deps": [],
+    }
+    cmd = [sys.executable, "-c", f"import sys,json; print(json.dumps({json.dumps(payload)}))"]
+
+    assert reconciliation.load_live_deps(["independent-publication-a5-noop-deploy-and-automatic-rollback"], cmd) is None
+
+
+def test_main_fails_when_dependency_show_reports_dropped(monkeypatch) -> None:
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
+    live_items = [{"id": item_id, "state": "done"} for item_id in LIVE_A0_A11]
+
+    def fake_load_deps(ids):
+        # Simulate race: show for a5 reports dropped
+        for iid in ids:
+            if iid == "independent-publication-a5-noop-deploy-and-automatic-rollback":
+                return None
+        return {iid: REAL_DEPS.get(iid, []) for iid in ids}
+
+    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
+    monkeypatch.setattr(reconciliation, "load_live_deps", fake_load_deps)
+
+    assert reconciliation.main() == 1
