@@ -3,12 +3,12 @@ sources:
   - name: canonical
     type: git
     url: https://github.com/joeharris76/skill-sync-skills.git
-    ref: 6580679cca642e704725ce43a20316aa2ff634f2
+    ref: b11bddc6ea6fa0d04a827651e0d6c42a295b7839
     subdir: skills
   - name: todo-context-efficiency
     type: git
     url: https://github.com/joeharris76/skill-sync-skills.git
-    ref: 77ab905fe66cc86a8d8a11fdc4b3500e28d8e0d0
+    ref: b11bddc6ea6fa0d04a827651e0d6c42a295b7839
     subdir: skills
   - name: product
     type: git

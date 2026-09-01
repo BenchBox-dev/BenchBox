@@ -96,9 +96,15 @@ capture remains local under `shared-review-protocol/SKILL.md`.
    Inspect `git status --porcelain {files}` and `git diff {files}`.
 4. Run Section 3. Fix failures or stop without committing.
 5. Stage and commit the explicit files in one shell command.
-6. Push the branch. Use `-u origin {branch}` when it has no upstream.
-7. Open a draft PR as part of the same repository-write authorization unless
-   the user explicitly requires local-only work or another publication mode.
+6. Unless a direct user instruction requires local-only work, confirm the
+   remote host, owner, and repository match an authorized repository or an
+   authorized fork of it, then push the branch. Use `-u origin {branch}` when it
+   has no upstream. Stop on an unknown remote, a push to a default or protected
+   branch, or a history rewrite. A PR that targets the default branch is normal
+   and is not a stop.
+7. Create the branch's draft PR, or update the existing PR for that branch, as
+   part of the same repository-write authorization unless the user explicitly
+   requires local-only work or another publication mode.
 
 ### Rules
 
@@ -123,12 +129,24 @@ capture remains local under `shared-review-protocol/SKILL.md`.
 - Use Conventional Commits.
 - Do not commit if verification fails or scope is ambiguous.
 - Branch creation and commits are required close-out steps for completed
-  repository write actions, not separate permissions. A later user message may
-  explicitly require local-only work or another publication mode.
-- If repository policy explicitly uses trunk-based or direct-default-branch
-  development, follow that policy and report the deviation from the default
-  task-branch workflow.
+  repository write actions, not separate permissions. The authorizing user
+  message, or a later one, may explicitly require local-only work or another
+  publication mode.
+- If repository policy uses trunk-based or direct-default-branch development,
+  keep the user-authorized terminal state and use a task branch and draft PR.
+  Repository policy never authorizes a direct default- or protected-branch
+  write; only a direct user instruction in the current task does. Report the
+  policy conflict, and report the deviation from the default task-branch
+  workflow when the user authorizes that target.
 - A task branch is cheap isolation; it does not alter another user's branch or
   linked worktree.
 - If a required push or PR is mechanically unavailable, keep the verified
   commit and report the blocker; do not describe the workflow as complete.
+- The workflow ends at a pushed branch and its created or updated draft PR.
+  The authority boundary that ends it there, and the actions it does not
+  authorize (merge, auto-merge, ready, deployment, activation, writes to an
+  unnamed repository), is owned by `shared-review-protocol/SKILL.md` §1; do not
+  restate it here. Repository policy may choose how an already-authorized step
+  is performed, such as commit style, required checks, or PR template. Report
+  the state reached per surface; never describe local-only work as applied or
+  shipped.

@@ -1,3 +1,5 @@
+depends:
+  - shared-agent-execution
 tags:
   - orchestration
   - workflow
