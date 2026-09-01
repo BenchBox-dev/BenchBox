@@ -14,6 +14,7 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
     summary.winner !== null
       ? summary.percentiles.find((entry) => entry.resultId === summary.winner?.resultId)
       : undefined;
+  const hasValidationCaveat = summary.nonCleanValidation.length > 0;
 
   return (
     <section aria-labelledby="compare-decision-summary-title" class="card mb-8">
@@ -24,10 +25,34 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
           </h2>
           <p class="mt-1 text-sm font-medium text-[var(--bb-data-fg-primary)]">{summary.headline}</p>
         </div>
-        <StatusBadge role="computed" tone={summary.claimSuppressed ? "warning" : "info"}>
-          {summary.claimSuppressed ? "Claims suppressed" : "Computed from selected runs"}
-        </StatusBadge>
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          {hasValidationCaveat && (
+            <StatusBadge role="validation" tone="warning">
+              Unvalidated result{summary.nonCleanValidation.length > 1 ? "s" : ""}
+            </StatusBadge>
+          )}
+          <StatusBadge role="computed" tone={summary.claimSuppressed ? "warning" : "info"}>
+            {summary.claimSuppressed ? "Claims suppressed" : "Computed from selected runs"}
+          </StatusBadge>
+        </div>
       </div>
+
+      {hasValidationCaveat && (
+        <div
+          class="mb-4 rounded-md border border-[var(--bb-tone-warning-border)] bg-[var(--bb-tone-warning-bg)] px-3 py-2 text-xs text-[var(--bb-tone-warning-fg)]"
+          data-testid="compare-validation-caveat"
+        >
+          <span class="font-semibold">Validation caution:</span>{" "}
+          {summary.nonCleanValidation.map((entry, index) => (
+            <span key={entry.resultId}>
+              {index > 0 ? "; " : ""}
+              <span class="font-medium">{entry.platform}</span> is {entry.label}
+            </span>
+          ))}
+          . This comparison rests on at least one unvalidated or non-clean result - treat any winner claim above as
+          provisional.
+        </div>
+      )}
 
       <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard label="Winner">

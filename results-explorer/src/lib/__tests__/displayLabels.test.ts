@@ -3,6 +3,7 @@ import {
   formatBenchmarkLabel,
   canonicalBenchmarkSlug,
   canonicalPhase,
+  describeValidationStatus,
   formatCostStatus,
   formatEnumLabel,
   formatFunding,
@@ -62,6 +63,69 @@ describe("formatValidationStatus", () => {
 
   it("returns 'unknown' for missing values", () => {
     expect(formatValidationStatus(null)).toBe("unknown");
+  });
+
+  // Full status set from benchbox/core/results/status.py
+  // NON_CLEAN_VALIDATION_STATUSES - the raw enum used to be impossible for a
+  // reader to interpret (e.g. a bare "not_run" chip); every one of these must
+  // now render plain language.
+  it("humanizes every NON_CLEAN_VALIDATION_STATUSES value", () => {
+    expect(formatValidationStatus("failed")).toBe("failed");
+    expect(formatValidationStatus("interrupted")).toBe("interrupted");
+    expect(formatValidationStatus("partial")).toBe("partial pass");
+    expect(formatValidationStatus("error")).toBe("validation error");
+    expect(formatValidationStatus("not_run")).toBe("no validation");
+    expect(formatValidationStatus("not_validated")).toBe("not validated");
+    expect(formatValidationStatus("uncertain")).toBe("uncertain");
+    expect(formatValidationStatus("unknown")).toBe("unknown");
+  });
+});
+
+describe("describeValidationStatus", () => {
+  it("returns the raw status alongside the reader-facing label", () => {
+    const info = describeValidationStatus("not_run");
+    expect(info.status).toBe("not_run");
+    expect(info.label).toBe("no validation");
+    expect(info.description.length).toBeGreaterThan(0);
+    expect(info.isClean).toBe(false);
+  });
+
+  it("marks passed (and its aliases) as the only clean status", () => {
+    expect(describeValidationStatus("passed").isClean).toBe(true);
+    expect(describeValidationStatus("pass").isClean).toBe(true);
+    expect(describeValidationStatus("exact").isClean).toBe(true);
+    expect(describeValidationStatus("full").isClean).toBe(true);
+    expect(describeValidationStatus("not_run").isClean).toBe(false);
+    expect(describeValidationStatus("failed").isClean).toBe(false);
+  });
+
+  it("gives CLI-failure statuses a danger tone", () => {
+    for (const status of ["failed", "interrupted", "partial", "error"]) {
+      expect(describeValidationStatus(status).tone).toBe("danger");
+    }
+  });
+
+  it("gives never-validated statuses a warning tone, never neutral", () => {
+    for (const status of ["not_run", "not_validated", "uncertain", "unknown"]) {
+      const info = describeValidationStatus(status);
+      expect(info.tone).toBe("warning");
+      expect(info.tone).not.toBe("neutral");
+    }
+  });
+
+  it("normalizes case and whitespace before matching", () => {
+    expect(describeValidationStatus("  Not_Run ").label).toBe("no validation");
+  });
+
+  it("handles a missing status without throwing", () => {
+    const info = describeValidationStatus(null);
+    expect(info.status).toBeNull();
+    expect(info.isClean).toBe(false);
+    expect(info.tone).toBe("neutral");
+  });
+
+  it("never gives an unrecognised non-null status the neutral tone", () => {
+    expect(describeValidationStatus("some_future_status").tone).toBe("warning");
   });
 });
 

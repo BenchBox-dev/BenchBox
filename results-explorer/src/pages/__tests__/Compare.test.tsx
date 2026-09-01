@@ -907,6 +907,62 @@ describe("Compare", () => {
     expect(window.location.hash).toBe("#comparability-receipt-warnings");
   });
 
+  // ---------------------------------------------------------------------
+  // Live reproduction: DuckDB vs Pandas at H2ODB SF0.01. Pandas carries
+  // validation_status "not_run" alongside three cosmetic environment diffs
+  // (platform version, driver version, execution mode). Before this fix the
+  // guardrails summary named only the three cosmetic diffs and folded
+  // Validation into "+1 more", and the Decision Summary headlined a
+  // confident winner claim with no caveat that one side was unvalidated.
+  // ---------------------------------------------------------------------
+  it("names Validation explicitly in the guardrails summary and caveats the winner claim (DuckDB vs Pandas, unvalidated)", async () => {
+    vi.mocked(getDetailResult).mockImplementation((id) =>
+      id === "r1"
+        ? Promise.resolve(
+            makeResult({
+              result_id: "r1",
+              platform: "DuckDB",
+              power_score: 3560,
+              platform_version: "1.1.0",
+              driver_version: "1.1.0",
+              execution_mode: "native",
+              validation_status: "passed",
+            }),
+          )
+        : Promise.resolve(
+            makeResult({
+              result_id: "r2",
+              platform: "Pandas",
+              platform_id: "pandas",
+              power_score: 1000,
+              platform_version: "2.2.0",
+              driver_version: "2.2.0",
+              execution_mode: "dataframe",
+              validation_status: "not_run",
+              display_timings: [
+                { query_id: "Q1", display_ms: 100, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+                { query_id: "Q2", display_ms: 200, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+              ],
+            }),
+          ),
+    );
+
+    render(<Compare />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy());
+
+    const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
+    // Validation must be named in the visible summary, not folded into "+N more" -
+    // it is sorted to the front, so any truncation falls on the cosmetic fields.
+    expect(guardrails.textContent).toMatch(/Warning classes: Validation,/);
+
+    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    expect(summary).toHaveTextContent("DuckDB");
+    // The headline itself carries the caveat - a reader who reads only the
+    // headline must not conclude this rests on validated data.
+    expect(summary).toHaveTextContent("Validation caution");
+    expect(summary).toHaveTextContent("Unvalidated result");
+  });
+
   it("uses singular warning copy for one compare guardrail warning", async () => {
     vi.mocked(getDetailResult).mockImplementation((id) =>
       id === "r1"

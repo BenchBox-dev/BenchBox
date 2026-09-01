@@ -387,4 +387,67 @@ describe("buildCompareDecisionSummary", () => {
     expect(summary.headline).toContain("Polars 2026-05-08 (deadbeef)");
     expect(summary.headline).not.toMatch(/^Polars leads/);
   });
+
+  describe("validation disclosure", () => {
+    it("flags a result with an explicit non-clean validation_status", () => {
+      const summary = buildCompareDecisionSummary(
+        [
+          makeResult({ result_id: "duck", platform: "DuckDB", power_score: 3000, validation_status: "passed" }),
+          makeResult({
+            result_id: "pandas",
+            platform: "Pandas",
+            power_score: 843,
+            validation_status: "not_run",
+          }),
+        ],
+        "power_score",
+      );
+
+      expect(summary.nonCleanValidation).toEqual([
+        { resultId: "pandas", platform: "Pandas", status: "not_run", label: "no validation" },
+      ]);
+      expect(summary.validationCaveat).toContain("Pandas is no validation");
+      expect(summary.headline.endsWith(summary.validationCaveat!)).toBe(true);
+    });
+
+    it("does not flag a result with no validation_status recorded at all", () => {
+      const summary = buildCompareDecisionSummary(
+        [
+          makeResult({ result_id: "duck", platform: "DuckDB", power_score: 3000 }),
+          makeResult({ result_id: "sqlite", platform: "SQLite", power_score: 300 }),
+        ],
+        "power_score",
+      );
+
+      expect(summary.nonCleanValidation).toEqual([]);
+      expect(summary.validationCaveat).toBeNull();
+    });
+
+    it("flags every non-clean status in a multi-way comparison, not just the first", () => {
+      const summary = buildCompareDecisionSummary(
+        [
+          makeResult({ result_id: "duck", platform: "DuckDB", power_score: 3000, validation_status: "passed" }),
+          makeResult({ result_id: "pandas", platform: "Pandas", power_score: 843, validation_status: "not_run" }),
+          makeResult({ result_id: "polars", platform: "Polars", power_score: 500, validation_status: "uncertain" }),
+        ],
+        "power_score",
+      );
+
+      expect(summary.nonCleanValidation.map((entry) => entry.platform)).toEqual(["Pandas", "Polars"]);
+    });
+
+    it("still reports the caveat when the winner claim is suppressed for other reasons", () => {
+      const summary = buildCompareDecisionSummary(
+        [
+          makeResult({ result_id: "duck", platform: "DuckDB", power_score: 3000, validation_status: "passed" }),
+          makeResult({ result_id: "pandas", platform: "Pandas", power_score: 843, validation_status: "not_run" }),
+        ],
+        "power_score",
+        { suppressWinnerClaims: true, suppressionReason: "benchmarks differ" },
+      );
+
+      expect(summary.nonCleanValidation).toHaveLength(1);
+      expect(summary.claimSuppressed).toBe(true);
+    });
+  });
 });

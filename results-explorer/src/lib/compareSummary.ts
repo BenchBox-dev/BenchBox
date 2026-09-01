@@ -1,5 +1,6 @@
 import type { DetailResult } from "@/types";
 import { formatSpeedup } from "@/lib/metricFormatters";
+import { describeValidationStatus } from "@/lib/displayLabels";
 import {
   compareEvidenceSummary,
   isComparable,
@@ -49,6 +50,16 @@ export interface CompareCostSummary {
   winnerIsBestCostPerformance: boolean;
 }
 
+/** One selected result whose validation status is not a clean pass. */
+export interface CompareValidationCaveat {
+  resultId: string;
+  platform: string;
+  /** Raw validation status, e.g. "not_run". */
+  status: string;
+  /** Reader-facing label from the shared vocabulary, e.g. "no validation". */
+  label: string;
+}
+
 export interface CompareDecisionSummary {
   primaryMetric: ComparePrimaryMetric;
   primaryMetricLabel: string;
@@ -67,6 +78,16 @@ export interface CompareDecisionSummary {
   queryRecord: WinnerQueryRecord;
   percentiles: ComparePercentiles[];
   cost: CompareCostSummary | null;
+  /**
+   * Selected results whose validation status is present but not a clean pass
+   * (e.g. `not_run`, `failed`, `uncertain`). A result with no recorded status
+   * at all is not included here - this flags an explicit non-clean status,
+   * not an absent one. Non-empty even when `claimSuppressed` is true, so the
+   * UI can still explain *why* a suppressed comparison is untrustworthy.
+   */
+  nonCleanValidation: CompareValidationCaveat[];
+  /** Prose caveat built from `nonCleanValidation`, or null when it is empty. */
+  validationCaveat: string | null;
 }
 
 interface CompareDecisionSummaryOptions {
@@ -114,6 +135,8 @@ export function buildCompareDecisionSummary(
   const cost = buildCostSummary(results, winner, primaryMetric);
   const isTie = comparisonRatio !== null && Math.abs(comparisonRatio - 1) < COMPARE_TIE_THRESHOLD;
   const winnerLabel = winner ? options.runLabels?.[winner.resultId] ?? winner.platform : null;
+  const nonCleanValidation = buildNonCleanValidation(results);
+  const validationCaveat = buildValidationCaveat(nonCleanValidation);
 
   return {
     primaryMetric,
@@ -131,11 +154,38 @@ export function buildCompareDecisionSummary(
       ...options,
       suppressWinnerClaims,
       suppressionReason: suppressionReason ?? undefined,
-    }),
+    }, validationCaveat),
     queryRecord,
     percentiles,
     cost,
+    nonCleanValidation,
+    validationCaveat,
   };
+}
+
+/**
+ * Selected results whose validation status is present but not a clean pass.
+ * This is the fix for the "headline claims a winner off an unvalidated
+ * result" gap: a result missing a status entirely is not flagged (many
+ * fixtures/legacy bundles simply never recorded one), but an explicit
+ * non-clean status - `not_run` included - always is.
+ */
+function buildNonCleanValidation(results: DetailResult[]): CompareValidationCaveat[] {
+  const caveats: CompareValidationCaveat[] = [];
+  for (const result of results) {
+    const raw = result.validation_status;
+    if (raw === null || raw === undefined || raw === "") continue;
+    const info = describeValidationStatus(raw);
+    if (info.isClean) continue;
+    caveats.push({ resultId: result.result_id, platform: result.platform, status: raw, label: info.label });
+  }
+  return caveats;
+}
+
+function buildValidationCaveat(nonCleanValidation: CompareValidationCaveat[]): string | null {
+  if (nonCleanValidation.length === 0) return null;
+  const parts = nonCleanValidation.map((entry) => `${entry.platform} is ${entry.label}`);
+  return `Validation caution: ${parts.join("; ")}. This comparison rests on at least one unvalidated or non-clean result - treat the winner claim as provisional.`;
 }
 
 function metricRatio(winnerValue: number, comparisonValue: number, higherIsBetter: boolean): number | null {
@@ -148,6 +198,7 @@ function buildHeadline(
   comparisonRatio: number | null,
   primaryMetric: ComparePrimaryMetric,
   options: CompareDecisionSummaryOptions,
+  validationCaveat: string | null,
 ): string {
   if (options.suppressWinnerClaims) {
     const reason = options.suppressionReason ?? "selected runs are not from the same comparable ranking";
@@ -158,14 +209,18 @@ function buildHeadline(
   }
   if (!winner) return "No winner claim: selected results are missing the primary metric.";
   const winnerLabel = options.runLabels?.[winner.resultId] ?? winner.platform;
-  if (comparisonRatio === null) return `${winnerLabel} leads on the selected primary metric.`;
+  // A reader who reads only this headline must not come away believing the
+  // comparison rests on validated data when it does not - so the caveat rides
+  // along with the winner claim itself, not just the receipt below the fold.
+  const caveatSuffix = validationCaveat ? ` ${validationCaveat}` : "";
+  if (comparisonRatio === null) return `${winnerLabel} leads on the selected primary metric.${caveatSuffix}`;
   if (Math.abs(comparisonRatio - 1) < COMPARE_TIE_THRESHOLD) {
-    return `Selected runs are within the tie threshold (${formatRatio(comparisonRatio)}); no material winner on the selected primary metric.`;
+    return `Selected runs are within the tie threshold (${formatRatio(comparisonRatio)}); no material winner on the selected primary metric.${caveatSuffix}`;
   }
   if (primaryMetric === "power_score") {
-    return `${winnerLabel} leads by ${formatRatio(comparisonRatio)} on power score.`;
+    return `${winnerLabel} leads by ${formatRatio(comparisonRatio)} on power score.${caveatSuffix}`;
   }
-  return `${winnerLabel} is ${formatRatio(comparisonRatio)} faster by geomean query time.`;
+  return `${winnerLabel} is ${formatRatio(comparisonRatio)} faster by geomean query time.${caveatSuffix}`;
 }
 
 function isQueryEvidenceSuppressionReason(reason: string): boolean {

@@ -5,6 +5,7 @@ import {
   COMPARABILITY_WARNING_TARGET_ID,
   buildComparabilityFields,
   comparabilityWarningFields,
+  orderWarningLabelsForSummary,
   ComparabilityReceipt,
 } from "@/components/ComparabilityReceipt";
 
@@ -145,6 +146,65 @@ describe("ComparabilityReceipt", () => {
     expect(fields.find((field) => field.label === "Phase")?.status).toBe("diff");
     expect(fields.find((field) => field.label === "Query scope")?.status).toBe("diff");
     expect(comparabilityWarningFields(fields).map((field) => field.label)).toEqual(["Phase", "Query scope"]);
+  });
+
+  it("renders the receipt's Validation row with the reader-facing label, raw status kept alongside it", () => {
+    const { container } = render(
+      <ComparabilityReceipt
+        results={[
+          makeDetail({ validation_status: "passed" }),
+          makeDetail({ result_id: "r2", platform: "Pandas", platform_id: "pandas", validation_status: "not_run" }),
+        ]}
+      />,
+    );
+    const validationCard = [...container.querySelectorAll("h3")]
+      .find((el) => el.textContent === "Validation")
+      ?.closest("div")?.parentElement;
+    expect(validationCard).toBeTruthy();
+    expect(validationCard).toHaveTextContent("2 values differ");
+    expect(validationCard).toHaveTextContent("DuckDB: passed; Pandas: no validation (not_run)");
+  });
+
+  describe("orderWarningLabelsForSummary", () => {
+    it("sorts a Validation warning to the front, ahead of cosmetic environment fields", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ platform_version: "1.0", driver_version: "1.0", execution_mode: "in-memory", validation_status: "passed" }),
+        makeDetail({
+          result_id: "r2",
+          platform: "Pandas",
+          platform_id: "pandas",
+          platform_version: "2.0",
+          driver_version: "2.0",
+          execution_mode: "lazy",
+          validation_status: "not_run",
+        }),
+      ]);
+      const warnings = comparabilityWarningFields(fields);
+      // Sanity: without reordering, Validation would land after the three
+      // environment fields (build order), which is exactly the "+1 more"
+      // bug from the audit.
+      expect(warnings.map((f) => f.label).indexOf("Validation")).toBeGreaterThan(0);
+
+      const ordered = orderWarningLabelsForSummary(warnings);
+      expect(ordered[0]).toBe("Validation");
+      expect(ordered).toEqual(
+        expect.arrayContaining(["Platform version", "Driver version", "Execution mode", "Validation"]),
+      );
+    });
+
+    it("is a no-op when there is no Validation warning", () => {
+      const fields = buildComparabilityFields([
+        makeDetail(),
+        makeDetail({
+          result_id: "r2",
+          platform: "SQLite",
+          platform_id: "sqlite",
+          test_type: "throughput",
+        }),
+      ]);
+      const warnings = comparabilityWarningFields(fields);
+      expect(orderWarningLabelsForSummary(warnings)).toEqual(warnings.map((f) => f.label));
+    });
   });
 
   it("uses singular count copy for one warning and one query", () => {

@@ -1,3 +1,4 @@
+import type { StatusTone } from "@/components/StatusBadge";
 import { humanizeBenchmark } from "@/utils";
 
 // Public-facing formatters for raw internal enum strings.
@@ -19,7 +20,111 @@ const VALIDATION_STATUS_LABELS: Record<string, string> = {
   warning: "warning",
   not_applicable: "not applicable",
   pending: "pending",
+  // The remaining keys are the full validation-status enum from
+  // benchbox/core/results/status.py (NON_CLEAN_VALIDATION_STATUSES). Mirrored
+  // here rather than generated, same rationale as FUNDING_LABELS above.
+  interrupted: "interrupted",
+  partial: "partial pass",
+  error: "validation error",
+  not_run: "no validation",
+  not_validated: "not validated",
+  uncertain: "uncertain",
+  unknown: "unknown",
 };
+
+/**
+ * Longer, tooltip-length prose for each validation status. Paired 1:1 with
+ * `VALIDATION_STATUS_LABELS` by key; a status without a curated label also has
+ * no curated description here and falls back to a generic sentence built from
+ * the short label in `describeValidationStatus`.
+ */
+const VALIDATION_STATUS_DESCRIPTIONS: Record<string, string> = {
+  passed: "Validated against the reference oracle and confirmed correct.",
+  failed: "Validation ran and found this result incorrect.",
+  warning: "Validation ran and flagged a concern short of a hard failure.",
+  not_applicable: "Validation does not apply to this result.",
+  pending: "Validation has not completed yet.",
+  interrupted: "The run was interrupted before validation could complete.",
+  partial: "Some queries failed validation; this is a partial pass.",
+  error: "The validation process itself errored and produced no verdict.",
+  not_run: "Validation never executed for this result (for example, DataFrame mode or --validation disabled). The numbers are unverified.",
+  not_validated: "This result was explicitly not checked against an oracle.",
+  uncertain: "Validation completed with reduced confidence; treat this result with caution.",
+  unknown: "Validation status was not recorded for this result.",
+};
+
+// Mirrors benchbox/core/results/status.py::CLI_FAILURE_VALIDATION_STATUSES.
+// Statuses where the run itself failed at the CLI/execution level.
+const VALIDATION_CLI_FAILURE_STATUSES = new Set(["failed", "interrupted", "partial", "error"]);
+
+// Everything else non-clean falls to UNVALIDATED_VALIDATION_STATUSES in
+// benchbox/core/results/status.py (not_run, not_validated, uncertain, unknown)
+// plus warning/pending: the run completed but validation never produced a
+// clean confirmation. Handled by the final `else` branch below rather than a
+// duplicate literal set - keep the CLI-failure and clean sets as the only
+// hand-maintained lists, same "derived, don't hand-maintain a third set"
+// rule status.py itself follows.
+
+// Statuses treated as a clean pass. "passed" is the current producer value;
+// "pass", "exact", and "full" are historical/tolerance-mode values that carry
+// the same meaning (see ResultDetail.tsx's isPassingValidationStatus, which
+// also accepts "pass").
+const VALIDATION_CLEAN_STATUSES = new Set(["passed", "pass", "exact", "full"]);
+
+export interface ValidationStatusInfo {
+  /** Normalized (trimmed, lowercased) raw status, or null when absent. */
+  status: string | null;
+  /** Short, reader-facing label. Always defined, even for an absent status. */
+  label: string;
+  /** Longer tooltip-length explanation of what the status means. */
+  description: string;
+  /** Suggested StatusBadge tone. */
+  tone: StatusTone;
+  /** True only for a clean pass ("passed"). */
+  isClean: boolean;
+}
+
+/**
+ * The ONE shared mapping from a raw validation-status enum value to
+ * reader-facing language. Every surface that displays a validation status
+ * (compare receipt, result detail chip, platform index Source column,
+ * leaderboard validation badge) should call this - or `formatValidationStatus`
+ * for just the short label - instead of rendering the raw enum string.
+ *
+ * The raw status stays available via the `status` field for any surface that
+ * wants to show precision (a tooltip, a receipt row, a detail field) alongside
+ * the interpretable label.
+ */
+export function describeValidationStatus(raw: string | null | undefined): ValidationStatusInfo {
+  const status = raw === null || raw === undefined ? null : raw.trim().toLowerCase() || null;
+  if (status === null) {
+    return {
+      status: null,
+      label: "not recorded",
+      description: "No validation status was recorded for this result.",
+      tone: "neutral",
+      isClean: false,
+    };
+  }
+  const label = VALIDATION_STATUS_LABELS[status] ?? formatEnumLabel(status);
+  const description = VALIDATION_STATUS_DESCRIPTIONS[status] ?? "No further detail is defined for this status.";
+  const isClean = VALIDATION_CLEAN_STATUSES.has(status);
+  let tone: StatusTone;
+  if (isClean) {
+    tone = "info";
+  } else if (status === "loose" || status === "range") {
+    // Tolerance-mode passes: validated, but with a wider acceptance band.
+    tone = "warning";
+  } else if (VALIDATION_CLI_FAILURE_STATUSES.has(status)) {
+    tone = "danger";
+  } else {
+    // Everything else non-clean, including UNVALIDATED_VALIDATION_STATUSES
+    // and any unrecognised status: never fall through to the least-alarming
+    // ("neutral") tone for a value that is not a clean pass.
+    tone = "warning";
+  }
+  return { status, label, description, tone, isClean };
+}
 
 const VISIBILITY_LABELS: Record<string, string> = {
   "public-curated": "public (curated)",
@@ -65,7 +170,7 @@ export function formatFunding(raw: string | null | undefined): string {
 
 export function formatValidationStatus(raw: string | null | undefined): string {
   if (raw === null || raw === undefined || raw === "") return "unknown";
-  return VALIDATION_STATUS_LABELS[raw] ?? formatEnumLabel(raw);
+  return describeValidationStatus(raw).label;
 }
 
 /**
