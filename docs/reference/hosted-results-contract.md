@@ -437,9 +437,16 @@ public-facing views.
 | `contributor_email` | Submitter or admin | Only collected in Phase 3; display name is shown instead |
 | `ip_address` | Admin only (never public) | Stored for abuse detection; never exposed |
 
-Redaction of a public field does not change archive acceptance or the
-`public_result_id`. Presentation visibility and ranking remain separate policy
-decisions; only the specific field value is hidden.
+Redaction does not change archive acceptance. Redaction before publication is
+reflected in the anonymized published bytes and therefore in the minted
+`public_result_id` (the `sha8` is `sha256` over published bytes). Redaction of
+an already-live result that changes published bytes (replacing a field with
+`"[redacted]"`) is a compatibility event per
+`docs/development/adr/adr-public-result-id-permanence.md`: it mints a new
+content-addressed `public_result_id` (new `sha8`) and the old URL is preserved
+via an explicit alias or redirect to the new bundle, so existing links remain
+resolvable. Presentation visibility and ranking remain separate policy decisions;
+only the specific field value is hidden.
 
 ### 4.3 Retention Policy
 

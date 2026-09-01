@@ -54,6 +54,8 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "_project/scripts/explorer_pipeline/models.py",
         "_project/scripts/explorer_pipeline/pipeline.py",
         "_project/scripts/explorer_pipeline/ranking.py",
+        "_project/scripts/explorer_pipeline/transformer.py",
+        "benchbox/core/results/schema_policy.py",
         "_project/scripts/explorer_publish.py",
         "scripts/generate_corpus_inventory.py",
         "scripts/validate_submission.py",
@@ -229,6 +231,8 @@ def test_codeowners_covers_soundness_paths() -> None:
     assert "_project/scripts/explorer_pipeline/models.py @joeharris76" in codeowners
     assert "_project/scripts/explorer_pipeline/pipeline.py @joeharris76" in codeowners
     assert "_project/scripts/explorer_pipeline/ranking.py @joeharris76" in codeowners
+    assert "_project/scripts/explorer_pipeline/transformer.py @joeharris76" in codeowners
+    assert "benchbox/core/results/schema_policy.py @joeharris76" in codeowners
     assert "scripts/generate_corpus_inventory.py @joeharris76" in codeowners
     assert "scripts/validate_submission.py @joeharris76" in codeowners
     assert ".github/workflows/validate-submission.yml @joeharris76" in codeowners
