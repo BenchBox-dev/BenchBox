@@ -2,7 +2,10 @@
 
 from pathlib import Path
 
+import pytest
 import yaml
+
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW = REPO_ROOT / ".github/workflows/validate-submission.yml"
