@@ -87,6 +87,10 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           MERGE_SHA: ${{ env.MERGE_SHA }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           # Use resolved MERGE_SHA, not HEAD. Three-dot BASE_SHA...MERGE_SHA.
           # Self-green defense: validator/workflow changes must not be in submission PR.
@@ -95,6 +99,15 @@ jobs:
           # 5-file guard: scripts/validate_submission.py, benchbox/validation/bundle.py,
           # benchbox/core/results/query_status.py, scripts/generate_corpus_inventory.py,
           # and this workflow file itself.
+          #
+          # sync-results-data-to-published.yml mirrors these exact 5 files onto
+          # published-results by design (see that workflow's header comment), so its
+          # auto/results-mirror-* PRs legitimately touch this guard's file set. Waive
+          # the guard for that trusted, unforgeable shape only - same TRUSTED_MIRROR
+          # condition as the "Reject non-maintainer vendor/ additions" step below
+          # (same-repo PR, base=published-results, author=github-actions[bot], head
+          # branch matching auto/results-mirror-*). Any other PR touching these files
+          # - non-mirror, fork, wrong base, or human-authored - is still rejected.
           CHANGED_GUARD=$(git diff --name-only "$BASE_SHA...${MERGE_SHA:-HEAD}" -- \
             scripts/validate_submission.py \
             benchbox/validation/bundle.py \
@@ -103,12 +116,24 @@ jobs:
             .github/workflows/validate-submission.yml \
             || true)
           if [ -n "$CHANGED_GUARD" ]; then
-            echo "::error::This submission PR modifies validator/workflow files, which is not allowed:"
-            printf '%s\n' "$CHANGED_GUARD"
-            echo "Revert these files and open a separate develop PR for validator/workflow changes."
-            exit 1
+            TRUSTED_MIRROR="false"
+            if [ "$BASE_REF" = "published-results" ] && [ "$IS_FORK" = "false" ] && [ "$PR_AUTHOR" = "github-actions[bot]" ]; then
+              case "$HEAD_REF" in
+                auto/results-mirror-*) TRUSTED_MIRROR="true" ;;
+              esac
+            fi
+            if [ "$TRUSTED_MIRROR" = "true" ]; then
+              echo "Trusted bot-created same-repo mirror PR ($HEAD_REF) validator/workflow mirror - allowed:"
+              printf '%s\n' "$CHANGED_GUARD"
+            else
+              echo "::error::This submission PR modifies validator/workflow files, which is not allowed:"
+              printf '%s\n' "$CHANGED_GUARD"
+              echo "Revert these files and open a separate develop PR for validator/workflow changes."
+              exit 1
+            fi
+          else
+            echo "No validator/workflow files changed - proceeding."
           fi
-          echo "No validator/workflow files changed - proceeding."
 
       - name: Reject non-maintainer vendor/ additions
         env:
