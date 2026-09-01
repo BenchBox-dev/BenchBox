@@ -252,6 +252,8 @@ def test_codeowners_covers_soundness_paths() -> None:
     assert "docs/operations/independent-publication-contract.md @joeharris76" in codeowners
     assert "docs/reference/hosted-results-contract.md @joeharris76" in codeowners
     assert "scripts/check_decision_records.py @joeharris76" in codeowners
+    assert "publication/** @joeharris76" in codeowners
+    assert "scripts/publication/** @joeharris76" in codeowners
 
 
 def test_codeowners_matches_soundness_prefixes_1to1() -> None:
