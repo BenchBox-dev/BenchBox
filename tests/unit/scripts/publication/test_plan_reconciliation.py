@@ -450,3 +450,13 @@ def test_main_fails_when_dependency_show_reports_dropped(monkeypatch) -> None:
     monkeypatch.setattr(reconciliation, "load_live_deps", fake_load_deps)
 
     assert reconciliation.main() == 1
+
+
+def test_dependency_violations_fails_on_unpinned_phase() -> None:
+    plan = LIVE_A0_A11 + ["independent-publication-a12-new-phase"]
+    drifted = dict(REAL_DEPS)
+    drifted["independent-publication-a12-new-phase"] = ["independent-publication-a11-operations-canaries-and-closeout"]
+
+    violations = reconciliation.dependency_violations(plan, drifted)
+
+    assert any("is not pinned in EXPECTED_DEPS" in v and "a12-new-phase" in v for v in violations)

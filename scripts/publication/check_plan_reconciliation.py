@@ -178,6 +178,8 @@ def dependency_violations(plan_order: list[str], deps: dict[str, list[str]]) -> 
             for dep in item_deps:
                 if dep not in expected_in:
                     violations.append(f"{item_id} has unexpected dependency on {dep}")
+        else:
+            violations.append(f"{item_id} is not pinned in EXPECTED_DEPS (unpinned phase)")
     return violations
 
 
