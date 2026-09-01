@@ -29,6 +29,44 @@ LIVE_A0_A11 = [
     "independent-publication-a11-operations-canaries-and-closeout",
 ]
 
+REAL_DEPS = {
+    "independent-publication-a0-baseline-and-freeze": [],
+    "independent-publication-a1-authority-and-threat-contract": ["independent-publication-a0-baseline-and-freeze"],
+    "independent-publication-a2-corpus-trust-isolation": ["independent-publication-a1-authority-and-threat-contract"],
+    "independent-publication-a3-control-plane-and-artifact-contract": [
+        "independent-publication-a1-authority-and-threat-contract",
+        "independent-publication-a2-corpus-trust-isolation",
+    ],
+    "independent-publication-a4-hermetic-build-and-shadow-assembly": [
+        "independent-publication-a3-control-plane-and-artifact-contract"
+    ],
+    "independent-publication-a5-noop-deploy-and-automatic-rollback": [
+        "independent-publication-a4-hermetic-build-and-shadow-assembly"
+    ],
+    "independent-publication-a6-site-and-api-docs-lane": [
+        "independent-publication-a5-noop-deploy-and-automatic-rollback"
+    ],
+    "independent-publication-a7-explorer-application-lane": [
+        "independent-publication-a5-noop-deploy-and-automatic-rollback"
+    ],
+    "independent-publication-a8-published-results-gate-and-shadow-promotion": [
+        "independent-publication-a2-corpus-trust-isolation",
+        "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "independent-publication-a7-explorer-application-lane",
+    ],
+    "independent-publication-a9-corpus-production-cutover": [
+        "independent-publication-a6-site-and-api-docs-lane",
+        "independent-publication-a7-explorer-application-lane",
+        "independent-publication-a8-published-results-gate-and-shadow-promotion",
+    ],
+    "independent-publication-a10-release-and-mirror-retirement": [
+        "independent-publication-a9-corpus-production-cutover"
+    ],
+    "independent-publication-a11-operations-canaries-and-closeout": [
+        "independent-publication-a10-release-and-mirror-retirement"
+    ],
+}
+
 
 def test_all_controlling_surfaces_and_gates_are_named() -> None:
     text = reconciliation.DECISION.read_text()
@@ -222,12 +260,64 @@ def test_main_fails_when_live_sequence_does_not_match(monkeypatch) -> None:
     assert reconciliation.main() == 1
 
 
+def test_dependency_violations_passes_for_real_dag() -> None:
+    assert reconciliation.dependency_violations(LIVE_A0_A11, REAL_DEPS) == []
+
+
+def test_dependency_violations_fails_on_removed_chain() -> None:
+    drifted = dict(REAL_DEPS)
+    drifted["independent-publication-a1-authority-and-threat-contract"] = []
+
+    violations = reconciliation.dependency_violations(LIVE_A0_A11, drifted)
+
+    assert any("has no prior dependency" in v and "a1-authority" in v for v in violations)
+
+
+def test_dependency_violations_fails_on_backward_edge() -> None:
+    drifted = dict(REAL_DEPS)
+    drifted["independent-publication-a1-authority-and-threat-contract"] = [
+        "independent-publication-a2-corpus-trust-isolation"
+    ]
+
+    violations = reconciliation.dependency_violations(LIVE_A0_A11, drifted)
+
+    assert any("depends on" in v and "which the plan orders after it" in v for v in violations)
+
+
+def test_dependency_violations_surfaces_cycle_as_backward_edge() -> None:
+    drifted = dict(REAL_DEPS)
+    drifted["independent-publication-a0-baseline-and-freeze"] = [
+        "independent-publication-a1-authority-and-threat-contract"
+    ]
+
+    violations = reconciliation.dependency_violations(LIVE_A0_A11, drifted)
+
+    assert any("depends on" in v for v in violations)
+
+
 def test_main_succeeds_when_live_sequence_matches_decision(monkeypatch) -> None:
     import sys
 
     monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
     live_items = [{"id": item_id} for item_id in LIVE_A0_A11]
     monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
-    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: [] for iid in ids})
+    monkeypatch.setattr(
+        reconciliation,
+        "load_live_deps",
+        lambda ids: {iid: REAL_DEPS.get(iid, []) for iid in ids},
+    )
 
     assert reconciliation.main() == 0
+
+
+def test_main_fails_on_dependency_edge_drift(monkeypatch) -> None:
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
+    live_items = [{"id": item_id} for item_id in LIVE_A0_A11]
+    drifted = dict(REAL_DEPS)
+    drifted["independent-publication-a1-authority-and-threat-contract"] = []
+    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
+    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: drifted.get(iid, []) for iid in ids})
+
+    assert reconciliation.main() == 1

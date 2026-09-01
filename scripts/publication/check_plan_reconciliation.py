@@ -87,6 +87,33 @@ def live_tracker_ids(items: list[dict], prefix: str) -> list[str]:
     return order
 
 
+def dependency_violations(plan_order: list[str], deps: dict[str, list[str]]) -> list[str]:
+    """Return live dependency edges inconsistent with the plan's total order.
+
+    The decision document asserts a total migration order. Every live dependency
+    edge within that set must point strictly earlier in the plan, and (except
+    for the plan's first item) every item must be justified by at least one
+    prior in-set dependency. This detects dependency-edge drift directly -- an
+    added or renumbered edge to a later item, or a removed edge that leaves a
+    chain inconsistent -- rather than inferring order from the A-phase in the
+    ID or a lossy tie-break. A cycle is reported as a backward edge.
+
+    ``deps`` maps each plan item to its live dependency ids (only those within
+    the plan set are considered).
+    """
+    rank = {item_id: i for i, item_id in enumerate(plan_order)}
+    order_set = set(plan_order)
+    violations: list[str] = []
+    for item_id in plan_order:
+        item_deps = [dep for dep in deps.get(item_id, []) if dep in order_set]
+        for dep in item_deps:
+            if rank[dep] >= rank[item_id]:
+                violations.append(f"{item_id} depends on {dep}, which the plan orders after it")
+        if rank[item_id] > 0 and not any(rank[dep] < rank[item_id] for dep in item_deps):
+            violations.append(f"{item_id} has no prior dependency in the plan (removed chain)")
+    return violations
+
+
 def load_live_deps(item_ids: list[str], todo_cmd: list[str] | None = None) -> dict[str, list[str]] | None:
     """Return ``{item_id: deps}`` for each id, or ``None`` if any read is unavailable.
 
@@ -155,15 +182,10 @@ def main() -> int:
             )
             missing.append("exact ordered A0-A11 tracker sequence (dependency graph unavailable)")
         else:
-            for item in live_scope:
-                item["deps"] = live_deps.get(item["id"], [])
-            try:
-                expected_ids = live_tracker_ids(live_items, args.todo_prefix)
-            except ValueError as exc:
-                missing.append(f"exact ordered A0-A11 tracker sequence ({exc})")
-                expected_ids = []
-            if tracker_ids != expected_ids:
+            live_item_ids = sorted(live_ids, key=lambda item_id: _phase_key(item_id, args.todo_prefix))
+            if tracker_ids != live_item_ids:
                 missing.append("exact ordered A0-A11 tracker sequence (live tracker)")
+            missing.extend(dependency_violations(tracker_ids, live_deps))
     if missing:
         for value in missing:
             print(f"ERROR: unreconciled publication surface: {value}")
