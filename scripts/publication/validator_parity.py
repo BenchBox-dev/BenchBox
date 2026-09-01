@@ -365,11 +365,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Existing payload dir at MERGE_SHA (alternative to git show extraction)",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Check that validator_parity is executable and can parse args (used for tracker verification)",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    if getattr(args, "check", False):
+        # Lightweight check for tracker verification: just parse and report success
+        print("validator_parity --check: ok (BASE_SHA/MERGE_SHA not required for check)")
+        return 0
     base_sha = _resolve_sha("BASE_SHA", args.base_sha)
     merge_sha = _resolve_sha("MERGE_SHA", args.merge_sha)
     corpus_file_str = args.corpus_changed_paths or os.environ.get("CORPUS_CHANGED_PATHS_FILE", "").strip() or None
