@@ -119,6 +119,13 @@ report `summary.validation=passed` with no failed measurement evidence.
 Truthful partial results are accepted only from the trusted maintainer mirror
 path and remain excluded from rankings.
 
+Submissions are **data-only**: every file a PR adds under
+`results-data/bundles/` must be a supported `.json` result bundle, companion,
+sidecar manifest, or the inventory. Scripts, workflows, symlinks, executables,
+package manifests, and hidden control paths are rejected. If your submission
+is blocked for a non-`.json` file, remove it and open a separate
+`develop`-targeted PR for any non-data change.
+
 If validation fails, the PR comment will explain what to fix. The workflow also
 checks that `results-data/corpus-inventory.json` matches the submitted bundles.
 If that check fails, rerun:

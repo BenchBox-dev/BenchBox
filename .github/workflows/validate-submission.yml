@@ -234,6 +234,29 @@ jobs:
             echo "$CHANGED" > /tmp/changed_bundles.txt
           fi
 
+      # Positive data-only allowlist (A2 corpus trust isolation). Every file a
+      # submission PR touches under the corpus tree must be a supported .json
+      # data file (bundle, companion, sidecar manifest, or inventory) -- a
+      # regular file, never a symlink, executable, workflow, package manifest,
+      # or hidden control path. Rejecting by allowlist (not a deny-list of
+      # executables) means a new, unexpected surface fails closed by default.
+      # This runs on the full changed-file set, independent of bundle
+      # discovery, so a PR that only smuggles a non-data file is still caught.
+      - name: Reject disallowed corpus paths
+        id: corpus-paths
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          # Overridable in tests to avoid a shared scratch file; production
+          # falls back to the default /tmp path.
+          CORPUS_CHANGED_PATHS_FILE: ${{ vars.CORPUS_CHANGED_PATHS_FILE }}
+        run: |
+          set -euo pipefail
+          CORPUS_PATHS="${CORPUS_CHANGED_PATHS_FILE:-/tmp/corpus_changed_paths.txt}"
+          git diff --name-only --diff-filter=ACMRD "$BASE_SHA"...HEAD -- \
+            'results-data/bundles/**' > "$CORPUS_PATHS" || true
+          uv run -- python scripts/validate_submission.py \
+            --corpus-changed-paths "$CORPUS_PATHS"
+
       - name: Validate bundles
         if: steps.changed.outputs.has_bundles == 'true'
         id: validate
