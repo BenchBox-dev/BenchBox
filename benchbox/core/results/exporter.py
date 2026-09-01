@@ -180,7 +180,11 @@ class ResultExporter:
 
             try:
                 existing_mode = stat.S_IMODE(destination.stat().st_mode) if destination.exists() else None
-                if existing_mode is not None:
+                # os.fchmod is POSIX-only (no Windows implementation); Windows
+                # has no equivalent notion of the POSIX permission bits this
+                # preserves, so permission preservation is simply unavailable
+                # there and the write proceeds with the new file's default mode.
+                if existing_mode is not None and hasattr(os, "fchmod"):
                     os.fchmod(file_descriptor, existing_mode)
                 with os.fdopen(file_descriptor, mode, encoding="utf-8", newline="") as handle:
                     file_descriptor = None

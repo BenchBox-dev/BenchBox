@@ -49,6 +49,12 @@ class TestGetCpuModel:
         with (
             patch("benchbox.core.system.HAS_PSUTIL", False),
             patch("benchbox.core.system.platform.machine", return_value="arm64"),
+            # platform.processor() is the fallback path exercised right after
+            # detect_cpu_info() fails; on a real machine it returns a genuine
+            # (platform-dependent) CPU string, not an empty value, so it must
+            # be patched too or this test only passes by accident on
+            # platforms where the real processor() happens to be "".
+            patch("benchbox.core.system.platform.processor", return_value=""),
             patch("benchbox.core.system.detect_cpu_info", return_value=(None, None)),
         ):
             profile = SystemProfiler().get_system_profile()

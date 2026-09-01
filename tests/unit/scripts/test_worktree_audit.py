@@ -754,7 +754,7 @@ def test_snapshot_file_persistence(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert first_snapshot != second_snapshot
     assert first_snapshot.is_file()
     assert second_snapshot.is_file()
-    assert "_project/reports/worktree-lifecycle" in str(first_snapshot)
+    assert "_project/reports/worktree-lifecycle" in first_snapshot.as_posix()
 
 
 def test_git_timeout_in_worktree_evaluation_resolves_unavailable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

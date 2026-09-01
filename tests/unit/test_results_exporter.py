@@ -108,6 +108,24 @@ def test_write_file_preserves_existing_permissions(tmp_path):
     assert stat.S_IMODE(destination.stat().st_mode) == 0o640
 
 
+def test_write_file_skips_permission_preservation_without_fchmod(monkeypatch, tmp_path):
+    """Simulates Windows, where ``os.fchmod`` does not exist.
+
+    ``_write_file`` must not raise ``AttributeError`` when the platform has no
+    ``os.fchmod`` (e.g. Windows); it should simply skip permission
+    preservation and still complete the write.
+    """
+    destination = tmp_path / "result.json"
+    destination.write_text("old\n", encoding="utf-8")
+    destination.chmod(0o640)
+
+    monkeypatch.delattr(exporter_module.os, "fchmod", raising=False)
+
+    ResultExporter(output_dir=tmp_path, anonymize=False)._write_file(destination, "new\n")
+
+    assert destination.read_text(encoding="utf-8") == "new\n"
+
+
 def test_write_file_prefers_canonical_cloud_bytes(tmp_path):
     class CloudPath:
         content: bytes | None = None
