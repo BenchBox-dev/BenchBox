@@ -224,6 +224,28 @@ def main() -> int:
         )
         missing.append("exact ordered A0-A11 tracker sequence (live tracker unavailable)")
     else:
+        # Retain dropped rows for explicit drift failure. Filtering dropped
+        # before comparison would hide a dropped required phase when the
+        # decision is edited to omit that phase (11 vs 11 would match).
+        # Check against EXPECTED_DEPS so the gate fails even if the plan
+        # text was changed to match the filtered live set.
+        prefix_all = [item for item in live_items if str(item.get("id", "")).startswith(args.todo_prefix)]
+        dropped_required = [
+            item["id"]
+            for item in prefix_all
+            if str(item.get("state", "")).lower() == "dropped" and item["id"] in EXPECTED_DEPS
+        ]
+        # Also catch dropped items that appear in the plan but are not in
+        # EXPECTED_DEPS yet (forward-compat if the freeze set grows).
+        for item in prefix_all:
+            if (
+                str(item.get("state", "")).lower() == "dropped"
+                and str(item.get("id", "")) in tracker_ids
+                and item["id"] not in dropped_required
+            ):
+                dropped_required.append(item["id"])
+        for did in sorted(dropped_required, key=lambda item_id: _phase_key(item_id, args.todo_prefix)):
+            missing.append(f"dropped required phase is dropped: {did}")
         live_scope = [
             item
             for item in live_items

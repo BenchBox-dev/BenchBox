@@ -369,3 +369,38 @@ def test_main_fails_on_partial_edge_removal(monkeypatch) -> None:
     monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: drifted.get(iid, []) for iid in ids})
 
     assert reconciliation.main() == 1
+
+
+def test_main_fails_when_required_phase_is_dropped(monkeypatch) -> None:
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
+    live_items = [{"id": item_id, "state": "done"} for item_id in LIVE_A0_A11]
+    # Mark a5 as dropped but keep it in live set; main must retain it to fail.
+    for item in live_items:
+        if item["id"] == "independent-publication-a5-noop-deploy-and-automatic-rollback":
+            item["state"] = "dropped"
+    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
+    monkeypatch.setattr(
+        reconciliation,
+        "load_live_deps",
+        lambda ids: {iid: REAL_DEPS.get(iid, []) for iid in ids},
+    )
+
+    assert reconciliation.main() == 1
+
+
+def test_main_fails_when_dropped_phase_omitted_from_decision(monkeypatch) -> None:
+    import sys
+
+    # Live: a5 is dropped, plus 11 other actives. Decision is edited to omit a5 (11 ids).
+    live_items = [{"id": item_id, "state": "done"} for item_id in LIVE_A0_A11 if item_id != LIVE_A0_A11[5]]
+    live_items.append({"id": LIVE_A0_A11[5], "state": "dropped"})
+    omitted_tracker = [iid for iid in LIVE_A0_A11 if iid != LIVE_A0_A11[5]]
+
+    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
+    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
+    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: REAL_DEPS.get(iid, []) for iid in ids})
+    monkeypatch.setattr(reconciliation, "planned_tracker_ids", lambda text, prefix: omitted_tracker)
+
+    assert reconciliation.main() == 1
