@@ -93,6 +93,42 @@ def test_decision_names_exact_live_ordered_tracker_sequence() -> None:
     assert reconciliation.planned_tracker_ids(text, PREFIX) == LIVE_A0_A11
 
 
+def test_live_tracker_ids_orders_by_dependency_graph_not_id_number() -> None:
+    payload = [
+        {
+            "id": "independent-publication-a0-baseline-and-freeze",
+            "deps": ["independent-publication-a2-corpus-trust-isolation"],
+        },
+        {
+            "id": "independent-publication-a1-authority-and-threat-contract",
+            "deps": ["independent-publication-a0-baseline-and-freeze"],
+        },
+        {"id": "independent-publication-a2-corpus-trust-isolation", "deps": []},
+    ]
+
+    assert reconciliation.live_tracker_ids(payload, PREFIX) == [
+        "independent-publication-a2-corpus-trust-isolation",
+        "independent-publication-a0-baseline-and-freeze",
+        "independent-publication-a1-authority-and-threat-contract",
+    ]
+
+
+def test_live_tracker_ids_detects_dependency_cycle() -> None:
+    payload = [
+        {
+            "id": "independent-publication-a0-baseline-and-freeze",
+            "deps": ["independent-publication-a1-authority-and-threat-contract"],
+        },
+        {
+            "id": "independent-publication-a1-authority-and-threat-contract",
+            "deps": ["independent-publication-a0-baseline-and-freeze"],
+        },
+    ]
+
+    with pytest.raises(ValueError):
+        reconciliation.live_tracker_ids(payload, PREFIX)
+
+
 def test_authority_is_not_a_hardcoded_tracker_list() -> None:
     assert not hasattr(reconciliation, "REQUIRED_TRACKER_IDS")
 
@@ -129,11 +165,45 @@ def test_load_live_items_returns_none_on_invalid_json() -> None:
     assert reconciliation.load_live_items(cmd) is None
 
 
+def test_load_live_deps_returns_deps_for_each_item() -> None:
+    import json
+    import sys
+
+    payload = {
+        "id": "independent-publication-a1-authority-and-threat-contract",
+        "deps": ["independent-publication-a0-baseline-and-freeze"],
+    }
+    cmd = [sys.executable, "-c", f"import sys,json; print(json.dumps({json.dumps(payload)}))"]
+
+    assert reconciliation.load_live_deps(["independent-publication-a1-authority-and-threat-contract"], cmd) == {
+        "independent-publication-a1-authority-and-threat-contract": ["independent-publication-a0-baseline-and-freeze"]
+    }
+
+
+def test_load_live_deps_returns_none_when_show_fails() -> None:
+    import sys
+
+    cmd = [sys.executable, "-c", "raise SystemExit(1)"]
+
+    assert reconciliation.load_live_deps(["independent-publication-a1-authority-and-threat-contract"], cmd) is None
+
+
 def test_main_fails_closed_when_live_tracker_unavailable(monkeypatch) -> None:
     import sys
 
     monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
     monkeypatch.setattr(reconciliation, "load_live_items", lambda: None)
+
+    assert reconciliation.main() == 1
+
+
+def test_main_fails_closed_when_dependency_graph_unavailable(monkeypatch) -> None:
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
+    live_items = [{"id": item_id} for item_id in LIVE_A0_A11]
+    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
+    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: None)
 
     assert reconciliation.main() == 1
 
@@ -147,6 +217,7 @@ def test_main_fails_when_live_sequence_does_not_match(monkeypatch) -> None:
         {"id": "independent-publication-a1-authority-and-threat-contract"},
     ]
     monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
+    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: [] for iid in ids})
 
     assert reconciliation.main() == 1
 
@@ -157,5 +228,6 @@ def test_main_succeeds_when_live_sequence_matches_decision(monkeypatch) -> None:
     monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
     live_items = [{"id": item_id} for item_id in LIVE_A0_A11]
     monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
+    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: [] for iid in ids})
 
     assert reconciliation.main() == 0

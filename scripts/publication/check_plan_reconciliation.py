@@ -49,19 +49,63 @@ def _phase_key(item_id: str, prefix: str) -> tuple[int, str]:
 
 
 def live_tracker_ids(items: list[dict], prefix: str) -> list[str]:
-    """Order non-dropped tracker items matching ``prefix`` by their numeric A-phase (a0..a11).
+    """Order non-dropped tracker items matching ``prefix`` by their dependency graph.
 
-    ``list`` returns items across all lifecycle states, so a step moved to
-    ``dropped`` still appears in output and would otherwise be counted as part
-    of the live sequence. Exclude dropped items so the reconciliation cannot
-    pass while a step of the migration has been dropped.
+    ``todo list`` returns items across all lifecycle states, and its rows carry
+    an optional ``deps`` list. Ordering is read from that dependency graph
+    (a topological order) rather than inferred from the A-phase encoded in the
+    ID, so a renumbering or dependency change that deletes from the names cannot
+    silently reproduce a stale sequence. Dropped items are excluded so the
+    reconciliation cannot pass while a step has been dropped. When no row
+    carries ``deps`` (for example a plain ``list`` payload), ordering falls back
+    to the A-phase key to preserve existing behavior.
+
+    Raises ``ValueError`` if the dependency graph among the selected items
+    contains a cycle.
     """
-    matches = [
-        item["id"]
-        for item in items
-        if str(item.get("id", "")).startswith(prefix) and str(item.get("state", "")).lower() != "dropped"
-    ]
-    return sorted(matches, key=lambda item_id: _phase_key(item_id, prefix))
+    selected: dict[str, dict] = {}
+    for item in items:
+        item_id = str(item.get("id", ""))
+        if item_id.startswith(prefix) and str(item.get("state", "")).lower() != "dropped":
+            selected[item_id] = item
+    if not any("deps" in item for item in selected.values()):
+        return sorted(selected, key=lambda item_id: _phase_key(item_id, prefix))
+    deps_of = {
+        item_id: [dep for dep in (item.get("deps") or []) if dep in selected] for item_id, item in selected.items()
+    }
+    order: list[str] = []
+    remaining = set(selected)
+    while remaining:
+        ready = sorted(
+            (item_id for item_id in remaining if not (set(deps_of[item_id]) & remaining)),
+            key=lambda item_id: _phase_key(item_id, prefix),
+        )
+        if not ready:
+            raise ValueError("cycle in live tracker dependency graph")
+        order.extend(ready)
+        remaining.difference_update(ready)
+    return order
+
+
+def load_live_deps(item_ids: list[str], todo_cmd: list[str] | None = None) -> dict[str, list[str]] | None:
+    """Return ``{item_id: deps}`` for each id, or ``None`` if any read is unavailable.
+
+    ``todo list`` does not expose dependencies, so each item is read with
+    ``show <id> --json``. Deps come from the tracker's authoritative graph; an
+    unavailable read is treated as a failure so the gate cannot pass without it.
+    """
+    shim_cmd = todo_cmd if todo_cmd is not None else [str(TODO_SHIM)]
+    deps: dict[str, list[str]] = {}
+    for item_id in item_ids:
+        try:
+            result = subprocess.run(
+                [*shim_cmd, "show", item_id, "--json"], capture_output=True, text=True, check=True, timeout=60
+            )
+            item = json.loads(result.stdout)
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, json.JSONDecodeError):
+            return None
+        deps[item_id] = item.get("deps") or []
+    return deps
 
 
 def load_live_items(todo_cmd: list[str] | None = None) -> list[dict] | None:
@@ -97,9 +141,29 @@ def main() -> int:
         )
         missing.append("exact ordered A0-A11 tracker sequence (live tracker unavailable)")
     else:
-        expected_ids = live_tracker_ids(live_items, args.todo_prefix)
-        if tracker_ids != expected_ids:
-            missing.append("exact ordered A0-A11 tracker sequence (live tracker)")
+        live_scope = [
+            item
+            for item in live_items
+            if str(item.get("id", "")).startswith(args.todo_prefix) and str(item.get("state", "")).lower() != "dropped"
+        ]
+        live_ids = [item["id"] for item in live_scope]
+        live_deps = load_live_deps(live_ids)
+        if live_deps is None:
+            print(
+                "ERROR: could not read the tracker dependency graph; cannot reconcile A0-A11 order (fail closed)",
+                file=sys.stderr,
+            )
+            missing.append("exact ordered A0-A11 tracker sequence (dependency graph unavailable)")
+        else:
+            for item in live_scope:
+                item["deps"] = live_deps.get(item["id"], [])
+            try:
+                expected_ids = live_tracker_ids(live_items, args.todo_prefix)
+            except ValueError as exc:
+                missing.append(f"exact ordered A0-A11 tracker sequence ({exc})")
+                expected_ids = []
+            if tracker_ids != expected_ids:
+                missing.append("exact ordered A0-A11 tracker sequence (live tracker)")
     if missing:
         for value in missing:
             print(f"ERROR: unreconciled publication surface: {value}")
