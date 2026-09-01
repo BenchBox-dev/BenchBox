@@ -360,6 +360,8 @@ jobs:
                 ;;
             esac
           fi
+          # Trusted bot-created same-repo mirrors preserve truthful partial maintainer seed
+          # results as non-ranking capability evidence. Community submissions remain strict.
           # Payload read via git show $MERGE_SHA:path or sparse checkout to /tmp/payload from trusted base checkout (ref: BASE_SHA)
           # Changed bundles already extracted to /tmp/payload and list points there.
           # Test harness fallback: when env not set (isolated unit test), use HEAD fallback so script remains runnable.
