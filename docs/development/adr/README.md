@@ -13,3 +13,4 @@ Architecture Decision Records
 - [ADR: Core Kernel and Runtime Composition Boundary](adr-runtime-composition-boundary.md)
 - [ADR: `public_result_id` permanence attaches at publication](adr-public-result-id-permanence.md)
 - [ADR: `clickhouse-server` Containerization and Linux SF1 Certification](adr-clickhouse-server-containerization.md)
+- [ADR: Corpus Public-Mirror Validation-Status Admission Policy](adr-corpus-validation-admission-policy.md)
