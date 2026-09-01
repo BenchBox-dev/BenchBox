@@ -56,6 +56,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "scripts/generate_corpus_inventory.py",
         "scripts/validate_submission.py",
         ".github/workflows/validate-submission.yml",
+        ".github/workflows/sync-results-data-to-published.yml",
         ".github/workflows/docs.yml",
         # Self-protection: the review-gate machinery and the PyPI-publishing
         # workflow. In-workflow checks are attacker-controlled for same-repo

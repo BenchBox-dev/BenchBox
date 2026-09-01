@@ -89,6 +89,7 @@ SOUNDNESS_FILES = (
     "scripts/generate_corpus_inventory.py",
     "scripts/validate_submission.py",
     ".github/workflows/validate-submission.yml",
+    ".github/workflows/sync-results-data-to-published.yml",
     # Current production Pages authority. Until the independent compositor is
     # cut over, this workflow holds deployment credentials and publishes the
     # complete site and Explorer, so changes require the same manual review.

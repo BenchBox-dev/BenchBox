@@ -461,22 +461,29 @@ no deadline. Withdrawal is available before and after publication.
 - Phase 1: File an issue or contact maintainers. The maintainer records the
   withdrawal policy and republishes presentation without deleting accepted source bytes.
 - Phase 2: Same as Phase 1, or close the original PR if acceptance has not occurred.
-- Phase 3: Call `DELETE /v1/results/{public_result_id}` with a valid auth token,
-  or contact support.
+- Phase 3: For a result with a minted public ID, call
+  `DELETE /v1/results/{public_result_id}` with a valid auth token. For a
+  never-public `private` result, call `DELETE /v1/submissions/{submission_id}`.
+  Either path may also be initiated through support.
 
 **Effect of withdrawal:**
 
-1. The result is removed from active browse, search, ranking, and compare indexes within
-   7 days of the withdrawal request. Its stable ID remains in a separate tombstone lookup
-   registry.
-2. Derived public read models suppress the result. Accepted source bytes remain under the
+1. A result with a minted public ID is removed from active browse, search, ranking, and
+   compare indexes within 7 days of the withdrawal request. Its stable ID remains in a
+   separate tombstone lookup registry.
+2. A never-public `private` result is addressed only by authenticated `submission_id`.
+   Withdrawal must not mint or expose a `public_result_id`. A matching receipt confirms
+   that no public-ID mapping, public route, or public index membership exists; only then is
+   presentation recorded as `withdrawn` for the submitter. Because no public URL ever
+   existed, no public tombstone is created.
+3. Derived public read models suppress the result. Accepted source bytes remain under the
    A0 preservation floor unless a separately approved erasure incident supersedes it.
-3. A **tombstone** remains in the separate lookup registry indefinitely. The
-   tombstone contains only: `public_result_id`, `status: withdrawn`, and
-   `withdrawn_at` (date). All other fields are redacted. The detail page at
-   the stable URL returns the tombstone with a `410 Gone` HTTP status.
+4. For a result that had a public ID, a **tombstone** remains in the separate lookup
+   registry indefinitely. The tombstone contains only: `public_result_id`,
+   `status: withdrawn`, and `withdrawn_at` (date). All other fields are redacted. The
+   detail page at the stable URL returns the tombstone with a `410 Gone` HTTP status.
 
-The tombstone ensures that existing links and citations do not
+For results that had public IDs, the tombstone ensures that existing links and citations do not
 silently resolve to a different result. External parties who bookmarked the URL
 see a clear signal that the result was withdrawn rather than a 404 or an
 unrelated result.

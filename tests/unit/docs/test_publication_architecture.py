@@ -188,6 +188,9 @@ def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
     assert "Promotion: live → promotion_pending" in text
     assert "the prior `current_live_generation` and receipt remain observed live" in text
     assert "separate tombstone lookup registry" in text
+    assert "`DELETE /v1/submissions/{submission_id}`" in text
+    assert "Withdrawal must not mint or expose a `public_result_id`" in text
+    assert "Because no public URL ever existed, no public tombstone is created" in text
     assert "| `accepted` |" in _text(HOSTED_CONTRACT)
     assert "| `live` |" in _text(HOSTED_CONTRACT)
     assert "| `published` | On commit" not in _text(HOSTED_CONTRACT)

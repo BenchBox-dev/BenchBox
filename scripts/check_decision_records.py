@@ -96,6 +96,9 @@ def main() -> int:
                 "the result remains suppressed and tombstoned until a matching live receipt",
                 "Presentation: active → withdrawal_requested → withdrawn",
                 "separate tombstone lookup registry",
+                "`DELETE /v1/submissions/{submission_id}`",
+                "Withdrawal must not mint or expose a `public_result_id`",
+                "Because no public URL ever existed, no public tombstone is created",
             ),
         )
     )
