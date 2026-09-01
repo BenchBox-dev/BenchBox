@@ -27,6 +27,9 @@ pytest-xdist:
 pytest-timeout:
   reason: "Timeout plugin; loaded via pytest marks/config. Not imported."
 
+pytest-json-report:
+  reason: "JSON report plugin for pytest; activated via --json-report/--json-report-file CLI flags (see .github/workflows/cross-platform-validation.yml). Not imported."
+
 # --------------------------------------------------------------------------
 # Linting and type-checking CLI tools - invoked as shell commands.
 # --------------------------------------------------------------------------
