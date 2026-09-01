@@ -41,6 +41,7 @@ import {
   platformTimingValue,
   validPrimaryMetricValue,
 } from "@/lib/displayEligibility";
+import { isValidationNotClean } from "@/lib/displayLabels";
 
 // ---------------------------------------------------------------------------
 // Color math - sourced from chartMath.ts (single source of truth for parity)
@@ -473,6 +474,10 @@ export function QueryHeatmap({
           excluded from heat, ranks, and comparisons. <strong>No run</strong> means missing data. The primary score column (
           {primaryLabel}) on the left of each row uses its own metric and direction ({primaryDirectionLabel}).
         </div>
+        <div class="mt-1">
+          A validation badge next to a platform name means that result was excluded from ranking on validation
+          grounds - the query cells shown are still published evidence, not a validated, comparable score.
+        </div>
       </div>
 
       <div
@@ -657,6 +662,7 @@ export function QueryHeatmap({
                     ? selectionLimitReasonId
                     : undefined;
                 const rankingExclusion = isRankable(row) ? null : formatTimingExclusion(row.ranking_exclusion_reason);
+                const validationNotClean = isValidationNotClean(row.validation_status);
                 return (
                   <tr
                     key={row.result_id}
@@ -718,6 +724,14 @@ export function QueryHeatmap({
                         </span>
                       )}
                     </div>
+                    {validationNotClean && (
+                      <div
+                        class="mt-0.5 flex flex-wrap items-center gap-1"
+                        data-testid={`heatmap-validation-flag-${row.result_id}`}
+                      >
+                        <ValidationBadge validationStatus={row.validation_status} showMissing />
+                      </div>
+                    )}
                     <details class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
                       <summary class="cursor-pointer font-medium text-[var(--bb-accent-hover)]">
                         {BENCHMARK_MATRIX_DENSITY_CONTRACT.secondaryMetadataAffordance}
@@ -725,7 +739,9 @@ export function QueryHeatmap({
                       <div class="mt-1 flex flex-wrap items-center gap-1">
                         <TrustBadge trustLabel={row.trust_label} compact />
                         <FundingChip funding={row.funding} compact />
-                        <ValidationBadge validationStatus={row.validation_status} showMissing />
+                        {!validationNotClean && (
+                          <ValidationBadge validationStatus={row.validation_status} showMissing />
+                        )}
                         <a
                           href={`/results/r/${row.result_id}#run-receipt`}
                           class="font-medium no-underline"

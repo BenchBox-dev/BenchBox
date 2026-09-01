@@ -261,6 +261,50 @@ describe("QueryHeatmap rendering", () => {
     expect(screen.getAllByText("loose").length).toBeGreaterThan(0);
   });
 
+  it("surfaces a not_run validation badge next to the platform name without expanding the disclosure", () => {
+    const summary = makeSummary({
+      platforms: [
+        {
+          ...makeSummary().platforms[0]!,
+          result_id: "platform-not-run",
+          validation_status: "not_run",
+        },
+        makeSummary().platforms[1]!,
+      ],
+    });
+    render(<QueryHeatmap summary={summary} />);
+
+    // Visible without clicking any "Receipt and metadata" disclosure.
+    const flag = screen.getByTestId("heatmap-validation-flag-platform-not-run");
+    const badge = within(flag).getByText("not_run");
+    expect(badge.closest("details")).toBeNull();
+    // Tone (warning vs. neutral) for "not_run" is owned by
+    // fix/explorer-validation-badge-gating (TrustBadge.tsx validationTone());
+    // this test only asserts the badge is visible without expanding anything.
+    expect(badge.getAttribute("data-role")).toBe("validation");
+
+    // The disclosure for that row no longer duplicates the badge - it stays
+    // reserved for trust/funding/receipt, so the not_run flag has exactly one
+    // rendered instance for this row.
+    const row = flag.closest("tr");
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getAllByText("not_run")).toHaveLength(1);
+  });
+
+  it("does not add a validation flag for a clean (passed) result", () => {
+    const summary = makeSummary({
+      platforms: [
+        {
+          ...makeSummary().platforms[0]!,
+          result_id: "platform-passed",
+          validation_status: "passed",
+        },
+      ],
+    });
+    render(<QueryHeatmap summary={summary} />);
+    expect(screen.queryByTestId("heatmap-validation-flag-platform-passed")).toBeNull();
+  });
+
   it("clicking a query header sorts rows by that query", () => {
     const { container } = render(<QueryHeatmap summary={makeSummary()} />);
     const rowOrder = () =>

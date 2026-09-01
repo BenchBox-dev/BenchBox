@@ -870,6 +870,29 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(fundingChips[0]?.textContent).toContain("Employer");
   });
 
+  // Non-clean validation status (e.g. never-run DataFrame-mode results) must
+  // read as non-validated in the default column set - no horizontal scroll
+  // to the Source column required.
+  it("surfaces a not_run validation flag in the default (unscrolled) column set", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({ result_id: "r-not-run", short_id: "notrun01", validation_status: "not_run" }),
+      makeRow({ result_id: "r-clean", short_id: "clean001", validation_status: "passed" }),
+    ]);
+
+    const { container } = render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const notRunFlag = screen.getByTestId("platform-validation-flag-r-not-run");
+    // The flag lives in the "Run" cell (compare, compare_state, run are the
+    // first default-visible columns) rather than the scroll-gated Source
+    // column, so it renders without scrolling the table.
+    const runCell = notRunFlag.closest("td");
+    expect(runCell?.querySelector('[data-testid="run-identity-label"]')).not.toBeNull();
+    expect(within(notRunFlag).getByText("not_run")).toBeTruthy();
+
+    expect(container.querySelector('[data-testid="platform-validation-flag-r-clean"]')).toBeNull();
+  });
+
   it("exposes the provenance legend on a page that shows the badges", async () => {
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
