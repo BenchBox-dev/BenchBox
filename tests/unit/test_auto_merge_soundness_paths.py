@@ -52,6 +52,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "_project/scripts/explorer_pipeline/models.py",
         "_project/scripts/explorer_pipeline/pipeline.py",
         "_project/scripts/explorer_pipeline/ranking.py",
+        "_project/scripts/explorer_publish.py",
         "scripts/generate_corpus_inventory.py",
         "scripts/validate_submission.py",
         ".github/workflows/validate-submission.yml",

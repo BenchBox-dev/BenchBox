@@ -122,7 +122,9 @@ def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
     assert "Accepted-but-not-live results must not be described as already published" in text
     assert '"acceptance_status": "<pending|validated|accepted|rejected>"' in _text(HOSTED_CONTRACT)
     assert '"promotion_status": "<not_requested|promotion_pending|live|promotion_failed>"' in _text(HOSTED_CONTRACT)
-    assert '"presentation_status": "<active|withdrawal_requested|withdrawn>"' in _text(HOSTED_CONTRACT)
+    assert '"presentation_status": "<active|withdrawal_requested|withdrawn|readmission_requested>"' in _text(
+        HOSTED_CONTRACT
+    )
     assert '"current_live_generation": "<integer or null>"' in _text(HOSTED_CONTRACT)
     assert '"current_live_receipt": "<receipt identifier or null>"' in _text(HOSTED_CONTRACT)
     assert "does not replace the currently observed live generation" in text
@@ -175,6 +177,8 @@ def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
     assert "Acceptance or policy state" not in _text(HOSTED_CONTRACT)
     assert "tombstone remains in the index" not in _text(HOSTED_CONTRACT)
     assert "Presentation: active → withdrawal_requested → withdrawn" in text
+    assert "Presentation: withdrawn → readmission_requested → active" in text
+    assert "the result remains suppressed and tombstoned until a matching live receipt" in text
     assert "Promotion: promotion_failed → promotion_pending" in text
     assert "Promotion: live → promotion_pending" in text
     assert "the prior `current_live_generation` and receipt remain observed live" in text

@@ -120,6 +120,7 @@ authority is
 | Presentation: `active` | Normal visibility and ranking policy applies | According to visibility policy |
 | Presentation: `withdrawal_requested` | Authorized suppression is desired but not yet receipt-confirmed | Previous live state remains |
 | Presentation: `withdrawn` | A receipt confirms suppression from public presentation and ranking | Tombstone only |
+| Presentation: `readmission_requested` | Authorized restoration is desired but not yet receipt-confirmed | Tombstone only |
 
 #### Status Transition Rules
 
@@ -132,6 +133,7 @@ Promotion: promotion_pending → promotion_failed
 Promotion: promotion_failed → promotion_pending
 Promotion: live → promotion_pending
 Presentation: active → withdrawal_requested → withdrawn
+Presentation: withdrawn → readmission_requested → active
 ```
 
 Promotion state is scoped to the latest target generation. A failed target may be retried
@@ -143,7 +145,10 @@ matching receipt.
 Acceptance remains an audit fact when promotion fails or presentation is
 withdrawn. Withdrawal must be carried into later desired state so ordinary
 promotion cannot resurrect it. Re-admission requires a new authorized policy
-event, not a contributor-controlled field.
+event, not a contributor-controlled field. That event records
+`readmission_requested`; the result remains suppressed and tombstoned until a
+matching live receipt confirms the restoration generation, at which point
+presentation returns to `active`.
 
 `published` is retained only as a legacy API compatibility term. New contracts
 must report acceptance, promotion, and presentation separately, and must never
@@ -173,7 +178,7 @@ Additional rules:
 | `live` | Matching attested public receipt | Same | Same |
 | `promotion_failed` | Promotion ended without matching receipt | Same | Same |
 | `rejected` | Not used | CI failed or PR closed without merge | Validation failed |
-| Presentation: `withdrawal_requested` / `withdrawn` | Authorized policy and receipt-confirmed suppression | Same | API or admin policy event |
+| Presentation: `withdrawal_requested` / `withdrawn` / `readmission_requested` | Authorized policy and receipt-confirmed suppression or restoration | Same | API or admin policy event |
 
 ---
 
@@ -625,7 +630,7 @@ Response:
   "bundle_hash": "<sha256>",
   "acceptance_status": "<pending|validated|accepted|rejected>",
   "promotion_status": "<not_requested|promotion_pending|live|promotion_failed>",
-  "presentation_status": "<active|withdrawal_requested|withdrawn>",
+  "presentation_status": "<active|withdrawal_requested|withdrawn|readmission_requested>",
   "target_generation": "<integer or null>",
   "current_live_generation": "<integer or null>",
   "current_live_receipt": "<receipt identifier or null>",

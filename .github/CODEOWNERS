@@ -27,6 +27,7 @@ benchbox/core/publishing/bundle_publisher.py @joeharris76
 _project/scripts/explorer_pipeline/models.py @joeharris76
 _project/scripts/explorer_pipeline/pipeline.py @joeharris76
 _project/scripts/explorer_pipeline/ranking.py @joeharris76
+_project/scripts/explorer_publish.py @joeharris76
 scripts/generate_corpus_inventory.py @joeharris76
 scripts/validate_submission.py @joeharris76
 .github/workflows/validate-submission.yml @joeharris76
