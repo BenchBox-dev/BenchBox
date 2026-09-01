@@ -1,0 +1,9 @@
+{
+  "bundle_file": "ssb_sf10_duckdb_v1_4_4_median.json",
+  "bundle_hash": "df28f8644aa63fbc08a20d355299ecd4ada9a3c2cb42ae8ab986b3e079b57459",
+  "companion_hashes": {},
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}
