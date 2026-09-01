@@ -77,3 +77,5 @@ cc01856f9da6f3dc815c0810936a88e3897132e7
 193e125543378ffd81b0838d04fd8f983a1f0ff6
 # fix/required-lane-helper-converge — stranded after rebase/merge
 9e9df6e3a98553bf103b8e410e2b8cf03670927c
+# docs/blog-results-explorer-preview-outline — stranded 9f0fca0b7 on dead branch after #1993 (16f95adf5) squash-merge; content already on develop via #1993
+9f0fca0b7c54ff9d20b38d1c0565b5cbf3ddba55
