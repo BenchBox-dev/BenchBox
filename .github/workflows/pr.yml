@@ -1247,11 +1247,25 @@ jobs:
   publication-reconciliation:
     name: publication reconciliation
     needs: ci-paths
-    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    # Run for any code PR and also for decision/publication script changes,
+    # which are classified as safe-content and would otherwise skip code CI.
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' || contains(needs.ci-paths.outputs.changed-paths, '_project/decisions/') || contains(needs.ci-paths.outputs.changed-paths, 'scripts/publication/') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch for trusted script check
+        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+
+      - name: Verify script not modified to exfiltrate secrets (run base version if changed)
+        run: |
+          if ! git diff --quiet "origin/${{ github.base_ref }}...HEAD" -- scripts/publication/check_plan_reconciliation.py; then
+            echo "::warning::Publication reconciliation script was modified in this PR; using base branch version for credentialed execution to avoid secret exfiltration."
+            git checkout "origin/${{ github.base_ref }}" -- scripts/publication/check_plan_reconciliation.py
+          fi
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -1270,8 +1284,8 @@ jobs:
           TODO_DB_RO_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
         run: |
           if [ -z "${TODO_DB_URL:-}" ] || [ -z "${TODO_DB_RO_AUTH_TOKEN:-}" ]; then
-            echo "No tracker credentials (TODO_DB_URL/RO_AUTH_TOKEN) in this run; skipping live publication reconciliation (no live evidence)."
-            exit 0
+            echo "::error::Missing tracker credentials (TODO_DB_URL/RO_AUTH_TOKEN); cannot verify live publication reconciliation without live evidence."
+            exit 1
           fi
           uv run python scripts/publication/check_plan_reconciliation.py --todo-prefix independent-publication-
 
