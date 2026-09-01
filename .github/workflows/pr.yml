@@ -1244,6 +1244,37 @@ jobs:
       - name: Verify parity fixtures match Python source
         run: make parity-check
 
+  publication-reconciliation:
+    name: publication reconciliation
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run publication plan reconciliation (live tracker)
+        env:
+          TODO_DB_URL: ${{ secrets.TODO_DB_URL }}
+          TODO_DB_RO_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
+        run: |
+          if [ -z "${TODO_DB_URL:-}" ] || [ -z "${TODO_DB_RO_AUTH_TOKEN:-}" ]; then
+            echo "No tracker credentials (TODO_DB_URL/RO_AUTH_TOKEN) in this run; skipping live publication reconciliation (no live evidence)."
+            exit 0
+          fi
+          uv run python scripts/publication/check_plan_reconciliation.py --todo-prefix independent-publication-
+
   audit-sha:
     name: audit-sha
     needs: ci-paths
@@ -1369,7 +1400,7 @@ jobs:
 
   ci-required-result:
     name: ci-required-result
-    needs: [ci-paths, tpch-binary-framing, content-guard, skill-integrity, code-lint, code-test, correctness-gate, plan-capture-gate, medium-test, explorer-tokens, site-theme-tokens, explorer-vitest, audit-sha, package-smoke, dependency-audit, parity-check]
+    needs: [ci-paths, tpch-binary-framing, content-guard, skill-integrity, code-lint, code-test, correctness-gate, plan-capture-gate, medium-test, explorer-tokens, site-theme-tokens, explorer-vitest, audit-sha, package-smoke, dependency-audit, parity-check, publication-reconciliation]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -1391,6 +1422,7 @@ jobs:
           PACKAGE_SMOKE_RESULT: ${{ needs.package-smoke.result }}
           DEPENDENCY_AUDIT_RESULT: ${{ needs.dependency-audit.result }}
           PARITY_CHECK_RESULT: ${{ needs.parity-check.result }}
+          PUBLICATION_RECONCILIATION_RESULT: ${{ needs.publication-reconciliation.result }}
           CONTENT_GUARD_NEEDED: ${{ needs.ci-paths.outputs.content-guard-needed }}
           SKILL_INTEGRITY_NEEDED: ${{ needs.ci-paths.outputs.skill-integrity-needed }}
           NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
@@ -1457,6 +1489,11 @@ jobs:
           if [ "$PARITY_CHECK_RESULT" != "success" ] \
               && [ "$PARITY_CHECK_RESULT" != "skipped" ]; then
             echo "parity-check=$PARITY_CHECK_RESULT"
+            exit 1
+          fi
+
+          if [ "$NEEDS_CODE_CI" = "true" ] && [ "$PUBLICATION_RECONCILIATION_RESULT" != "success" ]; then
+            echo "publication-reconciliation=$PUBLICATION_RECONCILIATION_RESULT"
             exit 1
           fi
 

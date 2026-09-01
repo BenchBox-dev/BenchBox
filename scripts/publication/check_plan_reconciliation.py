@@ -280,6 +280,30 @@ def main() -> int:
             )
             missing.append("exact ordered A0-A11 tracker sequence (dependency graph unavailable)")
         else:
+            # Verify stable snapshot: the tracker must not have changed
+            # between the initial list and the per-item show reads. A concurrent
+            # change (e.g., A0's deps modified after its show, or a new A12
+            # added after the list) could otherwise assemble a mixed snapshot
+            # that still matches EXPECTED_DEPS.
+            live_items_after = load_live_items()
+            if live_items_after is None:
+                missing.append("exact ordered A0-A11 tracker sequence (live tracker unavailable on re-read)")
+            else:
+                prefix_after = [
+                    item for item in live_items_after if str(item.get("id", "")).startswith(args.todo_prefix)
+                ]
+                before_map = {item["id"]: str(item.get("state", "")).lower() for item in prefix_all}
+                after_map = {item["id"]: str(item.get("state", "")).lower() for item in prefix_after}
+                if before_map != after_map:
+                    missing.append("exact ordered A0-A11 tracker sequence (live tracker changed during check)")
+                else:
+                    live_deps_after = load_live_deps(live_ids)
+                    if live_deps_after is None:
+                        missing.append("exact ordered A0-A11 tracker sequence (dependency graph changed during check)")
+                    elif live_deps_after != live_deps:
+                        missing.append(
+                            "exact ordered A0-A11 tracker sequence (live dependency graph changed during check)"
+                        )
             live_item_ids = sorted(live_ids, key=lambda item_id: _phase_key(item_id, args.todo_prefix))
             expected_sorted = sorted(EXPECTED_DEPS.keys(), key=lambda item_id: _phase_key(item_id, args.todo_prefix))
             # Require every pinned phase to be present in both sequences.

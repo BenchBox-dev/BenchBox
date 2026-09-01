@@ -500,3 +500,51 @@ def test_main_fails_when_pinned_phase_missing_from_live(monkeypatch) -> None:
     monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: REAL_DEPS.get(iid, []) for iid in ids})
 
     assert reconciliation.main() == 1
+
+
+def test_main_fails_when_tracker_changes_during_check(monkeypatch) -> None:
+    import sys
+
+    live_items_initial = [{"id": item_id, "state": "done"} for item_id in LIVE_A0_A11]
+    live_items_after = [{"id": item_id, "state": "done"} for item_id in LIVE_A0_A11] + [
+        {"id": "independent-publication-a12-new-phase", "state": "active"}
+    ]
+
+    call_count = {"n": 0}
+
+    def fake_load_items():
+        call_count["n"] += 1
+        return live_items_initial if call_count["n"] == 1 else live_items_after
+
+    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
+    monkeypatch.setattr(reconciliation, "load_live_items", fake_load_items)
+    monkeypatch.setattr(
+        reconciliation,
+        "load_live_deps",
+        lambda ids: {iid: REAL_DEPS.get(iid, []) for iid in ids},
+    )
+
+    assert reconciliation.main() == 1
+
+
+def test_main_fails_when_deps_change_during_check(monkeypatch) -> None:
+    import sys
+
+    live_items = [{"id": item_id, "state": "done"} for item_id in LIVE_A0_A11]
+
+    call_count = {"n": 0}
+
+    def fake_load_deps(ids):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            return {iid: REAL_DEPS.get(iid, []) for iid in ids}
+        # Second call (stability check) returns drifted deps for a0
+        drifted = dict(REAL_DEPS)
+        drifted["independent-publication-a1-authority-and-threat-contract"] = []
+        return {iid: drifted.get(iid, []) for iid in ids}
+
+    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
+    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
+    monkeypatch.setattr(reconciliation, "load_live_deps", fake_load_deps)
+
+    assert reconciliation.main() == 1

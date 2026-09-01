@@ -84,6 +84,7 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
         "PACKAGE_SMOKE_RESULT": "skipped",
         "DEPENDENCY_AUDIT_RESULT": "skipped",
         "PARITY_CHECK_RESULT": "skipped",
+        "PUBLICATION_RECONCILIATION_RESULT": "success",
         "EXPLORER_VITEST_RESULT": "skipped",
         "CONTENT_GUARD_NEEDED": "false",
         "SKILL_INTEGRITY_NEEDED": "false",
