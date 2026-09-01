@@ -321,3 +321,51 @@ def test_main_fails_on_dependency_edge_drift(monkeypatch) -> None:
     monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: drifted.get(iid, []) for iid in ids})
 
     assert reconciliation.main() == 1
+
+
+def test_expected_deps_matches_real_deps() -> None:
+    assert reconciliation.EXPECTED_DEPS == REAL_DEPS
+
+
+def test_dependency_violations_fails_on_partial_edge_removal() -> None:
+    # A8 originally depends on a2,a4,a7; removing a7 while keeping a2,a4
+    # still leaves a valid topological order (orphan check would pass) but
+    # must be flagged as missing expected edge.
+    drifted = dict(REAL_DEPS)
+    drifted["independent-publication-a8-published-results-gate-and-shadow-promotion"] = [
+        "independent-publication-a2-corpus-trust-isolation",
+        "independent-publication-a4-hermetic-build-and-shadow-assembly",
+    ]
+
+    violations = reconciliation.dependency_violations(LIVE_A0_A11, drifted)
+
+    assert any("is missing expected dependency" in v and "a8-published" in v and "a7-explorer" in v for v in violations)
+
+
+def test_dependency_violations_fails_on_unexpected_edge() -> None:
+    drifted = dict(REAL_DEPS)
+    drifted["independent-publication-a3-control-plane-and-artifact-contract"] = [
+        "independent-publication-a1-authority-and-threat-contract",
+        "independent-publication-a2-corpus-trust-isolation",
+        "independent-publication-a0-baseline-and-freeze",
+    ]
+
+    violations = reconciliation.dependency_violations(LIVE_A0_A11, drifted)
+
+    assert any("has unexpected dependency" in v and "a3-control" in v for v in violations)
+
+
+def test_main_fails_on_partial_edge_removal(monkeypatch) -> None:
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
+    live_items = [{"id": item_id} for item_id in LIVE_A0_A11]
+    drifted = dict(REAL_DEPS)
+    drifted["independent-publication-a8-published-results-gate-and-shadow-promotion"] = [
+        "independent-publication-a2-corpus-trust-isolation",
+        "independent-publication-a4-hermetic-build-and-shadow-assembly",
+    ]
+    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
+    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: drifted.get(iid, []) for iid in ids})
+
+    assert reconciliation.main() == 1

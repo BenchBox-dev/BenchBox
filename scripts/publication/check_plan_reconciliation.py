@@ -36,6 +36,47 @@ REQUIRED_GATES = (
     "G4 ownership",
     "G5 final reconciliation",
 )
+# Expected dependency graph at the freeze decision (source of truth for edge drift).
+# Each key is a tracker item; value is its in-set dependencies. This encodes the
+# exact precedence required by the plan so that removal of any required edge
+# (even when the total order remains topologically valid) is detected.
+EXPECTED_DEPS: dict[str, list[str]] = {
+    "independent-publication-a0-baseline-and-freeze": [],
+    "independent-publication-a1-authority-and-threat-contract": ["independent-publication-a0-baseline-and-freeze"],
+    "independent-publication-a2-corpus-trust-isolation": ["independent-publication-a1-authority-and-threat-contract"],
+    "independent-publication-a3-control-plane-and-artifact-contract": [
+        "independent-publication-a1-authority-and-threat-contract",
+        "independent-publication-a2-corpus-trust-isolation",
+    ],
+    "independent-publication-a4-hermetic-build-and-shadow-assembly": [
+        "independent-publication-a3-control-plane-and-artifact-contract"
+    ],
+    "independent-publication-a5-noop-deploy-and-automatic-rollback": [
+        "independent-publication-a4-hermetic-build-and-shadow-assembly"
+    ],
+    "independent-publication-a6-site-and-api-docs-lane": [
+        "independent-publication-a5-noop-deploy-and-automatic-rollback"
+    ],
+    "independent-publication-a7-explorer-application-lane": [
+        "independent-publication-a5-noop-deploy-and-automatic-rollback"
+    ],
+    "independent-publication-a8-published-results-gate-and-shadow-promotion": [
+        "independent-publication-a2-corpus-trust-isolation",
+        "independent-publication-a4-hermetic-build-and-shadow-assembly",
+        "independent-publication-a7-explorer-application-lane",
+    ],
+    "independent-publication-a9-corpus-production-cutover": [
+        "independent-publication-a6-site-and-api-docs-lane",
+        "independent-publication-a7-explorer-application-lane",
+        "independent-publication-a8-published-results-gate-and-shadow-promotion",
+    ],
+    "independent-publication-a10-release-and-mirror-retirement": [
+        "independent-publication-a9-corpus-production-cutover"
+    ],
+    "independent-publication-a11-operations-canaries-and-closeout": [
+        "independent-publication-a10-release-and-mirror-retirement"
+    ],
+}
 TODO_SHIM = ROOT / "_project/scripts/todo"
 
 
@@ -98,6 +139,13 @@ def dependency_violations(plan_order: list[str], deps: dict[str, list[str]]) -> 
     chain inconsistent -- rather than inferring order from the A-phase in the
     ID or a lossy tie-break. A cycle is reported as a backward edge.
 
+    In addition, the live graph is compared against ``EXPECTED_DEPS`` (the
+    freeze-time graph). Removal of any required edge -- even when the item
+    retains another earlier dependency so the total order stays topologically
+    valid (e.g. A8 still depends on A2/A4 after A7 is removed) -- is a
+    violation, as is an unexpected in-set edge. This closes the "last prior
+    edge" gap where only orphan detection would fire.
+
     ``deps`` maps each plan item to its live dependency ids (only those within
     the plan set are considered).
     """
@@ -111,6 +159,14 @@ def dependency_violations(plan_order: list[str], deps: dict[str, list[str]]) -> 
                 violations.append(f"{item_id} depends on {dep}, which the plan orders after it")
         if rank[item_id] > 0 and not any(rank[dep] < rank[item_id] for dep in item_deps):
             violations.append(f"{item_id} has no prior dependency in the plan (removed chain)")
+        if item_id in EXPECTED_DEPS:
+            expected_in = [dep for dep in EXPECTED_DEPS[item_id] if dep in order_set]
+            for exp in expected_in:
+                if exp not in item_deps:
+                    violations.append(f"{item_id} is missing expected dependency on {exp}")
+            for dep in item_deps:
+                if dep not in expected_in:
+                    violations.append(f"{item_id} has unexpected dependency on {dep}")
     return violations
 
 
