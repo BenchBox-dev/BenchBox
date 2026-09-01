@@ -157,7 +157,7 @@ Start a [BenchBox discussion](https://github.com/BenchBox-dev/BenchBox/discussio
 
 ## References
 
-[^release]: [BenchBox changelog: v0.4.0](https://github.com/BenchBox-dev/BenchBox/blob/develop/CHANGELOG.md#040---2026-08-27) - BenchBox, August 27, 2026
+[^release]: [BenchBox 0.4.0 release](https://github.com/BenchBox-dev/BenchBox/releases/tag/v0.4.0) - BenchBox, published August 28, 2026
 [^launch]: [BenchBox results platform strategy](https://github.com/BenchBox-dev/BenchBox/blob/develop/docs/development/benchbox-results-platform-strategy.md) - BenchBox, Phase 1 launched April 4, 2026
 [^geekbench]: [Geekbench Browser](https://browser.geekbench.com/) - Primate Labs, accessed August 31, 2026
 [^open-llm]: [Open LLM Leaderboard README](https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard/blob/main/README.md) - Hugging Face, accessed August 31, 2026

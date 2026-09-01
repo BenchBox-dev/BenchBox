@@ -15,7 +15,7 @@ meta_description: "How BenchBox's Results Explorer separates display, comparison
 
 > The Results Explorer decides what may be displayed, compared, and ranked, and it leaves recorded differences visible. Two timings still have to earn a comparison.
 
-**TL;DR**: BenchBox v0.4.0's [Results Explorer](https://benchbox.dev/results/) is a curated preview that shows timings, compares runs that share enough query evidence, and puts a winner claim only when benchmark, scale factor, phase, and timing coverage line up.[^release] Other recorded differences stay on a Comparability Receipt for the reader to judge. The preview makes the public evidence inspectable.
+**TL;DR**: BenchBox v0.4.0's [Results Explorer](https://benchbox.dev/results/) is a curated preview that shows timings, compares runs that share enough query evidence, and makes a winner claim only when benchmark, scale factor, phase, and timing coverage line up.[^release] Other recorded differences stay on a Comparability Receipt for the reader to judge. The preview makes the public evidence inspectable.
 
 ---
 
