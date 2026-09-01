@@ -476,6 +476,7 @@ dev = [
     "import-linter>=2.13",
     "opentelemetry-sdk>=1.44,<2",
     "opentelemetry-exporter-otlp-proto-http>=1.44,<2",
+    "pytest-json-report>=1.5.0",
 ]
 
 [tool.mutmut]
