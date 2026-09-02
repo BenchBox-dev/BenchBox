@@ -148,13 +148,9 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 .mcp.json
 
 # skill-sync mirrors (regenerate locally via `make skill-sync`). The `claude`
-# target is a TRACKED snapshot — committed for cloud/CI, managed by the
-# skill-sync block below. the shared agents mirror stays untracked locally.
-.codex/skills/
-.codex/shared-skills/
-.codex/shared-skills.lock.json
-.gemini/skills/
-.agents/
+# target is a TRACKED snapshot — committed for cloud/CI. The `.agents/skills`
+# mirror is the single untracked interoperable workspace (Codex/Gemini/
+# Antigravity) and is ignored via the skill-sync managed block below.
 .antigravitycli/
 
 # TODO system infrastructure (added for distributed TODO structure)
