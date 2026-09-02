@@ -400,7 +400,7 @@ jobs:
           xargs -d '\n' uv run -- python scripts/validate_submission.py $REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION $CORPUS_ARG --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt \
             | tee /tmp/validation_output.txt
           # Also run parity validator to compare PR-head vs merge-SHA outcomes (fallback for harness)
-          uv run -- python scripts/publication/validator_parity.py --base-sha "$_BASE_SHA" --merge-sha "$_MERGE_SHA" --corpus-changed-paths "$_CORPUS_FILE" $REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION || echo "::warning::validator_parity non-zero but primary validation succeeded"
+          uv run -- python scripts/publication/validator_parity.py --base-sha "$_BASE_SHA" --merge-sha "$_MERGE_SHA" --corpus-changed-paths "$_CORPUS_FILE" $REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION
 
       - name: Check corpus inventory
         if: steps.validate.outcome == 'success' || steps.changed.outputs.has_bundles == 'corpus-only'

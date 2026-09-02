@@ -745,8 +745,7 @@ def reconcile_states(
     )
     drifts.extend(art_drifts)
 
-    if not live:
-        drifts.extend(_check_receipt_contract_fields(observed))
+    drifts.extend(_check_receipt_contract_fields(observed))
 
     stale_drifts, receipt_age_hours = _check_receipt_freshness(observed, live, max_age_hours, now)
     drifts.extend(stale_drifts)

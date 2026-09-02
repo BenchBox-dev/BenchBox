@@ -325,8 +325,15 @@ def test_validate_artifact_bundle_tar_archive(mock_artifact_dir: Path, tmp_path:
 # ---------------------------------------------------------------------------
 
 
-def test_cli_default_schema_checks(capsys: pytest.CaptureFixture[str]) -> None:
+def test_cli_no_args_requires_schema_only_or_inputs(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = checker.main([])
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert "--schema-only" in captured.err
+
+
+def test_cli_default_schema_checks(capsys: pytest.CaptureFixture[str]) -> None:
+    exit_code = checker.main(["--schema-only"])
     assert exit_code == 0
     captured = capsys.readouterr()
     assert "Results Explorer Compatibility" in captured.out
@@ -337,7 +344,7 @@ def test_cli_default_schema_checks(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 def test_cli_json_mode(capsys: pytest.CaptureFixture[str]) -> None:
-    exit_code = checker.main(["--json"])
+    exit_code = checker.main(["--schema-only", "--json"])
     assert exit_code == 0
     captured = capsys.readouterr()
     data = json.loads(captured.out)
@@ -348,7 +355,7 @@ def test_cli_json_mode(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 def test_cli_specific_schema_version(capsys: pytest.CaptureFixture[str]) -> None:
-    exit_code = checker.main(["--schema-versions", "9"])
+    exit_code = checker.main(["--schema-only", "--schema-versions", "9"])
     assert exit_code == 0
     captured = capsys.readouterr()
     assert "Schema v9" in captured.out
@@ -356,21 +363,21 @@ def test_cli_specific_schema_version(capsys: pytest.CaptureFixture[str]) -> None
 
 
 def test_cli_invalid_schema_version(capsys: pytest.CaptureFixture[str]) -> None:
-    exit_code = checker.main(["--schema-versions", "99"])
+    exit_code = checker.main(["--schema-only", "--schema-versions", "99"])
     assert exit_code == 2
     captured = capsys.readouterr()
     assert "Unsupported schema version 99" in captured.err
 
 
 def test_cli_invalid_schema_version_7(capsys: pytest.CaptureFixture[str]) -> None:
-    exit_code = checker.main(["--schema-versions", "7"])
+    exit_code = checker.main(["--schema-only", "--schema-versions", "7"])
     assert exit_code == 2
     captured = capsys.readouterr()
     assert "Unsupported schema version 7" in captured.err
 
 
 def test_cli_empty_schema_versions(capsys: pytest.CaptureFixture[str]) -> None:
-    exit_code = checker.main(["--schema-versions", ""])
+    exit_code = checker.main(["--schema-only", "--schema-versions", ""])
     assert exit_code == 2
     captured = capsys.readouterr()
     assert "Invalid --schema-versions format" in captured.err

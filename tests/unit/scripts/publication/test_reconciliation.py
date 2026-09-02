@@ -93,6 +93,31 @@ def test_reconcile_rejects_collapsed_states() -> None:
         recon_mod.reconcile_states(desired=desired, built=desired, deployed=desired, observed=desired, now_dt=NOW)
 
 
+def test_reconcile_live_incomplete_observed_receipt_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Resp:
+        status = 200
+
+        def read(self) -> bytes:
+            return b"ok"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a) -> None:
+            return None
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=15.0: Resp())
+
+    desired, built, deployed, observed = _distinct_states()
+    del observed["nonce"]
+    del observed["signature"]
+    report = recon_mod.reconcile_states(
+        desired=desired, built=built, deployed=deployed, observed=observed, live=True, now_dt=NOW
+    )
+    assert report.reconciled is False
+    assert any(d.drift_type == "RECEIPT_INCOMPLETE" for d in report.drifts)
+
+
 def test_reconcile_happy_path_distinct_matching_states() -> None:
     desired, built, deployed, observed = _distinct_states()
     report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)

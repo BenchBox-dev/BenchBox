@@ -22,9 +22,7 @@ def verify_site_directory(site_dir: Path) -> list[str]:
     errors: list[str] = []
 
     if not site_dir.exists():
-        # Informational check when site directory is not yet generated
-        print(f"Shadow site dir '{site_dir}' does not exist yet (pre-assembly state).")
-        return []
+        return [f"Shadow site dir '{site_dir}' does not exist"]
 
     # Check key files
     expected_entrypoints = ["index.html"]

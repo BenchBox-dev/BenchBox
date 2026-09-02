@@ -58,8 +58,7 @@ def scan_file_for_privacy(file_path: Path) -> list[str]:
 def scan_directory_for_privacy(target_dir: Path) -> list[str]:
     """Recursively scan all text assets in target_dir for privacy and sensitivity leaks."""
     if not target_dir.exists():
-        print(f"Target directory '{target_dir}' does not exist (pre-assembly state).")
-        return []
+        return [f"Target directory '{target_dir}' does not exist"]
 
     findings: list[str] = []
     for root, _, files in os.walk(target_dir):

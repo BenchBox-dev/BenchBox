@@ -73,6 +73,16 @@ def _run_step_with_validator_exiting(status: int, tmp_path: Path):
     )
     # `exit N | tee` preserves the pipeline shape the bug lived in.
     script = script.replace(matched, f"(exit {status})")
+    _PARITY_CALL = (
+        'uv run -- python scripts/publication/validator_parity.py --base-sha "$_BASE_SHA" '
+        '--merge-sha "$_MERGE_SHA" --corpus-changed-paths "$_CORPUS_FILE" '
+        "$REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION"
+    )
+    assert _PARITY_CALL in script, (
+        "the validator_parity invocation in validate-submission.yml no longer matches what this "
+        "test substitutes; update _PARITY_CALL so the rung keeps exercising the real block"
+    )
+    script = script.replace(_PARITY_CALL, "(exit 0)")
     # Mirror GitHub's default `run:` interpreter: bash with -e and no pipefail.
     return run_posix_shell(
         f"set -e\n{script}",

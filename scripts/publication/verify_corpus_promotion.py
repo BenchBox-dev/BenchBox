@@ -114,7 +114,12 @@ def main(argv: list[str] | None = None) -> int:
         local = get_local_bundles(REPO_ROOT / "results-data" / "bundles")
         inventory = get_inventory_paths()
         print(f"Shadow mode: verified {len(local)} local bundle(s) against {len(inventory)} inventory entries")
-        errors.extend(verify_exact_inventory(local, inventory) if inventory else [])
+        if not INVENTORY_FILE.is_file():
+            errors.append(f"Corpus inventory missing: {INVENTORY_FILE}")
+        elif not inventory:
+            errors.append("Corpus inventory is empty — cannot verify exact accepted-path inventory")
+        else:
+            errors.extend(verify_exact_inventory(local, inventory))
 
         # Zero-skip: every accepted path must physically exist (no silently dropped bundles).
         missing_files = [p for p in inventory if not (REPO_ROOT / p).is_file()]
@@ -143,7 +148,7 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as e:  # noqa: BLE001
         errors.append(f"Explorer compatibility check failed: {e}")
 
-    # Shadow site verification (best-effort; site may not be assembled)
+    # Shadow site verification (fail-closed when site is absent or broken)
     try:
         site_dir = REPO_ROOT / "publication" / "out" / "site"
         site_errors = verify_site_directory(site_dir)

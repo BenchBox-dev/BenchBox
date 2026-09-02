@@ -7,8 +7,8 @@ maintain compatibility with the current corpus DuckDB read-model schema
 artifact bundles.
 
 Usage:
-    # Run schema compatibility checks (v9 only):
-    uv run -- python scripts/publication/check_explorer_compat.py
+    # Run schema compatibility checks only (v9 only):
+    uv run -- python scripts/publication/check_explorer_compat.py --schema-only
 
     # Validate an Explorer build artifact directory or archive:
     uv run -- python scripts/publication/check_explorer_compat.py --artifact results-explorer/dist
@@ -23,10 +23,10 @@ Usage:
     uv run -- python scripts/publication/check_explorer_compat.py --db-path results-explorer/public/data/results.duckdb
 
     # Check specific schema versions (only 9 is supported):
-    uv run -- python scripts/publication/check_explorer_compat.py --schema-versions 9
+    uv run -- python scripts/publication/check_explorer_compat.py --schema-only --schema-versions 9
 
     # Output machine-readable JSON:
-    uv run -- python scripts/publication/check_explorer_compat.py --json
+    uv run -- python scripts/publication/check_explorer_compat.py --schema-only --json
 
 Exit codes:
     0 - All compatibility and artifact checks passed
@@ -892,6 +892,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output validation results in JSON format.",
     )
     parser.add_argument(
+        "--schema-only",
+        action="store_true",
+        help="Run in-memory schema compatibility checks without --artifact or --db-path.",
+    )
+    parser.add_argument(
         "--quiet",
         "-q",
         action="store_true",
@@ -1019,6 +1024,13 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901
 
     if args.generate_manifest and args.require_manifest:
         print("Error: --generate-manifest and --require-manifest are mutually exclusive", file=sys.stderr)
+        return 2
+
+    if args.artifact is None and args.db_path is None and not args.schema_only:
+        print(
+            "Error: provide --artifact and/or --db-path, or pass --schema-only for in-memory schema checks",
+            file=sys.stderr,
+        )
         return 2
 
     schema_versions = _parse_schema_versions_arg(args.schema_versions)

@@ -5,11 +5,12 @@ from pathlib import Path
 import pytest
 
 from scripts.publication.check_artifact_privacy import (
+    main as privacy_main,
     scan_directory_for_privacy,
     scan_file_for_privacy,
 )
 from scripts.publication.check_corpus_bijection import check_bijection
-from scripts.publication.verify_shadow_site import verify_site_directory
+from scripts.publication.verify_shadow_site import main as shadow_main, verify_site_directory
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -84,3 +85,19 @@ def test_shadow_site_verifier(tmp_path: Path):
     (site / "broken.html").write_text('<a href="missing.html">Link</a>', encoding="utf-8")
     errors = verify_site_directory(site)
     assert any("missing.html" in e for e in errors)
+
+
+def test_shadow_site_missing_directory_fails_closed(tmp_path: Path) -> None:
+    missing = tmp_path / "no-such-site"
+    errors = verify_site_directory(missing)
+    assert errors
+    assert any("does not exist" in e for e in errors)
+    assert shadow_main([str(missing)]) != 0
+
+
+def test_privacy_scan_missing_directory_fails_closed(tmp_path: Path) -> None:
+    missing = tmp_path / "no-such-site"
+    findings = scan_directory_for_privacy(missing)
+    assert findings
+    assert any("does not exist" in f for f in findings)
+    assert privacy_main([str(missing)]) != 0
