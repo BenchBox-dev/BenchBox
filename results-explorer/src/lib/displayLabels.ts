@@ -68,6 +68,22 @@ export function formatValidationStatus(raw: string | null | undefined): string {
   return VALIDATION_STATUS_LABELS[raw] ?? formatEnumLabel(raw);
 }
 
+/**
+ * Non-clean validation status: anything that is not the literal "passed"
+ * value, including missing/empty status. Mirrors the condition
+ * MetaLeaderboard.tsx already uses to decide whether the validation badge
+ * needs to surface outside its normal (ranked-cell) placement - kept here so
+ * every surface that needs an "is this validation status a problem" check
+ * shares one predicate rather than each re-deriving it.
+ *
+ * This is a placeholder pending the shared status->reader-facing-label
+ * mapping being introduced on fix/explorer-compare-validation-disclosure;
+ * once that lands, callers of this predicate should reconcile with it.
+ */
+export function isValidationNotClean(raw: string | null | undefined): boolean {
+  return (raw?.trim().toLowerCase() ?? "") !== "passed";
+}
+
 export function formatVisibility(raw: string | null | undefined): string {
   if (raw === null || raw === undefined || raw === "") return "unknown";
   return VISIBILITY_LABELS[raw] ?? formatEnumLabel(raw);

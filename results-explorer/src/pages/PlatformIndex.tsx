@@ -5,7 +5,12 @@ import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
 import { getPlatformIndexRows } from "@/lib/duckdbQueries";
 import { useFacetState, type DateWindowFacet, type ExplorerFacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue, toDateWindowFacet } from "@/lib/facetMatching";
-import { formatBenchmarkLabel, formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
+import {
+  formatBenchmarkLabel,
+  formatTrustLabel,
+  formatValidationStatus,
+  isValidationNotClean,
+} from "@/lib/displayLabels";
 import {
   compareCohortLockReason,
   compareCohortSignatureForRow,
@@ -785,7 +790,10 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             </div>
           </div>
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-xs text-[var(--bb-data-fg-muted)]">
-            <span>Rows are labelled by comparable ranking: benchmark, scale, phase, and primary metric.</span>
+            <span>
+              Rows are labelled by comparable ranking: benchmark, scale, phase, and primary metric. A validation
+              badge under the run label means that result was excluded from ranking on validation grounds.
+            </span>
             <TableScrollHint
               scrollerRef={resultsScrollerRef}
               testId="platform-table-scroll-hint"
@@ -1117,6 +1125,11 @@ function PlatformRow({ entry, runIdentityLabel, checked, onToggle, showMetricCon
       </td>
       <td class="table-td max-w-[24rem]" aria-colindex={platformTableColumnIndex("run", showMetricContract)}>
         <RunIdentityLabel label={runIdentityLabel} />
+        {isValidationNotClean(entry.validation_status) && (
+          <div class="mt-0.5" data-testid={`platform-validation-flag-${entry.result_id}`}>
+            <ValidationBadge validationStatus={entry.validation_status} showMissing />
+          </div>
+        )}
       </td>
       <td class="table-td font-medium" aria-colindex={platformTableColumnIndex("benchmark", showMetricContract)}>{humanizeBenchmark(entry.benchmark)}</td>
       <td class="table-td" aria-colindex={platformTableColumnIndex("scale", showMetricContract)}>SF {entry.scale_factor}</td>
