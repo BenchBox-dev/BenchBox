@@ -17,9 +17,10 @@ baseline that provides that depth before Phase 2 community submissions or any fu
 Phase 3 hosted service.
 
 The hard requirement today is still the validator gate in `results-data/validate_corpus.py`:
-every committed cohort must have at least 3 platforms. Any workflow target that lands
-below that threshold is provisional until a third platform exists or the validation policy
-is intentionally changed.
+every committed cohort must have at least 3 distinct comparison identities. Ordinary
+cohorts count platform names, preserving the historical three-platform floor. Bundles in
+the explicitly segregated `duckdb-version-matrix/` corpus count platform plus version;
+repeated runs of one platform/version do not pad that matrix.
 
 ## Generation Contract
 
@@ -61,6 +62,18 @@ Two important caveats apply to the target matrix above:
    SF 1.0 row also becomes non-mergeable if ClickHouse Cloud is unavailable.
 2. The current checked-in corpus is smaller than the full workflow target. Do not
    read this spec as a statement that all target bundles already exist in `main`.
+
+### Version-over-version cohorts
+
+Operator-run version matrices may repeat a platform name at several versions. The admitted
+DuckDB matrix is segregated under `results-data/bundles/duckdb-version-matrix/`, which is
+the only corpus location where the depth gate counts versions as distinct identities.
+Results Explorer disambiguates their rows by engine and resolved driver versions. The runner is
+`scripts/run_duckdb_version_matrix.py`, and its median analyzer is
+`scripts/analyze_duckdb_version_matrix.py`. The analyzer emits one median bundle per
+version/benchmark cell for promotion; raw repetitions stay outside the checkout. The
+current DuckDB matrix is documented in `results-data/CORPUS_NOTES.md` when its bundles
+are promoted.
 
 ## Benchmark Notes
 
