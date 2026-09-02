@@ -1,0 +1,55 @@
+name: Publication Canaries & Drift Reconciliation
+
+on:
+  schedule:
+    # Daily 07:15 UTC canary execution
+    - cron: "15 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  canaries:
+    name: Run Publication Canaries and Drift Reconciliation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run 4-way reconciliation and drift checks
+        id: reconciliation
+        run: |
+          mkdir -p diagnostic-reports
+          uv run python scripts/publication/reconciliation.py --json | tee diagnostic-reports/reconciliation-report.json
+
+      - name: Run four-lane independence matrix verification
+        id: independence
+        run: |
+          uv run python scripts/publication/verify_independence_matrix.py --json | tee diagnostic-reports/independence-matrix-report.json
+
+      - name: Audit operational receipts and capacity/retention
+        id: operational_receipts
+        run: |
+          uv run python scripts/publication/check_operational_receipts.py --json | tee diagnostic-reports/operational-receipts-report.json
+
+      - name: Upload diagnostic canary reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: publication-canary-reports
+          path: diagnostic-reports/
+          retention-days: 30
