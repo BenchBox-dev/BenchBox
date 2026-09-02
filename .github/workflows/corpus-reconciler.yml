@@ -1,0 +1,154 @@
+name: Corpus Reconciler
+
+# A8: Scheduled reconciler for published-results corpus gate.
+# Runs hourly as fallback for missed bridge events.
+# Also supports workflow_dispatch for manual trigger.
+#
+# Security properties:
+# - Always reads ledger-head-sha from live branch state
+# - Passes --ledger-head-sha to reconciler (REQUIRED, fail-closed)
+# - Concurrency group prevents parallel reconciler runs
+# - Minimal permissions (contents: read only)
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      merge-sha:
+        description: "Override merge SHA to process (optional, for manual trigger)"
+        required: false
+        type: string
+      base-sha:
+        description: "Override base SHA (optional, for manual trigger)"
+        required: false
+        type: string
+      ledger-head-sha:
+        description: "Override ledger head SHA (optional, reads from branch if empty)"
+        required: false
+        type: string
+      source:
+        description: "Source of this dispatch (for audit trail)"
+        required: false
+        default: "manual"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: corpus-reconciler
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: Process corpus events and reconcile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout published-results branch
+        uses: actions/checkout@v4
+        with:
+          ref: published-results
+          fetch-depth: 2
+
+      - name: Read current ledger head from branch
+        id: ledger
+        shell: bash
+        run: |
+          # Always read ledger head from branch — authoritative source
+          LEDGER_CONTENT=$(git show published-results:publication/ledger.json 2>/dev/null || echo "")
+
+          if [ -n "$LEDGER_CONTENT" ]; then
+            LEDGER_SHA=$(echo "$LEDGER_CONTENT" | python3 -c "
+          import json, sys
+          try:
+              data = json.load(sys.stdin)
+              sha = data.get('ledger_head_sha', '')
+              if not sha:
+                  print('', end='')
+                  sys.exit(0)
+              print(sha, end='')
+          except (json.JSONDecodeError, KeyError):
+              print('', end='')
+          " || echo "")
+          else
+            LEDGER_SHA=""
+          fi
+
+          # Use manual override if provided and branch has no ledger
+          if [ -z "$LEDGER_SHA" ] && [ -n "${{ inputs.ledger-head-sha }}" ]; then
+            LEDGER_SHA="${{ inputs.ledger-head-sha }}"
+          fi
+
+          echo "ledger_head_sha=$LEDGER_SHA" >> "$GITHUB_OUTPUT"
+          echo "Ledger head SHA: ${LEDGER_SHA:-<none>}"
+
+      - name: Generate events file for dispatch
+        id: events
+        if: github.event_name == 'workflow_dispatch' && inputs.merge-sha != ''
+        shell: bash
+        run: |
+          MERGE_SHA="${{ inputs.merge-sha }}"
+          BASE_SHA="${{ inputs.base-sha }}"
+          EVENTS_FILE="/tmp/corpus-events.jsonl"
+
+          python3 -c "
+          import json, sys
+          event = {
+              'merge_sha': sys.argv[1],
+              'base_sha': sys.argv[2],
+              'ts': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+          }
+          with open(sys.argv[3], 'w') as f:
+              f.write(json.dumps(event) + '\n')
+          " "$MERGE_SHA" "$BASE_SHA" "$EVENTS_FILE"
+
+          echo "events_file=$EVENTS_FILE" >> "$GITHUB_OUTPUT"
+          echo "Created events file with merge_sha=$MERGE_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run reconciler
+        id: reconcile
+        shell: bash
+        run: |
+          EVENTS_FILE="${{ steps.events.outputs.events_file }}"
+
+          if [ -z "$EVENTS_FILE" ] || [ ! -f "$EVENTS_FILE" ]; then
+            echo "No events file found — nothing to reconcile."
+            echo '{"status": "no_events", "processed": 0}' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          LEDGER_SHA="${{ steps.ledger.outputs.ledger_head_sha }}"
+
+          if [ -z "$LEDGER_SHA" ]; then
+            echo "::error::ledger_head_sha is empty — reconciler requires this (fail-closed)"
+            echo "## Reconciler FAILED" >> "$GITHUB_STEP_SUMMARY"
+            echo "ledger_head_sha is empty. The branch may not have a publication/ledger.json yet." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          uv run python scripts/publication/reconciler.py \
+            --events-file "$EVENTS_FILE" \
+            --ledger-head-sha "$LEDGER_SHA" \
+            --limit 100
+
+      - name: Write summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## Corpus Reconciler Run" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Event: ${{ github.event_name }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Source: ${{ inputs.source || 'scheduled' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ledger head SHA: ${{ steps.ledger.outputs.ledger_head_sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Reconciler status: ${{ steps.reconcile.outcome }}" >> "$GITHUB_STEP_SUMMARY"
