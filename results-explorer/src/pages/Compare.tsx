@@ -39,6 +39,7 @@ import {
   ComparabilityReceipt,
   buildComparabilityFields,
   comparabilityWarningFields,
+  orderWarningLabelsForSummary,
 } from "@/components/ComparabilityReceipt";
 import { CompareSummary } from "@/components/CompareSummary";
 import {
@@ -493,7 +494,10 @@ export function Compare({ url }: CompareProps) {
   const comparabilityFields = buildComparabilityFields(results);
   const comparabilityWarnings = comparabilityWarningFields(comparabilityFields);
   const comparabilityWarningCount = comparabilityWarnings.length;
-  const comparabilityWarningLabels = comparabilityWarnings.map((field) => field.label);
+  // Validation is sorted to the front of the summary so it never gets folded
+  // into "+N more" behind cosmetic environment differences (CPU model,
+  // driver version, ...) - see orderWarningLabelsForSummary.
+  const comparabilityWarningLabels = orderWarningLabelsForSummary(comparabilityWarnings);
   // Compare identity is canonicalized at the cohort boundary. Raw slugs such
   // as `star_schema` remain valid in result data and route links, but aliases
   // must not turn one SSB family into a false mixed-benchmark heading.

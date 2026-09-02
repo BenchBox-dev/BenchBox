@@ -195,11 +195,43 @@ describe("ValidationBadge", () => {
     expect(shown.getByText("validation n/a")).toBeTruthy();
   });
 
-  it("renders not_run with a warning tone, not the neutral fallback", () => {
+  // -----------------------------------------------------------------------
+  // Reader-facing vocabulary: the chip must never show the raw enum for
+  // statuses users cannot interpret (not_run and friends). It renders the
+  // shared describeValidationStatus() label instead; the raw status is still
+  // reachable via the title tooltip.
+  // -----------------------------------------------------------------------
+
+  it("renders not_run as plain language, not the raw enum, with a warning tone", () => {
     const { container } = render(<ValidationBadge validationStatus="not_run" />);
     const badge = container.querySelector(".badge");
+    expect(badge?.textContent).toBe("no validation");
     expect(badge?.getAttribute("data-tone")).toBe("warning");
-    expect(badge?.textContent).toBe("not_run");
-    expect(badge?.getAttribute("title")).toContain("Validation status: not_run");
+    const title = badge?.getAttribute("title") ?? "";
+    expect(title).toContain("Validation status: not_run");
+    expect(title.toLowerCase()).toContain("never executed");
+  });
+
+  it.each([
+    ["failed", "danger"],
+    ["interrupted", "danger"],
+    ["partial", "danger"],
+    ["error", "danger"],
+    ["not_run", "warning"],
+    ["not_validated", "warning"],
+    ["uncertain", "warning"],
+    ["unknown", "warning"],
+  ] as const)("%s never falls through to the neutral tone (%s)", (status, expectedTone) => {
+    const { container } = render(<ValidationBadge validationStatus={status} />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.getAttribute("data-tone")).toBe(expectedTone);
+    expect(badge?.getAttribute("data-tone")).not.toBe("neutral");
+  });
+
+  it("passed still renders as a clean, interpretable label", () => {
+    const { container } = render(<ValidationBadge validationStatus="passed" />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.textContent).toBe("passed");
+    expect(badge?.getAttribute("data-tone")).toBe("info");
   });
 });

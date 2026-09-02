@@ -888,7 +888,7 @@ describe("PlatformIndex - sortable table headers", () => {
     // column, so it renders without scrolling the table.
     const runCell = notRunFlag.closest("td");
     expect(runCell?.querySelector('[data-testid="run-identity-label"]')).not.toBeNull();
-    expect(within(notRunFlag).getByText("not_run")).toBeTruthy();
+    expect(within(notRunFlag).getByText("no validation")).toBeTruthy();
 
     expect(container.querySelector('[data-testid="platform-validation-flag-r-clean"]')).toBeNull();
   });

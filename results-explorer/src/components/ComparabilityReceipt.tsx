@@ -2,6 +2,7 @@ import type { DetailResult, Environment } from "@/types";
 import { humanizeBenchmark, shortHash } from "@/utils";
 import { costModelSummary, costScopeSummary, normalizedCostLabel } from "@/lib/costDisplay";
 import { formatCount, formatWarningCount } from "@/lib/copyFormatters";
+import { formatValidationStatus } from "@/lib/displayLabels";
 import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
 import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
 
@@ -86,7 +87,7 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
     compareValues("Driver version", results, (result) => valueOrMissing(result.driver_version)),
     compareValues("Execution mode", results, (result) => valueOrMissing(result.execution_mode)),
     buildTuningField(results),
-    compareValues("Validation", results, (result) => valueOrMissing(result.validation_status)),
+    compareValues("Validation", results, (result) => formatValidationStatusReceiptValue(result.validation_status)),
     compareHardwareValues("Architecture", results, (result) => valueOrMissing(result.environment?.arch)),
     compareHardwareValues("CPU family", results, (result) => valueOrMissing(result.environment?.cpu_family)),
     compareHardwareValues("CPU model", results, (result) => valueOrMissing(result.environment?.cpu_model)),
@@ -214,6 +215,22 @@ function setsEqual(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
 
 export function comparabilityWarningFields(fields: readonly ComparabilityField[]): ComparabilityField[] {
   return fields.filter((field) => field.status === "diff");
+}
+
+/**
+ * Warning-field labels ordered for a truncated summary (e.g. the guardrails
+ * banner's "Warning classes: A, B, C, +N more"). A validation difference is
+ * not equivalent to a cosmetic environment difference like "CPU model" or
+ * "Driver version" - it means at least one candidate's numbers are unverified
+ * - so it is always sorted to the front instead of risking getting folded
+ * into "+N more" by field-build order. Relative order of the rest is
+ * preserved.
+ */
+export function orderWarningLabelsForSummary(warningFields: readonly ComparabilityField[]): string[] {
+  const labels = warningFields.map((field) => field.label);
+  const priority = labels.filter((label) => label === "Validation");
+  const rest = labels.filter((label) => label !== "Validation");
+  return [...priority, ...rest];
 }
 
 function ComparabilityFieldRow({ field }: { field: ComparabilityField }) {
@@ -388,6 +405,18 @@ function formatEnvironment(environment: Environment) {
 
 function formatPerPlatform(entries: { platform: string; value: string }[]) {
   return entries.map((entry) => `${entry.platform}: ${entry.value}`).join("; ");
+}
+
+/**
+ * Reader-facing label for the receipt's Validation row, with the raw status
+ * kept alongside it in parentheses - the receipt is exactly the "detail
+ * field" surface the shared vocabulary is meant to keep precision available
+ * on, per describeValidationStatus's contract.
+ */
+function formatValidationStatusReceiptValue(status: string | null | undefined) {
+  if (!status) return "Not recorded";
+  const label = formatValidationStatus(status);
+  return label === status ? label : `${label} (${status})`;
 }
 
 function valueOrMissing(value: string | number | null | undefined) {

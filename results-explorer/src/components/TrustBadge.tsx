@@ -21,6 +21,7 @@
 // own color rather than a "cautionary" yellow.
 // ---------------------------------------------------------------------------
 
+import { describeValidationStatus } from "@/lib/displayLabels";
 import { StatusBadge, type StatusTone } from "./StatusBadge";
 
 const TRUST_CONFIG: Record<string, { label: string; tone: StatusTone; title: string }> = {
@@ -117,31 +118,27 @@ export function TrustBadge({ trustLabel, compact = false }: TrustBadgeProps) {
   );
 }
 
+// Renders the shared validation-status vocabulary (see
+// `describeValidationStatus` in src/lib/displayLabels.ts) as a badge. The
+// visible text is the reader-facing label, never the raw enum value (e.g.
+// "no validation", not "not_run") - the raw status is still available via the
+// title tooltip for anyone who wants precision.
 export function ValidationBadge({ validationStatus, showMissing = false }: ValidationBadgeProps) {
   if (!validationStatus && !showMissing) return null;
-  const status = validationStatus?.trim() || "not recorded";
-  const lower = status.toLowerCase();
-  const tone = validationTone(lower);
-  const label = validationStatus ? lower : "validation n/a";
+  if (!validationStatus) {
+    return (
+      <StatusBadge role="validation" tone="neutral" title="Validation status: not recorded">
+        validation n/a
+      </StatusBadge>
+    );
+  }
+  const info = describeValidationStatus(validationStatus);
   return (
-    <StatusBadge role="validation" tone={tone} title={`Validation status: ${status}`}>
-      {label}
+    <StatusBadge role="validation" tone={info.tone} title={`Validation status: ${info.status} - ${info.description}`}>
+      {info.label}
     </StatusBadge>
   );
 }
 
-function validationTone(status: string): StatusTone {
-  if (status.includes("fail")) return "danger";
-  if (status.includes("disabled") || status.includes("partial")) return "warning";
-  if (status === "exact" || status === "full" || status === "passed" || status === "pass") {
-    return "info";
-  }
-  if (status === "loose" || status === "range") return "warning";
-  // Validation never executed for this result (e.g. DataFrame-mode "not_run").
-  // That is not a pass, so it must not read as the least-alarming ("neutral")
-  // tone - treat it the same as other incomplete-validation statuses above.
-  if (status === "not_run") return "warning";
-  return "neutral";
-}
 
 export default TrustBadge;

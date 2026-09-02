@@ -768,7 +768,7 @@ describe("MetaLeaderboard", () => {
     // must still surface.
     expect(cell.querySelector('[data-role="trust"]')).toBeNull();
     const badge = cell.querySelector('[data-role="validation"]');
-    expect(badge?.textContent).toBe("not_run");
+    expect(badge?.textContent).toBe("no validation");
     expect(badge?.getAttribute("data-tone")).toBe("warning");
   });
 
