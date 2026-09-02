@@ -1,0 +1,120 @@
+name: Corpus Event Bridge
+
+# A8: Event bridge for published-results corpus gate.
+# Triggers on push to published-results, filters to results-data/** path changes,
+# and dispatches the corpus-reconciler with the merge SHA and ledger head state.
+#
+# Security properties:
+# - Only runs on push to published-results (no PR content checkout)
+# - Path filter limits to results-data/** only
+# - Minimal permissions (contents: read only)
+# - No deploy credentials received
+# - Passes --ledger-head-sha from live branch state (fail-closed if missing)
+
+on:
+  push:
+    branches:
+      - published-results
+    paths:
+      - "results-data/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: corpus-event-bridge-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch-reconciler:
+    name: Extract merge SHA and dispatch reconciler
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout published-results branch
+        uses: actions/checkout@v4
+        with:
+          ref: published-results
+          fetch-depth: 2
+
+      - name: Extract merge SHA and verify merge commit
+        id: extract
+        shell: bash
+        run: |
+          MERGE_SHA="${{ github.sha }}"
+
+          # REQUIRED 3 — Verify this is a real merge commit (2+ parents)
+          PARENT_COUNT=$(git cat-file -p "$MERGE_SHA" | grep -c "^parent " || true)
+          if [ "$PARENT_COUNT" -lt 2 ]; then
+            echo "::error::commit $MERGE_SHA has $PARENT_COUNT parent(s), expected 2+ (not a merge commit)"
+            exit 1
+          fi
+
+          # Extract base SHA (first parent)
+          BASE_SHA=$(git rev-parse "${MERGE_SHA}^")
+          echo "merge_sha=$MERGE_SHA" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "Verified merge commit $MERGE_SHA with $PARENT_COUNT parents"
+
+      - name: Read current ledger head SHA
+        id: ledger
+        shell: bash
+        run: |
+          # Read ledger head from the branch — fail-closed if not present
+          LEDGER_CONTENT=$(git show published-results:publication/ledger.json 2>/dev/null || echo "")
+          if [ -z "$LEDGER_CONTENT" ]; then
+            echo "::error::publication/ledger.json not found on published-results branch"
+            echo "ledger_head_sha=" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          # Extract ledger_head_sha from the JSON (must exist)
+          LEDGER_SHA=$(echo "$LEDGER_CONTENT" | python3 -c "
+          import json, sys
+          try:
+              data = json.load(sys.stdin)
+              sha = data.get('ledger_head_sha', '')
+              if not sha:
+                  print('', end='')
+                  sys.exit(1)
+              print(sha, end='')
+          except (json.JSONDecodeError, KeyError):
+              print('', end='')
+              sys.exit(1)
+          " || echo "")
+
+          if [ -z "$LEDGER_SHA" ]; then
+            echo "::error::ledger_head_sha not found or empty in publication/ledger.json"
+            echo "ledger_head_sha=" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          echo "ledger_head_sha=$LEDGER_SHA" >> "$GITHUB_OUTPUT"
+          echo "Ledger head SHA: $LEDGER_SHA"
+
+      - name: Dispatch corpus-reconciler workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const mergeSha = '${{ steps.extract.outputs.merge_sha }}';
+            const baseSha = '${{ steps.extract.outputs.base_sha }}';
+            const ledgerHeadSha = '${{ steps.ledger.outputs.ledger_head_sha }}';
+
+            if (!ledgerHeadSha) {
+              core.setFailed('ledger_head_sha is empty — cannot dispatch reconciler');
+              return;
+            }
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'corpus-reconciler.yml',
+              ref: 'published-results',
+              inputs: {
+                'merge-sha': mergeSha,
+                'base-sha': baseSha,
+                'ledger-head-sha': ledgerHeadSha,
+                'source': 'event-bridge',
+              },
+            });
+
+            console.log(`Dispatched corpus-reconciler with merge_sha=${mergeSha}, base_sha=${baseSha}, ledger_head_sha=${ledgerHeadSha}`);
