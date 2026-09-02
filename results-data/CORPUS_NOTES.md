@@ -1,5 +1,32 @@
 # Corpus Generation Notes - 2026-04-03
 
+## DuckDB version matrix (operator-run, 2026-08-29)
+
+The Results Explorer corpus includes a reproducible DuckDB version-over-version matrix at
+TPC-H, TPC-DS, ClickBench, and SSB SF10. BenchBox's ClickBench generator creates
+synthetic data linearly from the scale factor, so it is measured at SF10 like the
+other workloads. It uses three independent power runs per cell and reports medians.
+The published corpus has one median bundle per version/benchmark cell (28 bundles total);
+the 84 raw repetitions are retained only in the external operator output. The package
+points are DuckDB 1.0.0, 1.1.3, 1.2.2, 1.3.2, 1.4.4, 1.5.5, and
+1.6.0.dev365 (the current latest 1.6 development wheel at capture time).
+
+The runner and analyzer are `scripts/run_duckdb_version_matrix.py` and
+`scripts/analyze_duckdb_version_matrix.py`. The analyzer's
+`--explorer-bundles-dir` option creates the 28 median bundles for promotion. All raw
+data, databases, logs, and analysis outputs remain in the external operator output
+directory; only those anonymized median bundles are promoted here. DuckDB development wheels can report a separate internal
+engine build string, so the raw bundle retains it while Explorer identifies the run by
+the resolved package version.
+
+The 28 promoted median bundles carry maintainer-run submission manifests with
+per-bundle SHA-256 hashes. Their Apple M4 CPU identity is an operator attestation,
+not a recovered measurement: the retained raw matrix archive records the same
+Darwin/arm64 client host as the standing single-machine corpus attestation, while
+the historical capture path omitted CPU model and vendor. The exact provenance
+rewrite and old-to-new result IDs are recorded in
+`bundles/cpu-identity-attestation-pr-1946.manifest.json`.
+
 ## Platforms Run
 
 ### TPC-H (SF 0.01)
