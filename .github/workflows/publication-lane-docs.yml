@@ -1,0 +1,125 @@
+name: Publication Lane - Docs and Prose
+
+on:
+  push:
+    branches:
+      - develop
+      - release
+    paths:
+      - "docs/**"
+      - "landing/**"
+      - "_blog/**"
+      - "benchbox/**"
+      - "scripts/assemble_public_site.py"
+      - "scripts/publication/verify_lane_isolation.py"
+      - ".github/workflows/publication-lane-docs.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+  pull_request:
+    branches:
+      - develop
+      - release
+    paths:
+      - "docs/**"
+      - "landing/**"
+      - "_blog/**"
+      - "benchbox/**"
+      - "scripts/assemble_public_site.py"
+      - "scripts/publication/verify_lane_isolation.py"
+      - ".github/workflows/publication-lane-docs.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+  workflow_dispatch:
+
+concurrency:
+  group: publication-lane-docs-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-docs-lane:
+    name: Build prose site and release API docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Build Sphinx documentation
+        run: |
+          cd docs
+          uv run sphinx-build -b html --keep-going . _build/html
+
+      - name: Assemble prose site artifact
+        run: |
+          mkdir -p lane_artifacts/prose_site
+          uv run python scripts/assemble_public_site.py --site-dir lane_artifacts/prose_site --prose-only
+
+      - name: Package release API documentation artifact
+        run: |
+          mkdir -p lane_artifacts/api_docs
+          if [ -f docs/_build/html/api.html ]; then
+            cp docs/_build/html/api.html lane_artifacts/api_docs/
+          fi
+          if [ -d docs/_build/html/_modules ]; then
+            cp -r docs/_build/html/_modules lane_artifacts/api_docs/
+          fi
+          if [ -d docs/_build/html/_static ]; then
+            mkdir -p lane_artifacts/api_docs/_static
+            cp -r docs/_build/html/_static/* lane_artifacts/api_docs/_static/
+          fi
+          if [ -d docs/_build/html/reference/python-api ]; then
+            mkdir -p lane_artifacts/api_docs/reference/python-api
+            cp -r docs/_build/html/reference/python-api lane_artifacts/api_docs/reference/
+          fi
+          if [ ! -f lane_artifacts/api_docs/api.html ]; then
+            echo "ERROR: api_docs artifact missing api.html" >&2
+            exit 1
+          fi
+          if [ -z "$(ls -A lane_artifacts/api_docs 2>/dev/null)" ]; then
+            echo "ERROR: api_docs artifact is empty" >&2
+            exit 1
+          fi
+
+      - name: Verify lane isolation
+        run: |
+          CHANGED=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}" --quiet || true
+            CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" 2>/dev/null | tr '\n' ' ' || true)
+          fi
+          if [ -n "$CHANGED" ]; then
+            uv run python scripts/publication/verify_lane_isolation.py --lane site --changed-paths $CHANGED
+          else
+            uv run python scripts/publication/verify_lane_isolation.py --lane site
+          fi
+
+      - name: Upload prose site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prose_site
+          path: lane_artifacts/prose_site
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Upload API docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api_docs
+          path: lane_artifacts/api_docs
+          retention-days: 90
+          if-no-files-found: error

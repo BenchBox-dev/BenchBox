@@ -53,7 +53,7 @@ def _validate_destination(repo_root: Path, site_dir: Path) -> None:
         raise ValueError(f"refusing unsafe site output directory: {site_dir}")
 
 
-def assemble_public_site(*, repo_root: Path, site_dir: Path) -> None:
+def assemble_public_site(*, repo_root: Path, site_dir: Path, prose_only: bool = False) -> None:
     """Build the Pages-shaped landing, docs, blog, and optional Explorer tree."""
     repo_root = repo_root.resolve()
     _validate_destination(repo_root, site_dir)
@@ -89,30 +89,43 @@ def assemble_public_site(*, repo_root: Path, site_dir: Path) -> None:
     if image_assets.is_dir():
         _copy_tree(image_assets, site_dir / "_images")
 
-    cname = repo_root / "docs" / "CNAME"
-    if cname.is_file():
-        shutil.copy2(cname, site_dir / "CNAME")
-    (site_dir / ".nojekyll").touch()
+    # CNAME and 404 are Pages deployment concerns; prose_only produces a
+    # non-deployable artifact slice, so neither is emitted in that mode.
+    if not prose_only:
+        cname = repo_root / "docs" / "CNAME"
+        if cname.is_file():
+            shutil.copy2(cname, site_dir / "CNAME")
+        (site_dir / ".nojekyll").touch()
+    else:
+        # Still mark as Jekyll-bypassed so prose_site can be inspected locally,
+        # but do not claim the apex domain.
+        (site_dir / ".nojekyll").touch()
 
-    explorer_package = repo_root / "results-explorer" / "package.json"
-    explorer_dist = repo_root / "results-explorer" / "dist"
-    if explorer_package.is_file() and not explorer_dist.is_dir():
-        raise FileNotFoundError(f"Results Explorer build is missing: {explorer_dist}")
-    if explorer_dist.is_dir():
-        _copy_tree(explorer_dist, site_dir / "results")
-        (site_dir / "404.html").write_text(RESULTS_FALLBACK, encoding="utf-8")
+    if not prose_only:
+        explorer_package = repo_root / "results-explorer" / "package.json"
+        explorer_dist = repo_root / "results-explorer" / "dist"
+        if explorer_package.is_file() and not explorer_dist.is_dir():
+            raise FileNotFoundError(f"Results Explorer build is missing: {explorer_dist}")
+        if explorer_dist.is_dir():
+            _copy_tree(explorer_dist, site_dir / "results")
+            (site_dir / "404.html").write_text(RESULTS_FALLBACK, encoding="utf-8")
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--site-dir", type=Path, required=True, help="destination for the assembled Pages tree")
+    parser.add_argument(
+        "--prose-only",
+        action="store_true",
+        help="assemble prose, docs, and blog only without requiring or embedding Results Explorer",
+    )
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT, help=argparse.SUPPRESS)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    assemble_public_site(repo_root=args.repo_root, site_dir=args.site_dir)
+    assemble_public_site(repo_root=args.repo_root, site_dir=args.site_dir, prose_only=args.prose_only)
     return 0
 
 
