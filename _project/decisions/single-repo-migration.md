@@ -425,12 +425,3 @@ tooling.
 Release curation continues to remove `_project/` in full. Keeping the Make
 modules, contract inventory, historical migration proof, and inventory checker
 together under `make/` preserves a self-contained released Make interface.
-
-## Amendment 2026-09-02 — publication control plane on release branches
-
-The publication control plane directory `publication/` holds published-results
-ledger seeds, manifests, and publication metadata. It belongs on the repository tree
-and is not curated away.
-
-- **`main` only** (extension to A3): `publication/`.
-
