@@ -1,0 +1,53 @@
+name: Rehearse Release Isolation
+
+# The v0.4.0+ release tree keeps one Pages deploy source
+# (scripts/publication/verify_release_isolation.py `publication-deploy.yml`) and
+# requires that no other workflow couples a build with a Pages deploy. This
+# workflow is a read-only rehearsal: it inspects the workflows at a ref with
+# git ls-tree/show and fails loud if hidden coupling is reintroduced, without
+# ever deploying or writing GitHub state.
+
+"on":
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to inspect (e.g. origin/release, origin/develop, HEAD)"
+        type: string
+        default: "HEAD"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rehearse-release-isolation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  rehearse:
+    name: Rehearse release isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Rehearse release isolation (read-only)
+        env:
+          REF_TO_INSPECT: ${{ inputs.ref }}
+        run: |
+          uv run python scripts/publication/verify_release_isolation.py \
+            --ref "$REF_TO_INSPECT" \
+            --mode rehearsal
