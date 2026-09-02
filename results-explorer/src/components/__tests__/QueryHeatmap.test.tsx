@@ -276,7 +276,7 @@ describe("QueryHeatmap rendering", () => {
 
     // Visible without clicking any "Receipt and metadata" disclosure.
     const flag = screen.getByTestId("heatmap-validation-flag-platform-not-run");
-    const badge = within(flag).getByText("not_run");
+    const badge = within(flag).getByText("no validation");
     expect(badge.closest("details")).toBeNull();
     // Tone (warning vs. neutral) for "not_run" is owned by
     // fix/explorer-validation-badge-gating (TrustBadge.tsx validationTone());
@@ -288,7 +288,7 @@ describe("QueryHeatmap rendering", () => {
     // rendered instance for this row.
     const row = flag.closest("tr");
     expect(row).not.toBeNull();
-    expect(within(row as HTMLElement).getAllByText("not_run")).toHaveLength(1);
+    expect(within(row as HTMLElement).getAllByText("no validation")).toHaveLength(1);
   });
 
   it("does not add a validation flag for a clean (passed) result", () => {
