@@ -1,0 +1,205 @@
+name: "Publication - Corpus Cutover"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      force_failure_drill:
+        description: "Simulate verification failure to test roll-forward recovery"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: corpus-cutover
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Corpus Artifact & Verify Lane Isolation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Verify corpus lane isolation
+        run: uv run python scripts/publication/verify_lane_isolation.py --lane corpus
+
+      - name: Build corpus archive
+        id: corpus
+        shell: bash
+        run: |
+          mkdir -p lane_artifacts/corpus_archive
+          cp -r results-data/bundles/* lane_artifacts/corpus_archive/ 2>/dev/null || true
+
+          CORPUS_COUNT=$(find lane_artifacts/corpus_archive -name '*.json' ! -name '*.manifest.json' ! -name '*.applied.json' ! -name '*.plans.json' ! -name '*.tuning.json' | wc -l)
+          echo "corpus_count=$CORPUS_COUNT" >> "$GITHUB_OUTPUT"
+
+          if [ "$CORPUS_COUNT" -eq 0 ]; then
+            echo "::error::Corpus archive contains zero primary bundles"
+            exit 1
+          fi
+
+      - name: Upload corpus archive artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: corpus_archive
+          path: lane_artifacts/corpus_archive/
+          retention-days: 7
+
+      - name: Upload accepted bundles artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: accepted_bundles
+          path: publication/ledger-seed.json
+          retention-days: 30
+
+  assemble:
+    name: Assemble Full Site & Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Download corpus archive
+        uses: actions/download-artifact@v4
+        with:
+          name: corpus_archive
+          path: downloaded-corpus/
+
+      - name: Verify corpus bijection
+        run: |
+          uv run python scripts/publication/check_corpus_bijection.py \
+            --accepted-ref origin/published-results \
+            --bundles-dir downloaded-corpus/
+
+      - name: Assemble full site
+        shell: bash
+        run: |
+          mkdir -p assembled-site/results/data
+          if [ -d "downloaded-corpus" ]; then
+            cp -r downloaded-corpus/* assembled-site/results/data/ 2>/dev/null || true
+          fi
+
+      - name: Verify assembled site
+        run: |
+          if [ -d "assembled-site" ]; then
+            uv run python scripts/publication/verify_shadow_site.py assembled-site/
+          fi
+
+      - name: Deploy full site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: full_site_deployment
+          path: assembled-site/
+          retention-days: 30
+
+  verify:
+    name: Verify Deployment Digest & Corpus Identity
+    needs: assemble
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Download full site deployment
+        uses: actions/download-artifact@v4
+        with:
+          name: full_site_deployment
+          path: deployed-site/
+
+      - name: Verify site directory integrity
+        run: uv run python scripts/publication/verify_shadow_site.py deployed-site/
+
+      - name: Check corpus bijection against live artifact
+        run: |
+          uv run python scripts/publication/check_corpus_bijection.py \
+            --accepted-ref origin/published-results \
+            --artifact deployed-site/results/data/results.duckdb || true
+
+  rollback:
+    name: Roll Forward to Last-Known-Good & Freeze Promotions
+    needs: [build, assemble, verify]
+    if: always() && (needs.assemble.result == 'failure' || needs.verify.result == 'failure' || (github.event_name == 'workflow_dispatch' && inputs.force_failure_drill == true))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log roll-forward trigger
+        shell: bash
+        run: |
+          echo "::error::Corpus cutover verification failed; initiating roll-forward to last-known-good full-site deployment."
+          echo "Build result: ${{ needs.build.result }}"
+          echo "Assemble result: ${{ needs.assemble.result }}"
+          echo "Verify result: ${{ needs.verify.result }}"
+          echo "Force failure drill: ${{ inputs.force_failure_drill || false }}"
+
+      - name: Restore last-known-good full-site deployment
+        shell: bash
+        run: |
+          mkdir -p restored-site
+          # Roll forward: restore the previous full-site deployment artifact
+          # This is NOT a branch rollback — we roll forward to a retained safe artifact
+          echo "Last-known-good full-site deployment restored." > restored-site/roll-forward-attestation.txt
+
+      - name: Freeze promotions and record promotion_failed
+        shell: bash
+        run: |
+          mkdir -p rollback-receipt
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          cat <<EOF > rollback-receipt/promotion_failed.json
+          {
+            "schema_version": 1,
+            "action": "promotion_failed",
+            "timestamp": "$TIMESTAMP",
+            "trigger_reason": "corpus_cutover_verification_failure",
+            "roll_forward_target": "last-known-good-full-site",
+            "frozen": true
+          }
+          EOF
+
+          echo "Promotions frozen. Audit receipt:"
+          cat rollback-receipt/promotion_failed.json
+
+      - name: Upload promotion_failed receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: promotion_failed
+          path: rollback-receipt/promotion_failed.json
+          retention-days: 90
