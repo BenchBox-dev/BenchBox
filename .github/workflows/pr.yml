@@ -1258,13 +1258,13 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch base branch for trusted script check
-        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+        run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
 
       - name: Verify script not modified to exfiltrate secrets (run base version if changed)
         run: |
-          if ! git diff --quiet "origin/${{ github.base_ref }}...HEAD" -- scripts/publication/check_plan_reconciliation.py; then
+          if ! git diff --quiet "origin/${{ github.base_ref || 'develop' }}...HEAD" -- scripts/publication/check_plan_reconciliation.py; then
             echo "::warning::Publication reconciliation script was modified in this PR; using base branch version for credentialed execution to avoid secret exfiltration."
-            git checkout "origin/${{ github.base_ref }}" -- scripts/publication/check_plan_reconciliation.py
+            git checkout "origin/${{ github.base_ref || 'develop' }}" -- scripts/publication/check_plan_reconciliation.py
           fi
 
       - name: Set up Python 3.12
