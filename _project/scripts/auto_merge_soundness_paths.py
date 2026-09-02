@@ -111,6 +111,8 @@ SOUNDNESS_FILES = (
     # cut over, this workflow holds deployment credentials and publishes the
     # complete site and Explorer, so changes require the same manual review.
     ".github/workflows/docs.yml",
+    ".github/workflows/publication-lane-docs.yml",
+    "scripts/publication/verify_lane_isolation.py",
     "_project/scripts/auto_merge_soundness_paths.py",
     ".github/workflows/auto-merge-on-open.yml",
     ".github/workflows/release.yml",

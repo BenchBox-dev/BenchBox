@@ -41,6 +41,8 @@ scripts/validate_submission.py @joeharris76
 .github/workflows/validate-submission.yml @joeharris76
 .github/workflows/sync-results-data-to-published.yml @joeharris76
 .github/workflows/docs.yml @joeharris76
+.github/workflows/publication-lane-docs.yml @joeharris76
+scripts/publication/verify_lane_isolation.py @joeharris76
 # Self-protection: the review-gate machinery and the PyPI-publishing
 # workflow. In-workflow checks are attacker-controlled for same-repo PRs
 # (GitHub runs the PR's own copy of a pull_request-triggered workflow).

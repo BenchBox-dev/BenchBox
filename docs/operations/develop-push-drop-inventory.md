@@ -45,6 +45,7 @@ Re-run the method when adding a new develop-push workflow.
 | `results-explorer-browser.yml` | `release` + `develop` + explorer/`results-data` path filter | **none** | yes | Mixed — required PR gate (`Results Explorer browser gate`); develop push is post-merge tip re-build for path-matched merges | Dropped develop push can leave tip without a post-merge browser rebuild until the next matching push or dispatch | **Accepted risk** — pre-merge required check on every PR into develop is the primary safety property; develop push is additive tip verification; suite is expensive (Chromium full + smoke browsers) so no hourly schedule; recover with `gh workflow run results-explorer-browser.yml --ref develop` |
 | `docs.yml` | `develop`, all paths | **none** | yes | Mixed — assembles the Pages-shaped site and produces the SHA-bound public-site visual baseline | A dropped push delays baseline refresh; exact-base PR comparison fails closed once any baseline exists | **Accepted risk** — the develop PR visual job remains the review gate; the protected push is an additive baseline producer; recover with `gh workflow run docs.yml --ref develop` |
 | `publication-lane-explorer.yml` | `release` + `develop` + `results-explorer/**`/`scripts/publication/**` path filter | **none** | yes | Advisory — builds/typechecks the Explorer SPA, runs unit and contract tests, and validates the compatibility manifest; lane is **not** a required status check and does not block merges (primary required gate remains `Results Explorer browser gate`) | Dropped develop push delays tip re-verification of the Explorer build and manifest until the next matching push or dispatch; job holds no deploy or write credentials (`permissions: contents: read` only; output is a CI artifact upload, not a publish step) | **Accepted risk** — lane is advisory; pre-merge validation does not gate merges; develop push is additive tip verification with no elevated permissions or external publish surface; recover with `gh workflow run publication-lane-explorer.yml --ref develop` |
+| `publication-lane-docs.yml` | `develop` + `release` + docs/landing/blog/`benchbox/**` path filter | **none** | yes | Mixed — builds decoupled prose-site and API-docs artifacts independent of the package release lane | A dropped path-matched push delays the standalone docs-lane artifact build until the next matching push or dispatch; it does not gate develop tip or package release | **Accepted risk** — this lane only produces build artifacts (no deploy/write credentials); recover with `gh workflow run publication-lane-docs.yml --ref develop` |
 
 ### Explicit non-entries (push, but not develop)
 
@@ -166,7 +167,7 @@ PY
 
 Expected subject set (names only):
 `develop-post-merge.yml`, `docs.yml`, `orphaned-commit-detector.yml`,
-`publication-lane-explorer.yml`, `results-explorer-browser.yml`,
+`publication-lane-docs.yml`, `publication-lane-explorer.yml`, `results-explorer-browser.yml`,
 `submission-validator-drift-check.yml`, `sync-results-data-to-published.yml`.
 
 ## Manual recovery cheatsheet
@@ -178,5 +179,6 @@ Expected subject set (names only):
 | Corpus mirror lag | `gh workflow run corpus-drift-check.yml` then, if develop-ahead, `gh workflow run sync-results-data-to-published.yml --ref develop` |
 | Browser tip rebuild | `gh workflow run results-explorer-browser.yml --ref develop` |
 | Explorer publication lane artifact | `gh workflow run publication-lane-explorer.yml --ref develop` |
+| Docs-lane artifact rebuild | `gh workflow run publication-lane-docs.yml --ref develop` |
 | Orphan scan | `gh workflow run orphaned-commit-detector.yml --ref develop` |
 | Validator drift | `gh workflow run submission-validator-drift-check.yml --ref develop` |
