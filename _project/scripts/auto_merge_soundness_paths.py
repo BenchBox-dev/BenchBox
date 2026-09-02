@@ -63,8 +63,8 @@ SOUNDNESS_PREFIXES = (
     # because it publishes to PyPI. .github/workflows/pr.yml is deliberately
     # NOT included: it is high-churn (routine CI-lane edits), and the
     # required-check contract it feeds (ci-required-result) is pinned by the
-    # develop ruleset + the daily ruleset-drift canary rather than by owner
-    # review -- see soundness-surface-widening's recorded decision.
+    "publication/",
+    "scripts/publication/",
 )
 SOUNDNESS_FILES = (
     "benchbox/platforms/base/result_capture.py",
