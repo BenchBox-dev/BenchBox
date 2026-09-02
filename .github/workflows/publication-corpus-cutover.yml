@@ -4,9 +4,13 @@ name: "Publication - Corpus Cutover"
   workflow_dispatch:
     inputs:
       force_failure_drill:
-        description: "Simulate verification failure to test roll-forward recovery"
+        description: "Fail verification to exercise the detection -> roll-forward recovery path"
         type: boolean
         default: false
+      rollback_target_sha:
+        description: "Pinned last-known-good release SHA to roll forward to (default: publication baseline release SHA)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -22,6 +26,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -41,16 +47,51 @@ jobs:
         id: corpus
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p lane_artifacts/corpus_archive
-          cp -r results-data/bundles/* lane_artifacts/corpus_archive/ 2>/dev/null || true
 
-          CORPUS_COUNT=$(find lane_artifacts/corpus_archive -name '*.json' ! -name '*.manifest.json' ! -name '*.applied.json' ! -name '*.plans.json' ! -name '*.tuning.json' | wc -l)
+          # M11: no `|| true`. `cp -r src/. dest` fails loudly on a partial copy.
+          cp -r results-data/bundles/. lane_artifacts/corpus_archive/
+
+          count_primary() {
+            find "$1" -name '*.json' \
+              ! -name '*.manifest.json' ! -name '*.applied.json' \
+              ! -name '*.plans.json' ! -name '*.tuning.json' | wc -l | tr -d ' '
+          }
+          SRC_COUNT=$(count_primary results-data/bundles)
+          CORPUS_COUNT=$(count_primary lane_artifacts/corpus_archive)
           echo "corpus_count=$CORPUS_COUNT" >> "$GITHUB_OUTPUT"
 
           if [ "$CORPUS_COUNT" -eq 0 ]; then
             echo "::error::Corpus archive contains zero primary bundles"
             exit 1
           fi
+          if [ "$CORPUS_COUNT" -ne "$SRC_COUNT" ]; then
+            echo "::error::Corpus archive is incomplete: copied $CORPUS_COUNT of $SRC_COUNT primary bundles"
+            exit 1
+          fi
+
+      - name: Regenerate and diff ledger seed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin published-results
+          uv run python scripts/publication/create_ledger_seed.py \
+            --accepted-ref origin/published-results \
+            --output /tmp/ledger-seed.regen.json
+          # `source`/`generated_at` are snapshot metadata; the corpus content
+          # (union + dispositions + digests) must match the committed seed.
+          uv run python - <<'PY'
+          import json, sys
+          keys = ("union", "dispositions", "digests", "published_only", "legacy_overlay", "count")
+          committed = json.load(open("publication/ledger-seed.json"))
+          regen = json.load(open("/tmp/ledger-seed.regen.json"))
+          drift = {k: (committed.get(k), regen.get(k)) for k in keys if committed.get(k) != regen.get(k)}
+          if drift:
+              print("::error::Committed ledger seed drifted from origin/published-results:", list(drift))
+              sys.exit(1)
+          print(f"Ledger seed matches origin/published-results ({regen['count']} paths).")
+          PY
 
       - name: Upload corpus archive artifact
         uses: actions/upload-artifact@v4
@@ -67,12 +108,14 @@ jobs:
           retention-days: 30
 
   assemble:
-    name: Assemble Full Site & Deploy
+    name: Assemble Full Site & Verify
     needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -85,33 +128,63 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: results-explorer/package-lock.json
+
+      - name: Install explorer dependencies
+        run: npm ci
+        working-directory: results-explorer
+
       - name: Download corpus archive
         uses: actions/download-artifact@v4
         with:
           name: corpus_archive
           path: downloaded-corpus/
 
-      - name: Verify corpus bijection
+      - name: Verify corpus bijection (path cross-check)
         run: |
+          git fetch --no-tags origin published-results
           uv run python scripts/publication/check_corpus_bijection.py \
             --accepted-ref origin/published-results \
             --bundles-dir downloaded-corpus/
 
-      - name: Assemble full site
+      - name: Assemble full site (real A6/A7 assembler)
+        id: assemble
         shell: bash
         run: |
+          set -euo pipefail
+          # A7 explorer read model: DuckDB snapshot + copied bundles.
+          uv run python _project/scripts/explorer_publish.py build \
+            --data-dir results-data/ \
+            --output results-explorer/public/data/
+          # A7 explorer SPA (emits index.html + hashed assets).
+          npm run build --prefix results-explorer
+          # A6/A7 whole-site tree: SPA at root, read model under /results/data.
           mkdir -p assembled-site/results/data
-          if [ -d "downloaded-corpus" ]; then
-            cp -r downloaded-corpus/* assembled-site/results/data/ 2>/dev/null || true
-          fi
+          cp -r results-explorer/dist/. assembled-site/
+          cp -r results-explorer/public/data/. assembled-site/results/data/
+          test -f assembled-site/index.html
+          test -f assembled-site/results/data/results.duckdb
+          DB_SHA=$(sha256sum assembled-site/results/data/results.duckdb | cut -d' ' -f1)
+          echo "database_sha256=$DB_SHA" >> "$GITHUB_OUTPUT"
+          echo "Assembled site database sha256: $DB_SHA"
 
       - name: Verify assembled site
-        run: |
-          if [ -d "assembled-site" ]; then
-            uv run python scripts/publication/verify_shadow_site.py assembled-site/
-          fi
+        run: uv run python scripts/publication/verify_shadow_site.py assembled-site/
 
-      - name: Deploy full site artifact
+      - name: Verify corpus bijection against assembled DuckDB
+        run: |
+          uv run python scripts/publication/check_corpus_bijection.py \
+            --accepted-ref origin/published-results \
+            --bundles-dir downloaded-corpus/ \
+            --artifact assembled-site/results/data/results.duckdb \
+            --require-artifact
+
+      - name: Upload full site artifact
         uses: actions/upload-artifact@v4
         with:
           name: full_site_deployment
@@ -125,6 +198,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -137,69 +212,217 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
+      - name: Force failure drill
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.force_failure_drill == true }}
+        run: |
+          echo "::error::force_failure_drill enabled -- failing verify to exercise the roll-forward recovery path"
+          exit 1
+
       - name: Download full site deployment
         uses: actions/download-artifact@v4
         with:
           name: full_site_deployment
           path: deployed-site/
 
+      - name: Download corpus archive
+        uses: actions/download-artifact@v4
+        with:
+          name: corpus_archive
+          path: downloaded-corpus/
+
       - name: Verify site directory integrity
         run: uv run python scripts/publication/verify_shadow_site.py deployed-site/
 
-      - name: Check corpus bijection against live artifact
+      - name: Check corpus bijection against deployed artifact
         run: |
+          git fetch --no-tags origin published-results
           uv run python scripts/publication/check_corpus_bijection.py \
             --accepted-ref origin/published-results \
-            --artifact deployed-site/results/data/results.duckdb || true
+            --bundles-dir downloaded-corpus/ \
+            --artifact deployed-site/results/data/results.duckdb \
+            --require-artifact
 
   rollback:
     name: Roll Forward to Last-Known-Good & Freeze Promotions
     needs: [build, assemble, verify]
-    if: always() && (needs.assemble.result == 'failure' || needs.verify.result == 'failure' || (github.event_name == 'workflow_dispatch' && inputs.force_failure_drill == true))
+    # M5: any non-success outcome of assemble/verify (failure OR cancellation)
+    # triggers recovery. A `build` failure is deliberately excluded: nothing is
+    # assembled or deployed in that case, so there is no promotion state to
+    # freeze -- the cutover simply did not occur.
+    if: >-
+      always() && (
+        (needs.build.result == 'success' && (needs.assemble.result != 'success' || needs.verify.result != 'success'))
+        || (github.event_name == 'workflow_dispatch' && inputs.force_failure_drill == true)
+      )
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: results-explorer/package-lock.json
 
       - name: Log roll-forward trigger
         shell: bash
         run: |
-          echo "::error::Corpus cutover verification failed; initiating roll-forward to last-known-good full-site deployment."
-          echo "Build result: ${{ needs.build.result }}"
+          echo "::error::Corpus cutover verification failed; rolling forward to the last-known-good full-site deployment."
+          echo "Build result:   ${{ needs.build.result }}"
           echo "Assemble result: ${{ needs.assemble.result }}"
-          echo "Verify result: ${{ needs.verify.result }}"
+          echo "Verify result:   ${{ needs.verify.result }}"
           echo "Force failure drill: ${{ inputs.force_failure_drill || false }}"
 
-      - name: Restore last-known-good full-site deployment
+      - name: Resolve last-known-good release SHA
+        id: kg
         shell: bash
         run: |
-          mkdir -p restored-site
-          # Roll forward: restore the previous full-site deployment artifact
-          # This is NOT a branch rollback — we roll forward to a retained safe artifact
-          echo "Last-known-good full-site deployment restored." > restored-site/roll-forward-attestation.txt
+          set -euo pipefail
+          TARGET="${{ inputs.rollback_target_sha }}"
+          if [ -z "$TARGET" ]; then
+            TARGET=$(python3 -c "import json; print(json.load(open('docs/operations/publication-baseline-2026-08-31.json'))['branches']['release']['sha'])")
+          fi
+          echo "target_sha=$TARGET" >> "$GITHUB_OUTPUT"
+          git fetch --no-tags origin "$TARGET"
+          # Roll FORWARD: materialise the known-good tree in a side worktree.
+          # No branch is moved; nothing is checked out over the working tree.
+          git worktree add ../known-good "$TARGET"
+          echo "Known-good release tree materialised at ../known-good ($TARGET)"
 
-      - name: Freeze promotions and record promotion_failed
+      - name: Rebuild last-known-good full site
+        id: restore
         shell: bash
         run: |
+          set -euo pipefail
+          cd ../known-good
+          npm ci --prefix results-explorer
+          uv run python _project/scripts/explorer_publish.py build \
+            --data-dir results-data/ \
+            --output results-explorer/public/data/
+          npm run build --prefix results-explorer
+          mkdir -p "$GITHUB_WORKSPACE/restored-site/results/data"
+          cp -r results-explorer/dist/. "$GITHUB_WORKSPACE/restored-site/"
+          cp -r results-explorer/public/data/. "$GITHUB_WORKSPACE/restored-site/results/data/"
+          cd "$GITHUB_WORKSPACE"
+          test -f restored-site/index.html
+          test -f restored-site/results/data/results.duckdb
+          RESTORED_DB_SHA=$(sha256sum restored-site/results/data/results.duckdb | cut -d' ' -f1)
+          RESTORED_TREE_SHA=$(find restored-site -type f -exec sha256sum {} \; | sort | sha256sum | cut -d' ' -f1)
+          echo "restored_db_sha256=$RESTORED_DB_SHA" >> "$GITHUB_OUTPUT"
+          echo "restored_tree_sha256=$RESTORED_TREE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Verify rebuilt known-good site
+        id: verify_restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run python scripts/publication/verify_shadow_site.py restored-site/
+          uv run python scripts/publication/check_corpus_bijection.py \
+            --accepted-ref "${{ steps.kg.outputs.target_sha }}" \
+            --bundles-dir ../known-good/results-data/bundles/ \
+            --artifact restored-site/results/data/results.duckdb \
+            --require-artifact
+          echo "shadow_verify=passed" >> "$GITHUB_OUTPUT"
+          echo "bijection_verify=passed" >> "$GITHUB_OUTPUT"
+
+      - name: Probe live production site (non-fatal, result recorded)
+        id: probe
+        shell: bash
+        run: |
+          set +e
+          uv run python scripts/publication/verify_live.py \
+            --base-url https://benchbox.dev \
+            --manifest docs/operations/publication-baseline-2026-08-31.json \
+            --require-receipt \
+            --timeout 60 \
+            --json > probe-report.json 2> probe-error.txt
+          RC=$?
+          set -e
+          echo "exit_code=$RC" >> "$GITHUB_OUTPUT"
+          if [ "$RC" -eq 0 ]; then
+            echo "status=healthy" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=unconfirmed" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Live probe exit code: $RC"
+          cat probe-error.txt || true
+
+      - name: Write roll-forward receipt (established facts only)
+        id: receipt
+        shell: bash
+        run: |
+          set -euo pipefail
           mkdir -p rollback-receipt
+          cp restored-site/results/data/results.duckdb rollback-receipt/ 2>/dev/null || true
+          [ -f probe-report.json ] && cp probe-report.json rollback-receipt/ || true
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          cat <<EOF > rollback-receipt/promotion_failed.json
+          PROBE_REPORT="null"
+          if [ -s probe-report.json ] && python3 -c "import json,sys; json.load(open('probe-report.json'))" 2>/dev/null; then
+            PROBE_REPORT=$(cat probe-report.json)
+          fi
+          cat > rollback-receipt/promotion_failed.json <<EOF
           {
-            "schema_version": 1,
+            "schema_version": 2,
             "action": "promotion_failed",
             "timestamp": "$TIMESTAMP",
-            "trigger_reason": "corpus_cutover_verification_failure",
-            "roll_forward_target": "last-known-good-full-site",
-            "frozen": true
+            "trigger": {
+              "reason": "corpus_cutover_verification_failure",
+              "build_result": "${{ needs.build.result }}",
+              "assemble_result": "${{ needs.assemble.result }}",
+              "verify_result": "${{ needs.verify.result }}",
+              "force_failure_drill": ${{ inputs.force_failure_drill || false }}
+            },
+            "roll_forward": {
+              "target_release_sha": "${{ steps.kg.outputs.target_sha }}",
+              "method": "deterministic rebuild of the known-good release tree in a side worktree",
+              "restored_site_tree_sha256": "${{ steps.restore.outputs.restored_tree_sha256 }}",
+              "restored_database_sha256": "${{ steps.restore.outputs.restored_db_sha256 }}",
+              "shadow_site_verify": "${{ steps.verify_restore.outputs.shadow_verify }}",
+              "corpus_bijection_verify": "${{ steps.verify_restore.outputs.bijection_verify }}"
+            },
+            "live_probe": {
+              "base_url": "https://benchbox.dev",
+              "exit_code": ${{ steps.probe.outputs.exit_code }},
+              "status": "${{ steps.probe.outputs.status }}",
+              "report": $PROBE_REPORT
+            },
+            "promotion_gate": {
+              "signal": "promotion_failed",
+              "freeze_signal_emitted": true,
+              "mechanism": "Emitting this promotion_failed receipt is the freeze signal per docs/operations/independent-publication-contract.md step 8; the prior live generation is retained untouched.",
+              "scope_note": "This workflow holds contents:read only and never deploys to Pages, so production was not mutated. Restoration here means the known-good deployment was rebuilt byte-for-byte and verified, ready to re-serve."
+            }
           }
           EOF
-
-          echo "Promotions frozen. Audit receipt:"
+          python3 -c "import json; json.load(open('rollback-receipt/promotion_failed.json'))"
+          echo "Roll-forward receipt:"
           cat rollback-receipt/promotion_failed.json
+
+      - name: Upload restored full-site deployment
+        uses: actions/upload-artifact@v4
+        with:
+          name: restored_full_site
+          path: restored-site/
+          retention-days: 90
 
       - name: Upload promotion_failed receipt
         uses: actions/upload-artifact@v4
         with:
           name: promotion_failed
-          path: rollback-receipt/promotion_failed.json
+          path: rollback-receipt/
           retention-days: 90
