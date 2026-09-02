@@ -502,7 +502,9 @@ def verify_lane_isolation(  # noqa: C901
             real_mod = {victim: mutated}
             mutated_digests = compute_all_lane_digests(repo_root=repo_root, extra_files=real_mod)
             if mutated_digests[other_lane] == baseline_digests[other_lane]:
-                mutation_failures.append(f"real file mutation '{victim}' failed to change its own lane '{other_lane}' digest")
+                mutation_failures.append(
+                    f"real file mutation '{victim}' failed to change its own lane '{other_lane}' digest"
+                )
             if mutated_digests[lane] != baseline_digests[lane]:
                 mutation_failures.append(f"real file mutation '{victim}' in '{other_lane}' mutated '{lane}' digest")
         # Mutate own lane's real file and verify isolation of unrelated lanes
@@ -520,7 +522,9 @@ def verify_lane_isolation(  # noqa: C901
                             f"real file mutation '{victim}' in '{lane}' mutated unrelated '{other_lane}' digest"
                         )
                 if mutated_digests[lane] == baseline_digests[lane]:
-                    mutation_failures.append(f"real file mutation '{victim}' in '{lane}' failed to change its own digest")
+                    mutation_failures.append(
+                        f"real file mutation '{victim}' in '{lane}' failed to change its own digest"
+                    )
             except OSError as exc:
                 mutation_failures.append(f"cannot read real lane file '{victim}' for mutation check: {exc}")
 

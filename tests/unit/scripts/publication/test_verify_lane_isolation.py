@@ -276,7 +276,9 @@ jobs:
 """
     wf_path.write_text(wf_content, encoding="utf-8")
     errors = verify_workflow_isolation("site", repo_root=tmp_path)
-    assert any("job 'build-docs-lane'" in e and "contents: write" in e.lower() or "non-least-privilege" in e for e in errors), errors
+    assert any(
+        "job 'build-docs-lane'" in e and "contents: write" in e.lower() or "non-least-privilege" in e for e in errors
+    ), errors
     # Also test scalar job permissions
     wf_content_scalar = wf_content.replace("contents: write", '"write-all"')
     wf_path.write_text(wf_content_scalar, encoding="utf-8")
