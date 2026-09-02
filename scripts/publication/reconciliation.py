@@ -3,20 +3,35 @@
 
 Performs 4-way reconciliation across publication lifecycle states:
 1. Desired: Publication manifest pinning target generation, source commit, and artifacts.
-2. Built: Content-addressed store (CAS) or assembled artifacts and checksums.
-3. Deployed: Hosting provider deployment status and receipt.
-4. Observed: External live endpoint probes and attested live observations.
+2. Built: Immutable assembly receipt with artifact digests and provenance.
+3. Deployed: Hosting provider deployment acknowledgement receipt.
+4. Observed: External attested live-observation receipt with public route probes.
+
+This tool never fabricates any of the four states. Every state must be supplied
+as a real input file. When a required input is absent, malformed, or collapses
+onto another state, the run fails closed (exit 1 or 2) and never reports a
+reconciled result. Per ``docs/operations/independent-publication-contract.md``
+lines 22-25, a green run of this canary does not prove live publication; it only
+proves that the four supplied receipts agree.
 
 Detects and classifies drift:
 - MANIFEST_DRIFT: manifest digests, source commits, or build closures mismatch.
-- ARTIFACT_DRIFT: observed or built checksums differ from manifest definitions.
-- GENERATION_DRIFT: deployed or observed generation lags behind desired generation.
-- STALE_RECEIPT: live observation receipt is missing or exceeds max age.
+- ARTIFACT_DRIFT: manifest-required artifacts missing from the build, unexpected
+  extra artifacts, or built/observed checksums differ from manifest definitions.
+- GENERATION_DRIFT: deployed or observed generation lags or mismatches desired.
+- STALE_RECEIPT: live observation receipt is missing, undated, future-dated, or
+  exceeds max age.
+- RECEIPT_INCOMPLETE: the live receipt omits a field the contract mandates
+  (schema version, receipt ID, target, manifest digest, both source SHAs,
+  artifact identity, required route set with per-route status, nonce, freshness
+  window, attestor identity, or signature).
+- MISSING_OBSERVATION: no live-observation receipt or no public route probes.
 
 Exit codes:
-  0 - Fully reconciled, zero drift detected.
+  0 - Fully reconciled, zero drift detected, all four real states supplied.
   1 - Drift or reconciliation violation detected.
-  2 - Configuration, file reading, or argument error.
+  2 - Configuration, file reading, or argument error (including any missing
+      required input).
 """
 
 from __future__ import annotations
@@ -39,6 +54,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BASE_URL = "https://benchbox.dev"
 DEFAULT_MAX_AGE_HOURS = 24.0
 DEFAULT_TIMEOUT_SECONDS = 15.0
+# Clock-skew tolerance for future-dated receipts before it counts as a violation.
+FUTURE_SKEW_SECONDS = 300.0
 
 DEFAULT_PROBE_PATHS = (
     "/",
@@ -46,12 +63,37 @@ DEFAULT_PROBE_PATHS = (
     "/results/data/results.duckdb",
 )
 
+# Receipt file names expected inside --receipts-dir. These are documented in
+# docs/operations/independent-publication-contract.md ("Reconciliation inputs").
+ASSEMBLY_RECEIPT_NAME = "assembly-receipt.json"
+DEPLOYMENT_RECEIPT_NAME = "deployment-receipt.json"
+LIVE_RECEIPT_NAME = "live-receipt.json"
+
+# Fields the contract (independent-publication-contract.md, "Required live
+# receipt fields") mandates on an attested live-observation receipt.
+REQUIRED_RECEIPT_FIELDS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("schema version", ("schema_version", "schemaVersion")),
+    ("receipt ID", ("receipt_id", "id")),
+    ("target", ("target",)),
+    ("generation", ("generation",)),
+    ("observation timestamp", ("timestamp", "observed_at", "created_at")),
+    ("publication manifest digest", ("manifest_digest", "manifest_sha256")),
+    ("develop SHA", ("develop_sha", "source_commit", "develop_commit")),
+    ("published-results SHA", ("published_results_sha", "published_results_commit")),
+    ("artifact identity", ("artifacts", "artifact")),
+    ("required route set", ("routes", "probes")),
+    ("nonce", ("nonce",)),
+    ("freshness window", ("freshness_window", "freshness_window_hours", "max_age_hours")),
+    ("attestor identity", ("attestor", "attestor_identity", "attested_by")),
+    ("attestor signature", ("signature", "attestor_signature")),
+)
+
 
 @dataclass(frozen=True)
 class DriftFinding:
     """Individual drift finding with classification and expected vs actual values."""
 
-    drift_type: str  # MANIFEST_DRIFT, ARTIFACT_DRIFT, GENERATION_DRIFT, STALE_RECEIPT
+    drift_type: str
     description: str
     expected: Any = None
     actual: Any = None
@@ -115,6 +157,10 @@ class ReconciliationReport:
         }
 
 
+class ReconciliationInputError(ValueError):
+    """Raised when the four reconciliation states are missing or not distinct."""
+
+
 def parse_iso_timestamp(ts_str: str) -> datetime | None:
     """Parse an ISO-8601 UTC timestamp string."""
     if not ts_str:
@@ -127,6 +173,29 @@ def parse_iso_timestamp(ts_str: str) -> datetime | None:
         return dt
     except Exception:
         return None
+
+
+def _normalize_generation(value: Any) -> int | None:
+    """Coerce a generation value to int, tolerating string encodings."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def _first_present(data: dict[str, Any], keys: tuple[str, ...]) -> Any:
+    for key in keys:
+        if key in data and data[key] not in (None, "", [], {}):
+            return data[key]
+    return None
 
 
 def probe_live_endpoint(
@@ -180,7 +249,6 @@ def extract_artifact_digests(manifest_or_receipt: dict[str, Any]) -> dict[str, s
     """Extract path -> sha256 mapping from various manifest/receipt schemas."""
     digests: dict[str, str] = {}
 
-    # 1. Manifest artifacts dict: artifacts: {"explorer_app": {"digest": "...", "path": "..."}}
     artifacts = manifest_or_receipt.get("artifacts")
     if isinstance(artifacts, dict):
         for name, entry in artifacts.items():
@@ -193,13 +261,11 @@ def extract_artifact_digests(manifest_or_receipt: dict[str, Any]) -> dict[str, s
                 p = item.get("path", "")
                 digests[p] = str(item["sha256"]).lower().removeprefix("sha256:")
 
-    # 2. Checksums mapping: checksums: {"/results/data/results.duckdb": "..."}
     checksums = manifest_or_receipt.get("checksums")
     if isinstance(checksums, dict):
         for p, h in checksums.items():
             digests[p] = str(h).lower().removeprefix("sha256:")
 
-    # 3. Live database / baseline direct structure
     live_db = manifest_or_receipt.get("live_database")
     if isinstance(live_db, dict) and "sha256" in live_db:
         digests["/results/data/results.duckdb"] = str(live_db["sha256"]).lower().removeprefix("sha256:")
@@ -217,39 +283,41 @@ def _check_generation_drift(
     dep_gen: int | None,
     obs_gen: int | None,
 ) -> list[DriftFinding]:
-    """Detect generation lag or mismatch between desired, deployed, and observed."""
-    drifts: list[DriftFinding] = []
-    if des_gen is not None and dep_gen is not None and des_gen != dep_gen:
-        drifts.append(
-            DriftFinding(
-                drift_type="GENERATION_DRIFT",
-                description=f"Deployed generation ({dep_gen}) does not match desired generation ({des_gen})",
-                expected=des_gen,
-                actual=dep_gen,
-            )
-        )
+    """Detect generation lag or mismatch across desired, deployed, and observed.
 
-    if dep_gen is not None and obs_gen is not None and dep_gen != obs_gen:
-        drifts.append(
-            DriftFinding(
-                drift_type="GENERATION_DRIFT",
-                description=f"Observed generation ({obs_gen}) does not match deployed generation ({dep_gen})",
-                expected=dep_gen,
-                actual=obs_gen,
+    All three pairwise comparisons are made so a missing intermediate value
+    cannot mask a desired<->observed mismatch.
+    """
+    drifts: list[DriftFinding] = []
+    pairs = (
+        ("desired", des_gen, "deployed", dep_gen),
+        ("deployed", dep_gen, "observed", obs_gen),
+        ("desired", des_gen, "observed", obs_gen),
+    )
+    for a_name, a_val, b_name, b_val in pairs:
+        if a_val is not None and b_val is not None and a_val != b_val:
+            drifts.append(
+                DriftFinding(
+                    drift_type="GENERATION_DRIFT",
+                    description=(
+                        f"{b_name.capitalize()} generation ({b_val}) does not match {a_name} generation ({a_val})"
+                    ),
+                    expected=a_val,
+                    actual=b_val,
+                )
             )
-        )
     return drifts
 
 
 def _check_manifest_drift(
-    desired: dict[str, Any] | None,
-    built: dict[str, Any] | None,
-    deployed: dict[str, Any] | None,
+    desired: dict[str, Any],
+    built: dict[str, Any],
+    deployed: dict[str, Any],
 ) -> list[DriftFinding]:
-    """Detect commit or build closure drift across desired, built, and deployed states."""
+    """Detect commit or build closure drift across desired, built, and deployed."""
     drifts: list[DriftFinding] = []
-    des_commit = desired.get("source_commit") if desired else None
-    dep_commit = deployed.get("source_commit") or deployed.get("commit_sha") if deployed else None
+    des_commit = _first_present(desired, ("develop_sha", "source_commit", "develop_commit"))
+    dep_commit = _first_present(deployed, ("develop_sha", "source_commit", "commit_sha"))
 
     if des_commit and dep_commit and des_commit != dep_commit:
         drifts.append(
@@ -261,23 +329,178 @@ def _check_manifest_drift(
             )
         )
 
-    if desired and built:
-        desired_closure = desired.get("build_closure")
-        built_closure = built.get("build_closure")
-        if isinstance(desired_closure, dict) and isinstance(built_closure, dict):
-            for k in ("lockfile_sha256", "workflow_sha", "read_model_version"):
-                v_des = desired_closure.get(k)
-                v_bld = built_closure.get(k)
-                if v_des and v_bld and v_des != v_bld:
-                    drifts.append(
-                        DriftFinding(
-                            drift_type="MANIFEST_DRIFT",
-                            description=f"Build closure mismatch on '{k}': desired={v_des}, built={v_bld}",
-                            expected=v_des,
-                            actual=v_bld,
-                        )
+    desired_closure = desired.get("build_closure")
+    built_closure = built.get("build_closure")
+    if isinstance(desired_closure, dict) and isinstance(built_closure, dict):
+        for k in ("lockfile_sha256", "workflow_sha", "read_model_version"):
+            v_des = desired_closure.get(k)
+            v_bld = built_closure.get(k)
+            if v_des and v_bld and v_des != v_bld:
+                drifts.append(
+                    DriftFinding(
+                        drift_type="MANIFEST_DRIFT",
+                        description=f"Build closure mismatch on '{k}': desired={v_des}, built={v_bld}",
+                        expected=v_des,
+                        actual=v_bld,
                     )
+                )
     return drifts
+
+
+def _check_built_vs_desired(desired_digests: dict[str, str], built_digests: dict[str, str]) -> list[DriftFinding]:
+    """Full set comparison of manifest vs build artifact digests (not the intersection)."""
+    if not desired_digests:
+        return []
+    drifts: list[DriftFinding] = []
+    for path in sorted(set(desired_digests) - set(built_digests)):
+        drifts.append(
+            DriftFinding(
+                drift_type="ARTIFACT_DRIFT",
+                description=f"Manifest-required artifact '{path}' is absent from the build",
+                expected=desired_digests[path],
+                actual=None,
+            )
+        )
+    for path in sorted(set(built_digests) - set(desired_digests)):
+        drifts.append(
+            DriftFinding(
+                drift_type="ARTIFACT_DRIFT",
+                description=f"Built artifact '{path}' is not present in the desired manifest",
+                expected=None,
+                actual=built_digests[path],
+            )
+        )
+    for path in sorted(set(desired_digests) & set(built_digests)):
+        if desired_digests[path] != built_digests[path]:
+            drifts.append(
+                DriftFinding(
+                    drift_type="ARTIFACT_DRIFT",
+                    description=f"Built artifact digest for '{path}' differs from desired manifest",
+                    expected=desired_digests[path],
+                    actual=built_digests[path],
+                )
+            )
+    return drifts
+
+
+def _run_live_probes(
+    base_url: str, desired_digests: dict[str, str], built_digests: dict[str, str]
+) -> tuple[list[DriftFinding], list[EndpointObservation]]:
+    drifts: list[DriftFinding] = []
+    probes: list[EndpointObservation] = []
+    for p in DEFAULT_PROBE_PATHS:
+        probe = probe_live_endpoint(base_url, p)
+        probes.append(probe)
+        if not probe.ok:
+            drifts.append(
+                DriftFinding(
+                    drift_type="ARTIFACT_DRIFT",
+                    description=f"External endpoint probe failed for '{p}': {probe.error or f'HTTP {probe.status_code}'}",
+                    expected="HTTP 200 OK",
+                    actual=f"HTTP {probe.status_code}",
+                )
+            )
+        elif probe.sha256:
+            expected_sha = desired_digests.get(p) or built_digests.get(p)
+            if expected_sha and probe.sha256.lower() != expected_sha.lower():
+                drifts.append(
+                    DriftFinding(
+                        drift_type="ARTIFACT_DRIFT",
+                        description=f"Observed endpoint hash for '{p}' does not match expected artifact hash",
+                        expected=expected_sha,
+                        actual=probe.sha256,
+                    )
+                )
+    return drifts, probes
+
+
+def _observation_to_probe(pr: dict[str, Any]) -> tuple[EndpointObservation | None, DriftFinding | None]:
+    """Convert one receipt probe record to an observation, or a drift if it lacks status."""
+    path = pr.get("path") or pr.get("route") or ""
+    status_code = pr.get("status_code")
+    ok_field = pr.get("ok")
+    if "status" in pr and ok_field is None:
+        ok_field = str(pr["status"]).lower() in ("ok", "pass", "passed", "200")
+    if status_code is None and ok_field is None:
+        return None, DriftFinding(
+            drift_type="MISSING_OBSERVATION",
+            description=f"Probe record for '{path}' omits both 'status_code' and 'ok'/'status'",
+            expected="explicit status_code and ok",
+            actual="neither present",
+        )
+    numeric = isinstance(status_code, (int, str)) and str(status_code).isdigit()
+    obs = EndpointObservation(
+        path=path,
+        url=pr.get("url", ""),
+        status_code=int(status_code) if numeric else 0,
+        ok=bool(ok_field) if ok_field is not None else (numeric and 200 <= int(status_code) < 300),
+        sha256=pr.get("sha256") or pr.get("content_digest"),
+        latency_ms=float(pr.get("latency_ms", 0.0) or 0.0),
+        error=pr.get("error"),
+    )
+    return obs, None
+
+
+def _check_observed_probes(
+    observed: dict[str, Any] | None,
+) -> tuple[list[DriftFinding], list[EndpointObservation]]:
+    """Non-live path: the receipt must carry real probe records; never synthesize a pass."""
+    drifts: list[DriftFinding] = []
+    probes: list[EndpointObservation] = []
+
+    observed_probes = observed.get("probes") or observed.get("routes") if observed else None
+    if not isinstance(observed_probes, list) or not observed_probes:
+        drifts.append(
+            DriftFinding(
+                drift_type="MISSING_OBSERVATION",
+                description="Live-observation receipt carries no public route probe records",
+                expected="non-empty 'routes'/'probes' array with per-route status",
+                actual=type(observed_probes).__name__ if observed_probes is not None else "None",
+            )
+        )
+        return drifts, probes
+
+    seen_paths: set[str] = set()
+    for pr in observed_probes:
+        if not isinstance(pr, dict):
+            drifts.append(
+                DriftFinding(
+                    drift_type="MISSING_OBSERVATION",
+                    description="Live-observation receipt contains a non-object probe record",
+                    expected="probe object",
+                    actual=type(pr).__name__,
+                )
+            )
+            continue
+        seen_paths.add(pr.get("path") or pr.get("route") or "")
+        obs_p, missing = _observation_to_probe(pr)
+        if missing is not None:
+            drifts.append(missing)
+            continue
+        assert obs_p is not None
+        probes.append(obs_p)
+        if not obs_p.ok:
+            drifts.append(
+                DriftFinding(
+                    drift_type="ARTIFACT_DRIFT",
+                    description=f"Observed receipt indicates probe failure on '{obs_p.path}'",
+                    expected="ok=True",
+                    actual=f"ok=False ({obs_p.error})",
+                )
+            )
+
+    # Partial route success fails closed (contract line 61-62).
+    for required in DEFAULT_PROBE_PATHS:
+        if required not in seen_paths:
+            drifts.append(
+                DriftFinding(
+                    drift_type="MISSING_OBSERVATION",
+                    description=f"Required public route '{required}' has no probe record in the live receipt",
+                    expected="probe record present",
+                    actual="absent",
+                )
+            )
+    return drifts, probes
 
 
 def _check_artifact_drift(
@@ -289,97 +512,83 @@ def _check_artifact_drift(
     observed: dict[str, Any] | None,
 ) -> tuple[list[DriftFinding], list[EndpointObservation]]:
     """Detect checksum and endpoint response drift across built and observed targets."""
-    drifts: list[DriftFinding] = []
-    probes: list[EndpointObservation] = []
-
-    # Check built vs desired
-    for path, des_hash in desired_digests.items():
-        if path in built_digests:
-            bld_hash = built_digests[path]
-            if des_hash != bld_hash:
-                drifts.append(
-                    DriftFinding(
-                        drift_type="ARTIFACT_DRIFT",
-                        description=f"Built artifact digest for '{path}' differs from desired manifest",
-                        expected=des_hash,
-                        actual=bld_hash,
-                    )
-                )
+    drifts = _check_built_vs_desired(desired_digests, built_digests)
 
     if live:
-        for p in DEFAULT_PROBE_PATHS:
-            probe = probe_live_endpoint(base_url, p)
-            probes.append(probe)
-            if not probe.ok:
-                drifts.append(
-                    DriftFinding(
-                        drift_type="ARTIFACT_DRIFT",
-                        description=f"External endpoint probe failed for '{p}': {probe.error or f'HTTP {probe.status_code}'}",
-                        expected="HTTP 200 OK",
-                        actual=f"HTTP {probe.status_code}",
-                    )
-                )
-            elif probe.sha256:
-                expected_sha = desired_digests.get(p) or built_digests.get(p)
-                if expected_sha and probe.sha256.lower() != expected_sha.lower():
-                    drifts.append(
-                        DriftFinding(
-                            drift_type="ARTIFACT_DRIFT",
-                            description=f"Observed endpoint hash for '{p}' does not match expected artifact hash",
-                            expected=expected_sha,
-                            actual=probe.sha256,
-                        )
-                    )
-    else:
-        if observed and "probes" in observed and isinstance(observed["probes"], list):
-            for pr in observed["probes"]:
-                if isinstance(pr, dict):
-                    obs_p = EndpointObservation(
-                        path=pr.get("path", ""),
-                        url=pr.get("url", ""),
-                        status_code=pr.get("status_code", 200),
-                        ok=pr.get("ok", True),
-                        sha256=pr.get("sha256"),
-                        latency_ms=pr.get("latency_ms", 0.0),
-                        error=pr.get("error"),
-                    )
-                    probes.append(obs_p)
-                    if not obs_p.ok:
-                        drifts.append(
-                            DriftFinding(
-                                drift_type="ARTIFACT_DRIFT",
-                                description=f"Observed receipt indicates probe failure on '{obs_p.path}'",
-                                expected="ok=True",
-                                actual=f"ok=False ({obs_p.error})",
-                            )
-                        )
-        else:
-            for p in DEFAULT_PROBE_PATHS:
-                expected_sha = observed_digests.get(p) or desired_digests.get(p) or built_digests.get(p)
-                probes.append(
-                    EndpointObservation(
-                        path=p,
-                        url=f"{base_url.rstrip('/')}{p}",
-                        status_code=200,
-                        ok=True,
-                        sha256=expected_sha,
-                        latency_ms=10.0,
-                    )
-                )
+        live_drifts, probes = _run_live_probes(base_url, desired_digests, built_digests)
+        return drifts + live_drifts, probes
 
-        for path, obs_hash in observed_digests.items():
-            exp_hash = desired_digests.get(path) or built_digests.get(path)
-            if exp_hash and obs_hash.lower() != exp_hash.lower():
-                drifts.append(
-                    DriftFinding(
-                        drift_type="ARTIFACT_DRIFT",
-                        description=f"Observed receipt digest for '{path}' differs from desired state",
-                        expected=exp_hash,
-                        actual=obs_hash,
-                    )
+    obs_drifts, probes = _check_observed_probes(observed)
+    drifts.extend(obs_drifts)
+
+    for path, obs_hash in observed_digests.items():
+        exp_hash = desired_digests.get(path) or built_digests.get(path)
+        if exp_hash and obs_hash.lower() != exp_hash.lower():
+            drifts.append(
+                DriftFinding(
+                    drift_type="ARTIFACT_DRIFT",
+                    description=f"Observed receipt digest for '{path}' differs from desired state",
+                    expected=exp_hash,
+                    actual=obs_hash,
                 )
+            )
 
     return drifts, probes
+
+
+def _check_receipt_contract_fields(observed: dict[str, Any] | None) -> list[DriftFinding]:
+    """Verify the live receipt carries every contract-mandated field."""
+    drifts: list[DriftFinding] = []
+    if observed is None:
+        drifts.append(
+            DriftFinding(
+                drift_type="MISSING_OBSERVATION",
+                description="No attested live-observation receipt supplied; only a live receipt proves publication",
+                expected="live-observation receipt",
+                actual="None",
+            )
+        )
+        return drifts
+
+    for label, keys in REQUIRED_RECEIPT_FIELDS:
+        if _first_present(observed, keys) is None:
+            drifts.append(
+                DriftFinding(
+                    drift_type="RECEIPT_INCOMPLETE",
+                    description=f"Live receipt is missing the contract-mandated {label} field",
+                    expected=f"one of {keys}",
+                    actual="absent or empty",
+                )
+            )
+
+    # Route-set completeness with per-route status.
+    routes = observed.get("routes") or observed.get("probes")
+    if isinstance(routes, list) and routes:
+        for pr in routes:
+            if isinstance(pr, dict) and pr.get("status_code") is None and pr.get("ok") is None and "status" not in pr:
+                drifts.append(
+                    DriftFinding(
+                        drift_type="RECEIPT_INCOMPLETE",
+                        description="Live receipt route record omits per-route status",
+                        expected="status_code / ok / status per route",
+                        actual="absent",
+                    )
+                )
+                break
+
+    # Signature verification against a key is out of scope here; the contract
+    # gap is that we can only require presence and non-emptiness of the field.
+    sig = _first_present(observed, ("signature", "attestor_signature"))
+    if sig is not None and not str(sig).strip():
+        drifts.append(
+            DriftFinding(
+                drift_type="RECEIPT_INCOMPLETE",
+                description="Live receipt attestor signature field is present but empty",
+                expected="non-empty signature",
+                actual="empty string",
+            )
+        )
+    return drifts
 
 
 def _check_receipt_freshness(
@@ -388,31 +597,23 @@ def _check_receipt_freshness(
     max_age_hours: float,
     now: datetime,
 ) -> tuple[list[DriftFinding], float | None]:
-    """Verify live observation receipt freshness and age."""
+    """Verify live observation receipt freshness and age (fails closed)."""
     drifts: list[DriftFinding] = []
     receipt_age_hours: float | None = None
 
-    obs_timestamp_str = (
-        observed.get("timestamp") or observed.get("observed_at") or observed.get("created_at") if observed else None
-    )
-    if obs_timestamp_str:
-        obs_dt = parse_iso_timestamp(str(obs_timestamp_str))
-        if obs_dt:
-            age_sec = (now - obs_dt).total_seconds()
-            receipt_age_hours = round(max(0.0, age_sec / 3600.0), 2)
-            if receipt_age_hours > max_age_hours:
-                drifts.append(
-                    DriftFinding(
-                        drift_type="STALE_RECEIPT",
-                        description=(
-                            f"Live observation receipt is stale: age {receipt_age_hours}h exceeds "
-                            f"maximum threshold of {max_age_hours}h"
-                        ),
-                        expected=f"<= {max_age_hours}h",
-                        actual=f"{receipt_age_hours}h",
-                    )
-                )
-    elif observed and not live:
+    if observed is None:
+        drifts.append(
+            DriftFinding(
+                drift_type="STALE_RECEIPT",
+                description="No live-observation receipt to age-check",
+                expected=f"receipt <= {max_age_hours}h old",
+                actual="None",
+            )
+        )
+        return drifts, None
+
+    obs_timestamp_str = _first_present(observed, ("timestamp", "observed_at", "created_at"))
+    if not obs_timestamp_str:
         drifts.append(
             DriftFinding(
                 drift_type="STALE_RECEIPT",
@@ -421,12 +622,54 @@ def _check_receipt_freshness(
                 actual="None",
             )
         )
+        return drifts, None
+
+    obs_dt = parse_iso_timestamp(str(obs_timestamp_str))
+    if obs_dt is None:
+        drifts.append(
+            DriftFinding(
+                drift_type="STALE_RECEIPT",
+                description=f"Live receipt observation timestamp is unparseable: {obs_timestamp_str!r}",
+                expected="ISO-8601 UTC timestamp",
+                actual=str(obs_timestamp_str),
+            )
+        )
+        return drifts, None
+
+    age_sec = (now - obs_dt).total_seconds()
+    if age_sec < -FUTURE_SKEW_SECONDS:
+        drifts.append(
+            DriftFinding(
+                drift_type="STALE_RECEIPT",
+                description=(
+                    f"Live receipt observation timestamp is in the future by "
+                    f"{abs(age_sec) / 3600.0:.2f}h (beyond {FUTURE_SKEW_SECONDS}s skew tolerance)"
+                ),
+                expected="timestamp <= now",
+                actual=str(obs_timestamp_str),
+            )
+        )
+        return drifts, round(age_sec / 3600.0, 2)
+
+    receipt_age_hours = round(age_sec / 3600.0, 2)
+    if receipt_age_hours > max_age_hours:
+        drifts.append(
+            DriftFinding(
+                drift_type="STALE_RECEIPT",
+                description=(
+                    f"Live observation receipt is stale: age {receipt_age_hours}h exceeds "
+                    f"maximum threshold of {max_age_hours}h"
+                ),
+                expected=f"<= {max_age_hours}h",
+                actual=f"{receipt_age_hours}h",
+            )
+        )
 
     return drifts, receipt_age_hours
 
 
 def reconcile_states(
-    desired: dict[str, Any] | None,
+    desired: dict[str, Any],
     built: dict[str, Any] | None,
     deployed: dict[str, Any] | None,
     observed: dict[str, Any] | None,
@@ -435,24 +678,66 @@ def reconcile_states(
     max_age_hours: float = DEFAULT_MAX_AGE_HOURS,
     now_dt: datetime | None = None,
 ) -> ReconciliationReport:
-    """Perform 4-way reconciliation across desired, built, deployed, and observed states."""
+    """Perform 4-way reconciliation across desired, built, deployed, and observed states.
+
+    ``desired`` is required. ``built``, ``deployed``, and ``observed`` may be
+    ``None`` (each absence is recorded as fail-closed drift), but when supplied
+    they must be *distinct* objects from ``desired`` and from each other: a
+    reconciliation that compares a state against itself proves nothing.
+    """
+    if not isinstance(desired, dict):
+        raise ReconciliationInputError("desired manifest must be a JSON object")
+
+    supplied = {
+        "built": built,
+        "deployed": deployed,
+        "observed": observed,
+        "desired": desired,
+    }
+    seen: list[tuple[str, int]] = []
+    for name, obj in supplied.items():
+        if obj is None:
+            continue
+        for other_name, other_id in seen:
+            if id(obj) == other_id:
+                raise ReconciliationInputError(
+                    f"reconciliation requires distinct sources: '{name}' and '{other_name}' "
+                    f"are the same object; a state cannot be reconciled against itself"
+                )
+        seen.append((name, id(obj)))
+
     drifts: list[DriftFinding] = []
     now = now_dt or datetime.now(timezone.utc)
 
-    des_gen = desired.get("generation") if desired else None
-    dep_gen = deployed.get("generation") if deployed else None
-    obs_gen = observed.get("generation") if observed else None
-    des_commit = desired.get("source_commit") if desired else None
-    dep_commit = deployed.get("source_commit") or deployed.get("commit_sha") if deployed else None
+    des_gen = _normalize_generation(desired.get("generation"))
+    dep_gen = _normalize_generation(deployed.get("generation")) if deployed else None
+    obs_gen = _normalize_generation(observed.get("generation")) if observed else None
+    des_commit = _first_present(desired, ("develop_sha", "source_commit", "develop_commit"))
+    dep_commit = _first_present(deployed, ("develop_sha", "source_commit", "commit_sha")) if deployed else None
 
-    # 1. Generation drift
+    if built is None:
+        drifts.append(
+            DriftFinding(
+                drift_type="MANIFEST_DRIFT",
+                description="No assembly (built) receipt supplied",
+                expected="assembly receipt",
+                actual="None",
+            )
+        )
+    if deployed is None:
+        drifts.append(
+            DriftFinding(
+                drift_type="GENERATION_DRIFT",
+                description="No deployment receipt supplied",
+                expected="deployment acknowledgement receipt",
+                actual="None",
+            )
+        )
+
     drifts.extend(_check_generation_drift(des_gen, dep_gen, obs_gen))
+    drifts.extend(_check_manifest_drift(desired, built or {}, deployed or {}))
 
-    # 2. Manifest drift
-    drifts.extend(_check_manifest_drift(desired, built, deployed))
-
-    # 3. Artifact drift & probes
-    desired_digests = extract_artifact_digests(desired or {})
+    desired_digests = extract_artifact_digests(desired)
     built_digests = extract_artifact_digests(built or {})
     observed_digests = extract_artifact_digests(observed or {})
     art_drifts, probes = _check_artifact_drift(
@@ -460,7 +745,9 @@ def reconcile_states(
     )
     drifts.extend(art_drifts)
 
-    # 4. Stale receipt checks
+    if not live:
+        drifts.extend(_check_receipt_contract_fields(observed))
+
     stale_drifts, receipt_age_hours = _check_receipt_freshness(observed, live, max_age_hours, now)
     drifts.extend(stale_drifts)
 
@@ -480,7 +767,7 @@ def reconcile_states(
 
 
 def load_json_file(path: Path) -> dict[str, Any]:
-    """Load JSON file from disk."""
+    """Load a JSON object from disk, raising on missing file or non-object payload."""
     if not path.is_file():
         raise FileNotFoundError(f"File not found: {path}")
     with path.open("r", encoding="utf-8") as f:
@@ -488,39 +775,6 @@ def load_json_file(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError(f"Expected JSON object in {path}, got {type(data).__name__}")
     return data
-
-
-def load_baseline_state() -> dict[str, Any]:
-    """Load default publication baseline or synthetic default state."""
-    now_iso = datetime.now(timezone.utc).isoformat()
-    baseline_path = REPO_ROOT / "docs/operations/publication-baseline-2026-08-31.json"
-    if baseline_path.is_file():
-        try:
-            data = load_json_file(baseline_path)
-            if "generation" not in data:
-                data["generation"] = 1
-            if "timestamp" not in data:
-                data["timestamp"] = now_iso
-            return data
-        except Exception:
-            pass
-
-    # Standard default baseline
-    return {
-        "generation": 1,
-        "source_commit": "e885d5658e458ba59fcf8469ad51b53e414c77ea",
-        "source_branch": "develop",
-        "timestamp": now_iso,
-        "live_database": {
-            "sha256": "aaaa111122223333444455556666777788889999000011112222333344445555",
-            "url": "https://benchbox.dev/results/data/results.duckdb",
-        },
-        "checksums": {
-            "/": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-            "/results/": "1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-            "/results/data/results.duckdb": "aaaa111122223333444455556666777788889999000011112222333344445555",
-        },
-    }
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -531,13 +785,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--manifest",
         type=Path,
         default=None,
-        help="Path to desired publication manifest JSON (default: publication/manifest.json or baseline).",
+        help="Path to the desired publication manifest JSON (REQUIRED).",
     )
     parser.add_argument(
         "--receipts-dir",
         type=Path,
         default=None,
-        help="Path to receipts directory containing deployment and live observation receipts.",
+        help=(
+            "Directory containing the real built/deployed/observed receipts "
+            f"({ASSEMBLY_RECEIPT_NAME}, {DEPLOYMENT_RECEIPT_NAME}, {LIVE_RECEIPT_NAME}). REQUIRED."
+        ),
     )
     parser.add_argument(
         "--base-url",
@@ -548,7 +805,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--live",
         action="store_true",
-        help="Execute active external network probes against live base URL.",
+        help="Execute active external network probes against the live base URL.",
     )
     parser.add_argument(
         "--max-age-hours",
@@ -567,75 +824,61 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
 
-    # 1. Load Desired State
-    desired_data: dict[str, Any]
-    if args.manifest:
+    if args.manifest is None:
+        sys.stderr.write(
+            "Error: --manifest is required. This canary cannot verify publication "
+            "without a real desired manifest and real built/deployed/observed receipts. "
+            "A green run of this canary does not prove live publication "
+            "(independent-publication-contract.md lines 22-25).\n"
+        )
+        return 2
+    if args.receipts_dir is None:
+        sys.stderr.write(
+            f"Error: --receipts-dir is required and must contain {ASSEMBLY_RECEIPT_NAME}, "
+            f"{DEPLOYMENT_RECEIPT_NAME}, and {LIVE_RECEIPT_NAME}.\n"
+        )
+        return 2
+
+    try:
+        desired_data = load_json_file(args.manifest)
+    except Exception as e:
+        sys.stderr.write(f"Error loading manifest file {args.manifest}: {e}\n")
+        return 2
+
+    receipts_dir = args.receipts_dir
+    if not receipts_dir.is_dir():
+        sys.stderr.write(f"Receipts directory not found: {receipts_dir}\n")
+        return 2
+
+    required = {
+        "built": receipts_dir / ASSEMBLY_RECEIPT_NAME,
+        "deployed": receipts_dir / DEPLOYMENT_RECEIPT_NAME,
+        "observed": receipts_dir / LIVE_RECEIPT_NAME,
+    }
+    loaded: dict[str, dict[str, Any]] = {}
+    for name, path in required.items():
+        if not path.is_file():
+            sys.stderr.write(f"Error: required {name} receipt missing: {path}\n")
+            return 2
         try:
-            desired_data = load_json_file(args.manifest)
+            loaded[name] = load_json_file(path)
         except Exception as e:
-            sys.stderr.write(f"Error loading manifest file {args.manifest}: {e}\n")
-            return 2
-    else:
-        manifest_default = REPO_ROOT / "publication/manifest.json"
-        if manifest_default.is_file():
-            try:
-                desired_data = load_json_file(manifest_default)
-            except Exception as e:
-                sys.stderr.write(f"Error loading default manifest {manifest_default}: {e}\n")
-                return 2
-        else:
-            desired_data = load_baseline_state()
-
-    # 2. Load Built State
-    built_data: dict[str, Any] = desired_data
-
-    # 3. Load Deployed State & Observed State
-    deployed_data: dict[str, Any] = desired_data
-    observed_data: dict[str, Any] = desired_data
-
-    if args.receipts_dir:
-        receipts_dir = args.receipts_dir
-        if not receipts_dir.is_dir():
-            sys.stderr.write(f"Receipts directory not found: {receipts_dir}\n")
+            sys.stderr.write(f"Error loading {name} receipt {path}: {e}\n")
             return 2
 
-        # Deployment receipt
-        dep_path = receipts_dir / "deployment-receipt.json"
-        if dep_path.is_file():
-            try:
-                deployed_data = load_json_file(dep_path)
-            except Exception as e:
-                sys.stderr.write(f"Error loading deployment receipt: {e}\n")
-                return 2
-
-        # Assembly / built receipt
-        bld_path = receipts_dir / "assembly-receipt.json"
-        if bld_path.is_file():
-            try:
-                built_data = load_json_file(bld_path)
-            except Exception as e:
-                sys.stderr.write(f"Error loading assembly receipt: {e}\n")
-                return 2
-
-        # Live observation receipt
-        obs_path = receipts_dir / "live-receipt.json"
-        if obs_path.is_file():
-            try:
-                observed_data = load_json_file(obs_path)
-            except Exception as e:
-                sys.stderr.write(f"Error loading live receipt: {e}\n")
-                return 2
-
-    # Run 4-way reconciliation
-    report = reconcile_states(
-        desired=desired_data,
-        built=built_data,
-        deployed=deployed_data,
-        observed=observed_data,
-        base_url=args.base_url,
-        live=args.live,
-        max_age_hours=args.max_age_hours,
-    )
+    try:
+        report = reconcile_states(
+            desired=desired_data,
+            built=loaded["built"],
+            deployed=loaded["deployed"],
+            observed=loaded["observed"],
+            base_url=args.base_url,
+            live=args.live,
+            max_age_hours=args.max_age_hours,
+        )
+    except ReconciliationInputError as e:
+        sys.stderr.write(f"Error: {e}\n")
+        return 2
 
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))

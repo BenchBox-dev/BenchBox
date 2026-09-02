@@ -1,5 +1,18 @@
 name: Publication Canaries & Drift Reconciliation
 
+# These canaries fail closed. Each tool requires real publication evidence
+# (a desired manifest plus attested built/deployed/observed receipts, or recorded
+# lane transitions, or real operational drill receipts). Until an independent
+# publication run produces and publishes that evidence for this workflow to
+# consume, these jobs are expected to exit nonzero: per
+# docs/operations/independent-publication-contract.md lines 22-25 a green
+# workflow does not prove live publication, and we would rather this canary be
+# red than fabricate a passing result.
+#
+# To wire real evidence: download the publication evidence bundle into
+# ${{ runner.temp }}/publication-evidence and pass --manifest / --receipts-dir /
+# --pages-dir to each step.
+
 on:
   schedule:
     # Daily 07:15 UTC canary execution
@@ -9,12 +22,23 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: publication-canaries-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
   canaries:
     name: Run Publication Canaries and Drift Reconciliation
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
+    env:
+      EVIDENCE_DIR: ${{ runner.temp }}/publication-evidence
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,21 +54,53 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
+      - name: Prepare diagnostic report directory
+        run: mkdir -p diagnostic-reports
+
       - name: Run 4-way reconciliation and drift checks
         id: reconciliation
         run: |
-          mkdir -p diagnostic-reports
-          uv run python scripts/publication/reconciliation.py --json | tee diagnostic-reports/reconciliation-report.json
+          set -o pipefail
+          rc=0
+          uv run python scripts/publication/reconciliation.py \
+            --manifest "${EVIDENCE_DIR}/desired-manifest.json" \
+            --receipts-dir "${EVIDENCE_DIR}/reconciliation" \
+            --json > diagnostic-reports/reconciliation-report.json || rc=$?
+          cat diagnostic-reports/reconciliation-report.json || true
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::reconciliation canary could not verify live publication (exit ${rc}); no fabricated pass"
+          fi
+          exit "$rc"
 
       - name: Run four-lane independence matrix verification
         id: independence
+        if: always()
         run: |
-          uv run python scripts/publication/verify_independence_matrix.py --json | tee diagnostic-reports/independence-matrix-report.json
+          set -o pipefail
+          rc=0
+          uv run python scripts/publication/verify_independence_matrix.py \
+            --receipts-dir "${EVIDENCE_DIR}/independence" \
+            --json > diagnostic-reports/independence-matrix-report.json || rc=$?
+          cat diagnostic-reports/independence-matrix-report.json || true
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::independence canary could not verify recorded lane transitions (exit ${rc})"
+          fi
+          exit "$rc"
 
       - name: Audit operational receipts and capacity/retention
         id: operational_receipts
+        if: always()
         run: |
-          uv run python scripts/publication/check_operational_receipts.py --json | tee diagnostic-reports/operational-receipts-report.json
+          set -o pipefail
+          rc=0
+          uv run python scripts/publication/check_operational_receipts.py \
+            --receipts-dir "${EVIDENCE_DIR}/operational" \
+            --json > diagnostic-reports/operational-receipts-report.json || rc=$?
+          cat diagnostic-reports/operational-receipts-report.json || true
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::operational receipts canary could not verify real drill/capacity/retention evidence (exit ${rc})"
+          fi
+          exit "$rc"
 
       - name: Upload diagnostic canary reports
         if: always()
@@ -52,4 +108,6 @@ jobs:
         with:
           name: publication-canary-reports
           path: diagnostic-reports/
-          retention-days: 30
+          # Diagnostic canary output is a transient build/test artifact
+          # (<= 7 day retention per the operational receipts taxonomy).
+          retention-days: 7

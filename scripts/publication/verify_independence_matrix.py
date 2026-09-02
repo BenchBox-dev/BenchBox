@@ -11,10 +11,15 @@ Independence Invariant:
 When lane L_i is updated, only Hash(L_i) changes, while Hash(L_{j != i})
 remain strictly identical across transitions.
 
+This tool never fabricates transitions. It verifies real recorded lane
+transitions supplied in ``--receipts-dir``. With no real transition record it
+fails closed (exit 2): it cannot prove independence against a fixture it made
+up.
+
 Exit codes:
   0 - Independence verified, zero cross-lane coupling violations.
   1 - Independence violation detected (lane coupling or unexpected hash drift).
-  2 - Configuration, file reading, or argument error.
+  2 - Configuration, file reading, or argument error (including missing input).
 """
 
 from __future__ import annotations
@@ -31,10 +36,17 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LANES = ("package", "site", "explorer", "corpus")
 
+MATRIX_FILE_NAME = "independence-matrix.json"
+LANE_TRANSITIONS_FILE_NAME = "lane-transitions.json"
+
+
+class MatrixInputError(ValueError):
+    """Raised when no real transition record is available."""
+
 
 @dataclass
 class LaneTransition:
-    """A recorded or simulated transition between two publication states."""
+    """A recorded transition between two publication states."""
 
     transition_id: str
     target_lane: str
@@ -83,21 +95,23 @@ def verify_transition_independence(
     if target_lane not in LANES:
         violations.append(f"Unknown target lane '{target_lane}'; expected one of {LANES}")
 
-    # Check target lane mutation
     target_before = before_hashes.get(target_lane, "")
     target_after = after_hashes.get(target_lane, "")
-    if target_before == target_after:
+    if not target_before or not target_after:
+        violations.append(f"Target lane '{target_lane}' is missing a before/after hash")
+    elif target_before == target_after:
         violations.append(
             f"Target lane '{target_lane}' hash did not change during update ({target_before[:8]} == {target_after[:8]})"
         )
 
-    # Check non-target lane invariance
     for lane in LANES:
         if lane == target_lane:
             continue
         h_before = before_hashes.get(lane, "")
         h_after = after_hashes.get(lane, "")
-        if h_before != h_after:
+        if not h_before or not h_after:
+            violations.append(f"Non-target lane '{lane}' is missing a before/after hash")
+        elif h_before != h_after:
             violations.append(
                 f"Independence violation: non-target lane '{lane}' changed during '{target_lane}' update "
                 f"({h_before[:8]} -> {h_after[:8]})"
@@ -114,34 +128,52 @@ def verify_transition_independence(
     )
 
 
-def generate_canonical_matrix_transitions() -> list[LaneTransition]:
-    """Generate canonical baseline single-lane mutation transitions across the 4 lanes."""
-    base_hashes = {
-        "package": "1000000000000000000000000000000000000000000000000000000000000001",
-        "site": "2000000000000000000000000000000000000000000000000000000000000002",
-        "explorer": "3000000000000000000000000000000000000000000000000000000000000003",
-        "corpus": "4000000000000000000000000000000000000000000000000000000000000004",
-    }
-
-    transitions: list[LaneTransition] = []
-    mutated_hashes = {
-        "package": "100000000000000000000000000000000000000000000000000000000000000a",
-        "site": "200000000000000000000000000000000000000000000000000000000000000b",
-        "explorer": "300000000000000000000000000000000000000000000000000000000000000c",
-        "corpus": "400000000000000000000000000000000000000000000000000000000000000d",
-    }
-
-    for lane in LANES:
-        after = dict(base_hashes)
-        after[lane] = mutated_hashes[lane]
-        t = verify_transition_independence(
-            transition_id=f"canonical_lane_update_{lane}",
-            target_lane=lane,
-            before_hashes=base_hashes,
-            after_hashes=after,
+def _parse_transition_records(raw_transitions: Any) -> list[LaneTransition]:
+    if not isinstance(raw_transitions, list):
+        raise MatrixInputError("transition record must contain a list of transitions")
+    parsed: list[LaneTransition] = []
+    for r in raw_transitions:
+        if not isinstance(r, dict):
+            raise MatrixInputError(f"transition entry is not an object: {type(r).__name__}")
+        parsed.append(
+            verify_transition_independence(
+                transition_id=str(r.get("transition_id", "unknown")),
+                target_lane=str(r.get("target_lane", "")),
+                before_hashes=r.get("before_hashes", {}),
+                after_hashes=r.get("after_hashes", {}),
+            )
         )
-        transitions.append(t)
+    return parsed
 
+
+def load_transitions_from_dir(receipts_dir: Path) -> list[LaneTransition]:
+    """Load recorded lane transitions from a receipts directory.
+
+    Raises MatrixInputError when no recognised transition record is present or
+    the file cannot be parsed as JSON.
+    """
+    matrix_file = receipts_dir / MATRIX_FILE_NAME
+    lane_trans_file = receipts_dir / LANE_TRANSITIONS_FILE_NAME
+
+    source = matrix_file if matrix_file.is_file() else lane_trans_file if lane_trans_file.is_file() else None
+    if source is None:
+        raise MatrixInputError(
+            f"no transition record found in {receipts_dir} "
+            f"(expected {MATRIX_FILE_NAME} or {LANE_TRANSITIONS_FILE_NAME})"
+        )
+
+    try:
+        with source.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        raise MatrixInputError(f"cannot read transition record {source}: {e}") from e
+
+    raw = data if isinstance(data, list) else data.get("transitions") if isinstance(data, dict) else None
+    if raw is None:
+        raise MatrixInputError(f"transition record {source} has no 'transitions' array")
+    transitions = _parse_transition_records(raw)
+    if not transitions:
+        raise MatrixInputError(f"transition record {source} contains zero transitions")
     return transitions
 
 
@@ -149,43 +181,22 @@ def verify_independence(
     transitions: list[LaneTransition] | None = None,
     receipts_dir: Path | None = None,
 ) -> IndependenceReport:
-    """Verify lane independence matrix and build 4x4 coupling matrix."""
-    eval_transitions: list[LaneTransition] = []
+    """Verify lane independence matrix and build the 4x4 coupling matrix.
 
+    Exactly one real source of transitions must be provided: an explicit
+    ``transitions`` list or a ``receipts_dir`` holding a recorded transition
+    file. With neither, this raises ``MatrixInputError`` - there is no synthetic
+    fallback.
+    """
     if transitions:
-        eval_transitions.extend(transitions)
-    elif receipts_dir:
-        matrix_file = receipts_dir / "independence-matrix.json"
-        lane_trans_file = receipts_dir / "lane-transitions.json"
-
-        if matrix_file.is_file():
-            with matrix_file.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-            raw_transitions = data.get("transitions", [])
-            for r in raw_transitions:
-                t = verify_transition_independence(
-                    transition_id=r.get("transition_id", "unknown"),
-                    target_lane=r.get("target_lane", ""),
-                    before_hashes=r.get("before_hashes", {}),
-                    after_hashes=r.get("after_hashes", {}),
-                )
-                eval_transitions.append(t)
-        elif lane_trans_file.is_file():
-            with lane_trans_file.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-            raw_transitions = data if isinstance(data, list) else data.get("transitions", [])
-            for r in raw_transitions:
-                t = verify_transition_independence(
-                    transition_id=r.get("transition_id", "unknown"),
-                    target_lane=r.get("target_lane", ""),
-                    before_hashes=r.get("before_hashes", {}),
-                    after_hashes=r.get("after_hashes", {}),
-                )
-                eval_transitions.append(t)
-        else:
-            eval_transitions = generate_canonical_matrix_transitions()
+        eval_transitions = list(transitions)
+    elif receipts_dir is not None:
+        eval_transitions = load_transitions_from_dir(receipts_dir)
     else:
-        eval_transitions = generate_canonical_matrix_transitions()
+        raise MatrixInputError(
+            "verify_independence requires real transitions or a receipts directory; "
+            "it will not verify a self-made fixture"
+        )
 
     all_violations: list[dict[str, Any]] = []
     matrix: dict[str, dict[str, bool]] = {i: dict.fromkeys(LANES, False) for i in LANES}
@@ -199,8 +210,6 @@ def verify_independence(
                     "violations": t.violations,
                 }
             )
-
-        # Record which lanes changed in this transition
         for lane in LANES:
             h_before = t.before_hashes.get(lane)
             h_after = t.after_hashes.get(lane)
@@ -208,7 +217,6 @@ def verify_independence(
                 if t.target_lane in matrix:
                     matrix[t.target_lane][lane] = True
 
-    # Check matrix orthogonality: M[i][j] must be True iff i == j
     for row in LANES:
         for col in LANES:
             changed = matrix[row][col]
@@ -247,12 +255,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--receipts-dir",
         type=Path,
         default=None,
-        help="Path to directory containing lane transition receipts.",
-    )
-    parser.add_argument(
-        "--live",
-        action="store_true",
-        help="Perform live receipt / transition discovery from repository state.",
+        help=(
+            "Directory containing a recorded lane transition file "
+            f"({MATRIX_FILE_NAME} or {LANE_TRANSITIONS_FILE_NAME}). REQUIRED."
+        ),
     )
     parser.add_argument(
         "--json",
@@ -265,11 +271,21 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
 
-    if args.receipts_dir and not args.receipts_dir.is_dir():
+    if args.receipts_dir is None:
+        sys.stderr.write(
+            "Error: --receipts-dir is required. This canary verifies real recorded "
+            "lane transitions; it does not verify a self-generated fixture.\n"
+        )
+        return 2
+    if not args.receipts_dir.is_dir():
         sys.stderr.write(f"Receipts directory not found: {args.receipts_dir}\n")
         return 2
 
-    report = verify_independence(receipts_dir=args.receipts_dir)
+    try:
+        report = verify_independence(receipts_dir=args.receipts_dir)
+    except MatrixInputError as e:
+        sys.stderr.write(f"Error: {e}\n")
+        return 2
 
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))
@@ -281,7 +297,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"  Violations          : {len(report.violations)}")
 
         print("\nIndependence Matrix (Diagonal = True, Off-diagonal = False):")
-        header = "Target \\ Observed | " + " | ".join(f"{l:>8}" for l in report.lanes)
+        header = "Target \\ Observed | " + " | ".join(f"{lane:>8}" for lane in report.lanes)
         print("  " + header)
         print("  " + "-" * len(header))
         for row in report.lanes:

@@ -1,22 +1,30 @@
 #!/usr/bin/env python3
 """Operational receipts and capacity/retention auditor (A11 w2).
 
-Audits operational exercise receipts, storage capacity, retention policies, and drill freshness:
-1. Capacity Limits:
-   - Total Pages publication tree size < 1 GB (1,073,741,824 B), warning at 800 MB (838,860,800 B).
-   - Maximum individual file size < 100 MB (104,857,600 B).
-2. Retention Rules:
+Audits operational exercise receipts, storage capacity, retention policies, and
+drill freshness. It never fabricates a receipt, a capacity measurement, or a
+retention policy. Every input must be supplied as a real file (or, for capacity,
+a real directory to measure). A missing required input fails closed (exit 1 for
+a policy violation, exit 2 for a config/parse error).
+
+1. Capacity Limits (GitHub Pages rejects AT the limit, so comparisons are >=):
+   - Total Pages publication tree size < 1 GiB (1,073,741,824 B); warn at 800 MiB.
+   - Maximum individual file size < 100 MiB (104,857,600 B).
+2. Retention Rules (from the retention-policy.json ``source`` field, which must
+   cite the governing workflow ``retention-days`` or contract clause):
    - Transient build/test artifacts: <= 7 days retention.
    - Attested receipts & audit logs: >= 30 days retention.
    - Rollback checkpoints & disaster recovery states: >= 90 days retention.
-3. Operational Drills:
-   - Automated rollback drill receipt freshness (<= max-age-days, default: 30 days).
+3. Operational Drills (each receipt required on disk; a missing receipt is a
+   MISSING violation, never a synthesized pass):
+   - Automated rollback drill receipt freshness (<= max-age-days, default 30).
    - Emergency takedown drill receipt freshness (<= max-age-days).
    - Incident response drill receipt freshness (<= max-age-days).
 
 Exit codes:
   0 - All operational receipts, capacity bounds, and retention policies verified.
-  1 - Verification failure (capacity limit exceeded, expired drill, retention policy violation).
+  1 - Verification failure (capacity limit exceeded, expired/missing drill,
+      retention policy violation).
   2 - Configuration, file reading, or argument error.
 """
 
@@ -34,15 +42,26 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-MAX_TOTAL_PAGES_BYTES = 1024 * 1024 * 1024  # 1 GB
-WARNING_TOTAL_PAGES_BYTES = 800 * 1024 * 1024  # 800 MB
-MAX_INDIVIDUAL_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
+MAX_TOTAL_PAGES_BYTES = 1024 * 1024 * 1024  # 1 GiB
+WARNING_TOTAL_PAGES_BYTES = 800 * 1024 * 1024  # 800 MiB
+MAX_INDIVIDUAL_FILE_BYTES = 100 * 1024 * 1024  # 100 MiB
 
 MAX_TRANSIENT_RETENTION_DAYS = 7
 MIN_RECEIPT_RETENTION_DAYS = 30
 MIN_ROLLBACK_CHECKPOINT_RETENTION_DAYS = 90
 
 DEFAULT_MAX_AGE_DAYS = 30.0
+FUTURE_SKEW_SECONDS = 300.0
+
+ROLLBACK_DRILL_FILE = "rollback-drill.json"
+TAKEDOWN_DRILL_FILE = "takedown-drill.json"
+INCIDENT_DRILL_FILE = "incident-drill.json"
+CAPACITY_FILE = "capacity-audit.json"
+RETENTION_FILE = "retention-policy.json"
+
+
+class ReceiptsConfigError(ValueError):
+    """Raised for a configuration or parse error in operational inputs."""
 
 
 @dataclass
@@ -55,6 +74,7 @@ class CapacityAudit:
     largest_file_bytes: int = 0
     largest_file_path: str = ""
     max_file_bytes: int = MAX_INDIVIDUAL_FILE_BYTES
+    measured: bool = False
     passed: bool = True
     warnings: list[str] = field(default_factory=list)
     violations: list[str] = field(default_factory=list)
@@ -67,9 +87,10 @@ class CapacityAudit:
 class RetentionAudit:
     """Audit of artifact retention configuration."""
 
-    transient_retention_days: int = MAX_TRANSIENT_RETENTION_DAYS
-    receipt_retention_days: int = MIN_RECEIPT_RETENTION_DAYS
-    rollback_checkpoint_retention_days: int = MIN_ROLLBACK_CHECKPOINT_RETENTION_DAYS
+    transient_retention_days: int | None = None
+    receipt_retention_days: int | None = None
+    rollback_checkpoint_retention_days: int | None = None
+    source: str = ""
     passed: bool = True
     violations: list[str] = field(default_factory=list)
 
@@ -81,8 +102,8 @@ class RetentionAudit:
 class DrillReceiptStatus:
     """Verification status of an operational exercise drill receipt."""
 
-    drill_type: str  # rollback, takedown, incident_response
-    status: str  # VERIFIED, EXPIRED, MISSING, FAILED
+    drill_type: str
+    status: str  # VERIFIED, EXPIRED, MISSING, INVALID, FAILED
     receipt_id: str | None = None
     executed_at: str | None = None
     age_days: float | None = None
@@ -132,39 +153,50 @@ def parse_iso_timestamp(ts_str: str) -> datetime | None:
         return None
 
 
+def _load_json_object(path: Path) -> dict[str, Any]:
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        raise ReceiptsConfigError(f"cannot read {path}: {e}") from e
+    if not isinstance(data, dict):
+        raise ReceiptsConfigError(f"expected JSON object in {path}, got {type(data).__name__}")
+    return data
+
+
 def audit_capacity(
     total_bytes: int,
     largest_file_bytes: int = 0,
     largest_file_path: str = "",
+    measured: bool = False,
 ) -> CapacityAudit:
-    """Evaluate storage capacity against Pages limits."""
+    """Evaluate storage capacity against Pages limits (rejection is AT the limit)."""
     warnings: list[str] = []
     violations: list[str] = []
     passed = True
 
-    if total_bytes > MAX_TOTAL_PAGES_BYTES:
+    if total_bytes >= MAX_TOTAL_PAGES_BYTES:
         passed = False
         violations.append(
-            f"Pages total size ({total_bytes:,} bytes) exceeds limit of {MAX_TOTAL_PAGES_BYTES:,} bytes (1.0 GB)"
+            f"Pages total size ({total_bytes:,} bytes) meets or exceeds limit of {MAX_TOTAL_PAGES_BYTES:,} bytes (1.0 GiB)"
         )
-    elif total_bytes > WARNING_TOTAL_PAGES_BYTES:
+    elif total_bytes >= WARNING_TOTAL_PAGES_BYTES:
         warnings.append(
-            f"Pages total size ({total_bytes:,} bytes) exceeds warning threshold of {WARNING_TOTAL_PAGES_BYTES:,} bytes (800 MB)"
+            f"Pages total size ({total_bytes:,} bytes) exceeds warning threshold of {WARNING_TOTAL_PAGES_BYTES:,} bytes (800 MiB)"
         )
 
-    if largest_file_bytes > MAX_INDIVIDUAL_FILE_BYTES:
+    if largest_file_bytes >= MAX_INDIVIDUAL_FILE_BYTES:
         passed = False
         violations.append(
-            f"Individual file '{largest_file_path}' ({largest_file_bytes:,} bytes) exceeds limit of {MAX_INDIVIDUAL_FILE_BYTES:,} bytes (100 MB)"
+            f"Individual file '{largest_file_path}' ({largest_file_bytes:,} bytes) meets or exceeds limit of "
+            f"{MAX_INDIVIDUAL_FILE_BYTES:,} bytes (100 MiB)"
         )
 
     return CapacityAudit(
         total_size_bytes=total_bytes,
-        max_total_bytes=MAX_TOTAL_PAGES_BYTES,
-        warning_total_bytes=WARNING_TOTAL_PAGES_BYTES,
         largest_file_bytes=largest_file_bytes,
         largest_file_path=largest_file_path,
-        max_file_bytes=MAX_INDIVIDUAL_FILE_BYTES,
+        measured=measured,
         passed=passed,
         warnings=warnings,
         violations=violations,
@@ -172,36 +204,55 @@ def audit_capacity(
 
 
 def audit_retention(
-    transient_days: int = MAX_TRANSIENT_RETENTION_DAYS,
-    receipt_days: int = MIN_RECEIPT_RETENTION_DAYS,
-    rollback_days: int = MIN_ROLLBACK_CHECKPOINT_RETENTION_DAYS,
+    transient_days: int | None,
+    receipt_days: int | None,
+    rollback_days: int | None,
+    source: str = "",
 ) -> RetentionAudit:
-    """Evaluate artifact retention policies against minimum requirements."""
+    """Evaluate artifact retention policies against minimum requirements.
+
+    A missing value (``None``) is itself a violation - the policy must state it.
+    """
     violations: list[str] = []
     passed = True
 
-    if transient_days > MAX_TRANSIENT_RETENTION_DAYS:
+    if not source:
+        passed = False
+        violations.append("Retention policy does not cite a source (workflow retention-days or contract clause)")
+
+    if transient_days is None:
+        passed = False
+        violations.append("Retention policy does not declare transient_retention_days")
+    elif transient_days > MAX_TRANSIENT_RETENTION_DAYS:
         passed = False
         violations.append(
             f"Transient artifact retention ({transient_days} days) exceeds maximum budget of {MAX_TRANSIENT_RETENTION_DAYS} days"
         )
 
-    if receipt_days < MIN_RECEIPT_RETENTION_DAYS:
+    if receipt_days is None:
+        passed = False
+        violations.append("Retention policy does not declare receipt_retention_days")
+    elif receipt_days < MIN_RECEIPT_RETENTION_DAYS:
         passed = False
         violations.append(
             f"Receipt retention ({receipt_days} days) is below mandatory minimum of {MIN_RECEIPT_RETENTION_DAYS} days"
         )
 
-    if rollback_days < MIN_ROLLBACK_CHECKPOINT_RETENTION_DAYS:
+    if rollback_days is None:
+        passed = False
+        violations.append("Retention policy does not declare rollback_checkpoint_retention_days")
+    elif rollback_days < MIN_ROLLBACK_CHECKPOINT_RETENTION_DAYS:
         passed = False
         violations.append(
-            f"Rollback checkpoint retention ({rollback_days} days) is below mandatory minimum of {MIN_ROLLBACK_CHECKPOINT_RETENTION_DAYS} days"
+            f"Rollback checkpoint retention ({rollback_days} days) is below mandatory minimum of "
+            f"{MIN_ROLLBACK_CHECKPOINT_RETENTION_DAYS} days"
         )
 
     return RetentionAudit(
         transient_retention_days=transient_days,
         receipt_retention_days=receipt_days,
         rollback_checkpoint_retention_days=rollback_days,
+        source=source,
         passed=passed,
         violations=violations,
     )
@@ -227,7 +278,17 @@ def audit_drill_receipt(
 
     receipt_id = receipt_data.get("receipt_id") or receipt_data.get("id")
     executed_at = receipt_data.get("executed_at") or receipt_data.get("timestamp") or receipt_data.get("created_at")
-    status = receipt_data.get("status", "SUCCESS")
+    status = receipt_data.get("status")
+
+    if status is None:
+        return DrillReceiptStatus(
+            drill_type=drill_type,
+            status="INVALID",
+            receipt_id=receipt_id,
+            max_age_days=max_age_days,
+            passed=False,
+            error="Drill receipt does not declare an execution status",
+        )
 
     if not executed_at:
         return DrillReceiptStatus(
@@ -251,9 +312,22 @@ def audit_drill_receipt(
             error="Drill receipt contains unparseable timestamp",
         )
 
-    age_days = round(max(0.0, (now - exec_dt).total_seconds() / 86400.0), 2)
+    age_seconds = (now - exec_dt).total_seconds()
+    if age_seconds < -FUTURE_SKEW_SECONDS:
+        return DrillReceiptStatus(
+            drill_type=drill_type,
+            status="INVALID",
+            receipt_id=receipt_id,
+            executed_at=str(executed_at),
+            age_days=round(age_seconds / 86400.0, 2),
+            max_age_days=max_age_days,
+            passed=False,
+            error="Drill receipt execution timestamp is in the future",
+        )
 
-    if status.upper() not in ("SUCCESS", "PASSED", "VERIFIED"):
+    age_days = round(age_seconds / 86400.0, 2)
+
+    if str(status).upper() not in ("SUCCESS", "PASSED", "VERIFIED"):
         return DrillReceiptStatus(
             drill_type=drill_type,
             status="FAILED",
@@ -291,7 +365,7 @@ def audit_drill_receipt(
 def measure_local_directory_capacity(path: Path) -> tuple[int, int, str]:
     """Measure total size, largest file size, and largest file path of a directory."""
     if not path.exists():
-        return 0, 0, ""
+        raise ReceiptsConfigError(f"capacity measurement path does not exist: {path}")
 
     if path.is_file():
         sz = path.stat().st_size
@@ -306,132 +380,103 @@ def measure_local_directory_capacity(path: Path) -> tuple[int, int, str]:
             p = Path(root) / f
             try:
                 sz = p.stat().st_size
-                total_size += sz
-                if sz > max_size:
-                    max_size = sz
-                    max_file = str(p.relative_to(path))
-            except Exception:
-                pass
+            except OSError:
+                continue
+            total_size += sz
+            if sz > max_size:
+                max_size = sz
+                max_file = str(p.relative_to(path))
 
     return total_size, max_size, max_file
 
 
 def audit_operational_receipts(
     receipts_dir: Path | None = None,
+    pages_dir: Path | None = None,
     max_age_days: float = DEFAULT_MAX_AGE_DAYS,
     now_dt: datetime | None = None,
 ) -> OperationalReceiptsReport:
-    """Audit all operational exercise receipts, capacity, and retention rules."""
+    """Audit all operational exercise receipts, capacity, and retention rules.
+
+    ``receipts_dir`` is required and must contain the three drill receipts, a
+    retention policy, and either a capacity audit file or (via ``pages_dir``) a
+    real directory to measure.
+    """
     now = now_dt or datetime.now(timezone.utc)
-    now_iso = now.isoformat()
+
+    if receipts_dir is None:
+        raise ReceiptsConfigError(
+            "receipts_dir is required; this auditor does not synthesize drill receipts, "
+            "capacity numbers, or retention policy"
+        )
+    if not receipts_dir.is_dir():
+        raise ReceiptsConfigError(f"receipts directory not found: {receipts_dir}")
 
     all_violations: list[str] = []
     all_warnings: list[str] = []
 
-    # Default baseline synthetic receipts
-    rollback_data: dict[str, Any] | None = {
-        "receipt_id": "rcpt-rollback-drill-verified",
-        "status": "SUCCESS",
-        "executed_at": now_iso,
-        "target_sha": "3cd3706657239e533e27afe06c9571caed5c440d",
-        "verified_live": True,
-    }
-    takedown_data: dict[str, Any] | None = {
-        "receipt_id": "rcpt-takedown-drill-verified",
-        "status": "SUCCESS",
-        "executed_at": now_iso,
-        "presentation_suppressed": True,
-        "audit_preserved": True,
-    }
-    incident_data: dict[str, Any] | None = {
-        "receipt_id": "rcpt-incident-drill-verified",
-        "status": "SUCCESS",
-        "executed_at": now_iso,
-        "containment_time_min": 12,
-        "escalation_verified": True,
-    }
+    def _load_optional(name: str) -> dict[str, Any] | None:
+        p = receipts_dir / name
+        return _load_json_object(p) if p.is_file() else None
 
-    # Capacity measurement: default baseline numbers (~45 MB total, max file ~15 MB)
-    total_bytes = 47_185_920
-    largest_file_bytes = 15_728_640
-    largest_file_path = "results/data/results.duckdb"
+    rollback_data = _load_optional(ROLLBACK_DRILL_FILE)
+    takedown_data = _load_optional(TAKEDOWN_DRILL_FILE)
+    incident_data = _load_optional(INCIDENT_DRILL_FILE)
 
-    # Retention defaults: 7d transient, 30d receipts, 90d rollback
-    transient_days = 7
-    receipt_days = 30
-    rollback_days = 90
+    # Capacity: measure a real directory or read a real audit file. Never invent.
+    cap_data = _load_optional(CAPACITY_FILE)
+    if pages_dir is not None:
+        total_bytes, largest_file_bytes, largest_file_path = measure_local_directory_capacity(pages_dir)
+        capacity_audit = audit_capacity(total_bytes, largest_file_bytes, largest_file_path, measured=True)
+    elif cap_data is not None:
+        try:
+            total_bytes = int(cap_data["total_size_bytes"])
+            largest_file_bytes = int(cap_data.get("largest_file_bytes", 0))
+        except (KeyError, TypeError, ValueError) as e:
+            raise ReceiptsConfigError(f"{CAPACITY_FILE} is missing/invalid total_size_bytes: {e}") from e
+        capacity_audit = audit_capacity(
+            total_bytes,
+            largest_file_bytes,
+            str(cap_data.get("largest_file_path", "")),
+            measured=bool(cap_data.get("measured", False)),
+        )
+    else:
+        capacity_audit = CapacityAudit(total_size_bytes=0, passed=False)
+        capacity_audit.violations.append(
+            f"No capacity evidence: supply --pages-dir or {CAPACITY_FILE} in the receipts directory"
+        )
 
-    if receipts_dir and receipts_dir.is_dir():
-        # Load drill receipts if available on disk
-        rb_file = receipts_dir / "rollback-drill.json"
-        if rb_file.is_file():
-            with rb_file.open("r", encoding="utf-8") as f:
-                rollback_data = json.load(f)
-
-        td_file = receipts_dir / "takedown-drill.json"
-        if td_file.is_file():
-            with td_file.open("r", encoding="utf-8") as f:
-                takedown_data = json.load(f)
-
-        inc_file = receipts_dir / "incident-drill.json"
-        if inc_file.is_file():
-            with inc_file.open("r", encoding="utf-8") as f:
-                incident_data = json.load(f)
-
-        # Capacity file or measurement
-        cap_file = receipts_dir / "capacity-audit.json"
-        if cap_file.is_file():
-            with cap_file.open("r", encoding="utf-8") as f:
-                cap_data = json.load(f)
-                total_bytes = cap_data.get("total_size_bytes", total_bytes)
-                largest_file_bytes = cap_data.get("largest_file_bytes", largest_file_bytes)
-                largest_file_path = cap_data.get("largest_file_path", largest_file_path)
-
-        # Retention file
-        ret_file = receipts_dir / "retention-policy.json"
-        if ret_file.is_file():
-            with ret_file.open("r", encoding="utf-8") as f:
-                ret_data = json.load(f)
-                transient_days = ret_data.get("transient_retention_days", transient_days)
-                receipt_days = ret_data.get("receipt_retention_days", receipt_days)
-                rollback_days = ret_data.get("rollback_checkpoint_retention_days", rollback_days)
-
-    # 1. Capacity Audit
-    capacity_audit = audit_capacity(
-        total_bytes=total_bytes,
-        largest_file_bytes=largest_file_bytes,
-        largest_file_path=largest_file_path,
-    )
     if not capacity_audit.passed:
         all_violations.extend(capacity_audit.violations)
     all_warnings.extend(capacity_audit.warnings)
 
-    # 2. Retention Audit
-    retention_audit = audit_retention(
-        transient_days=transient_days,
-        receipt_days=receipt_days,
-        rollback_days=rollback_days,
-    )
+    # Retention: real policy file only.
+    ret_data = _load_optional(RETENTION_FILE)
+    if ret_data is None:
+        retention_audit = RetentionAudit(passed=False)
+        retention_audit.violations.append(
+            f"No retention policy: supply {RETENTION_FILE} declaring transient/receipt/rollback retention and its source"
+        )
+    else:
+        retention_audit = audit_retention(
+            transient_days=ret_data.get("transient_retention_days"),
+            receipt_days=ret_data.get("receipt_retention_days"),
+            rollback_days=ret_data.get("rollback_checkpoint_retention_days"),
+            source=str(ret_data.get("source", "")),
+        )
     if not retention_audit.passed:
         all_violations.extend(retention_audit.violations)
 
-    # 3. Drill Audits
     drills: dict[str, DrillReceiptStatus] = {}
-
-    rb_status = audit_drill_receipt("rollback", rollback_data, max_age_days=max_age_days, now_dt=now)
-    drills["rollback"] = rb_status
-    if not rb_status.passed and rb_status.error:
-        all_violations.append(rb_status.error)
-
-    td_status = audit_drill_receipt("takedown", takedown_data, max_age_days=max_age_days, now_dt=now)
-    drills["takedown"] = td_status
-    if not td_status.passed and td_status.error:
-        all_violations.append(td_status.error)
-
-    inc_status = audit_drill_receipt("incident_response", incident_data, max_age_days=max_age_days, now_dt=now)
-    drills["incident_response"] = inc_status
-    if not inc_status.passed and inc_status.error:
-        all_violations.append(inc_status.error)
+    for key, data in (
+        ("rollback", rollback_data),
+        ("takedown", takedown_data),
+        ("incident_response", incident_data),
+    ):
+        status = audit_drill_receipt(key, data, max_age_days=max_age_days, now_dt=now)
+        drills[key] = status
+        if not status.passed and status.error:
+            all_violations.append(status.error)
 
     valid = len(all_violations) == 0
 
@@ -454,12 +499,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--receipts-dir",
         type=Path,
         default=None,
-        help="Path to directory containing operational drill receipts and capacity audits.",
+        help="Directory containing operational drill receipts, retention policy, and capacity audit. REQUIRED.",
     )
     parser.add_argument(
-        "--live",
-        action="store_true",
-        help="Perform live audit of repository operational state.",
+        "--pages-dir",
+        type=Path,
+        default=None,
+        help="Real Pages publication tree to measure for capacity (alternative to capacity-audit.json).",
     )
     parser.add_argument(
         "--max-age-days",
@@ -478,14 +524,25 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
 
-    if args.receipts_dir and not args.receipts_dir.is_dir():
+    if args.receipts_dir is None:
+        sys.stderr.write(
+            "Error: --receipts-dir is required. This auditor does not fabricate drill "
+            "receipts, capacity numbers, or retention policy.\n"
+        )
+        return 2
+    if not args.receipts_dir.is_dir():
         sys.stderr.write(f"Receipts directory not found: {args.receipts_dir}\n")
         return 2
 
-    report = audit_operational_receipts(
-        receipts_dir=args.receipts_dir,
-        max_age_days=args.max_age_days,
-    )
+    try:
+        report = audit_operational_receipts(
+            receipts_dir=args.receipts_dir,
+            pages_dir=args.pages_dir,
+            max_age_days=args.max_age_days,
+        )
+    except ReceiptsConfigError as e:
+        sys.stderr.write(f"Error: {e}\n")
+        return 2
 
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))
@@ -494,12 +551,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Operational Receipts and Capacity Audit: {status_str}")
         print(
             f"  Pages Total Size    : {report.capacity.total_size_bytes:,} / {report.capacity.max_total_bytes:,} bytes"
+            f" ({'measured' if report.capacity.measured else 'declared'})"
         )
         print(
-            f"  Largest File Size   : {report.capacity.largest_file_bytes:,} / {report.capacity.max_file_bytes:,} bytes ({report.capacity.largest_file_path})"
+            f"  Largest File Size   : {report.capacity.largest_file_bytes:,} / {report.capacity.max_file_bytes:,} bytes"
+            f" ({report.capacity.largest_file_path})"
         )
         print(
-            f"  Retention Windows   : Transient={report.retention.transient_retention_days}d, Receipts={report.retention.receipt_retention_days}d, Rollback={report.retention.rollback_checkpoint_retention_days}d"
+            f"  Retention Windows   : Transient={report.retention.transient_retention_days}d, "
+            f"Receipts={report.retention.receipt_retention_days}d, "
+            f"Rollback={report.retention.rollback_checkpoint_retention_days}d "
+            f"(source: {report.retention.source or 'NONE'})"
         )
 
         print("\nOperational Drill Statuses:")

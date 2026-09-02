@@ -60,6 +60,26 @@ A receipt records, at minimum:
 Receipts are immutable and append-only. Partial route success, stale observations,
 internal-only probes, or a signature over mismatched inputs fail closed.
 
+## Reconciliation inputs
+
+The `scripts/publication` canaries consume this evidence as files. They never
+fabricate a state; a missing or malformed input fails closed.
+
+- `reconciliation.py` requires `--manifest` (the desired manifest) and a
+  `--receipts-dir` containing `assembly-receipt.json` (built), `deployment-receipt.json`
+  (deployed), and `live-receipt.json` (the attested live receipt with the fields
+  above). The four states must be distinct sources.
+- `verify_independence_matrix.py` requires a `--receipts-dir` containing recorded
+  lane transitions in `independence-matrix.json` or `lane-transitions.json`.
+- `check_operational_receipts.py` requires a `--receipts-dir` containing
+  `rollback-drill.json`, `takedown-drill.json`, `incident-drill.json`,
+  `retention-policy.json` (which must cite its `source`), and either a
+  `capacity-audit.json` or a `--pages-dir` to measure.
+
+Signature verification against an attestor key is not yet implemented; the
+canary currently requires only that the signature field is present and
+non-empty. Closing that gap is tracked with the w3-w5 live-evidence work.
+
 ## Rollback
 
 Rollback targets the last known-good attested manifest and exact artifact. Do not rebuild

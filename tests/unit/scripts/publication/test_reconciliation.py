@@ -1,12 +1,15 @@
-"""Unit tests for publication reconciliation, independence matrix, and operational receipts."""
+"""Unit tests for publication reconciliation, independence matrix, and operational receipts.
+
+These tools fail closed. The tests assert that missing, malformed, fabricated, or
+collapsed inputs produce a nonzero result and never a reconciled/valid one, and
+that real matching evidence reconciles.
+"""
 
 from __future__ import annotations
 
 import importlib.util
-import io
 import json
 import sys
-import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -15,477 +18,456 @@ import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
-# Load modules under test via spec
 ROOT = Path(__file__).resolve().parents[4]
 
-RECON_SCRIPT = ROOT / "scripts" / "publication" / "reconciliation.py"
-RECON_SPEC = importlib.util.spec_from_file_location("reconciliation", RECON_SCRIPT)
-assert RECON_SPEC and RECON_SPEC.loader
-recon_mod = importlib.util.module_from_spec(RECON_SPEC)
-sys.modules[RECON_SPEC.name] = recon_mod
-RECON_SPEC.loader.exec_module(recon_mod)
 
-MATRIX_SCRIPT = ROOT / "scripts" / "publication" / "verify_independence_matrix.py"
-MATRIX_SPEC = importlib.util.spec_from_file_location("verify_independence_matrix", MATRIX_SCRIPT)
-assert MATRIX_SPEC and MATRIX_SPEC.loader
-matrix_mod = importlib.util.module_from_spec(MATRIX_SPEC)
-sys.modules[MATRIX_SPEC.name] = matrix_mod
-MATRIX_SPEC.loader.exec_module(matrix_mod)
-
-RECEIPTS_SCRIPT = ROOT / "scripts" / "publication" / "check_operational_receipts.py"
-RECEIPTS_SPEC = importlib.util.spec_from_file_location("check_operational_receipts", RECEIPTS_SCRIPT)
-assert RECEIPTS_SPEC and RECEIPTS_SPEC.loader
-receipts_mod = importlib.util.module_from_spec(RECEIPTS_SPEC)
-sys.modules[RECEIPTS_SPEC.name] = receipts_mod
-RECEIPTS_SPEC.loader.exec_module(receipts_mod)
+def _load(name: str):
+    path = ROOT / "scripts" / "publication" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return mod
 
 
-class MockHTTPResponse:
-    def __init__(self, body: bytes, status: int = 200, headers: dict[str, str] | None = None):
-        self._body = io.BytesIO(body)
-        self.status = status
-        self.headers = headers or {"content-type": "application/octet-stream"}
+recon_mod = _load("reconciliation")
+matrix_mod = _load("verify_independence_matrix")
+receipts_mod = _load("check_operational_receipts")
 
-    def read(self, size: int = -1) -> bytes:
-        return self._body.read(size)
-
-    def __enter__(self) -> MockHTTPResponse:
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        pass
+NOW = datetime.now(timezone.utc)
+NOW_ISO = NOW.isoformat()
 
 
-# ==============================================================================
-# RECONCILIATION & DRIFT TESTS (w1)
-# ==============================================================================
-
-
-def test_reconciliation_happy_path_matched_states() -> None:
-    now = datetime.now(timezone.utc)
-    now_iso = now.isoformat()
-
-    manifest = {
-        "generation": 5,
-        "source_commit": "1111111111111111111111111111111111111111",
-        "source_branch": "develop",
-        "build_closure": {
-            "lockfile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "workflow_sha": "2222222222222222222222222222222222222222",
-            "read_model_version": "v1",
-        },
-        "artifacts": {
-            "explorer_app": {
-                "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-                "path": "/results/",
-            },
-            "corpus_database": {
-                "digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-                "path": "/results/data/results.duckdb",
-            },
-        },
+def _full_live_receipt(generation: int = 5, timestamp: str | None = None) -> dict:
+    return {
+        "schema_version": "1.0",
+        "receipt_id": "rcpt-live-0001",
+        "target": "benchbox.dev",
+        "generation": generation,
+        "timestamp": timestamp or NOW_ISO,
+        "manifest_digest": "sha256:" + "a" * 64,
+        "develop_sha": "1111111111111111111111111111111111111111",
+        "published_results_sha": "2222222222222222222222222222222222222222",
+        "artifacts": {"site": {"digest": "d" * 64, "path": "/"}},
+        "nonce": "nonce-xyz",
+        "freshness_window": "24h",
+        "attestor": "maintainer:joe",
+        "signature": "BASE64SIG==",
+        "routes": [
+            {"path": "/", "status_code": 200, "ok": True},
+            {"path": "/results/", "status_code": 200, "ok": True},
+            {"path": "/results/data/results.duckdb", "status_code": 200, "ok": True},
+        ],
     }
 
+
+def _distinct_states(generation: int = 5):
+    desired = {
+        "generation": generation,
+        "develop_sha": "1111111111111111111111111111111111111111",
+        "build_closure": {"lockfile_sha256": "lock", "workflow_sha": "wf"},
+    }
     built = {
-        "generation": 5,
-        "source_commit": "1111111111111111111111111111111111111111",
-        "build_closure": dict(manifest["build_closure"]),
-        "artifacts": dict(manifest["artifacts"]),
+        "generation": generation,
+        "develop_sha": "1111111111111111111111111111111111111111",
+        "build_closure": {"lockfile_sha256": "lock", "workflow_sha": "wf"},
     }
-
     deployed = {
-        "generation": 5,
+        "generation": generation,
         "source_commit": "1111111111111111111111111111111111111111",
         "status": "DEPLOYED",
     }
+    observed = _full_live_receipt(generation=generation)
+    return desired, built, deployed, observed
 
-    observed = {
-        "generation": 5,
-        "timestamp": now_iso,
-        "checksums": {
-            "/results/": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "/results/data/results.duckdb": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        },
-    }
 
-    report = recon_mod.reconcile_states(
-        desired=manifest,
-        built=built,
-        deployed=deployed,
-        observed=observed,
-        now_dt=now,
-    )
+# ======================================================================
+# RECONCILIATION (w1)
+# ======================================================================
 
-    assert report.reconciled is True
+
+def test_reconcile_rejects_collapsed_states() -> None:
+    desired = {"generation": 1}
+    with pytest.raises(recon_mod.ReconciliationInputError):
+        recon_mod.reconcile_states(desired=desired, built=desired, deployed=desired, observed=desired, now_dt=NOW)
+
+
+def test_reconcile_happy_path_distinct_matching_states() -> None:
+    desired, built, deployed, observed = _distinct_states()
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
+    assert report.reconciled is True, [d.description for d in report.drifts]
     assert report.drift_count == 0
-    assert len(report.drifts) == 0
-    assert report.desired_generation == 5
-    assert report.deployed_generation == 5
-    assert report.observed_generation == 5
-    assert report.receipt_age_hours == 0.0
 
 
-def test_reconciliation_generation_drift_detection() -> None:
-    now = datetime.now(timezone.utc)
-    manifest = {"generation": 6, "source_commit": "aaaa"}
-    deployed = {"generation": 5, "source_commit": "aaaa"}  # lagging generation
-    observed = {"generation": 5, "timestamp": now.isoformat()}
-
-    report = recon_mod.reconcile_states(
-        desired=manifest,
-        built=manifest,
-        deployed=deployed,
-        observed=observed,
-        now_dt=now,
-    )
-
+def test_reconcile_missing_observation_fails_closed() -> None:
+    desired, built, deployed, _ = _distinct_states()
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=None, now_dt=NOW)
     assert report.reconciled is False
-    assert any(d.drift_type == "GENERATION_DRIFT" for d in report.drifts)
-    gen_drift = next(d for d in report.drifts if d.drift_type == "GENERATION_DRIFT")
-    assert gen_drift.expected == 6
-    assert gen_drift.actual == 5
+    assert any(d.drift_type in ("MISSING_OBSERVATION", "STALE_RECEIPT") for d in report.drifts)
 
 
-def test_reconciliation_manifest_drift_detection() -> None:
-    now = datetime.now(timezone.utc)
-    manifest = {
-        "generation": 1,
-        "source_commit": "1111111111111111111111111111111111111111",
-        "build_closure": {"lockfile_sha256": "lock_sha_A"},
-    }
-    built = {
-        "generation": 1,
-        "source_commit": "1111111111111111111111111111111111111111",
-        "build_closure": {"lockfile_sha256": "lock_sha_B"},  # lockfile mismatch
-    }
-    deployed = {
-        "generation": 1,
-        "source_commit": "2222222222222222222222222222222222222222",  # commit mismatch
-    }
-    observed = {"generation": 1, "timestamp": now.isoformat()}
-
-    report = recon_mod.reconcile_states(
-        desired=manifest,
-        built=built,
-        deployed=deployed,
-        observed=observed,
-        now_dt=now,
-    )
-
+def test_reconcile_missing_built_and_deployed_fails_closed() -> None:
+    desired, _, _, observed = _distinct_states()
+    report = recon_mod.reconcile_states(desired=desired, built=None, deployed=None, observed=observed, now_dt=NOW)
     assert report.reconciled is False
-    manifest_drifts = [d for d in report.drifts if d.drift_type == "MANIFEST_DRIFT"]
-    assert len(manifest_drifts) >= 2
+    assert any("assembly (built) receipt" in d.description for d in report.drifts)
+    assert any("deployment receipt" in d.description for d in report.drifts)
 
 
-def test_reconciliation_artifact_drift_detection() -> None:
-    now = datetime.now(timezone.utc)
-    manifest = {
-        "generation": 1,
-        "artifacts": {
-            "explorer": {"path": "/results/", "digest": "sha_expected"},
-        },
-    }
-    built = {
-        "generation": 1,
-        "artifacts": {
-            "explorer": {"path": "/results/", "digest": "sha_different_built"},
-        },
-    }
-    observed = {
-        "generation": 1,
-        "timestamp": now.isoformat(),
-        "checksums": {"/results/": "sha_different_live"},
-    }
-
-    report = recon_mod.reconcile_states(
-        desired=manifest,
-        built=built,
-        deployed=manifest,
-        observed=observed,
-        now_dt=now,
-    )
-
+def test_reconcile_generation_drift_desired_vs_observed_when_deployed_missing() -> None:
+    desired, built, _, _ = _distinct_states(generation=5)
+    observed = _full_live_receipt(generation=1)
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=None, observed=observed, now_dt=NOW)
     assert report.reconciled is False
-    artifact_drifts = [d for d in report.drifts if d.drift_type == "ARTIFACT_DRIFT"]
-    assert len(artifact_drifts) >= 1
+    gen_drifts = [d for d in report.drifts if d.drift_type == "GENERATION_DRIFT"]
+    assert any(d.expected == 5 and d.actual == 1 for d in gen_drifts)
 
 
-def test_reconciliation_stale_receipt_detection() -> None:
-    now = datetime.now(timezone.utc)
-    stale_time = (now - timedelta(hours=36)).isoformat()
+def test_reconcile_generation_type_normalization() -> None:
+    desired, built, deployed, observed = _distinct_states(generation=5)
+    deployed["generation"] = "5"
+    observed["generation"] = "5"
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
+    assert not any(d.drift_type == "GENERATION_DRIFT" for d in report.drifts)
 
-    manifest = {"generation": 1}
-    observed = {
-        "generation": 1,
-        "timestamp": stale_time,
+
+def test_reconcile_missing_required_artifact_is_drift() -> None:
+    desired, built, deployed, observed = _distinct_states()
+    desired["artifacts"] = {
+        "site": {"path": "/", "digest": "s" * 64},
+        "explorer": {"path": "/results/", "digest": "e" * 64},
     }
-
-    report = recon_mod.reconcile_states(
-        desired=manifest,
-        built=manifest,
-        deployed=manifest,
-        observed=observed,
-        max_age_hours=24.0,
-        now_dt=now,
-    )
-
+    built["artifacts"] = {"site": {"path": "/", "digest": "s" * 64}}  # explorer never built
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
     assert report.reconciled is False
-    assert any(d.drift_type == "STALE_RECEIPT" for d in report.drifts)
-    stale_drift = next(d for d in report.drifts if d.drift_type == "STALE_RECEIPT")
-    assert "stale" in stale_drift.description
+    assert any(d.drift_type == "ARTIFACT_DRIFT" and "/results/" in d.description for d in report.drifts)
+
+
+def test_reconcile_incomplete_receipt_fields() -> None:
+    desired, built, deployed, observed = _distinct_states()
+    del observed["nonce"]
+    del observed["signature"]
+    del observed["attestor"]
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
+    assert report.reconciled is False
+    incomplete = [d for d in report.drifts if d.drift_type == "RECEIPT_INCOMPLETE"]
+    assert len(incomplete) >= 3
+
+
+def test_reconcile_partial_route_success_fails_closed() -> None:
+    desired, built, deployed, observed = _distinct_states()
+    observed["routes"] = [{"path": "/", "status_code": 200, "ok": True}]  # missing 2 required routes
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
+    assert report.reconciled is False
+    assert any("Required public route" in d.description for d in report.drifts)
+
+
+def test_reconcile_probe_without_status_is_drift() -> None:
+    desired, built, deployed, observed = _distinct_states()
+    observed["routes"] = [
+        {"path": "/"},
+        {"path": "/results/"},
+        {"path": "/results/data/results.duckdb"},
+    ]
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
+    assert report.reconciled is False
+    assert any("omits both 'status_code'" in d.description for d in report.drifts)
+
+
+def test_reconcile_stale_receipt() -> None:
+    desired, built, deployed, _ = _distinct_states()
+    observed = _full_live_receipt(timestamp=(NOW - timedelta(hours=36)).isoformat())
+    report = recon_mod.reconcile_states(
+        desired=desired, built=built, deployed=deployed, observed=observed, max_age_hours=24.0, now_dt=NOW
+    )
+    assert report.reconciled is False
+    assert any(d.drift_type == "STALE_RECEIPT" and "stale" in d.description for d in report.drifts)
     assert report.receipt_age_hours is not None and report.receipt_age_hours >= 36.0
 
 
-def test_reconciliation_live_probe_execution(monkeypatch: pytest.MonkeyPatch) -> None:
-    content = b"Simulated DuckDB live database content"
+def test_reconcile_future_dated_receipt_fails_closed() -> None:
+    desired, built, deployed, _ = _distinct_states()
+    observed = _full_live_receipt(timestamp=(NOW + timedelta(hours=5)).isoformat())
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
+    assert report.reconciled is False
+    assert any(d.drift_type == "STALE_RECEIPT" and "future" in d.description for d in report.drifts)
+
+
+def test_reconcile_undated_receipt_fails_closed() -> None:
+    desired, built, deployed, observed = _distinct_states()
+    del observed["timestamp"]
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
+    assert report.reconciled is False
+    assert any(d.drift_type == "STALE_RECEIPT" for d in report.drifts)
+
+
+def test_reconcile_live_probe_execution(monkeypatch: pytest.MonkeyPatch) -> None:
     import hashlib
 
+    content = b"live database bytes"
     db_sha = hashlib.sha256(content).hexdigest()
 
-    manifest = {
-        "generation": 1,
-        "live_database": {"sha256": db_sha},
-    }
+    class Resp:
+        status = 200
 
-    def mock_urlopen(req, timeout=15.0):
-        return MockHTTPResponse(content, status=200)
+        def read(self) -> bytes:
+            return content
 
-    monkeypatch.setattr(urllib.request, "urlopen", mock_urlopen)
+        def __enter__(self):
+            return self
 
+        def __exit__(self, *a) -> None:
+            return None
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=15.0: Resp())
+
+    desired = {"generation": 1, "live_database": {"sha256": db_sha}}
+    built = {"generation": 1, "live_database": {"sha256": db_sha}, "kind": "assembly"}
+    deployed = {"generation": 1, "kind": "deploy"}
     report = recon_mod.reconcile_states(
-        desired=manifest,
-        built=manifest,
-        deployed=manifest,
-        observed=None,
-        base_url="https://benchbox.dev",
-        live=True,
+        desired=desired, built=built, deployed=deployed, observed=None, live=True, now_dt=NOW
     )
-
     assert len(report.probes) == 3
     assert all(p.ok for p in report.probes)
-    db_probe = next(p for p in report.probes if p.path == "/results/data/results.duckdb")
-    assert db_probe.sha256 == db_sha
 
 
-def test_reconciliation_cli_main_exit_codes(tmp_path: Path) -> None:
-    with pytest.raises(SystemExit) as exc_info:
+def test_reconciliation_cli_requires_inputs(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as exc:
         recon_mod.main(["--help"])
-    assert exc_info.value.code == 0
+    assert exc.value.code == 0
 
-    # 1. Valid manifest JSON
-    now_iso = datetime.now(timezone.utc).isoformat()
-    manifest_file = tmp_path / "test-manifest.json"
-    manifest_file.write_text(
-        json.dumps(
+    # No arguments at all -> config error, never 0.
+    assert recon_mod.main([]) == 2
+    assert recon_mod.main(["--json"]) == 2
+
+    manifest = tmp_path / "desired-manifest.json"
+    manifest.write_text(json.dumps(_distinct_states()[0]), encoding="utf-8")
+
+    # Manifest but no receipts dir -> 2.
+    assert recon_mod.main(["--manifest", str(manifest)]) == 2
+
+    # Receipts dir missing files -> 2.
+    rdir = tmp_path / "reconciliation"
+    rdir.mkdir()
+    assert recon_mod.main(["--manifest", str(manifest), "--receipts-dir", str(rdir)]) == 2
+
+
+def test_reconciliation_cli_full_evidence_reconciles(tmp_path: Path) -> None:
+    desired, built, deployed, observed = _distinct_states()
+    manifest = tmp_path / "desired-manifest.json"
+    manifest.write_text(json.dumps(desired), encoding="utf-8")
+    rdir = tmp_path / "reconciliation"
+    rdir.mkdir()
+    (rdir / recon_mod.ASSEMBLY_RECEIPT_NAME).write_text(json.dumps(built), encoding="utf-8")
+    (rdir / recon_mod.DEPLOYMENT_RECEIPT_NAME).write_text(json.dumps(deployed), encoding="utf-8")
+    (rdir / recon_mod.LIVE_RECEIPT_NAME).write_text(json.dumps(observed), encoding="utf-8")
+
+    assert recon_mod.main(["--manifest", str(manifest), "--receipts-dir", str(rdir), "--json"]) == 0
+
+
+# ======================================================================
+# INDEPENDENCE MATRIX (w2)
+# ======================================================================
+
+_BASE = {"package": "p1", "site": "s1", "explorer": "e1", "corpus": "c1"}
+
+
+def _single_lane_transitions() -> list[dict]:
+    mut = {"package": "p2", "site": "s2", "explorer": "e2", "corpus": "c2"}
+    out = []
+    for lane in matrix_mod.LANES:
+        after = dict(_BASE)
+        after[lane] = mut[lane]
+        out.append(
             {
-                "generation": 1,
-                "source_commit": "aaaa",
-                "timestamp": now_iso,
+                "transition_id": f"t_{lane}",
+                "target_lane": lane,
+                "before_hashes": dict(_BASE),
+                "after_hashes": after,
             }
-        ),
-        encoding="utf-8",
-    )
-
-    rc = recon_mod.main(["--manifest", str(manifest_file), "--json"])
-    assert rc == 0
-
-    # 2. Non-existent manifest returns error code 2
-    rc_err = recon_mod.main(["--manifest", "/tmp/non-existent-manifest-path.json"])
-    assert rc_err == 2
+        )
+    return out
 
 
-# ==============================================================================
-# INDEPENDENCE MATRIX TESTS (w2)
-# ==============================================================================
+def test_matrix_no_input_raises() -> None:
+    with pytest.raises(matrix_mod.MatrixInputError):
+        matrix_mod.verify_independence()
 
 
-def test_independence_matrix_canonical_orthogonal_verification() -> None:
-    report = matrix_mod.verify_independence()
-    assert report.valid is True
-    assert report.transitions_checked == 4
-    assert len(report.violations) == 0
-
-    # Check 4x4 matrix is strictly identity / orthogonal
-    for row in matrix_mod.LANES:
-        for col in matrix_mod.LANES:
-            assert report.matrix[row][col] is (row == col)
-
-
-def test_independence_matrix_detects_lane_coupling() -> None:
-    base = {
-        "package": "p1",
-        "site": "s1",
-        "explorer": "e1",
-        "corpus": "c1",
-    }
-    # Mutating site ALSO mutates explorer (coupling violation)
-    coupled_after = {
-        "package": "p1",
-        "site": "s2",
-        "explorer": "e2",  # Unintended side-effect mutation
-        "corpus": "c1",
-    }
-
+def test_matrix_detects_lane_coupling() -> None:
+    coupled_after = {"package": "p1", "site": "s2", "explorer": "e2", "corpus": "c1"}
     trans = matrix_mod.verify_transition_independence(
-        transition_id="test_coupled_transition",
-        target_lane="site",
-        before_hashes=base,
-        after_hashes=coupled_after,
+        transition_id="coupled", target_lane="site", before_hashes=_BASE, after_hashes=coupled_after
     )
-
     assert trans.valid is False
-    assert any("explorer" in v for v in trans.violations)
-
-    # Check that report reports invalid
     report = matrix_mod.verify_independence(transitions=[trans])
     assert report.valid is False
-    assert len(report.violations) > 0
 
 
-def test_independence_matrix_detects_unmutated_target_lane() -> None:
-    base = {
-        "package": "p1",
-        "site": "s1",
-        "explorer": "e1",
-        "corpus": "c1",
-    }
-    # Target lane package did NOT change
-    no_change_after = dict(base)
-
+def test_matrix_detects_unmutated_target_lane() -> None:
     trans = matrix_mod.verify_transition_independence(
-        transition_id="test_no_change_transition",
-        target_lane="package",
-        before_hashes=base,
-        after_hashes=no_change_after,
+        transition_id="nochange", target_lane="package", before_hashes=_BASE, after_hashes=dict(_BASE)
     )
-
     assert trans.valid is False
     assert any("did not change" in v for v in trans.violations)
 
 
-def test_independence_matrix_cli_main(tmp_path: Path) -> None:
-    # CLI help and default run
-    with pytest.raises(SystemExit) as exc_info:
-        matrix_mod.main(["--help"])
-    assert exc_info.value.code == 0
-
-    rc_default = matrix_mod.main(["--json"])
-    assert rc_default == 0
-
-    # Invalid directory returns 2
-    rc_bad = matrix_mod.main(["--receipts-dir", "/tmp/bad-receipts-dir-does-not-exist"])
-    assert rc_bad == 2
-
-
-# ==============================================================================
-# OPERATIONAL RECEIPTS AUDIT TESTS (w2)
-# ==============================================================================
-
-
-def test_operational_receipts_happy_path() -> None:
-    now = datetime.now(timezone.utc)
-    report = receipts_mod.audit_operational_receipts(now_dt=now)
-
+def test_matrix_loads_recorded_transitions(tmp_path: Path) -> None:
+    (tmp_path / matrix_mod.MATRIX_FILE_NAME).write_text(
+        json.dumps({"transitions": _single_lane_transitions()}), encoding="utf-8"
+    )
+    report = matrix_mod.verify_independence(receipts_dir=tmp_path)
     assert report.valid is True
-    assert report.capacity.passed is True
-    assert report.retention.passed is True
-    assert len(report.violations) == 0
-    assert report.drills["rollback"].passed is True
-    assert report.drills["takedown"].passed is True
-    assert report.drills["incident_response"].passed is True
+    assert report.transitions_checked == 4
 
 
-def test_operational_receipts_capacity_limits() -> None:
-    # 1. Normal capacity
-    cap_ok = receipts_mod.audit_capacity(total_bytes=50_000_000, largest_file_bytes=10_000_000)
-    assert cap_ok.passed is True
-    assert len(cap_ok.warnings) == 0
-    assert len(cap_ok.violations) == 0
+def test_matrix_malformed_record_is_config_error(tmp_path: Path) -> None:
+    (tmp_path / matrix_mod.MATRIX_FILE_NAME).write_text("{ not json", encoding="utf-8")
+    with pytest.raises(matrix_mod.MatrixInputError):
+        matrix_mod.verify_independence(receipts_dir=tmp_path)
 
-    # 2. Warning capacity (> 800 MB, <= 1 GB)
-    cap_warn = receipts_mod.audit_capacity(total_bytes=850 * 1024 * 1024, largest_file_bytes=10_000_000)
-    assert cap_warn.passed is True
-    assert len(cap_warn.warnings) == 1
-    assert len(cap_warn.violations) == 0
 
-    # 3. Violation total size (> 1 GB)
-    cap_total_err = receipts_mod.audit_capacity(total_bytes=1100 * 1024 * 1024, largest_file_bytes=10_000_000)
-    assert cap_total_err.passed is False
-    assert any("exceeds limit" in v for v in cap_total_err.violations)
+def test_matrix_cli(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as exc:
+        matrix_mod.main(["--help"])
+    assert exc.value.code == 0
 
-    # 4. Violation single file size (> 100 MB)
-    cap_file_err = receipts_mod.audit_capacity(
-        total_bytes=200 * 1024 * 1024,
-        largest_file_bytes=105 * 1024 * 1024,
-        largest_file_path="big_results.duckdb",
+    assert matrix_mod.main([]) == 2
+    assert matrix_mod.main(["--json"]) == 2
+    assert matrix_mod.main(["--receipts-dir", str(tmp_path / "nope")]) == 2
+
+    empty = tmp_path / "independence"
+    empty.mkdir()
+    assert matrix_mod.main(["--receipts-dir", str(empty)]) == 2  # no transition record
+
+    (empty / matrix_mod.MATRIX_FILE_NAME).write_text(
+        json.dumps({"transitions": _single_lane_transitions()}), encoding="utf-8"
     )
-    assert cap_file_err.passed is False
-    assert any("exceeds limit" in v for v in cap_file_err.violations)
+    assert matrix_mod.main(["--receipts-dir", str(empty), "--json"]) == 0
 
 
-def test_operational_receipts_retention_rules() -> None:
-    # Transient too long (> 7 days)
-    ret_err1 = receipts_mod.audit_retention(transient_days=14)
-    assert ret_err1.passed is False
-    assert any("Transient artifact retention" in v for v in ret_err1.violations)
-
-    # Receipts retention too short (< 30 days)
-    ret_err2 = receipts_mod.audit_retention(receipt_days=14)
-    assert ret_err2.passed is False
-    assert any("Receipt retention" in v for v in ret_err2.violations)
-
-    # Rollback retention too short (< 90 days)
-    ret_err3 = receipts_mod.audit_retention(rollback_days=60)
-    assert ret_err3.passed is False
-    assert any("Rollback checkpoint retention" in v for v in ret_err3.violations)
+# ======================================================================
+# OPERATIONAL RECEIPTS (w2)
+# ======================================================================
 
 
-def test_operational_receipts_expired_drill_detection() -> None:
-    now = datetime.now(timezone.utc)
-    expired_time = (now - timedelta(days=45)).isoformat()
+def _valid_operational_dir(tmp_path: Path) -> Path:
+    d = tmp_path / "operational"
+    d.mkdir()
+    for name, rid in (
+        (receipts_mod.ROLLBACK_DRILL_FILE, "r1"),
+        (receipts_mod.TAKEDOWN_DRILL_FILE, "t1"),
+        (receipts_mod.INCIDENT_DRILL_FILE, "i1"),
+    ):
+        (d / name).write_text(
+            json.dumps({"receipt_id": rid, "status": "SUCCESS", "executed_at": NOW_ISO}), encoding="utf-8"
+        )
+    (d / receipts_mod.CAPACITY_FILE).write_text(
+        json.dumps({"total_size_bytes": 50_000_000, "largest_file_bytes": 10_000_000, "measured": True}),
+        encoding="utf-8",
+    )
+    (d / receipts_mod.RETENTION_FILE).write_text(
+        json.dumps(
+            {
+                "transient_retention_days": 7,
+                "receipt_retention_days": 30,
+                "rollback_checkpoint_retention_days": 90,
+                "source": "publication-canaries.yml retention-days + contract Retention and audit",
+            }
+        ),
+        encoding="utf-8",
+    )
+    return d
 
-    expired_drill_data = {
-        "receipt_id": "rcpt-old-rollback",
-        "status": "SUCCESS",
-        "executed_at": expired_time,
-    }
 
+def test_operational_requires_receipts_dir() -> None:
+    with pytest.raises(receipts_mod.ReceiptsConfigError):
+        receipts_mod.audit_operational_receipts(receipts_dir=None)
+
+
+def test_operational_missing_drill_is_missing_violation(tmp_path: Path) -> None:
+    d = _valid_operational_dir(tmp_path)
+    (d / receipts_mod.ROLLBACK_DRILL_FILE).unlink()
+    report = receipts_mod.audit_operational_receipts(receipts_dir=d, now_dt=NOW)
+    assert report.valid is False
+    assert report.drills["rollback"].status == "MISSING"
+    assert report.drills["rollback"].passed is False
+
+
+def test_operational_missing_capacity_and_retention_fail_closed(tmp_path: Path) -> None:
+    d = tmp_path / "operational"
+    d.mkdir()
+    for name in (receipts_mod.ROLLBACK_DRILL_FILE, receipts_mod.TAKEDOWN_DRILL_FILE, receipts_mod.INCIDENT_DRILL_FILE):
+        (d / name).write_text(
+            json.dumps({"receipt_id": "x", "status": "SUCCESS", "executed_at": NOW_ISO}), encoding="utf-8"
+        )
+    report = receipts_mod.audit_operational_receipts(receipts_dir=d, now_dt=NOW)
+    assert report.valid is False
+    assert any("capacity evidence" in v.lower() or "no capacity" in v.lower() for v in report.violations)
+    assert any("retention policy" in v.lower() for v in report.violations)
+
+
+def test_operational_retention_without_source_fails() -> None:
+    audit = receipts_mod.audit_retention(transient_days=7, receipt_days=30, rollback_days=90, source="")
+    assert audit.passed is False
+    assert any("source" in v for v in audit.violations)
+
+
+def test_operational_capacity_at_limit_rejected() -> None:
+    audit = receipts_mod.audit_capacity(total_bytes=receipts_mod.MAX_TOTAL_PAGES_BYTES, largest_file_bytes=1)
+    assert audit.passed is False
+    audit2 = receipts_mod.audit_capacity(total_bytes=1, largest_file_bytes=receipts_mod.MAX_INDIVIDUAL_FILE_BYTES)
+    assert audit2.passed is False
+
+
+def test_operational_status_missing_is_invalid() -> None:
+    status = receipts_mod.audit_drill_receipt("rollback", {"receipt_id": "r", "executed_at": NOW_ISO}, now_dt=NOW)
+    assert status.passed is False
+    assert status.status == "INVALID"
+
+
+def test_operational_future_dated_drill_is_invalid() -> None:
+    future = (NOW + timedelta(days=2)).isoformat()
     status = receipts_mod.audit_drill_receipt(
-        drill_type="rollback",
-        receipt_data=expired_drill_data,
-        max_age_days=30.0,
-        now_dt=now,
+        "rollback", {"receipt_id": "r", "status": "SUCCESS", "executed_at": future}, now_dt=NOW
     )
+    assert status.passed is False
+    assert status.status == "INVALID"
 
+
+def test_operational_expired_drill() -> None:
+    old = (NOW - timedelta(days=45)).isoformat()
+    status = receipts_mod.audit_drill_receipt(
+        "rollback", {"receipt_id": "r", "status": "SUCCESS", "executed_at": old}, max_age_days=30.0, now_dt=NOW
+    )
     assert status.passed is False
     assert status.status == "EXPIRED"
-    assert status.age_days is not None and status.age_days >= 45.0
 
 
-def test_operational_receipts_cli_main(tmp_path: Path) -> None:
-    with pytest.raises(SystemExit) as exc_info:
+def test_operational_pages_dir_measurement(tmp_path: Path) -> None:
+    d = _valid_operational_dir(tmp_path)
+    (d / receipts_mod.CAPACITY_FILE).unlink()
+    pages = tmp_path / "pages"
+    pages.mkdir()
+    (pages / "index.html").write_text("x" * 1000, encoding="utf-8")
+    report = receipts_mod.audit_operational_receipts(receipts_dir=d, pages_dir=pages, now_dt=NOW)
+    assert report.capacity.measured is True
+    assert report.capacity.total_size_bytes == 1000
+    assert report.valid is True
+
+
+def test_operational_cli(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as exc:
         receipts_mod.main(["--help"])
-    assert exc_info.value.code == 0
+    assert exc.value.code == 0
 
-    rc_default = receipts_mod.main(["--json"])
-    assert rc_default == 0
+    assert receipts_mod.main([]) == 2
+    assert receipts_mod.main(["--json"]) == 2
+    assert receipts_mod.main(["--receipts-dir", str(tmp_path / "missing")]) == 2
 
-    # Receipts dir with custom valid drill
-    rdir = tmp_path / "receipts"
-    rdir.mkdir()
-    now_iso = datetime.now(timezone.utc).isoformat()
-    (rdir / "rollback-drill.json").write_text(
-        json.dumps({"receipt_id": "r1", "status": "SUCCESS", "executed_at": now_iso}),
-        encoding="utf-8",
-    )
-    (rdir / "takedown-drill.json").write_text(
-        json.dumps({"receipt_id": "t1", "status": "SUCCESS", "executed_at": now_iso}),
-        encoding="utf-8",
-    )
-    (rdir / "incident-drill.json").write_text(
-        json.dumps({"receipt_id": "i1", "status": "SUCCESS", "executed_at": now_iso}),
-        encoding="utf-8",
-    )
+    d = _valid_operational_dir(tmp_path)
+    assert receipts_mod.main(["--receipts-dir", str(d), "--json"]) == 0
 
-    rc_custom = receipts_mod.main(["--receipts-dir", str(rdir), "--json"])
-    assert rc_custom == 0
+    (d / receipts_mod.TAKEDOWN_DRILL_FILE).write_text("{bad", encoding="utf-8")
+    assert receipts_mod.main(["--receipts-dir", str(d), "--json"]) == 2
