@@ -84,6 +84,7 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
         "PACKAGE_SMOKE_RESULT": "skipped",
         "DEPENDENCY_AUDIT_RESULT": "skipped",
         "PARITY_CHECK_RESULT": "skipped",
+        "PUBLICATION_RECONCILIATION_RESULT": "success",
         "EXPLORER_VITEST_RESULT": "skipped",
         "CONTENT_GUARD_NEEDED": "false",
         "SKILL_INTEGRITY_NEEDED": "false",
@@ -106,13 +107,14 @@ def test_pr_path_classifier_fetches_base_history_for_merge_base() -> None:
 
     # The classifier uses `git diff origin/develop...HEAD`; a depth-1 base fetch
     # on GitHub's synthetic PR merge ref can leave no merge base available.
-    # Three consumers of the full base history today:
+    # Consumers of the full base history today:
     #   - ci-paths (path classifier)
     #   - content-guard (recreates path lists for content validators)
     #   - explorer-tokens and site-theme-tokens (each greps the diff for its
     #     own source changes)
+    #   - publication-plan-reconciliation (trusted script diff)
     assert '--depth=1 origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"' not in workflow
-    assert workflow.count(base_fetch) == 4
+    assert workflow.count(base_fetch) == 5
 
 
 def test_ci_required_result_preserves_content_guard_failure() -> None:

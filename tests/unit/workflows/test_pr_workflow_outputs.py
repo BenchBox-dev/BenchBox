@@ -38,6 +38,7 @@ def test_required_umbrella_observes_every_selected_lane(workflow: dict[str, Any]
         "package-smoke",
         "dependency-audit",
         "parity-check",
+        "publication-reconciliation",
     ]
 
 
