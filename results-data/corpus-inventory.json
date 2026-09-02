@@ -2223,7 +2223,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "831fdf191e2024c4e28b564329fa9c466d5f9c75f42684f993e3fb3b57e1d45d"
+      "bundle_sha256": "3a00d6605062472bddcd919daa1be6187ed3fd7f2ee6865a4948a617b9c0d85f"
     },
     {
       "file": "tpch_sf01_polars_df_20260826_204211_f659fcbf.json",
@@ -2249,7 +2249,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "cf61192089a3430f4f1221f561f17e8abce88f2f9f0985e029e60e1413963d72"
+      "bundle_sha256": "1eaa5467e018087972766e7192bb0a5b79b4a09cca9187a7b94042ab96acf811"
     },
     {
       "file": "tpch_sf1_polars_df_20260824_193005_54a9e53f.json",
