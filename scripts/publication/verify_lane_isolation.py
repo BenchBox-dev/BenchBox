@@ -449,7 +449,7 @@ def verify_lane_isolation(  # noqa: C901
                     f"shared input modification failed to change '{l}' digest (SHARED_BUILD_INPUTS not folded)"
                 )
 
-        # Static disjointness + real-file ownership checks (excluding shared inputs)
+        # Static disjoint sets + real-file ownership checks (excluding shared inputs)
         lane_filesets = {l: set(scan_lane_files(l, repo_root=repo_root).keys()) for l in ("site", "explorer", "corpus")}
         shared_files: set[str] = set()
         for p in lane_filesets["site"]:
