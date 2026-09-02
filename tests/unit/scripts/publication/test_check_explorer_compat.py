@@ -1,0 +1,437 @@
+"""Tests for the Results Explorer compatibility and artifact check script."""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+import os
+import tarfile
+import zipfile
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+SCRIPT_PATH = REPO_ROOT / "scripts" / "publication" / "check_explorer_compat.py"
+
+SPEC = importlib.util.spec_from_file_location("check_explorer_compat", SCRIPT_PATH)
+assert SPEC and SPEC.loader
+checker = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(checker)
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def mock_artifact_dir(tmp_path: Path) -> Path:
+    """Create a minimal valid Results Explorer artifact dist directory."""
+    dist = tmp_path / "dist"
+    dist.mkdir(parents=True)
+    (dist / "index.html").write_text(
+        "<!DOCTYPE html><html><head><title>Results Explorer</title></head>"
+        "<body><div id='root'></div><script src='/assets/index.js'></script></body></html>",
+        encoding="utf-8",
+    )
+    assets = dist / "assets"
+    assets.mkdir(parents=True)
+    (assets / "index.js").write_text("console.log('explorer');", encoding="utf-8")
+    (assets / "style.css").write_text("body { margin: 0; }", encoding="utf-8")
+    return dist
+
+
+# ---------------------------------------------------------------------------
+# Schema Definitions & Normalization Tests
+# ---------------------------------------------------------------------------
+
+
+def test_normalize_type() -> None:
+    assert checker.normalize_type("varchar") == "VARCHAR"
+    assert checker.normalize_type("TEXT") == "VARCHAR"
+    assert checker.normalize_type("int4") == "INTEGER"
+    assert checker.normalize_type("double") == "DOUBLE"
+    assert checker.normalize_type("boolean") == "BOOLEAN"
+    assert checker.normalize_type("CUSTOM_TYPE") == "CUSTOM_TYPE"
+
+
+def test_schema_versions_definitions() -> None:
+    # Only v9 is supported; contract import should match
+    assert checker.SUPPORTED_SCHEMA_VERSIONS == (9,)
+    assert checker.CURRENT_SCHEMA_VERSION == 9
+    # Check that contract version is consistent
+    from _project.scripts.explorer_pipeline.contract import EXPLORER_READ_MODEL_VERSION
+
+    assert checker.CURRENT_SCHEMA_VERSION == EXPLORER_READ_MODEL_VERSION
+    assert checker.SUPPORTED_SCHEMA_VERSIONS == (EXPLORER_READ_MODEL_VERSION,)
+
+    cols = checker.get_table_columns_for_version(9)
+    assert "results" in cols
+    assert "metadata" in cols
+    assert "result_environment" in cols
+    assert "query_executions" in cols
+    assert "benchmark_rankings" in cols
+    assert "cohort_metadata" in cols
+    assert "result_basis_availability" in cols
+    assert "cpu_identity_provenance" in cols["result_environment"]
+    assert "run_type" in cols["query_executions"]
+
+
+def test_invalid_schema_version_raises() -> None:
+    with pytest.raises(ValueError, match="Unsupported schema version"):
+        checker.get_table_columns_for_version(99)
+    with pytest.raises(ValueError, match="Unsupported schema version"):
+        checker.get_table_columns_for_version(7)
+    with pytest.raises(ValueError, match="Unsupported schema version"):
+        checker.get_table_columns_for_version(8)
+    with pytest.raises(ValueError, match="Unsupported schema version"):
+        checker.get_views_for_version(7)
+    with pytest.raises(ValueError, match="Unsupported schema version"):
+        checker.get_indexes_for_version(8)
+
+
+# ---------------------------------------------------------------------------
+# In-Memory Database & Query Verification Tests
+# ---------------------------------------------------------------------------
+
+
+def test_in_memory_schema_creation_and_validation() -> None:
+    for version in checker.SUPPORTED_SCHEMA_VERSIONS:
+        con = checker.create_in_memory_schema(version)
+        try:
+            errors = checker.validate_database_schema(con, expected_version=version)
+            assert errors == [], f"Schema validation failed for v{version}: {errors}"
+
+            query_errors = checker.validate_database_queries(con, version=version)
+            assert query_errors == [], f"Query validation failed for v{version}: {query_errors}"
+        finally:
+            con.close()
+
+
+def test_check_schema_compatibility_all_supported() -> None:
+    results = checker.check_schema_compatibility()
+    for version, errors in results.items():
+        assert errors == [], f"Version v{version} had unexpected errors: {errors}"
+    assert set(results.keys()) == set(checker.SUPPORTED_SCHEMA_VERSIONS)
+
+
+def test_validate_database_schema_detects_missing_table() -> None:
+    con = checker.create_in_memory_schema(9)
+    try:
+        con.execute("DROP TABLE cohort_metadata")
+        errors = checker.validate_database_schema(con, expected_version=9)
+        assert any("missing required tables for v9: cohort_metadata" in err for err in errors)
+    finally:
+        con.close()
+
+
+def test_validate_database_schema_detects_missing_column() -> None:
+    con = checker.create_in_memory_schema(9)
+    try:
+        con.execute("ALTER TABLE results DROP COLUMN funding")
+        errors = checker.validate_database_schema(con, expected_version=9)
+        assert any("table 'results' missing required columns: funding" in err for err in errors)
+    finally:
+        con.close()
+
+
+def test_validate_database_schema_detects_missing_view() -> None:
+    con = checker.create_in_memory_schema(9)
+    try:
+        con.execute("DROP VIEW result_detail_metrics")
+        errors = checker.validate_database_schema(con, expected_version=9)
+        assert any("missing required views for v9: result_detail_metrics" in err for err in errors)
+    finally:
+        con.close()
+
+
+def test_validate_database_schema_version_mismatch() -> None:
+    con = checker.create_in_memory_schema(9)
+    try:
+        # Tamper metadata to simulate version mismatch
+        con.execute("UPDATE metadata SET read_model_version = 8")
+        errors = checker.validate_database_schema(con, expected_version=9)
+        assert any("read_model_version mismatch: expected 9, got 8" in err for err in errors)
+    finally:
+        con.close()
+
+
+# ---------------------------------------------------------------------------
+# Artifact Bundle Verification Tests
+# ---------------------------------------------------------------------------
+
+
+def test_compute_file_and_directory_checksums(mock_artifact_dir: Path) -> None:
+    checksums = checker.compute_directory_checksums(mock_artifact_dir)
+    assert "index.html" in checksums
+    assert "assets/index.js" in checksums
+    assert "assets/style.css" in checksums
+    assert len(checksums) == 3
+
+    addr = checker.compute_content_address(checksums)
+    assert isinstance(addr, str) and len(addr) == 64
+
+
+def test_compute_directory_checksums_anchored_exclude(mock_artifact_dir: Path) -> None:
+    # Nested manifest.json should be included in checksums (anchored to root)
+    nested = mock_artifact_dir / "assets" / "manifest.json"
+    nested.write_text('{"fake": true}', encoding="utf-8")
+    checksums = checker.compute_directory_checksums(mock_artifact_dir)
+    # Root manifest.json is excluded, nested one is not
+    assert "assets/manifest.json" in checksums
+    assert "manifest.json" not in checksums
+    # Same for SHA256SUMS
+    nested_sums = mock_artifact_dir / "assets" / "SHA256SUMS"
+    nested_sums.write_text("fake", encoding="utf-8")
+    checksums2 = checker.compute_directory_checksums(mock_artifact_dir)
+    assert "assets/SHA256SUMS" in checksums2
+    assert "SHA256SUMS" not in checksums2
+
+
+def test_generate_artifact_manifest(mock_artifact_dir: Path) -> None:
+    manifest = checker.generate_artifact_manifest(mock_artifact_dir, write=True)
+    assert manifest["bundle"] == "explorer_app"
+    assert manifest["file_count"] == 3
+    assert (mock_artifact_dir / "manifest.json").is_file()
+    assert (mock_artifact_dir / "SHA256SUMS").is_file()
+    # Provenance fields
+    assert manifest["read_model_version"] == checker.CURRENT_SCHEMA_VERSION
+    assert manifest["supported_versions"] == list(checker.SUPPORTED_SCHEMA_VERSIONS)
+    assert "github_sha" in manifest
+    assert "contract_version" in manifest
+
+    # Validating bundle after manifest generation succeeds cleanly
+    errors, info = checker.validate_artifact_bundle(mock_artifact_dir)
+    assert errors == []
+    assert info is not None
+    assert info["content_address"] == manifest["content_address"]
+
+
+def test_generate_manifest_embeds_github_sha(mock_artifact_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_SHA", "abc123def456")
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/develop")
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
+    manifest = checker.generate_artifact_manifest(mock_artifact_dir, write=False)
+    assert manifest["github_sha"] == "abc123def456"
+    assert manifest["github_ref"] == "refs/heads/develop"
+    assert manifest["github_event_name"] == "push"
+
+
+def test_validate_artifact_bundle_valid_directory(mock_artifact_dir: Path) -> None:
+    errors, info = checker.validate_artifact_bundle(mock_artifact_dir)
+    assert errors == []
+    assert info is not None
+    assert info["file_count"] == 3
+    assert info["js_bundles"] == 1
+    assert info["css_bundles"] == 1
+
+
+def test_validate_artifact_bundle_require_manifest_missing(mock_artifact_dir: Path) -> None:
+    # Without manifest, require_manifest=False passes; with True fails
+    errors_ok, _ = checker.validate_artifact_bundle(mock_artifact_dir, require_manifest=False)
+    assert errors_ok == []
+    errors_req, _ = checker.validate_artifact_bundle(mock_artifact_dir, require_manifest=True)
+    assert any("manifest.json is missing" in err for err in errors_req)
+    assert any("SHA256SUMS is missing" in err for err in errors_req)
+
+
+def test_validate_artifact_bundle_nonexistent_path(tmp_path: Path) -> None:
+    non_existent = tmp_path / "does_not_exist"
+    errors, info = checker.validate_artifact_bundle(non_existent)
+    assert any("does not exist" in err for err in errors)
+    assert info is None
+
+
+def test_validate_artifact_bundle_missing_index(tmp_path: Path) -> None:
+    dist = tmp_path / "no_index"
+    dist.mkdir()
+    assets = dist / "assets"
+    assets.mkdir()
+    (assets / "index.js").write_text("console.log('hi');", encoding="utf-8")
+    (assets / "index.css").write_text("body {}", encoding="utf-8")
+
+    errors, _ = checker.validate_artifact_bundle(dist)
+    assert any("missing 'index.html'" in err for err in errors)
+
+
+def test_validate_artifact_bundle_empty_file(mock_artifact_dir: Path) -> None:
+    empty_file = mock_artifact_dir / "empty.txt"
+    empty_file.touch()
+
+    errors, _ = checker.validate_artifact_bundle(mock_artifact_dir)
+    assert any("empty file in artifact bundle: empty.txt" in err for err in errors)
+
+
+def test_validate_artifact_bundle_manifest_checksum_mismatch(mock_artifact_dir: Path) -> None:
+    checker.generate_artifact_manifest(mock_artifact_dir, write=True)
+
+    # Tamper with a file
+    (mock_artifact_dir / "index.html").write_text("TAMPERED", encoding="utf-8")
+
+    errors, _ = checker.validate_artifact_bundle(mock_artifact_dir)
+    assert any("manifest content_address mismatch" in err or "file checksum mismatch" in err for err in errors)
+
+
+def test_validate_artifact_bundle_malformed_sha256sums(mock_artifact_dir: Path) -> None:
+    checker.generate_artifact_manifest(mock_artifact_dir, write=True)
+    # Overwrite with malformed single token
+    (mock_artifact_dir / "SHA256SUMS").write_text("garbage_token\n", encoding="utf-8")
+    errors, _ = checker.validate_artifact_bundle(mock_artifact_dir)
+    assert any("malformed SHA256SUMS" in err for err in errors)
+
+
+def test_validate_artifact_bundle_malformed_sha256sums_line_continuation(mock_artifact_dir: Path) -> None:
+    checker.generate_artifact_manifest(mock_artifact_dir, write=True)
+    (mock_artifact_dir / "SHA256SUMS").write_text(
+        "not-a-hash  index.html\n" + (mock_artifact_dir / "SHA256SUMS").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    errors, _ = checker.validate_artifact_bundle(mock_artifact_dir)
+    assert any("malformed SHA256SUMS hash" in err for err in errors)
+
+
+def test_validate_artifact_bundle_zip_archive(mock_artifact_dir: Path, tmp_path: Path) -> None:
+    zip_path = tmp_path / "explorer_app.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        for p in mock_artifact_dir.rglob("*"):
+            if p.is_file():
+                zf.write(p, arcname=p.relative_to(mock_artifact_dir))
+
+    errors, info = checker.validate_artifact_bundle(zip_path)
+    assert errors == []
+    assert info is not None
+    assert info["file_count"] == 3
+
+
+def test_validate_artifact_bundle_tar_archive(mock_artifact_dir: Path, tmp_path: Path) -> None:
+    tar_path = tmp_path / "explorer_app.tar.gz"
+    with tarfile.open(tar_path, "w:gz") as tf:
+        for p in mock_artifact_dir.rglob("*"):
+            if p.is_file():
+                tf.add(p, arcname=str(p.relative_to(mock_artifact_dir)))
+
+    errors, info = checker.validate_artifact_bundle(tar_path)
+    assert errors == []
+    assert info is not None
+    assert info["file_count"] == 3
+
+
+# ---------------------------------------------------------------------------
+# CLI Execution Tests
+# ---------------------------------------------------------------------------
+
+
+def test_cli_default_schema_checks(capsys: pytest.CaptureFixture[str]) -> None:
+    exit_code = checker.main([])
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert "Results Explorer Compatibility" in captured.out
+    assert "Schema v9" in captured.out
+    assert "Schema v8" not in captured.out
+    assert "Schema v7" not in captured.out
+    assert "All Results Explorer compatibility checks PASSED" in captured.out
+
+
+def test_cli_json_mode(capsys: pytest.CaptureFixture[str]) -> None:
+    exit_code = checker.main(["--json"])
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    data = json.loads(captured.out)
+    assert data["status"] == "passed"
+    assert data["current_version"] == 9
+    assert "v9" in data["schema_checks"]
+    assert "v8" not in data["schema_checks"]
+
+
+def test_cli_specific_schema_version(capsys: pytest.CaptureFixture[str]) -> None:
+    exit_code = checker.main(["--schema-versions", "9"])
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert "Schema v9" in captured.out
+    assert "Schema v8" not in captured.out
+
+
+def test_cli_invalid_schema_version(capsys: pytest.CaptureFixture[str]) -> None:
+    exit_code = checker.main(["--schema-versions", "99"])
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert "Unsupported schema version 99" in captured.err
+
+
+def test_cli_invalid_schema_version_7(capsys: pytest.CaptureFixture[str]) -> None:
+    exit_code = checker.main(["--schema-versions", "7"])
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert "Unsupported schema version 7" in captured.err
+
+
+def test_cli_empty_schema_versions(capsys: pytest.CaptureFixture[str]) -> None:
+    exit_code = checker.main(["--schema-versions", ""])
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert "Invalid --schema-versions format" in captured.err
+
+
+def test_cli_artifact_check(mock_artifact_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    exit_code = checker.main(["--artifact", str(mock_artifact_dir), "--generate-manifest"])
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert "Explorer Application Artifact" in captured.out
+    assert "Content address" in captured.out
+    assert "All Results Explorer compatibility checks PASSED" in captured.out
+
+
+def test_cli_artifact_verify_requires_manifest(mock_artifact_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    # Without manifest, --require-manifest should fail
+    exit_code = checker.main(["--artifact", str(mock_artifact_dir), "--require-manifest"])
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert "FAILED" in captured.err or "manifest.json is missing" in captured.out or "FAILED" in captured.out
+
+    # After generating manifest, require should pass
+    checker.generate_artifact_manifest(mock_artifact_dir, write=True)
+    exit_code2 = checker.main(["--artifact", str(mock_artifact_dir), "--require-manifest"])
+    assert exit_code2 == 0
+
+
+def test_cli_generate_and_require_mutually_exclusive(
+    mock_artifact_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    exit_code = checker.main(["--artifact", str(mock_artifact_dir), "--generate-manifest", "--require-manifest"])
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert "mutually exclusive" in captured.err
+
+
+def test_cli_artifact_not_found(capsys: pytest.CaptureFixture[str]) -> None:
+    exit_code = checker.main(["--artifact", "/tmp/non_existent_explorer_dir_12345"])
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert "Artifact path not found" in captured.err
+
+
+def test_cli_db_path_check(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    import duckdb
+
+    db_file = tmp_path / "test.duckdb"
+    with duckdb.connect(str(db_file)) as con:
+        for stmt in checker.generate_schema_ddl(9):
+            con.execute(stmt)
+        con.execute("INSERT INTO metadata VALUES (9)")
+
+    exit_code = checker.main(["--db-path", str(db_file)])
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert "Database Snapshot" in captured.out
+    assert "All Results Explorer compatibility checks PASSED" in captured.out
+
+
+def test_cli_db_path_not_found(capsys: pytest.CaptureFixture[str]) -> None:
+    exit_code = checker.main(["--db-path", "/tmp/non_existent_db_12345.duckdb"])
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert "DuckDB database file not found" in captured.err
