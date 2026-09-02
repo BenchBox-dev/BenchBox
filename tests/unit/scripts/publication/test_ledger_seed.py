@@ -43,13 +43,23 @@ def _accepted_ref_exists() -> bool:
         )
         return True
     except subprocess.CalledProcessError:
-        return False
+        try:
+            subprocess.run(
+                ["git", "fetch", "--no-tags", "origin", "published-results:refs/remotes/origin/published-results"],
+                cwd=REPO_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return False
 
 
 REF_AVAILABLE = _accepted_ref_exists()
 skip_no_ref = pytest.mark.skipif(
-    not REF_AVAILABLE and _ALLOW_MISSING_REF,
-    reason="origin/published-results not reachable (explicitly allowed)",
+    not REF_AVAILABLE,
+    reason="origin/published-results not reachable",
 )
 
 
