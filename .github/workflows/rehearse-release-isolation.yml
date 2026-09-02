@@ -1,0 +1,72 @@
+name: Rehearse Release Isolation
+
+# The v0.4.0+ release tree must keep exactly one GitHub Pages deploy source
+# (publication-deploy.yml) with no other workflow coupling a build step to a
+# Pages deploy. scripts/publication/verify_release_isolation.py checks that.
+# This workflow is a read-only rehearsal: it inspects the workflows at a ref
+# with git ls-tree/show and fails loud if a second deploy source or hidden
+# build+deploy coupling is present, without ever deploying or writing GitHub
+# state. It is expected to FAIL while docs.yml still carries its release-driven
+# `deploy` job (the G3 surface that A10 has not yet retired).
+
+"on":
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to inspect (e.g. origin/release, origin/develop, HEAD)"
+        type: string
+        # Default to the release branch: the isolation guarantee is about the
+        # release deploy surface, not whatever branch dispatched this run.
+        default: "origin/release"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rehearse-release-isolation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  rehearse:
+    name: Rehearse release isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch ref to inspect
+        env:
+          REF_TO_INSPECT: ${{ inputs.ref }}
+        run: |
+          # actions/checkout fetches only the dispatched branch. Make the
+          # remote-tracking ref the verifier inspects (default origin/release)
+          # available before it runs `git ls-tree <ref>`.
+          case "$REF_TO_INSPECT" in
+            origin/*)
+              branch="${REF_TO_INSPECT#origin/}"
+              git fetch --no-tags origin "+refs/heads/${branch}:refs/remotes/origin/${branch}"
+              ;;
+          esac
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Rehearse release isolation (read-only)
+        env:
+          REF_TO_INSPECT: ${{ inputs.ref }}
+        run: |
+          uv run python scripts/publication/verify_release_isolation.py \
+            --ref "$REF_TO_INSPECT" \
+            --mode rehearsal
