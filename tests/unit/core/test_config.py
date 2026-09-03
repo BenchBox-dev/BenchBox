@@ -165,6 +165,9 @@ class TestRunConfig:
         assert config.test_execution_type == "standard"
         assert config.scale_factor == 0.01
         assert config.seed is None
+        assert config.client_region is None
+        assert config.client_cloud is None
+        assert config.link_probe is True
 
     def test_run_config_power_test(self):
         """Test RunConfig for power test."""
@@ -173,6 +176,18 @@ class TestRunConfig:
         assert config.test_execution_type == "power"
         assert config.scale_factor == 1.0
         assert config.seed == 42
+
+    def test_run_config_client_link_fields(self):
+        """Test RunConfig client link locality fields."""
+        config = RunConfig(
+            client_region="us-east-1",
+            client_cloud="aws",
+            link_probe=False,
+        )
+
+        assert config.client_region == "us-east-1"
+        assert config.client_cloud == "aws"
+        assert config.link_probe is False
 
 
 class TestLibraryInfo:

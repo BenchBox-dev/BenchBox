@@ -9,6 +9,7 @@ import pytest
 
 from benchbox.core.results.builder import BenchmarkInfoInput, ResultBuilder
 from benchbox.core.results.environment import (
+    ClientLinkEnvironment,
     ContainerEnvironment,
     NormalizedExecutionEnvironment,
     PlatformCloudMetadata,
@@ -330,3 +331,107 @@ def test_anonymized_export_omits_machine_id_in_flat_and_normalized_client_host(t
     assert "machine_id" not in payload["environment"]
     assert "machine_id" not in payload["environment"].get("client_host", {})
     assert "raw-machine-id" not in json.dumps(payload)
+
+
+def test_client_link_environment_defaults() -> None:
+    link = ClientLinkEnvironment()
+    assert link.collection_status == "unavailable"
+    assert link.source == "unavailable"
+    assert link.client_region is None
+    assert link.client_cloud is None
+    assert link.statement_overhead_ms is None
+    assert link.collection_error_class is None
+    assert link.collection_error_message is None
+    assert link.to_dict() == {
+        "collection_status": "unavailable",
+        "source": "unavailable",
+    }
+
+
+def test_client_link_environment_populated() -> None:
+    link = ClientLinkEnvironment(
+        collection_status="available",
+        source="observed",
+        client_region="us-east-1",
+        client_cloud="aws",
+        statement_overhead_ms={"mean": 1.25, "p95": 2.1},
+    )
+    assert link.to_dict() == {
+        "collection_status": "available",
+        "source": "observed",
+        "client_region": "us-east-1",
+        "client_cloud": "aws",
+        "statement_overhead_ms": {"mean": 1.25, "p95": 2.1},
+    }
+
+
+def test_build_environment_payload_preserves_client_link_without_flat_pollution() -> None:
+    from benchbox.core.results.environment import build_environment_payload
+
+    link = ClientLinkEnvironment(
+        collection_status="available",
+        source="observed",
+        client_region="us-east-1",
+        client_cloud="aws",
+        statement_overhead_ms={"mean": 1.25},
+    )
+    env = NormalizedExecutionEnvironment(client_link=link)
+    payload = build_environment_payload(system_profile={"os_type": "Darwin"}, execution_environment=env)
+
+    # client_link must be present as a nested dict
+    assert "client_link" in payload
+    assert payload["client_link"] == {
+        "collection_status": "available",
+        "source": "observed",
+        "client_region": "us-east-1",
+        "client_cloud": "aws",
+        "statement_overhead_ms": {"mean": 1.25},
+    }
+    # client_link fields must NOT pollute the flat top-level legacy keys on payload
+    assert "client_region" not in payload
+    assert "client_cloud" not in payload
+    assert "statement_overhead_ms" not in payload
+
+
+def test_builder_and_loader_client_link_round_trip() -> None:
+    link = ClientLinkEnvironment(
+        collection_status="available",
+        source="observed",
+        client_region="us-west-2",
+        client_cloud="aws",
+        statement_overhead_ms={"mean": 0.8},
+    )
+    builder = ResultBuilder(
+        benchmark=BenchmarkInfoInput(name="TPC-H", scale_factor=0.01, benchmark_id="tpch"),
+        platform=PlatformInfoInput(name="DuckDB", platform_version="1.0.0", client_library_version="1.0.0"),
+        execution_id="builder-client-link-test",
+    )
+    builder.set_execution_environment(NormalizedExecutionEnvironment(client_link=link))
+    builder.add_query_result(
+        normalize_query_result(
+            {
+                "query_id": "Q1",
+                "execution_time_seconds": 0.1,
+                "rows_returned": 1,
+                "status": "SUCCESS",
+                "run_type": "measurement",
+            }
+        )
+    )
+    result = builder.build()
+
+    assert "client_link" in result.execution_environment
+    assert result.execution_environment["client_link"]["client_region"] == "us-west-2"
+    assert result.execution_environment["client_link"]["client_cloud"] == "aws"
+
+    payload = build_result_payload(result)
+    assert "client_link" in payload["environment"]
+    assert payload["environment"]["client_link"]["client_region"] == "us-west-2"
+
+    reconstructed = reconstruct_benchmark_results(payload)
+    assert "client_link" in reconstructed.execution_environment
+    assert reconstructed.execution_environment["client_link"]["client_region"] == "us-west-2"
+
+    round_trip = build_result_payload(reconstructed)
+    assert round_trip["environment"]["client_link"]["client_region"] == "us-west-2"
+    assert round_trip["environment"]["client_link"]["statement_overhead_ms"] == {"mean": 0.8}

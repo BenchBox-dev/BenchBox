@@ -12,8 +12,15 @@ export interface Environment {
   cpu_model?: string;
   cpu_family?: string;
   cpu_identity_provenance?: "measured" | "user_attested" | "inferred";
+  client_region?: string | null;
+  client_cloud?: string | null;
+  statement_overhead_min_ms?: number | null;
+  statement_overhead_median_ms?: number | null;
+  link_status?: string | null;
   [key: string]: string | number | boolean | null | undefined;
 }
+
+export type ResultEnvironment = Environment;
 
 export interface QueryTiming {
   query_id: string;
@@ -136,7 +143,14 @@ export interface DetailResult extends CostDeploymentFields {
   // field don't need updating.
   physical_mechanisms?: string[];
   physical_rendering_id?: string | null;
+  client_region?: string | null;
+  client_cloud?: string | null;
+  statement_overhead_min_ms?: number | null;
+  statement_overhead_median_ms?: number | null;
+  link_status?: string | null;
 }
+
+export type ResultDetailMetrics = DetailResult;
 
 // ---------------------------------------------------------------------------
 // Benchmark summary types - rows are read from DuckDB tables such as

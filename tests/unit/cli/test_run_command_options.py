@@ -543,3 +543,101 @@ class TestNonInteractiveModeValidation:
 
         # Should not fail on missing --platform in data-only mode
         assert "Missing: --platform" not in result.output
+
+
+class TestClientLinkLocalityOptions:
+    """Test --client-region, --client-cloud, --no-link-probe CLI options."""
+
+    def test_client_link_options_in_help(self):
+        runner = CliRunner()
+        result = runner.invoke(run, ["--help"])
+        assert result.exit_code == 0
+        assert "--client-region" in result.output
+        assert "Attested client cloud region" in result.output
+        assert "--client-cloud" in result.output
+        assert "Attested client cloud provider" in result.output
+        assert "--no-link-probe" in result.output
+        assert "Disable post-benchmark statement overhead" in result.output
+
+    def test_client_link_options_forwarded_to_benchmark_config(self):
+        runner = CliRunner()
+        captured_config = None
+
+        def mock_execute(orchestrator, benchmark_config, *args, **kwargs):
+            nonlocal captured_config
+            captured_config = benchmark_config
+            mock_result = MagicMock()
+            mock_result.validation_status = "SUCCESS"
+            return mock_result
+
+        with (
+            patch("benchbox.cli.commands.run._execute_orchestrated_run", side_effect=mock_execute),
+            patch("benchbox.cli.commands.run._direct_handle_result"),
+        ):
+            result = runner.invoke(
+                run,
+                [
+                    "--platform",
+                    "duckdb",
+                    "--benchmark",
+                    "tpch",
+                    "--scale",
+                    "0.01",
+                    "--phases",
+                    "power",
+                    "--non-interactive",
+                    "--client-region",
+                    "us-east-1",
+                    "--client-cloud",
+                    "aws",
+                    "--no-link-probe",
+                ],
+                obj=_run_obj(),
+            )
+
+        assert result.exit_code == 0, result.output
+        assert captured_config is not None
+        assert captured_config.client_region == "us-east-1"
+        assert captured_config.client_cloud == "aws"
+        assert captured_config.link_probe is False
+        assert captured_config.options.get("client_region") == "us-east-1"
+        assert captured_config.options.get("client_cloud") == "aws"
+        assert captured_config.options.get("link_probe") is False
+
+    def test_client_link_options_default_probe_true(self):
+        runner = CliRunner()
+        captured_config = None
+
+        def mock_execute(orchestrator, benchmark_config, *args, **kwargs):
+            nonlocal captured_config
+            captured_config = benchmark_config
+            mock_result = MagicMock()
+            mock_result.validation_status = "SUCCESS"
+            return mock_result
+
+        with (
+            patch("benchbox.cli.commands.run._execute_orchestrated_run", side_effect=mock_execute),
+            patch("benchbox.cli.commands.run._direct_handle_result"),
+        ):
+            result = runner.invoke(
+                run,
+                [
+                    "--platform",
+                    "duckdb",
+                    "--benchmark",
+                    "tpch",
+                    "--scale",
+                    "0.01",
+                    "--phases",
+                    "power",
+                    "--non-interactive",
+                ],
+                obj=_run_obj(),
+            )
+
+        assert result.exit_code == 0, result.output
+        assert captured_config is not None
+        assert captured_config.client_region is None
+        assert captured_config.client_cloud is None
+        assert captured_config.link_probe is True
+        assert captured_config.options.get("link_probe") is True

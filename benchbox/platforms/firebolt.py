@@ -493,7 +493,12 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
         compute = info.get("compute_configuration") if isinstance(info.get("compute_configuration"), Mapping) else {}
 
-        metadata["execution_environment"] = self._firebolt_execution_environment(info, config)
+        exec_env = self._firebolt_execution_environment(info, config)
+        if isinstance(metadata.get("execution_environment"), Mapping):
+            client_link = metadata["execution_environment"].get("client_link")
+            if client_link:
+                exec_env["client_link"] = client_link
+        metadata["execution_environment"] = exec_env
         metadata["platform_deployment"] = self._firebolt_deployment_metadata(info, config)
         metadata["platform_cloud"] = self._firebolt_cloud_metadata(config)
         metadata["platform_compute"] = self._firebolt_compute_metadata(config, compute)

@@ -1482,6 +1482,48 @@ class BundleTransformer:
                 environment["cpu_model"] = None
                 environment["cpu_family"] = None
 
+        client_link = environment.get("client_link") if isinstance(environment.get("client_link"), dict) else {}
+        client_region = (
+            client_link.get("client_region") or client_link.get("region") or environment.get("client_region")
+        )
+        client_cloud = client_link.get("client_cloud") or client_link.get("cloud") or environment.get("client_cloud")
+        link_status = client_link.get("link_status") or client_link.get("status") or environment.get("link_status")
+        stmt_min = (
+            client_link.get("statement_overhead_min_ms")
+            if client_link.get("statement_overhead_min_ms") is not None
+            else client_link.get("overhead_min_ms")
+            if client_link.get("overhead_min_ms") is not None
+            else environment.get("statement_overhead_min_ms")
+        )
+        stmt_med = (
+            client_link.get("statement_overhead_median_ms")
+            if client_link.get("statement_overhead_median_ms") is not None
+            else client_link.get("overhead_median_ms")
+            if client_link.get("overhead_median_ms") is not None
+            else environment.get("statement_overhead_median_ms")
+        )
+
+        def _to_finite_float_or_none(v: Any) -> float | None:
+            if v is None:
+                return None
+            try:
+                val = float(v)
+                return val if math.isfinite(val) else None
+            except (ValueError, TypeError):
+                return None
+
+        environment["client_region"] = (
+            str(client_region).strip() if client_region is not None and str(client_region).strip() else None
+        )
+        environment["client_cloud"] = (
+            str(client_cloud).strip() if client_cloud is not None and str(client_cloud).strip() else None
+        )
+        environment["link_status"] = (
+            str(link_status).strip() if link_status is not None and str(link_status).strip() else None
+        )
+        environment["statement_overhead_min_ms"] = _to_finite_float_or_none(stmt_min)
+        environment["statement_overhead_median_ms"] = _to_finite_float_or_none(stmt_med)
+
         # Detect companion files relative to bundle
         stem = bundle_path.stem
         has_plans = bundle_path.with_name(f"{stem}.plans.json").exists()
@@ -1560,6 +1602,8 @@ class BundleTransformer:
             failed_query_count=detail.failed_query_count,
         )
         return detail.model_copy(update={"ranking_exclusion_reason": ranking_exclusion_reason(manifest_peer)})
+
+    extract_detail = to_detail_result
 
 
 __all__ = ["BundleTransformer"]

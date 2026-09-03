@@ -118,6 +118,7 @@ def build_default_normalized_result_metadata(
     if raw_metadata:
         metadata["platform_raw_metadata"] = raw_metadata
 
+    _merge_adapter_client_link(metadata, adapter)
     return _compact_mapping(metadata)
 
 
@@ -142,7 +143,9 @@ def collect_normalized_result_metadata(
         except Exception as exc:
             return _metadata_hook_failure(exc)
         if isinstance(metadata, Mapping):
-            return _compact_mapping(metadata)
+            metadata_dict = dict(metadata)
+            _merge_adapter_client_link(metadata_dict, adapter)
+            return _compact_mapping(metadata_dict)
 
     return build_default_normalized_result_metadata(
         adapter,
@@ -151,6 +154,23 @@ def collect_normalized_result_metadata(
         platform_config=platform_config,
         execution_mode=execution_mode,
     )
+
+
+def _merge_adapter_client_link(metadata: dict[str, Any], adapter: Any | None) -> None:
+    """Merge adapter _client_link_metadata into execution_environment when present."""
+    client_link = getattr(adapter, "_client_link_metadata", None)
+    if not isinstance(client_link, Mapping) or not client_link:
+        return
+    exec_env = metadata.setdefault("execution_environment", {})
+    if isinstance(exec_env, Mapping) and not isinstance(exec_env, dict):
+        exec_env = dict(exec_env)
+        metadata["execution_environment"] = exec_env
+    if isinstance(exec_env, dict):
+        existing = exec_env.get("client_link")
+        if isinstance(existing, Mapping):
+            exec_env["client_link"] = _merge_metadata_dicts(dict(existing), client_link)
+        else:
+            exec_env["client_link"] = dict(client_link)
 
 
 def _metadata_hook_failure(exc: Exception) -> dict[str, Any]:

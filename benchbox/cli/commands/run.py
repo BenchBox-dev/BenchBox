@@ -1351,6 +1351,9 @@ def _build_benchmark_config(
         **_strict_translation_config_entry(s),
         **_platform_option_config_entries(s),
         **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
+        **({"client_region": s.client_region} if getattr(s, "client_region", None) is not None else {}),
+        **({"client_cloud": s.client_cloud} if getattr(s, "client_cloud", None) is not None else {}),
+        **({"link_probe": not s.no_link_probe} if getattr(s, "no_link_probe", None) is not None else {}),
     }
     return BenchmarkConfig(
         name=plan.benchmark,
@@ -1368,6 +1371,9 @@ def _build_benchmark_config(
         stats_reset=s.stats_reset,
         stats_per_table_timing=s.stats_per_table_timing,
         official=s.official,
+        client_region=getattr(s, "client_region", None),
+        client_cloud=getattr(s, "client_cloud", None),
+        link_probe=not getattr(s, "no_link_probe", False),
         options=options,
     )
 
@@ -2507,6 +2513,9 @@ def _finalize_normal_interactive_plan(s: types.SimpleNamespace) -> None:
     s.benchmark_config.test_execution_type = plan.test_execution_type
     s.benchmark_config.stats_reset = getattr(s, "stats_reset", None)
     s.benchmark_config.stats_per_table_timing = bool(getattr(s, "stats_per_table_timing", False))
+    s.benchmark_config.client_region = getattr(s, "client_region", None)
+    s.benchmark_config.client_cloud = getattr(s, "client_cloud", None)
+    s.benchmark_config.link_probe = not getattr(s, "no_link_probe", False)
     s.benchmark_config.options.update(
         {
             "table_mode": plan.table_mode,
@@ -2514,6 +2523,12 @@ def _finalize_normal_interactive_plan(s: types.SimpleNamespace) -> None:
             "unified_tuning_configuration": plan.loaded_unified_config,
         }
     )
+    if getattr(s, "client_region", None) is not None:
+        s.benchmark_config.options["client_region"] = s.client_region
+    if getattr(s, "client_cloud", None) is not None:
+        s.benchmark_config.options["client_cloud"] = s.client_cloud
+    if getattr(s, "no_link_probe", None) is not None:
+        s.benchmark_config.options["link_probe"] = not s.no_link_probe
     if plan.seed is None:
         s.benchmark_config.options.pop("seed", None)
     else:
@@ -2540,6 +2555,9 @@ def _interactive_preflight_and_execute(s: types.SimpleNamespace, system_profile:
         # Quick restart already finalized both configs from the atomic plan.
         s.benchmark_config.stats_reset = getattr(s, "stats_reset", None)
         s.benchmark_config.stats_per_table_timing = bool(getattr(s, "stats_per_table_timing", False))
+        s.benchmark_config.client_region = getattr(s, "client_region", None)
+        s.benchmark_config.client_cloud = getattr(s, "client_cloud", None)
+        s.benchmark_config.link_probe = not getattr(s, "no_link_probe", False)
         # Quick restart already finalized concurrency in its resolved plan.
         if getattr(s, "concurrency", None) is not None:
             s.benchmark_config.concurrency = s.concurrency
@@ -3008,6 +3026,24 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
         "vendor label is assigned downstream under maintainer control."
     ),
 )
+@click.option(
+    "--client-region",
+    type=str,
+    default=None,
+    help="Attested client cloud region (e.g. us-east-1).",
+)
+@click.option(
+    "--client-cloud",
+    type=str,
+    default=None,
+    help="Attested client cloud provider (e.g. aws, gcp, azure).",
+)
+@click.option(
+    "--no-link-probe",
+    is_flag=True,
+    default=False,
+    help="Disable post-benchmark statement overhead probe.",
+)
 @click.pass_context
 def run(
     ctx: click.Context,
@@ -3054,6 +3090,9 @@ def run(
     publish_label: str,
     funding: str | None,
     result_source: str | None,
+    client_region: str | None = None,
+    client_cloud: str | None = None,
+    no_link_probe: bool = False,
 ) -> None:
     """Run benchmarks.
 
@@ -3119,6 +3158,9 @@ def run(
         publish_label=publish_label,
         funding=funding,
         result_source=result_source,
+        client_region=client_region,
+        client_cloud=client_cloud,
+        no_link_probe=no_link_probe,
     )
     _prepare_run_state(s)
 

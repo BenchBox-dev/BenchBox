@@ -580,4 +580,27 @@ describe("RunReceipt applied-tuning receipt drill-down", () => {
     expect(screen.getByText("Unknown")).toBeInTheDocument();
     expect(screen.queryByText("Inferred")).toBeNull();
   });
+
+  it("renders client locality and statement overhead when present", () => {
+    render(
+      <RunReceipt
+        detail={makeDetail({
+          environment: {
+            ...makeDetail().environment,
+            client_region: "us-east-1",
+            client_cloud: "aws",
+            statement_overhead_min_ms: 0.85,
+            statement_overhead_median_ms: 1.42,
+            link_status: "measured",
+          },
+        })}
+      />,
+    );
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    expect(within(receipt).getByText("Client locality")).toBeTruthy();
+    expect(
+      within(receipt).getByText(/us-east-1 \/ aws \(overhead: 0\.85 ms min, 1\.42 ms median\) \[measured\]/),
+    ).toBeTruthy();
+  });
 });

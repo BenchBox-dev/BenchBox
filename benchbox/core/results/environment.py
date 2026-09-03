@@ -191,12 +191,29 @@ class ContainerEnvironment:
 
 
 @dataclass
+class ClientLinkEnvironment:
+    """Normalized client-to-platform link and locality metadata."""
+
+    collection_status: CollectionStatus = "unavailable"
+    source: MetadataSource = "unavailable"
+    client_region: str | None = None
+    client_cloud: str | None = None
+    statement_overhead_ms: dict[str, Any] | None = None
+    collection_error_class: str | None = None
+    collection_error_message: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return _compact(asdict(self))
+
+
+@dataclass
 class NormalizedExecutionEnvironment:
     """Normalized top-level result ``environment`` contract."""
 
     client_host: ClientHostEnvironment | dict[str, Any] | None = None
     platform_runtime: PlatformRuntimeEnvironment | dict[str, Any] = field(default_factory=PlatformRuntimeEnvironment)
     container: ContainerEnvironment | dict[str, Any] | None = None
+    client_link: ClientLinkEnvironment | dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {}
@@ -205,6 +222,8 @@ class NormalizedExecutionEnvironment:
         payload["platform_runtime"] = _metadata_dict(self.platform_runtime)
         if self.container is not None:
             payload["container"] = _metadata_dict(self.container)
+        if self.client_link is not None:
+            payload["client_link"] = _metadata_dict(self.client_link)
         return _compact(payload)
 
 
@@ -293,6 +312,7 @@ def build_environment_payload(
     client_host = {**profile_client_host, **explicit_client_host}
     platform_runtime = _metadata_dict(explicit.get("platform_runtime")) or PlatformRuntimeEnvironment().to_dict()
     container = _metadata_dict(explicit.get("container"))
+    client_link = _metadata_dict(explicit.get("client_link"))
 
     payload: dict[str, Any] = dict(client_host)
     if client_host:
@@ -301,6 +321,8 @@ def build_environment_payload(
         payload["platform_runtime"] = platform_runtime
     if container:
         payload["container"] = container
+    if client_link:
+        payload["client_link"] = client_link
     return _compact(payload)
 
 
@@ -417,6 +439,7 @@ def _first_config_value(platform_config: Mapping[str, Any], keys: tuple[str, ...
 
 __all__ = [
     "ClientHostEnvironment",
+    "ClientLinkEnvironment",
     "CollectionStatus",
     "ContainerEnvironment",
     "EndpointClass",

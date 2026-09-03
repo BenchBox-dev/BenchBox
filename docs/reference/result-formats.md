@@ -225,6 +225,79 @@ duration, counts, and stage-specific metadata.
 | `validation` | string or object | Validation result summary |
 | `tpc_metrics` | object | Optional TPC-style metrics such as `power_at_size` |
 
+#### Environment Block
+
+The top-level `environment` block contains execution environment metadata for the BenchBox client runner, including host operating system, architecture, CPU details, and memory. It also supports optional structured subsections for container isolation and client-to-platform connectivity.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `os` | string | Operating system name (e.g., `macOS`, `Linux`, `Windows`) |
+| `arch` | string | Host architecture (e.g., `arm64`, `x86_64`) |
+| `cpu_count` | int | Logical CPU count |
+| `memory_gb` | number | Total system memory in gigabytes |
+| `python` | string | Python interpreter version |
+| `client_host` | object | Normalized client host profile |
+| `platform_runtime` | object | Target platform runtime environment profile |
+| `container` | object | Optional container environment profile |
+| `client_link` | object | Optional client-to-platform locality disclosure and statement overhead probe metrics |
+
+##### `environment.client_link` (optional)
+
+Discloses the client execution location and connectivity characteristics relative to remote and cloud data warehouses. Because client-to-platform distance (such as cross-region network latency or WAN round trips) can dominate small query execution times, `client_link` provides standardized, non-identifying locality metrics without publishing private network identifiers (such as raw IP addresses, hostnames, or ports).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `collection_status` | string | Locality probe lifecycle status: `"available"` (full locality and probe recorded), `"partial"` (probe recorded, but cloud/region unavailable or unobserved), `"unavailable"` (probe not available), `"error"` (discovery or probe encountered an error), or `"not_requested"` (collection disabled or skipped). |
+| `source` | string | Provenance of client cloud/region metadata: `"observed"` (detected via link-local cloud instance metadata service / IMDS), `"cli_option"` (attested via CLI options `--client-cloud` / `--client-region`), or `"unavailable"`. |
+| `client_region` | string \| null | Cloud region where the BenchBox client runner is executing (e.g., `"us-east-1"`, `"eu-west-2"`). Omitted or `null` when running outside known clouds or unavailable. |
+| `client_cloud` | string \| null | Cloud provider of the client runner (`"aws"`, `"gcp"`, `"azure"`). Omitted or `null` when running outside known clouds or unavailable. |
+| `statement_overhead_ms` | object | Post-benchmark statement round-trip overhead probe against the target platform. Measures baseline client↔platform transaction round-trip latency using repeated lightweight queries (typically 5 `SELECT 1` statements). |
+| `statement_overhead_ms.samples` | int | Number of overhead probe query executions recorded (typically `5`). |
+| `statement_overhead_ms.min` | float | Minimum statement overhead observed across samples, in milliseconds floor. Serves as the transport/driver floor. |
+| `statement_overhead_ms.median` | float | Median statement overhead observed across samples, in milliseconds. |
+| `collection_error_class` | string \| null | Optional exception or error class name if locality discovery or overhead probing failed. |
+| `collection_error_message` | string \| null | Optional error message explaining probe collection failure details. |
+
+###### Example: Observed Cloud VM Run
+
+An AWS EC2 runner in `us-east-1` executing benchmarks against a cloud data warehouse in the same cloud region:
+
+```json
+{
+  "client_link": {
+    "collection_status": "available",
+    "source": "observed",
+    "client_cloud": "aws",
+    "client_region": "us-east-1",
+    "statement_overhead_ms": {
+      "samples": 5,
+      "min": 1.42,
+      "median": 1.68
+    }
+  }
+}
+```
+
+###### Example: Non-Cloud / Laptop Run
+
+A developer running BenchBox on a local workstation or laptop against a remote database without cloud IMDS:
+
+```json
+{
+  "client_link": {
+    "collection_status": "partial",
+    "source": "unavailable",
+    "client_cloud": null,
+    "client_region": null,
+    "statement_overhead_ms": {
+      "samples": 5,
+      "min": 42.15,
+      "median": 45.80
+    }
+  }
+}
+```
+
 ### Query Execution Details
 
 Each query execution record contains:

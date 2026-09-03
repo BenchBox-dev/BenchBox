@@ -484,7 +484,7 @@ def _extract_execution_environment(environment_section: dict[str, Any]) -> dict[
 
     normalized = {
         key: environment_section[key]
-        for key in ("client_host", "platform_runtime", "container")
+        for key in ("client_host", "platform_runtime", "container", "client_link")
         if isinstance(environment_section.get(key), dict)
     }
     return normalized or None

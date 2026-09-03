@@ -3,11 +3,11 @@
 
 This CLI tool verifies that the Results Explorer SPA and its artifacts
 maintain compatibility with the current corpus DuckDB read-model schema
-(v9). It also validates hermetic, content-addressed Explorer application
+(v10). It also validates hermetic, content-addressed Explorer application
 artifact bundles.
 
 Usage:
-    # Run schema compatibility checks only (v9 only):
+    # Run schema compatibility checks only (v10 only):
     uv run -- python scripts/publication/check_explorer_compat.py --schema-only
 
     # Validate an Explorer build artifact directory or archive:
@@ -22,8 +22,8 @@ Usage:
     # Validate a specific DuckDB database snapshot file:
     uv run -- python scripts/publication/check_explorer_compat.py --db-path results-explorer/public/data/results.duckdb
 
-    # Check specific schema versions (only 9 is supported):
-    uv run -- python scripts/publication/check_explorer_compat.py --schema-only --schema-versions 9
+    # Check specific schema versions (only 10 is supported):
+    uv run -- python scripts/publication/check_explorer_compat.py --schema-only --schema-versions 10
 
     # Output machine-readable JSON:
     uv run -- python scripts/publication/check_explorer_compat.py --schema-only --json
@@ -48,7 +48,7 @@ import zipfile
 from pathlib import Path
 from typing import Any, Sequence
 
-# Import canonical read-model version from contract. Fall back to 9 if
+# Import canonical read-model version from contract. Fall back to 10 if
 # contract is unavailable (e.g. during isolated test import).
 try:
     from _project.scripts.explorer_pipeline.contract import (
@@ -60,8 +60,8 @@ try:
     CURRENT_SCHEMA_VERSION: int = _READ_MODEL_VERSION
     CONTRACT_VERSION: str = _CONTRACT_VERSION
 except ImportError:
-    SUPPORTED_SCHEMA_VERSIONS: tuple[int, ...] = (9,)
-    CURRENT_SCHEMA_VERSION: int = 9
+    SUPPORTED_SCHEMA_VERSIONS: tuple[int, ...] = (10,)
+    CURRENT_SCHEMA_VERSION: int = 10
     CONTRACT_VERSION: str = "6"
 
 # Canonical DuckDB type normalisation for schema validation comparisons
@@ -293,6 +293,23 @@ TABLE_COLUMNS_V9: dict[str, dict[str, str]] = {
     },
 }
 
+TABLE_COLUMNS_V10: dict[str, dict[str, str]] = {
+    **TABLE_COLUMNS_V9,
+    "result_environment": {
+        **TABLE_COLUMNS_V9["result_environment"],
+        "client_region": "VARCHAR",
+        "client_cloud": "VARCHAR",
+        "statement_overhead_min_ms": "DOUBLE",
+        "statement_overhead_median_ms": "DOUBLE",
+        "link_status": "VARCHAR",
+    },
+}
+
+SCHEMA_REGISTRY: dict[int, dict[str, dict[str, str]]] = {
+    9: TABLE_COLUMNS_V9,
+    10: TABLE_COLUMNS_V10,
+}
+
 REQUIRED_INDEXES_V9: list[tuple[str, str, list[str]]] = [
     ("idx_query_executions_result", "query_executions", ["result_id"]),
     ("idx_matrix_cells_cohort", "benchmark_matrix_cells", ["benchmark", "scale_factor", "phase"]),
@@ -301,31 +318,35 @@ REQUIRED_INDEXES_V9: list[tuple[str, str, list[str]]] = [
     ("idx_cohort_metadata_platform", "cohort_metadata", ["cohort_key", "platform_id"]),
 ]
 
+REQUIRED_INDEXES_V10: list[tuple[str, str, list[str]]] = list(REQUIRED_INDEXES_V9)
+
 REQUIRED_VIEWS_V9: list[str] = [
     "result_detail_metrics",
     "platform_index_rows",
 ]
 
+REQUIRED_VIEWS_V10: list[str] = list(REQUIRED_VIEWS_V9)
+
 
 def get_table_columns_for_version(version: int) -> dict[str, dict[str, str]]:
     """Return the expected table column map for a given read-model version."""
-    if version == CURRENT_SCHEMA_VERSION:
-        return TABLE_COLUMNS_V9
+    if version in SUPPORTED_SCHEMA_VERSIONS and version in SCHEMA_REGISTRY:
+        return SCHEMA_REGISTRY[version]
     raise ValueError(f"Unsupported schema version: {version}")
 
 
 def get_views_for_version(version: int) -> list[str]:
     """Return required view names for a schema version."""
-    if version != CURRENT_SCHEMA_VERSION:
+    if version not in SUPPORTED_SCHEMA_VERSIONS:
         raise ValueError(f"Unsupported schema version: {version}")
-    return list(REQUIRED_VIEWS_V9)
+    return list(REQUIRED_VIEWS_V10)
 
 
 def get_indexes_for_version(version: int) -> list[tuple[str, str, list[str]]]:
     """Return required index definitions for a schema version."""
-    if version != CURRENT_SCHEMA_VERSION:
+    if version not in SUPPORTED_SCHEMA_VERSIONS:
         raise ValueError(f"Unsupported schema version: {version}")
-    return list(REQUIRED_INDEXES_V9)
+    return list(REQUIRED_INDEXES_V10)
 
 
 def generate_schema_ddl(version: int) -> list[str]:

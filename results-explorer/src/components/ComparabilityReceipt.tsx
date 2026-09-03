@@ -100,6 +100,7 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
     compareHardwareValues("Memory", results, (result) =>
       result.environment?.memory_gb !== undefined ? `${result.environment.memory_gb} GB` : "Not recorded",
     ),
+    buildLocalityField(results),
     compareValues("Normalized cost", results, normalizedCostLabel),
     compareValues("Cost model", results, costModelSummary),
     compareValues("Cost scope", results, costScopeSummary),
@@ -202,6 +203,91 @@ function buildPhysicalMechanismsField(results: DetailResult[]): ComparabilityFie
         value: (result.physical_mechanisms ?? []).join(", ") || "none",
       })),
     ),
+  };
+}
+
+function isRemoteOrCloudPlatform(result: DetailResult): boolean {
+  if (result.deployment_class === "cloud" || result.deployment_class === "remote") {
+    return true;
+  }
+  if (result.cloud_provider && result.cloud_provider !== "local" && result.cloud_provider !== "none") {
+    return true;
+  }
+  if (result.cloud_region && result.cloud_region !== "unknown" && result.cloud_region !== "local") {
+    return true;
+  }
+  return false;
+}
+
+function getClientRegion(result: DetailResult): string | null {
+  const r = result.environment?.client_region ?? result.client_region;
+  return r && String(r).trim() ? String(r).trim() : null;
+}
+
+function getPlatformRegion(result: DetailResult): string | null {
+  const r = result.cloud_region ?? (result.pricing_region !== "unknown" ? result.pricing_region : null);
+  return r && String(r).trim() ? String(r).trim() : null;
+}
+
+function buildLocalityField(results: DetailResult[]): ComparabilityField {
+  const entries = results.map((result) => {
+    const isRemote = isRemoteOrCloudPlatform(result);
+    const clientReg = getClientRegion(result);
+    const platformReg = getPlatformRegion(result);
+
+    if (isRemote) {
+      if (!clientReg) {
+        return {
+          platform: result.platform,
+          value: "Unknown client locality",
+          warn: true,
+        };
+      }
+      if (platformReg && clientReg.toLowerCase() !== platformReg.toLowerCase()) {
+        return {
+          platform: result.platform,
+          value: `Cross-region: client in ${clientReg}, platform in ${platformReg}`,
+          warn: true,
+        };
+      }
+      return {
+        platform: result.platform,
+        value: `Collocated (${clientReg})`,
+        warn: false,
+      };
+    }
+
+    return {
+      platform: result.platform,
+      value: clientReg ? `Local (${clientReg})` : "Local",
+      warn: false,
+    };
+  });
+
+  const values = entries.map((e) => e.value);
+  const uniqueValues = [...new Set(values)];
+  const hasWarning = entries.some((e) => e.warn);
+  const hasDiff = hasWarning || uniqueValues.length > 1;
+
+  if (hasDiff) {
+    let summary: string;
+    if (uniqueValues.length === 1) {
+      summary = uniqueValues[0]!;
+    } else {
+      summary = `${uniqueValues.length} localities differ`;
+    }
+    return {
+      label: "Locality",
+      status: "diff",
+      summary,
+      detail: formatPerPlatform(entries),
+    };
+  }
+
+  return {
+    label: "Locality",
+    status: "match",
+    summary: uniqueValues[0] ?? "Local",
   };
 }
 

@@ -583,5 +583,64 @@ describe("ComparabilityReceipt", () => {
       expect(warnings.some((w) => w.label === "CPU family")).toBe(true);
       expect(warnings.some((w) => w.label === "CPU model")).toBe(true);
     });
+
+    it("warns when client region != platform region or if locality is unknown for remote/cloud platforms", () => {
+      // 1. Cross-region mismatch
+      const crossRegionRun = makeDetail({
+        result_id: "r1",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "us-east-1",
+        environment: {
+          client_region: "us-west-2",
+        },
+      });
+      const collocatedRun = makeDetail({
+        result_id: "r2",
+        platform: "BigQuery",
+        deployment_class: "cloud",
+        cloud_provider: "gcp",
+        cloud_region: "us-east-1",
+        environment: {
+          client_region: "us-east-1",
+        },
+      });
+
+      let fields = buildComparabilityFields([crossRegionRun, collocatedRun]);
+      let localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("diff");
+      expect(localityField.detail).toContain("Cross-region: client in us-west-2, platform in us-east-1");
+
+      // 2. Unknown locality on cloud platform
+      const unknownLocalityRun = makeDetail({
+        result_id: "r3",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "us-east-1",
+        environment: {},
+      });
+      fields = buildComparabilityFields([unknownLocalityRun]);
+      localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("diff");
+      expect(localityField.summary).toBe("Unknown client locality");
+
+      // 3. Matching collocated runs
+      const collocatedRun2 = makeDetail({
+        result_id: "r4",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "us-east-1",
+        environment: {
+          client_region: "us-east-1",
+        },
+      });
+      fields = buildComparabilityFields([collocatedRun, collocatedRun2]);
+      localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("match");
+      expect(localityField.summary).toBe("Collocated (us-east-1)");
+    });
   });
 });

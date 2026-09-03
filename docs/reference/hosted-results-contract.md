@@ -421,6 +421,7 @@ visibility state. They cannot be redacted by the submitter or admin.
 | `public_result_id` | The stable permalink slug |
 | `query_subset` | Which queries were run (full set or named subset) |
 | `tuning_mode` | Whether platform tuning was applied |
+| `client_link` | Optional nested locality metrics under `environment.client_link` (`client_cloud`, `client_region`, `statement_overhead_ms`); safe non-identifying metadata |
 
 ### 4.2 Redactable Fields
 
@@ -537,6 +538,16 @@ Downstream consumers are stricter than public ingest:
 Any change to accepted versions or field semantics must update
 `benchbox.core.results.schema_policy`, this contract, and the public contract
 map in the same PR.
+
+##### Allowed nested metadata blocks
+
+Benchmark results may include optional nested metadata blocks within canonical schema-v2 sections:
+
+- `environment.client_link`: Allowed nested metadata block disclosing client-to-platform
+  locality and statement round-trip overhead (`collection_status`, `source`, `client_cloud`,
+  `client_region`, and `statement_overhead_ms`). This block contains non-identifying
+  topological and driver overhead metrics only; raw network identifiers (IP addresses,
+  hostnames, and port numbers) are strictly excluded from published bundles.
 
 The submission manifest schema:
 

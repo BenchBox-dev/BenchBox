@@ -37,7 +37,12 @@ CREATE TABLE IF NOT EXISTS result_environment (
     python           VARCHAR,
     cpu_model        VARCHAR,
     cpu_family       VARCHAR,
-    cpu_identity_provenance VARCHAR
+    cpu_identity_provenance VARCHAR,
+    client_region    VARCHAR,
+    client_cloud     VARCHAR,
+    statement_overhead_min_ms DOUBLE,
+    statement_overhead_median_ms DOUBLE,
+    link_status      VARCHAR
 );
 
 CREATE TABLE IF NOT EXISTS result_phase_durations (
@@ -251,7 +256,12 @@ SELECT
     e.python,
     e.cpu_model,
     e.cpu_family,
-    e.cpu_identity_provenance
+    e.cpu_identity_provenance,
+    e.client_region,
+    e.client_cloud,
+    e.statement_overhead_min_ms,
+    e.statement_overhead_median_ms,
+    e.link_status
 FROM results r
 LEFT JOIN result_environment e USING (result_id);
 

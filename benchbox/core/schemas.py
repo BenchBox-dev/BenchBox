@@ -151,6 +151,11 @@ class RunConfig(BaseModel):
     warm_up_iterations: int = GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS  # Default: 1 warmup iteration
     power_fail_fast: bool = False
 
+    # Client-link locality disclosure
+    client_region: str | None = None
+    client_cloud: str | None = None
+    link_probe: bool = True
+
     # Table format fields
     table_format: Optional[str] = None
     table_format_compression: str = "snappy"
@@ -288,6 +293,10 @@ class BenchmarkConfig(BaseModel):
     # must receive this to classify as `official`; without it a run can never
     # pass `benchbox submit`.
     official: bool = False
+    # Client-link locality disclosure
+    client_region: str | None = None
+    client_cloud: str | None = None
+    link_probe: bool = True
 
     @field_validator("scale_factor")
     @classmethod

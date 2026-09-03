@@ -15,6 +15,7 @@ import math
 import threading
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,7 @@ from benchbox.core.tuning.applied_ledger import (
     recording_connection,
 )
 from benchbox.core.tuning.introspection import Introspector, corroborate
+from benchbox.platforms.base.client_region import discover_client_region
 from benchbox.platforms.base.connection_lifecycle import ConnectionLifecycleMixin
 from benchbox.platforms.base.connection_wrappers import (
     DriverIsolationCapability,
@@ -46,6 +48,7 @@ from benchbox.platforms.base.connection_wrappers import (
 from benchbox.platforms.base.data_loading import SchemaHelpersMixin
 from benchbox.platforms.base.dialect_translation import DialectTranslationMixin
 from benchbox.platforms.base.execution import TestDriversMixin
+from benchbox.platforms.base.link_probe import probe_statement_overhead
 from benchbox.platforms.base.models import (
     SetupPhase,
     StatisticsGatheringPhase,
@@ -258,6 +261,7 @@ class PlatformAdapter(
         self._sorted_ingestion_applied_tables: list[str] = []
         self._sorted_ingestion_total_apply_seconds: float = 0.0
         self._reset_plan_capture_stats()
+        self._client_link_metadata: dict[str, Any] | None = None
 
     def _reset_run_scoped_state(self) -> None:
         """Reset mutable state that belongs to one benchmark execution."""
@@ -267,6 +271,7 @@ class PlatformAdapter(
         self._sorted_ingestion_applied_tables = []
         self._sorted_ingestion_total_apply_seconds = 0.0
         self._reset_plan_capture_stats()
+        self._client_link_metadata = None
         if self.dry_run_mode:
             self.captured_sql = []
             self.query_counter = 0
@@ -943,6 +948,7 @@ class PlatformAdapter(
             quiet_console.print(f"Executing benchmark queries ({test_execution_type} mode)...")
             self._last_throughput_test_result = None
             query_results = self._execute_queries_by_type(benchmark, connection, run_config)
+            self._collect_client_link_metadata(connection, run_config)
 
             # Get queries for definitions - pass canonical slug so dialect selection
             # doesn't have to infer benchmark family from object internals.
@@ -971,10 +977,7 @@ class PlatformAdapter(
             )
 
             platform_info = self.get_platform_info(connection)
-            normalized_metadata = self.get_normalized_result_metadata(
-                connection=connection,
-                platform_info=platform_info,
-            )
+            normalized_metadata = self._resolve_normalized_metadata(connection, platform_info)
             execution_metadata, system_profile, anonymous_machine_id = self._build_execution_metadata(run_config)
 
             total_rows_loaded = sum(table_stats.values()) if table_stats else 0
@@ -1095,6 +1098,51 @@ class PlatformAdapter(
             if hasattr(self, "connection") and self.connection:
                 self.close_connection(self.connection)
                 self.connection = None
+
+    def _collect_client_link_metadata(self, connection: Any, run_config: Mapping[str, Any]) -> None:
+        """Probe statement overhead and discover client region post-benchmark."""
+        link_probe_opt = run_config.get("link_probe", True)
+        probe_result: dict[str, Any] | None = None
+        if link_probe_opt is not False and link_probe_opt not in ("false", "0", 0):
+            probe_result = probe_statement_overhead(connection)
+
+        merged_config = {**self.platform_config, **run_config}
+        region_info = discover_client_region(merged_config)
+
+        has_region = bool(region_info.get("client_region"))
+        probe_available = bool(probe_result and probe_result.get("collection_status") == "available")
+        probe_requested = link_probe_opt is not False and link_probe_opt not in ("false", "0", 0)
+
+        if has_region and probe_available:
+            collection_status = "available"
+        elif has_region or probe_available or (probe_result and probe_result.get("collection_error_class")):
+            collection_status = "partial"
+        elif not probe_requested and not has_region:
+            collection_status = "not_requested"
+        else:
+            collection_status = "unavailable"
+
+        self._client_link_metadata = {
+            "collection_status": collection_status,
+            "source": region_info.get("source", "unavailable"),
+            "client_region": region_info.get("client_region"),
+            "client_cloud": region_info.get("client_cloud"),
+            "statement_overhead_ms": probe_result.get("statement_overhead_ms") if probe_result else None,
+            "collection_error_class": probe_result.get("collection_error_class") if probe_result else None,
+            "collection_error_message": probe_result.get("collection_error_message") if probe_result else None,
+        }
+
+    def _resolve_normalized_metadata(self, connection: Any, platform_info: Mapping[str, Any] | None) -> dict[str, Any]:
+        """Obtain normalized metadata and ensure run-scoped client_link metadata is included."""
+        metadata = self.get_normalized_result_metadata(
+            connection=connection,
+            platform_info=platform_info,
+        )
+        if self._client_link_metadata:
+            exec_env = metadata.setdefault("execution_environment", {})
+            if isinstance(exec_env, dict) and ("client_link" not in exec_env or not exec_env["client_link"]):
+                exec_env["client_link"] = dict(self._client_link_metadata)
+        return metadata
 
     def _corroborate_applied_ledger(self, connection: Any, status: str) -> tuple[str, dict[str, Any] | None]:
         """Corroborate the applied ledger against the live catalog.

@@ -184,6 +184,13 @@ def resolve_run_config(
         iterations=max(1, iterations),
         warm_up_iterations=max(0, warmups),
         power_fail_fast=fail_fast,
+        client_region=getattr(config, "client_region", None) or options.get("client_region"),
+        client_cloud=getattr(config, "client_cloud", None) or options.get("client_cloud"),
+        link_probe=(
+            getattr(config, "link_probe", None)
+            if getattr(config, "link_probe", None) is not None
+            else options.get("link_probe", True)
+        ),
     )
 
 
