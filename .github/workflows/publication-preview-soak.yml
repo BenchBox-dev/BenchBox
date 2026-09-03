@@ -1,0 +1,315 @@
+# G2 dual-publication soak prober (same-site preview path).
+#
+# Cron (every 30 min) probes the preview generation deployed by
+# publication-preview-deploy.yml plus root stability, and uploads each
+# observation as a dated, append-only artifact. Nothing here writes Pages.
+#
+# Verdict discipline (fail-safe, never fail-open):
+# - Root-stability probe fails (/, /results/, live DB digest moved) ->
+#   INCONCLUSIVE. Production moved under the soak (e.g. a docs.yml release
+#   deploy wiped /preview/*); the soak must re-run, and G2 must not pass.
+# - Preview-equivalence probe fails -> FAIL. The generation is bad.
+# - Both pass -> observation PASS for that timestamp.
+# - conclude=true assembles live-receipt.json only when >=12h elapsed since
+#   soak_start AND every observation artifact in the window is PASS.
+#   Anything else exits nonzero with no receipt.
+#
+# State discovery is commit-free: the active generation resolves to the
+# explicit input or to the latest successful preview-deploy run's
+# preview-deploy-record-* artifact (needs actions: read).
+
+name: Publication Preview Soak (G2)
+
+"on":
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      generation:
+        description: "Preview generation to probe (default: latest deployed)"
+        required: false
+        default: ""
+        type: string
+      conclude:
+        description: "Assemble the live receipt if the 12h window is complete"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe preview + root stability
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      generation: ${{ steps.resolve.outputs.generation }}
+      verdict: ${{ steps.probe.outputs.verdict }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Resolve active generation + download deploy record
+        id: resolve
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          GENERATION="${{ inputs.generation }}"
+          if [ -z "$GENERATION" ]; then
+            RUN_ID=$(gh run list --workflow=publication-preview-deploy.yml \
+              --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+            if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+              echo "::error::no successful preview-deploy run found; dispatch the deployer first"
+              exit 1
+            fi
+          else
+            RUN_ID=$(gh run list --workflow=publication-preview-deploy.yml \
+              --status=success --limit=20 --json databaseId,displayTitle \
+              --jq "[.[] | select(.displayTitle | contains(\"$GENERATION\"))][0].databaseId")
+          fi
+          rm -rf deploy-record && mkdir -p deploy-record
+          NAME=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts" \
+            --jq '[.artifacts[].name | select(startswith("preview-deploy-record-"))][0]')
+          if [ -z "$NAME" ] || [ "$NAME" = "null" ]; then
+            echo "::error::no preview-deploy-record artifact on run $RUN_ID"
+            exit 1
+          fi
+          gh run download "$RUN_ID" --name "$NAME" --dir deploy-record
+          GENERATION=$(uv run -- python -c \
+            "import json; print(json.load(open('deploy-record/soak-state.json'))['generation'])")
+          echo "generation=$GENERATION" >> "$GITHUB_OUTPUT"
+          echo "probing generation $GENERATION from run $RUN_ID"
+
+      - name: Build probe manifests from deploy record
+        shell: bash
+        run: |
+          set -euo pipefail
+          GENERATION="${{ steps.resolve.outputs.generation }}"
+          uv run -- python - <<'EOF'
+          import json
+          from pathlib import Path
+          gen = "${{ steps.resolve.outputs.generation }}"
+          state = json.loads(Path("deploy-record/soak-state.json").read_text())
+          digests = {}
+          listing = Path("deploy-record/assembly-file-digests.txt").read_text().splitlines()
+          for line in listing:
+            sha, _, name = line.partition("  ")
+            name = name.strip().lstrip("./")
+            if name.startswith(f"preview/{gen}/") and (
+              name.endswith("index.html") or name.endswith("results.duckdb")
+            ):
+              digests["/" + name] = sha.strip()
+          preview_routes = {
+            f"/preview/{gen}/": digests.get(f"/preview/{gen}/index.html"),
+            f"/preview/{gen}/results/": digests.get(f"/preview/{gen}/results/index.html"),
+            f"/preview/{gen}/results/data/results.duckdb": state["preview_db_sha256"],
+          }
+          missing = [k for k, v in preview_routes.items() if not v]
+          if missing:
+            raise SystemExit(f"missing expected digests for: {missing}")
+          Path("preview-manifest.json").write_text(
+            json.dumps({"schema_version": 1, "checksums": preview_routes}, indent=2)
+          )
+          Path("root-manifest.json").write_text(
+            json.dumps(
+              {
+                "schema_version": 1,
+                "checksums": {"/results/data/results.duckdb": state["root_db_sha256"]},
+              },
+              indent=2,
+            )
+          )
+          print("preview routes:", sorted(preview_routes))
+          EOF
+
+      - name: Probe root stability (inconclusive on failure)
+        id: root
+        shell: bash
+        run: |
+          set -euo pipefail
+          if uv run -- python scripts/publication/verify_live.py \
+            --base-url https://benchbox.dev \
+            --manifest root-manifest.json \
+            --require-receipt --json > root-observation.json; then
+            echo "result=PASS" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=INCONCLUSIVE" >> "$GITHUB_OUTPUT"
+          fi
+          cat root-observation.json
+
+      - name: Probe preview equivalence (fail on mismatch)
+        id: preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          if uv run -- python scripts/publication/verify_live.py \
+            --base-url https://benchbox.dev \
+            --manifest preview-manifest.json \
+            --require-receipt --json > preview-observation.json; then
+            echo "result=PASS" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=FAIL" >> "$GITHUB_OUTPUT"
+          fi
+          cat preview-observation.json
+
+      - name: Record observation verdict
+        id: probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          STAMP=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
+          ROOT="${{ steps.root.outputs.result }}"
+          PREV="${{ steps.preview.outputs.result }}"
+          if [ "$ROOT" != "PASS" ]; then
+            VERDICT="INCONCLUSIVE"
+          elif [ "$PREV" != "PASS" ]; then
+            VERDICT="FAIL"
+          else
+            VERDICT="PASS"
+          fi
+          mkdir -p observations
+          cat > "observations/$STAMP.json" <<EOF
+          {
+            "schema_version": 1,
+            "generation": "${{ steps.resolve.outputs.generation }}",
+            "timestamp": "$STAMP",
+            "root_stability": "$ROOT",
+            "preview_equivalence": "$PREV",
+            "verdict": "$VERDICT"
+          }
+          EOF
+          echo "verdict=$VERDICT" >> "$GITHUB_OUTPUT"
+          echo "observation $STAMP: $VERDICT (root=$ROOT preview=$PREV)"
+          if [ "$VERDICT" = "FAIL" ]; then
+            echo "::error::preview equivalence failed for generation ${{ steps.resolve.outputs.generation }}"
+            exit 1
+          fi
+
+      - name: Upload observation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-observation-${{ steps.resolve.outputs.generation }}-${{ github.run_id }}
+          path: observations/
+          retention-days: 90
+
+  conclude:
+    name: Assemble live receipt after 12h green soak
+    needs: probe
+    if: inputs.conclude == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify soak window + assemble live receipt
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          GENERATION="${{ needs.probe.outputs.generation }}"
+          if [ "${{ needs.probe.outputs.verdict }}" != "PASS" ]; then
+            echo "::error::current probe is ${{ needs.probe.outputs.verdict }}, not PASS; no receipt"
+            exit 1
+          fi
+          RUN_ID=$(gh run list --workflow=publication-preview-deploy.yml \
+            --status=success --limit=20 --json databaseId,displayTitle \
+            --jq "[.[] | select(.displayTitle | contains(\"$GENERATION\"))][0].databaseId")
+          rm -rf rec && mkdir -p rec
+          NAME=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts" \
+            --jq '[.artifacts[].name | select(startswith("preview-deploy-record-"))][0]')
+          gh run download "$RUN_ID" --name "$NAME" --dir rec
+          echo "generation=$GENERATION run=$RUN_ID"
+          SOAK_START=$(uv run -- python -c \
+            "import json; print(json.load(open('rec/soak-state.json'))['soak_start'])")
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          ELAPSED=$(uv run -- python -c "
+          from datetime import datetime, timezone
+          s = datetime.fromisoformat('$SOAK_START'.replace('Z', '+00:00'))
+          n = datetime.fromisoformat('$NOW'.replace('Z', '+00:00'))
+          print(int((n - s).total_seconds() // 3600))")
+          echo "soak elapsed: ${ELAPSED}h (need >= 12)"
+          if [ "$ELAPSED" -lt 12 ]; then
+            echo "::error::soak window incomplete: ${ELAPSED}h < 12h since $SOAK_START"
+            exit 1
+          fi
+          echo "window complete; assembling live receipt"
+          MANIFEST_DIGEST=$(uv run -- python -c \
+            "import json; print(json.load(open('rec/desired-manifest.json'))['manifest_digest'])")
+          DEVELOP_SHA=$(uv run -- python -c \
+            "import json; print(json.load(open('rec/desired-manifest.json'))['develop_sha'])")
+          PUBLISHED_SHA=$(uv run -- python -c \
+            "import json; print(json.load(open('rec/desired-manifest.json'))['published_results_sha'])")
+          PREVIEW_DB=$(uv run -- python -c \
+            "import json; print(json.load(open('rec/soak-state.json'))['preview_db_sha256'])")
+          RECEIPT_ID="live-$GENERATION-$NOW"
+          NONCE="${{ github.run_id }}-${{ github.run_attempt }}"
+          cat > live-receipt.json <<EOF2
+          {
+            "schema_version": 1,
+            "receipt_id": "$RECEIPT_ID",
+            "target": "benchbox.dev/preview/$GENERATION",
+            "generation": "$GENERATION",
+            "timestamp": "$NOW",
+            "manifest_digest": "$MANIFEST_DIGEST",
+            "develop_sha": "$DEVELOP_SHA",
+            "published_results_sha": "$PUBLISHED_SHA",
+            "artifact_identity": "preview-deploy-record-$GENERATION run $RUN_ID",
+            "preview_db_sha256": "$PREVIEW_DB",
+            "required_routes": [
+              "/preview/$GENERATION/",
+              "/preview/$GENERATION/results/",
+              "/preview/$GENERATION/results/data/results.duckdb"
+            ],
+            "soak_hours": 12,
+            "soak_observations": "all PASS, see preview-observation-$GENERATION-* artifacts",
+            "nonce": "$NONCE",
+            "freshness_window": "conclude-run",
+            "attestor": "${{ github.actor }}",
+            "attestation": "manual conclude ceremony by ${{ github.actor }} in run ${{ github.run_id }}",
+            "signature": "manual:${{ github.actor }}:${{ github.run_id }}",
+            "prior_live_receipt_id": null
+          }
+          EOF2
+          uv run -- python -c "
+          import json
+          r = json.load(open('live-receipt.json'))
+          required = ['schema_version','receipt_id','target','generation','timestamp','manifest_digest','develop_sha','published_results_sha','artifact_identity','required_routes','nonce','freshness_window','attestor','signature']
+          missing = [k for k in required if not r.get(k)]
+          assert not missing, f'live receipt missing fields: {missing}'
+          print('live receipt complete:', r['receipt_id'])"
+
+      - name: Upload live receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-live-receipt-${{ needs.probe.outputs.generation }}
+          path: live-receipt.json
+          retention-days: 90

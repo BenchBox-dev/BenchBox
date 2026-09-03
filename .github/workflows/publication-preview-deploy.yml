@@ -1,0 +1,336 @@
+# G2 dual-publication preview deployer (same-site preview path).
+#
+# Deploys a full-site Pages artifact whose ROOT is a rebuild of the pinned
+# known-good release (production bytes) plus a `/preview/<generation>/`
+# subtree built independently from pinned develop + published-results SHAs.
+# GitHub Pages replaces the whole site per deployment, so there is no such
+# thing as a root-independent preview deploy on one Pages site: root
+# neutrality is enforced by the pre-deploy gate (rebuilt root DB digest must
+# equal the baseline live sha256) instead of by mechanism. If the gate cannot
+# prove root neutrality, the run fails BEFORE any Pages write.
+#
+# Trigger discipline: workflow_dispatch ONLY. Dispatching with explicit SHAs
+# and an approver IS the manual maintainer approval the A1 contract requires
+# for a new publication generation. No push/PR trigger may be added: an
+# automatic trigger would turn every matching push into a production Pages
+# write. The github-pages environment serializes this against docs.yml
+# production deploys (Pages runs one deployment at a time); the concurrency
+# group below serializes concurrent dispatches of this workflow.
+#
+# Soak: this workflow deploys and records state; publication-preview-soak.yml
+# (cron, 30min) probes root stability + preview equivalence for the 12h soak
+# window and assembles the live receipt. G2 passes only on that receipt.
+#
+# Freeze: mirror retirement stays blocked until G2 passes; docs.yml stays the
+# production deployer until G3 passes. A mid-soak docs.yml release deploy
+# wipes /preview/* (full-site replacement) — the soak then reports
+# INCONCLUSIVE (production moved under us), never PASS.
+
+name: Publication Preview Deploy (G2)
+
+"on":
+  workflow_dispatch:
+    inputs:
+      develop_sha:
+        description: "Pinned develop SHA (40-hex commit)"
+        required: true
+        type: string
+      published_results_sha:
+        description: "Pinned published-results SHA (40-hex commit)"
+        required: true
+        type: string
+      release_sha:
+        description: "Pinned known-good release SHA for the root rebuild"
+        required: false
+        default: "f841b85f1d40cc2396f16fb185d1dfbb371ac1a3"
+        type: string
+      generation:
+        description: "Preview generation id, [a-z0-9-]{1,32} (served at /preview/<generation>/) "
+        required: true
+        type: string
+      approver:
+        description: "Maintainer approving this generation (contract attestor-of-record)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build root + preview generation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      generation: ${{ steps.vars.outputs.generation }}
+      preview_db_sha: ${{ steps.preview.outputs.preview_db_sha }}
+      root_db_sha: ${{ steps.root.outputs.root_db_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate dispatch inputs
+        id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEVELOP_SHA="${{ inputs.develop_sha }}"
+          PUBLISHED_SHA="${{ inputs.published_results_sha }}"
+          RELEASE_SHA="${{ inputs.release_sha }}"
+          GENERATION="${{ inputs.generation }}"
+          APPROVER="${{ inputs.approver }}"
+          for label in DEVELOP_SHA PUBLISHED_SHA RELEASE_SHA; do
+            val="$(eval "echo \$$label")"
+            if ! printf '%s' "$val" | grep -qE '^[0-9a-f]{40}$'; then
+              echo "::error::$label must be a 40-hex commit SHA, got: $val"
+              exit 1
+            fi
+            git cat-file -e "$val" || { echo "::error::$label not found in repo: $val"; exit 1; }
+          done
+          if ! printf '%s' "$GENERATION" | grep -qE '^[a-z0-9-]{1,32}$'; then
+            echo "::error::generation must match [a-z0-9-]{1,32}, got: $GENERATION"
+            exit 1
+          fi
+          if [ -z "$APPROVER" ]; then
+            echo "::error::approver is required (manual maintainer approval)"
+            exit 1
+          fi
+          {
+            echo "generation=$GENERATION"
+            echo "develop_sha=$DEVELOP_SHA"
+            echo "published_results_sha=$PUBLISHED_SHA"
+            echo "release_sha=$RELEASE_SHA"
+            echo "approver=$APPROVER"
+          } >> "$GITHUB_OUTPUT"
+          echo "inputs OK generation=$GENERATION approver=$APPROVER"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build production-equivalent root from release SHA
+        id: root
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_SHA="${{ steps.vars.outputs.release_sha }}"
+          git fetch origin "$RELEASE_SHA" --depth=1
+          WORK="$(mktemp -d)"
+          git worktree add --detach "$WORK" "$RELEASE_SHA"
+          trap 'git worktree remove --force "$WORK"' EXIT
+          mkdir -p site
+          (
+            cd "$WORK"
+            uv run -- python scripts/assemble_public_site.py --site-dir "$OLDPWD/site-tmp-root"
+          )
+          rm -rf site
+          mv site-tmp-root site
+          uv run python scripts/publication/check_artifact_privacy.py site
+          ROOT_DB="site/results/data/results.duckdb"
+          ROOT_DB_SHA=""
+          if [ -f "$ROOT_DB" ]; then
+            ROOT_DB_SHA=$(sha256sum "$ROOT_DB" | cut -d ' ' -f 1)
+          fi
+          echo "root_db_sha=$ROOT_DB_SHA" >> "$GITHUB_OUTPUT"
+          echo "root DB sha256: ${ROOT_DB_SHA:-MISSING}"
+
+      - name: Build preview generation subtree from pinned SHAs
+        id: preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          GENERATION="${{ steps.vars.outputs.generation }}"
+          DEVELOP_SHA="${{ steps.vars.outputs.develop_sha }}"
+          PUBLISHED_SHA="${{ steps.vars.outputs.published_results_sha }}"
+          git fetch origin "$DEVELOP_SHA" --depth=1
+          git fetch origin "$PUBLISHED_SHA" --depth=1
+          # Payload extraction reads blobs at pinned SHAs via git show into a
+          # scratch dir; validator code always executes from this checkout.
+          rm -rf preview-payload preview-dist
+          mkdir -p preview-payload preview-dist
+          git archive "$PUBLISHED_SHA" results-data | tar -x -C preview-payload
+          uv run python _project/scripts/explorer_publish.py build \
+            --data-dir preview-payload/results-data \
+            --output preview-dist/data
+          if [ ! -f "preview-dist/data/results.duckdb" ]; then
+            echo "::error::preview DB missing after explorer_publish build"
+            exit 1
+          fi
+          uv run python _project/scripts/results_explorer_snapshot_invariants.py \
+            preview-dist/data/results.duckdb
+          mkdir -p "site/preview/$GENERATION/results"
+          cp -r preview-dist/data "site/preview/$GENERATION/results/"
+          # Minimal generation index so /preview/<gen>/ probes 200 with digest.
+          DEST="site/preview/$GENERATION"
+          PREVIEW_DB_SHA=$(sha256sum "$DEST/results/data/results.duckdb" | cut -d ' ' -f 1)
+          {
+            echo '<!doctype html><html><head><meta charset="utf-8">'
+            echo "<title>Preview $GENERATION</title></head><body>"
+            echo "<h1>Publication preview $GENERATION</h1>"
+            echo "<p>develop=$DEVELOP_SHA published-results=$PUBLISHED_SHA</p>"
+            echo "<p>database_sha256=$PREVIEW_DB_SHA</p>"
+            echo '</body></html>'
+          } > "$DEST/index.html"
+          cp "$DEST/index.html" "$DEST/results/index.html"
+          uv run python scripts/publication/check_artifact_privacy.py site
+          echo "preview_db_sha=$PREVIEW_DB_SHA" >> "$GITHUB_OUTPUT"
+          echo "preview DB sha256: $PREVIEW_DB_SHA"
+
+      - name: Write desired manifest + assembly receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          GENERATION="${{ steps.vars.outputs.generation }}"
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          mkdir -p receipt-dist
+          MANIFEST_DIGEST_INPUT="develop=${{ steps.vars.outputs.develop_sha }}|published=${{ steps.vars.outputs.published_results_sha }}|target=benchbox.dev/preview/$GENERATION|generation=$GENERATION"
+          MANIFEST_DIGEST=$(printf '%s' "$MANIFEST_DIGEST_INPUT" | sha256sum | cut -d ' ' -f 1)
+          cat > receipt-dist/desired-manifest.json <<EOF
+          {
+            "schema_version": 1,
+            "target": "benchbox.dev/preview/$GENERATION",
+            "generation": "$GENERATION",
+            "develop_sha": "${{ steps.vars.outputs.develop_sha }}",
+            "published_results_sha": "${{ steps.vars.outputs.published_results_sha }}",
+            "release_sha": "${{ steps.vars.outputs.release_sha }}",
+            "manifest_digest": "$MANIFEST_DIGEST",
+            "approver": "${{ steps.vars.outputs.approver }}",
+            "dispatched_by": "${{ github.actor }}",
+            "timestamp": "$TIMESTAMP"
+          }
+          EOF
+          (cd site && find . -type f -exec sha256sum {} + | sort) > receipt-dist/assembly-file-digests.txt
+          ASSEMBLY_DIGEST=$(sha256sum receipt-dist/assembly-file-digests.txt | cut -d ' ' -f 1)
+          cat > receipt-dist/assembly-receipt.json <<EOF
+          {
+            "schema_version": 1,
+            "generation": "$GENERATION",
+            "artifact_digest": "$ASSEMBLY_DIGEST",
+            "preview_db_sha256": "${{ steps.preview.outputs.preview_db_sha }}",
+            "root_db_sha256": "${{ steps.root.outputs.root_db_sha }}",
+            "timestamp": "$TIMESTAMP"
+          }
+          EOF
+          echo "manifest_digest=$MANIFEST_DIGEST assembly_digest=$ASSEMBLY_DIGEST"
+
+      - name: Pre-deploy root-neutrality gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The rebuilt root DB must equal the live production DB pinned in the
+          # baseline. This proves the deploy cannot change production bytes at
+          # root; only /preview/<generation>/ is new. Any mismatch fails here,
+          # BEFORE any Pages write.
+          LIVE_DB_SHA=$(uv run -- python -c \
+            "import json; print(json.load(open('docs/operations/publication-baseline-2026-08-31.json'))['live_database']['sha256'])")
+          ROOT_DB_SHA="${{ steps.root.outputs.root_db_sha }}"
+          if [ -z "$ROOT_DB_SHA" ]; then
+            echo "::error::rebuilt root has no results.duckdb; refusing deploy"
+            exit 1
+          fi
+          if [ "$ROOT_DB_SHA" != "$LIVE_DB_SHA" ]; then
+            echo "::error::root DB $ROOT_DB_SHA != live baseline $LIVE_DB_SHA; rebuild is not production-neutral"
+            exit 1
+          fi
+          echo "root neutrality proven: $ROOT_DB_SHA"
+
+      - name: Upload Pages artifact (site + preview subtree)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Upload generation receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-receipts-${{ steps.vars.outputs.generation }}
+          path: receipt-dist/
+          retention-days: 90
+
+  deploy:
+    name: Deploy preview site to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  record:
+    name: Record deployment receipt + soak state
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download generation receipts
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-receipts-${{ needs.build.outputs.generation }}
+          path: ./receipt-dist
+
+      - name: Write deployment receipt + soak state
+        shell: bash
+        run: |
+          set -euo pipefail
+          GENERATION="${{ needs.build.outputs.generation }}"
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          DEPLOY_ID="${{ github.run_id }}-${{ github.run_attempt }}"
+          cat > receipt-dist/deployment-receipt.json <<EOF
+          {
+            "schema_version": 1,
+            "generation": "$GENERATION",
+            "target": "benchbox.dev/preview/$GENERATION",
+            "deployment_id": "$DEPLOY_ID",
+            "page_url": "https://benchbox.dev",
+            "timestamp": "$TIMESTAMP"
+          }
+          EOF
+          SOAK_START=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          cat > receipt-dist/soak-state.json <<EOF
+          {
+            "schema_version": 1,
+            "generation": "$GENERATION",
+            "soak_start": "$SOAK_START",
+            "soak_hours": 12,
+            "probe_interval_minutes": 30,
+            "preview_db_sha256": "${{ needs.build.outputs.preview_db_sha }}",
+            "root_db_sha256": "${{ needs.build.outputs.root_db_sha }}"
+          }
+          EOF
+          echo "soak state opens at $SOAK_START for generation $GENERATION"
+
+      - name: Upload deployment receipt + soak state
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-deploy-record-${{ needs.build.outputs.generation }}
+          path: receipt-dist/
+          retention-days: 90
