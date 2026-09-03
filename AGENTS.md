@@ -105,7 +105,7 @@ Read a claimed TODO's `verification` ladder and run the narrowest proof first.
 Before publication, self-review with the `code` skill's review action and fix every Critical
 and Required finding; nits and considerations stay optional per its rubric. Run `make pr-preflight`
 once, then `make pr-open`. Boilerplate gates may go to a low-effort subagent; you still
-choose the command and interpret failures. Do not poll CI: pending is a valid terminal state.
+choose the command and interpret failures. Check CI on a schedule (sleep/cron between reads), never in a loop. Pending means wait, not re-query.
 
 Dev PRs target `develop` (or `release` / `published-results`), use squash merge, and never direct-push
 protected branches. Force-push only feature branches with `--force-with-lease`. Soundness paths listed
