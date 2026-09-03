@@ -61,7 +61,7 @@ requires-dist = [
     { name = "libsql", specifier = ">=0.1.11" },
     { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "sqlglot", specifier = ">=25.6.0,<31.0.0" },
-    { name = "todo-db", extras = ["hosted", "mcp"], path = "vendor/todo_db-0.6.0-py3-none-any.whl" },
+    { name = "todo-db", extras = ["hosted", "mcp"], path = "vendor/todo_db-0.6.1-py3-none-any.whl" },
     { name = "zstandard", specifier = ">=0.20.0" },
 ]
 
@@ -1024,13 +1024,13 @@ wheels = [
 
 [[package]]
 name = "todo-db"
-version = "0.6.0"
-source = { path = "vendor/todo_db-0.6.0-py3-none-any.whl" }
+version = "0.6.1"
+source = { path = "vendor/todo_db-0.6.1-py3-none-any.whl" }
 dependencies = [
     { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
 wheels = [
-    { filename = "todo_db-0.6.0-py3-none-any.whl", hash = "sha256:664d19825bc9ebd614bbc8580ae7d128c6340210ed28b714221e510367b2fd46" },
+    { filename = "todo_db-0.6.1-py3-none-any.whl", hash = "sha256:e692629fe34ba1fc76e99880b3de65020bbe11786955d4ad284691095f0e8030" },
 ]
 
 [package.optional-dependencies]

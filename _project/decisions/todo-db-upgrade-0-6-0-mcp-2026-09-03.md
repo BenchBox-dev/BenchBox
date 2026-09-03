@@ -73,3 +73,20 @@ BenchBox wheel.
 Revert the vendored wheel, `_project/scripts/pyproject.toml`, and `uv.lock` to
 the 0.4.3 pin and re-lock. No data implications: the hosted schema is untouched
 by this change, so a downgrade to 0.4.3 is safe.
+
+## Follow-up: 0.6.0 to 0.6.1 (2026-09-03)
+
+The `todo` skill v1.0.0 expects the MCP additions from todo-db PR #21
+(`doctor` tool, agent-profile deferral tools), which the 0.6.0 wheel predates.
+So the runtime moves to the 0.6.1 wheel: `todo_db-0.6.1-py3-none-any.whl`,
+SHA-256 `e692629fe34ba1fc76e99880b3de65020bbe11786955d4ad284691095f0e8030`
+(matched against the release `SHA256SUMS`; canonical release `v0.6.1` at
+todo-db merge `671c45b`).
+
+- Still `SCHEMA_VERSION = 7`; the seven migration SQL files are byte-identical
+  to the 0.6.0 wheel, so again no hosted migration, backup, or rehearsal.
+- `uv.lock` re-resolved with the same 40 packages; only the wheel filename and
+  digest change.
+- Paired with the skill-sync re-pin to `d22ea7f` (skill-sync-skills PR #71:
+  `prioritize.md` MCP rewrite plus lock regen), so the vendored runtime and
+  the mirrored skill agree on the MCP interface.
