@@ -120,6 +120,9 @@ jobs:
       - name: Assemble public site
         run: uv run -- python scripts/assemble_public_site.py --site-dir site
 
+      - name: Scan assembled site for privacy leaks
+        run: uv run python scripts/publication/check_artifact_privacy.py site
+
       - name: Upload HTML artifacts
         uses: actions/upload-pages-artifact@v3
         with:

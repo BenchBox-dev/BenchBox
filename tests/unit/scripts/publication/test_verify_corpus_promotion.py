@@ -24,6 +24,9 @@ def _isolate_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, with_inven
     monkeypatch.setattr(promotion_mod, "REPO_ROOT", fake_root)
     monkeypatch.setattr(promotion_mod, "INVENTORY_FILE", inventory)
     monkeypatch.setattr(explorer_compat, "check_schema_compatibility", lambda versions=None: {9: []})
+    # Keep promotion unit tests focused on inventory/site fail-closed paths.
+    monkeypatch.setattr(promotion_mod, "check_corpus_bijection", lambda **kwargs: [])
+    monkeypatch.setattr(promotion_mod, "scan_directory_for_privacy", lambda site_dir: [])
     return fake_root
 
 
@@ -40,5 +43,33 @@ def test_shadow_without_inventory_fails(tmp_path: Path, monkeypatch: pytest.Monk
     site = fake_root / "publication" / "out" / "site"
     site.mkdir(parents=True)
     (site / "index.html").write_text("<html></html>", encoding="utf-8")
+    rc = promotion_mod.main(["--shadow"])
+    assert rc != 0
+
+
+def test_promotion_fails_when_bijection_returns_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_root = _isolate_repo(tmp_path, monkeypatch, with_inventory=True)
+    site = fake_root / "publication" / "out" / "site"
+    site.mkdir(parents=True)
+    (site / "index.html").write_text("<html></html>", encoding="utf-8")
+    monkeypatch.setattr(
+        promotion_mod,
+        "check_corpus_bijection",
+        lambda **kwargs: ["bundles-dir vs accepted-ref mismatch"],
+    )
+    rc = promotion_mod.main(["--shadow"])
+    assert rc != 0
+
+
+def test_promotion_fails_when_privacy_finds_leaks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_root = _isolate_repo(tmp_path, monkeypatch, with_inventory=True)
+    site = fake_root / "publication" / "out" / "site"
+    site.mkdir(parents=True)
+    (site / "index.html").write_text("<html></html>", encoding="utf-8")
+    monkeypatch.setattr(
+        promotion_mod,
+        "scan_directory_for_privacy",
+        lambda site_dir: ["token.json: Detected GitHub Personal Access Token"],
+    )
     rc = promotion_mod.main(["--shadow"])
     assert rc != 0

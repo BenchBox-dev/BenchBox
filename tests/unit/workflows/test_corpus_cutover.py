@@ -91,12 +91,15 @@ def test_build_verifies_lane_isolation() -> None:
     assert "scripts/publication/verify_lane_isolation.py --lane corpus" in _run_text("build")
 
 
-def test_build_corpus_archive_has_no_silent_copy_failure() -> None:
-    """M11: the archive copy must fail loudly and be count-checked, never `|| true`."""
+def test_build_corpus_archive_materializes_accepted_union() -> None:
+    """Archive must materialize the ledger-seed union (incl. published_only), never develop-only cp."""
     build_run = _run_text("build")
-    assert "cp -r results-data/bundles/. lane_artifacts/corpus_archive/" in build_run
+    assert "cp -r results-data/bundles/. lane_artifacts/corpus_archive/" not in build_run
+    assert "--materialize-dest lane_artifacts/corpus_archive" in build_run
+    assert "git fetch --no-tags origin published-results" in build_run
     assert "2>/dev/null || true" not in build_run
-    assert 'CORPUS_COUNT" -ne "$SRC_COUNT' in build_run
+    assert 'CORPUS_COUNT" -eq 0' in build_run
+    assert 'CORPUS_COUNT" -ne "$EXPECTED' in build_run
 
 
 def test_build_uploads_corpus_artifacts() -> None:
@@ -119,12 +122,19 @@ def test_assemble_invokes_real_site_assembler() -> None:
     run = _run_text("assemble")
     assert "_project/scripts/explorer_publish.py build" in run
     assert "npm run build --prefix results-explorer" in run
+    assert "scripts/publication/assembler.py" in run
     assert "assembled-site/index.html" in run
     assert "assembled-site/results/data/results.duckdb" in run
 
 
 def test_assemble_verifies_shadow_site() -> None:
     assert "verify_shadow_site.py assembled-site/" in _run_text("assemble")
+
+
+def test_assemble_scans_privacy() -> None:
+    run = _run_text("assemble")
+    assert "check_artifact_privacy.py assembled-site/" in run
+    assert "|| true" not in run
 
 
 def test_assemble_bijection_requires_real_artifact() -> None:

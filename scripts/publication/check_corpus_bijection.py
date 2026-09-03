@@ -5,7 +5,9 @@ The check is fail-closed:
 
   * ``--accepted-ref`` gives the authoritative accepted-path set (git ls-tree).
   * ``--bundles-dir`` is an *independent* cross-check: its basenames must be
-    symmetric-difference-empty against the accepted ref (not a fallback).
+    symmetric-difference-empty against the accepted ref (not a fallback), except
+    for ledger dispositions: ``published_only`` may be absent from the dir and
+    ``legacy_overlay`` may appear as dir-only extras.
   * ``--artifact`` (a DuckDB / SQLite read model) is compared 1:1 against the
     ``result_id`` recomputed from every accepted bundle. A missing artifact is a
     hard failure whenever one is expected (``--require-artifact`` or an explicit
@@ -92,6 +94,49 @@ def recompute_result_id(bundle_path: Path) -> str:
     return BundleTransformer().result_id_from_bundle(bundle_path)
 
 
+def recompute_result_id_from_bytes(raw: bytes, *, hint_path: str = "bundle.json") -> str:
+    """Derive a result_id from raw bundle bytes without requiring a durable file path."""
+    from _project.scripts.explorer_pipeline.transformer import BundleTransformer
+
+    data = json.loads(raw)
+    return BundleTransformer().result_id_from_bundle(Path(hint_path), data=data, raw=raw)
+
+
+def _git_show_bytes(ref: str, path: str) -> bytes:
+    try:
+        return subprocess.run(
+            ["git", "show", f"{ref}:{path}"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or b"").decode("utf-8", errors="replace").strip()
+        raise BijectionError(f"git show failed for {ref}:{path}: {stderr or exc}") from exc
+
+
+def bundle_bytes_for_path(path: str, dir_map: dict[str, Path], ref: str) -> bytes:
+    """Resolve bundle bytes from the dir map, worktree, or ``git show`` of *path*."""
+    name = Path(path).name
+    if name in dir_map:
+        return dir_map[name].read_bytes()
+    worktree = ROOT / path
+    if worktree.is_file():
+        return worktree.read_bytes()
+    return _git_show_bytes(ref, path)
+
+
+def _disposition_for_basename(name: str, dispositions: dict[str, str]) -> str | None:
+    """Return the disposition for a basename, preferring the canonical corpus path."""
+    direct = f"{CORPUS_PREFIX}{name}"
+    if direct in dispositions:
+        return dispositions[direct]
+    for path, disp in dispositions.items():
+        if Path(path).name == name:
+            return disp
+    return None
+
+
 def read_published_result_ids(artifact_path: Path) -> list[str]:
     """Published ``result_id`` values from a DuckDB or SQLite artifact."""
     try:
@@ -156,29 +201,39 @@ def check(
     ledger_seed: Path,
 ) -> list[str]:
     errors: list[str] = []
+    dispositions = load_dispositions(ledger_seed)
     accepted = accepted_paths_from_ref(accepted_ref)
     accepted_names = {Path(p).name for p in accepted}
+    accepted_by_name = {Path(p).name: p for p in accepted}
     print(f"Accepted ref {accepted_ref}: {len(accepted)} primary bundle(s)")
 
-    # (c) independent cross-check: bundles-dir vs ref, symmetric difference empty.
+    # Independent cross-check: bundles-dir vs ref, with ledger disposition exceptions.
     dir_map = bundle_files_in_dir(bundles_dir)
     if not dir_map:
         raise BijectionError(f"--bundles-dir {bundles_dir} contains no primary bundles")
+
     only_ref = sorted(accepted_names - set(dir_map))
     only_dir = sorted(set(dir_map) - accepted_names)
-    if only_ref or only_dir:
+
+    unaccounted_only_ref = [name for name in only_ref if dispositions.get(accepted_by_name[name]) != "published_only"]
+    unaccounted_only_dir = [
+        name for name in only_dir if _disposition_for_basename(name, dispositions) != "legacy_overlay"
+    ]
+    if unaccounted_only_ref or unaccounted_only_dir:
         errors.append(
-            f"bundles-dir vs accepted-ref mismatch: {len(only_ref)} only in ref "
-            f"({only_ref[:3]}), {len(only_dir)} only in dir ({only_dir[:3]})"
+            f"bundles-dir vs accepted-ref mismatch: {len(unaccounted_only_ref)} only in ref "
+            f"({unaccounted_only_ref[:3]}), {len(unaccounted_only_dir)} only in dir ({unaccounted_only_dir[:3]})"
         )
         return errors
 
-    dispositions = load_dispositions(ledger_seed)
-
-    # Recompute the result_id for every accepted bundle from its published bytes.
+    # Recompute the result_id for every accepted bundle present in the dir.
+    # published_only paths absent from the dir are permitted omissions.
     rid_to_path: dict[str, str] = {}
     for path in accepted:
-        rid = recompute_result_id(dir_map[Path(path).name])
+        name = Path(path).name
+        if name not in dir_map:
+            continue
+        rid = recompute_result_id(dir_map[name])
         if rid in rid_to_path:
             errors.append(f"result_id collision: {rid} <- {rid_to_path[rid]} and {path}")
             continue
@@ -199,7 +254,15 @@ def check(
         errors.append(f"artifact contains {len(published) - len(published_set)} duplicate result_id row(s)")
 
     allowed_missing = {p for p, d in dispositions.items() if d == "published_only"}
-    allowed_extra_paths = {p for p, d in dispositions.items() if d == "legacy_overlay"}
+    allowed_extra_rids: set[str] = set()
+    for path, disp in dispositions.items():
+        if disp != "legacy_overlay":
+            continue
+        try:
+            raw = bundle_bytes_for_path(path, dir_map, accepted_ref)
+            allowed_extra_rids.add(recompute_result_id_from_bytes(raw, hint_path=path))
+        except (BijectionError, OSError, ValueError, json.JSONDecodeError) as exc:
+            errors.append(f"legacy_overlay result_id unresolved for {path}: {exc}")
 
     unaccounted_skips = sorted(
         path for rid, path in rid_to_path.items() if rid not in published_set and path not in allowed_missing
@@ -212,7 +275,7 @@ def check(
 
     accepted_rids = set(rid_to_path)
     unaccounted_extras = sorted(
-        rid for rid in published_set if rid not in accepted_rids and rid_to_path.get(rid) not in allowed_extra_paths
+        rid for rid in published_set if rid not in accepted_rids and rid not in allowed_extra_rids
     )
     if unaccounted_extras:
         errors.append(

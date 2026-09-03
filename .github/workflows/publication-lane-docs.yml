@@ -97,13 +97,28 @@ jobs:
 
       - name: Verify lane isolation
         run: |
-          CHANGED=""
+          set -euo pipefail
+          CHANGED_FILE="${RUNNER_TEMP}/lane-changed-paths.txt"
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git fetch origin "${{ github.base_ref }}" --quiet || true
-            CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" 2>/dev/null | tr '\n' ' ' || true)
-          fi
-          if [ -n "$CHANGED" ]; then
-            uv run python scripts/publication/verify_lane_isolation.py --lane site --changed-paths $CHANGED
+            git fetch origin "${{ github.base_ref }}"
+            git diff --name-only "origin/${{ github.base_ref }}...HEAD" > "$CHANGED_FILE"
+            if [ ! -s "$CHANGED_FILE" ]; then
+              echo "ERROR: empty changed-paths for pull_request isolation check" >&2
+              exit 1
+            fi
+            uv run python scripts/publication/verify_lane_isolation.py --lane site --changed-paths-file "$CHANGED_FILE"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            BEFORE="${{ github.event.before }}"
+            if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+              git diff --name-only "${BEFORE}...HEAD" > "$CHANGED_FILE"
+              if [ -s "$CHANGED_FILE" ]; then
+                uv run python scripts/publication/verify_lane_isolation.py --lane site --changed-paths-file "$CHANGED_FILE"
+              else
+                uv run python scripts/publication/verify_lane_isolation.py --lane site
+              fi
+            else
+              uv run python scripts/publication/verify_lane_isolation.py --lane site
+            fi
           else
             uv run python scripts/publication/verify_lane_isolation.py --lane site
           fi

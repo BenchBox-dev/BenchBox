@@ -62,6 +62,17 @@ jobs:
           # likely fail if conflicts exist, which is correct closed behavior).
           if git fetch origin "pull/${PR_NUMBER}/merge" --depth=1 2>/dev/null; then
             MERGE_SHA=$(git rev-parse FETCH_HEAD)
+            # Parity gate (validator_parity.py --head-sha) needs the PR-head
+            # object too: a --depth=1 merge-ref fetch stores the merge commit
+            # but not parent 2 (PR head), and the base checkout at fetch-depth 0
+            # does not contractually include fork heads. Fetch the head ref
+            # explicitly and fail closed (no `|| true`) when it is missing, then
+            # prove HEAD_SHA resolves before the Validate bundles step runs.
+            git fetch origin "pull/${PR_NUMBER}/head" --depth=1
+            git cat-file -e "$HEAD_SHA" || {
+              echo "::error::HEAD_SHA $HEAD_SHA not found after fetching origin pull/${PR_NUMBER}/head"
+              exit 1
+            }
           else
             echo "::warning::Could not fetch origin pull/${PR_NUMBER}/merge (likely conflicts), falling back to head SHA"
             MERGE_SHA="$HEAD_SHA"
@@ -372,6 +383,7 @@ jobs:
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           BASE_SHA: ${{ env.BASE_SHA }}
           MERGE_SHA: ${{ env.MERGE_SHA }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           CORPUS_CHANGED_PATHS_FILE: ${{ env.CORPUS_CHANGED_PATHS_FILE }}
         run: |
           set -euo pipefail
@@ -392,6 +404,7 @@ jobs:
           # Test harness fallback: when env not set (isolated unit test), use HEAD fallback so script remains runnable.
           _BASE_SHA="${BASE_SHA:-HEAD}"
           _MERGE_SHA="${MERGE_SHA:-HEAD}"
+          _HEAD_SHA="${HEAD_SHA:-HEAD}"
           _CORPUS_FILE="${CORPUS_CHANGED_PATHS_FILE:-/tmp/corpus_changed_paths.txt}"
           CORPUS_ARG=""
           if [ -f "$_CORPUS_FILE" ]; then
@@ -400,7 +413,7 @@ jobs:
           xargs -d '\n' uv run -- python scripts/validate_submission.py $REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION $CORPUS_ARG --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt \
             | tee /tmp/validation_output.txt
           # Also run parity validator to compare PR-head vs merge-SHA outcomes (fallback for harness)
-          uv run -- python scripts/publication/validator_parity.py --base-sha "$_BASE_SHA" --merge-sha "$_MERGE_SHA" --corpus-changed-paths "$_CORPUS_FILE" $REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION
+          uv run -- python scripts/publication/validator_parity.py --base-sha "$_BASE_SHA" --merge-sha "$_MERGE_SHA" --head-sha "$_HEAD_SHA" --corpus-changed-paths "$_CORPUS_FILE" $REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION
 
       - name: Check corpus inventory
         if: steps.validate.outcome == 'success' || steps.changed.outputs.has_bundles == 'corpus-only'

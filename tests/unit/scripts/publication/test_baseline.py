@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
-SCRIPT = Path(__file__).parents[4] / "scripts/publication/capture_baseline.py"
+ROOT = Path(__file__).parents[4]
+SCRIPT = ROOT / "scripts/publication/capture_baseline.py"
+COMMITTED_BASELINE = ROOT / "docs/operations/publication-baseline-2026-08-31.json"
 SPEC = importlib.util.spec_from_file_location("capture_baseline", SCRIPT)
 assert SPEC and SPEC.loader
 baseline = importlib.util.module_from_spec(SPEC)
@@ -36,7 +39,26 @@ def valid_baseline() -> dict:
             "release": {"sha": "abc"},
         },
         "workflow": {"head_sha": "abc"},
-        "pages": {"deployment": {"state": "success"}},
+        "pages": {
+            "deployment": {"state": "success"},
+            "bandwidth": {
+                "telemetry": "unavailable",
+                "reason": "GitHub Pages and repository APIs expose artifact bytes and HTTP cache headers, not transfer totals.",
+            },
+            "artifacts": [
+                {
+                    "id": 1,
+                    "name": "github-pages",
+                    "size_in_bytes": 1024,
+                    "digest": "sha256:" + ("a" * 64),
+                }
+            ],
+        },
+        "live_database": {
+            "url": "https://benchbox.dev/results/data/results.duckdb",
+            "sha256": "b" * 64,
+            "bytes": 8400896,
+        },
         "corpus": {
             "path_semantics": "set union, never a target count",
             "branch_source_shas": {"develop": "dev", "published-results": "pub", "release": "abc"},
@@ -202,3 +224,16 @@ def test_validation_requires_all_destructive_surfaces_frozen() -> None:
     data["freeze"]["mirror_retirement"] = "allowed"
 
     assert "all destructive migration surfaces must remain blocked" in baseline.validate(data)
+
+
+def test_validation_rejects_missing_live_database() -> None:
+    data = valid_baseline()
+    del data["live_database"]
+
+    errors = baseline.validate(data)
+    assert any("live_database" in error for error in errors)
+
+
+def test_committed_publication_baseline_passes_validate() -> None:
+    data = json.loads(COMMITTED_BASELINE.read_text(encoding="utf-8"))
+    assert baseline.validate(data) == []

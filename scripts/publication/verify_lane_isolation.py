@@ -69,6 +69,7 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
         "_project/scripts/explorer_publish.py",
         "_project/scripts/results_explorer_snapshot_invariants.py",
         ".github/workflows/results-explorer-browser.yml",
+        ".github/workflows/publication-lane-explorer.yml",
     ),
     "corpus": (
         "results-data/",
@@ -82,12 +83,14 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
 
 LANE_ARTIFACTS: dict[str, tuple[str, ...]] = {
     "site": ("prose_site", "api_docs"),
-    "explorer": ("explorer_app", "results.duckdb"),
+    "explorer": ("explorer_app",),
     "corpus": ("corpus_archive", "accepted_bundles"),
 }
 
 LANE_WORKFLOWS: dict[str, str] = {
     "site": ".github/workflows/publication-lane-docs.yml",
+    "explorer": ".github/workflows/publication-lane-explorer.yml",
+    "corpus": ".github/workflows/publication-corpus-cutover.yml",
 }
 
 
@@ -274,6 +277,17 @@ def _check_least_privilege(perms: Any) -> str | None:
     return f"permissions must be 'contents: read' dict, got {perms!r} (scalar permissions are not least-privilege)"
 
 
+def _artifact_name_matches(found_name: str, expected: str) -> bool:
+    """Match exact artifact names or prefixed/templated variants (e.g. explorer_app-${{ github.sha }})."""
+    if found_name == expected:
+        return True
+    if found_name.startswith(expected + "-"):
+        return True
+    if found_name.startswith(expected + "-${{"):
+        return True
+    return False
+
+
 def verify_workflow_isolation(lane: str, repo_root: Path) -> list[str]:  # noqa: C901
     errors: list[str] = []
     workflow_rel = LANE_WORKFLOWS.get(lane)
@@ -339,15 +353,8 @@ def verify_workflow_isolation(lane: str, repo_root: Path) -> list[str]:  # noqa:
                         name = with_cfg.get("name")
                         if isinstance(name, str):
                             found_artifacts.add(name)
-                        # Also check path field for artifact name hints
-                        path_val = with_cfg.get("path", "")
-                        if isinstance(path_val, str):
-                            for art in expected_artifacts:
-                                if art in path_val:
-                                    # path contains artifact but name is authoritative; don't add
-                                    pass
     for artifact in expected_artifacts:
-        if artifact not in found_artifacts:
+        if not any(_artifact_name_matches(name, artifact) for name in found_artifacts):
             errors.append(
                 f"workflow {workflow_rel} does not declare required lane artifact: {artifact} (must be actions/upload-artifact with name: {artifact})"
             )
@@ -586,23 +593,30 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv)
     repo_root = args.repo_root.resolve()
 
-    # Fail closed: if --changed-paths was explicitly supplied it must carry at least
-    # one non-empty path. With nargs="*" a bare `--changed-paths` would otherwise
-    # silently become [] and skip contamination checks.
-    if args.changed_paths is not None:
-        non_empty = [p for p in args.changed_paths if p.strip()]
-        if not non_empty and args.changed_paths_file is None:
-            print("error: --changed-paths supplied but no paths provided (fails closed)", file=sys.stderr)
-            return 1
-
+    # Fail closed: if --changed-paths or --changed-paths-file was supplied, the
+    # combined path list must contain at least one non-empty entry. Otherwise
+    # contamination checks would be silently skipped.
     changed_paths: list[str] = []
-    if args.changed_paths:
+    paths_requested = False
+    if args.changed_paths is not None:
+        paths_requested = True
         changed_paths.extend(args.changed_paths)
-    if args.changed_paths_file and args.changed_paths_file.is_file():
+    if args.changed_paths_file is not None:
+        paths_requested = True
+        if not args.changed_paths_file.is_file():
+            print(f"changed-paths file not found: {args.changed_paths_file}", file=sys.stderr)
+            return 1
         changed_paths.extend(args.changed_paths_file.read_text(encoding="utf-8").splitlines())
-    elif args.changed_paths_file and not args.changed_paths_file.is_file():
-        print(f"changed-paths file not found: {args.changed_paths_file}", file=sys.stderr)
-        return 1
+
+    if paths_requested:
+        non_empty = [p for p in changed_paths if p.strip()]
+        if not non_empty:
+            print(
+                "error: --changed-paths/--changed-paths-file supplied but no paths provided (fails closed)",
+                file=sys.stderr,
+            )
+            return 1
+        changed_paths = non_empty
 
     lanes_to_verify = ["site", "explorer", "corpus"] if args.lane == "all" else [args.lane]
     reports: list[LaneIsolationReport] = []

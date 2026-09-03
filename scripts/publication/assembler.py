@@ -8,10 +8,12 @@ tree with strict path ownership.
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
 import shutil
+import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -34,6 +36,10 @@ class LaneArtifact:
 
 class PathOwnershipError(Exception):
     """Raised when multiple publication lanes claim ownership of the same output path."""
+
+
+class DigestMismatchError(Exception):
+    """Raised when a lane source tree does not match the declared artifact identity."""
 
 
 def compute_file_sha256(path: Path) -> str:
@@ -72,17 +78,51 @@ def compute_tree_digest(tree_dir: Path) -> tuple[str, int, dict[str, str]]:
     return h.hexdigest(), total_size, manifest
 
 
+def verify_lane_digest(artifact: LaneArtifact, src_dir: Path) -> tuple[str, int, dict[str, str]]:
+    """Verify src_dir against declared digest/manifest/size; return computed identity."""
+    computed_digest, computed_size, computed_manifest = compute_tree_digest(src_dir)
+
+    if not artifact.digest or artifact.digest != computed_digest:
+        raise DigestMismatchError(
+            f"Lane '{artifact.lane_name}' digest mismatch: declared={artifact.digest!r}, computed={computed_digest}"
+        )
+
+    if artifact.size_bytes > 0 and artifact.size_bytes != computed_size:
+        raise DigestMismatchError(
+            f"Lane '{artifact.lane_name}' size mismatch: declared={artifact.size_bytes}, computed={computed_size}"
+        )
+
+    if artifact.file_manifest:
+        declared = artifact.file_manifest
+        declared_paths = set(declared)
+        computed_paths = set(computed_manifest)
+        missing = sorted(declared_paths - computed_paths)
+        extra = sorted(computed_paths - declared_paths)
+        if missing or extra:
+            raise DigestMismatchError(
+                f"Lane '{artifact.lane_name}' file_manifest path mismatch: missing={missing}, extra={extra}"
+            )
+        mismatched = sorted(path for path, sha in declared.items() if computed_manifest.get(path) != sha)
+        if mismatched:
+            raise DigestMismatchError(f"Lane '{artifact.lane_name}' file_manifest hash mismatch for: {mismatched}")
+
+    return computed_digest, computed_size, computed_manifest
+
+
 class SiteAssembler:
     """Assembles lane artifacts into a deterministic, unified site tree with path ownership."""
 
-    def __init__(self, output_dir: Path) -> None:
+    def __init__(self, output_dir: Path, receipt_path: Path | None = None) -> None:
         self.output_dir = output_dir
+        self.receipt_path = receipt_path or (output_dir.parent / f"{output_dir.name}-receipt.json")
         self.claimed_paths: dict[str, str] = {}  # rel_path -> lane_name
 
     def mount_lane_artifact(self, artifact: LaneArtifact, src_dir: Path) -> None:
         """Mount files from a lane artifact into the output directory, enforcing path ownership."""
         if not src_dir.exists():
             raise FileNotFoundError(f"Source directory for lane '{artifact.lane_name}' not found: {src_dir}")
+
+        verify_lane_digest(artifact, src_dir)
 
         prefix = artifact.output_prefix.strip("/")
 
@@ -108,10 +148,10 @@ class SiteAssembler:
         self.claimed_paths[rel_dest] = lane_name
         dest_path = self.output_dir / rel_dest
         dest_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dest_path)
+        shutil.copyfile(src, dest_path)
 
-    def assemble(self, artifacts: list[tuple[LaneArtifact, Path]]) -> dict[str, Any]:
-        """Assemble all artifacts and produce a summary receipt."""
+    def assemble(self, artifacts: list[tuple[LaneArtifact, Path]]) -> tuple[dict[str, Any], Path]:
+        """Assemble all artifacts and write a receipt outside the hashed output tree."""
         if self.output_dir.exists():
             shutil.rmtree(self.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -130,8 +170,78 @@ class SiteAssembler:
             "file_manifest": manifest,
         }
 
-        receipt_path = self.output_dir / "publication-receipt.json"
+        receipt_path = self.receipt_path
+        if (
+            receipt_path.resolve() == self.output_dir.resolve()
+            or self.output_dir.resolve() in receipt_path.resolve().parents
+        ):
+            raise ValueError(f"receipt_path must be outside hashed output tree: {receipt_path}")
+        receipt_path.parent.mkdir(parents=True, exist_ok=True)
         with open(receipt_path, "w", encoding="utf-8") as f:
             json.dump(receipt, f, indent=2, sort_keys=True)
 
-        return receipt
+        return receipt, receipt_path
+
+
+def _parse_lane_spec(spec: str) -> tuple[str, Path, str]:
+    """Parse ``name=NAME,src=SRC,prefix=PREFIX`` into components."""
+    parts: dict[str, str] = {}
+    for chunk in spec.split(","):
+        if "=" not in chunk:
+            raise argparse.ArgumentTypeError(f"invalid lane spec chunk (expected key=value): {chunk!r} in {spec!r}")
+        key, value = chunk.split("=", 1)
+        parts[key.strip()] = value.strip()
+    missing = [key for key in ("name", "src", "prefix") if key not in parts]
+    if missing:
+        raise argparse.ArgumentTypeError(f"lane spec missing {missing}: {spec!r}")
+    return parts["name"], Path(parts["src"]), parts["prefix"]
+
+
+def build_lane_artifact(name: str, src: Path, prefix: str) -> LaneArtifact:
+    digest, size_bytes, file_manifest = compute_tree_digest(src)
+    return LaneArtifact(
+        lane_name=name,
+        digest=digest,
+        size_bytes=size_bytes,
+        source_path=str(src),
+        output_prefix=prefix,
+        file_manifest=file_manifest,
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--receipt-path", type=Path, required=True)
+    parser.add_argument(
+        "--lane",
+        action="append",
+        default=[],
+        metavar="name=NAME,src=SRC,prefix=PREFIX",
+        help="Repeatable lane mount spec",
+    )
+    args = parser.parse_args(argv)
+    if not args.lane:
+        print("ERROR: at least one --lane is required", file=sys.stderr)
+        return 2
+
+    try:
+        artifacts: list[tuple[LaneArtifact, Path]] = []
+        for spec in args.lane:
+            name, src, prefix = _parse_lane_spec(spec)
+            if not src.exists():
+                print(f"ERROR: lane src not found: {src}", file=sys.stderr)
+                return 1
+            artifacts.append((build_lane_artifact(name, src, prefix), src))
+
+        assembler = SiteAssembler(args.output_dir, receipt_path=args.receipt_path)
+        receipt, receipt_path = assembler.assemble(artifacts)
+        print(f"assembled digest={receipt['assembly_digest']} files={receipt['total_files']} receipt={receipt_path}")
+        return 0
+    except (DigestMismatchError, PathOwnershipError, ValueError, OSError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

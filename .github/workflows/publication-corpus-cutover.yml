@@ -43,6 +43,9 @@ jobs:
       - name: Verify corpus lane isolation
         run: uv run python scripts/publication/verify_lane_isolation.py --lane corpus
 
+      - name: Fetch accepted published-results ref
+        run: git fetch --no-tags origin published-results
+
       - name: Build corpus archive
         id: corpus
         shell: bash
@@ -50,24 +53,27 @@ jobs:
           set -euo pipefail
           mkdir -p lane_artifacts/corpus_archive
 
-          # M11: no `|| true`. `cp -r src/. dest` fails loudly on a partial copy.
-          cp -r results-data/bundles/. lane_artifacts/corpus_archive/
+          # Materialize the accepted-path union (includes published_only blobs).
+          uv run python scripts/publication/create_ledger_seed.py \
+            --accepted-ref origin/published-results \
+            --ledger-seed publication/ledger-seed.json \
+            --materialize-dest lane_artifacts/corpus_archive
 
           count_primary() {
             find "$1" -name '*.json' \
               ! -name '*.manifest.json' ! -name '*.applied.json' \
               ! -name '*.plans.json' ! -name '*.tuning.json' | wc -l | tr -d ' '
           }
-          SRC_COUNT=$(count_primary results-data/bundles)
           CORPUS_COUNT=$(count_primary lane_artifacts/corpus_archive)
+          EXPECTED=$(python3 -c "import json; print(json.load(open('publication/ledger-seed.json'))['count'])")
           echo "corpus_count=$CORPUS_COUNT" >> "$GITHUB_OUTPUT"
 
           if [ "$CORPUS_COUNT" -eq 0 ]; then
             echo "::error::Corpus archive contains zero primary bundles"
             exit 1
           fi
-          if [ "$CORPUS_COUNT" -ne "$SRC_COUNT" ]; then
-            echo "::error::Corpus archive is incomplete: copied $CORPUS_COUNT of $SRC_COUNT primary bundles"
+          if [ "$CORPUS_COUNT" -ne "$EXPECTED" ]; then
+            echo "::error::Corpus archive is incomplete: materialized $CORPUS_COUNT of $EXPECTED union bundles"
             exit 1
           fi
 
@@ -75,7 +81,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --no-tags origin published-results
           uv run python scripts/publication/create_ledger_seed.py \
             --accepted-ref origin/published-results \
             --output /tmp/ledger-seed.regen.json
@@ -92,7 +97,6 @@ jobs:
               sys.exit(1)
           print(f"Ledger seed matches origin/published-results ({regen['count']} paths).")
           PY
-
       - name: Upload corpus archive artifact
         uses: actions/upload-artifact@v4
         with:
@@ -163,10 +167,12 @@ jobs:
             --output results-explorer/public/data/
           # A7 explorer SPA (emits index.html + hashed assets).
           npm run build --prefix results-explorer
-          # A6/A7 whole-site tree: SPA at root, read model under /results/data.
-          mkdir -p assembled-site/results/data
-          cp -r results-explorer/dist/. assembled-site/
-          cp -r results-explorer/public/data/. assembled-site/results/data/
+          # A6/A7 whole-site tree via hermetic assembler CLI.
+          uv run python scripts/publication/assembler.py \
+            --output-dir assembled-site \
+            --receipt-path /tmp/assembled-site-receipt.json \
+            --lane "name=explorer,src=results-explorer/dist,prefix=" \
+            --lane "name=read_model,src=results-explorer/public/data,prefix=results/data"
           test -f assembled-site/index.html
           test -f assembled-site/results/data/results.duckdb
           DB_SHA=$(sha256sum assembled-site/results/data/results.duckdb | cut -d' ' -f1)
@@ -176,6 +182,8 @@ jobs:
       - name: Verify assembled site
         run: uv run python scripts/publication/verify_shadow_site.py assembled-site/
 
+      - name: Scan assembled site for privacy leaks
+        run: uv run python scripts/publication/check_artifact_privacy.py assembled-site/
       - name: Verify corpus bijection against assembled DuckDB
         run: |
           uv run python scripts/publication/check_corpus_bijection.py \

@@ -21,13 +21,13 @@ Contract:
   --corpus-changed-paths flag.
 
 Usage:
-  uv run -- python scripts/publication/validator_parity.py --base-sha <sha> --merge-sha <sha>
-  uv run -- python scripts/publication/validator_parity.py --base-sha $BASE_SHA --merge-sha $MERGE_SHA --corpus-changed-paths /tmp/corpus_changed_paths.txt
+  uv run -- python scripts/publication/validator_parity.py --base-sha <sha> --merge-sha <sha> --head-sha <sha>
+  uv run -- python scripts/publication/validator_parity.py --base-sha $BASE_SHA --merge-sha $MERGE_SHA --head-sha $HEAD_SHA --corpus-changed-paths /tmp/corpus_changed_paths.txt
   # Env fallback:
-  BASE_SHA=... MERGE_SHA=... CORPUS_CHANGED_PATHS_FILE=/tmp/corpus_changed_paths.txt uv run -- python scripts/publication/validator_parity.py
+  BASE_SHA=... MERGE_SHA=... HEAD_SHA=... CORPUS_CHANGED_PATHS_FILE=/tmp/corpus_changed_paths.txt uv run -- python scripts/publication/validator_parity.py
 
 Exit codes:
-  0 - parity holds (head and merge outcomes identical, inventory check passes)
+  0 - parity holds (head and merge outcomes identical and both succeed)
   1 - validation failure or parity divergence
   2 - usage / environment error (missing SHA, missing file, git failure)
 """
@@ -76,13 +76,13 @@ def _run_git(*args: str, cwd: Path | None = None) -> str:
     return result.stdout
 
 
-def _resolve_sha(label: str, value: str | None) -> str:
+def _resolve_sha(label: str, value: str | None, *alt_env: str) -> str:
     if value and value.strip():
         return value.strip()
-    env_val = os.environ.get(label, "").strip()
-    if env_val:
-        return env_val
-    # also support CORPUS_CHANGED_PATHS_FILE style fallback for base/merge
+    for env_label in (label, *alt_env):
+        env_val = os.environ.get(env_label, "").strip()
+        if env_val:
+            return env_val
     return ""
 
 
@@ -328,8 +328,15 @@ def _run_validation_on_payload(
             else:
                 print(f"Warning: bundle {b} not extracted at {local}", file=sys.stderr)
         if not local_bundles:
-            print("No bundle files extracted, skipping validation", file=sys.stderr)
-            return 0, "No bundles extracted"
+            # bundle_paths was non-empty but nothing extracted at this SHA:
+            # fail closed. Returning 0 here would let compare_head_merge_outcomes
+            # print "Parity OK" over two vacuous zeros (e.g. HEAD payload never
+            # fetched while MERGE validation also extracted nothing).
+            print(
+                f"::error::No bundle files extracted at {merge_sha} for {len(bundle_paths)} requested bundle(s)",
+                file=sys.stderr,
+            )
+            return 1, "No bundles extracted"
         results = validate_bundles(
             local_bundles, require_manifest=require_manifest, allow_partial_validation=allow_partial
         )
@@ -350,6 +357,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--merge-sha", dest="merge_sha", default=None, help="MERGE_SHA (default: env MERGE_SHA or FETCH_HEAD)"
     )
     parser.add_argument(
+        "--head-sha",
+        dest="head_sha",
+        default=None,
+        help="HEAD_SHA / PR head (default: env HEAD_SHA or PR_HEAD_SHA)",
+    )
+    parser.add_argument(
         "--corpus-changed-paths",
         dest="corpus_changed_paths",
         default=None,
@@ -368,19 +381,53 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Check that validator_parity is executable and can parse args (used for tracker verification)",
+        help="Run the full head-vs-merge parity comparison (SHAs still required)",
     )
     return parser.parse_args(argv)
 
 
+def compare_head_merge_outcomes(
+    changed_bundles: list[str],
+    merge_sha: str,
+    head_sha: str,
+    *,
+    require_manifest: bool = False,
+    allow_partial: bool = False,
+) -> tuple[int, str]:
+    """Run validation on MERGE_SHA and HEAD_SHA payloads; return (exit_code, message)."""
+    merge_rc, merge_summary = _run_validation_on_payload(
+        changed_bundles,
+        merge_sha,
+        require_manifest=require_manifest,
+        allow_partial=allow_partial,
+    )
+    head_rc, head_summary = _run_validation_on_payload(
+        changed_bundles,
+        head_sha,
+        require_manifest=require_manifest,
+        allow_partial=allow_partial,
+    )
+    print("--- Validation summary (MERGE_SHA payload) ---")
+    print(merge_summary)
+    print("--- Validation summary (HEAD_SHA payload) ---")
+    print(head_summary)
+
+    if merge_rc != head_rc:
+        msg = f"head vs merge outcomes diverged: MERGE_SHA rc={merge_rc}, HEAD_SHA rc={head_rc}"
+        print(f"::error::{msg}", file=sys.stderr)
+        return 1, msg
+    if merge_rc != 0:
+        msg = "Parity validation FAILED: both MERGE_SHA and HEAD_SHA payload validations failed"
+        print(f"::error::{msg}", file=sys.stderr)
+        return 1, msg
+    return 0, "Parity OK: MERGE_SHA and HEAD_SHA validation outcomes match"
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    if getattr(args, "check", False):
-        # Lightweight check for tracker verification: just parse and report success
-        print("validator_parity --check: ok (BASE_SHA/MERGE_SHA not required for check)")
-        return 0
     base_sha = _resolve_sha("BASE_SHA", args.base_sha)
     merge_sha = _resolve_sha("MERGE_SHA", args.merge_sha)
+    head_sha = _resolve_sha("HEAD_SHA", args.head_sha, "PR_HEAD_SHA")
     corpus_file_str = args.corpus_changed_paths or os.environ.get("CORPUS_CHANGED_PATHS_FILE", "").strip() or None
     corpus_file = Path(corpus_file_str) if corpus_file_str else None
 
@@ -390,29 +437,28 @@ def main(argv: list[str] | None = None) -> int:
     if not merge_sha:
         print("::error::MERGE_SHA is required (--merge-sha or env MERGE_SHA)", file=sys.stderr)
         return 2
+    if not head_sha:
+        print("::error::HEAD_SHA is required (--head-sha or env HEAD_SHA / PR_HEAD_SHA)", file=sys.stderr)
+        return 2
 
     # Validate SHAs look like hex
-    for label, sha in [("BASE_SHA", base_sha), ("MERGE_SHA", merge_sha)]:
+    for label, sha in [("BASE_SHA", base_sha), ("MERGE_SHA", merge_sha), ("HEAD_SHA", head_sha)]:
         if len(sha) < 7 or not all(c in "0123456789abcdef" for c in sha.lower()):
             print(f"::error::{label} does not look like a valid SHA: {sha}", file=sys.stderr)
             return 2
     # Verify SHAs resolve
-    try:
-        _run_git("cat-file", "-e", base_sha)
-    except RuntimeError:
-        print(f"::error::BASE_SHA not found in repo: {base_sha}", file=sys.stderr)
-        return 2
-    try:
-        _run_git("cat-file", "-e", merge_sha)
-    except RuntimeError:
-        print(f"::error::MERGE_SHA not found in repo: {merge_sha}", file=sys.stderr)
-        return 2
+    for label, sha in [("BASE_SHA", base_sha), ("MERGE_SHA", merge_sha), ("HEAD_SHA", head_sha)]:
+        try:
+            _run_git("cat-file", "-e", sha)
+        except RuntimeError:
+            print(f"::error::{label} not found in repo: {sha}", file=sys.stderr)
+            return 2
 
     # Three-dot vs two-dot semantics note: we use three-dot BASE_SHA...MERGE_SHA
     # to include changes on PR branch since merge-base, which is the correct
     # contract for PR validation (two-dot BASE_SHA..MERGE_SHA would miss merge-base context).
 
-    # Discover changed bundles at MERGE_SHA
+    # Discover changed bundles at MERGE_SHA (same discovery used for both payload extractions)
     try:
         changed_bundles = _discover_changed_bundles(base_sha, merge_sha)
     except SystemExit as exc:
@@ -423,6 +469,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"BASE_SHA={base_sha}")
     print(f"MERGE_SHA={merge_sha}")
+    print(f"HEAD_SHA={head_sha}")
     print(f"Changed bundles ({len(changed_bundles)}):")
     for bundle in changed_bundles:
         print(f"  {bundle}")
@@ -432,48 +479,29 @@ def main(argv: list[str] | None = None) -> int:
     if corpus_rc != 0:
         return 1
 
-    # Validate payload via git show $MERGE_SHA:path (trusted base execution)
-    # This mirrors the workflow's sparse checkout to /tmp/payload from base SHA context
-    rc, summary = _run_validation_on_payload(
+    rc, message = compare_head_merge_outcomes(
         changed_bundles,
         merge_sha,
+        head_sha,
         require_manifest=args.require_manifest,
         allow_partial=args.allow_partial_validation,
     )
-    print("--- Validation summary (MERGE_SHA payload) ---")
-    print(summary)
+    if rc != 0:
+        return rc
 
-    # Compare with local generate_corpus_inventory parity if corpus changed
+    # Optional corpus inventory length signal when corpus paths changed
     if corpus_file is not None and corpus_file.exists():
         content = corpus_file.read_text(encoding="utf-8")
         if content.strip():
-            # Run corpus inventory parity check on extracted payload
-            # We run generate_corpus_inventory --check logic against the merge payload's bundles
-            # For local parity, ensure that extracting to /tmp/payload and running inventory would agree
-            # Here we simply hash the inventory that would be generated from current checkout's bundles
-            # versus merge SHA bundles, and compare lengths as a minimal parity signal.
             try:
-                # Import generate logic without side effects
                 from scripts.generate_corpus_inventory import generate_inventory  # type: ignore
 
-                # Generate inventory from current checkout (trusted base)
                 local_inv = generate_inventory(CHECKOUT_ROOT / "results-data" / "bundles")
-                # For merge, extract to temp and generate there
-                # Re-run via subprocess to avoid path confusion
                 print(f"Local inventory bundles: {len(local_inv.get('bundles', []))} (parity check)")
             except Exception as exc:
                 print(f"Warning: corpus inventory parity check skipped: {exc}", file=sys.stderr)
 
-    # Parity outcome: if validation failed, parity fails
-    if rc != 0:
-        print("::error::Parity validation FAILED: merge-SHA payload validation failed", file=sys.stderr)
-        return 1
-
-    # If we reached here, parity holds: PR-head vs merge-SHA outcomes identical
-    # (Both would be validated via same trusted code; divergence would have shown as
-    # different changed sets or validation failures. A future extension could
-    # explicitly diff head vs merge results.)
-    print("Parity OK: merge-SHA validation outcomes match trusted-base expectations")
+    print(message)
     return 0
 
 

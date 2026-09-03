@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import pytest
 
 from scripts.publication.manifest import (
@@ -63,6 +60,8 @@ def test_valid_genesis_manifest():
         parent_generation=None,
         source_commit="f" * 40,
         source_branch="develop",
+        develop_sha="d" * 40,
+        published_results_sha="c" * 40,
         build_closure=sample_closure(),
         artifacts=sample_artifacts(),
         corpus=sample_corpus(),
@@ -76,6 +75,8 @@ def test_valid_genesis_manifest():
     assert deserialized.generation == 1
     assert deserialized.parent_sha is None
     assert deserialized.source_commit == "f" * 40
+    assert deserialized.develop_sha == "d" * 40
+    assert deserialized.published_results_sha == "c" * 40
     assert deserialized.build_closure.python_version == "3.12.13"
     assert deserialized.artifacts["corpus_database"].bundle_count == 120
 
@@ -87,6 +88,8 @@ def test_valid_successor_manifest():
         parent_generation=1,
         source_commit="e" * 40,
         source_branch="develop",
+        develop_sha="d" * 40,
+        published_results_sha="c" * 40,
         build_closure=sample_closure(),
         artifacts=sample_artifacts(),
         corpus=sample_corpus(),
@@ -105,6 +108,8 @@ def test_reject_invalid_generation_and_parent():
         parent_generation=None,
         source_commit="f" * 40,
         source_branch="develop",
+        develop_sha="d" * 40,
+        published_results_sha="c" * 40,
         build_closure=sample_closure(),
         artifacts=sample_artifacts(),
         corpus=sample_corpus(),
@@ -119,6 +124,8 @@ def test_reject_invalid_generation_and_parent():
         parent_generation=1,
         source_commit="f" * 40,
         source_branch="develop",
+        develop_sha="d" * 40,
+        published_results_sha="c" * 40,
         build_closure=sample_closure(),
         artifacts=sample_artifacts(),
         corpus=sample_corpus(),
@@ -133,6 +140,8 @@ def test_reject_invalid_generation_and_parent():
         parent_generation=0,
         source_commit="f" * 40,
         source_branch="develop",
+        develop_sha="d" * 40,
+        published_results_sha="c" * 40,
         build_closure=sample_closure(),
         artifacts=sample_artifacts(),
         corpus=sample_corpus(),
@@ -148,6 +157,8 @@ def test_reject_incomplete_build_closure():
         parent_generation=None,
         source_commit="f" * 40,
         source_branch="develop",
+        develop_sha="d" * 40,
+        published_results_sha="c" * 40,
         build_closure=sample_closure(),
         artifacts=sample_artifacts(),
         corpus=sample_corpus(),
@@ -165,6 +176,8 @@ def test_reject_missing_artifacts():
         parent_generation=None,
         source_commit="f" * 40,
         source_branch="develop",
+        develop_sha="d" * 40,
+        published_results_sha="c" * 40,
         build_closure=sample_closure(),
         artifacts=sample_artifacts(),
         corpus=sample_corpus(),
@@ -182,6 +195,8 @@ def test_reject_malformed_digests():
         parent_generation=None,
         source_commit="f" * 40,
         source_branch="develop",
+        develop_sha="d" * 40,
+        published_results_sha="c" * 40,
         build_closure=sample_closure(),
         artifacts=sample_artifacts(),
         corpus=sample_corpus(),
@@ -190,3 +205,23 @@ def test_reject_malformed_digests():
     raw["artifacts"]["prose_site"]["digest"] = "invalid_digest"
     errors = validate_manifest_dict(raw)
     assert any("invalid digest" in e for e in errors)
+
+
+def test_reject_manifest_with_only_source_commit():
+    raw = PublicationManifest(
+        generation=1,
+        parent_sha=None,
+        parent_generation=None,
+        source_commit="f" * 40,
+        source_branch="develop",
+        develop_sha="d" * 40,
+        published_results_sha="c" * 40,
+        build_closure=sample_closure(),
+        artifacts=sample_artifacts(),
+        corpus=sample_corpus(),
+    ).to_dict()
+    del raw["published_results_sha"]
+    del raw["develop_sha"]
+    errors = validate_manifest_dict(raw)
+    assert any("published_results_sha must be a 40-char hex string" in e for e in errors)
+    assert any("develop_sha must be a 40-char hex string" in e for e in errors)

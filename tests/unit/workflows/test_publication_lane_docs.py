@@ -89,6 +89,18 @@ def test_publication_lane_docs_generates_decoupled_artifacts() -> None:
 def test_publication_lane_docs_executes_verify_lane_isolation() -> None:
     raw_text = WORKFLOW_PATH.read_text(encoding="utf-8")
     assert "uv run python scripts/publication/verify_lane_isolation.py --lane site" in raw_text
+    assert "set -euo pipefail" in raw_text
+    assert "--changed-paths-file" in raw_text
+    # PR path must fail closed: no soft-fail on fetch/diff
+    assert 'git fetch origin "${{ github.base_ref }}"' in raw_text
+    assert "git fetch origin" in raw_text
+    fetch_line = next(line for line in raw_text.splitlines() if "git fetch origin" in line and "base_ref" in line)
+    assert "|| true" not in fetch_line
+    diff_line = next(line for line in raw_text.splitlines() if "git diff --name-only" in line and "base_ref" in line)
+    assert "|| true" not in diff_line
+    # PRs must always pass --changed-paths-file (never skip on empty via soft-fail)
+    assert 'github.event_name }}" = "pull_request"' in raw_text
+    assert '--changed-paths-file "$CHANGED_FILE"' in raw_text or '--changed-paths-file "$CHANGED_FILE"' in raw_text
 
 
 def test_publication_lane_docs_does_not_contain_pages_deployment() -> None:

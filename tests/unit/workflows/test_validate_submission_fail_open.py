@@ -75,7 +75,7 @@ def _run_step_with_validator_exiting(status: int, tmp_path: Path):
     script = script.replace(matched, f"(exit {status})")
     _PARITY_CALL = (
         'uv run -- python scripts/publication/validator_parity.py --base-sha "$_BASE_SHA" '
-        '--merge-sha "$_MERGE_SHA" --corpus-changed-paths "$_CORPUS_FILE" '
+        '--merge-sha "$_MERGE_SHA" --head-sha "$_HEAD_SHA" --corpus-changed-paths "$_CORPUS_FILE" '
         "$REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION"
     )
     assert _PARITY_CALL in script, (
