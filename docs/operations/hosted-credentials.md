@@ -19,7 +19,7 @@ export TODO_DB_RO_AUTH_TOKEN="$(turso db tokens create benchbox-todo --read-only
 Inject the result with an OS keychain, password manager, process supervisor, or
 CI secret store. Point `TODO_DB_CREDENTIAL_COMMAND` at that store so sessions
 retrieve it without an interactive step; see Provision once below. Do not save it
-in `.todo-db/config.json` or a wrapper-managed cache. Record the database, capability,
+in `.todo-db/config.json` or any on-disk cache. Record the database, capability,
 issue date, expiry date, owner, and replacement reminder in the external secret
 inventory—never the token value in tracker evidence.
 
@@ -58,10 +58,15 @@ or CI worker needs an interactive step until the token is rotated.
 
    ```sh
    env -u TODO_DB_AUTH_TOKEN -u TODO_DB_RO_AUTH_TOKEN \
-     _project/scripts/todo doctor --json
+     uv run --project _project/scripts --locked -- todo-db doctor --json
    ```
 
    The `database` check must report `"source": "TODO_DB_CREDENTIAL_COMMAND"`.
+
+Both access paths rely on this inherited `TODO_DB_CREDENTIAL_COMMAND`: the
+`todo-db-mcp` server registered in `.mcp.json` and direct `todo-db` CLI calls.
+Direct CLI calls also need `TODO_DB_AUTH_CONTRACT=v2` in the environment (the
+`.mcp.json` server sets it in its own `env` block).
 
 The command is never run through a shell, so it must be a plain program and its
 arguments. Put any pipeline or conditional logic in a small script and name that
@@ -96,13 +101,13 @@ capability records what todo-db asked for, not what the token can do.
 Run a read-only preflight before a batch:
 
 ```sh
-TODO_DB_RO_AUTH_TOKEN=... _project/scripts/todo doctor --json
+TODO_DB_RO_AUTH_TOKEN=... uv run --project _project/scripts --locked -- todo-db doctor --json
 ```
 
 A mutation worker validates its read-write credential explicitly:
 
 ```sh
-TODO_DB_AUTH_TOKEN=... _project/scripts/todo doctor --rw --json
+TODO_DB_AUTH_TOKEN=... uv run --project _project/scripts --locked -- todo-db doctor --rw --json
 ```
 
 Read-only mode is server-enforced only when the supplied token was created with
@@ -114,8 +119,8 @@ For a provider-backed credential this is the only recurring interactive step,
 at most once per lifetime maximum for that capability: mint the replacement,
 overwrite the store entry in place (`security add-generic-password -U` updates
 rather than duplicates), start a fresh process, and re-run the validation check.
-`TODO_DB_CREDENTIAL_COMMAND` still names the same entry, so no session,
-wrapper, or CI job needs an update.
+`TODO_DB_CREDENTIAL_COMMAND` still names the same entry, so no session, MCP
+server, or CI job needs an update.
 
 For directly injected credentials:
 
