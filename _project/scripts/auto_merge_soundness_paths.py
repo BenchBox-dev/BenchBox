@@ -114,6 +114,12 @@ SOUNDNESS_FILES = (
     # Rehearsal control-plane workflow; still holds / may regain Pages credentials
     # and must not auto-merge even while freeze G3 keeps it non-deploying.
     ".github/workflows/publication-deploy.yml",
+    # G2 preview deployer holds production Pages write by design (manual
+    # dispatch only) and must never auto-merge.
+    ".github/workflows/publication-preview-deploy.yml",
+    # G2 soak prober assembles the live receipt that passes G2; its verdict
+    # logic must never auto-merge.
+    ".github/workflows/publication-preview-soak.yml",
     ".github/workflows/publication-lane-docs.yml",
     "scripts/publication/verify_lane_isolation.py",
     "_project/scripts/auto_merge_soundness_paths.py",
