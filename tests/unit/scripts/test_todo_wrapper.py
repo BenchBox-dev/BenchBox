@@ -117,6 +117,10 @@ class TestShim:
         project = (REPO_ROOT / "_project" / "scripts" / "pyproject.toml").read_text(encoding="utf-8")
         assert 'todo-db = { path = "vendor/todo_db-0.6.0-py3-none-any.whl" }' in project
         assert "github.com/joeharris76/todo-db" not in project
+        # The `mcp` extra must stay in the dependency pin: without it the
+        # `todo-db-mcp` console script has no runtime and silently stops
+        # installing. Guards against a regression to a bare `[hosted]` extra.
+        assert '"todo-db[hosted,mcp]"' in project
 
     @pytest.mark.parametrize("subcommand", ["create", "candidates"])
     def test_offline_finding_commands_do_not_mint_hosted_credentials(self, tmp_path: Path, subcommand: str):

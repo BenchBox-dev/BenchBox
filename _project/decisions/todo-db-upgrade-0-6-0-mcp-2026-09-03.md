@@ -3,33 +3,62 @@
 ## Scope
 
 Move BenchBox's vendored `todo-db` runtime from the checksum-verified 0.4.3
-wheel to the 0.6.0 wheel to adopt the packaged MCP server. This is a
-packaging-only bump: no hosted-database migration, no backup or rehearsal.
+wheel to the 0.6.0 wheel to adopt the packaged MCP server. No hosted-database
+migration, backup, or rehearsal: the hosted schema is untouched. The runtime is
+schema-compatible with 0.4.3 but not behaviour-compatible — 0.6.0 removes most
+of the top-level CLI verb surface (see "What changed").
 
 ## Release provenance
 
-- Canonical release: `v0.6.0` in `joeharris76/todo-db`.
+- Canonical release: `v0.6.0` at todo-db commit
+  `185c028962a49870877f9fab45ce4f014e9fb35b`.
 - Wheel: `todo_db-0.6.0-py3-none-any.whl`.
 - Wheel SHA-256:
   `664d19825bc9ebd614bbc8580ae7d128c6340210ed28b714221e510367b2fd46`.
-- The downloaded wheel digest matched the release `SHA256SUMS` entry
-  (`shasum -a 256 -c SHA256SUMS` reported the wheel and sdist `OK`).
+- The downloaded wheel digest matched the release `SHA256SUMS` entry for the
+  wheel and the sdist.
 - The wheel embeds `SCHEMA_VERSION = 7` in `todo_db/database.py`.
 
 ## Schema compatibility
 
-Both 0.4.3 and 0.6.0 ship schema version 7 with migrations 1..7 unchanged.
-The hosted tracker is already at schema 7, so there is no migration to apply,
-no schema-sensitive read path, and no backup, export rehearsal, or audit-chain
-re-verification required. `_project/todo-schema-migrations.json` is unchanged.
+Both 0.4.3 and 0.6.0 ship schema version 7. The seven migration SQL files
+(`todo_db/migrations/001_initial.sql` .. `007_verification_attestation.sql`)
+are byte-identical between the two wheels (`diff -r` over the extracted
+`todo_db/migrations/` trees reports no differences). The hosted tracker is
+already at schema 7, so there is no migration to apply, no schema-sensitive
+read path, and no backup, export rehearsal, or audit-chain re-verification
+required. `_project/todo-schema-migrations.json` is unchanged.
 
 ## What changed
 
+- 0.6.0 removes most of the top-level `todo-db` CLI verb surface. The agent
+  verbs — `create`, `list`, `show`, `ready`, `take`, `next`, `finish`,
+  `done`, `start`, `update`, `stats`, `release`, `agent`, `context`,
+  `progress`, `defer`, `promote`, `dismiss`, `check-scope`, and the rest —
+  move into the `todo-db-mcp` server. The surviving CLI verbs are `init`,
+  `init-project`, `doctor`, `export`, `restore`, `restore-legacy`, `audit`,
+  `import-yaml`, `verify-run`, `rebaseline`, `complete`, `sweep-stale`,
+  `migrate`, `config`, and `finding`. This is why the `_project/scripts/todo`
+  shim, which fronts the removed verbs, must be retired.
 - `todo_db/mcp/` is now present in the runtime (stdio MCP server, exposed as
   the `todo-db-mcp` console script).
-- `_project/scripts/pyproject.toml` requests `todo-db[hosted,mcp]`; the `mcp`
-  extra pulls `mcp>=1.10.0,<2`. `uv.lock` regenerated against the new wheel
-  filename and digest.
+- `_project/scripts/pyproject.toml` requests `todo-db[hosted,mcp]` (was
+  `todo-db[hosted]`); the `mcp` extra pulls `mcp>=1.10.0,<2`, resolved to
+  `mcp 1.29.1`. `uv.lock` regenerated against the new wheel filename and
+  digest.
+
+## Dependency-footprint cost
+
+The `mcp` extra adds roughly 31 packages to the locked `_project/scripts`
+environment: the locked set goes from 8 to 39 distinct packages (`uv.lock`
+holds 40 `[[package]]` entries; `rpds-py` is locked for two platforms). The
+new transitives are `mcp` itself plus pydantic / pydantic-core /
+pydantic-settings, starlette / sse-starlette / uvicorn, anyio, httpx /
+httpcore / httpx-sse / h11, cryptography / cffi / pycparser, jsonschema /
+jsonschema-specifications / referencing / rpds-py / attrs, click, pyjwt,
+python-dotenv, python-multipart, and supporting packages. These land only in
+the internal `_project/scripts` environment and are not shipped in the
+BenchBox wheel.
 
 ## What did not change
 
