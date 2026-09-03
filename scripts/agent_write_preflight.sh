@@ -107,12 +107,33 @@ EOF
   fi
 fi
 
-# An ephemeral clone has no linked-worktree setup, so commit-time hooks may not
-# be installed. Installing is best-effort: CI re-runs the same guards, so a failure to
-# install is a warning rather than a refusal.
-if [ "$ephemeral" = "yes" ] && [ ! -e "$common_abs/hooks/pre-commit" ]; then
-  if (cd "$top_abs" && uv run -- pre-commit install --hook-type pre-commit --hook-type commit-msg >/dev/null 2>&1); then
-    printf 'Installed pre-commit hooks (ephemeral clone had none).\n'
+# Commit-time hooks live in the common Git directory, so every linked worktree
+# shares one set. `pre-commit install` records the absolute path of whichever
+# interpreter ran it, so installing from a worktree pins the shared hooks to a
+# directory that is later deleted -- and commits then fail in every worktree at
+# once. Presence is therefore not health: check that the recorded interpreter
+# still resolves, and always repair from the primary clone, never from the
+# caller's worktree. Repair is best-effort: CI re-runs the same guards, so a
+# failure to install is a warning rather than a refusal.
+hook_path="$common_abs/hooks/pre-commit"
+
+hooks_usable=no
+hook_reason="no pre-commit hook is installed"
+if [ -e "$hook_path" ]; then
+  # A hook pre-commit did not generate has no INSTALL_PYTHON line; leave it be.
+  hook_interpreter=$(sed -n 's/^INSTALL_PYTHON=//p' "$hook_path" | head -n 1)
+  if [ -z "$hook_interpreter" ] || [ -x "$hook_interpreter" ]; then
+    hooks_usable=yes
+  else
+    hook_reason="its recorded interpreter is gone ($hook_interpreter)"
+  fi
+fi
+
+if [ "$hooks_usable" != yes ]; then
+  # Hook types come from default_install_hook_types in .pre-commit-config.yaml,
+  # so all configured stages stay in sync.
+  if (cd "$primary_abs" && uv run -- pre-commit install >/dev/null 2>&1); then
+    printf 'Repaired commit-time hooks from %s (%s).\n' "$primary_abs" "$hook_reason"
   else
     echo "note: pre-commit install failed/unavailable; commit-time guards will not run here (CI still enforces them)" >&2
   fi
