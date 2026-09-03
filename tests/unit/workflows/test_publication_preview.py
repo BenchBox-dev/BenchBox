@@ -72,6 +72,13 @@ def test_deploy_has_root_neutrality_gate_before_pages_write() -> None:
     assert "live_database" in text
     # Gate compares rebuilt root DB against the live baseline digest.
     assert "refusing deploy" in text or "refuses" in text or "refusing" in text
+    # Exact bytes can never match (wall-clock generated_at, 1-ULP float drift),
+    # so the gate must compare canonical digests, never raw sha256 equality.
+    assert "compare_db_digest" in text
+    assert '"$ROOT_DB_SHA" != "$LIVE_DB_SHA"' not in text
+    # Live must be fetched fail-closed and proven unmoved before comparison.
+    assert "could not download" in text
+    assert "moved under us" in text
 
 
 def test_deploy_requires_pinned_shas_and_approver() -> None:

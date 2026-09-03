@@ -5,9 +5,10 @@
 # subtree built independently from pinned develop + published-results SHAs.
 # GitHub Pages replaces the whole site per deployment, so there is no such
 # thing as a root-independent preview deploy on one Pages site: root
-# neutrality is enforced by the pre-deploy gate (rebuilt root DB digest must
-# equal the baseline live sha256) instead of by mechanism. If the gate cannot
-# prove root neutrality, the run fails BEFORE any Pages write.
+# neutrality is enforced by the pre-deploy gate (rebuilt root DB must be
+# canonical-digest-equivalent to the live production DB, see
+# scripts/publication/compare_db_digest.py) instead of by mechanism. If the
+# gate cannot prove root neutrality, the run fails BEFORE any Pages write.
 #
 # Trigger discipline: workflow_dispatch ONLY. Dispatching with explicit SHAs
 # and an approver IS the manual maintainer approval the A1 contract requires
@@ -263,22 +264,37 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # The rebuilt root DB must equal the live production DB pinned in the
-          # baseline. This proves the deploy cannot change production bytes at
-          # root; only /preview/<generation>/ is new. Any mismatch fails here,
-          # BEFORE any Pages write.
+          # The rebuilt root DB must be canonical-digest-equivalent to the live
+          # production DB pinned in the baseline (live_database sha256 + url).
+          # Exact bytes can never match: every build stamps a wall-clock
+          # generated_at and float aggregates drift 1 ULP across runners. The
+          # canonical digest excludes the build stamp and rounds floats, so it
+          # still fails on any added/removed table, column, row, rank, or
+          # material value change. This proves the deploy cannot change
+          # production content at root; only /preview/<generation>/ is new.
+          # Any mismatch, and any failure to fetch live for comparison, fails
+          # here BEFORE any Pages write.
           LIVE_DB_SHA=$(uv run -- python -c \
             "import json; print(json.load(open('docs/operations/publication-baseline-2026-08-31.json'))['live_database']['sha256'])")
-          ROOT_DB_SHA="${{ steps.root.outputs.root_db_sha }}"
-          if [ -z "$ROOT_DB_SHA" ]; then
+          LIVE_DB_URL=$(uv run -- python -c \
+            "import json; print(json.load(open('docs/operations/publication-baseline-2026-08-31.json'))['live_database']['url'])")
+          ROOT_DB="site/results/data/results.duckdb"
+          if [ ! -f "$ROOT_DB" ]; then
             echo "::error::rebuilt root has no results.duckdb; refusing deploy"
             exit 1
           fi
-          if [ "$ROOT_DB_SHA" != "$LIVE_DB_SHA" ]; then
-            echo "::error::root DB $ROOT_DB_SHA != live baseline $LIVE_DB_SHA; rebuild is not production-neutral"
+          curl -sSL --fail --retry 3 -o /tmp/live-results.duckdb "$LIVE_DB_URL" || {
+            echo "::error::could not download live DB from $LIVE_DB_URL; refusing deploy"
+            exit 1
+          }
+          LIVE_DL_SHA=$(sha256sum /tmp/live-results.duckdb | cut -d ' ' -f 1)
+          if [ "$LIVE_DL_SHA" != "$LIVE_DB_SHA" ]; then
+            echo "::error::live DB moved under us ($LIVE_DL_SHA != baseline $LIVE_DB_SHA); refusing deploy"
             exit 1
           fi
-          echo "root neutrality proven: $ROOT_DB_SHA"
+          uv run -- python scripts/publication/compare_db_digest.py compare \
+            "$ROOT_DB" /tmp/live-results.duckdb || exit 1
+          echo "root neutrality proven: canonical digest equivalence with live $LIVE_DB_SHA"
 
       - name: Upload Pages artifact (site + preview subtree)
         uses: actions/upload-pages-artifact@v3
