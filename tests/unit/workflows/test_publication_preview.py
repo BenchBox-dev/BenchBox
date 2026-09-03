@@ -102,6 +102,11 @@ def test_deploy_builds_docs_before_assembly() -> None:
     text = DEPLOY_PATH.read_text(encoding="utf-8")
     assert "sphinx-build -b html" in text
     assert text.index("sphinx-build -b html") < text.index("assemble_public_site.py")
+    # Explorer app + data must be built before assembly (missing dist red).
+    assert "npm ci" in text
+    assert "explorer_publish.py build" in text
+    assert "results_explorer_snapshot_invariants.py" in text
+    assert text.index("npm run --prefix") < text.index("assemble_public_site.py")
 
 
 def test_deploy_serializes_dispatches() -> None:
