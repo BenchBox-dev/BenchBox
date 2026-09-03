@@ -93,6 +93,17 @@ def test_deploy_writes_receipts_with_both_shas() -> None:
     assert "soak-state.json" in text
 
 
+def test_deploy_builds_docs_before_assembly() -> None:
+    """Root rebuild mirrors docs.yml: Sphinx HTML must exist before assemble.
+
+    Missing docs/_build/html fails assembly with FileNotFoundError (first
+    gen1 deploy red). The sphinx-build step must precede assemble_public_site.
+    """
+    text = DEPLOY_PATH.read_text(encoding="utf-8")
+    assert "sphinx-build -b html" in text
+    assert text.index("sphinx-build -b html") < text.index("assemble_public_site.py")
+
+
 def test_deploy_serializes_dispatches() -> None:
     data = _load(DEPLOY_PATH)
     assert "concurrency" in data, "concurrent dispatches must serialize (Pages is last-writer-wins)"
