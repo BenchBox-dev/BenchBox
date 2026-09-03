@@ -14,7 +14,7 @@ Apply instructions in this order:
 4. loaded skills and mechanical tool output;
 5. recommendations, examples, and historical notes.
 
-Personal-global agent defaults apply only where this guide is silent; where behavior conflicts, this guide and the active project protocol win — e.g. a bundled review-and-fix request stays review-only per REVIEW-AUTH-001 below.
+Personal-global agent defaults apply only where this guide is silent; where behavior conflicts, this guide and the active project protocol win.
 
 `[AUTH-PROVENANCE-001]` Classify a requirement before acting: task authority,
 repository policy, mechanical constraint, or recommendation. State the source
@@ -42,11 +42,12 @@ Hooks and CI check actual commits. Report only PR defects.
 
 `[REVIEW-AUTH-001]` Reviews, audits, research, explanations, and diagnoses are
 read-only except for local capture. Do not remediate, commit, push, open a PR,
-or write hosted tracker state without authorization. A bundled request to review
-and fix remains review-only; remediation requires a later user message, sent
-after the findings, that explicitly authorizes it. Its immediate action is
-findings only, with zero tracked worktree-content changes; do not review and
-then edit locally in the same turn. Implementation requests authorize the
+or write hosted tracker state without authorization. A request that asks only for review, audit, or research remains review-only;
+remediation requires a later user message, sent after the findings, that
+explicitly authorizes it. Its immediate action is findings only, with zero tracked worktree-content changes;
+do not review and then edit locally in the same turn — unless the same request explicitly asks
+for both review and remediation ("review and fix" within a named scope), in which case report
+the findings first, then implement them in that turn. Implementation requests authorize the
 narrow implementation workflow, not unrelated cleanup or external actions.
 
 `[WRITE-CLOSEOUT-001]` An authorized write workflow closes at a named branch, a
