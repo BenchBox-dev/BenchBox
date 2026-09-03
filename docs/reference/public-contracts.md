@@ -353,6 +353,11 @@ Current extension inventory:
 | `platform_deployment`, `platform_cloud`, `platform_compute`, `platform_storage` | `platform.deployment`, `platform.cloud`, `platform.compute`, `platform.storage` | Reconstructs the normalized platform facets. | Loader/exporter, environment compatibility tests, explorer environment facets. | Keep as canonical platform facets. |
 | `execution_context` | `execution` and selected `config` fields | Loader preserves selected execution metadata, not the full internal context. | CLI/MCP/exporter/explorer metadata consumers. | Keep selected exported fields; expand only by explicit schema policy. |
 | `_benchmark_id_override` | `benchmark.id` | Reconstructs from `benchmark.id`. | Filename builder, loader, explorer IDs, result parity tests. | Keep internal compatibility field until builder and loader identity handling are redesigned. |
+| `client_link` | `environment.client_link` | Reconstructs client locality and statement overhead metadata. | Result loader/exporter, validation, results explorer read model. | Safe non-identifying locality metrics (`client_region`, `client_cloud`, `statement_overhead_ms`); no raw IP, hostnames, or ports are published. |
+
+### Client Link Locality Metadata
+
+`environment.client_link` metadata discloses client-to-platform locality and statement overhead probe measurements. All published fields (`client_region`, `client_cloud`, and `statement_overhead_ms`) are safe non-identifying locality metrics; no raw IP, hostnames, or ports are published.
 
 ## Translation and Validation Mode Policy
 

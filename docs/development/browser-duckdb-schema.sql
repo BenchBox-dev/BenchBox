@@ -14,7 +14,9 @@
 --   - Cohort/ranking identity is derived during publish: raw `benchmark` and
 --     `test_type` remain immutable evidence, while canonical aliases
 --     (`star_schema` -> `ssb`) and missing phase (`unknown`) are written into
---     ranking/cohort keys. The frontend consumes the same v7 contract.
+--     ranking/cohort keys. The frontend consumes the versioned read-model
+--     contract (`EXPLORER_READ_MODEL_VERSION`); bump it when this file's
+--     column set changes.
 
 -- ---------------------------------------------------------------------------
 -- Metadata table (required by browser read-model version guard)
@@ -37,7 +39,12 @@ CREATE TABLE IF NOT EXISTS result_environment (
     python           VARCHAR,
     cpu_model        VARCHAR,
     cpu_family       VARCHAR,
-    cpu_identity_provenance VARCHAR
+    cpu_identity_provenance VARCHAR,
+    client_region    VARCHAR,
+    client_cloud     VARCHAR,
+    statement_overhead_min_ms DOUBLE,
+    statement_overhead_median_ms DOUBLE,
+    link_status      VARCHAR
 );
 
 CREATE TABLE IF NOT EXISTS result_phase_durations (
@@ -251,7 +258,12 @@ SELECT
     e.python,
     e.cpu_model,
     e.cpu_family,
-    e.cpu_identity_provenance
+    e.cpu_identity_provenance,
+    e.client_region,
+    e.client_cloud,
+    e.statement_overhead_min_ms,
+    e.statement_overhead_median_ms,
+    e.link_status
 FROM results r
 LEFT JOIN result_environment e USING (result_id);
 

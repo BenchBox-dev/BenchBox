@@ -175,6 +175,11 @@ describe("duckdbQueries - SQL targets and parameters", () => {
         cpu_model: null,
         cpu_family: null,
         cpu_identity_provenance: null,
+        client_region: null,
+        client_cloud: null,
+        statement_overhead_min_ms: null,
+        statement_overhead_median_ms: null,
+        link_status: null,
         physical_mechanisms: null,
         ...overrides,
       };
@@ -224,6 +229,36 @@ describe("duckdbQueries - SQL targets and parameters", () => {
       expect(detailSql).toContain("cpu_model");
       expect(detailSql).toContain("cpu_family");
       expect(detailSql).toContain("cpu_identity_provenance");
+      expect(detailSql).toContain("client_region");
+      expect(detailSql).toContain("client_cloud");
+      expect(detailSql).toContain("statement_overhead_min_ms");
+      expect(detailSql).toContain("statement_overhead_median_ms");
+      expect(detailSql).toContain("link_status");
+    });
+
+    it("preserves client locality and overhead fields when present", async () => {
+      const detail = await fetchDetail(
+        "with-locality",
+        makeWideRow({
+          result_id: "with-locality",
+          client_region: "us-east-1",
+          client_cloud: "aws",
+          statement_overhead_min_ms: 1.25,
+          statement_overhead_median_ms: 2.5,
+          link_status: "measured",
+        }),
+      );
+      expect(detail?.environment.client_region).toBe("us-east-1");
+      expect(detail?.environment.client_cloud).toBe("aws");
+      expect(detail?.environment.statement_overhead_min_ms).toBe(1.25);
+      expect(detail?.environment.statement_overhead_median_ms).toBe(2.5);
+      expect(detail?.environment.link_status).toBe("measured");
+
+      expect(detail?.client_region).toBe("us-east-1");
+      expect(detail?.client_cloud).toBe("aws");
+      expect(detail?.statement_overhead_min_ms).toBe(1.25);
+      expect(detail?.statement_overhead_median_ms).toBe(2.5);
+      expect(detail?.link_status).toBe("measured");
     });
 
     it("a legacy row (no logical_profile recorded -> NULL) yields undefined, not []", async () => {

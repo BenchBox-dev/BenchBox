@@ -7,7 +7,7 @@ const EXPECTED_EXPLORER_BUILD_COMMAND =
   "uv run -- python _project/scripts/explorer_publish.py build";
 // Independent migration pin: update this reviewed value when the snapshot
 // schema changes; do not derive it from db.ts or the Python contract.
-const CURRENT_READ_MODEL_VERSION = 9;
+const CURRENT_READ_MODEL_VERSION = 10;
 const NEWER_READ_MODEL_POLICY = "warn-and-continue";
 const repoRoot = resolve(process.cwd(), "..");
 

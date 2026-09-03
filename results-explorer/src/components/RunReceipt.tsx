@@ -79,6 +79,7 @@ export function RunReceipt({
   const queryCount = detail.display_timings.length || new Set(detail.queries.map((query) => query.query_id)).size;
   const sampleCount =
     detail.display_timings.reduce((sum, timing) => sum + timing.sample_count, 0) || detail.queries.length;
+  const clientLocalityRow = buildClientLocalityRow(detail);
 
   const sections = [
     {
@@ -137,6 +138,7 @@ export function RunReceipt({
         rowFromString("CPU count", detail.environment.cpu_count),
         memoryRow(detail.environment.memory_gb),
         rowFromString("Python", detail.environment.python),
+        ...(clientLocalityRow ? [clientLocalityRow] : []),
       ],
     },
     {
@@ -455,6 +457,43 @@ function reproduceRow(reproduceCommand: string | null): ReceiptRow {
 function memoryRow(value: number | null | undefined): ReceiptRow {
   if (value === null || value === undefined) return missingRow("Memory");
   return recordedRow("Memory", `${value} GB`);
+}
+
+function buildClientLocalityRow(detail: DetailResult): ReceiptRow | null {
+  const env = detail.environment ?? {};
+  const region = env.client_region ?? detail.client_region;
+  const cloud = env.client_cloud ?? detail.client_cloud;
+  const minMs = env.statement_overhead_min_ms ?? detail.statement_overhead_min_ms;
+  const medMs = env.statement_overhead_median_ms ?? detail.statement_overhead_median_ms;
+  const status = env.link_status ?? detail.link_status;
+
+  const localityParts = [region, cloud].filter((p): p is string => Boolean(p && String(p).trim()));
+  const overheadParts: string[] = [];
+  if (minMs != null && Number.isFinite(Number(minMs))) {
+    overheadParts.push(`${Number(minMs).toFixed(2)} ms min`);
+  }
+  if (medMs != null && Number.isFinite(Number(medMs))) {
+    overheadParts.push(`${Number(medMs).toFixed(2)} ms median`);
+  }
+
+  if (localityParts.length === 0 && overheadParts.length === 0 && !status) {
+    return null;
+  }
+
+  const localityStr = localityParts.length > 0 ? localityParts.join(" / ") : "";
+  const overheadStr = overheadParts.length > 0 ? `overhead: ${overheadParts.join(", ")}` : "";
+
+  const displayParts: string[] = [];
+  if (localityStr && overheadStr) {
+    displayParts.push(`${localityStr} (${overheadStr})`);
+  } else if (localityStr || overheadStr) {
+    displayParts.push(localityStr || overheadStr);
+  }
+  if (status && String(status).trim()) {
+    displayParts.push(`[${String(status).trim()}]`);
+  }
+
+  return recordedRow("Client locality", displayParts.join(" "));
 }
 
 function rankingEligibilityRow(value: boolean | null | undefined): ReceiptRow {

@@ -196,6 +196,11 @@ export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_elig
   cpu_model: string | null;
   cpu_family: string | null;
   cpu_identity_provenance: "measured" | "user_attested" | "inferred" | null;
+  client_region: string | null;
+  client_cloud: string | null;
+  statement_overhead_min_ms: number | null;
+  statement_overhead_median_ms: number | null;
+  link_status: string | null;
   // ADR-2 §3: comma-joined, sorted physical tuning mechanisms (see
   // physical_mechanisms in DetailResult). Tri-state, preserved from the
   // pipeline: SQL NULL (-> null here) means no logical tuning profile was
@@ -531,6 +536,11 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   "cpu_model",
   "cpu_family",
   "cpu_identity_provenance",
+  "client_region",
+  "client_cloud",
+  "statement_overhead_min_ms",
+  "statement_overhead_median_ms",
+  "link_status",
 ].join(", ");
 
 const COHORT_METADATA_COLUMNS = [
@@ -765,6 +775,15 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
   if (wide.cpu_model !== null) environment.cpu_model = wide.cpu_model;
   if (wide.cpu_family !== null) environment.cpu_family = wide.cpu_family;
   if (wide.cpu_identity_provenance !== null) environment.cpu_identity_provenance = wide.cpu_identity_provenance;
+  if (wide.client_region !== null && wide.client_region !== undefined) environment.client_region = wide.client_region;
+  if (wide.client_cloud !== null && wide.client_cloud !== undefined) environment.client_cloud = wide.client_cloud;
+  if (wide.statement_overhead_min_ms !== null && wide.statement_overhead_min_ms !== undefined) {
+    environment.statement_overhead_min_ms = wide.statement_overhead_min_ms;
+  }
+  if (wide.statement_overhead_median_ms !== null && wide.statement_overhead_median_ms !== undefined) {
+    environment.statement_overhead_median_ms = wide.statement_overhead_median_ms;
+  }
+  if (wide.link_status !== null && wide.link_status !== undefined) environment.link_status = wide.link_status;
 
   const display_timings: QueryDisplayTiming[] = timingRows.map((r) => ({
     query_id: r.query_id,
@@ -852,6 +871,11 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
           ? []
           : wide.physical_mechanisms.split(","),
     physical_rendering_id: wide.physical_rendering_id,
+    client_region: wide.client_region,
+    client_cloud: wide.client_cloud,
+    statement_overhead_min_ms: wide.statement_overhead_min_ms,
+    statement_overhead_median_ms: wide.statement_overhead_median_ms,
+    link_status: wide.link_status,
   };
 }
 

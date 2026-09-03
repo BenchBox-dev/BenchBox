@@ -583,5 +583,185 @@ describe("ComparabilityReceipt", () => {
       expect(warnings.some((w) => w.label === "CPU family")).toBe(true);
       expect(warnings.some((w) => w.label === "CPU model")).toBe(true);
     });
+
+    it("warns when client region != platform region or if locality is unknown for remote/cloud platforms", () => {
+      // 1. Cross-region mismatch
+      const crossRegionRun = makeDetail({
+        result_id: "r1",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "us-east-1",
+        environment: {
+          client_region: "us-west-2",
+        },
+      });
+      const collocatedRun = makeDetail({
+        result_id: "r2",
+        platform: "BigQuery",
+        deployment_class: "cloud",
+        cloud_provider: "gcp",
+        cloud_region: "us-east-1",
+        environment: {
+          client_region: "us-east-1",
+        },
+      });
+
+      let fields = buildComparabilityFields([crossRegionRun, collocatedRun]);
+      let localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("diff");
+      expect(localityField.detail).toContain("Cross-region: client in us-west-2, platform in us-east-1");
+
+      // 2. Unknown locality on cloud platform
+      const unknownLocalityRun = makeDetail({
+        result_id: "r3",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "us-east-1",
+        environment: {},
+      });
+      fields = buildComparabilityFields([unknownLocalityRun]);
+      localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("diff");
+      expect(localityField.summary).toBe("Unknown client locality");
+
+      // 3. Matching collocated runs
+      const collocatedRun2 = makeDetail({
+        result_id: "r4",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "us-east-1",
+        environment: {
+          client_region: "us-east-1",
+        },
+      });
+      fields = buildComparabilityFields([collocatedRun, collocatedRun2]);
+      localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("match");
+      expect(localityField.summary).toBe("Collocated (us-east-1)");
+    });
+
+    it("does not warn for provider-native spellings of the same region", () => {
+      // Snowflake CURRENT_REGION() yields AWS_US_EAST_1; IMDS yields us-east-1.
+      const snowflakeRun = makeDetail({
+        result_id: "r1",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "AWS_US_EAST_1",
+        environment: {
+          client_region: "us-east-1",
+          client_cloud: "aws",
+        },
+      });
+      const fields = buildComparabilityFields([snowflakeRun]);
+      const localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("match");
+      expect(localityField.summary).toBe("Collocated (us-east-1)");
+    });
+
+    it("normalizes Azure display regions before comparing", () => {
+      const azureRun = makeDetail({
+        result_id: "r1",
+        platform: "Azure SQL",
+        deployment_class: "cloud",
+        cloud_provider: "azure",
+        cloud_region: "East US 2",
+        environment: {
+          client_region: "eastus2",
+          client_cloud: "azure",
+        },
+      });
+      const fields = buildComparabilityFields([azureRun]);
+      const localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("match");
+    });
+
+    it("distinguishes same-named regions across clouds", () => {
+      const awsRun = makeDetail({
+        result_id: "r1",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "us-east-1",
+        environment: {
+          client_region: "us-east-1",
+          client_cloud: "aws",
+        },
+      });
+      const gcpRun = makeDetail({
+        result_id: "r2",
+        platform: "BigQuery",
+        deployment_class: "cloud",
+        cloud_provider: "gcp",
+        cloud_region: "us-east1",
+        environment: {
+          client_region: "us-east1",
+          client_cloud: "gcp",
+        },
+      });
+      const fields = buildComparabilityFields([awsRun, gcpRun]);
+      const localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("diff");
+      expect(localityField.detail).toContain("Collocated (us-east-1)");
+      expect(localityField.detail).toContain("Collocated (us-east1)");
+    });
+
+    it("warns instead of asserting collocation when the platform region is unknown", () => {
+      // Remote self-hosted platforms carry no cloud region: without
+      // platform-side evidence the row must warn, never match.
+      const remoteRun = makeDetail({
+        result_id: "r1",
+        platform: "ClickHouse Server",
+        deployment_class: "remote",
+        environment: {
+          client_region: "us-east-1",
+          client_cloud: "aws",
+        },
+      });
+      const fields = buildComparabilityFields([remoteRun]);
+      const localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("diff");
+      expect(localityField.summary).toBe("Client in us-east-1, platform locality unknown");
+    });
+
+    it("warns when client and platform clouds differ on the same region name", () => {
+      const run = makeDetail({
+        result_id: "r1",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "us-east-1",
+        environment: {
+          client_region: "us-east-1",
+          client_cloud: "gcp",
+        },
+      });
+      const fields = buildComparabilityFields([run]);
+      const localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("diff");
+      expect(localityField.detail).toContain("Cross-cloud: client in us-east-1 (gcp), platform in us-east-1 (aws)");
+    });
+
+    it("appends the measured statement floor to cross-region detail", () => {
+      const run = makeDetail({
+        result_id: "r1",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "us-east-1",
+        environment: {
+          client_region: "eu-west-1",
+          client_cloud: "aws",
+          statement_overhead_median_ms: 88.2,
+        },
+      });
+      const fields = buildComparabilityFields([run]);
+      const localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("diff");
+      expect(localityField.detail).toContain("client statement floor 88.20 ms");
+    });
   });
 });

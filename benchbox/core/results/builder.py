@@ -1051,7 +1051,7 @@ class ResultBuilder:
         )
         return {
             key: payload[key]
-            for key in ("client_host", "platform_runtime", "container")
+            for key in ("client_host", "platform_runtime", "container", "client_link")
             if isinstance(payload.get(key), dict)
         }
 

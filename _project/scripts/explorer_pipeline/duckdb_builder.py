@@ -383,7 +383,12 @@ class DuckDBSnapshotBuilder:
                 python      VARCHAR,
                 cpu_model   VARCHAR,
                 cpu_family  VARCHAR,
-                cpu_identity_provenance VARCHAR
+                cpu_identity_provenance VARCHAR,
+                client_region VARCHAR,
+                client_cloud VARCHAR,
+                statement_overhead_min_ms DOUBLE,
+                statement_overhead_median_ms DOUBLE,
+                link_status VARCHAR
             )
         """)
         con.execute("""
@@ -556,7 +561,12 @@ class DuckDBSnapshotBuilder:
                 e.python,
                 e.cpu_model,
                 e.cpu_family,
-                e.cpu_identity_provenance
+                e.cpu_identity_provenance,
+                e.client_region,
+                e.client_cloud,
+                e.statement_overhead_min_ms,
+                e.statement_overhead_median_ms,
+                e.link_status
             FROM results r
             LEFT JOIN result_environment e USING (result_id)
         """)
@@ -761,14 +771,13 @@ class DuckDBSnapshotBuilder:
     # Population helpers
     # ------------------------------------------------------------------
 
-    def _populate_supporting_tables(
+    def _populate_environment(
         self,
         con: Any,
         entries: list[ManifestEntry],
         details_map: dict[str, DetailResult],
     ) -> None:
         env_rows: list[tuple] = []
-        phase_rows: list[tuple] = []
         for entry in entries:
             detail = details_map.get(entry.result_id)
             if detail is None:
@@ -792,14 +801,40 @@ class DuckDBSnapshotBuilder:
                     raw_cpu_model,
                     cpu_family,
                     env.get("cpu_identity_provenance"),
+                    env.get("client_region"),
+                    env.get("client_cloud"),
+                    env.get("statement_overhead_min_ms"),
+                    env.get("statement_overhead_median_ms"),
+                    env.get("link_status"),
                 )
             )
+
+        if env_rows:
+            con.executemany(
+                "INSERT INTO result_environment (result_id, os, arch, cpu_count, memory_gb,"
+                " python, cpu_model, cpu_family, cpu_identity_provenance,"
+                " client_region, client_cloud, statement_overhead_min_ms,"
+                " statement_overhead_median_ms, link_status)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                env_rows,
+            )
+
+    def _populate_supporting_tables(
+        self,
+        con: Any,
+        entries: list[ManifestEntry],
+        details_map: dict[str, DetailResult],
+    ) -> None:
+        self._populate_environment(con, entries, details_map)
+        phase_rows: list[tuple] = []
+        for entry in entries:
+            detail = details_map.get(entry.result_id)
+            if detail is None:
+                continue
             if detail.phase_durations:
                 for phase, duration_s in detail.phase_durations.items():
                     phase_rows.append((entry.result_id, phase, duration_s))
 
-        if env_rows:
-            con.executemany("INSERT INTO result_environment VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", env_rows)
         if phase_rows:
             con.executemany("INSERT INTO result_phase_durations VALUES (?, ?, ?)", phase_rows)
 

@@ -79,6 +79,7 @@ from benchbox.utils.dialect_utils import (
 )
 from benchbox.utils.format_converters import ConversionOptions
 from benchbox.utils.printing import emit
+from benchbox.utils.toggles import is_probe_requested
 from benchbox.utils.verbosity import VerbosityMixin, VerbositySettings
 
 logger = logging.getLogger(__name__)
@@ -774,6 +775,11 @@ def _build_run_config_from_options(
         table_format=table_format,
         table_format_compression=str(options.get("table_format_compression", "snappy") or "snappy"),
         table_format_partition_cols=_parse_partition_cols(options.get("table_format_partition_cols")),
+        client_region=getattr(benchmark_config, "client_region", None) or options.get("client_region"),
+        client_cloud=getattr(benchmark_config, "client_cloud", None) or options.get("client_cloud"),
+        # BenchmarkConfig.link_probe defaults True, so the toggle always
+        # resolves from config; there is intentionally no options fallback.
+        link_probe=is_probe_requested(getattr(benchmark_config, "link_probe", None)),
     )
 
 

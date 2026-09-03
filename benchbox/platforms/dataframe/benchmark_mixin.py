@@ -55,6 +55,7 @@ from benchbox.core.results.schema import compute_plan_capture_stats
 from benchbox.core.runner.dataframe_runner import dataframe_compliance_class, no_dataframe_queries_message
 from benchbox.core.schemas import BenchmarkConfig, SystemProfile
 from benchbox.platforms.base.adapter import DriverIsolationCapability
+from benchbox.platforms.base.client_region import discover_client_region
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.printing import quiet_console
 
@@ -171,6 +172,36 @@ def _client_host_profile(system_profile: Any) -> dict[str, Any]:
     from benchbox.utils.system_info import get_system_info
 
     return get_system_info().to_dict()
+
+
+def _client_link_block_for_dataframe(benchmark_config: Any, options_map: dict[str, Any]) -> dict[str, Any] | None:
+    """Build the region-only ``client_link`` block for a DataFrame run.
+
+    Returns None when no locality is known, keeping laptop/local runs
+    free of empty blocks. Discovery must never break a benchmark run, so
+    surprise errors degrade to no block (same rule as the SQL path).
+    """
+    client_config = {
+        **options_map,
+        "client_region": getattr(benchmark_config, "client_region", None) or options_map.get("client_region"),
+        "client_cloud": getattr(benchmark_config, "client_cloud", None) or options_map.get("client_cloud"),
+    }
+    try:
+        region_info = discover_client_region(client_config)
+    except Exception as exc:  # noqa: BLE001 - discovery must never break a run
+        logger.warning("DataFrame client-link discovery failed: %r", exc)
+        return None
+    if not region_info.get("client_region") and not region_info.get("client_cloud"):
+        return None
+    return {
+        "collection_status": "partial",
+        "source": region_info.get("source", "unavailable"),
+        "client_region": region_info.get("client_region"),
+        "client_cloud": region_info.get("client_cloud"),
+        "statement_overhead_ms": None,
+        "collection_error_class": None,
+        "collection_error_message": None,
+    }
 
 
 class BenchmarkExecutionMixin:
@@ -344,6 +375,14 @@ class BenchmarkExecutionMixin:
                 tuning_config=options_map.get("df_tuning_config"),
             )
         )
+
+        # DataFrame engines have no SQL connection to probe, so only the
+        # region half of client_link is collected here (status partial:
+        # region known, overhead unmeasurable) rather than silently
+        # dropping the block when locality is known.
+        client_link = _client_link_block_for_dataframe(benchmark_config, options_map)
+        if client_link is not None:
+            builder.set_execution_environment({"client_link": client_link})
 
         # Initialize result tracking
         query_results: list[dict[str, Any]] = []

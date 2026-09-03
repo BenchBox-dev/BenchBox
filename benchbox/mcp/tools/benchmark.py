@@ -125,6 +125,7 @@ def register_benchmark_tools(
         capture_plans: bool = False,
         dry_run: bool = False,
         validate_only: bool = False,
+        link_probe: bool = True,
         platform_options: dict[str, object] | None = None,
     ) -> dict[str, Any]:
         """Run a benchmark on a database platform.
@@ -139,6 +140,7 @@ def register_benchmark_tools(
             capture_plans: Capture query execution plans (3-8%% overhead). Supported: DuckDB, PostgreSQL, DataFusion.
             dry_run: Preview execution plan without running
             validate_only: Validate configuration without running
+            link_probe: Measure post-benchmark statement overhead (6 metered SELECT 1 statements on billable warehouses). Set false to skip; equivalent to the CLI --no-link-probe flag.
             platform_options: Bounded, non-secret platform settings approved for the selected platform.
 
         Returns:
@@ -195,6 +197,7 @@ def register_benchmark_tools(
             phases,
             mode,
             capture_plans,
+            link_probe=link_probe,
             platform_options=normalized_platform_options,
             results_dir=resolve_path_provider(results_dir),
             anonymize=anonymize_results,
@@ -349,6 +352,7 @@ def _execute_mcp_run_via_core(
     phases: list[str],
     resolved_mode: str,
     capture_plans: bool,
+    link_probe: bool = True,
     normalized_platform_options: Mapping[str, object],
     results_dir: Path,
     execution_id: str,
@@ -408,6 +412,7 @@ def _execute_mcp_run_via_core(
         scale_factor=scale_factor,
         queries=query_subset,
         capture_plans=capture_plans,
+        link_probe=link_probe,
     )
     benchmark_config.test_execution_type = map_phases_to_execution_type(phases)
     if "statistics" in phases:
@@ -532,6 +537,7 @@ def _run_benchmark_impl(
     phases: str | None,
     mode: str | None,
     capture_plans: bool = False,
+    link_probe: bool = True,
     *,
     platform_options: Mapping[str, object] | None = None,
     results_dir: Path,
@@ -596,6 +602,7 @@ def _run_benchmark_impl(
             phases=phases_list,
             resolved_mode=resolved_mode,
             capture_plans=capture_plans,
+            link_probe=link_probe,
             normalized_platform_options=normalized_platform_options,
             results_dir=results_dir,
             execution_id=execution_id,

@@ -928,6 +928,11 @@ def _deployment_class_from_contract(data: dict[str, Any]) -> str | None:
         return "local"
     if deployment_key == "embedded" or endpoint_key in {"embedded_process", "localhost_port"}:
         return "local"
+    if endpoint_key == "remote_host":
+        # Self-hosted remote server: not local, but no cloud region either.
+        # The compare view expects this vocabulary ("remote"); without it
+        # remote self-hosted runs render as "Local".
+        return "remote"
     if runtime_key == "unknown" or deployment_key == "unknown" or endpoint_key == "unknown":
         return "unavailable"
     if runtime_key or deployment_key or endpoint_key:
@@ -1481,6 +1486,41 @@ class BundleTransformer:
             else:
                 environment["cpu_model"] = None
                 environment["cpu_family"] = None
+
+        # Producer shape (benchbox/platforms/base/adapter.py): the bundle
+        # carries client_link:{collection_status, client_region,
+        # client_cloud, statement_overhead_ms:{samples,min,median}}. Read
+        # exactly that shape: earlier flattened fallbacks matched no
+        # producer and silently projected NULLs.
+        client_link = environment.get("client_link") if isinstance(environment.get("client_link"), dict) else {}
+        overhead = client_link.get("statement_overhead_ms")
+        overhead = overhead if isinstance(overhead, dict) else {}
+        client_region = client_link.get("client_region")
+        client_cloud = client_link.get("client_cloud")
+        link_status = client_link.get("collection_status")
+        stmt_min = overhead.get("min")
+        stmt_med = overhead.get("median")
+
+        def _to_finite_float_or_none(v: Any) -> float | None:
+            if v is None:
+                return None
+            try:
+                val = float(v)
+                return val if math.isfinite(val) else None
+            except (ValueError, TypeError):
+                return None
+
+        environment["client_region"] = (
+            str(client_region).strip() if client_region is not None and str(client_region).strip() else None
+        )
+        environment["client_cloud"] = (
+            str(client_cloud).strip() if client_cloud is not None and str(client_cloud).strip() else None
+        )
+        environment["link_status"] = (
+            str(link_status).strip() if link_status is not None and str(link_status).strip() else None
+        )
+        environment["statement_overhead_min_ms"] = _to_finite_float_or_none(stmt_min)
+        environment["statement_overhead_median_ms"] = _to_finite_float_or_none(stmt_med)
 
         # Detect companion files relative to bundle
         stem = bundle_path.stem

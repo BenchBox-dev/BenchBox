@@ -600,6 +600,7 @@ class DurableJobWorker:
         phases = request.get("phases")
         mode = request.get("mode")
         capture_plans = bool(request.get("capture_plans", False))
+        link_probe = bool(request.get("link_probe", True))
         platform_options = request.get("platform_options")
         results_dir = staging
         execution_id = job.execution_id
@@ -677,6 +678,7 @@ class DurableJobWorker:
             phases=phases_list,
             resolved_mode=resolved_mode,
             capture_plans=capture_plans,
+            link_probe=link_probe,
             normalized_platform_options=normalized_platform_options,
             results_dir=results_dir,
             execution_id=execution_id,
@@ -926,6 +928,7 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
         phases: str | None = None,
         mode: str | None = None,
         capture_plans: bool = False,
+        link_probe: bool = True,
         platform_options: dict[str, object] | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
@@ -944,6 +947,7 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
             "phases": phases,
             "mode": mode,
             "capture_plans": capture_plans,
+            "link_probe": link_probe,
         }
         if normalized_platform_options:
             request["platform_options"] = normalized_platform_options

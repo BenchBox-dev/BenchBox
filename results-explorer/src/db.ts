@@ -80,7 +80,7 @@ async function createCspBoundWorker(workerPath: string): Promise<Worker> {
 // `results-explorer/src/lib/__tests__/db-remediation-pin.test.ts` pins the
 // browser constant against an independently reviewed contract value and
 // exercises the older/equal/newer compatibility policy below.
-const EXPECTED_READ_MODEL_VERSION = 9;
+const EXPECTED_READ_MODEL_VERSION = 10;
 
 // Required scans must be queryable AND non-empty for the snapshot to be
 // considered ready. Optional scans must be queryable (so we know the table

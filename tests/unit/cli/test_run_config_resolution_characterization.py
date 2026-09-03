@@ -130,6 +130,17 @@ class TestPassthroughFields:
     def test_power_fail_fast_is_read_from_options(self, tmp_path):
         assert _prepare(tmp_path, options={"power_fail_fast": True}).power_fail_fast is True
 
+    def test_client_link_fields_flow_into_run_config(self, tmp_path):
+        run_config = _prepare(
+            tmp_path,
+            client_region="us-east-1",
+            client_cloud="aws",
+            link_probe=False,
+        )
+        assert run_config.client_region == "us-east-1"
+        assert run_config.client_cloud == "aws"
+        assert run_config.link_probe is False
+
 
 class TestSeedResolution:
     def test_absent_seed_is_none(self, tmp_path):

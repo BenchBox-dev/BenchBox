@@ -38,7 +38,10 @@ EXPLORER_BUILD_CONTRACT_VERSION = "6"
 #     pass provenance AND CPU identity".
 # v9: result_environment/result_detail_metrics gained cpu_identity_provenance,
 #     which the detail receipt selects unconditionally.
-EXPLORER_READ_MODEL_VERSION = 9
+# v10: result_environment and result_detail_metrics gained client_region,
+#      client_cloud, statement_overhead_min_ms, statement_overhead_median_ms,
+#      and link_status.
+EXPLORER_READ_MODEL_VERSION = 10
 EXPLORER_READ_MODEL_COMPATIBILITY = {
     "minimum_supported": EXPLORER_READ_MODEL_VERSION,
     "newer_policy": "warn-and-continue",

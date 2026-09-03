@@ -69,6 +69,7 @@ EXPECTED_RUN_PARAMS = {
     "capture_plans": {"type": "boolean", "required": False, "default": False},
     "dry_run": {"type": "boolean", "required": False, "default": False},
     "validate_only": {"type": "boolean", "required": False, "default": False},
+    "link_probe": {"type": "boolean", "required": False, "default": True},
     "platform_options": {"type": "object or null", "required": False, "default": None},
 }
 
@@ -82,6 +83,9 @@ MCP_TO_CLI_OPTIONS = {
     "capture_plans": "--capture-plans",
     "dry_run": "--dry-run",
     "validate_only": None,
+    # Inverted polarity: MCP link_probe=True is the default-on probe, while
+    # the CLI surface is the opt-out --no-link-probe flag.
+    "link_probe": "--no-link-probe",
     "platform_options": "--platform-option",
 }
 PARTIAL_CLI_SURFACES = {"--platform-option"}
@@ -154,6 +158,8 @@ EXPECTED_OMISSION_TIERS = {
     "--ignore-memory-warnings": "security-scoped",
     "--funding": "not-yet-demanded",
     "--result-source": "not-yet-demanded",
+    "--client-region": "not-yet-demanded",
+    "--client-cloud": "not-yet-demanded",
     "--tuning": "not-yet-demanded",
     "--validation": "not-yet-demanded",
 }

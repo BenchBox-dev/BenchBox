@@ -100,6 +100,7 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
     compareHardwareValues("Memory", results, (result) =>
       result.environment?.memory_gb !== undefined ? `${result.environment.memory_gb} GB` : "Not recorded",
     ),
+    buildLocalityField(results),
     compareValues("Normalized cost", results, normalizedCostLabel),
     compareValues("Cost model", results, costModelSummary),
     compareValues("Cost scope", results, costScopeSummary),
@@ -202,6 +203,154 @@ function buildPhysicalMechanismsField(results: DetailResult[]): ComparabilityFie
         value: (result.physical_mechanisms ?? []).join(", ") || "none",
       })),
     ),
+  };
+}
+
+function isRemoteOrCloudPlatform(result: DetailResult): boolean {
+  if (result.deployment_class === "cloud" || result.deployment_class === "remote") {
+    return true;
+  }
+  if (result.cloud_provider && result.cloud_provider !== "local" && result.cloud_provider !== "none") {
+    return true;
+  }
+  if (result.cloud_region && result.cloud_region !== "unknown" && result.cloud_region !== "local") {
+    return true;
+  }
+  return false;
+}
+
+function getClientRegion(result: DetailResult): string | null {
+  const r = result.environment?.client_region ?? result.client_region;
+  return r && String(r).trim() ? String(r).trim() : null;
+}
+
+function getPlatformRegion(result: DetailResult): string | null {
+  const r = result.cloud_region ?? (result.pricing_region !== "unknown" ? result.pricing_region : null);
+  return r && String(r).trim() ? String(r).trim() : null;
+}
+
+function getClientCloud(result: DetailResult): string | null {
+  const c = result.environment?.client_cloud ?? result.client_cloud;
+  if (!c || !String(c).trim()) return null;
+  const token = String(c).trim().toLowerCase();
+  // "unknown" is the default when only --client-region is attested: it
+  // carries no cloud signal and must not force a cross-cloud verdict.
+  if (token === "unknown" || token === "local" || token === "none") return null;
+  return String(c).trim();
+}
+
+function getPlatformCloud(result: DetailResult): string | null {
+  const c = result.cloud_provider;
+  return c && String(c).trim() && String(c).trim().toLowerCase() !== "unknown"
+    ? String(c).trim()
+    : null;
+}
+
+function getOverheadMedian(result: DetailResult): number | null {
+  const m = result.environment?.statement_overhead_median_ms ?? result.statement_overhead_median_ms;
+  const n = m == null ? NaN : Number(m);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Region tokens arrive in provider-native spellings: Snowflake reports
+// `CURRENT_REGION()` as `AWS_US_EAST_1`, Azure as `East US 2`, GCP IMDS as
+// `us-east1`, AWS IMDS as `us-east-1`. Compare canonical forms so equal
+// footprints do not false-warn.
+function canonicalRegion(region: string): string {
+  return region
+    .toLowerCase()
+    .replace(/^(aws|azure|gcp)_/, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function buildLocalityField(results: DetailResult[]): ComparabilityField {
+  const entries = results.map((result) => {
+    const isRemote = isRemoteOrCloudPlatform(result);
+    const clientReg = getClientRegion(result);
+    const platformReg = getPlatformRegion(result);
+
+    if (isRemote) {
+      if (!clientReg) {
+        return {
+          platform: result.platform,
+          value: "Unknown client locality",
+          warn: true,
+        };
+      }
+      // Cloud identity is evidence independent of region spellings: a
+      // client attested on one cloud against a platform on another never
+      // shares a footprint, even when the region names normalize equally.
+      const clientCloud = getClientCloud(result);
+      const platformCloud = getPlatformCloud(result);
+      if (
+        clientCloud != null &&
+        platformCloud != null &&
+        clientCloud.toLowerCase() !== platformCloud.toLowerCase()
+      ) {
+        return {
+          platform: result.platform,
+          value: `Cross-cloud: client in ${clientReg} (${clientCloud}), platform in ${platformReg ?? "unknown locality"} (${platformCloud})`,
+          warn: true,
+        };
+      }
+      // No platform region is no evidence: asserting collocation here
+      // would publish an unearned match (remote self-hosted platforms
+      // and cloud runs with uncaptured regions land in this branch).
+      if (!platformReg) {
+        return {
+          platform: result.platform,
+          value: `Client in ${clientReg}, platform locality unknown`,
+          warn: true,
+        };
+      }
+      if (canonicalRegion(clientReg) !== canonicalRegion(platformReg)) {
+        const overhead = getOverheadMedian(result);
+        const overheadCtx =
+          overhead != null ? ` (client statement floor ${overhead.toFixed(2)} ms)` : "";
+        return {
+          platform: result.platform,
+          value: `Cross-region: client in ${clientReg}, platform in ${platformReg}${overheadCtx}`,
+          warn: true,
+        };
+      }
+      return {
+        platform: result.platform,
+        value: `Collocated (${clientReg})`,
+        warn: false,
+      };
+    }
+
+    return {
+      platform: result.platform,
+      value: clientReg ? `Local (${clientReg})` : "Local",
+      warn: false,
+    };
+  });
+
+  const values = entries.map((e) => e.value);
+  const uniqueValues = [...new Set(values)];
+  const hasWarning = entries.some((e) => e.warn);
+  const hasDiff = hasWarning || uniqueValues.length > 1;
+
+  if (hasDiff) {
+    let summary: string;
+    if (uniqueValues.length === 1) {
+      summary = uniqueValues[0]!;
+    } else {
+      summary = `${uniqueValues.length} localities differ`;
+    }
+    return {
+      label: "Locality",
+      status: "diff",
+      summary,
+      detail: formatPerPlatform(entries),
+    };
+  }
+
+  return {
+    label: "Locality",
+    status: "match",
+    summary: uniqueValues[0] ?? "Local",
   };
 }
 

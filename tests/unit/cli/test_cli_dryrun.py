@@ -1344,6 +1344,41 @@ class TestGenerateCliCommandNewParams:
         assert "--capture-plans" in cmd
 
 
+class TestGenerateCliCommandClientLink:
+    def test_client_link_options_rendered(self):
+        from benchbox.cli.dryrun import generate_cli_command
+
+        cmd = generate_cli_command(
+            platform="snowflake",
+            benchmark="tpch",
+            scale=1.0,
+            client_region="us-east-1",
+            client_cloud="aws",
+        )
+        assert "--client-region us-east-1" in cmd
+        assert "--client-cloud aws" in cmd
+        assert "--no-link-probe" not in cmd
+
+    def test_no_link_probe_rendered(self):
+        from benchbox.cli.dryrun import generate_cli_command
+
+        cmd = generate_cli_command(
+            platform="duckdb",
+            benchmark="tpch",
+            scale=0.01,
+            no_link_probe=True,
+        )
+        assert "--no-link-probe" in cmd
+
+    def test_client_link_options_omitted_when_unset(self):
+        from benchbox.cli.dryrun import generate_cli_command
+
+        cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01)
+        assert "--client-region" not in cmd
+        assert "--client-cloud" not in cmd
+        assert "--no-link-probe" not in cmd
+
+
 class TestGenerateCliCommandCompleteness:
     """Introspection test: assert generate_cli_command covers all behavior-affecting CLI params."""
 
