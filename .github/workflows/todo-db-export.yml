@@ -118,9 +118,23 @@ jobs:
         env:
           TODO_DB_URL: ${{ secrets.TODO_DB_URL }}
           TODO_DB_RO_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
+          # The floor CLI returns a legacy-safe exit 2 on hosted calls unless the
+          # v2 auth contract is selected explicitly. The retired shim used to set
+          # this for the export.
+          TODO_DB_AUTH_CONTRACT: v2
         run: |
           set -euo pipefail
-          _project/scripts/todo export --out "${EXPORT_DIR}" \
+          # 0.6.0's `export` emits only the single lossless JSON envelope. Render
+          # the committed items-domain views (items.jsonl, events.jsonl,
+          # index.md) from that envelope with the standalone stdlib script; the
+          # lossless copy lands in LOSSLESS_DIR, outside EXPORT_DIR.
+          uv run --project _project/scripts --locked -- \
+            todo-db --project-id "${TODO_DB_PROJECT_ID}" --repository "${TODO_DB_REPOSITORY}" \
+            export --output "${RUNNER_TEMP}/todo-db.json"
+          uv run --project _project/scripts --locked -- \
+            python _project/scripts/todo_db_export_views.py \
+            --envelope "${RUNNER_TEMP}/todo-db.json" \
+            --out "${EXPORT_DIR}" \
             --lossless-out "${LOSSLESS_DIR}"
 
       - name: Validate clean-database restore
