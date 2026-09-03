@@ -47,6 +47,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Full history: the PR isolation gate diffs origin/${base}...HEAD
+          # (three-dot needs a merge base). A shallow checkout fails that diff
+          # with "no merge base" (CI 2022 lane red), failing closed for the
+          # wrong reason.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5

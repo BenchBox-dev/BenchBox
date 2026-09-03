@@ -103,6 +103,18 @@ def test_publication_lane_docs_executes_verify_lane_isolation() -> None:
     assert '--changed-paths-file "$CHANGED_FILE"' in raw_text or '--changed-paths-file "$CHANGED_FILE"' in raw_text
 
 
+def test_publication_lane_docs_checkout_has_full_history() -> None:
+    """Three-dot base...HEAD diff needs a merge base (CI 2022 lane red).
+
+    A shallow checkout fails that diff with "no merge base", failing closed
+    for the wrong reason. The checkout must be full history.
+    """
+    wf = _workflow()
+    steps = wf["jobs"]["build-docs-lane"]["steps"]
+    checkout = next(s for s in steps if s.get("uses", "").startswith("actions/checkout"))
+    assert str(checkout.get("with", {}).get("fetch-depth")) == "0"
+
+
 def test_publication_lane_docs_does_not_contain_pages_deployment() -> None:
     raw_text = WORKFLOW_PATH.read_text(encoding="utf-8")
     assert "actions/deploy-pages" not in raw_text

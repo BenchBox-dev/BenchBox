@@ -143,6 +143,63 @@ def test_shadow_site_missing_directory_fails_closed(tmp_path: Path) -> None:
     assert shadow_main([str(missing)]) != 0
 
 
+def test_privacy_scanner_exempts_aws_example_tokens(tmp_path: Path) -> None:
+    """AWS-documented example keys are prose, not leaks (CI: docs build)."""
+    doc = tmp_path / "redshift.html"
+    doc.write_text(
+        "export AWS_ACCESS_KEY_ID=[REDACTED]\nexport AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\n",
+        encoding="utf-8",
+    )
+    assert scan_file_for_privacy(doc) == []
+
+    real = tmp_path / "leak.html"
+    real.write_text("export AWS_ACCESS_KEY_ID=AKIAZZZZZZZZZZZZZZ12\n", encoding="utf-8")
+    findings = scan_file_for_privacy(real)
+    assert len(findings) == 1
+    assert "AWS Access Key ID" in findings[0]
+
+
+def test_privacy_scanner_exempts_placeholder_passwords(tmp_path: Path) -> None:
+    """Docs connection strings with literal placeholder passwords pass (CI: guides)."""
+    for url in (
+        "postgres://username:password@hostname:port/database?sslmode=require",
+        "postgresql://user:pass@host/db",
+        "postgres://tsdbadmin:password@abc123.tsdb.cloud.timescale.com:5432/tsdb",
+    ):
+        doc = tmp_path / "guide.html"
+        doc.write_text(f"export SERVICE_URL='{url}'\n", encoding="utf-8")
+        assert scan_file_for_privacy(doc) == [], url
+
+    leaked = tmp_path / "dump.html"
+    leaked.write_text("postgres://admin:s3cr3t-real@prod.internal:5432/db\n", encoding="utf-8")
+    findings = scan_file_for_privacy(leaked)
+    assert len(findings) == 1
+    assert "connection string" in findings[0]
+
+
+def test_privacy_scanner_connection_pattern_does_not_slurp_prose(tmp_path: Path) -> None:
+    """A bare scheme mention plus a distant '@' is not credentials (tpc-di docs)."""
+    doc = tmp_path / "guide.html"
+    doc.write_text(
+        "if db_url.startswith('postgresql://'):\n"
+        "    import psycopg2  # contact ops@example.com for access\n"
+        "no credentials here, just code and an email address\n",
+        encoding="utf-8",
+    )
+    assert scan_file_for_privacy(doc) == []
+
+
+def test_privacy_scanner_counts_only_real_connection_leaks(tmp_path: Path) -> None:
+    mixed = tmp_path / "mixed.html"
+    mixed.write_text(
+        "a=postgres://user:pass@host/db\nb=postgres://admin:real-secret-1@h1/db\nc=mysql://root:real-secret-2@h2/db\n",
+        encoding="utf-8",
+    )
+    findings = scan_file_for_privacy(mixed)
+    assert len(findings) == 1
+    assert "2 occurrence(s)" in findings[0]
+
+
 def test_privacy_scan_missing_directory_fails_closed(tmp_path: Path) -> None:
     missing = tmp_path / "no-such-site"
     findings = scan_directory_for_privacy(missing)
