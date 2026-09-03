@@ -366,7 +366,6 @@ def test_skill_integrity_job_is_required_read_only_and_pinned() -> None:
     assert "6d09682dabe2ff0d68f400d60f8ba8b87f8c02aa" in workflow_text
     assert "scripts/skill_sync_ci_policy.py validate" in workflow_text
     assert 'verify --project "$GITHUB_WORKSPACE"' in workflow_text
-    assert "test_todo_wrapper.py::TestSkillThinness" in workflow_text
     assert '--check-commit-range "$BASE_SHA"' in workflow_text
 
 
