@@ -77,31 +77,142 @@ def test_rejects_empty_ledger_head_sha() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_candidate_with_more_paths_than_ledger_accepted() -> None:
+def _git(repo: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def _init_corpus_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "corpus-git"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test")
+    (repo / "results-data" / "bundles").mkdir(parents=True)
+    return repo
+
+
+def _commit_bundles(repo: Path, names: list[str], message: str) -> str:
+    bundles = repo / "results-data" / "bundles"
+    desired = set(names)
+    for existing in list(bundles.glob("*.json")):
+        if existing.name not in desired:
+            rel = existing.relative_to(repo).as_posix()
+            existing.unlink()
+            # Only rm if tracked; ignore if never committed.
+            subprocess.run(
+                ["git", "rm", "--quiet", "--ignore-unmatch", rel],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+    for name in names:
+        path = bundles / name
+        path.write_text(f'{{"id": "{name}"}}\n', encoding="utf-8")
+        _git(repo, "add", path.relative_to(repo).as_posix())
+    # Allow empty commits only when the tree is unchanged (same-path merges use -s ours).
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    if status.stdout.strip():
+        _git(repo, "commit", "-m", message)
+    else:
+        _git(repo, "commit", "--allow-empty", "-m", message)
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def test_candidate_with_more_paths_than_ledger_accepted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Candidate with MORE paths than ledger head is a set-preserving union (accepted)."""
-    ledger_paths = {"results-data/bundles/a.json", "results-data/bundles/b.json"}
-    candidate_paths = ledger_paths | {"results-data/bundles/c.json"}
-    # The core coalescing decision: accept iff P_H ⊆ P_C
-    missing = ledger_paths - candidate_paths
-    assert missing == set(), "expected candidate to cover all ledger paths"
-    assert ledger_paths <= candidate_paths, "ledger ⊆ candidate expected"
+    repo = _init_corpus_repo(tmp_path)
+    base_sha = _commit_bundles(repo, ["a.json", "b.json"], "base")
+    ledger_sha = base_sha
+    _git(repo, "checkout", "-b", "add-c", base_sha)
+    _commit_bundles(repo, ["a.json", "b.json", "c.json"], "add-c")
+    _git(repo, "checkout", "main")
+    _git(repo, "merge", "--no-ff", "-m", "merge add-c", "add-c")
+    merge_sha = _git(repo, "rev-parse", "HEAD")
+    monkeypatch.setattr(reconciler, "REPO_ROOT", repo)
+
+    ledger_paths = reconciler.get_corpus_paths(ledger_sha)
+    candidate_paths = reconciler.get_corpus_paths(merge_sha)
+    assert ledger_paths <= candidate_paths
+    assert "results-data/bundles/c.json" in candidate_paths
+
+    accepted, gen, reason = reconciler.reconcile_event(
+        {"merge_sha": merge_sha, "base_sha": base_sha, "ts": "t"},
+        ledger_sha,
+        0,
+    )
+    assert accepted is True
+    assert gen == 1
+    assert reason == "accepted"
 
 
-def test_candidate_with_fewer_paths_than_ledger_rejected() -> None:
+def test_candidate_with_fewer_paths_than_ledger_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Candidate with FEWER paths than ledger head loses history → rejected."""
-    ledger_paths = {"a", "b", "c"}
-    candidate_paths = {"a", "b"}
-    missing = ledger_paths - candidate_paths
-    assert missing, "expected candidate to be missing some ledger paths"
-    assert not (ledger_paths <= candidate_paths), "ledger ⊆ candidate must fail when paths are lost"
+    repo = _init_corpus_repo(tmp_path)
+    base_sha = _commit_bundles(repo, ["a.json", "b.json"], "base")
+    ledger_sha = _commit_bundles(repo, ["a.json", "b.json", "c.json"], "ledger")
+    # Branch from base (fewer paths), merge ledger with -s ours so the merge tree
+    # keeps only base paths while still being a 2-parent merge commit.
+    _git(repo, "checkout", "-b", "fewer", base_sha)
+    fewer_tip = _commit_bundles(repo, ["a.json", "b.json"], "fewer-paths")
+    _git(repo, "checkout", "-b", "merge-fewer", fewer_tip)
+    _git(repo, "merge", "--no-ff", "-m", "merge ledger ref", "-s", "ours", ledger_sha)
+    merge_sha = _git(repo, "rev-parse", "HEAD")
+    monkeypatch.setattr(reconciler, "REPO_ROOT", repo)
+
+    ledger_paths = reconciler.get_corpus_paths(ledger_sha)
+    candidate_paths = reconciler.get_corpus_paths(merge_sha)
+    assert ledger_paths - candidate_paths, "candidate must lose at least one ledger path"
+    assert not (ledger_paths <= candidate_paths)
+
+    accepted, gen, reason = reconciler.reconcile_event(
+        {"merge_sha": merge_sha, "base_sha": base_sha, "ts": "t"},
+        ledger_sha,
+        0,
+    )
+    assert accepted is False
+    assert gen == 0
+    assert "coalescing rejected" in reason
 
 
-def test_candidate_with_same_paths_as_ledger_accepted() -> None:
+def test_candidate_with_same_paths_as_ledger_accepted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Candidate with SAME paths as ledger head is a valid set-preserving union."""
-    ledger_paths = {"a", "b"}
-    candidate_paths = {"a", "b"}
+    repo = _init_corpus_repo(tmp_path)
+    base_sha = _commit_bundles(repo, ["a.json", "b.json"], "base")
+    ledger_sha = base_sha
+    _git(repo, "checkout", "-b", "side", base_sha)
+    _commit_bundles(repo, ["a.json", "b.json"], "side-empty-change")
+    _git(repo, "checkout", "main")
+    _git(repo, "merge", "--no-ff", "-m", "merge side same paths", "-s", "ours", "side")
+    merge_sha = _git(repo, "rev-parse", "HEAD")
+    monkeypatch.setattr(reconciler, "REPO_ROOT", repo)
+
+    ledger_paths = reconciler.get_corpus_paths(ledger_sha)
+    candidate_paths = reconciler.get_corpus_paths(merge_sha)
     assert ledger_paths <= candidate_paths
     assert ledger_paths - candidate_paths == set()
+
+    accepted, gen, reason = reconciler.reconcile_event(
+        {"merge_sha": merge_sha, "base_sha": base_sha, "ts": "t"},
+        ledger_sha,
+        0,
+    )
+    assert accepted is True
+    assert gen == 1
+    assert reason == "accepted"
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +327,8 @@ def test_missed_events_are_replayable_from_log() -> None:
 
     The reconciler reads events from a JSONL log and processes them in order,
     so an hourly scheduled run replays any events the push-bridge missed.
+    Rejected events must fail the CLI (nonzero) so the schedule does not
+    silently mark a rejected SHA as success.
     """
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -236,9 +349,38 @@ def test_missed_events_are_replayable_from_log() -> None:
         "--limit",
         "100",
     )
-    # A revalidation failure (bad SHA) is reported as a rejected event, not a crash.
-    assert result.returncode == 0
+    # A revalidation failure (bad SHA) is a rejected event → nonzero exit.
+    assert result.returncode != 0
     assert "rejected" in result.stdout
+
+
+def test_cli_exits_nonzero_when_event_rejected(tmp_path: Path) -> None:
+    """Events file with one rejectable event must make the CLI exit 1."""
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=REPO_ROOT,
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+    events_file = _write_events(
+        tmp_path,
+        [{"merge_sha": "0" * 40, "base_sha": "0" * 40, "ts": "reject-me"}],
+    )
+    result = _run_cli(
+        "--events-file",
+        str(events_file),
+        "--ledger-head-sha",
+        head,
+        "--limit",
+        "10",
+    )
+    assert result.returncode == 1
+    lines = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
+    assert any(line.get("accepted") is False for line in lines)
+    summary = lines[-1]
+    assert summary.get("rejected") == 1
+    assert summary.get("accepted") == 0
 
 
 def test_reconcile_cap_respects_limit(tmp_path: Path) -> None:

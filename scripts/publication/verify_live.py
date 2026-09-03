@@ -346,6 +346,7 @@ def verify_live(
     timeout: float = DEFAULT_TIMEOUT,
     endpoints: list[str] | None = None,
     skip_live_probes: bool = False,
+    pre_deploy: bool = False,
 ) -> VerificationReport:
     """Perform comprehensive pre-deploy candidate and/or live verification."""
     report = VerificationReport(
@@ -356,6 +357,19 @@ def verify_live(
 
     candidate_checksums = _resolve_candidate_checksums(candidate_manifest, candidate_digest, report)
     baseline_checksums = _resolve_baseline_checksums(baseline_manifest or manifest_path, baseline_digest, report)
+
+    if pre_deploy:
+        missing: list[str] = []
+        if not candidate_checksums:
+            missing.append("candidate (--candidate-manifest or --candidate-digest)")
+        if not baseline_checksums:
+            missing.append("baseline (--baseline-manifest/--manifest or --baseline-digest)")
+        if missing:
+            report.ok = False
+            report.errors.append(
+                "Pre-deploy check requires both a candidate and a baseline; missing: " + ", ".join(missing)
+            )
+            return report
 
     _run_pre_deploy_check(candidate_checksums, baseline_checksums, report, expect_noop, require_receipt)
 
@@ -458,6 +472,7 @@ def main(argv: list[str] | None = None) -> int:
         timeout=args.timeout,
         endpoints=args.endpoints,
         skip_live_probes=args.pre_deploy,
+        pre_deploy=args.pre_deploy,
     )
 
     if args.json:

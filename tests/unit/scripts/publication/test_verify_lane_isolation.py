@@ -36,6 +36,7 @@ def test_classify_path_identifies_correct_lanes() -> None:
     assert classify_path("results-explorer/src/App.tsx") == {"explorer"}
     assert classify_path("_project/scripts/explorer_pipeline/pipeline.py") == {"explorer"}
     assert classify_path("_project/scripts/explorer_publish.py") == {"explorer"}
+    assert classify_path(".github/workflows/publication-lane-explorer.yml") == {"explorer"}
 
     # Corpus lane
     assert classify_path("results-data/bundles/bundle_123.json") == {"corpus"}
@@ -297,6 +298,52 @@ def test_cli_changed_paths_fails_closed_on_empty() -> None:
     # Whitespace-only fails closed
     exit_code = main(["--lane", "site", "--changed-paths", "   "])
     assert exit_code == 1
+
+
+def test_cli_changed_paths_file_fails_closed_on_empty(tmp_path: Path) -> None:
+    """Empty --changed-paths-file that exists must fail closed, same as empty --changed-paths."""
+    empty_file = tmp_path / "empty-changed.txt"
+    empty_file.write_text("", encoding="utf-8")
+    assert main(["--lane", "site", "--changed-paths-file", str(empty_file)]) == 1
+
+    whitespace_file = tmp_path / "whitespace-changed.txt"
+    whitespace_file.write_text("\n  \n\n", encoding="utf-8")
+    assert main(["--lane", "site", "--changed-paths-file", str(whitespace_file)]) == 1
+
+
+def test_verify_workflow_isolation_real_explorer_lane() -> None:
+    """Explorer isolation must parse the real publication-lane-explorer.yml (no deploy-pages)."""
+    from scripts.publication.verify_lane_isolation import LANE_ARTIFACTS, LANE_WORKFLOWS
+
+    assert LANE_WORKFLOWS["explorer"] == ".github/workflows/publication-lane-explorer.yml"
+    assert LANE_ARTIFACTS["explorer"] == ("explorer_app",)
+    assert "results.duckdb" not in LANE_ARTIFACTS["explorer"]
+
+    errors = verify_workflow_isolation("explorer", repo_root=REPO_ROOT)
+    assert not errors, errors
+
+    report = verify_lane_isolation("explorer", repo_root=REPO_ROOT, check_mutations=False)
+    assert report.success is True
+    assert report.artifacts == ["explorer_app"]
+
+    raw = (REPO_ROOT / LANE_WORKFLOWS["explorer"]).read_text(encoding="utf-8")
+    assert "deploy-pages" not in raw
+    assert "pages: write" not in raw
+
+
+def test_verify_workflow_isolation_missing_explorer_workflow(tmp_path: Path) -> None:
+    errors = verify_workflow_isolation("explorer", repo_root=tmp_path)
+    assert any("required workflow file missing" in err for err in errors)
+    assert any("publication-lane-explorer.yml" in err for err in errors)
+
+
+def test_cli_lane_all_runs_explorer_and_corpus_workflow_checks() -> None:
+    """--lane all must not be a vacuous pass: explorer+corpus workflows are inspected."""
+    from scripts.publication.verify_lane_isolation import LANE_WORKFLOWS
+
+    assert set(LANE_WORKFLOWS) == {"site", "explorer", "corpus"}
+    exit_code = main(["--lane", "all", "--json"])
+    assert exit_code == 0
 
 
 def test_real_file_mutation_and_disjointness(tmp_path: Path) -> None:

@@ -282,11 +282,57 @@ def validate_corpus(corpus: dict[str, Any], branches: dict[str, Any]) -> list[st
     return errors
 
 
+def _is_hex64(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(c in "0123456789abcdef" for c in value.lower())
+
+
+def validate_live_evidence(data: dict[str, Any]) -> list[str]:
+    """Require observed live Pages/database evidence fields for --check."""
+    errors: list[str] = []
+    live = data.get("live_database")
+    if not isinstance(live, dict):
+        errors.append("live_database must be present with observed sha256/bytes/url")
+    else:
+        if not _is_hex64(live.get("sha256")):
+            errors.append(f"live_database.sha256 must be a 64-char hex digest, got {live.get('sha256')}")
+        if not isinstance(live.get("bytes"), int) or live.get("bytes") <= 0:
+            errors.append(f"live_database.bytes must be a positive int, got {live.get('bytes')}")
+        url = live.get("url")
+        if not isinstance(url, str) or not url.strip():
+            errors.append(f"live_database.url must be a non-empty string, got {url}")
+
+    pages = data.get("pages")
+    if not isinstance(pages, dict):
+        errors.append("pages must be present with bandwidth telemetry and artifacts")
+        return errors
+
+    bandwidth = pages.get("bandwidth")
+    if not isinstance(bandwidth, dict) or bandwidth.get("telemetry") != "unavailable":
+        errors.append('pages.bandwidth.telemetry must be "unavailable" (do not invent bandwidth totals)')
+
+    artifacts = pages.get("artifacts")
+    if not isinstance(artifacts, list):
+        errors.append("pages.artifacts must be a list of observed artifact records")
+    else:
+        for idx, item in enumerate(artifacts):
+            if not isinstance(item, dict):
+                errors.append(f"pages.artifacts[{idx}] must be an object")
+                continue
+            digest = item.get("digest")
+            size = item.get("size_in_bytes", item.get("size"))
+            if not isinstance(digest, str) or not digest.strip():
+                errors.append(f"pages.artifacts[{idx}] missing digest")
+            if not isinstance(size, int) or size < 0:
+                errors.append(f"pages.artifacts[{idx}] missing size")
+    return errors
+
+
 def validate(data: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     if data.get("schema_version") != 2:
         errors.append("publication baseline schema version must be 2")
     errors.extend(validate_corpus(data.get("corpus", {}), data.get("branches", {})))
+    errors.extend(validate_live_evidence(data))
     if data.get("workflow", {}).get("head_sha") != data.get("branches", {}).get("release", {}).get("sha"):
         errors.append("deployed workflow SHA must equal the captured release SHA")
     if data.get("pages", {}).get("deployment", {}).get("state") != "success":

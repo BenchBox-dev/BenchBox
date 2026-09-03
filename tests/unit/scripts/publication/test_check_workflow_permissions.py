@@ -82,7 +82,7 @@ def test_publication_deploy_permissions_valid_structure(tmp_path: Path) -> None:
                 "steps": [],
             },
             "deploy": {
-                "permissions": {"contents": "read", "pages": "write", "id-token": "write"},
+                "permissions": {"contents": "read"},
                 "runs-on": "ubuntu-latest",
                 "steps": [],
             },
@@ -92,7 +92,7 @@ def test_publication_deploy_permissions_valid_structure(tmp_path: Path) -> None:
                 "steps": [],
             },
             "rollback": {
-                "permissions": {"pages": "write", "id-token": "write", "contents": "read"},
+                "permissions": {"contents": "read"},
                 "runs-on": "ubuntu-latest",
                 "steps": [],
             },
@@ -118,48 +118,55 @@ def test_publication_deploy_permissions_detects_build_write(tmp_path: Path) -> N
         "name": "Unsafe Build",
         "jobs": {
             "build": {"permissions": {"contents": "write"}},
-            "deploy": {"permissions": {"pages": "write", "id-token": "write"}},
+            "deploy": {"permissions": {"contents": "read"}},
             "verify": {"permissions": {"contents": "read"}},
-            "rollback": {"permissions": {"pages": "write", "id-token": "write"}},
+            "rollback": {"permissions": {"contents": "read"}},
         },
     }
     errors = checker.check_publication_deploy_permissions(wf, data)
     assert any("declared write permissions" in err and "build" in err for err in errors)
 
 
-def test_publication_deploy_permissions_detects_missing_deploy_pages_write(tmp_path: Path) -> None:
+def test_publication_deploy_permissions_detects_deploy_pages_write(tmp_path: Path) -> None:
     wf = tmp_path / "publication-deploy.yml"
     data = {
-        "name": "Missing Pages Write",
+        "name": "Forbidden Pages Write",
         "jobs": {
             "build": {"permissions": {"contents": "read"}},
-            "deploy": {"permissions": {"contents": "read", "id-token": "write"}},  # missing pages: write
+            "deploy": {"permissions": {"contents": "read", "pages": "write", "id-token": "write"}},
             "verify": {"permissions": {"contents": "read"}},
-            "rollback": {"permissions": {"pages": "write", "id-token": "write"}},
+            "rollback": {"permissions": {"contents": "read"}},
         },
     }
     errors = checker.check_publication_deploy_permissions(wf, data)
-    assert any("missing required 'pages: write'" in err for err in errors)
+    assert any("pages: write is forbidden" in err for err in errors)
+    assert any("id-token: write is forbidden" in err for err in errors)
 
 
-def test_publication_deploy_permissions_detects_rollback_actions_write(tmp_path: Path) -> None:
+def test_publication_deploy_permissions_detects_rollback_pages_write(tmp_path: Path) -> None:
     wf = tmp_path / "publication-deploy.yml"
     data = {
-        "name": "Disallowed Actions Write Rollback",
+        "name": "Forbidden Rollback Pages Write",
         "jobs": {
             "build": {"permissions": {"contents": "read"}},
-            "deploy": {"permissions": {"pages": "write", "id-token": "write"}},
+            "deploy": {"permissions": {"contents": "read"}},
             "verify": {"permissions": {"contents": "read"}},
             "rollback": {"permissions": {"actions": "write", "pages": "write", "id-token": "write"}},
         },
     }
     errors = checker.check_publication_deploy_permissions(wf, data)
-    assert any("unneeded write permissions" in err and "rollback" in err for err in errors)
+    assert any("pages: write is forbidden" in err and "rollback" in err for err in errors)
+    assert any("declared write permissions" in err and "rollback" in err for err in errors)
 
 
 def test_repo_publication_deploy_passes_audit() -> None:
     real_wf = Path(__file__).parents[4] / ".github" / "workflows" / "publication-deploy.yml"
     assert real_wf.is_file()
+    text = real_wf.read_text(encoding="utf-8")
+    assert "pages: write" not in text
+    assert "id-token: write" not in text
+    assert "actions/deploy-pages" not in text
+    assert "actions/upload-pages-artifact" not in text
     errors = checker.audit_workflow_file(real_wf, strict=True)
     assert errors == [], f"Errors found in real publication-deploy.yml: {errors}"
 

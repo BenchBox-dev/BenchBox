@@ -9,6 +9,8 @@ name: Corpus Reconciler
 # - Passes --ledger-head-sha to reconciler (REQUIRED, fail-closed)
 # - Concurrency group prevents parallel reconciler runs
 # - Minimal permissions (contents: read only)
+# - Workspace is the full workflow-commit tree (uv sync needs pyproject.toml);
+#   published-results is fetched as an extra ref for ledger reads only.
 
 on:
   schedule:
@@ -45,18 +47,22 @@ jobs:
     name: Process corpus events and reconcile
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout published-results branch
+      - name: Checkout workflow commit
         uses: actions/checkout@v4
-        with:
-          ref: published-results
-          fetch-depth: 2
+
+      - name: Fetch published-results ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin published-results:refs/remotes/origin/published-results
 
       - name: Read current ledger head from branch
         id: ledger
         shell: bash
         run: |
-          # Always read ledger head from branch — authoritative source
-          LEDGER_CONTENT=$(git show published-results:publication/ledger.json 2>/dev/null || echo "")
+          set -euo pipefail
+          # Always read ledger head from live published-results — authoritative source
+          LEDGER_CONTENT=$(git show origin/published-results:publication/ledger.json 2>/dev/null || echo "")
 
           if [ -n "$LEDGER_CONTENT" ]; then
             LEDGER_SHA=$(echo "$LEDGER_CONTENT" | python3 -c "

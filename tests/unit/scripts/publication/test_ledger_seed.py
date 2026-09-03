@@ -298,3 +298,41 @@ def test_cli_reports_bad_ref_distinctly(tmp_path: Path) -> None:
     result = _run_cli("--accepted-ref", "totally/not/a/ref", "--output", str(out))
     assert result.returncode != 0
     assert "rev-parse" in result.stderr or "ls-tree" in result.stderr
+
+
+@skip_no_ref
+def test_cli_materialize_dest_writes_union_and_verifies_digests(tmp_path: Path) -> None:
+    """--materialize-dest writes every seed-union path and fails on digest mismatch."""
+    dest = tmp_path / "corpus_archive"
+    result = _run_cli(
+        "--accepted-ref",
+        PINNED_SOURCE_REF,
+        "--ledger-seed",
+        str(SEED_PATH),
+        "--materialize-dest",
+        str(dest),
+    )
+    assert result.returncode == 0, result.stderr
+    seed = _seed()
+    written = sorted(p.name for p in dest.rglob("*.json") if _primary(p.name))
+    expected = sorted(Path(p).name for p in seed["union"])
+    assert written == expected
+
+    # Tamper the seed digest and confirm materialize fails closed.
+    bad_seed = tmp_path / "bad-seed.json"
+    tampered = dict(seed)
+    tampered["digests"] = dict(seed["digests"])
+    first = seed["union"][0]
+    tampered["digests"][first] = "0" * 64
+    bad_seed.write_text(json.dumps(tampered), encoding="utf-8")
+    bad_dest = tmp_path / "bad_archive"
+    bad = _run_cli(
+        "--accepted-ref",
+        PINNED_SOURCE_REF,
+        "--ledger-seed",
+        str(bad_seed),
+        "--materialize-dest",
+        str(bad_dest),
+    )
+    assert bad.returncode != 0
+    assert "digest mismatch" in bad.stderr

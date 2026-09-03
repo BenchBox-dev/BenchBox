@@ -87,17 +87,72 @@ def list_bundles_on_worktree(repo_root: Path = ROOT) -> list[str]:
 
 def blob_sha256_at_ref(ref: str, path: str, repo_root: Path = ROOT) -> str:
     """SHA-256 of the exact blob bytes for *path* at *ref*."""
-    proc = subprocess.run(
-        ["git", "cat-file", "blob", f"{ref}:{path}"],
-        cwd=repo_root,
-        check=True,
-        capture_output=True,
-    )
-    return hashlib.sha256(proc.stdout).hexdigest()
+    return hashlib.sha256(blob_bytes_at_ref(ref, path, repo_root)).hexdigest()
+
+
+def blob_bytes_at_ref(ref: str, path: str, repo_root: Path = ROOT) -> bytes:
+    """Exact blob bytes for *path* at *ref*."""
+    try:
+        proc = subprocess.run(
+            ["git", "cat-file", "blob", f"{ref}:{path}"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or b"").decode("utf-8", errors="replace").strip()
+        raise LedgerSeedError(f"git cat-file failed for {ref}:{path}: {stderr or exc}") from exc
+    return proc.stdout
 
 
 def worktree_sha256(path: str, repo_root: Path = ROOT) -> str:
     return hashlib.sha256((repo_root / path).read_bytes()).hexdigest()
+
+
+def materialize_union(
+    accepted_ref: str,
+    ledger_seed: Path,
+    dest: Path,
+    repo_root: Path = ROOT,
+) -> int:
+    """Write every seed-union path's bytes into *dest*, verifying digests.
+
+    Paths whose worktree bytes match the seed digest are copied from the
+    worktree. ``published_only`` paths and digest mismatches are taken from
+    ``git show`` of *accepted_ref*. Returns the number of primary bundles written.
+    """
+    if not ledger_seed.is_file():
+        raise LedgerSeedError(f"ledger seed not found: {ledger_seed}")
+    seed = json.loads(ledger_seed.read_text(encoding="utf-8"))
+    union = seed.get("union") or []
+    digests = seed.get("digests") or {}
+    if not union:
+        raise LedgerSeedError(f"ledger seed {ledger_seed} has an empty union (no vacuous pass)")
+
+    accepted_sha = resolve_ref(accepted_ref, repo_root)
+    dest.mkdir(parents=True, exist_ok=True)
+    written = 0
+    for path in union:
+        expected = digests.get(path)
+        if not expected:
+            raise LedgerSeedError(f"ledger seed missing digest for {path}")
+
+        worktree_path = repo_root / path
+        if worktree_path.is_file() and hashlib.sha256(worktree_path.read_bytes()).hexdigest() == expected:
+            data = worktree_path.read_bytes()
+        else:
+            data = blob_bytes_at_ref(accepted_sha, path, repo_root)
+
+        actual = hashlib.sha256(data).hexdigest()
+        if actual != expected:
+            raise LedgerSeedError(f"materialized digest mismatch for {path}: expected {expected}, got {actual}")
+
+        rel = path[len(CORPUS_PREFIX) :] if path.startswith(CORPUS_PREFIX) else Path(path).name
+        out = dest / rel
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(data)
+        written += 1
+    return written
 
 
 def build_seed(
@@ -195,6 +250,18 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Output path for the seed JSON (default: publication/ledger-seed.json)",
     )
     parser.add_argument(
+        "--ledger-seed",
+        type=Path,
+        default=ROOT / "publication" / "ledger-seed.json",
+        help="Existing seed JSON to materialize from (default: publication/ledger-seed.json)",
+    )
+    parser.add_argument(
+        "--materialize-dest",
+        type=Path,
+        default=None,
+        help="When set, materialize the seed union into this directory and exit",
+    )
+    parser.add_argument(
         "--published-only",
         nargs="*",
         default=[],
@@ -218,6 +285,20 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     repo_root = args.repo_root.resolve()
+
+    if args.materialize_dest is not None:
+        try:
+            count = materialize_union(
+                accepted_ref=args.accepted_ref,
+                ledger_seed=args.ledger_seed,
+                dest=args.materialize_dest,
+                repo_root=repo_root,
+            )
+        except LedgerSeedError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        print(f"Materialized {count} bundle(s) into {args.materialize_dest}")
+        return 0
 
     try:
         seed = build_seed(

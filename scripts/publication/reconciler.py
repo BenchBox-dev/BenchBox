@@ -225,7 +225,7 @@ def main(argv: list[str] | None = None) -> int:
         "dry_run": args.dry_run,
     }
     print(json.dumps(summary))
-    return 0
+    return 1 if rejected_count > 0 else 0
 
 
 if __name__ == "__main__":

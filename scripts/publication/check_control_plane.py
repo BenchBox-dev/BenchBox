@@ -113,10 +113,15 @@ def check_live_app_and_branch() -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check publication control plane contracts")
     parser.add_argument("--live", action="store_true", help="Perform live GitHub checks (branch, app, rules)")
-    parser.add_argument("--strict", action="store_true", help="Fail on any advisory warnings")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Require live checks; fail when --live was not used or live checks were skipped",
+    )
     args = parser.parse_args(argv)
 
     all_errors: list[str] = []
+    live_checks_performed = False
 
     # Local contracts
     codeowner_errors = check_codeowners()
@@ -125,6 +130,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.live:
         live_errors = check_live_app_and_branch()
         all_errors.extend(live_errors)
+        live_checks_performed = True
+
+    if args.strict and not live_checks_performed:
+        all_errors.append("--strict requires --live and completed live checks; live checks were not performed")
 
     if all_errors:
         print("❌ Publication Control Plane Check FAILED:")

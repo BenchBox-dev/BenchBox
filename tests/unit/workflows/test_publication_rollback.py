@@ -21,6 +21,10 @@ def _workflow() -> dict[str, Any]:
     return yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
 
 
+def _workflow_text() -> str:
+    return WORKFLOW_PATH.read_text(encoding="utf-8")
+
+
 def test_workflow_has_required_triggers() -> None:
     wf = _workflow()
     triggers = wf.get("on") or wf.get(True) or {}
@@ -49,24 +53,20 @@ def test_workflow_permissions_follow_least_privilege() -> None:
     # Top-level permissions should be read-only
     assert wf.get("permissions") == {"contents": "read"}
 
-    # build job: read-only
-    assert jobs["build"]["permissions"] == {"contents": "read"}
+    # Freeze G3: every job is contents: read only (docs.yml is sole Pages deployer)
+    for job_name in ("build", "deploy", "verify", "rollback"):
+        assert jobs[job_name]["permissions"] == {"contents": "read"}, job_name
+        perms = jobs[job_name]["permissions"]
+        assert perms.get("pages") != "write", job_name
+        assert perms.get("id-token") != "write", job_name
 
-    # deploy job: pages and id-token write only
-    deploy_perms = jobs["deploy"]["permissions"]
-    assert deploy_perms.get("pages") == "write"
-    assert deploy_perms.get("id-token") == "write"
-    assert deploy_perms.get("contents") == "read"
 
-    # verify job: strictly read-only
-    assert jobs["verify"]["permissions"] == {"contents": "read"}
-
-    # rollback job: immutable CAS deployment needs only pages and id-token write
-    rollback_perms = jobs["rollback"]["permissions"]
-    assert rollback_perms.get("pages") == "write"
-    assert rollback_perms.get("id-token") == "write"
-    assert rollback_perms.get("contents") == "read"
-    assert "actions" not in rollback_perms
+def test_workflow_has_no_pages_deploy_actions() -> None:
+    text = _workflow_text()
+    assert "actions/deploy-pages" not in text
+    assert "actions/upload-pages-artifact" not in text
+    assert "pages: write" not in text
+    assert "id-token: write" not in text
 
 
 def test_workflow_job_dependencies_and_ordering() -> None:
@@ -82,6 +82,21 @@ def test_workflow_job_dependencies_and_ordering() -> None:
     assert jobs["rollback"]["needs"] == ["build", "deploy", "verify"]
 
 
+def test_build_uses_correct_cli_flags() -> None:
+    text = _workflow_text()
+    assert "--data-dir results-data" in text
+    assert "--data-dir results-data/bundles" not in text
+    assert "--output results-explorer/public/data" in text
+    assert "--bundles-dir" not in text
+    assert "--output-dir" not in text
+    assert "results_explorer_snapshot_invariants.py" in text
+    assert "results-explorer/public/data/results.duckdb" in text
+    assert "--data-dir results-explorer/public/data" not in text
+    assert "2>/dev/null || true" not in text
+    assert 'if [ -f "results-explorer/public/data/results.duckdb" ]' not in text
+    assert 'if [ ! -f "results-explorer/public/data/results.duckdb" ]' in text
+
+
 def test_build_step_includes_pre_deploy_candidate_and_noop_check() -> None:
     steps = _workflow()["jobs"]["build"]["steps"]
     precheck_step = next(s for s in steps if s.get("name") == "Pre-deploy candidate verification and no-op check")
@@ -92,6 +107,18 @@ def test_build_step_includes_pre_deploy_candidate_and_noop_check() -> None:
     assert "--baseline-manifest" in run_cmd
     assert "--pre-deploy" in run_cmd
     assert "--require-receipt" in run_cmd
+
+
+def test_deploy_is_rehearsal_noop() -> None:
+    steps = _workflow()["jobs"]["deploy"]["steps"]
+    assert len(steps) >= 1
+    run_bodies = "\n".join(s.get("run", "") for s in steps if isinstance(s.get("run"), str))
+    assert "docs.yml as the sole production Pages deployer" in run_bodies
+    assert "do not deploy" in run_bodies.lower()
+    for step in steps:
+        uses = step.get("uses", "")
+        assert "deploy-pages" not in uses
+        assert "upload-pages-artifact" not in uses
 
 
 def test_verify_step_invokes_verify_live_with_receipt() -> None:
@@ -105,14 +132,26 @@ def test_verify_step_invokes_verify_live_with_receipt() -> None:
     assert "--base-url" in run_cmd
 
 
-def test_rollback_deploys_attested_immutable_artifact() -> None:
+def test_rollback_writes_facts_only_receipt_without_pages_deploy() -> None:
     steps = _workflow()["jobs"]["rollback"]["steps"]
     step_names = [s.get("name") for s in steps]
+    run_bodies = "\n".join(s.get("run", "") for s in steps if isinstance(s.get("run"), str))
 
-    assert "Stage attested immutable rollback package and issue generation receipt" in step_names
-    assert "Upload immutable rollback Pages artifact" in step_names
-    assert "Deploy attested rollback artifact to GitHub Pages" in step_names
+    assert "Write facts-only rollback receipt" in step_names
     assert "Upload rollback audit receipt" in step_names
+    assert "Deploy attested rollback artifact to GitHub Pages" not in step_names
+    assert "Upload immutable rollback Pages artifact" not in step_names
+
+    assert "<html" not in run_bodies.lower()
+    assert "index.html" not in run_bodies
+    assert "pinned_baseline_release_sha" in run_bodies
+    assert "freeze_still_blocked" in run_bodies
+    assert "pages_deploy_attempted" in run_bodies
+
+    for step in steps:
+        uses = step.get("uses", "")
+        assert "deploy-pages" not in uses
+        assert "upload-pages-artifact" not in uses
 
 
 def test_rollback_condition_covers_all_failure_modes_and_drills() -> None:

@@ -93,6 +93,8 @@ class PublicationManifest:
     parent_generation: int | None
     source_commit: str
     source_branch: str
+    develop_sha: str
+    published_results_sha: str
     build_closure: BuildClosure
     artifacts: dict[str, ArtifactEntry]
     corpus: CorpusSummary
@@ -108,6 +110,8 @@ class PublicationManifest:
             "parent_generation": self.parent_generation,
             "source_commit": self.source_commit,
             "source_branch": self.source_branch,
+            "develop_sha": self.develop_sha,
+            "published_results_sha": self.published_results_sha,
             "created_at": self.created_at,
             "build_closure": self.build_closure.to_dict(),
             "artifacts": {k: v.to_dict() for k, v in self.artifacts.items()},
@@ -160,6 +164,14 @@ def _validate_source(data: dict[str, Any], errors: list[str]) -> None:
     source_branch = data.get("source_branch")
     if not isinstance(source_branch, str) or not source_branch.strip():
         errors.append(f"source_branch must be a non-empty string, got {source_branch}")
+
+    develop_sha = data.get("develop_sha")
+    if not _is_valid_sha40(develop_sha):
+        errors.append(f"develop_sha must be a 40-char hex string, got {develop_sha}")
+
+    published_results_sha = data.get("published_results_sha")
+    if not _is_valid_sha40(published_results_sha):
+        errors.append(f"published_results_sha must be a 40-char hex string, got {published_results_sha}")
 
 
 def _validate_build_closure(data: dict[str, Any], errors: list[str]) -> None:
@@ -292,6 +304,8 @@ def deserialize_manifest(raw: str | dict[str, Any]) -> PublicationManifest:
         parent_generation=data["parent_generation"],
         source_commit=data["source_commit"],
         source_branch=data["source_branch"],
+        develop_sha=data["develop_sha"],
+        published_results_sha=data["published_results_sha"],
         created_at=data["created_at"],
         build_closure=build_closure,
         artifacts=artifacts,

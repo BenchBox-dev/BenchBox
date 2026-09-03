@@ -67,6 +67,22 @@ def test_shas_resolved_via_event_and_fetch_head_fallback():
     assert "GITHUB_ENV" in text
 
 
+def test_head_ref_fetched_fail_closed_for_parity():
+    """Parity needs the PR-head object: merge-ref fetch alone is not enough.
+
+    A --depth=1 `pull/N/merge` fetch stores the merge commit but not parent 2
+    (PR head), so validator_parity.py --head-sha would exit 2 on a missing
+    object for fork PRs. The head ref must be fetched on the success path with
+    no `|| true`, and HEAD_SHA must be proven present before validation runs.
+    """
+    text = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "pull/${PR_NUMBER}/head" in text
+    for line in text.splitlines():
+        if "pull/${PR_NUMBER}/head" in line:
+            assert "|| true" not in line
+    assert 'git cat-file -e "$HEAD_SHA"' in text
+
+
 def test_corpus_paths_producer_is_atomic_and_fails_closed():
     data = _load()
     steps = data["jobs"]["validate"]["steps"]

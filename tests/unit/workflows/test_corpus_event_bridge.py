@@ -69,8 +69,15 @@ def test_triggers_only_on_results_data_path_changes() -> None:
 def test_workflow_permissions_are_least_privilege() -> None:
     workflow, _ = _load_workflow()
     assert workflow.get("permissions") == {"contents": "read"}, (
-        f"event bridge must be contents: read only, got {workflow.get('permissions')!r}"
+        f"event bridge top-level must be contents: read only, got {workflow.get('permissions')!r}"
     )
+    job = workflow["jobs"]["dispatch-reconciler"]
+    job_perms = job.get("permissions")
+    assert isinstance(job_perms, dict)
+    assert job_perms.get("actions") == "write", (
+        f"dispatch job must grant actions: write for createWorkflowDispatch, got {job_perms!r}"
+    )
+    assert job_perms.get("contents") == "read"
 
 
 def test_never_checks_out_pr_content() -> None:
@@ -128,3 +135,7 @@ def test_dispatches_reconciler_with_required_inputs() -> None:
     assert "base-sha" in text
     assert "ledger-head-sha" in text
     assert "createWorkflowDispatch" in text or "workflow_dispatch" in text
+    # Workflow file lives on develop (published-results is slim and 404s on dispatch)
+    assert "ref: 'develop'" in text or 'ref: "develop"' in text
+    assert "ref: 'published-results'" not in text
+    assert 'ref: "published-results"' not in text

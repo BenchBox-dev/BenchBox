@@ -67,15 +67,18 @@ jobs:
       - name: Build explorer snapshot data
         run: |
           mkdir -p results-explorer/public/data
-          if [ -f "_project/scripts/explorer_publish.py" ]; then
-            uv run python _project/scripts/explorer_publish.py build --bundles-dir results-data/bundles/ --output-dir results-explorer/public/data/
-          fi
+          uv run python _project/scripts/explorer_publish.py build \
+            --data-dir results-data \
+            --output results-explorer/public/data
 
       - name: Validate snapshot invariants
         run: |
-          if [ -f "_project/scripts/results_explorer_snapshot_invariants.py" ] && [ -f "results-explorer/public/data/results.duckdb" ]; then
-            uv run python _project/scripts/results_explorer_snapshot_invariants.py --data-dir results-explorer/public/data/
+          if [ ! -f "results-explorer/public/data/results.duckdb" ]; then
+            echo "::error::results-explorer/public/data/results.duckdb is missing after explorer_publish build"
+            exit 1
           fi
+          uv run python _project/scripts/results_explorer_snapshot_invariants.py \
+            results-explorer/public/data/results.duckdb
 
       - name: Build static publication site
         run: npm run build
@@ -85,11 +88,12 @@ jobs:
         id: receipt
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p site-dist receipt-dist
-          cp -r results-explorer/dist/* site-dist/ 2>/dev/null || true
+          cp -r results-explorer/dist/* site-dist/
           mkdir -p site-dist/results/data
           if [ -d "results-explorer/public/data" ]; then
-            cp -r results-explorer/public/data/* site-dist/results/data/ 2>/dev/null || true
+            cp -r results-explorer/public/data/* site-dist/results/data/
           fi
 
           DB_SHA=""
@@ -134,9 +138,10 @@ jobs:
             --require-receipt \
             $NOOP_FLAG
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload rehearsal site artifact
+        uses: actions/upload-artifact@v4
         with:
+          name: publication-site-rehearsal
           path: site-dist
           retention-days: 7
 
@@ -152,17 +157,14 @@ jobs:
     needs: build
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.expect_noop != true && inputs.force_rollback != true)
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       contents: read
-      pages: write
-      id-token: write
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Rehearsal no-op (freeze G3)
+        shell: bash
+        run: |
+          echo "Freeze G3 keeps docs.yml as the sole production Pages deployer; do not deploy."
+          echo "publication-deploy.yml is a rehearsal control-plane only until G1-G5 pass."
 
   verify:
     name: Verify Live Publication & Checksum Receipt
@@ -208,13 +210,8 @@ jobs:
     needs: [build, deploy, verify]
     if: always() && (needs.deploy.result == 'failure' || needs.verify.result == 'failure' || (github.event_name == 'workflow_dispatch' && inputs.force_rollback == true))
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       contents: read
-      pages: write
-      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -222,19 +219,19 @@ jobs:
       - name: Log rollback trigger context
         shell: bash
         run: |
-          echo "::error::Publication deployment or verification failed; initiating automated immutable artifact rollback."
+          echo "::error::Publication deployment or verification failed; recording freeze-blocked rollback receipt (no Pages write)."
           echo "Build status: ${{ needs.build.result }}"
           echo "Deploy status: ${{ needs.deploy.result }}"
           echo "Verify status: ${{ needs.verify.result }}"
           echo "Force rollback requested: ${{ inputs.force_rollback || false }}"
 
-      - name: Stage attested immutable rollback package and issue generation receipt
+      - name: Write facts-only rollback receipt
         id: rollback-stage
         shell: bash
         run: |
-          mkdir -p rollback-site-dist rollback-receipt-dist
+          set -euo pipefail
+          mkdir -p rollback-receipt-dist
 
-          # Extract baseline publication metadata
           BASELINE_FILE="docs/operations/publication-baseline-2026-08-31.json"
           TARGET_SHA=""
           EXPECTED_DB_SHA=""
@@ -244,38 +241,24 @@ jobs:
           fi
 
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          GENERATION=$(date +%s)
           RECEIPT_FILE="rollback-receipt-dist/rollback-receipt.json"
 
           cat <<EOF > "$RECEIPT_FILE"
           {
             "schema_version": 1,
-            "action": "immutable_artifact_rollback",
-            "generation": $GENERATION,
-            "target_release_sha": "$TARGET_SHA",
+            "action": "freeze_blocked_rollback_receipt",
+            "pinned_baseline_release_sha": "$TARGET_SHA",
             "attested_database_sha256": "$EXPECTED_DB_SHA",
             "timestamp": "$TIMESTAMP",
-            "trigger_reason": "deploy_or_verification_failure"
+            "reason": "deploy_or_verification_failure",
+            "freeze_still_blocked": true,
+            "pages_deploy_attempted": false,
+            "sole_production_pages_deployer": "docs.yml"
           }
           EOF
 
-          echo "Generated immutable rollback receipt:"
+          echo "Generated freeze-blocked rollback receipt:"
           cat "$RECEIPT_FILE"
-
-          # Assemble immutable rollback static artifact payload
-          mkdir -p rollback-site-dist/results/data
-          echo "<html><head><title>BenchBox Results Explorer</title></head><body><h1>BenchBox Results Explorer (Restored)</h1></body></html>" > rollback-site-dist/index.html
-          echo "Restored from immutable baseline $TARGET_SHA" > rollback-site-dist/rollback-attestation.txt
-
-      - name: Upload immutable rollback Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: rollback-site-dist
-          retention-days: 7
-
-      - name: Deploy attested rollback artifact to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
 
       - name: Upload rollback audit receipt
         uses: actions/upload-artifact@v4

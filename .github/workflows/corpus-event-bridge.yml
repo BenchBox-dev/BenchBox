@@ -7,7 +7,8 @@ name: Corpus Event Bridge
 # Security properties:
 # - Only runs on push to published-results (no PR content checkout)
 # - Path filter limits to results-data/** only
-# - Minimal permissions (contents: read only)
+# - Job grants contents: read plus actions: write solely to dispatch
+#   corpus-reconciler.yml on develop (the workflow file is not on the slim branch)
 # - No deploy credentials received
 # - Passes --ledger-head-sha from live branch state (fail-closed if missing)
 
@@ -29,6 +30,9 @@ jobs:
   dispatch-reconciler:
     name: Extract merge SHA and dispatch reconciler
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
     steps:
       - name: Checkout published-results branch
         uses: actions/checkout@v4
@@ -108,7 +112,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'corpus-reconciler.yml',
-              ref: 'published-results',
+              ref: 'develop',
               inputs: {
                 'merge-sha': mergeSha,
                 'base-sha': baseSha,

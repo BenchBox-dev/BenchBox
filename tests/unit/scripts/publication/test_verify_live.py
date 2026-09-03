@@ -307,3 +307,13 @@ def test_pre_deploy_cli_main(tmp_path: Path) -> None:
         ]
     )
     assert rc == 0
+
+
+def test_pre_deploy_without_manifests_fails() -> None:
+    rc = verify_live_mod.main(["--pre-deploy"])
+    assert rc != 0
+    report = verify_live_mod.verify_live(pre_deploy=True, skip_live_probes=True)
+    assert report.ok is False
+    assert report.pre_deploy_check_performed is False
+    assert report.live_probes_performed is False
+    assert any("Pre-deploy check requires both a candidate and a baseline" in err for err in report.errors)
