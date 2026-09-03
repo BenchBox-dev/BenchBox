@@ -99,6 +99,10 @@ def probe_statement_overhead(
     thread and the caller stops waiting after the deadline, so a hung
     `execute()` cannot hang a benchmark run that already succeeded.
 
+    On timeout the worker may still hold the connection when this returns:
+    callers must treat the connection as tainted (no further use except
+    close) when `collection_error_class` is `"TimeoutError"`.
+
     Never raises exceptions: missing connections, non-standard clients, and
     execution failures return a partial/unavailable status with an allowlisted
     diagnostic (no raw error text enters the bundle).
@@ -118,21 +122,21 @@ def probe_statement_overhead(
             AttributeError(f"{type(connection).__name__} connection has no callable cursor() or query() method")
         )
 
-    # A connection left inside a failed transaction would fail every probe
-    # statement with the backend's own error, masking the real state in the
-    # published diagnostic. Reset defensively; the benchmark workload that
-    # used this connection has already completed.
-    rollback = getattr(connection, "rollback", None)
-    if callable(rollback):
-        try:
-            rollback()
-        except Exception as exc:
-            logger.debug("Link probe pre-rollback skipped: %r", exc)
-
     outcome: dict[str, Any] = {}
 
     def _sample() -> None:
         try:
+            # A connection left inside a failed transaction would fail every
+            # probe statement with the backend's own error, masking the real
+            # state in the published diagnostic. Reset defensively inside the
+            # worker so the rollback itself is covered by the deadline; the
+            # benchmark workload that used this connection has completed.
+            rollback = getattr(connection, "rollback", None)
+            if callable(rollback):
+                try:
+                    rollback()
+                except Exception as exc:
+                    logger.debug("Link probe pre-rollback skipped: %r", exc)
             if callable(cursor_factory):
                 samples = _sample_via_cursor(connection, sample_count)
             else:

@@ -250,6 +250,101 @@ def test_collect_client_link_metadata_surprise_error_degrades() -> None:
     assert adapter._client_link_metadata["collection_error_class"] == "RuntimeError"
 
 
+def test_collect_client_link_metadata_failed_probe_without_region_is_unavailable() -> None:
+    adapter = _DummyAdapter()
+    conn = MagicMock()
+
+    with (
+        patch(
+            "benchbox.platforms.base.adapter.probe_statement_overhead",
+            return_value={
+                "collection_status": "partial",
+                "source": "unavailable",
+                "collection_error_class": "ConnectionError",
+                "collection_error_message": "ConnectionError: statement overhead probe failed",
+            },
+        ),
+        patch(
+            "benchbox.platforms.base.adapter.discover_client_region",
+            return_value={
+                "client_region": None,
+                "client_cloud": None,
+                "source": "unavailable",
+            },
+        ),
+    ):
+        adapter._collect_client_link_metadata(conn, {"link_probe": True})
+
+    # Nothing recorded on either half: unavailable, not partial.
+    assert adapter._client_link_metadata is not None
+    assert adapter._client_link_metadata["collection_status"] == "unavailable"
+    assert adapter._client_link_metadata["statement_overhead_ms"] is None
+    assert adapter._link_probe_timed_out is False
+
+
+def test_collect_client_link_metadata_timeout_marks_connection_tainted() -> None:
+    adapter = _DummyAdapter()
+    conn = MagicMock()
+
+    with (
+        patch(
+            "benchbox.platforms.base.adapter.probe_statement_overhead",
+            return_value={
+                "collection_status": "partial",
+                "source": "unavailable",
+                "collection_error_class": "TimeoutError",
+                "collection_error_message": "TimeoutError: statement overhead probe failed",
+            },
+        ),
+        patch(
+            "benchbox.platforms.base.adapter.discover_client_region",
+            return_value={
+                "client_region": "us-east-1",
+                "client_cloud": "aws",
+                "source": "observed",
+            },
+        ),
+    ):
+        adapter._collect_client_link_metadata(conn, {"link_probe": True})
+
+    assert adapter._link_probe_timed_out is True
+    degraded = adapter._client_link_only_metadata()
+    assert degraded["execution_environment"]["client_link"]["client_region"] == "us-east-1"
+
+    adapter._reset_run_scoped_state()
+    assert adapter._link_probe_timed_out is False
+    assert adapter._client_link_only_metadata() == {}
+
+
+def test_collect_platform_metadata_skips_tainted_connection() -> None:
+    adapter = _DummyAdapter()
+    adapter._link_probe_timed_out = True
+    adapter._client_link_metadata = {
+        "collection_status": "partial",
+        "source": "observed",
+        "client_region": "us-east-1",
+        "client_cloud": "aws",
+    }
+
+    with patch.object(
+        _DummyAdapter,
+        "get_platform_info",
+        side_effect=AssertionError("tainted connection must not be reused"),
+    ):
+        platform_info, normalized = adapter._collect_platform_metadata(MagicMock())
+
+    assert platform_info == {}
+    assert normalized["execution_environment"]["client_link"]["client_region"] == "us-east-1"
+
+
+def test_exclude_probe_wall_time() -> None:
+    from benchbox.platforms.base.adapter import exclude_probe_wall_time
+
+    assert exclude_probe_wall_time(10.0, 2.5) == 7.5
+    assert exclude_probe_wall_time(1.0, 5.0) == 0.0
+    assert exclude_probe_wall_time(0.0, 0.0) == 0.0
+
+
 def test_collect_client_link_metadata_string_flag_forms() -> None:
     adapter = _DummyAdapter()
     conn = MagicMock()

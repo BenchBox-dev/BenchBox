@@ -102,6 +102,16 @@ except ImportError:
 EnhancedBenchmarkResults = BenchmarkResults
 
 
+def exclude_probe_wall_time(total_seconds: float, probe_seconds: float) -> float:
+    """Return a run duration with post-benchmark probe wall time removed.
+
+    The statement overhead probe issues live statements after the workload
+    succeeded; its time is measurement overhead, not benchmark time, and the
+    published ``total_duration`` must not include it.
+    """
+    return max(0.0, total_seconds - probe_seconds)
+
+
 class PlatformAdapter(
     ConnectionLifecycleMixin,
     DialectTranslationMixin,
@@ -263,6 +273,7 @@ class PlatformAdapter(
         self._sorted_ingestion_total_apply_seconds: float = 0.0
         self._reset_plan_capture_stats()
         self._client_link_metadata: dict[str, Any] | None = None
+        self._link_probe_timed_out = False
 
     def _reset_run_scoped_state(self) -> None:
         """Reset mutable state that belongs to one benchmark execution."""
@@ -273,6 +284,7 @@ class PlatformAdapter(
         self._sorted_ingestion_total_apply_seconds = 0.0
         self._reset_plan_capture_stats()
         self._client_link_metadata = None
+        self._link_probe_timed_out = False
         if self.dry_run_mode:
             self.captured_sql = []
             self.query_counter = 0
@@ -969,7 +981,7 @@ class PlatformAdapter(
             query_executions = self._create_standard_execution_phase(query_results, stream_id)
 
             # Step 7: Compile enhanced results
-            total_duration = max(0.0, elapsed_seconds(start_time) - probe_elapsed_s)
+            total_duration = exclude_probe_wall_time(elapsed_seconds(start_time), probe_elapsed_s)
 
             setup_phase = SetupPhase(
                 data_generation=data_generation_phase,
@@ -983,8 +995,7 @@ class PlatformAdapter(
                 query_results, query_executions, run_config, setup_phase
             )
 
-            platform_info = self.get_platform_info(connection)
-            normalized_metadata = self._resolve_normalized_metadata(connection, platform_info)
+            platform_info, normalized_metadata = self._collect_platform_metadata(connection)
             execution_metadata, system_profile, anonymous_machine_id = self._build_execution_metadata(run_config)
 
             total_rows_loaded = sum(table_stats.values()) if table_stats else 0
@@ -1115,8 +1126,12 @@ class PlatformAdapter(
         """
         try:
             self._client_link_metadata = self._build_client_link_metadata(connection, run_config)
+            self._link_probe_timed_out = bool(
+                (self._client_link_metadata or {}).get("collection_error_class") == "TimeoutError"
+            )
         except Exception as exc:  # noqa: BLE001 - collection must never break a run
             self.logger.warning("Client-link metadata collection failed: %r", exc)
+            self._link_probe_timed_out = False
             self._client_link_metadata = {
                 "collection_status": "unavailable",
                 "source": "unavailable",
@@ -1135,15 +1150,24 @@ class PlatformAdapter(
         if probe_requested:
             probe_result = probe_statement_overhead(connection)
 
-        merged_config = {**self.platform_config, **run_config}
-        region_info = discover_client_region(merged_config)
+        # run_config always carries client_region/client_cloud keys (None by
+        # default), which would shadow platform-config values: merge only
+        # explicitly set entries.
+        merged_config = {
+            **self.platform_config,
+            **{key: value for key, value in run_config.items() if value is not None},
+        }
+        if dry_run:
+            region_info: dict[str, Any] = {"client_region": None, "client_cloud": None, "source": "unavailable"}
+        else:
+            region_info = discover_client_region(merged_config)
 
         has_region = bool(region_info.get("client_region"))
         probe_available = bool(probe_result and probe_result.get("collection_status") == "available")
 
         if has_region and probe_available:
             collection_status = "available"
-        elif has_region or probe_available or (probe_result and probe_result.get("collection_error_class")):
+        elif has_region or probe_available:
             collection_status = "partial"
         elif not probe_requested and not has_region:
             collection_status = "not_requested"
@@ -1159,6 +1183,33 @@ class PlatformAdapter(
             "collection_error_class": probe_result.get("collection_error_class") if probe_result else None,
             "collection_error_message": probe_result.get("collection_error_message") if probe_result else None,
         }
+
+    def _collect_platform_metadata(self, connection: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Collect platform info and normalized metadata for a finished run.
+
+        When the statement overhead probe timed out, its abandoned worker may
+        still hold the connection: any further use (even driver-level locks)
+        can hang or crash this completed run, so collect nothing more from it
+        and degrade to the safely collected client_link block.
+        """
+        if self._link_probe_timed_out:
+            self.logger.warning(
+                "Statement overhead probe timed out; skipping live platform "
+                "metadata collection on the possibly-held connection."
+            )
+            return {}, self._client_link_only_metadata()
+        platform_info = self.get_platform_info(connection)
+        return platform_info, self._resolve_normalized_metadata(connection, platform_info)
+
+    def _client_link_only_metadata(self) -> dict[str, Any]:
+        """Degraded normalized metadata for a probe-tainted connection.
+
+        Carries only the safely collected ``client_link`` block so a timed-out
+        probe degrades the bundle instead of risking the completed run.
+        """
+        if self._client_link_metadata:
+            return {"execution_environment": {"client_link": dict(self._client_link_metadata)}}
+        return {}
 
     def _resolve_normalized_metadata(self, connection: Any, platform_info: Mapping[str, Any] | None) -> dict[str, Any]:
         """Obtain normalized metadata and ensure run-scoped client_link metadata is included."""

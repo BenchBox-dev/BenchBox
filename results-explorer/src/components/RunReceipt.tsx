@@ -483,18 +483,17 @@ function buildClientLocalityRow(detail: DetailResult): ReceiptRow | null {
   const localityStr = localityParts.length > 0 ? localityParts.join(" / ") : "";
   const overheadStr = overheadParts.length > 0 ? `overhead: ${overheadParts.join(", ")}` : "";
 
-  let displayStr = "";
+  const displayParts: string[] = [];
   if (localityStr && overheadStr) {
-    displayStr = `${localityStr} (${overheadStr})`;
-  } else {
-    displayStr = localityStr || overheadStr;
+    displayParts.push(`${localityStr} (${overheadStr})`);
+  } else if (localityStr || overheadStr) {
+    displayParts.push(localityStr || overheadStr);
   }
-
   if (status && String(status).trim()) {
-    displayStr += ` [${status}]`;
+    displayParts.push(`[${String(status).trim()}]`);
   }
 
-  return recordedRow("Client locality", displayStr);
+  return recordedRow("Client locality", displayParts.join(" "));
 }
 
 function rankingEligibilityRow(value: boolean | null | undefined): ReceiptRow {

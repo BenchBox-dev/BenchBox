@@ -181,8 +181,6 @@ def _client_link_block_for_dataframe(benchmark_config: Any, options_map: dict[st
     free of empty blocks. Discovery must never break a benchmark run, so
     surprise errors degrade to no block (same rule as the SQL path).
     """
-    import logging
-
     client_config = {
         **options_map,
         "client_region": getattr(benchmark_config, "client_region", None) or options_map.get("client_region"),
@@ -191,7 +189,7 @@ def _client_link_block_for_dataframe(benchmark_config: Any, options_map: dict[st
     try:
         region_info = discover_client_region(client_config)
     except Exception as exc:  # noqa: BLE001 - discovery must never break a run
-        logging.getLogger(__name__).warning("DataFrame client-link discovery failed: %r", exc)
+        logger.warning("DataFrame client-link discovery failed: %r", exc)
         return None
     if not region_info.get("client_region") and not region_info.get("client_cloud"):
         return None

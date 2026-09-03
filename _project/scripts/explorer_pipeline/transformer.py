@@ -1601,7 +1601,5 @@ class BundleTransformer:
         )
         return detail.model_copy(update={"ranking_exclusion_reason": ranking_exclusion_reason(manifest_peer)})
 
-    extract_detail = to_detail_result
-
 
 __all__ = ["BundleTransformer"]

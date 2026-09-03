@@ -709,7 +709,9 @@ describe("ComparabilityReceipt", () => {
       expect(localityField.detail).toContain("Collocated (us-east1)");
     });
 
-    it("treats remote self-hosted platforms as remote, not local", () => {
+    it("warns instead of asserting collocation when the platform region is unknown", () => {
+      // Remote self-hosted platforms carry no cloud region: without
+      // platform-side evidence the row must warn, never match.
       const remoteRun = makeDetail({
         result_id: "r1",
         platform: "ClickHouse Server",
@@ -721,8 +723,8 @@ describe("ComparabilityReceipt", () => {
       });
       const fields = buildComparabilityFields([remoteRun]);
       const localityField = fields.find((f) => f.label === "Locality")!;
-      expect(localityField.status).toBe("match");
-      expect(localityField.summary).toContain("Collocated");
+      expect(localityField.status).toBe("diff");
+      expect(localityField.summary).toBe("Client in us-east-1, platform locality unknown");
     });
 
     it("warns when client and platform clouds differ on the same region name", () => {
@@ -740,7 +742,7 @@ describe("ComparabilityReceipt", () => {
       const fields = buildComparabilityFields([run]);
       const localityField = fields.find((f) => f.label === "Locality")!;
       expect(localityField.status).toBe("diff");
-      expect(localityField.detail).toContain("Cross-region: client in us-east-1, platform in us-east-1");
+      expect(localityField.detail).toContain("Cross-cloud: client in us-east-1 (gcp), platform in us-east-1 (aws)");
     });
 
     it("appends the measured statement floor to cross-region detail", () => {

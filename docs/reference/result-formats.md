@@ -255,10 +255,10 @@ Discloses the client execution location and connectivity characteristics relativ
 | `statement_overhead_ms.samples` | int | Number of overhead probe query executions recorded (typically `5`). |
 | `statement_overhead_ms.min` | float | Minimum statement overhead observed across samples, in milliseconds floor. Serves as the transport/driver floor. |
 | `statement_overhead_ms.median` | float | Median statement overhead observed across samples, in milliseconds. |
+| `collection_error_class` | string \| null | Optional exception or error class name if locality discovery or overhead probing failed. |
+| `collection_error_message` | string \| null | Fixed-template diagnostic (`"<ErrorClass>: statement overhead probe failed"`). Raw error text is never published, so hostnames, IPs, and credentials cannot leak through this field. |
 
 The probe issues 1 warmup plus 5 `SELECT 1` statements on the live connection after the workload succeeds, bounded by a 5-second deadline. On billable warehouses (Snowflake, Athena, Redshift) these are metered statements; pass `--no-link-probe` to skip them. Probe wall time is excluded from the published run `total_duration`. The Explorer read model (v10) projects `min`/`median` only; `samples` stays bundle-level by design.
-| `collection_error_class` | string \| null | Optional exception or error class name if locality discovery or overhead probing failed. |
-| `collection_error_message` | string \| null | Optional error message explaining probe collection failure details. |
 
 ###### Example: Observed Cloud VM Run
 

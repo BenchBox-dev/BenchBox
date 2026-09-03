@@ -20,8 +20,6 @@ export interface Environment {
   [key: string]: string | number | boolean | null | undefined;
 }
 
-export type ResultEnvironment = Environment;
-
 export interface QueryTiming {
   query_id: string;
   duration_ms: number;
@@ -149,8 +147,6 @@ export interface DetailResult extends CostDeploymentFields {
   statement_overhead_median_ms?: number | null;
   link_status?: string | null;
 }
-
-export type ResultDetailMetrics = DetailResult;
 
 // ---------------------------------------------------------------------------
 // Benchmark summary types - rows are read from DuckDB tables such as

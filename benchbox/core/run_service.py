@@ -187,11 +187,9 @@ def resolve_run_config(
         power_fail_fast=fail_fast,
         client_region=getattr(config, "client_region", None) or options.get("client_region"),
         client_cloud=getattr(config, "client_cloud", None) or options.get("client_cloud"),
-        link_probe=(
-            is_probe_requested(getattr(config, "link_probe", None))
-            if getattr(config, "link_probe", None) is not None
-            else is_probe_requested(options.get("link_probe", True))
-        ),
+        # RunConfig.link_probe defaults True, so the toggle always resolves
+        # from config; there is intentionally no options fallback.
+        link_probe=is_probe_requested(getattr(config, "link_probe", None)),
     )
 
 

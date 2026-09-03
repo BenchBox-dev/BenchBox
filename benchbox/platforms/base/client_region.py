@@ -25,13 +25,27 @@ _IMDS_TIMEOUT_SECONDS: float = 0.2
 _IMDS_BASE_URL = "http://169.254.169.254"
 _MAX_IMDS_BODY_BYTES = 8192
 
+
 # IMDS endpoints are link-local and must never be sent to a proxy: with
 # HTTP(S)_PROXY set (common in corp/CI), the default opener would hand the
 # metadata request to the proxy, leaking the token and publishing whatever
 # the proxy answers as the client region. An empty ProxyHandler registers
 # no *_open methods, so the opener below routes direct by construction and
 # the default env-proxy handler is skipped.
-_IMDS_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects from the metadata address.
+
+    The default redirect handler re-sends request headers (including the
+    IMDSv2 token) to the redirect target, so a 302 from 169.254.169.254
+    would leak the token to an arbitrary host. Metadata endpoints never
+    redirect legitimately.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, ANN202
+        return None
+
+
+_IMDS_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirectHandler())
 
 _REGION_TOKEN_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 _KNOWN_CLIENT_CLOUDS = frozenset({"aws", "gcp", "azure"})
@@ -251,8 +265,9 @@ def discover_client_region(config: Mapping[str, Any] | None = None) -> dict[str,
             # An explicitly attested cloud must not relabel an observed region
             # from another cloud: that fabricates a cross-cloud collocation
             # signal. Keep the observed region only when the clouds agree.
+            # "unknown" carries no cloud signal, so it never drops the region.
             observed_region = observed.get("client_region")
-            if observed.get("client_cloud") != cloud:
+            if cloud in _KNOWN_CLIENT_CLOUDS and observed.get("client_cloud") != cloud:
                 observed_region = None
             return {
                 "client_region": observed_region,

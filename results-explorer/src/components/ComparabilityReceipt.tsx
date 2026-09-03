@@ -277,15 +277,33 @@ function buildLocalityField(results: DetailResult[]): ComparabilityField {
           warn: true,
         };
       }
+      // Cloud identity is evidence independent of region spellings: a
+      // client attested on one cloud against a platform on another never
+      // shares a footprint, even when the region names normalize equally.
       const clientCloud = getClientCloud(result);
       const platformCloud = getPlatformCloud(result);
       if (
-        platformReg &&
-        (canonicalRegion(clientReg) !== canonicalRegion(platformReg) ||
-          (clientCloud != null &&
-            platformCloud != null &&
-            clientCloud.toLowerCase() !== platformCloud.toLowerCase()))
+        clientCloud != null &&
+        platformCloud != null &&
+        clientCloud.toLowerCase() !== platformCloud.toLowerCase()
       ) {
+        return {
+          platform: result.platform,
+          value: `Cross-cloud: client in ${clientReg} (${clientCloud}), platform in ${platformReg ?? "unknown locality"} (${platformCloud})`,
+          warn: true,
+        };
+      }
+      // No platform region is no evidence: asserting collocation here
+      // would publish an unearned match (remote self-hosted platforms
+      // and cloud runs with uncaptured regions land in this branch).
+      if (!platformReg) {
+        return {
+          platform: result.platform,
+          value: `Client in ${clientReg}, platform locality unknown`,
+          warn: true,
+        };
+      }
+      if (canonicalRegion(clientReg) !== canonicalRegion(platformReg)) {
         const overhead = getOverheadMedian(result);
         const overheadCtx =
           overhead != null ? ` (client statement floor ${overhead.toFixed(2)} ms)` : "";

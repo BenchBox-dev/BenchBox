@@ -293,6 +293,53 @@ def test_cli_cloud_only_drops_mismatched_observed_region() -> None:
     }
 
 
+def test_imds_redirects_refused() -> None:
+    from benchbox.platforms.base import client_region as client_region_module
+
+    handler = client_region_module._NoRedirectHandler()
+    assert (
+        handler.redirect_request(
+            MagicMock(),
+            MagicMock(),
+            302,
+            "Found",
+            {},
+            "http://attacker.invalid/steal",
+        )
+        is None
+    )
+    assert any(
+        isinstance(handler, client_region_module._NoRedirectHandler)
+        for handler in client_region_module._IMDS_OPENER.handlers
+    )
+
+
+def test_cli_cloud_unknown_keeps_observed_region() -> None:
+    token_response = MagicMock()
+    token_response.read.return_value = b"token"
+    token_response.__enter__.return_value = token_response
+    doc_response = MagicMock()
+    doc_response.read.return_value = json.dumps({"region": "us-east-1"}).encode("utf-8")
+    doc_response.__enter__.return_value = doc_response
+
+    def fake_imds_open(req, timeout=0.2):
+        if "latest/api/token" in req.full_url:
+            return token_response
+        if "instance-identity/document" in req.full_url:
+            return doc_response
+        raise urllib.error.URLError("Not found")
+
+    with patch("benchbox.platforms.base.client_region._imds_open", side_effect=fake_imds_open):
+        result = discover_client_region({"client_cloud": "unknown"})
+
+    # "unknown" attests no cloud, so it must not discard the observed region.
+    assert result == {
+        "client_region": "us-east-1",
+        "client_cloud": "unknown",
+        "source": "cli_option",
+    }
+
+
 def test_cli_cloud_only_keeps_matching_observed_region() -> None:
     token_response = MagicMock()
     token_response.read.return_value = b"token"

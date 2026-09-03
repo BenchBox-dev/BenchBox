@@ -6,7 +6,10 @@ Licensed under the MIT License.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 _FALSE_TOKENS = frozenset({"0", "false", "no", "off"})
 _TRUE_TOKENS = frozenset({"1", "true", "yes", "on"})
@@ -30,7 +33,10 @@ def is_probe_requested(value: Any) -> bool:
             return False
         if normalized in _TRUE_TOKENS:
             return True
-        return bool(normalized)
+        # Unrecognized tokens fail closed: running billable probe statements
+        # on ambiguous input is worse than skipping them.
+        logger.warning("Unrecognized toggle value %r; treating as not requested", value)
+        return False
     return bool(value)
 
 

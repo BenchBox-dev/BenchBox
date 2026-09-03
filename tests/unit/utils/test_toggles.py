@@ -24,6 +24,7 @@ pytestmark = [
         (0, False),
         ("no", False),
         ("off", False),
+        ("nope", False),
         ("true", True),
         ("1", True),
         (1, True),

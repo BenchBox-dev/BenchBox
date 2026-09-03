@@ -251,6 +251,7 @@ modes remain available because they do not hold the request for execution.
 | `capture_plans` | boolean | No | `false` | Capture query plans where the selected platform supports them. |
 | `dry_run` | boolean | No | `false` | Preview the run plan without executing queries. |
 | `validate_only` | boolean | No | `false` | Validate platform, benchmark, scale, and mode without executing. |
+| `link_probe` | boolean | No | `true` | Measure post-benchmark statement overhead (6 metered `SELECT 1` statements on billable warehouses). Set `false` to skip; equivalent to the CLI `--no-link-probe` flag. |
 | `platform_options` | object or null | No | `null` | Typed, bounded, non-secret settings approved for the selected platform; credentials, endpoints, paths, and package-install controls are rejected. |
 
 **Behavior**
@@ -441,7 +442,6 @@ above.
 | `--result-source` | Omitted | not-yet-demanded | Result-source selection is a bounded provenance control with no client demand yet. |
 | `--client-region` | Omitted | not-yet-demanded | Attested client-region metadata is a bounded provenance field with no client demand yet. |
 | `--client-cloud` | Omitted | not-yet-demanded | Attested client-cloud metadata is a bounded provenance field with no client demand yet. |
-| `--no-link-probe` | Omitted | not-yet-demanded | Statement-overhead probe toggle is a bounded measurement control with no client demand yet. |
 
 The textcharts MCP server remains a separate-client integration, not a bundled or proxied part of `benchbox-mcp`. See `docs/design/textcharts-mcp-boundary.md` for the accepted separate textcharts configuration and the rejected bundle/proxy alternatives.
 ### Discovery Tools

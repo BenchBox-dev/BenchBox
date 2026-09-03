@@ -777,11 +777,9 @@ def _build_run_config_from_options(
         table_format_partition_cols=_parse_partition_cols(options.get("table_format_partition_cols")),
         client_region=getattr(benchmark_config, "client_region", None) or options.get("client_region"),
         client_cloud=getattr(benchmark_config, "client_cloud", None) or options.get("client_cloud"),
-        link_probe=(
-            is_probe_requested(getattr(benchmark_config, "link_probe", None))
-            if getattr(benchmark_config, "link_probe", None) is not None
-            else is_probe_requested(options.get("link_probe", True))
-        ),
+        # BenchmarkConfig.link_probe defaults True, so the toggle always
+        # resolves from config; there is intentionally no options fallback.
+        link_probe=is_probe_requested(getattr(benchmark_config, "link_probe", None)),
     )
 
 
