@@ -23,7 +23,7 @@ dependencies = [
     "libsql>=0.1.11", # todo-db hosted backend (Turso embedded replica)
     "pyyaml>=6.0.0", # todo-db import-yaml + other _project/scripts tools
     "sqlglot>=25.6.0,<31.0.0",
-    "todo-db[hosted]",
+    "todo-db[hosted,mcp]",
     "zstandard>=0.20.0",
 ]
 
@@ -33,4 +33,4 @@ dependencies = [
 managed = true
 
 [tool.uv.sources]
-todo-db = { path = "vendor/todo_db-0.4.3-py3-none-any.whl" }
+todo-db = { path = "vendor/todo_db-0.6.0-py3-none-any.whl" }

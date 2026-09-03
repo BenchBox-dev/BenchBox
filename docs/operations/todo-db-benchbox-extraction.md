@@ -2,7 +2,7 @@
 
 Status: historical 0.4.2 migration and compatibility evidence complete. This
 handoff records the 0.4.2 rollout; the current locked runtime is todo-db
-0.4.3, while `_project/scripts/todo` remains the stable repository entry point.
+0.6.0, while `_project/scripts/todo` remains the stable repository entry point.
 Use `_project/specs/todo-db-tracker.md` and `_project/scripts/pyproject.toml`
 for the current runtime and credential contract.
 

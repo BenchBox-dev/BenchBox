@@ -1,6 +1,6 @@
 # TODO Tracker on a Shared Database — Design Spec
 
-Status: historical design spec (implemented; live in production at schema v7, todo-db v0.4.3).
+Status: historical design spec (implemented; live in production at schema v7, todo-db v0.6.0).
 Author: agent session, 2026-07-18, from the TODO-infrastructure review.
 Decision owner: maintainer.
 

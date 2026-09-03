@@ -33,7 +33,7 @@ pytestmark = [
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SHIM_PATH = REPO_ROOT / "_project" / "scripts" / "todo"
 SKILL_PATH = REPO_ROOT / ".claude" / "skills" / "todo" / "SKILL.md"
-VENDORED_WHEEL = REPO_ROOT / "_project" / "scripts" / "vendor" / "todo_db-0.4.3-py3-none-any.whl"
+VENDORED_WHEEL = REPO_ROOT / "_project" / "scripts" / "vendor" / "todo_db-0.6.0-py3-none-any.whl"
 
 sys_path = str(REPO_ROOT / "_project" / "scripts")
 if sys_path not in sys.path:
@@ -112,10 +112,10 @@ class TestShim:
     def test_scripts_project_uses_verified_vendored_todo_db_release(self):
         assert VENDORED_WHEEL.is_file()
         assert hashlib.sha256(VENDORED_WHEEL.read_bytes()).hexdigest() == (
-            "28ced378d8fa12be79ea55cdc47e4cce62bbd900225b93eaf8d1aeb50e7b9ba7"
+            "664d19825bc9ebd614bbc8580ae7d128c6340210ed28b714221e510367b2fd46"
         )
         project = (REPO_ROOT / "_project" / "scripts" / "pyproject.toml").read_text(encoding="utf-8")
-        assert 'todo-db = { path = "vendor/todo_db-0.4.3-py3-none-any.whl" }' in project
+        assert 'todo-db = { path = "vendor/todo_db-0.6.0-py3-none-any.whl" }' in project
         assert "github.com/joeharris76/todo-db" not in project
 
     @pytest.mark.parametrize("subcommand", ["create", "candidates"])
