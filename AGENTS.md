@@ -14,6 +14,8 @@ Apply instructions in this order:
 4. loaded skills and mechanical tool output;
 5. recommendations, examples, and historical notes.
 
+Personal-global agent defaults apply only where this guide is silent; where behavior conflicts, this guide and the active project protocol win — e.g. a bundled review-and-fix request stays review-only per REVIEW-AUTH-001 below.
+
 `[AUTH-PROVENANCE-001]` Classify a requirement before acting: task authority,
 repository policy, mechanical constraint, or recommendation. State the source
 when it changes scope, identity, publication, or destructive behavior. Never
