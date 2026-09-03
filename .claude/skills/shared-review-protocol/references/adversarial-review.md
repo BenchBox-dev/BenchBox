@@ -44,5 +44,6 @@ with evidence about value, complexity, maintenance cost, and alternatives.
 4. L2 blind spots and any L3 reframe.
 5. What is done well.
 
-Route defects through [REVIEW-DEFECT-001] and capture through
+Route defects through [REVIEW-DEFECT-001], solution-fit findings without
+accompanying defect as action items under [REVIEW-FIT-001], and capture through
 [REVIEW-CAPTURE-001].

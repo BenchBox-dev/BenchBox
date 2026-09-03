@@ -65,8 +65,10 @@ planning depth, defect handling, capture, and remediation.
 | **Nit** | Minor, optional | May ignore |
 | **Consider** | Suggestion worth evaluating | Not required |
 
-Critical and Required findings are defects under the shared protocol. Put them
-in the severity table and action items, never in blind-spots.
+Critical and Required findings that meet the defect gate are defects under the
+shared protocol. Put them in the severity table and action items, never in
+blind-spots. A solution-fit finding with no accompanying defect routes as an
+action item under [REVIEW-FIT-001], not into the severity table.
 
 ## Change Sizing
 
