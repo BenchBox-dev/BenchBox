@@ -48,6 +48,34 @@ These states are deliberately separate:
 No count threshold can satisfy G1. No successful build without a deployed live
 probe can satisfy G2 or G3.
 
+## Gate evidence log
+
+### G1 archive preservation — PASS (2026-09-03)
+
+Restore drill re-materialized the exact accepted-path union from the pinned
+source and proved per-object byte identity for every path:
+
+- Seed: `publication/ledger-seed.json`, 199 union paths with sha256 digests,
+  `source_ref = origin/published-results`, pinned `source =
+  b3e34585d0fc60ea5c0f858638e9cd90b0e5a70c`.
+- Drill A (live union, bidirectional, `published_only = []`): materialized 199
+  paths via `create_ledger_seed.py --materialize-dest`; independent verifier
+  hashed both the materialized bytes and the git-object bytes at the pinned
+  SHA against the seed digests: **PASS=199 FAIL=0**.
+- Drill B (asymmetric case): synthetic seed regenerated from the pinned SHA
+  with 1 forced `published_only` path, materialized and independently
+  verified the same way: **PASS=199 FAIL=0**, including the published-only
+  path restored from git objects.
+
+Provenance caveat: the `--materialize-dest` drill tooling lands in PR #2022
+(commit `beb1a4615`), not yet merged to `develop` at the time of the drill.
+This G1 pass is replayable from that commit; it becomes replayable from
+`develop` itself once #2022 merges. The destructive-corpus-rewrite row is
+released on that basis — the drill, not the row, is what a re-verifier replays.
+
+Residual: land the drill as a durable repo command with a committed
+PASS/FAIL artifact instead of a throwaway probe.
+
 ## Prior-decision reconciliation
 
 - `_project/analysis/ingest-architecture-design.md`: **extended**. Immutable raw
