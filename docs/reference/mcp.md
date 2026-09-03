@@ -439,6 +439,9 @@ above.
 | `--ignore-memory-warnings` | Omitted | security-scoped | Skips memory-admission checks. Resource-budget bypasses stay permanently omitted from MCP. |
 | `--funding` | Omitted | not-yet-demanded | Funding metadata is a bounded provenance field with no client demand yet. |
 | `--result-source` | Omitted | not-yet-demanded | Result-source selection is a bounded provenance control with no client demand yet. |
+| `--client-region` | Omitted | not-yet-demanded | Attested client-region metadata is a bounded provenance field with no client demand yet. |
+| `--client-cloud` | Omitted | not-yet-demanded | Attested client-cloud metadata is a bounded provenance field with no client demand yet. |
+| `--no-link-probe` | Omitted | not-yet-demanded | Statement-overhead probe toggle is a bounded measurement control with no client demand yet. |
 
 The textcharts MCP server remains a separate-client integration, not a bundled or proxied part of `benchbox-mcp`. See `docs/design/textcharts-mcp-boundary.md` for the accepted separate textcharts configuration and the rejected bundle/proxy alternatives.
 ### Discovery Tools

@@ -97,11 +97,12 @@ Fields:
 
 - **Automated IMDS Discovery (`observed`):** BenchBox attempts non-blocking, link-local discovery via standard cloud Instance Metadata Services:
   - AWS: IMDSv2 token request (`PUT http://169.254.169.254/latest/api/token`) followed by document fetch (`GET http://169.254.169.254/latest/dynamic/instance-identity/document`).
-  - GCP: Metadata fetch (`GET http://metadata.google.internal/computeMetadata/v1/instance/zone`) with `Metadata-Flavor: Google`.
-  - Azure: Instance metadata fetch (`GET http://169.254.169.254/metadata/instance?api-version=2021-02-01`) with `Metadata: true`.
+  - GCP: Metadata fetch (`GET http://169.254.169.254/computeMetadata/v1/instance/zone`) with `Metadata-Flavor: Google`.
+  - Azure: Instance metadata fetch (`GET http://169.254.169.254/metadata/instance/compute/location?api-version=2021-02-01&format=text`) with `Metadata: true`.
   Discovery uses short timeouts (100–250 ms) to ensure that running on developer laptops or non-cloud servers terminates immediately without slowing startup.
 - **CLI Overrides (`cli_option`):** When running in air-gapped environments, on bare-metal servers, or where IMDS access is disabled, submitters can provide `--client-cloud` and `--client-region` on the CLI. The result records `source: "cli_option"`.
 - **Non-Cloud / Laptop Runs:** When IMDS is unreachable and no CLI override is provided, `client_cloud` and `client_region` remain `null`, and `source` is set to `"unavailable"`.
+- **Known limits:** Container runtimes with IMDS hop-limit 1 and ECS/Fargate tasks (metadata at `169.254.170.2` / `$ECS_CONTAINER_METADATA_URI_V4`, not EC2 IMDS) fail closed to `unavailable`; attest with `--client-region` there. IMDS requests bypass proxies and only tight region tokens (`^[a-z0-9][a-z0-9-]{0,63}$`) are accepted, so a middlebox error page can never become a published region.
 
 ### 3. Post-Benchmark Statement Overhead Probe (`statement_overhead_ms`)
 

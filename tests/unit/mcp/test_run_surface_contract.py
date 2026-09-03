@@ -154,6 +154,9 @@ EXPECTED_OMISSION_TIERS = {
     "--ignore-memory-warnings": "security-scoped",
     "--funding": "not-yet-demanded",
     "--result-source": "not-yet-demanded",
+    "--client-region": "not-yet-demanded",
+    "--client-cloud": "not-yet-demanded",
+    "--no-link-probe": "not-yet-demanded",
     "--tuning": "not-yet-demanded",
     "--validation": "not-yet-demanded",
 }

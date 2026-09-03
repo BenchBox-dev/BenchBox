@@ -89,6 +89,9 @@ benchbox run [OPTIONS]
   - `full`: All validation checks enabled (preflight, postgen, postload, platform check)
   - `preflight`, `postgen`, `postload`, `check-platforms`: Individual validation types
 - `--strict-translation`: Fail instead of falling back when SQL dialect translation cannot produce target SQL
+- `--client-region TEXT`: Attested client cloud region (e.g. `us-east-1`), recorded in `environment.client_link` with `source: "cli_option"`
+- `--client-cloud TEXT`: Attested client cloud provider (`aws`, `gcp`, `azure`)
+- `--no-link-probe`: Disable the post-benchmark statement overhead probe (6 metered `SELECT 1` statements on billable warehouses)
 
 **Platform-Specific Configuration:**
 - `--platform-option KEY=VALUE`: Platform-specific option (can be used multiple times)

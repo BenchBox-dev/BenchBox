@@ -247,7 +247,7 @@ Discloses the client execution location and connectivity characteristics relativ
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `collection_status` | string | Locality probe lifecycle status: `"available"` (full locality and probe recorded), `"partial"` (probe recorded, but cloud/region unavailable or unobserved), `"unavailable"` (probe not available), `"error"` (discovery or probe encountered an error), or `"not_requested"` (collection disabled or skipped). |
+| `collection_status` | string | Locality probe lifecycle status: `"available"` (region and probe recorded), `"partial"` (region or probe recorded, but not both), `"unavailable"` (neither recorded), or `"not_requested"` (collection disabled or skipped). |
 | `source` | string | Provenance of client cloud/region metadata: `"observed"` (detected via link-local cloud instance metadata service / IMDS), `"cli_option"` (attested via CLI options `--client-cloud` / `--client-region`), or `"unavailable"`. |
 | `client_region` | string \| null | Cloud region where the BenchBox client runner is executing (e.g., `"us-east-1"`, `"eu-west-2"`). Omitted or `null` when running outside known clouds or unavailable. |
 | `client_cloud` | string \| null | Cloud provider of the client runner (`"aws"`, `"gcp"`, `"azure"`). Omitted or `null` when running outside known clouds or unavailable. |
@@ -255,6 +255,8 @@ Discloses the client execution location and connectivity characteristics relativ
 | `statement_overhead_ms.samples` | int | Number of overhead probe query executions recorded (typically `5`). |
 | `statement_overhead_ms.min` | float | Minimum statement overhead observed across samples, in milliseconds floor. Serves as the transport/driver floor. |
 | `statement_overhead_ms.median` | float | Median statement overhead observed across samples, in milliseconds. |
+
+The probe issues 1 warmup plus 5 `SELECT 1` statements on the live connection after the workload succeeds, bounded by a 5-second deadline. On billable warehouses (Snowflake, Athena, Redshift) these are metered statements; pass `--no-link-probe` to skip them. Probe wall time is excluded from the published run `total_duration`. The Explorer read model (v10) projects `min`/`median` only; `samples` stays bundle-level by design.
 | `collection_error_class` | string \| null | Optional exception or error class name if locality discovery or overhead probing failed. |
 | `collection_error_message` | string \| null | Optional error message explaining probe collection failure details. |
 

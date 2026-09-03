@@ -64,6 +64,7 @@ from benchbox.platforms.base.tuning import TuningHooksMixin
 from benchbox.platforms.base.tuning_config import TuningConfigMixin
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.printing import quiet_console
+from benchbox.utils.toggles import is_probe_requested
 from benchbox.utils.verbosity import VerbosityMixin, VerbositySettings
 
 # Import result models for type hints and re-export alias
@@ -948,7 +949,13 @@ class PlatformAdapter(
             quiet_console.print(f"Executing benchmark queries ({test_execution_type} mode)...")
             self._last_throughput_test_result = None
             query_results = self._execute_queries_by_type(benchmark, connection, run_config)
+            # The overhead probe issues live statements after the workload
+            # succeeded. Its wall time is excluded from the published run
+            # duration below so the probe never inflates the number it
+            # exists to contextualise.
+            probe_start = mono_time()
             self._collect_client_link_metadata(connection, run_config)
+            probe_elapsed_s = elapsed_seconds(probe_start)
 
             # Get queries for definitions - pass canonical slug so dialect selection
             # doesn't have to infer benchmark family from object internals.
@@ -962,7 +969,7 @@ class PlatformAdapter(
             query_executions = self._create_standard_execution_phase(query_results, stream_id)
 
             # Step 7: Compile enhanced results
-            total_duration = elapsed_seconds(start_time)
+            total_duration = max(0.0, elapsed_seconds(start_time) - probe_elapsed_s)
 
             setup_phase = SetupPhase(
                 data_generation=data_generation_phase,
@@ -1100,10 +1107,32 @@ class PlatformAdapter(
                 self.connection = None
 
     def _collect_client_link_metadata(self, connection: Any, run_config: Mapping[str, Any]) -> None:
-        """Probe statement overhead and discover client region post-benchmark."""
-        link_probe_opt = run_config.get("link_probe", True)
+        """Probe statement overhead and discover client region post-benchmark.
+
+        Collection must never fail a benchmark run that already succeeded, so
+        unexpected errors degrade to an ``unavailable`` block (same rule as
+        the applied-tuning ledger guard).
+        """
+        try:
+            self._client_link_metadata = self._build_client_link_metadata(connection, run_config)
+        except Exception as exc:  # noqa: BLE001 - collection must never break a run
+            self.logger.warning("Client-link metadata collection failed: %r", exc)
+            self._client_link_metadata = {
+                "collection_status": "unavailable",
+                "source": "unavailable",
+                "client_region": None,
+                "client_cloud": None,
+                "statement_overhead_ms": None,
+                "collection_error_class": type(exc).__name__,
+                "collection_error_message": f"{type(exc).__name__}: client-link metadata collection failed",
+            }
+
+    def _build_client_link_metadata(self, connection: Any, run_config: Mapping[str, Any]) -> dict[str, Any]:
+        """Assemble the ``client_link`` block from probe and region discovery."""
+        dry_run = bool(getattr(self, "dry_run_mode", False) or run_config.get("dry_run_mode", False))
+        probe_requested = is_probe_requested(run_config.get("link_probe", True)) and not dry_run
         probe_result: dict[str, Any] | None = None
-        if link_probe_opt is not False and link_probe_opt not in ("false", "0", 0):
+        if probe_requested:
             probe_result = probe_statement_overhead(connection)
 
         merged_config = {**self.platform_config, **run_config}
@@ -1111,7 +1140,6 @@ class PlatformAdapter(
 
         has_region = bool(region_info.get("client_region"))
         probe_available = bool(probe_result and probe_result.get("collection_status") == "available")
-        probe_requested = link_probe_opt is not False and link_probe_opt not in ("false", "0", 0)
 
         if has_region and probe_available:
             collection_status = "available"
@@ -1122,7 +1150,7 @@ class PlatformAdapter(
         else:
             collection_status = "unavailable"
 
-        self._client_link_metadata = {
+        return {
             "collection_status": collection_status,
             "source": region_info.get("source", "unavailable"),
             "client_region": region_info.get("client_region"),

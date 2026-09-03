@@ -26,6 +26,8 @@ from benchbox.cli.app import cli
 from benchbox.cli.commands.run import run
 from benchbox.cli.config import ConfigManager
 
+_run_module = sys.modules["benchbox.cli.commands.run"]
+
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -571,8 +573,8 @@ class TestClientLinkLocalityOptions:
             return mock_result
 
         with (
-            patch("benchbox.cli.commands.run._execute_orchestrated_run", side_effect=mock_execute),
-            patch("benchbox.cli.commands.run._direct_handle_result"),
+            patch.object(_run_module, "_execute_orchestrated_run", side_effect=mock_execute),
+            patch.object(_run_module, "_direct_handle_result"),
         ):
             result = runner.invoke(
                 run,
@@ -616,8 +618,8 @@ class TestClientLinkLocalityOptions:
             return mock_result
 
         with (
-            patch("benchbox.cli.commands.run._execute_orchestrated_run", side_effect=mock_execute),
-            patch("benchbox.cli.commands.run._direct_handle_result"),
+            patch.object(_run_module, "_execute_orchestrated_run", side_effect=mock_execute),
+            patch.object(_run_module, "_direct_handle_result"),
         ):
             result = runner.invoke(
                 run,

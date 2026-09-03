@@ -811,7 +811,11 @@ class DuckDBSnapshotBuilder:
 
         if env_rows:
             con.executemany(
-                "INSERT INTO result_environment VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO result_environment (result_id, os, arch, cpu_count, memory_gb,"
+                " python, cpu_model, cpu_family, cpu_identity_provenance,"
+                " client_region, client_cloud, statement_overhead_min_ms,"
+                " statement_overhead_median_ms, link_status)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 env_rows,
             )
 

@@ -79,6 +79,7 @@ from benchbox.utils.dialect_utils import (
 )
 from benchbox.utils.format_converters import ConversionOptions
 from benchbox.utils.printing import emit
+from benchbox.utils.toggles import is_probe_requested
 from benchbox.utils.verbosity import VerbosityMixin, VerbositySettings
 
 logger = logging.getLogger(__name__)
@@ -777,9 +778,9 @@ def _build_run_config_from_options(
         client_region=getattr(benchmark_config, "client_region", None) or options.get("client_region"),
         client_cloud=getattr(benchmark_config, "client_cloud", None) or options.get("client_cloud"),
         link_probe=(
-            getattr(benchmark_config, "link_probe", None)
+            is_probe_requested(getattr(benchmark_config, "link_probe", None))
             if getattr(benchmark_config, "link_probe", None) is not None
-            else options.get("link_probe", True)
+            else is_probe_requested(options.get("link_probe", True))
         ),
     )
 

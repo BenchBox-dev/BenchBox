@@ -354,14 +354,14 @@ def test_client_link_environment_populated() -> None:
         source="observed",
         client_region="us-east-1",
         client_cloud="aws",
-        statement_overhead_ms={"mean": 1.25, "p95": 2.1},
+        statement_overhead_ms={"samples": 5, "min": 1.25, "median": 2.1},
     )
     assert link.to_dict() == {
         "collection_status": "available",
         "source": "observed",
         "client_region": "us-east-1",
         "client_cloud": "aws",
-        "statement_overhead_ms": {"mean": 1.25, "p95": 2.1},
+        "statement_overhead_ms": {"samples": 5, "min": 1.25, "median": 2.1},
     }
 
 
@@ -373,7 +373,7 @@ def test_build_environment_payload_preserves_client_link_without_flat_pollution(
         source="observed",
         client_region="us-east-1",
         client_cloud="aws",
-        statement_overhead_ms={"mean": 1.25},
+        statement_overhead_ms={"samples": 5, "min": 1.25, "median": 1.4},
     )
     env = NormalizedExecutionEnvironment(client_link=link)
     payload = build_environment_payload(system_profile={"os_type": "Darwin"}, execution_environment=env)
@@ -385,7 +385,7 @@ def test_build_environment_payload_preserves_client_link_without_flat_pollution(
         "source": "observed",
         "client_region": "us-east-1",
         "client_cloud": "aws",
-        "statement_overhead_ms": {"mean": 1.25},
+        "statement_overhead_ms": {"samples": 5, "min": 1.25, "median": 1.4},
     }
     # client_link fields must NOT pollute the flat top-level legacy keys on payload
     assert "client_region" not in payload
@@ -399,7 +399,7 @@ def test_builder_and_loader_client_link_round_trip() -> None:
         source="observed",
         client_region="us-west-2",
         client_cloud="aws",
-        statement_overhead_ms={"mean": 0.8},
+        statement_overhead_ms={"samples": 5, "min": 0.8, "median": 1.1},
     )
     builder = ResultBuilder(
         benchmark=BenchmarkInfoInput(name="TPC-H", scale_factor=0.01, benchmark_id="tpch"),
@@ -434,4 +434,8 @@ def test_builder_and_loader_client_link_round_trip() -> None:
 
     round_trip = build_result_payload(reconstructed)
     assert round_trip["environment"]["client_link"]["client_region"] == "us-west-2"
-    assert round_trip["environment"]["client_link"]["statement_overhead_ms"] == {"mean": 0.8}
+    assert round_trip["environment"]["client_link"]["statement_overhead_ms"] == {
+        "samples": 5,
+        "min": 0.8,
+        "median": 1.1,
+    }

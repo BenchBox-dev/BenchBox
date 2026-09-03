@@ -75,6 +75,7 @@ from benchbox.core.runner.runner import (
     ValidationOptions,
     run_benchmark_lifecycle,
 )
+from benchbox.utils.toggles import is_probe_requested
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -187,9 +188,9 @@ def resolve_run_config(
         client_region=getattr(config, "client_region", None) or options.get("client_region"),
         client_cloud=getattr(config, "client_cloud", None) or options.get("client_cloud"),
         link_probe=(
-            getattr(config, "link_probe", None)
+            is_probe_requested(getattr(config, "link_probe", None))
             if getattr(config, "link_probe", None) is not None
-            else options.get("link_probe", True)
+            else is_probe_requested(options.get("link_probe", True))
         ),
     )
 

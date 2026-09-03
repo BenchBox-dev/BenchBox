@@ -14,7 +14,9 @@
 --   - Cohort/ranking identity is derived during publish: raw `benchmark` and
 --     `test_type` remain immutable evidence, while canonical aliases
 --     (`star_schema` -> `ssb`) and missing phase (`unknown`) are written into
---     ranking/cohort keys. The frontend consumes the same v7 contract.
+--     ranking/cohort keys. The frontend consumes the versioned read-model
+--     contract (`EXPLORER_READ_MODEL_VERSION`); bump it when this file's
+--     column set changes.
 
 -- ---------------------------------------------------------------------------
 -- Metadata table (required by browser read-model version guard)

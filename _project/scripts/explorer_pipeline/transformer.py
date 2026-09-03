@@ -928,6 +928,11 @@ def _deployment_class_from_contract(data: dict[str, Any]) -> str | None:
         return "local"
     if deployment_key == "embedded" or endpoint_key in {"embedded_process", "localhost_port"}:
         return "local"
+    if endpoint_key == "remote_host":
+        # Self-hosted remote server: not local, but no cloud region either.
+        # The compare view expects this vocabulary ("remote"); without it
+        # remote self-hosted runs render as "Local".
+        return "remote"
     if runtime_key == "unknown" or deployment_key == "unknown" or endpoint_key == "unknown":
         return "unavailable"
     if runtime_key or deployment_key or endpoint_key:
@@ -1482,26 +1487,19 @@ class BundleTransformer:
                 environment["cpu_model"] = None
                 environment["cpu_family"] = None
 
+        # Producer shape (benchbox/platforms/base/adapter.py): the bundle
+        # carries client_link:{collection_status, client_region,
+        # client_cloud, statement_overhead_ms:{samples,min,median}}. Read
+        # exactly that shape: earlier flattened fallbacks matched no
+        # producer and silently projected NULLs.
         client_link = environment.get("client_link") if isinstance(environment.get("client_link"), dict) else {}
-        client_region = (
-            client_link.get("client_region") or client_link.get("region") or environment.get("client_region")
-        )
-        client_cloud = client_link.get("client_cloud") or client_link.get("cloud") or environment.get("client_cloud")
-        link_status = client_link.get("link_status") or client_link.get("status") or environment.get("link_status")
-        stmt_min = (
-            client_link.get("statement_overhead_min_ms")
-            if client_link.get("statement_overhead_min_ms") is not None
-            else client_link.get("overhead_min_ms")
-            if client_link.get("overhead_min_ms") is not None
-            else environment.get("statement_overhead_min_ms")
-        )
-        stmt_med = (
-            client_link.get("statement_overhead_median_ms")
-            if client_link.get("statement_overhead_median_ms") is not None
-            else client_link.get("overhead_median_ms")
-            if client_link.get("overhead_median_ms") is not None
-            else environment.get("statement_overhead_median_ms")
-        )
+        overhead = client_link.get("statement_overhead_ms")
+        overhead = overhead if isinstance(overhead, dict) else {}
+        client_region = client_link.get("client_region")
+        client_cloud = client_link.get("client_cloud")
+        link_status = client_link.get("collection_status")
+        stmt_min = overhead.get("min")
+        stmt_med = overhead.get("median")
 
         def _to_finite_float_or_none(v: Any) -> float | None:
             if v is None:

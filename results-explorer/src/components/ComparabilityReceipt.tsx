@@ -229,6 +229,40 @@ function getPlatformRegion(result: DetailResult): string | null {
   return r && String(r).trim() ? String(r).trim() : null;
 }
 
+function getClientCloud(result: DetailResult): string | null {
+  const c = result.environment?.client_cloud ?? result.client_cloud;
+  if (!c || !String(c).trim()) return null;
+  const token = String(c).trim().toLowerCase();
+  // "unknown" is the default when only --client-region is attested: it
+  // carries no cloud signal and must not force a cross-cloud verdict.
+  if (token === "unknown" || token === "local" || token === "none") return null;
+  return String(c).trim();
+}
+
+function getPlatformCloud(result: DetailResult): string | null {
+  const c = result.cloud_provider;
+  return c && String(c).trim() && String(c).trim().toLowerCase() !== "unknown"
+    ? String(c).trim()
+    : null;
+}
+
+function getOverheadMedian(result: DetailResult): number | null {
+  const m = result.environment?.statement_overhead_median_ms ?? result.statement_overhead_median_ms;
+  const n = m == null ? NaN : Number(m);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Region tokens arrive in provider-native spellings: Snowflake reports
+// `CURRENT_REGION()` as `AWS_US_EAST_1`, Azure as `East US 2`, GCP IMDS as
+// `us-east1`, AWS IMDS as `us-east-1`. Compare canonical forms so equal
+// footprints do not false-warn.
+function canonicalRegion(region: string): string {
+  return region
+    .toLowerCase()
+    .replace(/^(aws|azure|gcp)_/, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
 function buildLocalityField(results: DetailResult[]): ComparabilityField {
   const entries = results.map((result) => {
     const isRemote = isRemoteOrCloudPlatform(result);
@@ -243,10 +277,21 @@ function buildLocalityField(results: DetailResult[]): ComparabilityField {
           warn: true,
         };
       }
-      if (platformReg && clientReg.toLowerCase() !== platformReg.toLowerCase()) {
+      const clientCloud = getClientCloud(result);
+      const platformCloud = getPlatformCloud(result);
+      if (
+        platformReg &&
+        (canonicalRegion(clientReg) !== canonicalRegion(platformReg) ||
+          (clientCloud != null &&
+            platformCloud != null &&
+            clientCloud.toLowerCase() !== platformCloud.toLowerCase()))
+      ) {
+        const overhead = getOverheadMedian(result);
+        const overheadCtx =
+          overhead != null ? ` (client statement floor ${overhead.toFixed(2)} ms)` : "";
         return {
           platform: result.platform,
-          value: `Cross-region: client in ${clientReg}, platform in ${platformReg}`,
+          value: `Cross-region: client in ${clientReg}, platform in ${platformReg}${overheadCtx}`,
           warn: true,
         };
       }

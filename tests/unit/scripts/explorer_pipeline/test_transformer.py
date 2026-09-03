@@ -1398,3 +1398,44 @@ class TestPublishedCorpusResolvesExecutionMode:
                 mismatches.append((path.name, expected, actual))
 
         assert not mismatches, f"filename suffix disagrees with resolved mode: {mismatches[:5]}"
+
+
+class TestClientLinkProducerShape:
+    def test_producer_shaped_client_link_projects(self, bundle_file: Path) -> None:
+        transformer = BundleTransformer()
+        rid = transformer.result_id_from_bundle(bundle_file)
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["environment"]["client_link"] = {
+            "collection_status": "available",
+            "source": "observed",
+            "client_region": "us-east-1",
+            "client_cloud": "aws",
+            "statement_overhead_ms": {"samples": 5, "min": 1.42, "median": 1.68},
+        }
+        detail = transformer.to_detail_result(bundle_file, rid, data=data)
+
+        assert detail.environment.get("client_region") == "us-east-1"
+        assert detail.environment.get("client_cloud") == "aws"
+        assert detail.environment.get("link_status") == "available"
+        assert detail.environment.get("statement_overhead_min_ms") == pytest.approx(1.42)
+        assert detail.environment.get("statement_overhead_median_ms") == pytest.approx(1.68)
+
+    def test_missing_client_link_projects_nulls(self, bundle_file: Path) -> None:
+        transformer = BundleTransformer()
+        rid = transformer.result_id_from_bundle(bundle_file)
+        detail = transformer.to_detail_result(bundle_file, rid)
+
+        assert detail.environment.get("client_region") is None
+        assert detail.environment.get("link_status") is None
+        assert detail.environment.get("statement_overhead_min_ms") is None
+        assert detail.environment.get("statement_overhead_median_ms") is None
+
+    def test_remote_host_endpoint_classifies_remote(self) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["platform"]["deployment"] = {"endpoint_class": "remote_host"}
+        assert transformer_module._deployment_class_from_contract(data) == "remote"
+
+    def test_cloud_endpoint_still_classifies_cloud(self) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["platform"]["deployment"] = {"endpoint_class": "cloud_endpoint"}
+        assert transformer_module._deployment_class_from_contract(data) == "cloud"

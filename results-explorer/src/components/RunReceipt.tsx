@@ -79,6 +79,7 @@ export function RunReceipt({
   const queryCount = detail.display_timings.length || new Set(detail.queries.map((query) => query.query_id)).size;
   const sampleCount =
     detail.display_timings.reduce((sum, timing) => sum + timing.sample_count, 0) || detail.queries.length;
+  const clientLocalityRow = buildClientLocalityRow(detail);
 
   const sections = [
     {
@@ -137,7 +138,7 @@ export function RunReceipt({
         rowFromString("CPU count", detail.environment.cpu_count),
         memoryRow(detail.environment.memory_gb),
         rowFromString("Python", detail.environment.python),
-        ...(buildClientLocalityRow(detail) ? [buildClientLocalityRow(detail)!] : []),
+        ...(clientLocalityRow ? [clientLocalityRow] : []),
       ],
     },
     {

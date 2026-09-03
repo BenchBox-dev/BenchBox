@@ -64,6 +64,9 @@ def generate_cli_command(
     benchmark_options: dict[str, str] | None = None,
     funding: str | None = None,
     result_source: str | None = None,
+    client_region: str | None = None,
+    client_cloud: str | None = None,
+    no_link_probe: bool = False,
 ) -> str:
     """Generate equivalent CLI command from interactive wizard configuration.
 
@@ -100,6 +103,9 @@ def generate_cli_command(
         publish_label: Trust label for --publish
         funding: Funding-source disclosure recorded in the bundle's provenance block
         result_source: Advisory producer hint recorded in the bundle's provenance block
+        client_region: Attested client cloud region recorded in environment.client_link
+        client_cloud: Attested client cloud provider recorded in environment.client_link
+        no_link_probe: Disable the post-benchmark statement overhead probe
 
     Returns:
         Complete CLI command string
@@ -138,6 +144,8 @@ def generate_cli_command(
         (sorted_ingestion_method, "--sorted-ingestion-method", None),
         (funding, "--funding", None),
         (result_source, "--result-source", None),
+        (client_region, "--client-region", None),
+        (client_cloud, "--client-cloud", None),
     ]
     for value, flag, skip in _VALUE_PARAMS:
         if value is not None and value != skip:
@@ -162,6 +170,7 @@ def generate_cli_command(
         (stats_per_table_timing, "--stats-per-table-timing"),
         (global_cache, "--global-cache"),
         (publish, "--publish"),
+        (no_link_probe, "--no-link-probe"),
     ]
     for flag_value, flag in _BOOL_PARAMS:
         if flag_value:

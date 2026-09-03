@@ -204,3 +204,71 @@ def test_databricks_adapter_state_reset_and_metadata_inheritance() -> None:
 
     adapter._reset_run_scoped_state()
     assert adapter._client_link_metadata is None
+
+
+def test_collect_client_link_metadata_dry_run_skips_probe() -> None:
+    adapter = _DummyAdapter()
+    adapter.dry_run_mode = True
+    conn = MagicMock()
+
+    with (
+        patch("benchbox.platforms.base.adapter.probe_statement_overhead") as mock_probe,
+        patch(
+            "benchbox.platforms.base.adapter.discover_client_region",
+            return_value={
+                "client_region": None,
+                "client_cloud": None,
+                "source": "unavailable",
+            },
+        ),
+    ):
+        adapter._collect_client_link_metadata(conn, {"link_probe": True})
+        mock_probe.assert_not_called()
+
+    assert adapter._client_link_metadata is not None
+    assert adapter._client_link_metadata["collection_status"] == "not_requested"
+    assert adapter._client_link_metadata["statement_overhead_ms"] is None
+
+
+def test_collect_client_link_metadata_surprise_error_degrades() -> None:
+    adapter = _DummyAdapter()
+    conn = MagicMock()
+
+    with (
+        patch("benchbox.platforms.base.adapter.probe_statement_overhead") as mock_probe,
+        patch(
+            "benchbox.platforms.base.adapter.discover_client_region",
+            side_effect=RuntimeError("IMDS cache poisoned"),
+        ),
+    ):
+        # Collection must never break a run that already succeeded.
+        adapter._collect_client_link_metadata(conn, {"link_probe": True})
+        mock_probe.assert_called_once()
+
+    assert adapter._client_link_metadata is not None
+    assert adapter._client_link_metadata["collection_status"] == "unavailable"
+    assert adapter._client_link_metadata["collection_error_class"] == "RuntimeError"
+
+
+def test_collect_client_link_metadata_string_flag_forms() -> None:
+    adapter = _DummyAdapter()
+    conn = MagicMock()
+
+    with (
+        patch("benchbox.platforms.base.adapter.probe_statement_overhead") as mock_probe,
+        patch(
+            "benchbox.platforms.base.adapter.discover_client_region",
+            return_value={
+                "client_region": None,
+                "client_cloud": None,
+                "source": "unavailable",
+            },
+        ),
+    ):
+        adapter._collect_client_link_metadata(conn, {"link_probe": "false"})
+        mock_probe.assert_not_called()
+        assert adapter._client_link_metadata is not None
+        assert adapter._client_link_metadata["collection_status"] == "not_requested"
+
+        adapter._collect_client_link_metadata(conn, {"link_probe": "0"})
+        mock_probe.assert_not_called()
