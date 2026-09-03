@@ -129,6 +129,11 @@ jobs:
           git worktree add --detach "$WORK" "$RELEASE_SHA"
           trap 'git worktree remove --force "$WORK"' EXIT
           mkdir -p site
+          # Mirror docs.yml: the Sphinx HTML build must exist before assembly.
+          (
+            cd "$WORK/docs"
+            uv run sphinx-build -b html --keep-going . _build/html
+          )
           (
             cd "$WORK"
             uv run -- python scripts/assemble_public_site.py --site-dir "$OLDPWD/site-tmp-root"
