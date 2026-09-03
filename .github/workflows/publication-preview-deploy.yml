@@ -118,6 +118,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Build production-equivalent root from release SHA
         id: root
         shell: bash
@@ -129,6 +134,32 @@ jobs:
           git worktree add --detach "$WORK" "$RELEASE_SHA"
           trap 'git worktree remove --force "$WORK"' EXIT
           mkdir -p site
+          # Mirror the docs.yml explorer sequence inside the release worktree:
+          # without the built app + data, assembly fails on a missing dist.
+          if [ ! -f "$WORK/results-explorer/package.json" ]; then
+            echo "::error::release worktree lacks results-explorer/package.json"
+            exit 1
+          fi
+          test -f "$WORK/results-explorer/package-lock.json" || {
+            echo "results-explorer/package-lock.json is required for npm ci" >&2
+            exit 1
+          }
+          test -d "$WORK/results-data/bundles"
+          test -d "$WORK/_project/scripts/explorer_pipeline"
+          npm ci --prefix "$WORK/results-explorer"
+          npm run --prefix "$WORK/results-explorer" typecheck
+          (
+            cd "$WORK"
+            uv run -- python _project/scripts/explorer_publish.py build \
+              --data-dir results-data/ --output results-explorer/public/data/
+          )
+          test -s "$WORK/results-explorer/public/data/results.duckdb"
+          (
+            cd "$WORK"
+            uv run -- python _project/scripts/results_explorer_snapshot_invariants.py \
+              results-explorer/public/data/results.duckdb
+          )
+          npm run --prefix "$WORK/results-explorer" build
           # Mirror docs.yml: the Sphinx HTML build must exist before assembly.
           (
             cd "$WORK/docs"
