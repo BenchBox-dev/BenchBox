@@ -50,7 +50,6 @@ _OPT_IN_LANE_MARKERS = {"live_integration", "stress"}
 _SERVICE_DEPENDENT_CLASSES = {
     "tests/integration/test_ducklake_integration.py::TestDuckLakePostgresCatalogLive": "needs a live PostgreSQL server",
     "tests/integration/test_ducklake_integration.py::TestDuckLakeS3DataPathLive": "needs a real S3 bucket + AWS creds",
-    "tests/integration/test_todo_db_hosted_live.py::TestHostedLiveLifecycle": "needs the hosted Turso tracker DB",
     "tests/integration/test_throughput_session_isolation.py"
     "::TestPostgreSQLIndependentConnectionIsolatesSessions": "needs a live PostgreSQL server on :5432",
 }

@@ -192,7 +192,6 @@ _project/DONE/_indexes/
 .todo-db/*.sqlite
 .todo-db/*.sqlite-*
 .todo-db/replica*
-.todo-db/standalone-replica*
 .todo-db/export/
 .todo-db/archive/
 _project/blind-spots/_indexes/

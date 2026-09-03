@@ -3,12 +3,15 @@
 # These scripts are NOT shipped in the BenchBox wheel. They live here so their
 # dependency surface cannot leak into the public install.
 #
-# Usage:
-#   uv run --project _project/scripts -- todo-db <args>
-#   _project/scripts/todo <args>   # BenchBox policy adapter over todo-db
+# This environment installs the `todo-db` and `todo-db-mcp` console scripts.
 #
-# See `.claude/skills/todo/SKILL.md` and `_project/scripts/todo --help` for the
-# current workflow and command forms.
+# Usage:
+#   - Agents drive the tracker through the `todo-db-mcp` server, registered in
+#     `.mcp.json`. They never shell out to a CLI.
+#   - Scripts and humans use the floor CLI:
+#       uv run --project _project/scripts --locked -- todo-db <verb>
+#
+# See `.claude/skills/todo/SKILL.md` for the current workflow.
 
 [project]
 name = "benchbox-project-scripts"
