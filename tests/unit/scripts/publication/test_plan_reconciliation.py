@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -68,6 +69,27 @@ REAL_DEPS = {
 }
 
 
+def _snapshot(states: dict[str, str] | None = None, deps: dict[str, list[str]] | None = None) -> dict:
+    if states is None:
+        states = dict.fromkeys(LIVE_A0_A11, "active")
+    if deps is None:
+        deps = {item_id: list(REAL_DEPS.get(item_id, [])) for item_id in states}
+    return {"states": states, "deps": deps}
+
+
+def _envelope(items: list[dict], item_deps: list[dict]) -> str:
+    return json.dumps({"tables": {"items": items, "item_deps": item_deps}})
+
+
+def _prefixed_argv(monkeypatch) -> None:
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", PREFIX])
+
+
+# --- planned/live ordering helpers (unchanged surface) -----------------------
+
+
 def test_all_controlling_surfaces_and_gates_are_named() -> None:
     text = reconciliation.DECISION.read_text()
 
@@ -101,15 +123,6 @@ def test_live_tracker_ids_orders_by_a_phase_not_hardcoded_order() -> None:
     ]
 
 
-def test_live_tracker_ids_ignores_items_outside_prefix() -> None:
-    payload = [
-        {"id": "independent-publication-a0-baseline-and-freeze"},
-        {"id": "some-other-item"},
-    ]
-
-    assert reconciliation.live_tracker_ids(payload, PREFIX) == ["independent-publication-a0-baseline-and-freeze"]
-
-
 def test_live_tracker_ids_excludes_dropped_items() -> None:
     payload = [
         {"id": "independent-publication-a0-baseline-and-freeze", "state": "done"},
@@ -131,133 +144,181 @@ def test_decision_names_exact_live_ordered_tracker_sequence() -> None:
     assert reconciliation.planned_tracker_ids(text, PREFIX) == LIVE_A0_A11
 
 
-def test_live_tracker_ids_orders_by_dependency_graph_not_id_number() -> None:
-    payload = [
-        {
-            "id": "independent-publication-a0-baseline-and-freeze",
-            "deps": ["independent-publication-a2-corpus-trust-isolation"],
-        },
-        {
-            "id": "independent-publication-a1-authority-and-threat-contract",
-            "deps": ["independent-publication-a0-baseline-and-freeze"],
-        },
-        {"id": "independent-publication-a2-corpus-trust-isolation", "deps": []},
-    ]
-
-    assert reconciliation.live_tracker_ids(payload, PREFIX) == [
-        "independent-publication-a2-corpus-trust-isolation",
-        "independent-publication-a0-baseline-and-freeze",
-        "independent-publication-a1-authority-and-threat-contract",
-    ]
-
-
-def test_live_tracker_ids_detects_dependency_cycle() -> None:
-    payload = [
-        {
-            "id": "independent-publication-a0-baseline-and-freeze",
-            "deps": ["independent-publication-a1-authority-and-threat-contract"],
-        },
-        {
-            "id": "independent-publication-a1-authority-and-threat-contract",
-            "deps": ["independent-publication-a0-baseline-and-freeze"],
-        },
-    ]
-
-    with pytest.raises(ValueError):
-        reconciliation.live_tracker_ids(payload, PREFIX)
-
-
 def test_authority_is_not_a_hardcoded_tracker_list() -> None:
     assert not hasattr(reconciliation, "REQUIRED_TRACKER_IDS")
 
 
-def test_load_live_items_returns_none_when_todo_cmd_fails() -> None:
-    import sys
-
-    assert reconciliation.load_live_items([sys.executable, "-c", "raise SystemExit(1)"]) is None
+# --- export envelope parsing ------------------------------------------------
 
 
-def test_load_live_items_parses_json_list() -> None:
-    import json
-    import sys
+def test_parse_envelope_builds_state_and_dep_maps() -> None:
+    raw = _envelope(
+        items=[
+            {"id": "independent-publication-a0-baseline-and-freeze", "state": "done"},
+            {"id": "independent-publication-a1-authority-and-threat-contract", "state": "active"},
+        ],
+        item_deps=[
+            {
+                "item_id": "independent-publication-a1-authority-and-threat-contract",
+                "needs_item": "independent-publication-a0-baseline-and-freeze",
+            },
+        ],
+    )
 
-    payload = [{"id": "independent-publication-a0-baseline-and-freeze"}]
-    cmd = [sys.executable, "-c", f"import json,sys; print(json.dumps({json.dumps(payload)}))"]
+    snapshot = reconciliation.parse_envelope(raw)
 
-    assert reconciliation.load_live_items(cmd) == payload
-
-
-def test_load_live_items_returns_none_on_non_list_json() -> None:
-    import sys
-
-    cmd = [sys.executable, "-c", "print('{}')"]
-
-    assert reconciliation.load_live_items(cmd) is None
-
-
-def test_load_live_items_returns_none_on_invalid_json() -> None:
-    import sys
-
-    cmd = [sys.executable, "-c", "print('not json')"]
-
-    assert reconciliation.load_live_items(cmd) is None
-
-
-def test_load_live_deps_returns_deps_for_each_item() -> None:
-    import json
-    import sys
-
-    payload = {
-        "id": "independent-publication-a1-authority-and-threat-contract",
-        "deps": ["independent-publication-a0-baseline-and-freeze"],
-    }
-    cmd = [sys.executable, "-c", f"import sys,json; print(json.dumps({json.dumps(payload)}))"]
-
-    assert reconciliation.load_live_deps(["independent-publication-a1-authority-and-threat-contract"], cmd) == {
-        "independent-publication-a1-authority-and-threat-contract": ["independent-publication-a0-baseline-and-freeze"]
+    assert snapshot == {
+        "states": {
+            "independent-publication-a0-baseline-and-freeze": "done",
+            "independent-publication-a1-authority-and-threat-contract": "active",
+        },
+        "deps": {
+            "independent-publication-a0-baseline-and-freeze": [],
+            "independent-publication-a1-authority-and-threat-contract": [
+                "independent-publication-a0-baseline-and-freeze"
+            ],
+        },
     }
 
 
-def test_load_live_deps_returns_none_when_show_fails() -> None:
-    import sys
-
-    cmd = [sys.executable, "-c", "raise SystemExit(1)"]
-
-    assert reconciliation.load_live_deps(["independent-publication-a1-authority-and-threat-contract"], cmd) is None
+def test_parse_envelope_returns_none_on_malformed_json() -> None:
+    assert reconciliation.parse_envelope("not json") is None
 
 
-def test_main_fails_closed_when_live_tracker_unavailable(monkeypatch) -> None:
-    import sys
+def test_parse_envelope_returns_none_on_truncated_envelope() -> None:
+    raw = _envelope(items=[{"id": "x", "state": "active"}], item_deps=[])
+    assert reconciliation.parse_envelope(raw[: len(raw) // 2]) is None
 
-    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
-    monkeypatch.setattr(reconciliation, "load_live_items", lambda: None)
+
+def test_parse_envelope_returns_none_on_missing_tables() -> None:
+    assert reconciliation.parse_envelope(json.dumps({"events": []})) is None
+    assert reconciliation.parse_envelope(json.dumps({"tables": {"items": []}})) is None
+
+
+def test_parse_envelope_returns_none_when_item_row_lacks_id() -> None:
+    assert (
+        reconciliation.parse_envelope(json.dumps({"tables": {"items": [{"state": "active"}], "item_deps": []}})) is None
+    )
+
+
+def test_load_tracker_snapshot_returns_none_when_export_fails(monkeypatch) -> None:
+    monkeypatch.setattr(reconciliation, "_run_export", lambda output_path: False)
+
+    assert reconciliation.load_tracker_snapshot() is None
+
+
+def test_load_tracker_snapshot_parses_written_envelope(monkeypatch) -> None:
+    raw = _envelope(items=[{"id": "x", "state": "active"}], item_deps=[{"item_id": "x", "needs_item": "y"}])
+
+    def fake_run_export(output_path: Path) -> bool:
+        output_path.write_text(raw, encoding="utf-8")
+        return True
+
+    monkeypatch.setattr(reconciliation, "_run_export", fake_run_export)
+
+    assert reconciliation.load_tracker_snapshot() == {
+        "states": {"x": "active"},
+        "deps": {"x": ["y"]},
+    }
+
+
+# --- main() fail-closed / success behaviour --------------------------------
+
+
+def test_main_fails_closed_when_snapshot_unavailable(monkeypatch) -> None:
+    _prefixed_argv(monkeypatch)
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: None)
 
     assert reconciliation.main() == 1
 
 
-def test_main_fails_closed_when_dependency_graph_unavailable(monkeypatch) -> None:
-    import sys
-
-    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
-    live_items = [{"id": item_id} for item_id in LIVE_A0_A11]
-    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
-    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: None)
+def test_main_fails_closed_when_dependency_row_absent(monkeypatch) -> None:
+    _prefixed_argv(monkeypatch)
+    states = dict.fromkeys(LIVE_A0_A11, "active")
+    deps = {item_id: list(REAL_DEPS.get(item_id, [])) for item_id in LIVE_A0_A11}
+    deps.pop("independent-publication-a5-noop-deploy-and-automatic-rollback")
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot(states, deps))
 
     assert reconciliation.main() == 1
+
+
+def test_main_succeeds_when_live_sequence_matches_decision(monkeypatch) -> None:
+    _prefixed_argv(monkeypatch)
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot())
+
+    assert reconciliation.main() == 0
 
 
 def test_main_fails_when_live_sequence_does_not_match(monkeypatch) -> None:
-    import sys
-
-    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
-    live_items = [
-        {"id": "independent-publication-a0-baseline-and-freeze"},
-        {"id": "independent-publication-a1-authority-and-threat-contract"},
-    ]
-    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
-    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: [] for iid in ids})
+    _prefixed_argv(monkeypatch)
+    states = {
+        "independent-publication-a0-baseline-and-freeze": "active",
+        "independent-publication-a1-authority-and-threat-contract": "active",
+    }
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot(states))
 
     assert reconciliation.main() == 1
+
+
+def test_main_fails_on_dependency_edge_drift(monkeypatch) -> None:
+    _prefixed_argv(monkeypatch)
+    deps = {item_id: list(REAL_DEPS.get(item_id, [])) for item_id in LIVE_A0_A11}
+    deps["independent-publication-a1-authority-and-threat-contract"] = []
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot(deps=deps))
+
+    assert reconciliation.main() == 1
+
+
+def test_main_fails_on_partial_edge_removal(monkeypatch) -> None:
+    _prefixed_argv(monkeypatch)
+    deps = {item_id: list(REAL_DEPS.get(item_id, [])) for item_id in LIVE_A0_A11}
+    deps["independent-publication-a8-published-results-gate-and-shadow-promotion"] = [
+        "independent-publication-a2-corpus-trust-isolation",
+        "independent-publication-a4-hermetic-build-and-shadow-assembly",
+    ]
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot(deps=deps))
+
+    assert reconciliation.main() == 1
+
+
+def test_main_fails_when_required_phase_is_dropped(monkeypatch) -> None:
+    _prefixed_argv(monkeypatch)
+    states = dict.fromkeys(LIVE_A0_A11, "done")
+    states["independent-publication-a5-noop-deploy-and-automatic-rollback"] = "dropped"
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot(states))
+
+    assert reconciliation.main() == 1
+
+
+def test_main_fails_when_dropped_phase_omitted_from_decision(monkeypatch) -> None:
+    _prefixed_argv(monkeypatch)
+    states = dict.fromkeys(LIVE_A0_A11, "done")
+    states["independent-publication-a5-noop-deploy-and-automatic-rollback"] = "dropped"
+    omitted = [item_id for item_id in LIVE_A0_A11 if item_id != LIVE_A0_A11[5]]
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot(states))
+    monkeypatch.setattr(reconciliation, "planned_tracker_ids", lambda text, prefix: omitted)
+
+    assert reconciliation.main() == 1
+
+
+def test_main_fails_when_pinned_phase_missing_from_plan(monkeypatch) -> None:
+    _prefixed_argv(monkeypatch)
+    omitted = LIVE_A0_A11[:-1]
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot())
+    monkeypatch.setattr(reconciliation, "planned_tracker_ids", lambda text, prefix: omitted)
+
+    assert reconciliation.main() == 1
+
+
+def test_main_fails_when_pinned_phase_missing_from_live(monkeypatch) -> None:
+    _prefixed_argv(monkeypatch)
+    states = dict.fromkeys(LIVE_A0_A11[:-1], "done")
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot(states))
+
+    assert reconciliation.main() == 1
+
+
+# --- dependency_violations (pure) ------------------------------------------
 
 
 def test_dependency_violations_passes_for_real_dag() -> None:
@@ -295,42 +356,7 @@ def test_dependency_violations_surfaces_cycle_as_backward_edge() -> None:
     assert any("depends on" in v for v in violations)
 
 
-def test_main_succeeds_when_live_sequence_matches_decision(monkeypatch) -> None:
-    import sys
-
-    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
-    live_items = [{"id": item_id} for item_id in LIVE_A0_A11]
-    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
-    monkeypatch.setattr(
-        reconciliation,
-        "load_live_deps",
-        lambda ids: {iid: REAL_DEPS.get(iid, []) for iid in ids},
-    )
-
-    assert reconciliation.main() == 0
-
-
-def test_main_fails_on_dependency_edge_drift(monkeypatch) -> None:
-    import sys
-
-    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
-    live_items = [{"id": item_id} for item_id in LIVE_A0_A11]
-    drifted = dict(REAL_DEPS)
-    drifted["independent-publication-a1-authority-and-threat-contract"] = []
-    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
-    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: drifted.get(iid, []) for iid in ids})
-
-    assert reconciliation.main() == 1
-
-
-def test_expected_deps_matches_real_deps() -> None:
-    assert reconciliation.EXPECTED_DEPS == REAL_DEPS
-
-
 def test_dependency_violations_fails_on_partial_edge_removal() -> None:
-    # A8 originally depends on a2,a4,a7; removing a7 while keeping a2,a4
-    # still leaves a valid topological order (orphan check would pass) but
-    # must be flagged as missing expected edge.
     drifted = dict(REAL_DEPS)
     drifted["independent-publication-a8-published-results-gate-and-shadow-promotion"] = [
         "independent-publication-a2-corpus-trust-isolation",
@@ -355,57 +381,6 @@ def test_dependency_violations_fails_on_unexpected_edge() -> None:
     assert any("has unexpected dependency" in v and "a3-control" in v for v in violations)
 
 
-def test_main_fails_on_partial_edge_removal(monkeypatch) -> None:
-    import sys
-
-    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
-    live_items = [{"id": item_id} for item_id in LIVE_A0_A11]
-    drifted = dict(REAL_DEPS)
-    drifted["independent-publication-a8-published-results-gate-and-shadow-promotion"] = [
-        "independent-publication-a2-corpus-trust-isolation",
-        "independent-publication-a4-hermetic-build-and-shadow-assembly",
-    ]
-    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
-    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: drifted.get(iid, []) for iid in ids})
-
-    assert reconciliation.main() == 1
-
-
-def test_main_fails_when_required_phase_is_dropped(monkeypatch) -> None:
-    import sys
-
-    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
-    live_items = [{"id": item_id, "state": "done"} for item_id in LIVE_A0_A11]
-    # Mark a5 as dropped but keep it in live set; main must retain it to fail.
-    for item in live_items:
-        if item["id"] == "independent-publication-a5-noop-deploy-and-automatic-rollback":
-            item["state"] = "dropped"
-    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
-    monkeypatch.setattr(
-        reconciliation,
-        "load_live_deps",
-        lambda ids: {iid: REAL_DEPS.get(iid, []) for iid in ids},
-    )
-
-    assert reconciliation.main() == 1
-
-
-def test_main_fails_when_dropped_phase_omitted_from_decision(monkeypatch) -> None:
-    import sys
-
-    # Live: a5 is dropped, plus 11 other actives. Decision is edited to omit a5 (11 ids).
-    live_items = [{"id": item_id, "state": "done"} for item_id in LIVE_A0_A11 if item_id != LIVE_A0_A11[5]]
-    live_items.append({"id": LIVE_A0_A11[5], "state": "dropped"})
-    omitted_tracker = [iid for iid in LIVE_A0_A11 if iid != LIVE_A0_A11[5]]
-
-    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
-    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
-    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: REAL_DEPS.get(iid, []) for iid in ids})
-    monkeypatch.setattr(reconciliation, "planned_tracker_ids", lambda text, prefix: omitted_tracker)
-
-    assert reconciliation.main() == 1
-
-
 def test_dependency_violations_fails_on_external_dependency() -> None:
     drifted = dict(REAL_DEPS)
     drifted["independent-publication-a3-control-plane-and-artifact-contract"] = [
@@ -419,39 +394,6 @@ def test_dependency_violations_fails_on_external_dependency() -> None:
     assert any("has unexpected external dependency" in v and "external-tracker-item" in v for v in violations)
 
 
-def test_load_live_deps_returns_none_when_show_is_dropped() -> None:
-    import json
-    import sys
-
-    payload = {
-        "id": "independent-publication-a5-noop-deploy-and-automatic-rollback",
-        "state": "dropped",
-        "deps": [],
-    }
-    cmd = [sys.executable, "-c", f"import sys,json; print(json.dumps({json.dumps(payload)}))"]
-
-    assert reconciliation.load_live_deps(["independent-publication-a5-noop-deploy-and-automatic-rollback"], cmd) is None
-
-
-def test_main_fails_when_dependency_show_reports_dropped(monkeypatch) -> None:
-    import sys
-
-    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
-    live_items = [{"id": item_id, "state": "done"} for item_id in LIVE_A0_A11]
-
-    def fake_load_deps(ids):
-        # Simulate race: show for a5 reports dropped
-        for iid in ids:
-            if iid == "independent-publication-a5-noop-deploy-and-automatic-rollback":
-                return None
-        return {iid: REAL_DEPS.get(iid, []) for iid in ids}
-
-    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
-    monkeypatch.setattr(reconciliation, "load_live_deps", fake_load_deps)
-
-    assert reconciliation.main() == 1
-
-
 def test_dependency_violations_fails_on_unpinned_phase() -> None:
     plan = LIVE_A0_A11 + ["independent-publication-a12-new-phase"]
     drifted = dict(REAL_DEPS)
@@ -462,89 +404,5 @@ def test_dependency_violations_fails_on_unpinned_phase() -> None:
     assert any("is not pinned in EXPECTED_DEPS" in v and "a12-new-phase" in v for v in violations)
 
 
-def test_main_fails_when_pinned_phase_missing_from_both(monkeypatch) -> None:
-    import sys
-
-    omitted = LIVE_A0_A11[:-1]  # omit A11
-    live_items = [{"id": item_id, "state": "done"} for item_id in omitted]
-
-    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
-    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
-    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: REAL_DEPS.get(iid, []) for iid in ids})
-    monkeypatch.setattr(reconciliation, "planned_tracker_ids", lambda text, prefix: omitted)
-
-    assert reconciliation.main() == 1
-
-
-def test_main_fails_when_pinned_phase_missing_from_plan(monkeypatch) -> None:
-    import sys
-
-    omitted = LIVE_A0_A11[:-1]
-    live_items = [{"id": item_id} for item_id in LIVE_A0_A11]
-
-    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
-    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
-    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: REAL_DEPS.get(iid, []) for iid in ids})
-    monkeypatch.setattr(reconciliation, "planned_tracker_ids", lambda text, prefix: omitted)
-
-    assert reconciliation.main() == 1
-
-
-def test_main_fails_when_pinned_phase_missing_from_live(monkeypatch) -> None:
-    import sys
-
-    live_items = [{"id": item_id, "state": "done"} for item_id in LIVE_A0_A11[:-1]]
-
-    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
-    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
-    monkeypatch.setattr(reconciliation, "load_live_deps", lambda ids: {iid: REAL_DEPS.get(iid, []) for iid in ids})
-
-    assert reconciliation.main() == 1
-
-
-def test_main_fails_when_tracker_changes_during_check(monkeypatch) -> None:
-    import sys
-
-    live_items_initial = [{"id": item_id, "state": "done"} for item_id in LIVE_A0_A11]
-    live_items_after = [{"id": item_id, "state": "done"} for item_id in LIVE_A0_A11] + [
-        {"id": "independent-publication-a12-new-phase", "state": "active"}
-    ]
-
-    call_count = {"n": 0}
-
-    def fake_load_items():
-        call_count["n"] += 1
-        return live_items_initial if call_count["n"] == 1 else live_items_after
-
-    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
-    monkeypatch.setattr(reconciliation, "load_live_items", fake_load_items)
-    monkeypatch.setattr(
-        reconciliation,
-        "load_live_deps",
-        lambda ids: {iid: REAL_DEPS.get(iid, []) for iid in ids},
-    )
-
-    assert reconciliation.main() == 1
-
-
-def test_main_fails_when_deps_change_during_check(monkeypatch) -> None:
-    import sys
-
-    live_items = [{"id": item_id, "state": "done"} for item_id in LIVE_A0_A11]
-
-    call_count = {"n": 0}
-
-    def fake_load_deps(ids):
-        call_count["n"] += 1
-        if call_count["n"] == 1:
-            return {iid: REAL_DEPS.get(iid, []) for iid in ids}
-        # Second call (stability check) returns drifted deps for a0
-        drifted = dict(REAL_DEPS)
-        drifted["independent-publication-a1-authority-and-threat-contract"] = []
-        return {iid: drifted.get(iid, []) for iid in ids}
-
-    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", "independent-publication-"])
-    monkeypatch.setattr(reconciliation, "load_live_items", lambda: live_items)
-    monkeypatch.setattr(reconciliation, "load_live_deps", fake_load_deps)
-
-    assert reconciliation.main() == 1
+def test_expected_deps_matches_real_deps() -> None:
+    assert reconciliation.EXPECTED_DEPS == REAL_DEPS

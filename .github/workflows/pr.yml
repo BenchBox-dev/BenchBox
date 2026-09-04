@@ -1282,6 +1282,9 @@ jobs:
         env:
           TODO_DB_URL: ${{ secrets.TODO_DB_URL }}
           TODO_DB_RO_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
+          # Required by the 0.6.0 floor CLI; a hosted call without it returns a
+          # legacy-safe exit 2 and the reconciliation gate then fails closed.
+          TODO_DB_AUTH_CONTRACT: v2
         run: |
           if [ -z "${TODO_DB_URL:-}" ] || [ -z "${TODO_DB_RO_AUTH_TOKEN:-}" ]; then
             echo "::error::Missing tracker credentials (TODO_DB_URL/RO_AUTH_TOKEN); cannot verify live publication reconciliation without live evidence."
