@@ -14,6 +14,8 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "publication-deploy.yml"
 BASELINE_PATH = ROOT / "docs" / "operations" / "publication-baseline-2026-08-31.json"
+DEPLOY_PAGES_ACTION = "actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e"
+UPLOAD_PAGES_ACTION = "actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa"
 
 
 def _workflow() -> dict[str, Any]:
@@ -48,7 +50,7 @@ def test_workflow_permissions_follow_least_privilege() -> None:
     # Top-level permissions should be read-only
     assert wf.get("permissions") == {"contents": "read"}
 
-    assert jobs["build"]["permissions"] == {"contents": "read"}
+    assert jobs["build"]["permissions"] == {"actions": "read", "contents": "read"}
     assert jobs["verify"]["permissions"] == {"contents": "read"}
     assert jobs["deploy"]["permissions"] == {"contents": "read", "pages": "write", "id-token": "write"}
     assert jobs["rollback"]["permissions"] == {
@@ -61,8 +63,8 @@ def test_workflow_permissions_follow_least_privilege() -> None:
 
 def test_workflow_uses_pages_deploy_actions_only_in_write_jobs() -> None:
     text = _workflow_text()
-    assert "actions/deploy-pages@v4" in text
-    assert "actions/upload-pages-artifact@v3" in text
+    assert DEPLOY_PAGES_ACTION in text
+    assert UPLOAD_PAGES_ACTION in text
     assert "group: pages-deploy" in text
     assert "cancel-in-progress: false" in text
 
@@ -111,9 +113,37 @@ def test_build_step_includes_pre_deploy_candidate_and_noop_check() -> None:
 
 
 def test_deploy_uses_real_pages_deployment() -> None:
-    steps = _workflow()["jobs"]["deploy"]["steps"]
-    assert any(step.get("uses") == "actions/deploy-pages@v4" for step in steps)
-    assert _workflow()["jobs"]["deploy"]["environment"]["name"] == "github-pages"
+    workflow = _workflow()
+    steps = workflow["jobs"]["deploy"]["steps"]
+    deployment = next(step for step in steps if step.get("uses") == DEPLOY_PAGES_ACTION)
+    assert deployment["with"]["artifact_name"] == "publication-pages-${{ needs.build.outputs.generation }}"
+    assert workflow["jobs"]["deploy"]["environment"]["name"] == "github-pages"
+
+
+def test_receipts_use_measured_provenance_and_valid_json_newlines() -> None:
+    text = _workflow_text()
+
+    assert '"target": "benchbox.dev"' in text
+    assert 'd("lock")' not in text
+    assert 'd("corpus")' not in text
+    assert 'd("read-model")' not in text
+    assert '"bundle_count": 0' not in text
+    assert '"size": 0' not in text
+    assert "LOCKFILE_DIGEST=$(sha256sum uv.lock" in text
+    assert "CORPUS_DIGEST=$(sha256sum receipt-dist/corpus-file-digests.txt" in text
+    assert 'tree_size("site")' in text
+    assert " + '\\\\n'" not in text
+
+
+def test_build_receipt_enforces_attested_cas_lineage() -> None:
+    text = _workflow_text()
+
+    assert "generation 1 is genesis and cannot name a prior live receipt" in text
+    assert "requires prior_live_receipt_id" in text
+    assert "verify_live_receipt_signature" in text
+    assert 'receipt.get("generation") != int(os.environ["GENERATION"]) - 1' in text
+    assert '"parent_sha": os.environ.get("PARENT_SHA") or None' in text
+    assert "validate_manifest_dict(receipt)" in text
 
 
 def test_verify_step_invokes_verify_live_with_receipt() -> None:
@@ -142,9 +172,21 @@ def test_rollback_restores_only_a_cryptographically_attested_artifact() -> None:
     assert "verify_live_receipt_signature" in run_bodies
     assert "known-good artifact digest mismatch" in run_bodies
     assert "rollback_target_sha" not in run_bodies
+    assert ".workflow_run.name" not in run_bodies
+    assert "actions/runs/$RUN_ID" in run_bodies
+    assert "['artifacts']['pages_assembly']['digest']" in run_bodies
 
-    assert any(step.get("uses") == "actions/deploy-pages@v4" for step in steps)
-    assert any(step.get("uses") == "actions/upload-pages-artifact@v3" for step in steps)
+    assert any(step.get("uses") == DEPLOY_PAGES_ACTION for step in steps)
+    assert any(step.get("uses") == UPLOAD_PAGES_ACTION for step in steps)
+
+
+def test_retained_site_artifact_includes_hidden_files() -> None:
+    steps = _workflow()["jobs"]["build"]["steps"]
+    retained = next(
+        step for step in steps if step.get("name") == "Retain immutable site artifact for attested rollback"
+    )
+
+    assert retained["with"]["include-hidden-files"] is True
 
 
 def test_rollback_condition_covers_all_failure_modes_and_drills() -> None:

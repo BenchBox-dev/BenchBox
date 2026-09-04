@@ -161,8 +161,8 @@ def test_repo_publication_deploy_passes_audit() -> None:
     real_wf = Path(__file__).parents[4] / ".github" / "workflows" / "publication-deploy.yml"
     assert real_wf.is_file()
     text = real_wf.read_text(encoding="utf-8")
-    assert "actions/deploy-pages@v4" in text
-    assert "actions/upload-pages-artifact@v3" in text
+    assert "actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e" in text
+    assert "actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa" in text
     errors = checker.audit_workflow_file(real_wf, strict=True)
     assert errors == [], f"Errors found in real publication-deploy.yml: {errors}"
 
