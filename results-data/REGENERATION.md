@@ -191,10 +191,10 @@ the seed lane as skip-when-secrets-absent only.
 5. Each admitted cohort must meet the >=3-platform floor in
    `results-data/validate_corpus.py`.
 
-## Restore outcome (this branch)
+## Remaining-gap restore outcome
 
-Recorded when remaining-gap bundles are copied into `results-data/bundles/`
-and the inventory is regenerated:
+Recorded when remaining-gap bundles were copied into `results-data/bundles/`
+and the inventory regenerated (post-2026-08-23 trust-cut restore):
 
 | Benchmark | Admitted cohorts | Deferred |
 |-----------|------------------|----------|

@@ -258,6 +258,8 @@ jobs:
             scale_factor: "0.01"
             extras: clickhouse-local
 
+          # tpcdi admitted coverage is DuckDB / DataFusion / ClickHouse Local.
+          # Do not assign sqlite here without a validation-passed local sqlite run.
           - benchmark: tpcdi
             platform: duckdb
             scale_factor: "0.01"
@@ -267,9 +269,9 @@ jobs:
             scale_factor: "0.01"
             extras: datafusion
           - benchmark: tpcdi
-            platform: sqlite
+            platform: clickhouse-local
             scale_factor: "0.01"
-            extras: duckdb
+            extras: clickhouse-local
 
           - benchmark: tpchavoc
             platform: duckdb
@@ -297,31 +299,9 @@ jobs:
             scale_factor: "1"
             extras: clickhouse-local
 
-          - benchmark: metadata_primitives
-            platform: duckdb
-            scale_factor: "1.0"
-            extras: duckdb
-          - benchmark: metadata_primitives
-            platform: datafusion
-            scale_factor: "1.0"
-            extras: datafusion
-          - benchmark: metadata_primitives
-            platform: sqlite
-            scale_factor: "1.0"
-            extras: duckdb
-
-          - benchmark: write_primitives
-            platform: duckdb
-            scale_factor: "0.01"
-            extras: duckdb
-          - benchmark: write_primitives
-            platform: datafusion
-            scale_factor: "0.01"
-            extras: datafusion
-          - benchmark: write_primitives
-            platform: sqlite
-            scale_factor: "0.01"
-            extras: duckdb
+          # metadata_primitives and write_primitives stay off this lane until
+          # each can produce a >=3-identity validation-passed cohort
+          # (tracker follow-ups …-def726 / …-def727).
 
     # Skip matrix entries that don't match the requested benchmark (when
     # provided). This CANNOT be a job-level `if`: the matrix context is not

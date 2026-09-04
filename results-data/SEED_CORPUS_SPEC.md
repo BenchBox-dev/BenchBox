@@ -27,41 +27,47 @@ repeated runs of one platform/version do not pad that matrix.
 | Item | Value |
 |------|-------|
 | Workflow | `.github/workflows/seed-corpus.yml` |
-| Trigger | Manual `workflow_dispatch` only |
+| Trigger | Monthly cron `0 7 1 * *` (01:00 UTC on the 1st) plus manual `workflow_dispatch` |
 | Producer identity | `benchbox-bot` via GitHub Actions |
 | Benchmark phases | `generate,load,power` |
 | Trust label | `maintainer-run` |
 | Visibility | `public-curated` |
 | Optional entry | `clickhouse-cloud` at TPC-H SF 1.0, skipped when cloud secrets are absent |
 
-There is no scheduled quarterly refresh in the current workflow. Refreshes are run on
-demand by maintainers.
+The monthly schedule keeps published-results from stalling until someone remembers
+to dispatch. Maintainers can still run a full or single-benchmark refresh via
+`workflow_dispatch`.
 
 ## Workflow Target Matrix
 
-This is the matrix encoded in `.github/workflows/seed-corpus.yml`.
+The authoritative cell list lives in `.github/workflows/seed-corpus.yml`
+(`strategy.matrix.include`). Do not treat a frozen table in this document as the
+source of truth; the workflow drifts as admitted coverage changes.
 
-| Benchmark | Scale Factor | Platforms | Expected Bundles |
-|-----------|--------------|-----------|------------------|
-| TPC-H | 0.01 | duckdb, datafusion, polars-df | 3 |
-| TPC-H | 0.1 | duckdb, datafusion, polars-df | 3 |
-| TPC-H | 1.0 | duckdb, datafusion, clickhouse-cloud* | 2-3 |
-| TPC-DS | 1 | duckdb, datafusion | 2 |
-| SSB | 0.01 | duckdb, datafusion, polars-df | 3 |
-| SSB | 0.1 | duckdb, datafusion, polars-df | 3 |
+At a summary level the lane regenerates:
 
-\* `clickhouse-cloud` is conditional on `CLICKHOUSE_CLOUD_HOST` and
-`CLICKHOUSE_CLOUD_PASSWORD`.
+- **Already-covered local cells** at their live smallest comparable scales:
+  TPC-H (SF 0.01 / 0.1 / 1.0), TPC-DS (SF 1), SSB (SF 0.01 / 0.1), AMPLab /
+  CoffeeShop / H2ODB / read_primitives / tpch_skew (SF 0.01), ClickBench and
+  JoinOrder (SF 1.0). Platforms are the local set already present in the corpus
+  (typically DuckDB, DataFusion, and Polars or SQLite depending on the cell).
+- **Remaining-gap local cells** admitted after the 2026-08-23 trust cut:
+  datavault, flightdata, nyctaxi, tpcdi, tpchavoc (SF 0.01) and tpcds_obt (SF 1),
+  on DuckDB / DataFusion / ClickHouse Local (matching admitted coverage).
+- **Deferred off-lane:** `metadata_primitives` and `write_primitives` stay out of
+  the monthly matrix until each can produce a >=3-identity validation-passed
+  cohort. `star_schema` is an alias of SSB and is not a separate cell.
+- **Optional:** ClickHouse Cloud on TPC-H SF 1.0 when secrets are present.
 
 ## Merge Gate Caveats
 
-Two important caveats apply to the target matrix above:
-
-1. The current corpus validator fails any cohort with fewer than 3 platforms.
-   That means the TPC-DS SF 1 target row is not merge-ready as-is, and the TPC-H
-   SF 1.0 row also becomes non-mergeable if ClickHouse Cloud is unavailable.
-2. The current checked-in corpus is smaller than the full workflow target. Do not
-   read this spec as a statement that all target bundles already exist in `main`.
+1. The corpus validator fails any cohort with fewer than 3 comparison identities.
+   Seed-lane jobs that cannot form a merge-ready cohort (for example TPC-H SF 1.0
+   when ClickHouse Cloud secrets are absent, or a two-platform TPC-DS matrix row)
+   must not be treated as automatically publishable without a third identity.
+2. Checked-in coverage and the workflow target can diverge briefly after a
+   restore or schedule change. Prefer `results-data/corpus-inventory.json` and
+   `results-data/README.md` for what is currently committed.
 
 ### Version-over-version cohorts
 
