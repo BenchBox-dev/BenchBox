@@ -131,6 +131,64 @@ def test_verify_lane_isolation_detects_contaminating_changed_paths() -> None:
     assert any("changed paths violate lane 'site' isolation" in err for err in dirty_report.errors)
 
 
+def test_non_lane_inputs_skipped_in_changed_paths() -> None:
+    # Tracked inputs owned by no lane and never read by lane builds must not
+    # trip the boundary check (broad PRs such as tracker cutovers mix these
+    # with lane files).
+    mixed_paths = [
+        "docs/index.rst",
+        "tests/unit/test_example.py",
+        ".claude/skills/todo/SKILL.md",
+        ".github/workflows/pr.yml",
+        "Makefile",
+        "make/inventory.json",
+        "_project/specs/example.md",
+        "_project/scripts/agent_instruction_audit.py",
+        "AGENTS.md",
+        "skill-sync.yaml",
+        ".mcp.json",
+        ".todo-db/config.json",
+    ]
+    report = verify_lane_isolation("site", repo_root=REPO_ROOT, changed_paths=mixed_paths)
+    assert report.success is True
+    assert not report.errors
+
+
+def test_unclassified_changed_paths_still_fail() -> None:
+    # Genuinely new areas outside every lane and allowlist must still fail
+    # closed, with remediation guidance.
+    report = verify_lane_isolation("site", repo_root=REPO_ROOT, changed_paths=["brand-new-area/file.txt"])
+    assert report.success is False
+    assert any("unclassified inputs" in err for err in report.errors)
+
+
+def test_lane_owned_paths_still_contaminate_despite_non_lane_allowlist() -> None:
+    # Classification runs before the non-lane allowlist: an explorer-owned
+    # file under a non-lane parent (_project/) must still report
+    # contamination when the site lane builds.
+    report = verify_lane_isolation(
+        "site",
+        repo_root=REPO_ROOT,
+        changed_paths=["docs/index.rst", "_project/scripts/explorer_pipeline/contract.py"],
+    )
+    assert report.success is False
+    assert any("changed paths violate lane 'site' isolation" in err for err in report.errors)
+
+
+def test_non_lane_inputs_excluded_from_digests() -> None:
+    # Unlike shared inputs, non-lane inputs must never fold into lane
+    # digests: lane fingerprints stay scoped to real build inputs.
+    baseline = compute_lane_digest("site", repo_root=REPO_ROOT)
+    with_non_lane_extra = compute_lane_digest(
+        "site", repo_root=REPO_ROOT, extra_files={"tests/synthetic_probe.py": b"# probe\n"}
+    )
+    assert with_non_lane_extra == baseline
+    with_lane_extra = compute_lane_digest(
+        "site", repo_root=REPO_ROOT, extra_files={"docs/synthetic_probe.md": b"# probe\n"}
+    )
+    assert with_lane_extra != baseline
+
+
 def test_verify_workflow_isolation_least_privilege(tmp_path: Path) -> None:
     # Create valid mock repo with compliant workflow
     wf_dir = tmp_path / ".github" / "workflows"

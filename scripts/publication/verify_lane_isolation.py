@@ -54,6 +54,42 @@ SHARED_BUILD_INPUTS: tuple[str, ...] = (
     "uv.lock",
 )
 
+# Tracked repo inputs that belong to no publication lane and are never read
+# by lane artifact builds. The changed-paths boundary check skips them (see
+# ``verify_lane_isolation``); unlike ``SHARED_BUILD_INPUTS`` they are NOT
+# folded into lane digests, so lane fingerprints stay scoped to real build
+# inputs. Broad PRs (tracker cutovers, skill re-pins) touch these alongside
+# lane files; without an allowlist entry the gate fails closed on every such
+# PR (#2030, #2032). Lane-vs-lane contamination detection is unaffected: the
+# boundary check classifies first, so a path matching a lane prefix (e.g.
+# ``_project/scripts/explorer_pipeline/``) still reports contamination when
+# another lane builds.
+NON_LANE_INPUTS: tuple[str, ...] = (
+    # Test suites: exercised by code CI, never read by lane builds.
+    "tests/",
+    # Agent skill mirrors: consumed by coding agents, not lane builds.
+    ".claude/skills/",
+    # CI definitions and repo orchestration.
+    ".github/",
+    "Makefile",
+    "make/",
+    # Internal tooling, specs, decisions, audits, and tracker state.
+    # Lane-owned exact files under here (e.g. the explorer pipeline, this
+    # verifier) still classify to their lane first.
+    "_project/",
+    # Repo-root agent docs, skill manifest, and local-tooling config.
+    "AGENTS.md",
+    "CLAUDE.md",
+    "GEMINI.md",
+    "ANTIGRAVITY.md",
+    "skill-sync.yaml",
+    "skill-sync.lock",
+    ".env.example",
+    ".gitignore",
+    ".mcp.json",
+    ".todo-db/",
+)
+
 LANE_PREFIXES: dict[str, tuple[str, ...]] = {
     "site": (
         "docs/",
@@ -125,6 +161,25 @@ def _is_shared_input(rel_path: str) -> bool:
     if not normalized:
         return False
     for prefix in SHARED_BUILD_INPUTS:
+        if prefix.endswith("/"):
+            if normalized.startswith(prefix) or normalized == prefix[:-1]:
+                return True
+        else:
+            if normalized == prefix or fnmatch.fnmatch(normalized, prefix):
+                return True
+    return False
+
+
+def _is_non_lane_input(rel_path: str) -> bool:
+    """Return True for tracked inputs owned by no lane (see ``NON_LANE_INPUTS``).
+
+    These are skipped by the changed-paths boundary check but, unlike shared
+    inputs, are never folded into lane digests.
+    """
+    normalized = rel_path.strip().replace("\\", "/")
+    if not normalized:
+        return False
+    for prefix in NON_LANE_INPUTS:
         if prefix.endswith("/"):
             if normalized.startswith(prefix) or normalized == prefix[:-1]:
                 return True
@@ -397,6 +452,11 @@ def verify_lane_isolation(  # noqa: C901
                 continue
             path_lanes = classify_path(normalized)
             if not path_lanes:
+                # Classify first so lane-owned paths still report
+                # contamination below; only genuinely unowned paths reach
+                # the non-lane allowlist.
+                if _is_non_lane_input(normalized):
+                    continue
                 unclassified_paths.append(normalized)
             elif lane not in path_lanes:
                 contaminating_paths.append((normalized, sorted(path_lanes)))
@@ -408,7 +468,8 @@ def verify_lane_isolation(  # noqa: C901
         if unclassified_paths:
             errors.append(
                 f"changed paths contain unclassified inputs not owned by any lane: "
-                f"{unclassified_paths} (must be allowlisted as SHARED_BUILD_INPUTS or assigned to a lane)"
+                f"{unclassified_paths} (must be allowlisted as SHARED_BUILD_INPUTS or "
+                f"NON_LANE_INPUTS, or assigned to a lane)"
             )
         details["changed_paths_checked"] = len(changed_paths)
         details["contaminating_paths"] = contaminating_paths
