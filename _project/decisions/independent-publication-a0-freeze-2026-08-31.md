@@ -118,8 +118,10 @@ Record:
 
 - Operator Joe Harris exercised preview deploys, soak conclusions, merges
   through required gates, and the `github-pages` deployment branch policy.
-- Credentials are a least-privilege `GITHUB_TOKEN` per job, with `pages: write`
-  scoped to deploy jobs, plus maintainer `gh` CLI auth for operator actions.
+- CI uses `GITHUB_TOKEN`, but `docs.yml` declares `pages: write` and
+  `id-token: write` at workflow scope, so non-deploy jobs inherit those
+  permissions; this evidence does not establish per-job least privilege.
+  Maintainer `gh` CLI auth was used for operator actions.
 - Alerting is GitHub-native only. There is no dedicated paging channel, which is
   accepted for a static-site risk profile.
 - Bandwidth telemetry stays `unavailable`. GitHub exposes artifact bytes and
