@@ -22,7 +22,7 @@ pick a sweep window appropriate to the volume of merged PRs and the size of
 the unactioned queue (`make pr-review-followups-list` previews it). Each
 sweep produces:
 
-1. A new tracker item created through `_project/scripts/todo create` with id
+1. A new tracker item created through the `todo` skill with id
    `pr-review-followups-<window-tag>` (the window tag identifies the selected
    range; legacy entries used `week-YYYY-MM-DD`)
 2. A rescan audit at
@@ -168,15 +168,15 @@ paths. PR-review threads will not surface them. The tracked
 `_project/blind-spots/` corpus is frozen; current authority is the hosted
 findings domain plus unsynced drafts under `~/.benchbox/finding-drafts/`.
 
-```bash
-# Hosted findings. Filter the returned created_at timestamps to the exact
-# inclusive window; the list command intentionally has no date flags.
-_project/scripts/todo finding list --json \
-  | jq --arg s "$START_DATE" --arg e "$END_DATE" \
-      '[.[] | select(.created_at[0:10] >= $s and .created_at[0:10] <= $e)]'
+Both reads go through the `todo` skill. They are MCP tools, not shell commands:
 
-# Zero-credential local drafts not yet landed in the tracker.
-_project/scripts/todo finding candidates
+- Hosted findings: `finding_list`, then filter the returned `created_at`
+  timestamps to the exact inclusive window. The tool has no date arguments.
+- Zero-credential local drafts not yet landed in the tracker: the drafts under
+  `~/.benchbox/finding-drafts/`. Land them with the floor CLI:
+
+```bash
+uv run --project _project/scripts --locked -- todo-db finding sync
 ```
 
 For each in-window finding:
@@ -302,17 +302,18 @@ The current tracker writer validates command structure at authoring time. The
 sweep still owns the semantic checks above, including exit-status masking,
 which a schema validator cannot judge.
 
-Run the deterministic project lint over current hosted items:
+Run the deterministic project lint over current hosted items through the `todo`
+skill: `lint` for each in-window item, and `verify_list` for its verification
+records. Both are MCP tools in the default profile.
 
-```bash
-_project/scripts/todo lint --all
-uv run -- python _project/scripts/todo_verification_lint.py \
-  --since "$START_DATE" --until "$END_DATE"
-```
+Classify `lint` findings against the pinned window instead of claiming the
+historical corpus is green.
 
-Classify `todo lint --all` findings against the pinned window instead of
-claiming the historical corpus is green. The bounded semantic linter must pass
-for the selected window before close-out.
+The window-scoped verification lint this step used to run
+(`_project/scripts/todo_verification_lint.py --since/--until`) was removed with
+the shim and has no successor. Until one exists, check verification records for
+the window by reading `verify_list` output per item, and treat the absence of a
+window-wide gate as a known gap rather than a pass.
 
 Then manually assess context-dependent exit masking such as `; echo $?`,
 `|| true`, and pipelines ending in `head`, `tail`, or `wc`; their validity
@@ -320,7 +321,7 @@ depends on the expected result and cannot be decided from syntax alone.
 
 ## Tracker item shape
 
-Create and update the item only through `_project/scripts/todo`. The
+Create and update the item only through the `todo` skill. The
 conventional fields for a sweep item are:
 
 - `id: pr-review-followups-<window-tag>` (e.g. `pr-review-followups-2026-05-01-to-05-07`
@@ -359,10 +360,14 @@ Required sections:
 
 When the TODO completes:
 
-- Triage the cross-linked findings through `todo finding triage` with a
+- Triage the cross-linked findings through the `finding_triage` MCP tool with a
   one-line reason citing the tracker item id.
 - Record the rescan audit path in the final work-unit evidence before running
-  `_project/scripts/todo complete --pr <N> <item-id>`.
+  the floor CLI completion, which stays a human step:
+
+  ```bash
+  uv run --project _project/scripts --locked -- todo-db complete --pr <N> <item-id>
+  ```
 - If new patterns surfaced for Axis 3 (test-weakening) that this
   template did not list, add them here so the next sweep starts wider.
 
