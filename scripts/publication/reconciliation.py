@@ -183,7 +183,7 @@ def parse_iso_timestamp(ts_str: str) -> datetime | None:
         return None
 
 
-def _normalize_generation(value: Any) -> int | None:
+def _normalize_generation(value: Any) -> int | str | None:
     """Coerce a generation value to int, tolerating string encodings."""
     if value is None:
         return None
@@ -195,7 +195,10 @@ def _normalize_generation(value: Any) -> int | None:
         try:
             return int(value.strip())
         except ValueError:
-            return None
+            # Workflow receipts deliberately use an opaque, validated label
+            # (for example publication-123-1).  Treat it as a real value, not
+            # as an absent generation that can silently evade comparison.
+            return value.strip()
     return None
 
 
@@ -245,24 +248,27 @@ def verify_live_receipt_signature(receipt: dict[str, Any], public_key_path: Path
         signature_path = temp / "receipt.sig"
         payload_path.write_bytes(canonical_live_receipt_payload(receipt))
         signature_path.write_bytes(signature_bytes)
-        completed = subprocess.run(
-            [
-                "openssl",
-                "pkeyutl",
-                "-verify",
-                "-pubin",
-                "-inkey",
-                str(public_key_path),
-                "-rawin",
-                "-in",
-                str(payload_path),
-                "-sigfile",
-                str(signature_path),
-            ],
-            capture_output=True,
-            check=False,
-            text=True,
-        )
+        try:
+            completed = subprocess.run(
+                [
+                    "openssl",
+                    "pkeyutl",
+                    "-verify",
+                    "-pubin",
+                    "-inkey",
+                    str(public_key_path),
+                    "-rawin",
+                    "-in",
+                    str(payload_path),
+                    "-sigfile",
+                    str(signature_path),
+                ],
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+        except (FileNotFoundError, PermissionError, OSError) as exc:
+            return False, f"openssl binary execution failed: {exc}"
     if completed.returncode != 0:
         return False, "receipt signature does not verify against the configured attestor public key"
     return True, ""
@@ -386,6 +392,51 @@ def _check_manifest_drift(
 ) -> list[DriftFinding]:
     """Detect commit or build closure drift across desired, built, and deployed."""
     drifts: list[DriftFinding] = []
+    binding_fields = (
+        ("target", ("target",)),
+        ("develop SHA", ("develop_sha", "source_commit", "develop_commit")),
+        ("published-results SHA", ("published_results_sha", "published_results_commit")),
+        ("manifest digest", ("manifest_digest", "manifest_sha256")),
+    )
+    states = (("desired", desired), ("built", built), ("deployed", deployed))
+    for label, keys in binding_fields:
+        values = [(name, _first_present(state, keys)) for name, state in states]
+        present = [(name, value) for name, value in values if value is not None]
+        if len(present) >= 2:
+            first_name, first_value = present[0]
+            for name, value in present[1:]:
+                if value != first_value:
+                    drifts.append(
+                        DriftFinding(
+                            drift_type="MANIFEST_DRIFT",
+                            description=f"{label} mismatch between {first_name} and {name}",
+                            expected=first_value,
+                            actual=value,
+                        )
+                    )
+
+    # Artifact identity is part of the binding, not merely descriptive
+    # assembly metadata.  Compare the complete identity wherever a state
+    # supplies it so crossed receipts cannot reconcile successfully.
+    identity_fields = (
+        ("artifact_name", "artifact identity name"),
+        ("artifact_run_id", "artifact workflow run"),
+    )
+    for key, label in identity_fields:
+        values = [(name, state.get(key)) for name, state in states if state.get(key) not in (None, "")]
+        if len(values) >= 2:
+            first_name, first_value = values[0]
+            for name, value in values[1:]:
+                if value != first_value:
+                    drifts.append(
+                        DriftFinding(
+                            drift_type="ARTIFACT_DRIFT",
+                            description=f"{label} mismatch between {first_name} and {name}",
+                            expected=first_value,
+                            actual=value,
+                        )
+                    )
+
     des_commit = _first_present(desired, ("develop_sha", "source_commit", "develop_commit"))
     dep_commit = _first_present(deployed, ("develop_sha", "source_commit", "commit_sha"))
 

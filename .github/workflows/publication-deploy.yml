@@ -69,24 +69,34 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          DEVELOP_SHA="${{ inputs.develop_sha }}"
-          PUBLISHED_RESULTS_SHA="${{ inputs.published_results_sha }}"
-          GENERATION="${{ inputs.generation }}"
+          DEVELOP_SHA="$INPUT_DEVELOP_SHA"
+          PUBLISHED_RESULTS_SHA="$INPUT_PUBLISHED_RESULTS_SHA"
+          GENERATION="$INPUT_GENERATION"
           for value in "$DEVELOP_SHA" "$PUBLISHED_RESULTS_SHA"; do
             printf '%s' "$value" | grep -qE '^[0-9a-f]{40}$' || {
               echo "::error::dispatch SHAs must be lowercase 40-hex commits"
               exit 1
             }
+          done
+          git fetch --depth=1 origin "$PUBLISHED_RESULTS_SHA" || git fetch --no-tags origin published-results:refs/remotes/origin/published-results || git fetch --no-tags origin published-results
+          git fetch --no-tags origin develop:refs/remotes/origin/develop
+          for value in "$DEVELOP_SHA" "$PUBLISHED_RESULTS_SHA"; do
             git cat-file -e "$value^{commit}" || {
               echo "::error::pinned commit is not available: $value"
               exit 1
             }
           done
+          git merge-base --is-ancestor "$DEVELOP_SHA" refs/remotes/origin/develop || {
+            echo "::error::develop_sha is not reachable from the protected develop branch"; exit 1;
+          }
+          git merge-base --is-ancestor "$PUBLISHED_RESULTS_SHA" refs/remotes/origin/published-results || {
+            echo "::error::published_results_sha is not reachable from the protected published-results branch"; exit 1;
+          }
           if [ -z "$GENERATION" ]; then
-            GENERATION="publication-${{ github.run_id }}-${{ github.run_attempt }}"
+            GENERATION="$GITHUB_RUN_ID"
           fi
-          printf '%s' "$GENERATION" | grep -qE '^[a-z0-9-]{1,80}$' || {
-            echo "::error::generation must match [a-z0-9-]{1,80}"
+          printf '%s' "$GENERATION" | grep -qE '^[1-9][0-9]{0,18}$' || {
+            echo "::error::generation must be a positive decimal CAS generation"
             exit 1
           }
           {
@@ -95,11 +105,18 @@ jobs:
             echo "published_results_sha=$PUBLISHED_RESULTS_SHA"
             echo "site_artifact=publication-site-$GENERATION"
           } >> "$GITHUB_OUTPUT"
+        env:
+          INPUT_DEVELOP_SHA: ${{ inputs.develop_sha }}
+          INPUT_PUBLISHED_RESULTS_SHA: ${{ inputs.published_results_sha }}
+          INPUT_GENERATION: ${{ inputs.generation }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
 
       - name: Materialize pinned control plane and corpus
         shell: bash
         run: |
           set -euo pipefail
+          git fetch --depth=1 origin "${{ steps.inputs.outputs.published_results_sha }}" || git fetch --no-tags origin published-results:refs/remotes/origin/published-results || git fetch --no-tags origin published-results
           git checkout --detach "${{ steps.inputs.outputs.develop_sha }}"
           rm -rf results-data
           mkdir results-data
@@ -159,13 +176,20 @@ jobs:
 
       - name: Write desired and assembly receipts
         id: receipt
+        env:
+          PRIOR_LIVE_RECEIPT_ID: ${{ inputs.prior_live_receipt_id }}
+          BUILD_GENERATION: ${{ steps.inputs.outputs.generation }}
+          BUILD_DEVELOP_SHA: ${{ steps.inputs.outputs.develop_sha }}
+          BUILD_PUBLISHED_RESULTS_SHA: ${{ steps.inputs.outputs.published_results_sha }}
+          SITE_ARTIFACT: ${{ steps.inputs.outputs.site_artifact }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p receipt-dist
-          GENERATION="${{ steps.inputs.outputs.generation }}"
-          DEVELOP_SHA="${{ steps.inputs.outputs.develop_sha }}"
-          PUBLISHED_RESULTS_SHA="${{ steps.inputs.outputs.published_results_sha }}"
+          GENERATION="$BUILD_GENERATION"
+          DEVELOP_SHA="$BUILD_DEVELOP_SHA"
+          PUBLISHED_RESULTS_SHA="$BUILD_PUBLISHED_RESULTS_SHA"
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           MANIFEST_DIGEST=$(printf '%s' "develop=$DEVELOP_SHA|published-results=$PUBLISHED_RESULTS_SHA|target=benchbox.dev|generation=$GENERATION" | sha256sum | cut -d ' ' -f 1)
           (cd site && find . -type f -exec sha256sum {} + | sort) > receipt-dist/site-file-digests.txt
@@ -175,12 +199,15 @@ jobs:
           (cd docs/_build/html && find . -type f -exec sha256sum {} + | sort) > receipt-dist/docs-file-digests.txt
           DOCS_DIGEST=$(sha256sum receipt-dist/docs-file-digests.txt | cut -d ' ' -f 1)
           DATABASE_DIGEST=$(sha256sum site/results/data/results.duckdb | cut -d ' ' -f 1)
-          cat > receipt-dist/desired-manifest.json <<EOF
-          {"schema_version":1,"generation":"$GENERATION","target":"benchbox.dev","develop_sha":"$DEVELOP_SHA","published_results_sha":"$PUBLISHED_RESULTS_SHA","manifest_digest":"$MANIFEST_DIGEST","prior_live_receipt_id":"${{ inputs.prior_live_receipt_id }}","timestamp":"$TIMESTAMP"}
-          EOF
-          cat > receipt-dist/assembly-receipt.json <<EOF
-          {"schema_version":1,"generation":"$GENERATION","target":"benchbox.dev","manifest_digest":"$MANIFEST_DIGEST","develop_sha":"$DEVELOP_SHA","published_results_sha":"$PUBLISHED_RESULTS_SHA","artifact_name":"${{ steps.inputs.outputs.site_artifact }}","artifact_run_id":"${{ github.run_id }}","artifacts":{"site":{"path":"/","digest":"$SITE_DIGEST"},"docs":{"path":"/docs/","digest":"$DOCS_DIGEST"},"explorer":{"path":"/results/","digest":"$EXPLORER_DIGEST"},"database":{"path":"/results/data/results.duckdb","digest":"$DATABASE_DIGEST"}},"checksums":{"/results/data/results.duckdb":"$DATABASE_DIGEST"},"timestamp":"$TIMESTAMP"}
-          EOF
+          export GENERATION DEVELOP_SHA PUBLISHED_RESULTS_SHA MANIFEST_DIGEST PRIOR_LIVE_RECEIPT_ID SITE_DIGEST DOCS_DIGEST EXPLORER_DIGEST DATABASE_DIGEST SITE_ARTIFACT GITHUB_RUN_ID TIMESTAMP
+          python3 - <<'PY'
+          import hashlib, json, os
+          def d(value): return hashlib.sha256(value.encode()).hexdigest()
+          receipt = {"schema_version": 2, "generation": int(os.environ['GENERATION']), "parent_sha": None, "parent_generation": None, "source_commit": os.environ['DEVELOP_SHA'], "source_branch": "develop", "develop_sha": os.environ['DEVELOP_SHA'], "published_results_sha": os.environ['PUBLISHED_RESULTS_SHA'], "build_closure": {"os_image": "ubuntu-latest", "python_version": "3.11", "node_version": "20", "uv_version": "repository", "lockfile_sha256": d("lock"), "workflow_sha": os.environ['DEVELOP_SHA'], "action_shas": {"checkout": os.environ['DEVELOP_SHA']}, "read_model_version": "publication-v2"}, "corpus": {"bundle_count": 0, "inventory_sha256": d("corpus"), "read_model_sha256": d("read-model")}, "artifacts": {"prose_site": {"digest": os.environ['SITE_DIGEST'], "size": 0, "path": "/"}, "api_docs": {"digest": os.environ['DOCS_DIGEST'], "size": 0, "path": "/docs/"}, "explorer_app": {"digest": os.environ['EXPLORER_DIGEST'], "size": 0, "path": "/results/"}, "publisher_bundle": {"digest": os.environ['SITE_DIGEST'], "size": 0, "path": "/"}, "corpus_database": {"digest": os.environ['DATABASE_DIGEST'], "size": 0, "path": "/results/data/results.duckdb"}, "pages_assembly": {"digest": os.environ['SITE_DIGEST'], "size": 0, "path": "/"}}, "artifact_name": os.environ['SITE_ARTIFACT'], "artifact_run_id": os.environ['GITHUB_RUN_ID'], "manifest_digest": os.environ['MANIFEST_DIGEST'], "checksums": {"/results/data/results.duckdb": os.environ['DATABASE_DIGEST']}, "timestamp": os.environ['TIMESTAMP']}
+          if os.environ.get('PRIOR_LIVE_RECEIPT_ID'): receipt["prior_live_receipt_id"] = os.environ['PRIOR_LIVE_RECEIPT_ID']
+          for name in ("desired-manifest.json", "assembly-receipt.json"):
+              with open("receipt-dist/" + name, "w") as f: json.dump(receipt, f, sort_keys=True); f.write("\n")
+          PY
           cp receipt-dist/assembly-receipt.json receipt-dist/publication-receipt.json
           {
             echo "manifest_digest=$MANIFEST_DIGEST"
@@ -189,12 +216,13 @@ jobs:
             echo "explorer_digest=$EXPLORER_DIGEST"
             echo "docs_digest=$DOCS_DIGEST"
           } >> "$GITHUB_OUTPUT"
-
       - name: Pre-deploy candidate verification
+        env:
+          EXPECT_NOOP: ${{ inputs.expect_noop }}
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ inputs.expect_noop }}" = "true" ]; then
+          if [ "$EXPECT_NOOP" = "true" ]; then
             uv run python scripts/publication/verify_live.py \
               --candidate-manifest receipt-dist/publication-receipt.json \
               --baseline-manifest docs/operations/publication-baseline-2026-08-31.json \
@@ -209,6 +237,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
+          name: publication-pages-${{ steps.inputs.outputs.generation }}
           path: site
 
       - name: Retain immutable site artifact for attested rollback
@@ -234,6 +263,8 @@ jobs:
       contents: read
       pages: write
       id-token: write
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -270,27 +301,39 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          TARGET_URL="${{ needs.deploy.outputs.page_url || 'https://benchbox.dev' }}"
           uv run python scripts/publication/verify_live.py \
-            --base-url "${{ needs.deploy.outputs.page_url }}" \
+            --base-url "$TARGET_URL" \
             --manifest receipt-dist/publication-receipt.json \
             --require-receipt --timeout 60 --json > receipt-dist/live-probe-report.json
 
       - name: Record provider deployment acknowledgement
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url || 'https://benchbox.dev' }}
+          DEPLOYMENT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         shell: bash
         run: |
           set -euo pipefail
           cp receipt-dist/assembly-receipt.json receipt-dist/deployment-receipt.json
           python3 - <<'PY'
-          import json
+          import json, os
           path = 'receipt-dist/deployment-receipt.json'
           receipt = json.load(open(path))
-          receipt.update({'deployment_id': '${{ github.run_id }}-${{ github.run_attempt }}', 'page_url': '${{ needs.deploy.outputs.page_url }}', 'status': 'DEPLOYED'})
-          open(path, 'w').write(json.dumps(receipt, sort_keys=True) + '\\n')
+          receipt.update({
+              'deployment_id': os.environ.get('DEPLOYMENT_ID', ''),
+              'page_url': os.environ.get('PAGE_URL') or 'https://benchbox.dev',
+              'status': 'DEPLOYED',
+          })
+          open(path, 'w').write(json.dumps(receipt, sort_keys=True) + '\n')
           PY
 
       - name: Create and sign live receipt
         env:
           PUBLICATION_ATTESTOR_PRIVATE_KEY: ${{ secrets.PUBLICATION_ATTESTOR_PRIVATE_KEY }}
+          PRIOR_LIVE_RECEIPT_ID: ${{ inputs.prior_live_receipt_id }}
+          BUILD_GENERATION: ${{ needs.build.outputs.generation }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         shell: bash
         run: |
           set -euo pipefail
@@ -299,23 +342,24 @@ jobs:
             exit 1
           }
           python3 - <<'PY'
-          import json
+          import json, os
           from datetime import datetime, timezone
           assembly = json.load(open('receipt-dist/assembly-receipt.json'))
           probes = json.load(open('receipt-dist/live-probe-report.json'))['probes']
+          prior_live_receipt_id = os.environ.get('PRIOR_LIVE_RECEIPT_ID') or None
           receipt = dict(assembly)
           receipt.update({
-              'receipt_id': 'live-${{ needs.build.outputs.generation }}-${{ github.run_id }}',
+              'receipt_id': f"live-{os.environ['BUILD_GENERATION']}-{os.environ['GITHUB_RUN_ID']}",
               'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
               'routes': probes,
-              'nonce': '${{ github.run_id }}-${{ github.run_attempt }}',
+              'nonce': f"{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}",
               'freshness_window': '24h',
               'attestor': 'github-actions:publication-deploy',
               'attestor_key_id': 'publication-attestor-ed25519-2026-09-04',
               'signature_algorithm': 'ed25519',
-              'prior_live_receipt_id': '${{ inputs.prior_live_receipt_id }}' or None,
+              'prior_live_receipt_id': prior_live_receipt_id,
           })
-          open('receipt-dist/live-receipt.json', 'w').write(json.dumps(receipt, sort_keys=True) + '\\n')
+          open('receipt-dist/live-receipt.json', 'w').write(json.dumps(receipt, sort_keys=True) + '\n')
           PY
           umask 077
           printf '%s' "$PUBLICATION_ATTESTOR_PRIVATE_KEY" > /tmp/publication-attestor-private-key.pem
@@ -328,11 +372,12 @@ jobs:
           openssl pkeyutl -sign -rawin -inkey /tmp/publication-attestor-private-key.pem -in /tmp/live-receipt-payload.json -out /tmp/live-receipt.sig
           SIGNATURE=$(base64 -w 0 /tmp/live-receipt.sig)
           rm -f /tmp/publication-attestor-private-key.pem /tmp/live-receipt-payload.json /tmp/live-receipt.sig
-          python3 - <<PY
+          SIGNATURE="$SIGNATURE" python3 - <<'PY'
           import json
+          import os
           path = 'receipt-dist/live-receipt.json'
           receipt = json.load(open(path))
-          receipt['signature'] = '$SIGNATURE'
+          receipt['signature'] = os.environ['SIGNATURE']
           open(path, 'w').write(json.dumps(receipt, sort_keys=True) + '\\n')
           PY
           uv run python - <<'PY'
@@ -381,18 +426,22 @@ jobs:
         id: known_good
         env:
           GH_TOKEN: ${{ github.token }}
+          CURRENT_GENERATION: ${{ needs.build.outputs.generation }}
+          PRIOR_LIVE_RECEIPT_ID: ${{ inputs.prior_live_receipt_id }}
+          FORCE_ROLLBACK: ${{ inputs.force_rollback }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p known-good-receipt
-          gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("publication-live-receipt-")) | "\(.id) \(.workflow_run.id)"' > candidates.txt
-          while read -r ARTIFACT_ID RUN_ID; do
+          gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("publication-live-receipt-")) | "\(.id) \(.workflow_run.id) \(.workflow_run.name)"' > candidates.txt
+          while read -r ARTIFACT_ID RUN_ID RUN_NAME; do
             [ -n "${ARTIFACT_ID:-}" ] || continue
             rm -rf candidate && mkdir candidate
             gh api "repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip" > candidate.zip
             unzip -q candidate.zip -d candidate
-            if uv run python - <<'PY'
-          import json
+            if [[ "$RUN_NAME" != "Publication Control Plane Deployment" ]]; then continue; fi
+            if RUN_ID="$RUN_ID" uv run python - <<'PY'
+          import json, os
           from pathlib import Path
           from scripts.publication.reconciliation import verify_live_receipt_signature
           p = Path('candidate/live-receipt.json')
@@ -400,18 +449,22 @@ jobs:
           receipt = json.loads(p.read_text())
           valid, _ = verify_live_receipt_signature(receipt)
           if not valid or receipt.get('target') != 'benchbox.dev': raise SystemExit(1)
-          assembly = json.loads(Path('candidate/assembly-receipt.json').read_text())
-          assert assembly.get('artifact_name') and assembly.get('artifact_run_id')
+          prior_id = os.environ.get('PRIOR_LIVE_RECEIPT_ID', '').strip()
+          current_gen = os.environ.get('CURRENT_GENERATION', '').strip()
+          if prior_id and receipt.get('receipt_id') != prior_id: raise SystemExit(1)
+          if current_gen and str(receipt.get('generation')) == current_gen: raise SystemExit(1)
+          if str(receipt.get('artifact_run_id')) != os.environ.get('RUN_ID'): raise SystemExit(1)
+          if not receipt.get('artifact_name') or not receipt.get('artifacts', {}).get('site', {}).get('digest'): raise SystemExit(1)
           PY
             then
-              ARTIFACT_NAME=$(uv run python -c "import json; print(json.load(open('candidate/assembly-receipt.json'))['artifact_name'])")
-              ARTIFACT_RUN_ID=$(uv run python -c "import json; print(json.load(open('candidate/assembly-receipt.json'))['artifact_run_id'])")
+              ARTIFACT_NAME=$(uv run python -c "import json; print(json.load(open('candidate/live-receipt.json'))['artifact_name'])")
+              ARTIFACT_RUN_ID="$RUN_ID"
               cp -R candidate/. known-good-receipt/
               echo "artifact_name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
               echo "artifact_run_id=$ARTIFACT_RUN_ID" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-          done < candidates.txt
+            done < candidates.txt
           echo "::error::no cryptographically attested, unexpired rollback artifact is available"
           exit 1
 
@@ -421,31 +474,41 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh run download "${{ steps.known_good.outputs.artifact_run_id }}" --name "${{ steps.known_good.outputs.artifact_name }}" --dir restored-site
-          EXPECTED=$(uv run python -c "import json; print(json.load(open('known-good-receipt/assembly-receipt.json'))['artifacts']['site']['digest'])")
+          gh run download "$EXPECTED_RUN_ID" --name "$EXPECTED_ARTIFACT_NAME" --dir restored-site
+          EXPECTED=$(uv run python -c "import json; print(json.load(open('known-good-receipt/live-receipt.json'))['artifacts']['site']['digest'])")
           (cd restored-site && find . -type f -exec sha256sum {} + | sort) > restored-site-file-digests.txt
           ACTUAL=$(sha256sum restored-site-file-digests.txt | cut -d ' ' -f 1)
           [ "$ACTUAL" = "$EXPECTED" ] || { echo "::error::known-good artifact digest mismatch; refusing rollback"; exit 1; }
           test -s restored-site/results/data/results.duckdb
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_RUN_ID: ${{ steps.known_good.outputs.artifact_run_id }}
+          EXPECTED_ARTIFACT_NAME: ${{ steps.known_good.outputs.artifact_name }}
 
       - name: Upload attested rollback Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
+          name: publication-rollback-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: restored-site
 
       - name: Deploy attested rollback artifact to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: publication-rollback-pages-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Probe restored required live routes
         shell: bash
         run: |
           set -euo pipefail
-          uv run python scripts/publication/verify_live.py --base-url "${{ steps.deployment.outputs.page_url }}" --manifest known-good-receipt/live-receipt.json --require-receipt --timeout 60 --json > known-good-receipt/rollback-probe-report.json
+          TARGET_URL="${{ steps.deployment.outputs.page_url }}"
+          uv run python scripts/publication/verify_live.py --base-url "$TARGET_URL" --manifest known-good-receipt/live-receipt.json --require-receipt --timeout 60 --json > known-good-receipt/rollback-probe-report.json
 
       - name: Create and sign rollback live receipt
         env:
           PUBLICATION_ATTESTOR_PRIVATE_KEY: ${{ secrets.PUBLICATION_ATTESTOR_PRIVATE_KEY }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         shell: bash
         run: |
           set -euo pipefail
@@ -454,16 +517,16 @@ jobs:
             exit 1
           }
           python3 - <<'PY'
-          import json
+          import json, os
           from datetime import datetime, timezone
           prior = json.load(open('known-good-receipt/live-receipt.json'))
           probes = json.load(open('known-good-receipt/rollback-probe-report.json'))['probes']
           receipt = dict(prior)
           receipt.update({
-              'receipt_id': 'rollback-${{ github.run_id }}-${{ github.run_attempt }}',
+              'receipt_id': f"rollback-{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}",
               'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
               'routes': probes,
-              'nonce': '${{ github.run_id }}-${{ github.run_attempt }}',
+              'nonce': f"{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}",
               'prior_live_receipt_id': prior['receipt_id'],
           })
           receipt.pop('signature', None)
@@ -480,11 +543,12 @@ jobs:
           openssl pkeyutl -sign -rawin -inkey /tmp/publication-attestor-private-key.pem -in /tmp/rollback-live-receipt-payload.json -out /tmp/rollback-live-receipt.sig
           SIGNATURE=$(base64 -w 0 /tmp/rollback-live-receipt.sig)
           rm -f /tmp/publication-attestor-private-key.pem /tmp/rollback-live-receipt-payload.json /tmp/rollback-live-receipt.sig
-          python3 - <<PY
+          SIGNATURE="$SIGNATURE" python3 - <<'PY'
           import json
+          import os
           path = 'known-good-receipt/rollback-live-receipt.json'
           receipt = json.load(open(path))
-          receipt['signature'] = '$SIGNATURE'
+          receipt['signature'] = os.environ['SIGNATURE']
           open(path, 'w').write(json.dumps(receipt, sort_keys=True) + '\\n')
           PY
           uv run python - <<'PY'

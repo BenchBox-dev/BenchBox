@@ -135,6 +135,11 @@ def _parse_transition_records(raw_transitions: Any) -> list[LaneTransition]:
     for r in raw_transitions:
         if not isinstance(r, dict):
             raise MatrixInputError(f"transition entry is not an object: {type(r).__name__}")
+        evidence = r.get("evidence")
+        if not isinstance(evidence, dict) or any(
+            not evidence.get(key) for key in ("workflow_run_id", "event_id", "artifact_name", "artifact_digest")
+        ):
+            raise MatrixInputError("transition entry lacks provenance bound to a workflow event and immutable artifact")
         parsed.append(
             verify_transition_independence(
                 transition_id=str(r.get("transition_id", "unknown")),

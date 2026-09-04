@@ -120,7 +120,7 @@ def _list_open_prs(repo: str, base: str) -> list[dict[str, Any]]:
             "--state",
             "open",
             "--limit",
-            "200",
+            "100000",
             "--json",
             "number,title,headRefName",
         ],
@@ -191,6 +191,14 @@ def _audit_pr(pr: dict[str, Any], base_shas: dict[str, str], repo: str) -> Mirro
         head_ref=pr.get("headRefName", ""),
         mirrored_file_count=0,
     )
+
+    # Only the synchronizer's machine-owned head namespace is authoritative
+    # mirror provenance.  Unrelated PRs must never become retire-able EMPTY
+    # records merely because they target the same base branch.
+    if not audit.head_ref.startswith("auto/results-mirror-"):
+        audit.verdict = "UNRELATED"
+        audit.error = "PR has no authoritative results-mirror head provenance"
+        return audit
 
     try:
         files = _list_pr_files(repo, number)

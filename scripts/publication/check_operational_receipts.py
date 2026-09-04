@@ -175,6 +175,10 @@ def audit_capacity(
     violations: list[str] = []
     passed = True
 
+    if not measured:
+        passed = False
+        violations.append("Capacity evidence is a declaration; measured=true or --pages-dir is required")
+
     if total_bytes >= MAX_TOTAL_PAGES_BYTES:
         passed = False
         violations.append(
@@ -349,6 +353,32 @@ def audit_drill_receipt(
             max_age_days=max_age_days,
             passed=False,
             error=f"Drill receipt is expired: age {age_days} days exceeds maximum threshold of {max_age_days} days",
+        )
+
+    evidence = receipt_data.get("evidence")
+    if not isinstance(evidence, dict):
+        return DrillReceiptStatus(
+            drill_type=drill_type,
+            status="INVALID",
+            receipt_id=receipt_id,
+            executed_at=str(executed_at),
+            age_days=age_days,
+            max_age_days=max_age_days,
+            passed=False,
+            error="Successful drill receipt lacks bound workflow/artifact evidence",
+        )
+    required_evidence = ("workflow_run_id", "event_id", "artifact_name", "artifact_digest")
+    missing = [key for key in required_evidence if not evidence.get(key)]
+    if missing:
+        return DrillReceiptStatus(
+            drill_type=drill_type,
+            status="INVALID",
+            receipt_id=receipt_id,
+            executed_at=str(executed_at),
+            age_days=age_days,
+            max_age_days=max_age_days,
+            passed=False,
+            error=f"Drill evidence missing required bindings: {', '.join(missing)}",
         )
 
     return DrillReceiptStatus(

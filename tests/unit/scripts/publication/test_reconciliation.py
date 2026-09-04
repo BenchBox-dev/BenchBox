@@ -351,6 +351,29 @@ def test_reconcile_receipt_signature_accepts_valid_attestor_signature(attestor_k
     assert report.reconciled is True, [d.description for d in report.drifts]
 
 
+def test_verify_live_receipt_signature_handles_missing_openssl(
+    attestor_keypair: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    desired, built, deployed, observed = _distinct_states()
+    _sign_receipt(observed, attestor_keypair)
+
+    def _mock_subprocess_run(*args, **kwargs):
+        raise FileNotFoundError("No such file or directory: 'openssl'")
+
+    monkeypatch.setattr(subprocess, "run", _mock_subprocess_run)
+    valid, reason = recon_mod.verify_live_receipt_signature(observed)
+    assert valid is False
+    assert "openssl binary execution failed" in reason
+    assert "No such file or directory: 'openssl'" in reason
+
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
+    assert report.reconciled is False
+    assert any(
+        d.drift_type == "RECEIPT_SIGNATURE_INVALID" and "openssl binary execution failed" in d.description
+        for d in report.drifts
+    )
+
+
 # ======================================================================
 # INDEPENDENCE MATRIX (w2)
 # ======================================================================
@@ -370,6 +393,12 @@ def _single_lane_transitions() -> list[dict]:
                 "target_lane": lane,
                 "before_hashes": dict(_BASE),
                 "after_hashes": after,
+                "evidence": {
+                    "workflow_run_id": "123",
+                    "event_id": f"event-{lane}",
+                    "artifact_name": f"lane-{lane}",
+                    "artifact_digest": "a" * 64,
+                },
             }
         )
     return out
@@ -446,7 +475,20 @@ def _valid_operational_dir(tmp_path: Path) -> Path:
         (receipts_mod.INCIDENT_DRILL_FILE, "i1"),
     ):
         (d / name).write_text(
-            json.dumps({"receipt_id": rid, "status": "SUCCESS", "executed_at": NOW_ISO}), encoding="utf-8"
+            json.dumps(
+                {
+                    "receipt_id": rid,
+                    "status": "SUCCESS",
+                    "executed_at": NOW_ISO,
+                    "evidence": {
+                        "workflow_run_id": "123",
+                        "event_id": rid,
+                        "artifact_name": "pages",
+                        "artifact_digest": "a" * 64,
+                    },
+                }
+            ),
+            encoding="utf-8",
         )
     (d / receipts_mod.CAPACITY_FILE).write_text(
         json.dumps({"total_size_bytes": 50_000_000, "largest_file_bytes": 10_000_000, "measured": True}),

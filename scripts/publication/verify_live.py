@@ -114,6 +114,17 @@ def extract_expected_checksums(manifest_data: dict[str, Any]) -> dict[str, str]:
                 norm_p = p if p.startswith("/") else f"/{p}"
                 expected[norm_p] = str(artifact["sha256"]).strip()
 
+    # Publication receipts use the canonical manifest's mapping form.  Keep
+    # route checks and byte checks separate: only entries with an explicit
+    # checksum are byte-equivalence claims.
+    if "artifacts" in manifest_data and isinstance(manifest_data["artifacts"], dict):
+        for artifact in manifest_data["artifacts"].values():
+            if not isinstance(artifact, dict) or not artifact.get("path"):
+                continue
+            if artifact.get("endpoint_sha256"):
+                path = str(artifact["path"])
+                expected[path if path.startswith("/") else f"/{path}"] = str(artifact["endpoint_sha256"]).strip()
+
     return expected
 
 
