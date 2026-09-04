@@ -309,25 +309,36 @@ def test_deleted_orphan_companion_is_allowed(tmp_path: Path, companion_suffix: s
 
 
 def test_deleted_bundle_and_manifest_do_not_inject_empty_bundle_path(tmp_path: Path) -> None:
-    """Deleting a bundle and its manifest must not append an empty validator path."""
+    """Mixed ACMR + deleted pair must not append a blank validator path.
+
+    Primary discovery uses ``--diff-filter=ACMR``, so a pure pair-delete leaves
+    ``CHANGED`` empty and ``CHANGED="${CHANGED:+...}${bundle}"`` is a no-op even
+    when ``$bundle`` is empty. The real failure needs a surviving primary already
+    in ``CHANGED`` plus a deleted companion/primary pair: ``git cat-file -e
+    "$SHA:"`` succeeds on the root tree, ``grep -qxF ""`` does not match the live
+    path, and the append inserts a blank line after it.
+    """
     _git(tmp_path, "init", "--quiet")
     _git(tmp_path, "config", "user.name", "Test")
     _git(tmp_path, "config", "user.email", "test@example.invalid")
 
     bundle_dir = tmp_path / "results-data" / "bundles"
     bundle_dir.mkdir(parents=True)
-    primary = bundle_dir / "result.json"
-    manifest = bundle_dir / "result.manifest.json"
-    primary.write_text("{}\n", encoding="utf-8")
-    manifest.write_text("{}\n", encoding="utf-8")
+    keep = bundle_dir / "keep.json"
+    gone = bundle_dir / "gone.json"
+    gone_manifest = bundle_dir / "gone.manifest.json"
+    keep.write_text('{"keep": 1}\n', encoding="utf-8")
+    gone.write_text('{"gone": 1}\n', encoding="utf-8")
+    gone_manifest.write_text("{}\n", encoding="utf-8")
     _git(tmp_path, "add", str(bundle_dir.relative_to(tmp_path)))
     _git(tmp_path, "commit", "--quiet", "-m", "base")
     base_sha = _git(tmp_path, "rev-parse", "HEAD")
 
-    primary.unlink()
-    manifest.unlink()
+    keep.write_text('{"keep": 2}\n', encoding="utf-8")
+    gone.unlink()
+    gone_manifest.unlink()
     _git(tmp_path, "add", "-u", str(bundle_dir.relative_to(tmp_path)))
-    _git(tmp_path, "commit", "--quiet", "-m", "delete bundle and manifest")
+    _git(tmp_path, "commit", "--quiet", "-m", "modify keep; delete gone pair")
 
     skip_without_posix_shell()
     env = {**os.environ, "BASE_SHA": base_sha}
@@ -341,4 +352,5 @@ def test_deleted_bundle_and_manifest_do_not_inject_empty_bundle_path(tmp_path: P
     )
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout == "\n"
+    # Exact stdout: one surviving path, no trailing blank line from empty append.
+    assert result.stdout == "results-data/bundles/keep.json\n"
