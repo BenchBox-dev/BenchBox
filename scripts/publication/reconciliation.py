@@ -37,9 +37,12 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
+import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -68,6 +71,11 @@ DEFAULT_PROBE_PATHS = (
 ASSEMBLY_RECEIPT_NAME = "assembly-receipt.json"
 DEPLOYMENT_RECEIPT_NAME = "deployment-receipt.json"
 LIVE_RECEIPT_NAME = "live-receipt.json"
+
+# This is a public verification key. The corresponding private key is held
+# only by the GitHub Actions secret documented in the operations contract.
+DEFAULT_ATTESTOR_PUBLIC_KEY = REPO_ROOT / "docs/operations/publication-attestor-public-key.pem"
+ATTESTOR_SIGNATURE_ALGORITHM = "ed25519"
 
 # Fields the contract (independent-publication-contract.md, "Required live
 # receipt fields") mandates on an attested live-observation receipt.
@@ -196,6 +204,68 @@ def _first_present(data: dict[str, Any], keys: tuple[str, ...]) -> Any:
         if key in data and data[key] not in (None, "", [], {}):
             return data[key]
     return None
+
+
+def canonical_live_receipt_payload(receipt: dict[str, Any]) -> bytes:
+    """Return the deterministic byte payload an attestor signs for a receipt.
+
+    Signatures never sign themselves. Both accepted signature field spellings
+    are excluded so aliases cannot change the verified payload.
+    """
+    payload = dict(receipt)
+    payload.pop("signature", None)
+    payload.pop("attestor_signature", None)
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+
+
+def verify_live_receipt_signature(receipt: dict[str, Any], public_key_path: Path | None = None) -> tuple[bool, str]:
+    """Verify an Ed25519 receipt signature with the repository public key.
+
+    ``openssl pkeyutl`` is available on GitHub-hosted runners and avoids adding
+    a cryptography dependency solely for this verification boundary.
+    """
+    public_key_path = public_key_path or DEFAULT_ATTESTOR_PUBLIC_KEY
+    signature = _first_present(receipt, ("signature", "attestor_signature"))
+    if not isinstance(signature, str) or not signature.strip():
+        return False, "receipt signature is missing or empty"
+    if receipt.get("signature_algorithm") != ATTESTOR_SIGNATURE_ALGORITHM:
+        return False, f"receipt signature algorithm must be {ATTESTOR_SIGNATURE_ALGORITHM!r}"
+    if not public_key_path.is_file():
+        return False, f"attestor public key is unavailable: {public_key_path}"
+    try:
+        signature_bytes = base64.b64decode(signature, validate=True)
+    except (ValueError, TypeError) as exc:
+        return False, f"receipt signature is not valid base64: {exc}"
+    if not signature_bytes:
+        return False, "receipt signature is empty"
+
+    with tempfile.TemporaryDirectory(prefix="benchbox-receipt-") as temp_dir:
+        temp = Path(temp_dir)
+        payload_path = temp / "receipt-payload.json"
+        signature_path = temp / "receipt.sig"
+        payload_path.write_bytes(canonical_live_receipt_payload(receipt))
+        signature_path.write_bytes(signature_bytes)
+        completed = subprocess.run(
+            [
+                "openssl",
+                "pkeyutl",
+                "-verify",
+                "-pubin",
+                "-inkey",
+                str(public_key_path),
+                "-rawin",
+                "-in",
+                str(payload_path),
+                "-sigfile",
+                str(signature_path),
+            ],
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+    if completed.returncode != 0:
+        return False, "receipt signature does not verify against the configured attestor public key"
+    return True, ""
 
 
 def probe_live_endpoint(
@@ -576,16 +646,14 @@ def _check_receipt_contract_fields(observed: dict[str, Any] | None) -> list[Drif
                 )
                 break
 
-    # Signature verification against a key is out of scope here; the contract
-    # gap is that we can only require presence and non-emptiness of the field.
-    sig = _first_present(observed, ("signature", "attestor_signature"))
-    if sig is not None and not str(sig).strip():
+    signature_valid, signature_error = verify_live_receipt_signature(observed)
+    if not signature_valid:
         drifts.append(
             DriftFinding(
-                drift_type="RECEIPT_INCOMPLETE",
-                description="Live receipt attestor signature field is present but empty",
-                expected="non-empty signature",
-                actual="empty string",
+                drift_type="RECEIPT_SIGNATURE_INVALID",
+                description=f"Live receipt attestor signature verification failed: {signature_error}",
+                expected="valid Ed25519 signature from the configured attestor key",
+                actual="missing, malformed, or unverifiable signature",
             )
         )
     return drifts

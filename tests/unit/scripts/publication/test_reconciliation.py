@@ -7,8 +7,10 @@ that real matching evidence reconciles.
 
 from __future__ import annotations
 
+import base64
 import importlib.util
 import json
+import subprocess
 import sys
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -53,6 +55,7 @@ def _full_live_receipt(generation: int = 5, timestamp: str | None = None) -> dic
         "nonce": "nonce-xyz",
         "freshness_window": "24h",
         "attestor": "maintainer:joe",
+        "signature_algorithm": "ed25519",
         "signature": "BASE64SIG==",
         "routes": [
             {"path": "/", "status_code": 200, "ok": True},
@@ -60,6 +63,38 @@ def _full_live_receipt(generation: int = 5, timestamp: str | None = None) -> dic
             {"path": "/results/data/results.duckdb", "status_code": 200, "ok": True},
         ],
     }
+
+
+def _sign_receipt(receipt: dict, private_key: Path) -> None:
+    payload = private_key.parent / "receipt-payload.json"
+    signature = private_key.parent / "receipt.sig"
+    payload.write_bytes(recon_mod.canonical_live_receipt_payload(receipt))
+    subprocess.run(
+        [
+            "openssl",
+            "pkeyutl",
+            "-sign",
+            "-rawin",
+            "-inkey",
+            str(private_key),
+            "-in",
+            str(payload),
+            "-out",
+            str(signature),
+        ],
+        check=True,
+    )
+    receipt["signature"] = base64.b64encode(signature.read_bytes()).decode("ascii")
+
+
+@pytest.fixture
+def attestor_keypair(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    private_key = tmp_path / "attestor-private.pem"
+    public_key = tmp_path / "attestor-public.pem"
+    subprocess.run(["openssl", "genpkey", "-algorithm", "ED25519", "-out", str(private_key)], check=True)
+    subprocess.run(["openssl", "pkey", "-in", str(private_key), "-pubout", "-out", str(public_key)], check=True)
+    monkeypatch.setattr(recon_mod, "DEFAULT_ATTESTOR_PUBLIC_KEY", public_key)
+    return private_key
 
 
 def _distinct_states(generation: int = 5):
@@ -118,8 +153,9 @@ def test_reconcile_live_incomplete_observed_receipt_fails(monkeypatch: pytest.Mo
     assert any(d.drift_type == "RECEIPT_INCOMPLETE" for d in report.drifts)
 
 
-def test_reconcile_happy_path_distinct_matching_states() -> None:
+def test_reconcile_happy_path_distinct_matching_states(attestor_keypair: Path) -> None:
     desired, built, deployed, observed = _distinct_states()
+    _sign_receipt(observed, attestor_keypair)
     report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
     assert report.reconciled is True, [d.description for d in report.drifts]
     assert report.drift_count == 0
@@ -278,8 +314,9 @@ def test_reconciliation_cli_requires_inputs(tmp_path: Path) -> None:
     assert recon_mod.main(["--manifest", str(manifest), "--receipts-dir", str(rdir)]) == 2
 
 
-def test_reconciliation_cli_full_evidence_reconciles(tmp_path: Path) -> None:
+def test_reconciliation_cli_full_evidence_reconciles(tmp_path: Path, attestor_keypair: Path) -> None:
     desired, built, deployed, observed = _distinct_states()
+    _sign_receipt(observed, attestor_keypair)
     manifest = tmp_path / "desired-manifest.json"
     manifest.write_text(json.dumps(desired), encoding="utf-8")
     rdir = tmp_path / "reconciliation"
@@ -289,6 +326,29 @@ def test_reconciliation_cli_full_evidence_reconciles(tmp_path: Path) -> None:
     (rdir / recon_mod.LIVE_RECEIPT_NAME).write_text(json.dumps(observed), encoding="utf-8")
 
     assert recon_mod.main(["--manifest", str(manifest), "--receipts-dir", str(rdir), "--json"]) == 0
+
+
+def test_reconcile_receipt_signature_fails_closed_for_missing_empty_or_wrong_signature(
+    attestor_keypair: Path,
+) -> None:
+    for signature in (None, "", "Zm9yZ2Vk"):
+        desired, built, deployed, observed = _distinct_states()
+        if signature is None:
+            del observed["signature"]
+        else:
+            observed["signature"] = signature
+        report = recon_mod.reconcile_states(
+            desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW
+        )
+        assert report.reconciled is False
+        assert any(d.drift_type == "RECEIPT_SIGNATURE_INVALID" for d in report.drifts)
+
+
+def test_reconcile_receipt_signature_accepts_valid_attestor_signature(attestor_keypair: Path) -> None:
+    desired, built, deployed, observed = _distinct_states()
+    _sign_receipt(observed, attestor_keypair)
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
+    assert report.reconciled is True, [d.description for d in report.drifts]
 
 
 # ======================================================================
