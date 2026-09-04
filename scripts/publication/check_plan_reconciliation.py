@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 """Check that publication migration plans cite all controlling surfaces.
 
-The A0-A11 tracker sequence is sourced from the live tracker (the todo CLI)
-rather than a hard-coded list, so the check cannot silently pass on a stale
-expected sequence. The check fails closed: if the live tracker cannot be
-reached (no credential or offline), reconciliation is a hard failure rather
-than an advisory pass, because without live evidence the gate cannot prove
-the plan matches the currently pending migration order.
+The A0-A11 tracker sequence is sourced from the live tracker (a single lossless
+``todo-db export`` envelope) rather than a hard-coded list, so the check cannot
+silently pass on a stale expected sequence. The check fails closed: if the live
+tracker cannot be reached (no credential or offline), reconciliation is a hard
+failure rather than an advisory pass, because without live evidence the gate
+cannot prove the plan matches the currently pending migration order.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -77,7 +79,13 @@ EXPECTED_DEPS: dict[str, list[str]] = {
         "independent-publication-a10-release-and-mirror-retirement"
     ],
 }
-TODO_SHIM = ROOT / "_project/scripts/todo"
+# Tracker identity -- must match .todo-db/config.json (project_id / repository).
+TRACKER_PROJECT_ID = "benchbox"
+TRACKER_REPOSITORY = "https://github.com/joeharris76/BenchBox"
+# Environment variables forwarded to the floor CLI for a hosted read. The
+# credentialed CI step supplies them; without TODO_DB_AUTH_CONTRACT=v2 a hosted
+# call returns a legacy-safe exit 2, which this gate then treats as fail-closed.
+_EXPORT_ENV_KEYS = ("TODO_DB_URL", "TODO_DB_RO_AUTH_TOKEN", "TODO_DB_AUTH_CONTRACT")
 
 
 def planned_tracker_ids(text: str, prefix: str) -> list[str]:
@@ -183,48 +191,105 @@ def dependency_violations(plan_order: list[str], deps: dict[str, list[str]]) -> 
     return violations
 
 
-def load_live_deps(item_ids: list[str], todo_cmd: list[str] | None = None) -> dict[str, list[str]] | None:
-    """Return ``{item_id: deps}`` for each id, or ``None`` if any read is unavailable.
+def _export_command(output_path: Path) -> list[str]:
+    return [
+        "uv",
+        "run",
+        "--project",
+        "_project/scripts",
+        "--locked",
+        "--",
+        "todo-db",
+        "--project-id",
+        TRACKER_PROJECT_ID,
+        "--repository",
+        TRACKER_REPOSITORY,
+        "export",
+        "--output",
+        str(output_path),
+    ]
 
-    ``todo list`` does not expose dependencies, so each item is read with
-    ``show <id> --json``. Deps come from the tracker's authoritative graph; an
-    unavailable read is treated as a failure so the gate cannot pass without it.
 
-    The lifecycle state is also re-checked from the ``show`` response: if a
-    required phase flipped to ``dropped`` after the initial ``list`` call,
-    the ``show`` payload carries the fresher state and the gate must fail
-    rather than using the stale non-dropped state from the list.
+def _run_export(output_path: Path) -> bool:
+    """Run the floor-CLI export, writing the lossless envelope to ``output_path``.
+
+    Returns ``False`` on any failure so the caller fails closed. The hosted-read
+    credentials are forwarded from the process environment (the credentialed CI
+    step sets them); they are never hard-coded here.
     """
-    shim_cmd = todo_cmd if todo_cmd is not None else [str(TODO_SHIM)]
-    deps: dict[str, list[str]] = {}
-    for item_id in item_ids:
-        try:
-            result = subprocess.run(
-                [*shim_cmd, "show", item_id, "--json"], capture_output=True, text=True, check=True, timeout=60
-            )
-            item = json.loads(result.stdout)
-        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, json.JSONDecodeError):
-            return None
-        if str(item.get("state", "")).lower() == "dropped":
-            return None
-        deps[item_id] = item.get("deps") or []
-    return deps
-
-
-def load_live_items(todo_cmd: list[str] | None = None) -> list[dict] | None:
-    """Return parsed ``todo list --json`` items, or ``None`` if the tracker is unreachable."""
-    cmd = todo_cmd if todo_cmd is not None else [str(TODO_SHIM), "list", "--json"]
+    env = dict(os.environ)
+    for key in _EXPORT_ENV_KEYS:
+        value = os.environ.get(key)
+        if value is not None:
+            env[key] = value
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=60)
+        subprocess.run(
+            _export_command(output_path),
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=120,
+            cwd=ROOT,
+            env=env,
+        )
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
-        return None
+        return False
+    return True
+
+
+def parse_envelope(raw: str) -> dict | None:
+    """Shape a ``todo-db export`` envelope into the maps reconciliation needs.
+
+    Returns ``{"states": {item_id: state}, "deps": {item_id: [needs_item, ...]}}``
+    built from the top-level ``tables.items`` and ``tables.item_deps`` rows, or
+    ``None`` when the envelope is malformed or missing a required table so the
+    caller fails closed.
+    """
     try:
-        payload = json.loads(result.stdout)
+        envelope = json.loads(raw)
     except json.JSONDecodeError:
         return None
-    if not isinstance(payload, list):
+    if not isinstance(envelope, dict):
         return None
-    return payload
+    tables = envelope.get("tables")
+    if not isinstance(tables, dict):
+        return None
+    items = tables.get("items")
+    item_deps = tables.get("item_deps")
+    if not isinstance(items, list) or not isinstance(item_deps, list):
+        return None
+    states: dict[str, str] = {}
+    for row in items:
+        if not isinstance(row, dict) or "id" not in row:
+            return None
+        states[str(row["id"])] = str(row.get("state", ""))
+    deps: dict[str, list[str]] = {item_id: [] for item_id in states}
+    for row in item_deps:
+        if not isinstance(row, dict) or "item_id" not in row or "needs_item" not in row:
+            return None
+        deps.setdefault(str(row["item_id"]), []).append(str(row["needs_item"]))
+    return {"states": states, "deps": {item_id: sorted(values) for item_id, values in deps.items()}}
+
+
+def load_tracker_snapshot() -> dict | None:
+    """Export the live tracker once and shape it, or ``None`` if unavailable.
+
+    A single ``todo-db export`` is an atomic snapshot of the whole tracker, so
+    the item states and the dependency graph it returns are mutually consistent
+    with no re-read needed (the retired ``todo list``/``todo show`` path had to
+    re-read to detect concurrent edits). Any failure -- the export command, an
+    unreadable file, or a malformed envelope -- returns ``None`` and the gate
+    fails closed.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        output_path = Path(tmp) / "tracker-export.json"
+        if not _run_export(output_path):
+            return None
+        try:
+            raw = output_path.read_text(encoding="utf-8")
+        except OSError:
+            return None
+    return parse_envelope(raw)
 
 
 def main() -> int:
@@ -235,46 +300,50 @@ def main() -> int:
     missing = [surface for surface in REQUIRED_SURFACES if surface not in text]
     missing.extend(gate for gate in REQUIRED_GATES if gate not in text)
     tracker_ids = planned_tracker_ids(text, args.todo_prefix)
-    live_items = load_live_items()
+    snapshot = load_tracker_snapshot()
 
-    if live_items is None:
+    if snapshot is None:
         print(
             "ERROR: live tracker unavailable; cannot reconcile the A0-A11 sequence (fail closed)",
             file=sys.stderr,
         )
         missing.append("exact ordered A0-A11 tracker sequence (live tracker unavailable)")
     else:
+        states: dict[str, str] = snapshot["states"]
+        dep_graph: dict[str, list[str]] = snapshot["deps"]
+        prefix_ids = [item_id for item_id in states if item_id.startswith(args.todo_prefix)]
+
         # Retain dropped rows for explicit drift failure. Filtering dropped
         # before comparison would hide a dropped required phase when the
         # decision is edited to omit that phase (11 vs 11 would match).
-        # Check against EXPECTED_DEPS so the gate fails even if the plan
-        # text was changed to match the filtered live set.
-        prefix_all = [item for item in live_items if str(item.get("id", "")).startswith(args.todo_prefix)]
-        dropped_required = [
-            item["id"]
-            for item in prefix_all
-            if str(item.get("state", "")).lower() == "dropped" and item["id"] in EXPECTED_DEPS
-        ]
-        # Also catch dropped items that appear in the plan but are not in
-        # EXPECTED_DEPS yet (forward-compat if the freeze set grows).
-        for item in prefix_all:
-            if (
-                str(item.get("state", "")).lower() == "dropped"
-                and str(item.get("id", "")) in tracker_ids
-                and item["id"] not in dropped_required
-            ):
-                dropped_required.append(item["id"])
-        for did in sorted(dropped_required, key=lambda item_id: _phase_key(item_id, args.todo_prefix)):
+        # Check against EXPECTED_DEPS and the plan text so the gate fails even
+        # if the plan text was changed to match the filtered live set.
+        dropped_required = sorted(
+            (
+                item_id
+                for item_id in prefix_ids
+                if states[item_id].lower() == "dropped" and (item_id in EXPECTED_DEPS or item_id in tracker_ids)
+            ),
+            key=lambda item_id: _phase_key(item_id, args.todo_prefix),
+        )
+        for did in dropped_required:
             missing.append(f"dropped required phase is dropped: {did}")
-        live_scope = [
-            item
-            for item in live_items
-            if str(item.get("id", "")).startswith(args.todo_prefix)
-            and str(item.get("state", "")).lower() != "dropped"
-            and item.get("id") in EXPECTED_DEPS
-        ]
-        live_ids = [item["id"] for item in live_scope]
-        live_deps = load_live_deps(live_ids)
+
+        live_item_ids = sorted(
+            (item_id for item_id in prefix_ids if states[item_id].lower() != "dropped" and item_id in EXPECTED_DEPS),
+            key=lambda item_id: _phase_key(item_id, args.todo_prefix),
+        )
+
+        # Every pinned phase must carry its dependency rows in the same atomic
+        # export snapshot; an absent id means the envelope is incomplete, so
+        # fail closed rather than treating it as having no dependencies.
+        live_deps: dict[str, list[str]] | None = {}
+        for item_id in live_item_ids:
+            if item_id not in dep_graph:
+                live_deps = None
+                break
+            live_deps[item_id] = dep_graph[item_id]
+
         if live_deps is None:
             print(
                 "ERROR: could not read the tracker dependency graph; cannot reconcile A0-A11 order (fail closed)",
@@ -282,52 +351,6 @@ def main() -> int:
             )
             missing.append("exact ordered A0-A11 tracker sequence (dependency graph unavailable)")
         else:
-            # Verify stable snapshot: the tracker must not have changed
-            # between the initial list and the per-item show reads. A concurrent
-            # change (e.g., A0's deps modified after its show, or a new A12
-            # added after the list) could otherwise assemble a mixed snapshot
-            # that still matches EXPECTED_DEPS. Use a trailing revision check
-            # via re-reading the list and deps after the second sweep so the
-            # window ends with an atomic list comparison, not with per-item reads.
-            live_items_after = load_live_items()
-            if live_items_after is None:
-                missing.append("exact ordered A0-A11 tracker sequence (live tracker unavailable on re-read)")
-            else:
-                prefix_after = [
-                    item for item in live_items_after if str(item.get("id", "")).startswith(args.todo_prefix)
-                ]
-                before_map = {item["id"]: str(item.get("state", "")).lower() for item in prefix_all}
-                after_map = {item["id"]: str(item.get("state", "")).lower() for item in prefix_after}
-                if before_map != after_map:
-                    missing.append("exact ordered A0-A11 tracker sequence (live tracker changed during check)")
-                else:
-                    live_deps_after = load_live_deps(live_ids)
-                    if live_deps_after is None:
-                        missing.append("exact ordered A0-A11 tracker sequence (dependency graph changed during check)")
-                    elif live_deps_after != live_deps:
-                        missing.append(
-                            "exact ordered A0-A11 tracker sequence (live dependency graph changed during check)"
-                        )
-                    else:
-                        # Final revision check after the second sweep: ensures no
-                        # new phase or state change slipped in after the last show.
-                        live_items_final = load_live_items()
-                        if live_items_final is None:
-                            missing.append(
-                                "exact ordered A0-A11 tracker sequence (live tracker unavailable on final re-read)"
-                            )
-                        else:
-                            prefix_final = [
-                                item
-                                for item in live_items_final
-                                if str(item.get("id", "")).startswith(args.todo_prefix)
-                            ]
-                            final_map = {item["id"]: str(item.get("state", "")).lower() for item in prefix_final}
-                            if final_map != before_map:
-                                missing.append(
-                                    "exact ordered A0-A11 tracker sequence (live tracker changed after dependency reads)"
-                                )
-            live_item_ids = sorted(live_ids, key=lambda item_id: _phase_key(item_id, args.todo_prefix))
             expected_sorted = sorted(EXPECTED_DEPS.keys(), key=lambda item_id: _phase_key(item_id, args.todo_prefix))
             # Require every pinned phase to be present in both sequences.
             # Without this, both the plan and live could omit a terminal phase
