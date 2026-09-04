@@ -157,8 +157,10 @@ The Results Explorer is not built directly from `published-results`; the documen
 
 ## Trust Labels
 
-Results in the explorer carry trust labels. The `SOURCE_TO_TRUST_LABEL` table
-in `benchbox/core/results/provenance.py` is the vocabulary of record:
+Results in the explorer carry trust labels. In
+`benchbox/core/results/provenance.py`, `RESULT_SOURCES` defines the manifest
+`result_source` values and `SOURCE_TO_TRUST_LABEL` maps them to trust labels.
+`TRUST_LABELS` is the complete canonical trust-label vocabulary:
 
 | Canonical label | Explorer display | Meaning |
 |-----------------|------------------|---------|
