@@ -87,9 +87,14 @@ must never wipe.
 For a maintainer-approved removal from the public archive, open a hand-created
 PR against `published-results` that is **deletion-only**: it may remove the
 affected archive paths and regenerate the inventory, but it must not add or
-replace bundles. PRs #1882 and #1940 are worked examples. During the A0
-freeze, do not delete paths from `published-results` or `develop`; use the
-presentation withdrawal and artifact-access suppression procedure below.
+replace bundles. If an affected bundle path also exists on `develop`, remove it
+from `develop` first as part of the same coordinated change; otherwise the
+next union mirror will copy it back onto `published-results`. There is no
+durable archive exclusion or tombstone mechanism in this workflow. After the
+`develop` removal is in place, open the deletion-only `published-results` PR.
+PRs #1882 and #1940 are worked examples. During the A0 freeze, do not delete
+paths from `published-results` or `develop`; use the presentation withdrawal
+and artifact-access suppression procedure below.
 
 Maintainer and seed additions to the public archive land on `develop` first,
 then sync through the mirror — never via a hand-opened maintainer PR that
