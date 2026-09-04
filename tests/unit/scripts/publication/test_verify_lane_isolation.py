@@ -175,6 +175,28 @@ def test_lane_owned_paths_still_contaminate_despite_non_lane_allowlist() -> None
     assert any("changed paths violate lane 'site' isolation" in err for err in report.errors)
 
 
+def test_site_allows_only_explicit_non_build_corpus_paths() -> None:
+    """Site docs may accompany corpus policy edits, but corpus payloads remain forbidden."""
+    report = verify_lane_isolation(
+        "site",
+        repo_root=REPO_ROOT,
+        changed_paths=[
+            "docs/index.rst",
+            ".github/workflows/validate-submission.yml",
+            "results-data/README.md",
+        ],
+    )
+    assert report.success is True
+
+    contaminated = verify_lane_isolation(
+        "site",
+        repo_root=REPO_ROOT,
+        changed_paths=["docs/index.rst", "results-data/bundles/new-bundle.json"],
+    )
+    assert contaminated.success is False
+    assert any("changed paths violate lane 'site' isolation" in err for err in contaminated.errors)
+
+
 def test_non_lane_inputs_excluded_from_digests() -> None:
     # Unlike shared inputs, non-lane inputs must never fold into lane
     # digests: lane fingerprints stay scoped to real build inputs.

@@ -90,6 +90,18 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     ".todo-db/",
 )
 
+# Exact files owned by another lane but not read by this lane's artifact build.
+# Keep this map narrow: lane-owned paths remain contamination failures unless
+# they are explicitly proven irrelevant to the target lane.
+LANE_SAFE_EXTERNAL_PATHS: dict[str, frozenset[str]] = {
+    "site": frozenset(
+        {
+            ".github/workflows/validate-submission.yml",
+            "results-data/README.md",
+        }
+    ),
+}
+
 LANE_PREFIXES: dict[str, tuple[str, ...]] = {
     "site": (
         "docs/",
@@ -187,6 +199,12 @@ def _is_non_lane_input(rel_path: str) -> bool:
             if normalized == prefix or fnmatch.fnmatch(normalized, prefix):
                 return True
     return False
+
+
+def _is_safe_external_path(lane: str, rel_path: str) -> bool:
+    """Return True for an explicitly approved, other-lane non-build input."""
+    normalized = rel_path.strip().replace("\\", "/")
+    return normalized in LANE_SAFE_EXTERNAL_PATHS.get(lane, frozenset())
 
 
 def classify_path(rel_path: str) -> set[str]:
@@ -459,6 +477,8 @@ def verify_lane_isolation(  # noqa: C901
                     continue
                 unclassified_paths.append(normalized)
             elif lane not in path_lanes:
+                if _is_safe_external_path(lane, normalized):
+                    continue
                 contaminating_paths.append((normalized, sorted(path_lanes)))
         if contaminating_paths:
             errors.append(
