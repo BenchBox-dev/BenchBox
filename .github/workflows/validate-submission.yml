@@ -264,7 +264,7 @@ jobs:
               stem="${manifest:0:${#manifest}-14}"
               bundle=$(git ls-tree -r --name-only "$EFFECTIVE_MERGE" -- results-data/bundles \
                 | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { print; exit }')
-              if git cat-file -e "$EFFECTIVE_MERGE:${bundle}" 2>/dev/null \
+              if [ -n "$bundle" ] && git cat-file -e "$EFFECTIVE_MERGE:${bundle}" 2>/dev/null \
                   && ! printf '%s\n' "$CHANGED" | grep -qxF "$bundle"; then
                 CHANGED="${CHANGED:+${CHANGED}$'\n'}${bundle}"
               fi
@@ -281,7 +281,7 @@ jobs:
               stem="${applied:0:${#applied}-13}"
               bundle=$(git ls-tree -r --name-only "$EFFECTIVE_MERGE" -- results-data/bundles \
                 | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { print; exit }')
-              if git cat-file -e "$EFFECTIVE_MERGE:${bundle}" 2>/dev/null \
+              if [ -n "$bundle" ] && git cat-file -e "$EFFECTIVE_MERGE:${bundle}" 2>/dev/null \
                   && ! printf '%s\n' "$CHANGED" | grep -qxF "$bundle"; then
                 CHANGED="${CHANGED:+${CHANGED}$'\n'}${bundle}"
               fi
@@ -308,7 +308,7 @@ jobs:
                 echo "::error file=${companion}::Live companion has no primary bundle at ${stem}.json"
                 exit 1
               fi
-              if git cat-file -e "$EFFECTIVE_MERGE:${bundle}" 2>/dev/null \
+              if [ -n "$bundle" ] && git cat-file -e "$EFFECTIVE_MERGE:${bundle}" 2>/dev/null \
                   && ! printf '%s\n' "$CHANGED" | grep -qxF "$bundle"; then
                 CHANGED="${CHANGED:+${CHANGED}$'\n'}${bundle}"
               fi

@@ -306,3 +306,39 @@ def test_deleted_orphan_companion_is_allowed(tmp_path: Path, companion_suffix: s
 
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == ""
+
+
+def test_deleted_bundle_and_manifest_do_not_inject_empty_bundle_path(tmp_path: Path) -> None:
+    """Deleting a bundle and its manifest must not append an empty validator path."""
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+
+    bundle_dir = tmp_path / "results-data" / "bundles"
+    bundle_dir.mkdir(parents=True)
+    primary = bundle_dir / "result.json"
+    manifest = bundle_dir / "result.manifest.json"
+    primary.write_text("{}\n", encoding="utf-8")
+    manifest.write_text("{}\n", encoding="utf-8")
+    _git(tmp_path, "add", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    primary.unlink()
+    manifest.unlink()
+    _git(tmp_path, "add", "-u", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "delete bundle and manifest")
+
+    skip_without_posix_shell()
+    env = {**os.environ, "BASE_SHA": base_sha}
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "\n"
