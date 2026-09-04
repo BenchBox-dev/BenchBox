@@ -84,6 +84,31 @@ exists only on `published-results`, it becomes **published-only** and is kept
 on the next mirror. That protects community submissions the automated sync
 must never wipe.
 
+For a maintainer-approved removal from the public archive, open a hand-created
+PR against `published-results` that is **deletion-only**: it may remove the
+affected archive paths and regenerate the inventory, but it must not add or
+replace bundles. PRs #1882 and #1940 are worked examples. During the A0
+freeze, do not delete paths from `published-results` or `develop`; use the
+presentation withdrawal and artifact-access suppression procedure below.
+
+To add content to the public archive, land the change on `develop` first, then
+run:
+
+```bash
+gh workflow run sync-results-data-to-published.yml
+```
+
+Review and merge the resulting `auto/results-mirror-*` PR. Never add archive
+content by hand. The sync uses a union overlay so an automated mirror never
+deletes public content. Its four-signal waiver for trusted mirror content
+requires all of the following: base `published-results`,
+`head.repo.fork == false`, PR author `github-actions[bot]`, and `head_ref`
+matching `auto/results-mirror-*`. Do not relax this waiver to make a
+hand-opened addition pass. If one change both adds and deletes paths, mirror
+last: complete the reviewed deletion first, then land the addition on
+`develop` and run the mirror so the corpus floor is never violated on the
+public branch.
+
 During the A0 migration freeze, privacy remediation, takedown, or mistaken
 publication authorizes presentation withdrawal and artifact-access suppression,
 not accepted-archive deletion:
