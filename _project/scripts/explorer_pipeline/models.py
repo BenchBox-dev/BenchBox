@@ -6,7 +6,6 @@ pipeline and consumed by the results-explorer frontend.
 
 from __future__ import annotations
 
-import datetime as _dt
 import math
 import re
 from dataclasses import dataclass
@@ -507,29 +506,12 @@ def custom_tuning_is_materially_applied(entry: ManifestEntry) -> bool:
     return entry.tuning_mode != "custom" or entry.tuning_validation_status in APPLIED_TUNING_STATUSES
 
 
-def run_age_days(run_date: str, *, as_of: _dt.date | None = None) -> int:
-    """Whole days between a ManifestEntry/DetailResult ``run_date`` and *as_of*.
-
-    Accepts ``YYYY-MM-DD`` (pipeline form) or ``YYYYMMDD`` (result_id form).
-    Derived from the existing ``run_date`` field — no DuckDB column and no
-    Explorer read-model contract bump. Informational only: age is not a
-    ranking exclusion (see ``ranking_exclusion_reason``).
-    """
-    as_of = as_of or _dt.date.today()
-    text = run_date.strip()
-    if len(text) == 8 and text.isdigit():
-        parsed = _dt.date(int(text[0:4]), int(text[4:6]), int(text[6:8]))
-    else:
-        parsed = _dt.date.fromisoformat(text[:10])
-    return (as_of - parsed).days
-
-
 def ranking_exclusion_reason(entry: ManifestEntry, primary_metric: str | None = None) -> str | None:
     """Return the row-level reason an entry cannot receive a rank.
 
     Age/staleness is intentionally absent from the reason set. Run age is
-    derived via ``run_age_days`` and reported by ``results-data/validate_corpus.py``
-    but does not affect ranking eligibility. Making age an exclusion requires an
+    reported by ``results-data/validate_corpus.py`` (informational only) and
+    does not affect ranking eligibility. Making age an exclusion requires an
     explicit recorded decision; the default remains no.
     """
     if entry.visibility not in RANKING_ELIGIBLE_VISIBILITIES:
@@ -768,7 +750,6 @@ __all__ = [
     "is_ranking_eligible",
     "MetaRank",
     "ranking_exclusion_reason",
-    "run_age_days",
     "select_canonical_row",
     "timing_eligibility",
     "timing_exclusion_reason",

@@ -112,8 +112,9 @@ def parse_run_date(payload: dict, *, bundle: pathlib.Path | None = None) -> _dt.
     """Extract the calendar run date from ``run.timestamp``.
 
     Accepts ISO-8601 prefixes (``YYYY-MM-DD``) as written by BenchBox exporters.
-    Missing or unparseable timestamps fail closed so a truncated bundle cannot
-    hide from the recency report.
+    Missing or unparseable timestamps raise ``CorpusReadError``; callers that
+    treat age as informational (``cohort_recency``) must catch and omit rather
+    than fail the depth gate.
     """
     label = f" in {bundle}" if bundle is not None else ""
     try:
@@ -176,24 +177,32 @@ def cohort_recency(
     bundles: list[pathlib.Path],
     *,
     as_of: _dt.date | None = None,
-) -> tuple[RecencyStats | None, dict[CohortKey, RecencyStats]]:
+) -> tuple[RecencyStats | None, dict[CohortKey, RecencyStats], list[str]]:
     """Per-cohort and overall oldest/newest run ages from bundle timestamps.
 
-    Returns ``(overall, per_cohort)``. *overall* is ``None`` when *bundles* is
-    empty. Age never participates in the depth-gate exit code.
+    Returns ``(overall, per_cohort, warnings)``. *overall* is ``None`` when no
+    parseable timestamps remain. Bundles with a missing or unparseable
+    ``run.timestamp`` are omitted from the report and listed in *warnings*.
+    Age never participates in the depth-gate exit code.
     """
     as_of = as_of or _dt.date.today()
     by_cohort: collections.defaultdict[CohortKey, list[_dt.date]] = collections.defaultdict(list)
     all_dates: list[_dt.date] = []
+    warnings: list[str] = []
     for bundle in bundles:
         payload = _load_bundle(bundle)
-        run_date = parse_run_date(payload, bundle=bundle)
+        try:
+            run_date = parse_run_date(payload, bundle=bundle)
+        except CorpusReadError as exc:
+            # Age is informational: omit, warn, and leave the depth exit alone.
+            warnings.append(str(exc).replace("ERROR", "WARN", 1))
+            continue
         key = _cohort_key(payload)
         by_cohort[key].append(run_date)
         all_dates.append(run_date)
     per_cohort = {key: _stats_from_dates(dates, as_of=as_of) for key, dates in by_cohort.items()}
     overall = _stats_from_dates(all_dates, as_of=as_of) if all_dates else None
-    return overall, per_cohort
+    return overall, per_cohort, warnings
 
 
 def format_recency_report(
@@ -242,7 +251,6 @@ def main(bundles_dir: pathlib.Path | None = None, *, as_of: _dt.date | None = No
 
     try:
         cohorts = cohort_platforms(bundles)
-        overall, per_cohort = cohort_recency(bundles, as_of=as_of)
     except CorpusReadError as exc:
         print(exc)
         return 1
@@ -251,6 +259,18 @@ def main(bundles_dir: pathlib.Path | None = None, *, as_of: _dt.date | None = No
     for key, platforms in sorted(cohorts.items()):
         status = "OK" if len(platforms) >= MINIMUM_PLATFORMS_PER_COHORT else "WARN (<3 identities)"
         print(f"  {key[0]} SF={key[1]}: {len(platforms)} identities ({sorted(platforms)}) [{status}]")
+
+    # Recency is informational: timestamp parse failures warn and omit, and
+    # never override the depth exit code computed below.
+    try:
+        overall, per_cohort, recency_warnings = cohort_recency(bundles, as_of=as_of)
+    except CorpusReadError as exc:
+        # Unreadable payload after a successful depth pass is unexpected; warn
+        # and continue with an empty recency report rather than flipping depth.
+        print(f"WARN recency skipped: {exc}")
+        overall, per_cohort, recency_warnings = None, {}, []
+    for warning in recency_warnings:
+        print(warning)
 
     print()
     print(format_recency_report(overall, per_cohort, as_of=as_of))

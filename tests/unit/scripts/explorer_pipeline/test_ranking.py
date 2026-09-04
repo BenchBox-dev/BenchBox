@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import datetime as dt
-import inspect
-
 import pytest
 
 from _project.scripts.explorer_pipeline.models import (
@@ -14,7 +11,6 @@ from _project.scripts.explorer_pipeline.models import (
     RankingConfig,
     is_ranking_eligible,
     ranking_exclusion_reason,
-    run_age_days,
 )
 from _project.scripts.explorer_pipeline.ranking import rank_platforms
 
@@ -47,26 +43,11 @@ def test_official_entry_is_ranking_eligible() -> None:
     assert ranking_exclusion_reason(_rankable_entry()) is None
 
 
-def test_run_age_days_derives_from_existing_run_date() -> None:
-    as_of = dt.date(2026, 9, 4)
-    assert run_age_days("2026-05-02", as_of=as_of) == 125
-    assert run_age_days("20260502", as_of=as_of) == 125
-
-
 def test_ranking_exclusion_reason_has_no_age_or_staleness_reason() -> None:
-    """Age is visible via run_age_days / validate_corpus; it is not an exclusion."""
-    returned_literals = {
-        line.strip().removeprefix("return ").strip("'\"")
-        for line in inspect.getsource(ranking_exclusion_reason).splitlines()
-        if line.strip().startswith('return "') or line.strip().startswith("return '")
-    }
-    assert returned_literals
-    assert not any("age" in reason or "stale" in reason for reason in returned_literals)
-    # An old but otherwise rankable row stays eligible.
+    """An old but otherwise rankable row stays eligible; age is not an exclusion."""
     old = _rankable_entry(run_date="2020-01-01")
     assert is_ranking_eligible(old)
     assert ranking_exclusion_reason(old) is None
-    assert run_age_days(old.run_date, as_of=dt.date(2026, 9, 4)) > 365
 
 
 @pytest.mark.parametrize("status", [None, "not_applicable", "noop", "failed", "not_validated"])
