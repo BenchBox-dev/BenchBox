@@ -28,7 +28,7 @@ BenchBox _loosely_ follows [Semantic Versioning](https://semver.org/) using the 
 - **MINOR** when we add backward-compatible changes _OR significantly expand functionality_.
 - **PATCH** when we make bug fixes or documentation updates, _bug-fixes may not be backward-compatible_.
 
-Current release: v0.4.0. This marker mirrors `pyproject.toml` on `develop`, which is kept in sync with the latest published release (bumped to match after each release), and is checked for internal consistency by `benchbox --version`.
+Current release: v0.4.1. This marker mirrors `pyproject.toml` on `develop`, which is kept in sync with the latest published release (bumped to match after each release), and is checked for internal consistency by `benchbox --version`.
 
 **The current PyPI-latest release is `v0.4.0`** (published 2026-08-28; see [PyPI's release history](https://pypi.org/project/benchbox/#history) or `pip index versions benchbox` for the authoritative answer). PyPI provides both a universal wheel and source distribution for this release. Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
 

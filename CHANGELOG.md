@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-09-04
+
+### Added
+
+- The Results Explorer now uses read model v10 with DuckDB-backed query data and explicit engine-version, CPU, and host metadata.
+- Explorer browsing supports engine-version selection, measurement-basis-aware comparisons, multi-run baselines, ratio heatmaps, and standings.
+- Query search and paging are backed by the published SQL data, with clearer index, coverage, and empty-result states.
+- Results pages disclose client-platform locality, statement overhead, validation status, provenance, and the basis used for each comparison.
+- The public corpus adds a DuckDB version matrix, a TPC-DS scale ladder, and refreshed local-platform benchmark coverage.
+- Explorer detail and comparison views gain accessible selection trays, mobile layouts, safe-area support, print layouts, and stable deep-link routes.
+- The publication pipeline adds controlled corpus promotion, deterministic artifact assembly, preview deployment, and release retention for the Explorer.
+- A publication control plane records artifact manifests, content-addressed promotion, reconciliation, operational canaries, and bounded receipts.
+- Release and preview builds now assemble the Explorer in the same order and validate the resulting Pages routes and public-path privacy.
+
+### Changed
+
+- Comparison eligibility is now fail-closed when measurement basis, validation, provenance, scale, or cohort identity is incomplete.
+- Explorer labels distinguish measured results from unvalidated, excluded, unavailable, and pass-not-recorded states.
+- Public result bundles preserve hardware provenance, applied-tuning evidence, and truthful corpus authority across refreshes.
+- The release process retains the curated Explorer preview and its companion data artifacts in release branches.
+
+### Fixed
+
+- Corrected comparison headings, mixed-metric direction, matrix legends, overflow cues, and index run labels.
+- Bounded comparison candidate resolution and the number of results that can be selected locally.
+- Fixed sidecar hash synchronization so the public mirror can open after corpus updates.
+- Prevented reruns from overwriting attestation manifests and made anonymization converge to a stable public result.
+- Improved streaming and bounded execution behavior for published benchmark data and platform UAT.
+- Hardened public-site visual checks, deterministic browser captures, and release deployment path validation.
+
 ## [Unreleased]
 
 ## [0.4.0] - 2026-08-27
