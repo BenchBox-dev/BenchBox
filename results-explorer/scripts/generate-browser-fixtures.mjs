@@ -132,6 +132,48 @@ const VARIANTS = [
     },
   },
   {
+    // Vendor-supplied variant: derived from the TPC-H Pandas source. Bundles
+    // under the top-level `vendor/` subtree receive `trust_label=vendor-supplied`
+    // from the explorer pipeline. Keep this subtree free of community
+    // submission-manifest sidecars so the label stays unambiguous.
+    source: "tpch-pandas-sf0.01-20260826-8bde2222.json",
+    subdir: "vendor",
+    derived: "tpch-pandas-sf0.01-20260826-vendor.json",
+    mutate: (bundle) => {
+      const mutated = structuredClone(bundle);
+      if (mutated.run) {
+        mutated.run.id = `${mutated.run.id ?? "run"}-vendor`;
+      }
+      return mutated;
+    },
+  },
+  {
+    // Second tuned/notuned pair: Pandas mirror of the DuckDB tuned variant.
+    // Gives the honesty controls a ≥2-platform tuned cohort without adding
+    // extra DuckDB or Polars rows (those platforms have hard-coded e2e counts).
+    source: "tpch-pandas-sf0.01-20260826-8bde2222.json",
+    subdir: "tuned-pandas",
+    derived: "tpch-pandas-sf0.01-20260826-tuned.json",
+    sidecars: {
+      "tpch-pandas-sf0.01-20260826-tuned.tuning.json": {
+        tuning_mode: "tuned",
+        memory_limit: "4GB",
+        threads: 4,
+        notes:
+          "Synthetic tuning config produced by the browser-test fixture " +
+          "generator. Do not treat as a real contribution.",
+      },
+    },
+    mutate: (bundle) => {
+      const mutated = structuredClone(bundle);
+      mutated.config = { ...(mutated.config ?? {}), tuning_mode: "tuned" };
+      if (mutated.run) {
+        mutated.run.id = `${mutated.run.id ?? "run"}-tuned`;
+      }
+      return mutated;
+    },
+  },
+  {
     // Scale-factor variant: same TPC-H DuckDB bundle rewritten to SF 0.1.
     // The compare-scale-mismatch failure test pairs this with an SF 0.01
     // bundle to exercise the hard-block path that jsdom cannot reach.
@@ -396,12 +438,28 @@ const LOCAL_PLATFORM_METADATA = {
       collection_status: "partial",
     },
   },
+  pandas: {
+    runtimeType: "dataframe_process",
+    deployment: {
+      deployment_type: "embedded",
+      connection_mode: "dataframe",
+      endpoint_class: "embedded_process",
+      metadata_source: "observed",
+      collection_status: "available",
+    },
+    storage: {
+      table_format: "parquet",
+      source: "inferred",
+      collection_status: "partial",
+    },
+  },
 };
 
 const platformKey = (bundle) => {
   const name = String(bundle.platform?.name ?? "").toLowerCase();
   if (name.includes("datafusion")) return "datafusion";
   if (name.includes("polars")) return "polars";
+  if (name.includes("pandas")) return "pandas";
   return "duckdb";
 };
 
@@ -604,6 +662,9 @@ const FIXTURE_ROLES = {
   "9c0925d1-env-container-local": "containerLocal",
   "9c0925d1-env-gcp-serverless": "gcpServerless",
   "9c0925d1-zero-timing": "zeroTiming",
+  "8bde2222": "pandas",
+  "8bde2222-vendor": "pandasVendor",
+  "8bde2222-tuned": "pandasTuned",
   c235e698: "datafusion",
   "c235e698-partial-query": "datafusionPartial",
   d4ec318a: "starSchema",

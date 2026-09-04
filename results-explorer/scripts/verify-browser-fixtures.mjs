@@ -6,12 +6,15 @@
  * Run after `generate-browser-fixtures.mjs`. Fails if the generated
  * corpus does not satisfy the minimum contract the browser suite
  * depends on:
- *   - at least one benchmark × scale has ≥3 distinct platforms
+ *   - at least one benchmark × scale has ≥4 distinct platforms
  *     (compare happy-path cohort)
  *   - at least two benchmarks exist (compare-invalid benchmark-mismatch
  *     cohort source)
- *   - both `maintainer-run` and `community-submission` trust labels are
- *     represented (trust-badge coverage)
+ *   - `maintainer-run`, `community-submission`, and `vendor-supplied`
+ *     trust labels are represented (trust-badge coverage)
+ *   - at least two platforms in a ≥4-platform cohort have both a
+ *     notuned/default run and a tuned (`tuning_mode=tuned` or
+ *     `has_tuning`) run
  *   - environment facets include fixture-only cloud/provider/region/shape
  *     coverage plus a normalized container runtime source
  *   - a second generator run produces the same fixture tree. JSON files
@@ -78,6 +81,18 @@ benchmarks = [row[0] for row in con.execute(
 trust_labels = {row[0] for row in con.execute(
     "SELECT DISTINCT trust_label FROM results"
 ).fetchall()}
+tuning_rows = con.execute(
+    """
+    SELECT
+        benchmark,
+        scale_factor,
+        platform,
+        COALESCE(tuning_mode, '') AS tuning_mode,
+        has_tuning
+    FROM results
+    ORDER BY 1, 2, 3, 4
+    """
+).fetchall()
 environment_values = {}
 for column in (
     "deployment_class",
@@ -127,6 +142,7 @@ result = {
     "platforms_per_cohort": platforms_per_cohort,
     "benchmarks": benchmarks,
     "trust_labels": sorted(trust_labels),
+    "tuning_rows": tuning_rows,
     "environment_values": environment_values,
     "cloud_rows": cloud_rows,
     "container_rows": container_rows,
@@ -192,18 +208,19 @@ function verifyFixtureInvariants() {
       `large fixture has ${data.result_count} results; expected at least ${LARGE_CORPUS_MINIMUM_RESULTS}`,
     );
   }
-  const comparableCohort = data.platforms_per_cohort.find(([, , count]) => count >= 3);
-  if (!comparableCohort) {
-    errors.push("no benchmark × scale has ≥3 distinct platforms (compare happy-path needs one)");
+  const comparableCohorts = data.platforms_per_cohort.filter(([, , count]) => count >= 4);
+  if (!comparableCohorts.length) {
+    errors.push("no benchmark × scale has ≥4 distinct platforms (compare happy-path needs one)");
   }
   if (data.benchmarks.length < 2) {
     errors.push(`only ${data.benchmarks.length} benchmark(s) present; compare-invalid test needs ≥2`);
   }
-  for (const required of ["maintainer-run", "community-submission"]) {
+  for (const required of ["maintainer-run", "community-submission", "vendor-supplied"]) {
     if (!data.trust_labels.includes(required)) {
       errors.push(`trust_label="${required}" missing from corpus`);
     }
   }
+  verifyTunedPairCoverage(data, comparableCohorts, errors);
   verifyEnvironmentCoverage(data, errors);
 
   if (errors.length) {
@@ -214,6 +231,38 @@ function verifyFixtureInvariants() {
   }
 
   console.log("[verify-browser-fixtures] OK", JSON.stringify(data));
+}
+
+function verifyTunedPairCoverage(data, comparableCohorts, errors) {
+  if (!comparableCohorts.length) return;
+
+  const cohortKeys = new Set(
+    comparableCohorts.map(([benchmark, scaleFactor]) => `${benchmark}\0${scaleFactor}`),
+  );
+  const byCohortPlatform = new Map();
+  for (const [benchmark, scaleFactor, platform, tuningMode, hasTuning] of data.tuning_rows ?? []) {
+    const cohortKey = `${benchmark}\0${scaleFactor}`;
+    if (!cohortKeys.has(cohortKey)) continue;
+    const platformKey = `${cohortKey}\0${platform}`;
+    const flags = byCohortPlatform.get(platformKey) ?? { hasDefault: false, hasTuned: false };
+    const isTuned = tuningMode === "tuned" || hasTuning === true;
+    if (isTuned) {
+      flags.hasTuned = true;
+    } else {
+      flags.hasDefault = true;
+    }
+    byCohortPlatform.set(platformKey, flags);
+  }
+
+  let pairedPlatforms = 0;
+  for (const flags of byCohortPlatform.values()) {
+    if (flags.hasDefault && flags.hasTuned) pairedPlatforms += 1;
+  }
+  if (pairedPlatforms < 2) {
+    errors.push(
+      `expected ≥2 platforms in a ≥4-platform cohort with both notuned/default and tuned runs; observed ${pairedPlatforms}`,
+    );
+  }
 }
 
 function verifyEnvironmentCoverage(data, errors) {
