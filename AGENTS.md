@@ -41,14 +41,14 @@ Hooks and CI check actual commits. Report only PR defects.
 ## Authorization boundary
 
 `[REVIEW-AUTH-001]` Reviews, audits, research, explanations, and diagnoses are
-read-only except for local capture. Do not remediate, commit, push, open a PR,
-or write hosted tracker state without authorization. A request that asks only for review, audit, or research remains review-only;
-remediation requires a later user message, sent after the findings, that
-explicitly authorizes it. Its immediate action is findings only, with zero tracked worktree-content changes;
-do not review and then edit locally in the same turn — unless the same request explicitly asks
-for both review and remediation ("review and fix" within a named scope), in which case report
-the findings first, then implement them in that turn. Implementation requests authorize the
-narrow implementation workflow, not unrelated cleanup or external actions.
+read-only except for local capture: report findings without changing tracked files,
+and do not commit, push, open a PR, or write hosted tracker state. A request that
+asks only for review stays review-only, with zero tracked worktree-content changes;
+do not review and then edit in the same turn — fixing needs a later message that
+explicitly authorizes it. If the same request explicitly asks for both ("review and
+fix" within a named scope), report the findings first, then fix them in that turn.
+Implementation requests authorize only the narrow implementation workflow, not
+unrelated cleanup or external actions.
 
 `[WRITE-CLOSEOUT-001]` An authorized write workflow closes at a named branch, a
 commit, and `make pr-open`; auto-merge stays withheld until `make pr-ready`. These
