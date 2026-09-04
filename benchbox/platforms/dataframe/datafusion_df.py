@@ -178,15 +178,18 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         if config.parallelism.thread_count is not None:
             self._target_partitions = config.parallelism.thread_count
             self._log_verbose(f"Set target_partitions={self._target_partitions}")
+            self._record_runtime_tuning(f"target_partitions={self._target_partitions}")
 
         # Apply execution settings
         if config.execution.streaming_mode:
+            # Per-query only — not a global setting, so do not record as applied.
             self._log_verbose("Note: DataFusion streaming mode is per-query, not global")
 
         # Apply memory settings (DataFusion manages memory through Arrow)
         if config.memory.chunk_size is not None:
             self._batch_size = config.memory.chunk_size
             self._log_verbose(f"Set batch_size={self._batch_size}")
+            self._record_runtime_tuning(f"batch_size={self._batch_size}")
 
     @property
     def platform_name(self) -> str:

@@ -215,27 +215,32 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
             self.n_workers = config.parallelism.worker_count
             self._n_workers_configured = True
             self._log_verbose(f"Set n_workers={self.n_workers} from tuning configuration")
+            self._record_runtime_tuning(f"n_workers={self.n_workers}")
 
         # Apply threads per worker setting
         if config.parallelism.threads_per_worker is not None:
             self.threads_per_worker = config.parallelism.threads_per_worker
             self._threads_per_worker_configured = True
             self._log_verbose(f"Set threads_per_worker={self.threads_per_worker} from tuning configuration")
+            self._record_runtime_tuning(f"threads_per_worker={self.threads_per_worker}")
 
         # Apply memory limit setting
         if config.memory.memory_limit is not None:
             self._memory_limit = config.memory.memory_limit
             self._memory_limit_configured = True
             self._log_verbose(f"Set memory_limit={self._memory_limit} from tuning configuration")
+            self._record_runtime_tuning(f"memory_limit={self._memory_limit}")
 
         # Apply spill to disk setting
         if config.memory.spill_to_disk:
             self._spill_to_disk = True
             self._log_verbose("Enabled spill to disk from tuning configuration")
+            self._record_runtime_tuning("spill_to_disk=on")
 
         spill_directory = getattr(config.memory, "spill_directory", None)
         if spill_directory is not None:
             self._configured_spill_directory = Path(spill_directory).expanduser()
+            self._record_runtime_tuning(f"spill_directory={self._configured_spill_directory}")
 
     def _apply_local_resource_envelope_defaults(self) -> None:
         """Apply conservative defaults for local distributed Dask runs."""
