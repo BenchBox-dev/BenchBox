@@ -86,6 +86,80 @@ This contract applies to every `_project/audits/` report, not only Results
 Explorer retheme reports. Structured finding lists still keep their existing
 body format after the frontmatter block.
 
+## Independent release certification
+
+A green Vitest run or a single Chromium project is not certification. Close
+security, submissions, metrics, and browsers independently, and pin the
+identities you measured.
+
+### How to pin identities
+
+Record the exact commands and their outputs before judging the live site or a
+local fixture server:
+
+- Source: `git rev-parse origin/develop` and `git rev-parse HEAD`.
+- Live HTML: `curl -sS -D - -o /tmp/explorer-results.html https://benchbox.dev/results/`
+  and keep status, etag, last-modified, cache-control, age, accept-ranges, and
+  content-length. Confirm the document title and the CSP `<meta>` content.
+- Live snapshot: the same header set for
+  `https://benchbox.dev/results/data/results.duckdb`, plus `shasum -a 256` of the
+  downloaded bytes and `SELECT read_model_version FROM metadata` on that file.
+  Compare the snapshot version to the expected version in the live Explorer JS
+  (search the deployed index bundle for `UI requires v`) and to
+  `EXPLORER_READ_MODEL_VERSION` in the source tree. Do not copy second-hand SQL
+  counts; recompute from this pinned file.
+- Browsers: Playwright and engine versions from the installed
+  `@playwright/test` binaries.
+- Local e2e server: allocate a unique port (do not assume 4319 is yours).
+  Record PID, process cwd, fixture directory, and SHA-256 of the served
+  `results.duckdb`. Confirm the listening process is the one you started.
+
+GitHub Pages does not emit CSP, COOP, COEP, or `X-Frame-Options` as HTTP
+headers. Framing protection and SharedArrayBuffer headers, if required, must
+be observed at the CDN/hosting layer or classified as a hosting-policy gap.
+The explorer's `connect-src 'self'` CSP is the meta-tag control that confines
+DuckDB-WASM network access to the app origin.
+
+### Suites that must run
+
+- Focused Python (default pytest marker filter applies):
+  `uv run -- python -m pytest tests/integration tests/uat/test_explorer_smoke.py tests/unit/scripts/explorer_pipeline -q`
+- Submission contract paths already covered by
+  `tests/unit/workflows/test_validate_submission_*.py` (fork, vendor subtree,
+  companion discovery, comment security, corpus allowlist, fail-open, trusted
+  checkout) plus privacy rejection in
+  `tests/unit/scripts/explorer_pipeline/test_privacy_rejection.py`.
+- Chromium blocking suite on the isolated port:
+  `cd results-explorer && npm run test:e2e:chromium`
+- Firefox and WebKit `@smoke` projects when those browsers are installed:
+  `npx playwright test --project=firefox` and
+  `npx playwright test --project=webkit --workers=1`.
+  Promotion to a blocking gate still waits for consecutive evidence, not a
+  short green sample. Classify every failure as product, infrastructure, or
+  policy, with an owner. Do not skip classification. Injected JavaScript,
+  synthetic `popstate`, or synthetic keyboard events are not sole evidence.
+
+### Independent oracles
+
+Recompute geomean, percentile, and ranking direction from the pinned snapshot's
+`query_display_timings` using the helpers in
+`tests/parity/generate_visualization_fixtures.py` (`geomean_ms`,
+`compute_percentile` / `platform_percentile_stats`, and an independent
+competition ranker). Compare those values to `results.display_geomean_ms` and
+`benchmark_rankings`. The oracle must detect divergence; it must not replace
+production logic in `_project/scripts/explorer_pipeline/transformer.py` or
+`results-explorer/src/lib/chartMath.ts`.
+
+Scan public bundles and snapshot string columns with
+`benchbox.core.results.anonymization.find_public_path_leaks`. Report field
+paths only; never echo private path values. Keep raw logs, Playwright reports,
+and screenshots out of Git unless a later review approves a specific artifact.
+Security tests must not use real credentials.
+
+Stamp the certification audit with `develop_sha` (and `measured_at_sha` when
+the body contains empirical counts) and validate it with
+`make audit-sha-check FILE=_project/audits/<report>.md`.
+
 ## Expected Hidden Controls
 
 Some controls are intentionally hidden until the loaded corpus has more
