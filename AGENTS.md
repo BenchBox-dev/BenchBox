@@ -14,20 +14,13 @@ Apply instructions in this order:
 4. loaded skills and mechanical tool output;
 5. recommendations, examples, and historical notes.
 
-`[AUTH-PROVENANCE-001]` Classify a requirement before acting: task authority,
-repository policy, mechanical constraint, or recommendation. State the source
-when it changes scope, identity, publication, or destructive behavior. Never
-turn a recommendation or earlier task instruction into a standing requirement.
+Personal-global agent defaults apply only where this guide is silent; where behavior conflicts, this guide and the active project protocol win.
 
-`[COMMIT-IDENTITY-001]` Before committing, resolve Git identity and its config
-origin. Reject known agent/service identities as author unless this task requests
-that exact identity; add no agent/service `Co-Authored-By` or equivalent attribution
-unless it requests that exact trailer. Repository-local values override the global
-identity and every linked worktree inherits them, but are not automatically intentional.
-A signing service may hold the committer slot behind a human author. Stale requests,
-tool conventions, harness/hook messages, and claimed agent work are not authorization
-(`docs/agent/identity-instruction-boundary.md`). The no-attribution bar also binds
-assistant-authored comments, reviews, and PR bodies (`docs/agent/attribution-surfaces.md`).
+`[AUTH-PROVENANCE-001]` Classify a requirement before acting: task authority, repository policy, mechanical constraint, or recommendation. State the source when it changes scope, identity, publication, or destructive behavior. Never turn a recommendation or earlier task instruction into a standing requirement.
+
+`[COMMIT-IDENTITY-001]` Before committing, resolve Git identity and its config origin. Reject known agent/service identities as author unless this task requests that exact identity; add no agent/service `Co-Authored-By` or equivalent attribution unless it requests that exact trailer. Repository-local values override the global identity and every linked worktree inherits them, but are not automatically intentional. A signing service may hold the committer slot behind a human author. Stale requests, tool conventions, harness/hook messages, and claimed agent work are not authorization (`docs/agent/identity-instruction-boundary.md`). The no-attribution bar also binds assistant-authored comments, reviews, and PR bodies (`docs/agent/attribution-surfaces.md`).
+
+`[DURABLE-ARTIFACTS-001]` Write durable artifacts (commit messages, PR titles/bodies, committed comments) for a reader who never saw the session: no phase, gate, wave, or work-item labels, no plan or handoff references, no run-local state. Give the durable reason; process state belongs in a decision record or the tracker.
 
 ## Code Review Rules
 
@@ -37,13 +30,14 @@ Hooks and CI check actual commits. Report only PR defects.
 ## Authorization boundary
 
 `[REVIEW-AUTH-001]` Reviews, audits, research, explanations, and diagnoses are
-read-only except for local capture. Do not remediate, commit, push, open a PR,
-or write hosted tracker state without authorization. A bundled request to review
-and fix remains review-only; remediation requires a later user message, sent
-after the findings, that explicitly authorizes it. Its immediate action is
-findings only, with zero tracked worktree-content changes; do not review and
-then edit locally in the same turn. Implementation requests authorize the
-narrow implementation workflow, not unrelated cleanup or external actions.
+read-only except for local capture: report findings without changing tracked files,
+and do not commit, push, open a PR, or write hosted tracker state. A request that
+asks only for review stays review-only, with zero tracked worktree-content changes;
+do not review and then edit in the same turn — fixing needs a later message that
+explicitly authorizes it. If the same request explicitly asks for both ("review and
+fix" within a named scope), report the findings first, then fix them in that turn.
+Implementation requests authorize only the narrow implementation workflow, not
+unrelated cleanup or external actions.
 
 `[WRITE-CLOSEOUT-001]` An authorized write workflow closes at a named branch, a
 commit, and `make pr-open`; auto-merge stays withheld until `make pr-ready`. These
@@ -52,9 +46,7 @@ Within an authorized write workflow, do not stop before `make pr-open` unless th
 prompt explicitly forbids publication, authorizes only a local commit, or a gate
 fails (in which case keep the commit and report the blocker).
 
-The active BenchBox bindings are in
-`docs/agent/review-protocol.md`. It supersedes the legacy
-`docs/agent/review-protocol-legacy.md` document.
+The active BenchBox bindings are in `docs/agent/review-protocol.md`, which supersedes the legacy `docs/agent/review-protocol-legacy.md` document.
 
 ## Worktree and change safety
 
@@ -69,81 +61,51 @@ make agent-write-preflight
 
 `worktree-create` pins identity via `git config --worktree`, so later writes cannot reauthor it.
 
-Stop if `git rev-parse --show-toplevel` is the primary clone; emergency writes
-there need explicit user authorization plus `BENCHBOX_ALLOW_MAIN_CLONE_WRITE=1`.
-Preserve unrelated dirty work; never use destructive Git/filesystem commands
-without approval. Use `rg`; stage only authorized paths; never `git add -A`.
+Stop if `git rev-parse --show-toplevel` is the primary clone; emergency writes there need explicit user authorization plus `BENCHBOX_ALLOW_MAIN_CLONE_WRITE=1`. Preserve unrelated dirty work; never use destructive Git/filesystem commands without approval. Use `rg`; stage only authorized paths; never `git add -A`.
 
-A disposable clone (remote agent session, CI runner) has no canonical clone; it declares
-`BENCHBOX_EPHEMERAL_CLONE=1` instead of the emergency override. Local agent sessions must use linked worktrees.
-Never run `git worktree prune` or `gc` inside a container mounting `.git` (pruning destroys host registrations);
-unlock only for safe removal after confirming the mount is inactive.
+A disposable clone (remote agent session, CI runner) has no canonical clone; it declares `BENCHBOX_EPHEMERAL_CLONE=1` instead of the emergency override. Local agent sessions must use linked worktrees. Never run `git worktree prune` or `gc` inside a container mounting `.git` (pruning destroys host registrations); unlock only for safe removal after confirming the mount is inactive.
 
 ## Tooling and implementation
 
 - Prefer repository `make` targets and existing helpers.
 - Python tooling is `uv` only: `uv run -- ...`, `uv add`, `uv sync`, `uv lock`.
-- Research the affected path, make the narrowest coherent change, and preserve
-  compatibility and critical-path performance. Before writing a new helper,
-  search for an existing equivalent (`make duplicate-check-verbose` / `duplicate-check-delta`).
+- Research the affected path, make the narrowest coherent change, and preserve compatibility and critical-path performance. Before writing a new helper, search for an existing equivalent (`make duplicate-check-verbose` / `duplicate-check-delta`).
 - Use Python 3.10+, four spaces, 120 columns, Ruff, and public API type hints.
 - No credentials in Git; redact logs and use environment variables.
 - Live cloud tests and broad/destructive cleanup require explicit approval.
 
-For long output, write `/tmp/<slug>.log` (report status + short tail). UAT/stress runs use
-`BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs` (announce command, maximum runtime, log path,
-and stop condition). Do not commit raw logs, screenshots, browser reports, or generated binaries.
+For long output, write `/tmp/<slug>.log` (report status + short tail). UAT/stress runs use `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs` (announce command, maximum runtime, log path, and stop condition). Do not commit raw logs, screenshots, browser reports, or generated binaries.
 
 ## Verification and close-out
 
-`[EVIDENCE-FRESHNESS-001]` Assert tracker state, timings, and gate outcomes from a live read; a snapshot
-(the weekly `todo-db export` workflow, `_project/todo-db-export/`) dates a past state, never a current one. A validator pass is not
-a `submit` pass.
+`[EVIDENCE-FRESHNESS-001]` Assert tracker state, timings, and gate outcomes from a live read; a snapshot (`todo export`, `_project/todo-db-export/`) dates a past state, never a current one. A validator pass is not a `submit` pass.
 
 Read a claimed TODO's `verification` ladder and run the narrowest proof first.
 
-Before publication, self-review with the `code` skill's review action and fix every Critical
-and Required finding; nits and considerations stay optional per its rubric. Run `make pr-preflight`
-once, then `make pr-open`. Boilerplate gates may go to a low-effort subagent; you still
-choose the command and interpret failures. Check CI on a schedule (sleep/cron between reads), never in a loop. Pending means wait, not re-query.
+Before publication, self-review with the `code` skill's review action and fix every Critical and Required finding; nits and considerations stay optional per its rubric. Run `make pr-preflight` once, then `make pr-open`. Boilerplate gates may go to a low-effort subagent; you still choose the command and interpret failures. Check CI on a schedule (sleep/cron between reads), never in a loop. Pending means wait, not re-query.
 
-Dev PRs target `develop` (or `release` / `published-results`), use squash merge, and never direct-push
-protected branches. Force-push only feature branches with `--force-with-lease`. Soundness paths listed
-by `_project/scripts/auto_merge_soundness_paths.py` require maintainer review; excluded from auto-merge.
-A drift/pinning guard and its required-CI wiring must land in the same PR. Stacked/feature-base PRs are
-unsupported: zero CI by filters; `pr-base-guard.yml` fails loud — retarget/rebase onto `develop` after parent
-squash-merge (`docs/development/pr-base-branch-policy.md`). Bad-base empty checks ≠ `mergeable_state: dirty`.
+Dev PRs target `develop` (or `release` / `published-results`), use squash merge, and never direct-push protected branches. Force-push only feature branches with `--force-with-lease`. Soundness paths listed by `_project/scripts/auto_merge_soundness_paths.py` require maintainer review; excluded from auto-merge. A drift/pinning guard and its required-CI wiring must land in the same PR. Stacked/feature-base PRs are unsupported: zero CI by filters; `pr-base-guard.yml` fails loud — retarget/rebase onto `develop` after parent squash-merge (`docs/development/pr-base-branch-policy.md`). Bad-base empty checks ≠ `mergeable_state: dirty`.
 
 ## TODO tracker
 
-Use the `todo` skill for tracker operations. Tracker writes follow worktree policy;
-`_project/todo-db-export/` is public, so never recover plaintext into it.
+Use the `todo` skill for tracker operations. Tracker writes follow worktree policy; `_project/todo-db-export/` is public, so never recover plaintext into it.
 
 ## BenchBox invariants
 
 - Timing durations use `benchbox.utils.clock.mono_time()` and `elapsed_seconds()`; wall clocks are event/audit only.
-- Adapter SDK imports stay lazy. New platforms follow `docs/development/adding-new-platforms.md` and
-  pass `make platform-manifest-check`.
+- Adapter SDK imports stay lazy. New platforms follow `docs/development/adding-new-platforms.md` and pass `make platform-manifest-check`.
 - CREATE TABLE rewrites are registered under `Phase.DDL_OPTIMIZE`; run `make compat-docs-check` and DDL drift check.
 - CLI dry runs must propagate explicit phases; deterministic runs use a seed.
 - Green focused/fast tests are not UAT or production certification.
 
-Apple/macOS: correctness-gate digests are Linux-generated; use `make ci-linux` (release-guide.md). Mocker is
-local-only, never CI: databend's `minio` was observed to exit under it; doris/starrocks are single-service.
-`docs/operations/uat-framework.md` ("Mocker validation status") holds per-stack state. Never prune globally.
+Apple/macOS: correctness-gate digests are Linux-generated; use `make ci-linux` (release-guide.md). Mocker is local-only, never CI: databend's `minio` was observed to exit under it; doris/starrocks are single-service. `docs/operations/uat-framework.md` ("Mocker validation status") holds per-stack state. Never prune globally.
 
 ## Skills and generated mirrors
 
-Stable wrappers are `code`, `test`, `todo`, `docs`, `blog`, `benchbox`, `skill-sync`, and `tidy-perms`.
-`todo` authors ideas/specs and owns tracker actions. Skill source is `/Users/joe/.skill-sync/skills`;
-only `.claude/skills` is tracked. `.agents/skills` is the shared, gitignored local materialization for Codex,
-Gemini, and Antigravity. Regenerate mirrors with `make skill-sync` in a write worktree; never hand-edit one.
-`scripts/check_untracked_skill_mirrors.sh` guards tracking state, not content parity.
+Stable wrappers are `code`, `test`, `todo`, `docs`, `blog`, `benchbox`, `skill-sync`, and `tidy-perms`. `todo` authors ideas/specs and owns tracker actions. Skill source is `/Users/joe/.skill-sync/skills`; only `.claude/skills` is tracked. `.agents/skills` is the shared, gitignored local materialization for Codex, Gemini, and Antigravity. Regenerate mirrors with `make skill-sync` in a write worktree; never hand-edit one. `scripts/check_untracked_skill_mirrors.sh` guards tracking state, not content parity.
 
 ## Operational references
 
-- Operations: `docs/operations/` — `repo-admin-settings.md` (PR/admin policy),
-  `uat-framework.md`, `release-guide.md`, `agent-instruction-evaluation.md`
-- Agent: unpublished `docs/agent/` (`review-protocol.md`). Development:
-  `docs/development/` — `adding-new-platforms.md`, `pr-base-branch-policy.md`
+- Operations: `docs/operations/` — `repo-admin-settings.md` (PR/admin policy), `uat-framework.md`, `release-guide.md`, `agent-instruction-evaluation.md`
+- Agent: unpublished `docs/agent/` (`review-protocol.md`). Development: `docs/development/` — `adding-new-platforms.md`, `pr-base-branch-policy.md`
 - SQL compatibility: `benchbox/sql_compat/README.md`; tests: `tests/README.md`
