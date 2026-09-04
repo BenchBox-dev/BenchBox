@@ -2,8 +2,15 @@ name: Seed Corpus
 
 # NOTE: Actual benchmark runs require meaningful compute resources and wall-clock time.
 # SF 0.01 / SF 0.1 jobs typically complete in a few minutes on a GitHub-hosted runner.
-# SF 1.0 jobs (especially TPC-DS) may take 10-30+ minutes depending on the platform.
+# SF 1.0 jobs (especially TPC-DS / TPC-DS-OBT / TPC-Havoc) may take 10-60+ minutes.
 # ClickHouse Cloud jobs require CLICKHOUSE_CLOUD_HOST and CLICKHOUSE_CLOUD_PASSWORD secrets.
+#
+# Matrix intent (post-2026-08-23 restore):
+# - Keep regenerating live comparable local cells already present in the corpus.
+# - Also cover remaining-gap local cells listed in results-data/REGENERATION.md.
+# - Do not add Databricks / Snowflake / BigQuery or any cloud-vendor signup.
+# - Nested staging under results-data/bundles/<benchmark>/<platform>/sf<scale>/ is
+#   intentional for this workflow; the checked-in corpus may remain a flat tree.
 
 on:
   schedule:
@@ -32,6 +39,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # --- Live comparable local cells (already-OK; keep on the lane) ---
+
           # TPC-H SF 0.01
           - benchmark: tpch
             platform: duckdb
@@ -113,6 +122,206 @@ jobs:
             platform: polars-df
             scale_factor: "0.1"
             extras: polars
+
+          # AMPLab / CoffeeShop / H2ODB / read_primitives / tpch_skew at SF 0.01
+          - benchmark: amplab
+            platform: duckdb
+            scale_factor: "0.01"
+            extras: duckdb
+          - benchmark: amplab
+            platform: datafusion
+            scale_factor: "0.01"
+            extras: datafusion
+          - benchmark: amplab
+            platform: sqlite
+            scale_factor: "0.01"
+            extras: duckdb # sqlite is stdlib; duckdb extra satisfies uv sync
+
+          - benchmark: coffeeshop
+            platform: duckdb
+            scale_factor: "0.01"
+            extras: duckdb
+          - benchmark: coffeeshop
+            platform: datafusion
+            scale_factor: "0.01"
+            extras: datafusion
+          - benchmark: coffeeshop
+            platform: sqlite
+            scale_factor: "0.01"
+            extras: duckdb
+
+          - benchmark: h2odb
+            platform: duckdb
+            scale_factor: "0.01"
+            extras: duckdb
+          - benchmark: h2odb
+            platform: datafusion
+            scale_factor: "0.01"
+            extras: datafusion
+          - benchmark: h2odb
+            platform: sqlite
+            scale_factor: "0.01"
+            extras: duckdb
+
+          - benchmark: read_primitives
+            platform: duckdb
+            scale_factor: "0.01"
+            extras: duckdb
+          - benchmark: read_primitives
+            platform: datafusion
+            scale_factor: "0.01"
+            extras: datafusion
+          - benchmark: read_primitives
+            platform: sqlite
+            scale_factor: "0.01"
+            extras: duckdb
+
+          - benchmark: tpch_skew
+            platform: duckdb
+            scale_factor: "0.01"
+            extras: duckdb
+          - benchmark: tpch_skew
+            platform: datafusion
+            scale_factor: "0.01"
+            extras: datafusion
+          - benchmark: tpch_skew
+            platform: sqlite
+            scale_factor: "0.01"
+            extras: duckdb
+
+          # ClickBench SF 1 and JoinOrder SF 1 (live smallest comparable cells)
+          - benchmark: clickbench
+            platform: duckdb
+            scale_factor: "1.0"
+            extras: duckdb
+          - benchmark: clickbench
+            platform: datafusion
+            scale_factor: "1.0"
+            extras: datafusion
+          - benchmark: clickbench
+            platform: sqlite
+            scale_factor: "1.0"
+            extras: duckdb
+
+          - benchmark: joinorder
+            platform: duckdb
+            scale_factor: "1.0"
+            extras: duckdb
+          - benchmark: joinorder
+            platform: datafusion
+            scale_factor: "1.0"
+            extras: datafusion
+          - benchmark: joinorder
+            platform: sqlite
+            scale_factor: "1.0"
+            extras: duckdb
+
+          # --- Remaining-gap local cells (zero coverage as of 2026-09-04) ---
+          # star_schema is an alias of ssb — do not duplicate it here.
+
+          - benchmark: datavault
+            platform: duckdb
+            scale_factor: "0.01"
+            extras: duckdb
+          - benchmark: datavault
+            platform: datafusion
+            scale_factor: "0.01"
+            extras: datafusion
+          - benchmark: datavault
+            platform: clickhouse-local
+            scale_factor: "0.01"
+            extras: clickhouse-local
+
+          - benchmark: flightdata
+            platform: duckdb
+            scale_factor: "0.01"
+            extras: duckdb
+          - benchmark: flightdata
+            platform: datafusion
+            scale_factor: "0.01"
+            extras: datafusion
+          - benchmark: flightdata
+            platform: clickhouse-local
+            scale_factor: "0.01"
+            extras: clickhouse-local
+
+          - benchmark: nyctaxi
+            platform: duckdb
+            scale_factor: "0.01"
+            extras: duckdb
+          - benchmark: nyctaxi
+            platform: datafusion
+            scale_factor: "0.01"
+            extras: datafusion
+          - benchmark: nyctaxi
+            platform: clickhouse-local
+            scale_factor: "0.01"
+            extras: clickhouse-local
+
+          - benchmark: tpcdi
+            platform: duckdb
+            scale_factor: "0.01"
+            extras: duckdb
+          - benchmark: tpcdi
+            platform: datafusion
+            scale_factor: "0.01"
+            extras: datafusion
+          - benchmark: tpcdi
+            platform: sqlite
+            scale_factor: "0.01"
+            extras: duckdb
+
+          - benchmark: tpchavoc
+            platform: duckdb
+            scale_factor: "0.01"
+            extras: duckdb
+          - benchmark: tpchavoc
+            platform: datafusion
+            scale_factor: "0.01"
+            extras: datafusion
+          - benchmark: tpchavoc
+            platform: clickhouse-local
+            scale_factor: "0.01"
+            extras: clickhouse-local
+
+          - benchmark: tpcds_obt
+            platform: duckdb
+            scale_factor: "1"
+            extras: duckdb
+          - benchmark: tpcds_obt
+            platform: datafusion
+            scale_factor: "1"
+            extras: datafusion
+          - benchmark: tpcds_obt
+            platform: clickhouse-local
+            scale_factor: "1"
+            extras: clickhouse-local
+
+          - benchmark: metadata_primitives
+            platform: duckdb
+            scale_factor: "1.0"
+            extras: duckdb
+          - benchmark: metadata_primitives
+            platform: datafusion
+            scale_factor: "1.0"
+            extras: datafusion
+          - benchmark: metadata_primitives
+            platform: sqlite
+            scale_factor: "1.0"
+            extras: duckdb
+
+          - benchmark: write_primitives
+            platform: duckdb
+            scale_factor: "0.01"
+            extras: duckdb
+          - benchmark: write_primitives
+            platform: datafusion
+            scale_factor: "0.01"
+            extras: datafusion
+          - benchmark: write_primitives
+            platform: sqlite
+            scale_factor: "0.01"
+            extras: duckdb
 
     # Skip matrix entries that don't match the requested benchmark (when
     # provided). This CANNOT be a job-level `if`: the matrix context is not
