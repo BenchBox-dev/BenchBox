@@ -2,6 +2,7 @@
 develop_sha: c44fdfc457886d9340b75d86ecb6e29796fdbb98
 measured_at_sha: fc6dd5958b1deffa468e01852a392a29585d11eb
 checked_sha: fc6dd5958b1deffa468e01852a392a29585d11eb
+integrated_reviewed_sha: 06ede89eca3c5b1b7722cf3f7af16b3beb411f6e
 ---
 
 # Results Explorer release-readiness closeout — 2026-09-04
@@ -26,7 +27,8 @@ promote those browsers to blocking coverage.
 
 | Surface | Current evidence |
 |---|---|
-| Worktree | `git rev-parse HEAD` = `fc6dd5958b1deffa468e01852a392a29585d11eb`; branch `feat/explorer-evidence-closeout`; origin is `https://github.com/BenchBox-dev/BenchBox.git`. |
+| Integrated/reviewed report head | `git rev-parse HEAD` = `06ede89eca3c5b1b7722cf3f7af16b3beb411f6e`; branch `feat/explorer-evidence-closeout`; this is the integrated closeout content reviewed by this report. |
+| Measured evidence tree | `measured_at_sha`/`checked_sha` = `fc6dd5958b1deffa468e01852a392a29585d11eb`; the measurements and certification evidence were run against this historical tree. |
 | Develop | `git rev-parse origin/develop` = `c44fdfc457886d9340b75d86ecb6e29796fdbb98`; this report's `develop_sha` is that exact 40-character value. |
 | Launch | PR #1933 / v0.4.0 launch is already landed; `https://benchbox.dev/results/` was live in the independent certification. |
 | Certified live pair | At `fc6dd5958`, Pages HTML and DuckDB were HTTP 200, internally matched read-model v7, and the deployed JS required v7. Source at current develop expects v10. |
