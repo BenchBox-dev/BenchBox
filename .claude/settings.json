@@ -1,4 +1,7 @@
 {
+  "enabledMcpjsonServers": [
+    "todo-db"
+  ],
   "extraKnownMarketplaces": {
     "claude-plugins-official": {
       "source": {
