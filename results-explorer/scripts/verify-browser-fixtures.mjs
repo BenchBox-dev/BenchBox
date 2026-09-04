@@ -73,7 +73,14 @@ db_path = Path(sys.argv[1])
 con = duckdb.connect(str(db_path), read_only=True)
 
 platforms_per_cohort = con.execute(
-    "SELECT benchmark, scale_factor, COUNT(DISTINCT platform_id) FROM results GROUP BY 1,2"
+    """
+    SELECT benchmark, scale_factor,
+           COALESCE(NULLIF(LOWER(TRIM(test_type)), ''), 'unknown') AS phase,
+           COUNT(DISTINCT platform_id)
+    FROM results
+    WHERE platform_id IN ('datafusion', 'duckdb', 'pandas', 'polars')
+    GROUP BY 1, 2, 3
+    """
 ).fetchall()
 benchmarks = [row[0] for row in con.execute(
     "SELECT DISTINCT benchmark FROM results ORDER BY 1"
@@ -86,7 +93,8 @@ tuning_rows = con.execute(
     SELECT
         benchmark,
         scale_factor,
-        platform,
+        COALESCE(NULLIF(LOWER(TRIM(test_type)), ''), 'unknown') AS phase,
+        platform_id,
         COALESCE(tuning_mode, '') AS tuning_mode,
         has_tuning
     FROM results
@@ -208,9 +216,9 @@ function verifyFixtureInvariants() {
       `large fixture has ${data.result_count} results; expected at least ${LARGE_CORPUS_MINIMUM_RESULTS}`,
     );
   }
-  const comparableCohorts = data.platforms_per_cohort.filter(([, , count]) => count >= 4);
+  const comparableCohorts = data.platforms_per_cohort.filter(([, , , count]) => count >= 4);
   if (!comparableCohorts.length) {
-    errors.push("no benchmark × scale has ≥4 distinct platforms (compare happy-path needs one)");
+    errors.push("no benchmark × scale × phase has ≥4 canonical platforms (compare happy-path needs one)");
   }
   if (data.benchmarks.length < 2) {
     errors.push(`only ${data.benchmarks.length} benchmark(s) present; compare-invalid test needs ≥2`);
@@ -237,13 +245,13 @@ function verifyTunedPairCoverage(data, comparableCohorts, errors) {
   if (!comparableCohorts.length) return;
 
   const cohortKeys = new Set(
-    comparableCohorts.map(([benchmark, scaleFactor]) => `${benchmark}\0${scaleFactor}`),
+    comparableCohorts.map(([benchmark, scaleFactor, phase]) => `${benchmark}\0${scaleFactor}\0${phase}`),
   );
   const byCohortPlatform = new Map();
-  for (const [benchmark, scaleFactor, platform, tuningMode, hasTuning] of data.tuning_rows ?? []) {
-    const cohortKey = `${benchmark}\0${scaleFactor}`;
+  for (const [benchmark, scaleFactor, phase, platformId, tuningMode, hasTuning] of data.tuning_rows ?? []) {
+    const cohortKey = `${benchmark}\0${scaleFactor}\0${phase}`;
     if (!cohortKeys.has(cohortKey)) continue;
-    const platformKey = `${cohortKey}\0${platform}`;
+    const platformKey = `${cohortKey}\0${platformId}`;
     const flags = byCohortPlatform.get(platformKey) ?? { hasDefault: false, hasTuned: false };
     const isTuned = tuningMode === "tuned" || hasTuning === true;
     if (isTuned) {

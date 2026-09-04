@@ -526,6 +526,13 @@ function omitMeasurementQuery(bundle, queryId) {
 
 const withNormalizedEnvironment = (bundle) => {
   const mutated = structuredClone(bundle);
+  // The checked-in Pandas source was captured as a power run, but the browser
+  // compare fixture needs one coherent TPC-H phase across its four canonical
+  // source platforms. Keep the source corpus unchanged and normalize only the
+  // generated fixture copy.
+  if (platformKey(mutated) === "pandas" && mutated.benchmark?.id === "tpch") {
+    mutated.benchmark = { ...(mutated.benchmark ?? {}), test_type: "standard" };
+  }
   const metadata = LOCAL_PLATFORM_METADATA[platformKey(mutated)];
   const environment = mutated.environment && typeof mutated.environment === "object" ? mutated.environment : {};
   const platform = mutated.platform && typeof mutated.platform === "object" ? mutated.platform : {};
