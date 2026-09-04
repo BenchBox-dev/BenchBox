@@ -132,6 +132,7 @@ class TestRuntimeSettingsRecorded:
     @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
     def test_tuned_datafusion_records_applied_runtime_settings(self):
         adapter = DataFusionDataFrameAdapter(tuning_config=_datafusion_thread_config())
+        _ = adapter.session_ctx
         ledger = adapter._applied_tuning_ledger
         statements = {s.statement for s in ledger.statements}
 
@@ -156,9 +157,39 @@ class TestRuntimeSettingsRecorded:
         assert adapter._applied_tuning_ledger.applied_ledger_hash() is None
 
     @pytest.mark.skipif(not DASK_AVAILABLE, reason="Dask not installed")
-    def test_tuned_dask_records_applied_runtime_settings(self):
+    def test_tuned_dask_non_distributed_run_does_not_record_cluster_settings(self):
         adapter = DaskDataFrameAdapter(
             use_distributed=False,
+            tuning_config=_dask_worker_config(),
+        )
+        assert adapter._applied_tuning_ledger.is_empty()
+        assert adapter._derive_applied_tuning_status() == NOOP
+
+    @pytest.mark.skipif(not DASK_AVAILABLE, reason="Dask not installed")
+    def test_tuned_dask_existing_scheduler_does_not_record_cluster_settings(self, monkeypatch):
+        monkeypatch.setattr("benchbox.platforms.dataframe.dask_df.Client", lambda _address: object())
+        adapter = DaskDataFrameAdapter(
+            use_distributed=False,
+            scheduler_address="tcp://scheduler:8786",
+            tuning_config=_dask_worker_config(),
+        )
+        assert adapter._applied_tuning_ledger.is_empty()
+
+    @pytest.mark.skipif(not DASK_AVAILABLE, reason="Dask not installed")
+    def test_tuned_dask_local_cluster_records_consumed_settings(self, monkeypatch):
+        monkeypatch.setattr(DaskDataFrameAdapter, "_setup_distributed", lambda self: None)
+        adapter = DaskDataFrameAdapter(
+            use_distributed=True,
+            tuning_config=_dask_worker_config(),
+        )
+        statements = {s.statement for s in adapter._applied_tuning_ledger.statements}
+        assert statements == {"n_workers=3", "threads_per_worker=2"}
+
+    @pytest.mark.skipif(not DASK_AVAILABLE, reason="Dask not installed")
+    def test_tuned_dask_records_applied_runtime_settings(self, monkeypatch):
+        monkeypatch.setattr(DaskDataFrameAdapter, "_setup_distributed", lambda self: None)
+        adapter = DaskDataFrameAdapter(
+            use_distributed=True,
             tuning_config=_dask_worker_config(),
         )
         ledger = adapter._applied_tuning_ledger
@@ -273,6 +304,7 @@ class TestRunBenchmarkCarriesLedger:
     @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
     def test_tuned_datafusion_run_result_carries_ledger_and_applied_unverified(self):
         adapter = DataFusionDataFrameAdapter(tuning_config=_datafusion_thread_config())
+        _ = adapter.session_ctx
         result = _run_no_phases(adapter)
 
         assert result.tuning_validation_status == APPLIED_UNVERIFIED
@@ -287,6 +319,24 @@ class TestRunBenchmarkCarriesLedger:
         assert "target_partitions=4" in recorded
 
     @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
+    def test_tuned_datafusion_lazy_context_is_not_reported_as_applied(self):
+        adapter = DataFusionDataFrameAdapter(tuning_config=_datafusion_thread_config())
+        assert adapter._applied_tuning_ledger.is_empty()
+        assert adapter._derive_applied_tuning_status() == NOOP
+
+    @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
+    def test_datafusion_context_fallback_does_not_record_tuning(self, monkeypatch):
+        class BrokenSessionConfig:
+            def __init__(self):
+                raise RuntimeError("configuration unavailable")
+
+        monkeypatch.setattr("benchbox.platforms.dataframe.datafusion_df.SessionConfig", BrokenSessionConfig)
+        adapter = DataFusionDataFrameAdapter(tuning_config=_datafusion_thread_config())
+        _ = adapter.session_ctx
+        assert adapter._applied_tuning_ledger.is_empty()
+        assert adapter._derive_applied_tuning_status() == NOOP
+
+    @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
     def test_default_datafusion_run_result_is_noop(self):
         adapter = DataFusionDataFrameAdapter()
         result = _run_no_phases(adapter)
@@ -295,9 +345,10 @@ class TestRunBenchmarkCarriesLedger:
         assert result.applied_ledger_hash is None
 
     @pytest.mark.skipif(not DASK_AVAILABLE, reason="Dask not installed")
-    def test_tuned_dask_run_result_carries_ledger_and_applied_unverified(self):
+    def test_tuned_dask_run_result_carries_ledger_and_applied_unverified(self, monkeypatch):
+        monkeypatch.setattr(DaskDataFrameAdapter, "_setup_distributed", lambda self: None)
         adapter = DaskDataFrameAdapter(
-            use_distributed=False,
+            use_distributed=True,
             tuning_config=_dask_worker_config(),
         )
         result = _run_no_phases(adapter)

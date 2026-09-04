@@ -178,7 +178,6 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         if config.parallelism.thread_count is not None:
             self._target_partitions = config.parallelism.thread_count
             self._log_verbose(f"Set target_partitions={self._target_partitions}")
-            self._record_runtime_tuning(f"target_partitions={self._target_partitions}")
 
         # Apply execution settings
         if config.execution.streaming_mode:
@@ -189,7 +188,6 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         if config.memory.chunk_size is not None:
             self._batch_size = config.memory.chunk_size
             self._log_verbose(f"Set batch_size={self._batch_size}")
-            self._record_runtime_tuning(f"batch_size={self._batch_size}")
 
     @property
     def platform_name(self) -> str:
@@ -217,6 +215,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         runtime = self._configure_runtime_environment()
 
         # Create session configuration
+        configured_context = False
         if SessionConfig is not None:
             try:
                 config = SessionConfig()
@@ -251,6 +250,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
                         ctx = SessionContext(config)
                 else:
                     ctx = SessionContext(config)
+                configured_context = True
 
             except Exception as e:
                 # Fall back to default context if configuration fails
@@ -258,6 +258,13 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
                 ctx = SessionContext()
         else:
             ctx = SessionContext()
+
+        if configured_context:
+            config = self._tuning_config
+            if config.parallelism.thread_count is not None:
+                self._record_runtime_tuning(f"target_partitions={self._target_partitions}")
+            if config.memory.chunk_size is not None:
+                self._record_runtime_tuning(f"batch_size={self._batch_size}")
 
         # Log configuration
         config_parts = [
