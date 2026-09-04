@@ -22,7 +22,6 @@ def _contract_paths(root: Path = REPO_ROOT) -> dict[str, Path]:
     assert len(wheels) == 1
     return {
         "package_wheel": wheels[0],
-        "wrapper": root / "_project/scripts/todo",
         "inventory": root / "_project/todo-schema-migrations.json",
     }
 
@@ -52,7 +51,6 @@ def test_package_migrations_must_be_contiguous(tmp_path: Path) -> None:
     with pytest.raises(check.SchemaMigrationError, match="must be contiguous"):
         check.validate_contract(
             package_wheel=_wheel(tmp_path / "todo_db.whl", migrations=(1, 2, 4, 5)),
-            wrapper=paths["wrapper"],
             inventory=paths["inventory"],
         )
 
@@ -63,7 +61,7 @@ def test_wheel_must_expose_literal_schema_version(tmp_path: Path) -> None:
         archive.writestr("todo_db/database.py", "SCHEMA_VERSION = current_schema()\n")
     paths = _contract_paths()
     with pytest.raises(check.SchemaMigrationError, match="integer literal"):
-        check.validate_contract(package_wheel=wheel, wrapper=paths["wrapper"], inventory=paths["inventory"])
+        check.validate_contract(package_wheel=wheel, inventory=paths["inventory"])
 
 
 def test_corrupt_wheel_fails_closed(tmp_path: Path) -> None:
@@ -71,29 +69,23 @@ def test_corrupt_wheel_fails_closed(tmp_path: Path) -> None:
     wheel.write_text("not a zip", encoding="utf-8")
     paths = _contract_paths()
     with pytest.raises(check.SchemaMigrationError, match="cannot inspect"):
-        check.validate_contract(package_wheel=wheel, wrapper=paths["wrapper"], inventory=paths["inventory"])
-
-
-def test_wrapper_schema_must_match_package(tmp_path: Path) -> None:
-    wrapper = tmp_path / "todo"
-    wrapper.write_text("TODO_SCHEMA_VERSION=4\n", encoding="utf-8")
-    paths = _contract_paths()
-    with pytest.raises(check.SchemaMigrationError, match="does not match package schema 7"):
-        check.validate_contract(package_wheel=paths["package_wheel"], wrapper=wrapper, inventory=paths["inventory"])
+        check.validate_contract(package_wheel=wheel, inventory=paths["inventory"])
 
 
 def test_inventory_schema_must_match_package(tmp_path: Path) -> None:
+    # The committed migration inventory is now the sole schema-version marker
+    # gate: its schema_version must equal the locked wheel's SCHEMA_VERSION.
     paths = _contract_paths()
     inventory = _inventory(tmp_path, lambda record: record.update(schema_version=4))
     with pytest.raises(check.SchemaMigrationError, match="does not match package schema 7"):
-        check.validate_contract(package_wheel=paths["package_wheel"], wrapper=paths["wrapper"], inventory=inventory)
+        check.validate_contract(package_wheel=paths["package_wheel"], inventory=inventory)
 
 
 def test_current_deployment_revision_requires_evidence(tmp_path: Path) -> None:
     paths = _contract_paths()
     inventory = _inventory(tmp_path, lambda record: record["migrations"][-1].pop("deployment_evidence"))
     with pytest.raises(check.SchemaMigrationError, match="needs deployment_evidence"):
-        check.validate_contract(package_wheel=paths["package_wheel"], wrapper=paths["wrapper"], inventory=inventory)
+        check.validate_contract(package_wheel=paths["package_wheel"], inventory=inventory)
 
 
 def test_inventory_rejects_credentials(tmp_path: Path) -> None:
@@ -103,4 +95,4 @@ def test_inventory_rejects_credentials(tmp_path: Path) -> None:
         lambda record: record["migrations"][-1].update(summary="token=secret"),
     )
     with pytest.raises(check.SchemaMigrationError, match="must not contain backend URLs or tokens"):
-        check.validate_contract(package_wheel=paths["package_wheel"], wrapper=paths["wrapper"], inventory=inventory)
+        check.validate_contract(package_wheel=paths["package_wheel"], inventory=inventory)

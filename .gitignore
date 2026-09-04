@@ -145,7 +145,6 @@ _sources/tpc-ds/tools/y.*
 _sources/tpc-ds/tools/tpcds.idx*
 _sources/tpc-ds/tools/.ctags*
 _sources/tpc-h/dbgen/dbgen_x86_64
-.mcp.json
 
 # skill-sync mirrors (regenerate locally via `make skill-sync`). The `claude`
 # target is a TRACKED snapshot — committed for cloud/CI. The `.agents/skills`
@@ -193,7 +192,6 @@ _project/DONE/_indexes/
 .todo-db/*.sqlite
 .todo-db/*.sqlite-*
 .todo-db/replica*
-.todo-db/standalone-replica*
 .todo-db/export/
 .todo-db/archive/
 _project/blind-spots/_indexes/
@@ -236,5 +234,6 @@ node_modules/
 
 # >>> skill-sync managed (do not edit) >>>
 /.agents/skills/
+/.claude/skills/.system/
 /.claude/skills/blog/
 # <<< skill-sync managed <<<

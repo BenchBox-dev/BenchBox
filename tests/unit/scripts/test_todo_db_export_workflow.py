@@ -14,8 +14,20 @@ def test_workflow_uses_only_the_locked_package_runtime() -> None:
     text = WORKFLOW.read_text()
 
     assert text.count("uv sync --project _project/scripts --locked") == 1
-    assert "_project/scripts/todo export" in text
-    assert text.count("uv run --project _project/scripts --locked") == 4
+    # The tracker is read only through the pinned isolated-project boundary:
+    # two invocations for the export step (envelope, then view rendering) plus
+    # four for the clean-database restore validation.
+    assert text.count("uv run --project _project/scripts --locked") == 6
+    # The retired `_project/scripts/todo` shim is gone. 0.6.0's `export` emits
+    # only the lossless envelope; the standalone stdlib script renders the
+    # committed views from it.
+    assert "_project/scripts/todo export" not in text
+    assert 'todo-db --project-id "${TODO_DB_PROJECT_ID}" --repository "${TODO_DB_REPOSITORY}" \\\n' in text
+    assert 'export --output "${RUNNER_TEMP}/todo-db.json"' in text
+    assert "python _project/scripts/todo_db_export_views.py" in text
+    assert '--envelope "${RUNNER_TEMP}/todo-db.json"' in text
+    assert '--out "${EXPORT_DIR}"' in text
+    assert '--lossless-out "${LOSSLESS_DIR}"' in text
     for forbidden in (
         "todo_db.py",
         "BENCHBOX_TODO_DB_STANDALONE",
@@ -25,6 +37,13 @@ def test_workflow_uses_only_the_locked_package_runtime() -> None:
         "--with",
     ):
         assert forbidden not in text
+
+
+def test_export_step_selects_the_v2_auth_contract() -> None:
+    # Without it the floor CLI returns a legacy-safe exit 2 on hosted calls.
+    text = WORKFLOW.read_text()
+
+    assert "TODO_DB_AUTH_CONTRACT: v2" in text
 
 
 def test_restore_validation_compares_the_exact_recovery_artifact_bytes() -> None:

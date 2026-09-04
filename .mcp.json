@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "todo-db": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "_project/scripts",
+        "--locked",
+        "--",
+        "todo-db-mcp",
+        "--actor",
+        "claude:${USER}@${HOSTNAME}",
+        "--allow-hosted"
+      ],
+      "env": {
+        "TODO_DB_AUTH_CONTRACT": "v2"
+      }
+    }
+  }
+}

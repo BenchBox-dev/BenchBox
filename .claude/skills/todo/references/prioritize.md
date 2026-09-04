@@ -1,22 +1,16 @@
 # Prioritize TODOs
 
 Rank open items by topic without changing tracker state. There is no
-`prioritize` CLI command.
+`prioritize` MCP tool; this is a skill-only action driven by the inspect tools.
 
 ## Before you start
 
-1. Run `_project/scripts/todo --help` and confirm `doctor`, `stats`, `ready`,
-   `list`, `show`, and `deps`.
-2. Run `todo doctor`. Use the production database:
-   - Hosted: `TODO_DB_URL` and credentials resolved via `TODO_DB_CREDENTIAL_COMMAND`
-     (or explicit `TODO_DB_RO_AUTH_TOKEN` / `TODO_DB_AUTH_TOKEN`).
-   - Read-only fallback: an explicit `--db <git-root>/.todo-db/replica.db` or
-     `TODO_DB_REPLICA`, but only when `doctor` approves its schema and shows a
-     non-trivial item count.
-3. Stop on schema, authentication, or identity failure. Use a non-production
-   file only when the user explicitly requests analysis of that file. Never run
-   `todo migrate` on a stale copy or build the backlog from `_project/TODO`,
-   `_project/todo-db-export/`, or chat history.
+1. Call the `doctor` tool. The MCP server owns the database connection,
+   credentials, and project identity.
+2. If `doctor` reports a schema, authentication, or identity problem, stop.
+   Do not build the backlog from `_project/TODO`, `_project/todo-db-export/`,
+   or chat history, and do not analyse a non-production database unless the
+   user explicitly asks for that file.
 
 ## Inputs
 
@@ -30,35 +24,28 @@ Rank open items by topic without changing tracker state. There is no
 
 Start with the live picture:
 
-```sh
-todo doctor
-todo stats
-todo ready
-todo list --priority critical
-todo list --priority high
-todo list --priority medium-high
-todo list --state active
-```
+- `doctor` — confirm readiness and identity.
+- `stats` — open counts by state, priority, worktree, and deferral.
+- `ready` — items with no open blockers or dependencies.
+- `list_items(fields=[...], limit=..., cursor=...)` — page through all open
+  items, following `cursor` until exhausted. `list_items` has no priority or
+  state filter, so request the fields you need (`id`, `title`, `priority`,
+  `state`, `worktree`, `category`, `blocked_reason`) and filter by priority
+  and state in-session.
 
-When `N` is large or medium-high matters, also list `medium`. Report any
-findings warning from `ready` or `stats`; findings are not ranked items.
+Report any warning from `ready` or `stats`; warnings are not ranked items.
 
-Use `todo show <id>` and `todo deps <id>` when list output is insufficient.
+Use `show_item(id="...")` and `deps(id="...")` when list output is
+insufficient.
 
 For about 15 or fewer open items, rank up to `N` directly by severity,
 readiness, unlock value, and keyword risk. Group by category or worktree.
 
 ### When you need a structured ranking
 
-Use a bulk view for more than about 15 high-priority items or requested topic
-groups.
-
-Choose one source, in this order:
-
-1. Fresh `todo export` output.
-2. Read-only SQL against a path approved by `doctor`. Never guess the file.
-   Inspect `items`, `item_deps`, and optional `findings` columns with
-   `PRAGMA table_info` and a sample row before querying.
+For more than about 15 high-priority items or requested topic groups, take a
+bulk view with the `export` tool (deterministic JSON, available in all
+profiles). Inspect `items`, `item_deps`, and any `findings` before ranking.
 
 For each open candidate, compute:
 
@@ -103,7 +90,7 @@ Include:
 3. Suggested dependency-aware order across groups, with privacy, security, and
    tracker reliability before product work.
 4. High or critical demotions and their reasons.
-5. Findings warnings, replica caveats, and user-owned blocked criticals.
+5. Findings warnings and user-owned blocked criticals.
 
 Ranks are session recommendations and do not change the database.
 
@@ -111,11 +98,13 @@ Ranks are session recommendations and do not change the database.
 
 Only when the user asks to apply the ranking:
 
-1. Confirm `todo update --help` succeeds. Report a missing command; do not drop
-   and recreate items.
-2. Update only items whose stored priority differs from the recommended band.
-3. Give a one-line reason per update. Prefer band moves (`medium` → `high`) over invented ranks the schema cannot store.
-4. Re-run `todo stats` and show before/after counts.
+1. Confirm the `update_item` tool is available (it requires `--profile full`).
+   If it is missing, report that; do not drop and recreate items.
+2. Update only items whose stored priority differs from the recommended band,
+   with `update_item(id="...", priority="...", reason="...")`.
+3. Give a one-line reason per update. Prefer band moves (`medium` → `high`)
+   over invented ranks the schema cannot store.
+4. Re-run `stats` and show before/after counts.
 
 Never change priorities, block, or claim during read-only ranking. Respect `N`
 and requested grouping; do not dump all medium items, create one topic per item,

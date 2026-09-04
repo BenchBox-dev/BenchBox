@@ -189,7 +189,7 @@ or declaration appears unused.
 | `clickhouse-connect` | DEV | (also in dev for tests) | covered above | KEEP |
 | `cloudpathlib[s3,gs,azure]` | DEV | tests use `cloudpathlib` core | covered above | KEEP - extras pin S3/GCS/Azure providers for live tests |
 | `pyiceberg[sql-sqlite,pyarrow]` | DEV | tests use `pyiceberg` core | covered above | KEEP - extras pin SQL-SQLite catalog for tests |
-| `ruamel-yaml` | DEV | `_project/scripts/todo_cli.py` | 0 (runtime); 1 (tooling) | KEEP - used by TODO tooling. (Distinct from `jsonschema` because `ruamel-yaml` is dev-only, not declared as a *core* runtime dep.) |
+| `ruamel-yaml` | DEV | (none) | 0 | **REMOVAL CANDIDATE** - its only consumer was `_project/scripts/todo_cli.py`, removed in the 0.6.x MCP cutover. todo-db now handles YAML import through `pyyaml` (`_project/scripts/pyproject.toml`). No current declaration or import; confirm before dropping. |
 | `sphinx` | DOC | `tests/conftest.py`, `tests/unit/docs/test_docs_build.py` | 2 | KEEP - drives docs build via `make docs-build` |
 | `sphinx-tags` | DOC | (config in `docs/conf.py:66`) | 0 | KEEP - registered in `extensions` list |
 | `sphinx-design` | DOC | (config in `docs/conf.py:68`) | 0 | KEEP |

@@ -13,9 +13,10 @@ Git, PR service, CI, artifacts, and human decisions remain authoritative.
 1. Read repository instructions, `references/implement.md`,
    `shared-change-framework/SKILL.md`, and `shared-review-protocol/SKILL.md` as
    required for the next action; do not copy their rules into the ledger.
-2. Run required tracker `--help` checks and `todo doctor`, using the wrapper and
-   global-flag ordering from `SKILL.md`. Fix or report any failure and stop
-   before claiming or editing; follow that contract on authentication failure.
+2. Run tracker preflight using the MCP `doctor` tool (or floor `todo-db doctor`).
+   Fix or report any failure and stop before claiming or editing. When using
+   multiple linked worktrees, ensure each worktree has its own client session or
+   explicit `--repo-root` (one server instance per worktree).
 3. Confirm the exact TODO set, dependencies, integration branch, and existing
    claims, branches, worktrees, and PRs. Reconcile rather than duplicate work.
 4. Run any required repository write preflight; fix or report failure and stop.

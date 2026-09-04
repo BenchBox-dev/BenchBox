@@ -570,7 +570,6 @@ skill-integrity-check:
 	$(MAKE) agent-instructions-check; \
 	$(MAKE) agent-identity-check; \
 	$(MAKE) agent-commit-range-check; \
-	uv run -- python -m pytest tests/unit/scripts/test_todo_wrapper.py::TestSkillThinness -q; \
 	$(MAKE) artifact-hygiene
 
 # Duplicate code detection (AST structural clone detection)

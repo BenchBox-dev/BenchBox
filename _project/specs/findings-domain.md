@@ -50,7 +50,8 @@ the design does not silently contradict a settled decision:
    (with its `shared-review-protocol` skill mirror; unabridged rationale in
    the historical `docs/agent/review-protocol-legacy.md` §4) names the
    append-only draft file under
-   `~/.benchbox/finding-drafts/` as the **sole** in-review finding write.
+   `~/.todo-db/finding-drafts/<project-id>/` as the **sole** in-review finding
+   write.
    Writing a finding straight into the hosted DB during a review is *landing*
    (§1) and is forbidden without a separate authorized turn; `todo finding
    sync` is that separate step.
@@ -61,7 +62,7 @@ work state.
 
 ## Capture (phase 1)
 
-New drafts are written to `~/.benchbox/finding-drafts/` — outside every
+New drafts are written to `~/.todo-db/finding-drafts/<project-id>/` — outside every
 worktree (survives worktree churn; per-machine; no credentials). The existing
 Markdown schema **is** the offline draft format.
 
@@ -203,15 +204,21 @@ row in the table above fails the gate.
 
 ## CLI (phase 3)
 
-`todo finding create | list | show | candidates | dismiss | triage | link |
+`finding create | list | show | candidates | dismiss | triage | link |
 promote | sync | import`.
+
+> **0.6.x interface.** Agents call `finding_create` (full profile) and the
+> other finding operations as `todo-db-mcp` tools; scripts and humans run the
+> surviving floor verb `uv run --project _project/scripts --locked -- todo-db
+> finding sync`. The behavior below is unchanged; only the entry point moved off
+> the retired `todo finding` shim.
 
 - **`create`** prints the review-protocol §2 defect-gate question and requires
   a `--gate class-not-instance` attestation; refuses `finding_kind bug-class`
   without `--fixed-by <ref>` (mechanises §2: a bug-class finding requires an
   already-landed fix). `create` writes the **draft file only, never the DB** —
   capture and landing are always two steps.
-- **`sync`** walks `~/.benchbox/finding-drafts/`, validates each via the
+- **`sync`** walks `~/.todo-db/finding-drafts/<project-id>/`, validates each via the
   phase-1 validator, and inserts-if-absent by filename-stem id. Same-id /
   different-content is a **loud error, never a merge**. This is the authorized
   landing step.
@@ -234,14 +241,13 @@ promote | sync | import`.
   false dangler.
 
 **Drafts directory binding.** Every findings surface resolves its drafts
-directory through `TODO_DB_FINDING_DRAFTS_DIR`, falling back to
-`~/.benchbox/finding-drafts/`. BenchBox and the standalone `todo-db` default to
-different locations (the standalone uses
-`~/.todo-db/finding-drafts/<project-id>/`), and the divergence is **silent**:
-`sync` reports `synced 0` and the planning banner counts zero while a real draft
-sits stranded. Pin the variable at cutover so both tools agree; an
-exported-but-empty value is ignored rather than resolving to the process working
-directory.
+directory through `TODO_DB_FINDING_DRAFTS_DIR`, falling back to the `todo-db`
+default `~/.todo-db/finding-drafts/<project-id>/` (for BenchBox,
+`~/.todo-db/finding-drafts/benchbox/`). The 0.6.x MCP cutover removed the
+BenchBox-specific `~/.benchbox/finding-drafts/` location, so the earlier silent
+divergence between the shim and the standalone default no longer applies. `todo-db
+doctor` reports the resolved directory; an exported-but-empty override is ignored
+rather than resolving to the process working directory.
 
 ## Surfacing (phase 4)
 
@@ -384,8 +390,9 @@ Dependency order (enforced by the tracker):
 | 5 | `findings-phase5-migration` | 1, 3 |
 | 6 | `findings-phase6-demolition` | 4, 5 |
 
-**Phase 3 ↔ phase 1 coupling.** Phase 3's `todo finding create`/`sync` share
-phase 1's draft directory (`~/.benchbox/finding-drafts/`) and its retargeted
+**Phase 3 ↔ phase 1 coupling.** Phase 3's `finding_create` (MCP) / `finding
+sync` (floor CLI) share phase 1's draft directory
+(`~/.todo-db/finding-drafts/<project-id>/`) and its retargeted
 `validate_blind_spot.py`. The tracker models phase 3's hard deps as `{0, 2}`
 (not `{1, 3}`), and that is deliberate: phase 3 can land its schema, module,
 and CLI against an empty drafts directory without phase 1 present — no draft

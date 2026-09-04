@@ -78,7 +78,7 @@ For long output, write `/tmp/<slug>.log` (report status + short tail). UAT/stres
 
 ## Verification and close-out
 
-`[EVIDENCE-FRESHNESS-001]` Assert tracker state, timings, and gate outcomes from a live read; a snapshot (`todo export`, `_project/todo-db-export/`) dates a past state, never a current one. A validator pass is not a `submit` pass.
+`[EVIDENCE-FRESHNESS-001]` Assert tracker state, timings, and gate outcomes from a live read; a snapshot (the weekly `todo-db export` workflow, `_project/todo-db-export/`) dates a past state, never a current one. A validator pass is not a `submit` pass.
 
 Read a claimed TODO's `verification` ladder and run the narrowest proof first.
 

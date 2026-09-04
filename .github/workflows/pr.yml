@@ -344,10 +344,9 @@ jobs:
       - name: Install focused test dependencies
         run: uv sync --group dev
 
-      - name: Run skill wrapper and instruction audit contracts
+      - name: Run agent instruction audit contracts
         run: |
           uv run -- python -m pytest \
-            tests/unit/scripts/test_todo_wrapper.py::TestSkillThinness \
             tests/unit/scripts/test_agent_instruction_audit.py \
             -q
 

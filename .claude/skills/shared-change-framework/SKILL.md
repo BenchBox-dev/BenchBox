@@ -150,3 +150,11 @@ capture remains local under `shared-review-protocol/SKILL.md`.
   is performed, such as commit style, required checks, or PR template. Report
   the state reached per surface; never describe local-only work as applied or
   shipped.
+
+## 5. Capability removal and replacement [CHANGE-REMOVAL-001]
+
+When an item removes or disables a user-reachable capability, name the item
+that replaces it. The removal item must not reach a terminal state until that
+replacement is merged. If the capability is intentionally not replaced, record
+that as an explicit decision on the removal item with the affected callers
+named.

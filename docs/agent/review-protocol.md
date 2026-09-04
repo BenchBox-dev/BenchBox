@@ -10,8 +10,8 @@ It supersedes `docs/agent/review-protocol-legacy.md`.
   `[REVIEW-L2-001]` are governed verbatim by the canonical skill. Named here to
   satisfy `[REVIEW-PARITY-001]` without restating behavior, which
   `shared-review-protocol` section 5 forbids this file from doing.
-- `[REVIEW-CAPTURE-001]` Finding drafts live under `~/.benchbox/finding-drafts/`;
-  tracker operations use `_project/scripts/todo`.
+- `[REVIEW-CAPTURE-001]` Finding drafts live under `~/.todo-db/finding-drafts/<project>/`;
+  tracker operations use the `todo-db-mcp` server.
 - `[REVIEW-PARITY-001]` The canonical skill governs behavior; this file contains
   only BenchBox-specific bindings.
 

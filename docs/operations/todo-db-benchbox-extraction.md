@@ -1,10 +1,22 @@
 # BenchBox todo-db extraction: staged integration and acceptance handoff
 
 Status: historical 0.4.2 migration and compatibility evidence complete. This
-handoff records the 0.4.2 rollout; the current locked runtime is todo-db
-0.4.3, while `_project/scripts/todo` remains the stable repository entry point.
-Use `_project/specs/todo-db-tracker.md` and `_project/scripts/pyproject.toml`
-for the current runtime and credential contract.
+handoff records the 0.4.2 rollout as evidence; the current locked runtime is the
+vendored todo-db 0.6.0 wheel (`_project/scripts/vendor/`). Agents drive the
+tracker through the `todo-db-mcp` server registered in `.mcp.json`; scripts and
+humans use the floor CLI:
+
+```sh
+uv run --project _project/scripts --locked -- todo-db <verb>
+```
+
+where `<verb>` is one of the surviving CLI verbs (`init`, `init-project`,
+`doctor`, `export`, `restore`, `restore-legacy`, `audit verify`, `import-yaml`,
+`verify-run`, `rebaseline`, `complete`, `sweep-stale`, `migrate`, `config`,
+`finding sync`). The 0.6.0 cutover is recorded in
+`_project/decisions/todo-db-upgrade-0-6-0-mcp-2026-09-03.md`. Use
+`_project/specs/todo-db-tracker.md` and `_project/scripts/pyproject.toml` for the
+current runtime and credential contract.
 
 ## Live evidence at this handoff
 
@@ -26,42 +38,29 @@ for the current runtime and credential contract.
 - During that historical read-only snapshot rehearsal, no hosted write credential
   was used and the hosted primary was not modified.
 
-## Compatibility boundary
+## Runtime boundary
 
-`_project/scripts/todo` remains the stable entry point and always runs the
-package-backed BenchBox adapter. BenchBox's wrapper is custom, so
-`todo-db refresh-wrapper` intentionally leaves it unmanaged; BenchBox carries
-its own manual `# todo-db-wrapper: v2` contract instead:
+Agents call the tracker through the `todo-db-mcp` stdio server (registered in
+`.mcp.json`), which exposes the item and lease lifecycle verbs that 0.6.0 moved
+off the top-level CLI (`create`, `show`, `ready`, `take`, `next`, `finish`,
+`done`, `start`, `update`, `stats`, `release`, `defer`, `promote`, `dismiss`,
+and the rest). Scripts and humans call the surviving CLI verbs directly through
+the locked scripts environment:
 
 ```sh
-_project/scripts/todo --db PATH_OR_URL <command>
+uv run --project _project/scripts --locked -- todo-db <verb>
 ```
 
-The adapter passes an argv list to the canonical `todo-db` executable, verifies
-its `--version` handshake against the pinned 0.4.2 release, pins the BenchBox
-project identity, and preserves actor/worktree context and exit statuses. The
-custom wrapper carries the v2 external-credential contract: it exports only the
-non-secret `TODO_DB_AUTH_CONTRACT=v2` marker and never calls Turso or mints,
-parses, caches, logs, prints, refreshes, or retries credentials. The package
-retains read-only/read-write credential selection and returns dedicated auth
-exit code 4 only after v2 negotiation; direct hosted automation must set the
-same marker when it wants that contract. The adapter has no shell interpolation
-and redacts both credential environment values in delegated output. Export
-keeps the old `items.jsonl` and `index.md` views, strips claim-generation tokens
-from those public compatibility views, and writes the complete private lossless
-recovery envelope separately.
-
-| Command family | Generic operation | BenchBox adapter responsibility |
-|---|---|---|
-| `init`, `migrate`, `config` | schema, migration, and database settings | add BenchBox identity; require an explicit configured database |
-| `create`, `show`, `claim`, `release`, `deps`, `unblock` | item and lease lifecycle | preserve actor and work-order invocation |
-| `start`, `done` | work-unit lifecycle | delegate worktree/branch capture from the BenchBox cwd |
-| `defer`, `promote`, `dismiss` | deferral lifecycle | preserve legacy arguments and output |
-| `complete`, `drop`, `block` | terminal/block transitions | preserve policy errors and exit behavior |
-| `list`, `ready`, `stats` | read-only views | preserve command names and legacy output mode |
-| `check-scope`, `verify`, `lint` | policy gates | preserve the standalone compatibility exit contract |
-| `agent` | claim-coordinated automation | keep reads read-only and apply the maintenance-freeze guard to mutations |
-| `export` | lossless envelope | render token-free public JSONL/Markdown views and a separate private recovery envelope |
+The runtime is the checksum-verified wheel vendored under
+`_project/scripts/vendor/` and pinned by `_project/scripts/uv.lock`; it is never
+resolved from a sibling checkout, private Git fetch, or registry install. The v2
+external-credential contract is unchanged: set the non-secret
+`TODO_DB_AUTH_CONTRACT=v2` marker for hosted calls, and inject credentials
+externally with bounded lifetime. The runtime never calls Turso to mint, parse,
+cache, log, print, refresh, or retry credentials, and it redacts credential
+environment values in output. Export writes a single lossless JSON envelope; the
+committed `items.jsonl` / `events.jsonl` / `index.md` views are rendered from it
+by `_project/scripts/todo_db_export_views.py`.
 
 The standalone YAML and legacy-snapshot bridges preserve BenchBox policy rows,
 terminal deferrals, metadata, and ordered event provenance. Legacy events are
@@ -112,7 +111,8 @@ the package-only cutover.
 ## Export workflow and restore validation
 
 `.github/workflows/todo-db-export.yml` syncs the locked scripts project and runs
-the package-only wrapper when the two database secrets are available:
+the floor CLI (`uv run --project _project/scripts --locked -- todo-db export`)
+when the two database secrets are available:
 
 - `TODO_DB_URL` repository secret for the dedicated BenchBox Turso/libSQL DB.
 - `TODO_DB_RO_AUTH_TOKEN` repository secret carrying read-only authority.
@@ -121,17 +121,18 @@ the package-only wrapper when the two database secrets are available:
 
 CI supplies `TODO_DB_URL` and `TODO_DB_RO_AUTH_TOKEN` as secrets. Local commands
 must select a database with `--db`, `TODO_DB_PATH`, `TODO_DB_URL`, or
-`.todo-db/config.json`; the wrapper refuses to create an implicit fork database.
-For a selected hosted database, inject credentials externally with bounded
-lifetime via `TODO_DB_AUTH_TOKEN` or `TODO_DB_RO_AUTH_TOKEN`. The v2 wrapper
+`.todo-db/config.json`; the CLI refuses to create an implicit fork database. For
+a selected hosted database, inject credentials externally with bounded lifetime
+via `TODO_DB_AUTH_TOKEN` or `TODO_DB_RO_AUTH_TOKEN` (or a
+`TODO_DB_CREDENTIAL_COMMAND`), and set `TODO_DB_AUTH_CONTRACT=v2`. The v2
 contract never mints or refreshes them. It does not fall back to a sibling
 checkout, embedded runtime, or local database. The sole database-free
 exceptions are `doctor`, help/version output, and finding commands that operate
 only on local drafts.
 
-The verified wheel is committed under `_project/scripts/vendor/` and resolved
-by `_project/scripts/uv.lock`. The compatibility adapter enforces version 0.4.2.
-The workflow does not download or select a runtime through repository variables.
+The verified 0.6.0 wheel is committed under `_project/scripts/vendor/` and
+resolved by `_project/scripts/uv.lock`. The workflow does not download or select
+a runtime through repository variables.
 
 The job remains weekly, deterministic, path-scoped, and outage-alerting. Each
 successful run uploads a uniquely named recovery artifact with 90-day automatic
@@ -145,42 +146,41 @@ snapshot PR. Missing database secrets, an unavailable locked package, an
 unreachable database, or a schema mismatch open or reuse the incident issue;
 they do not claim production readiness.
 
-The live BenchBox database uses the package schema. Export it through the stable
-wrapper with explicit read-only credentials, then prove the lossless envelope
-on a new local database:
+The live BenchBox database uses the package schema. Export it through the floor
+CLI with explicit read-only credentials, then prove the lossless envelope on a
+new local database. This mirrors the restore-validation block in
+`.github/workflows/todo-db-export.yml`:
 
 ```sh
 set -eu
 test -n "$TODO_DB_URL"
 test -n "$TODO_DB_RO_AUTH_TOKEN"
+export TODO_DB_AUTH_CONTRACT=v2
 
 SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/todo-db-live-restore.XXXXXX")"
-IDENTITY="--project-id benchbox --repository https://github.com/BenchBox-dev/BenchBox"
+IDENTITY="--project-id benchbox --repository https://github.com/joeharris76/BenchBox"
+RUN="uv run --project _project/scripts --locked -- todo-db"
 
-_project/scripts/todo export --out "$SCRATCH/views" \
-  --lossless-out "$SCRATCH/lossless"
+$RUN $IDENTITY export --output "$SCRATCH/todo-db.json"
 
-uv run --project _project/scripts --locked -- todo-db \
-  --db "$SCRATCH/roundtrip.sqlite" $IDENTITY init
-uv run --project _project/scripts --locked -- todo-db \
-  --db "$SCRATCH/roundtrip.sqlite" $IDENTITY \
-  restore --input "$SCRATCH/lossless/todo-db.json" --replace
-uv run --project _project/scripts --locked -- todo-db \
-  --db "$SCRATCH/roundtrip.sqlite" $IDENTITY audit verify
-uv run --project _project/scripts --locked -- todo-db \
-  --db "$SCRATCH/roundtrip.sqlite" $IDENTITY \
+$RUN --db "$SCRATCH/roundtrip.sqlite" $IDENTITY init
+$RUN --db "$SCRATCH/roundtrip.sqlite" $IDENTITY \
+  restore --input "$SCRATCH/todo-db.json" --replace
+$RUN --db "$SCRATCH/roundtrip.sqlite" $IDENTITY audit verify
+$RUN --db "$SCRATCH/roundtrip.sqlite" $IDENTITY \
   export --output "$SCRATCH/roundtrip.json"
 
-cmp "$SCRATCH/lossless/todo-db.json" "$SCRATCH/roundtrip.json"
+cmp "$SCRATCH/todo-db.json" "$SCRATCH/roundtrip.json"
 ```
 
 ## Testing, CI, release, and operations gate
 
-The BenchBox-side tests cover adapter argument and identity forwarding,
-database and version pinning, exit fidelity, deterministic lossless and
-compatibility export views, explicit YAML paths, empty-source rejection,
-export-fidelity reporting, freeze and renew extensions, and failed-import
-rollback. The released package suite covers local lifecycle, identity,
+The BenchBox-side tests from the adapter era covered adapter argument and
+identity forwarding, database and version pinning, exit fidelity, deterministic
+lossless and compatibility export views, explicit YAML paths, empty-source
+rejection, export-fidelity reporting, freeze and renew extensions, and
+failed-import rollback. The released package suite covers local lifecycle,
+identity,
 migrations/checksums, audit/export/restore, concurrency/claim contention,
 secure hosted transport, token redaction, and credential-gated live coverage.
 
@@ -284,26 +284,11 @@ BenchBox's rollout from 0.3.2 crosses additive migration 007, which adds
 taken read-only and rehearsed locally before the staged 0.4.1 runtime migrated
 the hosted tracker from schema 6 to schema 7. Version 0.4.2 itself introduces
 no migration; it remains schema-7 compatible and adds hosted auth contract
-unification, safe v2 exit negotiation, generated-wrapper path hardening, and
-expanded endpoint redaction.
-
-BenchBox's custom wrapper carries the v2 external-credential contract even
-though it is intentionally left unmanaged by `refresh-wrapper`:
-
-- `# todo-db-wrapper: v2` marker present;
-- exports only `TODO_DB_AUTH_CONTRACT=v2`;
-- never mints, parses, caches, logs, prints, refreshes, or retries credentials;
-- relies on external bounded read-write/read-only credential environment values;
-- keeps claim/release/finish coordination in the locked compatibility adapter;
-- routes mutating `agent` subcommands through the maintenance-freeze guard;
-- removes claim-generation tokens from public compatibility exports.
-
-Direct hosted automation that wants dedicated auth exit code 4 must set
-`TODO_DB_AUTH_CONTRACT=v2`; without negotiation, 0.4.2 safely returns legacy
-exit code 2 so an older wrapper cannot mistake the failure for a refresh signal.
-If `todo-db doctor --json` reports `legacy generated wrapper`, run
-`todo-db refresh-wrapper`. If it reports `unrecognized wrapper left unmanaged`,
-do not overwrite it blindly; audit and maintain the custom wrapper manually.
+unification, safe v2 exit negotiation, and expanded endpoint redaction. The
+external-credential contract from that rollout survives the 0.6.0 cutover
+unchanged: credentials stay external, `TODO_DB_AUTH_CONTRACT=v2` is set by the
+caller, and the runtime never mints, parses, caches, logs, prints, refreshes, or
+retries them. Hosted calls without the v2 marker return legacy exit code 2.
 
 Rollback remains the retained pre-upgrade lossless envelope plus its verified
 scratch restore rehearsal. Replay that artifact only through an explicitly
@@ -320,7 +305,7 @@ migration, or destructive administration through model-facing tools.
 The CLI refuses any database whose `schema_version` is below its own
 `SCHEMA_VERSION`, and migrations never auto-apply. Landing v4 code therefore
 makes every collaborator's CLI inert against the live v3 database until the
-hosted migration runs: **land the code and run `todo migrate` together.**
+hosted migration runs: **land the code and run `todo-db migrate` together.**
 
 Rehearse first on a scratch database, never against production:
 

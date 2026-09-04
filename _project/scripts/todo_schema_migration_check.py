@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed when the locked todo-db package, wrapper, or rollout record drift.
+"""Fail closed when the locked todo-db package or rollout record drift.
 
 This guard is stdlib-only so the required ``ci-paths`` job can inspect the
 vendored wheel before dependency installation. Package migration correctness
@@ -52,17 +52,8 @@ def _package_contract(wheel: Path) -> tuple[int, list[int]]:
     return schema_version, versions
 
 
-def validate_contract(*, package_wheel: Path, wrapper: Path, inventory: Path) -> None:
+def validate_contract(*, package_wheel: Path, inventory: Path) -> None:
     schema_version, _ = _package_contract(package_wheel)
-
-    wrapper_text = wrapper.read_text(encoding="utf-8")
-    wrapper_match = re.search(r"(?m)^TODO_SCHEMA_VERSION=([0-9]+)$", wrapper_text)
-    if wrapper_match is None:
-        raise SchemaMigrationError(f"{wrapper}: missing literal TODO_SCHEMA_VERSION declaration")
-    if int(wrapper_match.group(1)) != schema_version:
-        raise SchemaMigrationError(
-            f"{wrapper}: TODO_SCHEMA_VERSION={wrapper_match.group(1)} does not match package schema {schema_version}"
-        )
 
     try:
         inventory_text = inventory.read_text(encoding="utf-8")
@@ -109,7 +100,6 @@ def main(argv: list[str] | None = None) -> int:
         raise SchemaMigrationError(f"expected exactly one vendored todo-db wheel, found {len(wheels)}")
     validate_contract(
         package_wheel=wheels[0],
-        wrapper=root / "_project/scripts/todo",
         inventory=root / "_project/todo-schema-migrations.json",
     )
     print("TODO package/schema migration contract: OK")

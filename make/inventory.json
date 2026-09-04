@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "36c0abed31f9a7300e6b83c8043c9d36c7e30bcb14918b6922772f91bb5d0729",
+  "contract_sha256": "9115699424d9a2c3edb56e08e52e81ece82774303940d8383ed84fcdd634d837",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -1241,8 +1241,8 @@
       },
       {
         "header": "skill-integrity-check:",
-        "recipe": "\t@set -eu; \\\n\tuv run -- python scripts/skill_sync_ci_policy.py validate --manifest skill-sync.yaml; \\\n\tVERIFIER=$$(uv run -- python -c 'from scripts.skill_sync_ci_policy import VERIFIER_REF, VERIFIER_REPOSITORY; print(VERIFIER_REF, VERIFIER_REPOSITORY)'); \\\n\tset -- $$VERIFIER; VERIFIER_REF=$$1; VERIFIER_REPOSITORY=$$2; \\\n\tVERIFIER_DIR=$$(mktemp -d \"$${TMPDIR:-/tmp}/benchbox-skill-sync-verifier.XXXXXX\"); \\\n\ttrap 'rm -rf \"$$VERIFIER_DIR\"' EXIT; \\\n\tmkdir -p \"$$VERIFIER_DIR/home\"; \\\n\tgit clone --quiet \"$$VERIFIER_REPOSITORY\" \"$$VERIFIER_DIR/tool\"; \\\n\tgit -C \"$$VERIFIER_DIR/tool\" checkout --detach --quiet \"$$VERIFIER_REF\"; \\\n\ttest \"$$(git -C \"$$VERIFIER_DIR/tool\" rev-parse HEAD)\" = \"$$VERIFIER_REF\"; \\\n\t(cd \"$$VERIFIER_DIR/tool\" && npm ci --ignore-scripts && npm run build); \\\n\ttest -f \"$$VERIFIER_DIR/tool/dist/cli/index.js\"; \\\n\tenv HOME=\"$$VERIFIER_DIR/home\" node \"$$VERIFIER_DIR/tool/dist/cli/index.js\" verify --project \"$(CURDIR)\"; \\\n\tsh scripts/check_untracked_skill_mirrors.sh; \\\n\t$(MAKE) agent-instructions-check; \\\n\t$(MAKE) agent-identity-check; \\\n\t$(MAKE) agent-commit-range-check; \\\n\tuv run -- python -m pytest tests/unit/scripts/test_todo_wrapper.py::TestSkillThinness -q; \\\n\t$(MAKE) artifact-hygiene",
-        "recipe_sha256": "3483d8b66d495ed64da8de1d312e684f3c03e91cb7e20540a0877825c9988917"
+        "recipe": "\t@set -eu; \\\n\tuv run -- python scripts/skill_sync_ci_policy.py validate --manifest skill-sync.yaml; \\\n\tVERIFIER=$$(uv run -- python -c 'from scripts.skill_sync_ci_policy import VERIFIER_REF, VERIFIER_REPOSITORY; print(VERIFIER_REF, VERIFIER_REPOSITORY)'); \\\n\tset -- $$VERIFIER; VERIFIER_REF=$$1; VERIFIER_REPOSITORY=$$2; \\\n\tVERIFIER_DIR=$$(mktemp -d \"$${TMPDIR:-/tmp}/benchbox-skill-sync-verifier.XXXXXX\"); \\\n\ttrap 'rm -rf \"$$VERIFIER_DIR\"' EXIT; \\\n\tmkdir -p \"$$VERIFIER_DIR/home\"; \\\n\tgit clone --quiet \"$$VERIFIER_REPOSITORY\" \"$$VERIFIER_DIR/tool\"; \\\n\tgit -C \"$$VERIFIER_DIR/tool\" checkout --detach --quiet \"$$VERIFIER_REF\"; \\\n\ttest \"$$(git -C \"$$VERIFIER_DIR/tool\" rev-parse HEAD)\" = \"$$VERIFIER_REF\"; \\\n\t(cd \"$$VERIFIER_DIR/tool\" && npm ci --ignore-scripts && npm run build); \\\n\ttest -f \"$$VERIFIER_DIR/tool/dist/cli/index.js\"; \\\n\tenv HOME=\"$$VERIFIER_DIR/home\" node \"$$VERIFIER_DIR/tool/dist/cli/index.js\" verify --project \"$(CURDIR)\"; \\\n\tsh scripts/check_untracked_skill_mirrors.sh; \\\n\t$(MAKE) agent-instructions-check; \\\n\t$(MAKE) agent-identity-check; \\\n\t$(MAKE) agent-commit-range-check; \\\n\t$(MAKE) artifact-hygiene",
+        "recipe_sha256": "1d88ca8090335a2844aae232e61e781c51c175bc35928f246432d007ff564597"
       }
     ],
     "skill-sync": [
@@ -1924,7 +1924,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "ad4dbfdeeb680fe24449a119bfc22ebff4e5e266461bbea1cb577d171ae2c206",
+  "semantic_sha256": "2ced83c930a4419a3349a5fc02c1954dcd6b5f22478e2273ade7b4229ec21415",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3048,9 +3048,9 @@
       ]
     },
     {
-      "body": "skill-integrity-check:\n\t@set -eu; \\\n\tuv run -- python scripts/skill_sync_ci_policy.py validate --manifest skill-sync.yaml; \\\n\tVERIFIER=$$(uv run -- python -c 'from scripts.skill_sync_ci_policy import VERIFIER_REF, VERIFIER_REPOSITORY; print(VERIFIER_REF, VERIFIER_REPOSITORY)'); \\\n\tset -- $$VERIFIER; VERIFIER_REF=$$1; VERIFIER_REPOSITORY=$$2; \\\n\tVERIFIER_DIR=$$(mktemp -d \"$${TMPDIR:-/tmp}/benchbox-skill-sync-verifier.XXXXXX\"); \\\n\ttrap 'rm -rf \"$$VERIFIER_DIR\"' EXIT; \\\n\tmkdir -p \"$$VERIFIER_DIR/home\"; \\\n\tgit clone --quiet \"$$VERIFIER_REPOSITORY\" \"$$VERIFIER_DIR/tool\"; \\\n\tgit -C \"$$VERIFIER_DIR/tool\" checkout --detach --quiet \"$$VERIFIER_REF\"; \\\n\ttest \"$$(git -C \"$$VERIFIER_DIR/tool\" rev-parse HEAD)\" = \"$$VERIFIER_REF\"; \\\n\t(cd \"$$VERIFIER_DIR/tool\" && npm ci --ignore-scripts && npm run build); \\\n\ttest -f \"$$VERIFIER_DIR/tool/dist/cli/index.js\"; \\\n\tenv HOME=\"$$VERIFIER_DIR/home\" node \"$$VERIFIER_DIR/tool/dist/cli/index.js\" verify --project \"$(CURDIR)\"; \\\n\tsh scripts/check_untracked_skill_mirrors.sh; \\\n\t$(MAKE) agent-instructions-check; \\\n\t$(MAKE) agent-identity-check; \\\n\t$(MAKE) agent-commit-range-check; \\\n\tuv run -- python -m pytest tests/unit/scripts/test_todo_wrapper.py::TestSkillThinness -q; \\\n\t$(MAKE) artifact-hygiene",
+      "body": "skill-integrity-check:\n\t@set -eu; \\\n\tuv run -- python scripts/skill_sync_ci_policy.py validate --manifest skill-sync.yaml; \\\n\tVERIFIER=$$(uv run -- python -c 'from scripts.skill_sync_ci_policy import VERIFIER_REF, VERIFIER_REPOSITORY; print(VERIFIER_REF, VERIFIER_REPOSITORY)'); \\\n\tset -- $$VERIFIER; VERIFIER_REF=$$1; VERIFIER_REPOSITORY=$$2; \\\n\tVERIFIER_DIR=$$(mktemp -d \"$${TMPDIR:-/tmp}/benchbox-skill-sync-verifier.XXXXXX\"); \\\n\ttrap 'rm -rf \"$$VERIFIER_DIR\"' EXIT; \\\n\tmkdir -p \"$$VERIFIER_DIR/home\"; \\\n\tgit clone --quiet \"$$VERIFIER_REPOSITORY\" \"$$VERIFIER_DIR/tool\"; \\\n\tgit -C \"$$VERIFIER_DIR/tool\" checkout --detach --quiet \"$$VERIFIER_REF\"; \\\n\ttest \"$$(git -C \"$$VERIFIER_DIR/tool\" rev-parse HEAD)\" = \"$$VERIFIER_REF\"; \\\n\t(cd \"$$VERIFIER_DIR/tool\" && npm ci --ignore-scripts && npm run build); \\\n\ttest -f \"$$VERIFIER_DIR/tool/dist/cli/index.js\"; \\\n\tenv HOME=\"$$VERIFIER_DIR/home\" node \"$$VERIFIER_DIR/tool/dist/cli/index.js\" verify --project \"$(CURDIR)\"; \\\n\tsh scripts/check_untracked_skill_mirrors.sh; \\\n\t$(MAKE) agent-instructions-check; \\\n\t$(MAKE) agent-identity-check; \\\n\t$(MAKE) agent-commit-range-check; \\\n\t$(MAKE) artifact-hygiene",
       "kind": "rule",
-      "sha256": "084866e660e55e6d721f8f90296985786ff1c4cd3b008a7fbb32b3de87154fbd",
+      "sha256": "324e2105c72bea2ca68c1828c5f034452e427cd0673cfea094f9ddba62da3cfa",
       "targets": [
         "skill-integrity-check"
       ]

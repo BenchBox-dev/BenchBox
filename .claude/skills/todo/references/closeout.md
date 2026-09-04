@@ -17,7 +17,7 @@ match the report:
 - the commit and PR exist and target the expected branch;
 - the merge and required checks have the reported state;
 - the reviewed findings still apply to the current code;
-- `todo show <id> --json` matches the expected tracker state.
+- `show_item(id="<id>")` matches the expected tracker state.
 
 Record changed or superseded findings. Do not silently apply a stale review.
 
@@ -33,10 +33,10 @@ Record changed or superseded findings. Do not silently apply a stale review.
 
 ## Phase 3 — close tracker state
 
-1. Resolve open deferrals with `promote` or `dismiss`.
-2. Use `complete` with merged PR evidence when the work landed.
-3. Use `drop` with evidence when the work proved unnecessary. "Already fixed"
-   is valid only when the fixing revision is identified.
+1. Resolve open deferrals with `promote_deferral` or `dismiss_deferral`.
+2. Close completed items using MCP `finish` (or human floor CLI `todo-db complete`).
+3. Use `drop(id="...", reason="...")` under `--profile full` when the work proved
+   unnecessary. "Already fixed" is valid only when the fixing revision is identified.
 4. Leave blocked items open and record the exact unblock condition.
 
 ## Report

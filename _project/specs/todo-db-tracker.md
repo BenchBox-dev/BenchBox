@@ -1,8 +1,10 @@
 # TODO Tracker on a Shared Database — Design Spec
 
-Status: historical design spec (implemented; live in production at schema v7, todo-db v0.4.3).
+Status: historical design spec (implemented; live in production at schema v7, todo-db v0.6.0).
 Author: agent session, 2026-07-18, from the TODO-infrastructure review.
 Decision owner: maintainer.
+
+Superseded by the 0.6.x MCP cutover — see `_project/decisions/todo-db-upgrade-0-6-0-mcp-2026-09-03.md`.
 
 > **Architecture & Operational Evolution:**
 > This document records the original 2026-07-18 design specification for the shared database tracker.
