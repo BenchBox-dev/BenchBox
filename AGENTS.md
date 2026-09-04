@@ -88,7 +88,7 @@ Dev PRs target `develop` (or `release` / `published-results`), use squash merge,
 
 ## TODO tracker
 
-Use the `todo` skill for tracker operations. Tracker writes follow worktree policy; `_project/todo-db-export/` is public, so never recover plaintext into it.
+Use the `todo-db` skill for tracker operations. Tracker writes follow worktree policy; `_project/todo-db-export/` is public, so never recover plaintext into it.
 
 ## BenchBox invariants
 
@@ -102,7 +102,7 @@ Apple/macOS: correctness-gate digests are Linux-generated; use `make ci-linux` (
 
 ## Skills and generated mirrors
 
-Stable wrappers are `code`, `test`, `todo`, `docs`, `blog`, `benchbox`, `skill-sync`, and `tidy-perms`. `todo` authors ideas/specs and owns tracker actions. Skill source is `/Users/joe/.skill-sync/skills`; only `.claude/skills` is tracked. `.agents/skills` is the shared, gitignored local materialization for Codex, Gemini, and Antigravity. Regenerate mirrors with `make skill-sync` in a write worktree; never hand-edit one. `scripts/check_untracked_skill_mirrors.sh` guards tracking state, not content parity.
+Stable wrappers are `code`, `test`, `todo-db`, `docs`, `blog`, `benchbox`, `skill-sync`, and `tidy-perms`. `todo-db` authors ideas/specs and owns tracker actions. Skill source is `/Users/joe/.skill-sync/skills`; only `.claude/skills` is tracked. `.agents/skills` is the shared, gitignored local materialization for Codex, Gemini, and Antigravity. Regenerate mirrors with `make skill-sync` in a write worktree; never hand-edit one. `scripts/check_untracked_skill_mirrors.sh` guards tracking state, not content parity.
 
 ## Operational references
 

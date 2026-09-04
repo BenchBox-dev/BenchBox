@@ -1,6 +1,6 @@
 # TODO review: own-edit-target freshness
 
-Companion to `~/.skill-sync/skills/todo/references/review.md`. This file is
+Companion to `.claude/skills/todo-db/references/review.md`. This file is
 not part of the active instruction-byte surface.
 
 When a TODO's `only_modify` includes a living policy, spec, or goal document

@@ -25,7 +25,7 @@ _REF_LINE_RE = re.compile(r"^(    ref: )([0-9a-f]{40})$")
 
 ALLOWED_SOURCES = {
     "canonical": ("git", "https://github.com/joeharris76/skill-sync-skills.git", "skills"),
-    "todo-context-efficiency": ("git", "https://github.com/joeharris76/skill-sync-skills.git", "skills"),
+    "todo-db": ("git", "https://github.com/joeharris76/todo-db.git", "skills"),
     "product": ("git", VERIFIER_REPOSITORY, "skills"),
 }
 
@@ -97,7 +97,7 @@ def validate_manifest_text(text: str) -> None:
     required_fragments = (
         "targets:\n  claude:\n    dir: .claude/skills\n    tracked: true",
         "install_mode: mirror",
-        "overrides:\n  skill-sync:\n    source_name: product\n  todo:\n    source_name: todo-context-efficiency",
+        "overrides:\n  skill-sync:\n    source_name: product\n  todo-db:\n    source_name: todo-db",
     )
     missing = [fragment for fragment in required_fragments if fragment not in text]
     if missing:

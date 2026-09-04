@@ -90,3 +90,22 @@ todo-db merge `671c45b`).
 - Paired with the skill-sync re-pin to `d22ea7f` (skill-sync-skills PR #71:
   `prioritize.md` MCP rewrite plus lock regen), so the vendored runtime and
   the mirrored skill agree on the MCP interface.
+
+## Follow-up: current main rebuild (2026-09-04)
+
+The GitHub `v0.6.1` wheel still registers `create_item` only behind
+`--profile full`. todo-db `main` at
+`b8dda65c53f4a8fa443ec09a7419576ea8362e90` (PR #25) loads planning tools on
+every profile, and ships the repo-owned `todo-db` skill. There is no newer
+tagged release, so the vendored wheel is rebuilt from that commit.
+
+- Wheel filename stays `todo_db-0.6.1-py3-none-any.whl` because
+  `pyproject.toml` version is still 0.6.1.
+- Wheel SHA-256:
+  `264a32b0af71bb8eb27fc6dfe04d01a30516ac7ba6352170a94bcab6354d3894`.
+- Still `SCHEMA_VERSION = 7`; the seven migration SQL files are byte-identical
+  to the previous 0.6.1 wheel, so no hosted migration, backup, or rehearsal.
+- Floor CLI verbs used by CI (`export`, `restore`, `audit verify`) remain.
+- Skill-sync now sources `todo-db` from `https://github.com/joeharris76/todo-db.git`
+  at the same commit, replacing the catalog `todo` skill. The duplicate
+  `todo-context-efficiency` source is gone.
