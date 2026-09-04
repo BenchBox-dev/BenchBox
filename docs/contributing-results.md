@@ -169,8 +169,10 @@ Results in the explorer carry trust labels. In
 | `vendor-supplied` | **Vendor Supplied** | Produced by the platform vendor itself; applied by maintainers, never self-declared on a submission |
 | `verified` | **Verified** | Reserved for future third-party attestation |
 
-`CI` and `Local` are descriptions of where a run was produced, not current
-trust labels.
+The publisher also accepts `ci`, `local`, and `unofficial-research` as
+publish-only workflow labels through `benchbox publish --label`. These labels
+are not derived from `result_source` and are not part of the canonical Explorer
+trust-label vocabulary above.
 
 Community submissions are labeled "Community" in the explorer to distinguish
 them from maintainer-curated results. **Vendor Supplied** (`vendor-supplied`)
