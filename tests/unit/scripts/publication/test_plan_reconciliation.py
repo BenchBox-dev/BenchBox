@@ -69,11 +69,23 @@ REAL_DEPS = {
 }
 
 
+def _with_expected_externals(deps: dict[str, list[str]]) -> dict[str, list[str]]:
+    """Merge pinned freeze-transferred external predecessors into in-set deps."""
+    out = {item_id: list(values) for item_id, values in deps.items()}
+    for item_id, externals in reconciliation.EXPECTED_EXTERNAL_DEPS.items():
+        merged = list(out.get(item_id, []))
+        for dep in sorted(externals):
+            if dep not in merged:
+                merged.append(dep)
+        out[item_id] = merged
+    return out
+
+
 def _snapshot(states: dict[str, str] | None = None, deps: dict[str, list[str]] | None = None) -> dict:
     if states is None:
         states = dict.fromkeys(LIVE_A0_A11, "active")
     if deps is None:
-        deps = {item_id: list(REAL_DEPS.get(item_id, [])) for item_id in states}
+        deps = _with_expected_externals({item_id: list(REAL_DEPS.get(item_id, [])) for item_id in states})
     return {"states": states, "deps": deps}
 
 
@@ -322,11 +334,33 @@ def test_main_fails_when_pinned_phase_missing_from_live(monkeypatch) -> None:
 
 
 def test_dependency_violations_passes_for_real_dag() -> None:
-    assert reconciliation.dependency_violations(LIVE_A0_A11, REAL_DEPS) == []
+    assert reconciliation.dependency_violations(LIVE_A0_A11, _with_expected_externals(REAL_DEPS)) == []
+
+
+def test_dependency_violations_accepts_pinned_a10_external_predecessor() -> None:
+    deps = _with_expected_externals(REAL_DEPS)
+
+    assert (
+        "independent-production-deployer-and-retirement"
+        in deps["independent-publication-a10-release-and-mirror-retirement"]
+    )
+    assert reconciliation.dependency_violations(LIVE_A0_A11, deps) == []
+
+
+def test_dependency_violations_fails_when_pinned_a10_external_missing() -> None:
+    # In-set REAL_DEPS alone omit the freeze-transferred deployer predecessor.
+    violations = reconciliation.dependency_violations(LIVE_A0_A11, REAL_DEPS)
+
+    assert any(
+        "is missing expected external dependency" in v
+        and "independent-publication-a10-release-and-mirror-retirement" in v
+        and "independent-production-deployer-and-retirement" in v
+        for v in violations
+    )
 
 
 def test_dependency_violations_fails_on_removed_chain() -> None:
-    drifted = dict(REAL_DEPS)
+    drifted = _with_expected_externals(REAL_DEPS)
     drifted["independent-publication-a1-authority-and-threat-contract"] = []
 
     violations = reconciliation.dependency_violations(LIVE_A0_A11, drifted)
@@ -335,7 +369,7 @@ def test_dependency_violations_fails_on_removed_chain() -> None:
 
 
 def test_dependency_violations_fails_on_backward_edge() -> None:
-    drifted = dict(REAL_DEPS)
+    drifted = _with_expected_externals(REAL_DEPS)
     drifted["independent-publication-a1-authority-and-threat-contract"] = [
         "independent-publication-a2-corpus-trust-isolation"
     ]
@@ -346,7 +380,7 @@ def test_dependency_violations_fails_on_backward_edge() -> None:
 
 
 def test_dependency_violations_surfaces_cycle_as_backward_edge() -> None:
-    drifted = dict(REAL_DEPS)
+    drifted = _with_expected_externals(REAL_DEPS)
     drifted["independent-publication-a0-baseline-and-freeze"] = [
         "independent-publication-a1-authority-and-threat-contract"
     ]
@@ -357,7 +391,7 @@ def test_dependency_violations_surfaces_cycle_as_backward_edge() -> None:
 
 
 def test_dependency_violations_fails_on_partial_edge_removal() -> None:
-    drifted = dict(REAL_DEPS)
+    drifted = _with_expected_externals(REAL_DEPS)
     drifted["independent-publication-a8-published-results-gate-and-shadow-promotion"] = [
         "independent-publication-a2-corpus-trust-isolation",
         "independent-publication-a4-hermetic-build-and-shadow-assembly",
@@ -369,7 +403,7 @@ def test_dependency_violations_fails_on_partial_edge_removal() -> None:
 
 
 def test_dependency_violations_fails_on_unexpected_edge() -> None:
-    drifted = dict(REAL_DEPS)
+    drifted = _with_expected_externals(REAL_DEPS)
     drifted["independent-publication-a3-control-plane-and-artifact-contract"] = [
         "independent-publication-a1-authority-and-threat-contract",
         "independent-publication-a2-corpus-trust-isolation",
@@ -382,7 +416,7 @@ def test_dependency_violations_fails_on_unexpected_edge() -> None:
 
 
 def test_dependency_violations_fails_on_external_dependency() -> None:
-    drifted = dict(REAL_DEPS)
+    drifted = _with_expected_externals(REAL_DEPS)
     drifted["independent-publication-a3-control-plane-and-artifact-contract"] = [
         "independent-publication-a1-authority-and-threat-contract",
         "independent-publication-a2-corpus-trust-isolation",
@@ -392,11 +426,12 @@ def test_dependency_violations_fails_on_external_dependency() -> None:
     violations = reconciliation.dependency_violations(LIVE_A0_A11, drifted)
 
     assert any("has unexpected external dependency" in v and "external-tracker-item" in v for v in violations)
+    assert not any("independent-production-deployer-and-retirement" in v and "unexpected" in v for v in violations)
 
 
 def test_dependency_violations_fails_on_unpinned_phase() -> None:
     plan = LIVE_A0_A11 + ["independent-publication-a12-new-phase"]
-    drifted = dict(REAL_DEPS)
+    drifted = _with_expected_externals(REAL_DEPS)
     drifted["independent-publication-a12-new-phase"] = ["independent-publication-a11-operations-canaries-and-closeout"]
 
     violations = reconciliation.dependency_violations(plan, drifted)
@@ -406,3 +441,11 @@ def test_dependency_violations_fails_on_unpinned_phase() -> None:
 
 def test_expected_deps_matches_real_deps() -> None:
     assert reconciliation.EXPECTED_DEPS == REAL_DEPS
+
+
+def test_expected_external_deps_pins_only_a10_deployer_predecessor() -> None:
+    assert {
+        "independent-publication-a10-release-and-mirror-retirement": frozenset(
+            {"independent-production-deployer-and-retirement"}
+        ),
+    } == reconciliation.EXPECTED_EXTERNAL_DEPS
