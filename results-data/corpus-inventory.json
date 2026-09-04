@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-09-01T12:32:37.461087+00:00",
+  "generated_at": "2026-09-04T20:18:29.272052+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
@@ -653,6 +653,201 @@
       "bundle_sha256": "3f6ea7f8315f023edea1e3bec49c7fd40da02177c12659fa50980d03bf323d81"
     },
     {
+      "file": "datavault_sf001_clickhouse_local_sql_20260826_172319_c202ec05.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-08-26T17:23:19.611834",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "262f235e9acfea7d431c57affeff6b1ca8132c972061c5de455bbe51275e5fe5"
+    },
+    {
+      "file": "datavault_sf01_clickhouse_local_sql_20260826_172329_b4fd5612.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-08-26T17:23:29.274178",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "14bd9a74c372b8475bad2e630f5e12ea9a8761bf0f500a53f934ad751b3b603f"
+    },
+    {
+      "file": "datavault_sf001_datafusion_sql_20260825_174206_a0f056fa.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.01,
+      "timestamp": "2026-08-25T17:42:06.180661",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "2ea72f0a8164e756b36bba0023129779242b9ddd049dd99c09fc4fd90075f2ec"
+    },
+    {
+      "file": "datavault_sf01_datafusion_sql_20260825_174216_497e5dd1.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.1,
+      "timestamp": "2026-08-25T17:42:16.066693",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "b8ac5ca886fcc63df6c6f956a9494e91aa1c4cabfb79db3bd1722f2ab73b5c8d"
+    },
+    {
+      "file": "datavault_sf001_duckdb_sql_20260826_163426_e3781d0d.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-08-26T16:34:26.234561",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "3a3892389747b7b38285d4afb0ff96f0d68b3f92225e4ddebb891e6f63f6751a"
+    },
+    {
+      "file": "datavault_sf01_duckdb_sql_20260826_163433_27308530.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-08-26T16:34:33.133120",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "e32c1ffc997c38d4bb23b2ca5996b466270e429408dfa9c57ec716fb602ea963"
+    },
+    {
+      "file": "flightdata_sf001_clickhouse_local_sql_20260826_172222_5f3f4c89.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-08-26T17:22:22.534707",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "9cd09931fcd1315d1cf3e6dba520a2814c53e306c8fb87d7a78d737706d291da"
+    },
+    {
+      "file": "flightdata_sf01_clickhouse_local_sql_20260826_172228_49be64a3.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-08-26T17:22:28.721828",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "0da04befdcb2f98779ac3ab44fbe70a19df8de58e0b633372853bb46229822dc"
+    },
+    {
+      "file": "flightdata_sf1_clickhouse_local_sql_20260826_172315_1fe46258.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-26T17:23:15.723409",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "0f2274c87030e4b813bbfadd245c3dea8a7b79d2ad4e01edae87d8154aaf37d1"
+    },
+    {
+      "file": "flightdata_sf001_datafusion_sql_20260826_170231_7f81f4d8.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.01,
+      "timestamp": "2026-08-26T17:02:31.451387",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "0e51801380a88fb317f9d5dd97d6520840c36bca937f57d2a5e32f2674a0d481"
+    },
+    {
+      "file": "flightdata_sf01_datafusion_sql_20260826_170238_db37a951.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.1,
+      "timestamp": "2026-08-26T17:02:38.678352",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "113a89d3e68671fb14e1328d5ca3eb16807f3a1c6c43f872afe187459733fcba"
+    },
+    {
+      "file": "flightdata_sf1_datafusion_sql_20260826_170316_28183319.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-26T17:03:16.431159",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "fc114a6f3ae438a2ae7e38567aa3ab89119a6d9b95978fbac92544e33e0a43c0"
+    },
+    {
+      "file": "flightdata_sf001_duckdb_sql_20260826_163352_55f0b3f1.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-08-26T16:33:52.495998",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "79694c70edbad04fcfa6589838be983590886d1ed2e52302d16a29a8e91e1417"
+    },
+    {
+      "file": "flightdata_sf01_duckdb_sql_20260826_163357_76fda453.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-08-26T16:33:57.116978",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "c78882bd2555819b50432d679fbe619b1074497b5c1c33f811ac4519a1a0083b"
+    },
+    {
+      "file": "flightdata_sf1_duckdb_sql_20260826_163423_fd3b42c4.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-26T16:34:23.038184",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "3eaae9d678c3b705077c1a87ac9ae23994200563be35ef8bcd5ff83ee38654d8"
+    },
+    {
       "file": "h2odb_sf001_clickhouse_local_sql_20260826_113044_c45bba08.json",
       "benchmark": "h2odb",
       "benchmark_name": "H2O Database",
@@ -963,6 +1158,123 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "4f7bae8e9dd4881d9ff3b6f28fc6bce26745e5f834b20246b47f5d26a2378cdf"
+    },
+    {
+      "file": "nyctaxi_sf001_clickhouse_local_sql_20260826_172208_fd44405e.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-08-26T17:22:08.545203",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "42f96fa25d6398b9a80b88d61cc83cc075caf2f4b63f630b58aa0c18b9e51dcc"
+    },
+    {
+      "file": "nyctaxi_sf01_clickhouse_local_sql_20260826_172211_21bbf078.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-08-26T17:22:11.235157",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "04f806c85749679ef9ae8024b7c98705f38c64d3402053a09be7fb7e8a32b838"
+    },
+    {
+      "file": "nyctaxi_sf1_clickhouse_local_sql_20260826_172218_45e02227.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-26T17:22:18.660778",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "8d4db0f881c329ff73f6db94de4e53100b5a859db726b6a0f7e99f417eaadec4"
+    },
+    {
+      "file": "nyctaxi_sf001_datafusion_sql_20260826_170209_a82f9269.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.01,
+      "timestamp": "2026-08-26T17:02:09.141108",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "61e267ecd745218dc66d66ffef8e38f4854a998bf34f27fed4072c0462c2a534"
+    },
+    {
+      "file": "nyctaxi_sf01_datafusion_sql_20260826_170213_7c79a921.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.1,
+      "timestamp": "2026-08-26T17:02:13.007630",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "4af81345b54c50f0b7a9aa86dde2987899350afd941a933b8e5f5edcd39f1b68"
+    },
+    {
+      "file": "nyctaxi_sf1_datafusion_sql_20260826_170227_ccd26c8d.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-26T17:02:27.135726",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "2eccd6ac4227ef2edeb1ff0af45f529970b6f7543116ad57197af67e0b7b04f3"
+    },
+    {
+      "file": "nyctaxi_sf001_duckdb_sql_20260826_163341_b51bee79.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-08-26T16:33:41.283276",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "37094bd4728a6bca9c1d1c6ebb2a588fb17fc204669e81f4aa796041bdc3c22e"
+    },
+    {
+      "file": "nyctaxi_sf01_duckdb_sql_20260826_163343_a9835026.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-08-26T16:33:43.709589",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "7df109e7a5f2cf89480ae24fb2b5d27a41ebcd7362f09febf4e57621d792e050"
+    },
+    {
+      "file": "nyctaxi_sf1_duckdb_sql_20260826_163349_6c37cd51.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-26T16:33:49.680099",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "c1d588d7657d952314016b2ff37a3a0b605e019aa708ff8b54669fd4ebfa8f5a"
     },
     {
       "file": "read_primitives_sf001_clickhouse_local_sql_20260826_113104_3465d4f3.json",
@@ -1537,6 +1849,123 @@
       "bundle_sha256": "0f7dac407862742403cca3253a5b47465320eb1262052236fdd67bcf1201769f"
     },
     {
+      "file": "tpcdi_sf001_clickhouse_local_sql_20260826_171147_01f31a9c.json",
+      "benchmark": "tpcdi",
+      "benchmark_name": "TPC-DI",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-08-26T17:11:47.248748",
+      "query_count": 114,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "86adc9601866782434decb140b6880a3bbdd32ef96a7605a8e4f5e29e1fe793b"
+    },
+    {
+      "file": "tpcdi_sf01_clickhouse_local_sql_20260826_171153_4d6e3213.json",
+      "benchmark": "tpcdi",
+      "benchmark_name": "TPC-DI",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-08-26T17:11:53.586912",
+      "query_count": 114,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "8baa4788c4a734c79121974cd77be704e9b5ad9d5bf35a17ad2473121acd9608"
+    },
+    {
+      "file": "tpcdi_sf1_clickhouse_local_sql_20260826_171209_b6f8b467.json",
+      "benchmark": "tpcdi",
+      "benchmark_name": "TPC-DI",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-26T17:12:09.979451",
+      "query_count": 114,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "2f4080c8021b701921985a5a6c54fa2cf69bf8328a1cb3661a618ab51c6d72ce"
+    },
+    {
+      "file": "tpcdi_sf001_datafusion_sql_20260826_164627_b9971b30.json",
+      "benchmark": "tpcdi",
+      "benchmark_name": "TPC-DI",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.01,
+      "timestamp": "2026-08-26T16:46:27.175336",
+      "query_count": 114,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "64cf3dd658c2aee01c6976276bd32b7d9981bb6c14bdf855386dbdb28f5a1c1e"
+    },
+    {
+      "file": "tpcdi_sf01_datafusion_sql_20260826_164631_51f0bade.json",
+      "benchmark": "tpcdi",
+      "benchmark_name": "TPC-DI",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.1,
+      "timestamp": "2026-08-26T16:46:31.658426",
+      "query_count": 114,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "6a52536a4506c00802b7bcc8db5fbeecd3666f5d42b1094f64c44bd60d2267ad"
+    },
+    {
+      "file": "tpcdi_sf1_datafusion_sql_20260826_164643_85837db4.json",
+      "benchmark": "tpcdi",
+      "benchmark_name": "TPC-DI",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-26T16:46:43.535002",
+      "query_count": 114,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "e76e1eebe037f15dcd47df33a04198961c0f727e771352a5fc45428224990bf2"
+    },
+    {
+      "file": "tpcdi_sf001_duckdb_sql_20260826_162441_115bd3b6.json",
+      "benchmark": "tpcdi",
+      "benchmark_name": "TPC-DI",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-08-26T16:24:41.862514",
+      "query_count": 114,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "d2855bbe5b6aa5ed3e41d0de2ce1426677f0b115a82c98ed2e2fd7b592827814"
+    },
+    {
+      "file": "tpcdi_sf01_duckdb_sql_20260826_162507_1769a68f.json",
+      "benchmark": "tpcdi",
+      "benchmark_name": "TPC-DI",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-08-26T16:25:07.936262",
+      "query_count": 114,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "76655e8ef85764b9e47ff71c7b86a73de0861b91523703f9e5ea4d15f89c57d0"
+    },
+    {
+      "file": "tpcdi_sf1_duckdb_sql_20260826_162542_1eb31887.json",
+      "benchmark": "tpcdi",
+      "benchmark_name": "TPC-DI",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-26T16:25:42.037246",
+      "query_count": 114,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "995ebac81101656fcd14ddcb77ba70ed9855354bfe5fd80189db96cb82ccdcab"
+    },
+    {
       "file": "tpcds_sf1_clickhouse_local_sql_20260826_112830_c250741b.json",
       "benchmark": "tpcds",
       "benchmark_name": "TPC-DS",
@@ -1821,6 +2250,45 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "5293ac3a9592b7576566668f098fa8353bbef464d5b1c20dc33bf6f788bab8f5"
+    },
+    {
+      "file": "tpcds_obt_sf1_clickhouse_local_sql_20260826_171140_836c988b.json",
+      "benchmark": "tpcds_obt",
+      "benchmark_name": "TPC-DS One Big Table",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-26T17:11:40.190211",
+      "query_count": 267,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "895bbece3b93e7e2048454ba742f0564afa4a07c93c78bcab43ebcd01ce5a87c"
+    },
+    {
+      "file": "tpcds_obt_sf1_datafusion_sql_20260826_164619_4e6d3fff.json",
+      "benchmark": "tpcds_obt",
+      "benchmark_name": "TPC-DS One Big Table",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-26T16:46:19.736435",
+      "query_count": 267,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "4d34fab2ee7d5b20e0bfabb233323e0604c6ae8c4ff51843c8b71517aabc8baa"
+    },
+    {
+      "file": "tpcds_obt_sf1_duckdb_sql_20260826_162433_2a6932b1.json",
+      "benchmark": "tpcds_obt",
+      "benchmark_name": "TPC-DS One Big Table",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-26T16:24:33.247739",
+      "query_count": 267,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "224c18b9fc693297fcfee359bc96c134446ce4ca3172eeec1f2bc4ea8d65ca48"
     },
     {
       "file": "tpch_sf001_cedardb_sql_20260825_095330_cf0d9e4d.json",
@@ -2588,6 +3056,123 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "e1367c8d07d61af45d34ff96a3a28598b2c332aa80c5a3efafaae12f6387170c"
+    },
+    {
+      "file": "tpchavoc_sf001_clickhouse_local_sql_20260826_171608_ce266327.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-08-26T17:16:08.723572",
+      "query_count": 591,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "a26b34ac1bc7955067289c951bad6785c33b004557d69b6242f83a167abe80a0"
+    },
+    {
+      "file": "tpchavoc_sf01_clickhouse_local_sql_20260826_171641_4d088e3c.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-08-26T17:16:41.729667",
+      "query_count": 591,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "fb8b62bae8ca7a05fa6a8dfd9f4f670b147c1293cb69053aadd3b4e13d6f6615"
+    },
+    {
+      "file": "tpchavoc_sf1_clickhouse_local_sql_20260826_172129_4f695fe1.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-26T17:21:29.581348",
+      "query_count": 591,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "41f91bda92064b483c9a6a259384369c669df1fd56486498bb6e9b1fc9525cc1"
+    },
+    {
+      "file": "tpchavoc_sf001_datafusion_sql_20260826_165844_721d2f5e.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.01,
+      "timestamp": "2026-08-26T16:58:44.820565",
+      "query_count": 618,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "a543cccc18240a89262eb0ebe61d81ed437ab489d4d382fdc19f11dc420562f9"
+    },
+    {
+      "file": "tpchavoc_sf01_datafusion_sql_20260826_165901_6b5bd124.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.1,
+      "timestamp": "2026-08-26T16:59:01.933123",
+      "query_count": 618,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "c2fba5bc145e57f0c467bfcb2eb5b6def0122871a4562d2bd39bb6ff8e8f76a9"
+    },
+    {
+      "file": "tpchavoc_sf1_datafusion_sql_20260825_174039_28733b91.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-25T17:40:39.075571",
+      "query_count": 618,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "2dd6fca15f82568597bd6eed6b5acbedb61681835470d30b51a70ef6642460d9"
+    },
+    {
+      "file": "tpchavoc_sf001_duckdb_sql_20260826_163147_d96baca2.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-08-26T16:31:47.673913",
+      "query_count": 660,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "b56deaa6c3b46f549e5519149f29b4d6b690c75761ff907df50bb92737270d2e"
+    },
+    {
+      "file": "tpchavoc_sf01_duckdb_sql_20260826_163204_98d64133.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-08-26T16:32:04.755171",
+      "query_count": 660,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "03a653f9d112ef455535443f9e1d705105d6b09b4e029cbeef164a5cf8778067"
+    },
+    {
+      "file": "tpchavoc_sf1_duckdb_sql_20260826_163310_7d7aeb6f.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-08-26T16:33:10.076028",
+      "query_count": 660,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "ec4eb69756aef8dd7fc8434c1ba341c4fed1aa702bd0c81ae73ec1a8ce8478b5"
     }
   ],
   "cohorts": {
@@ -2655,6 +3240,31 @@
       "Polars v1.40.0",
       "SQLite v3.53.1"
     ],
+    "datavault@sf0.01": [
+      "ClickHouse Local",
+      "DataFusion v53.0.0",
+      "DuckDB v1.3.2"
+    ],
+    "datavault@sf0.1": [
+      "ClickHouse Local",
+      "DataFusion v53.0.0",
+      "DuckDB v1.3.2"
+    ],
+    "flightdata@sf0.01": [
+      "ClickHouse Local",
+      "DataFusion v53.0.0",
+      "DuckDB v1.3.2"
+    ],
+    "flightdata@sf0.1": [
+      "ClickHouse Local",
+      "DataFusion v53.0.0",
+      "DuckDB v1.3.2"
+    ],
+    "flightdata@sf1.0": [
+      "ClickHouse Local",
+      "DataFusion v53.0.0",
+      "DuckDB v1.3.2"
+    ],
     "h2odb@sf0.01": [
       "ClickHouse Local",
       "DataFusion v53.0.0",
@@ -2685,6 +3295,21 @@
       "DuckDB v1.3.2",
       "Polars v1.40.0",
       "SQLite v3.53.1"
+    ],
+    "nyctaxi@sf0.01": [
+      "ClickHouse Local",
+      "DataFusion v53.0.0",
+      "DuckDB v1.3.2"
+    ],
+    "nyctaxi@sf0.1": [
+      "ClickHouse Local",
+      "DataFusion v53.0.0",
+      "DuckDB v1.3.2"
+    ],
+    "nyctaxi@sf1.0": [
+      "ClickHouse Local",
+      "DataFusion v53.0.0",
+      "DuckDB v1.3.2"
     ],
     "read_primitives@sf0.01": [
       "ClickHouse Local",
@@ -2735,6 +3360,21 @@
       "DuckDB v1.5.5",
       "DuckDB v1.6.0.dev365"
     ],
+    "tpcdi@sf0.01": [
+      "ClickHouse Local",
+      "DataFusion v53.0.0",
+      "DuckDB v1.3.2"
+    ],
+    "tpcdi@sf0.1": [
+      "ClickHouse Local",
+      "DataFusion v53.0.0",
+      "DuckDB v1.3.2"
+    ],
+    "tpcdi@sf1.0": [
+      "ClickHouse Local",
+      "DataFusion v53.0.0",
+      "DuckDB v1.3.2"
+    ],
     "tpcds@sf1.0": [
       "ClickHouse Local",
       "DataFusion v53.0.0",
@@ -2754,6 +3394,11 @@
       "DuckDB v1.5.5",
       "DuckDB v1.6.0.dev365",
       "Spark v4.1.1"
+    ],
+    "tpcds_obt@sf1.0": [
+      "ClickHouse Local",
+      "DataFusion v53.0.0",
+      "DuckDB v1.3.2"
     ],
     "tpch@sf0.01": [
       "CedarDB",
@@ -2817,28 +3462,49 @@
       "DuckDB v1.3.2",
       "Polars v1.40.0",
       "SQLite v3.53.1"
+    ],
+    "tpchavoc@sf0.01": [
+      "ClickHouse Local",
+      "DataFusion v53.0.0",
+      "DuckDB v1.3.2"
+    ],
+    "tpchavoc@sf0.1": [
+      "ClickHouse Local",
+      "DataFusion v53.0.0",
+      "DuckDB v1.3.2"
+    ],
+    "tpchavoc@sf1.0": [
+      "ClickHouse Local",
+      "DataFusion v53.0.0",
+      "DuckDB v1.3.2"
     ]
   },
   "summary": {
-    "total_bundles": 199,
+    "total_bundles": 244,
     "by_benchmark": {
       "amplab": 19,
       "clickbench": 14,
       "coffeeshop": 17,
+      "datavault": 6,
+      "flightdata": 9,
       "h2odb": 18,
       "joinorder": 6,
+      "nyctaxi": 9,
       "read_primitives": 12,
       "ssb": 32,
+      "tpcdi": 9,
       "tpcds": 22,
+      "tpcds_obt": 3,
       "tpch": 44,
-      "tpch_skew": 15
+      "tpch_skew": 15,
+      "tpchavoc": 9
     },
     "by_platform": {
       "CedarDB": 1,
-      "ClickHouse Local": 23,
+      "ClickHouse Local": 38,
       "ClickHouse Server": 1,
-      "DataFusion": 30,
-      "DuckDB": 65,
+      "DataFusion": 45,
+      "DuckDB": 80,
       "DuckLake": 1,
       "LakeSail": 1,
       "Pandas": 17,
@@ -2849,10 +3515,10 @@
       "StarRocks": 1
     },
     "by_trust_label": {
-      "maintainer-run": 199
+      "maintainer-run": 244
     },
     "by_funding": {
-      "unspecified": 199
+      "unspecified": 244
     }
   }
 }
