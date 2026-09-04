@@ -1,46 +1,110 @@
 name: Publication Control Plane Deployment
 
+# Dispatch-only during soak: docs.yml still owns release-push deployment.
 "on":
-  push:
-    branches: [release]
-    paths:
-      - "results-data/**"
-      - "results-explorer/**"
-      - "_project/scripts/explorer_pipeline/**"
-      - "_project/scripts/explorer_publish.py"
-      - "_project/scripts/results_explorer_snapshot_invariants.py"
-      - "scripts/publication/**"
-      - ".github/workflows/publication-deploy.yml"
-      - "docs/**"
-      - "pyproject.toml"
-      - "Makefile"
   workflow_dispatch:
     inputs:
+      develop_sha:
+        description: "Pinned develop commit SHA (40 hex)"
+        required: true
+        type: string
+      published_results_sha:
+        description: "Pinned published-results commit SHA (40 hex)"
+        required: true
+        type: string
+      generation:
+        description: "Optional immutable generation label; defaults to the run ID"
+        required: false
+        default: ""
+        type: string
+      prior_live_receipt_id:
+        description: "Prior attested live receipt ID, if this supersedes one"
+        required: false
+        default: ""
+        type: string
       expect_noop:
-        description: "Verify pre-deploy candidate against baseline (assert no unexpected mutation occurs)"
+        description: "Rehearse against the baseline without a Pages write"
         type: boolean
         default: false
       force_rollback:
-        description: "Force automated rollback drill execution"
+        description: "Exercise rollback using a prior attested artifact"
         type: boolean
         default: false
       rollback_target_sha:
-        description: "Specific target commit SHA for rollback (optional, defaults to baseline)"
+        description: "Deprecated: rollback selects an attested artifact, never a branch SHA"
         type: string
         default: ""
 
 permissions:
   contents: read
 
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
 jobs:
   build:
-    name: Build Publication Artifacts & Candidate Pre-check
+    name: Build atomic publication artifact
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      generation: ${{ steps.inputs.outputs.generation }}
+      develop_sha: ${{ steps.inputs.outputs.develop_sha }}
+      published_results_sha: ${{ steps.inputs.outputs.published_results_sha }}
+      manifest_digest: ${{ steps.receipt.outputs.manifest_digest }}
+      assembly_digest: ${{ steps.receipt.outputs.assembly_digest }}
+      database_digest: ${{ steps.receipt.outputs.database_digest }}
+      explorer_digest: ${{ steps.receipt.outputs.explorer_digest }}
+      docs_digest: ${{ steps.receipt.outputs.docs_digest }}
+      site_artifact: ${{ steps.inputs.outputs.site_artifact }}
     steps:
-      - name: Checkout repository
+      - name: Checkout control-plane source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate pinned dispatch inputs
+        id: inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEVELOP_SHA="${{ inputs.develop_sha }}"
+          PUBLISHED_RESULTS_SHA="${{ inputs.published_results_sha }}"
+          GENERATION="${{ inputs.generation }}"
+          for value in "$DEVELOP_SHA" "$PUBLISHED_RESULTS_SHA"; do
+            printf '%s' "$value" | grep -qE '^[0-9a-f]{40}$' || {
+              echo "::error::dispatch SHAs must be lowercase 40-hex commits"
+              exit 1
+            }
+            git cat-file -e "$value^{commit}" || {
+              echo "::error::pinned commit is not available: $value"
+              exit 1
+            }
+          done
+          if [ -z "$GENERATION" ]; then
+            GENERATION="publication-${{ github.run_id }}-${{ github.run_attempt }}"
+          fi
+          printf '%s' "$GENERATION" | grep -qE '^[a-z0-9-]{1,80}$' || {
+            echo "::error::generation must match [a-z0-9-]{1,80}"
+            exit 1
+          }
+          {
+            echo "generation=$GENERATION"
+            echo "develop_sha=$DEVELOP_SHA"
+            echo "published_results_sha=$PUBLISHED_RESULTS_SHA"
+            echo "site_artifact=publication-site-$GENERATION"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Materialize pinned control plane and corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach "${{ steps.inputs.outputs.develop_sha }}"
+          rm -rf results-data
+          mkdir results-data
+          git archive "${{ steps.inputs.outputs.published_results_sha }}" results-data | tar -x
+          test -d results-data/bundles
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -50,7 +114,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: uv sync --group dev
 
       - name: Set up Node.js
@@ -60,121 +124,133 @@ jobs:
           cache: npm
           cache-dependency-path: results-explorer/package-lock.json
 
-      - name: Install explorer dependencies
+      - name: Install Explorer dependencies
         run: npm ci
         working-directory: results-explorer
 
-      - name: Build explorer snapshot data
+      - name: Build Explorer corpus database
         run: |
-          mkdir -p results-explorer/public/data
           uv run python _project/scripts/explorer_publish.py build \
-            --data-dir results-data \
-            --output results-explorer/public/data
-
-      - name: Validate snapshot invariants
-        run: |
-          if [ ! -f "results-explorer/public/data/results.duckdb" ]; then
-            echo "::error::results-explorer/public/data/results.duckdb is missing after explorer_publish build"
+            --data-dir results-data --output results-explorer/public/data
+          test -s results-explorer/public/data/results.duckdb || {
+            echo "::error::results.duckdb is missing after explorer_publish build"
             exit 1
-          fi
+          }
           uv run python _project/scripts/results_explorer_snapshot_invariants.py \
             results-explorer/public/data/results.duckdb
 
-      - name: Build static publication site
+      - name: Build Explorer application
         run: npm run build
         working-directory: results-explorer
 
-      - name: Generate candidate publication receipt
+      - name: Build documentation
+        run: |
+          cd docs
+          uv run sphinx-build -b html --keep-going . _build/html
+
+      - name: Assemble and validate whole-site artifact
+        run: |
+          uv run python scripts/assemble_public_site.py --site-dir site
+          test -s site/results/data/results.duckdb || {
+            echo "::error::atomic site artifact is missing results.duckdb"
+            exit 1
+          }
+          uv run python scripts/publication/check_artifact_privacy.py site
+
+      - name: Write desired and assembly receipts
         id: receipt
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p site-dist receipt-dist
-          cp -r results-explorer/dist/* site-dist/
-          mkdir -p site-dist/results/data
-          if [ -d "results-explorer/public/data" ]; then
-            cp -r results-explorer/public/data/* site-dist/results/data/
-          fi
-
-          DB_SHA=""
-          if [ -f "site-dist/results/data/results.duckdb" ]; then
-            DB_SHA=$(sha256sum site-dist/results/data/results.duckdb | cut -d ' ' -f 1)
-          fi
-
+          mkdir -p receipt-dist
+          GENERATION="${{ steps.inputs.outputs.generation }}"
+          DEVELOP_SHA="${{ steps.inputs.outputs.develop_sha }}"
+          PUBLISHED_RESULTS_SHA="${{ steps.inputs.outputs.published_results_sha }}"
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          RECEIPT_FILE="receipt-dist/publication-receipt.json"
-
-          cat <<EOF > "$RECEIPT_FILE"
-          {
-            "schema_version": 1,
-            "sha": "${{ github.sha }}",
-            "ref": "${{ github.ref }}",
-            "timestamp": "$TIMESTAMP",
-            "database_sha256": "$DB_SHA",
-            "checksums": {
-              "/results/data/results.duckdb": "$DB_SHA"
-            }
-          }
+          MANIFEST_DIGEST=$(printf '%s' "develop=$DEVELOP_SHA|published-results=$PUBLISHED_RESULTS_SHA|target=benchbox.dev|generation=$GENERATION" | sha256sum | cut -d ' ' -f 1)
+          (cd site && find . -type f -exec sha256sum {} + | sort) > receipt-dist/site-file-digests.txt
+          SITE_DIGEST=$(sha256sum receipt-dist/site-file-digests.txt | cut -d ' ' -f 1)
+          (cd results-explorer/dist && find . -type f -exec sha256sum {} + | sort) > receipt-dist/explorer-file-digests.txt
+          EXPLORER_DIGEST=$(sha256sum receipt-dist/explorer-file-digests.txt | cut -d ' ' -f 1)
+          (cd docs/_build/html && find . -type f -exec sha256sum {} + | sort) > receipt-dist/docs-file-digests.txt
+          DOCS_DIGEST=$(sha256sum receipt-dist/docs-file-digests.txt | cut -d ' ' -f 1)
+          DATABASE_DIGEST=$(sha256sum site/results/data/results.duckdb | cut -d ' ' -f 1)
+          cat > receipt-dist/desired-manifest.json <<EOF
+          {"schema_version":1,"generation":"$GENERATION","target":"benchbox.dev","develop_sha":"$DEVELOP_SHA","published_results_sha":"$PUBLISHED_RESULTS_SHA","manifest_digest":"$MANIFEST_DIGEST","prior_live_receipt_id":"${{ inputs.prior_live_receipt_id }}","timestamp":"$TIMESTAMP"}
           EOF
+          cat > receipt-dist/assembly-receipt.json <<EOF
+          {"schema_version":1,"generation":"$GENERATION","target":"benchbox.dev","manifest_digest":"$MANIFEST_DIGEST","develop_sha":"$DEVELOP_SHA","published_results_sha":"$PUBLISHED_RESULTS_SHA","artifact_name":"${{ steps.inputs.outputs.site_artifact }}","artifact_run_id":"${{ github.run_id }}","artifacts":{"site":{"path":"/","digest":"$SITE_DIGEST"},"docs":{"path":"/docs/","digest":"$DOCS_DIGEST"},"explorer":{"path":"/results/","digest":"$EXPLORER_DIGEST"},"database":{"path":"/results/data/results.duckdb","digest":"$DATABASE_DIGEST"}},"checksums":{"/results/data/results.duckdb":"$DATABASE_DIGEST"},"timestamp":"$TIMESTAMP"}
+          EOF
+          cp receipt-dist/assembly-receipt.json receipt-dist/publication-receipt.json
+          {
+            echo "manifest_digest=$MANIFEST_DIGEST"
+            echo "assembly_digest=$SITE_DIGEST"
+            echo "database_digest=$DATABASE_DIGEST"
+            echo "explorer_digest=$EXPLORER_DIGEST"
+            echo "docs_digest=$DOCS_DIGEST"
+          } >> "$GITHUB_OUTPUT"
 
-          echo "Generated candidate deployment receipt:"
-          cat "$RECEIPT_FILE"
-
-      - name: Pre-deploy candidate verification and no-op check
-        env:
-          EXPECT_NOOP: ${{ inputs.expect_noop || false }}
+      - name: Pre-deploy candidate verification
         shell: bash
         run: |
-          NOOP_FLAG=""
-          if [ "$EXPECT_NOOP" = "true" ]; then
-            NOOP_FLAG="--expect-noop"
+          set -euo pipefail
+          if [ "${{ inputs.expect_noop }}" = "true" ]; then
+            uv run python scripts/publication/verify_live.py \
+              --candidate-manifest receipt-dist/publication-receipt.json \
+              --baseline-manifest docs/operations/publication-baseline-2026-08-31.json \
+              --pre-deploy --require-receipt --expect-noop
+          else
+            uv run python scripts/publication/verify_live.py \
+              --candidate-manifest receipt-dist/publication-receipt.json \
+              --baseline-manifest receipt-dist/publication-receipt.json \
+              --pre-deploy --require-receipt
           fi
 
-          echo "Executing pre-deploy candidate check (expect_noop=$EXPECT_NOOP)..."
-          uv run python scripts/publication/verify_live.py \
-            --candidate-manifest receipt-dist/publication-receipt.json \
-            --baseline-manifest docs/operations/publication-baseline-2026-08-31.json \
-            --pre-deploy \
-            --require-receipt \
-            $NOOP_FLAG
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
 
-      - name: Upload rehearsal site artifact
+      - name: Retain immutable site artifact for attested rollback
         uses: actions/upload-artifact@v4
         with:
-          name: publication-site-rehearsal
-          path: site-dist
-          retention-days: 7
+          name: ${{ steps.inputs.outputs.site_artifact }}
+          path: site
+          retention-days: 90
 
-      - name: Upload candidate deployment receipt
+      - name: Upload build receipts
         uses: actions/upload-artifact@v4
         with:
-          name: publication-receipt
-          path: receipt-dist/publication-receipt.json
-          retention-days: 30
+          name: publication-build-receipts-${{ steps.inputs.outputs.generation }}
+          path: receipt-dist/
+          retention-days: 90
 
   deploy:
-    name: Deploy to GitHub Pages
+    name: Deploy atomic artifact to GitHub Pages
     needs: build
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.expect_noop != true && inputs.force_rollback != true)
+    if: inputs.expect_noop != true && inputs.force_rollback != true
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Rehearsal no-op (freeze G3)
-        shell: bash
-        run: |
-          echo "Freeze G3 keeps docs.yml as the sole production Pages deployer; do not deploy."
-          echo "publication-deploy.yml is a rehearsal control-plane only until G1-G5 pass."
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
 
   verify:
-    name: Verify Live Publication & Checksum Receipt
+    name: Probe live routes and issue attested receipt
     needs: [build, deploy]
+    if: needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -184,85 +260,243 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
-      - name: Download deployment receipt
+      - name: Download build receipts
         uses: actions/download-artifact@v4
         with:
-          name: publication-receipt
-          path: ./downloaded-receipt
+          name: publication-build-receipts-${{ needs.build.outputs.generation }}
+          path: receipt-dist
 
-      - name: Run live verification probe
-        env:
-          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
-        shell: bash
-        run: |
-          RECEIPT_PATH="./downloaded-receipt/publication-receipt.json"
-          TARGET_URL="${PAGE_URL:-https://benchbox.dev}"
-
-          echo "Verifying live publication at: $TARGET_URL"
-          uv run python scripts/publication/verify_live.py \
-            --base-url "$TARGET_URL" \
-            --manifest "$RECEIPT_PATH" \
-            --require-receipt \
-            --timeout 60
-
-  rollback:
-    name: Immutable CAS Artifact Rollback Drill / Mitigation
-    needs: [build, deploy, verify]
-    if: always() && (needs.deploy.result == 'failure' || needs.verify.result == 'failure' || (github.event_name == 'workflow_dispatch' && inputs.force_rollback == true))
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Log rollback trigger context
-        shell: bash
-        run: |
-          echo "::error::Publication deployment or verification failed; recording freeze-blocked rollback receipt (no Pages write)."
-          echo "Build status: ${{ needs.build.result }}"
-          echo "Deploy status: ${{ needs.deploy.result }}"
-          echo "Verify status: ${{ needs.verify.result }}"
-          echo "Force rollback requested: ${{ inputs.force_rollback || false }}"
-
-      - name: Write facts-only rollback receipt
-        id: rollback-stage
+      - name: Probe required live routes
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p rollback-receipt-dist
+          uv run python scripts/publication/verify_live.py \
+            --base-url "${{ needs.deploy.outputs.page_url }}" \
+            --manifest receipt-dist/publication-receipt.json \
+            --require-receipt --timeout 60 --json > receipt-dist/live-probe-report.json
 
-          BASELINE_FILE="docs/operations/publication-baseline-2026-08-31.json"
-          TARGET_SHA=""
-          EXPECTED_DB_SHA=""
-          if [ -f "$BASELINE_FILE" ]; then
-            TARGET_SHA=$(python3 -c "import json; data=json.load(open('$BASELINE_FILE')); print(data.get('branches', {}).get('release', {}).get('sha', ''))")
-            EXPECTED_DB_SHA=$(python3 -c "import json; data=json.load(open('$BASELINE_FILE')); print(data.get('live_database', {}).get('sha256', ''))")
-          fi
+      - name: Record provider deployment acknowledgement
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp receipt-dist/assembly-receipt.json receipt-dist/deployment-receipt.json
+          python3 - <<'PY'
+          import json
+          path = 'receipt-dist/deployment-receipt.json'
+          receipt = json.load(open(path))
+          receipt.update({'deployment_id': '${{ github.run_id }}-${{ github.run_attempt }}', 'page_url': '${{ needs.deploy.outputs.page_url }}', 'status': 'DEPLOYED'})
+          open(path, 'w').write(json.dumps(receipt, sort_keys=True) + '\\n')
+          PY
 
-          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          RECEIPT_FILE="rollback-receipt-dist/rollback-receipt.json"
-
-          cat <<EOF > "$RECEIPT_FILE"
-          {
-            "schema_version": 1,
-            "action": "freeze_blocked_rollback_receipt",
-            "pinned_baseline_release_sha": "$TARGET_SHA",
-            "attested_database_sha256": "$EXPECTED_DB_SHA",
-            "timestamp": "$TIMESTAMP",
-            "reason": "deploy_or_verification_failure",
-            "freeze_still_blocked": true,
-            "pages_deploy_attempted": false,
-            "sole_production_pages_deployer": "docs.yml"
+      - name: Create and sign live receipt
+        env:
+          PUBLICATION_ATTESTOR_PRIVATE_KEY: ${{ secrets.PUBLICATION_ATTESTOR_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PUBLICATION_ATTESTOR_PRIVATE_KEY" || {
+            echo "::error::PUBLICATION_ATTESTOR_PRIVATE_KEY is required to attest a live deployment"
+            exit 1
           }
-          EOF
+          python3 - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          assembly = json.load(open('receipt-dist/assembly-receipt.json'))
+          probes = json.load(open('receipt-dist/live-probe-report.json'))['probes']
+          receipt = dict(assembly)
+          receipt.update({
+              'receipt_id': 'live-${{ needs.build.outputs.generation }}-${{ github.run_id }}',
+              'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+              'routes': probes,
+              'nonce': '${{ github.run_id }}-${{ github.run_attempt }}',
+              'freshness_window': '24h',
+              'attestor': 'github-actions:publication-deploy',
+              'attestor_key_id': 'publication-attestor-ed25519-2026-09-04',
+              'signature_algorithm': 'ed25519',
+              'prior_live_receipt_id': '${{ inputs.prior_live_receipt_id }}' or None,
+          })
+          open('receipt-dist/live-receipt.json', 'w').write(json.dumps(receipt, sort_keys=True) + '\\n')
+          PY
+          umask 077
+          printf '%s' "$PUBLICATION_ATTESTOR_PRIVATE_KEY" > /tmp/publication-attestor-private-key.pem
+          uv run python - <<'PY'
+          import json
+          from scripts.publication.reconciliation import canonical_live_receipt_payload
+          receipt = json.load(open('receipt-dist/live-receipt.json'))
+          open('/tmp/live-receipt-payload.json', 'wb').write(canonical_live_receipt_payload(receipt))
+          PY
+          openssl pkeyutl -sign -rawin -inkey /tmp/publication-attestor-private-key.pem -in /tmp/live-receipt-payload.json -out /tmp/live-receipt.sig
+          SIGNATURE=$(base64 -w 0 /tmp/live-receipt.sig)
+          rm -f /tmp/publication-attestor-private-key.pem /tmp/live-receipt-payload.json /tmp/live-receipt.sig
+          python3 - <<PY
+          import json
+          path = 'receipt-dist/live-receipt.json'
+          receipt = json.load(open(path))
+          receipt['signature'] = '$SIGNATURE'
+          open(path, 'w').write(json.dumps(receipt, sort_keys=True) + '\\n')
+          PY
+          uv run python - <<'PY'
+          import json
+          from scripts.publication.reconciliation import verify_live_receipt_signature
+          valid, reason = verify_live_receipt_signature(json.load(open('receipt-dist/live-receipt.json')))
+          assert valid, reason
+          PY
 
-          echo "Generated freeze-blocked rollback receipt:"
-          cat "$RECEIPT_FILE"
+      - name: Upload attested live receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: publication-live-receipt-${{ needs.build.outputs.generation }}
+          path: receipt-dist/
+          retention-days: 90
+
+  rollback:
+    name: Roll back to last known-good attested artifact
+    needs: [build, deploy, verify]
+    if: >-
+      always() && needs.build.result == 'success' && (
+        needs.deploy.result == 'failure' || needs.verify.result == 'failure' ||
+        (github.event_name == 'workflow_dispatch' && inputs.force_rollback == true)
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Resolve last known-good attested receipt
+        id: known_good
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p known-good-receipt
+          gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("publication-live-receipt-")) | "\(.id) \(.workflow_run.id)"' > candidates.txt
+          while read -r ARTIFACT_ID RUN_ID; do
+            [ -n "${ARTIFACT_ID:-}" ] || continue
+            rm -rf candidate && mkdir candidate
+            gh api "repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip" > candidate.zip
+            unzip -q candidate.zip -d candidate
+            if uv run python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.publication.reconciliation import verify_live_receipt_signature
+          p = Path('candidate/live-receipt.json')
+          if not p.is_file(): raise SystemExit(1)
+          receipt = json.loads(p.read_text())
+          valid, _ = verify_live_receipt_signature(receipt)
+          if not valid or receipt.get('target') != 'benchbox.dev': raise SystemExit(1)
+          assembly = json.loads(Path('candidate/assembly-receipt.json').read_text())
+          assert assembly.get('artifact_name') and assembly.get('artifact_run_id')
+          PY
+            then
+              ARTIFACT_NAME=$(uv run python -c "import json; print(json.load(open('candidate/assembly-receipt.json'))['artifact_name'])")
+              ARTIFACT_RUN_ID=$(uv run python -c "import json; print(json.load(open('candidate/assembly-receipt.json'))['artifact_run_id'])")
+              cp -R candidate/. known-good-receipt/
+              echo "artifact_name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
+              echo "artifact_run_id=$ARTIFACT_RUN_ID" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done < candidates.txt
+          echo "::error::no cryptographically attested, unexpired rollback artifact is available"
+          exit 1
+
+      - name: Download and verify known-good site artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "${{ steps.known_good.outputs.artifact_run_id }}" --name "${{ steps.known_good.outputs.artifact_name }}" --dir restored-site
+          EXPECTED=$(uv run python -c "import json; print(json.load(open('known-good-receipt/assembly-receipt.json'))['artifacts']['site']['digest'])")
+          (cd restored-site && find . -type f -exec sha256sum {} + | sort) > restored-site-file-digests.txt
+          ACTUAL=$(sha256sum restored-site-file-digests.txt | cut -d ' ' -f 1)
+          [ "$ACTUAL" = "$EXPECTED" ] || { echo "::error::known-good artifact digest mismatch; refusing rollback"; exit 1; }
+          test -s restored-site/results/data/results.duckdb
+
+      - name: Upload attested rollback Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: restored-site
+
+      - name: Deploy attested rollback artifact to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Probe restored required live routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run python scripts/publication/verify_live.py --base-url "${{ steps.deployment.outputs.page_url }}" --manifest known-good-receipt/live-receipt.json --require-receipt --timeout 60 --json > known-good-receipt/rollback-probe-report.json
+
+      - name: Create and sign rollback live receipt
+        env:
+          PUBLICATION_ATTESTOR_PRIVATE_KEY: ${{ secrets.PUBLICATION_ATTESTOR_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PUBLICATION_ATTESTOR_PRIVATE_KEY" || {
+            echo "::error::PUBLICATION_ATTESTOR_PRIVATE_KEY is required to attest rollback"
+            exit 1
+          }
+          python3 - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          prior = json.load(open('known-good-receipt/live-receipt.json'))
+          probes = json.load(open('known-good-receipt/rollback-probe-report.json'))['probes']
+          receipt = dict(prior)
+          receipt.update({
+              'receipt_id': 'rollback-${{ github.run_id }}-${{ github.run_attempt }}',
+              'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+              'routes': probes,
+              'nonce': '${{ github.run_id }}-${{ github.run_attempt }}',
+              'prior_live_receipt_id': prior['receipt_id'],
+          })
+          receipt.pop('signature', None)
+          open('known-good-receipt/rollback-live-receipt.json', 'w').write(json.dumps(receipt, sort_keys=True) + '\\n')
+          PY
+          umask 077
+          printf '%s' "$PUBLICATION_ATTESTOR_PRIVATE_KEY" > /tmp/publication-attestor-private-key.pem
+          uv run python - <<'PY'
+          import json
+          from scripts.publication.reconciliation import canonical_live_receipt_payload
+          receipt = json.load(open('known-good-receipt/rollback-live-receipt.json'))
+          open('/tmp/rollback-live-receipt-payload.json', 'wb').write(canonical_live_receipt_payload(receipt))
+          PY
+          openssl pkeyutl -sign -rawin -inkey /tmp/publication-attestor-private-key.pem -in /tmp/rollback-live-receipt-payload.json -out /tmp/rollback-live-receipt.sig
+          SIGNATURE=$(base64 -w 0 /tmp/rollback-live-receipt.sig)
+          rm -f /tmp/publication-attestor-private-key.pem /tmp/rollback-live-receipt-payload.json /tmp/rollback-live-receipt.sig
+          python3 - <<PY
+          import json
+          path = 'known-good-receipt/rollback-live-receipt.json'
+          receipt = json.load(open(path))
+          receipt['signature'] = '$SIGNATURE'
+          open(path, 'w').write(json.dumps(receipt, sort_keys=True) + '\\n')
+          PY
+          uv run python - <<'PY'
+          import json
+          from scripts.publication.reconciliation import verify_live_receipt_signature
+          valid, reason = verify_live_receipt_signature(json.load(open('known-good-receipt/rollback-live-receipt.json')))
+          assert valid, reason
+          PY
 
       - name: Upload rollback audit receipt
         uses: actions/upload-artifact@v4
         with:
-          name: rollback-receipt
-          path: rollback-receipt-dist/rollback-receipt.json
+          name: publication-rollback-${{ github.run_id }}
+          path: known-good-receipt/
           retention-days: 90
