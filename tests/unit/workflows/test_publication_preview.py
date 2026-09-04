@@ -148,6 +148,20 @@ def test_soak_verdict_discipline() -> None:
     assert "verify_live.py" in text
 
 
+def test_soak_conclude_reuses_probe_run_id() -> None:
+    """The receipt job must not search runs by dispatch title.
+
+    Dispatch titles are the workflow name, never the generation, so a
+    title search yields null and the artifact fetch 404s (observed on the
+    first gen1 conclude dispatch). The probe resolves the deploy run once;
+    conclude consumes its run_id fail-closed.
+    """
+    text = SOAK_PATH.read_text(encoding="utf-8")
+    assert "displayTitle" not in text, "no run may be resolved by dispatch title"
+    assert "needs.probe.outputs.run_id" in text
+    assert "probe did not resolve a deploy run" in text
+
+
 def test_preview_workflows_are_soundness_paths() -> None:
     assert ".github/workflows/publication-preview-deploy.yml" in _soundness.SOUNDNESS_FILES
     assert ".github/workflows/publication-preview-soak.yml" in _soundness.SOUNDNESS_FILES

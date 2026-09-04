@@ -48,6 +48,7 @@ jobs:
       actions: read
     outputs:
       generation: ${{ steps.resolve.outputs.generation }}
+      run_id: ${{ steps.resolve.outputs.run_id }}
       verdict: ${{ steps.probe.outputs.verdict }}
     steps:
       - uses: actions/checkout@v4
@@ -69,18 +70,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          GENERATION="${{ inputs.generation }}"
-          if [ -z "$GENERATION" ]; then
-            RUN_ID=$(gh run list --workflow=publication-preview-deploy.yml \
-              --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
-            if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
-              echo "::error::no successful preview-deploy run found; dispatch the deployer first"
-              exit 1
-            fi
-          else
-            RUN_ID=$(gh run list --workflow=publication-preview-deploy.yml \
-              --status=success --limit=20 --json databaseId,displayTitle \
-              --jq "[.[] | select(.displayTitle | contains(\"$GENERATION\"))][0].databaseId")
+          WANT_GENERATION="${{ inputs.generation }}"
+          # Dispatch titles are the workflow name, never the generation, so a
+          # title search can never resolve a run (it yields null and the
+          # artifact fetch 404s). Resolve the latest successful deploy and,
+          # when a generation was requested, prove the record matches it.
+          RUN_ID=$(gh run list --workflow=publication-preview-deploy.yml \
+            --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "::error::no successful preview-deploy run found; dispatch the deployer first"
+            exit 1
           fi
           rm -rf deploy-record && mkdir -p deploy-record
           NAME=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts" \
@@ -92,7 +91,12 @@ jobs:
           gh run download "$RUN_ID" --name "$NAME" --dir deploy-record
           GENERATION=$(uv run -- python -c \
             "import json; print(json.load(open('deploy-record/soak-state.json'))['generation'])")
+          if [ -n "$WANT_GENERATION" ] && [ "$GENERATION" != "$WANT_GENERATION" ]; then
+            echo "::error::latest deploy is generation $GENERATION, not requested $WANT_GENERATION"
+            exit 1
+          fi
           echo "generation=$GENERATION" >> "$GITHUB_OUTPUT"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
           echo "probing generation $GENERATION from run $RUN_ID"
 
       - name: Build probe manifests from deploy record
@@ -240,12 +244,18 @@ jobs:
             echo "::error::current probe is ${{ needs.probe.outputs.verdict }}, not PASS; no receipt"
             exit 1
           fi
-          RUN_ID=$(gh run list --workflow=publication-preview-deploy.yml \
-            --status=success --limit=20 --json databaseId,displayTitle \
-            --jq "[.[] | select(.displayTitle | contains(\"$GENERATION\"))][0].databaseId")
+          RUN_ID="${{ needs.probe.outputs.run_id }}"
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::probe did not resolve a deploy run; refusing receipt"
+            exit 1
+          fi
           rm -rf rec && mkdir -p rec
           NAME=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts" \
             --jq '[.artifacts[].name | select(startswith("preview-deploy-record-"))][0]')
+          if [ -z "$NAME" ] || [ "$NAME" = "null" ]; then
+            echo "::error::no preview-deploy-record artifact on run $RUN_ID"
+            exit 1
+          fi
           gh run download "$RUN_ID" --name "$NAME" --dir rec
           echo "generation=$GENERATION run=$RUN_ID"
           SOAK_START=$(uv run -- python -c \
