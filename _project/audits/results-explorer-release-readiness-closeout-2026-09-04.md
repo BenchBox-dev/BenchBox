@@ -2,7 +2,7 @@
 develop_sha: c44fdfc457886d9340b75d86ecb6e29796fdbb98
 measured_at_sha: fc6dd5958b1deffa468e01852a392a29585d11eb
 checked_sha: fc6dd5958b1deffa468e01852a392a29585d11eb
-integrated_reviewed_sha: 06ede89eca3c5b1b7722cf3f7af16b3beb411f6e
+integrated_reviewed_sha: 066ba7cc02c6785c85086146639af9ddeec9d28a
 ---
 
 # Results Explorer release-readiness closeout — 2026-09-04
@@ -27,7 +27,7 @@ promote those browsers to blocking coverage.
 
 | Surface | Current evidence |
 |---|---|
-| Integrated/reviewed report head | `git rev-parse HEAD` = `06ede89eca3c5b1b7722cf3f7af16b3beb411f6e`; branch `feat/explorer-evidence-closeout`; this is the integrated closeout content reviewed by this report. |
+| Integrated/reviewed report head | `git rev-parse HEAD` = `066ba7cc02c6785c85086146639af9ddeec9d28a`; the integration head containing these closeout and certification audit artifacts. It is a content/provenance pin, not a measurement run. |
 | Measured evidence tree | `measured_at_sha`/`checked_sha` = `fc6dd5958b1deffa468e01852a392a29585d11eb`; the measurements and certification evidence were run against this historical tree. |
 | Develop | `git rev-parse origin/develop` = `c44fdfc457886d9340b75d86ecb6e29796fdbb98`; this report's `develop_sha` is that exact 40-character value. |
 | Launch | PR #1933 / v0.4.0 launch is already landed; `https://benchbox.dev/results/` was live in the independent certification. |
@@ -63,7 +63,15 @@ including the grouped 2.18b entry:
 | N1 | 2.5 publisher URI, dedup, and companion handling passed review |
 | N2 | 2.7 PR-controlled validator self-green risk |
 | N3 | 2.11 stale `make validate-imports` target |
-| N4 | 2.18b grouped doc drifts; 2.19 naming collision; 2.20 trust vocabulary; 2.21 empty TrustBadge; 2.22 test-directory naming |
+| N4.1a | 2.18b strategy drift |
+| N4.1b | 2.18b workflow-trigger drift |
+| N4.1c | 2.18b token-scan drift |
+| N4.1d | 2.18b ruleset drift |
+| N4.1e | 2.18b runbook drift |
+| N4.2 | 2.19 publish naming collision |
+| N4.3 | 2.20 trust vocabulary |
+| N4.4 | 2.21 empty TrustBadge |
+| N4.5 | 2.22 test-directory naming |
 
 The original adversarial report remains immutable. Historical claims are not
 treated as current evidence unless the matrix below cites a current source,
@@ -83,7 +91,7 @@ test, or the independent certification.
 | **D8** — 2.10 | `remediate-ci-required-gate-integrity` | PR #962 / `f28a15ffa` | `.github/workflows/docs.yml:97-118`; `Makefile:494` | Snapshot-invariant script and docs workflow gate are present | Live certification independently recomputed deployed metrics; next v10 publish must rerun the gate | P2 | fixed |
 | **D9** — 2.12 | `remediate-prune-publishing-doc-hazard` | PR #961 / `c4e72e7fd` | `docs/design/future-state/prune-publishing-subsystem/README.md:3-24` | Source/doc inspection | Rendered doc now labels the proposal completed and says not to delete live publish code | P1 | fixed |
 | **D10** — 2.13 | `remediate-explorer-deploy-path-reconciliation` | PR #1679 / `c78db2e37` | `.github/workflows/docs.yml:3-17,79-118`; release curation in `Makefile:1080-1118` | Workflow/source contract inspection | Live Pages pair was observed by certification; it is consistent but stale against v10 source | P2 | accepted with owner Explorer publication; expiry/review before the next UI deploy (2026-09-18) |
-| **D11** — 2.14 | `remediate-explorer-deploy-path-reconciliation` | PR #993 lineage; `c78db2e37` | `CONTRIBUTING.md:44`; current develop tree | Branch-presence and audit-SHA checks | Current default is develop and contains referenced paths; release branch curation remains a separate documented boundary | P2 | superseded with evidence: default-branch premise no longer holds |
+| **D11** — 2.14 | `remediate-explorer-deploy-path-reconciliation` | PR #993 lineage; `c78db2e37` | `CONTRIBUTING.md:44`; `origin/develop:.github/workflows/docs.yml`; `origin/develop:.github/workflows/results-explorer-browser.yml`; `_project/audits/results-explorer-evidence/d11-live-evidence-2026-09-04.txt` | Read-only `git ls-tree` confirmed all three named develop paths and the related ADR/token-scan/admin/runbook paths | Retained live reads report default branch `develop`; the `main` branch endpoint returns branch `release`, commit `4ad1d727903328702c93abf139902cee42dc3890`, and `/tree/main` renders with status 200 at `/tree/release` | P2 | superseded with evidence: the live default branch is `develop` and the requested `/tree/main` rendering resolves to `release`, so the original default-main premise does not hold |
 | **D12** — 2.15 | `remediate-governance-and-doc-drift` | Current ADR/doc remediation is present on `fc6dd5958` | `docs/development/adr/adr-published-results-slim-corpus-branch.md`; `.github/workflows/sync-results-data-to-published.yml` | Published-results workflow/allowlist tests | No live branch mutation | P2 | fixed |
 | **D13** — 2.16 | `remediate-governance-and-doc-drift` | PR #996 / `0c1f671e3` | `docs/operations/results-explorer-qa.md:192-212,490-515` | QA-plan contract is source-readable | Current plan names the next unused pass and keeps screenshots/logs out of Git | P2 | fixed |
 | **D14** — 2.17 | `remediate-qa-and-browser-test-doc-accuracy` | PR #964 / `c3155c16a` | `docs/operations/results-explorer-qa.md:446-451` | Query route test pins read-only rejection; Python/browser contract suites | Independent Chromium certification passed worker CSP and the read-only runtime sample | P3 | fixed |
@@ -92,7 +100,15 @@ test, or the independent certification.
 | **N1** — 2.5 | None; non-defect historical control | None | `benchbox/core/publishing/store.py`; `benchbox/validation/bundle.py:551-617` | Static safety review and validator tests | No traversal/dedup defect reproduced; certification privacy scan passed | P3 | superseded with evidence: original control passed and remains bounded |
 | **N2** — 2.7 | `remediate-submission-trust-label-enforcement` | `033806e4d` / current trusted-base workflow | `.github/workflows/validate-submission.yml:25-145` | Workflow contract tests | No fork PR run here; source now executes validators from trusted base and rejects unauthorized validator changes | P3 | fixed |
 | **N3** — 2.11 | `remediate-ci-required-gate-integrity` | PR #962 / `f28a15ffa` | `Makefile:950` | Make target resolves to `lint-imports`; source check | No deployment relevance | P3 | fixed |
-| **N4** — 2.18b, 2.19–2.22 | `remediate-governance-and-doc-drift`; `remediate-explorer-trust-label-vocabulary` | PRs #964, #974; current source at `fc6dd5958` | QA/ADR/token-scan/admin/runbook docs; `TrustBadge.tsx:1-128`; test paths | Source and focused test coverage; current suite reached 1,272 passing Vitest tests before two timeouts | Rendered/live certification supports the trust badge and route contract; Firefox/WebKit remain advisory samples | P3 | fixed with accepted coverage limits noted |
+| **N4.1a** — 2.18b strategy evidence | `remediate-governance-and-doc-drift` | current integration tree | `docs/development/benchbox-results-platform-strategy.md:481-484` names `exporter.py`, `bundle_publisher.py`, and `store.py`, and identifies the deleted prototype as historical | Current-source inspection | No rendered evidence required for this documentation correction | P3 | fixed |
+| **N4.1b** — 2.18b workflow triggers | `remediate-governance-and-doc-drift` | current integration tree | `.github/workflows/docs.yml:3-23`; `.github/workflows/results-explorer-browser.yml:3-28`; `docs/development/results-explorer-browser-testing.md:67-79` | Current-source inspection | No live workflow run was claimed | P3 | fixed |
+| **N4.1c** — 2.18b token-scan job set | `remediate-governance-and-doc-drift` | current integration tree | `docs/operations/results-explorer-token-scan.md:121-137` includes `medium-test`; `.github/workflows/develop-post-merge.yml:512-524` defines the four expected jobs | Current-source inspection | No live post-merge run was claimed | P3 | fixed |
+| **N4.1d** — 2.18b ruleset aggregate count | `remediate-governance-and-doc-drift` | current integration tree | `docs/operations/repo-admin-settings.md:70-75`; `.github/workflows/pr.yml:1417-1438` names the current aggregate contract | Current-source inspection | The wording no longer asserts the obsolete four-job aggregate | P3 | fixed |
+| **N4.1e** — 2.18b runbook sync/seed description | `remediate-governance-and-doc-drift` | current integration tree | `docs/operations/results-phase-2-runbook.md:37-42` still says `seed-corpus.yml` has a monthly schedule; `.github/workflows/seed-corpus.yml:1-25` shows dispatch only | Current-source inspection | The sync-validator wording is current, but the seed schedule statement remains inaccurate | P3 | accepted residual — Documentation owner must correct the seed trigger before calling this historical sub-finding fixed |
+| **N4.2** — 2.19 publish naming collision | `remediate-governance-and-doc-drift` | current integration tree | `docs/development/benchbox-results-platform-strategy.md:499-504`; `docs/reference/cli/submit.md:123-132`; D9 evidence at `docs/design/future-state/prune-publishing-subsystem/README.md:3-24` | Current-source inspection | No live/rendered evidence is needed for terminology and the former prune hazard is closed by D9 | P3 | fixed |
+| **N4.3** — 2.20 trust vocabulary | `remediate-explorer-trust-label-vocabulary` | current integration tree | `results-explorer/src/components/TrustBadge.tsx:8-17,27-74`; `results-explorer/src/components/__tests__/TrustBadge.test.tsx:104-128` | TrustBadge unit coverage explicitly iterates all publisher labels | No live/rendered evidence is claimed | P3 | fixed |
+| **N4.4** — 2.21 empty TrustBadge | `remediate-explorer-trust-label-vocabulary` | current integration tree | `results-explorer/src/components/TrustBadge.tsx:76-119`; `results-explorer/src/components/__tests__/TrustBadge.test.tsx:96-102` | Unit test requires a visible neutral `Unknown` badge for `trustLabel=""` | No live/rendered evidence is claimed | P3 | fixed |
+| **N4.5** — 2.22 test-directory naming | `remediate-governance-and-doc-drift` | current integration tree | `tests/unit/scripts/explorer_pipeline/README.md:1-20`; `tests/unit/scripts/test_explorer_build_contract.py:1-58`; `docs/development/adr/adr-explorer-cli-surface.md:230-256` | Current-source inspection of relocated test paths and migration ADR | No live/rendered evidence is needed for path naming | P3 | fixed |
 
 ## Verification record
 
@@ -105,7 +121,28 @@ test, or the independent certification.
 | Focused Python command | **Environment-blocked after 437 passed:** four hosted-submission fixtures and the Explorer smoke test require local binds and received `PermissionError: [Errno 1] Operation not permitted`; `/tmp/explorer-closeout-pytest.log`. The required command was run with task-local UV cache and lock directory only. |
 | Pages curl check | **Environment-blocked:** `curl` could not resolve `benchbox.dev` (`curl: (6) Could not resolve host`). The independent certification captured the live pair over HTTPS at the same develop pin. |
 | Independent math/privacy/browser evidence | Certification at `fc6dd5958`: 138/138 geomeans, 138/138 percentile rows, 55/55 rank rows, 35/35 ranking-direction cohorts; zero public path leaks; Chromium blocking green; Firefox/WebKit 16 smoke tests each. |
-| `make audit-sha-check FILE=_project/audits/results-explorer-release-readiness-closeout-2026-09-04.md` | Run after this file is written; must pass before commit. |
+| `UV_CACHE_DIR=/tmp/benchbox-explorer-evidence-audit-uv-cache make audit-sha-check FILE=_project/audits/results-explorer-release-readiness-closeout-2026-09-04.md` | PASS — `OK _project/audits/results-explorer-release-readiness-closeout-2026-09-04.md: develop_sha=c44fdfc457886d9340b75d86ecb6e29796fdbb98 target_ref=origin/develop measured_at_sha=fc6dd5958b1deffa468e01852a392a29585d11eb`. |
+
+## D11 live-evidence record
+
+The Manager-retained read-only transcript at
+`_project/audits/results-explorer-evidence/d11-live-evidence-2026-09-04.txt`
+records the commands at `2026-09-04T23:13:13Z`. It reports:
+
+- `gh api repos/BenchBox-dev/BenchBox --jq .default_branch` => `develop`.
+- `gh api -i repos/BenchBox-dev/BenchBox/branches/main` => HTTP 200; JSON
+  branch name `release`, commit
+  `4ad1d727903328702c93abf139902cee42dc3890`, and HTML URL ending in
+  `/tree/release`.
+- The requested GitHub `/tree/main` URL => status 200 and effective URL ending
+  in `/tree/release`; the title is `GitHub - BenchBox-dev/BenchBox at release ·
+  GitHub`.
+- `git ls-tree` on `origin/develop` lists `CONTRIBUTING.md`, both named
+  workflow paths, and the related ADR, token-scan, admin, and runbook paths.
+
+Disposition: superseded with evidence. The live default branch is `develop` and
+the requested `/tree/main` rendering resolves to `release`, so the original
+default-main premise does not hold.
 
 ## L2/L3 review and residual ownership
 
@@ -128,7 +165,7 @@ be acquired. The concrete remaining defects are named above for the manager to
 create or route through the tracker using the distinct requested actor; no
 sibling item was claimed or released.
 
-Disposition count: fixed 16; accepted 2; superseded 2; still blocking 0 in the
+Disposition count: fixed 23; accepted 3; superseded 2; still blocking 0 in the
 historical D/N matrix. Current closeout gate remains **not certified** until
 the two new frontend timeouts and the environment-blocked required runs are
 resolved or independently attested.

@@ -1,0 +1,45 @@
+{
+  "replay": {
+    "script": "_project/audits/results-explorer-evidence/replay_independent_oracle.py",
+    "sha256": "ebb5bfe90f2378e4142684b0ec98006f0e46f3bf6488ff029463004015e747f8"
+  },
+  "measurement_sha": "c44fdfc457886d9340b75d86ecb6e29796fdbb98",
+  "snapshot": {
+    "url": "https://benchbox.dev/results/data/results.duckdb",
+    "sha256": "3bce914eae9f9bb3dceea490af4f47f8b14ad084cb46aeb7a4f624208b1d5795",
+    "bytes": 8663040
+  },
+  "read_model_version": 7,
+  "geomean": {
+    "results_compared": 138,
+    "agree": 138,
+    "diverge": 0,
+    "divergences": []
+  },
+  "percentile": {
+    "rows_compared": 138,
+    "agree": 138,
+    "diverge": 0,
+    "divergences": []
+  },
+  "ranking": {
+    "cohorts": 35,
+    "rankable_rows": 55,
+    "unranked_rows": 83,
+    "rank_diverge": 0,
+    "direction_failures": []
+  },
+  "privacy": {
+    "snapshot": {
+      "tables_scanned": 13,
+      "leak_fields": [],
+      "leak_hits": 0
+    },
+    "bundles": {
+      "files_scanned": 391,
+      "unreadable": [],
+      "leak_fields": [],
+      "leak_hits": 0
+    }
+  }
+}
