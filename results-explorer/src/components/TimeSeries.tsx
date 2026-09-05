@@ -15,6 +15,7 @@ import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
 import { useElementSize } from "@/lib/useElementSize";
 import { timeSeriesColor } from "@/lib/chartTheme";
 import { formatLatencyMs, formatPowerScore } from "@/lib/metricFormatters";
+import { formatRunDateWithAge } from "@/lib/runAge";
 import {
   resultDetailHref,
   resultIdentityAriaLabel,
@@ -22,6 +23,7 @@ import {
   visibleResultIdForRow,
 } from "@/lib/resultLinks";
 import { formatRunIdentityLabelsForCohort, type RunIdentitySource } from "@/lib/runIdentity";
+import { RunDateWithAge } from "@/components/RunAge";
 
 const LABEL_W = 58;
 const AXIS_H = 32;
@@ -113,7 +115,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
     const points: SeriesPoint[] = trendable.map((point, index) => {
       const identity = pointLabels[index]?.full ?? point.entry.platform;
       const metricValue = formatMetricValue(point.value, metric);
-      const title = `${identity}: ${point.entry.run_date} = ${metricValue}`;
+      const title = `${identity}: ${metricValue}`;
       return {
         resultId: point.entry.result_id,
         date: point.entry.run_date,
@@ -280,8 +282,10 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
                   x={x}
                   y={20}
                   textAnchor="middle"
+                  aria-label={formatRunDateWithAge(date)}
                   style={{ fontSize: "9px", fill: "var(--bb-chart-axis)" }}
                 >
+                  <title>{formatRunDateWithAge(date)}</title>
                   {date.slice(5)}
                 </text>
               </g>
@@ -358,7 +362,7 @@ function duplicateSameDayGroups(entries: ChartHistoricalEntry[], metric: Props["
           return {
             entry,
             value,
-            title: `${labels[index]?.full ?? entry.platform}: ${entry.run_date} = ${formatMetricValue(value, metric)}`,
+            title: `${labels[index]?.full ?? entry.platform}: ${formatMetricValue(value, metric)}`,
           };
         }),
       };
@@ -405,7 +409,7 @@ function DuplicateDayTrendState({
             {groups.flatMap((group) =>
               group.runs.map(({ entry, value, title }) => (
                 <tr key={entry.result_id} data-result-id={entry.result_id} title={title}>
-                  <td class="pr-4 py-1 font-mono text-[var(--bb-data-fg-muted)]">{group.date}</td>
+                  <td class="pr-4 py-1 font-mono text-[var(--bb-data-fg-muted)]"><RunDateWithAge runDate={group.date} /></td>
                   <td class="pr-4 py-1">{group.platform}</td>
                   <td class="pr-4 py-1 font-mono">Public ID {visibleResultIdForRow(entry)}</td>
                   <td class="pr-4 py-1 font-mono">{formatMetricValue(value, metric)}</td>

@@ -46,4 +46,10 @@ describe("CompareTray", () => {
 
     expect(screen.queryByRole("button", { name: /from comparison/ })).toBeNull();
   });
+
+  it("shows the selected run age beside its date", () => {
+    renderTray();
+
+    expect(screen.getByTestId("compare-tray-row-result-1").textContent).toMatch(/2026-08-24.*days ago/);
+  });
 });

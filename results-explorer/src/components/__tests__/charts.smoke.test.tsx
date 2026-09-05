@@ -152,6 +152,30 @@ describe("PercentileLadder", () => {
     expect(ids).toEqual(["r-duckdb-tuned", "r-duckdb-notuning"]);
     expect(new Set(ids).size).toBe(ids.length);
   });
+
+  it("keeps date-qualified labels distinct after truncation", () => {
+    const { container } = render(
+      <PercentileLadder
+        rows={[
+          {
+            result_id: "r-date-1",
+            platform: "DataFusion",
+            displayLabel: "DataFusion 2026-05-01 (127 days ago)",
+            percentile_stats: { p50: 10, p90: 25, p95: 40, p99: 90 },
+          },
+          {
+            result_id: "r-date-2",
+            platform: "DataFusion",
+            displayLabel: "DataFusion 2026-05-02 (126 days ago)",
+            percentile_stats: { p50: 12, p90: 28, p95: 45, p99: 100 },
+          },
+        ]}
+      />,
+    );
+
+    const labels = Array.from(container.querySelectorAll("[data-result-id] text")).map((node) => node.textContent);
+    expect(labels[0]).not.toBe(labels[1]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -502,6 +526,9 @@ describe("TimeSeries", () => {
     expect(points).toHaveLength(2);
     expect(points[0]?.querySelector("title")?.textContent).toContain("1111aaaa");
     expect(points[0]?.getAttribute("aria-label")).toContain("1111aaaa");
+    expect(points[0]?.querySelector("title")?.textContent).toMatch(/2026-04-01.*days ago/);
+    expect(points[0]?.getAttribute("aria-label")).toMatch(/2026-04-01.*days ago/);
+    expect(container.querySelector('text[aria-label*="days ago"]')).not.toBeNull();
     expect(points[0]?.querySelector("title")?.textContent).not.toContain("2222bbbb");
     expect(points[1]?.querySelector("title")?.textContent).toContain("2222bbbb");
     expect(points[1]?.getAttribute("aria-label")).toContain("2222bbbb");
@@ -520,6 +547,7 @@ describe("TimeSeries", () => {
     expect(container.querySelector("svg")).toBeNull();
     expect(state?.textContent).toContain("Trend line hidden");
     expect(state?.textContent).toContain("same-day runs");
+    expect(state?.textContent).toMatch(/2026-04-03.*days ago/);
     expect(state?.querySelectorAll("[data-result-id]")).toHaveLength(2);
     expect(state?.querySelector('a[href="/results/r/tpch-duckdb-sf0.01-20260403-1111aaaa"]')).toBeTruthy();
     expect(state?.querySelector('a[href="/results/r/tpch-duckdb-sf0.01-20260403-2222bbbb#run-receipt"]')).toBeTruthy();

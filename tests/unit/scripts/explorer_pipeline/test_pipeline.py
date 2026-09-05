@@ -6,6 +6,7 @@ import hashlib
 import importlib
 import json
 import logging
+import shutil
 from pathlib import Path
 
 import duckdb
@@ -16,6 +17,7 @@ from _project.scripts.explorer_pipeline.pipeline import (
     COMMUNITY_TRUST_LABEL,
     SUBMISSION_MANIFEST_FILENAME,
     ExplorerPipeline,
+    _build_benchmark_summaries,
     _build_short_ids,
 )
 from _project.scripts.explorer_pipeline.transformer import BundleTransformer
@@ -98,6 +100,43 @@ class TestBuildShortIds:
             assert len(short_id) >= 8
         # Because the 8-char prefixes were identical, the result must use > 8 chars
         assert all(len(k) > 8 for k in result)
+
+
+def test_mismatched_query_sets_are_not_ranked(tmp_path: Path) -> None:
+    transformer = BundleTransformer()
+    bundle_paths = [
+        Path("results-data/bundles/tpchavoc_sf001_clickhouse_local_sql_20260826_171608_ce266327.json"),
+        Path("results-data/bundles/tpchavoc_sf001_datafusion_sql_20260826_165844_721d2f5e.json"),
+        Path("results-data/bundles/tpchavoc_sf001_duckdb_sql_20260826_163147_d96baca2.json"),
+    ]
+    pairs = []
+    for path in bundle_paths:
+        entry = transformer.to_manifest_entry(path)
+        pairs.append((entry, transformer.to_detail_result(path, entry.result_id)))
+    full_to_short = {entry.result_id: entry.result_id[-8:] for entry, _ in pairs}
+
+    summaries = _build_benchmark_summaries({("tpchavoc", 0.01, "power"): pairs}, full_to_short)
+
+    rows = summaries[0][1].platforms
+    assert {len({query_id for query_id, value in row.timings.items() if value is not None}) for row in rows} == {
+        197,
+        206,
+        220,
+    }
+    assert all(not row.is_ranking_eligible for row in rows)
+    assert {row.ranking_exclusion_reason for row in rows} == {"mismatched_query_set"}
+
+    data_dir = tmp_path / "input"
+    bundle_dir = data_dir / "bundles"
+    bundle_dir.mkdir(parents=True)
+    for path in bundle_paths:
+        shutil.copy2(path, bundle_dir / path.name)
+    output = tmp_path / "output"
+    ExplorerPipeline().run(data_dir, output)
+
+    with duckdb.connect(str(output / "results.duckdb"), read_only=True) as con:
+        ranking_reasons = con.execute("SELECT DISTINCT ranking_exclusion_reason FROM benchmark_rankings").fetchall()
+    assert ranking_reasons == [("mismatched_query_set",)]
 
 
 def _duckdb_results(output: Path) -> list[dict]:

@@ -19,6 +19,35 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 class TestToManifestEntry:
+    def test_offset_timestamp_uses_utc_day_in_read_model_and_result_id(self, tmp_path: Path) -> None:
+        """The ingestion boundary, not the UI, owns UTC date normalization."""
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["run"]["timestamp"] = "2026-09-05T00:15:00+14:00"
+        bundle = tmp_path / "offset.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        result_id = transformer.result_id_from_bundle(bundle)
+        entry = transformer.to_manifest_entry(bundle, result_id=result_id)
+        detail = transformer.to_detail_result(bundle, result_id=result_id)
+
+        assert result_id.startswith("tpch-duckdb-sf0.1-20260904-")
+        assert entry.run_date == "2026-09-04"
+        assert detail.run_date == "2026-09-04"
+
+    @pytest.mark.parametrize(
+        "timestamp",
+        ["2026-09-05Tnot-a-time", "2026-09-05T12:00", "2026-09-05T12:00:00Z trailing"],
+    )
+    def test_malformed_timestamp_is_rejected_before_read_model_projection(self, tmp_path: Path, timestamp: str) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["run"]["timestamp"] = timestamp
+        bundle = tmp_path / "bad-timestamp.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        with pytest.raises(ValueError, match="invalid run.timestamp"):
+            BundleTransformer().to_manifest_entry(bundle)
+
     def test_basic_fields(self, bundle_file: Path) -> None:
         transformer = BundleTransformer()
         entry = transformer.to_manifest_entry(bundle_file)

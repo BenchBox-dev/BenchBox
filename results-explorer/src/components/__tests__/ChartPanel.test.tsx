@@ -188,6 +188,24 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
 }
 
 describe("ChartPanel", () => {
+  it("shows the latest run age in summary-only history", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: null,
+          historical: [
+            makeHistoricalEntry(),
+            makeHistoricalEntry({ result_id: "hist-2", run_date: "2026-04-18T12:00:00Z" }),
+          ],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Overview" }));
+    expect(screen.getByText("Latest run").parentElement?.textContent).toMatch(/2026-04-18.*days ago/);
+  });
+
   it("groups summary charts by analytical question", () => {
     render(
       <ChartPanel

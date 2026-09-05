@@ -118,6 +118,14 @@ describe("ResultDetail - median-first contract", () => {
     expect(q2Cells.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("shows the run age beside the result date and in the receipt", async () => {
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    expect(screen.getByLabelText(/Run age:/)).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Run receipt" })).toHaveTextContent(/Run date.*ago/);
+  });
+
   it("(b) sample_count cell matches display_timings[i].sample_count", async () => {
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());

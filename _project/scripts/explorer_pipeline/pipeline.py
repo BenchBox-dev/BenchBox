@@ -388,6 +388,8 @@ def _build_benchmark_summaries(
             {dt.query_id for _, detail in pairs for dt in detail.display_timings},
             key=_natural_sort_key,
         )
+        query_id_sets = {frozenset(dt.query_id for dt in detail.display_timings) for _, detail in pairs}
+        cohort_query_sets_match = len(query_id_sets) <= 1
 
         platform_rows: list[PlatformRow] = []
         for entry, detail in pairs:
@@ -395,6 +397,9 @@ def _build_benchmark_summaries(
             for dt in detail.display_timings:
                 timings[dt.query_id] = dt.display_ms
 
+            row_ranking_reason = entry.ranking_exclusion_reason
+            if row_ranking_reason is None and not cohort_query_sets_match:
+                row_ranking_reason = "mismatched_query_set"
             row = PlatformRow(
                 result_id=entry.result_id,
                 short_id=full_to_short.get(entry.result_id, ""),
@@ -406,7 +411,8 @@ def _build_benchmark_summaries(
                 execution_mode=entry.execution_mode,
                 trust_label=entry.trust_label,
                 run_date=entry.run_date,
-                is_ranking_eligible=is_ranking_eligible(entry),
+                is_ranking_eligible=is_ranking_eligible(entry) and row_ranking_reason is None,
+                ranking_exclusion_reason=row_ranking_reason,
                 power_score=entry.power_score,
                 display_geomean_ms=entry.display_geomean_ms,
                 sample_geomean_ms=entry.geomean_ms,

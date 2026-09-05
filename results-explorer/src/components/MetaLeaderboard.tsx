@@ -16,6 +16,7 @@ import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { TableScrollHint } from "@/components/TableScrollHint";
+import { formatRunAge } from "@/lib/runAge";
 import {
   EXPLORER_PERFORMANCE_MARKS,
   EXPLORER_PERFORMANCE_MEASURES,
@@ -384,12 +385,14 @@ export function MetaLeaderboard({
                     const hue = shadeMetric !== null ? colorForCell(shadeMetric, minInCol) : null;
                     const lightness = shadeMetric !== null ? lightnessForCell(shadeMetric, minInCol) : null;
                     const active = focusPos.row === rowIdx && focusPos.col === colIdx;
-                    const text = describeCell(platform, cohort, cellState, mode);
-                    const title = cellTitle(platform, cohort, cellState, mode);
                     const receiptState = cellState.kind !== "missing" ? cellState : null;
                     const metadata = receiptState?.result
                       ? resultMetadataById?.get(receiptState.result.result_id)
                       : undefined;
+                    const runAge = formatRunAge(metadata?.run_date);
+                    const runAgeLabel = runAge ?? (metadata ? "not recorded" : null);
+                    const text = describeCell(platform, cohort, cellState, mode, runAgeLabel);
+                    const title = cellTitle(platform, cohort, cellState, mode, runAgeLabel);
                     const receiptHref = receiptState?.result
                       ? `/results/r/${receiptState.result.result_id}#run-receipt`
                       : null;
@@ -434,12 +437,17 @@ export function MetaLeaderboard({
                             }
                             class="font-mono no-underline hover:text-[var(--bb-accent-hover)]"
                             onClick={(event) => event.stopPropagation()}
-                            title={receiptLinkTitle(receiptState, cohort)}
+                            title={receiptLinkTitle(receiptState, cohort, runAgeLabel)}
                           >
                             {renderCellValue(cellState, cohort, mode)}
                           </a>
                         ) : (
                           renderCellValue(cellState, cohort, mode)
+                        )}
+                        {metadata && cellState.kind !== "missing" && (
+                          <div class="mt-0.5 text-[10px] font-normal text-[var(--bb-data-fg-muted)]">
+                            Run age: {runAgeLabel}
+                          </div>
                         )}
                         {metadata && cellState.kind !== "missing" && (
                           <div class="mt-0.5 flex flex-wrap justify-center gap-1">
@@ -621,21 +629,34 @@ function cellTitle(
   cohort: MetaCohort,
   state: MetaLeaderboardCellState,
   mode: MetaLeaderboardMode,
+  runAge: string | null,
 ): string | undefined {
   if (state.kind === "missing") return MISSING_COHORT_TITLE;
   if (state.kind === "unranked") {
-    return `${platform.platform} has published evidence for ${cohort.label}, but it is ${state.label.toLowerCase()}: ${state.reason}`;
+    return [
+      `${platform.platform} has published evidence for ${cohort.label}, but it is ${state.label.toLowerCase()}: ${state.reason}`,
+      runAgeText(runAge),
+    ].filter(Boolean).join(" ");
   }
   const exact = exactMetricTitle(state.rank, cohort);
-  return exact ? `${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}. ${exact}` : undefined;
+  const age = runAgeText(runAge);
+  if (!exact && !age) return undefined;
+  return [`${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}.`, exact, age]
+    .filter(Boolean)
+    .join(" ");
 }
 
-function receiptLinkTitle(state: Exclude<MetaLeaderboardCellState, { kind: "missing" }>, cohort: MetaCohort): string {
+function receiptLinkTitle(
+  state: Exclude<MetaLeaderboardCellState, { kind: "missing" }>,
+  cohort: MetaCohort,
+  runAge: string | null,
+): string {
   if (state.kind === "unranked") {
-    return `Open result receipt. ${state.label}: ${state.reason}`;
+    return ["Open result receipt.", `${state.label}: ${state.reason}`, runAgeText(runAge)].filter(Boolean).join(" ");
   }
   const exact = exactMetricTitle(state.rank, cohort);
-  return exact ? `Open result receipt. ${exact}` : "Open result receipt";
+  const age = runAgeText(runAge);
+  return ["Open result receipt.", exact, age].filter(Boolean).join(" ");
 }
 
 function renderCellValue(
@@ -693,17 +714,26 @@ function describeCell(
   cohort: MetaCohort,
   state: MetaLeaderboardCellState,
   mode: MetaLeaderboardMode,
+  runAge: string | null,
 ): string {
   if (state.kind === "missing") {
     return `${platform.platform} has no published run for ${cohort.label}. ${COVERAGE_POLICY_COPY}`;
   }
   if (state.kind === "unranked") {
-    return `${platform.platform} has published evidence for ${cohort.label}, but it is ${state.label.toLowerCase()}: ${state.reason}`;
+    return [
+      `${platform.platform} has published evidence for ${cohort.label}, but it is ${state.label.toLowerCase()}: ${state.reason}`,
+      runAgeText(runAge),
+    ].filter(Boolean).join(" ");
   }
   const rank = state.rank;
   const text = cellText(rank, cohort, mode);
   const nativeSuffix = mode === "speedup" ? `; ${nativeMetricText(rank, cohort)}` : "";
-  return `${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}: ${text}${nativeSuffix}`;
+  const age = runAgeText(runAge);
+  return `${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}: ${text}${nativeSuffix}${age ? `; ${age}` : ""}`;
+}
+
+function runAgeText(runAge: string | null): string | null {
+  return runAge === null ? null : `Run age: ${runAge}.`;
 }
 
 function hasPublishedEvidence(platform: MetaPlatform, cohorts: MetaCohort[]): boolean {

@@ -120,7 +120,7 @@ describe("ComparabilityReceipt", () => {
     expect(receipt).toHaveTextContent("Driver version");
     expect(receipt).toHaveTextContent("DuckDB: 1.0; SQLite: 2.0");
     expect(receipt).toHaveTextContent("Date window");
-    expect(receipt).toHaveTextContent("2026-04-01 to 2026-04-03");
+    expect(receipt.textContent).toMatch(/2026-04-01.*days ago.*to 2026-04-03.*days ago/);
     expect(receipt).toHaveTextContent("Tuning");
     expect(receipt).toHaveTextContent("DuckDB: default; SQLite: manual");
     expect(receipt).toHaveTextContent("Architecture");

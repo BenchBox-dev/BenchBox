@@ -41,7 +41,7 @@ describe("formatRunIdentity", () => {
       driver_version: "1.3.2",
       run_date: "2026-04-17",
     });
-    expect(formatRunIdentity(s, "table")).toBe("DuckDB · v1.3.2 · 2026-04-17");
+    expect(formatRunIdentity(s, "table")).toMatch(/^DuckDB · v1\.3\.2 · 2026-04-17 \(.*days ago\)$/);
   });
 
   it("tooltip variant lists every qualifier on its own line", () => {
@@ -54,7 +54,7 @@ describe("formatRunIdentity", () => {
     const tooltip = formatRunIdentity(s, "tooltip");
     expect(tooltip.split("\n")).toContain("DuckDB");
     expect(tooltip.split("\n")).toContain("v1.3.2");
-    expect(tooltip.split("\n")).toContain("2026-04-17");
+    expect(tooltip.split("\n").some((line) => /2026-04-17.*days ago/.test(line))).toBe(true);
     expect(tooltip.split("\n")).toContain("SF 0.1");
   });
 });
@@ -127,7 +127,8 @@ describe("formatRunIdentitiesForCohort", () => {
     ];
     const labels = formatRunIdentitiesForCohort(cohort, "chart");
 
-    expect(labels).toEqual(["DataFusion 2026-05-01", "DataFusion 2026-05-02"]);
+    expect(labels[0]).toMatch(/^DataFusion 2026-05-01 \(.*days ago\)$/);
+    expect(labels[1]).toMatch(/^DataFusion 2026-05-02 \(.*days ago\)$/);
     expect(labels.join(" ")).not.toContain("SF 0.01");
     expect(labels.join(" ")).not.toContain("v53.0.0");
   });
@@ -150,7 +151,8 @@ describe("formatRunIdentitiesForCohort", () => {
     ];
     const labels = formatRunIdentitiesForCohort(cohort, "chart");
 
-    expect(labels).toEqual(["Spark v3.5.0", "Spark 2026-05-01"]);
+    expect(labels[0]).toBe("Spark v3.5.0");
+    expect(labels[1]).toMatch(/^Spark 2026-05-01 \(.*days ago\)$/);
     expect(labels.join(" ")).not.toMatch(/1111aaaa|2222bbbb/);
   });
 
@@ -254,8 +256,8 @@ describe("formatRunIdentitiesForCohort", () => {
     ];
     const labels = formatRunIdentityLabelsForCohort(cohort);
 
-    expect(labels[0]?.compact).toBe("DataFusion 2026-05-06");
-    expect(labels[1]?.compact).toBe("DataFusion 2026-05-07");
+    expect(labels[0]?.compact).toMatch(/^DataFusion 2026-05-06 \(.*days ago\)$/);
+    expect(labels[1]?.compact).toMatch(/^DataFusion 2026-05-07 \(.*days ago\)$/);
     expect(labels[0]?.full).toContain("v53.0.0");
     expect(labels[0]?.full).toContain("SF 0.01");
     expect(labels[0]?.full).toContain("maintainer-run");

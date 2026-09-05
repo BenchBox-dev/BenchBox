@@ -114,3 +114,97 @@ variants both landed under `tuning_mode=tuned`).
 4. Regenerate the inventory: `uv run -- python scripts/generate_corpus_inventory.py --write`
 5. Re-run `uv run -- python results-data/validate_corpus.py` to confirm the
    cohort still meets the >=3-platform depth gate.
+
+---
+
+# Post-2026-08-23 trust cut — remaining-gap restore
+
+**Related TODO:** `restore-corpus-coverage-after-20260823-trust-cut`
+**Checked-in validation:** The checked-in inventory and `results-data/validate_corpus.py`
+are the current source of corpus counts and validation status. Regenerate and check
+the inventory before relying on either value.
+
+## What happened
+
+The 2026-08-28 trust cut (PRs #1939 develop, #1940 published-results) withdrew
+every result run before 2026-08-23. That left a 9-bundle / 3-cohort corpus. The
+withdrawal was intentional; coverage has to be rebuilt with fresh runs only.
+Do not restore withdrawn bundles from git history.
+
+## Live already-OK cohorts (do not re-run)
+
+The checked-in inventory records **244 bundles**, **16 benchmarks**, and **42
+cohorts**, all at the >=3-identity floor. These
+benchmarks already have comparable local coverage and must not be re-run for
+this restore:
+
+| Benchmark | Live scales with >=3 identities |
+|-----------|----------------------------------|
+| amplab | 0.01, 0.1, 1.0 |
+| clickbench | 1.0 (plus DuckDB-only SF 10 version-matrix cells) |
+| coffeeshop | 0.01, 0.1, 1.0 |
+| h2odb | 0.01, 0.1, 1.0 |
+| joinorder | 1.0 |
+| read_primitives | 0.01, 0.1 |
+| ssb | 0.01, 0.1, 1.0 (plus DuckDB-only SF 10 version-matrix cells) |
+| tpcds | 1.0 (plus SF 10 cells) |
+| tpch | 0.01, 0.1, 1.0 (plus DuckDB-only SF 10 version-matrix cells) |
+| tpch_skew | 0.01, 0.1, 1.0 |
+
+## Alias note: `star_schema`
+
+`star_schema` is a CLI / historical schema-v2 alias of **`ssb`**
+(`benchbox/cli/commands/run.py` maps `star_schema` → `ssb`; current SSB
+bundles use `benchmark.id = "ssb"`). It is **not** a separate remaining-gap
+benchmark. Do not admit a duplicate `star_schema` cohort beside live `ssb`
+coverage.
+
+## Remaining zero-coverage local cells (2026-09-04)
+
+Benchmarks with **no** checked-in primary bundles after the trust cut:
+
+| Benchmark | Smallest local target cell | Notes |
+|-----------|----------------------------|-------|
+| datavault | SF 0.01 × >=3 local platforms | Prefer DuckDB, DataFusion, ClickHouse Local / SQLite |
+| flightdata | SF 0.01 × >=3 local platforms | Same local platform set |
+| metadata_primitives | SF 1.0 × >=3 local platforms | Scale is unused for sizing; needs three validation-passed platforms |
+| nyctaxi | SF 0.01 × >=3 local platforms | |
+| tpcdi | SF 0.01 × >=3 local platforms | |
+| tpcds_obt | SF 1.0 × >=3 local platforms | Integer SF >= 1 only (TPC-DS generator alignment) |
+| tpchavoc | SF 0.01 × >=3 local platforms | Experimental; large query count |
+| write_primitives | SF 0.01 × >=3 local platforms | Needs three validation-passed local platforms |
+| star_schema | — | Alias of `ssb` — **not admitted as a separate cell** |
+
+Skip SF 10 expansion for this restore. No cloud-vendor account signup
+(Databricks / Snowflake / BigQuery). The supported seed lane is local-only and
+does not require ClickHouse Cloud credentials.
+
+## Admission rules for remaining-gap cells
+
+1. Fresh post-2026-08-23 runs only; never copy withdrawn git-history bundles.
+2. Real validation phase must execute; admit only when
+   `summary.validation == passed`.
+3. Do not commit a `benchbox submit` community sidecar unless a community
+   submission is genuinely wanted. Sidecar absence continues to derive
+   `maintainer-run` trust in `scripts/generate_corpus_inventory.py`.
+4. Prefer existing local platforms (DuckDB, DataFusion, SQLite, Polars,
+   ClickHouse Local) at the smallest supported scale.
+5. Each admitted cohort must meet the >=3-platform floor in
+   `results-data/validate_corpus.py`.
+
+## Remaining-gap restore outcome
+
+Recorded when remaining-gap bundles were copied into `results-data/bundles/`
+and the inventory regenerated (post-2026-08-23 trust-cut restore):
+
+| Benchmark | Admitted cohorts | Deferred |
+|-----------|------------------|----------|
+| datavault | SF 0.01, SF 0.1 (DuckDB, DataFusion, ClickHouse Local) | SF 1.0 — no full-suite DataFusion validation-passed third platform in local output |
+| flightdata | SF 0.01, SF 0.1, SF 1.0 | — |
+| nyctaxi | SF 0.01, SF 0.1, SF 1.0 | — |
+| tpcdi | SF 0.01, SF 0.1, SF 1.0 | — |
+| tpcds_obt | SF 1.0 | — |
+| tpchavoc | SF 0.01, SF 0.1, SF 1.0 | — |
+| metadata_primitives | — (see deferral) | DuckDB + DataFusion validation-passed locally; ClickHouse Local incompatible (ACL privileges); SQLite fresh run 2026-09-04 failed all 51 queries |
+| write_primitives | — (see deferral) | Only DuckDB validation-passed locally; DataFusion SF 0.01 failed missing write-ops tables; ClickHouse Local SF 0.01 failed schema NOT NULL; SQLite/Spark/Polars remain partial |
+| star_schema | not applicable | Alias of `ssb`; do not duplicate |

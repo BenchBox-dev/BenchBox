@@ -17,15 +17,14 @@ Do not add a second nightly UAT gate for this. Generation already lives in
 
 ## Recurring matrix
 
-This is the `seed-corpus.yml` matrix. It is DuckDB / DataFusion / Polars
-(and optional ClickHouse Cloud when secrets exist). Cloud warehouses
-(Snowflake, Databricks, BigQuery) are not on this calendar until live
-credentials are confirmed.
+The workflow is the canonical matrix. It uses only local DuckDB, DataFusion,
+Polars DataFrame, and ClickHouse Local identities. Cloud warehouses are not on
+this calendar.
 
 | Benchmark | Scales | Platforms | Notes |
 | --- | --- | --- | --- |
-| TPC-H | 0.01, 0.1, 1.0 | DuckDB, DataFusion, Polars-DF (SF 0.01/0.1); DuckDB, DataFusion, ClickHouse Cloud optional (SF 1.0) | Power phase only |
-| TPC-DS | 1 | DuckDB, DataFusion | Integer SF only. Runs with `--official --seed 42` so submit/admission will not classify them unofficial |
+| TPC-H | 0.01, 0.1, 1.0 | DuckDB, DataFusion, Polars-DF (SF 0.01/0.1); DuckDB, DataFusion, ClickHouse Local (SF 1.0) | Power phase only |
+| TPC-DS | 1 | DuckDB, DataFusion, ClickHouse Local | Integer SF only |
 | SSB | 0.01, 0.1 | DuckDB, DataFusion, Polars-DF | Power phase only |
 
 TPC-H SF10 / SF100 and extra TPC-DS platforms stay operator-run (too large

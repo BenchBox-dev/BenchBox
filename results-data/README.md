@@ -68,36 +68,37 @@ document already described in prose.
 
 ## Seed Corpus
 
-The current checked-in corpus covers 4 benchmark families across 6 cohorts, all
-run on or after 2026-08-23:
+After the 2026-08-28 trust cut and the remaining-gap restore, the checked-in
+corpus holds **244** maintainer-run bundles across **16** benchmarks and **42**
+cohorts, all at the >=3-identity validator floor. Covered families include the
+already-OK local set (amplab, clickbench, coffeeshop, h2odb, joinorder,
+read_primitives, ssb, tpcds, tpch, tpch_skew) plus admitted remaining-gap cells
+(datavault, flightdata, nyctaxi, tpcdi, tpcds_obt, tpchavoc).
+`metadata_primitives` and `write_primitives` remain uncovered until each can
+form a validation-passed three-identity cohort; `star_schema` is an alias of
+`ssb` and is not admitted separately. See `REGENERATION.md` for deferral detail.
 
-| Benchmark | Scale | Platforms |
-|---|---|---|
-| tpcds | 1.0 | DataFusion, DuckDB, Spark |
-| tpcds | 10.0 | DataFusion, DuckDB versions 1.0.0–1.6.0.dev365, Spark |
-| tpch | 1.0 | DuckDB, Polars, PySpark |
-| tpch | 10.0 | DuckDB versions 1.0.0–1.6.0.dev365 |
-| clickbench | 10.0 | DuckDB versions 1.0.0–1.6.0.dev365 |
-| ssb | 10.0 | DuckDB versions 1.0.0–1.6.0.dev365 |
+The DuckDB version-matrix cells (ClickBench / SSB / TPC-H / TPC-DS at SF 10)
+use three independent power repetitions per cell and promote one median bundle
+per version/benchmark cell; raw repetitions stay outside the checkout. See
+`CORPUS_NOTES.md` for operator-run details.
 
-The DuckDB version matrix uses three independent power repetitions per cell and
-reports medians. The corpus promotes one median bundle per version/benchmark
-cell; the 84 raw repetitions and analysis outputs remain in the external operator
-output directory. ClickBench uses BenchBox's synthetic generator, whose record count
-scales linearly with the scale factor; this matrix therefore uses SF10 like
-the other workloads. See `CORPUS_NOTES.md` for the operator-run details.
-
-Everything older was withdrawn on 2026-08-28 as a trust decision; see
-`CORPUS_NOTES.md`. The maintainer-run seed lane (`seed-corpus.yml` workflow,
-manual `workflow_dispatch`) targets TPC-H and SSB at SF 0.01 / 0.1, so its
-matrix no longer matches anything checked in — a dispatch is what refills
-those cohorts.
+Everything older than 2026-08-23 was withdrawn on 2026-08-28 as a trust
+decision; see `CORPUS_NOTES.md`. The maintainer-run seed lane
+(`.github/workflows/seed-corpus.yml`) runs at 07:00 UTC on the first day of
+each month (`0 7 1 * *`) and remains callable via `workflow_dispatch`. Its
+supported local matrix maintains TPC-H at SF 0.01 and SF 0.1 with DuckDB,
+DataFusion, and Polars DataFrame; TPC-H SF 1 and TPC-DS SF 1 with DuckDB,
+DataFusion, and ClickHouse Local; and SSB at SF 0.01 and SF 0.1 with DuckDB,
+DataFusion, and Polars DataFrame. It does not claim to regenerate every
+checked-in cohort; the authoritative cell list is the workflow file and is
+summarized in `SEED_CORPUS_SPEC.md`.
 
 For the up-to-date per-cohort breakdown, see
 `results-data/corpus-inventory.json` (regenerate via
 `uv run -- python scripts/generate_corpus_inventory.py --write`).
-`results-data/SEED_CORPUS_SPEC.md` documents the seed-lane workflow target
-matrix and the validator gate.
+`results-data/SEED_CORPUS_SPEC.md` documents the seed-lane contract and the
+validator gate.
 
 ### Tuned bundles dropped (2026-07-16)
 

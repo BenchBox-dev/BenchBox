@@ -37,6 +37,7 @@ import { formatFacetDisplayValue } from "@/lib/facetDisplay";
 import { stringSerde, useUrlState } from "@/lib/useUrlState";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { usePickingState } from "@/lib/pickingState";
+import { RunDateWithAge } from "@/components/RunAge";
 import {
   EXPLORER_PERFORMANCE_MARKS,
   EXPLORER_PERFORMANCE_MEASURES,
@@ -1402,7 +1403,7 @@ function RecentRow({ entry, showCost }: { entry: ResultRow; showCost: boolean })
         <span class="badge badge-blue">{entry.platform}</span>
       </td>
       <td class="table-td">SF {entry.scale_factor}</td>
-      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.run_date}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]"><RunDateWithAge runDate={entry.run_date} /></td>
       <td
         class="table-td font-mono"
         title={entry.power_score != null ? `Exact power score: ${fmtScoreExact(entry.power_score)}` : undefined}

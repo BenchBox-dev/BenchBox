@@ -7,6 +7,7 @@ import {
   formatUsd,
 } from "@/lib/metricFormatters";
 import { humanizeBenchmark } from "@/utils";
+import { formatRunDateWithAge } from "@/lib/runAge";
 
 const QUERY_ID_COLLATOR = new Intl.Collator(undefined, {
   numeric: true,
@@ -99,7 +100,7 @@ export function formatQueryCell(column: string, value: unknown): string {
     if (column === "cost_usd" || column === "normalized_cost_usd") return "No cost recorded";
     return "Not recorded";
   }
-  if (column === "run_date") return formatRunDate(value);
+  if (column === "run_date") return formatRunDateWithAge(typeof value === "string" ? value : null);
   if (column === "power_score") return typeof value === "number" ? formatPowerScore(value).valueText : String(value);
   if (column === "geomean_ms" || column === "display_geomean_ms") {
     return typeof value === "number" ? formatLatencyMs(value).valueText : String(value);
@@ -114,11 +115,6 @@ export function formatQueryCell(column: string, value: unknown): string {
   if (typeof value === "string") return formatQueryFacetValue(column, value);
   if (column === "scale_factor") return `SF ${value}`;
   return formatPlainCell(value);
-}
-
-function formatRunDate(value: unknown): string {
-  const text = String(value);
-  return text.length >= 10 ? text.slice(0, 10) : text;
 }
 
 function formatPlainCell(value: unknown): string {
