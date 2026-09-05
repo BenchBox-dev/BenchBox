@@ -11,28 +11,34 @@ import { CompareWithinRun } from "./pages/CompareWithinRun";
 import { Query } from "./pages/Query";
 import { NotFound } from "./pages/NotFound";
 import { PickingStateProvider } from "./lib/pickingState";
+import { LocalResultProvider } from "./lib/localResultState";
 
 export function App() {
   return (
-    <PickingStateProvider>
-      <Layout>
-        <Router>
-          <Home path="/results/" />
-          <Compare path="/results/compare" />
-          <Compare path="/results/compare/" />
-          <Query path="/results/query" />
-          <Query path="/results/query/" />
-          <BenchmarksIndex path="/results/benchmarks" />
-          <BenchmarksIndex path="/results/benchmarks/" />
-          <PlatformsIndex path="/results/platforms" />
-          <PlatformsIndex path="/results/platforms/" />
-          <PlatformIndex path="/results/p/:platform/" />
-          <CompareWithinRun path="/results/r/:resultId/passes" />
-          <ResultDetail path="/results/r/:resultId" />
-          <BenchmarkIndex path="/results/:benchmark/" />
-          <NotFound default />
-        </Router>
-      </Layout>
-    </PickingStateProvider>
+    <LocalResultProvider>
+      <PickingStateProvider>
+        <Layout>
+          <Router>
+            <Home path="/results/" />
+            <Compare path="/results/compare" />
+            <Compare path="/results/compare/" />
+            <Query path="/results/query" />
+            <Query path="/results/query/" />
+            <BenchmarksIndex path="/results/benchmarks" />
+            <BenchmarksIndex path="/results/benchmarks/" />
+            <PlatformsIndex path="/results/platforms" />
+            <PlatformsIndex path="/results/platforms/" />
+            <PlatformIndex path="/results/p/:platform/" />
+            <CompareWithinRun path="/results/r/:resultId/passes" />
+            <ResultDetail path="/results/r/:resultId" />
+            <ResultDetail path="/results/local" source="local" />
+            <ResultDetail path="/results/local/" source="local" />
+            <ResultDetail path="/results/local/:resultId" source="local" />
+            <BenchmarkIndex path="/results/:benchmark/" />
+            <NotFound default />
+          </Router>
+        </Layout>
+      </PickingStateProvider>
+    </LocalResultProvider>
   );
 }
