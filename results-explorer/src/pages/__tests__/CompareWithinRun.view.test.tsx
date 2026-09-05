@@ -73,7 +73,7 @@ describe("CompareWithinRun page component", () => {
     render(<CompareWithinRun resultId="res-123" />);
 
     await waitFor(() => {
-      expect(screen.getByText("DuckDB — measurement bases compared")).toBeTruthy();
+      expect(screen.getByText("Compare measurements from one DuckDB run")).toBeTruthy();
     });
 
     // Check table headers and cells
@@ -183,7 +183,7 @@ describe("CompareWithinRun page component", () => {
     render(<CompareWithinRun resultId="res-123" />);
 
     await waitFor(() => expect(window.location.search).toContain("default"));
-    expect(screen.getByText("DuckDB — measurement bases compared")).toBeTruthy();
+    expect(screen.getByText("Compare measurements from one DuckDB run")).toBeTruthy();
     expect(screen.getByText("1 of 2 queries comparable")).toBeTruthy();
   });
 
@@ -192,7 +192,7 @@ describe("CompareWithinRun page component", () => {
     render(<CompareWithinRun resultId="res-123" />);
 
     await waitFor(() => {
-      expect(screen.getByText("DuckDB — measurement bases compared")).toBeTruthy();
+      expect(screen.getByText("Compare measurements from one DuckDB run")).toBeTruthy();
     });
 
     const radioWarmPass1 = screen.getByTestId("reference-radio-warm_pass_1");
@@ -206,7 +206,7 @@ describe("CompareWithinRun page component", () => {
     render(<CompareWithinRun resultId="res-123" />);
 
     await waitFor(() => {
-      expect(screen.getByText("DuckDB — measurement bases compared")).toBeTruthy();
+      expect(screen.getByText("Compare measurements from one DuckDB run")).toBeTruthy();
     });
 
     const removeButtons = screen.getAllByRole("button", { name: /^Remove / });
@@ -224,7 +224,7 @@ describe("CompareWithinRun page component", () => {
     render(<CompareWithinRun resultId="res-123" />);
 
     await waitFor(() => {
-      expect(screen.getByText("DuckDB — measurement bases compared")).toBeTruthy();
+      expect(screen.getByText("Compare measurements from one DuckDB run")).toBeTruthy();
     });
 
     const addButton = screen.getByRole("button", { name: "+ Add basis" });
@@ -275,7 +275,7 @@ describe("CompareWithinRun page component", () => {
     render(<CompareWithinRun resultId="res-123" />);
 
     await waitFor(() => {
-      expect(screen.getByText("DuckDB — measurement bases compared")).toBeTruthy();
+      expect(screen.getByText("Compare measurements from one DuckDB run")).toBeTruthy();
     });
     const displayedTieRatios = screen.getAllByText(/^1\.00x \(/);
     expect(displayedTieRatios.length).toBeGreaterThan(0);

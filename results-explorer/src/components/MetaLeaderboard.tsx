@@ -50,7 +50,7 @@ type MetaLeaderboardCellState =
 const MODE_LABELS: Record<MetaLeaderboardMode, string> = {
   times: "Times",
   ranks: "Ranks",
-  speedup: "Speedup",
+  speedup: "Relative to best",
 };
 const AVG_RANK_LABEL = "Avg rank over covered rankings";
 const COVERAGE_POLICY_COPY = "Missing rankings are not scored; coverage is shown separately.";
@@ -222,10 +222,10 @@ export function MetaLeaderboard({
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 id="meta-leaderboard-title" class="text-xl font-semibold text-[var(--bb-data-fg-primary)]">
-            Cross-Benchmark Leaderboard
+            Cross-benchmark rankings
           </h2>
           <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
-            Absolute values, ranks, or speedup-vs-best across the visible rankings.
+            Compare measured values, ranks, or each result relative to the best result in its ranking.
           </p>
         </div>
         <div
@@ -258,10 +258,10 @@ export function MetaLeaderboard({
                 {
                   value: "times",
                   label: "Times",
-                  title: "Native metric values per ranking (lower is better for latency; higher is better for power)",
+                  title: "Measured values for each ranking. Lower latency is better; a higher power score is better.",
                 },
                 { value: "ranks", label: "Ranks", title: "Rank within each ranking (1 is best)" },
-                { value: "speedup", label: "Speedup", title: "Relative to ranking best (1.00x is best; below 1.00x is worse)" },
+                { value: "speedup", label: "Relative to best", title: "1.00× is the best result in each ranking. Lower values are worse." },
               ]}
             />
           </div>
@@ -280,9 +280,9 @@ export function MetaLeaderboard({
           {mode === "times" && "Heat: darker = worse within each ranking. "}
           {mode === "ranks" && "Heat: darker = a worse rank within each ranking. "}
           {mode === "speedup" &&
-            "Heat: darker = farther from the ranking best (1.00x). Values below 1.00x are worse than the ranking best. "}
-          <span class="italic">No run</span> = no published evidence. <span class="font-medium">Excluded</span> or{" "}
-          <span class="font-medium">Unranked</span> = published evidence that is not scored.
+            "Heat: darker = farther from the best result (1.00×). Values below 1.00× are worse. "}
+          <span class="italic">No run</span> means no result is published. <span class="font-medium">Excluded</span> or{" "}
+          <span class="font-medium">Unranked</span> means the result is published but not scored.
         </p>
       </div>
 
@@ -520,8 +520,7 @@ export function MetaLeaderboard({
             ranking. {COVERAGE_POLICY_COPY}
           </p>
           <p>
-            <strong>Speedup</strong> normalizes every cell to the ranking best, where 1.00x is
-            best-in-ranking and smaller values are worse.
+            <strong>Relative to best</strong> shows every result against the best result in its ranking. 1.00× is best; lower values are worse.
           </p>
         </div>
       </details>
@@ -545,7 +544,7 @@ function cohortMetricSublabel(cohort: MetaCohort, mode: MetaLeaderboardMode): st
         ? "Total duration"
         : metric;
   if (mode === "speedup") {
-    return `${cohort.phase} · Speedup vs best · 1.00x is best; lower is worse · Native: ${metricLabel}, ${direction}`;
+    return `${cohort.phase} · Relative to best · 1.00× is best; lower is worse · Measured value: ${metricLabel}, ${direction}`;
   }
   if (mode === "ranks") return `${cohort.phase} · Rank · 1 is best; higher is worse · Native: ${metricLabel}`;
   return `${cohort.phase} · ${metricLabel} · ${direction}`;

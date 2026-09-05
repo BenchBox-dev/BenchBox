@@ -103,14 +103,14 @@ async function launchFirstBuilderComparison(page: Page): Promise<void> {
 async function openFirstSparseResultDetail(page: Page): Promise<void> {
   await page.goto("/results/");
   await waitForShell(page);
-  await waitForDataLoaded(page, /Cross-Benchmark Leaderboard/);
+  await waitForDataLoaded(page, /Cross-benchmark rankings/);
   const hrefs = await page.locator('a[href^="/results/r/"]').evaluateAll((links) =>
     Array.from(new Set(links.map((link) => link.getAttribute("href")).filter((href): href is string => !!href))),
   );
   for (const href of hrefs) {
     await page.goto(href);
     await waitForShell(page);
-    await waitForDataLoaded(page, /Query Timings/);
+    await waitForDataLoaded(page, /Query timings/);
     if ((await page.getByText(/Show missing/i).count()) > 0) return;
   }
   throw new Error("No sparse result-detail page with a Show missing disclosure was found");
@@ -122,7 +122,7 @@ test.describe("@followup-usability release-gate route walk", () => {
   test("Query Workbench renders the collapsible facet rail with searchable Benchmark group", async ({ page }) => {
     await page.goto("/results/query");
     await waitForShell(page);
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     const desktopFilters = page.getByTestId("query-desktop-filters");
     await expect(desktopFilters).toBeVisible();
@@ -140,7 +140,7 @@ test.describe("@followup-usability release-gate route walk", () => {
   test("Query compare tray defaults to the prompt copy and offers a launch button after two picks", async ({ page }) => {
     await page.goto("/results/query");
     await waitForShell(page);
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     const tray = page.getByTestId("query-compare-tray");
     await expect(tray).toContainText(/Select two or more rows/);
@@ -162,10 +162,10 @@ test.describe("@followup-usability release-gate route walk", () => {
   test("Home renders the ranking selector above the matrix with a compare entrypoint", async ({ page }) => {
     await page.goto("/results/");
     await waitForShell(page);
-    await waitForDataLoaded(page, /Cross-Benchmark Leaderboard/);
+    await waitForDataLoaded(page, /Cross-benchmark rankings/);
 
     const selector = page.getByRole("region", { name: "Leaderboard ranking selector" });
-    const matrix = page.getByRole("region", { name: "Cross-Benchmark Leaderboard" });
+    const matrix = page.getByRole("region", { name: "Cross-benchmark rankings" });
     await expect(selector).toBeVisible();
     await expect(matrix).toBeVisible();
     const selectorBox = await selector.boundingBox();
@@ -199,9 +199,9 @@ test.describe("@followup-usability release-gate route walk", () => {
     const firstHeatmapRow = page.locator("tbody tr[data-testid]").first();
     await expect(firstHeatmapRow).toBeVisible();
     // Matrix reachability now lives behind the compact per-row
-    // "Receipt and metadata" disclosure so the dense timing cells stay
+    // "Run details" disclosure so the dense timing cells stay
     // scannable. Open the disclosure before asserting receipt links.
-    await firstHeatmapRow.locator("summary", { hasText: /Receipt and metadata/ }).click();
+    await firstHeatmapRow.locator("summary", { hasText: /Run details/ }).click();
     await expect(firstHeatmapRow.getByRole("link", { name: /Receipt/ }).first()).toBeVisible();
 
     await maybeCapture(page, "benchmark-detail-switcher-and-sticky-header");
@@ -242,31 +242,31 @@ test.describe("@followup-usability release-gate route walk", () => {
     await maybeCapture(page, "platform-detail-filters");
   });
 
-  test("Compare builder renders the empty-state cohort filters and candidate list", async ({ page }) => {
+  test("Compare empty state points to Find runs", async ({ page }) => {
     await page.goto("/results/compare/");
     await waitForShell(page);
     await waitForDataLoaded(page, /Compare/);
 
-    await expect(page.getByTestId("compare-builder")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Choose runs to compare" })).toBeVisible();
+    await expect(page.getByTestId("compare-picker-query-link")).toBeVisible();
 
     await maybeCapture(page, "compare-builder-empty-state");
   });
 
-  test("Compare picker hides incompatible candidates after first selection by default", async ({ page }) => {
+  test("Compare keeps run selection in Find runs", async ({ page }) => {
     await page.goto("/results/compare/");
     await waitForShell(page);
     await waitForDataLoaded(page, /Compare/);
 
-    // rx-19: candidate table retired; picking is in Query. Verify compact builder + Query CTA.
-    await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
-    await expect(page.getByTestId("compare-builder-query-link")).toHaveAttribute("href", "/results/query");
+    await expect(page.getByRole("heading", { name: "Choose runs to compare" })).toBeVisible();
+    await expect(page.getByTestId("compare-picker-query-link")).toHaveAttribute("href", "/results/query");
     await expect(page.locator("table")).toHaveCount(0);
   });
 
   test("Query compare tray defaults compatible-only after first selection", async ({ page }) => {
     await page.goto("/results/query");
     await waitForShell(page);
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     const checkboxes = page.locator('input[data-testid^="query-compare-checkbox-"]');
     if ((await checkboxes.count()) < 2) return;
@@ -320,7 +320,7 @@ test.describe("@followup-usability release-gate route walk", () => {
       if ((await chartPanel.locator("svg").count()) > 0) {
         await expect(chartPanel.locator("svg").first()).toBeVisible();
       } else {
-        await expect(page.getByText("No meaningful per-query speedup difference")).toBeVisible();
+        await expect(page.getByText("No meaningful per-query difference")).toBeVisible();
       }
     }
 
@@ -330,7 +330,7 @@ test.describe("@followup-usability release-gate route walk", () => {
   test("Result Detail renders without claiming missing receipt fields", async ({ page }) => {
     await openFirstSparseResultDetail(page);
 
-    // The disclosure-based "Show missing metadata" toggle was shipped in
+    // The disclosure-based "Show missing fields" toggle was shipped in
     // PR #295 (TODO results-explorer-result-detail-metadata-density) and
     // is part of the broader follow-up effort the audit covers. Assert it
     // is present so a regression that re-adds inline empties surfaces.

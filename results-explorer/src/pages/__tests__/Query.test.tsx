@@ -5,8 +5,17 @@ vi.mock("@/db", () => ({
   queryRows: vi.fn(),
 }));
 
+vi.mock("@/lib/duckdbQueries", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/duckdbQueries")>("@/lib/duckdbQueries");
+  return {
+    ...actual,
+    getDetailResult: vi.fn(),
+    resolveShortId: vi.fn((id: string) => Promise.resolve(id)),
+  };
+});
+
 import { queryRows } from "@/db";
-import { clearDuckdbQueryCachesForTests } from "@/lib/duckdbQueries";
+import { clearDuckdbQueryCachesForTests, getDetailResult, resolveShortId } from "@/lib/duckdbQueries";
 import { DEFAULT_ROW_LIMIT, UNLIMITED_ROW_LIMIT } from "@/lib/queryFilters";
 import { Query } from "@/pages/Query";
 
@@ -111,6 +120,8 @@ beforeEach(() => {
   schemaColumns = BASE_SCHEMA_COLUMNS;
   resultRows = BASE_ROWS;
   resultQueryError = null;
+  vi.mocked(getDetailResult).mockReset();
+  vi.mocked(resolveShortId).mockImplementation((id) => Promise.resolve(id));
   window.history.replaceState(null, "", "/results/query");
   vi.stubGlobal(
     "fetch",
@@ -240,6 +251,16 @@ beforeEach(() => {
 // develop until restored. See TODO
 // query-test-configure-visible-columns-failures.
 describe("Query", () => {
+  it("preserves a run handed off from the one-run Compare route", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(BASE_ROWS[0] as never);
+
+    render(<Query url="/results/query?pick=r1" />);
+
+    await waitFor(() => expect(screen.getByTestId("query-compare-selected-r1")).toBeTruthy());
+    expect(resolveShortId).toHaveBeenCalledWith("r1");
+    expect(screen.getByTestId("query-compare-tray")).toHaveTextContent("1 result selected");
+  });
+
   it("shows narrowing facets and clears them when no rows match", async () => {
     window.history.replaceState(null, "", "/results/query?benchmark=tpch&platform=MissingDB");
     resultRows = [];
@@ -328,9 +349,9 @@ describe("Query", () => {
 
     const blocked = screen.getByTestId("query-compare-checkbox-r2") as HTMLInputElement;
     expect(blocked.disabled).toBe(true);
-    expect(blocked.title).toContain("Result does not have enough valid query timings");
+    expect(blocked.title).toContain("This run does not include enough usable query timings");
     const visibleReason = screen.getByTestId("query-disabled-reason");
-    expect(visibleReason.textContent).toContain("Disabled reason: Insufficient valid timings");
+    expect(visibleReason.textContent).toContain("Why unavailable: Insufficient valid timings");
     expect(visibleReason.textContent).toContain("Choose a run with at least two valid query timings");
     expect(blocked.getAttribute("aria-describedby")).toBe(visibleReason.id);
 
@@ -359,7 +380,7 @@ describe("Query", () => {
     expect(callout.textContent).toContain("insufficient query coverage");
     expect(within(callout).getByRole("button", { name: "Clear filters" })).toBeTruthy();
     expect(screen.getAllByTestId("query-disabled-reason")[0]?.textContent).toContain(
-      "Disabled reason: Insufficient query coverage",
+      "Why unavailable: Insufficient query coverage",
     );
   });
 
@@ -404,7 +425,7 @@ describe("Query", () => {
 
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB compatible").length).toBeGreaterThan(0));
-    expect(screen.getByText("Showing 1–24 of 61 matching result bundles")).toBeTruthy();
+    expect(screen.getByText("Showing 1–24 of 61 matching runs")).toBeTruthy();
 
     for (const id of ["r1", "page-row-0", "page-row-1", "page-row-2"]) {
       fireEvent.click(screen.getByTestId(`query-compare-checkbox-${id}`));
@@ -412,7 +433,7 @@ describe("Query", () => {
     expect(screen.getByTestId("query-compare-tray").textContent).toContain("4 results selected (maximum)");
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
 
-    await waitFor(() => expect(screen.getByText("Showing 25–48 of 61 matching result bundles")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Showing 25–48 of 61 matching runs")).toBeTruthy());
     const replacement = screen.getByTestId("query-compare-checkbox-page-row-23") as HTMLInputElement;
     expect(replacement.disabled).toBe(true);
 
@@ -486,7 +507,7 @@ describe("Query", () => {
   it("loads facet counts and table rows from DuckDB", async () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
-    expect(document.title).toBe("Query · BenchBox Results");
+    expect(document.title).toBe("Find runs · BenchBox Results");
     const resultsTable = screen.getAllByRole("table")[0]!;
 
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
@@ -494,10 +515,10 @@ describe("Query", () => {
     // `results-explorer-query-workbench-controls-and-facets` w6 introduces
     // the centralized `formatTrustLabel` formatter, applied via Query.tsx
     // `formatQueryRowCell`. With that formatter wired in, the raw
-    // "maintainer-run" trust label renders as "maintainer run" in the
+    // "maintainer-run" trust label renders as "Maintainer run" in the
     // table. PR #277 had aligned this assertion to the unformatted source
     // because the formatter didn't exist yet; w6 closes that gap.
-    expect(within(resultsTable).getByText("maintainer run")).toBeTruthy();
+    expect(within(resultsTable).getByText("Maintainer run")).toBeTruthy();
   });
 
   it("uses public table labels and formatted values in the default result table", async () => {
@@ -522,7 +543,7 @@ describe("Query", () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
-    const heading = screen.getByRole("heading", { name: "Results Query Workbench" });
+    const heading = screen.getByRole("heading", { name: "Find benchmark runs" });
     const resultSummary = screen.getByTestId("query-result-summary");
     const mobileDrawer = screen.getByTestId("query-mobile-filter-drawer");
     const resultsPanel = screen.getByTestId("query-results-panel");
@@ -617,7 +638,7 @@ describe("Query", () => {
     const mobileDrawer = screen.getByTestId("query-mobile-filter-drawer");
     expect(within(mobileDrawer).getAllByText("Benchmark: SSB").length).toBeGreaterThan(0);
     expect(within(mobileDrawer).getAllByText("Benchmark: SSB (historical source)").length).toBeGreaterThan(0);
-    expect(within(mobileDrawer).getAllByText("Trust: maintainer run").length).toBeGreaterThan(0);
+    expect(within(mobileDrawer).getAllByText("Trust: Maintainer run").length).toBeGreaterThan(0);
     expect(within(mobileDrawer).getAllByText("Cost status: not applicable (local)").length).toBeGreaterThan(0);
     expect(within(mobileDrawer).queryByText("Trust: maintainer-run")).toBeNull();
     expect(within(mobileDrawer).queryByText("Cost status: not applicable local")).toBeNull();
@@ -818,10 +839,10 @@ describe("Query", () => {
       );
       expect(countCalls.at(-1)?.[0]).toContain(`LEAST(COUNT(*), ${UNLIMITED_ROW_LIMIT})`);
     });
-    expect(screen.getByText("Showing 1–2 of 2 matching result bundles")).toBeTruthy();
+    expect(screen.getByText("Showing 1–2 of 2 matching runs")).toBeTruthy();
     expect(screen.queryByText(/Query limit:/)).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /^Default$/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Up to 10,000$/ }));
 
     await waitFor(() =>
       expect(new URL(window.location.href).searchParams.get("limit")).toBeNull(),
@@ -841,7 +862,7 @@ describe("Query", () => {
       target: { value: "3.49" },
     });
 
-    await waitFor(() => expect(screen.getByText("Showing 1–1 of 1 matching result bundle")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Showing 1–1 of 1 matching run")).toBeTruthy());
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("query-compare-checkbox-public-duckdb-1")).toBeNull();
     expect(new URL(window.location.href).searchParams.get("q")).toBe("3.49");
@@ -861,7 +882,7 @@ describe("Query", () => {
     await waitFor(() =>
       expect(new URL(window.location.href).searchParams.get("limit")).toBeNull(),
     );
-    expect(screen.getByRole("button", { name: /^Default$/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /^Up to 10,000$/ })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("exports the complete filtered row set as quoted CSV without filesystem access", async () => {

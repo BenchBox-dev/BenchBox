@@ -160,7 +160,7 @@ async function collectHomePerformanceSample(page: Page, index: number): Promise<
 
 async function collectQueryPerformanceSample(page: Page, index: number): Promise<QueryPerformanceSample> {
   await page.goto(`/results/query?bb_perf=1&perf_run=${index}`);
-  await waitForPerformanceDataLoaded(page, /matching result bundle/i);
+  await waitForPerformanceDataLoaded(page, /matching run/i);
   await waitForMeasure(page, MEASURES.QUERY_WORKBENCH_RENDER_AFTER_DB);
 
   return page.evaluate(({ measures }) => ({

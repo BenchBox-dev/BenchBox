@@ -20,10 +20,9 @@ import { MethodologyDisclosure } from "@/components/MethodologyDisclosure";
 import { RunReceipt, planDownloadUrl } from "@/components/RunReceipt";
 import { ChartPanel } from "@/components/ChartPanel";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
-import { formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
+import { formatEnumLabel, formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
 import { formatDurationSeconds, formatLatencyMs } from "@/lib/metricFormatters";
 import { visibleResultIdForRow } from "@/lib/resultLinks";
-import { usePickingState } from "@/lib/pickingState";
 
 interface ResultDetailProps extends RoutableProps {
   resultId?: string;
@@ -142,25 +141,16 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
         <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: "Result detail" }]} />
         <div class="mt-8">
           <ErrorMessage message={error} />
-          <a href="/results/" class="mt-4 inline-block btn btn-secondary no-underline">
-            Back to Results
-          </a>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <a href="/results/query" class="btn btn-primary no-underline">Find runs</a>
+            <a href="/results/benchmarks/" class="btn btn-secondary no-underline">Browse benchmarks</a>
+          </div>
         </div>
       </div>
     );
   }
   if (!detail || !chartContext) return <LoadingSpinner message="Loading result..." />;
 
-  let picking: ReturnType<typeof usePickingState> | null = null;
-  try {
-    picking = usePickingState();
-  } catch {
-    // Unit tests may not wrap with provider.
-  }
-  const isPicked = detail && picking ? picking.pickedIds.includes(detail.result_id) : false;
-  const pickingFull = picking ? picking.pickedIds.length >= 4 && !isPicked : false;
-  const resultPickingCompareHref = picking?.compareHref ?? null;
-  const resultPickingCount = picking?.pickedIds.length ?? 0;
   const benchmarkLabel = humanizeBenchmark(detail.benchmark);
 
   function toggleSort(key: MedianSortKey) {
@@ -220,13 +210,13 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
         })
         .catch((err: unknown) => {
           if (err instanceof DOMException && err.name === "AbortError") return;
-          setTuningError("Could not load tuning config.");
+          setTuningError("Could not load tuning settings.");
           setTuningLoading(false);
         });
     }
   }
 
-  const showTuningSection = detail.tuning_mode !== null || detail.has_tuning;
+  const showTuningSection = true;
   const plansUrl = planDownloadUrl(detail);
   const showSidebar = showTuningSection || (detail.has_plans && !plansUrl);
   const hasTimings = detail.display_timings.length > 0 || detail.queries.length > 0;
@@ -256,7 +246,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
           <div class="min-w-0">
             <div class="mb-3 flex flex-wrap items-center gap-3">
               <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">
-                {benchmarkLabel} - {detail.platform}
+                {benchmarkLabel} result: {detail.platform}
               </h1>
               <TrustBadge trustLabel={detail.trust_label} />
               <FundingChip funding={detail.funding} />
@@ -270,39 +260,19 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                 />
               )}
               {detail.visibility === "public-curated" && (
-                <StatusBadge role="visibility" tone="success">curated</StatusBadge>
+                <StatusBadge role="visibility" tone="success">Published</StatusBadge>
               )}
             </div>
             <p class="text-sm text-[var(--bb-data-fg-muted)]">
-              {benchmarkLabel} · SF {detail.scale_factor} · {detail.test_type ?? "standard"} · run{" "}
+              This {benchmarkLabel} run used scale factor {detail.scale_factor} for the {detail.test_type ? formatEnumLabel(detail.test_type) : "standard"} phase on{" "}
               {detail.run_date.slice(0, 10)} · Public ID{" "}
               <code class="font-mono text-[var(--bb-data-fg-primary)]">{visibleResultIdForRow(detail)}</code>
             </p>
           </div>
           <div class="flex flex-wrap gap-2">
-            <a href={`/results/compare?ids=${detail.result_id}`} class="btn btn-primary" data-testid="result-detail-compare-link">
-              Compare this result
+            <a href={`/results/query?pick=${encodeURIComponent(detail.result_id)}`} class="btn btn-primary" data-testid="result-detail-compare-link">
+              Find a run to compare
             </a>
-            <button
-              type="button"
-              class={`btn ${isPicked ? "btn-secondary" : "btn-secondary"}`}
-              aria-pressed={isPicked ? "true" : "false"}
-              aria-describedby={pickingFull ? "result-detail-picking-full" : undefined}
-              title={pickingFull ? "Up to 4 runs can be compared." : undefined}
-              disabled={pickingFull}
-              data-testid="result-detail-picking-toggle"
-              onClick={() => picking?.toggle(detail.result_id)}
-            >
-              {isPicked ? "Remove from comparison" : "Add to comparison"}
-            </button>
-            {pickingFull && (
-              <span id="result-detail-picking-full" class="text-xs text-[var(--bb-tone-warning-fg)]">Up to 4 runs can be compared.</span>
-            )}
-            {resultPickingCompareHref && resultPickingCount >= 2 && (
-              <a href={resultPickingCompareHref} class="btn btn-primary" data-testid="result-detail-compare-picked">
-                Compare {resultPickingCount} selected →
-              </a>
-            )}
             <a href={detail.bundle_download_url} class="btn btn-secondary" download>
               Download bundle
             </a>
@@ -345,7 +315,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
         <div class={showSidebar ? "space-y-6" : "hidden"}>
           {showTuningSection && (
             <section class="card">
-              <h2 class="mb-3 text-base font-semibold text-[var(--bb-data-fg-primary)]">Tuning Config</h2>
+              <h2 class="mb-3 text-base font-semibold text-[var(--bb-data-fg-primary)]">Tuning</h2>
               <div class="space-y-2 text-sm">
                 {detail.tuning_mode ? (
                   <div class="flex items-center gap-2">
@@ -356,7 +326,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                     />
                   </div>
                 ) : (
-                  <p class="text-[var(--bb-data-fg-muted)]">Tuning mode not recorded.</p>
+                  <p class="text-[var(--bb-data-fg-muted)]">Tuning status was not recorded.</p>
                 )}
                 {tuningUrl ? (
                   <div>
@@ -364,7 +334,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                       class="mt-1 cursor-pointer border-0 bg-transparent p-0 text-xs text-[var(--bb-accent-hover)] underline hover:text-[var(--bb-accent)]"
                       onClick={handleTuningExpand}
                     >
-                      {tuningExpanded ? "Hide config ↑" : "Show config ↓"}
+                      {tuningExpanded ? "Hide settings ↑" : "Show settings ↓"}
                     </button>
                     {tuningExpanded && (
                       <div class="mt-2">
@@ -379,7 +349,9 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                     )}
                   </div>
                 ) : (
-                  <p class="text-xs text-[var(--bb-data-fg-subtle)]">No tuning config recorded.</p>
+                  <p class="text-xs text-[var(--bb-data-fg-subtle)]">
+                    {detail.tuning_mode === "notuning" ? "No tuning settings were applied." : "Tuning details were not published."}
+                  </p>
                 )}
               </div>
             </section>
@@ -403,7 +375,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
           {hasTimings && (
             <section class="card">
             <h2 class="mb-4 text-base font-semibold text-[var(--bb-data-fg-primary)]">
-              Query Timings ({detail.display_timings.length})
+              Query timings ({detail.display_timings.length})
             </h2>
             <TableScrollHint scrollerRef={timingsScrollerRef} testId="detail-timings-scroll-hint" />
             <div ref={timingsScrollerRef} class="overflow-x-auto" data-testid="detail-timings-scroll-container">

@@ -225,7 +225,7 @@ describe("QueryDiffTable", () => {
       />,
     );
 
-    const table = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
+    const table = screen.getByRole("heading", { name: "Query-level differences" }).closest("section");
     expect(table).not.toBeNull();
     expect(table).toHaveTextContent("Baseline: DuckDB");
     // w4: every state names how many of how many are shown, so an empty
@@ -260,7 +260,7 @@ describe("QueryDiffTable", () => {
       />,
     );
 
-    const table = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
+    const table = screen.getByRole("heading", { name: "Query-level differences" }).closest("section");
     expect(table).toHaveTextContent("Showing 2 of 3 queries.");
     expect(table).not.toHaveTextContent("Showing 4 of 6 queries.");
   });

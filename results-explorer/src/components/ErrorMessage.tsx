@@ -3,7 +3,7 @@ interface ErrorMessageProps {
   message: string;
 }
 
-export function ErrorMessage({ title = "Error", message }: ErrorMessageProps) {
+export function ErrorMessage({ title = "Something went wrong", message }: ErrorMessageProps) {
   return (
     <div role="alert" class="rounded-lg p-6 tone-danger">
       <h3 class="mb-1 text-sm font-semibold">{title}</h3>

@@ -106,7 +106,7 @@ export function IdentityDiffStrip({ results, baselineIndex = 0, runLabels }: Ide
           <h2 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">Engine and hardware</h2>
           <p class="text-xs text-[var(--bb-data-fg-muted)]">
             {diffCount === 0
-              ? "These runs match on every axis below, so the difference is not explained by them."
+              ? `No differences were recorded for these ${fields.length} fields. Other recorded or unrecorded factors may differ.`
               : `${diffCount} of ${fields.length} ${diffCount === 1 ? "axis varies" : "axes vary"} across the whole selection.`}
           </p>
         </div>
@@ -181,7 +181,7 @@ export function IdentityDiffStrip({ results, baselineIndex = 0, runLabels }: Ide
         <h2 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">Engine and hardware</h2>
         <p class="text-xs text-[var(--bb-data-fg-muted)]">
           {diffCount === 0
-            ? "These runs match on every axis below, so the difference is not explained by them."
+            ? `No differences were recorded for these ${fields.length} fields. Other recorded or unrecorded factors may differ.`
             : `${diffCount} of ${fields.length} ${diffCount === 1 ? "axis differs" : "axes differ"} between these runs.`}
         </p>
       </div>

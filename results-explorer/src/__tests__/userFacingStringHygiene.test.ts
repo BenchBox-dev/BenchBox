@@ -24,12 +24,16 @@ const FORBIDDEN_PATTERNS: ReadonlyArray<{ pattern: RegExp; label: string }> = [
   { pattern: /\bresults\.duckdb\b/i, label: "results.duckdb" },
   { pattern: /\blegacy slug\b/i, label: "legacy slug" },
   { pattern: /\bedit the URL\b/i, label: "edit the URL" },
+  { pattern: /\bADR-\d+\b/i, label: "ADR reference" },
+  { pattern: /\bResultDetail\b/, label: "internal component name" },
+  { pattern: /\b(?:explorer_pipeline|benchbox\.core)\b/, label: "internal module path" },
 ];
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const srcRoot = resolve(here, "..");
 
 const ALLOWED_INTERNAL_FRAGMENTS = new Map<string, ReadonlySet<string>>([
+  ["App.tsx", new Set(['"./pages/ResultDetail"'])],
   [
     "db.ts",
     new Set([
@@ -131,6 +135,7 @@ describe("user-facing string hygiene", () => {
       "<p>See AGENTS.md</p>",
       "{/* JSX maintainer note: CLAUDE.md (this is a comment, allowed) */}",
       '<p>Inspect results.duckdb, the legacy slug, or edit the URL.</p>',
+      '<p>See ADR-2, ResultDetail, or explorer_pipeline for details.</p>',
       'const ok = "ask a maintainer to rebuild the Explorer data";',
     ].join("\n");
     const findings = scanSource("synthetic.tsx", sample, ts.ScriptKind.TSX);
@@ -159,6 +164,21 @@ describe("user-facing string hygiene", () => {
         file: "synthetic.tsx",
         fragment: "Inspect results.duckdb, the legacy slug, or edit the URL.",
         pattern: "edit the URL",
+      },
+      {
+        file: "synthetic.tsx",
+        fragment: "See ADR-2, ResultDetail, or explorer_pipeline for details.",
+        pattern: "ADR reference",
+      },
+      {
+        file: "synthetic.tsx",
+        fragment: "See ADR-2, ResultDetail, or explorer_pipeline for details.",
+        pattern: "internal component name",
+      },
+      {
+        file: "synthetic.tsx",
+        fragment: "See ADR-2, ResultDetail, or explorer_pipeline for details.",
+        pattern: "internal module path",
       },
     ]);
   });

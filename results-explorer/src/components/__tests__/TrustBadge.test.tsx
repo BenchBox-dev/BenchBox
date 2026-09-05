@@ -90,7 +90,7 @@ describe("TrustBadge", () => {
     const badge = container.querySelector(".badge");
     const title = badge?.getAttribute("title") ?? "";
     expect(title).toContain("some-new-tier");
-    expect(title).toContain("unrecognised");
+    expect(title).toContain("not recognized");
   });
 
   it("empty trustLabel renders an explicit Unknown badge (not nothing)", () => {
@@ -178,7 +178,7 @@ describe("ValidationBadge", () => {
     const badge = container.querySelector(".badge");
     expect(badge?.getAttribute("data-tone")).toBe("info");
     expect(badge?.textContent).toBe("exact");
-    expect(badge?.getAttribute("title")).toContain("Validation status: exact");
+    expect(badge?.getAttribute("title")).toContain("Recorded status: exact");
   });
 
   it("emits data-role=validation", () => {
@@ -192,7 +192,7 @@ describe("ValidationBadge", () => {
     expect(hidden.container.querySelector(".badge")).toBeNull();
 
     const shown = render(<ValidationBadge validationStatus={null} showMissing />);
-    expect(shown.getByText("validation n/a")).toBeTruthy();
+    expect(shown.getByText("Not recorded")).toBeTruthy();
   });
 
   // -----------------------------------------------------------------------
@@ -208,8 +208,8 @@ describe("ValidationBadge", () => {
     expect(badge?.textContent).toBe("no validation");
     expect(badge?.getAttribute("data-tone")).toBe("warning");
     const title = badge?.getAttribute("title") ?? "";
-    expect(title).toContain("Validation status: not_run");
-    expect(title.toLowerCase()).toContain("never executed");
+    expect(title).toContain("Recorded status: not_run");
+    expect(title.toLowerCase()).toContain("was not run");
   });
 
   it.each([

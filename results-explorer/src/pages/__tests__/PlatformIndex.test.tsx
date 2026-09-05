@@ -407,9 +407,9 @@ describe("PlatformIndex - sortable table headers", () => {
 
     const blocked = screen.getByTestId("platform-compare-checkbox-r-not-comparable") as HTMLInputElement;
     expect(blocked.disabled).toBe(true);
-    expect(blocked.title).toContain("Result does not have enough valid query timings");
+    expect(blocked.title).toContain("This run does not include enough usable query timings");
     const visibleReason = screen.getByTestId("platform-disabled-reason");
-    expect(visibleReason.textContent).toContain("Disabled reason: Insufficient valid timings");
+    expect(visibleReason.textContent).toContain("Why unavailable: Insufficient valid timings");
     expect(visibleReason.textContent).toContain("Choose a run with at least two valid query timings");
     expect(blocked.getAttribute("aria-describedby")).toBe(visibleReason.id);
 
@@ -440,7 +440,7 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(callout.textContent).toContain("insufficient query coverage");
     expect(within(callout).getByRole("button", { name: "Clear filters" })).toBeTruthy();
     expect(screen.getAllByTestId("platform-disabled-reason")[0]?.textContent).toContain(
-      "Disabled reason: Insufficient query coverage",
+      "Why unavailable: Insufficient query coverage",
     );
   });
 
@@ -816,7 +816,7 @@ describe("PlatformIndex - sortable table headers", () => {
     const trend = screen.getByTestId("trend-cohort-tpch-sf0.01-standard-display_geomean_ms");
     const duplicateState = within(trend).getByTestId("time-series-duplicate-day");
     expect(screen.queryByRole("img", { name: "Geomean latency trend over time" })).toBeNull();
-    expect(duplicateState.textContent).toContain("Trend line hidden");
+    expect(duplicateState.textContent).toContain("cannot be ordered in this trend");
     expect(duplicateState.textContent).toContain("same-day runs");
     expect(duplicateState.textContent).toContain("Public ID 1111aaaa");
     expect(duplicateState.textContent).toContain("Public ID 2222bbbb");
@@ -846,8 +846,8 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(screen.queryByRole("img", { name: "Geomean latency trend over time" })).toBeNull();
     const plural = screen.getByTestId("trend-sparse-tpch-sf0.1-power-display_geomean_ms");
     const singular = screen.getByTestId("trend-sparse-star_schema-sf0.01-power-display_geomean_ms");
-    expect(plural.textContent).toContain("Limited observations: 2 published runs in this comparable ranking.");
-    expect(singular.textContent).toContain("Limited observations: 1 published run in this comparable ranking.");
+    expect(plural.textContent).toContain("2 published runs");
+    expect(singular.textContent).toContain("1 published run");
     expect(plural.textContent).not.toContain("runin");
     expect(singular.textContent).not.toContain("runin");
     expect(plural.textContent).toContain("Geomean latency (lower is better)");

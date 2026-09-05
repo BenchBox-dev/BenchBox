@@ -129,7 +129,7 @@ export function buildCompareDecisionSummary(
   const winner = suppressWinnerClaims ? null : metricWinner;
   const comparison = sortedMetrics.length > 1 ? sortedMetrics[sortedMetrics.length - 1]! : null;
   const comparisonRatio = winner && comparison ? metricRatio(winner.value, comparison.value, higherIsBetter) : null;
-  const comparisonLabel = higherIsBetter ? "vs lowest selected" : "vs slowest selected";
+  const comparisonLabel = higherIsBetter ? "the lowest selected score" : "the slowest selected run";
   const queryRecord = buildWinnerQueryRecord(results, winner?.resultId ?? null);
   const percentiles = results.map((result) => buildPercentiles(result));
   const cost = buildCostSummary(results, winner, primaryMetric);
@@ -207,7 +207,7 @@ function buildHeadline(
     }
     return `Not directly comparable: ${reason}. Winner language is suppressed; raw query evidence remains available.`;
   }
-  if (!winner) return "No winner claim: selected results are missing the primary metric.";
+  if (!winner) return "The selected runs do not have enough primary-metric data for a comparison.";
   const winnerLabel = options.runLabels?.[winner.resultId] ?? winner.platform;
   // A reader who reads only this headline must not come away believing the
   // comparison rests on validated data when it does not - so the caveat rides
@@ -215,12 +215,12 @@ function buildHeadline(
   const caveatSuffix = validationCaveat ? ` ${validationCaveat}` : "";
   if (comparisonRatio === null) return `${winnerLabel} leads on the selected primary metric.${caveatSuffix}`;
   if (Math.abs(comparisonRatio - 1) < COMPARE_TIE_THRESHOLD) {
-    return `Selected runs are within the tie threshold (${formatRatio(comparisonRatio)}); no material winner on the selected primary metric.${caveatSuffix}`;
+    return `The selected runs are within the tie threshold (${formatRatio(comparisonRatio)}) on the primary metric.${caveatSuffix}`;
   }
   if (primaryMetric === "power_score") {
-    return `${winnerLabel} leads by ${formatRatio(comparisonRatio)} on power score.${caveatSuffix}`;
+    return `In these selected runs, ${winnerLabel}'s power score was ${formatRatio(comparisonRatio)} the lowest selected score.${caveatSuffix}`;
   }
-  return `${winnerLabel} is ${formatRatio(comparisonRatio)} faster by geomean query time.${caveatSuffix}`;
+  return `In these selected runs, ${winnerLabel}'s geomean query time was ${formatRatio(comparisonRatio)} faster than the slowest selected run.${caveatSuffix}`;
 }
 
 function isQueryEvidenceSuppressionReason(reason: string): boolean {

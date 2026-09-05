@@ -33,8 +33,10 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import {
   buildQueryResultExportQuery,
   buildQueryResultPageQueries,
+  getDetailResult,
   memoizedSnapshotQueryRows,
   QUERY_RESULT_PAGE_SIZE,
+  resolveShortId,
 } from "@/lib/duckdbQueries";
 import { formatQueryCell, formatQueryColumnLabel, formatQueryFacetValue } from "@/lib/queryLabels";
 import { formatPlainNumber } from "@/lib/metricFormatters";
@@ -90,8 +92,16 @@ const COMPARE_METADATA_COLUMNS = [
   "comparison_exclusion_reason",
 ];
 
-export function Query(_: RoutableProps) {
-  useDocumentTitle("Query · BenchBox Results");
+interface QueryProps extends RoutableProps {
+  url?: string;
+}
+
+export function Query({ url }: QueryProps) {
+  useDocumentTitle("Find runs · BenchBox Results");
+  const pinnedCompareId = useMemo(() => {
+    const activeUrl = url ?? (typeof window === "undefined" ? "/results/query" : `${window.location.pathname}${window.location.search}`);
+    return new URL(activeUrl, "https://benchbox.dev").searchParams.get("pick");
+  }, [url]);
   const resultsScrollerRef = useRef<HTMLDivElement>(null);
   const sqlScrollerRef = useRef<HTMLDivElement>(null);
   const [benchmarks, setBenchmarks] = useFacetField("benchmark");
@@ -146,6 +156,7 @@ export function Query(_: RoutableProps) {
   // render disabled. The Compare tray below the result count surfaces
   // the active cohort and the launch button.
   const [compareSelectedRows, setCompareSelectedRows] = useState<Map<string, ResultRow>>(new Map());
+  const [compareHandoffError, setCompareHandoffError] = useState<string | null>(null);
   const compareSelectedIds = useMemo(() => new Set(compareSelectedRows.keys()), [compareSelectedRows]);
   const toggleCompareSelection = (row: ResultRow) =>
     setCompareSelectedRows((prev) => {
@@ -165,6 +176,31 @@ export function Query(_: RoutableProps) {
   // Default compatible-only on once the cohort signature locks; users can
   // disable to inspect (still-disabled) incompatible rows. See finding #3.
   const [compareCompatibleOnly, setCompareCompatibleOnly] = useState(true);
+
+  useEffect(() => {
+    if (!pinnedCompareId) return;
+    let cancelled = false;
+    setCompareHandoffError(null);
+    resolveShortId(pinnedCompareId)
+      .then((resolvedId) => getDetailResult(resolvedId))
+      .then((detail) => {
+        if (cancelled) return;
+        if (detail === null) {
+          setCompareHandoffError(`The selected run “${pinnedCompareId}” is no longer published.`);
+          return;
+        }
+        setCompareSelectedRows(new Map([[detail.result_id, detail as unknown as ResultRow]]));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCompareHandoffError("The selected run could not be loaded. Try finding it again.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pinnedCompareId]);
+
   const rowLimitMode = rowLimitRaw === "all" ? "all" : "default";
   const rowLimit = rowLimitMode === "all" ? UNLIMITED_ROW_LIMIT : DEFAULT_ROW_LIMIT;
   const parsedPage = Number.parseInt(pageRaw, 10);
@@ -378,11 +414,21 @@ export function Query(_: RoutableProps) {
   const pageStart = resultTotal === 0 ? 0 : pageOffset + 1;
   const pageEnd = Math.min(pageOffset + rows.length, resultTotal);
 
-  if (error) return <ErrorMessage message={error} />;
+  if (error) {
+    return (
+      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <ErrorMessage title="Could not load results" message={error} />
+        <div class="mt-4 flex flex-wrap gap-2">
+          <a href="/results/query" class="btn btn-primary no-underline">Try again</a>
+          <a href="/results/" class="btn btn-secondary no-underline">Browse leaderboards</a>
+        </div>
+      </div>
+    );
+  }
   if (schema.length === 0 && loading) {
     return (
       <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <QueryRowsSkeleton message="Loading query workbench..." />
+        <QueryRowsSkeleton message="Loading published runs..." />
       </div>
     );
   }
@@ -693,10 +739,9 @@ export function Query(_: RoutableProps) {
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div class="mb-6">
-        <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">Results Query Workbench</h1>
+        <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">Find benchmark runs</h1>
         <p class="mt-2 max-w-3xl text-sm text-[var(--bb-data-fg-muted)]">
-          Explore published benchmark runs with shareable filters, configurable columns, CSV and JSON exports, and an optional
-          read-only SQL workspace.
+          Filter published runs, open their evidence, or select up to four runs to compare. Your filters stay in the page link.
         </p>
       </div>
 
@@ -707,8 +752,7 @@ export function Query(_: RoutableProps) {
             class="order-1 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm"
           >
             <div class="text-sm text-[var(--bb-data-fg-muted)]">
-              Showing {pageStart.toLocaleString()}–{pageEnd.toLocaleString()} of {resultTotal.toLocaleString()} matching result{" "}
-              {resultTotal === 1 ? "bundle" : "bundles"}
+              Showing {pageStart.toLocaleString()}–{pageEnd.toLocaleString()} of {resultTotal.toLocaleString()} matching {resultTotal === 1 ? "run" : "runs"}
               {rowLimitMode === "default" && resultTotal >= DEFAULT_ROW_LIMIT && (
                 <span class="ml-2 text-xs text-[var(--bb-tone-warning-fg)]">
                   The query reached the {DEFAULT_ROW_LIMIT.toLocaleString()}-result cap; add filters to narrow the set.
@@ -717,7 +761,7 @@ export function Query(_: RoutableProps) {
             </div>
             <div class="flex flex-wrap items-center gap-2">
               <div class="flex items-center gap-2 text-sm text-[var(--bb-data-fg-muted)]">
-                <span class="font-medium">Rows:</span>
+                <span class="font-medium">Results to load:</span>
                 <div class="flex overflow-hidden rounded-md border border-[var(--bb-data-border-strong)]" role="group" aria-label="Result row limit">
                   {(["default", "all"] as const).map((mode) => (
                     <button
@@ -731,7 +775,7 @@ export function Query(_: RoutableProps) {
                       aria-pressed={rowLimitMode === mode}
                       onClick={() => setRowLimitRaw(mode)}
                     >
-                      {mode === "default" ? "Default" : "All"}
+                      {mode === "default" ? `Up to ${DEFAULT_ROW_LIMIT.toLocaleString()}` : "All"}
                     </button>
                   ))}
                 </div>
@@ -744,8 +788,7 @@ export function Query(_: RoutableProps) {
               </button>
             </div>
             <p class="w-full text-xs text-[var(--bb-data-fg-muted)]">
-              Exports include every row matching the facets and search within the selected Query limit, using the currently
-              visible columns. Paging does not narrow export scope.
+              Downloads include every matching run within the selected limit and use the columns shown below. Moving between pages does not change the download.
             </p>
             <label class="w-full text-sm text-[var(--bb-data-fg-muted)]">
               <span class="font-medium">Search results</span>
@@ -790,7 +833,7 @@ export function Query(_: RoutableProps) {
                   description={
                     queryNarrowingLabels.length > 0
                       ? `Narrowed by ${queryNarrowingLabels.join(", ")}. Clear the filters or search text to widen the query.`
-                      : "The published corpus has no result bundles to show."
+                      : "There are no published runs to show."
                   }
                   action={
                     queryNarrowingLabels.length > 0 ? (
@@ -894,6 +937,11 @@ export function Query(_: RoutableProps) {
                             )}
                           </span>
                         </div>
+                        {compareHandoffError && (
+                          <p class="border-t border-[var(--bb-tone-warning-border)] px-4 py-2 text-[var(--bb-tone-warning-fg)]" role="alert">
+                            {compareHandoffError}
+                          </p>
+                        )}
                         {compareSelectedRows.size > 0 && (
                           <ul
                             class="flex flex-wrap gap-2 border-t border-[var(--bb-data-border)] px-4 py-2"
@@ -962,7 +1010,7 @@ export function Query(_: RoutableProps) {
                               >
                                 <span class="sr-only">Compare</span>
                               </th>
-                              <th class="table-th">Compare state</th>
+                              <th class="table-th hidden sm:table-cell">Compare state</th>
                               {visibleColumns.map((column) => {
                                 const isActive = sort.column === column;
                                 const arrow = isActive ? (sort.direction === "asc" ? " ↑" : " ↓") : "";
@@ -972,7 +1020,7 @@ export function Query(_: RoutableProps) {
                                     : "descending"
                                   : "none";
                                 return (
-                                  <th key={column} scope="col" aria-sort={ariaSort} class="p-0">
+                                  <th key={column} scope="col" aria-sort={ariaSort} class={`p-0 ${queryColumnResponsiveClass(column)}`}>
                                     <button
                                       type="button"
                                       class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--bb-accent)]"
@@ -1024,11 +1072,11 @@ export function Query(_: RoutableProps) {
                                       data-testid={`query-compare-checkbox-${id}`}
                                     />
                                   </td>
-                                  <td class="table-td max-w-[16rem]">
+                                  <td class="table-td hidden max-w-[16rem] sm:table-cell">
                                     <QueryCompareReasonStatus id={reasonId} copy={disabledCopy} selected={isSelected} />
                                   </td>
                                   {visibleColumns.map((column) => (
-                                    <td key={column} class="table-td">
+                                    <td key={column} class={`table-td ${queryColumnResponsiveClass(column)}`}>
                                       {formatQueryRowCell(column, row[column])}
                                     </td>
                                   ))}
@@ -1080,8 +1128,9 @@ export function Query(_: RoutableProps) {
           <details class="order-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm">
             <summary class="cursor-pointer text-sm font-medium text-[var(--bb-data-fg-primary)]">Advanced SQL</summary>
             <div class="mt-4 space-y-4">
+              <p class="text-sm text-[var(--bb-data-fg-muted)]">Write a read-only SQL query against the published results. Start from the current filters or choose an example.</p>
               <button class="btn btn-secondary" onClick={buildSqlFromFilters}>
-                Build SQL From Filters
+                Build SQL from filters
               </button>
               <StarterQueries onSelect={loadStarterQuery} />
               <textarea
@@ -1159,7 +1208,7 @@ export function Query(_: RoutableProps) {
             <div class="mt-3 space-y-3">
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <p class="text-xs text-[var(--bb-data-fg-muted)]">
-                  Driven from DuckDB <code class="rounded bg-[var(--bb-surface-app)] px-1 font-mono">bench.results</code> introspection.
+                  Choose the details shown in the results table and downloads. Technical field names remain available for SQL users.
                 </p>
                 <div class="flex flex-wrap gap-2" role="group" aria-label="Bulk visible-column actions">
                   <button
@@ -1321,6 +1370,12 @@ function formatQueryRowCell(column: string, value: unknown): string {
   return formatQueryCell(column, value);
 }
 
+function queryColumnResponsiveClass(column: string): string {
+  return column === "trust_label" || column === "visibility" || column === "validation_status"
+    ? "hidden md:table-cell"
+    : "";
+}
+
 function QueryCompareReasonStatus({
   id,
   copy,
@@ -1335,7 +1390,7 @@ function QueryCompareReasonStatus({
   }
   return (
     <div id={id} class="text-xs text-[var(--bb-data-fg-muted)]" data-testid="query-disabled-reason">
-      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Disabled reason: {copy.shortText}</span>
+      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Why unavailable: {copy.shortText}</span>
       <span class="block">{copy.recoveryHint}</span>
     </div>
   );

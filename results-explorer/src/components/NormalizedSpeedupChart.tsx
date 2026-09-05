@@ -126,7 +126,7 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
         width="100%"
         height={totalHeight}
         viewBox={`0 0 ${drawWidth} ${totalHeight}`}
-        aria-label="Normalized speedup chart"
+        aria-label="Per-query results relative to the selected baseline"
       >
         {/* Grid lines and axis labels */}
         {SPEEDUP_GRID_STOPS.map((stop) => {
@@ -254,9 +254,9 @@ function SpeedupParityState({
 }) {
   return (
     <div class="rounded-lg panel-muted p-4 text-sm">
-      <p class="font-semibold text-[var(--bb-data-fg-primary)]">No meaningful per-query speedup difference</p>
+      <p class="font-semibold text-[var(--bb-data-fg-primary)]">No meaningful per-query difference</p>
       <p class="mt-1 text-[var(--bb-data-fg-muted)]">
-        All {speedupCount.toLocaleString()} compared query speedups are 1.00× versus baseline {baseline}.
+        All {speedupCount.toLocaleString()} compared queries are 1.00× relative to {baseline}.
       </p>
       <p class="mt-2 text-xs text-[var(--bb-data-fg-muted)]">
         Baseline: <strong>{baseline}</strong>

@@ -195,7 +195,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("Compare", () => {
-  it("opens the compare builder with a single ID pinned (instead of redirecting back to the detail page)", async () => {
+  it("sends a pinned run to Query without losing its ID", async () => {
     setupUrl(["a556e716"]);
     vi.mocked(resolveShortId).mockResolvedValue("tpch-duckdb-sf0.01-20260403-7fe93365");
     vi.mocked(getDetailResult).mockResolvedValue(DUCKDB);
@@ -210,15 +210,13 @@ describe("Compare", () => {
 
     render(<Compare />);
 
-    await waitFor(() => expect(screen.getByTestId("compare-builder")).toBeTruthy());
-    await waitFor(() => expect(screen.getByTestId("compare-builder-query-cta")).toBeTruthy());
-    await waitFor(() => expect(screen.getByTestId("compare-builder-status")).toBeTruthy());
-    expect(screen.getByTestId("compare-builder-status").textContent).toContain("1 result selected");
-    expect(screen.getByTestId("compare-builder-query-link").getAttribute("href")).toMatch(/^\/results\/query/);
-    // Pinned builder may still fetch detail for status; not asserted after retirement
-    // The old behavior was a redirect to /results/r/<id>; that round-trip is
-    // gone. The user must end up on a comparison surface, not the detail page
-    // they came from.
+    await waitFor(() => expect(screen.getByTestId("compare-picker-launch")).toBeTruthy());
+    expect(screen.getByRole("heading", { name: "Find another run" })).toBeTruthy();
+    expect(screen.getByText(/One run is selected/)).toBeTruthy();
+    expect(screen.getByTestId("compare-picker-query-link")).toHaveAttribute(
+      "href",
+      "/results/query?pick=tpch-duckdb-sf0.01-20260403-7fe93365",
+    );
     expect(route).not.toHaveBeenCalledWith(expect.stringMatching(/^\/results\/r\//), true);
   });
 
@@ -244,10 +242,10 @@ describe("Compare", () => {
 
     render(<Compare />);
 
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy());
     const notice = screen.getByTestId("compare-url-notice");
     expect(notice).toHaveTextContent("Ignored unavailable result ID: “stale-result”.");
-    expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy();
     expect(screen.queryByText(/Cannot compare/i)).toBeNull();
     await waitFor(() => {
       expect(new URL(window.location.href).searchParams.get("ids")).toBe("r1,r2");
@@ -292,7 +290,7 @@ describe("Compare", () => {
     await waitFor(() => {
       expect(new URL(window.location.href).searchParams.get("ids")).toBe("r1,r2");
     });
-    expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy();
   });
 
   it("resolves aliases before applying the four-result comparison limit", async () => {
@@ -350,17 +348,18 @@ describe("Compare", () => {
 
     render(<Compare />);
 
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy());
     expect(new URL(window.location.href).searchParams.get("ids")).toBe("r1,r2,r3");
   });
 
-  it("renders the in-page compare builder when no ids are provided (no URL editing required)", async () => {
+  it("offers a direct path to find runs when no IDs are provided", async () => {
     setupUrl([]);
 
     render(<Compare />);
 
-    await waitFor(() => expect(screen.getByTestId("compare-builder")).toBeTruthy());
-    expect(screen.getByText(/Pick runs to compare/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId("compare-picker-launch")).toBeTruthy());
+    expect(screen.getByRole("heading", { name: "Choose runs to compare" })).toBeTruthy();
+    expect(screen.getByTestId("compare-picker-query-link")).toHaveAttribute("href", "/results/query");
     expect(screen.queryByText(/Add \?ids=/)).toBeNull();
     expect(route).not.toHaveBeenCalled();
   });
@@ -602,7 +601,7 @@ describe("Compare", () => {
     expect(blocked.disabled).toBe(true);
     expect(blocked.title).toContain("Result does not have enough valid query timings");
     const visibleReason = within(getByTestId("compare-builder-row-r2")).getByTestId("compare-disabled-reason");
-    expect(visibleReason.textContent).toContain("Disabled reason: Insufficient valid timings");
+    expect(visibleReason.textContent).toContain("Why unavailable: Insufficient valid timings");
     expect(visibleReason.textContent).toContain("Choose a run with at least two valid query timings");
     expect(blocked.getAttribute("aria-describedby")).toBe(visibleReason.id);
 
@@ -633,7 +632,7 @@ describe("Compare", () => {
     expect(callout.textContent).toContain("insufficient query coverage");
     expect(within(callout).getByRole("button", { name: "Clear filters" })).toBeTruthy();
     expect(getByTestId("compare-builder-row-blocked-a").textContent).toContain(
-      "Disabled reason: Insufficient query coverage",
+      "Why unavailable: Insufficient query coverage",
     );
   });
 
@@ -695,22 +694,32 @@ describe("Compare", () => {
     rerender(<Compare url="/results/compare?ids=r1,r2" />);
 
     await waitFor(() => expect(screen.queryByTestId("compare-builder")).toBeNull());
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy());
     expect(getDetailResult).toHaveBeenCalledWith("r1");
     expect(getDetailResult).toHaveBeenCalledWith("r2");
   });
 
-  it("shows 'vs worst' speedup of 10.00x in the DuckDB summary card (power_score primary)", async () => {
-    // DUCKDB power_score=3000, SQLITE power_score=300 → DuckDB vs worst = 3000/300 = 10.00x
+  it("shows a 10.00x ratio to the lowest selected score in the DuckDB summary card (power_score primary)", async () => {
+    // DUCKDB power_score=3000, SQLITE power_score=300 → DuckDB / lowest selected = 10.00x
     render(<Compare />);
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
     await waitFor(() => expect(document.title).toBe("Compare (2) · BenchBox Results"));
     // The summary card dt label
-    expect(screen.getAllByText(/vs worst/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Compared with lowest selected score/i).length).toBeGreaterThan(0);
     // The computed ratio: 10.00x
     expect(screen.getAllByText("10.00x").length).toBeGreaterThan(0);
+  });
+
+  it("labels the lowest selected score instead of calling a run tied with itself", async () => {
+    render(<Compare />);
+    await waitFor(() => expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0));
+
+    const sqliteCard = screen.getByText("Public ID r2").closest(".card");
+    expect(sqliteCard).toBeTruthy();
+    expect(sqliteCard).toHaveTextContent("Lowest selected");
+    expect(sqliteCard).not.toHaveTextContent("Tied");
   });
 
   it("renders a funding chip on the primary compare cards, not just the builder table", async () => {
@@ -739,12 +748,12 @@ describe("Compare", () => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
 
-    const summary = screen.getByRole("heading", { name: "Decision Summary" });
+    const summary = screen.getByRole("heading", { name: "Comparison summary" });
     const chartsHeading = screen.getByText("Charts");
-    const queryDiffHeading = screen.getByRole("heading", { name: "Query-Level Diff" });
+    const queryDiffHeading = screen.getByRole("heading", { name: "Query-level differences" });
 
-    expect(summary.closest("section")).toHaveTextContent("DuckDB leads by 10.00x on power score.");
-    expect(summary.closest("section")).toHaveTextContent("2 fastest of 2 comparable");
+    expect(summary.closest("section")).toHaveTextContent("In these selected runs, DuckDB's power score was 10.00x the lowest selected score.");
+    expect(summary.closest("section")).toHaveTextContent("DuckDB was fastest on 2 of 2 comparable queries");
     expect(summary.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(summary.compareDocumentPosition(queryDiffHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(chartsHeading.compareDocumentPosition(queryDiffHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -753,10 +762,10 @@ describe("Compare", () => {
   it("omits summary cost context when normalized costs are absent", async () => {
     render(<Compare />);
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy();
     });
 
-    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    const summary = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
     expect(summary).not.toHaveTextContent("Cost/performance:");
   });
 
@@ -782,10 +791,10 @@ describe("Compare", () => {
 
     render(<Compare />);
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy();
     });
 
-    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    const summary = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
     expect(summary).toHaveTextContent("Cost/performance:");
     expect(summary).toHaveTextContent("winner cost $0.50");
     expect(summary).toHaveTextContent("30.00x cost/performance");
@@ -808,18 +817,18 @@ describe("Compare", () => {
 
     render(<Compare />);
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy();
     });
 
-    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
-    const queryDiff = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
-    expect(summary).toHaveTextContent("Claims suppressed");
+    const summary = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
+    const queryDiff = screen.getByRole("heading", { name: "Query-level differences" }).closest("section");
+    expect(summary).toHaveTextContent("No winner named");
     expect(summary).toHaveTextContent("Insufficient comparable query evidence");
     expect(summary).toHaveTextContent("Selected runs do not share at least two valid query timings");
     // w4: the badge now names how many of how many are shown, so an empty
     // filter is distinguishable from an empty comparison.
     expect(queryDiff).toHaveTextContent("Showing 3 of 3 queries.");
-    expect(queryDiff).toHaveTextContent("Winner claims are suppressed because Selected runs do not share at least two valid query timings");
+    expect(queryDiff).toHaveTextContent("This page does not name a winner because Selected runs do not share at least two valid query timings");
     // w4 replaced the generic "Missing" badge with an explicit
     // not-comparable marker. The pinned behaviour this test exists for is
     // unchanged: the rows are still SHOWN rather than dropped, which is what
@@ -867,7 +876,7 @@ describe("Compare", () => {
     expect(standings).toHaveTextContent("Selected runs do not share at least two valid query timings");
     expect(standings?.querySelector("table")).toBeNull();
     expect(screen.getByRole("heading", { name: "Query by run" })).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Query-Level Diff" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Query-level differences" })).toBeNull();
   });
 
   it("links compare warning counts to the Comparability Receipt and names warning classes", async () => {
@@ -888,14 +897,14 @@ describe("Compare", () => {
     );
 
     render(<Compare />);
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy());
 
     const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
     const warningLink = screen.getByTestId("compare-warning-link") as HTMLAnchorElement;
-    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    const receipt = screen.getByRole("region", { name: "Comparison checks" });
     const warningTarget = screen.getByTestId("comparability-warning-target") as HTMLElement;
     expect(warningLink.getAttribute("href")).toBe("#comparability-receipt-warnings");
-    expect(warningLink.getAttribute("aria-label")).toBe("2 warnings; review comparability receipt warnings");
+    expect(warningLink.getAttribute("aria-label")).toBe("2 warnings; review comparison differences");
     expect(receipt.getAttribute("id")).toBe("comparability-receipt");
     expect(warningTarget.getAttribute("id")).toBe("comparability-receipt-warnings");
     expect(guardrails.textContent).toContain("Warning classes:");
@@ -912,7 +921,7 @@ describe("Compare", () => {
   // validation_status "not_run" alongside three cosmetic environment diffs
   // (platform version, driver version, execution mode). Before this fix the
   // guardrails summary named only the three cosmetic diffs and folded
-  // Validation into "+1 more", and the Decision Summary headlined a
+  // Validation into "+1 more", and the Comparison summary headlined a
   // confident winner claim with no caveat that one side was unvalidated.
   // ---------------------------------------------------------------------
   it("names Validation explicitly in the guardrails summary and caveats the winner claim (DuckDB vs Pandas, unvalidated)", async () => {
@@ -948,14 +957,14 @@ describe("Compare", () => {
     );
 
     render(<Compare />);
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy());
 
     const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
     // Validation must be named in the visible summary, not folded into "+N more" -
     // it is sorted to the front, so any truncation falls on the cosmetic fields.
     expect(guardrails.textContent).toMatch(/Warning classes: Validation,/);
 
-    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    const summary = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
     expect(summary).toHaveTextContent("DuckDB");
     // The headline itself carries the caveat - a reader who reads only the
     // headline must not conclude this rests on validated data.
@@ -980,15 +989,15 @@ describe("Compare", () => {
     );
 
     render(<Compare />);
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy());
 
     const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
-    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    const receipt = screen.getByRole("region", { name: "Comparison checks" });
     expect(guardrails).toHaveTextContent("1 warning");
     expect(guardrails).not.toHaveTextContent("1 warnings");
     expect(receipt).toHaveTextContent("1 warning");
     expect(receipt).not.toHaveTextContent("1 warnings");
-    expect(screen.getByRole("link", { name: "1 warning; review comparability receipt warnings" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "1 warning; review comparison differences" })).toBeTruthy();
   });
 
   it("summary card speedup and query diff ratio are consistent for 2-platform fixture", async () => {
@@ -1090,19 +1099,19 @@ describe("Compare", () => {
   // (d) Baseline selector changes baseline in chart section
   // -----------------------------------------------------------------------
 
-  it("baseline selector shows both platforms as options when Normalized Speedup tab is active", async () => {
+  it("baseline selector shows both platforms as options when Relative to selected baseline tab is active", async () => {
     render(<Compare />);
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
-    // Click the Normalized Speedup chart tab to reveal the baseline selector
-    const speedupTab = screen.getByRole("button", { name: /Normalized Speedup/i });
+    // Click the Relative to selected baseline chart tab to reveal the baseline selector
+    const speedupTab = screen.getByRole("button", { name: /Relative to selected baseline/i });
     fireEvent.click(speedupTab);
     // The baseline selector should now be visible
     await waitFor(() => {
-      expect(screen.getByLabelText(/Baseline/i)).toBeTruthy();
+      expect(screen.getByRole("combobox", { name: "Baseline" })).toBeTruthy();
     });
-    const select = screen.getByLabelText(/Baseline/i) as HTMLSelectElement;
+    const select = screen.getByRole("combobox", { name: "Baseline" }) as HTMLSelectElement;
     // Both platforms should appear as options
     const options = Array.from(select.options).map((o) => o.text);
     expect(options).toContain("DuckDB");
@@ -1114,12 +1123,12 @@ describe("Compare", () => {
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
-    const speedupTab = screen.getByRole("button", { name: /Normalized Speedup/i });
+    const speedupTab = screen.getByRole("button", { name: /Relative to selected baseline/i });
     fireEvent.click(speedupTab);
     await waitFor(() => {
-      expect(screen.getByLabelText(/Baseline/i)).toBeTruthy();
+      expect(screen.getByRole("combobox", { name: "Baseline" })).toBeTruthy();
     });
-    const select = screen.getByLabelText(/Baseline/i) as HTMLSelectElement;
+    const select = screen.getByRole("combobox", { name: "Baseline" }) as HTMLSelectElement;
     // Default baseline is index 0 (DuckDB - first result in the fixture)
     expect(select.value).toBe("0");
     expect(select.options[0]!.text).toBe("DuckDB");
@@ -1135,7 +1144,7 @@ describe("Compare", () => {
     const select = screen.getByLabelText("Baseline") as HTMLSelectElement;
     fireEvent.change(select, { target: { value: "1" } });
 
-    const diffTable = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
+    const diffTable = screen.getByRole("heading", { name: "Query-level differences" }).closest("section");
     expect(select.value).toBe("1");
     expect(diffTable).toHaveTextContent("Baseline: SQLite");
     expect(diffTable).toHaveTextContent("DuckDB");
@@ -1159,17 +1168,17 @@ describe("Compare", () => {
     });
 
     await waitFor(() => expect(document.title).toBe("Compare (3) · BenchBox Results"));
-    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    const summary = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
     const select = screen.getByLabelText("Baseline") as HTMLSelectElement;
     const options = Array.from(select.options).map((option) => option.text);
     const beforeIds = new URL(window.location.href).searchParams.get("ids");
 
-    expect(summary).toHaveTextContent("DuckDB leads by 10.00x on power score.");
+    expect(summary).toHaveTextContent("In these selected runs, DuckDB's power score was 10.00x the lowest selected score.");
     expect(options).toEqual(["DuckDB", "SQLite", "PostgreSQL"]);
     expect(screen.getByRole("heading", { name: "Query by run" }).closest("section")).toHaveTextContent(
       "Showing 2 of 2 queries.",
     );
-    expect(screen.queryByRole("heading", { name: "Query-Level Diff" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Query-level differences" })).toBeNull();
 
     fireEvent.change(select, { target: { value: "2" } });
 
@@ -1200,27 +1209,27 @@ describe("Compare", () => {
 
     render(<Compare />);
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy();
     });
 
     expect(screen.getByRole("heading", { name: "Mixed Benchmark Comparison" })).toBeTruthy();
     expect(screen.queryByText(/Cannot compare results from different benchmarks/)).toBeNull();
     const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
-    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
-    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
-    const queryDiff = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
+    const receipt = screen.getByRole("region", { name: "Comparison checks" });
+    const summary = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
+    const queryDiff = screen.getByRole("heading", { name: "Query-level differences" }).closest("section");
     expect(guardrails).toHaveTextContent(
-      "Winner claims are suppressed because benchmarks differ and scale factors differ.",
+      "The summary does not rank these runs because benchmarks differ and scale factors differ.",
     );
     expect(receipt).toHaveTextContent("Benchmark");
     expect(receipt).toHaveTextContent("Scale factor");
     expect(summary).toHaveTextContent("Not directly comparable: benchmarks differ and scale factors differ.");
-    expect(summary).toHaveTextContent("Claims suppressed");
-    expect(summary).not.toHaveTextContent("DuckDB leads by");
+    expect(summary).toHaveTextContent("No winner named");
+    expect(summary).not.toHaveTextContent("DuckDB's power score was");
     expect(summary).not.toHaveTextContent("fastest");
     expect(screen.queryByText("vs worst")).toBeNull();
     expect(queryDiff).toHaveTextContent(
-      "Winner claims are suppressed because benchmarks differ and scale factors differ",
+      "This page does not name a winner because benchmarks differ and scale factors differ",
     );
   });
 
@@ -1246,18 +1255,20 @@ describe("Compare", () => {
 
     render(<Compare />);
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy();
     });
 
     expect(screen.getByRole("heading", { name: "SSB Comparison" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Mixed Benchmark Comparison" })).toBeNull();
 
     const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
-    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
-    expect(guardrails).toHaveTextContent("Selected runs share the same benchmark, scale, and phase for winner claims.");
+    const summary = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
+    expect(guardrails).toHaveTextContent(
+      "These runs share the same benchmark, scale, and test phase. Review the differences below before drawing conclusions.",
+    );
     expect(guardrails).toHaveTextContent("Comparable");
-    expect(summary).not.toHaveTextContent("Claims suppressed");
-    expect(summary).toHaveTextContent("DuckDB leads by");
+    expect(summary).not.toHaveTextContent("No winner named");
+    expect(summary).toHaveTextContent("DuckDB's power score was");
   });
 
   it("suppresses winner claims for direct compare URLs with mixed phases", async () => {
@@ -1281,21 +1292,21 @@ describe("Compare", () => {
 
     render(<Compare />);
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy();
     });
 
     const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
-    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
-    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
-    const queryDiff = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
-    expect(guardrails).toHaveTextContent("Winner claims are suppressed because phases differ.");
-    expect(receipt).toHaveTextContent("Phase");
+    const receipt = screen.getByRole("region", { name: "Comparison checks" });
+    const summary = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
+    const queryDiff = screen.getByRole("heading", { name: "Query-level differences" }).closest("section");
+    expect(guardrails).toHaveTextContent("The summary does not rank these runs because phases differ.");
+    expect(receipt).toHaveTextContent("Test phase");
     expect(receipt).toHaveTextContent("DuckDB: power; SQLite: throughput");
     expect(summary).toHaveTextContent("Not directly comparable: phases differ.");
-    expect(summary).toHaveTextContent("Claims suppressed");
-    expect(summary).not.toHaveTextContent("DuckDB leads by");
+    expect(summary).toHaveTextContent("No winner named");
+    expect(summary).not.toHaveTextContent("DuckDB's power score was");
     expect(screen.queryByText("vs worst")).toBeNull();
-    expect(queryDiff).toHaveTextContent("Winner claims are suppressed because phases differ");
+    expect(queryDiff).toHaveTextContent("This page does not name a winner because phases differ");
   });
 
   it("keeps the detailed comparability receipt after decision and chart evidence", async () => {
@@ -1304,9 +1315,9 @@ describe("Compare", () => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
 
-    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    const receipt = screen.getByRole("region", { name: "Comparison checks" });
     const chartsHeading = screen.getByText("Charts");
-    const queryDiffHeading = screen.getByRole("heading", { name: "Query-Level Diff" });
+    const queryDiffHeading = screen.getByRole("heading", { name: "Query-level differences" });
 
     expect(receipt).toHaveTextContent("Benchmark");
     expect(receipt).toHaveTextContent("Query scope");
@@ -1342,11 +1353,11 @@ describe("Compare", () => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
 
-    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    const receipt = screen.getByRole("region", { name: "Comparison checks" });
     expect(receipt).toHaveTextContent("Tuning");
     expect(receipt).toHaveTextContent("DuckDB: default; SQLite: manual");
     expect(receipt).toHaveTextContent("Environment");
     expect(receipt).toHaveTextContent("DuckDB: Linux, x64, 8 CPU");
-    expect(receipt).toHaveTextContent("SQLite: macOS, arm64, 10 CPU");
+    expect(receipt).toHaveTextContent("SQLite: macOS, Arm64, 10 CPU");
   });
 });
