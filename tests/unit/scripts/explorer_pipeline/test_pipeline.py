@@ -136,7 +136,9 @@ def test_mismatched_query_sets_are_not_ranked(tmp_path: Path) -> None:
 
     with duckdb.connect(str(output / "results.duckdb"), read_only=True) as con:
         ranking_reasons = con.execute("SELECT DISTINCT ranking_exclusion_reason FROM benchmark_rankings").fetchall()
+        detail_reasons = con.execute("SELECT DISTINCT ranking_exclusion_reason FROM result_detail_metrics").fetchall()
     assert ranking_reasons == [("mismatched_query_set",)]
+    assert detail_reasons == [("mismatched_query_set",)]
 
 
 def _duckdb_results(output: Path) -> list[dict]:

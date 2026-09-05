@@ -337,7 +337,13 @@ class DuckDBSnapshotBuilder:
                 self._create_schema(con)
                 self._create_metadata(con)
                 self._populate_supporting_tables(con, entries, details_map)
-                self._populate_results(con, entries, details_map, prefix)
+                cohort_ranking_reasons = {
+                    row.result_id: row.ranking_exclusion_reason
+                    for _, summary in summaries
+                    for row in summary.platforms
+                    if row.ranking_exclusion_reason is not None
+                }
+                self._populate_results(con, entries, details_map, prefix, cohort_ranking_reasons)
                 self._populate_result_basis_availability(con, entries, details_map)
                 self._populate_query_display_timings(con, entries, details_map)
                 self._populate_query_executions(con, entries, details_map)
@@ -844,6 +850,7 @@ class DuckDBSnapshotBuilder:
         entries: list[ManifestEntry],
         details_map: dict[str, DetailResult],
         bundle_url_prefix: str,
+        cohort_ranking_reasons: dict[str, str],
     ) -> None:
         rows: list[tuple] = []
         for entry in entries:
@@ -886,7 +893,7 @@ class DuckDBSnapshotBuilder:
                     entry.zero_timing_count,
                     entry.display_exclusion_reason,
                     entry.comparison_exclusion_reason,
-                    entry.ranking_exclusion_reason,
+                    cohort_ranking_reasons.get(entry.result_id, entry.ranking_exclusion_reason),
                     entry.trust_label,
                     entry.visibility,
                     entry.funding,

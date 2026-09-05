@@ -388,7 +388,11 @@ def _build_benchmark_summaries(
             {dt.query_id for _, detail in pairs for dt in detail.display_timings},
             key=_natural_sort_key,
         )
-        query_id_sets = {frozenset(dt.query_id for dt in detail.display_timings) for _, detail in pairs}
+        query_id_sets = {
+            frozenset(dt.query_id for dt in detail.display_timings)
+            for entry, detail in pairs
+            if is_ranking_eligible(entry)
+        }
         cohort_query_sets_match = len(query_id_sets) <= 1
 
         platform_rows: list[PlatformRow] = []
