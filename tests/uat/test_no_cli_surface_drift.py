@@ -143,6 +143,12 @@ ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     "benchbox/cli/commands/df_tuning.py",
     "benchbox/cli/commands/run_official.py",
     "benchbox/cli/commands/tuning.py",
+    # datafusion-tuning-support: `tuning validate --platform` now accepts
+    # datafusion, matching the existing `tuning init --platform datafusion
+    # --mode dataframe` path and the core DataFusion tuning capability map.
+    # This is an intentional public choice expansion; once merged, develop's
+    # baseline carries it and this temporary exception can be removed.
+    "benchbox/cli/commands/tuning_group.py",
     # Temporary (mirrors PR #800's --show-plans landing): the canonical plan-capture
     # work adds the first-class --analyze-plans/--no-analyze-plans option to `run`,
     # which intentionally changes run()'s signature surface. Skip the surface check

@@ -59,8 +59,8 @@ test.describe("compare entrypoint happy paths", () => {
     await waitForDataLoaded(page, /matching result bundle/);
 
     await facetCheckbox(page, "Benchmark", "TPC-H").check();
-    // The additive zero-timing ResultDetail fixture is a TPC-H bundle too.
-    await expect(page.getByTestId("query-result-summary")).toContainText("11 matching result bundle");
+    // The additive zero-timing and Pandas honesty fixtures are TPC-H bundles too.
+    await expect(page.getByTestId("query-result-summary")).toContainText("14 matching result bundle");
     await expect(page.getByRole("button", { name: /Download CSV/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Download JSON/ })).toBeVisible();
 

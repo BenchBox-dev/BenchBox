@@ -99,6 +99,19 @@ class TestTuningInitSqlMode:
 
 
 class TestTuningInitDataframeMode:
+    def test_init_datafusion_dataframe_mode_exits_zero(self):
+        runner = CliRunner()
+        with (
+            patch.object(_tuning_group_module, "console"),
+            patch.object(_tuning_group_module, "save_dataframe_tuning"),
+        ):
+            result = runner.invoke(
+                tuning_group,
+                ["init", "--platform", "datafusion", "--mode", "dataframe"],
+                obj=_obj(),
+            )
+        assert result.exit_code == 0
+
     def test_init_polars_dataframe_mode_exits_zero(self):
         runner = CliRunner()
         with (
