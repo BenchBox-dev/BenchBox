@@ -24,7 +24,7 @@ test.describe("local result preview", () => {
     await expect(page).toHaveURL(/\/results\/local\/local-[0-9a-f]{12}$/);
     const main = page.getByRole("main");
     await expect(main.getByTestId("local-result-banner")).toContainText("has not been uploaded");
-    await expect(main.getByRole("heading", { name: /TPC-H - DuckDB/ })).toBeVisible();
+    await expect(main.getByRole("heading", { name: /TPC-H result: DuckDB/ })).toBeVisible();
     await expect(main.locator('[data-role="trust"]')).toContainText("Local");
     await expect(main.getByText(/Local preview ID/)).toBeVisible();
     await expect(main.getByRole("link", { name: "Submit for public review" })).toHaveAttribute(

@@ -30,7 +30,7 @@ export function LocalResultPicker({ label = "Open local result", className = "bt
   }
 
   return (
-    <span class="inline-flex flex-col items-start gap-1">
+    <span class="relative inline-flex flex-col items-start gap-1">
       <input
         ref={inputRef}
         type="file"
