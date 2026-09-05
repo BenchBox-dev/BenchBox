@@ -138,6 +138,8 @@ def test_non_lane_inputs_skipped_in_changed_paths() -> None:
     mixed_paths = [
         "docs/index.rst",
         "tests/unit/test_example.py",
+        "scripts/publication/reconciliation.py",
+        "scripts/publication/check_operational_receipts.py",
         ".claude/skills/todo-db/SKILL.md",
         ".github/workflows/pr.yml",
         "Makefile",
@@ -174,6 +176,14 @@ def test_lane_owned_paths_still_contaminate_despite_non_lane_allowlist() -> None
     )
     assert report.success is False
     assert any("changed paths violate lane 'site' isolation" in err for err in report.errors)
+
+    corpus_report = verify_lane_isolation(
+        "site",
+        repo_root=REPO_ROOT,
+        changed_paths=["docs/index.rst", "scripts/publication/validator_parity.py"],
+    )
+    assert corpus_report.success is False
+    assert any("changed paths violate lane 'site' isolation" in err for err in corpus_report.errors)
 
 
 def test_non_lane_inputs_excluded_from_digests() -> None:
