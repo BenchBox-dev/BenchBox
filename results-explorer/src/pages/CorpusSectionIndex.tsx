@@ -63,12 +63,12 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
   return (
     <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
       <header class="mb-8 max-w-3xl">
-        <p class="mb-2 text-sm font-semibold uppercase tracking-wide text-[var(--bb-accent)]">Browse results</p>
+        <p class="mb-2 text-sm font-semibold uppercase tracking-wide text-[var(--bb-accent)]">Published results</p>
         <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">{title}</h1>
         <p class="mt-3 text-[var(--bb-data-fg-muted)]">
           {isBenchmarks
-            ? "Open every benchmark represented in the public corpus and see its platform coverage."
-            : "Open every platform represented in the public corpus and see its benchmark coverage."}
+            ? "Choose a benchmark to see its published runs, participating platforms, and rankings."
+            : "Choose a platform to see its published runs across benchmarks and scales."}
         </p>
       </header>
 
@@ -79,10 +79,10 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
       ) : entries.length === 0 ? (
         <EmptyState
           title={`No published ${kind}`}
-          description={`The public corpus has no ${kind} to list yet.`}
+          description={`There are no published ${kind} to list yet.`}
           action={
             <a href="/results/" class="btn btn-secondary no-underline">
-              Back to Leaderboards
+              Back to leaderboards
             </a>
           }
         />
@@ -118,7 +118,7 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
                   </h2>
                   <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <dt class="text-[var(--bb-data-fg-subtle)]">Results</dt>
+                      <dt class="text-[var(--bb-data-fg-subtle)]">Runs</dt>
                       <dd class="mt-1 font-medium text-[var(--bb-data-fg-primary)]">
                         {entry.resultCount.toLocaleString()}
                       </dd>

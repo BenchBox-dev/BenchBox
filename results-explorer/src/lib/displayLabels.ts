@@ -10,8 +10,8 @@ import { humanizeBenchmark } from "@/utils";
 // default).
 
 const TRUST_LABEL_LABELS: Record<string, string> = {
-  "maintainer-run": "maintainer run",
-  "community-submission": "community submission",
+  "maintainer-run": "Maintainer run",
+  "community-submission": "Community submission",
 };
 
 const VALIDATION_STATUS_LABELS: Record<string, string> = {
@@ -39,7 +39,7 @@ const VALIDATION_STATUS_LABELS: Record<string, string> = {
  * the short label in `describeValidationStatus`.
  */
 const VALIDATION_STATUS_DESCRIPTIONS: Record<string, string> = {
-  passed: "Validated against the reference oracle and confirmed correct.",
+  passed: "BenchBox checked this result against the expected answers and found no differences.",
   failed: "Validation ran and found this result incorrect.",
   warning: "Validation ran and flagged a concern short of a hard failure.",
   not_applicable: "Validation does not apply to this result.",
@@ -47,8 +47,8 @@ const VALIDATION_STATUS_DESCRIPTIONS: Record<string, string> = {
   interrupted: "The run was interrupted before validation could complete.",
   partial: "Some queries failed validation; this is a partial pass.",
   error: "The validation process itself errored and produced no verdict.",
-  not_run: "Validation never executed for this result (for example, DataFrame mode or --validation disabled). The numbers are unverified.",
-  not_validated: "This result was explicitly not checked against an oracle.",
+  not_run: "Validation was not run for this result. Its measurements have not been checked against the expected answers.",
+  not_validated: "This result was not checked against the expected answers.",
   uncertain: "Validation completed with reduced confidence; treat this result with caution.",
   unknown: "Validation status was not recorded for this result.",
 };
@@ -127,9 +127,9 @@ export function describeValidationStatus(raw: string | null | undefined): Valida
 }
 
 const VISIBILITY_LABELS: Record<string, string> = {
-  "public-curated": "public (curated)",
-  "public-community": "public (community)",
-  internal: "internal",
+  "public-curated": "Published, maintainer reviewed",
+  "public-community": "Published, community submitted",
+  internal: "Not public",
 };
 
 // Source of truth: benchbox/core/results/provenance.py::FUNDING_SOURCES.
@@ -142,7 +142,7 @@ const FUNDING_LABELS: Record<string, string> = {
   "free-trial": "free trial",
   "vendor-sponsored": "vendor sponsored",
   grant: "grant funded",
-  unspecified: "unspecified",
+  unspecified: "No funding information provided",
 };
 
 const COST_STATUS_LABELS: Record<string, string> = {
@@ -164,7 +164,7 @@ export function formatTrustLabel(raw: string | null | undefined): string {
  * value carries the same meaning as a declared one.
  */
 export function formatFunding(raw: string | null | undefined): string {
-  if (raw === null || raw === undefined || raw === "") return "unspecified";
+  if (raw === null || raw === undefined || raw === "") return FUNDING_LABELS.unspecified!;
   return FUNDING_LABELS[raw] ?? formatEnumLabel(raw);
 }
 
@@ -210,6 +210,44 @@ export function formatCostStatus(raw: string | null | undefined): string {
  */
 export function formatEnumLabel(raw: string): string {
   return raw.replace(/[_-]+/g, " ").trim();
+}
+
+export function formatArchitecture(raw: string): string {
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "x86_64" || normalized === "amd64") return "x86-64";
+  if (normalized === "arm64" || normalized === "aarch64") return "Arm64";
+  return formatEnumLabel(raw);
+}
+
+export function formatCpuFamily(raw: string): string {
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "amd_epyc") return "AMD EPYC";
+  if (normalized === "intel_xeon") return "Intel Xeon";
+  if (normalized === "apple_silicon") return "Apple silicon";
+  return formatEnumLabel(raw);
+}
+
+export function formatExecutionMode(raw: string): string {
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "sql") return "SQL";
+  if (normalized === "dataframe") return "DataFrame";
+  return formatEnumLabel(raw);
+}
+
+export function formatTuningMode(raw: string): string {
+  const normalized = raw.trim().toLowerCase();
+  const labels: Record<string, string> = {
+    notuning: "No tuning",
+    tuned: "Tuned",
+    "tuned-fallback": "Tuned with fallback settings",
+    auto: "Automatic tuning",
+    custom: "Custom tuning",
+  };
+  return labels[normalized] ?? formatEnumLabel(raw);
+}
+
+export function formatMemoryGb(value: number): string {
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value)} GB`;
 }
 
 /** Stable identity used by cohort/ranking surfaces. Raw slugs remain on rows. */

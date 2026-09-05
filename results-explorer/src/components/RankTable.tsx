@@ -174,7 +174,7 @@ export function RankTable({ summary, preserveOrder = false }: Props) {
       </div>
       {excludedPlatformCount > 0 && (
         <p class="mt-2 text-[11px] text-[var(--bb-data-fg-subtle)]">
-          Excluded columns are marked with * and are shown for provenance, not as rankable competitors.
+          Columns marked with * are shown for reference but are not included in the ranking.
         </p>
       )}
     </div>
@@ -198,7 +198,7 @@ function RankTableEmptyState({ summary, queryIds }: { summary: BenchmarkSummary;
     >
       <p class="font-semibold text-[var(--bb-data-fg-primary)]">Rank chart unavailable</p>
       <p class="mt-1 text-[var(--bb-data-fg-muted)]">
-        No rankable timing cells are available for this ranking. Submitted evidence is Excluded or lacks valid timing,
+        No timings in this ranking meet the requirements for ranking. The published runs are excluded or have no usable timing,
         so a normal rank matrix would be all dashes.
       </p>
       {reasons.length > 0 && (

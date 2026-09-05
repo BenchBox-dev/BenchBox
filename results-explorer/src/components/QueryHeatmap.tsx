@@ -71,7 +71,7 @@ type StickyColKey = keyof typeof STICKY_COL_REM;
 export const BENCHMARK_MATRIX_DENSITY_CONTRACT = {
   maxCollapsedRowHeightPx: 72,
   frozenColumns: ["selection", "platform identity", "primary metric", "secondary geomean"] as const,
-  secondaryMetadataAffordance: "Receipt and metadata",
+  secondaryMetadataAffordance: "Run details",
 } as const;
 
 function cumulativeStickyLeft(
@@ -124,7 +124,7 @@ function fmtQueryMs(ms: number): string {
 function CompareDisabledReason({ id, copy }: { id?: string; copy: CompareExclusionReasonCopy }) {
   return (
     <div id={id} class="mt-1 text-xs text-[var(--bb-data-fg-muted)]" data-testid="query-heatmap-disabled-reason">
-      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Disabled reason: {copy.shortText}</span>
+      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Why unavailable: {copy.shortText}</span>
       <span class="block">{copy.recoveryHint}</span>
     </div>
   );
@@ -326,7 +326,7 @@ export function QueryHeatmap({
   if (platforms.length === 0) {
     return (
       <div class="rounded-lg border border-dashed border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] p-10 text-center text-[var(--bb-data-fg-subtle)]">
-        No results available for this configuration.
+        No results are available for these settings.
       </div>
     );
   }
@@ -344,7 +344,7 @@ export function QueryHeatmap({
   // cohorts. The primary score column keeps its own column header
   // explanation (`primaryLabel`/`primaryDirectionLabel`) below.
   const heatmapMeaning = suppressHeat
-    ? "Heat color is suppressed because this ranking has fewer than two comparable platforms."
+    ? "Heat color is unavailable because fewer than two platforms can be compared in this ranking."
     : "Heat color compares each query column with the fastest published timing; darker cells are slower.";
 
   function renderHeaderSortControl(
@@ -476,7 +476,7 @@ export function QueryHeatmap({
         </div>
         <div class="mt-1">
           A validation badge next to a platform name means that result was excluded from ranking on validation
-          grounds - the query cells shown are still published evidence, not a validated, comparable score.
+          reason. The query measurements remain visible, but they do not form a validated comparison score.
         </div>
       </div>
 

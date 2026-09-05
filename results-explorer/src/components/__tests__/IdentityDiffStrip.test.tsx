@@ -70,7 +70,7 @@ describe("marking which axes differ", () => {
 
   it("says so plainly when nothing differs", () => {
     render(<IdentityDiffStrip results={[run(), run({ result_id: "r2" })]} />);
-    expect(screen.getByText(/match on every axis below/)).toBeTruthy();
+    expect(screen.getByText(/No differences were recorded for these 7 fields/)).toBeTruthy();
   });
 
   it("reports the differing count with correct grammar", () => {

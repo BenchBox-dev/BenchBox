@@ -10,9 +10,8 @@ test.describe("NotFound", () => {
     await page.goto("/results/no/such/route/");
     await waitForShell(page);
 
-    await expect(page.getByRole("heading", { name: "404" })).toBeVisible();
-    await expect(page.getByText(/Page not found/i)).toBeVisible();
-    const backLink = page.getByRole("link", { name: /Back to Results/i });
+    await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+    const backLink = page.getByRole("link", { name: "Browse leaderboards" });
     await expect(backLink).toHaveAttribute("href", "/results/");
   });
 
@@ -27,7 +26,7 @@ test.describe("NotFound", () => {
     await page.goto("/results/does-not-exist/");
     await waitForShell(page);
 
-    await expect(page.getByRole("heading", { name: "404" })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(/Benchmark "does-not-exist" is not part of the published corpus/i)).toBeVisible();
   });
 
@@ -42,6 +41,6 @@ test.describe("NotFound", () => {
     await expect(page.getByRole("heading", { name: /^ClickBench$/ })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(/No published results yet for ClickBench/i)).toBeVisible();
     // Crucially: NOT a 404.
-    await expect(page.getByRole("heading", { name: "404" })).not.toBeVisible();
+    await expect(page.getByRole("heading", { name: "Page not found" })).not.toBeVisible();
   });
 });

@@ -97,7 +97,8 @@ describe("ResultDetail - median-first contract", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
 
     expect(screen.getByRole("alert")).toHaveTextContent('No result found for "stale-result".');
-    expect(screen.getByRole("link", { name: "Back to Results" })).toHaveAttribute("href", "/results/");
+    expect(screen.getByRole("link", { name: "Find runs" })).toHaveAttribute("href", "/results/query");
+    expect(screen.getByRole("link", { name: "Browse benchmarks" })).toHaveAttribute("href", "/results/benchmarks/");
   });
 
   it("(a) default table shows one row per display_timing, not per raw query", async () => {
@@ -105,7 +106,7 @@ describe("ResultDetail - median-first contract", () => {
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
     // Header should show display_timings count
-    expect(screen.getByText("Query Timings (2)")).toBeTruthy();
+    expect(screen.getByText("Query timings (2)")).toBeTruthy();
     await waitFor(() => expect(document.title).toBe("TPC-H · DuckDB · SF0.1 · BenchBox Results"));
 
     // The main table uses the display timing contract, not raw samples.
@@ -244,7 +245,7 @@ describe("ResultDetail - median-first contract", () => {
     expect(summary).toHaveTextContent("Primary metric · higher is better");
     expect(summary).toHaveTextContent("Power score");
     expect(summary).toHaveTextContent("Public ID r1");
-    expect(within(summary).getByRole("link", { name: "Compare this result" })).toBeTruthy();
+    expect(within(summary).getByRole("link", { name: "Find a run to compare" })).toHaveAttribute("href", "/results/query?pick=r1");
     expect(summary.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(chartsHeading.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(receipt).toHaveTextContent("Measurement samples");

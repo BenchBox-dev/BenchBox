@@ -116,7 +116,7 @@ describe("corpus section indexes", () => {
 
     expect(await screen.findByText(`No published ${kind}`)).toBeTruthy();
     expect(listResults).toHaveBeenCalledTimes(2);
-    expect(screen.getByRole("link", { name: "Back to Leaderboards" })).toHaveAttribute("href", "/results/");
+    expect(screen.getByRole("link", { name: "Back to leaderboards" })).toHaveAttribute("href", "/results/");
   });
 
   it.each(SECTION_CASES)("$title renders a load failure instead of an empty state", async ({ kind }) => {

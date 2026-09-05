@@ -60,7 +60,7 @@ test.describe("@pr246-capture Home remediation", () => {
           // made e2e/routes/home.spec.ts pass without ever exercising loaded
           // Home content.
           await expect(page.getByRole("grid", { name: "Cross-benchmark leaderboard" })).toBeVisible();
-          await expect(page.getByRole("heading", { name: "BenchBox Curated Results Preview" })).toBeVisible();
+          await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible();
           await expect(page.locator("body")).not.toContainText(/Binder Error|Stack trace|Results snapshot incomplete/i);
           await page.waitForTimeout(800);
           const shot = filename(mode, width);

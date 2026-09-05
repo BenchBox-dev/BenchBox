@@ -43,7 +43,7 @@ test.describe("safe area layout", () => {
     await page.goto("/results/query");
     await waitForShell(page);
     await installSimulatedInsets(page);
-    await waitForDataLoaded(page, /Results Query Workbench/);
+    await waitForDataLoaded(page, /Find benchmark runs/);
     await waitForDataElement(page, page.getByTestId("query-results-panel").locator("tbody tr").first());
 
     await expectInsideHorizontalInsets(page, page.getByTestId("query-desktop-filters"));

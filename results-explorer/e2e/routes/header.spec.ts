@@ -51,7 +51,7 @@ test.describe("Global header", () => {
     await expect(page.getByRole("button", { name: /Theme: system/i })).toBeVisible();
 
     const explorerNav = page.getByRole("navigation", { name: "Results Explorer" });
-    await expect(explorerNav.getByRole("link")).toHaveText(["Leaderboards", "Benchmarks", "Platforms", "Compare", "Query"]);
+    await expect(explorerNav.getByRole("link")).toHaveText(["Leaderboards", "Benchmarks", "Platforms", "Compare", "Find runs"]);
   });
 
   test("@smoke preserves the global header contract behind the mobile disclosure", async ({ page }) => {
@@ -122,7 +122,7 @@ test.describe("Global header", () => {
     await waitForShell(page);
 
     const globalNav = page.getByRole("navigation", { name: HEADER_NAV_ARIA_LABEL });
-    for (const subnavLabel of ["Leaderboards", "Benchmarks", "Platforms", "Compare", "Query"]) {
+    for (const subnavLabel of ["Leaderboards", "Benchmarks", "Platforms", "Compare", "Find runs"]) {
       await expect(globalNav.getByRole("link", { name: subnavLabel, exact: true })).toHaveCount(0);
     }
   });

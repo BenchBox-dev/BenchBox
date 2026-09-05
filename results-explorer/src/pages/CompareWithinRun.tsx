@@ -13,6 +13,7 @@ import { clampReferenceIndex, withinRunCompareHref, MAX_WITHIN_RUN_BASES, MIN_WI
 import { paletteColor } from "@/lib/chartTheme";
 import { geomeanMs } from "@/lib/chartMath";
 import { COMPARE_TIE_THRESHOLD } from "@/lib/compareSummary";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import {
   DEFAULT_BASIS,
   availableBasesForExecutions,
@@ -220,6 +221,7 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
   const parsed = useMemo(() => parseBasesParam(search), [search]);
   const [bases, setBases] = useState<MeasurementBasis[]>(parsed.bases);
   const [referenceIndex, setReferenceIndex] = useState<number>(parsed.referenceIndex);
+  useDocumentTitle(detail ? `Compare measurements · ${detail.platform} · BenchBox Results` : "Compare measurements · BenchBox Results");
 
   useEffect(() => {
     setBases(parsed.bases);
@@ -357,7 +359,7 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
           Within one run
         </p>
         <h1 class="mt-1 text-2xl font-bold text-[var(--bb-data-fg-primary)]">
-          {detail.platform} — measurement bases compared
+          Compare measurements from one {detail.platform} run
         </h1>
         {/*
           The reason this page may do what no other compare surface may. Stated
@@ -365,13 +367,10 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
           numbers must not travel.
         */}
         <p class="mt-2 text-sm text-[var(--bb-data-fg-muted)]">
-          Every column is the same run on the same hardware and engine, so no engine or hardware
-          varies here. Only the measurement basis does — which is why the statistic may differ
-          between columns on this page and nowhere else.
+          Each column reads the same run in a different way. The platform, hardware, and queries stay fixed, so any difference comes from the selected passes or summary method.
         </p>
         <p class="mt-1 text-xs text-[var(--bb-data-fg-subtle)]" data-testid="not-a-platform-result">
-          These figures describe measurement methodology, not engine performance. They are excluded
-          from rankings and must not be quoted as platform results.
+          These figures explain how the measurement method changes the result. They do not compare platforms and are not included in rankings.
         </p>
         <div class="mt-3 flex flex-wrap items-center gap-2">
           <StatusBadge role="comparison" tone="neutral">

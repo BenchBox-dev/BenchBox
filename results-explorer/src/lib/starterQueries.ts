@@ -40,7 +40,7 @@ export const STARTER_QUERIES: StarterQuery[] = [
     id: "recent_results",
     category: "results",
     label: "Recent results",
-    description: "The 25 most recent result bundles with headline metrics.",
+    description: "The 25 most recent runs and their main measurements.",
     sql: `SELECT result_id, benchmark, scale_factor, platform, run_date, power_score, display_geomean_ms
 FROM bench.results
 ORDER BY run_date DESC
@@ -63,7 +63,7 @@ ORDER BY benchmark, scale_factor, best_display_geomean_ms ASC;`,
     id: "normalized_cost_leaderboard",
     category: "cost_and_deployment",
     label: "Normalized cost leaderboard",
-    description: "Comparable cloud rows ranked by BenchBox-computed normalized USD and deployment shape.",
+    description: "Comparable cloud runs ranked by normalized cost and deployment type.",
     sql: `SELECT benchmark, scale_factor, platform,
        normalized_cost_usd, cost_status, cost_model_version,
        cloud_provider, cloud_region, warehouse_size, instance_type, storage_format
@@ -76,7 +76,7 @@ LIMIT 50;`,
     id: "cost_status_by_cloud",
     category: "cost_and_deployment",
     label: "Cost status by cloud and region",
-    description: "Counts normalized, local-not-applicable, and unavailable cost rows by emitted deployment facets.",
+    description: "Counts runs by cost status, cloud, region, and cost model.",
     sql: `SELECT cost_status,
        COALESCE(cloud_provider, 'unknown') AS cloud_provider,
        COALESCE(cloud_region, pricing_region, 'unknown') AS region,
@@ -189,7 +189,7 @@ ORDER BY benchmark, runs DESC;`,
     id: "detail_query_timings",
     category: "detail_drilldown",
     label: "Detail page timings",
-    description: "The display_ms timings shown on a ResultDetail page for the most recent result.",
+    description: "The per-query timings shown on the most recent run page.",
     sql: `WITH latest AS (
   SELECT result_id FROM bench.results ORDER BY run_date DESC LIMIT 1
 )

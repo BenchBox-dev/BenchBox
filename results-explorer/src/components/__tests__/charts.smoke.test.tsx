@@ -292,8 +292,8 @@ describe("RankTable", () => {
 
     expect(container.querySelector("table")).toBeNull();
     expect(container.textContent).toContain("Rank chart unavailable");
-    expect(container.textContent).toContain("Submitted evidence is Excluded");
-    expect(container.textContent).toContain("Trust policy excludes this result from ranking.");
+    expect(container.textContent).toContain("The published runs are excluded");
+    expect(container.textContent).toContain("Results from this source are not included in rankings.");
     expect(container.textContent).toContain("Validation status excludes this result from ranking.");
   });
 });
@@ -346,7 +346,7 @@ describe("QueryHistogram", () => {
 
     expect(container.querySelector("svg")).not.toBeNull();
     expect(container.querySelectorAll("rect")).toHaveLength(0);
-    expect(container.textContent).toContain("Exact zero timing is excluded from display evidence.");
+    expect(container.textContent).toContain("A zero timing cannot be used in this ranking.");
   });
 
   it("uses a mobile-safe responsive width instead of forcing horizontal overflow", () => {
@@ -518,7 +518,7 @@ describe("TimeSeries", () => {
     const state = container.querySelector('[data-testid="time-series-duplicate-day"]');
 
     expect(container.querySelector("svg")).toBeNull();
-    expect(state?.textContent).toContain("Trend line hidden");
+    expect(state?.textContent).toContain("cannot be ordered in this trend");
     expect(state?.textContent).toContain("same-day runs");
     expect(state?.querySelectorAll("[data-result-id]")).toHaveLength(2);
     expect(state?.querySelector('a[href="/results/r/tpch-duckdb-sf0.01-20260403-1111aaaa"]')).toBeTruthy();
@@ -640,7 +640,7 @@ describe("CostScatter", () => {
 
   it("shows a legacy-schema message when normalized cost fields are absent", () => {
     const { container } = render(<CostScatter summary={makeSummary()} />);
-    expect(container.textContent).toContain("predate the normalized_cost contract");
+    expect(container.textContent).toContain("older runs do not include the cost details needed for comparison");
   });
 
   it("renders points when normalized cost is populated", () => {
@@ -710,6 +710,6 @@ describe("SparklineTable", () => {
     });
     const { container } = render(<SparklineTable summary={summary} />);
     expect(container.textContent).toContain("Normalized cost");
-    expect(container.textContent).toContain("unavailable");
+    expect(container.textContent).toContain("Not recorded");
   });
 });

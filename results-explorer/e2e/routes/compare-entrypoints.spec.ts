@@ -56,11 +56,11 @@ test.describe("compare entrypoint happy paths", () => {
   test("compare entrypoint: Query Workbench selection completes a comparison", async ({ page }) => {
     await page.goto("/results/query");
     await waitForShell(page);
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     await facetCheckbox(page, "Benchmark", "TPC-H").check();
     // The additive zero-timing ResultDetail fixture is a TPC-H bundle too.
-    await expect(page.getByTestId("query-result-summary")).toContainText("11 matching result bundle");
+    await expect(page.getByTestId("query-result-summary")).toContainText("11 matching run");
     await expect(page.getByRole("button", { name: /Download CSV/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Download JSON/ })).toBeVisible();
 
@@ -77,34 +77,26 @@ test.describe("compare entrypoint happy paths", () => {
   test("compare entrypoint: result detail pinned run can add a compatible second row", async ({ page }) => {
     await page.goto(`/results/r/${DUCKDB.id}`);
     await waitForShell(page);
-    await waitForDataLoaded(page, /Query Timings/);
+    await waitForDataLoaded(page, /Query timings/);
 
-    await page.getByRole("link", { name: /Compare this result/i }).click();
-    await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
-
-    await expect(page.getByTestId("compare-builder-status")).toContainText("1 result selected");
-    await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
-
-    // After retirement, second run is picked in Query, not in Compare builder table.
-    await page.getByTestId("compare-builder-query-link").click();
+    await page.getByRole("link", { name: "Find a run to compare" }).click();
     await waitForShell(page);
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
+    await expect(page).toHaveURL(new RegExp(`/results/query\\?pick=${encodeURIComponent(DUCKDB.id)}`));
+    await expect(page.getByTestId(`query-compare-checkbox-${DUCKDB.id}`)).toBeChecked();
     await facetCheckbox(page, "Benchmark", "TPC-H").check();
     await page.getByTestId(`query-compare-checkbox-${DATAFUSION.id}`).check();
-    // Query's compare launch requires the pinned + second. Use pickingState via URL: the pinned is already in builder,
-    // but Query picking is independent. For parity, use Compare with both ids directly.
-    await page.goto(`/results/compare?ids=${DUCKDB.shortId},${DATAFUSION.shortId}`);
+    await page.getByTestId("query-compare-launch").click();
     await expectCompletedComparison(page, [DUCKDB, DATAFUSION]);
   });
 
-  test("compare entrypoint: empty Compare builder can start and complete a comparison", async ({ page }) => {
+  test("compare entrypoint: empty Compare page can start and complete a comparison", async ({ page }) => {
     await page.goto("/results/compare");
     await waitForShell(page);
-    await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
-    await page.getByTestId("compare-builder-query-link").click();
+    await expect(page.getByRole("heading", { name: "Choose runs to compare" })).toBeVisible({ timeout: 20_000 });
+    await page.getByTestId("compare-picker-query-link").click();
     await waitForShell(page);
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
     await facetCheckbox(page, "Benchmark", "TPC-H").check();
     await page.getByTestId(`query-compare-checkbox-${DUCKDB.id}`).check();
     await page.getByTestId(`query-compare-checkbox-${DATAFUSION.id}`).check();
@@ -142,16 +134,16 @@ async function expectCompletedComparison(
   for (const run of runs) {
     await expect(main.locator(`a[href="/results/r/${run.id}"]`).first()).toBeVisible();
   }
-  await expect(main.getByRole("heading", { name: "Decision Summary" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Comparison summary" })).toBeVisible();
   await expect(main.getByRole("heading", { name: "Charts" })).toBeVisible();
-  await expect(main.getByRole("region", { name: "Comparability receipt" })).toBeVisible();
+  await expect(main.getByRole("region", { name: "Comparison checks" })).toBeVisible();
   await expect(main.getByRole("button", { name: /Share URL/ })).toBeVisible();
 
   if (options.reload) {
     await page.reload();
     await waitForDataLoaded(page, /TPC-H Comparison/);
-    await expect(main.getByRole("heading", { name: "Decision Summary" })).toBeVisible();
-    await expect(main.getByRole("region", { name: "Comparability receipt" })).toBeVisible();
+    await expect(main.getByRole("heading", { name: "Comparison summary" })).toBeVisible();
+    await expect(main.getByRole("region", { name: "Comparison checks" })).toBeVisible();
   }
 }
 

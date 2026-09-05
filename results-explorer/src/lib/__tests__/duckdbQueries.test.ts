@@ -297,9 +297,9 @@ describe("duckdbQueries - SQL targets and parameters", () => {
       expect(b).not.toBeNull();
 
       const fields = buildComparabilityFields([a!, b!]);
-      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toMatchObject({
+      expect(fields.find((f) => f.label === "Applied tuning features")).toMatchObject({
         status: "match",
-        summary: "None rendered",
+        summary: "None applied",
       });
     });
   });

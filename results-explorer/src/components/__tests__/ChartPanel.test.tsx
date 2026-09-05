@@ -428,7 +428,7 @@ describe("ChartPanel", () => {
     );
 
     expect(screen.getByRole("button", { name: "Comparison Bar" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Normalized Speedup" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Relative to selected baseline" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Query Heatmap" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Per-query" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.queryByRole("button", { name: "Performance Trend" })).toBeNull();
@@ -459,7 +459,7 @@ describe("ChartPanel", () => {
       />,
     );
 
-    expect(screen.queryByLabelText(/Baseline/i)).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Baseline" })).toBeNull();
     expect(screen.getByText("Baseline:")).toBeTruthy();
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
   });
@@ -506,7 +506,7 @@ describe("ChartPanel", () => {
     expect(screen.getByRole("button", { name: "Query Histogram" })).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "Rank" }));
     expect(screen.getByRole("table", { name: "Per-query platform rankings (1st = fastest)" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Normalized Speedup" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Relative to selected baseline" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Performance Trend" })).toBeNull();
   });
 
@@ -560,8 +560,8 @@ describe("ChartPanel", () => {
 
     expect(screen.getByRole("status", { name: "Rank Table unavailable" })).toBeTruthy();
     expect(screen.queryByRole("table", { name: "Per-query platform rankings (1st = fastest)" })).toBeNull();
-    expect(screen.getByText("No rankable rows")).toBeTruthy();
-    expect(screen.getByText(/Trust policy excludes this result from ranking/)).toBeTruthy();
+    expect(screen.getByText("No ranked runs")).toBeTruthy();
+    expect(screen.getByText(/Results from this source are not included in rankings/)).toBeTruthy();
     expect(screen.getByText(/Validation status excludes this result from ranking/)).toBeTruthy();
   });
 
@@ -638,8 +638,8 @@ describe("ChartPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Power@Size Bar" }));
 
     expect(screen.getByRole("status", { name: "Power@Size Bar unavailable" })).toBeTruthy();
-    expect(screen.getByText("No rankable rows")).toBeTruthy();
-    expect(screen.getByText(/Trust policy excludes this result from ranking/)).toBeTruthy();
+    expect(screen.getByText("No ranked runs")).toBeTruthy();
+    expect(screen.getByText(/Results from this source are not included in rankings/)).toBeTruthy();
     expect(screen.getByText(/Validation status excludes this result from ranking/)).toBeTruthy();
   });
 
@@ -672,7 +672,7 @@ describe("ChartPanel", () => {
 
     expect(screen.getByText("Rankable Low")).toBeTruthy();
     expect(screen.queryByText("Community High")).toBeNull();
-    expect(screen.getByText(/1 row excluded from this chart's rankable rows dataset/)).toBeTruthy();
+    expect(screen.getByText(/1 row excluded from this chart's ranked runs dataset/)).toBeTruthy();
   });
 
   it("uses winner language by default in the summary box", () => {

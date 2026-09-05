@@ -15,7 +15,7 @@ test.describe("Home", () => {
     // wait would resolve against the skeleton and prove nothing about the
     // loaded page - which is exactly how this test passed while never once
     // exercising loaded Home content.
-    await expect(page.getByRole("heading", { name: "BenchBox Curated Results Preview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible();
 
     const summary = page.getByRole("region", { name: "Corpus summary" });
     // Corpus Summary labels are count-aware: when the fixture corpus has
@@ -25,7 +25,7 @@ test.describe("Home", () => {
     // grammatically wrong copy like "1 leaderboard rankings".
     for (const label of [
       /^supported benchmarks?$/,
-      /^public result bundles?$/,
+      /^published runs?$/,
       /^platforms? with public results$/,
       /^leaderboard rankings?$/,
     ]) {

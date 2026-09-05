@@ -75,7 +75,7 @@ describe("buildCompareDecisionSummary", () => {
 
     expect(summary.winner?.platform).toBe("DuckDB");
     expect(summary.comparisonRatio).toBe(10);
-    expect(summary.headline).toBe("DuckDB leads by 10.00x on power score.");
+    expect(summary.headline).toBe("In these selected runs, DuckDB's power score was 10.00x the lowest selected score.");
     expect(summary.queryRecord).toMatchObject({
       totalQueries: 2,
       comparableQueries: 2,
@@ -128,7 +128,7 @@ describe("buildCompareDecisionSummary", () => {
 
     expect(summary.winner?.platform).toBe("FastDB");
     expect(summary.comparisonRatio).toBe(4);
-    expect(summary.headline).toBe("FastDB is 4.00x faster by geomean query time.");
+    expect(summary.headline).toBe("In these selected runs, FastDB's geomean query time was 4.00x faster than the slowest selected run.");
     expect(summary.queryRecord).toMatchObject({
       comparableQueries: 3,
       wins: 1,
@@ -278,7 +278,7 @@ describe("buildCompareDecisionSummary", () => {
     );
 
     expect(summary.winner).toBeNull();
-    expect(summary.headline).toBe("No winner claim: selected results are missing the primary metric.");
+    expect(summary.headline).toBe("The selected runs do not have enough primary-metric data for a comparison.");
     expect(summary.queryRecord.missing).toBe(2);
   });
 

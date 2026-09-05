@@ -25,7 +25,7 @@ test.describe("print rendering", () => {
     await page.addInitScript(() => localStorage.setItem("benchbox:theme", "dark"));
     await page.goto("/results/query");
     await waitForShell(page);
-    await waitForDataLoaded(page, /Results Query Workbench/);
+    await waitForDataLoaded(page, /Find benchmark runs/);
     await waitForDataElement(page, page.getByTestId("query-results-panel").locator("tbody tr").first());
 
     await page.emulateMedia({ media: "print" });
