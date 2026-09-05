@@ -68,12 +68,12 @@ document already described in prose.
 
 ## Seed Corpus
 
-After the 2026-08-28 trust cut and the remaining-gap restore, the checked-in
+After the 2026-08-28 trust boundary, the checked-in
 corpus holds **244** maintainer-run bundles across **16** benchmarks and **42**
 cohorts, all at the >=3-identity validator floor. Covered families include the
-already-OK local set (amplab, clickbench, coffeeshop, h2odb, joinorder,
-read_primitives, ssb, tpcds, tpch, tpch_skew) plus admitted remaining-gap cells
-(datavault, flightdata, nyctaxi, tpcdi, tpcds_obt, tpchavoc).
+local set (amplab, clickbench, coffeeshop, h2odb, joinorder, read_primitives,
+ssb, tpcds, tpch, tpch_skew) and the admitted datavault, flightdata, nyctaxi,
+tpcdi, tpcds_obt, and tpchavoc cohorts.
 `metadata_primitives` and `write_primitives` remain uncovered until each can
 form a validation-passed three-identity cohort; `star_schema` is an alias of
 `ssb` and is not admitted separately. See `REGENERATION.md` for deferral detail.
