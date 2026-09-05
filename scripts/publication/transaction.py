@@ -182,6 +182,13 @@ def prepare_rollback(
     if failed_transaction.state not in (STATE_RECOVERY_REQUIRED, STATE_WRITE_STARTED, STATE_WRITE_ACKNOWLEDGED):
         raise TransactionError(f"Cannot initiate rollback from non-recoverable state: {failed_transaction.state}")
 
+    if parent_durable_transaction.state not in (STATE_DURABLE, STATE_ROLLBACK_DURABLE):
+        raise TransactionError("Rollback source must be a durable transaction")
+    if failed_transaction.parent_transaction_id != parent_durable_transaction.transaction_id:
+        raise TransactionError("Rollback source must match the failed transaction parent")
+    if failed_transaction.target != parent_durable_transaction.target:
+        raise TransactionError("Rollback source target must match the failed transaction target")
+
     failed_write = failed_transaction.write or {}
     expected_deployment = failed_write.get("id") or failed_write.get("write_id")
     if (

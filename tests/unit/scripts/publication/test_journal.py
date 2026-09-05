@@ -206,7 +206,47 @@ def test_cas_conflict_detection(git_repo: Path, genesis_tx: tx_mod.Transaction) 
         )
 
 
-def test_timeout_resolution(git_repo: Path, genesis_tx: tx_mod.Transaction) -> None:
+def test_ambiguous_push_failure_reconciles_remote_success(
+    git_repo: Path, genesis_tx: tx_mod.Transaction, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    base_oid = subprocess.run(
+        ["git", "rev-parse", "refs/heads/publication"],
+        cwd=git_repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    state = journal_mod.JournalState(
+        target={"repository": "BenchBox-dev/BenchBox", "environment": "github-pages"},
+        next_generation=2,
+        active_transaction_id=genesis_tx.transaction_id,
+        durable_transaction_id=None,
+        write_block=None,
+        policy_digest="policy",
+        tip_commit_oid=base_oid,
+    )
+    original_run = subprocess.run
+
+    def lose_push_response(args, *positional, **kwargs):
+        result = original_run(args, *positional, **kwargs)
+        if args[:2] == ["git", "push"]:
+            return subprocess.CompletedProcess(args, 1, stdout="", stderr="connection closed after update")
+        return result
+
+    monkeypatch.setattr(journal_mod.subprocess, "run", lose_push_response)
+    updated, commit_oid = journal_mod.write_journal_update(
+        repo_path=git_repo,
+        expected_parent_oid=base_oid,
+        new_state=state,
+        transaction=genesis_tx,
+        ref="publication",
+    )
+
+    assert updated.tip_commit_oid == commit_oid
+    assert journal_mod.resolve_timeout_or_recheck(git_repo, commit_oid, ref="publication") is True
+
+
+def test_timeout_resolution(git_repo: Path, genesis_tx: tx_mod.Transaction, tmp_path: Path) -> None:
     base_oid = subprocess.run(
         ["git", "rev-parse", "refs/heads/publication"],
         cwd=git_repo,
@@ -225,16 +265,28 @@ def test_timeout_resolution(git_repo: Path, genesis_tx: tx_mod.Transaction) -> N
     )
 
     assert journal_mod.resolve_timeout_or_recheck(git_repo, commit_oid, ref="publication") is True
+    remote = subprocess.run(
+        ["git", "remote", "get-url", "origin"],
+        cwd=git_repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    other_repo = tmp_path / "other"
+    subprocess.run(["git", "clone", remote, str(other_repo)], check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=other_repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=other_repo, check=True)
+    subprocess.run(["git", "checkout", "publication"], cwd=other_repo, check=True, capture_output=True)
     tree_oid = subprocess.run(
         ["git", "show", "-s", "--format=%T", commit_oid],
-        cwd=git_repo,
+        cwd=other_repo,
         check=True,
         capture_output=True,
         text=True,
     ).stdout.strip()
     descendant_oid = subprocess.run(
         ["git", "commit-tree", tree_oid, "-p", commit_oid, "-m", "later journal update"],
-        cwd=git_repo,
+        cwd=other_repo,
         check=True,
         capture_output=True,
         text=True,
@@ -247,7 +299,7 @@ def test_timeout_resolution(git_repo: Path, genesis_tx: tx_mod.Transaction) -> N
             f"{descendant_oid}:refs/heads/publication",
             f"--force-with-lease=refs/heads/publication:{commit_oid}",
         ],
-        cwd=git_repo,
+        cwd=other_repo,
         check=True,
         capture_output=True,
     )

@@ -206,9 +206,10 @@ def write_journal_update(
             check=False,
         )
         if p_update.returncode != 0:
-            raise CasConflictError(
-                f"CAS update on remote ref '{ref}' failed (expected {expected_parent_oid}): {p_update.stderr.strip()}"
-            )
+            if not resolve_timeout_or_recheck(repo_path, commit_oid, ref=ref):
+                raise CasConflictError(
+                    f"CAS update on remote ref '{ref}' failed (expected {expected_parent_oid}): {p_update.stderr.strip()}"
+                )
         _run_git(["update-ref", f"refs/heads/{ref}", commit_oid], cwd=repo_path)
 
         updated_state = JournalState(
@@ -262,7 +263,8 @@ def init_genesis_journal(
 def resolve_timeout_or_recheck(repo_path: Path, proposed_commit_oid: str, ref: str = DEFAULT_REF) -> bool:
     """Resolve an ambiguous network or API timeout by re-checking whether the proposed commit won."""
     try:
-        current_oid = _run_git(["ls-remote", "origin", f"refs/heads/{ref}"], cwd=repo_path).split()[0]
+        _run_git(["fetch", "--no-tags", "origin", f"refs/heads/{ref}"], cwd=repo_path)
+        current_oid = _run_git(["rev-parse", "FETCH_HEAD"], cwd=repo_path)
         return (
             subprocess.run(
                 ["git", "merge-base", "--is-ancestor", proposed_commit_oid, current_oid],

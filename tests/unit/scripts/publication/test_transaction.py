@@ -9,6 +9,14 @@ from scripts.publication import transaction as tx_mod
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
+def make_durable(tx: tx_mod.Transaction) -> tx_mod.Transaction:
+    tx, _ = tx_mod.transition(tx, tx_mod.EVENT_START_WRITE, {"intent_commit_oid": "a" * 40})
+    tx, _ = tx_mod.transition(tx, tx_mod.EVENT_ACKNOWLEDGE_WRITE, {"id": "durable-deployment"})
+    tx, _ = tx_mod.transition(tx, tx_mod.EVENT_VERIFY_SUCCESS, {"observation_digest": "verified"})
+    tx, _ = tx_mod.transition(tx, tx_mod.EVENT_COMMIT_DURABLE)
+    return tx
+
+
 @pytest.fixture
 def base_context() -> dict[str, dict[str, str]]:
     return {
@@ -144,6 +152,7 @@ def test_prepare_rollback_requires_activation_barrier(base_context: dict[str, di
         content={"manifest_digest": "parent-manifest"},
         artifact={"artifact_id": 888, "archive_sha256": "parent-art"},
     )
+    parent_tx = make_durable(parent_tx)
 
     failed_tx, _ = tx_mod.prepare_promotion(
         target=base_context["target"],
@@ -170,6 +179,40 @@ def test_prepare_rollback_requires_activation_barrier(base_context: dict[str, di
         )
 
 
+def test_prepare_rollback_rejects_non_durable_source(base_context: dict[str, dict[str, str]]) -> None:
+    parent_tx, _ = tx_mod.prepare_promotion(
+        target=base_context["target"],
+        generation=9,
+        parent_transaction_id="g8",
+        approval=base_context["approval"],
+        controller=base_context["controller"],
+        owner=base_context["owner"],
+        content=base_context["content"],
+        artifact=base_context["artifact"],
+    )
+    failed_tx, _ = tx_mod.prepare_promotion(
+        target=base_context["target"],
+        generation=10,
+        parent_transaction_id=parent_tx.transaction_id,
+        approval=base_context["approval"],
+        controller=base_context["controller"],
+        owner=base_context["owner"],
+        content=base_context["content"],
+        artifact=base_context["artifact"],
+    )
+    failed_tx, _ = tx_mod.transition(failed_tx, tx_mod.EVENT_FAIL_WRITE, {"reason": "pre-send failure"})
+
+    with pytest.raises(tx_mod.TransactionError, match="durable transaction"):
+        tx_mod.prepare_rollback(
+            failed_transaction=failed_tx,
+            parent_durable_transaction=parent_tx,
+            generation=11,
+            controller=base_context["controller"],
+            owner=base_context["owner"],
+            barrier_evidence={},
+        )
+
+
 def test_prepare_rollback_rejects_nonterminal_provider(base_context: dict[str, dict[str, str]]) -> None:
     parent_tx, _ = tx_mod.prepare_promotion(
         target=base_context["target"],
@@ -181,6 +224,7 @@ def test_prepare_rollback_rejects_nonterminal_provider(base_context: dict[str, d
         content=base_context["content"],
         artifact=base_context["artifact"],
     )
+    parent_tx = make_durable(parent_tx)
     failed_tx, _ = tx_mod.prepare_promotion(
         target=base_context["target"],
         generation=10,
@@ -218,6 +262,7 @@ def test_rollback_lifecycle_happy_path(base_context: dict[str, dict[str, str]]) 
         content={"manifest_digest": "parent-manifest-123"},
         artifact={"artifact_id": 888, "archive_sha256": "parent-art-123"},
     )
+    parent_tx = make_durable(parent_tx)
 
     failed_tx, _ = tx_mod.prepare_promotion(
         target=base_context["target"],
