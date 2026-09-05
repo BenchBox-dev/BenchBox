@@ -122,7 +122,7 @@ def _list_open_prs(repo: str, base: str) -> list[dict[str, Any]]:
             "--limit",
             "100000",
             "--json",
-            "number,title,headRefName",
+            "number,title,headRefName,headRepository,headRepositoryOwner",
         ],
         "gh pr list",
     )
@@ -195,9 +195,26 @@ def _audit_pr(pr: dict[str, Any], base_shas: dict[str, str], repo: str) -> Mirro
     # Only the synchronizer's machine-owned head namespace is authoritative
     # mirror provenance.  Unrelated PRs must never become retire-able EMPTY
     # records merely because they target the same base branch.
-    if not audit.head_ref.startswith("auto/results-mirror-"):
+    try:
+        expected_owner, expected_repo = repo.split("/", 1)
+    except ValueError:
+        audit.verdict = "ERROR"
+        audit.error = f"invalid repository identifier: {repo!r}"
+        return audit
+    head_repository = pr.get("headRepository")
+    head_owner = pr.get("headRepositoryOwner")
+    actual_repo = head_repository.get("name") if isinstance(head_repository, dict) else None
+    actual_owner = head_owner.get("login") if isinstance(head_owner, dict) else None
+    authoritative_head = (
+        audit.head_ref.startswith("auto/results-mirror-")
+        and isinstance(actual_repo, str)
+        and actual_repo.casefold() == expected_repo.casefold()
+        and isinstance(actual_owner, str)
+        and actual_owner.casefold() == expected_owner.casefold()
+    )
+    if not authoritative_head:
         audit.verdict = "UNRELATED"
-        audit.error = "PR has no authoritative results-mirror head provenance"
+        audit.error = "PR has no authoritative same-repository results-mirror head provenance"
         return audit
 
     try:

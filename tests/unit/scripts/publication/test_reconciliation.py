@@ -59,6 +59,7 @@ def _full_live_receipt(generation: int = 5, timestamp: str | None = None) -> dic
         "signature": "BASE64SIG==",
         "routes": [
             {"path": "/", "status_code": 200, "ok": True},
+            {"path": "/docs/", "status_code": 200, "ok": True},
             {"path": "/results/", "status_code": 200, "ok": True},
             {"path": "/results/data/results.duckdb", "status_code": 200, "ok": True},
         ],
@@ -322,7 +323,12 @@ def test_reconcile_live_probe_execution(monkeypatch: pytest.MonkeyPatch) -> None
     report = recon_mod.reconcile_states(
         desired=desired, built=built, deployed=deployed, observed=None, live=True, now_dt=NOW
     )
-    assert len(report.probes) == 3
+    assert {probe.path for probe in report.probes} == {
+        "/",
+        "/docs/",
+        "/results/",
+        "/results/data/results.duckdb",
+    }
     assert all(p.ok for p in report.probes)
 
 

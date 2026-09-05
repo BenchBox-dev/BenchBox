@@ -180,6 +180,18 @@ def test_verify_step_invokes_verify_live_with_receipt() -> None:
     assert "--base-url" in run_cmd
 
 
+def test_live_receipt_binds_html_endpoints_and_acknowledges_before_probing() -> None:
+    workflow = _workflow()
+    text = _workflow_text()
+    steps = workflow["jobs"]["verify"]["steps"]
+    names = [step.get("name") for step in steps]
+
+    assert '"/": os.environ["ROOT_ENDPOINT_DIGEST"]' in text
+    assert '"/docs/": os.environ["DOCS_ENDPOINT_DIGEST"]' in text
+    assert '"/results/": os.environ["EXPLORER_ENDPOINT_DIGEST"]' in text
+    assert names.index("Upload provider deployment acknowledgement") < names.index("Probe required live routes")
+
+
 def test_rollback_restores_only_a_cryptographically_attested_artifact() -> None:
     steps = _workflow()["jobs"]["rollback"]["steps"]
     step_names = [s.get("name") for s in steps]

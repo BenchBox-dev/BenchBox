@@ -40,6 +40,7 @@ DEFAULT_BASE_URL = "https://benchbox.dev"
 DEFAULT_TIMEOUT = 30.0
 DEFAULT_ENDPOINTS = (
     "/",
+    "/docs/",
     "/results/",
     "/results/data/results.duckdb",
 )

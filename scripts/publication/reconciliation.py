@@ -62,6 +62,7 @@ FUTURE_SKEW_SECONDS = 300.0
 
 DEFAULT_PROBE_PATHS = (
     "/",
+    "/docs/",
     "/results/",
     "/results/data/results.duckdb",
 )

@@ -303,6 +303,9 @@ jobs:
           (cd results-data/bundles && find . -type f -exec sha256sum {} + | sort) > receipt-dist/corpus-file-digests.txt
           CORPUS_DIGEST=$(sha256sum receipt-dist/corpus-file-digests.txt | cut -d ' ' -f 1)
           DATABASE_DIGEST=$(sha256sum site/results/data/results.duckdb | cut -d ' ' -f 1)
+          ROOT_ENDPOINT_DIGEST=$(sha256sum site/index.html | cut -d ' ' -f 1)
+          DOCS_ENDPOINT_DIGEST=$(sha256sum site/docs/index.html | cut -d ' ' -f 1)
+          EXPLORER_ENDPOINT_DIGEST=$(sha256sum site/results/index.html | cut -d ' ' -f 1)
           LOCKFILE_DIGEST=$(sha256sum uv.lock | cut -d ' ' -f 1)
           BUNDLE_COUNT=$(find results-data/bundles -type f -name '*.json' | wc -l | tr -d ' ')
           PYTHON_VERSION=$(python3 -c 'import platform; print(platform.python_version())')
@@ -311,6 +314,7 @@ jobs:
           IMAGE_OS="${ImageOS:-ubuntu-latest}"
           export GENERATION DEVELOP_SHA PUBLISHED_RESULTS_SHA PRIOR_LIVE_RECEIPT_ID SITE_DIGEST DOCS_DIGEST
           export EXPLORER_DIGEST DATABASE_DIGEST CORPUS_DIGEST LOCKFILE_DIGEST BUNDLE_COUNT PYTHON_VERSION
+          export ROOT_ENDPOINT_DIGEST DOCS_ENDPOINT_DIGEST EXPLORER_ENDPOINT_DIGEST
           export NODE_VERSION UV_VERSION IMAGE_OS SITE_ARTIFACT GITHUB_RUN_ID TIMESTAMP GITHUB_OUTPUT
           export PARENT_SHA PARENT_GENERATION WORKFLOW_SHA APPROVED_MANIFEST_DIGEST
           python3 - <<'PY'
@@ -357,14 +361,21 @@ jobs:
                   "read_model_sha256": os.environ["DATABASE_DIGEST"],
               },
               "artifacts": {
-                  "prose_site": {"digest": os.environ["SITE_DIGEST"], "size": tree_size("site"), "path": "/"},
+                  "prose_site": {
+                      "digest": os.environ["SITE_DIGEST"],
+                      "endpoint_sha256": os.environ["ROOT_ENDPOINT_DIGEST"],
+                      "size": tree_size("site"),
+                      "path": "/",
+                  },
                   "api_docs": {
                       "digest": os.environ["DOCS_DIGEST"],
+                      "endpoint_sha256": os.environ["DOCS_ENDPOINT_DIGEST"],
                       "size": tree_size("docs/_build/html"),
                       "path": "/docs/",
                   },
                   "explorer_app": {
                       "digest": os.environ["EXPLORER_DIGEST"],
+                      "endpoint_sha256": os.environ["EXPLORER_ENDPOINT_DIGEST"],
                       "size": tree_size("results-explorer/dist"),
                       "path": "/results/",
                   },
@@ -384,7 +395,12 @@ jobs:
                       "path": "/",
                   },
               },
-              "checksums": {"/results/data/results.duckdb": os.environ["DATABASE_DIGEST"]},
+              "checksums": {
+                  "/": os.environ["ROOT_ENDPOINT_DIGEST"],
+                  "/docs/": os.environ["DOCS_ENDPOINT_DIGEST"],
+                  "/results/": os.environ["EXPLORER_ENDPOINT_DIGEST"],
+                  "/results/data/results.duckdb": os.environ["DATABASE_DIGEST"],
+              },
           }
           if os.environ.get("PRIOR_LIVE_RECEIPT_ID"):
               manifest["prior_live_receipt_id"] = os.environ["PRIOR_LIVE_RECEIPT_ID"]
@@ -530,16 +546,6 @@ jobs:
           name: publication-build-receipts-${{ needs.build.outputs.generation }}
           path: receipt-dist
 
-      - name: Probe required live routes
-        shell: bash
-        run: |
-          set -euo pipefail
-          TARGET_URL="${{ needs.deploy.outputs.page_url || 'https://benchbox.dev' }}"
-          uv run python scripts/publication/verify_live.py \
-            --base-url "$TARGET_URL" \
-            --manifest receipt-dist/publication-receipt.json \
-            --require-receipt --timeout 60 --json > receipt-dist/live-probe-report.json
-
       - name: Record provider deployment acknowledgement
         env:
           PAGE_URL: ${{ needs.deploy.outputs.page_url || 'https://benchbox.dev' }}
@@ -559,6 +565,23 @@ jobs:
           })
           open(path, 'w').write(json.dumps(receipt, sort_keys=True) + '\n')
           PY
+
+      - name: Upload provider deployment acknowledgement
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: publication-deployment-receipt-${{ needs.build.outputs.generation }}
+          path: receipt-dist/deployment-receipt.json
+          retention-days: 90
+
+      - name: Probe required live routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET_URL="${{ needs.deploy.outputs.page_url || 'https://benchbox.dev' }}"
+          uv run python scripts/publication/verify_live.py \
+            --base-url "$TARGET_URL" \
+            --manifest receipt-dist/publication-receipt.json \
+            --require-receipt --timeout 60 --json > receipt-dist/live-probe-report.json
 
       - name: Create and sign live receipt
         env:

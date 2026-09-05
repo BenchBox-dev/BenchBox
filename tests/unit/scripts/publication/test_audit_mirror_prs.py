@@ -87,7 +87,24 @@ def _run_main(argv: list[str], fake: _FakeRunner) -> int:
 
 
 def _pr(number: int, title: str = "mirror") -> dict:
-    return {"number": number, "title": title, "headRefName": f"auto/results-mirror-{number:08d}"}
+    return {
+        "number": number,
+        "title": title,
+        "headRefName": f"auto/results-mirror-{number:08d}",
+        "headRepository": {"name": "BenchBox"},
+        "headRepositoryOwner": {"login": "benchbox-dev"},
+    }
+
+
+def test_fork_with_machine_named_branch_is_unrelated(capsys):
+    pr = _pr(11)
+    pr["headRepositoryOwner"] = {"login": "untrusted-contributor"}
+    fake = _FakeRunner(prs=[pr], tree=BASE_TREE)
+
+    assert _run_main(["--repo", CID, "--base", BASE, "--json"], fake) == 0
+    (result,) = json.loads(capsys.readouterr().out)["prs"]
+    assert result["verdict"] == "UNRELATED"
+    assert result["retire_able"] is False
 
 
 def test_no_open_prs(capsys):
