@@ -27,6 +27,7 @@ EXPECTED_SNAPSHOT_BYTES = 8663040
 SNAPSHOT_RETRIEVAL_LOCATOR = "https://benchbox.dev/results/data/results.duckdb"
 CANONICAL_BUNDLE_ROOT = REPO_ROOT / "results-data" / "bundles"
 SOURCE_INPUTS = (
+    Path("tests/__init__.py"),
     Path("tests/parity/generate_visualization_fixtures.py"),
     Path("benchbox/core/results/anonymization.py"),
     Path("benchbox/core/results/anonymization_specs.yaml"),
@@ -229,9 +230,7 @@ def _privacy_scan_snapshot(con: Any, find_public_path_leaks: Callable[[Any], lis
     return {"tables_scanned": len(tables), "leak_fields": sorted(set(fields)), "leak_hits": len(fields)}
 
 
-def _privacy_scan_bundles(
-    bundle_root: Path, find_public_path_leaks: Callable[[Any], list[str]]
-) -> dict[str, Any]:
+def _privacy_scan_bundles(bundle_root: Path, find_public_path_leaks: Callable[[Any], list[str]]) -> dict[str, Any]:
     fields: list[str] = []
     unreadable: list[str] = []
     files = sorted(bundle_root.rglob("*.json"))

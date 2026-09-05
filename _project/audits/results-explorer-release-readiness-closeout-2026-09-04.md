@@ -3,7 +3,7 @@ develop_sha: c44fdfc457886d9340b75d86ecb6e29796fdbb98
 measured_at_sha: c44fdfc457886d9340b75d86ecb6e29796fdbb98
 checked_sha: c44fdfc457886d9340b75d86ecb6e29796fdbb98
 independent_review_source_sha: c44fdfc457886d9340b75d86ecb6e29796fdbb98
-evidence_content_receipt_sha256: 5aa2c7ace300777d32a8beb8aaf4ade0361b78267a7ed832094ac6cdff3d5407
+evidence_content_receipt_sha256: f4a7c1b69c0da6dbbfec36b26cc54c5002536ee082cdfa6bbf2b567df31fc7ff
 ---
 
 # Results Explorer release-readiness closeout — 2026-09-04
@@ -30,7 +30,7 @@ promote those browsers to blocking coverage.
 
 | Surface | Current evidence |
 |---|---|
-| Independent-review identity | `independent_review_source_sha` is the reachable source/base pin `c44fdfc457886d9340b75d86ecb6e29796fdbb98`. `evidence_content_receipt_sha256` is a squash-stable content receipt over the four retained evidence files named below. The earlier feature-branch review happened before later remediation and is not claimed as review of this final content. A new independent reviewer must recompute the receipt from the post-squash files and review that exact final head. Any later content change invalidates the pass; there is no post-review path allowance. |
+| Independent-review identity | `independent_review_source_sha` is the reachable source/base pin `c44fdfc457886d9340b75d86ecb6e29796fdbb98`. `evidence_content_receipt_sha256` is a squash-stable content receipt over the five retained evidence files named below. The earlier feature-branch review happened before later remediation and is not claimed as review of this final content. A new independent reviewer must recompute the receipt from the post-squash files and review that exact final head. Any later content change invalidates the pass; there is no post-review path allowance. |
 | Measured evidence tree | `measured_at_sha`/`checked_sha` = `c44fdfc457886d9340b75d86ecb6e29796fdbb98`; the measurements and certification evidence were run against this historical tree. Commit `fc6dd5958b1deffa468e01852a392a29585d11eb` later retained the certification audit and QA instructions; it is not the measured source tree. |
 | Develop | `git rev-parse origin/develop` = `c44fdfc457886d9340b75d86ecb6e29796fdbb98`; this report's `develop_sha` is that exact 40-character value. |
 | Launch | PR #1933 / v0.4.0 launch is already landed; `https://benchbox.dev/results/` was live in the independent certification. |
@@ -97,11 +97,11 @@ test, or the independent certification.
 | **D10** — 2.13 | `remediate-explorer-deploy-path-reconciliation` | PR #1679 / `c78db2e37` | `.github/workflows/docs.yml:3-17,79-118`; release curation in `Makefile:1080-1118` | Workflow/source contract inspection | Live Pages pair was observed by certification; it is consistent but stale against v10 source | P2 | accepted with owner Explorer publication; expiry/review before the next UI deploy (2026-09-18) |
 | **D11** — 2.14 | `remediate-explorer-deploy-path-reconciliation` | PR #993 lineage; `c78db2e37` | `CONTRIBUTING.md:44`; `origin/develop:.github/workflows/docs.yml`; `origin/develop:.github/workflows/results-explorer-browser.yml`; `_project/audits/results-explorer-evidence/d11-live-evidence-2026-09-04.txt` | Read-only `git ls-tree` confirmed all three named develop paths and the related ADR/token-scan/admin/runbook paths | Retained live reads report default branch `develop`; the `main` branch endpoint returns branch `release`, commit `4ad1d727903328702c93abf139902cee42dc3890`, and `/tree/main` renders with status 200 at `/tree/release` | P2 | superseded with evidence: the live default branch is `develop` and the requested `/tree/main` rendering resolves to `release`, so the original default-main premise does not hold |
 | **D12** — 2.15 | `remediate-governance-and-doc-drift` | Current ADR/doc remediation is present on `fc6dd5958` | `docs/development/adr/adr-published-results-slim-corpus-branch.md`; `.github/workflows/sync-results-data-to-published.yml` | Published-results workflow/allowlist tests | No live branch mutation | P2 | fixed |
-| **D13** — 2.16 | `remediate-governance-and-doc-drift` | PR #996 / `0c1f671e3` | `docs/operations/results-explorer-qa.md:192-212,490-515` | QA-plan contract is source-readable | Current plan names the next unused pass and keeps screenshots/logs out of Git | P2 | fixed |
-| **D14** — 2.17 | `remediate-qa-and-browser-test-doc-accuracy` | PR #964 / `c3155c16a` | `docs/operations/results-explorer-qa.md:446-451` | Query route test pins read-only rejection; Python/browser contract suites | Independent Chromium certification passed worker CSP and the read-only runtime sample | P3 | fixed |
-| **D15** — 2.18 | `remediate-qa-and-browser-test-doc-accuracy` | PR #964 / `c3155c16a` | `docs/operations/results-explorer-qa.md:5,283-292,314` | Fixture generator verification; route and URL-state tests | Current fixture generation produced 12 logical results and verified determinism; independent Chromium run passed | P3 | fixed |
+| **D13** — 2.16 | `remediate-governance-and-doc-drift` | PR #996 / `0c1f671e3` | `docs/operations/results-explorer-qa.md:219-240,544` | QA-plan contract is source-readable | Current plan names the next unused pass and keeps screenshots/logs out of Git | P2 | fixed |
+| **D14** — 2.17 | `remediate-qa-and-browser-test-doc-accuracy` | PR #964 / `c3155c16a` | `docs/operations/results-explorer-qa.md:473-483` | Query route test pins read-only rejection; Python/browser contract suites | Independent Chromium certification passed worker CSP and the read-only runtime sample | P3 | fixed |
+| **D15** — 2.18 | `remediate-qa-and-browser-test-doc-accuracy` | PR #964 / `c3155c16a` | `docs/operations/results-explorer-qa.md:5,310-321` | Fixture generator verification; route and URL-state tests | Current fixture generation produced 12 logical results and verified determinism; independent Chromium run passed | P3 | fixed |
 | **D16** — 2.23 | `explorer-csp-frame-ancestors-meta-cleanup`; publication owner for headers | PR #972 / `7a601522f`; meta cleanup PR #1013 / `edf2292a2` | `results-explorer/index.html`; built `dist/index.html`; Pages response headers | Worker CSP test passed; privacy scan found 0 public path leaks across 391 bundles and 13 live tables | Live Pages has meta CSP but no HTTP CSP, COOP, COEP, or X-Frame-Options; meta cannot provide `frame-ancestors` | P3 | accepted with owner Publication/GitHub Pages; expiry/review 2026-10-04 |
-| **N1** — 2.5 | None; non-defect historical control | None | `benchbox/core/publishing/store.py`; `benchbox/validation/bundle.py:551-617` | Static safety review and validator tests | No traversal/dedup defect reproduced; certification privacy scan passed | P3 | superseded with evidence: original control passed and remains bounded |
+| **N1** — 2.5 | None; non-defect historical control | None | `benchbox/core/publishing/store.py:246-286`; `benchbox/core/publishing/bundle_publisher.py:265-283`; `benchbox/validation/bundle.py:755-878` | Static safety review and validator tests | No traversal/dedup defect reproduced; certification privacy scan passed | P3 | superseded with evidence: original control passed and remains bounded |
 | **N2** — 2.7 | `remediate-submission-trust-label-enforcement` | `033806e4d` / current trusted-base workflow | `.github/workflows/validate-submission.yml:25-145` | Workflow contract tests | No fork PR run here; source now executes validators from trusted base and rejects unauthorized validator changes | P3 | fixed |
 | **N3** — 2.11 | `remediate-ci-required-gate-integrity` | PR #962 / `f28a15ffa` | `Makefile:950` | Make target resolves to `lint-imports`; source check | No deployment relevance | P3 | fixed |
 | **N4.1a** — 2.18b strategy evidence | `remediate-governance-and-doc-drift` | current integration tree | `docs/development/benchbox-results-platform-strategy.md:481-484` names `exporter.py`, `bundle_publisher.py`, and `store.py`, and identifies the deleted prototype as historical | Current-source inspection | No rendered evidence required for this documentation correction | P3 | fixed |
@@ -161,8 +161,8 @@ fi
 
 The replay fails before snapshot verification or DuckDB access unless the
 checkout is clean, the measurement/source commit is locally available, the
-canonical bundle root is used, and every imported repository helper plus the
-bundle tree is unchanged from that commit. The retained JSON records the
+canonical bundle root is used, and all five imported repository files plus the
+bundle tree are unchanged from that commit. The retained JSON records the
 verified helper and bundle-tree hashes. Run the wrong-snapshot and
 disposable-clone changed-input controls documented in the certification audit;
 both must fail without creating their requested output.
@@ -175,6 +175,7 @@ The retained receipt covers these evidence files, in this order:
 2. `_project/audits/results-explorer-evidence/independent-oracle-2026-09-04.json`
 3. `_project/audits/results-explorer-evidence/replay_independent_oracle.py`
 4. `_project/audits/results-explorer-release-certification-independent-oracles-2026-09-04.md`
+5. `docs/operations/results-explorer-qa.md`
 
 Recompute it from the post-squash checkout with:
 
@@ -188,6 +189,7 @@ paths = (
     "_project/audits/results-explorer-evidence/independent-oracle-2026-09-04.json",
     "_project/audits/results-explorer-evidence/replay_independent_oracle.py",
     "_project/audits/results-explorer-release-certification-independent-oracles-2026-09-04.md",
+    "docs/operations/results-explorer-qa.md",
 )
 receipt = hashlib.sha256()
 for name in paths:

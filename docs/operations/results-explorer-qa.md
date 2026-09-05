@@ -153,8 +153,8 @@ production logic in `_project/scripts/explorer_pipeline/transformer.py` or
 
 Historical replay must fail closed on both halves of its input identity before
 analysis. Pin the downloaded snapshot by SHA-256, require a clean Git checkout,
-require the recorded measurement/source commit to exist locally, require every
-imported repository helper and the canonical `results-data/bundles` tree to be
+require the recorded measurement/source commit to exist locally, require all
+five imported repository files and the canonical `results-data/bundles` tree to be
 unchanged from that commit, and reject any other bundle root. A live URL is
 only a retrieval locator: if its bytes change, replay must fail rather than
 attach the old measurement SHA to the new snapshot. Retain the verified source

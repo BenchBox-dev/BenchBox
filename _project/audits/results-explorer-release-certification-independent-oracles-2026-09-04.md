@@ -157,8 +157,8 @@ Before snapshot verification or DuckDB access, the replay now requires a clean
 checkout, the locally available measurement/source commit
 `c44fdfc457886d9340b75d86ecb6e29796fdbb98`, the canonical
 `results-data/bundles` root, and source/helper plus bundle content unchanged
-from that commit. The retained JSON records SHA-256 identities for every
-imported repository helper and for the complete bundle tree. It was recomputed
+from that commit. The retained JSON records SHA-256 identities for all five
+imported repository files and for the complete bundle tree. It was recomputed
 from the preserved pinned snapshot and verified inputs: 138/138 geomeans,
 138/138 percentile rows, 55 rankable rows across 35 cohorts, zero
 ranking-direction failures, and zero privacy leaks across 13 snapshot tables
