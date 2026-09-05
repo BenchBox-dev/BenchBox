@@ -2,6 +2,7 @@ import type { DetailResult } from "@/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { buildComparabilityFields, type ComparabilityField } from "@/components/ComparabilityReceipt";
 import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
+import { formatMemoryGb } from "@/lib/displayLabels";
 
 /**
  * The engine-and-hardware strip for a head-to-head comparison.
@@ -61,7 +62,7 @@ export function axisValueForRun(axis: (typeof STRIP_AXES)[number], result: Detai
     case "CPU evidence":
       return formatCpuIdentityProvenance(result.environment?.cpu_identity_provenance);
     case "Memory":
-      return result.environment?.memory_gb !== undefined ? `${result.environment.memory_gb} GB` : "Not recorded";
+      return result.environment?.memory_gb !== undefined ? formatMemoryGb(result.environment.memory_gb) : "Not recorded";
   }
 }
 

@@ -49,13 +49,13 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
               <span class="font-medium">{entry.platform}</span> is {entry.label}
             </span>
           ))}
-          . This comparison rests on at least one unvalidated or non-clean result - treat any winner claim above as
+          . This comparison rests on at least one unvalidated or non-clean result - treat the leading-run claim above as
           provisional.
         </div>
       )}
 
       <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Winner">
+        <SummaryCard label="Leading recorded run">
           {summary.claimSuppressed ? (
             <p class="text-sm text-[var(--bb-data-fg-muted)]">Not claimed</p>
           ) : summary.isTie ? (

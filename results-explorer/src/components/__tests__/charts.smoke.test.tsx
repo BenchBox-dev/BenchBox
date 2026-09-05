@@ -296,6 +296,24 @@ describe("RankTable", () => {
     expect(container.textContent).toContain("Results from this source are not included in rankings.");
     expect(container.textContent).toContain("Validation status excludes this result from ranking.");
   });
+
+  it("makes a ranking-exclusion marker keyboard focusable and self-describing", () => {
+    const summary = makeSummary({
+      platforms: [
+        makePlatform({ result_id: "r1", platform: "DuckDB" }),
+        makePlatform({
+          result_id: "r2",
+          platform: "SQLite",
+          ranking_exclusion_reason: "validation_not_clean",
+        }),
+      ],
+    });
+    const { container } = render(<RankTable summary={summary} />);
+    const marker = container.querySelector("span[tabindex='0'][aria-label]");
+
+    expect(marker).not.toBeNull();
+    expect(marker?.getAttribute("title")).toContain("Validation status excludes this result");
+  });
 });
 
 // ---------------------------------------------------------------------------

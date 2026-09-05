@@ -44,11 +44,24 @@ import {
   toShortIds,
   type ResultRow,
 } from "@/lib/duckdbQueries";
-import { Compare } from "@/pages/Compare";
+import { buildComparisonBoundary, Compare } from "@/pages/Compare";
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
+
+describe("buildComparisonBoundary", () => {
+  it("reports differing and unrecorded hardware fields together", () => {
+    expect(
+      buildComparisonBoundary([
+        { label: "Architecture", status: "diff" },
+        { label: "CPU model", status: "missing" },
+      ]),
+    ).toBe(
+      "Hardware boundary: architecture differs; CPU model is not recorded for every run. This compares recorded runs, not engines in isolation.",
+    );
+  });
+});
 
 function makeResult(overrides: Partial<DetailResult> = {}): DetailResult {
   return {
@@ -1118,7 +1131,7 @@ describe("Compare", () => {
     expect(options).toContain("SQLite");
   });
 
-  it("baseline selector defaults to index 0 (first platform is baseline)", async () => {
+  it("baseline selector defaults to the first result and records its stable ID", async () => {
     render(<Compare />);
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
@@ -1129,8 +1142,7 @@ describe("Compare", () => {
       expect(screen.getByRole("combobox", { name: "Baseline" })).toBeTruthy();
     });
     const select = screen.getByRole("combobox", { name: "Baseline" }) as HTMLSelectElement;
-    // Default baseline is index 0 (DuckDB - first result in the fixture)
-    expect(select.value).toBe("0");
+    expect(select.value).toBe("r1");
     expect(select.options[0]!.text).toBe("DuckDB");
   });
 
@@ -1142,15 +1154,80 @@ describe("Compare", () => {
 
     const beforeIds = new URL(window.location.href).searchParams.get("ids");
     const select = screen.getByLabelText("Baseline") as HTMLSelectElement;
-    fireEvent.change(select, { target: { value: "1" } });
+    fireEvent.change(select, { target: { value: "r2" } });
 
     const diffTable = screen.getByRole("heading", { name: "Query-level differences" }).closest("section");
-    expect(select.value).toBe("1");
+    expect(select.value).toBe("r2");
     expect(diffTable).toHaveTextContent("Baseline: SQLite");
     expect(diffTable).toHaveTextContent("DuckDB");
-    expect(diffTable).toHaveTextContent("0.10x");
+    expect(diffTable).toHaveTextContent("10.00x");
     expect(new URL(window.location.href).searchParams.get("ids")).toBe(beforeIds);
+    expect(new URL(window.location.href).searchParams.get("baseline")).toBe("r2");
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
+  });
+
+  it("stores the shared query subset in the URL without reloading the runs", async () => {
+    render(<Compare />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+    const callsBeforeChange = vi.mocked(getDetailResult).mock.calls.length;
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Queries shown" }), {
+      target: { value: "speedups" },
+    });
+
+    expect(new URL(window.location.href).searchParams.get("queries")).toBe("speedups");
+    expect(vi.mocked(getDetailResult).mock.calls.length).toBe(callsBeforeChange);
+    expect(screen.getByRole("combobox", { name: "Queries shown" })).toHaveValue("speedups");
+  });
+
+  it("restores the shared baseline and query subset from the URL", async () => {
+    setupUrl(["r1", "r2"], { baseline: "r2", queries: "slowdowns" });
+
+    render(<Compare />);
+    await waitFor(() => expect(screen.getByLabelText("Baseline")).toHaveValue("r2"));
+
+    expect(screen.getByRole("combobox", { name: "Queries shown" })).toHaveValue("slowdowns");
+    expect(screen.getByRole("heading", { name: "Query-level differences" }).closest("section")).toHaveTextContent(
+      "Baseline: SQLite",
+    );
+  });
+
+  it("keeps a hardware mismatch inseparable from the leading-run claim", async () => {
+    vi.mocked(getDetailResult).mockImplementation((id) =>
+      id === "r1"
+        ? Promise.resolve(makeResult({
+            result_id: "r1",
+            environment: {
+              arch: "arm64",
+              cpu_family: "apple_silicon",
+              cpu_model: "Apple M4",
+              logical_cores: 10,
+              memory_gb: 32,
+            },
+          }))
+        : Promise.resolve(makeResult({
+            result_id: "r2",
+            platform: "SQLite",
+            platform_id: "sqlite",
+            power_score: 300,
+            environment: {
+              arch: "x86_64",
+              cpu_family: "intel_xeon",
+              cpu_model: "Intel Xeon",
+              logical_cores: 16,
+              memory_gb: 64,
+            },
+          })),
+    );
+
+    render(<Compare />);
+    const summary = await screen.findByRole("heading", { name: "Comparison summary" });
+    const summarySection = summary.closest("section");
+    expect(summarySection).toHaveTextContent("Leading recorded run");
+    expect(summarySection).toHaveTextContent("This compares recorded runs, not engines in isolation.");
+    expect(summarySection).toHaveTextContent("architecture");
+    expect(summarySection).toHaveTextContent("CPU model");
+    expect(screen.queryByText("Winner", { exact: true })).toBeNull();
   });
 
   it("supports three-result compare and baseline switching without changing URL membership", async () => {
@@ -1180,14 +1257,15 @@ describe("Compare", () => {
     );
     expect(screen.queryByRole("heading", { name: "Query-level differences" })).toBeNull();
 
-    fireEvent.change(select, { target: { value: "2" } });
+    fireEvent.change(select, { target: { value: "r3" } });
 
     const queryGrid = screen.getByRole("heading", { name: "Query by run" }).closest("section");
-    expect(select.value).toBe("2");
+    expect(select.value).toBe("r3");
     expect(queryGrid).toHaveTextContent("Ratio against PostgreSQL");
     expect(screen.getByTestId("cell-Q1-0")).toHaveTextContent("0.20x");
     expect(screen.getByTestId("cell-Q1-2")).toHaveTextContent("1.00x");
     expect(new URL(window.location.href).searchParams.get("ids")).toBe(beforeIds);
+    expect(new URL(window.location.href).searchParams.get("baseline")).toBe("r3");
   });
 
   it("renders severe cohort mismatches with guardrails and no winner claim", async () => {
@@ -1266,7 +1344,7 @@ describe("Compare", () => {
     expect(guardrails).toHaveTextContent(
       "These runs share the same benchmark, scale, and test phase. Review the differences below before drawing conclusions.",
     );
-    expect(guardrails).toHaveTextContent("Comparable");
+    expect(guardrails).toHaveTextContent("Same ranking");
     expect(summary).not.toHaveTextContent("No winner named");
     expect(summary).toHaveTextContent("DuckDB's power score was");
   });

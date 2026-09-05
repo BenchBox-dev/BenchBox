@@ -1014,9 +1014,9 @@ export function Query({ url }: QueryProps) {
                                   : "The current filters do not expose a comparable run. Clear filters or choose another ranking."}
                               </p>
                             </div>
-                            <button type="button" class="btn btn-secondary shrink-0 text-sm" onClick={resetQueryFilters}>
-                              Clear filters
-                            </button>
+                            <p class="max-w-sm text-xs">
+                              Review each row's reason. A run can be unavailable because of its evidence, even when filters are cleared.
+                            </p>
                           </div>
                         </section>
                       )}

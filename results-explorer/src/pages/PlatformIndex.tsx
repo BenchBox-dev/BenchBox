@@ -101,6 +101,8 @@ const PLATFORM_RESULT_FACET_KEYS: ExplorerFacetKey[] = [
   "cost_status",
   "date_window",
   "platform_version",
+  "arch",
+  "cpu_family",
 ];
 
 interface TrendCohort {
@@ -189,10 +191,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const { facets, setFacet } = useFacetState();
   const tuningFilter = singleFacetValue(facets.tuning_mode, "all") ?? "all";
   const setTuningFilter = (value: string) => setFacet("tuning_mode", value === "all" ? [] : [value]);
-  // w5 (table-sticky-density-and-semantics): single-select filters for the
-  // Platform detail table. Each maps to a FacetKey already plumbed through
-  // useFacetState/matchesFacetRow so the filtered count strip updates as
-  // soon as the user picks a value.
+  // Single-select filters for the platform detail table. Each maps to shared
+  // facet state, so the result count updates as soon as the user picks a value.
   const benchmarkFilter = singleFacetValue(facets.benchmark, "all") ?? "all";
   const scaleFilter = singleFacetValue(facets.scale_factor, "all") ?? "all";
   const phaseFilter = singleFacetValue(facets.phase, "all") ?? "all";
@@ -219,6 +219,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     "validation_status",
     "date_window",
     "platform_version",
+    "arch",
+    "cpu_family",
   ];
   const hasW5Filters = hasActiveFacets(facets, w5FilterKeys);
   const resetW5Filters = () => {
@@ -229,12 +231,14 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     setFacet("validation_status", []);
     setFacet("date_window", "all");
     setFacet("platform_version", []);
+    setFacet("arch", []);
+    setFacet("cpu_family", []);
   };
-  // Default: geomean_ms ascending (fastest first), nulls last. The empty-state
-  // ordering is observable behaviour — must_preserve in the parent TODO.
+  // Lead with recency. A cross-benchmark latency sort invites comparison
+  // across different workloads and metric contracts.
   const [sort, setSort] = useState<SortState<PlatformSortKey>>({
-    key: "geomean_ms",
-    direction: "asc",
+    key: "run_date",
+    direction: "desc",
   });
   const platformDisplayName = rows ? platformRowsForRequest(rows, platform)[0]?.platform ?? platform : platform;
   useDocumentTitle(`${platformDisplayName} · BenchBox Results`);
@@ -395,7 +399,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     // run_date is "YYYY-MM-DD" (ISO 8601); strict lexicographic compare matches
     // chronological order without dragging in locale-sensitive collation.
     if (sort.key === "run_date") {
-      if (a.run_date === b.run_date) return 0;
+      if (a.run_date === b.run_date) return a.result_id.localeCompare(b.result_id);
       return dir * (a.run_date < b.run_date ? -1 : 1);
     }
     const av = a[sort.key];
@@ -407,7 +411,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     if (av === null && bv === null) return 0;
     if (av === null) return 1;
     if (bv === null) return -1;
-    return dir * (av - bv);
+    const comparison = dir * (av - bv);
+    return comparison !== 0 ? comparison : a.result_id.localeCompare(b.result_id);
   });
   const visiblePlatformResults = platformResults.slice(0, visibleLimit);
   const groupedPlatformResults = limitCohortGroups(
@@ -483,6 +488,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     return reason;
   }
   const zeroSelectable = platformResults.length > 0 && platformResults.every((row) => comparisonExclusionReason(row));
+  const filtersCausedZeroSelectable = zeroSelectable && hasW5Filters && allPlatformResults.some((row) => !comparisonExclusionReason(row));
   const zeroSelectableReasons = summarizeCompareExclusionReasons(
     platformResults.map((row) => comparisonExclusionReason(row)),
   );
@@ -754,9 +760,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   : "The current filters do not expose a comparable run. Clear filters or choose another ranking."}
               </p>
             </div>
-            <button type="button" class="btn btn-secondary shrink-0 text-sm" onClick={resetW5Filters}>
-              Clear filters
-            </button>
+            {filtersCausedZeroSelectable && (
+              <button type="button" class="btn btn-secondary shrink-0 text-sm" onClick={resetW5Filters}>
+                Clear filters
+              </button>
+            )}
           </div>
         </section>
       )}
@@ -807,8 +815,9 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
           leaderboards cannot describe the same reduction differently.
           */}
           <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]" data-testid="basis-statement">
-          Every figure below uses the published measurement basis: the median of each run's warm
-          passes per query, then the geometric mean across queries. Warmup passes are excluded.
+          Geomean query time uses the median of each query's published measurement passes, then the
+          geometric mean across queries. Warmup passes are excluded. Dates, counts, and power scores use
+          the definitions shown in their columns and receipts.
           </p>
           <DataTable
             ariaLabel={`${platformDisplayName} results`}

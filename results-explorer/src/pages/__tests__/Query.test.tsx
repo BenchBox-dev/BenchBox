@@ -406,7 +406,8 @@ describe("Query", () => {
     const callout = screen.getByTestId("query-zero-selectable");
     expect(callout.textContent).toContain("No selectable compare rows");
     expect(callout.textContent).toContain("insufficient query coverage");
-    expect(within(callout).getByRole("button", { name: "Clear filters" })).toBeTruthy();
+    expect(within(callout).queryByRole("button", { name: "Clear filters" })).toBeNull();
+    expect(callout).toHaveTextContent("A run can be unavailable because of its evidence");
     expect(screen.getAllByTestId("query-disabled-reason")[0]?.textContent).toContain(
       "Why unavailable: Insufficient query coverage",
     );

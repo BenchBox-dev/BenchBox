@@ -177,6 +177,8 @@ export interface ResultRow extends CostDeploymentFields {
   // SQL paths predating this field default to undefined rather than needing
   // updates everywhere a ResultRow is constructed.
   physical_rendering_id?: string | null;
+  arch?: string | null;
+  cpu_family?: string | null;
 }
 
 export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_eligible" | "visibility"> {
@@ -344,6 +346,8 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   compliance_class: string | null;
   cost_usd: number | null;
   primary_metric: string;
+  arch?: string | null;
+  cpu_family?: string | null;
 }
 
 export interface CohortMetadataRow {
@@ -465,6 +469,8 @@ const RESULT_COLUMNS = [
   "bundle_download_url",
   "physical_rendering_id",
 ].join(", ");
+
+const RESULT_HARDWARE_COLUMNS = `${RESULT_COLUMNS}, arch, cpu_family`;
 
 const RESULT_DETAIL_METRICS_COLUMNS = [
   "result_id",
@@ -668,7 +674,10 @@ export function memoizedSnapshotQueryRows<T>(
 }
 
 export async function listResults(where: FacetWhereClause = { sql: "", params: [] }): Promise<ResultRow[]> {
-  const sql = `SELECT ${RESULT_COLUMNS} FROM bench.results ${where.sql} ORDER BY run_date DESC`;
+  const needsHardware = /\b(?:arch|cpu_family)\b/.test(where.sql);
+  const columns = needsHardware ? RESULT_HARDWARE_COLUMNS : RESULT_COLUMNS;
+  const source = needsHardware ? "bench.result_detail_metrics" : "bench.results";
+  const sql = `SELECT ${columns} FROM ${source} ${where.sql} ORDER BY run_date DESC`;
   return memoizedSnapshotQueryRows<ResultRow>("list-results", { sql, params: where.params }, { cacheEmpty: false });
 }
 
@@ -1130,11 +1139,14 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.cloud_region," +
     " r.instance_or_warehouse," +
     " r.storage_format," +
+    " e.arch," +
+    " e.cpu_family," +
     " CASE WHEN br.primary_metric IS NOT NULL THEN br.primary_metric WHEN r.power_score IS NOT NULL THEN 'power_score' ELSE 'display_geomean_ms' END" +
     " AS primary_metric" +
     " FROM bench.results r" +
     " LEFT JOIN bench.short_ids si ON si.result_id = r.result_id" +
-    " LEFT JOIN bench.benchmark_rankings br ON br.result_id = r.result_id";
+    " LEFT JOIN bench.benchmark_rankings br ON br.result_id = r.result_id" +
+    " LEFT JOIN bench.result_environment e ON e.result_id = r.result_id";
   if (platformId === undefined) {
     return queryRows<PlatformIndexRowRow>(`${sql} ORDER BY r.run_date DESC`);
   }
