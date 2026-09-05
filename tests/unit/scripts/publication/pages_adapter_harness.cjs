@@ -153,6 +153,7 @@ async function run() {
           code: err.code || null,
           stage: err.stage || null,
           status: err.status || null,
+          cause_message: err.cause?.message || null,
         },
         masked_secrets: maskedSecrets,
         recorded_requests: recordedRequests,

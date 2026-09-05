@@ -59,8 +59,11 @@ function validateCreateInputs(inputs) {
     });
   }
 
-  const numericArtifactId = Number(artifact_id);
-  if (!Number.isInteger(numericArtifactId) || numericArtifactId <= 0) {
+  const artifactIdIsValid =
+    (typeof artifact_id === 'number' && Number.isSafeInteger(artifact_id)) ||
+    (typeof artifact_id === 'string' && /^\d+$/.test(artifact_id));
+  const numericArtifactId = artifactIdIsValid ? Number(artifact_id) : Number.NaN;
+  if (!Number.isSafeInteger(numericArtifactId) || numericArtifactId <= 0) {
     throw new AdapterError(`artifact_id must be a positive integer, got: ${artifact_id}`, {
       code: 'ERR_VALIDATION',
       stage: 'pre_send',
@@ -195,7 +198,6 @@ async function createDeployment({ github, core, context, effect, options = {} })
       code: 'ERR_PROVIDER_POST',
       stage: 'post_send',
       status: err.status || null,
-      cause: err,
     });
   }
 

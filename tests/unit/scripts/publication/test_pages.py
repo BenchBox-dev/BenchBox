@@ -84,6 +84,9 @@ def test_create_deployment_success() -> None:
         ("repo", "", "repo must be a non-empty string"),
         ("artifact_id", -1, "artifact_id must be a positive integer"),
         ("artifact_id", "abc", "artifact_id must be a positive integer"),
+        ("artifact_id", True, "artifact_id must be a positive integer"),
+        ("artifact_id", 1.5, "artifact_id must be a positive integer"),
+        ("artifact_id", "9007199254740993", "artifact_id must be a positive integer"),
         ("pages_build_version", "short", "pages_build_version must be a 40-character hexadecimal commit SHA"),
         ("pages_build_version", "g" * 40, "pages_build_version must be a 40-character hexadecimal commit SHA"),
     ],
@@ -153,6 +156,7 @@ def test_create_deployment_redacts_secret_in_error() -> None:
     assert secret_token not in result["error"]["message"]
     assert "[REDACTED]" in result["error"]["message"]
     assert secret_token in result["masked_secrets"]
+    assert result["error"]["cause_message"] is None
 
 
 def test_create_response_does_not_fabricate_provider_acknowledgement() -> None:
