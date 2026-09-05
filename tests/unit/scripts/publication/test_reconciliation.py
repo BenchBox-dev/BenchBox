@@ -161,6 +161,39 @@ def test_reconcile_happy_path_distinct_matching_states(attestor_keypair: Path) -
     assert report.drift_count == 0
 
 
+@pytest.mark.parametrize(
+    ("field", "drift_type"),
+    (
+        ("develop_sha", "MANIFEST_DRIFT"),
+        ("manifest_digest", "MANIFEST_DRIFT"),
+        ("artifact_name", "ARTIFACT_DRIFT"),
+        ("artifact_run_id", "ARTIFACT_DRIFT"),
+    ),
+)
+def test_reconcile_rejects_crossed_observed_binding(field: str, drift_type: str) -> None:
+    desired, built, deployed, observed = _distinct_states()
+    matching_values = {
+        "develop_sha": "1111111111111111111111111111111111111111",
+        "manifest_digest": "sha256:" + "a" * 64,
+        "artifact_name": "publication-site-5",
+        "artifact_run_id": "12345",
+    }
+    for state in (desired, built, deployed):
+        state[field] = matching_values[field]
+    observed[field] = "crossed-receipt-value"
+
+    report = recon_mod.reconcile_states(
+        desired=desired,
+        built=built,
+        deployed=deployed,
+        observed=observed,
+        now_dt=NOW,
+    )
+
+    assert report.reconciled is False
+    assert any(d.drift_type == drift_type and d.actual == "crossed-receipt-value" for d in report.drifts)
+
+
 def test_reconcile_missing_observation_fails_closed() -> None:
     desired, built, deployed, _ = _distinct_states()
     report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=None, now_dt=NOW)
@@ -546,6 +579,18 @@ def test_operational_capacity_at_limit_rejected() -> None:
     assert audit.passed is False
     audit2 = receipts_mod.audit_capacity(total_bytes=1, largest_file_bytes=receipts_mod.MAX_INDIVIDUAL_FILE_BYTES)
     assert audit2.passed is False
+
+
+@pytest.mark.parametrize("measured", ["false", "true", 0, 1, None])
+def test_operational_capacity_rejects_non_boolean_measured(tmp_path: Path, measured: object) -> None:
+    d = _valid_operational_dir(tmp_path)
+    capacity_path = d / receipts_mod.CAPACITY_FILE
+    capacity = json.loads(capacity_path.read_text(encoding="utf-8"))
+    capacity["measured"] = measured
+    capacity_path.write_text(json.dumps(capacity), encoding="utf-8")
+
+    with pytest.raises(receipts_mod.ReceiptsConfigError, match="measured must be a boolean"):
+        receipts_mod.audit_operational_receipts(receipts_dir=d, now_dt=NOW)
 
 
 def test_operational_status_missing_is_invalid() -> None:

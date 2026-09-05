@@ -389,8 +389,9 @@ def _check_manifest_drift(
     desired: dict[str, Any],
     built: dict[str, Any],
     deployed: dict[str, Any],
+    observed: dict[str, Any],
 ) -> list[DriftFinding]:
-    """Detect commit or build closure drift across desired, built, and deployed."""
+    """Detect commit or build closure drift across all publication states."""
     drifts: list[DriftFinding] = []
     binding_fields = (
         ("target", ("target",)),
@@ -398,7 +399,7 @@ def _check_manifest_drift(
         ("published-results SHA", ("published_results_sha", "published_results_commit")),
         ("manifest digest", ("manifest_digest", "manifest_sha256")),
     )
-    states = (("desired", desired), ("built", built), ("deployed", deployed))
+    states = (("desired", desired), ("built", built), ("deployed", deployed), ("observed", observed))
     for label, keys in binding_fields:
         values = [(name, _first_present(state, keys)) for name, state in states]
         present = [(name, value) for name, value in values if value is not None]
@@ -854,7 +855,7 @@ def reconcile_states(
         )
 
     drifts.extend(_check_generation_drift(des_gen, dep_gen, obs_gen))
-    drifts.extend(_check_manifest_drift(desired, built or {}, deployed or {}))
+    drifts.extend(_check_manifest_drift(desired, built or {}, deployed or {}, observed or {}))
 
     desired_digests = extract_artifact_digests(desired)
     built_digests = extract_artifact_digests(built or {})

@@ -464,11 +464,14 @@ def audit_operational_receipts(
             largest_file_bytes = int(cap_data.get("largest_file_bytes", 0))
         except (KeyError, TypeError, ValueError) as e:
             raise ReceiptsConfigError(f"{CAPACITY_FILE} is missing/invalid total_size_bytes: {e}") from e
+        measured = cap_data.get("measured", False)
+        if not isinstance(measured, bool):
+            raise ReceiptsConfigError(f"{CAPACITY_FILE} measured must be a boolean")
         capacity_audit = audit_capacity(
             total_bytes,
             largest_file_bytes,
             str(cap_data.get("largest_file_path", "")),
-            measured=bool(cap_data.get("measured", False)),
+            measured=measured,
         )
     else:
         capacity_audit = CapacityAudit(total_size_bytes=0, passed=False)
