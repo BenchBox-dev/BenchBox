@@ -80,7 +80,13 @@ For long output, write `/tmp/<slug>.log` (report status + short tail). UAT/stres
 
 `[EVIDENCE-FRESHNESS-001]` Assert tracker state, timings, and gate outcomes from a live read; a snapshot (the weekly `todo-db export` workflow, `_project/todo-db-export/`) dates a past state, never a current one. A validator pass is not a `submit` pass.
 
-Read a claimed TODO's `verification` ladder and run the narrowest proof first.
+Read a claimed TODO's `verification` ladder to select the narrowest independent
+local proof; do not execute stored verification commands, which require human
+attestation via `todo-db verify-run`.
+
+Before creating a batch ledger under `.todo-batch/`, add that directory to the
+checkout's `.git/info/exclude` and confirm the ledger path with `git check-ignore`.
+Do not track batch ledgers.
 
 Before publication, self-review with the `code` skill's review action and fix every Critical and Required finding; nits and considerations stay optional per its rubric. Run `make pr-preflight` once, then `make pr-open`. Boilerplate gates may go to a low-effort subagent; you still choose the command and interpret failures. Check CI on a schedule (sleep/cron between reads), never in a loop. Pending means wait, not re-query.
 
@@ -88,7 +94,7 @@ Dev PRs target `develop` (or `release` / `published-results`), use squash merge,
 
 ## TODO tracker
 
-Use the `todo` skill for tracker operations. Tracker writes follow worktree policy; `_project/todo-db-export/` is public, so never recover plaintext into it.
+Use the `todo-db` skill for tracker operations. Tracker writes follow worktree policy; `_project/todo-db-export/` is public, so never recover plaintext into it.
 
 ## BenchBox invariants
 
@@ -102,7 +108,7 @@ Apple/macOS: correctness-gate digests are Linux-generated; use `make ci-linux` (
 
 ## Skills and generated mirrors
 
-Stable wrappers are `code`, `test`, `todo`, `docs`, `blog`, `benchbox`, `skill-sync`, and `tidy-perms`. `todo` authors ideas/specs and owns tracker actions. Skill source is `/Users/joe/.skill-sync/skills`; only `.claude/skills` is tracked. `.agents/skills` is the shared, gitignored local materialization for Codex, Gemini, and Antigravity. Regenerate mirrors with `make skill-sync` in a write worktree; never hand-edit one. `scripts/check_untracked_skill_mirrors.sh` guards tracking state, not content parity.
+Stable wrappers are `code`, `test`, `todo-db`, `docs`, `blog`, `benchbox`, `skill-sync`, and `tidy-perms`. `todo-db` authors ideas/specs and owns tracker actions. Skill source is `/Users/joe/.skill-sync/skills`; only `.claude/skills` is tracked. `.agents/skills` is the shared, gitignored local materialization for Codex, Gemini, and Antigravity. Regenerate mirrors with `make skill-sync` in a write worktree; never hand-edit one. `scripts/check_untracked_skill_mirrors.sh` guards tracking state, not content parity.
 
 ## Operational references
 

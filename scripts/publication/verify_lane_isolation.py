@@ -84,6 +84,7 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "ANTIGRAVITY.md",
     "skill-sync.yaml",
     "skill-sync.lock",
+    "scripts/skill_sync_ci_policy.py",
     ".env.example",
     ".gitignore",
     ".mcp.json",

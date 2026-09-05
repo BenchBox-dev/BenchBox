@@ -22,7 +22,7 @@ pick a sweep window appropriate to the volume of merged PRs and the size of
 the unactioned queue (`make pr-review-followups-list` previews it). Each
 sweep produces:
 
-1. A new tracker item created through the `todo` skill with id
+1. A new tracker item created through the `todo-db` skill with id
    `pr-review-followups-<window-tag>` (the window tag identifies the selected
    range; legacy entries used `week-YYYY-MM-DD`)
 2. A rescan audit at
@@ -168,7 +168,7 @@ paths. PR-review threads will not surface them. The tracked
 `_project/blind-spots/` corpus is frozen; current authority is the hosted
 findings domain plus unsynced drafts under `~/.benchbox/finding-drafts/`.
 
-Both reads go through the `todo` skill. They are MCP tools, not shell commands:
+Both reads go through the `todo-db` skill. They are MCP tools, not shell commands:
 
 - Hosted findings: `finding_list`, then filter the returned `created_at`
   timestamps to the exact inclusive window. The tool has no date arguments.
@@ -302,7 +302,7 @@ The current tracker writer validates command structure at authoring time. The
 sweep still owns the semantic checks above, including exit-status masking,
 which a schema validator cannot judge.
 
-Run the deterministic project lint over current hosted items through the `todo`
+Run the deterministic project lint over current hosted items through the `todo-db`
 skill: `lint` for each in-window item, and `verify_list` for its verification
 records. Both are MCP tools in the default profile.
 
@@ -321,7 +321,7 @@ depends on the expected result and cannot be decided from syntax alone.
 
 ## Tracker item shape
 
-Create and update the item only through the `todo` skill. The
+Create and update the item only through the `todo-db` skill. The
 conventional fields for a sweep item are:
 
 - `id: pr-review-followups-<window-tag>` (e.g. `pr-review-followups-2026-05-01-to-05-07`

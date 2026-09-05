@@ -139,7 +139,7 @@ def test_non_lane_inputs_skipped_in_changed_paths() -> None:
     mixed_paths = [
         "docs/index.rst",
         "tests/unit/test_example.py",
-        ".claude/skills/todo/SKILL.md",
+        ".claude/skills/todo-db/SKILL.md",
         ".github/workflows/pr.yml",
         "Makefile",
         "make/inventory.json",
@@ -147,6 +147,7 @@ def test_non_lane_inputs_skipped_in_changed_paths() -> None:
         "_project/scripts/agent_instruction_audit.py",
         "AGENTS.md",
         "skill-sync.yaml",
+        "scripts/skill_sync_ci_policy.py",
         ".mcp.json",
         ".todo-db/config.json",
     ]
