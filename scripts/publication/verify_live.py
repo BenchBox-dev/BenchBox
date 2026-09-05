@@ -145,12 +145,18 @@ def compare_candidate_against_baseline(
     mismatched: dict[str, dict[str, str]] = {}
     errors: list[str] = []
 
-    for path, cand_sha in candidate_checksums.items():
+    # A frozen baseline defines the scope of a no-op assertion. Newer
+    # manifests may carry additional endpoint checksums; compare every path
+    # the baseline attests without treating those stronger claims as drift.
+    comparison_paths = baseline_checksums if expect_noop else candidate_checksums
+    for path in comparison_paths:
+        cand_sha = candidate_checksums.get(path)
         base_sha = baseline_checksums.get(path)
+        if cand_sha is None:
+            mismatched[path] = {"expected": str(base_sha), "actual": "(missing)"}
+            errors.append(f"Pre-deploy no-op check cannot verify baseline path '{path}': candidate checksum is missing")
+            continue
         if base_sha is None:
-            if expect_noop:
-                errors.append(f"Pre-deploy no-op violation: candidate contains unexpected new path '{path}'")
-                mismatched[path] = {"expected": "(none)", "actual": cand_sha}
             continue
 
         if cand_sha.lower() == base_sha.lower():

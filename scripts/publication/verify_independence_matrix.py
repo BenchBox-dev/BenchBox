@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
@@ -38,10 +39,32 @@ LANES = ("package", "site", "explorer", "corpus")
 
 MATRIX_FILE_NAME = "independence-matrix.json"
 LANE_TRANSITIONS_FILE_NAME = "lane-transitions.json"
+HEX_64_RE = re.compile(r"^(sha256:)?[0-9a-f]{64}$", re.IGNORECASE)
 
 
 class MatrixInputError(ValueError):
     """Raised when no real transition record is available."""
+
+
+def _validate_artifact_evidence(evidence: Any) -> list[str]:
+    """Validate immutable workflow-artifact provenance carried by a transition."""
+    if not isinstance(evidence, dict):
+        return ["evidence must be an object"]
+    errors: list[str] = []
+    run_id = evidence.get("workflow_run_id")
+    valid_run_id = (isinstance(run_id, int) and not isinstance(run_id, bool) and run_id > 0) or (
+        isinstance(run_id, str) and run_id.isdecimal() and int(run_id) > 0
+    )
+    if not valid_run_id:
+        errors.append("workflow_run_id must be a positive integer")
+    for key in ("event_id", "artifact_name"):
+        value = evidence.get(key)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"{key} must be a non-empty string")
+    digest = evidence.get("artifact_digest")
+    if not isinstance(digest, str) or HEX_64_RE.fullmatch(digest.strip()) is None:
+        errors.append("artifact_digest must be a SHA-256 digest")
+    return errors
 
 
 @dataclass
@@ -135,11 +158,12 @@ def _parse_transition_records(raw_transitions: Any) -> list[LaneTransition]:
     for r in raw_transitions:
         if not isinstance(r, dict):
             raise MatrixInputError(f"transition entry is not an object: {type(r).__name__}")
-        evidence = r.get("evidence")
-        if not isinstance(evidence, dict) or any(
-            not evidence.get(key) for key in ("workflow_run_id", "event_id", "artifact_name", "artifact_digest")
-        ):
-            raise MatrixInputError("transition entry lacks provenance bound to a workflow event and immutable artifact")
+        evidence_errors = _validate_artifact_evidence(r.get("evidence"))
+        if evidence_errors:
+            raise MatrixInputError(
+                "transition entry lacks valid provenance bound to a workflow event and immutable artifact: "
+                + "; ".join(evidence_errors)
+            )
         parsed.append(
             verify_transition_independence(
                 transition_id=str(r.get("transition_id", "unknown")),

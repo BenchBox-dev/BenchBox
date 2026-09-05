@@ -481,6 +481,25 @@ def test_matrix_malformed_record_is_config_error(tmp_path: Path) -> None:
         matrix_mod.verify_independence(receipts_dir=tmp_path)
 
 
+@pytest.mark.parametrize(
+    ("key", "value"),
+    (
+        ("workflow_run_id", True),
+        ("workflow_run_id", "not-a-run"),
+        ("event_id", 123),
+        ("artifact_name", ""),
+        ("artifact_digest", "not-a-digest"),
+    ),
+)
+def test_matrix_rejects_malformed_artifact_evidence(tmp_path: Path, key: str, value: object) -> None:
+    transitions = _single_lane_transitions()
+    transitions[0]["evidence"][key] = value
+    (tmp_path / matrix_mod.MATRIX_FILE_NAME).write_text(json.dumps({"transitions": transitions}), encoding="utf-8")
+
+    with pytest.raises(matrix_mod.MatrixInputError, match="valid provenance"):
+        matrix_mod.verify_independence(receipts_dir=tmp_path)
+
+
 def test_matrix_cli(tmp_path: Path) -> None:
     with pytest.raises(SystemExit) as exc:
         matrix_mod.main(["--help"])
@@ -559,6 +578,29 @@ def test_operational_missing_drill_is_missing_violation(tmp_path: Path) -> None:
     assert report.valid is False
     assert report.drills["rollback"].status == "MISSING"
     assert report.drills["rollback"].passed is False
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    (
+        ("workflow_run_id", True),
+        ("workflow_run_id", "not-a-run"),
+        ("event_id", 123),
+        ("artifact_name", ""),
+        ("artifact_digest", "not-a-digest"),
+    ),
+)
+def test_operational_rejects_malformed_artifact_evidence(tmp_path: Path, key: str, value: object) -> None:
+    d = _valid_operational_dir(tmp_path)
+    receipt_path = d / receipts_mod.ROLLBACK_DRILL_FILE
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["evidence"][key] = value
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+    report = receipts_mod.audit_operational_receipts(receipts_dir=d, now_dt=NOW)
+    assert report.valid is False
+    assert report.drills["rollback"].status == "INVALID"
+    assert "artifact evidence" in (report.drills["rollback"].error or "")
 
 
 def test_operational_missing_capacity_and_retention_fail_closed(tmp_path: Path) -> None:

@@ -106,6 +106,7 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
     ),
     "explorer": (
         "results-explorer/",
+        "scripts/publication/check_explorer_compat.py",
         "_project/scripts/explorer_pipeline/",
         "_project/scripts/explorer_publish.py",
         "_project/scripts/results_explorer_snapshot_invariants.py",

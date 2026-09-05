@@ -206,6 +206,23 @@ def test_verify_live_expect_noop_fails_on_mutation(tmp_path: Path, monkeypatch: 
     assert any("Unexpected mutation detected during no-op verification" in err for err in report.errors)
 
 
+def test_noop_comparison_uses_frozen_baseline_scope() -> None:
+    candidate = {
+        "/": "newly-attested-root",
+        "/results/": "newly-attested-explorer",
+        "/results/data/results.duckdb": "stable-database",
+    }
+    baseline = {"/results/data/results.duckdb": "stable-database"}
+
+    matched, mismatched, errors = verify_live_mod.compare_candidate_against_baseline(
+        candidate, baseline, expect_noop=True
+    )
+
+    assert matched == baseline
+    assert mismatched == {}
+    assert errors == []
+
+
 def test_verify_live_missing_manifest_when_required() -> None:
     report = verify_live_mod.verify_live(
         base_url="https://benchbox.dev",
