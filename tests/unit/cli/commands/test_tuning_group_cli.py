@@ -139,7 +139,7 @@ class TestTuningInitDataframeMode:
 
         runner = CliRunner()
         with (
-            patch.object(_tuning_group_module, "console"),
+            patch.object(_tuning_group_module, "console") as mock_console,
             patch.object(
                 _tuning_group_module,
                 "get_smart_defaults",
@@ -160,6 +160,10 @@ class TestTuningInitDataframeMode:
             result = runner.invoke(tuning_group, ["defaults", "--platform", "datafusion"], obj=_obj())
 
         assert result.exit_code == 0
+        assert any(
+            "--platform datafusion --mode dataframe --tuning auto" in str(call)
+            for call in mock_console.print.call_args_list
+        )
 
     def test_init_polars_dataframe_mode_exits_zero(self):
         runner = CliRunner()

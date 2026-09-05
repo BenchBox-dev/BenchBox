@@ -334,7 +334,8 @@ def show_defaults(platform: str) -> None:
     console.print(f"\n[bold]Recommended Settings for {platform.title()}:[/bold]")
     _display_config_settings_table(config)
 
-    console.print(f"\n[dim]To use these settings: benchbox run --platform {platform} --tuning auto[/dim]")
+    mode_option = " --mode dataframe" if platform.lower() == "datafusion" else ""
+    console.print(f"\n[dim]To use these settings: benchbox run --platform {platform}{mode_option} --tuning auto[/dim]")
 
 
 def _display_config_settings_table(config: DataFrameTuningConfiguration) -> None:
