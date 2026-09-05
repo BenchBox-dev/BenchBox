@@ -131,6 +131,16 @@ describe("local result import", () => {
     expect(JSON.stringify(preview.detail)).not.toContain("/private/customer.duckdb");
   });
 
+  it("uses an opaque per-import ID rather than a bundle fingerprint", async () => {
+    const text = JSON.stringify(bundle());
+    const first = await parseLocalResultText(text);
+    const second = await parseLocalResultText(text);
+
+    expect(first.detail.result_id).toMatch(/^local-[0-9a-f]{12}$/);
+    expect(second.detail.result_id).toMatch(/^local-[0-9a-f]{12}$/);
+    expect(second.detail.result_id).not.toBe(first.detail.result_id);
+  });
+
   it("marks an otherwise passing summary partial when queries failed", async () => {
     const value = bundle({
       summary: {
@@ -140,6 +150,53 @@ describe("local result import", () => {
     });
     const preview = await parseLocalResultText(JSON.stringify(value));
     expect(preview.detail.validation_status).toBe("partial");
+  });
+
+  it("uses publication fallbacks when summary.queries.failed is absent", async () => {
+    const fromSummary = bundle({
+      summary: {
+        queries: { total: 2, passed: 1, skipped: 0 },
+        validation: "passed",
+      },
+    });
+    const fromRows = bundle({
+      summary: {
+        queries: {},
+        validation: "passed",
+      },
+      queries: [{ id: "1", ms: 10, run_type: "measurement", status: "ERROR" }],
+    });
+
+    await expect(parseLocalResultText(JSON.stringify(fromSummary))).resolves.toMatchObject({
+      detail: { validation_status: "partial" },
+    });
+    await expect(parseLocalResultText(JSON.stringify(fromRows))).resolves.toMatchObject({
+      detail: { validation_status: "partial" },
+    });
+  });
+
+  it("marks translation fallback as uncertain like the publication transform", async () => {
+    const value = bundle({
+      execution: { translation: { status: "fallback" } },
+    });
+    const preview = await parseLocalResultText(JSON.stringify(value));
+    expect(preview.detail.validation_status).toBe("uncertain");
+  });
+
+  it("matches publication fallbacks for optional display fields", async () => {
+    const value = bundle({
+      benchmark: { id: "tpch", name: "TPC-H", scale_factor: 1 },
+      platform: { name: "Example  Engine", driver_resolved_version: "platform-only" },
+      execution: {},
+      phases: { power_test: { duration_ms: 1 } },
+      cost: { total_usd: 99 },
+    });
+    const preview = await parseLocalResultText(JSON.stringify(value));
+
+    expect(preview.detail.platform_id).toBe("example--engine");
+    expect(preview.detail.driver_version).toBeNull();
+    expect(preview.detail.test_type).toBe("power");
+    expect(preview.detail.cost_usd).toBeNull();
   });
 
   it.each(["2.0", "2.1", "2.2"])("accepts supported schema %s", async (version) => {
@@ -169,6 +226,6 @@ describe("local result import", () => {
       size: MAX_LOCAL_RESULT_BYTES + 1,
       text: () => Promise.resolve("unused"),
     } as File;
-    await expect(importLocalResultFile(file)).rejects.toThrow("larger than the 50 MiB");
+    await expect(importLocalResultFile(file)).rejects.toThrow("larger than the 10 MiB");
   });
 });

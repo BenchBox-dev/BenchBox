@@ -61,6 +61,12 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
   const [tuningError, setTuningError] = useState<string | null>(null);
   const tuningAbortRef = useRef<AbortController | null>(null);
   const localResultState = useLocalResultState();
+  let picking: ReturnType<typeof usePickingState> | null = null;
+  try {
+    picking = usePickingState();
+  } catch {
+    // Unit tests may not wrap with provider.
+  }
   const isLocal = source === "local";
   const detail = detailState?.detail ?? null;
   const primaryMetric = detailState?.primaryMetric ?? "display_geomean_ms";
@@ -172,12 +178,6 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
   }
   if (!detail || !chartContext) return <LoadingSpinner message="Loading result..." />;
 
-  let picking: ReturnType<typeof usePickingState> | null = null;
-  try {
-    picking = usePickingState();
-  } catch {
-    // Unit tests may not wrap with provider.
-  }
   const isPicked = detail && picking ? picking.pickedIds.includes(detail.result_id) : false;
   const pickingFull = picking ? picking.pickedIds.length >= 4 && !isPicked : false;
   const resultPickingCompareHref = picking?.compareHref ?? null;
@@ -321,7 +321,11 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
             {isLocal ? (
               <>
                 <LocalResultPicker label="Open another result" />
-                <a href="/docs/contributing-results.html" class="btn btn-primary no-underline">
+                <a
+                  href="/docs/contributing-results.html"
+                  referrerPolicy="no-referrer"
+                  class="btn btn-primary no-underline"
+                >
                   Submit for public review
                 </a>
               </>

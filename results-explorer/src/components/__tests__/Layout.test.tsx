@@ -123,6 +123,8 @@ describe("Layout", () => {
       expect(within(explorerNav).getByRole("link", { name: label })).toBeTruthy();
     }
     expect(within(explorerNav).getByRole("button", { name: "Open local result" })).toBeTruthy();
+    expect(within(explorerNav).getByTestId("local-result-file-input")).toHaveAttribute("aria-hidden", "true");
+    expect(within(explorerNav).getByTestId("local-result-file-input")).toHaveAttribute("tabindex", "-1");
     expect(within(explorerNav).getByRole("link", { name: "Query" })).toHaveAttribute("aria-current", "page");
     expect(within(explorerNav).getByRole("link", { name: "Leaderboards" })).not.toHaveAttribute("aria-current");
   });

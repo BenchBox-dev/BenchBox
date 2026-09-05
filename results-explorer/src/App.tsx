@@ -31,6 +31,8 @@ export function App() {
             <PlatformIndex path="/results/p/:platform/" />
             <CompareWithinRun path="/results/r/:resultId/passes" />
             <ResultDetail path="/results/r/:resultId" />
+            <ResultDetail path="/results/local" source="local" />
+            <ResultDetail path="/results/local/" source="local" />
             <ResultDetail path="/results/local/:resultId" source="local" />
             <BenchmarkIndex path="/results/:benchmark/" />
             <NotFound default />

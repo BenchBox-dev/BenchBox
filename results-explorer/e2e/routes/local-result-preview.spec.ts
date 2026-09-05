@@ -39,6 +39,15 @@ test.describe("local result preview", () => {
     expect(requests.some((request) => request.body?.includes("database_path") ?? false)).toBe(false);
     expect(requests.some((request) => request.url.includes(localBundle.run.id))).toBe(false);
     expect(requests.some((request) => request.url.includes(localBundleName))).toBe(false);
+
+    const persistentState = await page.evaluate(async () => ({
+      localStorage: Object.entries(localStorage),
+      sessionStorage: Object.entries(sessionStorage),
+      indexedDatabases: typeof indexedDB.databases === "function"
+        ? (await indexedDB.databases()).map((database) => database.name)
+        : [],
+    }));
+    expect(persistentState).toEqual({ localStorage: [], sessionStorage: [], indexedDatabases: [] });
   });
 
   test("explains that memory-only state is gone after a reload", async ({ page }) => {
@@ -51,5 +60,15 @@ test.describe("local result preview", () => {
     await page.reload();
     await expect(page.getByRole("alert")).toContainText("no longer available");
     await expect(page.getByRole("button", { name: "Open result file again" })).toBeVisible();
+
+    await page.getByRole("main").getByTestId("local-result-file-input").setInputFiles(LOCAL_BUNDLE);
+    await expect(page.getByTestId("local-result-banner")).toBeVisible();
+  });
+
+  test("uses the local recovery view for the bare local route", async ({ page }) => {
+    await page.goto("/results/local/");
+    await expect(page.getByRole("alert")).toContainText("No result ID provided");
+    await expect(page.getByRole("button", { name: "Open result file again" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /local results/i })).toHaveCount(0);
   });
 });
