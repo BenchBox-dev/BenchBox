@@ -36,6 +36,7 @@ def test_workflow_is_dispatch_only_with_required_inputs() -> None:
     dispatch_inputs = triggers["workflow_dispatch"].get("inputs", {})
     assert "expect_noop" in dispatch_inputs
     assert dispatch_inputs["expect_noop"]["type"] == "boolean"
+    assert dispatch_inputs["candidate_only"]["type"] == "boolean"
     assert "force_rollback" in dispatch_inputs
     assert dispatch_inputs["force_rollback"]["type"] == "boolean"
     assert "rollback_target_sha" in dispatch_inputs
@@ -199,7 +200,7 @@ def test_production_promotes_exact_approved_candidate_bytes() -> None:
     assert restore["if"] == "inputs.approved_manifest_digest != ''"
     assert "publication-candidate-receipts-$EXPECTED_GENERATION-$CANDIDATE_RUN_ID" in run
     assert 'gh run download "$CANDIDATE_RUN_ID"' in run
-    assert 'assembly.get("candidate_mode") != "no-write"' in run
+    assert 'assembly.get("candidate_mode") not in {"no-op-rehearsal", "candidate-only"}' in run
     assert 'RUN_HEAD_SHA" != "$EXPECTED_WORKFLOW_SHA"' in run
     assert '"prior_live_receipt_id": os.environ.get("EXPECTED_PRIOR_LIVE_RECEIPT_ID") or None' in run
     assert "approved candidate site digest mismatch" in run
@@ -295,12 +296,20 @@ def test_rollback_condition_covers_all_failure_modes_and_drills() -> None:
     assert "force_rollback == true" in if_cond
 
 
-def test_noop_and_forced_rollback_are_mutually_exclusive() -> None:
+def test_no_write_modes_and_forced_rollback_are_mutually_exclusive() -> None:
     validation = next(
         step for step in _workflow()["jobs"]["build"]["steps"] if step.get("name") == "Validate pinned dispatch inputs"
     )
 
-    assert 'if [ "$EXPECT_NOOP" = "true" ] && [ "$FORCE_ROLLBACK" = "true" ]' in validation["run"]
+    assert "expect_noop, candidate_only, and force_rollback are mutually exclusive" in validation["run"]
+
+
+def test_changed_candidate_mode_builds_without_deploying() -> None:
+    workflow = _workflow()
+
+    assert "inputs.candidate_only != true" in workflow["jobs"]["deploy"]["if"]
+    assert '"candidate-only"' in _workflow_text()
+    assert "CANDIDATE_ONLY: ${{ inputs.candidate_only }}" in _workflow_text()
 
 
 def test_dispatch_ref_must_be_develop() -> None:

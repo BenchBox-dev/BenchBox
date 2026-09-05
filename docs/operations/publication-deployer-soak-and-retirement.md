@@ -28,7 +28,8 @@ Choose exact 40-character lowercase commit SHAs for `develop_sha` and
 for the first independent deployment, then increment by one. Record the current
 attested live receipt ID when the run replaces an earlier generation.
 
-First dispatch the exact inputs with `expect_noop=true` and no
+For a publication that changes corpus content, first dispatch the exact inputs
+with `candidate_only=true`, `expect_noop=false`, and no
 `approved_manifest_digest`. Download `desired-manifest.json` from the candidate
 receipt artifact, inspect its pins and measured artifact closure, and record its
 `manifest_digest` and workflow run ID. Dispatch the production run with the same inputs,
@@ -40,7 +41,7 @@ refuses deployment unless the site's exact byte digest matches the reviewed
 manifest. It promotes those reviewed bytes without rebuilding the DuckDB file.
 This is an authorized production action; this runbook does not authorize it.
 
-For a no-write rehearsal, set `expect_noop=true`. That compares the candidate
+For a no-op rehearsal, set `expect_noop=true` and `candidate_only=false`. That compares the candidate
 database with the freeze baseline and skips the deploy job. A rehearsal is not
 a live receipt and cannot count toward soak.
 

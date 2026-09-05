@@ -35,6 +35,10 @@ name: Publication Control Plane Deployment
         description: "Rehearse against the baseline without a Pages write"
         type: boolean
         default: false
+      candidate_only:
+        description: "Build reviewable candidate bytes without a Pages write or baseline no-op assertion"
+        type: boolean
+        default: false
       force_rollback:
         description: "Exercise rollback using a prior attested artifact"
         type: boolean
@@ -91,8 +95,10 @@ jobs:
             echo "::error::publication deployment must be dispatched from develop"
             exit 1
           fi
-          if [ "$EXPECT_NOOP" = "true" ] && [ "$FORCE_ROLLBACK" = "true" ]; then
-            echo "::error::expect_noop and force_rollback are mutually exclusive"
+          if { [ "$EXPECT_NOOP" = "true" ] && [ "$FORCE_ROLLBACK" = "true" ]; } || \
+             { [ "$EXPECT_NOOP" = "true" ] && [ "$CANDIDATE_ONLY" = "true" ]; } || \
+             { [ "$FORCE_ROLLBACK" = "true" ] && [ "$CANDIDATE_ONLY" = "true" ]; }; then
+            echo "::error::expect_noop, candidate_only, and force_rollback are mutually exclusive"
             exit 1
           fi
           for value in "$DEVELOP_SHA" "$PUBLISHED_RESULTS_SHA"; do
@@ -131,7 +137,7 @@ jobs:
           elif [ -n "$APPROVED_CANDIDATE_RUN_ID" ]; then
             echo "::error::approved_candidate_run_id requires approved_manifest_digest"
             exit 1
-          elif [ "$EXPECT_NOOP" != "true" ] && [ "$FORCE_ROLLBACK" != "true" ]; then
+          elif [ "$EXPECT_NOOP" != "true" ] && [ "$CANDIDATE_ONLY" != "true" ] && [ "$FORCE_ROLLBACK" != "true" ]; then
             echo "::error::production deployment requires an independently reviewed approved_manifest_digest"
             exit 1
           fi
@@ -148,6 +154,7 @@ jobs:
           INPUT_APPROVED_MANIFEST_DIGEST: ${{ inputs.approved_manifest_digest }}
           INPUT_APPROVED_CANDIDATE_RUN_ID: ${{ inputs.approved_candidate_run_id }}
           EXPECT_NOOP: ${{ inputs.expect_noop }}
+          CANDIDATE_ONLY: ${{ inputs.candidate_only }}
           FORCE_ROLLBACK: ${{ inputs.force_rollback }}
 
       - name: Materialize pinned control plane and corpus
@@ -313,7 +320,7 @@ jobs:
               raise SystemExit(f"approved candidate manifest binding mismatch: expected={expected} actual={actual}")
           if desired.get("build_closure", {}).get("workflow_sha") != os.environ["EXPECTED_WORKFLOW_SHA"]:
               raise SystemExit("approved candidate was built by different workflow code")
-          if assembly.get("candidate_mode") != "no-write":
+          if assembly.get("candidate_mode") not in {"no-op-rehearsal", "candidate-only"}:
               raise SystemExit("approved candidate was not produced by a no-write rehearsal")
           if str(assembly.get("artifact_run_id")) != os.environ["CANDIDATE_RUN_ID"]:
               raise SystemExit("approved candidate receipt is not bound to its workflow run")
@@ -434,6 +441,7 @@ jobs:
           PAGES_ARTIFACT: publication-pages-${{ steps.inputs.outputs.generation }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           EXPECT_NOOP: ${{ inputs.expect_noop }}
+          CANDIDATE_ONLY: ${{ inputs.candidate_only }}
         if: inputs.approved_manifest_digest == ''
         shell: bash
         run: |
@@ -477,7 +485,7 @@ jobs:
           export ROOT_ENDPOINT_DIGEST DOCS_ENDPOINT_DIGEST API_DOCS_ENDPOINT_DIGEST EXPLORER_ENDPOINT_DIGEST
           export NODE_VERSION UV_VERSION IMAGE_OS SITE_ARTIFACT PAGES_ARTIFACT GITHUB_RUN_ID TIMESTAMP GITHUB_OUTPUT
           export PARENT_SHA PARENT_GENERATION WORKFLOW_SHA APPROVED_MANIFEST_DIGEST
-          export PARENT_ARTIFACT_ID EXPECT_NOOP
+          export PARENT_ARTIFACT_ID EXPECT_NOOP CANDIDATE_ONLY
           python3 - <<'PY'
           import hashlib
           import json
@@ -586,7 +594,13 @@ jobs:
               "rollback_artifact_name": os.environ["SITE_ARTIFACT"],
               "rollback_artifact_run_id": os.environ["GITHUB_RUN_ID"],
               "parent_artifact_id": os.environ.get("PARENT_ARTIFACT_ID") or None,
-              "candidate_mode": "no-write" if os.environ["EXPECT_NOOP"] == "true" else "rollback-preparation",
+              "candidate_mode": (
+                  "no-op-rehearsal"
+                  if os.environ["EXPECT_NOOP"] == "true"
+                  else "candidate-only"
+                  if os.environ["CANDIDATE_ONLY"] == "true"
+                  else "rollback-preparation"
+              ),
               "timestamp": os.environ["TIMESTAMP"],
               "status": "BUILT",
           })
@@ -663,7 +677,7 @@ jobs:
   deploy:
     name: Deploy atomic artifact to GitHub Pages
     needs: build
-    if: inputs.expect_noop != true && inputs.force_rollback != true
+    if: inputs.expect_noop != true && inputs.candidate_only != true && inputs.force_rollback != true
     runs-on: ubuntu-latest
     permissions:
       actions: read

@@ -8,6 +8,7 @@ that real matching evidence reconciles.
 from __future__ import annotations
 
 import base64
+import copy
 import importlib.util
 import json
 import subprocess
@@ -123,17 +124,17 @@ def _distinct_states(generation: int = 5):
         "artifacts": {"site": {"digest": "d" * 64, "path": "/"}},
     }
     desired = {
-        **common,
+        **copy.deepcopy(common),
         "build_closure": {"lockfile_sha256": "lock", "workflow_sha": "wf"},
     }
     built = {
-        **common,
+        **copy.deepcopy(common),
         "artifact_name": "publication-pages-5",
         "artifact_run_id": "12345",
         "build_closure": {"lockfile_sha256": "lock", "workflow_sha": "wf"},
     }
     deployed = {
-        **common,
+        **copy.deepcopy(common),
         "source_commit": "1111111111111111111111111111111111111111",
         "artifact_name": "publication-pages-5",
         "artifact_run_id": "12345",
@@ -291,6 +292,25 @@ def test_artifact_digests_preserve_identity_when_paths_overlap() -> None:
         "artifact:pages_assembly:/": "b" * 64,
         "endpoint:/": "c" * 64,
     }
+
+
+@pytest.mark.parametrize("state_name", ("deployed", "observed"))
+def test_reconcile_requires_complete_artifact_set_in_every_state(state_name: str) -> None:
+    desired, built, deployed, observed = _distinct_states()
+    for state in (desired, built, deployed, observed):
+        state["artifacts"]["explorer"] = {"path": "/results/", "digest": "e" * 64}
+    target = deployed if state_name == "deployed" else observed
+    del target["artifacts"]["explorer"]
+
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
+
+    assert report.reconciled is False
+    assert any(
+        finding.drift_type == "ARTIFACT_DRIFT"
+        and state_name in finding.description.lower()
+        and "artifact:explorer:/results/" in finding.description
+        for finding in report.drifts
+    )
 
 
 def test_reconcile_incomplete_receipt_fields() -> None:

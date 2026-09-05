@@ -514,37 +514,39 @@ def _check_state_binding_completeness(
     return drifts
 
 
-def _check_built_vs_desired(desired_digests: dict[str, str], built_digests: dict[str, str]) -> list[DriftFinding]:
-    """Full set comparison of manifest vs build artifact digests (not the intersection)."""
+def _check_state_vs_desired(
+    desired_digests: dict[str, str], state_digests: dict[str, str], state_name: str
+) -> list[DriftFinding]:
+    """Full set comparison of manifest vs one publication state's digests."""
     if not desired_digests:
         return []
     drifts: list[DriftFinding] = []
-    for path in sorted(set(desired_digests) - set(built_digests)):
+    for path in sorted(set(desired_digests) - set(state_digests)):
         drifts.append(
             DriftFinding(
                 drift_type="ARTIFACT_DRIFT",
-                description=f"Manifest-required artifact '{path}' is absent from the build",
+                description=f"Manifest-required artifact '{path}' is absent from the {state_name} state",
                 expected=desired_digests[path],
                 actual=None,
             )
         )
-    for path in sorted(set(built_digests) - set(desired_digests)):
+    for path in sorted(set(state_digests) - set(desired_digests)):
         drifts.append(
             DriftFinding(
                 drift_type="ARTIFACT_DRIFT",
-                description=f"Built artifact '{path}' is not present in the desired manifest",
+                description=f"{state_name.capitalize()} artifact '{path}' is not present in the desired manifest",
                 expected=None,
-                actual=built_digests[path],
+                actual=state_digests[path],
             )
         )
-    for path in sorted(set(desired_digests) & set(built_digests)):
-        if desired_digests[path] != built_digests[path]:
+    for path in sorted(set(desired_digests) & set(state_digests)):
+        if desired_digests[path] != state_digests[path]:
             drifts.append(
                 DriftFinding(
                     drift_type="ARTIFACT_DRIFT",
-                    description=f"Built artifact digest for '{path}' differs from desired manifest",
+                    description=f"{state_name.capitalize()} artifact digest for '{path}' differs from desired manifest",
                     expected=desired_digests[path],
-                    actual=built_digests[path],
+                    actual=state_digests[path],
                 )
             )
     return drifts
@@ -674,13 +676,17 @@ def _check_observed_probes(
 def _check_artifact_drift(
     desired_digests: dict[str, str],
     built_digests: dict[str, str],
+    deployed_digests: dict[str, str],
     observed_digests: dict[str, str],
     base_url: str,
     live: bool,
     observed: dict[str, Any] | None,
 ) -> tuple[list[DriftFinding], list[EndpointObservation]]:
     """Detect checksum and endpoint response drift across built and observed targets."""
-    drifts = _check_built_vs_desired(desired_digests, built_digests)
+    drifts = _check_state_vs_desired(desired_digests, built_digests, "built")
+    drifts.extend(_check_state_vs_desired(desired_digests, deployed_digests, "deployed"))
+    if observed is not None:
+        drifts.extend(_check_state_vs_desired(desired_digests, observed_digests, "observed"))
 
     if live:
         live_drifts, probes = _run_live_probes(base_url, desired_digests, built_digests)
@@ -688,18 +694,6 @@ def _check_artifact_drift(
 
     obs_drifts, probes = _check_observed_probes(observed)
     drifts.extend(obs_drifts)
-
-    for path, obs_hash in observed_digests.items():
-        exp_hash = desired_digests.get(path) or built_digests.get(path)
-        if exp_hash and obs_hash.lower() != exp_hash.lower():
-            drifts.append(
-                DriftFinding(
-                    drift_type="ARTIFACT_DRIFT",
-                    description=f"Observed receipt digest for '{path}' differs from desired state",
-                    expected=exp_hash,
-                    actual=obs_hash,
-                )
-            )
 
     return drifts, probes
 
@@ -921,9 +915,10 @@ def reconcile_states(
 
     desired_digests = extract_artifact_digests(desired)
     built_digests = extract_artifact_digests(built or {})
+    deployed_digests = extract_artifact_digests(deployed or {})
     observed_digests = extract_artifact_digests(observed or {})
     art_drifts, probes = _check_artifact_drift(
-        desired_digests, built_digests, observed_digests, base_url, live, observed
+        desired_digests, built_digests, deployed_digests, observed_digests, base_url, live, observed
     )
     drifts.extend(art_drifts)
 
