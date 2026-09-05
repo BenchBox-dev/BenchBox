@@ -188,7 +188,9 @@ def get_smart_defaults(
     _apply_memory_recommendations(config, system_profile)
 
     # Apply platform-specific recommendations
-    if platform_lower == "polars":
+    if platform_lower == "datafusion":
+        _configure_datafusion(config, system_profile)
+    elif platform_lower == "polars":
         _configure_polars(config, system_profile)
     elif platform_lower == "pandas":
         _configure_pandas(config, system_profile)
@@ -200,6 +202,12 @@ def get_smart_defaults(
         _configure_cudf(config, system_profile)
 
     return config
+
+
+def _configure_datafusion(config: DataFrameTuningConfiguration, profile: SystemProfile) -> None:
+    """Configure only the tuning controls supported by DataFusion."""
+    config.execution.streaming_mode = False
+    config.parallelism.thread_count = profile.cpu_cores
 
 
 def _apply_memory_recommendations(

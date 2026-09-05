@@ -101,6 +101,14 @@ class TestGetSmartDefaults:
         config = get_smart_defaults("polars")
         assert isinstance(config, DataFrameTuningConfiguration)
 
+    def test_datafusion_defaults_use_only_supported_controls(self):
+        profile = SystemProfile(cpu_cores=6, available_memory_gb=2.0)
+        config = get_smart_defaults("datafusion", profile)
+
+        assert config.parallelism.thread_count == 6
+        assert config.memory.chunk_size == 50_000
+        assert config.execution.streaming_mode is False
+
     def test_polars_defaults(self):
         """Test Polars-specific defaults."""
         profile = SystemProfile(cpu_cores=8, available_memory_gb=16.0)

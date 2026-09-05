@@ -262,10 +262,13 @@ function verifyTunedPairCoverage(data, comparableCohorts, errors) {
     byCohortPlatform.set(platformKey, flags);
   }
 
-  let pairedPlatforms = 0;
-  for (const flags of byCohortPlatform.values()) {
-    if (flags.hasDefault && flags.hasTuned) pairedPlatforms += 1;
+  const pairedPlatformsByCohort = new Map();
+  for (const [platformKey, flags] of byCohortPlatform.entries()) {
+    if (!flags.hasDefault || !flags.hasTuned) continue;
+    const cohortKey = platformKey.slice(0, platformKey.lastIndexOf("\0"));
+    pairedPlatformsByCohort.set(cohortKey, (pairedPlatformsByCohort.get(cohortKey) ?? 0) + 1);
   }
+  const pairedPlatforms = Math.max(0, ...pairedPlatformsByCohort.values());
   if (pairedPlatforms < 2) {
     errors.push(
       `expected ≥2 platforms in a ≥4-platform cohort with both notuned/default and tuned runs; observed ${pairedPlatforms}`,
