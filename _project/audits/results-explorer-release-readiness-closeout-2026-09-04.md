@@ -11,8 +11,9 @@ integrated_reviewed_sha: 066ba7cc02c6785c85086146639af9ddeec9d28a
 
 The curated preview remains safe to describe as a curated preview, not as
 broad Database Leaderboards readiness. The current source and the live
-certification evidence close the original provenance, CI, documentation, and
-browser-contract findings, but this closeout cannot certify a clean release:
+certification evidence close the original provenance, CI, and browser-contract
+findings, but N4.1b and N4.1d remain accepted documentation/workflow residuals
+and this closeout cannot certify a clean release:
 two Vitest tests timed out, the required local browser server could not bind in
 this sandbox, the focused Python run could not bind its test fixtures, and the
 live pair is still a v7 snapshot served to source that expects v10. Those
@@ -101,10 +102,10 @@ test, or the independent certification.
 | **N2** — 2.7 | `remediate-submission-trust-label-enforcement` | `033806e4d` / current trusted-base workflow | `.github/workflows/validate-submission.yml:25-145` | Workflow contract tests | No fork PR run here; source now executes validators from trusted base and rejects unauthorized validator changes | P3 | fixed |
 | **N3** — 2.11 | `remediate-ci-required-gate-integrity` | PR #962 / `f28a15ffa` | `Makefile:950` | Make target resolves to `lint-imports`; source check | No deployment relevance | P3 | fixed |
 | **N4.1a** — 2.18b strategy evidence | `remediate-governance-and-doc-drift` | current integration tree | `docs/development/benchbox-results-platform-strategy.md:481-484` names `exporter.py`, `bundle_publisher.py`, and `store.py`, and identifies the deleted prototype as historical | Current-source inspection | No rendered evidence required for this documentation correction | P3 | fixed |
-| **N4.1b** — 2.18b workflow triggers | `remediate-governance-and-doc-drift` | current integration tree | `.github/workflows/docs.yml:3-23`; `.github/workflows/results-explorer-browser.yml:3-28`; `docs/development/results-explorer-browser-testing.md:67-79` | Current-source inspection | No live workflow run was claimed | P3 | fixed |
+| **N4.1b** — 2.18b workflow triggers | `remediate-governance-and-doc-drift` | current integration tree | `.github/workflows/results-explorer-browser.yml:3-28,39-62` shows `release`/`develop` branches, no `pull_request.paths`, and explicit non-PR handling for push/dispatch; `.github/workflows/docs.yml:3-23`; `docs/development/results-explorer-browser-testing.md:67-79` | Current-source inspection | No live workflow run was claimed | P3 | accepted residual — CI/workflow owner must reconcile the trigger and required-check contract outside this allowlist; next action is to update `.github/workflows/results-explorer-browser.yml` and its related documentation before calling this fixed |
 | **N4.1c** — 2.18b token-scan job set | `remediate-governance-and-doc-drift` | current integration tree | `docs/operations/results-explorer-token-scan.md:121-137` includes `medium-test`; `.github/workflows/develop-post-merge.yml:512-524` defines the four expected jobs | Current-source inspection | No live post-merge run was claimed | P3 | fixed |
-| **N4.1d** — 2.18b ruleset aggregate count | `remediate-governance-and-doc-drift` | current integration tree | `docs/operations/repo-admin-settings.md:70-75`; `.github/workflows/pr.yml:1417-1438` names the current aggregate contract | Current-source inspection | The wording no longer asserts the obsolete four-job aggregate | P3 | fixed |
-| **N4.1e** — 2.18b runbook sync/seed description | `remediate-governance-and-doc-drift` | current integration tree | `docs/operations/results-phase-2-runbook.md:37-42` still says `seed-corpus.yml` has a monthly schedule; `.github/workflows/seed-corpus.yml:1-25` shows dispatch only | Current-source inspection | The sync-validator wording is current, but the seed schedule statement remains inaccurate | P3 | accepted residual — Documentation owner must correct the seed trigger before calling this historical sub-finding fixed |
+| **N4.1d** — 2.18b ruleset aggregate count | `remediate-governance-and-doc-drift` | current integration tree | `docs/operations/repo-admin-settings.md:70-79` lists the `ci-required-result` needs contract but omits `publication-reconciliation`; `.github/workflows/pr.yml:1417-1441` requires and exports `publication-reconciliation` | Current-source inspection | No live ruleset mutation or hosted run was claimed | P3 | accepted residual — CI/governance documentation owner must reconcile `docs/operations/repo-admin-settings.md` with `.github/workflows/pr.yml` outside this allowlist; next action is to update that admin documentation before calling this fixed |
+| **N4.1e** — 2.18b runbook sync/seed description | `remediate-governance-and-doc-drift` | current integration tree | `docs/operations/results-phase-2-runbook.md:37-42` describes the monthly and on-demand refresh; `.github/workflows/seed-corpus.yml:8-20` confirms `schedule` with cron `0 7 1 * *` and `workflow_dispatch` | Current-source inspection | The runbook and workflow now agree on both triggers | P3 | fixed |
 | **N4.2** — 2.19 publish naming collision | `remediate-governance-and-doc-drift` | current integration tree | `docs/development/benchbox-results-platform-strategy.md:499-504`; `docs/reference/cli/submit.md:123-132`; D9 evidence at `docs/design/future-state/prune-publishing-subsystem/README.md:3-24` | Current-source inspection | No live/rendered evidence is needed for terminology and the former prune hazard is closed by D9 | P3 | fixed |
 | **N4.3** — 2.20 trust vocabulary | `remediate-explorer-trust-label-vocabulary` | current integration tree | `results-explorer/src/components/TrustBadge.tsx:8-17,27-74`; `results-explorer/src/components/__tests__/TrustBadge.test.tsx:104-128` | TrustBadge unit coverage explicitly iterates all publisher labels | No live/rendered evidence is claimed | P3 | fixed |
 | **N4.4** — 2.21 empty TrustBadge | `remediate-explorer-trust-label-vocabulary` | current integration tree | `results-explorer/src/components/TrustBadge.tsx:76-119`; `results-explorer/src/components/__tests__/TrustBadge.test.tsx:96-102` | Unit test requires a visible neutral `Unknown` badge for `trustLabel=""` | No live/rendered evidence is claimed | P3 | fixed |
@@ -122,6 +123,28 @@ test, or the independent certification.
 | Pages curl check | **Environment-blocked:** `curl` could not resolve `benchbox.dev` (`curl: (6) Could not resolve host`). The independent certification captured the live pair over HTTPS at the same develop pin. |
 | Independent math/privacy/browser evidence | Certification at `fc6dd5958`: 138/138 geomeans, 138/138 percentile rows, 55/55 rank rows, 35/35 ranking-direction cohorts; zero public path leaks; Chromium blocking green; Firefox/WebKit 16 smoke tests each. |
 | `UV_CACHE_DIR=/tmp/benchbox-explorer-evidence-audit-uv-cache make audit-sha-check FILE=_project/audits/results-explorer-release-readiness-closeout-2026-09-04.md` | PASS — `OK _project/audits/results-explorer-release-readiness-closeout-2026-09-04.md: develop_sha=c44fdfc457886d9340b75d86ecb6e29796fdbb98 target_ref=origin/develop measured_at_sha=fc6dd5958b1deffa468e01852a392a29585d11eb`. |
+
+### Retained independent-oracle replay
+
+The retained result artifact is
+`_project/audits/results-explorer-evidence/independent-oracle-2026-09-04.json`.
+The commands below are executable replay instructions for the retained
+historical evidence; they are not a new live check. The managed-dependency
+command is the primary replay:
+
+```bash
+uv run --no-project --with duckdb --with pyyaml -- python _project/audits/results-explorer-evidence/replay_independent_oracle.py --snapshot /tmp/results.duckdb --measurement-sha c44fdfc457886d9340b75d86ecb6e29796fdbb98 --snapshot-url https://benchbox.dev/results/data/results.duckdb --output /tmp/independent-oracle.json
+```
+
+Controlled fallback, only when the import probe succeeds:
+
+```bash
+if python3 -c 'import duckdb, yaml'; then
+  python3 _project/audits/results-explorer-evidence/replay_independent_oracle.py --snapshot /tmp/results.duckdb --measurement-sha c44fdfc457886d9340b75d86ecb6e29796fdbb98 --snapshot-url https://benchbox.dev/results/data/results.duckdb --output /tmp/independent-oracle.json
+else
+  echo "python3 fallback unavailable: duckdb and/or yaml import failed" >&2
+fi
+```
 
 ## D11 live-evidence record
 
@@ -165,7 +188,7 @@ be acquired. The concrete remaining defects are named above for the manager to
 create or route through the tracker using the distinct requested actor; no
 sibling item was claimed or released.
 
-Disposition count: fixed 23; accepted 3; superseded 2; still blocking 0 in the
+Disposition count: fixed 23; accepted 4; superseded 2; still blocking 0 in the
 historical D/N matrix. Current closeout gate remains **not certified** until
 the two new frontend timeouts and the environment-blocked required runs are
 resolved or independently attested.
