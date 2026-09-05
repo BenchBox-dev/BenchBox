@@ -117,26 +117,24 @@ variants both landed under `tuning_mode=tuned`).
 
 ---
 
-# Post-2026-08-23 trust cut — remaining-gap restore
-
-**Related TODO:** `restore-corpus-coverage-after-20260823-trust-cut`
+# Corpus coverage after the 2026-08-23 trust boundary
 **Checked-in validation:** The checked-in inventory and `results-data/validate_corpus.py`
 are the current source of corpus counts and validation status. Regenerate and check
 the inventory before relying on either value.
 
-## What happened
+## Trust boundary
 
 The 2026-08-28 trust cut (PRs #1939 develop, #1940 published-results) withdrew
 every result run before 2026-08-23. That left a 9-bundle / 3-cohort corpus. The
 withdrawal was intentional; coverage has to be rebuilt with fresh runs only.
 Do not restore withdrawn bundles from git history.
 
-## Live already-OK cohorts (do not re-run)
+## Covered cohorts
 
 The checked-in inventory records **244 bundles**, **16 benchmarks**, and **42
 cohorts**, all at the >=3-identity floor. These
 benchmarks already have comparable local coverage and must not be re-run for
-this restore:
+for coverage recovery:
 
 | Benchmark | Live scales with >=3 identities |
 |-----------|----------------------------------|
@@ -159,7 +157,7 @@ bundles use `benchmark.id = "ssb"`). It is **not** a separate remaining-gap
 benchmark. Do not admit a duplicate `star_schema` cohort beside live `ssb`
 coverage.
 
-## Remaining zero-coverage local cells (2026-09-04)
+## Zero-coverage local cells recorded on 2026-09-04
 
 Benchmarks with **no** checked-in primary bundles after the trust cut:
 
@@ -175,11 +173,11 @@ Benchmarks with **no** checked-in primary bundles after the trust cut:
 | write_primitives | SF 0.01 × >=3 local platforms | Needs three validation-passed local platforms |
 | star_schema | — | Alias of `ssb` — **not admitted as a separate cell** |
 
-Skip SF 10 expansion for this restore. No cloud-vendor account signup
+Skip SF 10 expansion for this coverage work. No cloud-vendor account signup
 (Databricks / Snowflake / BigQuery). The supported seed lane is local-only and
 does not require ClickHouse Cloud credentials.
 
-## Admission rules for remaining-gap cells
+## Admission rules for uncovered cells
 
 1. Fresh post-2026-08-23 runs only; never copy withdrawn git-history bundles.
 2. Real validation phase must execute; admit only when
@@ -192,10 +190,10 @@ does not require ClickHouse Cloud credentials.
 5. Each admitted cohort must meet the >=3-platform floor in
    `results-data/validate_corpus.py`.
 
-## Remaining-gap restore outcome
+## Recorded coverage outcome
 
-Recorded when remaining-gap bundles were copied into `results-data/bundles/`
-and the inventory regenerated (post-2026-08-23 trust-cut restore):
+Recorded when replacement bundles were copied into `results-data/bundles/`
+and the inventory regenerated:
 
 | Benchmark | Admitted cohorts | Deferred |
 |-----------|------------------|----------|
