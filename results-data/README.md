@@ -136,6 +136,15 @@ documentation tree, so the complete runnable flow is included here:
 The full maintained guide is published at
 <https://benchbox.dev/docs/contributing-results.html>.
 
+### Maintainer archive path (not community)
+
+Community add PRs above are the supported submission path. Separately,
+maintainers handling seed or curated archive changes must follow the
+[published-results deletion and mirror procedure](https://github.com/BenchBox-dev/BenchBox/blob/develop/docs/operations/results-phase-2-runbook.md#public-deletion--privacy-takedown-intentional-path-removal):
+hand-opened *maintainer* PRs against `published-results` are deletion-only;
+maintainer and seed additions go through the `auto/results-mirror-*` sync,
+not a hand-opened add PR.
+
 ## Reproducibility
 
 Any bundle in this directory can be re-run locally using the parameters recorded in
