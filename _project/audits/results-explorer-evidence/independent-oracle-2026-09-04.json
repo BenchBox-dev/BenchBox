@@ -1,11 +1,12 @@
 {
+  "evidence_scope": "historical_replay",
   "replay": {
     "script": "_project/audits/results-explorer-evidence/replay_independent_oracle.py",
-    "sha256": "ebb5bfe90f2378e4142684b0ec98006f0e46f3bf6488ff029463004015e747f8"
+    "sha256": "ddef6d482353a5bdbd98d27a57c087322d7abb0975cea26804dd45cbab44dbd0"
   },
   "measurement_sha": "c44fdfc457886d9340b75d86ecb6e29796fdbb98",
   "snapshot": {
-    "url": "https://benchbox.dev/results/data/results.duckdb",
+    "retrieval_locator": "https://benchbox.dev/results/data/results.duckdb",
     "sha256": "3bce914eae9f9bb3dceea490af4f47f8b14ad084cb46aeb7a4f624208b1d5795",
     "bytes": 8663040
   },

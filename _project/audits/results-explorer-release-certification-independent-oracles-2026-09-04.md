@@ -119,27 +119,35 @@ a v10 rebuild from current source.
 The prior oracle result was present at the time of remediation, but its
 executable command was not recorded. The retained replacement is
 `_project/audits/results-explorer-evidence/independent-oracle-2026-09-04.json`.
-It identifies the input URL, digest
+It identifies the retrieval locator, digest
 `3bce914eae9f9bb3dceea490af4f47f8b14ad084cb46aeb7a4f624208b1d5795`, and
 measurement SHA `c44fdfc457886d9340b75d86ecb6e29796fdbb98`; it contains field
 paths only and no private path values.
 
-To replay from the pinned live snapshot, place the retained snapshot at
-`/tmp/results.duckdb`, then run the retained script. The commands below are
-executable replay instructions for the retained historical evidence; they are
-not a new live check. The script uses only the documented visualization-fixture
-helpers and canonical `find_public_path_leaks`; it does not invoke
-`transformer.py` or `chartMath.ts`.
+The snapshot bytes are not stored in Git because repository policy excludes
+generated binary snapshots. The retained JSON result, script, manifest fields,
+and checksum make that limitation explicit but cannot guarantee that the live
+locator will continue serving the historical bytes.
+
+The URL below is only a retrieval locator. This command downloads its current
+bytes and verifies the retained digest and size before replay. If the live URL
+changes, verification must fail; new bytes must not be relabeled as the 2026-09-04
+measurement.
 
 ```bash
-uv run --no-project --with duckdb --with pyyaml -- python _project/audits/results-explorer-evidence/replay_independent_oracle.py --snapshot /tmp/results.duckdb --measurement-sha c44fdfc457886d9340b75d86ecb6e29796fdbb98 --snapshot-url https://benchbox.dev/results/data/results.duckdb --output /tmp/independent-oracle.json
+curl --fail --location --output /tmp/results.duckdb https://benchbox.dev/results/data/results.duckdb && \
+  printf '%s  %s\n' 3bce914eae9f9bb3dceea490af4f47f8b14ad084cb46aeb7a4f624208b1d5795 /tmp/results.duckdb | shasum -a 256 --check - && \
+  test "$(wc -c < /tmp/results.duckdb | tr -d ' ')" = 8663040 && \
+  uv run --no-project --with duckdb --with pyyaml -- python _project/audits/results-explorer-evidence/replay_independent_oracle.py --snapshot /tmp/results.duckdb --output /tmp/independent-oracle.json
 ```
 
-Controlled fallback, only when the import probe succeeds:
+For an already retrieved copy, the script repeats the digest and size checks
+before opening DuckDB or scanning bundles. Controlled fallback, only when the
+import probe succeeds:
 
 ```bash
 if python3 -c 'import duckdb, yaml'; then
-  python3 _project/audits/results-explorer-evidence/replay_independent_oracle.py --snapshot /tmp/results.duckdb --measurement-sha c44fdfc457886d9340b75d86ecb6e29796fdbb98 --snapshot-url https://benchbox.dev/results/data/results.duckdb --output /tmp/independent-oracle.json
+  python3 _project/audits/results-explorer-evidence/replay_independent_oracle.py --snapshot /tmp/results.duckdb --output /tmp/independent-oracle.json
 else
   echo "python3 fallback unavailable: duckdb and/or yaml import failed" >&2
 fi

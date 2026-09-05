@@ -22,6 +22,10 @@ from typing import Any
 import duckdb
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+EXPECTED_MEASUREMENT_SHA = "c44fdfc457886d9340b75d86ecb6e29796fdbb98"
+EXPECTED_SNAPSHOT_SHA256 = "3bce914eae9f9bb3dceea490af4f47f8b14ad084cb46aeb7a4f624208b1d5795"
+EXPECTED_SNAPSHOT_BYTES = 8663040
+SNAPSHOT_RETRIEVAL_LOCATOR = "https://benchbox.dev/results/data/results.duckdb"
 sys.path.insert(0, str(REPO_ROOT))
 
 from tests.parity.generate_visualization_fixtures import geomean_ms, platform_percentile_stats
@@ -52,6 +56,23 @@ def _load_public_path_detector() -> Any:
 
 
 find_public_path_leaks = _load_public_path_detector()
+
+
+def _verify_snapshot(snapshot: Path) -> tuple[str, int]:
+    """Bind historical replay to the exact snapshot used for certification."""
+    size = snapshot.stat().st_size
+    digest = hashlib.sha256()
+    with snapshot.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    actual_digest = digest.hexdigest()
+    if actual_digest != EXPECTED_SNAPSHOT_SHA256 or size != EXPECTED_SNAPSHOT_BYTES:
+        raise ValueError(
+            "snapshot does not match retained historical evidence: "
+            f"expected sha256={EXPECTED_SNAPSHOT_SHA256} bytes={EXPECTED_SNAPSHOT_BYTES}, "
+            f"got sha256={actual_digest} bytes={size}"
+        )
+    return actual_digest, size
 
 
 def _equal(left: float | None, right: float | None) -> bool:
@@ -118,7 +139,8 @@ def _privacy_scan_bundles(bundle_root: Path) -> dict[str, Any]:
     }
 
 
-def replay(snapshot: Path, bundle_root: Path, measurement_sha: str, snapshot_url: str) -> dict[str, Any]:
+def replay(snapshot: Path, bundle_root: Path) -> dict[str, Any]:
+    digest, snapshot_bytes = _verify_snapshot(snapshot)
     con = duckdb.connect(str(snapshot), read_only=True)
     timings = defaultdict(list)
     for result_id, display_ms in con.execute("SELECT result_id, display_ms FROM query_display_timings").fetchall():
@@ -187,15 +209,19 @@ def replay(snapshot: Path, bundle_root: Path, measurement_sha: str, snapshot_url
         else:
             direction_failures.extend(row[3] for row in rows if row[9] == 1)
 
-    digest = hashlib.sha256(snapshot.read_bytes()).hexdigest()
     script_path = Path(__file__).resolve()
     result = {
+        "evidence_scope": "historical_replay",
         "replay": {
             "script": str(script_path.relative_to(REPO_ROOT)),
             "sha256": hashlib.sha256(script_path.read_bytes()).hexdigest(),
         },
-        "measurement_sha": measurement_sha,
-        "snapshot": {"url": snapshot_url, "sha256": digest, "bytes": snapshot.stat().st_size},
+        "measurement_sha": EXPECTED_MEASUREMENT_SHA,
+        "snapshot": {
+            "retrieval_locator": SNAPSHOT_RETRIEVAL_LOCATOR,
+            "sha256": digest,
+            "bytes": snapshot_bytes,
+        },
         "read_model_version": con.execute("SELECT read_model_version FROM metadata").fetchone()[0],
         "geomean": {
             "results_compared": len(stored_geomean),
@@ -226,14 +252,12 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--snapshot", required=True, type=Path)
     parser.add_argument("--bundle-root", type=Path, default=REPO_ROOT / "results-data" / "bundles")
-    parser.add_argument("--measurement-sha", required=True)
-    parser.add_argument("--snapshot-url", required=True)
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     temporary_output = args.output.with_suffix(args.output.suffix + ".tmp")
     temporary_output.write_text(
-        json.dumps(replay(args.snapshot, args.bundle_root, args.measurement_sha, args.snapshot_url), indent=2) + "\n",
+        json.dumps(replay(args.snapshot, args.bundle_root), indent=2) + "\n",
         encoding="utf-8",
     )
     temporary_output.replace(args.output)

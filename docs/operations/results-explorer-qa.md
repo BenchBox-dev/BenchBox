@@ -150,6 +150,12 @@ competition ranker). Compare those values to `results.display_geomean_ms` and
 production logic in `_project/scripts/explorer_pipeline/transformer.py` or
 `results-explorer/src/lib/chartMath.ts`.
 
+Historical replay must pin the downloaded snapshot by SHA-256 before analysis.
+A live URL is only a retrieval locator: if its bytes change, replay must fail
+rather than attach the old measurement SHA to the new snapshot. Generated
+DuckDB snapshots stay outside Git; retain the replay result, manifest fields,
+checksum, and an executable retrieval-and-verification command in the audit.
+
 Scan public bundles and snapshot string columns with
 `benchbox.core.results.anonymization.find_public_path_leaks`. Report field
 paths only; never echo private path values. Keep raw logs, Playwright reports,

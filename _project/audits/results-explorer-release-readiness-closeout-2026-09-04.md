@@ -1,7 +1,7 @@
 ---
 develop_sha: c44fdfc457886d9340b75d86ecb6e29796fdbb98
-measured_at_sha: fc6dd5958b1deffa468e01852a392a29585d11eb
-checked_sha: fc6dd5958b1deffa468e01852a392a29585d11eb
+measured_at_sha: c44fdfc457886d9340b75d86ecb6e29796fdbb98
+checked_sha: c44fdfc457886d9340b75d86ecb6e29796fdbb98
 independent_review_anchor_sha: 28bb89d157cdf819a43038257e13f6a1239f4f40
 ---
 
@@ -19,7 +19,8 @@ this sandbox, the focused Python run could not bind its test fixtures, and the
 live pair is still a v7 snapshot served to source that expects v10. Those
 defects are outside this branch's allowed product-code scope.
 
-The live certification at `fc6dd5958` is reused for the deployed artifact,
+The live certification measured at `c44fdfc457886d9340b75d86ecb6e29796fdbb98`
+is reused for the deployed artifact,
 privacy, independent math oracles, CSP meta behavior, and the Chromium sample.
 Its Firefox/WebKit runs remain one advisory smoke sample each; they do not
 promote those browsers to blocking coverage.
@@ -28,11 +29,11 @@ promote those browsers to blocking coverage.
 
 | Surface | Current evidence |
 |---|---|
-| Independent-review integration anchor | `independent_review_anchor_sha` = `28bb89d157cdf819a43038257e13f6a1239f4f40`; the exact integration head independently reviewed before this remediation. It is neither the SHA of this edited file nor a measurement run. From the committed remediation checkout, `git merge-base --is-ancestor 28bb89d157cdf819a43038257e13f6a1239f4f40 HEAD && test "$(git diff --name-only 28bb89d157cdf819a43038257e13f6a1239f4f40 HEAD | LC_ALL=C sort)" = "$(printf '%s\n' '_project/audits/results-explorer-release-readiness-closeout-2026-09-04.md' 'docs/operations/results-explorer-qa.md')"` verifies descent from the reviewed integration content and confines the post-review changes to those two authorized files. |
-| Measured evidence tree | `measured_at_sha`/`checked_sha` = `fc6dd5958b1deffa468e01852a392a29585d11eb`; the measurements and certification evidence were run against this historical tree. |
+| Independent-review integration anchor | `independent_review_anchor_sha` = `28bb89d157cdf819a43038257e13f6a1239f4f40`; the exact integration head independently reviewed before this remediation. It is neither the SHA of this edited file nor a measurement run. From the committed remediation checkout, `git merge-base --is-ancestor 28bb89d157cdf819a43038257e13f6a1239f4f40 HEAD && test "$(git diff --name-only 28bb89d157cdf819a43038257e13f6a1239f4f40 HEAD | LC_ALL=C sort)" = "$(printf '%s\n' '_project/audits/results-explorer-evidence/independent-oracle-2026-09-04.json' '_project/audits/results-explorer-evidence/replay_independent_oracle.py' '_project/audits/results-explorer-release-certification-independent-oracles-2026-09-04.md' '_project/audits/results-explorer-release-readiness-closeout-2026-09-04.md' 'docs/operations/results-explorer-qa.md')"` verifies descent from the reviewed integration content and confines the post-review changes to those five authorized files. |
+| Measured evidence tree | `measured_at_sha`/`checked_sha` = `c44fdfc457886d9340b75d86ecb6e29796fdbb98`; the measurements and certification evidence were run against this historical tree. Commit `fc6dd5958b1deffa468e01852a392a29585d11eb` later retained the certification audit and QA instructions; it is not the measured source tree. |
 | Develop | `git rev-parse origin/develop` = `c44fdfc457886d9340b75d86ecb6e29796fdbb98`; this report's `develop_sha` is that exact 40-character value. |
 | Launch | PR #1933 / v0.4.0 launch is already landed; `https://benchbox.dev/results/` was live in the independent certification. |
-| Certified live pair | At `fc6dd5958`, Pages HTML and DuckDB were HTTP 200, internally matched read-model v7, and the deployed JS required v7. Source at current develop expects v10. |
+| Certified live pair | At `c44fdfc457886d9340b75d86ecb6e29796fdbb98`, Pages HTML and DuckDB were HTTP 200, internally matched read-model v7, and the deployed JS required v7. Source at current develop expects v10. |
 | Certified local browser sample | Independent certification used port `60076`, PID `34745`, generated fixture directory `results-explorer/test-fixtures/.generated/data`, and fixture SHA-256 `58801fa40a810cdc6e2337d4f87461b4871e460559cd42edb1340ea9ec655aa1`. This closeout did not reuse that server. |
 | Current attempted local browser run | Requested port `60123` and the current worktree's generated fixture directory. Fixture generation and build passed; sandbox policy returned `listen EPERM`, so no local browser result is claimed. |
 | Raw evidence | Kept outside Git: `/tmp/explorer-closeout-e2e.log`, `/tmp/explorer-closeout-pytest.log`, `/tmp/explorer-closeout-typecheck.log`, `/tmp/explorer-closeout-build.log`, plus the independent certification logs named in its Pin matrix. |
@@ -123,26 +124,35 @@ test, or the independent certification.
 | `npm run test:e2e:full` | **Not reached:** fixture generation and build passed, then the isolated server failed `listen EPERM` on requested port `60123`; `/tmp/explorer-closeout-e2e.log`. No existing server was reused. Independent certification provides the separate port-60076 Chromium blocking result, plus one Firefox and one WebKit smoke sample. |
 | Focused Python command | **Environment-blocked after 437 passed:** four hosted-submission fixtures and the Explorer smoke test require local binds and received `PermissionError: [Errno 1] Operation not permitted`; `/tmp/explorer-closeout-pytest.log`. The required command was run with task-local UV cache and lock directory only. |
 | Pages curl check | **Environment-blocked:** `curl` could not resolve `benchbox.dev` (`curl: (6) Could not resolve host`). The independent certification captured the live pair over HTTPS at the same develop pin. |
-| Independent math/privacy/browser evidence | Certification at `fc6dd5958`: 138/138 geomeans, 138/138 percentile rows, 55/55 rank rows, 35/35 ranking-direction cohorts; zero public path leaks; Chromium blocking green; Firefox/WebKit 16 smoke tests each. |
-| `UV_CACHE_DIR=/tmp/benchbox-explorer-evidence-audit-uv-cache make audit-sha-check FILE=_project/audits/results-explorer-release-readiness-closeout-2026-09-04.md` | PASS — `OK _project/audits/results-explorer-release-readiness-closeout-2026-09-04.md: develop_sha=c44fdfc457886d9340b75d86ecb6e29796fdbb98 target_ref=origin/develop measured_at_sha=fc6dd5958b1deffa468e01852a392a29585d11eb`. |
+| Independent math/privacy/browser evidence | Certification measured at `c44fdfc457886d9340b75d86ecb6e29796fdbb98`: 138/138 geomeans, 138/138 percentile rows, 55/55 rank rows, 35/35 ranking-direction cohorts; zero public path leaks; Chromium blocking green; Firefox/WebKit 16 smoke tests each. |
+| `UV_CACHE_DIR=/tmp/benchbox-explorer-evidence-audit-uv-cache make audit-sha-check FILE=_project/audits/results-explorer-release-readiness-closeout-2026-09-04.md` | PASS — `OK _project/audits/results-explorer-release-readiness-closeout-2026-09-04.md: develop_sha=c44fdfc457886d9340b75d86ecb6e29796fdbb98 target_ref=origin/develop measured_at_sha=c44fdfc457886d9340b75d86ecb6e29796fdbb98`. |
 
 ### Retained independent-oracle replay
 
 The retained result artifact is
 `_project/audits/results-explorer-evidence/independent-oracle-2026-09-04.json`.
-The commands below are executable replay instructions for the retained
-historical evidence; they are not a new live check. The managed-dependency
-command is the primary replay:
+The snapshot bytes are not stored in Git because repository policy excludes
+generated binary snapshots. The retained JSON result, manifest fields, and
+checksum preserve the available identity evidence, not the binary itself.
+
+The URL below is only a retrieval locator. This executable command downloads
+its current bytes and verifies the retained digest and size before historical
+replay. If the live URL changes, verification must fail rather than relabel new
+bytes with the old measurement SHA:
 
 ```bash
-uv run --no-project --with duckdb --with pyyaml -- python _project/audits/results-explorer-evidence/replay_independent_oracle.py --snapshot /tmp/results.duckdb --measurement-sha c44fdfc457886d9340b75d86ecb6e29796fdbb98 --snapshot-url https://benchbox.dev/results/data/results.duckdb --output /tmp/independent-oracle.json
+curl --fail --location --output /tmp/results.duckdb https://benchbox.dev/results/data/results.duckdb && \
+  printf '%s  %s\n' 3bce914eae9f9bb3dceea490af4f47f8b14ad084cb46aeb7a4f624208b1d5795 /tmp/results.duckdb | shasum -a 256 --check - && \
+  test "$(wc -c < /tmp/results.duckdb | tr -d ' ')" = 8663040 && \
+  uv run --no-project --with duckdb --with pyyaml -- python _project/audits/results-explorer-evidence/replay_independent_oracle.py --snapshot /tmp/results.duckdb --output /tmp/independent-oracle.json
 ```
 
+For an already retrieved copy, the script repeats the checks before analysis.
 Controlled fallback, only when the import probe succeeds:
 
 ```bash
 if python3 -c 'import duckdb, yaml'; then
-  python3 _project/audits/results-explorer-evidence/replay_independent_oracle.py --snapshot /tmp/results.duckdb --measurement-sha c44fdfc457886d9340b75d86ecb6e29796fdbb98 --snapshot-url https://benchbox.dev/results/data/results.duckdb --output /tmp/independent-oracle.json
+  python3 _project/audits/results-explorer-evidence/replay_independent_oracle.py --snapshot /tmp/results.duckdb --output /tmp/independent-oracle.json
 else
   echo "python3 fallback unavailable: duckdb and/or yaml import failed" >&2
 fi
