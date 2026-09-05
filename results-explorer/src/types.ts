@@ -203,6 +203,8 @@ export interface PlatformRow extends CostDeploymentFields {
   phase_durations: Record<string, number> | null;
   timings: Record<string, number | null>;
   timing_eligibility: Record<string, Pick<QueryDisplayTiming, "is_valid_display_timing" | "timing_exclusion_reason">>;
+  arch?: string | null;
+  cpu_family?: string | null;
 }
 
 export interface BenchmarkSummary {

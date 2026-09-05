@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import type { JSX } from "preact";
 import type { BenchmarkSummary, RankingConfig } from "@/types";
 import {
   applicableCharts,
@@ -122,6 +123,7 @@ export function ChartPanel({
   const preferredId = useMemo(() => preferredChartId(context, charts), [context, charts]);
   const [activeId, setActiveId] = useState<string>(preferredId);
   const [localBaselineIdx, setLocalBaselineIdx] = useState(0);
+  const groupTabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const isBaselineControlled = baselineIndex !== undefined;
   const baselineIdx = normalizeBaselineIndex(
     summary?.platforms.length ?? 0,
@@ -250,6 +252,23 @@ export function ChartPanel({
     if (nextChart) setActiveId(nextChart.id);
   };
 
+  const selectGroupFromKey = (
+    event: JSX.TargetedKeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+  ) => {
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") nextIndex = (currentIndex + 1) % chartGroups.length;
+    else if (event.key === "ArrowLeft" || event.key === "ArrowUp") nextIndex = (currentIndex - 1 + chartGroups.length) % chartGroups.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = chartGroups.length - 1;
+    else return;
+    event.preventDefault();
+    const group = chartGroups[nextIndex];
+    if (!group) return;
+    selectGroup(group);
+    groupTabRefs.current[group.id]?.focus();
+  };
+
   return (
     <section class="card">
       <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -260,12 +279,16 @@ export function ChartPanel({
             role="tablist"
             aria-label="Chart question groups"
           >
-            {chartGroups.map((group) => {
+            {chartGroups.map((group, groupIndex) => {
               const selected = group.id === activeGroup.id;
+              const tabId = `chart-question-${group.id}`;
               return (
                 <button
                   key={group.id}
                   role="tab"
+                  id={tabId}
+                  ref={(node) => { groupTabRefs.current[group.id] = node; }}
+                  tabIndex={selected ? 0 : -1}
                   type="button"
                   aria-selected={selected}
                   aria-controls="chart-panel-chart"
@@ -276,6 +299,7 @@ export function ChartPanel({
                       : "text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data)] hover:text-[var(--bb-data-fg-primary)]"
                   }`}
                   onClick={() => selectGroup(group)}
+                  onKeyDown={(event) => selectGroupFromKey(event, groupIndex)}
                   title={group.description}
                 >
                   {group.label}
@@ -333,7 +357,13 @@ export function ChartPanel({
         )}
       </div>
 
-      <div id="chart-panel-chart" role="tabpanel" aria-label={`${activeGroup.label} chart`} data-chart-container>
+      <div
+        id="chart-panel-chart"
+        role="tabpanel"
+        aria-labelledby={chartGroups.length > 1 ? `chart-question-${activeGroup.id}` : undefined}
+        aria-label={chartGroups.length > 1 ? undefined : `${activeGroup.label} chart`}
+        data-chart-container
+      >
         {chartDatasetEmpty ? (
           <ChartDatasetEmptyState chart={activeChart} summary={summary!} />
         ) : queryFilter && chartSummary && chartSummary.query_ids.length === 0 ? (

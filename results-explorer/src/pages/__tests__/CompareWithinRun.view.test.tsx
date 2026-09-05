@@ -5,9 +5,10 @@ import type { DetailResult } from "@/types";
 
 vi.mock("@/lib/duckdbQueries", () => ({
   getDetailResult: vi.fn(),
+  resolveShortId: vi.fn((id: string) => Promise.resolve(id)),
 }));
 
-import { getDetailResult } from "@/lib/duckdbQueries";
+import { getDetailResult, resolveShortId } from "@/lib/duckdbQueries";
 
 function makeDetail(): DetailResult {
   return {
@@ -66,7 +67,21 @@ describe("CompareWithinRun page component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (getDetailResult as any).mockResolvedValue(makeDetail());
+    vi.mocked(resolveShortId).mockImplementation((id) => Promise.resolve(id));
     window.history.replaceState(null, "", "/results/r/res-123/passes");
+  });
+
+  it("resolves a short ID and canonicalizes the passes route", async () => {
+    vi.mocked(resolveShortId).mockResolvedValue("res-123");
+    window.history.replaceState(null, "", "/results/r/1234abcd/passes?bases=default,warm_pass_1#comparison");
+
+    render(<CompareWithinRun resultId="1234abcd" />);
+    await waitFor(() => expect(screen.getByText("Compare measurements from one DuckDB run")).toBeTruthy());
+
+    expect(getDetailResult).toHaveBeenCalledWith("res-123");
+    expect(window.location.pathname).toBe("/results/r/res-123/passes");
+    expect(window.location.search).toContain("bases=");
+    expect(window.location.hash).toBe("#comparison");
   });
 
   it("renders within-run comparisons with reference badge and ratio calculations", async () => {

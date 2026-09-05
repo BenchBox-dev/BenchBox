@@ -79,9 +79,11 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
   const medianDelta = sorted.length > 0
     ? sorted[Math.floor(sorted.length / 2)]?.deltaPct ?? 0
     : 0;
+  const chartDescription = `Per-query percentage change relative to ${results[baselineIdx]?.platform ?? "the selected baseline"}. Negative values are faster; positive values are slower. ${faster} entries are faster and ${slower} are slower. An accessible table follows the chart.`;
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
+      <p id="diverging-bar-description" class="sr-only">{chartDescription}</p>
       <p class="mb-2 text-xs text-[var(--bb-data-fg-muted)]">
         {faster} quer{faster === 1 ? "y" : "ies"} faster, {slower} quer{slower === 1 ? "y" : "ies"} slower
         {rawEntries.length > 0 && ` · median delta: ${medianDelta >= 0 ? "+" : ""}${medianDelta.toFixed(1)}%`}
@@ -92,7 +94,9 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
         width="100%"
         height={totalHeight}
         viewBox={`0 0 ${drawWidth} ${totalHeight}`}
+        role="img"
         aria-label="Diverging bar chart"
+        aria-describedby="diverging-bar-description"
       >
         {/* Center axis */}
         <line
@@ -169,6 +173,22 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
           );
         })}
       </svg>
+
+      <table class="sr-only">
+        <caption>Per-query percentage changes relative to {results[baselineIdx]?.platform ?? "the selected baseline"}</caption>
+        <thead>
+          <tr><th>Query</th><th>Candidate</th><th>Change</th></tr>
+        </thead>
+        <tbody>
+          {rawEntries.map((entry, index) => (
+            <tr key={`${entry.queryId}-${entry.platform}-${index}`}>
+              <td>{entry.queryId}</td>
+              <td>{entry.platform}</td>
+              <td>{entry.deltaPct >= 0 ? "+" : ""}{entry.deltaPct.toFixed(1)}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       {/* Legend */}
       <div class="mt-2 flex flex-wrap gap-3 text-xs text-[var(--bb-data-fg-muted)]">

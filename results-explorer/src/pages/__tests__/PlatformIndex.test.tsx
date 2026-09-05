@@ -1,9 +1,8 @@
 /**
  * Tests for PlatformIndex sortable table headers.
  *
- * The default sort (geomean_ms ascending, nulls last) is observable behaviour
- * — must_preserve in the parent TODO. Click-driven sort layered on top of
- * that default switches direction on repeated clicks of the same key.
+ * The default sort leads with the newest runs. Click-driven sort switches
+ * direction on repeated clicks of the same key.
  */
 
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/preact";
@@ -114,11 +113,11 @@ describe("PlatformIndex - sortable table headers", () => {
     vi.mocked(getPlatformIndexRows).mockResolvedValue(ROWS);
   });
 
-  it("default sort is geomean_ms ascending with nulls last", async () => {
+  it("sorts by run date descending by default", async () => {
     const { container } = render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
     await waitFor(() => expect(document.title).toBe("DuckDB · BenchBox Results"));
-    expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
+    expect(getRowOrder(container)).toEqual(["r-null-geo", "r-tpch-fast", "r-tpch-slow", "r-ssb-mid"]);
   });
 
   it("matches lower-case platform URLs against mixed-case platform IDs", async () => {
@@ -130,7 +129,7 @@ describe("PlatformIndex - sortable table headers", () => {
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
     expect(screen.queryByText(/No results found for platform/i)).toBeNull();
-    expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
+    expect(getRowOrder(container)).toEqual(["r-null-geo", "r-tpch-fast", "r-tpch-slow", "r-ssb-mid"]);
   });
 
   it("keeps legacy display-name URLs working when no platform ID matches", async () => {
@@ -142,7 +141,7 @@ describe("PlatformIndex - sortable table headers", () => {
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
     expect(screen.queryByText(/No results found for platform/i)).toBeNull();
-    expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
+    expect(getRowOrder(container)).toEqual(["r-null-geo", "r-tpch-fast", "r-tpch-slow", "r-ssb-mid"]);
   });
 
   it("canonicalizes the explicit clickhouse_local route alias", async () => {
@@ -185,7 +184,7 @@ describe("PlatformIndex - sortable table headers", () => {
 
     expect(getPlatformIndexRows).toHaveBeenCalledTimes(2);
     expect(screen.queryByText(/No results found for platform/i)).toBeNull();
-    expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
+    expect(getRowOrder(container)).toEqual(["r-null-geo", "r-tpch-fast", "r-tpch-slow", "r-ssb-mid"]);
   });
 
   it("does not brand a genuinely empty snapshot as a missing lower-case platform", async () => {
@@ -438,10 +437,34 @@ describe("PlatformIndex - sortable table headers", () => {
     const callout = screen.getByTestId("platform-zero-selectable");
     expect(callout.textContent).toContain("No selectable compare rows");
     expect(callout.textContent).toContain("insufficient query coverage");
-    expect(within(callout).getByRole("button", { name: "Clear filters" })).toBeTruthy();
+    expect(within(callout).queryByRole("button", { name: "Clear filters" })).toBeNull();
     expect(screen.getAllByTestId("platform-disabled-reason")[0]?.textContent).toContain(
       "Why unavailable: Insufficient query coverage",
     );
+  });
+
+  it("offers to clear filters only when an excluded selectable row proves the remedy", async () => {
+    window.history.replaceState(null, "", "/results/p/duckdb/?benchmark=tpch");
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({
+        result_id: "r-blocked-tpch",
+        short_id: "blockt01",
+        benchmark: "tpch",
+        comparison_exclusion_reason: "insufficient_query_coverage",
+      }),
+      makeRow({
+        result_id: "r-selectable-ssb",
+        short_id: "select01",
+        benchmark: "star_schema",
+      }),
+    ]);
+
+    render(<PlatformIndex platform="duckdb" />);
+    const callout = await screen.findByTestId("platform-zero-selectable");
+    fireEvent.click(within(callout).getByRole("button", { name: "Clear filters" }));
+
+    await waitFor(() => expect(screen.queryByTestId("platform-zero-selectable")).toBeNull());
+    expect(screen.getByTestId("r-selectable-ssb")).toBeTruthy();
   });
 
   it("hides the platform filter strip when the cohort has fewer than 25 rows", async () => {
@@ -464,9 +487,11 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(screen.getAllByText(/Geomean latency \(lower is better\)/).length).toBeGreaterThan(0);
   });
 
-  it("clicking the Geomean header twice flips ascending → descending (nulls still last)", async () => {
+  it("clicking the Geomean header selects ascending, then flips to descending", async () => {
     const { container } = render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /Geomean/ }));
+    expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
     fireEvent.click(screen.getByRole("button", { name: /Geomean/ }));
     expect(getRowOrder(container)).toEqual(["r-tpch-slow", "r-ssb-mid", "r-tpch-fast", "r-null-geo"]);
   });
@@ -508,11 +533,13 @@ describe("PlatformIndex - sortable table headers", () => {
   it("aria-sort reflects the active column and direction", async () => {
     const { container } = render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
-    // Default state: Geomean is sorted asc; others report none.
+    // Default state: Date is sorted descending; others report none.
     const headerCells = container.querySelectorAll("th[aria-sort]");
     const geoTh = Array.from(headerCells).find((th) => th.textContent?.includes("Geomean"));
     const benchTh = Array.from(headerCells).find((th) => th.textContent?.includes("Benchmark"));
-    expect(geoTh?.getAttribute("aria-sort")).toBe("ascending");
+    const dateTh = Array.from(headerCells).find((th) => th.textContent?.includes("Date"));
+    expect(dateTh?.getAttribute("aria-sort")).toBe("descending");
+    expect(geoTh?.getAttribute("aria-sort")).toBe("none");
     expect(benchTh?.getAttribute("aria-sort")).toBe("none");
     // Click Benchmark; it becomes the active column at asc.
     fireEvent.click(screen.getByRole("button", { name: /Benchmark/ }));
@@ -644,7 +671,7 @@ describe("PlatformIndex - sortable table headers", () => {
     const receiptLinks = screen.getAllByRole("link", {
       name: /Open receipt for DuckDB public ID/,
     }) as HTMLAnchorElement[];
-    expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r-tpch-fast#run-receipt");
+    expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r-null-geo#run-receipt");
     expect(screen.getAllByText("exact").length).toBeGreaterThan(0);
   });
 

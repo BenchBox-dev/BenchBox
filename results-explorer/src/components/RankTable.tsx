@@ -120,7 +120,12 @@ export function RankTable({ summary, preserveOrder = false }: Props) {
                   />
                   {truncated}
                   {exclusion && (
-                    <span class="ml-1 text-[var(--bb-data-fg-subtle)]" aria-label={exclusion}>
+                    <span
+                      class="ml-1 text-[var(--bb-data-fg-subtle)]"
+                      aria-label={exclusion}
+                      title={exclusion}
+                      tabIndex={0}
+                    >
                       *
                     </span>
                   )}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import type { DetailResult, QueryDisplayTiming, QueryTiming, SortState } from "@/types";
 import type { ChartContext } from "@/lib/chartRegistry";
-import { getDetailResult, getPrimaryMetricForBenchmark } from "@/lib/duckdbQueries";
+import { getDetailResult, getPrimaryMetricForBenchmark, resolveShortId } from "@/lib/duckdbQueries";
 import { humanizeBenchmark, errMsg, fmtGeomean, fmtScoreCompact, fmtScoreExact } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -11,7 +11,7 @@ import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { PassStrip } from "@/components/PassStrip";
-import { withinRunCompareHref } from "@/lib/resultLinks";
+import { resultDetailHref, withinRunCompareHref } from "@/lib/resultLinks";
 import { encodeBasis, selectComparableBasisPair } from "@/lib/measurementBasis";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { TuningBadge } from "@/components/TuningBadge";
@@ -77,7 +77,14 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
     tuningAbortRef.current?.abort();
     tuningAbortRef.current = null;
     let cancelled = false;
-    getDetailResult(resultId)
+    resolveShortId(resultId)
+      .then(async (resolvedId) => {
+        if (cancelled) return null;
+        if (resolvedId !== resultId && typeof window !== "undefined") {
+          history.replaceState(null, "", `${resultDetailHref(resolvedId)}${window.location.search}${window.location.hash}`);
+        }
+        return getDetailResult(resolvedId);
+      })
       .then(async (data) => {
         if (cancelled) return;
         if (data === null) {
@@ -294,9 +301,9 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             />
           )}
           <ResultMetricCard
-            label="Scale / phase"
+            label="Scale factor"
             value={`SF ${detail.scale_factor}`}
-            helper={detail.test_type ?? "standard"}
+            helper={`Phase: ${detail.test_type ? formatEnumLabel(detail.test_type) : "Standard"}`}
           />
           <ResultMetricCard
             label="Trust / validation"
@@ -331,14 +338,17 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                 {tuningUrl ? (
                   <div>
                     <button
+                      type="button"
                       class="mt-1 cursor-pointer border-0 bg-transparent p-0 text-xs text-[var(--bb-accent-hover)] underline hover:text-[var(--bb-accent)]"
                       onClick={handleTuningExpand}
+                      aria-expanded={tuningExpanded}
+                      aria-controls="tuning-settings-region"
                     >
                       {tuningExpanded ? "Hide settings ↑" : "Show settings ↓"}
                     </button>
                     {tuningExpanded && (
-                      <div class="mt-2">
-                        {tuningLoading && <p class="text-xs text-[var(--bb-data-fg-subtle)]">Loading...</p>}
+                      <div id="tuning-settings-region" class="mt-2" role="region" aria-label="Tuning settings">
+                        {tuningLoading && <p role="status" aria-live="polite" class="text-xs text-[var(--bb-data-fg-subtle)]">Loading tuning settings...</p>}
                         {tuningError && <p role="alert" class="text-xs text-[var(--bb-tone-danger-fg)]">{tuningError}</p>}
                         {tuningData && (
                           <pre class="overflow-x-auto rounded panel-muted p-2 text-xs text-[var(--bb-data-fg-primary)]">

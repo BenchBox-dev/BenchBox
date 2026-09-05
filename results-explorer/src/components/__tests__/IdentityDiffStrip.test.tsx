@@ -9,7 +9,7 @@
 import { render, screen } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 
-import { IdentityDiffStrip, identityStripDiffCount, identityStripFields } from "@/components/IdentityDiffStrip";
+import { IdentityDiffStrip, axisValueForRun, identityStripDiffCount, identityStripFields } from "@/components/IdentityDiffStrip";
 import { buildComparabilityFields } from "@/components/ComparabilityReceipt";
 import type { DetailResult } from "@/types";
 
@@ -82,6 +82,19 @@ describe("marking which axes differ", () => {
     const other = run({ result_id: "r2", platform_version: "1.5.0", driver_version: "9.9.9" });
     render(<IdentityDiffStrip results={[run(), other]} />);
     expect(screen.getByText(/2 of 7 axes differ/)).toBeTruthy();
+  });
+
+  it("formats fractional memory values consistently", () => {
+    const fractional = run({
+      environment: {
+        arch: "arm64",
+        cpu_family: "apple_silicon",
+        cpu_model: "Apple M4",
+        cpu_count: 10,
+        memory_gb: 15.613975524902344,
+      },
+    });
+    expect(axisValueForRun("Memory", fractional)).toBe("15.6 GB");
   });
 });
 

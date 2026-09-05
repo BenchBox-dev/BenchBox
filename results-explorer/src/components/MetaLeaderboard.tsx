@@ -326,7 +326,7 @@ export function MetaLeaderboard({
                       >
                         <span class="font-semibold text-[var(--bb-data-fg-primary)]">{cohort.label}</span>
                         <span class="text-[10px] font-normal normal-case tracking-normal text-[var(--bb-data-fg-subtle)]">
-                          {cohortMetricSublabel(cohort, mode)}
+                          {cohortMetricSublabel(cohort)}
                         </span>
                         {allExcludedReason && (
                           <span
@@ -533,7 +533,7 @@ export function MetaLeaderboard({
  * Surfaces the audit's required "every cohort must clearly state metric, unit,
  * and direction" without relying on tooltip-only disclosure.
  */
-function cohortMetricSublabel(cohort: MetaCohort, mode: MetaLeaderboardMode): string {
+function cohortMetricSublabel(cohort: MetaCohort): string {
   const metric = cohort.primary_metric;
   const direction = cohort.primary_order === "desc" ? "higher is better" : "lower is better";
   const metricLabel = metric === "power_score"
@@ -543,10 +543,6 @@ function cohortMetricSublabel(cohort: MetaCohort, mode: MetaLeaderboardMode): st
       : metric === "total_duration_s"
         ? "Total duration"
         : metric;
-  if (mode === "speedup") {
-    return `${cohort.phase} · Relative to best · 1.00× is best; lower is worse · Measured value: ${metricLabel}, ${direction}`;
-  }
-  if (mode === "ranks") return `${cohort.phase} · Rank · 1 is best; higher is worse · Native: ${metricLabel}`;
   return `${cohort.phase} · ${metricLabel} · ${direction}`;
 }
 

@@ -347,11 +347,9 @@ describe("MetaLeaderboard", () => {
       screen.getByRole("columnheader", { name: /ClickBench SF0\.1/ }),
       screen.getByRole("columnheader", { name: /TPC-H SF1 throughput/ }),
     ];
-    for (const header of headers) {
-      expect(header.textContent).toContain("Relative to best · 1.00× is best; lower is worse");
-    }
-    expect(headers[0]!.textContent).toContain("Measured value: Geomean latency, lower is better");
-    expect(headers[1]!.textContent).toContain("Measured value: Power score, higher is better");
+    expect(headers[0]!.textContent).toContain("power · Geomean latency · lower is better");
+    expect(headers[1]!.textContent).toContain("power · Power score · higher is better");
+    expect(screen.getByText(/Values below 1\.00× are worse/)).toBeTruthy();
     expect(screen.getByText("Native: 10 ms")).toBeTruthy();
     expect(screen.getByText("Native: 2,500")).toBeTruthy();
   });

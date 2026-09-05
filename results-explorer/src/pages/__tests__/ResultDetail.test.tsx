@@ -9,7 +9,7 @@
  */
 
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/preact";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { DetailResult } from "@/types";
 
 vi.mock("@/lib/duckdbQueries", async () => {
@@ -18,10 +18,11 @@ vi.mock("@/lib/duckdbQueries", async () => {
     ...actual,
     getDetailResult: vi.fn(),
     getPrimaryMetricForBenchmark: vi.fn().mockResolvedValue("power_score"),
+    resolveShortId: vi.fn((id: string) => Promise.resolve(id)),
   };
 });
 
-import { getDetailResult, getPrimaryMetricForBenchmark } from "@/lib/duckdbQueries";
+import { getDetailResult, getPrimaryMetricForBenchmark, resolveShortId } from "@/lib/duckdbQueries";
 import { ResultDetail } from "@/pages/ResultDetail";
 
 // ---------------------------------------------------------------------------
@@ -88,6 +89,40 @@ describe("ResultDetail - median-first contract", () => {
     vi.clearAllMocks();
     vi.mocked(getDetailResult).mockResolvedValue(makeDetail());
     vi.mocked(getPrimaryMetricForBenchmark).mockResolvedValue("power_score");
+    vi.mocked(resolveShortId).mockImplementation((id) => Promise.resolve(id));
+    window.history.replaceState(null, "", "/results/r/r1");
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("resolves a short ID and canonicalizes the route without losing URL state", async () => {
+    vi.mocked(resolveShortId).mockResolvedValue("result-full-id");
+    window.history.replaceState(null, "", "/results/r/1234abcd?view=receipt#run-receipt");
+
+    render(<ResultDetail resultId="1234abcd" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    expect(getDetailResult).toHaveBeenCalledWith("result-full-id");
+    expect(window.location.pathname).toBe("/results/r/result-full-id");
+    expect(window.location.search).toBe("?view=receipt");
+    expect(window.location.hash).toBe("#run-receipt");
+  });
+
+  it("exposes tuning disclosure state and its controlled region", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ has_tuning: true, tuning_mode: "tuned" }));
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => undefined)));
+
+    render(<ResultDetail resultId="r1" />);
+    const toggle = await screen.findByRole("button", { name: "Show settings ↓" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveAttribute("aria-controls", "tuning-settings-region");
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("region", { name: "Tuning settings" })).toHaveAttribute(
+      "id",
+      "tuning-settings-region",
+    );
   });
 
   it("gives an invalid result ID a recovery link", async () => {

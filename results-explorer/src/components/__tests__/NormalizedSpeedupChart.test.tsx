@@ -35,6 +35,10 @@ describe("NormalizedSpeedupChart", () => {
     render(<NormalizedSpeedupChart queries={QUERIES} results={RESULTS} baselineIdx={0} />);
     expect(screen.getByText(/Baseline/)).toBeTruthy();
     expect(screen.getByText("DuckDB")).toBeTruthy();
+    const chart = screen.getByRole("img", { name: "Per-query results relative to the selected baseline" });
+    expect(chart.getAttribute("aria-describedby")).toBe("normalized-speedup-description");
+    expect(screen.getByText(/Values above 1 are faster; values below 1 are slower/)).toBeTruthy();
+    expect(screen.getByRole("table", { name: /Per-query speedups relative to DuckDB/ })).toBeTruthy();
   });
 
   it("returns null for single result", () => {
