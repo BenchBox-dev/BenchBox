@@ -11,7 +11,7 @@
 #   - Scripts and humans use the floor CLI:
 #       uv run --project _project/scripts --locked -- todo-db <verb>
 #
-# See `.claude/skills/todo/SKILL.md` for the current workflow.
+# See `.claude/skills/todo-db/SKILL.md` for the current workflow.
 
 [project]
 name = "benchbox-project-scripts"

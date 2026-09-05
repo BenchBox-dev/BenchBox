@@ -75,8 +75,8 @@ def test_empty_diff_routes_to_full_ci(rules: dict[str, list[str]]) -> None:
 
 def test_skill_integrity_only_skips_product_ci(rules: dict[str, list[str]]) -> None:
     paths = [
-        ".claude/skills/todo/SKILL.md",
-        ".claude/skills/todo/references/batch.md",
+        ".claude/skills/todo-db/SKILL.md",
+        ".claude/skills/todo-db/references/batch.md",
         "skill-sync.yaml",
         "skill-sync.lock",
     ]
@@ -91,7 +91,7 @@ def test_skill_integrity_only_skips_product_ci(rules: dict[str, list[str]]) -> N
 
 
 def test_skill_integrity_plus_safe_content_runs_both_narrow_lanes(rules: dict[str, list[str]]) -> None:
-    decision = classify_paths([".claude/skills/todo/SKILL.md", "docs/guide.md"], rules)
+    decision = classify_paths([".claude/skills/todo-db/SKILL.md", "docs/guide.md"], rules)
 
     assert decision["skill_integrity_only"] is True
     assert decision["content_guard_needed"] is True
@@ -99,7 +99,7 @@ def test_skill_integrity_plus_safe_content_runs_both_narrow_lanes(rules: dict[st
 
 
 def test_skill_integrity_plus_product_code_runs_both_required_lanes(rules: dict[str, list[str]]) -> None:
-    decision = classify_paths([".claude/skills/todo/SKILL.md", "benchbox/cli/run.py"], rules)
+    decision = classify_paths([".claude/skills/todo-db/SKILL.md", "benchbox/cli/run.py"], rules)
 
     assert decision["skill_integrity_needed"] is True
     assert decision["skill_integrity_only"] is False
@@ -208,7 +208,7 @@ def test_github_output_exposes_explorer_paths_alias(rules: dict[str, list[str]],
 
 
 def test_github_output_exposes_skill_integrity_lane(rules: dict[str, list[str]], tmp_path: Path) -> None:
-    decision = classify_paths([".claude/skills/todo/SKILL.md"], rules)
+    decision = classify_paths([".claude/skills/todo-db/SKILL.md"], rules)
     output = tmp_path / "github-output.txt"
 
     write_github_output(output, decision)

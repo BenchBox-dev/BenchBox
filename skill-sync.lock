@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lockedAt": "2026-09-03T22:12:34.860Z",
+  "lockedAt": "2026-09-04T18:13:12.481Z",
   "skills": {
     "blog": {
       "source": {
@@ -157,68 +157,6 @@
         "skill.yaml": {
           "sha256": "c537b16111d60cb8cc947ac2659378b47e6cc5ace459519fb6ab029dac97911c",
           "size": 330
-        }
-      }
-    },
-    "todo": {
-      "source": {
-        "type": "git",
-        "name": "todo-context-efficiency",
-        "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "d22ea7fab6b7b9608e54a3910ab4dfa9bb407d42",
-        "subdir": "skills",
-        "revision": "d22ea7fab6b7b9608e54a3910ab4dfa9bb407d42",
-        "fetchedAt": "2026-09-03T22:12:28.295Z"
-      },
-      "installMode": "mirror",
-      "files": {
-        "references/batch.md": {
-          "sha256": "8a4383e80348979e9e73baa43917f46a8a2821baf2f66e5a2725bbccb1be3980",
-          "size": 6496
-        },
-        "references/bootstrap.md": {
-          "sha256": "895824a36102007cc279a595e3c41eb1a22cdffa4fbae2d6c3ebb358a312320b",
-          "size": 1730
-        },
-        "references/closeout.md": {
-          "sha256": "b79c8a27872ee760b25772e2c3f76ffe4666ff885f570e7d9d17e68625d02f27",
-          "size": 1965
-        },
-        "references/handoff.md": {
-          "sha256": "3c35c0001a14dae4c000750de7ccc75f89ee89daee6bd426a1677c894730dfe9",
-          "size": 1657
-        },
-        "references/ideate.md": {
-          "sha256": "8078255dd9835de869ccc33147f188db12ca8bfb21553766b11bf93eb3b2ab0d",
-          "size": 419
-        },
-        "references/implement.md": {
-          "sha256": "bce783e30c453c126eaff7c9bfae50d9f9afff1fa3afd9166777c7321b61a3ec",
-          "size": 1934
-        },
-        "references/prioritize.md": {
-          "sha256": "9d4d2e4353269f066c4a9e5bccfd02ca33856dc1fb6a4aa15052104065fc40b4",
-          "size": 4436
-        },
-        "references/queries.md": {
-          "sha256": "17913dc52ea98cab3a1da4a1de17e9054331344f2d63717db2c2701a718b2c2b",
-          "size": 1599
-        },
-        "references/review.md": {
-          "sha256": "7a120d7ef7541d20cb168dd7a25538faa80ae19b0da13f230e6c51b5bc98bbcd",
-          "size": 747
-        },
-        "references/spec.md": {
-          "sha256": "53ec542be038fa52dc4f6e2728a21f6e4fe58b2da45573261ecf185f7422d234",
-          "size": 463
-        },
-        "SKILL.md": {
-          "sha256": "2a50bc5d7f77592fd7b6ddc188e92c8949f1f6493e1a6cfc386f8544c2a7eda1",
-          "size": 5162
-        },
-        "skill.yaml": {
-          "sha256": "3889fddb52b746c118ba4aab8b83780e89642efd519f8bc708e030964c6440fd",
-          "size": 213
         }
       }
     },
@@ -509,6 +447,68 @@
         "skill.yaml": {
           "sha256": "ec71a233b04c9c9d860316b330baab2898f7ad3641a68c91cb48359ce4a653fa",
           "size": 111
+        }
+      }
+    },
+    "todo-db": {
+      "source": {
+        "type": "git",
+        "name": "todo-db",
+        "url": "https://github.com/joeharris76/todo-db.git",
+        "ref": "b8dda65c53f4a8fa443ec09a7419576ea8362e90",
+        "subdir": "skills",
+        "revision": "b8dda65c53f4a8fa443ec09a7419576ea8362e90",
+        "fetchedAt": "2026-09-04T18:13:07.305Z"
+      },
+      "installMode": "mirror",
+      "files": {
+        "references/batch.md": {
+          "sha256": "e95315e5768a6893beaca2b536605c3e6afa3a4f32671df4f0186c5746198f40",
+          "size": 2576
+        },
+        "references/bootstrap.md": {
+          "sha256": "b4d49e3a8f0469aa6f81f56bb26329d33f78f20c19e584f8f97ac3e9a1659224",
+          "size": 1666
+        },
+        "references/closeout.md": {
+          "sha256": "25bf97ba0a355dd9bc15aa52af6dae9fbd124284143ad94f3105a95f46a0b16d",
+          "size": 1974
+        },
+        "references/handoff.md": {
+          "sha256": "95701269dbb8154608282263697f6d5ce36b408681c7a6e843a47f350c03783e",
+          "size": 1554
+        },
+        "references/ideate.md": {
+          "sha256": "9007cb4fdc62d14c6a8357753fe1325a706e8db4ef42f6d917a4bab654d4fd9f",
+          "size": 1443
+        },
+        "references/implement.md": {
+          "sha256": "3cc0b83a58f1b150c7472f0aa8ba4ff7949e0b47965b613384515c14da3d1adc",
+          "size": 2424
+        },
+        "references/prioritize.md": {
+          "sha256": "b807172d9091bec0dede32f708a715e9290c20772853df7feed7076a2196eae9",
+          "size": 3089
+        },
+        "references/queries.md": {
+          "sha256": "fb26af728b0ec56f7bc9be6f688a01831185fc577f244964724972ea9d3e734e",
+          "size": 1701
+        },
+        "references/recovery.md": {
+          "sha256": "b48b4bcee165981e11de34786a48185d99a797b9766135151eaabfc364d48bbf",
+          "size": 2609
+        },
+        "references/review.md": {
+          "sha256": "9e8ed98c5caf6cb2e33a40267d0dc205bfd3eb37a429d831f3f03f1482af8231",
+          "size": 1415
+        },
+        "references/spec.md": {
+          "sha256": "ff9451262e07536f8209896b5f4d76bb68b5a9519eccffd46b6f6a7568a37235",
+          "size": 2376
+        },
+        "SKILL.md": {
+          "sha256": "fee6bc1859ea628668625651caa492592eed435964f8b85860be30b4ac8aa5ad",
+          "size": 8321
         }
       }
     }
