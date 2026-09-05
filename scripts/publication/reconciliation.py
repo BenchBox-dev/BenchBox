@@ -324,7 +324,7 @@ def probe_live_endpoint(
 
 
 def extract_artifact_digests(manifest_or_receipt: dict[str, Any]) -> dict[str, str]:
-    """Extract path -> sha256 mapping from various manifest/receipt schemas."""
+    """Extract identity-scoped artifact and endpoint digest mappings."""
     digests: dict[str, str] = {}
 
     artifacts = manifest_or_receipt.get("artifacts")
@@ -332,24 +332,25 @@ def extract_artifact_digests(manifest_or_receipt: dict[str, Any]) -> dict[str, s
         for name, entry in artifacts.items():
             if isinstance(entry, dict) and "digest" in entry:
                 p = entry.get("path", name)
-                digests[p] = str(entry["digest"]).lower().removeprefix("sha256:")
+                digests[f"artifact:{name}:{p}"] = str(entry["digest"]).lower().removeprefix("sha256:")
     elif isinstance(artifacts, list):
         for item in artifacts:
             if isinstance(item, dict) and "sha256" in item:
                 p = item.get("path", "")
-                digests[p] = str(item["sha256"]).lower().removeprefix("sha256:")
+                name = item.get("name") or item.get("artifact_name") or p
+                digests[f"artifact:{name}:{p}"] = str(item["sha256"]).lower().removeprefix("sha256:")
 
     checksums = manifest_or_receipt.get("checksums")
     if isinstance(checksums, dict):
         for p, h in checksums.items():
-            digests[p] = str(h).lower().removeprefix("sha256:")
+            digests[f"endpoint:{p}"] = str(h).lower().removeprefix("sha256:")
 
     live_db = manifest_or_receipt.get("live_database")
     if isinstance(live_db, dict) and "sha256" in live_db:
-        digests["/results/data/results.duckdb"] = str(live_db["sha256"]).lower().removeprefix("sha256:")
+        digests["endpoint:/results/data/results.duckdb"] = str(live_db["sha256"]).lower().removeprefix("sha256:")
 
     if "database_sha256" in manifest_or_receipt:
-        digests["/results/data/results.duckdb"] = (
+        digests["endpoint:/results/data/results.duckdb"] = (
             str(manifest_or_receipt["database_sha256"]).lower().removeprefix("sha256:")
         )
 
@@ -525,7 +526,8 @@ def _run_live_probes(
                 )
             )
         elif probe.sha256:
-            expected_sha = desired_digests.get(p) or built_digests.get(p)
+            endpoint_key = f"endpoint:{p}"
+            expected_sha = desired_digests.get(endpoint_key) or built_digests.get(endpoint_key)
             if expected_sha and probe.sha256.lower() != expected_sha.lower():
                 drifts.append(
                     DriftFinding(

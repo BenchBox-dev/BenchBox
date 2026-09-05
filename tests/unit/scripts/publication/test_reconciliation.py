@@ -252,6 +252,24 @@ def test_reconcile_missing_required_artifact_is_drift() -> None:
     assert any(d.drift_type == "ARTIFACT_DRIFT" and "/results/" in d.description for d in report.drifts)
 
 
+def test_artifact_digests_preserve_identity_when_paths_overlap() -> None:
+    receipt = {
+        "artifacts": {
+            "prose_site": {"path": "/", "digest": "a" * 64},
+            "pages_assembly": {"path": "/", "digest": "b" * 64},
+        },
+        "checksums": {"/": "c" * 64},
+    }
+
+    digests = recon_mod.extract_artifact_digests(receipt)
+
+    assert digests == {
+        "artifact:prose_site:/": "a" * 64,
+        "artifact:pages_assembly:/": "b" * 64,
+        "endpoint:/": "c" * 64,
+    }
+
+
 def test_reconcile_incomplete_receipt_fields() -> None:
     desired, built, deployed, observed = _distinct_states()
     del observed["nonce"]

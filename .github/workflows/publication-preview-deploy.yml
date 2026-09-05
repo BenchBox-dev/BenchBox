@@ -313,6 +313,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       pages: write
       id-token: write
@@ -320,8 +321,68 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for independent publication ownership
+        id: independent
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTIVE=false
+          gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("publication-live-receipt-")) | "\(.created_at) \(.id) \(.workflow_run.id)"' \
+            | sort -r > independent-publication-runs.txt
+          while read -r _CREATED_AT ARTIFACT_ID RUN_ID; do
+            [ -n "${RUN_ID:-}" ] || continue
+            RUN_META=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID" \
+              --jq '[.name, .status, .conclusion, .event, .head_branch] | @tsv')
+            IFS=$'\t' read -r RUN_NAME RUN_STATUS RUN_CONCLUSION RUN_EVENT RUN_BRANCH <<< "$RUN_META"
+            if [[ "$RUN_NAME" != "Publication Control Plane Deployment" || "$RUN_STATUS" != "completed" || \
+                  "$RUN_EVENT" != "workflow_dispatch" || "$RUN_BRANCH" != "develop" ]]; then
+              continue
+            fi
+            rm -rf independent-receipt && mkdir independent-receipt
+            gh api "repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip" > independent-receipt.zip
+            unzip -q independent-receipt.zip -d independent-receipt
+            if EXPECTED_RUN_ID="$RUN_ID" RUN_CONCLUSION="$RUN_CONCLUSION" python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+          from scripts.publication.reconciliation import verify_live_receipt_signature
+
+          path = Path("independent-receipt/live-receipt.json")
+          if not path.is_file():
+              raise SystemExit(1)
+          receipt = json.loads(path.read_text())
+          valid, _ = verify_live_receipt_signature(receipt)
+          if not valid or receipt.get("target") != "benchbox.dev":
+              raise SystemExit(1)
+          if str(receipt.get("receipt_run_id", receipt.get("artifact_run_id"))) != os.environ["EXPECTED_RUN_ID"]:
+              raise SystemExit(1)
+          if not re.fullmatch(r"[0-9a-f]{40}", str(receipt.get("source_commit", ""))):
+              raise SystemExit(1)
+          if os.environ["RUN_CONCLUSION"] != "success":
+              if not str(receipt.get("receipt_id", "")).startswith("rollback-"):
+                  raise SystemExit(1)
+              if not receipt.get("routes") or not all(route.get("ok") for route in receipt["routes"]):
+                  raise SystemExit(1)
+          PY
+            then
+              ACTIVE=true
+              break
+            fi
+          done < independent-publication-runs.txt
+          echo "active=$ACTIVE" >> "$GITHUB_OUTPUT"
+          if [ "$ACTIVE" = "true" ]; then
+            echo "::notice::Independent publication owns Pages; skipping the preview deployment"
+          fi
+
       - name: Deploy to GitHub Pages
         id: deployment
+        if: steps.independent.outputs.active != 'true'
         uses: actions/deploy-pages@v4
 
   record:

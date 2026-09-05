@@ -81,6 +81,10 @@ jobs:
           PUBLISHED_RESULTS_SHA="$INPUT_PUBLISHED_RESULTS_SHA"
           GENERATION="$INPUT_GENERATION"
           APPROVED_MANIFEST_DIGEST="$INPUT_APPROVED_MANIFEST_DIGEST"
+          if [ "$GITHUB_REF" != "refs/heads/develop" ]; then
+            echo "::error::publication deployment must be dispatched from develop"
+            exit 1
+          fi
           if [ "$EXPECT_NOOP" = "true" ] && [ "$FORCE_ROLLBACK" = "true" ]; then
             echo "::error::expect_noop and force_rollback are mutually exclusive"
             exit 1

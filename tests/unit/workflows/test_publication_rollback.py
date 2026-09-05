@@ -277,6 +277,14 @@ def test_noop_and_forced_rollback_are_mutually_exclusive() -> None:
     assert 'if [ "$EXPECT_NOOP" = "true" ] && [ "$FORCE_ROLLBACK" = "true" ]' in validation["run"]
 
 
+def test_dispatch_ref_must_be_develop() -> None:
+    validation = next(
+        step for step in _workflow()["jobs"]["build"]["steps"] if step.get("name") == "Validate pinned dispatch inputs"
+    )
+
+    assert 'if [ "$GITHUB_REF" != "refs/heads/develop" ]' in validation["run"]
+
+
 def test_pre_write_cas_rejection_does_not_trigger_rollback() -> None:
     deploy = _workflow()["jobs"]["deploy"]
 
