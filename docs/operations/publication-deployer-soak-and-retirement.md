@@ -8,8 +8,12 @@ automatic Pages writer while `docs.yml` continues to deploy release pushes.
 
 ## Prerequisites
 
-Before the first dispatch, configure the repository Actions secret
-`PUBLICATION_ATTESTOR_PRIVATE_KEY`. It must be the PEM Ed25519 private key
+Before the first dispatch, configure the `PUBLICATION_ATTESTOR_PRIVATE_KEY`
+environment secret in both `publication-attestation` and `github-pages`. The
+former must allow only `develop`; the latter must retain its protected-branch
+policy for deployment and rollback. Do not configure a repository-level copy,
+because unmerged branch workflow code could request it. The secret must be the
+PEM Ed25519 private key
 whose public half is committed at
 [`publication-attestor-public-key.pem`](publication-attestor-public-key.pem).
 Do not place the private key in a workflow input, artifact, commit, issue, or

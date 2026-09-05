@@ -84,8 +84,9 @@ against the repository public key at
 `signature_algorithm: ed25519`; missing, empty, malformed, or non-verifying
 signatures fail closed. The matching private key is never stored in the
 repository. Before dispatching the production deployer, a maintainer must set
-the `PUBLICATION_ATTESTOR_PRIVATE_KEY` GitHub Actions secret to the matching
-Ed25519 PEM private key.
+the `PUBLICATION_ATTESTOR_PRIVATE_KEY` environment secret to the matching
+Ed25519 PEM private key in the protected `publication-attestation` and
+`github-pages` environments. There must be no repository-level copy.
 
 ## Rollback
 

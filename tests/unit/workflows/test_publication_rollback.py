@@ -66,6 +66,8 @@ def test_workflow_permissions_follow_least_privilege() -> None:
         "pages": "write",
         "id-token": "write",
     }
+    assert jobs["verify"]["environment"] == {"name": "publication-attestation"}
+    assert jobs["rollback"]["environment"]["name"] == "github-pages"
 
 
 def test_workflow_uses_pages_deploy_actions_only_in_write_jobs() -> None:

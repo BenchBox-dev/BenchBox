@@ -530,6 +530,8 @@ jobs:
     needs: [build, deploy]
     if: needs.deploy.result == 'success'
     runs-on: ubuntu-latest
+    environment:
+      name: publication-attestation
     permissions:
       contents: read
     steps:
