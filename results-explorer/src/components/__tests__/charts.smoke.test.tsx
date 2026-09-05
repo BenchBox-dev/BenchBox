@@ -152,6 +152,30 @@ describe("PercentileLadder", () => {
     expect(ids).toEqual(["r-duckdb-tuned", "r-duckdb-notuning"]);
     expect(new Set(ids).size).toBe(ids.length);
   });
+
+  it("keeps date-qualified labels distinct after truncation", () => {
+    const { container } = render(
+      <PercentileLadder
+        rows={[
+          {
+            result_id: "r-date-1",
+            platform: "DataFusion",
+            displayLabel: "DataFusion 2026-05-01 (127 days ago)",
+            percentile_stats: { p50: 10, p90: 25, p95: 40, p99: 90 },
+          },
+          {
+            result_id: "r-date-2",
+            platform: "DataFusion",
+            displayLabel: "DataFusion 2026-05-02 (126 days ago)",
+            percentile_stats: { p50: 12, p90: 28, p95: 45, p99: 100 },
+          },
+        ]}
+      />,
+    );
+
+    const labels = Array.from(container.querySelectorAll("[data-result-id] text")).map((node) => node.textContent);
+    expect(labels[0]).not.toBe(labels[1]);
+  });
 });
 
 // ---------------------------------------------------------------------------
