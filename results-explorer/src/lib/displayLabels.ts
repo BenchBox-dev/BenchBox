@@ -12,6 +12,7 @@ import { humanizeBenchmark } from "@/utils";
 const TRUST_LABEL_LABELS: Record<string, string> = {
   "maintainer-run": "Maintainer run",
   "community-submission": "Community submission",
+  "local-run": "Local run",
 };
 
 const VALIDATION_STATUS_LABELS: Record<string, string> = {
@@ -129,6 +130,7 @@ export function describeValidationStatus(raw: string | null | undefined): Valida
 const VISIBILITY_LABELS: Record<string, string> = {
   "public-curated": "Published, maintainer reviewed",
   "public-community": "Published, community submitted",
+  "local-preview": "Local preview",
   internal: "Not public",
 };
 

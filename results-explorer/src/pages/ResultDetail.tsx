@@ -23,9 +23,12 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { formatEnumLabel, formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
 import { formatDurationSeconds, formatLatencyMs } from "@/lib/metricFormatters";
 import { visibleResultIdForRow } from "@/lib/resultLinks";
+import { useLocalResultState } from "@/lib/localResultState";
+import { LocalResultPicker } from "@/components/LocalResultPicker";
 
 interface ResultDetailProps extends RoutableProps {
   resultId?: string;
+  source?: "public" | "local";
 }
 
 type MedianSortKey = "query_id" | "display_ms" | "sample_count";
@@ -37,7 +40,7 @@ interface DetailState {
   primaryMetric: PrimaryMetric;
 }
 
-export function ResultDetail({ resultId = "" }: ResultDetailProps) {
+export function ResultDetail({ resultId = "", source = "public" }: ResultDetailProps) {
   const timingsScrollerRef = useRef<HTMLDivElement>(null);
   const samplesScrollerRef = useRef<HTMLDivElement>(null);
   const [detailState, setDetailState] = useState<DetailState | null>(null);
@@ -56,6 +59,8 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   const [tuningLoading, setTuningLoading] = useState(false);
   const [tuningError, setTuningError] = useState<string | null>(null);
   const tuningAbortRef = useRef<AbortController | null>(null);
+  const localResultState = useLocalResultState();
+  const isLocal = source === "local";
   const detail = detailState?.detail ?? null;
   const primaryMetric = detailState?.primaryMetric ?? "display_geomean_ms";
   const documentTitle = detail
@@ -77,6 +82,19 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
     tuningAbortRef.current?.abort();
     tuningAbortRef.current = null;
     let cancelled = false;
+    if (isLocal) {
+      const preview = localResultState.preview;
+      if (preview?.detail.result_id !== resultId) {
+        setError("This local preview is no longer available. Open the result file again to restore it.");
+      } else {
+        setDetailState({ detail: preview.detail, primaryMetric: preview.primaryMetric });
+      }
+      return () => {
+        cancelled = true;
+        tuningAbortRef.current?.abort();
+        tuningAbortRef.current = null;
+      };
+    }
     resolveShortId(resultId)
       .then(async (resolvedId) => {
         if (cancelled) return null;
@@ -101,7 +119,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
       tuningAbortRef.current?.abort();
       tuningAbortRef.current = null;
     };
-  }, [resultId]);
+  }, [isLocal, localResultState.preview, resultId]);
 
   // Hooks must run in the same order on every render - compute memos before
   // any conditional return, guarding inside the factory for the null case.
@@ -145,10 +163,11 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   if (error) {
     return (
       <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: "Result detail" }]} />
+        <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: isLocal ? "Local preview" : "Result detail" }]} />
         <div class="mt-8">
           <ErrorMessage message={error} />
           <div class="mt-4 flex flex-wrap gap-2">
+            {isLocal && <LocalResultPicker label="Open result file again" />}
             <a href="/results/query" class="btn btn-primary no-underline">Find runs</a>
             <a href="/results/benchmarks/" class="btn btn-secondary no-underline">Browse benchmarks</a>
           </div>
@@ -241,12 +260,29 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <Breadcrumb
-        crumbs={[
-          { label: "Results", href: "/results/" },
-          { label: benchmarkLabel, href: `/results/${detail.benchmark}/` },
-          { label: detail.platform },
-        ]}
+        crumbs={isLocal
+          ? [{ label: "Results", href: "/results/" }, { label: "Local preview" }, { label: detail.platform }]
+          : [
+              { label: "Results", href: "/results/" },
+              { label: benchmarkLabel, href: `/results/${detail.benchmark}/` },
+              { label: detail.platform },
+            ]}
       />
+
+      {isLocal && (
+        <aside
+          role="status"
+          class="mt-6 rounded-lg border border-[var(--bb-data-border-strong)] bg-[var(--bb-tone-info-bg)] p-4 text-sm text-[var(--bb-tone-info-fg)]"
+          data-testid="local-result-banner"
+          aria-label="Local result preview"
+        >
+          <p class="font-semibold">Local preview</p>
+          <p class="mt-1">
+            Viewing <span class="font-medium">{localResultState.preview?.fileName}</span> in this browser tab. This result
+            has not been uploaded, reviewed, or added to the public rankings.
+          </p>
+        </aside>
+      )}
 
       <section aria-label="Result summary" class="mt-6 mb-8 panel-elevated p-5">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -272,21 +308,36 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             </div>
             <p class="text-sm text-[var(--bb-data-fg-muted)]">
               This {benchmarkLabel} run used scale factor {detail.scale_factor} for the {detail.test_type ? formatEnumLabel(detail.test_type) : "standard"} phase on{" "}
-              {detail.run_date.slice(0, 10)} · Public ID{" "}
+              {detail.run_date.slice(0, 10)} · {isLocal ? "Local preview ID" : "Public ID"}{" "}
               <code class="font-mono text-[var(--bb-data-fg-primary)]">{visibleResultIdForRow(detail)}</code>
             </p>
           </div>
           <div class="flex flex-wrap gap-2">
-            <a href={`/results/query?pick=${encodeURIComponent(detail.result_id)}`} class="btn btn-primary" data-testid="result-detail-compare-link">
-              Find a run to compare
-            </a>
-            <a href={detail.bundle_download_url} class="btn btn-secondary" download>
-              Download bundle
-            </a>
-            {detail.has_plans && plansUrl && (
-              <a href={plansUrl} class="btn btn-secondary" download>
-                Download plans
-              </a>
+            {isLocal ? (
+              <>
+                <LocalResultPicker label="Open another result" />
+                <a
+                  href="/docs/contributing-results.html"
+                  referrerPolicy="no-referrer"
+                  class="btn btn-primary no-underline"
+                >
+                  Submit for public review
+                </a>
+              </>
+            ) : (
+              <>
+                <a href={`/results/query?pick=${encodeURIComponent(detail.result_id)}`} class="btn btn-primary" data-testid="result-detail-compare-link">
+                  Find a run to compare
+                </a>
+                <a href={detail.bundle_download_url} class="btn btn-secondary" download>
+                  Download bundle
+                </a>
+                {detail.has_plans && plansUrl && (
+                  <a href={plansUrl} class="btn btn-secondary" download>
+                    Download plans
+                  </a>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -380,7 +431,11 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             <ChartPanel context={chartContext} />
           )}
 
-          <RunReceipt detail={detail} />
+          <RunReceipt
+            detail={detail}
+            isRankingEligible={isLocal ? false : null}
+            reproduceCommand={isLocal ? null : undefined}
+          />
 
           {hasTimings && (
             <section class="card">
@@ -431,7 +486,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             {detail.queries.length > 0 && (
               <>
               <PassStrip queries={detail.queries} />
-              {withinRunBases !== null && (
+              {!isLocal && withinRunBases !== null && (
                 <p class="mb-6 text-sm">
                   <a
                     class="link"

@@ -123,6 +123,7 @@ describe("Layout", () => {
       expect(within(explorerNav).getByRole("link", { name: label })).toBeTruthy();
     }
     expect(within(explorerNav).getByRole("link", { name: "Find runs" })).toHaveAttribute("aria-current", "page");
+    expect(within(explorerNav).getByRole("button", { name: "Open local result" })).toBeTruthy();
     expect(within(explorerNav).getByRole("link", { name: "Leaderboards" })).not.toHaveAttribute("aria-current");
   });
 
