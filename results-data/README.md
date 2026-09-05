@@ -87,8 +87,10 @@ Everything older than 2026-08-23 was withdrawn on 2026-08-28 as a trust
 decision; see `CORPUS_NOTES.md`. The maintainer-run seed lane
 (`.github/workflows/seed-corpus.yml`) runs at 07:00 UTC on the first day of
 each month (`0 7 1 * *`) and remains callable via `workflow_dispatch`. Its
-supported local matrix maintains TPC-H and SSB at SF 0.01 and SF 0.1 with
-DuckDB, DataFusion, and Polars DataFrame. It does not claim to regenerate every
+supported local matrix maintains TPC-H at SF 0.01 and SF 0.1 with DuckDB,
+DataFusion, and Polars DataFrame; TPC-H SF 1 and TPC-DS SF 1 with DuckDB,
+DataFusion, and ClickHouse Local; and SSB at SF 0.01 and SF 0.1 with DuckDB,
+DataFusion, and Polars DataFrame. It does not claim to regenerate every
 checked-in cohort; the authoritative cell list is the workflow file and is
 summarized in `SEED_CORPUS_SPEC.md`.
 
@@ -134,6 +136,15 @@ documentation tree, so the complete runnable flow is included here:
 
 The full maintained guide is published at
 <https://benchbox.dev/docs/contributing-results.html>.
+
+### Maintainer archive path (not community)
+
+Community add PRs above are the supported submission path. Separately,
+maintainers handling seed or curated archive changes must follow the
+[published-results deletion and mirror procedure](https://github.com/BenchBox-dev/BenchBox/blob/develop/docs/operations/results-phase-2-runbook.md#public-deletion--privacy-takedown-intentional-path-removal):
+hand-opened *maintainer* PRs against `published-results` are deletion-only;
+maintainer and seed additions go through the `auto/results-mirror-*` sync,
+not a hand-opened add PR.
 
 ## Reproducibility
 

@@ -75,16 +75,29 @@ def test_supported_matrix_has_three_local_identities_per_cohort() -> None:
     entries = _workflow()["jobs"]["generate-seed-corpus"]["strategy"]["matrix"]["include"]
     cohorts: dict[tuple[str, str], set[str]] = {}
     for entry in entries:
-        assert entry["platform"] != "clickhouse-cloud"
-        assert "optional" not in entry
+        assert "cloud" not in entry["platform"]
+        assert entry["extras"] in {"duckdb", "datafusion", "polars", "clickhouse-local"}
         cohorts.setdefault((entry["benchmark"], entry["scale_factor"]), set()).add(entry["platform"])
 
-    assert cohorts == {
-        ("tpch", "0.01"): {"duckdb", "datafusion", "polars-df"},
-        ("tpch", "0.1"): {"duckdb", "datafusion", "polars-df"},
-        ("ssb", "0.01"): {"duckdb", "datafusion", "polars-df"},
-        ("ssb", "0.1"): {"duckdb", "datafusion", "polars-df"},
+    assert set(cohorts) == {
+        ("tpch", "0.01"),
+        ("tpch", "0.1"),
+        ("tpch", "1.0"),
+        ("tpcds", "1"),
+        ("ssb", "0.01"),
+        ("ssb", "0.1"),
     }
+    assert all(len(platforms) == 3 for platforms in cohorts.values())
+
+
+def test_seed_corpus_local_jobs_do_not_reference_cloud_credentials() -> None:
+    """The recurring local matrix has no optional-cloud execution path."""
+    workflow_text = WORKFLOW_PATH.read_text(encoding="utf-8").lower()
+    assert "clickhouse-cloud" not in workflow_text
+    assert "clickhouse_cloud" not in workflow_text
+    assert "cloud_host" not in workflow_text
+    assert "cloud_password" not in workflow_text
+    assert "matrix.optional" not in workflow_text
 
 
 def test_seed_corpus_pr_targets_develop() -> None:

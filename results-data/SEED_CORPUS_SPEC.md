@@ -32,7 +32,7 @@ repeated runs of one platform/version do not pad that matrix.
 | Benchmark phases | `generate,load,power` |
 | Trust label | `maintainer-run` |
 | Visibility | `public-curated` |
-| Supported identities | DuckDB, DataFusion, and Polars DataFrame; no cloud credentials |
+| Supported identities | DuckDB, DataFusion, Polars DataFrame, and ClickHouse Local; no cloud credentials |
 
 The monthly schedule keeps published-results from stalling until someone remembers
 to dispatch. Maintainers can still run a full or single-benchmark refresh via
@@ -44,12 +44,15 @@ The authoritative cell list lives in `.github/workflows/seed-corpus.yml`
 (`strategy.matrix.include`). Do not treat a frozen table in this document as the
 source of truth; the workflow drifts as admitted coverage changes.
 
-The supported matrix contains four local, merge-ready cohorts. Every cohort
-uses the same three identities: DuckDB, DataFusion, and Polars DataFrame.
+The supported matrix contains six local, merge-ready cohorts. TPC-H SF 0.01
+and SF 0.1 plus SSB use DuckDB, DataFusion, and Polars DataFrame. TPC-H SF 1
+and TPC-DS SF 1 use DuckDB, DataFusion, and ClickHouse Local. Every cohort has
+three local comparison identities and no cloud dependency.
 
 | Benchmark | Scale factors |
 |-----------|---------------|
-| TPC-H | 0.01, 0.1 |
+| TPC-H | 0.01, 0.1, 1 |
+| TPC-DS | 1 |
 | SSB | 0.01, 0.1 |
 
 Other checked-in cohorts are historical or operator-restored coverage, not a
@@ -79,10 +82,20 @@ are promoted.
 
 ## Benchmark Notes
 
-### DataFrame coverage
+### Local identity coverage
 
-The workflow includes `polars-df` for TPC-H and SSB. It intentionally does not
-include unsupported benchmark/platform combinations in its admitted matrix.
+The workflow includes `polars-df` for TPC-H SF 0.01/0.1 and SSB. TPC-H SF 1
+and TPC-DS use `clickhouse-local` as their local third identity because the
+admitted matrix does not rely on Polars DataFrame support there.
+
+### Timestamp contract
+
+Run age uses `run.timestamp`. A plain `YYYY-MM-DD` is an explicit UTC calendar
+date. A complete ISO timestamp with `Z` or an offset is converted to its UTC
+calendar date. Legacy complete timestamps without an offset are interpreted as
+UTC. Prefixes, malformed times, and trailing text are not age values. Age is
+informational only and does not change ranking, filtering, comparison, or
+admission behavior.
 
 ### Execution phases
 

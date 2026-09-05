@@ -27,6 +27,7 @@ import collections
 import datetime as _dt
 import json
 import pathlib
+import re
 import sys
 from typing import NamedTuple
 
@@ -36,6 +37,9 @@ LEGACY_MANIFEST_NAME = "submission-manifest.json"
 
 #: A cohort below this many distinct comparison identities is not a comparison.
 MINIMUM_PLATFORMS_PER_COHORT = 3
+UTC = _dt.timezone.utc
+DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
+TIMESTAMP_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})?$")
 
 CohortKey = tuple[str, str]
 
@@ -111,31 +115,49 @@ def _comparison_identity(bundle: pathlib.Path, payload: dict) -> str:
 def parse_run_date(payload: dict, *, bundle: pathlib.Path | None = None) -> _dt.date:
     """Extract the calendar run date from ``run.timestamp``.
 
-    Accepts ISO-8601 prefixes (``YYYY-MM-DD``) as written by BenchBox exporters.
-    Missing or unparseable timestamps raise ``CorpusReadError``; callers that
-    treat age as informational (``cohort_recency``) must catch and omit rather
-    than fail the depth gate.
+    ``YYYY-MM-DD`` is an explicit UTC calendar date. A complete ISO timestamp
+    with ``Z`` or an offset is converted to its UTC calendar date. Legacy
+    complete timestamps without an offset are interpreted as UTC. Prefixes,
+    malformed times, and trailing text are rejected. Callers that treat age as
+    informational (``cohort_recency``) catch errors and omit the bad value.
     """
     label = f" in {bundle}" if bundle is not None else ""
     try:
         timestamp = payload["run"]["timestamp"]
     except Exception as exc:  # noqa: BLE001
         raise CorpusReadError(f"ERROR missing run.timestamp{label}: {exc}") from exc
-    if not isinstance(timestamp, str) or len(timestamp) < 10:
+    if not isinstance(timestamp, str):
+        raise CorpusReadError(f"ERROR unparseable run.timestamp{label}: {timestamp!r}")
+
+    if DATE_RE.fullmatch(timestamp):
+        try:
+            return _dt.date.fromisoformat(timestamp)
+        except ValueError as exc:
+            raise CorpusReadError(f"ERROR unparseable run.timestamp{label}: {timestamp!r}") from exc
+
+    if not TIMESTAMP_RE.fullmatch(timestamp):
         raise CorpusReadError(f"ERROR unparseable run.timestamp{label}: {timestamp!r}")
     try:
-        return _dt.date.fromisoformat(timestamp[:10])
+        parsed = _dt.datetime.fromisoformat(f"{timestamp[:-1]}+00:00" if timestamp.endswith("Z") else timestamp)
     except ValueError as exc:
         raise CorpusReadError(f"ERROR unparseable run.timestamp{label}: {timestamp!r}") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC).date()
+
+
+def utc_today() -> _dt.date:
+    """Current calendar date in UTC for informational recency calculations."""
+    return _dt.datetime.now(UTC).date()
 
 
 def age_days(run_date: _dt.date, *, as_of: _dt.date | None = None) -> int:
-    """Whole days between *run_date* and *as_of* (default: today, local).
+    """Whole days between *run_date* and *as_of* (default: current UTC day).
 
     Informational only. Age does not fail the depth gate and does not affect
     ranking eligibility (see ``ranking_exclusion_reason`` in explorer_pipeline).
     """
-    as_of = as_of or _dt.date.today()
+    as_of = as_of or utc_today()
     return (as_of - run_date).days
 
 
@@ -185,7 +207,7 @@ def cohort_recency(
     ``run.timestamp`` are omitted from the report and listed in *warnings*.
     Age never participates in the depth-gate exit code.
     """
-    as_of = as_of or _dt.date.today()
+    as_of = as_of or utc_today()
     by_cohort: collections.defaultdict[CohortKey, list[_dt.date]] = collections.defaultdict(list)
     all_dates: list[_dt.date] = []
     warnings: list[str] = []
@@ -245,7 +267,7 @@ def shallow_cohorts(cohorts: dict[CohortKey, set[str]]) -> dict[CohortKey, set[s
 def main(bundles_dir: pathlib.Path | None = None, *, as_of: _dt.date | None = None) -> int:
     """Print the cohort and recency reports; exit code reflects depth only."""
     bundles_dir = bundles_dir or pathlib.Path(__file__).parent / "bundles"
-    as_of = as_of or _dt.date.today()
+    as_of = as_of or utc_today()
     bundles = discover_bundles(bundles_dir)
     print(f"Found {len(bundles)} bundles")
 

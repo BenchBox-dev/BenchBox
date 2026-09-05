@@ -23,9 +23,6 @@ jobs:
     name: "${{ matrix.benchmark }} / ${{ matrix.platform }} / sf${{ matrix.scale_factor }}"
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # ClickHouse Cloud requires external credentials - skip gracefully when absent.
-    # All other matrix entries are unconditional.
-    continue-on-error: ${{ matrix.optional == true }}
 
     strategy:
       fail-fast: false
@@ -58,6 +55,34 @@ jobs:
             platform: polars-df
             scale_factor: "0.1"
             extras: polars
+
+          # TPC-H SF 1.0
+          - benchmark: tpch
+            platform: duckdb
+            scale_factor: "1.0"
+            extras: duckdb
+          - benchmark: tpch
+            platform: datafusion
+            scale_factor: "1.0"
+            extras: datafusion
+          - benchmark: tpch
+            platform: clickhouse-local
+            scale_factor: "1.0"
+            extras: clickhouse-local
+
+          # TPC-DS SF 1 (integer-only scale factors)
+          - benchmark: tpcds
+            platform: duckdb
+            scale_factor: "1"
+            extras: duckdb
+          - benchmark: tpcds
+            platform: datafusion
+            scale_factor: "1"
+            extras: datafusion
+          - benchmark: tpcds
+            platform: clickhouse-local
+            scale_factor: "1"
+            extras: clickhouse-local
 
           # SSB SF 0.01
           - benchmark: ssb
@@ -121,9 +146,6 @@ jobs:
 
       - name: Run benchmark
         if: env.SELECTED == 'true'
-        env:
-          CLICKHOUSE_CLOUD_HOST: ${{ secrets.CLICKHOUSE_CLOUD_HOST }}
-          CLICKHOUSE_CLOUD_PASSWORD: ${{ secrets.CLICKHOUSE_CLOUD_PASSWORD }}
         run: |
           uv run benchbox run \
             --platform "${{ matrix.platform }}" \

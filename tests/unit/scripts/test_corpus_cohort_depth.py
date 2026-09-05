@@ -272,6 +272,45 @@ def test_recency_report_uses_bundle_timestamps(tmp_path: Path) -> None:
     assert per_cohort[("tpcds", "10.0")].oldest_age_days == 65
 
 
+@pytest.mark.parametrize(
+    ("timestamp", "expected"),
+    [
+        ("2026-09-05", dt.date(2026, 9, 5)),
+        ("2026-09-04T23:59:59-12:00", dt.date(2026, 9, 5)),
+        ("2026-09-05T00:15:00+14:00", dt.date(2026, 9, 4)),
+        ("2026-09-05T12:00:00Z", dt.date(2026, 9, 5)),
+        ("2026-09-05T12:00:00", dt.date(2026, 9, 5)),
+    ],
+)
+def test_run_timestamp_contract_uses_utc_calendar_days(timestamp: str, expected: dt.date) -> None:
+    """Offsets become UTC dates; legacy naive timestamps are explicitly UTC."""
+    validator = _load_validator()
+    assert validator.parse_run_date({"run": {"timestamp": timestamp}}) == expected
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    [
+        "2026-09-05Tnot-a-time",
+        "2026-09-05T12:00",
+        "2026-09-05T12:00:00Z trailing",
+        "2026-02-30",
+        "2026-09-05 12:00:00",
+        "2026-09-05T12:00:00+24:00",
+    ],
+)
+def test_run_timestamp_contract_rejects_malformed_or_trailing_text(timestamp: str) -> None:
+    validator = _load_validator()
+    with pytest.raises(validator.CorpusReadError, match="unparseable run.timestamp"):
+        validator.parse_run_date({"run": {"timestamp": timestamp}})
+
+
+def test_recency_defaults_to_the_utc_current_day(monkeypatch: pytest.MonkeyPatch) -> None:
+    validator = _load_validator()
+    monkeypatch.setattr(validator, "utc_today", lambda: dt.date(2026, 9, 5))
+    assert validator.age_days(dt.date(2026, 9, 4)) == 1
+
+
 def test_age_does_not_fail_a_deep_enough_cohort(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Stale timestamps remain visible in the report without flipping exit status."""
     validator = _load_validator()

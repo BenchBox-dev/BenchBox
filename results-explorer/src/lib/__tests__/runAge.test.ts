@@ -6,14 +6,28 @@ describe("formatRunAge", () => {
 
   it.each([
     ["2026-09-05", "today"],
-    ["2026-09-04T23:59:59-12:00", "1 day ago"],
+    ["2026-09-04T23:59:59-12:00", "today"],
+    ["2026-09-05T00:15:00+14:00", "1 day ago"],
     ["2026-09-03T00:00:00Z", "2 days ago"],
+    ["2026-09-03T23:59:59", "2 days ago"],
     ["2026-09-06", "in 1 day"],
   ])("uses UTC calendar-day boundaries for %s", (runDate, expected) => {
     expect(formatRunAge(runDate, reference)).toBe(expected);
   });
 
-  it.each([undefined, null, "", "not-a-date", "2026-02-30", "2026-9-05", "2026-09-05 12:00:00"])(
+  it.each([
+    undefined,
+    null,
+    "",
+    "not-a-date",
+    "2026-02-30",
+    "2026-9-05",
+    "2026-09-05 12:00:00",
+    "2026-09-05T12:00",
+    "2026-09-05Tnot-a-time",
+    "2026-09-05T12:00:00Z trailing",
+    "2026-09-05T12:00:00+24:00",
+  ])(
     "omits malformed input safely: %j",
     (runDate) => {
       expect(formatRunAge(runDate, reference)).toBeNull();
