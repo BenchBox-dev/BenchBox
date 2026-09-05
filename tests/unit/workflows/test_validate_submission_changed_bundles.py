@@ -434,3 +434,35 @@ def test_deleted_primary_requires_deleting_every_same_stem_companion(tmp_path: P
     assert result.returncode != 0
     assert f"file=results-data/bundles/gone{companion_suffix}" in result.stdout
     assert "also requires deleting its same-stem companion" in result.stdout
+
+
+def test_deleted_primary_does_not_match_differently_cased_stem(tmp_path: Path) -> None:
+    """Companion suffixes are case-insensitive, but bundle stems are not."""
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+
+    bundle_dir = tmp_path / "results-data" / "bundles"
+    bundle_dir.mkdir(parents=True)
+    primary = bundle_dir / "gone.json"
+    (bundle_dir / "GONE.MANIFEST.JSON").write_text("{}\n", encoding="utf-8")
+    primary.write_text('{"gone": 1}\n', encoding="utf-8")
+    _git(tmp_path, "add", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    primary.unlink()
+    _git(tmp_path, "add", "-u", str(primary.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "delete primary only")
+
+    skip_without_posix_shell()
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "BASE_SHA": base_sha},
+    )
+
+    assert result.returncode == 0, result.stderr
