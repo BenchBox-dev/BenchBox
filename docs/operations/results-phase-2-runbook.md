@@ -84,6 +84,39 @@ exists only on `published-results`, it becomes **published-only** and is kept
 on the next mirror. That protects community submissions the automated sync
 must never wipe.
 
+For a maintainer-approved removal from the public archive, open a hand-created
+PR against `published-results` that is **deletion-only**: it may remove the
+affected archive paths and regenerate the inventory, but it must not add or
+replace bundles. If an affected bundle path also exists on `develop`, remove it
+from `develop` first as part of the same coordinated change; otherwise the
+next union mirror will copy it back onto `published-results`. There is no
+durable archive exclusion or tombstone mechanism in this workflow. After the
+`develop` removal is in place, open the deletion-only `published-results` PR.
+PRs #1882 and #1940 are worked examples. During the A0 freeze, do not delete
+paths from `published-results` or `develop`; use the presentation withdrawal
+and artifact-access suppression procedure below.
+
+Maintainer and seed additions to the public archive land on `develop` first,
+then sync through the mirror — never via a hand-opened maintainer PR that
+adds or replaces bundles. Community submissions remain hand-opened PRs against
+`published-results` as in §1.1. For maintainer/seed content, run:
+
+```bash
+gh workflow run sync-results-data-to-published.yml
+```
+
+Review and merge the resulting `auto/results-mirror-*` PR. Hand-opened
+*maintainer* PRs against `published-results` must stay deletion-only; do not
+use them to add maintainer or seed archive content. The sync uses a union
+overlay so an automated mirror never deletes public content. Its four-signal
+waiver for trusted mirror content requires all of the following: base
+`published-results`, `head.repo.fork == false`, PR author
+`github-actions[bot]`, and `head_ref` matching `auto/results-mirror-*`. Do not
+relax this waiver to make a hand-opened addition pass. If one change both
+adds and deletes paths, mirror last: complete the reviewed deletion first,
+then land the addition on `develop` and run the mirror so the corpus floor is
+never violated on the public branch.
+
 During the A0 migration freeze, privacy remediation, takedown, or mistaken
 publication authorizes presentation withdrawal and artifact-access suppression,
 not accepted-archive deletion:

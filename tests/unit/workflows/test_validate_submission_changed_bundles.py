@@ -245,6 +245,50 @@ def test_plans_or_tuning_only_change_discovers_paired_primary_bundle(tmp_path: P
     assert result.stdout.strip().splitlines() == ["results-data/bundles/result.json"]
 
 
+def test_each_companion_back_mapping_loop_discovers_its_primary_bundle(tmp_path: Path) -> None:
+    """Manifest, applied, plans, and tuning-only changes all discover primaries."""
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+
+    bundle_dir = tmp_path / "results-data" / "bundles"
+    bundle_dir.mkdir(parents=True)
+    companion_specs = [
+        ("manifest-result", ".manifest.json"),
+        ("applied-result", ".applied.json"),
+        ("plans-result", ".plans.json"),
+        ("tuning-result", ".tuning.json"),
+    ]
+    for stem, _suffix in companion_specs:
+        (bundle_dir / f"{stem}.json").write_text("{}\n", encoding="utf-8")
+    _git(tmp_path, "add", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    for stem, suffix in companion_specs:
+        (bundle_dir / f"{stem}{suffix}").write_text("{}\n", encoding="utf-8")
+    _git(tmp_path, "add", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "add companions")
+
+    skip_without_posix_shell()
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "BASE_SHA": base_sha},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().splitlines() == [
+        "results-data/bundles/manifest-result.json",
+        "results-data/bundles/applied-result.json",
+        "results-data/bundles/plans-result.json",
+        "results-data/bundles/tuning-result.json",
+    ]
+
+
 @pytest.mark.parametrize("companion_suffix", [".plans.json", ".tuning.json"])
 def test_live_orphan_companion_is_rejected(tmp_path: Path, companion_suffix: str) -> None:
     _git(tmp_path, "init", "--quiet")
@@ -306,3 +350,51 @@ def test_deleted_orphan_companion_is_allowed(tmp_path: Path, companion_suffix: s
 
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == ""
+
+
+def test_deleted_bundle_and_manifest_do_not_inject_empty_bundle_path(tmp_path: Path) -> None:
+    """Mixed ACMR + deleted pair must not append a blank validator path.
+
+    Primary discovery uses ``--diff-filter=ACMR``, so a pure pair-delete leaves
+    ``CHANGED`` empty and ``CHANGED="${CHANGED:+...}${bundle}"`` is a no-op even
+    when ``$bundle`` is empty. The real failure needs a surviving primary already
+    in ``CHANGED`` plus a deleted companion/primary pair: ``git cat-file -e
+    "$SHA:"`` succeeds on the root tree, ``grep -qxF ""`` does not match the live
+    path, and the append inserts a blank line after it.
+    """
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+
+    bundle_dir = tmp_path / "results-data" / "bundles"
+    bundle_dir.mkdir(parents=True)
+    keep = bundle_dir / "keep.json"
+    gone = bundle_dir / "gone.json"
+    gone_manifest = bundle_dir / "gone.manifest.json"
+    keep.write_text('{"keep": 1}\n', encoding="utf-8")
+    gone.write_text('{"gone": 1}\n', encoding="utf-8")
+    gone_manifest.write_text("{}\n", encoding="utf-8")
+    _git(tmp_path, "add", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    keep.write_text('{"keep": 2}\n', encoding="utf-8")
+    gone.unlink()
+    gone_manifest.unlink()
+    _git(tmp_path, "add", "-u", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "modify keep; delete gone pair")
+
+    skip_without_posix_shell()
+    env = {**os.environ, "BASE_SHA": base_sha}
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stderr
+    # Exact stdout: one surviving path, no trailing blank line from empty append.
+    assert result.stdout == "results-data/bundles/keep.json\n"

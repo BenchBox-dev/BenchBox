@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from scripts.publication.verify_lane_isolation import (
+    LANE_SAFE_EXTERNAL_PATHS,
     REPO_ROOT,
     classify_path,
     compute_all_lane_digests,
@@ -174,6 +175,53 @@ def test_lane_owned_paths_still_contaminate_despite_non_lane_allowlist() -> None
     )
     assert report.success is False
     assert any("changed paths violate lane 'site' isolation" in err for err in report.errors)
+
+
+def test_site_allows_only_explicit_non_build_corpus_paths() -> None:
+    """Site docs may accompany corpus policy edits, but corpus payloads remain forbidden."""
+    assert LANE_SAFE_EXTERNAL_PATHS["site"] == frozenset(
+        {
+            ".github/workflows/validate-submission.yml",
+            "results-data/README.md",
+        }
+    )
+
+    report = verify_lane_isolation(
+        "site",
+        repo_root=REPO_ROOT,
+        changed_paths=[
+            "docs/index.rst",
+            ".github/workflows/validate-submission.yml",
+            "results-data/README.md",
+        ],
+    )
+    assert report.success is True
+
+    contaminated = verify_lane_isolation(
+        "site",
+        repo_root=REPO_ROOT,
+        changed_paths=["docs/index.rst", "results-data/bundles/new-bundle.json"],
+    )
+    assert contaminated.success is False
+    assert any("changed paths violate lane 'site' isolation" in err for err in contaminated.errors)
+
+
+@pytest.mark.parametrize(
+    "rejected_path",
+    [
+        "results-data/CORPUS_NOTES.md",
+        ".github/workflows/sync-results-data-to-published.yml",
+        "results-explorer/src/App.tsx",
+        "results-data/bundles/amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
+    ],
+)
+def test_site_rejects_each_non_exception_external_path(rejected_path: str) -> None:
+    report = verify_lane_isolation("site", repo_root=REPO_ROOT, changed_paths=[rejected_path])
+
+    assert report.success is False
+    assert any(
+        "changed paths violate lane 'site' isolation" in error and rejected_path in error for error in report.errors
+    )
 
 
 def test_non_lane_inputs_excluded_from_digests() -> None:
