@@ -2,7 +2,8 @@
 develop_sha: c44fdfc457886d9340b75d86ecb6e29796fdbb98
 measured_at_sha: c44fdfc457886d9340b75d86ecb6e29796fdbb98
 checked_sha: c44fdfc457886d9340b75d86ecb6e29796fdbb98
-independent_review_anchor_sha: 28bb89d157cdf819a43038257e13f6a1239f4f40
+independent_review_source_sha: c44fdfc457886d9340b75d86ecb6e29796fdbb98
+evidence_content_receipt_sha256: 5aa2c7ace300777d32a8beb8aaf4ade0361b78267a7ed832094ac6cdff3d5407
 ---
 
 # Results Explorer release-readiness closeout — 2026-09-04
@@ -29,7 +30,7 @@ promote those browsers to blocking coverage.
 
 | Surface | Current evidence |
 |---|---|
-| Independent-review integration anchor | `independent_review_anchor_sha` = `28bb89d157cdf819a43038257e13f6a1239f4f40`; the exact integration head independently reviewed before this remediation. It is neither the SHA of this edited file nor a measurement run. From the committed remediation checkout, `git merge-base --is-ancestor 28bb89d157cdf819a43038257e13f6a1239f4f40 HEAD && test "$(git diff --name-only 28bb89d157cdf819a43038257e13f6a1239f4f40 HEAD | LC_ALL=C sort)" = "$(printf '%s\n' '_project/audits/results-explorer-evidence/independent-oracle-2026-09-04.json' '_project/audits/results-explorer-evidence/replay_independent_oracle.py' '_project/audits/results-explorer-release-certification-independent-oracles-2026-09-04.md' '_project/audits/results-explorer-release-readiness-closeout-2026-09-04.md' 'docs/operations/results-explorer-qa.md')"` verifies descent from the reviewed integration content and confines the post-review changes to those five authorized files. |
+| Independent-review identity | `independent_review_source_sha` is the reachable source/base pin `c44fdfc457886d9340b75d86ecb6e29796fdbb98`. `evidence_content_receipt_sha256` is a squash-stable content receipt over the four retained evidence files named below. The earlier feature-branch review happened before later remediation and is not claimed as review of this final content. A new independent reviewer must recompute the receipt from the post-squash files and review that exact final head. Any later content change invalidates the pass; there is no post-review path allowance. |
 | Measured evidence tree | `measured_at_sha`/`checked_sha` = `c44fdfc457886d9340b75d86ecb6e29796fdbb98`; the measurements and certification evidence were run against this historical tree. Commit `fc6dd5958b1deffa468e01852a392a29585d11eb` later retained the certification audit and QA instructions; it is not the measured source tree. |
 | Develop | `git rev-parse origin/develop` = `c44fdfc457886d9340b75d86ecb6e29796fdbb98`; this report's `develop_sha` is that exact 40-character value. |
 | Launch | PR #1933 / v0.4.0 launch is already landed; `https://benchbox.dev/results/` was live in the independent certification. |
@@ -157,6 +158,51 @@ else
   echo "python3 fallback unavailable: duckdb and/or yaml import failed" >&2
 fi
 ```
+
+The replay fails before snapshot verification or DuckDB access unless the
+checkout is clean, the measurement/source commit is locally available, the
+canonical bundle root is used, and every imported repository helper plus the
+bundle tree is unchanged from that commit. The retained JSON records the
+verified helper and bundle-tree hashes. Run the wrong-snapshot and
+disposable-clone changed-input controls documented in the certification audit;
+both must fail without creating their requested output.
+
+### Squash-stable review receipt
+
+The retained receipt covers these evidence files, in this order:
+
+1. `_project/audits/results-explorer-evidence/d11-live-evidence-2026-09-04.txt`
+2. `_project/audits/results-explorer-evidence/independent-oracle-2026-09-04.json`
+3. `_project/audits/results-explorer-evidence/replay_independent_oracle.py`
+4. `_project/audits/results-explorer-release-certification-independent-oracles-2026-09-04.md`
+
+Recompute it from the post-squash checkout with:
+
+```bash
+python3 - <<'PY'
+import hashlib
+from pathlib import Path
+
+paths = (
+    "_project/audits/results-explorer-evidence/d11-live-evidence-2026-09-04.txt",
+    "_project/audits/results-explorer-evidence/independent-oracle-2026-09-04.json",
+    "_project/audits/results-explorer-evidence/replay_independent_oracle.py",
+    "_project/audits/results-explorer-release-certification-independent-oracles-2026-09-04.md",
+)
+receipt = hashlib.sha256()
+for name in paths:
+    receipt.update(name.encode("utf-8"))
+    receipt.update(b"\0")
+    receipt.update(hashlib.sha256(Path(name).read_bytes()).digest())
+    receipt.update(b"\0")
+print(receipt.hexdigest())
+PY
+```
+
+The output must equal the frontmatter `evidence_content_receipt_sha256`. Receipt
+agreement identifies the evidence content but is not itself an independent
+review pass. The reviewer must also name and review the exact post-squash final
+head. A change after that review requires another final-head review.
 
 ## D11 live-evidence record
 

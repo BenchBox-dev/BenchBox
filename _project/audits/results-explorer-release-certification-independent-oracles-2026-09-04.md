@@ -153,10 +153,53 @@ else
 fi
 ```
 
-The retained result was recomputed from the preserved pinned snapshot and the
-current `results-data/bundles` tree: 138/138 geomeans, 138/138 percentile
-rows, 55 rankable rows across 35 cohorts, zero ranking-direction failures, and
-zero privacy leaks across 13 snapshot tables and 391 bundle files.
+Before snapshot verification or DuckDB access, the replay now requires a clean
+checkout, the locally available measurement/source commit
+`c44fdfc457886d9340b75d86ecb6e29796fdbb98`, the canonical
+`results-data/bundles` root, and source/helper plus bundle content unchanged
+from that commit. The retained JSON records SHA-256 identities for every
+imported repository helper and for the complete bundle tree. It was recomputed
+from the preserved pinned snapshot and verified inputs: 138/138 geomeans,
+138/138 percentile rows, 55 rankable rows across 35 cohorts, zero
+ranking-direction failures, and zero privacy leaks across 13 snapshot tables
+and 391 JSON bundle files.
+
+Wrong-snapshot negative control (must fail without creating the output):
+
+```bash
+printf 'wrong snapshot\n' > /tmp/results-wrong.duckdb
+rm -f /tmp/oracle-wrong-snapshot.json
+if uv run --no-project --with duckdb --with pyyaml -- python \
+  _project/audits/results-explorer-evidence/replay_independent_oracle.py \
+  --snapshot /tmp/results-wrong.duckdb --output /tmp/oracle-wrong-snapshot.json; then
+  echo "ERROR: wrong snapshot was accepted" >&2
+  exit 1
+fi
+test ! -e /tmp/oracle-wrong-snapshot.json
+```
+
+Changed-input negative control (commits one helper change in a disposable clone
+so the checkout is clean, then must fail the c44 input-identity guard before
+reading the snapshot):
+
+```bash
+replay_negative_dir="$(mktemp -d /tmp/benchbox-replay-negative.XXXXXX)"
+git clone --local --no-hardlinks . "$replay_negative_dir/repo"
+printf '\n# changed-input negative control\n' >> \
+  "$replay_negative_dir/repo/tests/parity/generate_visualization_fixtures.py"
+git -C "$replay_negative_dir/repo" add tests/parity/generate_visualization_fixtures.py
+git -C "$replay_negative_dir/repo" \
+  -c user.name="$(git config user.name)" \
+  -c user.email="$(git config user.email)" \
+  commit --no-verify -m 'test: change replay helper input'
+if uv run --no-project --with duckdb --with pyyaml -- python \
+  "$replay_negative_dir/repo/_project/audits/results-explorer-evidence/replay_independent_oracle.py" \
+  --snapshot /tmp/results.duckdb --output "$replay_negative_dir/should-not-exist.json"; then
+  echo "ERROR: changed helper was accepted" >&2
+  exit 1
+fi
+test ! -e "$replay_negative_dir/should-not-exist.json"
+```
 
 ## Submission cases
 

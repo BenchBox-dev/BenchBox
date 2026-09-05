@@ -2,9 +2,36 @@
   "evidence_scope": "historical_replay",
   "replay": {
     "script": "_project/audits/results-explorer-evidence/replay_independent_oracle.py",
-    "sha256": "ddef6d482353a5bdbd98d27a57c087322d7abb0975cea26804dd45cbab44dbd0"
+    "sha256": "a368943350526097eef56f59c991ddb893fc06a5a9f62e0fc018ff6d147c373c"
   },
   "measurement_sha": "c44fdfc457886d9340b75d86ecb6e29796fdbb98",
+  "input_provenance": {
+    "measurement_source_commit": "c44fdfc457886d9340b75d86ecb6e29796fdbb98",
+    "clean_checkout": true,
+    "source_files": [
+      {
+        "path": "tests/parity/generate_visualization_fixtures.py",
+        "sha256": "65d5c3e4b6db0f0b6845170c9427e4f8b13e7c8a260bd11665083d23faaae61d"
+      },
+      {
+        "path": "benchbox/core/results/anonymization.py",
+        "sha256": "fd4d4863b04c68dbaecc0b595a4170c66e1467909a5700bf0178c3ba1d79a86d"
+      },
+      {
+        "path": "benchbox/core/results/anonymization_specs.yaml",
+        "sha256": "caffec40299b88a043ba286a5b8d52b0139362398aca1bdb55d05004f1dc4bfb"
+      },
+      {
+        "path": "benchbox/core/results/platform_options.py",
+        "sha256": "06f1bb116df5e191fc93f35ca137b4a16a51820b2d8a60401bd200eeccc1ec82"
+      }
+    ],
+    "bundle_tree": {
+      "path": "results-data/bundles",
+      "files": 392,
+      "sha256": "4d0d9994f19c3b1a6c1f06e7e5711e979dccd34035ef7b99263e73b6a8e83cbc"
+    }
+  },
   "snapshot": {
     "retrieval_locator": "https://benchbox.dev/results/data/results.duckdb",
     "sha256": "3bce914eae9f9bb3dceea490af4f47f8b14ad084cb46aeb7a4f624208b1d5795",

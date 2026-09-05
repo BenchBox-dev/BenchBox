@@ -13,22 +13,135 @@ import hashlib
 import importlib.util
 import json
 import math
+import subprocess
 import sys
 import types
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
-
-import duckdb
+from typing import Any, Callable
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EXPECTED_MEASUREMENT_SHA = "c44fdfc457886d9340b75d86ecb6e29796fdbb98"
 EXPECTED_SNAPSHOT_SHA256 = "3bce914eae9f9bb3dceea490af4f47f8b14ad084cb46aeb7a4f624208b1d5795"
 EXPECTED_SNAPSHOT_BYTES = 8663040
 SNAPSHOT_RETRIEVAL_LOCATOR = "https://benchbox.dev/results/data/results.duckdb"
+CANONICAL_BUNDLE_ROOT = REPO_ROOT / "results-data" / "bundles"
+SOURCE_INPUTS = (
+    Path("tests/parity/generate_visualization_fixtures.py"),
+    Path("benchbox/core/results/anonymization.py"),
+    Path("benchbox/core/results/anonymization_specs.yaml"),
+    Path("benchbox/core/results/platform_options.py"),
+)
 sys.path.insert(0, str(REPO_ROOT))
 
-from tests.parity.generate_visualization_fixtures import geomean_ms, platform_percentile_stats
+
+def _git(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    """Run Git in the repository without invoking a shell."""
+    return subprocess.run(
+        ["git", *args],
+        cwd=REPO_ROOT,
+        check=check,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _content_receipt(paths: list[Path]) -> str:
+    """Hash relative names and bytes into a squash-stable tree receipt."""
+    receipt = hashlib.sha256()
+    for path in paths:
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        receipt.update(relative.encode("utf-8"))
+        receipt.update(b"\0")
+        receipt.update(hashlib.sha256(path.read_bytes()).digest())
+        receipt.update(b"\0")
+    return receipt.hexdigest()
+
+
+def _expected_blobs(paths: list[str]) -> dict[str, str]:
+    """Return regular-file blob IDs for replay inputs at the measured commit."""
+    entries: dict[str, str] = {}
+    listing = _git("ls-tree", "-r", EXPECTED_MEASUREMENT_SHA, "--", *paths).stdout.splitlines()
+    for line in listing:
+        metadata, separator, relative = line.partition("\t")
+        if not separator:
+            raise ValueError("measurement commit returned an invalid input-tree entry")
+        mode, object_type, object_id = metadata.split()
+        if object_type != "blob" or mode not in {"100644", "100755"}:
+            raise ValueError(f"measurement input is not a regular file: {relative}")
+        entries[relative] = object_id
+    return entries
+
+
+def _verify_blobs(expected: dict[str, str]) -> None:
+    """Compare worktree bytes with measured blobs, even for skip-worktree paths."""
+    paths = list(expected)
+    actual_ids = _git("hash-object", "--no-filters", "--", *paths).stdout.splitlines()
+    if len(actual_ids) != len(paths):
+        raise ValueError("could not hash every replay input")
+    changed = [path for path, actual_id in zip(paths, actual_ids) if actual_id != expected[path]]
+    if changed:
+        raise ValueError(f"source or bundle inputs differ from measurement commit {EXPECTED_MEASUREMENT_SHA}")
+
+
+def _verify_input_provenance(bundle_root: Path) -> dict[str, Any]:
+    """Fail closed unless every local replay input matches the measured tree."""
+    try:
+        repository_root = Path(_git("rev-parse", "--show-toplevel").stdout.strip()).resolve(strict=True)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ValueError("input provenance check requires a readable Git checkout") from exc
+    if repository_root != REPO_ROOT.resolve(strict=True):
+        raise ValueError(f"replay script is not in the Git checkout root: {REPO_ROOT}")
+
+    status = _git("status", "--porcelain", "--untracked-files=all").stdout
+    if status:
+        raise ValueError("input provenance check requires a clean checkout")
+
+    if _git("cat-file", "-e", f"{EXPECTED_MEASUREMENT_SHA}^{{commit}}", check=False).returncode != 0:
+        raise ValueError(f"expected measurement commit is unavailable: {EXPECTED_MEASUREMENT_SHA}")
+
+    try:
+        resolved_bundle_root = bundle_root.resolve(strict=True)
+        canonical_bundle_root = CANONICAL_BUNDLE_ROOT.resolve(strict=True)
+    except OSError as exc:
+        raise ValueError("canonical bundle root is unavailable") from exc
+    if resolved_bundle_root != canonical_bundle_root:
+        raise ValueError(f"bundle root must be the canonical repository path: {CANONICAL_BUNDLE_ROOT}")
+
+    source_paths = [REPO_ROOT / path for path in SOURCE_INPUTS]
+    bundle_paths = sorted(path for path in canonical_bundle_root.rglob("*") if path.is_file())
+    source_names = [path.relative_to(REPO_ROOT).as_posix() for path in source_paths]
+    bundle_names = [path.relative_to(REPO_ROOT).as_posix() for path in bundle_paths]
+    expected_source_blobs = _expected_blobs(source_names)
+    expected_bundle_blobs = _expected_blobs(["results-data/bundles"])
+    if set(expected_source_blobs) != set(source_names):
+        raise ValueError("measurement commit does not contain every imported repository helper")
+    if set(expected_bundle_blobs) != set(bundle_names):
+        raise ValueError("canonical bundle tree differs from the measurement commit")
+    _verify_blobs({**expected_source_blobs, **expected_bundle_blobs})
+    return {
+        "measurement_source_commit": EXPECTED_MEASUREMENT_SHA,
+        "clean_checkout": True,
+        "source_files": [
+            {
+                "path": path.relative_to(REPO_ROOT).as_posix(),
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+            for path in source_paths
+        ],
+        "bundle_tree": {
+            "path": CANONICAL_BUNDLE_ROOT.relative_to(REPO_ROOT).as_posix(),
+            "files": len(bundle_paths),
+            "sha256": _content_receipt(bundle_paths),
+        },
+    }
+
+
+def _load_math_helpers() -> tuple[Callable[[list[float]], float | None], Callable[[list[float]], Any]]:
+    """Import measured-tree math helpers only after provenance is verified."""
+    from tests.parity.generate_visualization_fixtures import geomean_ms, platform_percentile_stats
+
+    return geomean_ms, platform_percentile_stats
 
 
 def _load_public_path_detector() -> Any:
@@ -53,9 +166,6 @@ def _load_public_path_detector() -> Any:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.find_public_path_leaks
-
-
-find_public_path_leaks = _load_public_path_detector()
 
 
 def _verify_snapshot(snapshot: Path) -> tuple[str, int]:
@@ -94,7 +204,7 @@ def _competition_ranks(rows: list[tuple[str, float]]) -> dict[str, int]:
     return ranks
 
 
-def _privacy_scan_snapshot(con: duckdb.DuckDBPyConnection) -> dict[str, Any]:
+def _privacy_scan_snapshot(con: Any, find_public_path_leaks: Callable[[Any], list[str]]) -> dict[str, Any]:
     fields: list[str] = []
     tables = con.execute(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' ORDER BY table_name"
@@ -119,7 +229,9 @@ def _privacy_scan_snapshot(con: duckdb.DuckDBPyConnection) -> dict[str, Any]:
     return {"tables_scanned": len(tables), "leak_fields": sorted(set(fields)), "leak_hits": len(fields)}
 
 
-def _privacy_scan_bundles(bundle_root: Path) -> dict[str, Any]:
+def _privacy_scan_bundles(
+    bundle_root: Path, find_public_path_leaks: Callable[[Any], list[str]]
+) -> dict[str, Any]:
     fields: list[str] = []
     unreadable: list[str] = []
     files = sorted(bundle_root.rglob("*.json"))
@@ -140,7 +252,12 @@ def _privacy_scan_bundles(bundle_root: Path) -> dict[str, Any]:
 
 
 def replay(snapshot: Path, bundle_root: Path) -> dict[str, Any]:
+    input_provenance = _verify_input_provenance(bundle_root)
     digest, snapshot_bytes = _verify_snapshot(snapshot)
+    geomean_ms, platform_percentile_stats = _load_math_helpers()
+    find_public_path_leaks = _load_public_path_detector()
+    import duckdb
+
     con = duckdb.connect(str(snapshot), read_only=True)
     timings = defaultdict(list)
     for result_id, display_ms in con.execute("SELECT result_id, display_ms FROM query_display_timings").fetchall():
@@ -217,6 +334,7 @@ def replay(snapshot: Path, bundle_root: Path) -> dict[str, Any]:
             "sha256": hashlib.sha256(script_path.read_bytes()).hexdigest(),
         },
         "measurement_sha": EXPECTED_MEASUREMENT_SHA,
+        "input_provenance": input_provenance,
         "snapshot": {
             "retrieval_locator": SNAPSHOT_RETRIEVAL_LOCATOR,
             "sha256": digest,
@@ -242,7 +360,10 @@ def replay(snapshot: Path, bundle_root: Path) -> dict[str, Any]:
             "rank_diverge": len(set(rank_divergences)),
             "direction_failures": sorted(set(direction_failures)),
         },
-        "privacy": {"snapshot": _privacy_scan_snapshot(con), "bundles": _privacy_scan_bundles(bundle_root)},
+        "privacy": {
+            "snapshot": _privacy_scan_snapshot(con, find_public_path_leaks),
+            "bundles": _privacy_scan_bundles(bundle_root, find_public_path_leaks),
+        },
     }
     con.close()
     return result
@@ -251,13 +372,14 @@ def replay(snapshot: Path, bundle_root: Path) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--snapshot", required=True, type=Path)
-    parser.add_argument("--bundle-root", type=Path, default=REPO_ROOT / "results-data" / "bundles")
+    parser.add_argument("--bundle-root", type=Path, default=CANONICAL_BUNDLE_ROOT)
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
+    result = replay(args.snapshot, args.bundle_root)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     temporary_output = args.output.with_suffix(args.output.suffix + ".tmp")
     temporary_output.write_text(
-        json.dumps(replay(args.snapshot, args.bundle_root), indent=2) + "\n",
+        json.dumps(result, indent=2) + "\n",
         encoding="utf-8",
     )
     temporary_output.replace(args.output)

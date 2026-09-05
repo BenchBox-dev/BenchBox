@@ -151,11 +151,23 @@ competition ranker). Compare those values to `results.display_geomean_ms` and
 production logic in `_project/scripts/explorer_pipeline/transformer.py` or
 `results-explorer/src/lib/chartMath.ts`.
 
-Historical replay must pin the downloaded snapshot by SHA-256 before analysis.
-A live URL is only a retrieval locator: if its bytes change, replay must fail
-rather than attach the old measurement SHA to the new snapshot. Generated
-DuckDB snapshots stay outside Git; retain the replay result, manifest fields,
-checksum, and an executable retrieval-and-verification command in the audit.
+Historical replay must fail closed on both halves of its input identity before
+analysis. Pin the downloaded snapshot by SHA-256, require a clean Git checkout,
+require the recorded measurement/source commit to exist locally, require every
+imported repository helper and the canonical `results-data/bundles` tree to be
+unchanged from that commit, and reject any other bundle root. A live URL is
+only a retrieval locator: if its bytes change, replay must fail rather than
+attach the old measurement SHA to the new snapshot. Retain the verified source
+file and bundle-tree hashes in the replay JSON. Generated DuckDB snapshots stay
+outside Git; retain the replay result, manifest fields, checksum, and an
+executable retrieval-and-verification command in the audit.
+
+Run both negative controls before accepting retained replay evidence. A
+wrong-snapshot control must fail before DuckDB opens the file. A changed-input
+control must run from a disposable local clone, commit one imported-helper
+change there, and fail the source-input guard from that otherwise clean checkout
+without changing the review checkout.
+Neither rejected run may create its requested output file.
 
 Scan public bundles and snapshot string columns with
 `benchbox.core.results.anonymization.find_public_path_leaks`. Report field
@@ -166,6 +178,16 @@ Security tests must not use real credentials.
 Stamp the certification audit with `develop_sha` (and `measured_at_sha` when
 the body contains empirical counts) and validate it with
 `make audit-sha-check FILE=_project/audits/<report>.md`.
+
+### Squash-stable independent-review identity
+
+Do not use an intermediate feature-branch commit as the durable identity of an
+independent review: a squash can make that object unreachable. Pin the reachable
+base/source commit and retain a SHA-256 content receipt over the reviewed
+evidence files. The final independent reviewer must recompute the receipt from
+the post-squash files and review the exact final head. Any later content change,
+including documentation-only changes, invalidates that pass and requires a new
+final-head review; there is no implicit post-review path allowance.
 
 ## Expected Hidden Controls
 
