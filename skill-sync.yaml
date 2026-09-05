@@ -5,10 +5,10 @@ sources:
     url: https://github.com/joeharris76/skill-sync-skills.git
     ref: d22ea7fab6b7b9608e54a3910ab4dfa9bb407d42
     subdir: skills
-  - name: todo-context-efficiency
+  - name: todo-db
     type: git
-    url: https://github.com/joeharris76/skill-sync-skills.git
-    ref: d22ea7fab6b7b9608e54a3910ab4dfa9bb407d42
+    url: https://github.com/joeharris76/todo-db.git
+    ref: b8dda65c53f4a8fa443ec09a7419576ea8362e90
     subdir: skills
   - name: product
     type: git
@@ -21,7 +21,7 @@ skills:
   - code
   - test
   - docs
-  - todo
+  - todo-db
   - benchbox
   - shared-review-protocol
   - shared-change-framework
@@ -40,8 +40,8 @@ install_mode: mirror
 overrides:
   skill-sync:
     source_name: product
-  todo:
-    source_name: todo-context-efficiency
+  todo-db:
+    source_name: todo-db
 config:
   code:
     lint: "uv run ruff check ."
