@@ -14,11 +14,18 @@ from benchbox.core.dataframe.tuning import (
     get_profile_summary,
     get_smart_defaults,
 )
+from benchbox.core.dataframe.tuning.profiles import create_profile_config
 
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+@pytest.mark.parametrize("profile", ["streaming", "memory-constrained", "gpu"])
+def test_datafusion_rejects_unsupported_profiles(profile: str) -> None:
+    with pytest.raises(ValueError, match="DataFusion does not support"):
+        create_profile_config("datafusion", profile)
 
 
 class TestSystemProfile:

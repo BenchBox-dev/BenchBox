@@ -52,6 +52,9 @@ def create_profile_config(platform: str, profile: str) -> DataFrameTuningConfigu
     Returns:
         Configured :class:`DataFrameTuningConfiguration`.
     """
+    if platform == "datafusion" and profile not in {"default", "optimized"}:
+        raise ValueError(f"DataFusion does not support the {profile!r} tuning profile")
+
     config = DataFrameTuningConfiguration()
 
     if profile == "optimized":
