@@ -285,6 +285,7 @@ jobs:
           PARENT_GENERATION: ${{ steps.lineage.outputs.parent_generation }}
           WORKFLOW_SHA: ${{ github.sha }}
           SITE_ARTIFACT: ${{ steps.inputs.outputs.site_artifact }}
+          PAGES_ARTIFACT: publication-pages-${{ steps.inputs.outputs.generation }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         shell: bash
         run: |
@@ -315,7 +316,7 @@ jobs:
           export GENERATION DEVELOP_SHA PUBLISHED_RESULTS_SHA PRIOR_LIVE_RECEIPT_ID SITE_DIGEST DOCS_DIGEST
           export EXPLORER_DIGEST DATABASE_DIGEST CORPUS_DIGEST LOCKFILE_DIGEST BUNDLE_COUNT PYTHON_VERSION
           export ROOT_ENDPOINT_DIGEST DOCS_ENDPOINT_DIGEST EXPLORER_ENDPOINT_DIGEST
-          export NODE_VERSION UV_VERSION IMAGE_OS SITE_ARTIFACT GITHUB_RUN_ID TIMESTAMP GITHUB_OUTPUT
+          export NODE_VERSION UV_VERSION IMAGE_OS SITE_ARTIFACT PAGES_ARTIFACT GITHUB_RUN_ID TIMESTAMP GITHUB_OUTPUT
           export PARENT_SHA PARENT_GENERATION WORKFLOW_SHA APPROVED_MANIFEST_DIGEST
           python3 - <<'PY'
           import hashlib
@@ -418,8 +419,10 @@ jobs:
               )
           assembly = dict(manifest)
           assembly.update({
-              "artifact_name": os.environ["SITE_ARTIFACT"],
+              "artifact_name": os.environ["PAGES_ARTIFACT"],
               "artifact_run_id": os.environ["GITHUB_RUN_ID"],
+              "rollback_artifact_name": os.environ["SITE_ARTIFACT"],
+              "rollback_artifact_run_id": os.environ["GITHUB_RUN_ID"],
               "timestamp": os.environ["TIMESTAMP"],
               "status": "BUILT",
           })
@@ -718,11 +721,12 @@ jobs:
           if prior_id and receipt.get('receipt_id') != prior_id: raise SystemExit(1)
           if current_gen and str(receipt.get('generation')) == current_gen: raise SystemExit(1)
           if str(receipt.get('receipt_run_id', receipt.get('artifact_run_id'))) != os.environ.get('RUN_ID'): raise SystemExit(1)
-          if not receipt.get('artifact_name') or not receipt.get('artifacts', {}).get('pages_assembly', {}).get('digest'): raise SystemExit(1)
+          if not receipt.get('artifact_name') or not receipt.get('rollback_artifact_name'): raise SystemExit(1)
+          if not receipt.get('artifacts', {}).get('pages_assembly', {}).get('digest'): raise SystemExit(1)
           PY
             then
-              ARTIFACT_NAME=$(uv run python -c "import json; print(json.load(open('candidate/live-receipt.json'))['artifact_name'])")
-              ARTIFACT_RUN_ID="$RUN_ID"
+              ARTIFACT_NAME=$(uv run python -c "import json; print(json.load(open('candidate/live-receipt.json'))['rollback_artifact_name'])")
+              ARTIFACT_RUN_ID=$(uv run python -c "import json; print(json.load(open('candidate/live-receipt.json')).get('rollback_artifact_run_id', '$RUN_ID'))")
               cp -R candidate/. known-good-receipt/
               echo "artifact_name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
               echo "artifact_run_id=$ARTIFACT_RUN_ID" >> "$GITHUB_OUTPUT"
@@ -782,6 +786,7 @@ jobs:
           PARENT_GENERATION: ${{ needs.build.outputs.parent_generation }}
           PRIOR_LIVE_RECEIPT_ID: ${{ inputs.prior_live_receipt_id }}
           SITE_ARTIFACT: publication-site-${{ needs.build.outputs.generation }}-rollback
+          PAGES_ARTIFACT: publication-rollback-pages-${{ github.run_id }}-${{ github.run_attempt }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         shell: bash
@@ -804,8 +809,10 @@ jobs:
               'parent_generation': int(os.environ['PARENT_GENERATION']),
               'receipt_id': f"rollback-{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}",
               'receipt_run_id': os.environ['GITHUB_RUN_ID'],
-              'artifact_name': os.environ['SITE_ARTIFACT'],
+              'artifact_name': os.environ['PAGES_ARTIFACT'],
               'artifact_run_id': os.environ['GITHUB_RUN_ID'],
+              'rollback_artifact_name': os.environ['SITE_ARTIFACT'],
+              'rollback_artifact_run_id': os.environ['GITHUB_RUN_ID'],
               'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
               'routes': probes,
               'nonce': f"{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}",

@@ -193,6 +193,18 @@ def test_lane_owned_paths_still_contaminate_despite_non_lane_allowlist() -> None
     assert explorer_report.success is False
     assert any("changed paths violate lane 'site' isolation" in err for err in explorer_report.errors)
 
+    for corpus_generator in (
+        "scripts/publication/create_ledger_seed.py",
+        "scripts/publication/assembler.py",
+    ):
+        generator_report = verify_lane_isolation(
+            "site",
+            repo_root=REPO_ROOT,
+            changed_paths=["docs/index.rst", corpus_generator],
+        )
+        assert generator_report.success is False
+        assert any("changed paths violate lane 'site' isolation" in err for err in generator_report.errors)
+
 
 def test_non_lane_inputs_excluded_from_digests() -> None:
     # Unlike shared inputs, non-lane inputs must never fold into lane

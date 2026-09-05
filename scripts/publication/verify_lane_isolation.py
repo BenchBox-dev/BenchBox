@@ -116,6 +116,8 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
     "corpus": (
         "results-data/",
         "scripts/validate_submission.py",
+        "scripts/publication/create_ledger_seed.py",
+        "scripts/publication/assembler.py",
         "scripts/publication/validator_parity.py",
         ".github/workflows/validate-submission.yml",
         ".github/workflows/sync-results-data-to-published.yml",

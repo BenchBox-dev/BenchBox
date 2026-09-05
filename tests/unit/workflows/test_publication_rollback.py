@@ -140,6 +140,8 @@ def test_receipts_use_measured_provenance_and_valid_json_newlines() -> None:
     assert "CORPUS_DIGEST=$(sha256sum receipt-dist/corpus-file-digests.txt" in text
     assert 'tree_size("site")' in text
     assert " + '\\\\n'" not in text
+    assert '"artifact_name": os.environ["PAGES_ARTIFACT"]' in text
+    assert '"rollback_artifact_name": os.environ["SITE_ARTIFACT"]' in text
 
 
 def test_build_receipt_enforces_attested_cas_lineage() -> None:
@@ -214,8 +216,10 @@ def test_rollback_restores_only_a_cryptographically_attested_artifact() -> None:
     assert "['artifacts']['pages_assembly']['digest']" in run_bodies
     assert "'generation': int(os.environ['BUILD_GENERATION'])" in run_bodies
     assert "successor-live-receipt/live-receipt.json" in run_bodies
-    assert "'artifact_name': os.environ['SITE_ARTIFACT']" in run_bodies
+    assert "'artifact_name': os.environ['PAGES_ARTIFACT']" in run_bodies
     assert "'artifact_run_id': os.environ['GITHUB_RUN_ID']" in run_bodies
+    assert "'rollback_artifact_name': os.environ['SITE_ARTIFACT']" in run_bodies
+    assert "['rollback_artifact_name']" in run_bodies
 
     assert any(step.get("uses") == DEPLOY_PAGES_ACTION for step in steps)
     assert any(step.get("uses") == UPLOAD_PAGES_ACTION for step in steps)
