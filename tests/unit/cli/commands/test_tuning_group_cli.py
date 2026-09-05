@@ -35,6 +35,17 @@ def _obj():
 
 
 class TestTuningInitSqlMode:
+    def test_datafusion_auto_mode_uses_manifest_sql_default(self):
+        runner = CliRunner()
+        with (
+            patch.object(_tuning_group_module, "console"),
+            patch("benchbox.cli.config.ConfigManager.create_sample_unified_tuning_config") as create_sql,
+        ):
+            result = runner.invoke(tuning_group, ["init", "--platform", "datafusion"], obj=_obj())
+
+        assert result.exit_code == 0
+        create_sql.assert_called_once()
+
     def test_init_sql_exits_zero(self, tmp_path):
         runner = CliRunner()
         with patch.object(_tuning_group_module, "console"):
@@ -110,6 +121,33 @@ class TestTuningInitDataframeMode:
                 ["init", "--platform", "datafusion", "--mode", "dataframe"],
                 obj=_obj(),
             )
+        assert result.exit_code == 0
+
+    def test_defaults_accepts_datafusion(self):
+        from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
+
+        runner = CliRunner()
+        with (
+            patch.object(_tuning_group_module, "console"),
+            patch.object(
+                _tuning_group_module,
+                "get_smart_defaults",
+                return_value=DataFrameTuningConfiguration(),
+            ),
+            patch.object(_tuning_group_module, "detect_system_profile", return_value=MagicMock()),
+            patch.object(
+                _tuning_group_module,
+                "get_profile_summary",
+                return_value={
+                    "cpu_cores": 8,
+                    "available_memory_gb": 16.0,
+                    "memory_category": "high",
+                    "has_gpu": False,
+                },
+            ),
+        ):
+            result = runner.invoke(tuning_group, ["defaults", "--platform", "datafusion"], obj=_obj())
+
         assert result.exit_code == 0
 
     def test_init_polars_dataframe_mode_exits_zero(self):

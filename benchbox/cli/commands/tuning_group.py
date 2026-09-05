@@ -39,6 +39,7 @@ from benchbox.core.dataframe.tuning.profiles import (
     DATAFRAME_CAPABILITY_ROWS,
     DATAFRAME_PLATFORMS,
 )
+from benchbox.platforms.adapter_factory import is_dataframe_mode
 
 
 @click.group("tuning")
@@ -112,7 +113,7 @@ def init(
 
     # Auto-detect mode based on platform
     if mode == "auto":
-        mode = "dataframe" if platform_lower in DATAFRAME_PLATFORMS else "sql"
+        mode = "dataframe" if is_dataframe_mode(platform_lower) else "sql"
 
     # Validate mode/platform compatibility
     if mode == "dataframe" and platform_lower not in DATAFRAME_PLATFORMS:
@@ -284,7 +285,7 @@ def validate_config(config_file: str, platform: str) -> None:
 @tuning_group.command("defaults")
 @click.option(
     "--platform",
-    type=click.Choice(["polars", "pandas", "dask", "modin", "cudf"], case_sensitive=False),
+    type=click.Choice(sorted(DATAFRAME_PLATFORMS), case_sensitive=False),
     required=True,
     help="Target DataFrame platform",
 )

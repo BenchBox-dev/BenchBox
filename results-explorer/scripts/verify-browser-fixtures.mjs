@@ -254,9 +254,10 @@ function verifyTunedPairCoverage(data, comparableCohorts, errors) {
     const platformKey = `${cohortKey}\0${platformId}`;
     const flags = byCohortPlatform.get(platformKey) ?? { hasDefault: false, hasTuned: false };
     const isTuned = tuningMode === "tuned" || hasTuning === true;
+    const isDefault = tuningMode === "notuning" || tuningMode === "default" || tuningMode === "";
     if (isTuned) {
       flags.hasTuned = true;
-    } else {
+    } else if (isDefault) {
       flags.hasDefault = true;
     }
     byCohortPlatform.set(platformKey, flags);
