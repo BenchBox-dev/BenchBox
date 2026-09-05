@@ -49,5 +49,8 @@ def test_release_docs_workflow_deploys_only_from_protected_release_push() -> Non
     assert steps[deploy_index]["if"] == "steps.independent.outputs.active != 'true'"
     guard_run = steps[guard_index]["run"]
     assert "Publication Control Plane Deployment" in guard_run
-    assert 'RUN_BRANCH" == "develop"' in guard_run
-    assert 'RUN_CONCLUSION" == "success"' in guard_run
+    assert 'RUN_BRANCH" != "develop"' in guard_run
+    assert "verify_live_receipt_signature" in guard_run
+    assert 'RUN_CONCLUSION"] != "success"' in guard_run
+    assert 'startswith("rollback-")' in guard_run
+    assert 'all(route.get("ok")' in guard_run
