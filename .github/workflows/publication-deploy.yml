@@ -244,6 +244,19 @@ jobs:
         run: npm ci
         working-directory: results-explorer
 
+      - name: Build lane-equivalent Explorer artifact
+        run: |
+          test ! -e results-explorer/public/data/results.duckdb || {
+            echo "::error::Explorer lane artifact must not contain the corpus database"
+            exit 1
+          }
+          npm run build --prefix results-explorer
+          uv run python scripts/publication/check_explorer_compat.py \
+            --artifact results-explorer/dist --generate-manifest
+          uv run python scripts/publication/check_explorer_compat.py \
+            --artifact results-explorer/dist --require-manifest
+          mv results-explorer/dist explorer-app
+
       - name: Build Explorer corpus database
         run: |
           uv run python _project/scripts/explorer_publish.py build \
@@ -270,6 +283,14 @@ jobs:
           mkdir -p api-docs
           test -f docs/_build/html/api.html && cp docs/_build/html/api.html api-docs/
           test -d docs/_build/html/_modules && cp -r docs/_build/html/_modules api-docs/
+          if [ -d docs/_build/html/_static ]; then
+            mkdir -p api-docs/_static
+            cp -r docs/_build/html/_static/* api-docs/_static/
+          fi
+          if [ -d docs/_build/html/reference/python-api ]; then
+            mkdir -p api-docs/reference/python-api
+            cp -r docs/_build/html/reference/python-api api-docs/reference/
+          fi
           uv run python scripts/assemble_public_site.py --site-dir site
           test -s site/results/data/results.duckdb || {
             echo "::error::atomic site artifact is missing results.duckdb"
@@ -303,7 +324,7 @@ jobs:
           SITE_DIGEST=$(sha256sum receipt-dist/site-file-digests.txt | cut -d ' ' -f 1)
           (cd prose-site && find . -type f -exec sha256sum {} + | sort) > receipt-dist/prose-file-digests.txt
           PROSE_DIGEST=$(sha256sum receipt-dist/prose-file-digests.txt | cut -d ' ' -f 1)
-          (cd results-explorer/dist && find . -type f -exec sha256sum {} + | sort) > receipt-dist/explorer-file-digests.txt
+          (cd explorer-app && find . -type f -exec sha256sum {} + | sort) > receipt-dist/explorer-file-digests.txt
           EXPLORER_DIGEST=$(sha256sum receipt-dist/explorer-file-digests.txt | cut -d ' ' -f 1)
           (cd api-docs && find . -type f -exec sha256sum {} + | sort) > receipt-dist/docs-file-digests.txt
           DOCS_DIGEST=$(sha256sum receipt-dist/docs-file-digests.txt | cut -d ' ' -f 1)
@@ -391,7 +412,7 @@ jobs:
                   "explorer_app": {
                       "digest": os.environ["EXPLORER_DIGEST"],
                       "endpoint_sha256": os.environ["EXPLORER_ENDPOINT_DIGEST"],
-                      "size": tree_size("results-explorer/dist"),
+                      "size": tree_size("explorer-app"),
                       "path": "/results/",
                   },
                   "publisher_bundle": {

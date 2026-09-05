@@ -147,6 +147,10 @@ def test_receipts_use_measured_provenance_and_valid_json_newlines() -> None:
     assert '"digest": os.environ["PROSE_DIGEST"]' in text
     assert 'tree_size("prose-site")' in text
     assert 'tree_size("api-docs")' in text
+    assert 'tree_size("explorer-app")' in text
+    assert "(cd explorer-app && find . -type f" in text
+    assert "docs/_build/html/_static/* api-docs/_static/" in text
+    assert "docs/_build/html/reference/python-api api-docs/reference/" in text
     assert " + '\\\\n'" not in text
     assert '"artifact_name": os.environ["PAGES_ARTIFACT"]' in text
     assert '"rollback_artifact_name": os.environ["SITE_ARTIFACT"]' in text
