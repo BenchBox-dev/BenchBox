@@ -315,13 +315,20 @@ def test_corrupt_journal_fails_closed(git_repo: Path) -> None:
 
 @pytest.mark.parametrize(
     "field,value",
-    [("object_type", "wrong"), ("transaction_schema_version", 99), ("state", "invented")],
+    [
+        ("object_type", "wrong"),
+        ("transaction_schema_version", 99),
+        ("state", "invented"),
+        ("kind", "invented"),
+        ("kind", tx_mod.KIND_ROLLBACK),
+    ],
 )
 def test_read_transaction_rejects_invalid_contract(monkeypatch: pytest.MonkeyPatch, field: str, value: object) -> None:
     data = {
         "object_type": tx_mod.OBJECT_TYPE,
         "transaction_schema_version": tx_mod.SCHEMA_VERSION,
         "state": tx_mod.STATE_PREPARED,
+        "kind": tx_mod.KIND_PROMOTION,
     }
     data[field] = value
     monkeypatch.setattr(journal_mod, "_run_git", lambda *args, **kwargs: json.dumps(data))
