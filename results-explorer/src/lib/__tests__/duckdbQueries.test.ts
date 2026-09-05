@@ -51,6 +51,15 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     expect(params).toEqual(["tpch"]);
   });
 
+  it("joins hardware fields onto ranking-eligible result rows", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await listResults({ sql: "WHERE arch IN (?)", params: ["arm64"] });
+    const [sql] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toContain("FROM (SELECT r.*, d.arch, d.cpu_family FROM bench.results r");
+    expect(sql).toContain("LEFT JOIN bench.result_detail_metrics d USING (result_id)");
+    expect(sql).toContain("is_ranking_eligible");
+  });
+
   it("memoizes listResults by WHERE clause and params for the current snapshot", async () => {
     const rows = [{ result_id: "r1" }];
     mockedQueryRows.mockResolvedValueOnce(rows);

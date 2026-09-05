@@ -2,7 +2,7 @@ import type { RoutableProps } from "preact-router";
 import { useEffect, useMemo, useState } from "preact/hooks";
 
 import type { DetailResult } from "@/types";
-import { getDetailResult } from "@/lib/duckdbQueries";
+import { getDetailResult, resolveShortId } from "@/lib/duckdbQueries";
 import { errMsg, fmtMs } from "@/utils";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { CompareSummarySkeleton } from "@/components/LoadingSpinner";
@@ -232,7 +232,14 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
     let cancelled = false;
     if (!resultId) return;
     setLoading(true);
-    getDetailResult(resultId)
+    resolveShortId(resultId)
+      .then(async (resolvedId) => {
+        if (cancelled) return null;
+        if (resolvedId !== resultId && typeof window !== "undefined") {
+          history.replaceState(null, "", `/results/r/${encodeURIComponent(resolvedId)}/passes${window.location.search}${window.location.hash}`);
+        }
+        return getDetailResult(resolvedId);
+      })
       .then((result) => {
         if (cancelled) return;
         setDetail(result);

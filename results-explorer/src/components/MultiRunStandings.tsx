@@ -5,6 +5,7 @@ import { timingValueForQuery } from "@/lib/displayEligibility";
 import { COMPARE_TIE_THRESHOLD } from "@/lib/compareSummary";
 import { fmtGeomean } from "@/utils";
 import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
+import { formatMemoryGb } from "@/lib/displayLabels";
 
 /**
  * Standings for a three-to-four run comparison.
@@ -97,7 +98,7 @@ export function buildStandings(
       : r.environment?.arch
       ? r.environment.arch
       : "Not recorded";
-    const mem = r.environment?.memory_gb !== undefined ? ` · ${r.environment.memory_gb} GB` : "";
+    const mem = r.environment?.memory_gb !== undefined ? ` · ${formatMemoryGb(r.environment.memory_gb)}` : "";
     const hardware = hw === "Not recorded" ? "Not recorded" : `${hw}${mem}`;
     const engine = r.platform_version ? `${r.platform} v${r.platform_version}` : r.platform;
     return {

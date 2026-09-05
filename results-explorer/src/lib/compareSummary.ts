@@ -88,6 +88,8 @@ export interface CompareDecisionSummary {
   nonCleanValidation: CompareValidationCaveat[];
   /** Prose caveat built from `nonCleanValidation`, or null when it is empty. */
   validationCaveat: string | null;
+  /** Hardware boundary that must travel with any leading-run claim. */
+  comparisonBoundary: string | null;
 }
 
 interface CompareDecisionSummaryOptions {
@@ -100,6 +102,7 @@ interface CompareDecisionSummaryOptions {
    * Falls back to `metric.platform` when a label is missing.
    */
   runLabels?: Record<string, string>;
+  comparisonBoundary?: string;
 }
 
 export function buildCompareDecisionSummary(
@@ -160,6 +163,7 @@ export function buildCompareDecisionSummary(
     cost,
     nonCleanValidation,
     validationCaveat,
+    comparisonBoundary: options.comparisonBoundary ?? null,
   };
 }
 
@@ -185,7 +189,7 @@ function buildNonCleanValidation(results: DetailResult[]): CompareValidationCave
 function buildValidationCaveat(nonCleanValidation: CompareValidationCaveat[]): string | null {
   if (nonCleanValidation.length === 0) return null;
   const parts = nonCleanValidation.map((entry) => `${entry.platform} is ${entry.label}`);
-  return `Validation caution: ${parts.join("; ")}. This comparison rests on at least one unvalidated or non-clean result - treat the winner claim as provisional.`;
+  return `Validation caution: ${parts.join("; ")}. This comparison rests on at least one unvalidated or non-clean result - treat the leading-run claim as provisional.`;
 }
 
 function metricRatio(winnerValue: number, comparisonValue: number, higherIsBetter: boolean): number | null {
@@ -200,19 +204,20 @@ function buildHeadline(
   options: CompareDecisionSummaryOptions,
   validationCaveat: string | null,
 ): string {
+  const boundarySuffix = options.comparisonBoundary ? ` ${options.comparisonBoundary}` : "";
   if (options.suppressWinnerClaims) {
     const reason = options.suppressionReason ?? "selected runs are not from the same comparable ranking";
     if (isQueryEvidenceSuppressionReason(reason)) {
-      return `Insufficient comparable query evidence: ${reason}. Winner language is suppressed; raw query evidence remains available.`;
+      return `Insufficient comparable query evidence: ${reason}. Winner language is suppressed; raw query evidence remains available.${boundarySuffix}`;
     }
-    return `Not directly comparable: ${reason}. Winner language is suppressed; raw query evidence remains available.`;
+    return `Not directly comparable: ${reason}. Winner language is suppressed; raw query evidence remains available.${boundarySuffix}`;
   }
-  if (!winner) return "The selected runs do not have enough primary-metric data for a comparison.";
+  if (!winner) return `The selected runs do not have enough primary-metric data for a comparison.${boundarySuffix}`;
   const winnerLabel = options.runLabels?.[winner.resultId] ?? winner.platform;
   // A reader who reads only this headline must not come away believing the
   // comparison rests on validated data when it does not - so the caveat rides
-  // along with the winner claim itself, not just the receipt below the fold.
-  const caveatSuffix = validationCaveat ? ` ${validationCaveat}` : "";
+  // along with the leading-run claim itself, not just the receipt below the fold.
+  const caveatSuffix = `${validationCaveat ? ` ${validationCaveat}` : ""}${boundarySuffix}`;
   if (comparisonRatio === null) return `${winnerLabel} leads on the selected primary metric.${caveatSuffix}`;
   if (Math.abs(comparisonRatio - 1) < COMPARE_TIE_THRESHOLD) {
     return `The selected runs are within the tie threshold (${formatRatio(comparisonRatio)}) on the primary metric.${caveatSuffix}`;

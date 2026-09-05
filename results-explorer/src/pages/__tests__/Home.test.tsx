@@ -1050,4 +1050,37 @@ describe("toggleFacetValue (w13)", () => {
     const platformLink = within(grid).getByRole("link", { name: "DuckDB" }) as HTMLAnchorElement;
     expect(platformLink.getAttribute("href")).toContain("version=1.4.0");
   });
+
+  it("shows architecture constraints and carries them through leaderboard drill-down links", async () => {
+    window.history.replaceState(null, "", "/results/?arch=arm64&cpu_family=apple_silicon");
+    const hardwareRows = RESULT_ROWS.map((row) => ({
+      ...row,
+      arch: "arm64",
+      cpu_family: "apple_silicon",
+    }));
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.includes("JOIN bench.result_detail_metrics")) return hardwareRows;
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        return META_LEADERBOARD_ROWS;
+      }
+      if (s.includes("FROM bench.cohort_metadata")) return COHORT_ROWS;
+      return [];
+    });
+
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
+
+    const activeFilters = screen.getByLabelText("Active filter chips");
+    expect(within(activeFilters).getByText("Architecture: arm64")).toBeTruthy();
+    expect(within(activeFilters).getByText("CPU family: Apple Silicon")).toBeTruthy();
+
+    const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
+    const cohortHref = (within(grid).getByRole("link", { name: /^ClickBench SF0.1/ }) as HTMLAnchorElement).href;
+    const platformHref = (within(grid).getByRole("link", { name: "DuckDB" }) as HTMLAnchorElement).href;
+    for (const href of [cohortHref, platformHref]) {
+      expect(href).toContain("arch=arm64");
+      expect(href).toContain("cpu_family=apple_silicon");
+    }
+  });
 });

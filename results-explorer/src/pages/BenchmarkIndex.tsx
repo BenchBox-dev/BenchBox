@@ -77,6 +77,8 @@ const BENCHMARK_RESULT_FACET_KEYS: ExplorerFacetKey[] = [
   "cost_status",
   "date_window",
   "platform_version",
+  "arch",
+  "cpu_family",
 ];
 const BENCHMARK_ROW_FACET_KEYS: ExplorerFacetKey[] = [
   "platform",
@@ -92,6 +94,8 @@ const BENCHMARK_ROW_FACET_KEYS: ExplorerFacetKey[] = [
   "cost_status",
   "date_window",
   "platform_version",
+  "arch",
+  "cpu_family",
 ];
 
 const TRUST_LABEL_ABBREV: Record<string, string> = {
@@ -223,6 +227,8 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       facets.instance_or_warehouse,
       facets.platform,
       facets.platform_version,
+      facets.arch,
+      facets.cpu_family,
       facets.storage_format,
       facets.validation_status,
     ],
@@ -248,6 +254,8 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       facets.execution_mode,
       facets.instance_or_warehouse,
       facets.platform,
+      facets.arch,
+      facets.cpu_family,
       facets.storage_format,
       facets.validation_status,
     ],
@@ -454,6 +462,8 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             ...platform,
             platform_version: platform.platform_version ?? metadata?.platform_version ?? null,
             validation_status: platform.validation_status ?? metadata?.validation_status ?? null,
+            arch: metadata?.arch ?? null,
+            cpu_family: metadata?.cpu_family ?? null,
           };
         }),
       }
@@ -1173,8 +1183,9 @@ function ListTable({
         deferral #724 for the measurement and the reason.
       */}
       <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]" data-testid="basis-statement">
-        Every figure below uses the published measurement basis: the median of each run's warm
-        passes per query, then the geometric mean across queries. Warmup passes are excluded.
+        Geomean query time uses the median of each query's published measurement passes, then the
+        geometric mean across queries. Warmup passes are excluded. Dates, counts, and power scores use
+        the definitions shown in their columns and receipts.
       </p>
       <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
         <thead class="bg-[var(--bb-surface-data-muted)]">

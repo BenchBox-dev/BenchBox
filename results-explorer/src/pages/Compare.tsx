@@ -46,7 +46,7 @@ import { IdentityDiffStrip } from "@/components/IdentityDiffStrip";
 import { MultiRunHeatmap } from "@/components/MultiRunHeatmap";
 import { MultiRunStandings } from "@/components/MultiRunStandings";
 import { MeasurementBasisBar } from "@/components/MeasurementBasisBar";
-import { useUrlState } from "@/lib/useUrlState";
+import { stringSerde, useUrlState, type UrlSerde } from "@/lib/useUrlState";
 import { getResultBasisAvailability } from "@/lib/duckdbQueries";
 import {
   BASIS_URL_KEY,
@@ -86,6 +86,13 @@ const EMPTY_RESULTS: DetailResult[] = [];
 interface CompareProps extends RoutableProps {
   url?: string;
 }
+
+const QUERY_LIMITER_URL_KEY = "queries";
+const BASELINE_URL_KEY = "baseline";
+const queryLimiterSerde: UrlSerde<QueryDiffLimiter> = {
+  encode: (value) => value,
+  decode: (raw) => raw in QUERY_DIFF_LIMITER_LABELS ? raw as QueryDiffLimiter : null,
+};
 
 function currentCompareUrl(url: string | undefined): string {
   if (url) return url;
@@ -162,11 +169,12 @@ export function compareLayoutForSelection(resultIds: readonly string[]): Compare
 
 export function Compare({ url }: CompareProps) {
   const activeUrl = currentCompareUrl(url);
+  const requestedIdsToken = searchParamsFromUrl(activeUrl).get("ids") ?? "";
   const [compareState, setCompareState] = useState<CompareState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [baselineIndex, setBaselineIndex] = useState(0);
+  const [baselineResultId, setBaselineResultId] = useUrlState(BASELINE_URL_KEY, "", stringSerde);
   // Through the model's serde, not a hand-rolled parser: the grammar is the
   // model's to define, and a shared link has to reproduce the sender's figures
   // exactly. One `basis` parameter, because a cross-run comparison carries
@@ -175,7 +183,7 @@ export function Compare({ url }: CompareProps) {
   // ONE limiter drives the chart and the table. Two independent controls would
   // let the page show a chart of one subset above a table of another, which
   // reads as a data error rather than as two filters.
-  const [queryLimiter, setQueryLimiter] = useState<QueryDiffLimiter>("all");
+  const [queryLimiter, setQueryLimiter] = useUrlState<QueryDiffLimiter>(QUERY_LIMITER_URL_KEY, "all", queryLimiterSerde);
   // Selection-launch mode: rendered when 0 ids are supplied, or when 1 id is
   // supplied from a result page.
   // Was previously an error string ("No result IDs provided. Add ?ids=...")
@@ -232,7 +240,8 @@ export function Compare({ url }: CompareProps) {
     );
   }, [results, availabilityRows]);
   const primaryMetric = compareState?.primaryMetric ?? "display_geomean_ms";
-  const normalizedBaselineIndex = results[baselineIndex] ? baselineIndex : 0;
+  const baselineIndex = results.findIndex((result) => result.result_id === baselineResultId);
+  const normalizedBaselineIndex = baselineIndex >= 0 ? baselineIndex : 0;
   const resolvedResults = useMemo(
     () => resolveResultsForBasis(results, basis),
     [results, basis],
@@ -260,8 +269,7 @@ export function Compare({ url }: CompareProps) {
     setCompareNotice(null);
     setPreserveRequestedIds(false);
 
-    const params = searchParamsFromUrl(activeUrl);
-    const idsParam = params.get("ids") ?? "";
+    const idsParam = requestedIdsToken;
     const rawIds = idsParam.split(",");
     // Resolve every requested ID before applying the comparison limit so a
     // short ID and its long-form alias consume one slot, not two.
@@ -372,7 +380,6 @@ export function Compare({ url }: CompareProps) {
 
         const metric = await getPrimaryMetricForBenchmark(details[0]!.benchmark);
         if (cancelled) return;
-        setBaselineIndex(0);
         if (details.length === 1) {
           setBuilderPinnedId(details[0]!.result_id);
           setShowBuilder(true);
@@ -393,7 +400,16 @@ export function Compare({ url }: CompareProps) {
       cancelled = true;
       if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
     };
-  }, [activeUrl]);
+  }, [requestedIdsToken]);
+
+  // A stale baseline token must not make the visible selector disagree with
+  // the figures. Fall back to the first selected run and remove the invalid
+  // token so a copied URL describes the state it actually renders.
+  useEffect(() => {
+    if (!baselineResultId || results.length === 0) return;
+    if (results.some((result) => result.result_id === baselineResultId)) return;
+    setBaselineResultId("");
+  }, [baselineResultId, results, setBaselineResultId]);
 
   // Canonicalize URL to the retained short IDs once data is loaded. This also
   // removes stale, duplicate, or excess entries so a copied URL reproduces
@@ -556,6 +572,7 @@ export function Compare({ url }: CompareProps) {
     suppressWinnerClaims: severeMismatchReason !== null,
     suppressionReason: severeMismatchReason ?? undefined,
     runLabels: summaryRunLabels,
+    comparisonBoundary: buildComparisonBoundary(comparabilityFields),
   });
 
   const validPrimaries = primaries.filter(isValidTimingValue);
@@ -670,6 +687,7 @@ export function Compare({ url }: CompareProps) {
         warningLabels={comparabilityWarningLabels}
         claimSuppressed={decisionSummary.claimSuppressed}
         suppressionReason={decisionSummary.claimSuppressionReason}
+        comparisonBoundary={decisionSummary.comparisonBoundary}
       />
       <CompareSummary summary={decisionSummary} />
       <IdentityDiffStrip
@@ -699,10 +717,10 @@ export function Compare({ url }: CompareProps) {
           <Select
             id="compare-baseline"
             ariaLabel="Baseline"
-            value={String(normalizedBaselineIndex)}
-            onChange={(value) => setBaselineIndex(Number(value))}
-            options={results.map((_result, index) => ({
-              value: String(index),
+            value={results[normalizedBaselineIndex]?.result_id ?? ""}
+            onChange={setBaselineResultId}
+            options={results.map((result, index) => ({
+              value: result.result_id,
               label: cohortIdentitiesCompact[index]!,
             }))}
             size="sm"
@@ -739,7 +757,7 @@ export function Compare({ url }: CompareProps) {
           <ChartPanel
             context={{ kind: "compare", results: resolvedResults, primaryMetric: effectivePrimaryMetric }}
             baselineIndex={normalizedBaselineIndex}
-            onBaselineIndexChange={setBaselineIndex}
+            onBaselineIndexChange={(index) => setBaselineResultId(results[index]?.result_id ?? "")}
             suppressWinnerClaims={decisionSummary.claimSuppressed}
             suppressionReason={decisionSummary.claimSuppressionReason ?? undefined}
             queryFilter={queryLimiter === "all" ? undefined : limitedQueryIds}
@@ -778,7 +796,7 @@ export function Compare({ url }: CompareProps) {
                       type="radio"
                       name="compare-baseline-radio"
                       checked={i === normalizedBaselineIndex}
-                      onChange={() => setBaselineIndex(i)}
+                      onChange={() => setBaselineResultId(r.resultId)}
                       aria-label={`Set ${r.label} as baseline`}
                       data-testid={`baseline-radio-${r.resultId}`}
                     />
@@ -936,11 +954,13 @@ function CompareGuardrailSummary({
   warningLabels,
   claimSuppressed,
   suppressionReason,
+  comparisonBoundary,
 }: {
   warningCount: number;
   warningLabels: string[];
   claimSuppressed: boolean;
   suppressionReason: string | null;
+  comparisonBoundary: string | null;
 }) {
   const warningText = warningCount > 0 ? formatWarningClassSummary(warningCount, warningLabels) : null;
   function focusWarningTarget(event: JSX.TargetedMouseEvent<HTMLAnchorElement>) {
@@ -962,6 +982,11 @@ function CompareGuardrailSummary({
               ? `The summary does not rank these runs because ${suppressionReason ?? "they are not comparable"}.`
               : "These runs share the same benchmark, scale, and test phase. Review the differences below before drawing conclusions."}
           </p>
+          {comparisonBoundary && (
+            <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]" data-testid="comparison-boundary">
+              {comparisonBoundary}
+            </p>
+          )}
           {warningText && (
             <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
               {warningText}{" "}
@@ -985,12 +1010,44 @@ function CompareGuardrailSummary({
           </a>
         ) : (
           <StatusBadge role="comparison" tone={claimSuppressed ? "warning" : "success"}>
-            {claimSuppressed ? "No winner named" : "Comparable"}
+            {claimSuppressed ? "No winner named" : "Same ranking"}
           </StatusBadge>
         )}
       </div>
     </section>
   );
+}
+
+const HARDWARE_BOUNDARY_FIELDS = ["Architecture", "CPU family", "CPU model", "CPU count", "Memory", "Locality"];
+
+export function buildComparisonBoundary(fields: readonly { label: string; status: string }[]): string {
+  const hardware = fields.filter((field) => HARDWARE_BOUNDARY_FIELDS.includes(field.label));
+  const differing = hardware.filter((field) => field.status === "diff").map((field) => sentenceCaseField(field.label));
+  const missing = hardware.filter((field) => field.status === "missing").map((field) => sentenceCaseField(field.label));
+  const limits: string[] = [];
+  if (differing.length > 0) {
+    limits.push(`${formatPlainList(differing)} ${differing.length === 1 ? "differs" : "differ"}`);
+  }
+  if (missing.length > 0) {
+    limits.push(
+      `${formatPlainList(missing)} ${missing.length === 1 ? "is" : "are"} not recorded for every run`,
+    );
+  }
+  if (limits.length > 0) {
+    return `Hardware boundary: ${limits.join("; ")}. This compares recorded runs, not engines in isolation.`;
+  }
+  return "Hardware boundary: the recorded architecture, CPU family, CPU model, CPU count, memory, and locality match. Other hardware details may differ.";
+}
+
+function sentenceCaseField(label: string): string {
+  if (/^[A-Z]{2,}\b/.test(label)) return label;
+  return `${label.charAt(0).toLowerCase()}${label.slice(1)}`;
+}
+
+function formatPlainList(values: readonly string[]): string {
+  if (values.length < 2) return values[0] ?? "hardware fields";
+  if (values.length === 2) return `${values[0]} and ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")}, and ${values[values.length - 1]}`;
 }
 
 function severeCohortMismatchReason(results: DetailResult[]) {

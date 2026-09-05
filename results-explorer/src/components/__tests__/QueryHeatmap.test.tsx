@@ -242,6 +242,7 @@ describe("QueryHeatmap rendering", () => {
     const marker = screen.getByTestId("heatmap-compliance-marker-platform-noncompliant");
     expect(marker.textContent).toBe("*");
     expect(marker.getAttribute("role")).toBe("img");
+    expect(marker.getAttribute("tabindex")).toBe("0");
     expect(marker.getAttribute("title")).toContain("does not meet the requirements for ranking");
     expect(marker.getAttribute("aria-label")).toContain("does not meet the requirements for ranking");
     expect(screen.getAllByRole("img", { name: "This result does not meet the requirements for ranking." })).toHaveLength(2);
@@ -253,12 +254,29 @@ describe("QueryHeatmap rendering", () => {
     for (const details of screen.getAllByText(BENCHMARK_MATRIX_DENSITY_CONTRACT.secondaryMetadataAffordance)) {
       fireEvent.click(details);
     }
-    const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];
+    const receiptLinks = screen.getAllByRole("link", { name: /Open receipt for/ }) as HTMLAnchorElement[];
 
     expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r1#run-receipt");
     expect(receiptLinks[1]?.getAttribute("href")).toBe("/results/r/r2#run-receipt");
     expect(screen.getAllByText("exact").length).toBeGreaterThan(0);
     expect(screen.getAllByText("loose").length).toBeGreaterThan(0);
+  });
+
+  it("uses the short ID when platform, version, and date still do not identify a row", () => {
+    const base = makeSummary().platforms[0]!;
+    render(
+      <QueryHeatmap
+        summary={makeSummary({
+          platforms: [
+            { ...base, result_id: "result-one", short_id: "aaaaaaaa", platform_version: "1.0", trust_label: "maintainer-run" },
+            { ...base, result_id: "result-two", short_id: "bbbbbbbb", platform_version: "1.0", trust_label: "maintainer-run" },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getAllByText(/aaaaaaaa/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/bbbbbbbb/).length).toBeGreaterThan(0);
   });
 
   it("surfaces a not_run validation badge next to the platform name without expanding the disclosure", () => {
