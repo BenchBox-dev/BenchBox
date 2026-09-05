@@ -1,9 +1,10 @@
 import type { DetailResult, Environment, QueryDisplayTiming, QueryTiming } from "@/types";
 
-export const MAX_LOCAL_RESULT_BYTES = 50 * 1024 * 1024;
+export const MAX_LOCAL_RESULT_BYTES = 10 * 1024 * 1024;
 
 const SUPPORTED_SCHEMA_VERSIONS = new Set(["2.0", "2.1", "2.2"]);
 const PASS_STATUSES = new Set(["SUCCESS", "PASS", "pass", "success"]);
+const NON_FAILED_QUERY_ROW_STATUSES = new Set(["SUCCESS", "SKIPPED"]);
 const EXECUTION_RUN_TYPES = new Set(["measurement", "warmup"]);
 const EXECUTION_MODES = new Set(["sql", "dataframe"]);
 const TUNING_MODES = new Set(["tuned", "tuned-fallback", "notuning", "auto", "custom"]);
@@ -39,7 +40,7 @@ export async function importLocalResultFile(file: File): Promise<LocalResultPrev
     throw new LocalResultImportError("Choose a BenchBox result bundle in JSON format.");
   }
   if (file.size > MAX_LOCAL_RESULT_BYTES) {
-    throw new LocalResultImportError("This result is larger than the 50 MiB local preview limit.");
+    throw new LocalResultImportError("This result is larger than the 10 MiB local preview limit.");
   }
   let text: string;
   try {
@@ -92,8 +93,8 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
     "qphh_at_size",
     "qphds_at_size",
   ]);
-  const resultId = await localResultId(text);
-  const validationStatus = validationStatusFor(summary, failedQueryCount(summary));
+  const resultId = localResultId();
+  const validationStatus = validationStatusFor(bundle, failedQueryCount(bundle));
   const environment = safeEnvironment(bundle.environment);
   const clientFields = {
     client_region: stringOrNull(environment.client_region),
@@ -105,8 +106,7 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
   const tuning = objectValue(platform, "tuning");
   const logicalProfile = objectValue(tuning, "logical_profile");
   const funding = fundingSource(bundle.provenance);
-  const rawCost = objectValue(bundle, "cost");
-  const costUsd = firstFiniteNumber(rawCost, ["total_usd", "cost_usd"]);
+  const costUsd = normalizedCostUsd(bundle);
 
   const detail: DetailResult = {
     result_id: resultId,
@@ -149,7 +149,7 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
     tuning_validation_status: stringOrNull(tuning.validation_status),
     applied_receipt: null,
     tuning_policy_generation: stringOrNull(tuning.tuning_policy_generation),
-    test_type: stringOrNull(benchmark.test_type),
+    test_type: testType(bundle, benchmark),
     validation_status: validationStatus,
     cost_usd: costUsd,
     compliance_class: stringOrNull(benchmark.compliance_class),
@@ -182,10 +182,11 @@ function queryTimings(rawQueries: unknown[]): QueryTiming[] {
     if (runType !== null && !EXECUTION_RUN_TYPES.has(runType)) continue;
     const queryId = raw.id || raw.query_id || "";
     const duration = finiteNumberOrNull(raw.ms ?? raw.execution_time_ms) ?? 0;
+    const rawStatus = Object.prototype.hasOwnProperty.call(raw, "status") ? raw.status : "pass";
     timings.push({
       query_id: String(queryId),
       duration_ms: duration,
-      status: PASS_STATUSES.has(String(raw.status ?? "pass")) ? "pass" : "fail",
+      status: PASS_STATUSES.has(String(rawStatus)) ? "pass" : "fail",
       run_type: runType,
       iter: integerOrNull(raw.iter),
       stream: integerOrNull(raw.stream),
@@ -332,19 +333,70 @@ function driverVersion(bundle: JsonObject, platform: JsonObject): string | null 
   return firstString(execution, [
     "driver_version_actual", "driver_version_resolved", "driver_version_requested",
     "driver_actual_version", "driver_resolved_version", "driver_requested_version",
-  ]) ?? firstString(platform, ["driver_actual_version", "driver_resolved_version"]);
+  ]);
 }
 
-function validationStatusFor(summary: JsonObject, failedCount: number): string | null {
+function validationStatusFor(bundle: JsonObject, failedCount: number): string | null {
+  const summary = objectValue(bundle, "summary");
   const raw = summary.validation;
   const value = typeof raw === "string" ? raw : isObject(raw) ? raw.status : null;
   const normalized = stringOrNull(value)?.toLowerCase() ?? null;
-  if (failedCount > 0 && (normalized === null || normalized === "passed" || normalized === "pass")) return "partial";
+  if (failedCount > 0 && (normalized === null || normalized === "passed")) return "partial";
+  if ((normalized === null || normalized === "passed") && translationIsNonClean(bundle)) {
+    return "uncertain";
+  }
   return normalized;
 }
 
-function failedQueryCount(summary: JsonObject): number {
-  return integerOrNull(objectValue(summary, "queries").failed) ?? 0;
+function failedQueryCount(bundle: JsonObject): number {
+  const querySummary = objectValue(objectValue(bundle, "summary"), "queries");
+  const explicitFailed = exactIntegerOrNull(querySummary.failed);
+  if (explicitFailed !== null && explicitFailed > 0) return explicitFailed;
+
+  const total = exactIntegerOrNull(querySummary.total);
+  const passed = exactIntegerOrNull(querySummary.passed);
+  const skipped = exactIntegerOrNull(querySummary.skipped) ?? 0;
+  if (total !== null && passed !== null && total > passed + skipped) {
+    return Math.max(total - passed - skipped, 0);
+  }
+
+  if (!Array.isArray(bundle.queries)) return 0;
+  return bundle.queries.filter((query) => {
+    if (!isObject(query)) return false;
+    const runType = String(query.run_type || "measurement").toLowerCase();
+    if (runType !== "measurement" || query.status === null || query.status === undefined) return false;
+    return !NON_FAILED_QUERY_ROW_STATUSES.has(String(query.status).toUpperCase());
+  }).length;
+}
+
+function translationIsNonClean(bundle: JsonObject): boolean {
+  const raw = objectValue(bundle, "execution").translation;
+  const status = stringOrNull(isObject(raw) ? raw.status : raw)?.toLowerCase() ?? null;
+  return status === "fallback" || status === "failed";
+}
+
+function normalizedCostUsd(bundle: JsonObject): number | null {
+  const root = objectValue(bundle, "normalized_cost");
+  if (Object.keys(root).length > 0) return finiteNumberOrNull(root.normalized_cost_usd);
+
+  const cost = objectValue(bundle, "cost");
+  for (const key of ["normalized_cost", "normalized"]) {
+    const nested = objectValue(cost, key);
+    if (Object.keys(nested).length > 0) return finiteNumberOrNull(nested.normalized_cost_usd);
+  }
+  const hasNormalizedCostShape = [
+    "normalized_cost_usd", "cost_model_version", "cost_model_source", "cost_scope", "cost_status",
+  ].some((key) => Object.prototype.hasOwnProperty.call(cost, key));
+  return hasNormalizedCostShape ? finiteNumberOrNull(cost.normalized_cost_usd) : null;
+}
+
+function testType(bundle: JsonObject, benchmark: JsonObject): string | null {
+  const explicit = stringOrNull(benchmark.test_type);
+  if (explicit !== null) return explicit;
+  const phases = objectValue(bundle, "phases");
+  if (phases.power_test) return "power";
+  if (phases.throughput_test) return "throughput";
+  return null;
 }
 
 function rawMeasurementDurations(queries: QueryTiming[]): number[] {
@@ -364,16 +416,16 @@ function platformId(platformName: string): string {
     .replace(/[-_]trust[-_](ci|community|local|unknown)/gi, "")
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, "-");
+    .replace(/ /g, "-");
 }
 
-async function localResultId(text: string): Promise<string> {
-  if (!globalThis.crypto?.subtle) {
+function localResultId(): string {
+  if (!globalThis.crypto?.getRandomValues) {
     throw new LocalResultImportError("This browser cannot create a private local preview ID.");
   }
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  const hex = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  return `local-${hex.slice(0, 12)}`;
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(6));
+  const token = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `local-${token}`;
 }
 
 function objectOrError(raw: unknown, message: string): JsonObject {
@@ -433,6 +485,14 @@ function finiteNumberOrNull(raw: unknown): number | null {
 function integerOrNull(raw: unknown): number | null {
   const value = finiteNumberOrNull(raw);
   return value === null ? null : Math.trunc(value);
+}
+
+function exactIntegerOrNull(raw: unknown): number | null {
+  if (typeof raw === "boolean") return Number(raw);
+  if (typeof raw === "number") return Number.isInteger(raw) ? raw : null;
+  if (typeof raw !== "string" || !/^[+-]?\d+$/.test(raw)) return null;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) ? value : null;
 }
 
 function median(values: number[]): number | null {

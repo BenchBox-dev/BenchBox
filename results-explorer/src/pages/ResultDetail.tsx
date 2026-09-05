@@ -60,6 +60,12 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
   const [tuningError, setTuningError] = useState<string | null>(null);
   const tuningAbortRef = useRef<AbortController | null>(null);
   const localResultState = useLocalResultState();
+  let picking: ReturnType<typeof usePickingState> | null = null;
+  try {
+    picking = usePickingState();
+  } catch {
+    // Unit tests may not wrap with provider.
+  }
   const isLocal = source === "local";
   const detail = detailState?.detail ?? null;
   const primaryMetric = detailState?.primaryMetric ?? "display_geomean_ms";

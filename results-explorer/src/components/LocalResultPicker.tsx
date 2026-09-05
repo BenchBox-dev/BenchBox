@@ -36,6 +36,8 @@ export function LocalResultPicker({ label = "Open local result", className = "bt
         type="file"
         accept=".json,application/json"
         aria-label="BenchBox result JSON file"
+        aria-hidden="true"
+        tabIndex={-1}
         class="sr-only"
         data-testid="local-result-file-input"
         onChange={(event) => void handleFile(event.currentTarget.files?.[0])}

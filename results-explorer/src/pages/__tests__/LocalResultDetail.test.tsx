@@ -89,6 +89,10 @@ describe("local ResultDetail", () => {
       "href",
       "/docs/contributing-results.html",
     );
+    expect(screen.getByRole("link", { name: "Submit for public review" })).toHaveAttribute(
+      "referrerpolicy",
+      "no-referrer",
+    );
     expect(screen.getByRole("button", { name: "Open another result" })).toBeTruthy();
     expect(screen.queryByText("Compare this result")).toBeNull();
     expect(screen.queryByText("Add to comparison")).toBeNull();
