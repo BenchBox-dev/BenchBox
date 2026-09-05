@@ -10,11 +10,11 @@ from pathlib import Path
 import pytest
 
 from scripts.publication.verify_lane_isolation import (
-    LANE_SAFE_EXTERNAL_PATHS,
     REPO_ROOT,
     classify_path,
     compute_all_lane_digests,
     compute_lane_digest,
+    determine_affected_lanes,
     is_ignored,
     main,
     scan_lane_files,
@@ -115,21 +115,25 @@ def test_verify_lane_isolation_current_repo() -> None:
     assert not report.errors
 
 
-def test_verify_lane_isolation_detects_contaminating_changed_paths() -> None:
+def test_verify_lane_isolation_mixed_paths_succeed_for_all_affected_lanes() -> None:
     # Clean paths for site
     clean_paths = ["docs/index.rst", "landing/index.html"]
     clean_report = verify_lane_isolation("site", repo_root=REPO_ROOT, changed_paths=clean_paths)
     assert clean_report.success is True
+    assert clean_report.details["affected_lanes"] == ["site"]
 
-    # Contaminated paths with explorer and corpus changes
-    dirty_paths = [
+    # Mixed paths spanning site, explorer, and corpus
+    mixed_paths = [
         "docs/index.rst",
         "results-explorer/package.json",
         "results-data/bundles/test.json",
     ]
-    dirty_report = verify_lane_isolation("site", repo_root=REPO_ROOT, changed_paths=dirty_paths)
-    assert dirty_report.success is False
-    assert any("changed paths violate lane 'site' isolation" in err for err in dirty_report.errors)
+    # D7: Changed paths determine affected lanes; mixed PRs succeed for all affected lanes
+    for lane in ("site", "explorer", "corpus"):
+        report = verify_lane_isolation(lane, repo_root=REPO_ROOT, changed_paths=mixed_paths)
+        assert report.success is True
+        assert not report.errors
+        assert report.details["affected_lanes"] == ["corpus", "explorer", "site"]
 
 
 def test_non_lane_inputs_skipped_in_changed_paths() -> None:
@@ -166,92 +170,81 @@ def test_unclassified_changed_paths_still_fail() -> None:
     assert any("unclassified inputs" in err for err in report.errors)
 
 
-def test_lane_owned_paths_still_contaminate_despite_non_lane_allowlist() -> None:
-    # Classification runs before the non-lane allowlist: an explorer-owned
-    # file under a non-lane parent (_project/) must still report
-    # contamination when the site lane builds.
-    report = verify_lane_isolation(
-        "site",
-        repo_root=REPO_ROOT,
-        changed_paths=["docs/index.rst", "_project/scripts/explorer_pipeline/contract.py"],
-    )
-    assert report.success is False
-    assert any("changed paths violate lane 'site' isolation" in err for err in report.errors)
+def test_determine_affected_lanes() -> None:
+    # Single lane
+    assert determine_affected_lanes(["docs/index.rst"]) == {"site"}
+    assert determine_affected_lanes(["results-explorer/src/App.tsx"]) == {"explorer"}
+    assert determine_affected_lanes(["results-data/bundles/bundle.json"]) == {"corpus"}
 
-    corpus_report = verify_lane_isolation(
-        "site",
-        repo_root=REPO_ROOT,
-        changed_paths=["docs/index.rst", "scripts/publication/validator_parity.py"],
-    )
-    assert corpus_report.success is False
-    assert any("changed paths violate lane 'site' isolation" in err for err in corpus_report.errors)
+    # Mixed lanes
+    assert determine_affected_lanes(["docs/index.rst", "results-explorer/src/App.tsx"]) == {"site", "explorer"}
+    assert determine_affected_lanes(["results-explorer/src/App.tsx", "results-data/README.md"]) == {
+        "explorer",
+        "corpus",
+    }
+
+    # Shared build inputs affect all lanes
+    assert determine_affected_lanes(["benchbox/core/runner.py"]) == {"site", "explorer", "corpus"}
+    assert determine_affected_lanes(["pyproject.toml"]) == {"site", "explorer", "corpus"}
+    assert determine_affected_lanes(["uv.lock"]) == {"site", "explorer", "corpus"}
+
+    # Non-lane inputs affect no lanes
+    assert determine_affected_lanes(["tests/unit/test_example.py", "Makefile", "AGENTS.md"]) == set()
+
+    # Ignored paths affect no lanes
+    assert determine_affected_lanes([".venv/bin/python", ".DS_Store", "tmp/scratch.txt"]) == set()
+
+    # Unclassified paths conservatively affect all lanes
+    assert determine_affected_lanes(["brand-new-area/file.txt"]) == {"site", "explorer", "corpus"}
+
+
+def test_mixed_pr_2051_corpus_and_explorer_and_tests() -> None:
+    """Verified mixed PR #2051 path set passes isolation for all affected lanes."""
+    pr_2051_paths = [
+        "results-data/bundles/nyctaxi_sf1_duckdb_sql_20260826_163349_6c37cd51.json",
+        "results-data/corpus-inventory.json",
+        "results-data/validate_corpus.py",
+        "results-explorer/src/components/ChartPanel.tsx",
+        "results-explorer/src/lib/compareCohort.ts",
+        "tests/unit/scripts/explorer_pipeline/test_pipeline.py",
+    ]
+    affected = determine_affected_lanes(pr_2051_paths)
+    assert affected == {"corpus", "explorer"}
+
+    corpus_report = verify_lane_isolation("corpus", repo_root=REPO_ROOT, changed_paths=pr_2051_paths)
+    assert corpus_report.success is True
+    assert not corpus_report.errors
 
     explorer_report = verify_lane_isolation(
-        "site",
-        repo_root=REPO_ROOT,
-        changed_paths=["docs/index.rst", "scripts/publication/check_explorer_compat.py"],
+        "explorer", repo_root=REPO_ROOT, changed_paths=pr_2051_paths, check_mutations=False
     )
-    assert explorer_report.success is False
-    assert any("changed paths violate lane 'site' isolation" in err for err in explorer_report.errors)
-
-    for corpus_generator in (
-        "scripts/publication/create_ledger_seed.py",
-        "scripts/publication/assembler.py",
-    ):
-        generator_report = verify_lane_isolation(
-            "site",
-            repo_root=REPO_ROOT,
-            changed_paths=["docs/index.rst", corpus_generator],
-        )
-        assert generator_report.success is False
-        assert any("changed paths violate lane 'site' isolation" in err for err in generator_report.errors)
+    assert explorer_report.success is True
+    assert not explorer_report.errors
 
 
-def test_site_allows_only_explicit_non_build_corpus_paths() -> None:
-    """Site docs may accompany corpus policy edits, but corpus payloads remain forbidden."""
-    assert LANE_SAFE_EXTERNAL_PATHS["site"] == frozenset(
-        {
-            ".github/workflows/validate-submission.yml",
-            "results-data/README.md",
-        }
+def test_mixed_pr_2052_shared_benchbox_and_explorer_and_tests() -> None:
+    """Verified mixed PR #2052 path set passes isolation for all affected lanes."""
+    pr_2052_paths = [
+        "benchbox/cli/commands/tuning_group.py",
+        "benchbox/core/dataframe/tuning/defaults.py",
+        "benchbox/platforms/dataframe/dask_df.py",
+        "results-explorer/scripts/generate-browser-fixtures.mjs",
+        "results-explorer/test-fixtures/source/README.md",
+        "tests/unit/cli/commands/test_tuning_group_cli.py",
+    ]
+    affected = determine_affected_lanes(pr_2052_paths)
+    assert affected == {"site", "explorer", "corpus"}
+
+    for lane in ("site", "corpus"):
+        report = verify_lane_isolation(lane, repo_root=REPO_ROOT, changed_paths=pr_2052_paths)
+        assert report.success is True
+        assert not report.errors
+
+    explorer_report = verify_lane_isolation(
+        "explorer", repo_root=REPO_ROOT, changed_paths=pr_2052_paths, check_mutations=False
     )
-
-    report = verify_lane_isolation(
-        "site",
-        repo_root=REPO_ROOT,
-        changed_paths=[
-            "docs/index.rst",
-            ".github/workflows/validate-submission.yml",
-            "results-data/README.md",
-        ],
-    )
-    assert report.success is True
-
-    contaminated = verify_lane_isolation(
-        "site",
-        repo_root=REPO_ROOT,
-        changed_paths=["docs/index.rst", "results-data/bundles/new-bundle.json"],
-    )
-    assert contaminated.success is False
-    assert any("changed paths violate lane 'site' isolation" in err for err in contaminated.errors)
-
-
-@pytest.mark.parametrize(
-    "rejected_path",
-    [
-        "results-data/CORPUS_NOTES.md",
-        ".github/workflows/sync-results-data-to-published.yml",
-        "results-explorer/src/App.tsx",
-        "results-data/bundles/amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
-    ],
-)
-def test_site_rejects_each_non_exception_external_path(rejected_path: str) -> None:
-    report = verify_lane_isolation("site", repo_root=REPO_ROOT, changed_paths=[rejected_path])
-
-    assert report.success is False
-    assert any(
-        "changed paths violate lane 'site' isolation" in error and rejected_path in error for error in report.errors
-    )
+    assert explorer_report.success is True
+    assert not explorer_report.errors
 
 
 def test_non_lane_inputs_excluded_from_digests() -> None:
@@ -352,15 +345,44 @@ def test_cli_lane_all_json() -> None:
 
 def test_cli_changed_paths_file(tmp_path: Path) -> None:
     paths_file = tmp_path / "changed.txt"
-    paths_file.write_text("docs/overview.md\nlanding/index.html\n", encoding="utf-8")
-
+    # Mixed paths spanning site and explorer pass
+    paths_file.write_text("docs/overview.md\nresults-explorer/package.json\n", encoding="utf-8")
     exit_code = main(["--lane", "site", "--changed-paths-file", str(paths_file)])
     assert exit_code == 0
 
-    # Test failure on cross-lane path in file
-    paths_file.write_text("results-data/bundles/bundle_evil.json\n", encoding="utf-8")
+    # Unclassified paths outside any lane fail closed
+    paths_file.write_text("unclassified-dir/bundle_evil.json\n", encoding="utf-8")
     exit_code = main(["--lane", "site", "--changed-paths-file", str(paths_file)])
     assert exit_code == 1
+
+
+def test_cli_determine_affected_lanes(capsys: pytest.CaptureFixture[str]) -> None:
+    exit_code = main(
+        [
+            "--changed-paths",
+            "docs/index.rst",
+            "results-explorer/src/App.tsx",
+            "--determine-affected-lanes",
+        ]
+    )
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert "explorer site" in captured.out or "site explorer" in captured.out
+
+    # JSON output
+    exit_code = main(
+        [
+            "--changed-paths",
+            "docs/index.rst",
+            "results-explorer/src/App.tsx",
+            "--determine-affected-lanes",
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    data = json.loads(captured.out)
+    assert data == {"affected_lanes": ["explorer", "site"]}
 
 
 def test_classify_path_shared_inputs_are_exempt() -> None:

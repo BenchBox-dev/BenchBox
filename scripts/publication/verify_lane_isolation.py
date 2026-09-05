@@ -95,18 +95,6 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     ".todo-db/",
 )
 
-# Exact files owned by another lane but not read by this lane's artifact build.
-# Keep this map narrow: lane-owned paths remain contamination failures unless
-# they are explicitly proven irrelevant to the target lane.
-LANE_SAFE_EXTERNAL_PATHS: dict[str, frozenset[str]] = {
-    "site": frozenset(
-        {
-            ".github/workflows/validate-submission.yml",
-            "results-data/README.md",
-        }
-    ),
-}
-
 LANE_PREFIXES: dict[str, tuple[str, ...]] = {
     "site": (
         "docs/",
@@ -209,10 +197,32 @@ def _is_non_lane_input(rel_path: str) -> bool:
     return False
 
 
-def _is_safe_external_path(lane: str, rel_path: str) -> bool:
-    """Return True for an explicitly approved, other-lane non-build input."""
-    normalized = rel_path.strip().replace("\\", "/")
-    return normalized in LANE_SAFE_EXTERNAL_PATHS.get(lane, frozenset())
+def determine_affected_lanes(changed_paths: Sequence[str]) -> set[str]:
+    """Determine publication lanes affected by a set of changed paths.
+
+    Shared build inputs (``SHARED_BUILD_INPUTS``) and unknown/unclassified paths
+    conservatively affect all publication lanes. Lane-owned paths affect their
+    respective lanes. Non-lane inputs (``NON_LANE_INPUTS``) and ignored paths
+    affect no publication lanes.
+    """
+    all_lanes = set(LANE_PREFIXES.keys())
+    affected: set[str] = set()
+    for path in changed_paths:
+        normalized = path.strip().replace("\\", "/")
+        if not normalized or is_ignored(normalized):
+            continue
+        if _is_shared_input(normalized):
+            affected.update(all_lanes)
+            continue
+        path_lanes = classify_path(normalized)
+        if path_lanes:
+            affected.update(path_lanes)
+            continue
+        if _is_non_lane_input(normalized):
+            continue
+        # Unknown/unclassified paths cause conservative affected-lane coverage
+        affected.update(all_lanes)
+    return affected
 
 
 def classify_path(rel_path: str) -> set[str]:
@@ -468,7 +478,7 @@ def verify_lane_isolation(  # noqa: C901
 
     # 2. Changed paths boundary checks
     if changed_paths:
-        contaminating_paths: list[tuple[str, list[str]]] = []
+        affected_lanes = determine_affected_lanes(changed_paths)
         unclassified_paths: list[str] = []
         for path in changed_paths:
             normalized = path.strip().replace("\\", "/")
@@ -478,21 +488,10 @@ def verify_lane_isolation(  # noqa: C901
                 continue
             path_lanes = classify_path(normalized)
             if not path_lanes:
-                # Classify first so lane-owned paths still report
-                # contamination below; only genuinely unowned paths reach
-                # the non-lane allowlist.
                 if _is_non_lane_input(normalized):
                     continue
                 unclassified_paths.append(normalized)
-            elif lane not in path_lanes:
-                if _is_safe_external_path(lane, normalized):
-                    continue
-                contaminating_paths.append((normalized, sorted(path_lanes)))
-        if contaminating_paths:
-            errors.append(
-                f"changed paths violate lane '{lane}' isolation: "
-                f"{[p for p, _ in contaminating_paths]} belong to other lanes"
-            )
+
         if unclassified_paths:
             errors.append(
                 f"changed paths contain unclassified inputs not owned by any lane: "
@@ -500,7 +499,7 @@ def verify_lane_isolation(  # noqa: C901
                 f"NON_LANE_INPUTS, or assigned to a lane)"
             )
         details["changed_paths_checked"] = len(changed_paths)
-        details["contaminating_paths"] = contaminating_paths
+        details["affected_lanes"] = sorted(affected_lanes)
         details["unclassified_paths"] = unclassified_paths
 
     # 3. Lane ownership consistency check (static, not a mathematical proof of artifact isolation)
@@ -671,6 +670,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="File containing newline-delimited changed paths",
     )
     parser.add_argument(
+        "--determine-affected-lanes",
+        action="store_true",
+        help="Output affected publication lanes for changed paths and exit",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Output structured JSON report",
@@ -684,7 +688,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # Fail closed: if --changed-paths or --changed-paths-file was supplied, the
     # combined path list must contain at least one non-empty entry. Otherwise
-    # contamination checks would be silently skipped.
+    # boundary checks would be silently skipped.
     changed_paths: list[str] = []
     paths_requested = False
     if args.changed_paths is not None:
@@ -706,6 +710,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return 1
         changed_paths = non_empty
+
+    if args.determine_affected_lanes:
+        if not paths_requested:
+            print(
+                "error: --determine-affected-lanes requires --changed-paths or --changed-paths-file",
+                file=sys.stderr,
+            )
+            return 1
+        affected = sorted(determine_affected_lanes(changed_paths))
+        if args.json:
+            print(json.dumps({"affected_lanes": affected}))
+        else:
+            print(" ".join(affected))
+        return 0
 
     lanes_to_verify = ["site", "explorer", "corpus"] if args.lane == "all" else [args.lane]
     reports: list[LaneIsolationReport] = []
@@ -737,6 +755,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"  - Files in lane: {report.file_count}")
             print(f"  - Artifacts: {', '.join(report.artifacts)}")
             print(f"  - Lane ownership consistency: {'OK' if report.mutation_isolation_verified else 'FAILED'}")
+            if "affected_lanes" in report.details:
+                print(f"  - Affected lanes: {', '.join(report.details['affected_lanes'])}")
             if report.errors:
                 print("  - Errors:")
                 for err in report.errors:
