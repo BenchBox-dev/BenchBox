@@ -140,6 +140,9 @@ def test_receipts_use_measured_provenance_and_valid_json_newlines() -> None:
     assert '"size": 0' not in text
     assert "LOCKFILE_DIGEST=$(sha256sum uv.lock" in text
     assert "CORPUS_DIGEST=$(sha256sum receipt-dist/corpus-file-digests.txt" in text
+    assert "INVENTORY_DIGEST=$(sha256sum results-data/corpus-inventory.json" in text
+    assert '"inventory_sha256": os.environ["INVENTORY_DIGEST"]' in text
+    assert '"bundle_tree_sha256": os.environ["CORPUS_DIGEST"]' in text
     assert "! -name '*.manifest.json' ! -name '*.applied.json'" in text
     assert "! -name '*.plans.json' ! -name '*.tuning.json'" in text
     assert "['summary']['total_bundles']" in text
@@ -261,29 +264,45 @@ def test_rollback_condition_covers_all_failure_modes_and_drills() -> None:
     if_cond = rollback_job.get("if", "")
 
     assert "always()" in if_cond
-    assert "needs.deploy.result == 'failure'" in if_cond
+    assert "needs.deploy.outputs.pages_write_outcome == 'failure'" in if_cond
     assert "needs.verify.result == 'failure'" in if_cond
     assert "force_rollback == true" in if_cond
 
 
+def test_noop_and_forced_rollback_are_mutually_exclusive() -> None:
+    validation = next(
+        step for step in _workflow()["jobs"]["build"]["steps"] if step.get("name") == "Validate pinned dispatch inputs"
+    )
+
+    assert 'if [ "$EXPECT_NOOP" = "true" ] && [ "$FORCE_ROLLBACK" = "true" ]' in validation["run"]
+
+
+def test_pre_write_cas_rejection_does_not_trigger_rollback() -> None:
+    deploy = _workflow()["jobs"]["deploy"]
+
+    assert deploy["outputs"]["pages_write_outcome"] == "${{ steps.deployment.outcome }}"
+    assert "needs.deploy.result == 'failure'" not in _workflow()["jobs"]["rollback"]["if"]
+
+
 @pytest.mark.parametrize(
-    ("deploy_result", "verify_result", "force_rollback", "expected_rollback"),
+    ("pages_write_outcome", "verify_result", "force_rollback", "expected_rollback"),
     [
         ("success", "success", False, False),  # Normal successful deployment -> no rollback
-        ("failure", "skipped", False, True),  # Deploy failed -> rollback
+        ("", "skipped", False, False),  # Pre-write CAS rejection -> no rollback
+        ("failure", "skipped", False, True),  # Pages write failed -> rollback
         ("success", "failure", False, True),  # Healthcheck/checksum verification failed -> rollback
         ("success", "success", True, True),  # Forced drill -> rollback
         ("failure", "failure", True, True),  # Multiple failures + force -> rollback
     ],
 )
 def test_simulated_rollback_trigger_logic(
-    deploy_result: str,
+    pages_write_outcome: str,
     verify_result: str,
     force_rollback: bool,
     expected_rollback: bool,
 ) -> None:
     """Simulate GitHub Actions expression evaluation for the rollback conditional."""
-    deploy_failed = deploy_result == "failure"
+    deploy_failed = pages_write_outcome == "failure"
     verify_failed = verify_result == "failure"
     should_rollback = deploy_failed or verify_failed or force_rollback
 

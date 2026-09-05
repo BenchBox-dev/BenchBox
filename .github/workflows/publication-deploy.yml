@@ -81,6 +81,10 @@ jobs:
           PUBLISHED_RESULTS_SHA="$INPUT_PUBLISHED_RESULTS_SHA"
           GENERATION="$INPUT_GENERATION"
           APPROVED_MANIFEST_DIGEST="$INPUT_APPROVED_MANIFEST_DIGEST"
+          if [ "$EXPECT_NOOP" = "true" ] && [ "$FORCE_ROLLBACK" = "true" ]; then
+            echo "::error::expect_noop and force_rollback are mutually exclusive"
+            exit 1
+          fi
           for value in "$DEVELOP_SHA" "$PUBLISHED_RESULTS_SHA"; do
             printf '%s' "$value" | grep -qE '^[0-9a-f]{40}$' || {
               echo "::error::dispatch SHAs must be lowercase 40-hex commits"
@@ -330,6 +334,7 @@ jobs:
           DOCS_DIGEST=$(sha256sum receipt-dist/docs-file-digests.txt | cut -d ' ' -f 1)
           (cd results-data/bundles && find . -type f -exec sha256sum {} + | sort) > receipt-dist/corpus-file-digests.txt
           CORPUS_DIGEST=$(sha256sum receipt-dist/corpus-file-digests.txt | cut -d ' ' -f 1)
+          INVENTORY_DIGEST=$(sha256sum results-data/corpus-inventory.json | cut -d ' ' -f 1)
           DATABASE_DIGEST=$(sha256sum site/results/data/results.duckdb | cut -d ' ' -f 1)
           ROOT_ENDPOINT_DIGEST=$(sha256sum site/index.html | cut -d ' ' -f 1)
           DOCS_ENDPOINT_DIGEST=$(sha256sum site/docs/index.html | cut -d ' ' -f 1)
@@ -349,7 +354,7 @@ jobs:
           UV_VERSION=$(uv --version | awk '{print $2}')
           IMAGE_OS="${ImageOS:-ubuntu-latest}"
           export GENERATION DEVELOP_SHA PUBLISHED_RESULTS_SHA PRIOR_LIVE_RECEIPT_ID SITE_DIGEST PROSE_DIGEST DOCS_DIGEST
-          export EXPLORER_DIGEST DATABASE_DIGEST CORPUS_DIGEST LOCKFILE_DIGEST BUNDLE_COUNT PYTHON_VERSION
+          export EXPLORER_DIGEST DATABASE_DIGEST CORPUS_DIGEST INVENTORY_DIGEST LOCKFILE_DIGEST BUNDLE_COUNT PYTHON_VERSION
           export ROOT_ENDPOINT_DIGEST DOCS_ENDPOINT_DIGEST API_DOCS_ENDPOINT_DIGEST EXPLORER_ENDPOINT_DIGEST
           export NODE_VERSION UV_VERSION IMAGE_OS SITE_ARTIFACT PAGES_ARTIFACT GITHUB_RUN_ID TIMESTAMP GITHUB_OUTPUT
           export PARENT_SHA PARENT_GENERATION WORKFLOW_SHA APPROVED_MANIFEST_DIGEST
@@ -393,7 +398,8 @@ jobs:
               },
               "corpus": {
                   "bundle_count": int(os.environ["BUNDLE_COUNT"]),
-                  "inventory_sha256": os.environ["CORPUS_DIGEST"],
+                  "inventory_sha256": os.environ["INVENTORY_DIGEST"],
+                  "bundle_tree_sha256": os.environ["CORPUS_DIGEST"],
                   "read_model_sha256": os.environ["DATABASE_DIGEST"],
               },
               "artifacts": {
@@ -536,6 +542,7 @@ jobs:
       id-token: write
     outputs:
       page_url: ${{ steps.deployment.outputs.page_url }}
+      pages_write_outcome: ${{ steps.deployment.outcome }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -744,7 +751,7 @@ jobs:
     needs: [build, deploy, verify]
     if: >-
       always() && needs.build.result == 'success' && (
-        needs.deploy.result == 'failure' || needs.verify.result == 'failure' ||
+        needs.deploy.outputs.pages_write_outcome == 'failure' || needs.verify.result == 'failure' ||
         (github.event_name == 'workflow_dispatch' && inputs.force_rollback == true)
       )
     runs-on: ubuntu-latest
