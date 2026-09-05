@@ -6,6 +6,7 @@ import hashlib
 import importlib
 import json
 import logging
+import shutil
 from pathlib import Path
 
 import duckdb
@@ -101,7 +102,7 @@ class TestBuildShortIds:
         assert all(len(k) > 8 for k in result)
 
 
-def test_mismatched_query_sets_are_not_ranked() -> None:
+def test_mismatched_query_sets_are_not_ranked(tmp_path: Path) -> None:
     transformer = BundleTransformer()
     bundle_paths = [
         Path("results-data/bundles/tpchavoc_sf001_clickhouse_local_sql_20260826_171608_ce266327.json"),
@@ -124,6 +125,18 @@ def test_mismatched_query_sets_are_not_ranked() -> None:
     }
     assert all(not row.is_ranking_eligible for row in rows)
     assert {row.ranking_exclusion_reason for row in rows} == {"mismatched_query_set"}
+
+    data_dir = tmp_path / "input"
+    bundle_dir = data_dir / "bundles"
+    bundle_dir.mkdir(parents=True)
+    for path in bundle_paths:
+        shutil.copy2(path, bundle_dir / path.name)
+    output = tmp_path / "output"
+    ExplorerPipeline().run(data_dir, output)
+
+    with duckdb.connect(str(output / "results.duckdb"), read_only=True) as con:
+        ranking_reasons = con.execute("SELECT DISTINCT ranking_exclusion_reason FROM benchmark_rankings").fetchall()
+    assert ranking_reasons == [("mismatched_query_set",)]
 
 
 def _duckdb_results(output: Path) -> list[dict]:

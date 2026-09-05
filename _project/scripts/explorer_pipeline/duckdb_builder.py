@@ -1049,8 +1049,8 @@ class DuckDBSnapshotBuilder:
                     if entry is not None
                     else _platform_row_timing_eligibility(platform_row, len(summary.query_ids))
                 )
-                ranking_reason = (
-                    entry.ranking_exclusion_reason if entry is not None else ranked_row.ranking_exclusion_reason
+                ranking_reason = ranked_row.ranking_exclusion_reason or (
+                    entry.ranking_exclusion_reason if entry is not None else None
                 )
                 ps = platform_row.percentile_stats
                 rows.append(
@@ -1131,7 +1131,8 @@ class DuckDBSnapshotBuilder:
                 )
                 ranking_context_by_result[ranked_row.row.result_id] = (
                     timing_contract,
-                    entry.ranking_exclusion_reason if entry is not None else ranked_row.ranking_exclusion_reason,
+                    ranked_row.ranking_exclusion_reason
+                    or (entry.ranking_exclusion_reason if entry is not None else None),
                     ranked.total_ranked,
                     cohort_reason,
                 )
