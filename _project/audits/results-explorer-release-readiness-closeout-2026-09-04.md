@@ -2,7 +2,7 @@
 develop_sha: c44fdfc457886d9340b75d86ecb6e29796fdbb98
 measured_at_sha: fc6dd5958b1deffa468e01852a392a29585d11eb
 checked_sha: fc6dd5958b1deffa468e01852a392a29585d11eb
-integrated_reviewed_sha: 066ba7cc02c6785c85086146639af9ddeec9d28a
+independent_review_anchor_sha: 28bb89d157cdf819a43038257e13f6a1239f4f40
 ---
 
 # Results Explorer release-readiness closeout — 2026-09-04
@@ -28,7 +28,7 @@ promote those browsers to blocking coverage.
 
 | Surface | Current evidence |
 |---|---|
-| Integrated/reviewed report head | `git rev-parse HEAD` = `066ba7cc02c6785c85086146639af9ddeec9d28a`; the integration head containing these closeout and certification audit artifacts. It is a content/provenance pin, not a measurement run. |
+| Independent-review integration anchor | `independent_review_anchor_sha` = `28bb89d157cdf819a43038257e13f6a1239f4f40`; the exact integration head independently reviewed before this remediation. It is neither the SHA of this edited file nor a measurement run. From the committed remediation checkout, `git merge-base --is-ancestor 28bb89d157cdf819a43038257e13f6a1239f4f40 HEAD && test "$(git diff --name-only 28bb89d157cdf819a43038257e13f6a1239f4f40 HEAD)" = "_project/audits/results-explorer-release-readiness-closeout-2026-09-04.md"` verifies descent from the reviewed integration content and confines the post-review change to this closeout. |
 | Measured evidence tree | `measured_at_sha`/`checked_sha` = `fc6dd5958b1deffa468e01852a392a29585d11eb`; the measurements and certification evidence were run against this historical tree. |
 | Develop | `git rev-parse origin/develop` = `c44fdfc457886d9340b75d86ecb6e29796fdbb98`; this report's `develop_sha` is that exact 40-character value. |
 | Launch | PR #1933 / v0.4.0 launch is already landed; `https://benchbox.dev/results/` was live in the independent certification. |
@@ -68,7 +68,8 @@ including the grouped 2.18b entry:
 | N4.1b | 2.18b workflow-trigger drift |
 | N4.1c | 2.18b token-scan drift |
 | N4.1d | 2.18b ruleset drift |
-| N4.1e | 2.18b runbook drift |
+| N4.1e | 2.18b runbook monthly-schedule drift |
+| N4.1f | 2.18b runbook on-demand-dispatch drift |
 | N4.2 | 2.19 publish naming collision |
 | N4.3 | 2.20 trust vocabulary |
 | N4.4 | 2.21 empty TrustBadge |
@@ -105,7 +106,8 @@ test, or the independent certification.
 | **N4.1b** — 2.18b workflow triggers | `remediate-governance-and-doc-drift` | current integration tree | `.github/workflows/results-explorer-browser.yml:3-28,39-62` shows `release`/`develop` branches, no `pull_request.paths`, and explicit non-PR handling for push/dispatch; `.github/workflows/docs.yml:3-23`; `docs/development/results-explorer-browser-testing.md:67-79` | Current-source inspection | No live workflow run was claimed | P3 | accepted residual — CI/workflow owner must reconcile the trigger and required-check contract outside this allowlist; next action is to update `.github/workflows/results-explorer-browser.yml` and its related documentation before calling this fixed |
 | **N4.1c** — 2.18b token-scan job set | `remediate-governance-and-doc-drift` | current integration tree | `docs/operations/results-explorer-token-scan.md:121-137` includes `medium-test`; `.github/workflows/develop-post-merge.yml:512-524` defines the four expected jobs | Current-source inspection | No live post-merge run was claimed | P3 | fixed |
 | **N4.1d** — 2.18b ruleset aggregate count | `remediate-governance-and-doc-drift` | current integration tree | `docs/operations/repo-admin-settings.md:70-79` lists the `ci-required-result` needs contract but omits `publication-reconciliation`; `.github/workflows/pr.yml:1417-1441` requires and exports `publication-reconciliation` | Current-source inspection | No live ruleset mutation or hosted run was claimed | P3 | accepted residual — CI/governance documentation owner must reconcile `docs/operations/repo-admin-settings.md` with `.github/workflows/pr.yml` outside this allowlist; next action is to update that admin documentation before calling this fixed |
-| **N4.1e** — 2.18b runbook sync/seed description | `remediate-governance-and-doc-drift` | current integration tree | `docs/operations/results-phase-2-runbook.md:37-42` describes the monthly and on-demand refresh; `.github/workflows/seed-corpus.yml:8-20` confirms `schedule` with cron `0 7 1 * *` and `workflow_dispatch` | Current-source inspection | The runbook and workflow now agree on both triggers | P3 | fixed |
+| **N4.1e** — 2.18b runbook monthly schedule | `remediate-governance-and-doc-drift` | current integration tree | `docs/operations/results-phase-2-runbook.md:37-42` describes a monthly refresh; `.github/workflows/seed-corpus.yml:8-13` defines `schedule` with cron `0 7 1 * *` | Current-source inspection | The runbook's monthly claim agrees with the authoritative workflow schedule | P3 | fixed |
+| **N4.1f** — 2.18b runbook on-demand dispatch | `remediate-governance-and-doc-drift` | current integration tree | `docs/operations/results-phase-2-runbook.md:39-42` describes an on-demand refresh; `.github/workflows/seed-corpus.yml:14-20` defines `workflow_dispatch` and its input | Current-source inspection | The runbook's on-demand claim agrees with the authoritative workflow dispatch trigger | P3 | fixed |
 | **N4.2** — 2.19 publish naming collision | `remediate-governance-and-doc-drift` | current integration tree | `docs/development/benchbox-results-platform-strategy.md:499-504`; `docs/reference/cli/submit.md:123-132`; D9 evidence at `docs/design/future-state/prune-publishing-subsystem/README.md:3-24` | Current-source inspection | No live/rendered evidence is needed for terminology and the former prune hazard is closed by D9 | P3 | fixed |
 | **N4.3** — 2.20 trust vocabulary | `remediate-explorer-trust-label-vocabulary` | current integration tree | `results-explorer/src/components/TrustBadge.tsx:8-17,27-74`; `results-explorer/src/components/__tests__/TrustBadge.test.tsx:104-128` | TrustBadge unit coverage explicitly iterates all publisher labels | No live/rendered evidence is claimed | P3 | fixed |
 | **N4.4** — 2.21 empty TrustBadge | `remediate-explorer-trust-label-vocabulary` | current integration tree | `results-explorer/src/components/TrustBadge.tsx:76-119`; `results-explorer/src/components/__tests__/TrustBadge.test.tsx:96-102` | Unit test requires a visible neutral `Unknown` badge for `trustLabel=""` | No live/rendered evidence is claimed | P3 | fixed |
@@ -188,7 +190,7 @@ be acquired. The concrete remaining defects are named above for the manager to
 create or route through the tracker using the distinct requested actor; no
 sibling item was claimed or released.
 
-Disposition count: fixed 22; accepted 4; superseded 2; still blocking 0 in the
+Disposition count: fixed 23; accepted 4; superseded 2; still blocking 0 in the
 historical D/N matrix. Current closeout gate remains **not certified** until
 the two new frontend timeouts and the environment-blocked required runs are
 resolved or independently attested.
