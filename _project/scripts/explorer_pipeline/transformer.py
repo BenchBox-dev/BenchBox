@@ -341,8 +341,10 @@ def _utc_run_date_from_timestamp(timestamp: object) -> str:
 
 
 def _run_date_from_timestamp(timestamp: object) -> str:
-    """Return the UTC calendar date token used in public result IDs."""
-    return _utc_run_date_from_timestamp(timestamp).replace("-", "")
+    """Return the stable source-date token used in public result IDs."""
+    _utc_run_date_from_timestamp(timestamp)
+    assert isinstance(timestamp, str)
+    return timestamp[:10].replace("-", "")
 
 
 def _driver_version(data: dict[str, Any]) -> str | None:

@@ -19,8 +19,8 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 class TestToManifestEntry:
-    def test_offset_timestamp_uses_utc_day_in_read_model_and_result_id(self, tmp_path: Path) -> None:
-        """The ingestion boundary, not the UI, owns UTC date normalization."""
+    def test_offset_timestamp_preserves_id_date_and_normalizes_read_model_date(self, tmp_path: Path) -> None:
+        """Public IDs retain their source date while read models use UTC."""
         data = copy.deepcopy(MINIMAL_BUNDLE)
         data["run"]["timestamp"] = "2026-09-05T00:15:00+14:00"
         bundle = tmp_path / "offset.json"
@@ -31,7 +31,7 @@ class TestToManifestEntry:
         entry = transformer.to_manifest_entry(bundle, result_id=result_id)
         detail = transformer.to_detail_result(bundle, result_id=result_id)
 
-        assert result_id.startswith("tpch-duckdb-sf0.1-20260904-")
+        assert result_id.startswith("tpch-duckdb-sf0.1-20260905-")
         assert entry.run_date == "2026-09-04"
         assert detail.run_date == "2026-09-04"
 
