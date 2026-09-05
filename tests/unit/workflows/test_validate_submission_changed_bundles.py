@@ -398,3 +398,39 @@ def test_deleted_bundle_and_manifest_do_not_inject_empty_bundle_path(tmp_path: P
     assert result.returncode == 0, result.stderr
     # Exact stdout: one surviving path, no trailing blank line from empty append.
     assert result.stdout == "results-data/bundles/keep.json\n"
+
+
+@pytest.mark.parametrize("companion_suffix", [".manifest.json", ".plans.json", ".tuning.json", ".applied.json"])
+def test_deleted_primary_requires_deleting_every_same_stem_companion(tmp_path: Path, companion_suffix: str) -> None:
+    """A primary deletion must not leave any public companion behind."""
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+
+    bundle_dir = tmp_path / "results-data" / "bundles"
+    bundle_dir.mkdir(parents=True)
+    primary = bundle_dir / "gone.json"
+    companion = bundle_dir / f"gone{companion_suffix}"
+    primary.write_text('{"gone": 1}\n', encoding="utf-8")
+    companion.write_text("{}\n", encoding="utf-8")
+    _git(tmp_path, "add", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    primary.unlink()
+    _git(tmp_path, "add", "-u", str(primary.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "delete primary only")
+
+    skip_without_posix_shell()
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "BASE_SHA": base_sha},
+    )
+
+    assert result.returncode != 0
+    assert f"file=results-data/bundles/gone{companion_suffix}" in result.stdout
+    assert "also requires deleting its same-stem companion" in result.stdout
