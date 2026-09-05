@@ -251,8 +251,37 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Check for independent publication ownership
+        id: independent
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTIVE=false
+          gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("publication-live-receipt-")) | "\(.workflow_run.id)"' \
+            | sort -ru > independent-publication-runs.txt
+          while read -r RUN_ID; do
+            [ -n "${RUN_ID:-}" ] || continue
+            RUN_META=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID" \
+              --jq '[.name, .status, .conclusion, .event, .head_branch] | @tsv')
+            IFS=$'\t' read -r RUN_NAME RUN_STATUS RUN_CONCLUSION RUN_EVENT RUN_BRANCH <<< "$RUN_META"
+            if [[ "$RUN_NAME" == "Publication Control Plane Deployment" && \
+                  "$RUN_STATUS" == "completed" && "$RUN_CONCLUSION" == "success" && \
+                  "$RUN_EVENT" == "workflow_dispatch" && "$RUN_BRANCH" == "develop" ]]; then
+              ACTIVE=true
+              break
+            fi
+          done < independent-publication-runs.txt
+          echo "active=$ACTIVE" >> "$GITHUB_OUTPUT"
+          if [ "$ACTIVE" = "true" ]; then
+            echo "::notice::Independent publication owns Pages; skipping the legacy release deployment"
+          fi
+
       - name: Deploy to GitHub Pages
         id: deployment
+        if: steps.independent.outputs.active != 'true'
         uses: actions/deploy-pages@v4
 
   # Validate example files and documentation references

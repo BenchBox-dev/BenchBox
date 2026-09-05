@@ -3,8 +3,10 @@
 `publication-deploy.yml` is an armed, dispatch-only Pages deployer. It builds
 one complete site from an exact `develop` SHA and an exact
 `published-results` SHA, then deploys that immutable artifact only after its
-pre-deploy checks pass. It does not run on a push. This avoids a second
-automatic Pages writer while `docs.yml` continues to deploy release pushes.
+pre-deploy checks pass. It does not run on a push. The `docs.yml` release job
+shares its deployment lock and stops writing Pages after the first successful
+independent live-receipt run, preventing a queued legacy artifact from
+overwriting an attested deployment during the soak.
 
 ## Prerequisites
 
@@ -47,7 +49,7 @@ The run is a successful production observation only when all are present:
   digests; the retained site artifact has the same site digest.
 - `deployment-receipt.json` is provider acknowledgement, not proof of live
   service.
-- `live-receipt.json` follows external probes of `/`, `/results/`, and
+- `live-receipt.json` follows external probes of `/`, `/docs/`, `/results/`, and
   `/results/data/results.duckdb`, has a fresh nonce and timestamp, includes the
   source SHAs, digest set, prior receipt ID where applicable, and verifies with
   `scripts/publication/reconciliation.py` against the repository public key.
