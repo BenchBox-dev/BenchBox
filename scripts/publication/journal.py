@@ -15,7 +15,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from scripts.publication.transaction import Transaction, canonical_json
+from scripts.publication.transaction import OBJECT_TYPE, SCHEMA_VERSION, VALID_STATES, Transaction, canonical_json
 
 JOURNAL_OBJECT_TYPE = "publication-journal"
 JOURNAL_SCHEMA_VERSION = 1
@@ -107,6 +107,14 @@ def read_transaction(repo_path: Path, tx_id: str, ref: str = DEFAULT_REF) -> Tra
     try:
         content = _run_git(["cat-file", "-p", tx_path], cwd=repo_path)
         data = json.loads(content)
+        if data.get("object_type") != OBJECT_TYPE:
+            raise CorruptJournalError(f"Invalid transaction object_type: {data.get('object_type')!r}")
+        if data.get("transaction_schema_version") != SCHEMA_VERSION:
+            raise CorruptJournalError(
+                f"Unsupported transaction schema version: {data.get('transaction_schema_version')!r}"
+            )
+        if data.get("state") not in VALID_STATES:
+            raise CorruptJournalError(f"Invalid transaction state: {data.get('state')!r}")
         return Transaction(**data)
     except Exception as e:
         raise JournalError(f"Failed to read transaction '{tx_id}' at {tx_path}: {e}") from e
@@ -183,9 +191,15 @@ def write_journal_update(
             cwd=repo_path,
         )
 
-        # 6. Fast-forward atomic CAS update on refs/heads/{ref}
+        # 6. Atomically reserve the shared ref on the remote authority.
         p_update = subprocess.run(
-            ["git", "update-ref", f"refs/heads/{ref}", commit_oid, expected_parent_oid],
+            [
+                "git",
+                "push",
+                "origin",
+                f"{commit_oid}:refs/heads/{ref}",
+                f"--force-with-lease=refs/heads/{ref}:{expected_parent_oid}",
+            ],
             cwd=repo_path,
             capture_output=True,
             text=True,
@@ -193,8 +207,9 @@ def write_journal_update(
         )
         if p_update.returncode != 0:
             raise CasConflictError(
-                f"CAS update on ref '{ref}' failed (expected {expected_parent_oid}): {p_update.stderr.strip()}"
+                f"CAS update on remote ref '{ref}' failed (expected {expected_parent_oid}): {p_update.stderr.strip()}"
             )
+        _run_git(["update-ref", f"refs/heads/{ref}", commit_oid], cwd=repo_path)
 
         updated_state = JournalState(
             target=new_state.target,
@@ -247,7 +262,14 @@ def init_genesis_journal(
 def resolve_timeout_or_recheck(repo_path: Path, proposed_commit_oid: str, ref: str = DEFAULT_REF) -> bool:
     """Resolve an ambiguous network or API timeout by re-checking whether the proposed commit won."""
     try:
-        current_oid = _run_git(["rev-parse", f"refs/heads/{ref}"], cwd=repo_path)
-        return current_oid == proposed_commit_oid
+        current_oid = _run_git(["ls-remote", "origin", f"refs/heads/{ref}"], cwd=repo_path).split()[0]
+        return (
+            subprocess.run(
+                ["git", "merge-base", "--is-ancestor", proposed_commit_oid, current_oid],
+                cwd=repo_path,
+                check=False,
+            ).returncode
+            == 0
+        )
     except Exception:
         return False

@@ -159,7 +159,7 @@ def test_prepare_rollback_requires_activation_barrier(base_context: dict[str, di
     failed_tx, _ = tx_mod.transition(failed_tx, tx_mod.EVENT_FAIL_WRITE, {"reason": "timeout"})
 
     # Rollback without barrier evidence must fail
-    with pytest.raises(tx_mod.TransactionError, match="Provider activation barrier evidence is required"):
+    with pytest.raises(tx_mod.TransactionError, match="activation barrier evidence is required"):
         tx_mod.prepare_rollback(
             failed_transaction=failed_tx,
             parent_durable_transaction=parent_tx,
@@ -167,6 +167,43 @@ def test_prepare_rollback_requires_activation_barrier(base_context: dict[str, di
             controller=base_context["controller"],
             owner=base_context["owner"],
             barrier_evidence={},
+        )
+
+
+def test_prepare_rollback_rejects_nonterminal_provider(base_context: dict[str, dict[str, str]]) -> None:
+    parent_tx, _ = tx_mod.prepare_promotion(
+        target=base_context["target"],
+        generation=9,
+        parent_transaction_id="g8",
+        approval=base_context["approval"],
+        controller=base_context["controller"],
+        owner=base_context["owner"],
+        content=base_context["content"],
+        artifact=base_context["artifact"],
+    )
+    failed_tx, _ = tx_mod.prepare_promotion(
+        target=base_context["target"],
+        generation=10,
+        parent_transaction_id=parent_tx.transaction_id,
+        approval=base_context["approval"],
+        controller=base_context["controller"],
+        owner=base_context["owner"],
+        content=base_context["content"],
+        artifact=base_context["artifact"],
+    )
+    failed_tx, _ = tx_mod.transition(failed_tx, tx_mod.EVENT_START_WRITE, {"intent_commit_oid": "2" * 40})
+    with pytest.raises(tx_mod.TransactionError, match="Affirmative"):
+        tx_mod.prepare_rollback(
+            failed_transaction=failed_tx,
+            parent_durable_transaction=parent_tx,
+            generation=11,
+            controller=base_context["controller"],
+            owner=base_context["owner"],
+            barrier_evidence={
+                "provider_status": "in_progress",
+                "quiescence_observed": False,
+                "deployment_id": failed_tx.write["write_id"],
+            },
         )
 
 
@@ -202,7 +239,11 @@ def test_rollback_lifecycle_happy_path(base_context: dict[str, dict[str, str]]) 
         generation=11,
         controller=base_context["controller"],
         owner=base_context["owner"],
-        barrier_evidence={"provider_status": "canceled", "quiescence_observed": True},
+        barrier_evidence={
+            "provider_status": "canceled",
+            "quiescence_observed": True,
+            "deployment_id": failed_tx.write["write_id"],
+        },
     )
 
     assert rb_tx.state == tx_mod.STATE_ROLLBACK_WRITE_STARTED
@@ -221,7 +262,7 @@ def test_rollback_lifecycle_happy_path(base_context: dict[str, dict[str, str]]) 
     assert effect.action == "probe_endpoints"
 
     # Verify rollback probes
-    rb_tx, effect = tx_mod.transition(rb_tx, tx_mod.EVENT_VERIFY_SUCCESS, {"observation_digest": "rb-obs-999"})
+    rb_tx, effect = tx_mod.transition(rb_tx, tx_mod.EVENT_VERIFY_ROLLBACK, {"observation_digest": "rb-obs-999"})
     assert rb_tx.state == tx_mod.STATE_ROLLBACK_VERIFIED
     assert effect.action == "commit_rollback"
 

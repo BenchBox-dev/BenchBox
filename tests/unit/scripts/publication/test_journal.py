@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -28,6 +29,10 @@ def git_repo(tmp_path: Path) -> Path:
 
     # Branch publication off main
     subprocess.run(["git", "branch", "publication"], cwd=repo, check=True)
+    remote = tmp_path / "remote.git"
+    subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+    subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=repo, check=True)
+    subprocess.run(["git", "push", "origin", "main", "publication"], cwd=repo, check=True, capture_output=True)
     return repo
 
 
@@ -192,7 +197,7 @@ def test_cas_conflict_detection(git_repo: Path, genesis_tx: tx_mod.Transaction) 
     )
 
     # Writer 2 attempts to commit using old parent -> MUST fail with CasConflictError
-    with pytest.raises(journal_mod.CasConflictError, match="CAS update on ref 'publication' failed"):
+    with pytest.raises(journal_mod.CasConflictError, match="CAS update on remote ref 'publication' failed"):
         journal_mod.write_journal_update(
             repo_path=git_repo,
             expected_parent_oid=genesis_commit_oid,
@@ -220,6 +225,33 @@ def test_timeout_resolution(git_repo: Path, genesis_tx: tx_mod.Transaction) -> N
     )
 
     assert journal_mod.resolve_timeout_or_recheck(git_repo, commit_oid, ref="publication") is True
+    tree_oid = subprocess.run(
+        ["git", "show", "-s", "--format=%T", commit_oid],
+        cwd=git_repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    descendant_oid = subprocess.run(
+        ["git", "commit-tree", tree_oid, "-p", commit_oid, "-m", "later journal update"],
+        cwd=git_repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    subprocess.run(
+        [
+            "git",
+            "push",
+            "origin",
+            f"{descendant_oid}:refs/heads/publication",
+            f"--force-with-lease=refs/heads/publication:{commit_oid}",
+        ],
+        cwd=git_repo,
+        check=True,
+        capture_output=True,
+    )
+    assert journal_mod.resolve_timeout_or_recheck(git_repo, commit_oid, ref="publication") is True
     assert journal_mod.resolve_timeout_or_recheck(git_repo, "nonexistent-sha", ref="publication") is False
 
 
@@ -227,3 +259,19 @@ def test_corrupt_journal_fails_closed(git_repo: Path) -> None:
     # On empty/uninitialized publication branch, read fails closed
     with pytest.raises(journal_mod.CorruptJournalError, match="Missing or invalid state.json"):
         journal_mod.read_journal_state(git_repo, ref="publication")
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("object_type", "wrong"), ("transaction_schema_version", 99), ("state", "invented")],
+)
+def test_read_transaction_rejects_invalid_contract(monkeypatch: pytest.MonkeyPatch, field: str, value: object) -> None:
+    data = {
+        "object_type": tx_mod.OBJECT_TYPE,
+        "transaction_schema_version": tx_mod.SCHEMA_VERSION,
+        "state": tx_mod.STATE_PREPARED,
+    }
+    data[field] = value
+    monkeypatch.setattr(journal_mod, "_run_git", lambda *args, **kwargs: json.dumps(data))
+    with pytest.raises(journal_mod.JournalError):
+        journal_mod.read_transaction(Path("."), "bad")

@@ -182,8 +182,14 @@ def prepare_rollback(
     if failed_transaction.state not in (STATE_RECOVERY_REQUIRED, STATE_WRITE_STARTED, STATE_WRITE_ACKNOWLEDGED):
         raise TransactionError(f"Cannot initiate rollback from non-recoverable state: {failed_transaction.state}")
 
-    if not barrier_evidence:
-        raise TransactionError("Provider activation barrier evidence is required before preparing rollback")
+    failed_write = failed_transaction.write or {}
+    expected_deployment = failed_write.get("id") or failed_write.get("write_id")
+    if (
+        barrier_evidence.get("provider_status", "").upper() not in {"CANCELED", "FAILED", "ERROR"}
+        or barrier_evidence.get("quiescence_observed") is not True
+        or barrier_evidence.get("deployment_id") != expected_deployment
+    ):
+        raise TransactionError("Affirmative provider activation barrier evidence is required before preparing rollback")
 
     tx_id = transaction_id or str(uuid.uuid4())
 
@@ -324,7 +330,7 @@ def _handle_write_acknowledged(
     ev: dict[str, Any],
     data: dict[str, Any],
 ) -> tuple[Transaction, Effect]:
-    if event_type == EVENT_VERIFY_SUCCESS:
+    if event_type == EVENT_VERIFY_SUCCESS or (current.kind == KIND_ROLLBACK and event_type == EVENT_VERIFY_ROLLBACK):
         obs_digest = payload.get("observation_digest")
         if not obs_digest:
             raise TransactionError("observation_digest is required for verification success")
