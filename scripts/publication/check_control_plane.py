@@ -9,7 +9,7 @@ Verifies:
    - 'legacy_app' role requires 'contents', 'pull_requests', and 'workflows'.
 
 Usage:
-  uv run python scripts/publication/check_control_plane.py [--live] [--strict] [--role {journal,legacy_app,all}]
+  uv run python scripts/publication/check_control_plane.py [--live] [--strict] [--role {journal,legacy_app}]
 """
 
 from __future__ import annotations
@@ -170,7 +170,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--role",
-        choices=["journal", "legacy_app", "all"],
+        choices=["journal", "legacy_app"],
         default="journal",
         help="Permission role to validate (journal: contents only; legacy_app: contents, pull_requests, workflows)",
     )

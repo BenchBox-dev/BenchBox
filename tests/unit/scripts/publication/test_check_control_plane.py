@@ -24,6 +24,11 @@ def test_local_without_strict_can_pass(monkeypatch: pytest.MonkeyPatch) -> None:
     assert rc == 0
 
 
+def test_combined_role_is_rejected() -> None:
+    with pytest.raises(SystemExit):
+        control_mod.main(["--role", "all"])
+
+
 def test_check_codeowners_missing_patterns(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     codeowners = tmp_path / "CODEOWNERS"
     codeowners.write_text("# incomplete\n*.py @dev\n", encoding="utf-8")
