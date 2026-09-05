@@ -157,22 +157,39 @@ export function Query({ url }: QueryProps) {
   // the active cohort and the launch button.
   const [compareSelectedRows, setCompareSelectedRows] = useState<Map<string, ResultRow>>(new Map());
   const [compareHandoffError, setCompareHandoffError] = useState<string | null>(null);
+  const [pinnedCompareResultId, setPinnedCompareResultId] = useState<string | null>(null);
   const compareSelectedIds = useMemo(() => new Set(compareSelectedRows.keys()), [compareSelectedRows]);
-  const toggleCompareSelection = (row: ResultRow) =>
+  const clearPinnedCompareParam = () => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("pick")) return;
+    params.delete("pick");
+    const search = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`);
+    setPinnedCompareResultId(null);
+  };
+  const toggleCompareSelection = (row: ResultRow) => {
+    const resultId = String(row.result_id);
+    if (compareSelectedRows.has(resultId) && resultId === pinnedCompareResultId) clearPinnedCompareParam();
     setCompareSelectedRows((prev) => {
-      const resultId = String(row.result_id);
       const next = new Map(prev);
       if (next.has(resultId)) next.delete(resultId);
       else if (next.size < MAX_COMPARE_SELECTIONS && comparisonExclusionReason(row) === undefined) next.set(resultId, row);
       return next;
     });
-  const removeCompareSelection = (resultId: string) =>
+  };
+  const removeCompareSelection = (resultId: string) => {
+    if (resultId === pinnedCompareResultId) clearPinnedCompareParam();
     setCompareSelectedRows((prev) => {
       const next = new Map(prev);
       next.delete(resultId);
       return next;
     });
-  const clearCompareSelection = () => setCompareSelectedRows(new Map());
+  };
+  const clearCompareSelection = () => {
+    clearPinnedCompareParam();
+    setCompareSelectedRows(new Map());
+  };
   // Default compatible-only on once the cohort signature locks; users can
   // disable to inspect (still-disabled) incompatible rows. See finding #3.
   const [compareCompatibleOnly, setCompareCompatibleOnly] = useState(true);
@@ -189,6 +206,7 @@ export function Query({ url }: QueryProps) {
           setCompareHandoffError(`The selected run “${pinnedCompareId}” is no longer published.`);
           return;
         }
+        setPinnedCompareResultId(detail.result_id);
         setCompareSelectedRows(new Map([[detail.result_id, detail as unknown as ResultRow]]));
       })
       .catch(() => {

@@ -261,6 +261,19 @@ describe("Query", () => {
     expect(screen.getByTestId("query-compare-tray")).toHaveTextContent("1 result selected");
   });
 
+  it("clears the pinned run from the URL when removing the handed-off selection", async () => {
+    window.history.replaceState(null, "", "/results/query?pick=r1");
+    vi.mocked(getDetailResult).mockResolvedValue(BASE_ROWS[0] as never);
+
+    render(<Query />);
+
+    await waitFor(() => expect(screen.getByTestId("query-compare-selected-r1")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /Remove .*Public ID r1, from comparison/ }));
+
+    expect(new URL(window.location.href).searchParams.has("pick")).toBe(false);
+    expect(screen.queryByTestId("query-compare-selected-r1")).toBeNull();
+  });
+
   it("shows narrowing facets and clears them when no rows match", async () => {
     window.history.replaceState(null, "", "/results/query?benchmark=tpch&platform=MissingDB");
     resultRows = [];
