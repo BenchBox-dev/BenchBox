@@ -44,7 +44,7 @@
       "independent-publication-a11-operations-canaries-and-closeout"
     ]
   },
-  "a10_disposition": "Retirement surgery (remove release-to-Pages coupling, close mirrors) is NOT executed: no independent production deployer exists, so removal would leave production undeployable. Deferred with reason and promoted to a follow-up workstream item; the two retirement freeze rows transfer to that item rather than lifting silently.",
+  "a10_disposition": "Retirement surgery (remove release-to-Pages coupling, close mirrors) is NOT executed: no independent production deployer exists, so removal would leave production undeployable. Recorded as deferral 725 against independent-publication-a10-release-and-mirror-retirement and filed as the tracker item independent-production-deployer-and-retirement; the two retirement freeze rows transfer to that item rather than lifting silently. A10 and A11 stay open.",
   "carried_restrictions": [
     "Do not retire sync-results-data-to-published.yml until the follow-up cutover lands",
     "Do not remove the docs.yml release deploy until a replacement production deployer is proven",
@@ -54,7 +54,8 @@
     "sphinx -W: 7 warnings in unrelated docs (production build does not gate -W)",
     "blog validation: 7 dash-style errors in others drafts",
     "phantom 0s publication-canaries / validate-submission push-run failures repo-wide (block nothing)",
-    "A5 rung1 / A7 rung2 / A9 rung2 / A11 rungs 2-3 ladder staleness (byte-exact premises, removed scripts) recorded in completion overrides"
+    "A5 rung1 / A7 rung2 / A9 rung2 / A11 rungs 2-3 ladder staleness (byte-exact premises, removed scripts) recorded in completion overrides",
+    "A10 rung 2 ladder staleness: the stored command passes audit_mirror_prs.py --require-live-replacement, a flag the script does not define; the runnable form needs --repo and --base"
   ],
   "pages_policy": "develop remains an allowed github-pages deploy branch (id 59059907); ownership of its removal transfers to the follow-up cutover item",
   "attestor": "joeharris76"

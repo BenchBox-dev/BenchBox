@@ -16,6 +16,9 @@ Until every named gate below passes, the following actions are blocked:
 3. removal or disabling of the release-driven GitHub Pages deployment; and
 4. deletion of any accepted bundle or published-only path.
 
+All five gates passed on 2026-09-04. See [Freeze closure](#freeze-closure)
+for which of these restrictions the closure carried forward, and why.
+
 The preservation floor is the exact set union of bundle paths captured from
 `origin/develop` and `origin/published-results`, not any expected file count.
 Every member of that union must remain recoverable with its original bytes.
@@ -75,6 +78,85 @@ released on that basis — the drill, not the row, is what a re-verifier replays
 
 Residual: land the drill as a durable repo command with a committed
 PASS/FAIL artifact instead of a throwaway probe.
+
+### G2 dual publication — PASS (2026-09-04)
+
+An independently assembled target served the required routes and matched the
+production database by canonical digest for a bounded soak:
+
+- Deploy: `Publication Preview Deploy (G2)` run 33814942530, live receipt
+  `live-gen1-2026-09-04T13:11:04Z`, served at `https://benchbox.dev/preview/gen1/`.
+- Soak: 12 hours of scheduled probes, every window PASS, concluded by
+  `Publication Preview Soak (G2)` run 33876444641.
+- Byte equality was rejected as the gate condition. The assembler stamps
+  `generated_at` and float serialization drifts by one ULP between builds, so
+  root neutrality is proven by canonical digest instead (PR #2031).
+- Supporting fixes: build Sphinx before root assembly (#2025), mirror the
+  Explorer dist from `docs.yml` (#2028), and reuse the probe deploy run when
+  concluding the soak (#2035).
+
+### G3 rollback — PASS (2026-09-04)
+
+A timed drill restored the pinned known-good release tree to production and
+probed it publicly. Receipt:
+[`docs/operations/publication-rollback-receipt-2026-09-04.json`](../../docs/operations/publication-rollback-receipt-2026-09-04.json).
+
+- Drill PR #2037 merged at 14:21:22Z; `Documentation` run 33883250472 completed
+  the production deploy at 14:28:03Z; public probes at 14:32:23Z returned 200
+  for `/` and `/results/`. Merge to live was 11 minutes.
+- The restored database differs from the baseline only by build stamp and
+  one-ULP float drift, and is canonical-digest equivalent.
+- The full-site release deploy wiped the preview subtree, as designed.
+- Direct pushes to `release` are ruleset-blocked, so the drill rode a PR using
+  the documented `RELEASE_READINESS_OVERRIDE_SHA` hatch. Those variables were
+  removed after the merge.
+
+### G4 ownership and incident response — PASS (2026-09-04)
+
+Record:
+[`docs/operations/publication-g4-incident-response-2026-09-04.json`](../../docs/operations/publication-g4-incident-response-2026-09-04.json).
+
+- Operator Joe Harris exercised preview deploys, soak conclusions, merges
+  through required gates, and the `github-pages` deployment branch policy.
+- CI uses `GITHUB_TOKEN`, but `docs.yml` declares `pages: write` and
+  `id-token: write` at workflow scope, so non-deploy jobs inherit those
+  permissions; this evidence does not establish per-job least privilege.
+  Maintainer `gh` CLI auth was used for operator actions.
+- Alerting is GitHub-native only. There is no dedicated paging channel, which is
+  accepted for a static-site risk profile.
+- Bandwidth telemetry stays `unavailable`. GitHub exposes artifact bytes and
+  cache headers, not transfer totals, and it is never inferred from size.
+- The rollback runbook was exercised by the G3 drill, not merely described.
+
+### G5 final reconciliation — PASS (2026-09-04)
+
+- `scripts/publication/check_plan_reconciliation.py --todo-prefix independent-publication-`
+  exits 0 against the live tracker: 7 prior surfaces, 5 gates, 12 tracker
+  priorities.
+- Tracker items A0 through A9 are done with audited evidence. A10 and A11 stay
+  open; see the closure section below.
+
+## Freeze closure
+
+All five gates passed on 2026-09-04. The decision is recorded in
+[`docs/operations/publication-freeze-closure-2026-09-04.json`](../../docs/operations/publication-freeze-closure-2026-09-04.json),
+which also lists the drift known at closure.
+
+Passing the gates does not by itself lift the four blocked actions above. The
+retirement surgery A10 describes was not executed, because no replacement
+production deployer exists: `docs.yml` is still the only lane that deploys
+`benchbox.dev`, and `publication-deploy.yml` is rehearsal-only. Removing the
+release coupling now would leave production undeployable.
+
+That scope is filed as the tracker item
+`independent-production-deployer-and-retirement`. Until it completes, these
+restrictions remain in force:
+
+- `sync-results-data-to-published.yml` is not retired.
+- The `docs.yml` release deploy is not removed.
+- No destructive corpus rewrites happen outside that workstream.
+- `develop` remains an allowed `github-pages` deploy branch. Removing it belongs
+  to that workstream.
 
 ## Prior-decision reconciliation
 

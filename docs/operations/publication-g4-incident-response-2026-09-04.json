@@ -14,7 +14,7 @@
     ]
   },
   "credentials": {
-    "ci": "GITHUB_TOKEN with least-privilege per-job permissions (contents:read, pages:write scoped to deploy jobs only)",
+    "ci": "GITHUB_TOKEN permissions are declared at workflow scope in docs.yml (contents:read, actions:read, pages:write, id-token:write), so non-deploy jobs inherit pages/id-token; this receipt does not establish per-job least privilege",
     "operator": "maintainer gh CLI auth",
     "tracker": "missing (E_AUTH_MISSING) - G5 blocker, not G4 scope"
   },
