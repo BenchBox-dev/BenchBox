@@ -80,7 +80,13 @@ For long output, write `/tmp/<slug>.log` (report status + short tail). UAT/stres
 
 `[EVIDENCE-FRESHNESS-001]` Assert tracker state, timings, and gate outcomes from a live read; a snapshot (the weekly `todo-db export` workflow, `_project/todo-db-export/`) dates a past state, never a current one. A validator pass is not a `submit` pass.
 
-Read a claimed TODO's `verification` ladder and run the narrowest proof first.
+Read a claimed TODO's `verification` ladder to select the narrowest independent
+local proof; do not execute stored verification commands, which require human
+attestation via `todo-db verify-run`.
+
+Before creating a batch ledger under `.todo-batch/`, add that directory to the
+checkout's `.git/info/exclude` and confirm the ledger path with `git check-ignore`.
+Do not track batch ledgers.
 
 Before publication, self-review with the `code` skill's review action and fix every Critical and Required finding; nits and considerations stay optional per its rubric. Run `make pr-preflight` once, then `make pr-open`. Boilerplate gates may go to a low-effort subagent; you still choose the command and interpret failures. Check CI on a schedule (sleep/cron between reads), never in a loop. Pending means wait, not re-query.
 
