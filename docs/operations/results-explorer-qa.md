@@ -39,7 +39,8 @@ against `vite dev` or the Explorer-only test server:
 ```bash
 cd results-explorer
 E2E_SITE_DIR=/absolute/path/to/site \
-E2E_PAGES_SHAPED=1 npx playwright test --project=chromium --workers=1 e2e/routes/pages-artifact.spec.ts
+E2E_PAGES_SHAPED=1 \
+E2E_PORT=<allocated-port> npx playwright test --project=chromium --workers=1 e2e/routes/pages-artifact.spec.ts
 ```
 
 This spec is deliberately fixture-free, so it needs no `npm run test:e2e:fixtures`
