@@ -504,6 +504,8 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
       - name: Revalidate authoritative live head
         env:
           GH_TOKEN: ${{ github.token }}
@@ -511,9 +513,49 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          CURRENT=$(gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
-            --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("publication-live-receipt-")) | "\(.created_at) \(.id)"' \
-            | sort -r | sed -n '1{s/^[^ ]* //;p;}')
+          CURRENT=""
+          gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("publication-live-receipt-")) | "\(.created_at) \(.id) \(.workflow_run.id)"' \
+            | sort -r > current-candidates.txt
+          while read -r _CREATED_AT ARTIFACT_ID RUN_ID; do
+            [ -n "${ARTIFACT_ID:-}" ] || continue
+            RUN_META=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID" --jq '[.name, .status, .conclusion, .event] | @tsv')
+            IFS=$'\t' read -r RUN_NAME RUN_STATUS RUN_CONCLUSION RUN_EVENT <<< "$RUN_META"
+            if [[ "$RUN_NAME" != "Publication Control Plane Deployment" || "$RUN_STATUS" != "completed" || "$RUN_EVENT" != "workflow_dispatch" ]]; then
+              continue
+            fi
+            rm -rf current-candidate && mkdir current-candidate
+            gh api "repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip" > current-candidate.zip
+            unzip -q current-candidate.zip -d current-candidate
+            if EXPECTED_RUN_ID="$RUN_ID" RUN_CONCLUSION="$RUN_CONCLUSION" python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+          from scripts.publication.reconciliation import verify_live_receipt_signature
+
+          path = Path("current-candidate/live-receipt.json")
+          if not path.is_file():
+              raise SystemExit(1)
+          receipt = json.loads(path.read_text())
+          valid, _ = verify_live_receipt_signature(receipt)
+          if not valid or receipt.get("target") != "benchbox.dev":
+              raise SystemExit(1)
+          if os.environ["RUN_CONCLUSION"] != "success":
+              if not str(receipt.get("receipt_id", "")).startswith("rollback-"):
+                  raise SystemExit(1)
+              if not receipt.get("routes") or not all(route.get("ok") for route in receipt["routes"]):
+                  raise SystemExit(1)
+          if str(receipt.get("receipt_run_id", receipt.get("artifact_run_id"))) != os.environ["EXPECTED_RUN_ID"]:
+              raise SystemExit(1)
+          if not re.fullmatch(r"[0-9a-f]{40}", str(receipt.get("source_commit", ""))):
+              raise SystemExit(1)
+          PY
+            then
+              CURRENT="$ARTIFACT_ID"
+              break
+            fi
+          done < current-candidates.txt
           [ "$CURRENT" = "$EXPECTED_PARENT_ARTIFACT_ID" ] || {
             echo "::error::publication live head changed after build; refusing stale deployment"
             exit 1

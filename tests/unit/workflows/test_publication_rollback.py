@@ -157,6 +157,8 @@ def test_build_receipt_enforces_attested_cas_lineage() -> None:
     assert '"\\(.created_at) \\(.id) \\(.workflow_run.id)"' in text
     assert "Revalidate authoritative live head" in text
     assert "publication live head changed after build" in text
+    assert "current-candidate/live-receipt.json" in text
+    assert text.count("verify_live_receipt_signature") >= 3
     assert '"parent_sha": os.environ.get("PARENT_SHA") or None' in text
     assert "validate_manifest_dict(manifest)" in text
 

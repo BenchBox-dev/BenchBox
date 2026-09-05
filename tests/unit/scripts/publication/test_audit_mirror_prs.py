@@ -90,6 +90,7 @@ def _pr(number: int, title: str = "mirror") -> dict:
     return {
         "number": number,
         "title": title,
+        "author": {"login": "github-actions[bot]"},
         "headRefName": f"auto/results-mirror-{number:08d}",
         "headRepository": {"name": "BenchBox"},
         "headRepositoryOwner": {"login": "benchbox-dev"},
@@ -99,6 +100,17 @@ def _pr(number: int, title: str = "mirror") -> dict:
 def test_fork_with_machine_named_branch_is_unrelated(capsys):
     pr = _pr(11)
     pr["headRepositoryOwner"] = {"login": "untrusted-contributor"}
+    fake = _FakeRunner(prs=[pr], tree=BASE_TREE)
+
+    assert _run_main(["--repo", CID, "--base", BASE, "--json"], fake) == 0
+    (result,) = json.loads(capsys.readouterr().out)["prs"]
+    assert result["verdict"] == "UNRELATED"
+    assert result["retire_able"] is False
+
+
+def test_human_authored_same_repo_machine_branch_is_unrelated(capsys):
+    pr = _pr(10)
+    pr["author"] = {"login": "human-collaborator"}
     fake = _FakeRunner(prs=[pr], tree=BASE_TREE)
 
     assert _run_main(["--repo", CID, "--base", BASE, "--json"], fake) == 0
