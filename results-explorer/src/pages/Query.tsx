@@ -206,6 +206,12 @@ export function Query({ url }: QueryProps) {
           setCompareHandoffError(`The selected run “${pinnedCompareId}” is no longer published.`);
           return;
         }
+        const exclusionReason = comparisonExclusionReason(detail as unknown as ResultRow);
+        if (exclusionReason !== undefined) {
+          const copy = describeCompareExclusionReason(exclusionReason);
+          setCompareHandoffError(copy?.detailText ?? "The selected run is not eligible for comparison.");
+          return;
+        }
         setPinnedCompareResultId(detail.result_id);
         setCompareSelectedRows(new Map([[detail.result_id, detail as unknown as ResultRow]]));
       })
@@ -1090,7 +1096,7 @@ export function Query({ url }: QueryProps) {
                                       data-testid={`query-compare-checkbox-${id}`}
                                     />
                                   </td>
-                                  <td class="table-td hidden max-w-[16rem] sm:table-cell">
+                                  <td class="table-td max-w-[16rem]">
                                     <QueryCompareReasonStatus id={reasonId} copy={disabledCopy} selected={isSelected} />
                                   </td>
                                   {visibleColumns.map((column) => (

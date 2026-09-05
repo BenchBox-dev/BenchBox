@@ -274,6 +274,20 @@ describe("Query", () => {
     expect(screen.queryByTestId("query-compare-selected-r1")).toBeNull();
   });
 
+  it("rejects an ineligible handed-off run", async () => {
+    window.history.replaceState(null, "", "/results/query?pick=r1");
+    vi.mocked(getDetailResult).mockResolvedValue({
+      ...BASE_ROWS[0],
+      comparison_exclusion_reason: "zero_timings_only",
+    } as never);
+
+    render(<Query />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Only exact zero timings are available");
+    expect(screen.queryByTestId("query-compare-selected-r1")).toBeNull();
+    expect(screen.getByTestId("query-compare-launch-disabled")).toBeTruthy();
+  });
+
   it("shows narrowing facets and clears them when no rows match", async () => {
     window.history.replaceState(null, "", "/results/query?benchmark=tpch&platform=MissingDB");
     resultRows = [];
@@ -367,6 +381,7 @@ describe("Query", () => {
     expect(visibleReason.textContent).toContain("Why unavailable: Insufficient valid timings");
     expect(visibleReason.textContent).toContain("Choose a run with at least two valid query timings");
     expect(blocked.getAttribute("aria-describedby")).toBe(visibleReason.id);
+    expect(visibleReason.closest("td")?.className).not.toContain("hidden");
 
     fireEvent.click(blocked);
     expect(screen.getByTestId("query-compare-tray").textContent).toContain("Select two or more rows");
