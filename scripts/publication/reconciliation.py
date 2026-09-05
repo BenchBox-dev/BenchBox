@@ -472,6 +472,48 @@ def _check_manifest_drift(
     return drifts
 
 
+def _check_state_binding_completeness(
+    desired: dict[str, Any],
+    built: dict[str, Any],
+    deployed: dict[str, Any],
+    observed: dict[str, Any],
+) -> list[DriftFinding]:
+    """Require every publication state to identify the manifest and artifact it represents."""
+    shared = (
+        ("target", ("target",), "MANIFEST_DRIFT"),
+        ("manifest digest", ("manifest_digest", "manifest_sha256"), "MANIFEST_DRIFT"),
+        ("develop SHA", ("develop_sha", "source_commit", "develop_commit"), "MANIFEST_DRIFT"),
+        (
+            "published-results SHA",
+            ("published_results_sha", "published_results_commit"),
+            "MANIFEST_DRIFT",
+        ),
+        ("artifact digest set", ("artifacts", "artifact"), "ARTIFACT_DRIFT"),
+    )
+    artifact_identity = (
+        ("artifact identity name", ("artifact_name",), "ARTIFACT_DRIFT"),
+        ("artifact workflow run", ("artifact_run_id",), "ARTIFACT_DRIFT"),
+    )
+    drifts: list[DriftFinding] = []
+    for state_name, state, requirements in (
+        ("desired", desired, shared),
+        ("built", built, shared + artifact_identity),
+        ("deployed", deployed, shared + artifact_identity),
+        ("observed", observed, shared + artifact_identity),
+    ):
+        for label, keys, drift_type in requirements:
+            if _first_present(state, keys) is None:
+                drifts.append(
+                    DriftFinding(
+                        drift_type=drift_type,
+                        description=f"{state_name.capitalize()} state is missing required {label}",
+                        expected=f"one of {keys}",
+                        actual="absent or empty",
+                    )
+                )
+    return drifts
+
+
 def _check_built_vs_desired(desired_digests: dict[str, str], built_digests: dict[str, str]) -> list[DriftFinding]:
     """Full set comparison of manifest vs build artifact digests (not the intersection)."""
     if not desired_digests:
@@ -874,6 +916,7 @@ def reconcile_states(
         )
 
     drifts.extend(_check_generation_drift(des_gen, dep_gen, obs_gen))
+    drifts.extend(_check_state_binding_completeness(desired, built or {}, deployed or {}, observed or {}))
     drifts.extend(_check_manifest_drift(desired, built or {}, deployed or {}, observed or {}))
 
     desired_digests = extract_artifact_digests(desired)

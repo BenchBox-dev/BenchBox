@@ -57,6 +57,8 @@ def _full_live_receipt(generation: int = 5, timestamp: str | None = None) -> dic
         "attestor": "maintainer:joe",
         "signature_algorithm": "ed25519",
         "signature": "BASE64SIG==",
+        "artifact_name": "publication-pages-5",
+        "artifact_run_id": "12345",
         "observation_origin": "github-actions:publication-verify",
         "routes": [
             {"path": "/", "status_code": 200, "ok": True},
@@ -112,19 +114,29 @@ def attestor_keypair(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def _distinct_states(generation: int = 5):
-    desired = {
+    common = {
         "generation": generation,
+        "target": "benchbox.dev",
+        "manifest_digest": "sha256:" + "a" * 64,
         "develop_sha": "1111111111111111111111111111111111111111",
+        "published_results_sha": "2222222222222222222222222222222222222222",
+        "artifacts": {"site": {"digest": "d" * 64, "path": "/"}},
+    }
+    desired = {
+        **common,
         "build_closure": {"lockfile_sha256": "lock", "workflow_sha": "wf"},
     }
     built = {
-        "generation": generation,
-        "develop_sha": "1111111111111111111111111111111111111111",
+        **common,
+        "artifact_name": "publication-pages-5",
+        "artifact_run_id": "12345",
         "build_closure": {"lockfile_sha256": "lock", "workflow_sha": "wf"},
     }
     deployed = {
-        "generation": generation,
+        **common,
         "source_commit": "1111111111111111111111111111111111111111",
+        "artifact_name": "publication-pages-5",
+        "artifact_run_id": "12345",
         "status": "DEPLOYED",
     }
     observed = _full_live_receipt(generation=generation)
@@ -221,6 +233,17 @@ def test_reconcile_missing_built_and_deployed_fails_closed() -> None:
     assert report.reconciled is False
     assert any("assembly (built) receipt" in d.description for d in report.drifts)
     assert any("deployment receipt" in d.description for d in report.drifts)
+
+
+@pytest.mark.parametrize("field", ("manifest_digest", "artifact_name", "artifact_run_id"))
+def test_reconcile_rejects_deployed_state_missing_required_binding(field: str) -> None:
+    desired, built, deployed, observed = _distinct_states()
+    del deployed[field]
+
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
+
+    assert report.reconciled is False
+    assert any("Deployed state is missing required" in finding.description for finding in report.drifts)
 
 
 def test_reconcile_generation_drift_desired_vs_observed_when_deployed_missing() -> None:

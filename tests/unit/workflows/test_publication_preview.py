@@ -89,6 +89,7 @@ def test_deploy_requires_pinned_shas_and_approver() -> None:
     text = DEPLOY_PATH.read_text(encoding="utf-8")
     assert "40" in text and "hex" in text, "SHAs must be validated as 40-hex"
     assert "cat-file -e" in text, "pinned SHAs must be proven present"
+    assert 'if [ "$GITHUB_REF" != "refs/heads/develop" ]' in text
 
 
 def test_deploy_writes_receipts_with_both_shas() -> None:
@@ -137,6 +138,8 @@ def test_preview_deploy_stops_after_independent_publication_takes_ownership() ->
     assert 'RUN_BRANCH" != "develop"' in guard
     assert "verify_live_receipt_signature" in guard
     assert 'startswith("rollback-")' in guard
+    assert deploy["outputs"]["pages_write_outcome"] == "${{ steps.deployment.outcome }}"
+    assert _load(DEPLOY_PATH)["jobs"]["record"]["if"] == "needs.deploy.outputs.pages_write_outcome == 'success'"
 
 
 def test_soak_never_writes_pages() -> None:

@@ -621,10 +621,17 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$EXPECT_NOOP" = "true" ]; then
-            uv run python scripts/publication/verify_live.py \
-              --candidate-manifest receipt-dist/publication-receipt.json \
-              --baseline-manifest docs/operations/publication-baseline-2026-08-31.json \
-              --pre-deploy --require-receipt --expect-noop
+            LIVE_DB_SHA=$(python3 -c \
+              "import json; print(json.load(open('docs/operations/publication-baseline-2026-08-31.json'))['live_database']['sha256'])")
+            LIVE_DB_URL=$(python3 -c \
+              "import json; print(json.load(open('docs/operations/publication-baseline-2026-08-31.json'))['live_database']['url'])")
+            curl -sSL --fail --retry 3 -o live-results.duckdb "$LIVE_DB_URL"
+            [ "$(sha256sum live-results.duckdb | cut -d ' ' -f 1)" = "$LIVE_DB_SHA" ] || {
+              echo "::error::live database no longer matches the frozen baseline; refusing rehearsal"
+              exit 1
+            }
+            uv run python scripts/publication/compare_db_digest.py compare \
+              site/results/data/results.duckdb live-results.duckdb
           else
             uv run python scripts/publication/verify_live.py \
               --candidate-manifest receipt-dist/publication-receipt.json \

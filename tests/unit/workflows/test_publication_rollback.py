@@ -187,6 +187,8 @@ def test_production_requires_an_independently_approved_manifest() -> None:
     assert "--baseline-manifest receipt-dist/desired-manifest.json" in text
     assert "WORKFLOW_SHA: ${{ github.sha }}" in text
     assert '"workflow_sha": os.environ["WORKFLOW_SHA"]' in text
+    assert "scripts/publication/compare_db_digest.py compare" in text
+    assert "live database no longer matches the frozen baseline" in text
 
 
 def test_production_promotes_exact_approved_candidate_bytes() -> None:
