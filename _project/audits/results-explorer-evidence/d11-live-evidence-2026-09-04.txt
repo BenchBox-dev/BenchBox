@@ -1,0 +1,30 @@
+timestamp=2026-09-04T23:13:13Z
+
+This is a retained historical transcript. The commands and output below are
+not a new live check.
+
+$ gh api repos/BenchBox-dev/BenchBox --jq .default_branch
+develop
+
+$ gh api -i repos/BenchBox-dev/BenchBox/branches/main
+HTTP/2.0 200 OK
+{"name":"release","commit":{"sha":"4ad1d727903328702c93abf139902cee42dc3890"},"_links":{"html":"https://github.com/BenchBox-dev/BenchBox/tree/release"}}
+
+$ curl -fsSL -o /tmp/explorer-d11-main.html -w 'status %{http_code}\neffective URL %{url_effective}\n' https://github.com/BenchBox-dev/BenchBox/tree/main
+status 200
+effective URL https://github.com/BenchBox-dev/BenchBox/tree/release
+
+$ rg -o "<title>[^<]*</title>" /tmp/explorer-d11-main.html | head -1
+<title>GitHub - BenchBox-dev/BenchBox at release · GitHub</title>
+
+$ git ls-tree -r --name-only origin/develop -- CONTRIBUTING.md .github/workflows/docs.yml .github/workflows/results-explorer-browser.yml
+.github/workflows/docs.yml
+.github/workflows/results-explorer-browser.yml
+CONTRIBUTING.md
+
+$ git ls-tree -r --name-only origin/develop -- docs/development/adr/adr-explorer-cli-surface.md docs/operations/repo-admin-settings.md docs/operations/results-explorer-token-scan.md docs/operations/results-phase-2-runbook.md docs/development/benchbox-results-platform-strategy.md
+docs/development/adr/adr-explorer-cli-surface.md
+docs/development/benchbox-results-platform-strategy.md
+docs/operations/repo-admin-settings.md
+docs/operations/results-explorer-token-scan.md
+docs/operations/results-phase-2-runbook.md
