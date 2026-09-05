@@ -70,15 +70,21 @@ def test_schedule_runs_the_full_matrix() -> None:
     assert "github.event_name == 'schedule'" in selected
 
 
-def test_tpcds_runs_are_official() -> None:
-    """Unofficial TPC-DS must not be published as official."""
-    run = next(
-        step["run"]
-        for step in _workflow()["jobs"]["generate-seed-corpus"]["steps"]
-        if step.get("name") == "Run benchmark"
-    )
-    assert "--official" in run
-    assert "tpcds" in run
+def test_supported_matrix_has_three_local_identities_per_cohort() -> None:
+    """Scheduled seed updates must not depend on cloud secrets to meet the floor."""
+    entries = _workflow()["jobs"]["generate-seed-corpus"]["strategy"]["matrix"]["include"]
+    cohorts: dict[tuple[str, str], set[str]] = {}
+    for entry in entries:
+        assert entry["platform"] != "clickhouse-cloud"
+        assert "optional" not in entry
+        cohorts.setdefault((entry["benchmark"], entry["scale_factor"]), set()).add(entry["platform"])
+
+    assert cohorts == {
+        ("tpch", "0.01"): {"duckdb", "datafusion", "polars-df"},
+        ("tpch", "0.1"): {"duckdb", "datafusion", "polars-df"},
+        ("ssb", "0.01"): {"duckdb", "datafusion", "polars-df"},
+        ("ssb", "0.1"): {"duckdb", "datafusion", "polars-df"},
+    }
 
 
 def test_seed_corpus_pr_targets_develop() -> None:

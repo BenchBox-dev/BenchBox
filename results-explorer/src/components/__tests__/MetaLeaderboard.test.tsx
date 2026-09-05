@@ -195,7 +195,7 @@ describe("MetaLeaderboard", () => {
         mode="times"
         onModeChange={vi.fn()}
         resultMetadataById={new Map([
-          ["r1", { trust_label: "maintainer-run", validation_status: "exact" }],
+          ["r1", { trust_label: "maintainer-run", validation_status: "exact", run_date: "2026-04-01" }],
           ["r2", { trust_label: "community-submission", validation_status: "loose" }],
         ])}
       />,
@@ -207,6 +207,7 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("Community")).toBeTruthy();
     expect(screen.getByText("exact")).toBeTruthy();
     expect(screen.getByText("loose")).toBeTruthy();
+    expect(screen.getByRole("gridcell", { name: /Run age:/ })).toBeTruthy();
   });
 
   it("shows coverage counts and can sort by covered ranking count", () => {

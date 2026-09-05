@@ -877,6 +877,7 @@ describe("BenchmarkIndex", () => {
     expect(new URL(window.location.href).searchParams.get("view")).toBe("list");
     expect(screen.queryByRole("button", { name: /^Q1/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Q2/ })).toBeNull();
+    expect(screen.getAllByLabelText(/Run age:/).length).toBeGreaterThan(0);
   });
 
   it("restores benchmark view mode from the URL", async () => {

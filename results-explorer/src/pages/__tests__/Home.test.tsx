@@ -925,6 +925,7 @@ describe("Home", () => {
     expect(within(grid).getAllByText("Maintainer").length).toBeGreaterThan(0);
     expect(within(grid).getAllByText("Community").length).toBeGreaterThan(0);
     expect(within(grid).getAllByText("exact").length).toBeGreaterThan(0);
+    expect(within(grid).getAllByRole("gridcell", { name: /Run age:/ }).length).toBeGreaterThan(0);
   });
 
 

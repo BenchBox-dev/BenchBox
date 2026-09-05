@@ -39,6 +39,7 @@ import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { RankingEligibilityLegend, RunIdentityLabel } from "@/components/DataTable";
 import { CompareTray } from "@/components/CompareTray";
 import { TrayAnnouncer } from "@/components/TrayAnnouncer";
+import { RunAge } from "@/components/RunAge";
 import { NotFound } from "@/pages/NotFound";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
@@ -1281,7 +1282,7 @@ function BenchmarkRow({ entry, runIdentityLabel }: { entry: ResultRow; runIdenti
         )}
       </td>
       <td class="table-td">SF {entry.scale_factor}</td>
-      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.run_date}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.run_date}<RunAge runDate={entry.run_date} /></td>
       <td class="table-td font-mono">{fmtScore(entry.power_score)}</td>
       <td class="table-td font-mono">{fmtGeomean(entry.display_geomean_ms ?? entry.geomean_ms)}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.query_count}</td>

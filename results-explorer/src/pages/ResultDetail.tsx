@@ -24,6 +24,7 @@ import { formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
 import { formatDurationSeconds, formatLatencyMs } from "@/lib/metricFormatters";
 import { visibleResultIdForRow } from "@/lib/resultLinks";
 import { usePickingState } from "@/lib/pickingState";
+import { RunAge } from "@/components/RunAge";
 
 interface ResultDetailProps extends RoutableProps {
   resultId?: string;
@@ -275,7 +276,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             </div>
             <p class="text-sm text-[var(--bb-data-fg-muted)]">
               {benchmarkLabel} · SF {detail.scale_factor} · {detail.test_type ?? "standard"} · run{" "}
-              {detail.run_date.slice(0, 10)} · Public ID{" "}
+              {detail.run_date.slice(0, 10)}<RunAge runDate={detail.run_date} /> · Public ID{" "}
               <code class="font-mono text-[var(--bb-data-fg-primary)]">{visibleResultIdForRow(detail)}</code>
             </p>
           </div>
