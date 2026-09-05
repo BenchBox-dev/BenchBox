@@ -43,6 +43,7 @@ const ALLOWED_INTERNAL_FRAGMENTS = new Map<string, ReadonlySet<string>>([
     ]),
   ],
   ["lib/duckdbQueries.ts", new Set(['"/results/data/results.duckdb"'])],
+  ["lib/localResult.ts", new Set(['"benchbox.core.cost.pricing"'])],
 ]);
 
 interface Finding {
