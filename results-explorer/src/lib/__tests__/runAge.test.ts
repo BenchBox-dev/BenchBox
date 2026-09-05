@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRunAge } from "@/lib/runAge";
+import { formatRunAge, formatRunDate, formatRunDateWithAge } from "@/lib/runAge";
 
 describe("formatRunAge", () => {
   const reference = new Date("2026-09-05T00:30:00Z");
@@ -36,5 +36,11 @@ describe("formatRunAge", () => {
 
   it("omits age when the injected reference is invalid", () => {
     expect(formatRunAge("2026-09-05", new Date("invalid"))).toBeNull();
+  });
+
+  it("shares the UTC date contract with reader-facing date labels", () => {
+    expect(formatRunDate("2026-09-05T00:15:00+14:00")).toBe("2026-09-04");
+    expect(formatRunDateWithAge("2026-09-05T00:15:00+14:00", reference)).toBe("2026-09-04 (1 day ago)");
+    expect(formatRunDate("2026-09-05Tnot-a-time")).toBe("2026-09-05Tnot-a-time");
   });
 });

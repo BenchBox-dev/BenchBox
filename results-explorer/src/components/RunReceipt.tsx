@@ -12,7 +12,7 @@ import {
 import { StatusBadge } from "@/components/StatusBadge";
 import { TuningVerificationBadge } from "@/components/TuningVerificationBadge";
 import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
-import { formatRunAge } from "@/lib/runAge";
+import { formatRunDateWithAge } from "@/lib/runAge";
 
 interface RunReceiptProps {
   detail: DetailResult;
@@ -224,11 +224,6 @@ export function RunReceipt({
       </div>
     </section>
   );
-}
-
-function formatRunDateWithAge(runDate: string): string {
-  const age = formatRunAge(runDate);
-  return age === null ? runDate : `${runDate.slice(0, 10)} (${age})`;
 }
 
 function ReceiptSection({

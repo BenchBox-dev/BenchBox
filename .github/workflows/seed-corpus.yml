@@ -147,12 +147,16 @@ jobs:
       - name: Run benchmark
         if: env.SELECTED == 'true'
         run: |
-          uv run benchbox run \
+          command=(uv run benchbox run \
             --platform "${{ matrix.platform }}" \
             --benchmark "${{ matrix.benchmark }}" \
             --scale "${{ matrix.scale_factor }}" \
             --phases generate,load,power \
-            --compression zstd:9
+            --compression zstd:9)
+          if [ "${{ matrix.benchmark }}" = "tpcds" ]; then
+            command+=(--official --seed 42)
+          fi
+          "${command[@]}"
 
       - name: Locate result bundle
         if: env.SELECTED == 'true'

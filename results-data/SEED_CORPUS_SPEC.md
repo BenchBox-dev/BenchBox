@@ -88,6 +88,10 @@ The workflow includes `polars-df` for TPC-H SF 0.01/0.1 and SSB. TPC-H SF 1
 and TPC-DS use `clickhouse-local` as their local third identity because the
 admitted matrix does not rely on Polars DataFrame support there.
 
+TPC-DS SF 1 jobs also run with `--official --seed 42`. This benchmark-specific
+command is required for the scheduled output to be compliance-admissible; all
+other matrix entries retain the generic local command.
+
 ### Timestamp contract
 
 Run age uses `run.timestamp`. A plain `YYYY-MM-DD` is an explicit UTC calendar

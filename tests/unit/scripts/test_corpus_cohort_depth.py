@@ -362,6 +362,27 @@ def test_missing_run_timestamp_is_omitted_from_recency(tmp_path: Path) -> None:
     assert per_cohort[("tpch", "1.0")].bundle_count == 1
 
 
+def test_recency_names_missing_parseable_timestamps_when_bundles_exist(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A populated corpus with bad dates is distinct from an empty corpus."""
+    validator = _load_validator()
+    for platform in ("DuckDB", "DataFusion", "Spark"):
+        _write_bundle(
+            tmp_path,
+            f"{platform}.json",
+            benchmark="tpch",
+            scale=1.0,
+            platform=platform,
+            run_timestamp="2026-09-05Tnot-a-time",
+        )
+
+    assert validator.main(tmp_path, as_of=dt.date(2026, 9, 5)) == 0
+    captured = capsys.readouterr().out
+    assert "Overall: no parseable run timestamps" in captured
+    assert "Overall: no bundles" not in captured
+
+
 def test_timestamp_less_bundle_does_not_fail_depth_exit(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """main() on a deep-enough cohort with a timestamp-less bundle exits 0."""
     validator = _load_validator()

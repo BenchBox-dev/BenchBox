@@ -240,7 +240,7 @@ def format_recency_report(
         f"  as_of={as_of.isoformat()}",
     ]
     if overall is None:
-        lines.append("  Overall: no bundles")
+        lines.append("  Overall: no parseable run timestamps")
         return "\n".join(lines)
     lines.append(
         "  Overall: "

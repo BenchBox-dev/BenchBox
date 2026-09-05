@@ -25,6 +25,7 @@ import { CDFChart } from "@/components/CDFChart";
 import { RankTable } from "@/components/RankTable";
 import { fmtGeomean, fmtScore } from "@/utils";
 import { paletteColor } from "@/lib/chartTheme";
+import { formatRunDateWithAge } from "@/lib/runAge";
 import {
   formatRunIdentitiesForCohort,
   formatRunIdentityLabelsForCohort,
@@ -871,7 +872,7 @@ function SummaryBoxPanel({
       <div class="grid gap-3 sm:grid-cols-3">
         <SummaryStat label="Runs" value={String(historical.length)} />
         <SummaryStat label="Benchmarks" value={String(benchmarks.size)} />
-        <SummaryStat label="Latest run" value={latest ? latest.run_date.slice(0, 10) : "-"} />
+        <SummaryStat label="Latest run" value={latest ? formatRunDateWithAge(latest.run_date) : "-"} />
       </div>
     );
   }

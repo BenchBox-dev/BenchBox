@@ -510,7 +510,7 @@ describe("Query", () => {
     expect(within(resultsTable).getByRole("columnheader", { name: /^Run date/ })).toBeTruthy();
     expect(within(resultsTable).getByRole("columnheader", { name: /^Geomean latency/ })).toBeTruthy();
     expect(within(resultsTable).getAllByText("SF 0.1").length).toBeGreaterThan(0);
-    expect(within(resultsTable).getAllByText("2026-04-17").length).toBeGreaterThan(0);
+    expect(within(resultsTable).getAllByText(/2026-04-17.*days ago/).length).toBeGreaterThan(0);
     expect(within(resultsTable).getByText("10 ms")).toBeTruthy();
 
     fireEvent.click(screen.getByText("Configure visible columns"));

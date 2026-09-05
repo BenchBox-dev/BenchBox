@@ -711,6 +711,7 @@ describe("Compare", () => {
     expect(screen.getAllByText(/vs worst/i).length).toBeGreaterThan(0);
     // The computed ratio: 10.00x
     expect(screen.getAllByText("10.00x").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/2026-04-01.*days ago/).length).toBeGreaterThan(0);
   });
 
   it("renders a funding chip on the primary compare cards, not just the builder table", async () => {

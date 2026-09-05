@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { FundingChip } from "@/components/FundingChip";
+import { RunDateWithAge } from "@/components/RunAge";
 import { TrustBadge } from "@/components/TrustBadge";
 
 export interface CompareTrayItem {
@@ -142,7 +143,7 @@ export function CompareTray({ summary, items, compareHref, compareLabel, onClear
                   <span>{item.benchmarkLabel}</span>
                   <span>SF {item.scaleFactor}</span>
                   <span>{item.phase}</span>
-                  <span>{item.runDate}</span>
+                  <RunDateWithAge runDate={item.runDate} />
                   <TrustBadge trustLabel={item.trustLabel} compact />
                   <FundingChip funding={item.funding} compact />
                   <span class="font-mono text-[var(--bb-data-fg-muted)]">Public ID {item.visibleResultId}</span>

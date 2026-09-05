@@ -93,6 +93,7 @@ import { ChartPanel } from "@/components/ChartPanel";
 import { Select } from "@/components/Select";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
+import { RunDateWithAge } from "@/components/RunAge";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import {
   planCompareIds,
@@ -813,7 +814,7 @@ export function Compare({ url }: CompareProps) {
                 </div>
               </div>
               <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]">
-                {r.runDate.slice(0, 10)}
+                <RunDateWithAge runDate={r.runDate} />
                 {r.driverVersion && !r.label.includes(`v${r.driverVersion}`) && ` · v${r.driverVersion}`}
               </p>
               <p class="mb-3 font-mono text-xs text-[var(--bb-data-fg-muted)]">Public ID {r.publicId}</p>
@@ -1427,7 +1428,7 @@ function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice:
                   <td class="table-td">{humanizeBenchmark(row.benchmark)}</td>
                   <td class="table-td font-mono">SF {row.scale_factor}</td>
                   <td class="table-td">{row.test_type ?? "-"}</td>
-                  <td class="table-td">{row.run_date.slice(0, 10)}</td>
+                  <td class="table-td"><RunDateWithAge runDate={row.run_date} /></td>
                   <td class="table-td">
                     <div class="flex flex-wrap gap-1">
                       <TrustBadge trustLabel={row.trust_label} compact />

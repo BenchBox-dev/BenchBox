@@ -100,6 +100,24 @@ def test_seed_corpus_local_jobs_do_not_reference_cloud_credentials() -> None:
     assert "matrix.optional" not in workflow_text
 
 
+def test_tpcds_matrix_jobs_run_with_official_seeded_command() -> None:
+    """TPC-DS output is merge-ready only when the scheduled command is official and seeded."""
+    workflow = _workflow()
+    entries = workflow["jobs"]["generate-seed-corpus"]["strategy"]["matrix"]["include"]
+    assert all(
+        entry["benchmark"] == "tpcds" and entry["scale_factor"] == "1"
+        for entry in entries
+        if entry["benchmark"] == "tpcds"
+    )
+
+    run_step = next(
+        step["run"] for step in workflow["jobs"]["generate-seed-corpus"]["steps"] if step.get("name") == "Run benchmark"
+    )
+    assert 'if [ "${{ matrix.benchmark }}" = "tpcds" ]; then' in run_step
+    assert "command+=(--official --seed 42)" in run_step
+    assert '"${command[@]}"' in run_step
+
+
 def test_seed_corpus_pr_targets_develop() -> None:
     """The seed corpus PR opens against `develop`, the default branch.
 

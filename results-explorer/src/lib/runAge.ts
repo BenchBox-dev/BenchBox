@@ -24,6 +24,20 @@ export function formatRunAge(runDate: string | null | undefined, reference = new
   return `in ${Math.abs(days)} days`;
 }
 
+/** Formats a strict run timestamp as its UTC calendar date for display. */
+export function formatRunDate(runDate: string | null | undefined): string {
+  const runDay = utcCalendarDay(runDate);
+  if (runDay === null) return runDate ?? "Not recorded";
+  return new Date(runDay).toISOString().slice(0, 10);
+}
+
+/** Formats a run's UTC calendar date and its informational age in one label. */
+export function formatRunDateWithAge(runDate: string | null | undefined, reference = new Date()): string {
+  const date = formatRunDate(runDate);
+  const age = formatRunAge(runDate, reference);
+  return age === null ? date : `${date} (${age})`;
+}
+
 function utcCalendarDay(value: string | Date | null | undefined): number | null {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) return null;

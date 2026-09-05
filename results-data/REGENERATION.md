@@ -120,8 +120,9 @@ variants both landed under `tuning_mode=tuned`).
 # Post-2026-08-23 trust cut — remaining-gap restore
 
 **Related TODO:** `restore-corpus-coverage-after-20260823-trust-cut`
-**Live revalidation:** 2026-09-04 against `results-data/corpus-inventory.json`
-(`generated_at` 2026-09-01) and `results-data/validate_corpus.py` (exit 0).
+**Checked-in validation:** The checked-in inventory and `results-data/validate_corpus.py`
+are the current source of corpus counts and validation status. Regenerate and check
+the inventory before relying on either value.
 
 ## What happened
 
@@ -132,8 +133,8 @@ Do not restore withdrawn bundles from git history.
 
 ## Live already-OK cohorts (do not re-run)
 
-As of the 2026-09-04 live inventory the corpus holds **244 bundles**, **16
-benchmarks**, and **42 cohorts**, all at the >=3-identity floor. These
+The checked-in inventory records **244 bundles**, **16 benchmarks**, and **42
+cohorts**, all at the >=3-identity floor. These
 benchmarks already have comparable local coverage and must not be re-run for
 this restore:
 
