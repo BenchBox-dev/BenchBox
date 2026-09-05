@@ -13,10 +13,14 @@ test("matrix direction uses one reading rule across every visible column", async
   const rankingHeaders = grid.locator("thead th").filter({ has: page.locator("a[href]") });
   const headerCount = await rankingHeaders.count();
   expect(headerCount).toBeGreaterThan(0);
+
+  const sharedLegend = page.locator("#meta-leaderboard-legend");
+  await expect(sharedLegend).toContainText("farther from the best result (1.00×)");
+  await expect(sharedLegend).toContainText("Values below 1.00× are worse");
+
   for (let index = 0; index < headerCount; index += 1) {
     const header = rankingHeaders.nth(index);
-    await expect(header).toContainText("Relative to best · 1.00× is best; lower is worse");
-    await expect(header).toContainText("Measured value:");
+    await expect(header).toContainText(/(higher|lower) is better/);
   }
 
   const rankedCells = grid.locator('tbody [role="gridcell"]:has-text("Native:")');

@@ -202,7 +202,7 @@ test.describe("@followup-usability release-gate route walk", () => {
     // "Run details" disclosure so the dense timing cells stay
     // scannable. Open the disclosure before asserting receipt links.
     await firstHeatmapRow.locator("summary", { hasText: /Run details/ }).click();
-    await expect(firstHeatmapRow.getByRole("link", { name: /Receipt/ }).first()).toBeVisible();
+    await expect(firstHeatmapRow.getByRole("link", { name: /^Open receipt for / }).first()).toBeVisible();
 
     await maybeCapture(page, "benchmark-detail-switcher-and-sticky-header");
   });

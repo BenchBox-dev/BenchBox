@@ -76,10 +76,10 @@ test.describe("Index sortable headers", () => {
     await platformHeader.getByRole("button", { name: /Platform/ }).click();
 
     await expect(platformHeader).toHaveAttribute("aria-sort", "ascending");
-    // QueryHeatmap sorts by the platform display name, while the cell also
-    // carries version and receipt metadata. Read the visible platform label
-    // element instead of sorting the whole cell text.
-    const platforms = await platformCellLabels(rows, 1);
+    // QueryHeatmap sorts by platform. Duplicate platform rows now carry the
+    // version, date, trust source, and public ID needed to distinguish them,
+    // so compare only the platform portion of each visible identity.
+    const platforms = (await platformCellLabels(rows, 1)).map((label) => label.split(" · ")[0] ?? label);
     expect(platforms).toEqual([...platforms].sort((a, b) => a.localeCompare(b)));
   });
 
