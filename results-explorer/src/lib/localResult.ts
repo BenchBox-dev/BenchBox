@@ -106,7 +106,7 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
   const tuning = objectValue(platform, "tuning");
   const logicalProfile = objectValue(tuning, "logical_profile");
   const funding = fundingSource(bundle.provenance);
-  const costUsd = normalizedCostUsd(bundle);
+  const normalizedCost = normalizedCostFields(bundle);
 
   const detail: DetailResult = {
     result_id: resultId,
@@ -151,7 +151,8 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
     tuning_policy_generation: stringOrNull(tuning.tuning_policy_generation),
     test_type: testType(bundle, benchmark),
     validation_status: validationStatus,
-    cost_usd: costUsd,
+    cost_usd: normalizedCost.normalized_cost_usd,
+    ...normalizedCost,
     compliance_class: stringOrNull(benchmark.compliance_class),
     physical_mechanisms: Array.isArray(logicalProfile.physical_mechanisms)
       ? logicalProfile.physical_mechanisms.map(String)
@@ -375,19 +376,32 @@ function translationIsNonClean(bundle: JsonObject): boolean {
   return status === "fallback" || status === "failed";
 }
 
-function normalizedCostUsd(bundle: JsonObject): number | null {
+function normalizedCostFields(bundle: JsonObject) {
   const root = objectValue(bundle, "normalized_cost");
-  if (Object.keys(root).length > 0) return finiteNumberOrNull(root.normalized_cost_usd);
-
   const cost = objectValue(bundle, "cost");
-  for (const key of ["normalized_cost", "normalized"]) {
-    const nested = objectValue(cost, key);
-    if (Object.keys(nested).length > 0) return finiteNumberOrNull(nested.normalized_cost_usd);
-  }
+  const nestedNormalizedCost = objectValue(cost, "normalized_cost");
+  const nestedNormalized = objectValue(cost, "normalized");
   const hasNormalizedCostShape = [
     "normalized_cost_usd", "cost_model_version", "cost_model_source", "cost_scope", "cost_status",
   ].some((key) => Object.prototype.hasOwnProperty.call(cost, key));
-  return hasNormalizedCostShape ? finiteNumberOrNull(cost.normalized_cost_usd) : null;
+  const normalized = Object.keys(root).length > 0
+    ? root
+    : Object.keys(nestedNormalizedCost).length > 0
+      ? nestedNormalizedCost
+      : Object.keys(nestedNormalized).length > 0
+        ? nestedNormalized
+        : hasNormalizedCostShape
+          ? cost
+          : {};
+  return {
+    normalized_cost_usd: finiteNumberOrNull(normalized.normalized_cost_usd),
+    cost_model_version: stringOrNull(normalized.cost_model_version),
+    cost_model_source: stringOrNull(normalized.cost_model_source),
+    cost_scope: stringOrNull(normalized.cost_scope),
+    cost_status: stringOrNull(normalized.cost_status),
+    billing_unit: stringOrNull(normalized.billing_unit),
+    pricing_region: stringOrNull(normalized.pricing_region),
+  };
 }
 
 function testType(bundle: JsonObject, benchmark: JsonObject): string | null {

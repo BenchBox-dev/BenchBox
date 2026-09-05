@@ -183,6 +183,32 @@ describe("local result import", () => {
     expect(preview.detail.validation_status).toBe("uncertain");
   });
 
+  it("projects canonical normalized cost metadata", async () => {
+    const value = bundle({
+      normalized_cost: {
+        normalized_cost_usd: 1.25,
+        cost_model_version: "2026-08",
+        cost_model_source: "benchbox",
+        cost_scope: "compute_only",
+        cost_status: "normalized",
+        billing_unit: "hour",
+        pricing_region: "us-east-1",
+      },
+    });
+    const preview = await parseLocalResultText(JSON.stringify(value));
+
+    expect(preview.detail).toMatchObject({
+      cost_usd: 1.25,
+      normalized_cost_usd: 1.25,
+      cost_model_version: "2026-08",
+      cost_model_source: "benchbox",
+      cost_scope: "compute_only",
+      cost_status: "normalized",
+      billing_unit: "hour",
+      pricing_region: "us-east-1",
+    });
+  });
+
   it("matches publication fallbacks for optional display fields", async () => {
     const value = bundle({
       benchmark: { id: "tpch", name: "TPC-H", scale_factor: 1 },
