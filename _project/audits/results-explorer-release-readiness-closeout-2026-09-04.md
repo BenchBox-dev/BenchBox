@@ -188,7 +188,7 @@ be acquired. The concrete remaining defects are named above for the manager to
 create or route through the tracker using the distinct requested actor; no
 sibling item was claimed or released.
 
-Disposition count: fixed 23; accepted 4; superseded 2; still blocking 0 in the
+Disposition count: fixed 22; accepted 4; superseded 2; still blocking 0 in the
 historical D/N matrix. Current closeout gate remains **not certified** until
 the two new frontend timeouts and the environment-blocked required runs are
 resolved or independently attested.
