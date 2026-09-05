@@ -40,24 +40,26 @@ def test_check_codeowners_missing_patterns(monkeypatch: pytest.MonkeyPatch, tmp_
 
 def test_check_permissions_journal_role() -> None:
     # Journal role requires ONLY contents write
-    journal_perms = {"contents"}
+    journal_perms = {"contents": "write"}
     assert control_mod.check_permissions(journal_perms, role="journal") == []
 
     # Missing contents fails
-    assert len(control_mod.check_permissions(set(), role="journal")) == 1
+    assert len(control_mod.check_permissions({}, role="journal")) == 1
+    assert control_mod.check_permissions({"contents": "read"}, role="journal")
+    assert control_mod.check_permissions({"contents": "write", "workflows": "write"}, role="journal")
 
 
 def test_check_permissions_legacy_app_role() -> None:
     # Legacy app role requires contents, pull_requests, and workflows
-    full_perms = {"contents", "pull_requests", "workflows"}
+    full_perms = {"contents": "write", "pull_requests": "write", "workflows": "write"}
     assert control_mod.check_permissions(full_perms, role="legacy_app") == []
 
     # Journal-only perms fail legacy_app check
-    journal_perms = {"contents"}
+    journal_perms = {"contents": "write"}
     errors = control_mod.check_permissions(journal_perms, role="legacy_app")
-    assert len(errors) == 1
-    assert "pull_requests" in errors[0]
-    assert "workflows" in errors[0]
+    assert len(errors) == 2
+    assert "pull_requests" in "\n".join(errors)
+    assert "workflows" in "\n".join(errors)
 
 
 def test_check_branch_protection_passes_when_safe() -> None:

@@ -128,8 +128,8 @@ function sanitizeCreateResponse(data, defaultBuildVersion) {
       id: null,
       status_url: null,
       page_url: null,
-      pages_build_version: defaultBuildVersion,
-      created_at: new Date().toISOString(),
+      pages_build_version: null,
+      created_at: null,
     };
   }
 
@@ -139,8 +139,8 @@ function sanitizeCreateResponse(data, defaultBuildVersion) {
     page_url: data.page_url ? String(data.page_url) : null,
     pages_build_version: data.pages_build_version
       ? String(data.pages_build_version)
-      : defaultBuildVersion,
-    created_at: data.created_at ? String(data.created_at) : new Date().toISOString(),
+      : null,
+    created_at: data.created_at ? String(data.created_at) : null,
   };
 }
 

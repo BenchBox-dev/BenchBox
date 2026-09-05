@@ -155,6 +155,23 @@ def test_create_deployment_redacts_secret_in_error() -> None:
     assert secret_token in result["masked_secrets"]
 
 
+def test_create_response_does_not_fabricate_provider_acknowledgement() -> None:
+    result = run_harness(
+        {
+            "action": "create",
+            "effect": {
+                "owner": "BenchBox-dev",
+                "repo": "BenchBox",
+                "artifact_id": 42,
+                "pages_build_version": VALID_SHA,
+            },
+            "mock": {"post_response": {"id": "deploy-12345"}},
+        }
+    )
+    assert result["result"]["pages_build_version"] is None
+    assert result["result"]["created_at"] is None
+
+
 def test_get_deployment_status_success() -> None:
     payload = {
         "action": "status",

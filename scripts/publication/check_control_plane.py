@@ -28,8 +28,8 @@ REPO = "BenchBox-dev/BenchBox"
 PUBLICATION_BRANCH = "publication"
 
 # Journal updates require contents write only; PR/workflow writes are not required
-REQUIRED_JOURNAL_PERMISSIONS = {"contents"}
-REQUIRED_LEGACY_APP_PERMISSIONS = {"contents", "pull_requests", "workflows"}
+REQUIRED_JOURNAL_PERMISSIONS = {"contents": "write"}
+REQUIRED_LEGACY_APP_PERMISSIONS = {"contents": "write", "pull_requests": "write", "workflows": "write"}
 REQUIRED_APP_PERMISSIONS = REQUIRED_JOURNAL_PERMISSIONS
 
 
@@ -57,17 +57,16 @@ def check_codeowners() -> list[str]:
     return errors
 
 
-def check_permissions(perms: set[str], role: str = "journal") -> list[str]:
+def check_permissions(perms: dict[str, str], role: str = "journal") -> list[str]:
     """Check that token/app permissions satisfy the least-privilege contract for the given role."""
     errors: list[str] = []
-    if role in ("journal", "all"):
-        missing = REQUIRED_JOURNAL_PERMISSIONS - perms
-        if missing:
-            errors.append(f"Missing required permissions for journal role: {sorted(missing)}")
-    if role in ("legacy_app", "all"):
-        missing = REQUIRED_LEGACY_APP_PERMISSIONS - perms
-        if missing:
-            errors.append(f"Missing required permissions for legacy_app role: {sorted(missing)}")
+    required = REQUIRED_JOURNAL_PERMISSIONS if role == "journal" else REQUIRED_LEGACY_APP_PERMISSIONS
+    for name, level in required.items():
+        if perms.get(name) != level:
+            errors.append(f"Permission {name!r} must be {level!r}, got {perms.get(name)!r}")
+    excess = set(perms) - set(required)
+    if excess:
+        errors.append(f"Excess permissions for {role} role: {sorted(excess)}")
     return errors
 
 
@@ -152,7 +151,7 @@ def check_live_app_and_branch(role: str = "journal") -> list[str]:
                 if not matching:
                     errors.append("Live check: GitHub App is not installed on account 'BenchBox-dev'")
                 else:
-                    perms = set(matching[0].get("permissions", {}).keys())
+                    perms = matching[0].get("permissions", {})
                     perm_errors = check_permissions(perms, role=role)
                     errors.extend(perm_errors)
         except Exception as e:
