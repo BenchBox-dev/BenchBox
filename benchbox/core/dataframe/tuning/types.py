@@ -112,6 +112,12 @@ class DataFrameTuningType(Enum):
 # Platform compatibility matrix
 # Maps platform names to sets of supported tuning types
 _PLATFORM_COMPATIBILITY: dict[str, set[DataFrameTuningType]] = {
+    "datafusion": {
+        # These are applied to SessionConfig as target partitions and record
+        # batch size when the lazy session context is materialized.
+        DataFrameTuningType.THREAD_COUNT,
+        DataFrameTuningType.CHUNK_SIZE,
+    },
     "polars": {
         DataFrameTuningType.THREAD_COUNT,
         DataFrameTuningType.CHUNK_SIZE,

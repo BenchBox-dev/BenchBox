@@ -177,17 +177,39 @@ class TestRuntimeSettingsRecorded:
 
     @pytest.mark.skipif(not DASK_AVAILABLE, reason="Dask not installed")
     def test_tuned_dask_local_cluster_records_consumed_settings(self, monkeypatch):
-        monkeypatch.setattr(DaskDataFrameAdapter, "_setup_distributed", lambda self: None)
+        captured: dict[str, object] = {}
+
+        class FakeCluster:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+                self.scheduler = SimpleNamespace(address="tcp://fixture:8786")
+                self.workers = {}
+
+        class FakeClient:
+            def __init__(self, cluster):
+                self.cluster = cluster
+
+        monkeypatch.setattr("benchbox.platforms.dataframe.dask_df.LocalCluster", FakeCluster)
+        monkeypatch.setattr("benchbox.platforms.dataframe.dask_df.Client", FakeClient)
         adapter = DaskDataFrameAdapter(
             use_distributed=True,
             tuning_config=_dask_worker_config(),
         )
         statements = {s.statement for s in adapter._applied_tuning_ledger.statements}
+
+        assert captured["n_workers"] == 3
+        assert captured["threads_per_worker"] == 2
         assert statements == {"n_workers=3", "threads_per_worker=2"}
 
     @pytest.mark.skipif(not DASK_AVAILABLE, reason="Dask not installed")
     def test_tuned_dask_records_applied_runtime_settings(self, monkeypatch):
-        monkeypatch.setattr(DaskDataFrameAdapter, "_setup_distributed", lambda self: None)
+        class FakeCluster:
+            def __init__(self, **_kwargs):
+                self.scheduler = SimpleNamespace(address="tcp://fixture:8786")
+                self.workers = {}
+
+        monkeypatch.setattr("benchbox.platforms.dataframe.dask_df.LocalCluster", FakeCluster)
+        monkeypatch.setattr("benchbox.platforms.dataframe.dask_df.Client", lambda cluster: cluster)
         adapter = DaskDataFrameAdapter(
             use_distributed=True,
             tuning_config=_dask_worker_config(),
@@ -346,7 +368,13 @@ class TestRunBenchmarkCarriesLedger:
 
     @pytest.mark.skipif(not DASK_AVAILABLE, reason="Dask not installed")
     def test_tuned_dask_run_result_carries_ledger_and_applied_unverified(self, monkeypatch):
-        monkeypatch.setattr(DaskDataFrameAdapter, "_setup_distributed", lambda self: None)
+        class FakeCluster:
+            def __init__(self, **_kwargs):
+                self.scheduler = SimpleNamespace(address="tcp://fixture:8786")
+                self.workers = {}
+
+        monkeypatch.setattr("benchbox.platforms.dataframe.dask_df.LocalCluster", FakeCluster)
+        monkeypatch.setattr("benchbox.platforms.dataframe.dask_df.Client", lambda cluster: cluster)
         adapter = DaskDataFrameAdapter(
             use_distributed=True,
             tuning_config=_dask_worker_config(),

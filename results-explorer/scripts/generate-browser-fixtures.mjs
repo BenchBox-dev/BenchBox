@@ -19,6 +19,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -30,6 +31,7 @@ const repoRoot = resolve(projectRoot, "..");
 
 const sourceRoot = join(projectRoot, "test-fixtures", "source");
 const sourceBundlesDir = join(sourceRoot, "bundles");
+const sourceProvenanceDir = join(sourceRoot, "provenance");
 const customGenRoot = process.env.E2E_FIXTURE_OUTPUT_ROOT;
 const genRoot = resolve(customGenRoot ?? join(projectRoot, "test-fixtures", ".generated"));
 if (customGenRoot && !basename(genRoot).startsWith("benchbox-large-browser-fixture-")) {
@@ -44,6 +46,19 @@ const genDataDir = join(genRoot, "data");
 const FIXTURE_PROFILE = process.env.E2E_FIXTURE_PROFILE ?? "default";
 const LARGE_CORPUS_ADDITIONAL_RESULTS = 280;
 const LARGE_CORPUS_RUN_ID_PREFIX = "9c0925d1-large-corpus-";
+const PANDAS_SOURCE_BUNDLE = "tpch-pandas-sf0.01-20260826-8bde2222.json";
+const PANDAS_STANDARD_FIXTURE_RUN_ID = "8bde2222-fixture-standard";
+
+// The Pandas source is an immutable copy of a real power run. The browser
+// compare cohort needs a standard-phase Pandas row, so it is emitted only as a
+// plainly synthetic fixture variant below, never normalized in place.
+const SOURCE_BINDINGS = [
+  {
+    fixtureBundle: PANDAS_SOURCE_BUNDLE,
+    manifest: "tpch-pandas-sf0.01-20260826-8bde2222.source.manifest.json",
+  },
+];
+const SYNTHETIC_CANONICAL_SOURCES = new Set(SOURCE_BINDINGS.map(({ fixtureBundle }) => fixtureBundle));
 
 if (!new Set(["default", "large"]).has(FIXTURE_PROFILE)) {
   throw new Error(`unsupported E2E_FIXTURE_PROFILE=${FIXTURE_PROFILE}; expected default or large`);
@@ -55,6 +70,35 @@ const assertExplorerBuildContract = () => {
   return contract;
 };
 
+const sha256 = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
+
+const verifySourceBindings = () => {
+  for (const binding of SOURCE_BINDINGS) {
+    const manifestPath = join(sourceProvenanceDir, binding.manifest);
+    if (!existsSync(manifestPath)) {
+      throw new Error(`source binding manifest not found: ${manifestPath}`);
+    }
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    const fixturePath = join(sourceBundlesDir, binding.fixtureBundle);
+    const sourcePath = resolve(repoRoot, manifest.source_bundle ?? "");
+    if (manifest.fixture_bundle !== binding.fixtureBundle || !existsSync(fixturePath) || !existsSync(sourcePath)) {
+      throw new Error(`invalid source binding in ${manifestPath}`);
+    }
+    const expectedHash = manifest.bundle_hash;
+    if (typeof expectedHash !== "string" || sha256(fixturePath) !== expectedHash || sha256(sourcePath) !== expectedHash) {
+      throw new Error(`source binding hash mismatch for ${binding.fixtureBundle}`);
+    }
+  }
+  log(`verified ${SOURCE_BINDINGS.length} immutable source binding(s)`);
+};
+
+const asSyntheticStandardPandasFixture = (bundle) => {
+  const mutated = structuredClone(bundle);
+  mutated.benchmark = { ...(mutated.benchmark ?? {}), test_type: "standard" };
+  mutated.run = { ...(mutated.run ?? {}), id: PANDAS_STANDARD_FIXTURE_RUN_ID };
+  return mutated;
+};
+
 /**
  * Metadata variants applied to the generator output. Each entry takes a
  * source bundle filename and produces one or more derived bundles plus
@@ -63,6 +107,15 @@ const assertExplorerBuildContract = () => {
  * for happy-path assertions.
  */
 const VARIANTS = [
+  {
+    // The source is a real power run. This separate, explicitly named synthetic
+    // row supplies the standard-phase Pandas comparison fixture without
+    // relabelling the contributed evidence itself.
+    source: PANDAS_SOURCE_BUNDLE,
+    subdir: "synthetic",
+    derived: "tpch-fixture-pandas-standard-sf0.01-20260826.json",
+    mutate: asSyntheticStandardPandasFixture,
+  },
   {
     // Community-submission variant: derived from the TPC-H DuckDB bundle.
     // The explorer pipeline promotes every bundle that lives next to a
@@ -136,14 +189,12 @@ const VARIANTS = [
     // under the top-level `vendor/` subtree receive `trust_label=vendor-supplied`
     // from the explorer pipeline. Keep this subtree free of community
     // submission-manifest sidecars so the label stays unambiguous.
-    source: "tpch-pandas-sf0.01-20260826-8bde2222.json",
+    source: PANDAS_SOURCE_BUNDLE,
     subdir: "vendor",
     derived: "tpch-pandas-sf0.01-20260826-vendor.json",
     mutate: (bundle) => {
-      const mutated = structuredClone(bundle);
-      if (mutated.run) {
-        mutated.run.id = `${mutated.run.id ?? "run"}-vendor`;
-      }
+      const mutated = asSyntheticStandardPandasFixture(bundle);
+      mutated.run.id = `${mutated.run.id}-vendor`;
       return mutated;
     },
   },
@@ -151,7 +202,7 @@ const VARIANTS = [
     // Second tuned/notuned pair: Pandas mirror of the DuckDB tuned variant.
     // Gives the honesty controls a ≥2-platform tuned cohort without adding
     // extra DuckDB or Polars rows (those platforms have hard-coded e2e counts).
-    source: "tpch-pandas-sf0.01-20260826-8bde2222.json",
+    source: PANDAS_SOURCE_BUNDLE,
     subdir: "tuned-pandas",
     derived: "tpch-pandas-sf0.01-20260826-tuned.json",
     sidecars: {
@@ -165,11 +216,9 @@ const VARIANTS = [
       },
     },
     mutate: (bundle) => {
-      const mutated = structuredClone(bundle);
+      const mutated = asSyntheticStandardPandasFixture(bundle);
       mutated.config = { ...(mutated.config ?? {}), tuning_mode: "tuned" };
-      if (mutated.run) {
-        mutated.run.id = `${mutated.run.id ?? "run"}-tuned`;
-      }
+      mutated.run.id = `${mutated.run.id}-tuned`;
       return mutated;
     },
   },
@@ -526,13 +575,6 @@ function omitMeasurementQuery(bundle, queryId) {
 
 const withNormalizedEnvironment = (bundle) => {
   const mutated = structuredClone(bundle);
-  // The checked-in Pandas source was captured as a power run, but the browser
-  // compare fixture needs one coherent TPC-H phase across its four canonical
-  // source platforms. Keep the source corpus unchanged and normalize only the
-  // generated fixture copy.
-  if (platformKey(mutated) === "pandas" && mutated.benchmark?.id === "tpch") {
-    mutated.benchmark = { ...(mutated.benchmark ?? {}), test_type: "standard" };
-  }
   const metadata = LOCAL_PLATFORM_METADATA[platformKey(mutated)];
   const environment = mutated.environment && typeof mutated.environment === "object" ? mutated.environment : {};
   const platform = mutated.platform && typeof mutated.platform === "object" ? mutated.platform : {};
@@ -572,7 +614,9 @@ const wipeGenerated = () => {
 
 const copySources = () => {
   const entries = readdirSync(sourceBundlesDir, { withFileTypes: true });
-  const files = entries.filter((e) => e.isFile() && e.name.endsWith(".json"));
+  const files = entries.filter(
+    (e) => e.isFile() && e.name.endsWith(".json") && !SYNTHETIC_CANONICAL_SOURCES.has(e.name),
+  );
   if (files.length === 0) {
     throw new Error(`no source bundles found under ${sourceBundlesDir}`);
   }
@@ -669,9 +713,9 @@ const FIXTURE_ROLES = {
   "9c0925d1-env-container-local": "containerLocal",
   "9c0925d1-env-gcp-serverless": "gcpServerless",
   "9c0925d1-zero-timing": "zeroTiming",
-  "8bde2222": "pandas",
-  "8bde2222-vendor": "pandasVendor",
-  "8bde2222-tuned": "pandasTuned",
+  [PANDAS_STANDARD_FIXTURE_RUN_ID]: "pandas",
+  [`${PANDAS_STANDARD_FIXTURE_RUN_ID}-vendor`]: "pandasVendor",
+  [`${PANDAS_STANDARD_FIXTURE_RUN_ID}-tuned`]: "pandasTuned",
   c235e698: "datafusion",
   "c235e698-partial-query": "datafusionPartial",
   d4ec318a: "starSchema",
@@ -766,6 +810,7 @@ const main = () => {
   log(`sourceRoot=${sourceRoot}`);
   log(`genRoot=${genRoot}`);
   log(`profile=${FIXTURE_PROFILE}`);
+  verifySourceBindings();
   const contract = assertExplorerBuildContract();
   wipeGenerated();
   copySources();

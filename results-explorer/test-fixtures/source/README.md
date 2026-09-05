@@ -23,6 +23,13 @@ full rationale.
   compare-invalid benchmark-mismatch hard-block test can reference a
   real bundle rather than a synthesised stub.
 
+The Pandas input is a byte-for-byte copy of the immutable internal corpus
+bundle named in `provenance/tpch-pandas-sf0.01-20260826-8bde2222.source.manifest.json`.
+The generator verifies both hashes before use. Its source is a `power` run;
+the standard-phase Pandas row is generated under `synthetic/` with run ID
+`8bde2222-fixture-standard`. It is therefore fixture-only, not relabelled
+contributed evidence.
+
 ## Generator-derived honesty coverage
 
 The generator also synthesises additive variants from these sources

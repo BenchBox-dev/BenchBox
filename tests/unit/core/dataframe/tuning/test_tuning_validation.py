@@ -173,6 +173,17 @@ class TestDaskValidation:
         assert any(i.level == ValidationLevel.INFO for i in issues)
 
 
+class TestDataFusionValidation:
+    def test_session_settings_are_supported(self):
+        config = DataFrameTuningConfiguration(
+            parallelism=ParallelismConfiguration(thread_count=4),
+            memory=MemoryConfiguration(chunk_size=4096),
+        )
+        issues = validate_dataframe_tuning(config, "datafusion-df")
+
+        assert not any(i.level == ValidationLevel.WARNING for i in issues)
+
+
 class TestModinValidation:
     """Tests for Modin-specific validation."""
 

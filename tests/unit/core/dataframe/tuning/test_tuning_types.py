@@ -50,6 +50,12 @@ class TestDataFrameTuningType:
         assert DataFrameTuningType.THREAD_COUNT.is_compatible_with_platform("pandas") is False
         assert DataFrameTuningType.GPU_DEVICE.is_compatible_with_platform("pandas") is False
 
+    def test_is_compatible_with_platform_datafusion(self):
+        """DataFusion exposes the SessionConfig settings its adapter applies."""
+        assert DataFrameTuningType.THREAD_COUNT.is_compatible_with_platform("datafusion") is True
+        assert DataFrameTuningType.CHUNK_SIZE.is_compatible_with_platform("datafusion") is True
+        assert DataFrameTuningType.STREAMING_MODE.is_compatible_with_platform("datafusion") is False
+
     def test_is_compatible_with_platform_dask(self):
         """Test Dask platform compatibility."""
         # Compatible with Dask
@@ -99,6 +105,7 @@ class TestGetAllPlatforms:
         """Test that all expected platforms are returned."""
         platforms = get_all_platforms()
         assert "polars" in platforms
+        assert "datafusion" in platforms
         assert "pandas" in platforms
         assert "dask" in platforms
         assert "modin" in platforms

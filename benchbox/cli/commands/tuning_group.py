@@ -228,7 +228,7 @@ def _create_profile_config(platform: str, profile: str) -> DataFrameTuningConfig
 @click.argument("config_file", type=click.Path(exists=True))
 @click.option(
     "--platform",
-    type=click.Choice(["polars", "pandas", "dask", "modin", "cudf"], case_sensitive=False),
+    type=click.Choice(["datafusion", "polars", "pandas", "dask", "modin", "cudf"], case_sensitive=False),
     required=True,
     help="Target DataFrame platform",
 )
@@ -240,6 +240,7 @@ def validate_config(config_file: str, platform: str) -> None:
 
     \b
     Examples:
+      benchbox tuning validate datafusion_tuning.yaml --platform datafusion
       benchbox tuning validate polars_tuning.yaml --platform polars
       benchbox tuning validate my_config.yaml --platform dask
     """
