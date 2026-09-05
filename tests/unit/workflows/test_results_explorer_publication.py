@@ -38,3 +38,4 @@ def test_release_docs_workflow_deploys_only_from_protected_release_push() -> Non
     assert deploy["if"] == "github.event_name == 'push' && github.ref == 'refs/heads/release'"
     assert deploy["needs"] == "build"
     assert deploy["environment"]["name"] == "github-pages"
+    assert deploy["concurrency"] == {"group": "pages-deploy", "cancel-in-progress": False}
