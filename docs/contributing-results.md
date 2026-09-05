@@ -170,7 +170,7 @@ Results in the explorer carry trust labels. In
 | `verified` | **Verified** | Reserved for future third-party attestation |
 
 The publisher also accepts `ci`, `local`, and `unofficial-research` as
-publish-only workflow labels through `benchbox publish --label`. These labels
+publish-only workflow labels through `benchbox publish run --label`. These labels
 are not derived from `result_source` and are not part of the canonical Explorer
 trust-label vocabulary above.
 

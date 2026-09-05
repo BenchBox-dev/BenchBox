@@ -245,6 +245,50 @@ def test_plans_or_tuning_only_change_discovers_paired_primary_bundle(tmp_path: P
     assert result.stdout.strip().splitlines() == ["results-data/bundles/result.json"]
 
 
+def test_each_companion_back_mapping_loop_discovers_its_primary_bundle(tmp_path: Path) -> None:
+    """Manifest, applied, plans, and tuning-only changes all discover primaries."""
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+
+    bundle_dir = tmp_path / "results-data" / "bundles"
+    bundle_dir.mkdir(parents=True)
+    companion_specs = [
+        ("manifest-result", ".manifest.json"),
+        ("applied-result", ".applied.json"),
+        ("plans-result", ".plans.json"),
+        ("tuning-result", ".tuning.json"),
+    ]
+    for stem, _suffix in companion_specs:
+        (bundle_dir / f"{stem}.json").write_text("{}\n", encoding="utf-8")
+    _git(tmp_path, "add", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    for stem, suffix in companion_specs:
+        (bundle_dir / f"{stem}{suffix}").write_text("{}\n", encoding="utf-8")
+    _git(tmp_path, "add", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "add companions")
+
+    skip_without_posix_shell()
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "BASE_SHA": base_sha},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().splitlines() == [
+        "results-data/bundles/manifest-result.json",
+        "results-data/bundles/applied-result.json",
+        "results-data/bundles/plans-result.json",
+        "results-data/bundles/tuning-result.json",
+    ]
+
+
 @pytest.mark.parametrize("companion_suffix", [".plans.json", ".tuning.json"])
 def test_live_orphan_companion_is_rejected(tmp_path: Path, companion_suffix: str) -> None:
     _git(tmp_path, "init", "--quiet")
