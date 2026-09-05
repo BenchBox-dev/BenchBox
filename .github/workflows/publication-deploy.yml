@@ -21,6 +21,11 @@ name: Publication Control Plane Deployment
         required: false
         default: ""
         type: string
+      approved_candidate_run_id:
+        description: "Workflow run containing the reviewed candidate bytes; required with approved_manifest_digest"
+        required: false
+        default: ""
+        type: string
       prior_live_receipt_id:
         description: "Prior attested live receipt ID, if this supersedes one"
         required: false
@@ -57,15 +62,15 @@ jobs:
       generation: ${{ steps.inputs.outputs.generation }}
       develop_sha: ${{ steps.inputs.outputs.develop_sha }}
       published_results_sha: ${{ steps.inputs.outputs.published_results_sha }}
-      manifest_digest: ${{ steps.receipt.outputs.manifest_digest }}
-      assembly_digest: ${{ steps.receipt.outputs.assembly_digest }}
-      database_digest: ${{ steps.receipt.outputs.database_digest }}
-      explorer_digest: ${{ steps.receipt.outputs.explorer_digest }}
-      docs_digest: ${{ steps.receipt.outputs.docs_digest }}
+      manifest_digest: ${{ steps.receipt.outputs.manifest_digest || steps.approved.outputs.manifest_digest }}
+      assembly_digest: ${{ steps.receipt.outputs.assembly_digest || steps.approved.outputs.assembly_digest }}
+      database_digest: ${{ steps.receipt.outputs.database_digest || steps.approved.outputs.database_digest }}
+      explorer_digest: ${{ steps.receipt.outputs.explorer_digest || steps.approved.outputs.explorer_digest }}
+      docs_digest: ${{ steps.receipt.outputs.docs_digest || steps.approved.outputs.docs_digest }}
       site_artifact: ${{ steps.inputs.outputs.site_artifact }}
-      parent_sha: ${{ steps.lineage.outputs.parent_sha }}
-      parent_generation: ${{ steps.lineage.outputs.parent_generation }}
-      parent_artifact_id: ${{ steps.lineage.outputs.parent_artifact_id }}
+      parent_sha: ${{ steps.lineage.outputs.parent_sha || steps.approved.outputs.parent_sha }}
+      parent_generation: ${{ steps.lineage.outputs.parent_generation || steps.approved.outputs.parent_generation }}
+      parent_artifact_id: ${{ steps.lineage.outputs.parent_artifact_id || steps.approved.outputs.parent_artifact_id }}
     steps:
       - name: Checkout control-plane source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -81,6 +86,7 @@ jobs:
           PUBLISHED_RESULTS_SHA="$INPUT_PUBLISHED_RESULTS_SHA"
           GENERATION="$INPUT_GENERATION"
           APPROVED_MANIFEST_DIGEST="$INPUT_APPROVED_MANIFEST_DIGEST"
+          APPROVED_CANDIDATE_RUN_ID="$INPUT_APPROVED_CANDIDATE_RUN_ID"
           if [ "$GITHUB_REF" != "refs/heads/develop" ]; then
             echo "::error::publication deployment must be dispatched from develop"
             exit 1
@@ -118,6 +124,13 @@ jobs:
               echo "::error::approved_manifest_digest must be a lowercase SHA-256 digest"
               exit 1
             }
+            printf '%s' "$APPROVED_CANDIDATE_RUN_ID" | grep -qE '^[1-9][0-9]*$' || {
+              echo "::error::approved_candidate_run_id is required with approved_manifest_digest"
+              exit 1
+            }
+          elif [ -n "$APPROVED_CANDIDATE_RUN_ID" ]; then
+            echo "::error::approved_candidate_run_id requires approved_manifest_digest"
+            exit 1
           elif [ "$EXPECT_NOOP" != "true" ] && [ "$FORCE_ROLLBACK" != "true" ]; then
             echo "::error::production deployment requires an independently reviewed approved_manifest_digest"
             exit 1
@@ -133,10 +146,12 @@ jobs:
           INPUT_PUBLISHED_RESULTS_SHA: ${{ inputs.published_results_sha }}
           INPUT_GENERATION: ${{ inputs.generation }}
           INPUT_APPROVED_MANIFEST_DIGEST: ${{ inputs.approved_manifest_digest }}
+          INPUT_APPROVED_CANDIDATE_RUN_ID: ${{ inputs.approved_candidate_run_id }}
           EXPECT_NOOP: ${{ inputs.expect_noop }}
           FORCE_ROLLBACK: ${{ inputs.force_rollback }}
 
       - name: Materialize pinned control plane and corpus
+        if: inputs.approved_manifest_digest == ''
         shell: bash
         run: |
           set -euo pipefail
@@ -156,9 +171,11 @@ jobs:
         uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
 
       - name: Install Python dependencies
+        if: inputs.approved_manifest_digest == ''
         run: uv sync --group dev
 
       - name: Resolve attested publication lineage
+        if: inputs.approved_manifest_digest == ''
         id: lineage
         env:
           GH_TOKEN: ${{ github.token }}
@@ -241,7 +258,96 @@ jobs:
           echo "::error::no authoritative attested live head is available for generation $GENERATION"
           exit 1
 
+      - name: Restore independently approved candidate bytes
+        if: inputs.approved_manifest_digest != ''
+        id: approved
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPROVED_DIGEST: ${{ inputs.approved_manifest_digest }}
+          CANDIDATE_RUN_ID: ${{ inputs.approved_candidate_run_id }}
+          EXPECTED_DEVELOP_SHA: ${{ steps.inputs.outputs.develop_sha }}
+          EXPECTED_PUBLISHED_RESULTS_SHA: ${{ steps.inputs.outputs.published_results_sha }}
+          EXPECTED_GENERATION: ${{ steps.inputs.outputs.generation }}
+          EXPECTED_WORKFLOW_SHA: ${{ github.sha }}
+          EXPECTED_PRIOR_LIVE_RECEIPT_ID: ${{ inputs.prior_live_receipt_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_META=$(gh api "repos/${{ github.repository }}/actions/runs/$CANDIDATE_RUN_ID" \
+            --jq '[.name, .status, .conclusion, .event, .head_branch, .head_sha] | @tsv')
+          IFS=$'\t' read -r RUN_NAME RUN_STATUS RUN_CONCLUSION RUN_EVENT RUN_BRANCH RUN_HEAD_SHA <<< "$RUN_META"
+          if [[ "$RUN_NAME" != "Publication Control Plane Deployment" || "$RUN_STATUS" != "completed" || \
+                "$RUN_CONCLUSION" != "success" || "$RUN_EVENT" != "workflow_dispatch" || \
+                "$RUN_BRANCH" != "develop" || "$RUN_HEAD_SHA" != "$EXPECTED_WORKFLOW_SHA" ]]; then
+            echo "::error::approved candidate run is not a successful develop publication rehearsal"
+            exit 1
+          fi
+          mkdir -p receipt-dist site
+          gh run download "$CANDIDATE_RUN_ID" \
+            --name "publication-candidate-receipts-$EXPECTED_GENERATION-$CANDIDATE_RUN_ID" --dir receipt-dist
+          gh run download "$CANDIDATE_RUN_ID" \
+            --name "publication-site-$EXPECTED_GENERATION" --dir site
+          CURRENT_RUN_ID="$GITHUB_RUN_ID" python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          desired_path = Path("receipt-dist/desired-manifest.json")
+          assembly_path = Path("receipt-dist/assembly-receipt.json")
+          desired = json.loads(desired_path.read_text())
+          assembly = json.loads(assembly_path.read_text())
+          claimed = desired.pop("manifest_digest", None)
+          canonical = json.dumps(desired, sort_keys=True, separators=(",", ":")).encode()
+          recomputed = hashlib.sha256(canonical).hexdigest()
+          desired["manifest_digest"] = claimed
+          expected = {
+              "manifest_digest": os.environ["APPROVED_DIGEST"],
+              "develop_sha": os.environ["EXPECTED_DEVELOP_SHA"],
+              "published_results_sha": os.environ["EXPECTED_PUBLISHED_RESULTS_SHA"],
+              "generation": int(os.environ["EXPECTED_GENERATION"]),
+              "prior_live_receipt_id": os.environ.get("EXPECTED_PRIOR_LIVE_RECEIPT_ID") or None,
+          }
+          actual = {key: desired.get(key) for key in expected}
+          if claimed != recomputed or actual != expected:
+              raise SystemExit(f"approved candidate manifest binding mismatch: expected={expected} actual={actual}")
+          if desired.get("build_closure", {}).get("workflow_sha") != os.environ["EXPECTED_WORKFLOW_SHA"]:
+              raise SystemExit("approved candidate was built by different workflow code")
+          if assembly.get("candidate_mode") != "no-write":
+              raise SystemExit("approved candidate was not produced by a no-write rehearsal")
+          if str(assembly.get("artifact_run_id")) != os.environ["CANDIDATE_RUN_ID"]:
+              raise SystemExit("approved candidate receipt is not bound to its workflow run")
+          digest_lines = []
+          for path in sorted(item for item in Path("site").rglob("*") if item.is_file()):
+              rel = path.relative_to("site").as_posix()
+              digest_lines.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  ./{rel}\n")
+          digest_lines.sort()
+          site_digest = hashlib.sha256("".join(digest_lines).encode()).hexdigest()
+          expected_site_digest = desired.get("artifacts", {}).get("pages_assembly", {}).get("digest")
+          if site_digest != expected_site_digest:
+              raise SystemExit(
+                  f"approved candidate site digest mismatch: expected={expected_site_digest} actual={site_digest}"
+              )
+          assembly.update({
+              "approved_candidate_run_id": os.environ["CANDIDATE_RUN_ID"],
+              "artifact_run_id": os.environ["CURRENT_RUN_ID"],
+              "rollback_artifact_run_id": os.environ["CURRENT_RUN_ID"],
+          })
+          assembly_path.write_text(json.dumps(assembly, sort_keys=True) + "\n")
+          Path("receipt-dist/publication-receipt.json").write_text(json.dumps(assembly, sort_keys=True) + "\n")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"manifest_digest={claimed}\n")
+              output.write(f"assembly_digest={site_digest}\n")
+              output.write(f"database_digest={desired['artifacts']['corpus_database']['digest']}\n")
+              output.write(f"explorer_digest={desired['artifacts']['explorer_app']['digest']}\n")
+              output.write(f"docs_digest={desired['artifacts']['api_docs']['digest']}\n")
+              output.write(f"parent_sha={desired.get('parent_sha') or ''}\n")
+              output.write(f"parent_generation={desired.get('parent_generation') or ''}\n")
+              output.write(f"parent_artifact_id={assembly.get('parent_artifact_id') or ''}\n")
+          PY
+
       - name: Set up Node.js
+        if: inputs.approved_manifest_digest == ''
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20"
@@ -249,10 +355,12 @@ jobs:
           cache-dependency-path: results-explorer/package-lock.json
 
       - name: Install Explorer dependencies
+        if: inputs.approved_manifest_digest == ''
         run: npm ci
         working-directory: results-explorer
 
       - name: Build lane-equivalent Explorer artifact
+        if: inputs.approved_manifest_digest == ''
         run: |
           test ! -e results-explorer/public/data/results.duckdb || {
             echo "::error::Explorer lane artifact must not contain the corpus database"
@@ -266,6 +374,7 @@ jobs:
           mv results-explorer/dist explorer-app
 
       - name: Build Explorer corpus database
+        if: inputs.approved_manifest_digest == ''
         run: |
           uv run python _project/scripts/explorer_publish.py build \
             --data-dir results-data --output results-explorer/public/data
@@ -277,15 +386,18 @@ jobs:
             results-explorer/public/data/results.duckdb
 
       - name: Build Explorer application
+        if: inputs.approved_manifest_digest == ''
         run: npm run build
         working-directory: results-explorer
 
       - name: Build documentation
+        if: inputs.approved_manifest_digest == ''
         run: |
           cd docs
           uv run sphinx-build -b html --keep-going . _build/html
 
       - name: Assemble and validate whole-site artifact
+        if: inputs.approved_manifest_digest == ''
         run: |
           uv run python scripts/assemble_public_site.py --site-dir prose-site --prose-only
           mkdir -p api-docs
@@ -316,10 +428,13 @@ jobs:
           APPROVED_MANIFEST_DIGEST: ${{ inputs.approved_manifest_digest }}
           PARENT_SHA: ${{ steps.lineage.outputs.parent_sha }}
           PARENT_GENERATION: ${{ steps.lineage.outputs.parent_generation }}
+          PARENT_ARTIFACT_ID: ${{ steps.lineage.outputs.parent_artifact_id }}
           WORKFLOW_SHA: ${{ github.sha }}
           SITE_ARTIFACT: ${{ steps.inputs.outputs.site_artifact }}
           PAGES_ARTIFACT: publication-pages-${{ steps.inputs.outputs.generation }}
           GITHUB_RUN_ID: ${{ github.run_id }}
+          EXPECT_NOOP: ${{ inputs.expect_noop }}
+        if: inputs.approved_manifest_digest == ''
         shell: bash
         run: |
           set -euo pipefail
@@ -362,6 +477,7 @@ jobs:
           export ROOT_ENDPOINT_DIGEST DOCS_ENDPOINT_DIGEST API_DOCS_ENDPOINT_DIGEST EXPLORER_ENDPOINT_DIGEST
           export NODE_VERSION UV_VERSION IMAGE_OS SITE_ARTIFACT PAGES_ARTIFACT GITHUB_RUN_ID TIMESTAMP GITHUB_OUTPUT
           export PARENT_SHA PARENT_GENERATION WORKFLOW_SHA APPROVED_MANIFEST_DIGEST
+          export PARENT_ARTIFACT_ID EXPECT_NOOP
           python3 - <<'PY'
           import hashlib
           import json
@@ -469,6 +585,8 @@ jobs:
               "artifact_run_id": os.environ["GITHUB_RUN_ID"],
               "rollback_artifact_name": os.environ["SITE_ARTIFACT"],
               "rollback_artifact_run_id": os.environ["GITHUB_RUN_ID"],
+              "parent_artifact_id": os.environ.get("PARENT_ARTIFACT_ID") or None,
+              "candidate_mode": "no-write" if os.environ["EXPECT_NOOP"] == "true" else "rollback-preparation",
               "timestamp": os.environ["TIMESTAMP"],
               "status": "BUILT",
           })
@@ -488,7 +606,7 @@ jobs:
           cp receipt-dist/assembly-receipt.json receipt-dist/publication-receipt.json
 
       - name: Upload candidate receipts for independent review
-        if: always() && steps.receipt.outcome == 'success'
+        if: inputs.approved_manifest_digest == '' && always() && steps.receipt.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: publication-candidate-receipts-${{ steps.inputs.outputs.generation }}-${{ github.run_id }}
@@ -496,6 +614,7 @@ jobs:
           retention-days: 90
 
       - name: Pre-deploy candidate verification
+        if: inputs.approved_manifest_digest == ''
         env:
           EXPECT_NOOP: ${{ inputs.expect_noop }}
         shell: bash

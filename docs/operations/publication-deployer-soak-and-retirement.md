@@ -29,11 +29,14 @@ attested live receipt ID when the run replaces an earlier generation.
 First dispatch the exact inputs with `expect_noop=true` and no
 `approved_manifest_digest`. Download `desired-manifest.json` from the candidate
 receipt artifact, inspect its pins and measured artifact closure, and record its
-`manifest_digest`. Dispatch the production run with the same inputs,
+`manifest_digest` and workflow run ID. Dispatch the production run with the same inputs,
 `expect_noop=false`, `force_rollback=false`, and that reviewed digest as
-`approved_manifest_digest`. The workflow rebuilds and refuses deployment unless
-the complete candidate manifest matches the approved digest. This is an
-authorized production action; this runbook does not authorize it.
+`approved_manifest_digest`; pass the recorded run ID as
+`approved_candidate_run_id`. The workflow authenticates the successful no-write
+run, rechecks its pins and manifest digest, downloads its retained site, and
+refuses deployment unless the site's exact byte digest matches the reviewed
+manifest. It promotes those reviewed bytes without rebuilding the DuckDB file.
+This is an authorized production action; this runbook does not authorize it.
 
 For a no-write rehearsal, set `expect_noop=true`. That compares the candidate
 database with the freeze baseline and skips the deploy job. A rehearsal is not

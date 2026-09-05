@@ -43,6 +43,7 @@ def test_workflow_is_dispatch_only_with_required_inputs() -> None:
     assert dispatch_inputs["published_results_sha"]["required"] is True
     assert dispatch_inputs["generation"]["required"] is True
     assert "approved_manifest_digest" in dispatch_inputs
+    assert "approved_candidate_run_id" in dispatch_inputs
 
 
 def test_workflow_permissions_follow_least_privilege() -> None:
@@ -186,6 +187,29 @@ def test_production_requires_an_independently_approved_manifest() -> None:
     assert "--baseline-manifest receipt-dist/desired-manifest.json" in text
     assert "WORKFLOW_SHA: ${{ github.sha }}" in text
     assert '"workflow_sha": os.environ["WORKFLOW_SHA"]' in text
+
+
+def test_production_promotes_exact_approved_candidate_bytes() -> None:
+    steps = _workflow()["jobs"]["build"]["steps"]
+    restore = next(step for step in steps if step.get("name") == "Restore independently approved candidate bytes")
+    run = restore["run"]
+
+    assert restore["if"] == "inputs.approved_manifest_digest != ''"
+    assert "publication-candidate-receipts-$EXPECTED_GENERATION-$CANDIDATE_RUN_ID" in run
+    assert 'gh run download "$CANDIDATE_RUN_ID"' in run
+    assert 'assembly.get("candidate_mode") != "no-write"' in run
+    assert 'RUN_HEAD_SHA" != "$EXPECTED_WORKFLOW_SHA"' in run
+    assert '"prior_live_receipt_id": os.environ.get("EXPECTED_PRIOR_LIVE_RECEIPT_ID") or None' in run
+    assert "approved candidate site digest mismatch" in run
+    assert "digest_lines.sort()" in run
+    for name in (
+        "Materialize pinned control plane and corpus",
+        "Build Explorer corpus database",
+        "Build Explorer application",
+        "Build documentation",
+    ):
+        step = next(item for item in steps if item.get("name") == name)
+        assert step["if"] == "inputs.approved_manifest_digest == ''"
 
 
 def test_verify_step_invokes_verify_live_with_receipt() -> None:
