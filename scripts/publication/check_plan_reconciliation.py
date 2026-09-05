@@ -79,6 +79,13 @@ EXPECTED_DEPS: dict[str, list[str]] = {
         "independent-publication-a10-release-and-mirror-retirement"
     ],
 }
+# Freeze closure deferred A10 retirement onto an independent production deployer.
+# That one external predecessor is pinned here; arbitrary external deps still fail.
+EXPECTED_EXTERNAL_DEPS: dict[str, frozenset[str]] = {
+    "independent-publication-a10-release-and-mirror-retirement": frozenset(
+        {"independent-production-deployer-and-retirement"}
+    ),
+}
 # Tracker identity -- must match .todo-db/config.json (project_id / repository).
 TRACKER_PROJECT_ID = "benchbox"
 TRACKER_REPOSITORY = "https://github.com/joeharris76/BenchBox"
@@ -154,9 +161,10 @@ def dependency_violations(plan_order: list[str], deps: dict[str, list[str]]) -> 
     violation, as is an unexpected in-set edge. This closes the "last prior
     edge" gap where only orphan detection would fire.
 
-    Dependencies outside the A0-A11 set are also validated: any live edge to
-    an item not in the plan's ordered set is an unexpected external
-    dependency, because readiness requires every predecessor to be done.
+    Dependencies outside the A0-A11 set are also validated: only edges listed
+    in ``EXPECTED_EXTERNAL_DEPS`` are allowed, and each pinned external
+    predecessor must be present. Arbitrary external deps still fail, because
+    readiness would otherwise require an unplanned predecessor.
 
     ``deps`` maps each plan item to its live dependency ids (all deps are
     validated; only in-set edges are checked for order/missing/unexpected).
@@ -166,12 +174,12 @@ def dependency_violations(plan_order: list[str], deps: dict[str, list[str]]) -> 
     violations: list[str] = []
     for item_id in plan_order:
         live_all = deps.get(item_id, []) or []
-        # External dependencies (outside A0-A11) must be explicitly pinned;
-        # any such edge is drift because the plan's total order cannot
-        # justify it and readiness would require the external predecessor.
-        for dep in live_all:
-            if dep not in order_set:
-                violations.append(f"{item_id} has unexpected external dependency on {dep}")
+        allowed_external = EXPECTED_EXTERNAL_DEPS.get(item_id, frozenset())
+        live_external = {dep for dep in live_all if dep not in order_set}
+        for dep in sorted(live_external - allowed_external):
+            violations.append(f"{item_id} has unexpected external dependency on {dep}")
+        for dep in sorted(allowed_external - live_external):
+            violations.append(f"{item_id} is missing expected external dependency on {dep}")
         item_deps = [dep for dep in live_all if dep in order_set]
         for dep in item_deps:
             if rank[dep] >= rank[item_id]:

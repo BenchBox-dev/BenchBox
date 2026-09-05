@@ -89,6 +89,7 @@ def test_deploy_requires_pinned_shas_and_approver() -> None:
     text = DEPLOY_PATH.read_text(encoding="utf-8")
     assert "40" in text and "hex" in text, "SHAs must be validated as 40-hex"
     assert "cat-file -e" in text, "pinned SHAs must be proven present"
+    assert 'if [ "$GITHUB_REF" != "refs/heads/develop" ]' in text
 
 
 def test_deploy_writes_receipts_with_both_shas() -> None:
@@ -119,6 +120,26 @@ def test_deploy_builds_docs_before_assembly() -> None:
 def test_deploy_serializes_dispatches() -> None:
     data = _load(DEPLOY_PATH)
     assert "concurrency" in data, "concurrent dispatches must serialize (Pages is last-writer-wins)"
+
+
+def test_preview_deploy_stops_after_independent_publication_takes_ownership() -> None:
+    deploy = _load(DEPLOY_PATH)["jobs"]["deploy"]
+    steps = deploy["steps"]
+    guard_index = next(
+        index for index, step in enumerate(steps) if step.get("name") == "Check for independent publication ownership"
+    )
+    deploy_index = next(index for index, step in enumerate(steps) if step.get("uses") == "actions/deploy-pages@v4")
+
+    assert deploy["permissions"]["actions"] == "read"
+    assert guard_index < deploy_index
+    assert steps[deploy_index]["if"] == "steps.independent.outputs.active != 'true'"
+    guard = steps[guard_index]["run"]
+    assert "Publication Control Plane Deployment" in guard
+    assert 'RUN_BRANCH" != "develop"' in guard
+    assert "verify_live_receipt_signature" in guard
+    assert 'startswith("rollback-")' in guard
+    assert deploy["outputs"]["pages_write_outcome"] == "${{ steps.deployment.outcome }}"
+    assert _load(DEPLOY_PATH)["jobs"]["record"]["if"] == "needs.deploy.outputs.pages_write_outcome == 'success'"
 
 
 def test_soak_never_writes_pages() -> None:

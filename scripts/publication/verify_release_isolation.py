@@ -222,9 +222,15 @@ def _analyze(
         except RuntimeError as exc:
             errors.append(str(exc))
             continue
-        except yaml.YAMLError:
+        except yaml.YAMLError as exc:
+            errors.append(f"workflow '{wf_name}' has malformed YAML: {exc}")
             continue
         if not isinstance(data, dict):
+            errors.append(f"workflow '{wf_name}' must have a mapping root")
+            continue
+
+        if not isinstance(data.get("jobs"), dict):
+            errors.append(f"workflow '{wf_name}' has invalid jobs mapping")
             continue
 
         scan = _scan_workflow(data)

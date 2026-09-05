@@ -76,9 +76,17 @@ fabricate a state; a missing or malformed input fails closed.
   `retention-policy.json` (which must cite its `source`), and either a
   `capacity-audit.json` or a `--pages-dir` to measure.
 
-Signature verification against an attestor key is not yet implemented; the
-canary currently requires only that the signature field is present and
-non-empty. Closing that gap is tracked with the w3-w5 live-evidence work.
+`scripts/publication/reconciliation.py` verifies every live receipt signature
+against the repository public key at
+`docs/operations/publication-attestor-public-key.pem`. It signs canonical JSON
+(sorted keys, compact separators, UTF-8) with `signature` and
+`attestor_signature` excluded. Receipts must declare
+`signature_algorithm: ed25519`; missing, empty, malformed, or non-verifying
+signatures fail closed. The matching private key is never stored in the
+repository. Before dispatching the production deployer, a maintainer must set
+the `PUBLICATION_ATTESTOR_PRIVATE_KEY` environment secret to the matching
+Ed25519 PEM private key in the protected `publication-attestation` and
+`github-pages` environments. There must be no repository-level copy.
 
 ## Rollback
 

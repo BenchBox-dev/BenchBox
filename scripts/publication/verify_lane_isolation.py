@@ -67,6 +67,10 @@ SHARED_BUILD_INPUTS: tuple[str, ...] = (
 NON_LANE_INPUTS: tuple[str, ...] = (
     # Test suites: exercised by code CI, never read by lane builds.
     "tests/",
+    # Publication control-plane checks and receipt tooling do not contribute
+    # bytes to any lane artifact. Lane-owned scripts below this prefix are
+    # still classified first by ``verify_lane_isolation``.
+    "scripts/publication/",
     # Agent skill mirrors: consumed by coding agents, not lane builds.
     ".claude/skills/",
     # CI definitions and repo orchestration.
@@ -114,6 +118,7 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
     ),
     "explorer": (
         "results-explorer/",
+        "scripts/publication/check_explorer_compat.py",
         "_project/scripts/explorer_pipeline/",
         "_project/scripts/explorer_publish.py",
         "_project/scripts/results_explorer_snapshot_invariants.py",
@@ -123,6 +128,8 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
     "corpus": (
         "results-data/",
         "scripts/validate_submission.py",
+        "scripts/publication/create_ledger_seed.py",
+        "scripts/publication/assembler.py",
         "scripts/publication/validator_parity.py",
         ".github/workflows/validate-submission.yml",
         ".github/workflows/sync-results-data-to-published.yml",

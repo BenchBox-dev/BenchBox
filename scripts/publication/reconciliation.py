@@ -37,9 +37,12 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
+import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -59,6 +62,7 @@ FUTURE_SKEW_SECONDS = 300.0
 
 DEFAULT_PROBE_PATHS = (
     "/",
+    "/docs/",
     "/results/",
     "/results/data/results.duckdb",
 )
@@ -68,6 +72,11 @@ DEFAULT_PROBE_PATHS = (
 ASSEMBLY_RECEIPT_NAME = "assembly-receipt.json"
 DEPLOYMENT_RECEIPT_NAME = "deployment-receipt.json"
 LIVE_RECEIPT_NAME = "live-receipt.json"
+
+# This is a public verification key. The corresponding private key is held
+# only by the GitHub Actions secret documented in the operations contract.
+DEFAULT_ATTESTOR_PUBLIC_KEY = REPO_ROOT / "docs/operations/publication-attestor-public-key.pem"
+ATTESTOR_SIGNATURE_ALGORITHM = "ed25519"
 
 # Fields the contract (independent-publication-contract.md, "Required live
 # receipt fields") mandates on an attested live-observation receipt.
@@ -82,6 +91,7 @@ REQUIRED_RECEIPT_FIELDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("published-results SHA", ("published_results_sha", "published_results_commit")),
     ("artifact identity", ("artifacts", "artifact")),
     ("required route set", ("routes", "probes")),
+    ("observation origin", ("observation_origin",)),
     ("nonce", ("nonce",)),
     ("freshness window", ("freshness_window", "freshness_window_hours", "max_age_hours")),
     ("attestor identity", ("attestor", "attestor_identity", "attested_by")),
@@ -175,7 +185,7 @@ def parse_iso_timestamp(ts_str: str) -> datetime | None:
         return None
 
 
-def _normalize_generation(value: Any) -> int | None:
+def _normalize_generation(value: Any) -> int | str | None:
     """Coerce a generation value to int, tolerating string encodings."""
     if value is None:
         return None
@@ -187,7 +197,10 @@ def _normalize_generation(value: Any) -> int | None:
         try:
             return int(value.strip())
         except ValueError:
-            return None
+            # Workflow receipts deliberately use an opaque, validated label
+            # (for example publication-123-1).  Treat it as a real value, not
+            # as an absent generation that can silently evade comparison.
+            return value.strip()
     return None
 
 
@@ -196,6 +209,71 @@ def _first_present(data: dict[str, Any], keys: tuple[str, ...]) -> Any:
         if key in data and data[key] not in (None, "", [], {}):
             return data[key]
     return None
+
+
+def canonical_live_receipt_payload(receipt: dict[str, Any]) -> bytes:
+    """Return the deterministic byte payload an attestor signs for a receipt.
+
+    Signatures never sign themselves. Both accepted signature field spellings
+    are excluded so aliases cannot change the verified payload.
+    """
+    payload = dict(receipt)
+    payload.pop("signature", None)
+    payload.pop("attestor_signature", None)
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+
+
+def verify_live_receipt_signature(receipt: dict[str, Any], public_key_path: Path | None = None) -> tuple[bool, str]:
+    """Verify an Ed25519 receipt signature with the repository public key.
+
+    ``openssl pkeyutl`` is available on GitHub-hosted runners and avoids adding
+    a cryptography dependency solely for this verification boundary.
+    """
+    public_key_path = public_key_path or DEFAULT_ATTESTOR_PUBLIC_KEY
+    signature = _first_present(receipt, ("signature", "attestor_signature"))
+    if not isinstance(signature, str) or not signature.strip():
+        return False, "receipt signature is missing or empty"
+    if receipt.get("signature_algorithm") != ATTESTOR_SIGNATURE_ALGORITHM:
+        return False, f"receipt signature algorithm must be {ATTESTOR_SIGNATURE_ALGORITHM!r}"
+    if not public_key_path.is_file():
+        return False, f"attestor public key is unavailable: {public_key_path}"
+    try:
+        signature_bytes = base64.b64decode(signature, validate=True)
+    except (ValueError, TypeError) as exc:
+        return False, f"receipt signature is not valid base64: {exc}"
+    if not signature_bytes:
+        return False, "receipt signature is empty"
+
+    with tempfile.TemporaryDirectory(prefix="benchbox-receipt-") as temp_dir:
+        temp = Path(temp_dir)
+        payload_path = temp / "receipt-payload.json"
+        signature_path = temp / "receipt.sig"
+        payload_path.write_bytes(canonical_live_receipt_payload(receipt))
+        signature_path.write_bytes(signature_bytes)
+        try:
+            completed = subprocess.run(
+                [
+                    "openssl",
+                    "pkeyutl",
+                    "-verify",
+                    "-pubin",
+                    "-inkey",
+                    str(public_key_path),
+                    "-rawin",
+                    "-in",
+                    str(payload_path),
+                    "-sigfile",
+                    str(signature_path),
+                ],
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+        except (FileNotFoundError, PermissionError, OSError) as exc:
+            return False, f"openssl binary execution failed: {exc}"
+    if completed.returncode != 0:
+        return False, "receipt signature does not verify against the configured attestor public key"
+    return True, ""
 
 
 def probe_live_endpoint(
@@ -246,7 +324,7 @@ def probe_live_endpoint(
 
 
 def extract_artifact_digests(manifest_or_receipt: dict[str, Any]) -> dict[str, str]:
-    """Extract path -> sha256 mapping from various manifest/receipt schemas."""
+    """Extract identity-scoped artifact and endpoint digest mappings."""
     digests: dict[str, str] = {}
 
     artifacts = manifest_or_receipt.get("artifacts")
@@ -254,24 +332,25 @@ def extract_artifact_digests(manifest_or_receipt: dict[str, Any]) -> dict[str, s
         for name, entry in artifacts.items():
             if isinstance(entry, dict) and "digest" in entry:
                 p = entry.get("path", name)
-                digests[p] = str(entry["digest"]).lower().removeprefix("sha256:")
+                digests[f"artifact:{name}:{p}"] = str(entry["digest"]).lower().removeprefix("sha256:")
     elif isinstance(artifacts, list):
         for item in artifacts:
             if isinstance(item, dict) and "sha256" in item:
                 p = item.get("path", "")
-                digests[p] = str(item["sha256"]).lower().removeprefix("sha256:")
+                name = item.get("name") or item.get("artifact_name") or p
+                digests[f"artifact:{name}:{p}"] = str(item["sha256"]).lower().removeprefix("sha256:")
 
     checksums = manifest_or_receipt.get("checksums")
     if isinstance(checksums, dict):
         for p, h in checksums.items():
-            digests[p] = str(h).lower().removeprefix("sha256:")
+            digests[f"endpoint:{p}"] = str(h).lower().removeprefix("sha256:")
 
     live_db = manifest_or_receipt.get("live_database")
     if isinstance(live_db, dict) and "sha256" in live_db:
-        digests["/results/data/results.duckdb"] = str(live_db["sha256"]).lower().removeprefix("sha256:")
+        digests["endpoint:/results/data/results.duckdb"] = str(live_db["sha256"]).lower().removeprefix("sha256:")
 
     if "database_sha256" in manifest_or_receipt:
-        digests["/results/data/results.duckdb"] = (
+        digests["endpoint:/results/data/results.duckdb"] = (
             str(manifest_or_receipt["database_sha256"]).lower().removeprefix("sha256:")
         )
 
@@ -313,9 +392,55 @@ def _check_manifest_drift(
     desired: dict[str, Any],
     built: dict[str, Any],
     deployed: dict[str, Any],
+    observed: dict[str, Any],
 ) -> list[DriftFinding]:
-    """Detect commit or build closure drift across desired, built, and deployed."""
+    """Detect commit or build closure drift across all publication states."""
     drifts: list[DriftFinding] = []
+    binding_fields = (
+        ("target", ("target",)),
+        ("develop SHA", ("develop_sha", "source_commit", "develop_commit")),
+        ("published-results SHA", ("published_results_sha", "published_results_commit")),
+        ("manifest digest", ("manifest_digest", "manifest_sha256")),
+    )
+    states = (("desired", desired), ("built", built), ("deployed", deployed), ("observed", observed))
+    for label, keys in binding_fields:
+        values = [(name, _first_present(state, keys)) for name, state in states]
+        present = [(name, value) for name, value in values if value is not None]
+        if len(present) >= 2:
+            first_name, first_value = present[0]
+            for name, value in present[1:]:
+                if value != first_value:
+                    drifts.append(
+                        DriftFinding(
+                            drift_type="MANIFEST_DRIFT",
+                            description=f"{label} mismatch between {first_name} and {name}",
+                            expected=first_value,
+                            actual=value,
+                        )
+                    )
+
+    # Artifact identity is part of the binding, not merely descriptive
+    # assembly metadata.  Compare the complete identity wherever a state
+    # supplies it so crossed receipts cannot reconcile successfully.
+    identity_fields = (
+        ("artifact_name", "artifact identity name"),
+        ("artifact_run_id", "artifact workflow run"),
+    )
+    for key, label in identity_fields:
+        values = [(name, state.get(key)) for name, state in states if state.get(key) not in (None, "")]
+        if len(values) >= 2:
+            first_name, first_value = values[0]
+            for name, value in values[1:]:
+                if value != first_value:
+                    drifts.append(
+                        DriftFinding(
+                            drift_type="ARTIFACT_DRIFT",
+                            description=f"{label} mismatch between {first_name} and {name}",
+                            expected=first_value,
+                            actual=value,
+                        )
+                    )
+
     des_commit = _first_present(desired, ("develop_sha", "source_commit", "develop_commit"))
     dep_commit = _first_present(deployed, ("develop_sha", "source_commit", "commit_sha"))
 
@@ -347,37 +472,81 @@ def _check_manifest_drift(
     return drifts
 
 
-def _check_built_vs_desired(desired_digests: dict[str, str], built_digests: dict[str, str]) -> list[DriftFinding]:
-    """Full set comparison of manifest vs build artifact digests (not the intersection)."""
+def _check_state_binding_completeness(
+    desired: dict[str, Any],
+    built: dict[str, Any],
+    deployed: dict[str, Any],
+    observed: dict[str, Any],
+) -> list[DriftFinding]:
+    """Require every publication state to identify the manifest and artifact it represents."""
+    shared = (
+        ("target", ("target",), "MANIFEST_DRIFT"),
+        ("manifest digest", ("manifest_digest", "manifest_sha256"), "MANIFEST_DRIFT"),
+        ("develop SHA", ("develop_sha", "source_commit", "develop_commit"), "MANIFEST_DRIFT"),
+        (
+            "published-results SHA",
+            ("published_results_sha", "published_results_commit"),
+            "MANIFEST_DRIFT",
+        ),
+        ("artifact digest set", ("artifacts", "artifact"), "ARTIFACT_DRIFT"),
+    )
+    artifact_identity = (
+        ("artifact identity name", ("artifact_name",), "ARTIFACT_DRIFT"),
+        ("artifact workflow run", ("artifact_run_id",), "ARTIFACT_DRIFT"),
+    )
+    drifts: list[DriftFinding] = []
+    for state_name, state, requirements in (
+        ("desired", desired, shared),
+        ("built", built, shared + artifact_identity),
+        ("deployed", deployed, shared + artifact_identity),
+        ("observed", observed, shared + artifact_identity),
+    ):
+        for label, keys, drift_type in requirements:
+            if _first_present(state, keys) is None:
+                drifts.append(
+                    DriftFinding(
+                        drift_type=drift_type,
+                        description=f"{state_name.capitalize()} state is missing required {label}",
+                        expected=f"one of {keys}",
+                        actual="absent or empty",
+                    )
+                )
+    return drifts
+
+
+def _check_state_vs_desired(
+    desired_digests: dict[str, str], state_digests: dict[str, str], state_name: str
+) -> list[DriftFinding]:
+    """Full set comparison of manifest vs one publication state's digests."""
     if not desired_digests:
         return []
     drifts: list[DriftFinding] = []
-    for path in sorted(set(desired_digests) - set(built_digests)):
+    for path in sorted(set(desired_digests) - set(state_digests)):
         drifts.append(
             DriftFinding(
                 drift_type="ARTIFACT_DRIFT",
-                description=f"Manifest-required artifact '{path}' is absent from the build",
+                description=f"Manifest-required artifact '{path}' is absent from the {state_name} state",
                 expected=desired_digests[path],
                 actual=None,
             )
         )
-    for path in sorted(set(built_digests) - set(desired_digests)):
+    for path in sorted(set(state_digests) - set(desired_digests)):
         drifts.append(
             DriftFinding(
                 drift_type="ARTIFACT_DRIFT",
-                description=f"Built artifact '{path}' is not present in the desired manifest",
+                description=f"{state_name.capitalize()} artifact '{path}' is not present in the desired manifest",
                 expected=None,
-                actual=built_digests[path],
+                actual=state_digests[path],
             )
         )
-    for path in sorted(set(desired_digests) & set(built_digests)):
-        if desired_digests[path] != built_digests[path]:
+    for path in sorted(set(desired_digests) & set(state_digests)):
+        if desired_digests[path] != state_digests[path]:
             drifts.append(
                 DriftFinding(
                     drift_type="ARTIFACT_DRIFT",
-                    description=f"Built artifact digest for '{path}' differs from desired manifest",
+                    description=f"{state_name.capitalize()} artifact digest for '{path}' differs from desired manifest",
                     expected=desired_digests[path],
-                    actual=built_digests[path],
+                    actual=state_digests[path],
                 )
             )
     return drifts
@@ -401,7 +570,8 @@ def _run_live_probes(
                 )
             )
         elif probe.sha256:
-            expected_sha = desired_digests.get(p) or built_digests.get(p)
+            endpoint_key = f"endpoint:{p}"
+            expected_sha = desired_digests.get(endpoint_key) or built_digests.get(endpoint_key)
             if expected_sha and probe.sha256.lower() != expected_sha.lower():
                 drifts.append(
                     DriftFinding(
@@ -506,13 +676,17 @@ def _check_observed_probes(
 def _check_artifact_drift(
     desired_digests: dict[str, str],
     built_digests: dict[str, str],
+    deployed_digests: dict[str, str],
     observed_digests: dict[str, str],
     base_url: str,
     live: bool,
     observed: dict[str, Any] | None,
 ) -> tuple[list[DriftFinding], list[EndpointObservation]]:
     """Detect checksum and endpoint response drift across built and observed targets."""
-    drifts = _check_built_vs_desired(desired_digests, built_digests)
+    drifts = _check_state_vs_desired(desired_digests, built_digests, "built")
+    drifts.extend(_check_state_vs_desired(desired_digests, deployed_digests, "deployed"))
+    if observed is not None:
+        drifts.extend(_check_state_vs_desired(desired_digests, observed_digests, "observed"))
 
     if live:
         live_drifts, probes = _run_live_probes(base_url, desired_digests, built_digests)
@@ -520,18 +694,6 @@ def _check_artifact_drift(
 
     obs_drifts, probes = _check_observed_probes(observed)
     drifts.extend(obs_drifts)
-
-    for path, obs_hash in observed_digests.items():
-        exp_hash = desired_digests.get(path) or built_digests.get(path)
-        if exp_hash and obs_hash.lower() != exp_hash.lower():
-            drifts.append(
-                DriftFinding(
-                    drift_type="ARTIFACT_DRIFT",
-                    description=f"Observed receipt digest for '{path}' differs from desired state",
-                    expected=exp_hash,
-                    actual=obs_hash,
-                )
-            )
 
     return drifts, probes
 
@@ -561,6 +723,21 @@ def _check_receipt_contract_fields(observed: dict[str, Any] | None) -> list[Drif
                 )
             )
 
+    observation_origin = observed.get("observation_origin")
+    if observation_origin is not None and not (
+        isinstance(observation_origin, str)
+        and observation_origin.startswith("github-actions:")
+        and len(observation_origin) > len("github-actions:")
+    ):
+        drifts.append(
+            DriftFinding(
+                drift_type="RECEIPT_INCOMPLETE",
+                description="Live receipt observation origin is not an approved external observer",
+                expected="github-actions:<workflow-observer>",
+                actual=str(observation_origin),
+            )
+        )
+
     # Route-set completeness with per-route status.
     routes = observed.get("routes") or observed.get("probes")
     if isinstance(routes, list) and routes:
@@ -576,16 +753,14 @@ def _check_receipt_contract_fields(observed: dict[str, Any] | None) -> list[Drif
                 )
                 break
 
-    # Signature verification against a key is out of scope here; the contract
-    # gap is that we can only require presence and non-emptiness of the field.
-    sig = _first_present(observed, ("signature", "attestor_signature"))
-    if sig is not None and not str(sig).strip():
+    signature_valid, signature_error = verify_live_receipt_signature(observed)
+    if not signature_valid:
         drifts.append(
             DriftFinding(
-                drift_type="RECEIPT_INCOMPLETE",
-                description="Live receipt attestor signature field is present but empty",
-                expected="non-empty signature",
-                actual="empty string",
+                drift_type="RECEIPT_SIGNATURE_INVALID",
+                description=f"Live receipt attestor signature verification failed: {signature_error}",
+                expected="valid Ed25519 signature from the configured attestor key",
+                actual="missing, malformed, or unverifiable signature",
             )
         )
     return drifts
@@ -735,13 +910,15 @@ def reconcile_states(
         )
 
     drifts.extend(_check_generation_drift(des_gen, dep_gen, obs_gen))
-    drifts.extend(_check_manifest_drift(desired, built or {}, deployed or {}))
+    drifts.extend(_check_state_binding_completeness(desired, built or {}, deployed or {}, observed or {}))
+    drifts.extend(_check_manifest_drift(desired, built or {}, deployed or {}, observed or {}))
 
     desired_digests = extract_artifact_digests(desired)
     built_digests = extract_artifact_digests(built or {})
+    deployed_digests = extract_artifact_digests(deployed or {})
     observed_digests = extract_artifact_digests(observed or {})
     art_drifts, probes = _check_artifact_drift(
-        desired_digests, built_digests, observed_digests, base_url, live, observed
+        desired_digests, built_digests, deployed_digests, observed_digests, base_url, live, observed
     )
     drifts.extend(art_drifts)
 

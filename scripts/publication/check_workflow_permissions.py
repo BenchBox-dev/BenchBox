@@ -5,11 +5,12 @@ This script inspects `.github/workflows/*.yml` files to verify that:
 1. No workflow uses wildcard or unconstrained permissions (`write-all` or `read-all`).
 2. Dangerous write permissions are scoped to the specific jobs requiring them.
 3. The independent publication deployment workflow (`publication-deploy.yml`)
-   strictly follows the principle of least privilege under freeze G3:
+   strictly follows the armed production-deployer least-privilege contract:
    - `build` job has only `contents: read` (no write permissions).
-   - `deploy` job is rehearsal-only: `contents: read` only (no Pages write).
+   - `deploy` job alone receives the Pages deployment write capabilities.
    - `verify` job has only `contents: read` (read-only probes).
-   - `rollback` job is facts-only receipt: `contents: read` only (no Pages write).
+   - `rollback` has only the bounded Pages deployment capabilities needed to
+     restore a cryptographically attested artifact plus `actions: read`.
 
 Usage:
   uv run -- python scripts/publication/check_workflow_permissions.py
@@ -135,20 +136,11 @@ def _check_deploy_job_perms(file_path: Path, jobs: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     deploy_job = jobs.get("deploy", {})
     deploy_perm = _normalize_permissions(deploy_job.get("permissions"))
-    if isinstance(deploy_perm, dict):
-        write_scopes = [k for k, v in deploy_perm.items() if v == "write"]
-        if write_scopes:
-            errors.append(
-                f"{file_path.name} (job 'deploy'): declared write permissions: {write_scopes}. "
-                f"Freeze G3 rehearsal deploy must be read-only (no pages/id-token write)."
-            )
-        if deploy_perm.get("pages") == "write":
-            errors.append(f"{file_path.name} (job 'deploy'): pages: write is forbidden under freeze G3")
-        if deploy_perm.get("id-token") == "write":
-            errors.append(f"{file_path.name} (job 'deploy'): id-token: write is forbidden under freeze G3")
-    else:
+    expected = {"actions": "read", "contents": "read", "pages": "write", "id-token": "write"}
+    if deploy_perm != expected:
         errors.append(
-            f"{file_path.name} (job 'deploy'): must declare explicit per-job read-only permissions (contents: read)"
+            f"{file_path.name} (job 'deploy'): must declare exactly {expected}; "
+            "only the deploy job may receive Pages write capabilities."
         )
     return errors
 
@@ -178,19 +170,12 @@ def _check_rollback_job_perms(file_path: Path, jobs: dict[str, Any]) -> list[str
     errors: list[str] = []
     rollback_job = jobs.get("rollback", {})
     rollback_perm = _normalize_permissions(rollback_job.get("permissions"))
-    if isinstance(rollback_perm, dict):
-        write_scopes = [k for k, v in rollback_perm.items() if v == "write"]
-        if write_scopes:
-            errors.append(
-                f"{file_path.name} (job 'rollback'): declared write permissions: {write_scopes}. "
-                f"Freeze G3 facts-only rollback must be read-only (no pages/id-token write)."
-            )
-        if rollback_perm.get("pages") == "write":
-            errors.append(f"{file_path.name} (job 'rollback'): pages: write is forbidden under freeze G3")
-        if rollback_perm.get("id-token") == "write":
-            errors.append(f"{file_path.name} (job 'rollback'): id-token: write is forbidden under freeze G3")
-    elif rollback_perm is None:
-        errors.append(f"{file_path.name} (job 'rollback'): must declare explicit per-job read-only permissions")
+    expected = {"actions": "read", "contents": "read", "pages": "write", "id-token": "write"}
+    if rollback_perm != expected:
+        errors.append(
+            f"{file_path.name} (job 'rollback'): must declare exactly {expected}; "
+            "rollback may restore only an attested artifact and may not gain unbounded write."
+        )
     return errors
 
 

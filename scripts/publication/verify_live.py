@@ -40,6 +40,7 @@ DEFAULT_BASE_URL = "https://benchbox.dev"
 DEFAULT_TIMEOUT = 30.0
 DEFAULT_ENDPOINTS = (
     "/",
+    "/docs/",
     "/results/",
     "/results/data/results.duckdb",
 )
@@ -63,6 +64,7 @@ class EndpointProbeResult:
 @dataclass
 class VerificationReport:
     base_url: str | None = None
+    observation_origin: str | None = None
     ok: bool = True
     expect_noop: bool = False
     require_receipt: bool = False
@@ -76,6 +78,7 @@ class VerificationReport:
     def to_dict(self) -> dict[str, Any]:
         return {
             "base_url": self.base_url,
+            "observation_origin": self.observation_origin,
             "ok": self.ok,
             "expect_noop": self.expect_noop,
             "require_receipt": self.require_receipt,
@@ -114,6 +117,17 @@ def extract_expected_checksums(manifest_data: dict[str, Any]) -> dict[str, str]:
                 norm_p = p if p.startswith("/") else f"/{p}"
                 expected[norm_p] = str(artifact["sha256"]).strip()
 
+    # Publication receipts use the canonical manifest's mapping form.  Keep
+    # route checks and byte checks separate: only entries with an explicit
+    # checksum are byte-equivalence claims.
+    if "artifacts" in manifest_data and isinstance(manifest_data["artifacts"], dict):
+        for artifact in manifest_data["artifacts"].values():
+            if not isinstance(artifact, dict) or not artifact.get("path"):
+                continue
+            if artifact.get("endpoint_sha256"):
+                path = str(artifact["path"])
+                expected[path if path.startswith("/") else f"/{path}"] = str(artifact["endpoint_sha256"]).strip()
+
     return expected
 
 
@@ -133,12 +147,18 @@ def compare_candidate_against_baseline(
     mismatched: dict[str, dict[str, str]] = {}
     errors: list[str] = []
 
-    for path, cand_sha in candidate_checksums.items():
+    # A frozen baseline defines the scope of a no-op assertion. Newer
+    # manifests may carry additional endpoint checksums; compare every path
+    # the baseline attests without treating those stronger claims as drift.
+    comparison_paths = baseline_checksums if expect_noop else candidate_checksums
+    for path in comparison_paths:
+        cand_sha = candidate_checksums.get(path)
         base_sha = baseline_checksums.get(path)
+        if cand_sha is None:
+            mismatched[path] = {"expected": str(base_sha), "actual": "(missing)"}
+            errors.append(f"Pre-deploy no-op check cannot verify baseline path '{path}': candidate checksum is missing")
+            continue
         if base_sha is None:
-            if expect_noop:
-                errors.append(f"Pre-deploy no-op violation: candidate contains unexpected new path '{path}'")
-                mismatched[path] = {"expected": "(none)", "actual": cand_sha}
             continue
 
         if cand_sha.lower() == base_sha.lower():
@@ -347,10 +367,12 @@ def verify_live(
     endpoints: list[str] | None = None,
     skip_live_probes: bool = False,
     pre_deploy: bool = False,
+    observation_origin: str | None = None,
 ) -> VerificationReport:
     """Perform comprehensive pre-deploy candidate and/or live verification."""
     report = VerificationReport(
         base_url=base_url,
+        observation_origin=observation_origin,
         expect_noop=expect_noop,
         require_receipt=require_receipt,
     )
@@ -390,6 +412,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--base-url",
         default=DEFAULT_BASE_URL,
         help=f"Base URL of publication target (default: {DEFAULT_BASE_URL})",
+    )
+    parser.add_argument(
+        "--observation-origin",
+        default=None,
+        help="External origin that performed live observations",
     )
     parser.add_argument(
         "--manifest",
@@ -473,6 +500,7 @@ def main(argv: list[str] | None = None) -> int:
         endpoints=args.endpoints,
         skip_live_probes=args.pre_deploy,
         pre_deploy=args.pre_deploy,
+        observation_origin=args.observation_origin,
     )
 
     if args.json:

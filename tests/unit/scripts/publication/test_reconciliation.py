@@ -7,8 +7,11 @@ that real matching evidence reconciles.
 
 from __future__ import annotations
 
+import base64
+import copy
 import importlib.util
 import json
+import subprocess
 import sys
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -53,29 +56,88 @@ def _full_live_receipt(generation: int = 5, timestamp: str | None = None) -> dic
         "nonce": "nonce-xyz",
         "freshness_window": "24h",
         "attestor": "maintainer:joe",
+        "signature_algorithm": "ed25519",
         "signature": "BASE64SIG==",
+        "artifact_name": "publication-pages-5",
+        "artifact_run_id": "12345",
+        "observation_origin": "github-actions:publication-verify",
         "routes": [
             {"path": "/", "status_code": 200, "ok": True},
+            {"path": "/docs/", "status_code": 200, "ok": True},
             {"path": "/results/", "status_code": 200, "ok": True},
             {"path": "/results/data/results.duckdb", "status_code": 200, "ok": True},
         ],
     }
 
 
+def test_reconciliation_rejects_internal_observation_origin() -> None:
+    receipt = _full_live_receipt()
+    receipt["observation_origin"] = "internal:deployment-runner"
+
+    findings = recon_mod._check_receipt_contract_fields(receipt)
+
+    assert any(
+        finding.drift_type == "RECEIPT_INCOMPLETE" and "approved external observer" in finding.description
+        for finding in findings
+    )
+
+
+def _sign_receipt(receipt: dict, private_key: Path) -> None:
+    payload = private_key.parent / "receipt-payload.json"
+    signature = private_key.parent / "receipt.sig"
+    payload.write_bytes(recon_mod.canonical_live_receipt_payload(receipt))
+    subprocess.run(
+        [
+            "openssl",
+            "pkeyutl",
+            "-sign",
+            "-rawin",
+            "-inkey",
+            str(private_key),
+            "-in",
+            str(payload),
+            "-out",
+            str(signature),
+        ],
+        check=True,
+    )
+    receipt["signature"] = base64.b64encode(signature.read_bytes()).decode("ascii")
+
+
+@pytest.fixture
+def attestor_keypair(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    private_key = tmp_path / "attestor-private.pem"
+    public_key = tmp_path / "attestor-public.pem"
+    subprocess.run(["openssl", "genpkey", "-algorithm", "ED25519", "-out", str(private_key)], check=True)
+    subprocess.run(["openssl", "pkey", "-in", str(private_key), "-pubout", "-out", str(public_key)], check=True)
+    monkeypatch.setattr(recon_mod, "DEFAULT_ATTESTOR_PUBLIC_KEY", public_key)
+    return private_key
+
+
 def _distinct_states(generation: int = 5):
-    desired = {
+    common = {
         "generation": generation,
+        "target": "benchbox.dev",
+        "manifest_digest": "sha256:" + "a" * 64,
         "develop_sha": "1111111111111111111111111111111111111111",
+        "published_results_sha": "2222222222222222222222222222222222222222",
+        "artifacts": {"site": {"digest": "d" * 64, "path": "/"}},
+    }
+    desired = {
+        **copy.deepcopy(common),
         "build_closure": {"lockfile_sha256": "lock", "workflow_sha": "wf"},
     }
     built = {
-        "generation": generation,
-        "develop_sha": "1111111111111111111111111111111111111111",
+        **copy.deepcopy(common),
+        "artifact_name": "publication-pages-5",
+        "artifact_run_id": "12345",
         "build_closure": {"lockfile_sha256": "lock", "workflow_sha": "wf"},
     }
     deployed = {
-        "generation": generation,
+        **copy.deepcopy(common),
         "source_commit": "1111111111111111111111111111111111111111",
+        "artifact_name": "publication-pages-5",
+        "artifact_run_id": "12345",
         "status": "DEPLOYED",
     }
     observed = _full_live_receipt(generation=generation)
@@ -118,11 +180,45 @@ def test_reconcile_live_incomplete_observed_receipt_fails(monkeypatch: pytest.Mo
     assert any(d.drift_type == "RECEIPT_INCOMPLETE" for d in report.drifts)
 
 
-def test_reconcile_happy_path_distinct_matching_states() -> None:
+def test_reconcile_happy_path_distinct_matching_states(attestor_keypair: Path) -> None:
     desired, built, deployed, observed = _distinct_states()
+    _sign_receipt(observed, attestor_keypair)
     report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
     assert report.reconciled is True, [d.description for d in report.drifts]
     assert report.drift_count == 0
+
+
+@pytest.mark.parametrize(
+    ("field", "drift_type"),
+    (
+        ("develop_sha", "MANIFEST_DRIFT"),
+        ("manifest_digest", "MANIFEST_DRIFT"),
+        ("artifact_name", "ARTIFACT_DRIFT"),
+        ("artifact_run_id", "ARTIFACT_DRIFT"),
+    ),
+)
+def test_reconcile_rejects_crossed_observed_binding(field: str, drift_type: str) -> None:
+    desired, built, deployed, observed = _distinct_states()
+    matching_values = {
+        "develop_sha": "1111111111111111111111111111111111111111",
+        "manifest_digest": "sha256:" + "a" * 64,
+        "artifact_name": "publication-site-5",
+        "artifact_run_id": "12345",
+    }
+    for state in (desired, built, deployed):
+        state[field] = matching_values[field]
+    observed[field] = "crossed-receipt-value"
+
+    report = recon_mod.reconcile_states(
+        desired=desired,
+        built=built,
+        deployed=deployed,
+        observed=observed,
+        now_dt=NOW,
+    )
+
+    assert report.reconciled is False
+    assert any(d.drift_type == drift_type and d.actual == "crossed-receipt-value" for d in report.drifts)
 
 
 def test_reconcile_missing_observation_fails_closed() -> None:
@@ -138,6 +234,17 @@ def test_reconcile_missing_built_and_deployed_fails_closed() -> None:
     assert report.reconciled is False
     assert any("assembly (built) receipt" in d.description for d in report.drifts)
     assert any("deployment receipt" in d.description for d in report.drifts)
+
+
+@pytest.mark.parametrize("field", ("manifest_digest", "artifact_name", "artifact_run_id"))
+def test_reconcile_rejects_deployed_state_missing_required_binding(field: str) -> None:
+    desired, built, deployed, observed = _distinct_states()
+    del deployed[field]
+
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
+
+    assert report.reconciled is False
+    assert any("Deployed state is missing required" in finding.description for finding in report.drifts)
 
 
 def test_reconcile_generation_drift_desired_vs_observed_when_deployed_missing() -> None:
@@ -167,6 +274,43 @@ def test_reconcile_missing_required_artifact_is_drift() -> None:
     report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
     assert report.reconciled is False
     assert any(d.drift_type == "ARTIFACT_DRIFT" and "/results/" in d.description for d in report.drifts)
+
+
+def test_artifact_digests_preserve_identity_when_paths_overlap() -> None:
+    receipt = {
+        "artifacts": {
+            "prose_site": {"path": "/", "digest": "a" * 64},
+            "pages_assembly": {"path": "/", "digest": "b" * 64},
+        },
+        "checksums": {"/": "c" * 64},
+    }
+
+    digests = recon_mod.extract_artifact_digests(receipt)
+
+    assert digests == {
+        "artifact:prose_site:/": "a" * 64,
+        "artifact:pages_assembly:/": "b" * 64,
+        "endpoint:/": "c" * 64,
+    }
+
+
+@pytest.mark.parametrize("state_name", ("deployed", "observed"))
+def test_reconcile_requires_complete_artifact_set_in_every_state(state_name: str) -> None:
+    desired, built, deployed, observed = _distinct_states()
+    for state in (desired, built, deployed, observed):
+        state["artifacts"]["explorer"] = {"path": "/results/", "digest": "e" * 64}
+    target = deployed if state_name == "deployed" else observed
+    del target["artifacts"]["explorer"]
+
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
+
+    assert report.reconciled is False
+    assert any(
+        finding.drift_type == "ARTIFACT_DRIFT"
+        and state_name in finding.description.lower()
+        and "artifact:explorer:/results/" in finding.description
+        for finding in report.drifts
+    )
 
 
 def test_reconcile_incomplete_receipt_fields() -> None:
@@ -253,7 +397,12 @@ def test_reconcile_live_probe_execution(monkeypatch: pytest.MonkeyPatch) -> None
     report = recon_mod.reconcile_states(
         desired=desired, built=built, deployed=deployed, observed=None, live=True, now_dt=NOW
     )
-    assert len(report.probes) == 3
+    assert {probe.path for probe in report.probes} == {
+        "/",
+        "/docs/",
+        "/results/",
+        "/results/data/results.duckdb",
+    }
     assert all(p.ok for p in report.probes)
 
 
@@ -278,8 +427,9 @@ def test_reconciliation_cli_requires_inputs(tmp_path: Path) -> None:
     assert recon_mod.main(["--manifest", str(manifest), "--receipts-dir", str(rdir)]) == 2
 
 
-def test_reconciliation_cli_full_evidence_reconciles(tmp_path: Path) -> None:
+def test_reconciliation_cli_full_evidence_reconciles(tmp_path: Path, attestor_keypair: Path) -> None:
     desired, built, deployed, observed = _distinct_states()
+    _sign_receipt(observed, attestor_keypair)
     manifest = tmp_path / "desired-manifest.json"
     manifest.write_text(json.dumps(desired), encoding="utf-8")
     rdir = tmp_path / "reconciliation"
@@ -289,6 +439,52 @@ def test_reconciliation_cli_full_evidence_reconciles(tmp_path: Path) -> None:
     (rdir / recon_mod.LIVE_RECEIPT_NAME).write_text(json.dumps(observed), encoding="utf-8")
 
     assert recon_mod.main(["--manifest", str(manifest), "--receipts-dir", str(rdir), "--json"]) == 0
+
+
+def test_reconcile_receipt_signature_fails_closed_for_missing_empty_or_wrong_signature(
+    attestor_keypair: Path,
+) -> None:
+    for signature in (None, "", "Zm9yZ2Vk"):
+        desired, built, deployed, observed = _distinct_states()
+        if signature is None:
+            del observed["signature"]
+        else:
+            observed["signature"] = signature
+        report = recon_mod.reconcile_states(
+            desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW
+        )
+        assert report.reconciled is False
+        assert any(d.drift_type == "RECEIPT_SIGNATURE_INVALID" for d in report.drifts)
+
+
+def test_reconcile_receipt_signature_accepts_valid_attestor_signature(attestor_keypair: Path) -> None:
+    desired, built, deployed, observed = _distinct_states()
+    _sign_receipt(observed, attestor_keypair)
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
+    assert report.reconciled is True, [d.description for d in report.drifts]
+
+
+def test_verify_live_receipt_signature_handles_missing_openssl(
+    attestor_keypair: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    desired, built, deployed, observed = _distinct_states()
+    _sign_receipt(observed, attestor_keypair)
+
+    def _mock_subprocess_run(*args, **kwargs):
+        raise FileNotFoundError("No such file or directory: 'openssl'")
+
+    monkeypatch.setattr(subprocess, "run", _mock_subprocess_run)
+    valid, reason = recon_mod.verify_live_receipt_signature(observed)
+    assert valid is False
+    assert "openssl binary execution failed" in reason
+    assert "No such file or directory: 'openssl'" in reason
+
+    report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
+    assert report.reconciled is False
+    assert any(
+        d.drift_type == "RECEIPT_SIGNATURE_INVALID" and "openssl binary execution failed" in d.description
+        for d in report.drifts
+    )
 
 
 # ======================================================================
@@ -310,6 +506,12 @@ def _single_lane_transitions() -> list[dict]:
                 "target_lane": lane,
                 "before_hashes": dict(_BASE),
                 "after_hashes": after,
+                "evidence": {
+                    "workflow_run_id": "123",
+                    "event_id": f"event-{lane}",
+                    "artifact_name": f"lane-{lane}",
+                    "artifact_digest": "a" * 64,
+                },
             }
         )
     return out
@@ -353,6 +555,25 @@ def test_matrix_malformed_record_is_config_error(tmp_path: Path) -> None:
         matrix_mod.verify_independence(receipts_dir=tmp_path)
 
 
+@pytest.mark.parametrize(
+    ("key", "value"),
+    (
+        ("workflow_run_id", True),
+        ("workflow_run_id", "not-a-run"),
+        ("event_id", 123),
+        ("artifact_name", ""),
+        ("artifact_digest", "not-a-digest"),
+    ),
+)
+def test_matrix_rejects_malformed_artifact_evidence(tmp_path: Path, key: str, value: object) -> None:
+    transitions = _single_lane_transitions()
+    transitions[0]["evidence"][key] = value
+    (tmp_path / matrix_mod.MATRIX_FILE_NAME).write_text(json.dumps({"transitions": transitions}), encoding="utf-8")
+
+    with pytest.raises(matrix_mod.MatrixInputError, match="valid provenance"):
+        matrix_mod.verify_independence(receipts_dir=tmp_path)
+
+
 def test_matrix_cli(tmp_path: Path) -> None:
     with pytest.raises(SystemExit) as exc:
         matrix_mod.main(["--help"])
@@ -386,7 +607,20 @@ def _valid_operational_dir(tmp_path: Path) -> Path:
         (receipts_mod.INCIDENT_DRILL_FILE, "i1"),
     ):
         (d / name).write_text(
-            json.dumps({"receipt_id": rid, "status": "SUCCESS", "executed_at": NOW_ISO}), encoding="utf-8"
+            json.dumps(
+                {
+                    "receipt_id": rid,
+                    "status": "SUCCESS",
+                    "executed_at": NOW_ISO,
+                    "evidence": {
+                        "workflow_run_id": "123",
+                        "event_id": rid,
+                        "artifact_name": "pages",
+                        "artifact_digest": "a" * 64,
+                    },
+                }
+            ),
+            encoding="utf-8",
         )
     (d / receipts_mod.CAPACITY_FILE).write_text(
         json.dumps({"total_size_bytes": 50_000_000, "largest_file_bytes": 10_000_000, "measured": True}),
@@ -420,6 +654,29 @@ def test_operational_missing_drill_is_missing_violation(tmp_path: Path) -> None:
     assert report.drills["rollback"].passed is False
 
 
+@pytest.mark.parametrize(
+    ("key", "value"),
+    (
+        ("workflow_run_id", True),
+        ("workflow_run_id", "not-a-run"),
+        ("event_id", 123),
+        ("artifact_name", ""),
+        ("artifact_digest", "not-a-digest"),
+    ),
+)
+def test_operational_rejects_malformed_artifact_evidence(tmp_path: Path, key: str, value: object) -> None:
+    d = _valid_operational_dir(tmp_path)
+    receipt_path = d / receipts_mod.ROLLBACK_DRILL_FILE
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["evidence"][key] = value
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+    report = receipts_mod.audit_operational_receipts(receipts_dir=d, now_dt=NOW)
+    assert report.valid is False
+    assert report.drills["rollback"].status == "INVALID"
+    assert "artifact evidence" in (report.drills["rollback"].error or "")
+
+
 def test_operational_missing_capacity_and_retention_fail_closed(tmp_path: Path) -> None:
     d = tmp_path / "operational"
     d.mkdir()
@@ -444,6 +701,18 @@ def test_operational_capacity_at_limit_rejected() -> None:
     assert audit.passed is False
     audit2 = receipts_mod.audit_capacity(total_bytes=1, largest_file_bytes=receipts_mod.MAX_INDIVIDUAL_FILE_BYTES)
     assert audit2.passed is False
+
+
+@pytest.mark.parametrize("measured", ["false", "true", 0, 1, None])
+def test_operational_capacity_rejects_non_boolean_measured(tmp_path: Path, measured: object) -> None:
+    d = _valid_operational_dir(tmp_path)
+    capacity_path = d / receipts_mod.CAPACITY_FILE
+    capacity = json.loads(capacity_path.read_text(encoding="utf-8"))
+    capacity["measured"] = measured
+    capacity_path.write_text(json.dumps(capacity), encoding="utf-8")
+
+    with pytest.raises(receipts_mod.ReceiptsConfigError, match="measured must be a boolean"):
+        receipts_mod.audit_operational_receipts(receipts_dir=d, now_dt=NOW)
 
 
 def test_operational_status_missing_is_invalid() -> None:

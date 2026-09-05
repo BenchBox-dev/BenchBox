@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
@@ -41,6 +42,7 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+HEX_64_RE = re.compile(r"^(sha256:)?[0-9a-f]{64}$", re.IGNORECASE)
 
 MAX_TOTAL_PAGES_BYTES = 1024 * 1024 * 1024  # 1 GiB
 WARNING_TOTAL_PAGES_BYTES = 800 * 1024 * 1024  # 800 MiB
@@ -62,6 +64,27 @@ RETENTION_FILE = "retention-policy.json"
 
 class ReceiptsConfigError(ValueError):
     """Raised for a configuration or parse error in operational inputs."""
+
+
+def _validate_artifact_evidence(evidence: Any) -> list[str]:
+    """Validate immutable workflow-artifact provenance carried by a receipt."""
+    if not isinstance(evidence, dict):
+        return ["evidence must be an object"]
+    errors: list[str] = []
+    run_id = evidence.get("workflow_run_id")
+    valid_run_id = (isinstance(run_id, int) and not isinstance(run_id, bool) and run_id > 0) or (
+        isinstance(run_id, str) and run_id.isdecimal() and int(run_id) > 0
+    )
+    if not valid_run_id:
+        errors.append("workflow_run_id must be a positive integer")
+    for key in ("event_id", "artifact_name"):
+        value = evidence.get(key)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"{key} must be a non-empty string")
+    digest = evidence.get("artifact_digest")
+    if not isinstance(digest, str) or HEX_64_RE.fullmatch(digest.strip()) is None:
+        errors.append("artifact_digest must be a SHA-256 digest")
+    return errors
 
 
 @dataclass
@@ -174,6 +197,10 @@ def audit_capacity(
     warnings: list[str] = []
     violations: list[str] = []
     passed = True
+
+    if not measured:
+        passed = False
+        violations.append("Capacity evidence is a declaration; measured=true or --pages-dir is required")
 
     if total_bytes >= MAX_TOTAL_PAGES_BYTES:
         passed = False
@@ -351,6 +378,19 @@ def audit_drill_receipt(
             error=f"Drill receipt is expired: age {age_days} days exceeds maximum threshold of {max_age_days} days",
         )
 
+    evidence_errors = _validate_artifact_evidence(receipt_data.get("evidence"))
+    if evidence_errors:
+        return DrillReceiptStatus(
+            drill_type=drill_type,
+            status="INVALID",
+            receipt_id=receipt_id,
+            executed_at=str(executed_at),
+            age_days=age_days,
+            max_age_days=max_age_days,
+            passed=False,
+            error="Invalid bound workflow/artifact evidence: " + "; ".join(evidence_errors),
+        )
+
     return DrillReceiptStatus(
         drill_type=drill_type,
         status="VERIFIED",
@@ -434,11 +474,14 @@ def audit_operational_receipts(
             largest_file_bytes = int(cap_data.get("largest_file_bytes", 0))
         except (KeyError, TypeError, ValueError) as e:
             raise ReceiptsConfigError(f"{CAPACITY_FILE} is missing/invalid total_size_bytes: {e}") from e
+        measured = cap_data.get("measured", False)
+        if not isinstance(measured, bool):
+            raise ReceiptsConfigError(f"{CAPACITY_FILE} measured must be a boolean")
         capacity_audit = audit_capacity(
             total_bytes,
             largest_file_bytes,
             str(cap_data.get("largest_file_path", "")),
-            measured=bool(cap_data.get("measured", False)),
+            measured=measured,
         )
     else:
         capacity_audit = CapacityAudit(total_size_bytes=0, passed=False)
