@@ -57,6 +57,7 @@ def _full_live_receipt(generation: int = 5, timestamp: str | None = None) -> dic
         "attestor": "maintainer:joe",
         "signature_algorithm": "ed25519",
         "signature": "BASE64SIG==",
+        "observation_origin": "github-actions:publication-verify",
         "routes": [
             {"path": "/", "status_code": 200, "ok": True},
             {"path": "/docs/", "status_code": 200, "ok": True},
@@ -64,6 +65,18 @@ def _full_live_receipt(generation: int = 5, timestamp: str | None = None) -> dic
             {"path": "/results/data/results.duckdb", "status_code": 200, "ok": True},
         ],
     }
+
+
+def test_reconciliation_rejects_internal_observation_origin() -> None:
+    receipt = _full_live_receipt()
+    receipt["observation_origin"] = "internal:deployment-runner"
+
+    findings = recon_mod._check_receipt_contract_fields(receipt)
+
+    assert any(
+        finding.drift_type == "RECEIPT_INCOMPLETE" and "approved external observer" in finding.description
+        for finding in findings
+    )
 
 
 def _sign_receipt(receipt: dict, private_key: Path) -> None:

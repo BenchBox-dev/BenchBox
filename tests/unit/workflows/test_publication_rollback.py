@@ -144,6 +144,9 @@ def test_receipts_use_measured_provenance_and_valid_json_newlines() -> None:
     assert "! -name '*.plans.json' ! -name '*.tuning.json'" in text
     assert "['summary']['total_bundles']" in text
     assert 'tree_size("site")' in text
+    assert '"digest": os.environ["PROSE_DIGEST"]' in text
+    assert 'tree_size("prose-site")' in text
+    assert 'tree_size("api-docs")' in text
     assert " + '\\\\n'" not in text
     assert '"artifact_name": os.environ["PAGES_ARTIFACT"]' in text
     assert '"rollback_artifact_name": os.environ["SITE_ARTIFACT"]' in text
@@ -187,6 +190,7 @@ def test_verify_step_invokes_verify_live_with_receipt() -> None:
     assert "--require-receipt" in run_cmd
     assert "--manifest" in run_cmd
     assert "--base-url" in run_cmd
+    assert "--observation-origin github-actions:publication-verify" in run_cmd
 
 
 def test_live_receipt_binds_html_endpoints_and_acknowledges_before_probing() -> None:
@@ -199,6 +203,8 @@ def test_live_receipt_binds_html_endpoints_and_acknowledges_before_probing() -> 
     assert '"/docs/": os.environ["DOCS_ENDPOINT_DIGEST"]' in text
     assert '"/results/": os.environ["EXPLORER_ENDPOINT_DIGEST"]' in text
     assert names.index("Upload provider deployment acknowledgement") < names.index("Probe required live routes")
+    assert "probe_report.get('observation_origin') != 'github-actions:publication-verify'" in text
+    assert "probe_report.get('observation_origin') != 'github-actions:publication-rollback-verify'" in text
 
 
 def test_rollback_restores_only_a_cryptographically_attested_artifact() -> None:

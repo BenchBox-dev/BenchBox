@@ -91,6 +91,7 @@ REQUIRED_RECEIPT_FIELDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("published-results SHA", ("published_results_sha", "published_results_commit")),
     ("artifact identity", ("artifacts", "artifact")),
     ("required route set", ("routes", "probes")),
+    ("observation origin", ("observation_origin",)),
     ("nonce", ("nonce",)),
     ("freshness window", ("freshness_window", "freshness_window_hours", "max_age_hours")),
     ("attestor identity", ("attestor", "attestor_identity", "attested_by")),
@@ -683,6 +684,21 @@ def _check_receipt_contract_fields(observed: dict[str, Any] | None) -> list[Drif
                     actual="absent or empty",
                 )
             )
+
+    observation_origin = observed.get("observation_origin")
+    if observation_origin is not None and not (
+        isinstance(observation_origin, str)
+        and observation_origin.startswith("github-actions:")
+        and len(observation_origin) > len("github-actions:")
+    ):
+        drifts.append(
+            DriftFinding(
+                drift_type="RECEIPT_INCOMPLETE",
+                description="Live receipt observation origin is not an approved external observer",
+                expected="github-actions:<workflow-observer>",
+                actual=str(observation_origin),
+            )
+        )
 
     # Route-set completeness with per-route status.
     routes = observed.get("routes") or observed.get("probes")

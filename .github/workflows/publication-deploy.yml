@@ -266,6 +266,10 @@ jobs:
 
       - name: Assemble and validate whole-site artifact
         run: |
+          uv run python scripts/assemble_public_site.py --site-dir prose-site --prose-only
+          mkdir -p api-docs
+          test -f docs/_build/html/api.html && cp docs/_build/html/api.html api-docs/
+          test -d docs/_build/html/_modules && cp -r docs/_build/html/_modules api-docs/
           uv run python scripts/assemble_public_site.py --site-dir site
           test -s site/results/data/results.duckdb || {
             echo "::error::atomic site artifact is missing results.duckdb"
@@ -297,15 +301,18 @@ jobs:
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           (cd site && find . -type f -exec sha256sum {} + | sort) > receipt-dist/site-file-digests.txt
           SITE_DIGEST=$(sha256sum receipt-dist/site-file-digests.txt | cut -d ' ' -f 1)
+          (cd prose-site && find . -type f -exec sha256sum {} + | sort) > receipt-dist/prose-file-digests.txt
+          PROSE_DIGEST=$(sha256sum receipt-dist/prose-file-digests.txt | cut -d ' ' -f 1)
           (cd results-explorer/dist && find . -type f -exec sha256sum {} + | sort) > receipt-dist/explorer-file-digests.txt
           EXPLORER_DIGEST=$(sha256sum receipt-dist/explorer-file-digests.txt | cut -d ' ' -f 1)
-          (cd docs/_build/html && find . -type f -exec sha256sum {} + | sort) > receipt-dist/docs-file-digests.txt
+          (cd api-docs && find . -type f -exec sha256sum {} + | sort) > receipt-dist/docs-file-digests.txt
           DOCS_DIGEST=$(sha256sum receipt-dist/docs-file-digests.txt | cut -d ' ' -f 1)
           (cd results-data/bundles && find . -type f -exec sha256sum {} + | sort) > receipt-dist/corpus-file-digests.txt
           CORPUS_DIGEST=$(sha256sum receipt-dist/corpus-file-digests.txt | cut -d ' ' -f 1)
           DATABASE_DIGEST=$(sha256sum site/results/data/results.duckdb | cut -d ' ' -f 1)
           ROOT_ENDPOINT_DIGEST=$(sha256sum site/index.html | cut -d ' ' -f 1)
           DOCS_ENDPOINT_DIGEST=$(sha256sum site/docs/index.html | cut -d ' ' -f 1)
+          API_DOCS_ENDPOINT_DIGEST=$(sha256sum site/docs/api.html | cut -d ' ' -f 1)
           EXPLORER_ENDPOINT_DIGEST=$(sha256sum site/results/index.html | cut -d ' ' -f 1)
           LOCKFILE_DIGEST=$(sha256sum uv.lock | cut -d ' ' -f 1)
           BUNDLE_COUNT=$(find results-data/bundles -type f -name '*.json' \
@@ -320,9 +327,9 @@ jobs:
           NODE_VERSION=$(node --version | sed 's/^v//')
           UV_VERSION=$(uv --version | awk '{print $2}')
           IMAGE_OS="${ImageOS:-ubuntu-latest}"
-          export GENERATION DEVELOP_SHA PUBLISHED_RESULTS_SHA PRIOR_LIVE_RECEIPT_ID SITE_DIGEST DOCS_DIGEST
+          export GENERATION DEVELOP_SHA PUBLISHED_RESULTS_SHA PRIOR_LIVE_RECEIPT_ID SITE_DIGEST PROSE_DIGEST DOCS_DIGEST
           export EXPLORER_DIGEST DATABASE_DIGEST CORPUS_DIGEST LOCKFILE_DIGEST BUNDLE_COUNT PYTHON_VERSION
-          export ROOT_ENDPOINT_DIGEST DOCS_ENDPOINT_DIGEST EXPLORER_ENDPOINT_DIGEST
+          export ROOT_ENDPOINT_DIGEST DOCS_ENDPOINT_DIGEST API_DOCS_ENDPOINT_DIGEST EXPLORER_ENDPOINT_DIGEST
           export NODE_VERSION UV_VERSION IMAGE_OS SITE_ARTIFACT PAGES_ARTIFACT GITHUB_RUN_ID TIMESTAMP GITHUB_OUTPUT
           export PARENT_SHA PARENT_GENERATION WORKFLOW_SHA APPROVED_MANIFEST_DIGEST
           python3 - <<'PY'
@@ -370,16 +377,16 @@ jobs:
               },
               "artifacts": {
                   "prose_site": {
-                      "digest": os.environ["SITE_DIGEST"],
+                      "digest": os.environ["PROSE_DIGEST"],
                       "endpoint_sha256": os.environ["ROOT_ENDPOINT_DIGEST"],
-                      "size": tree_size("site"),
+                      "size": tree_size("prose-site"),
                       "path": "/",
                   },
                   "api_docs": {
                       "digest": os.environ["DOCS_DIGEST"],
-                      "endpoint_sha256": os.environ["DOCS_ENDPOINT_DIGEST"],
-                      "size": tree_size("docs/_build/html"),
-                      "path": "/docs/",
+                      "endpoint_sha256": os.environ["API_DOCS_ENDPOINT_DIGEST"],
+                      "size": tree_size("api-docs"),
+                      "path": "/docs/api.html",
                   },
                   "explorer_app": {
                       "digest": os.environ["EXPLORER_DIGEST"],
@@ -406,6 +413,7 @@ jobs:
               "checksums": {
                   "/": os.environ["ROOT_ENDPOINT_DIGEST"],
                   "/docs/": os.environ["DOCS_ENDPOINT_DIGEST"],
+                  "/docs/api.html": os.environ["API_DOCS_ENDPOINT_DIGEST"],
                   "/results/": os.environ["EXPLORER_ENDPOINT_DIGEST"],
                   "/results/data/results.duckdb": os.environ["DATABASE_DIGEST"],
               },
@@ -635,6 +643,7 @@ jobs:
           uv run python scripts/publication/verify_live.py \
             --base-url "$TARGET_URL" \
             --manifest receipt-dist/publication-receipt.json \
+            --observation-origin github-actions:publication-verify \
             --require-receipt --timeout 60 --json > receipt-dist/live-probe-report.json
 
       - name: Create and sign live receipt
@@ -655,7 +664,10 @@ jobs:
           import json, os
           from datetime import datetime, timezone
           assembly = json.load(open('receipt-dist/assembly-receipt.json'))
-          probes = json.load(open('receipt-dist/live-probe-report.json'))['probes']
+          probe_report = json.load(open('receipt-dist/live-probe-report.json'))
+          if probe_report.get('observation_origin') != 'github-actions:publication-verify':
+              raise SystemExit('live receipt requires the external GitHub Actions observation origin')
+          probes = probe_report['probes']
           prior_live_receipt_id = os.environ.get('PRIOR_LIVE_RECEIPT_ID') or None
           receipt = dict(assembly)
           receipt.update({
@@ -663,6 +675,7 @@ jobs:
               'receipt_run_id': os.environ['GITHUB_RUN_ID'],
               'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
               'routes': probes,
+              'observation_origin': probe_report['observation_origin'],
               'nonce': f"{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}",
               'freshness_window': '24h',
               'attestor': 'github-actions:publication-deploy',
@@ -862,7 +875,7 @@ jobs:
         run: |
           set -euo pipefail
           TARGET_URL="${{ steps.deployment.outputs.page_url }}"
-          uv run python scripts/publication/verify_live.py --base-url "$TARGET_URL" --manifest known-good-receipt/live-receipt.json --require-receipt --timeout 60 --json > known-good-receipt/rollback-probe-report.json
+          uv run python scripts/publication/verify_live.py --base-url "$TARGET_URL" --manifest known-good-receipt/live-receipt.json --observation-origin github-actions:publication-rollback-verify --require-receipt --timeout 60 --json > known-good-receipt/rollback-probe-report.json
 
       - name: Create and sign rollback live receipt
         env:
@@ -887,7 +900,10 @@ jobs:
           from datetime import datetime, timezone
           from scripts.publication.manifest import validate_manifest_dict
           prior = json.load(open('known-good-receipt/live-receipt.json'))
-          probes = json.load(open('known-good-receipt/rollback-probe-report.json'))['probes']
+          probe_report = json.load(open('known-good-receipt/rollback-probe-report.json'))
+          if probe_report.get('observation_origin') != 'github-actions:publication-rollback-verify':
+              raise SystemExit('rollback receipt requires the external GitHub Actions observation origin')
+          probes = probe_report['probes']
           receipt = dict(prior)
           receipt.update({
               'generation': int(os.environ['BUILD_GENERATION']),
@@ -901,6 +917,7 @@ jobs:
               'rollback_artifact_run_id': os.environ['GITHUB_RUN_ID'],
               'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
               'routes': probes,
+              'observation_origin': probe_report['observation_origin'],
               'nonce': f"{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}",
               'prior_live_receipt_id': os.environ['PRIOR_LIVE_RECEIPT_ID'],
               'rollback_source_receipt_id': prior['receipt_id'],
