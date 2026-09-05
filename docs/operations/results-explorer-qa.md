@@ -130,10 +130,10 @@ DuckDB-WASM network access to the app origin.
   checkout) plus privacy rejection in
   `tests/unit/scripts/explorer_pipeline/test_privacy_rejection.py`.
 - Chromium blocking suite on the isolated port:
-  `cd results-explorer && npm run test:e2e:chromium`
+  `cd results-explorer && E2E_PORT=<allocated-port> npm run test:e2e:chromium`
 - Firefox and WebKit `@smoke` projects when those browsers are installed:
-  `npx playwright test --project=firefox` and
-  `npx playwright test --project=webkit --workers=1`.
+  `E2E_PORT=<allocated-port> npx playwright test --project=firefox` and
+  `E2E_PORT=<allocated-port> npx playwright test --project=webkit --workers=1`.
   Promotion to a blocking gate still waits for consecutive evidence, not a
   short green sample. Classify every failure as product, infrastructure, or
   policy, with an owner. Do not skip classification. Injected JavaScript,
