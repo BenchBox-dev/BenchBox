@@ -12,10 +12,12 @@ overwriting an attested deployment during the soak.
 
 Before the first dispatch, configure the `PUBLICATION_ATTESTOR_PRIVATE_KEY`
 environment secret in both `publication-attestation` and `github-pages`. The
-former must allow only `develop`; the latter must also allow only `develop` and
-must disable administrator bypass before activation. This retires stale
-`release` copies of the legacy and preview Pages writers while preserving
-deployment and rollback from the independent workflow. Do not configure a repository-level copy,
+former must allow only `develop`; the latter must continue to allow `develop`
+and `release` during the bounded soak so the legacy release deploy remains
+available until its retirement is approved. Disable the obsolete
+`publication-preview-deploy.yml` workflow at repository level before activation;
+its in-file ownership guard remains defense in depth if it is later re-enabled.
+Do not configure a repository-level copy,
 because unmerged branch workflow code could request it. The secret must be the
 PEM Ed25519 private key
 whose public half is committed at
