@@ -98,6 +98,7 @@ test.describe("Index sortable headers", () => {
 
     await expect(platformHeader).toHaveAttribute("aria-sort", "ascending");
     const platforms = await platformCellLabels(rows, 0);
-    expect(platforms).toEqual([...platforms].sort((a, b) => a.localeCompare(b)));
+    const platformName = (label: string) => label.split(" · ", 1)[0] ?? label;
+    expect(platforms).toEqual([...platforms].sort((a, b) => platformName(a).localeCompare(platformName(b))));
   });
 });
