@@ -676,7 +676,9 @@ export function memoizedSnapshotQueryRows<T>(
 export async function listResults(where: FacetWhereClause = { sql: "", params: [] }): Promise<ResultRow[]> {
   const needsHardware = /\b(?:arch|cpu_family)\b/.test(where.sql);
   const columns = needsHardware ? RESULT_HARDWARE_COLUMNS : RESULT_COLUMNS;
-  const source = needsHardware ? "bench.result_detail_metrics" : "bench.results";
+  const source = needsHardware
+    ? "(SELECT r.*, d.arch, d.cpu_family FROM bench.results r LEFT JOIN bench.result_detail_metrics d USING (result_id))"
+    : "bench.results";
   const sql = `SELECT ${columns} FROM ${source} ${where.sql} ORDER BY run_date DESC`;
   return memoizedSnapshotQueryRows<ResultRow>("list-results", { sql, params: where.params }, { cacheEmpty: false });
 }
