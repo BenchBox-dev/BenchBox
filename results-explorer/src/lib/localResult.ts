@@ -9,6 +9,18 @@ const EXECUTION_RUN_TYPES = new Set(["measurement", "warmup"]);
 const EXECUTION_MODES = new Set(["sql", "dataframe"]);
 const TUNING_MODES = new Set(["tuned", "tuned-fallback", "notuning", "auto", "custom"]);
 const FUNDING_SOURCES = new Set(["employer", "personal", "free-trial", "vendor-sponsored", "grant", "unspecified"]);
+const LOCAL_COST_MODEL_VERSION = "2025.11";
+const LOCAL_COST_MODEL_SOURCE = "benchbox.core.cost.pricing";
+const CPU_FAMILY_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/\bapple\s+(?:m\d|a\d)/i, "apple_silicon"],
+  [/\bgraviton/i, "graviton"],
+  [/\bxeon\b/i, "intel_xeon"],
+  [/\b(?:intel.*core|core\(tm\))\b/i, "intel_core"],
+  [/\bepyc\b/i, "amd_epyc"],
+  [/\b(?:ryzen|threadripper)\b/i, "amd_ryzen"],
+  [/\b(?:ampere|altra)\b/i, "ampere_altra"],
+  [/\bneoverse\b/i, "arm_neoverse"],
+];
 const KNOWN_LOGICAL_QUERY_COUNTS: Record<string, number> = {
   tpch: 22,
   tpch_skew: 22,
@@ -284,6 +296,9 @@ function safeEnvironment(raw: unknown): Environment {
     const value = finiteNumberOrNull(source[key]);
     if (value !== null) environment[key] = value;
   }
+  if (environment.cpu_model && !environment.cpu_family) {
+    environment.cpu_family = normalizeCpuFamily(environment.cpu_model);
+  }
   const provenance = stringOrNull(source.cpu_identity_provenance);
   if (provenance === "measured" || provenance === "user_attested" || provenance === "inferred") {
     environment.cpu_identity_provenance = provenance;
@@ -296,6 +311,11 @@ function safeEnvironment(raw: unknown): Environment {
   environment.statement_overhead_min_ms = finiteNumberOrNull(overhead.min);
   environment.statement_overhead_median_ms = finiteNumberOrNull(overhead.median);
   return environment;
+}
+
+function normalizeCpuFamily(rawModel: string): string {
+  const match = CPU_FAMILY_PATTERNS.find(([pattern]) => pattern.test(rawModel));
+  return match?.[1] ?? "unknown";
 }
 
 function executionMode(bundle: JsonObject): string | null {
@@ -392,7 +412,18 @@ function normalizedCostFields(bundle: JsonObject) {
         ? nestedNormalized
         : hasNormalizedCostShape
           ? cost
-          : {};
+          : null;
+  if (normalized === null) {
+    return {
+      normalized_cost_usd: null,
+      cost_model_version: LOCAL_COST_MODEL_VERSION,
+      cost_model_source: LOCAL_COST_MODEL_SOURCE,
+      cost_scope: "compute_only",
+      cost_status: "unavailable",
+      billing_unit: "unknown",
+      pricing_region: "unknown",
+    };
+  }
   return {
     normalized_cost_usd: finiteNumberOrNull(normalized.normalized_cost_usd),
     cost_model_version: stringOrNull(normalized.cost_model_version),
