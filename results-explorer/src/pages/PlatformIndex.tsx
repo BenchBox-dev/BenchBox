@@ -990,10 +990,9 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
 
       {platformResultsRaw.length > 0 && (
         <section class="card mt-8" aria-label="Performance trends by comparable ranking">
-          <h2 class="mb-2 text-base font-semibold text-[var(--bb-data-fg-primary)]">Performance Trends by Ranking</h2>
+          <h2 class="mb-2 text-base font-semibold text-[var(--bb-data-fg-primary)]">Performance trends by ranking</h2>
           <p class="mb-4 text-sm text-[var(--bb-data-fg-muted)]">
-            Trend rankings never mix benchmark, scale, phase, or metric. Charts require at least {MIN_TREND_OBSERVATIONS} observations;
-            smaller rankings stay visible as sparse-data states.
+            Each trend keeps the benchmark, scale, phase, and measurement fixed. A chart needs at least {MIN_TREND_OBSERVATIONS} runs.
           </p>
           {trendCohorts.length === 0 && sparseTrendCohorts.length === 0 ? (
             <p class="text-sm text-[var(--bb-data-fg-subtle)] italic">
@@ -1010,21 +1009,20 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   <TimeSeries entries={cohort.entries} primaryMetric={cohort.primaryMetric} />
                 </section>
               ))}
-              {sparseTrendCohorts.map((cohort) => (
-                <section
-                  key={cohort.key}
-                  data-testid={`trend-sparse-${cohort.key}`}
-                  class="rounded-lg border border-dashed border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-3"
-                >
-                  <h3 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">{cohort.label}</h3>
-                  <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]" aria-live="polite" aria-atomic="true">
-                    {`Limited observations: ${cohort.observationCount} published ${
-                      cohort.observationCount === 1 ? "run" : "runs"
-                    } in this comparable ranking. Trend chart hidden until at least ${MIN_TREND_OBSERVATIONS} observations exist.`}
-                  </p>
-                  <p class="mt-1 text-xs text-[var(--bb-data-fg-subtle)]">Metric: {cohort.metricDescription}.</p>
-                </section>
-              ))}
+              {sparseTrendCohorts.length > 0 && (
+                <details class="rounded-lg border border-dashed border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-3">
+                  <summary class="cursor-pointer text-sm font-medium text-[var(--bb-data-fg-primary)]">
+                    {sparseTrendCohorts.length} {sparseTrendCohorts.length === 1 ? "ranking has" : "rankings have"} too few runs for a trend
+                  </summary>
+                  <ul class="mt-3 space-y-2 text-sm text-[var(--bb-data-fg-muted)]">
+                    {sparseTrendCohorts.map((cohort) => (
+                      <li key={cohort.key} data-testid={`trend-sparse-${cohort.key}`}>
+                        <span class="font-medium text-[var(--bb-data-fg-primary)]">{cohort.label}</span>: {cohort.observationCount} published {cohort.observationCount === 1 ? "run" : "runs"} · {cohort.metricDescription}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
             </div>
           )}
         </section>
@@ -1182,7 +1180,7 @@ function PlatformCompareReasonStatus({
   }
   return (
     <div id={id} class="text-xs text-[var(--bb-data-fg-muted)]" data-testid="platform-disabled-reason">
-      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Disabled reason: {copy.shortText}</span>
+      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Why unavailable: {copy.shortText}</span>
       <span class="block">{copy.recoveryHint}</span>
     </div>
   );

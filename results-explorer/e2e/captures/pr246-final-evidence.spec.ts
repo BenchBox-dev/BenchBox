@@ -47,27 +47,27 @@ const ROUTES: CaptureRoute[] = [
     baseline: "browser-use-home-live-fullpage.png",
     url: "/results/",
     width: 1280,
-    readyText: /Cross-Benchmark Leaderboard/i,
+    readyText: /Cross-benchmark rankings/i,
   },
   ...WIDTHS.map((width) => ({
     baseline: `home-${width}.png`,
     url: "/results/",
     width,
-    readyText: /Cross-Benchmark Leaderboard/i,
+    readyText: /Cross-benchmark rankings/i,
     requireQueryNav: width <= 768,
   })),
   {
     baseline: "home-speedup-mobile-390.png",
     url: "/results/?mode=speedup",
     width: 390,
-    readyText: /Cross-Benchmark Leaderboard/i,
+    readyText: /Cross-benchmark rankings/i,
     requireQueryNav: true,
   },
   {
     baseline: "home-speedup-1280.png",
     url: "/results/?mode=speedup",
     width: 1280,
-    readyText: /Cross-Benchmark Leaderboard/i,
+    readyText: /Cross-benchmark rankings/i,
   },
   ...WIDTHS.map((width) => ({
     baseline: `benchmark-tpch-${width}.png`,
@@ -114,7 +114,7 @@ const ROUTES: CaptureRoute[] = [
     baseline: `result-detail-duckdb-${width}.png`,
     url: `/results/r/${DUCKDB_ID}`,
     width,
-    readyText: /TPC-H\s+-\s+DuckDB|Query Timings/i,
+    readyText: /TPC-H result:\s+DuckDB|Query timings/i,
     requireQueryNav: width <= 768,
   })),
   ...WIDTHS.map((width) => ({
@@ -134,14 +134,14 @@ const ROUTES: CaptureRoute[] = [
     baseline: `query-${width}.png`,
     url: "/results/query",
     width,
-    readyText: /Results Query Workbench|matching result bundle/i,
+    readyText: /Find benchmark runs|matching run/i,
     requireQueryNav: width <= 768,
   })),
   {
     baseline: "query-mobile-filter-drawer-390.png",
     url: "/results/query",
     width: 390,
-    readyText: /Results Query Workbench|matching result bundle/i,
+    readyText: /Find benchmark runs|matching run/i,
     openMobileFilters: true,
     requireQueryNav: true,
   },
@@ -209,7 +209,7 @@ test.describe("@pr246-capture final evidence gate", () => {
           /Binder Error|Stack trace|Results snapshot incomplete|undefined ID|raw internal error/i,
         );
         if (route.requireQueryNav) {
-          await expect(page.getByTestId("results-explorer-nav").getByRole("link", { name: "Query" })).toBeVisible();
+          await expect(page.getByTestId("results-explorer-nav").getByRole("link", { name: "Find runs" })).toBeVisible();
         }
         if (route.highContrast) {
           await page.getByRole("button", { name: /High contrast|Reduced color/ }).click({ timeout: 5_000 });

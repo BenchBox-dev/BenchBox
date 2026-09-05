@@ -242,9 +242,9 @@ describe("QueryHeatmap rendering", () => {
     const marker = screen.getByTestId("heatmap-compliance-marker-platform-noncompliant");
     expect(marker.textContent).toBe("*");
     expect(marker.getAttribute("role")).toBe("img");
-    expect(marker.getAttribute("title")).toContain("outside the ranked compliance class");
-    expect(marker.getAttribute("aria-label")).toContain("outside the ranked compliance class");
-    expect(screen.getAllByRole("img", { name: "Result is outside the ranked compliance class." })).toHaveLength(2);
+    expect(marker.getAttribute("title")).toContain("does not meet the requirements for ranking");
+    expect(marker.getAttribute("aria-label")).toContain("does not meet the requirements for ranking");
+    expect(screen.getAllByRole("img", { name: "This result does not meet the requirements for ranking." })).toHaveLength(2);
     expect(screen.queryByText("(subscale)")).toBeNull();
   });
 
@@ -599,7 +599,7 @@ describe("QueryHeatmap rendering", () => {
   it("empty platforms list shows empty-state", () => {
     const summary = makeSummary({ platforms: [] });
     render(<QueryHeatmap summary={summary} />);
-    expect(screen.getByText(/No results available/)).toBeTruthy();
+    expect(screen.getByText(/No results are available/)).toBeTruthy();
   });
 
   // -----------------------------------------------------------------------

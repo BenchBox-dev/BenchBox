@@ -332,7 +332,6 @@ describe("Home", () => {
       expect(performance.getEntriesByName(EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_READY, "mark"))
         .toHaveLength(1);
     });
-    expect(screen.getByTestId("home-loading-active-summary-reserve")).toBeTruthy();
     expect(screen.getByRole("region", { name: "Leaderboard ranking selector" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toHaveAttribute(
       "aria-busy",
@@ -340,10 +339,10 @@ describe("Home", () => {
     );
 
     resultRows.resolve(RESULT_ROWS);
-    await waitFor(() => expect(screen.getByText("Recent Results")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Recent results")).toBeTruthy());
     expect(document.title).toBe("Results · BenchBox");
     expect(screen.queryByText("Initializing static DuckDB snapshot...")).toBeNull();
-    expect(screen.queryByText("Cross-Benchmark Leaderboard")).toBeNull();
+    expect(screen.queryByText("Cross-benchmark rankings")).toBeNull();
   });
 
   it("shows normalized cost in recent results only when normalized cost metadata is present", async () => {
@@ -370,7 +369,7 @@ describe("Home", () => {
 
     render(<Home />);
 
-    await waitFor(() => expect(screen.getByText("Recent Results")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Recent results")).toBeTruthy());
     expect(screen.getByText("Normalized cost")).toBeTruthy();
     expect(screen.getByText("$1.10")).toBeTruthy();
   });
@@ -401,12 +400,12 @@ describe("Home", () => {
     await waitFor(() => expect(resultCalls).toBe(1));
     await waitFor(() => expect(screen.getByText("Initializing static DuckDB snapshot...")).toBeTruthy());
     // Headline stability is enforced by HOME_SHELL_GEOMETRY_CLASSES.
-    expect(screen.getByRole("heading", { level: 1, name: "BenchBox Curated Results Preview" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Compare benchmark results" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toHaveAttribute(
       "aria-busy",
       "true",
     );
-    expect(screen.queryByText("Recent Results")).toBeNull();
+    expect(screen.queryByText("Recent results")).toBeNull();
     expect(screen.queryByText("No leaderboard cells match the current filters.")).toBeNull();
 
     metaRows.resolve(META_LEADERBOARD_ROWS);
@@ -414,12 +413,12 @@ describe("Home", () => {
 
     await waitFor(() => expect(resultCalls).toBe(2));
     expect(screen.getByText("Initializing static DuckDB snapshot...")).toBeTruthy();
-    expect(screen.queryByText("Recent Results")).toBeNull();
+    expect(screen.queryByText("Recent results")).toBeNull();
     expect(screen.queryByText("No leaderboard cells match the current filters.")).toBeNull();
 
     retryRows.resolve(RESULT_ROWS);
 
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
     expect(screen.queryByText("Initializing static DuckDB snapshot...")).toBeNull();
     expect(screen.queryByText("No leaderboard cells match the current filters.")).toBeNull();
   });
@@ -445,41 +444,41 @@ describe("Home", () => {
     render(<Home />);
 
     await waitFor(() => expect(resultCalls).toBe(2));
-    expect(screen.getByText("Results snapshot incomplete")).toBeTruthy();
-    expect(screen.getByText(/Reload the page to retry the DuckDB snapshot load/)).toBeTruthy();
+    expect(screen.getByText("Could not load all results")).toBeTruthy();
+    expect(screen.getByText(/The rankings loaded, but the run list did not/)).toBeTruthy();
     expect(screen.queryByText("Initializing static DuckDB snapshot...")).toBeNull();
-    expect(screen.queryByText("Recent Results")).toBeNull();
+    expect(screen.queryByText("Recent results")).toBeNull();
   });
 
   it("renders the leaderboard-first product identity and dense cohort controls", async () => {
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
-    expect(screen.getByRole("heading", { level: 1, name: "BenchBox Curated Results Preview" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Compare benchmark results" })).toBeTruthy();
     expect(
-      screen.getByText("Reproducible OLAP benchmark evidence with explicitly scoped rankings and public corpus browse below."),
+      screen.getByText("See how published platform runs compare across BenchBox rankings. Open any result to inspect its evidence."),
     ).toBeTruthy();
 
     const selector = screen.getByRole("region", { name: "Leaderboard ranking selector" });
     expect(within(selector).getByLabelText("Benchmark")).toBeTruthy();
     expect(within(selector).getByLabelText("Scale")).toBeTruthy();
     expect(within(selector).getByLabelText("Phase")).toBeTruthy();
-    expect(within(selector).getByText("Leaderboard scope")).toBeTruthy();
-    expect(within(selector).getByText("Ranked-only filters")).toBeTruthy();
+    expect(within(selector).getByText("Ranking scope")).toBeTruthy();
+    expect(within(selector).getByText("Ranked results only")).toBeTruthy();
 
     fireEvent.click(screen.getByText("Advanced filters"));
     expect(within(selector).getByRole("button", { name: "All tuning labels" })).toBeTruthy();
-    expect(within(selector).getByRole("button", { name: "Not Recorded" })).toBeTruthy();
+    expect(within(selector).getByRole("button", { name: /not recorded/i })).toBeTruthy();
   });
 
   it("distinguishes supported benchmark coverage from published public corpus counts", async () => {
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const summary = screen.getByRole("region", { name: "Corpus summary" });
     expect(within(summary).getByText("supported benchmarks")).toBeTruthy();
     expect(within(summary).getByText("3 with public results")).toBeTruthy();
-    expect(within(summary).getByText("public result bundles")).toBeTruthy();
+    expect(within(summary).getByText("published runs")).toBeTruthy();
     expect(within(summary).getByText("platforms with public results")).toBeTruthy();
     expect(within(summary).getByText("leaderboard rankings")).toBeTruthy();
     expect(within(summary).getByText("2 visible; 2/2 ranked-scope platforms")).toBeTruthy();
@@ -501,11 +500,11 @@ describe("Home", () => {
     });
 
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const summary = screen.getByRole("region", { name: "Corpus summary" });
-    expect(within(summary).getByText("public result bundle")).toBeTruthy();
-    expect(within(summary).queryByText("public result bundles")).toBeNull();
+    expect(within(summary).getByText("published run")).toBeTruthy();
+    expect(within(summary).queryByText("published runs")).toBeNull();
     expect(within(summary).getByText("platform with public results")).toBeTruthy();
     expect(within(summary).queryByText("platforms with public results")).toBeNull();
     expect(within(summary).getByText("leaderboard ranking")).toBeTruthy();
@@ -530,7 +529,7 @@ describe("Home", () => {
     });
 
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Recent Results")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Recent results")).toBeTruthy());
 
     const summary = screen.getByRole("region", { name: "Corpus summary" });
     // 0 cohorts must read as "0 leaderboard rankings", not "0 leaderboard ranking".
@@ -551,7 +550,7 @@ describe("Home", () => {
     });
 
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const selector = screen.getByRole("region", { name: "Leaderboard ranking selector" });
     fireEvent.click(screen.getByText("Advanced filters"));
@@ -564,18 +563,18 @@ describe("Home", () => {
 
   it("states leaderboard cohort scope separately from public browse scope", async () => {
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     expect(screen.getByText("Showing 2 of 2 ranked-scope platforms across 2 leaderboard rankings")).toBeTruthy();
-    expect(screen.getAllByText(/Benchmark options cover 2 of 3 public benchmark sets/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Ranked results cover 2 of 3 published benchmarks/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/SSB/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/1 public platform ID is outside the current leaderboard scope/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/1 published platform is not represented in the rankings/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/1 of 4 public results is not recorded for tuning/).length).toBeGreaterThan(0);
-    expect(screen.getByRole("heading", { name: "Browse Public Benchmark Results" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Browse public benchmark results" })).toBeTruthy();
     expect(
       screen.getByText("3 public benchmark sets. Leaderboard filters above include 2 ranked leaderboards."),
     ).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Browse Public Platform Results" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Browse public platform results" })).toBeTruthy();
   });
 
   it("does not describe mixed ranked and unranked leaderboard evidence totals as ranked", async () => {
@@ -624,21 +623,21 @@ describe("Home", () => {
     });
 
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const selector = screen.getByRole("region", { name: "Leaderboard ranking selector" });
     expect(selector.textContent).toContain(
-      "Table scope is 3 of 3 ranked-scope platforms visible now; 2 ranked, 1 published unranked.",
+      "The current table includes 3 of 3 platforms found in the selected rankings: 2 ranked and 1 unranked.",
     );
     expect(selector.textContent).toContain(
-      "Full leaderboard scope has 3 platform IDs with published leaderboard evidence: 2 ranked and 1 published unranked.",
+      "Across all rankings, 2 of 3 platforms are ranked and 1 is unranked.",
     );
     expect(selector.textContent).not.toContain("3 ranked platform IDs");
   });
 
   it("keeps the home filter band on the dark surface and data sections on the light surface", async () => {
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const hero = screen.getByTestId("home-hero-filter-band");
     const selector = within(hero).getByRole("region", { name: "Leaderboard ranking selector" });
@@ -668,8 +667,6 @@ describe("Home", () => {
     });
 
     const expectSharedGeometry = () => {
-      const loadedActiveSummary = screen.queryByRole("region", { name: "Active leaderboard filters" });
-      const activeSummary = loadedActiveSummary ?? screen.getByTestId("home-loading-active-summary-reserve");
       const scopeDetails =
         screen.queryByTestId("leaderboard-scope-summary-mobile") ??
         screen.getByTestId("home-loading-scope-details-reserve");
@@ -681,16 +678,12 @@ describe("Home", () => {
         [screen.getByTestId("home-hero-wrapper"), HOME_SHELL_GEOMETRY_CLASSES.heroWrapper],
         [screen.getByTestId("home-hero-intro"), HOME_SHELL_GEOMETRY_CLASSES.heroIntro],
         [
-          screen.getByRole("heading", { level: 1, name: "BenchBox Curated Results Preview" }),
+          screen.getByRole("heading", { level: 1, name: "Compare benchmark results" }),
           HOME_SHELL_GEOMETRY_CLASSES.headline,
         ],
         [
-          activeSummary,
-          `${HOME_SHELL_GEOMETRY_CLASSES.activeSummary}${loadedActiveSummary ? "" : " sm:hidden"}`,
-        ],
-        [
           screen.getByText(
-            "Reproducible OLAP benchmark evidence with explicitly scoped rankings and public corpus browse below.",
+            "See how published platform runs compare across BenchBox rankings. Open any result to inspect its evidence.",
           ),
           HOME_SHELL_GEOMETRY_CLASSES.subtitle,
         ],
@@ -713,34 +706,29 @@ describe("Home", () => {
 
     expectSharedGeometry();
     expect(screen.queryByRole("region", { name: "Active leaderboard filters" })).toBeNull();
-    expect(screen.queryByText("Leaderboard scope details")).toBeNull();
+    expect(screen.queryByText("What counts as a ranked result?")).toBeNull();
 
     resultRows.resolve(RESULT_ROWS);
     metaRows.resolve(META_LEADERBOARD_ROWS);
     cohortRows.resolve(COHORT_ROWS);
 
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
     expectSharedGeometry();
-    expect(screen.getByRole("region", { name: "Active leaderboard filters" })).toBeTruthy();
-    expect(screen.getByText("Leaderboard scope details")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Active leaderboard filters" })).toBeNull();
+    expect(screen.getByText("What counts as a ranked result?")).toBeTruthy();
   });
 
   it("keeps the leaderboard region before secondary workflow and recent-result sections", async () => {
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
-    const headline = screen.getByRole("heading", { level: 1, name: "BenchBox Curated Results Preview" });
-    const activeSummary = screen.getByRole("region", { name: "Active leaderboard filters" });
-    const leaderboard = screen.getByRole("region", { name: "Cross-Benchmark Leaderboard" });
+    const headline = screen.getByRole("heading", { level: 1, name: "Compare benchmark results" });
+    const leaderboard = screen.getByRole("region", { name: "Cross-benchmark rankings" });
     const selector = screen.getByRole("region", { name: "Leaderboard ranking selector" });
     const workflow = screen.getByRole("navigation", { name: "Result contribution workflow" });
-    const recentHeading = screen.getByRole("heading", { name: "Recent Results" });
+    const recentHeading = screen.getByRole("heading", { name: "Recent results" });
 
-    expect(within(activeSummary).getByText("All benchmarks")).toBeTruthy();
-    expect(within(activeSummary).getByText("All scales")).toBeTruthy();
-    expect(within(activeSummary).getByText("All phases")).toBeTruthy();
-    expectDocumentOrder(headline, activeSummary);
-    expectDocumentOrder(activeSummary, selector);
+    expectDocumentOrder(headline, selector);
     expectDocumentOrder(selector, leaderboard);
     expectDocumentOrder(leaderboard, workflow);
     expectDocumentOrder(leaderboard, recentHeading);
@@ -748,7 +736,7 @@ describe("Home", () => {
 
   it("records first leaderboard data and render performance entries", async () => {
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     await waitFor(() => {
       expect(performance.getEntriesByName(EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_READY, "mark"))
@@ -766,16 +754,16 @@ describe("Home", () => {
     window.history.replaceState(null, "", "/results/");
 
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
-    expect(screen.getByRole("radio", { name: "Speedup" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: "Relative to best" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByText("0.50x")).toBeTruthy();
     expect(new URL(window.location.href).searchParams.get("mode")).toBeNull();
 
     fireEvent.click(screen.getByRole("radio", { name: "Times" }));
     await waitFor(() => expect(new URL(window.location.href).searchParams.get("mode")).toBe("times"));
 
-    fireEvent.click(screen.getByRole("radio", { name: "Speedup" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Relative to best" }));
     await waitFor(() => expect(new URL(window.location.href).searchParams.get("mode")).toBeNull());
 
     fireEvent.click(screen.getByRole("radio", { name: "Ranks" }));
@@ -785,7 +773,7 @@ describe("Home", () => {
 
   it("renders a Compare entrypoint inside the leaderboard ranking selector", async () => {
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const entrypoint = screen.getByTestId("home-compare-entrypoint");
     expect(entrypoint).toHaveAttribute("href", "/results/compare/");
@@ -795,16 +783,16 @@ describe("Home", () => {
 
   it("renders a compact run-compare-submit workflow near the leaderboard", async () => {
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
-    expect(screen.getByText("Run -> Compare -> Submit")).toBeTruthy();
+    expect(screen.getByText("Run, compare, and submit")).toBeTruthy();
     const workflow = screen.getByRole("navigation", { name: "Result contribution workflow" });
     const runLink = within(workflow).getByRole("link", { name: "Run a benchmark" });
     expect(runLink).toHaveAttribute("href", "/docs/usage/installation.html");
     expect(runLink).toHaveAttribute("data-native", "true");
     expect(within(workflow).getByRole("link", { name: "Compare your result" })).toHaveAttribute(
       "href",
-      "/results/compare",
+      "/results/query",
     );
     const submitLink = within(workflow).getByRole("link", { name: "Submit a bundle" });
     expect(submitLink).toHaveAttribute("href", "/docs/contributing-results.html");
@@ -814,7 +802,7 @@ describe("Home", () => {
 
   it("treats a benchmark selector change as isolate-not-exclude from the default all state", async () => {
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
     expect(within(grid).getByRole("link", { name: /^ClickBench SF0.1/ })).toBeTruthy();
@@ -851,7 +839,7 @@ describe("Home", () => {
       expect(screen.queryByRole("region", { name: "No leaderboard cells match the current filters" })).toBeNull();
     });
     expect(new URLSearchParams(window.location.search).get("platform")).toBe("duckdb");
-    expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy();
+    expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy();
   });
 
   it("restores canonical URL facets and applies them to the Home result query", async () => {
@@ -862,7 +850,7 @@ describe("Home", () => {
     );
 
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
     expect(within(grid).getByText("DuckDB")).toBeTruthy();
@@ -896,7 +884,7 @@ describe("Home", () => {
     );
 
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     await waitFor(() => {
       const params = new URL(window.location.href).searchParams;
@@ -916,7 +904,7 @@ describe("Home", () => {
 
   it("surfaces leaderboard receipt links with trust and validation metadata", async () => {
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
     const receiptLink = within(grid).getByRole("link", { name: "1.00x; Native: 10 ms" }) as HTMLAnchorElement;
@@ -930,7 +918,7 @@ describe("Home", () => {
 
   it("filters the matrix by trust tier and preserves tuning in cohort links", async () => {
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
     expect(within(grid).getByText("DuckDB")).toBeTruthy();
@@ -970,7 +958,7 @@ describe("Home", () => {
     });
 
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
     fireEvent.click(screen.getByText("Advanced filters"));
@@ -1024,7 +1012,7 @@ describe("toggleFacetValue (w13)", () => {
     });
 
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
     const grid = screen.getByTestId("home-ranking-selector-grid");
     expect(within(grid).getByText("Engine version")).toBeTruthy();
     expect(within(grid).getByText("All versions")).toBeTruthy();
@@ -1051,7 +1039,7 @@ describe("toggleFacetValue (w13)", () => {
     });
 
     render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const versionControl = screen.getByRole("combobox", { name: "Engine version" });
     expect(within(versionControl).getByRole("option", { name: "1.3.2" })).toBeTruthy();

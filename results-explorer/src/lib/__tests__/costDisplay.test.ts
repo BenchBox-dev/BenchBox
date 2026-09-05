@@ -37,7 +37,7 @@ describe("humanizeBillingFragment", () => {
 
   it("returns null for sentinel values (case-insensitive)", () => {
     expect(humanizeBillingFragment("not_applicable")).toBeNull();
-    expect(humanizeBillingFragment("Not Applicable")).toBeNull();
+    expect(humanizeBillingFragment("Not applicable")).toBeNull();
     expect(humanizeBillingFragment("unknown")).toBeNull();
     expect(humanizeBillingFragment("UNKNOWN")).toBeNull();
     expect(humanizeBillingFragment("none")).toBeNull();
@@ -68,14 +68,14 @@ describe("costScopeSummary", () => {
     const summary = costScopeSummary(
       makeRow({ cost_scope: "compute_only", billing_unit: "per_query", pricing_region: "us-west-2" }),
     );
-    expect(summary).toBe("compute only, billing: per query, region: us-west-2");
+    expect(summary).toBe("compute only, Billing unit: per query, Region: us-west-2");
   });
 
   it("renders only the present fragment when one side is sentinel and the other is real", () => {
     const summary = costScopeSummary(
       makeRow({ cost_scope: "compute_only", billing_unit: "per_hour", pricing_region: "Unknown" }),
     );
-    expect(summary).toBe("compute only, billing: per hour");
+    expect(summary).toBe("compute only, Billing unit: per hour");
   });
 
   it("falls back to 'Not recorded' when cost_scope is missing and billing/region are sentinel", () => {
@@ -87,8 +87,8 @@ describe("costScopeSummary", () => {
 });
 
 describe("costStatusLabel and normalizedCost helpers (unaffected by w1)", () => {
-  it("returns 'local' for not_applicable_local", () => {
-    expect(costStatusLabel(makeRow({ cost_status: "not_applicable_local" }))).toBe("local");
+  it("explains that cloud cost does not apply to a local run", () => {
+    expect(costStatusLabel(makeRow({ cost_status: "not_applicable_local" }))).toBe("Not applicable to this local run");
   });
 
   it("returns the dollar value when normalized cost is finite", () => {
@@ -98,13 +98,11 @@ describe("costStatusLabel and normalizedCost helpers (unaffected by w1)", () => 
   });
 
   it("falls back to status label when normalized cost is missing", () => {
-    expect(normalizedCostLabel(makeRow({ cost_status: "not_applicable_local" }))).toBe("local");
+    expect(normalizedCostLabel(makeRow({ cost_status: "not_applicable_local" }))).toBe("Not applicable to this local run");
   });
 
-  it("includes cost_model_source in costModelSummary parens when present", () => {
-    expect(costModelSummary(makeRow({ cost_model_version: "v3", cost_model_source: "ondemand" }))).toBe(
-      "v3 (ondemand)",
-    );
+  it("does not expose the internal cost model source", () => {
+    expect(costModelSummary(makeRow({ cost_model_version: "v3", cost_model_source: "ondemand" }))).toBe("v3");
     expect(costModelSummary(makeRow({ cost_model_version: "v3" }))).toBe("v3");
   });
 });

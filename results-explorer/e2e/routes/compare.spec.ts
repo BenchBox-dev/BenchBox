@@ -27,8 +27,8 @@ test.describe("Compare", () => {
     await expect(main.locator(`a[href="/results/r/${LONG_DUCKDB}"]`)).toBeVisible();
     await expect(main.locator(`a[href="/results/r/${LONG_DATAFUSION}"]`)).toBeVisible();
 
-    // Query-Level Diff is the stable landmark for the per-query evidence table.
-    await expect(main.getByRole("heading", { name: /Query-Level Diff/ })).toBeVisible();
+    // Query-level differences is the stable landmark for the per-query evidence table.
+    await expect(main.getByRole("heading", { name: /Query-level differences/ })).toBeVisible();
   });
 
   test("the explicit trailing-slash compare route resolves the same comparison page", async ({
@@ -55,15 +55,12 @@ test.describe("Compare", () => {
       .toMatch(/^[0-9a-f]{8},[0-9a-f]{8}$/);
   });
 
-  test("a single-id compare URL opens the compare builder with the run pinned", async ({ page }) => {
+  test("a single-id compare URL sends the selected run to Find runs", async ({ page }) => {
     await page.goto(`/results/compare?ids=${SHORT_DUCKDB}`);
     await waitForShell(page);
 
-    await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole("heading", { name: "Pick runs to compare" })).toBeVisible();
-    await expect(page.getByTestId("compare-builder-status")).toContainText("1 result selected");
-    await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
-    await expect(page.getByTestId("compare-builder-query-link")).toHaveAttribute("href", /\/results\/query/);
+    await expect(page.getByRole("heading", { name: "Find another run" })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("compare-picker-query-link")).toHaveAttribute("href", /\/results\/query\?pick=/);
   });
 
   test("Share URL button copies the current URL and updates its label", async ({

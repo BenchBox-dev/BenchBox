@@ -118,10 +118,10 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText(/Heat: darker = a worse rank within each ranking/)).toBeTruthy();
 
     rerender(<MetaLeaderboard data={DATA} mode="speedup" onModeChange={vi.fn()} />);
-    const legend = screen.getByText(/Heat: darker = farther from the ranking best/);
-    expect(legend.textContent).toContain("ranking best (1.00x)");
-    expect(legend.textContent).toContain("Values below 1.00x are worse than the ranking best");
-    expect(legend.textContent).not.toContain("≥1.00x");
+    const legend = screen.getByText(/Heat: darker = farther from the best result/);
+    expect(legend.textContent).toContain("best result (1.00×)");
+    expect(legend.textContent).toContain("Values below 1.00× are worse");
+    expect(legend.textContent).not.toContain("≥1.00×");
   });
 
   it("formats large power scores for scanning while preserving the exact value in titles", () => {
@@ -184,7 +184,7 @@ describe("MetaLeaderboard", () => {
     const onModeChange = vi.fn();
     render(<MetaLeaderboard data={DATA} mode="times" onModeChange={onModeChange} />);
 
-    fireEvent.click(screen.getByRole("radio", { name: "Speedup" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Relative to best" }));
     expect(onModeChange).toHaveBeenCalledWith("speedup");
   });
 
@@ -348,10 +348,10 @@ describe("MetaLeaderboard", () => {
       screen.getByRole("columnheader", { name: /TPC-H SF1 throughput/ }),
     ];
     for (const header of headers) {
-      expect(header.textContent).toContain("Speedup vs best · 1.00x is best; lower is worse");
+      expect(header.textContent).toContain("Relative to best · 1.00× is best; lower is worse");
     }
-    expect(headers[0]!.textContent).toContain("Native: Geomean latency, lower is better");
-    expect(headers[1]!.textContent).toContain("Native: Power score, higher is better");
+    expect(headers[0]!.textContent).toContain("Measured value: Geomean latency, lower is better");
+    expect(headers[1]!.textContent).toContain("Measured value: Power score, higher is better");
     expect(screen.getByText("Native: 10 ms")).toBeTruthy();
     expect(screen.getByText("Native: 2,500")).toBeTruthy();
   });
@@ -367,7 +367,7 @@ describe("MetaLeaderboard", () => {
   it("speedup mode visibly explains below-1.00x values", () => {
     render(<MetaLeaderboard data={DATA} mode="speedup" onModeChange={vi.fn()} />);
 
-    expect(screen.getByText(/Values below 1\.00x are worse than the ranking best/)).toBeTruthy();
+    expect(screen.getByText(/Values below 1\.00× are worse/)).toBeTruthy();
     expect(screen.getByText("0.50x")).toBeTruthy();
   });
 
@@ -673,10 +673,10 @@ describe("MetaLeaderboard", () => {
       }),
     );
     const cell = screen.getByRole("gridcell", {
-      name: /Polars has published evidence for TPC-H SF0\.1, but it is excluded: Trust policy excludes this result from ranking\./,
+        name: /Polars has published evidence for TPC-H SF0\.1, but it is excluded: Results from this source are not included in rankings\./,
     });
     expect(cell.textContent).toBe("Excluded");
-    expect(cell.getAttribute("title")).toContain("Trust policy excludes this result from ranking.");
+    expect(cell.getAttribute("title")).toContain("Results from this source are not included in rankings.");
     expect(cell.textContent).not.toContain("No run");
     expect((cell.querySelector("a") as HTMLAnchorElement | null)?.getAttribute("href")).toBe(
       "/results/r/polars-tpch-r1#run-receipt",
@@ -821,7 +821,7 @@ describe("MetaLeaderboard", () => {
 
     const state = screen.getByTestId("all-excluded-ranking-clickbench-sf0.1-power");
     expect(state).toHaveTextContent("No ranked evidence");
-    expect(state).toHaveTextContent("Trust policy excludes this result from ranking.");
+    expect(state).toHaveTextContent("Results from this source are not included in rankings.");
     expect(state).toHaveTextContent("Result does not have enough valid query coverage.");
     expect(state).toHaveTextContent("Open ranking for details.");
     expect(screen.queryAllByRole("gridcell")).toHaveLength(0);
@@ -833,7 +833,7 @@ describe("MetaLeaderboard", () => {
     );
     const cells = screen.getAllByRole("gridcell");
     expect(cells).toHaveLength(2);
-    expect(cells[0]!.getAttribute("aria-label")).toContain("Trust policy excludes this result from ranking.");
+    expect(cells[0]!.getAttribute("aria-label")).toContain("Results from this source are not included in rankings.");
     expect(cells[1]!.getAttribute("aria-label")).toContain("Result does not have enough valid query coverage.");
   });
 

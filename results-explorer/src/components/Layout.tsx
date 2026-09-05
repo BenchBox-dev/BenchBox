@@ -127,7 +127,7 @@ function Header() {
               Compare
             </ExplorerNavLink>
             <ExplorerNavLink href="/results/query" active={currentPath.startsWith("/results/query")}>
-              Query
+              Find runs
             </ExplorerNavLink>
           </nav>
         </div>
@@ -200,16 +200,14 @@ function Footer() {
       <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="flex flex-col items-center justify-between gap-4 sm:flex-row">
           <p class="text-sm text-[var(--bb-fg-muted)]">
-            &copy; {new Date().getFullYear()} BenchBox. The current public corpus is{" "}
-            <span class="font-medium text-[var(--bb-fg-primary)]">maintainer-curated</span>, and new submissions go through PR
-            validation and maintainer review before they appear here. Reproduce runs with{" "}
+            &copy; {new Date().getFullYear()} BenchBox. Maintainers review every result before publishing it. You can reproduce a run with{" "}
             <code class="rounded bg-[var(--bb-bg-elevated)] px-1 py-0.5 text-xs text-[var(--bb-fg-primary)]">benchbox run</code>.
           </p>
           <nav class="flex items-center gap-4">
             <a href="https://benchbox.dev" class="text-sm text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)] no-underline">
               benchbox.dev
             </a>
-            <a href="https://github.com/joeharris76/BenchBox" class="text-sm text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)] no-underline">
+            <a href="https://github.com/BenchBox-dev/BenchBox" class="text-sm text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)] no-underline">
               GitHub
             </a>
           </nav>

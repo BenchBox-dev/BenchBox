@@ -26,6 +26,7 @@ import {
 } from "@/lib/facetModel";
 import {
   appendFacetParams,
+  hasActiveFacets,
   matchesFacetRow,
   singleFacetValue,
   toggleFacetValue,
@@ -324,12 +325,12 @@ export function Home(_: RoutableProps) {
     scaleFilters,
   ]);
 
-  if (error) return <ErrorMessage message={error} />;
+  if (error) return <ErrorMessage title="Could not load results" message={error} />;
   if (hasPersistentInconsistentEmptySnapshot) {
     return (
       <ErrorMessage
-        title="Results snapshot incomplete"
-        message="The results table loaded empty while leaderboard metadata is present. Reload the page to retry the DuckDB snapshot load."
+        title="Could not load all results"
+        message="The rankings loaded, but the run list did not. Reload the page to try again."
       />
     );
   }
@@ -340,6 +341,12 @@ export function Home(_: RoutableProps) {
         scaleFactor={summarizeSelection(scaleFilters, "All scales", (value) => `SF ${value}`)}
         phase={phaseFilter === "all" ? "All phases" : phaseFilter}
         activeFacets={summarizeActiveFacets(facets, new Map())}
+        showActiveSummary={
+          benchmarkFilters.length > 0 ||
+          scaleFilters.length > 0 ||
+          phaseFilter !== "all" ||
+          hasActiveFacets(facets, RENDERED_FACET_KEYS)
+        }
       />
     );
   }
@@ -455,20 +462,24 @@ export function Home(_: RoutableProps) {
             mobile keep the roomier padding; their fold budget is 1200px. */}
         <div class={HOME_SHELL_GEOMETRY_CLASSES.heroWrapper} data-testid="home-hero-wrapper">
           <div class={HOME_SHELL_GEOMETRY_CLASSES.heroIntro} data-testid="home-hero-intro">
-            <h1 class={HOME_SHELL_GEOMETRY_CLASSES.headline}>BenchBox Curated Results Preview</h1>
+            <h1 class={HOME_SHELL_GEOMETRY_CLASSES.headline}>Compare benchmark results</h1>
             <p class={HOME_SHELL_GEOMETRY_CLASSES.subtitle}>
-              Reproducible OLAP benchmark evidence with explicitly scoped rankings and public corpus browse below.
+              See how published platform runs compare across BenchBox rankings. Open any result to inspect its evidence.
             </p>
           </div>
 
-          {filteredMetaLeaderboard && (
-            <ActiveLeaderboardSummary
-              benchmark={summarizeSelection(benchmarkFilters, "All benchmarks", humanizeBenchmark)}
-              scaleFactor={summarizeSelection(scaleFilters, "All scales", (value) => `SF ${value}`)}
-              phase={phaseFilter === "all" ? "All phases" : phaseFilter}
-              activeFacets={activeFacetSummaries}
-            />
-          )}
+          {filteredMetaLeaderboard &&
+            (benchmarkFilters.length > 0 ||
+              scaleFilters.length > 0 ||
+              phaseFilter !== "all" ||
+              activeFacetSummaries.length > 0) && (
+              <ActiveLeaderboardSummary
+                benchmark={summarizeSelection(benchmarkFilters, "All benchmarks", humanizeBenchmark)}
+                scaleFactor={summarizeSelection(scaleFilters, "All scales", (value) => `SF ${value}`)}
+                phase={phaseFilter === "all" ? "All phases" : phaseFilter}
+                activeFacets={activeFacetSummaries}
+              />
+            )}
 
           {/* Ranking selector renders above the matrix so users can change
               benchmark/scale/phase context without scrolling past the
@@ -538,7 +549,7 @@ export function Home(_: RoutableProps) {
                 data-testid="leaderboard-scope-summary-mobile"
               >
                 <summary class={HOME_SHELL_GEOMETRY_CLASSES.scopeSummary}>
-                  Leaderboard scope details
+                  What counts as a ranked result?
                 </summary>
                 <LeaderboardScopeSummary {...leaderboardScopeSummaryProps} />
               </details>
@@ -627,8 +638,8 @@ export function Home(_: RoutableProps) {
           />
           <StatCard
             value={results.length}
-            label={{ singular: "public result bundle", plural: "public result bundles" }}
-            detail="maintainer-curated corpus"
+            label={{ singular: "published run", plural: "published runs" }}
+            detail="reviewed by BenchBox maintainers"
           />
           <StatCard
             value={platformIds.length}
@@ -646,7 +657,7 @@ export function Home(_: RoutableProps) {
         </section>
 
         <section class="mb-8 sm:mb-12">
-          <h2 class="mb-4 text-xl font-semibold text-[var(--bb-data-fg-primary)]">Recent Results</h2>
+          <h2 class="mb-4 text-xl font-semibold text-[var(--bb-data-fg-primary)]">Recent results</h2>
           <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
             <TableScrollHint
               scrollerRef={recentResultsScrollerRef}
@@ -673,7 +684,7 @@ export function Home(_: RoutableProps) {
                     {showRecentCost && (
                       <th
                         class="table-th"
-                        title="BenchBox normalized USD from emitted normalized_cost metadata. Local and unavailable rows are not comparable cloud cost."
+                        title="BenchBox estimated this cloud cost from the recorded deployment details. Local runs and runs without cost details are not included."
                       >
                         Normalized cost
                       </th>
@@ -693,14 +704,14 @@ export function Home(_: RoutableProps) {
 
         <div class="grid grid-cols-1 gap-8 sm:grid-cols-2">
           <BrowseSection
-            title="Browse Public Benchmark Results"
+            title="Browse public benchmark results"
             description={`${formatCount(benchmarks.length, "public benchmark set")}. Leaderboard filters above include ${formatCount(leaderboardCohortCount, "ranked leaderboard")}.`}
             items={benchmarks}
             hrefFn={(benchmark) => `/results/${benchmark}/`}
             labelFn={formatBenchmarkLabel}
           />
           <BrowseSection
-            title="Browse Public Platform Results"
+            title="Browse public platform results"
             description={`${formatCount(platformIds.length, "published platform ID")} in the public corpus, independent of current leaderboard coverage.`}
             items={platformIds}
             hrefFn={(platformId) => `/results/p/${platformId}/`}
@@ -718,11 +729,13 @@ function HomeLoadingSkeleton({
   scaleFactor,
   phase,
   activeFacets,
+  showActiveSummary,
 }: {
   benchmark: string;
   scaleFactor: string;
   phase: string;
   activeFacets: ActiveFacetSummary[];
+  showActiveSummary: boolean;
 }) {
   return (
     <div>
@@ -734,42 +747,44 @@ function HomeLoadingSkeleton({
         {/* Loaded/skeleton geometry is owned by HOME_SHELL_GEOMETRY_CLASSES. */}
         <div class={HOME_SHELL_GEOMETRY_CLASSES.heroWrapper} data-testid="home-hero-wrapper">
           <div class={HOME_SHELL_GEOMETRY_CLASSES.heroIntro} data-testid="home-hero-intro">
-            <h1 class={HOME_SHELL_GEOMETRY_CLASSES.headline}>BenchBox Curated Results Preview</h1>
+            <h1 class={HOME_SHELL_GEOMETRY_CLASSES.headline}>Compare benchmark results</h1>
             <p class={HOME_SHELL_GEOMETRY_CLASSES.subtitle}>
-              Reproducible OLAP benchmark evidence with explicitly scoped rankings and public corpus browse below.
+              See how published platform runs compare across BenchBox rankings. Open any result to inspect its evidence.
             </p>
           </div>
 
-          <div
-            aria-hidden="true"
-            class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummary} sm:hidden`}
-            data-testid="home-loading-active-summary-reserve"
-          >
-            <div class={HOME_SHELL_GEOMETRY_CLASSES.activeSummaryItems}>
-              {[
-                ["Benchmark", benchmark],
-                ["Scale", scaleFactor],
-                ["Phase", phase],
-              ].map(([label, value]) => (
-                <div key={label} class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummaryChip} bb-skeleton-dark`}>
-                  <span class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummaryLabel} invisible`}>{label}</span>
-                  <span class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummaryValue} invisible`}>{value}</span>
-                </div>
-              ))}
-            </div>
-            {activeFacets.length > 0 && (
-              <div class={HOME_SHELL_GEOMETRY_CLASSES.activeFacetList}>
-                {activeFacets.map((facet) => (
-                  <span
-                    key={facet.key}
-                    class={`${HOME_SHELL_GEOMETRY_CLASSES.activeFacetChip} bb-skeleton-dark`}
-                  >
-                    <span class="invisible">{facet.label}: {facet.value}</span>
-                  </span>
+          {showActiveSummary && (
+            <div
+              aria-hidden="true"
+              class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummary} sm:hidden`}
+              data-testid="home-loading-active-summary-reserve"
+            >
+              <div class={HOME_SHELL_GEOMETRY_CLASSES.activeSummaryItems}>
+                {[
+                  ["Benchmark", benchmark],
+                  ["Scale", scaleFactor],
+                  ["Phase", phase],
+                ].map(([label, value]) => (
+                  <div key={label} class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummaryChip} bb-skeleton-dark`}>
+                    <span class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummaryLabel} invisible`}>{label}</span>
+                    <span class={`${HOME_SHELL_GEOMETRY_CLASSES.activeSummaryValue} invisible`}>{value}</span>
+                  </div>
                 ))}
               </div>
-            )}
-          </div>
+              {activeFacets.length > 0 && (
+                <div class={HOME_SHELL_GEOMETRY_CLASSES.activeFacetList}>
+                  {activeFacets.map((facet) => (
+                    <span
+                      key={facet.key}
+                      class={`${HOME_SHELL_GEOMETRY_CLASSES.activeFacetChip} bb-skeleton-dark`}
+                    >
+                      <span class="invisible">{facet.label}: {facet.value}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <section
             aria-label="Leaderboard ranking selector"
@@ -1022,12 +1037,12 @@ function LeaderboardScopeSummary({
 }) {
   const hiddenBenchmarkCopy =
     publicBenchmarksOutsideLeaderboard.length > 0
-      ? `${formatCountWithVerb(publicBenchmarksOutsideLeaderboard.length, "public benchmark", "has", "have")} results but no ranked leaderboard: ${publicBenchmarksOutsideLeaderboard.map(formatBenchmarkLabel).join(", ")}.`
-      : "Every public benchmark with results has a ranked leaderboard.";
+      ? `${formatCountWithVerb(publicBenchmarksOutsideLeaderboard.length, "published benchmark", "has", "have")} runs but no ranking: ${publicBenchmarksOutsideLeaderboard.map(formatBenchmarkLabel).join(", ")}.`
+      : "Every benchmark with published runs has a ranking.";
   const publicOnlyPlatformCopy =
     publicPlatformIdsOutsideLeaderboard > 0
-      ? `${formatCountWithVerb(publicPlatformIdsOutsideLeaderboard, "public platform ID", "is", "are")} outside the current leaderboard scope.`
-      : "Every public platform ID has evidence in the leaderboard scope.";
+      ? `${formatCountWithVerb(publicPlatformIdsOutsideLeaderboard, "published platform", "is", "are")} not represented in the rankings.`
+      : "Every published platform is represented in a ranking.";
   const visiblePublishedUnrankedPlatformCount = Math.max(
     0,
     visibleLeaderboardPlatformCount - visibleRankedLeaderboardPlatformCount,
@@ -1040,28 +1055,15 @@ function LeaderboardScopeSummary({
   return (
     <div class="mt-3 space-y-1 border-t border-[var(--bb-border-default)] pt-3 text-xs text-[var(--bb-fg-muted)]">
       <p>
-        Benchmark options cover {leaderboardBenchmarkCount.toLocaleString()} of{" "}
-        {publicBenchmarkCount.toLocaleString()} public benchmark {plural(publicBenchmarkCount, "set", "sets")}.{" "}
+        Ranked results cover {leaderboardBenchmarkCount.toLocaleString()} of{" "}
+        {publicBenchmarkCount.toLocaleString()} published {plural(publicBenchmarkCount, "benchmark", "benchmarks")}.{" "}
         {hiddenBenchmarkCopy}
       </p>
       <p>
-        Table scope is {visibleLeaderboardPlatformCount.toLocaleString()} of{" "}
-        {leaderboardEvidencePlatformCount.toLocaleString()} ranked-scope platforms visible now;{" "}
-        {visibleRankedLeaderboardPlatformCount.toLocaleString()} ranked,{" "}
-        {visiblePublishedUnrankedPlatformCount.toLocaleString()} published unranked. Full leaderboard scope has{" "}
-        {fullLeaderboardPlatformCount.toLocaleString()} platform{" "}
-        {plural(fullLeaderboardPlatformCount, "ID", "IDs")} with published leaderboard evidence:{" "}
-        {rankedLeaderboardPlatformCount.toLocaleString()} ranked and{" "}
-        {fullPublishedUnrankedPlatformCount.toLocaleString()} published unranked. Public coverage has{" "}
-        {publicPlatformCount.toLocaleString()} platform{" "}
-        {plural(publicPlatformCount, "ID", "IDs")}. {publicOnlyPlatformCopy}
+        The current table includes {visibleLeaderboardPlatformCount.toLocaleString()} of {leaderboardEvidencePlatformCount.toLocaleString()} platforms found in the selected rankings: {visibleRankedLeaderboardPlatformCount.toLocaleString()} ranked and {visiblePublishedUnrankedPlatformCount.toLocaleString()} unranked. Across all rankings, {rankedLeaderboardPlatformCount.toLocaleString()} of {fullLeaderboardPlatformCount.toLocaleString()} platforms are ranked and {fullPublishedUnrankedPlatformCount.toLocaleString()} {fullPublishedUnrankedPlatformCount === 1 ? "is" : "are"} unranked. There are {publicPlatformCount.toLocaleString()} published {plural(publicPlatformCount, "platform", "platforms")} in total. {publicOnlyPlatformCopy}
       </p>
       <p>
-        Tuning metadata: {tuningSummary.labelledCount.toLocaleString()}{" "}
-        {plural(tuningSummary.labelledCount, "labelled result", "labelled results")} across{" "}
-        {tuningSummary.labelledOptions.length.toLocaleString()}{" "}
-        {plural(tuningSummary.labelledOptions.length, "label", "labels")};{" "}
-        {tuningSummary.unlabelledCount.toLocaleString()} not labelled.
+        Tuning was recorded for {tuningSummary.labelledCount.toLocaleString()} {plural(tuningSummary.labelledCount, "run", "runs")} across {tuningSummary.labelledOptions.length.toLocaleString()} {plural(tuningSummary.labelledOptions.length, "setting", "settings")}. It was not recorded for {tuningSummary.unlabelledCount.toLocaleString()} {plural(tuningSummary.unlabelledCount, "run", "runs")}.
       </p>
     </div>
   );
@@ -1138,7 +1140,7 @@ function benchmarkFilterDescription(publicBenchmarksOutsideLeaderboard: readonly
   if (publicBenchmarksOutsideLeaderboard.length === 0) {
     return "Only benchmarks with ranked leaderboards appear here.";
   }
-  return "Choose from benchmarks with ranked leaderboards. Other public benchmarks are listed in Leaderboard scope details.";
+  return "Choose a benchmark with ranked results. Open “What counts as a ranked result?” to see other published benchmarks.";
 }
 
 function formatTuningModeOption(value: string): string {
@@ -1148,7 +1150,7 @@ function formatTuningModeOption(value: string): string {
 }
 
 function tuningModeOptionTitle(value: string, summary: TuningModeSummary): string {
-  if (value === "all") return "Include recorded and not-recorded tuning metadata.";
+  if (value === "all") return "Include runs with and without recorded tuning details.";
   if (value === UNLABELLED_TUNING_VALUE) {
     return `${formatCountWithVerb(summary.unlabelledCount, "public result", "has", "have")} no recorded tuning mode.`;
   }
@@ -1296,14 +1298,13 @@ function CoverageSummary() {
   }
   return (
     <div>
-      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">Leaderboard scope</div>
+      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">Ranking scope</div>
       <div class="flex flex-wrap gap-2">
         <span class="rounded-full bg-[var(--bb-bg-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--bb-fg-muted)]">
-          Ranked-only filters
+          Ranked results only
         </span>
-        {/* w5 (compare-flow-entrypoints): Home exposes a direct entry point
-            into the in-page Compare builder. The builder handles the empty
-            state itself, so no ?ids= prefilling is needed. */}
+        {/* Compare handles an empty selection and sends readers to the shared
+            run finder, so this entry point needs no prefilled IDs. */}
         <a
           href={compareHref ?? "/results/compare/"}
           data-testid="home-compare-entrypoint"
@@ -1318,7 +1319,7 @@ function CoverageSummary() {
 
 const FLYWHEEL_STEPS = [
   { label: "Run a benchmark", href: "/docs/usage/installation.html" },
-  { label: "Compare your result", href: "/results/compare" },
+  { label: "Compare your result", href: "/results/query" },
   { label: "Submit a bundle", href: "/docs/contributing-results.html" },
 ];
 
@@ -1326,7 +1327,7 @@ function FlywheelStrip() {
   return (
     <section class="mb-12 border-y border-[var(--bb-data-border)] py-3">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Run -&gt; Compare -&gt; Submit</p>
+        <p class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Run, compare, and submit</p>
         <nav aria-label="Result contribution workflow" class="flex flex-wrap gap-2">
           {FLYWHEEL_STEPS.map((step, index) => (
             <a

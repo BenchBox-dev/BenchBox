@@ -21,7 +21,7 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
       <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="compare-decision-summary-title" class="text-base font-semibold text-[var(--bb-data-fg-primary)]">
-            Decision Summary
+            Comparison summary
           </h2>
           <p class="mt-1 text-sm font-medium text-[var(--bb-data-fg-primary)]">{summary.headline}</p>
         </div>
@@ -32,7 +32,7 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
             </StatusBadge>
           )}
           <StatusBadge role="computed" tone={summary.claimSuppressed ? "warning" : "info"}>
-            {summary.claimSuppressed ? "Claims suppressed" : "Computed from selected runs"}
+            {summary.claimSuppressed ? "No winner named" : "Based on the selected runs"}
           </StatusBadge>
         </div>
       </div>
@@ -88,16 +88,16 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
           )}
         </SummaryCard>
 
-        <SummaryCard label="Query wins">
+        <SummaryCard label={summary.winnerLabel ? `Queries where ${summary.winnerLabel} was fastest` : "Query comparison"}>
           {summary.claimSuppressed ? (
             <>
-              <p class="text-sm text-[var(--bb-data-fg-muted)]">Winner claim suppressed</p>
-              <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">Use the query diff table for raw evidence.</p>
+              <p class="text-sm text-[var(--bb-data-fg-muted)]">No winner named</p>
+              <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">Review the individual query measurements below.</p>
             </>
           ) : (
             <>
               <p class="font-mono text-sm font-semibold text-[var(--bb-data-fg-primary)]">
-                {summary.queryRecord.wins} fastest of {summary.queryRecord.comparableQueries} comparable
+                {summary.winnerLabel ?? summary.winner?.platform} was fastest on {summary.queryRecord.wins} of {summary.queryRecord.comparableQueries} comparable queries
               </p>
               <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
                 {summary.queryRecord.losses} slower · {summary.queryRecord.ties} tied
@@ -114,7 +114,7 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
           )}
         </SummaryCard>
 
-        <SummaryCard label="Tail shape">
+        <SummaryCard label={summary.winnerLabel ? `${summary.winnerLabel} query-time distribution` : "Query-time distribution"}>
           {winnerPercentiles?.p50 !== null &&
           winnerPercentiles?.p50 !== undefined &&
           winnerPercentiles.p90 !== null &&

@@ -355,7 +355,7 @@ export function ChartPanel({
               suppressionReason:
                 suppressionReason ??
                 (Boolean(queryFilter && (chartSummary?.query_ids.length ?? 0) < 2)
-                  ? "Winner claims suppressed when fewer than 2 valid queries are selected"
+                  ? "No winner is named when fewer than two usable queries are selected"
                   : undefined),
               queryFilter,
             })}

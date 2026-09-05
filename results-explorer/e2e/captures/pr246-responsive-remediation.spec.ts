@@ -75,7 +75,7 @@ const ROUTES: CaptureRoute[] = [
     filename: `result-detail-duckdb-${width}.png`,
     url: `/results/r/${DETAIL_ID}`,
     width,
-    ready: /Query Timings/i,
+    ready: /Query timings/i,
     hintTestId: "detail-timings-scroll-hint",
   })),
   ...WIDTHS.map((width) => ({
@@ -89,14 +89,14 @@ const ROUTES: CaptureRoute[] = [
     filename: `query-${width}.png`,
     url: "/results/query",
     width,
-    ready: /matching result bundle/i,
+    ready: /matching run/i,
     hintTestId: "query-results-scroll-hint",
   })),
   {
     filename: "query-mobile-filter-drawer-390.png",
     url: "/results/query",
     width: 390,
-    ready: /matching result bundle/i,
+    ready: /matching run/i,
     drawer: true,
   },
 ];
@@ -116,7 +116,7 @@ test.describe("@pr246-capture responsive remediation", () => {
         await page.goto(route.url, { waitUntil: "domcontentloaded" });
         await page.waitForLoadState("load", { timeout: 10_000 }).catch(() => {});
         await expect(page.locator("body")).not.toContainText(/Binder Error|Stack trace|No published results yet/i);
-        await expect(page.getByTestId("results-explorer-nav").getByRole("link", { name: "Query" })).toBeVisible();
+        await expect(page.getByTestId("results-explorer-nav").getByRole("link", { name: "Find runs" })).toBeVisible();
         await expect(page.getByText(route.ready).first()).toBeVisible({ timeout: 20_000 });
         await expectNoUnexpectedOverflow(page);
         if (route.hintTestId) {

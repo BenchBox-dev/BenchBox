@@ -100,7 +100,7 @@ function parseResultSelect(query: BuiltQuery): ParsedResultSelect {
   const match = normalizedSql.match(
     /^(SELECT .+?)( FROM bench\.results)( WHERE .+?)? ORDER BY ([a-z_]+) (ASC|DESC) LIMIT (\d+)$/s,
   );
-  if (!match) throw new Error("Unexpected Query workbench select shape");
+  if (!match) throw new Error("The results query could not be prepared.");
   return {
     selectSql: `${match[1]}${match[2]}`,
     fromSql: match[2]!,

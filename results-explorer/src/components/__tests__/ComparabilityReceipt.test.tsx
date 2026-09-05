@@ -64,7 +64,7 @@ describe("ComparabilityReceipt", () => {
   it("renders workload matches and published cost metadata", () => {
     render(<ComparabilityReceipt results={[makeDetail(), makeDetail({ result_id: "r2", platform: "SQLite" })]} />);
 
-    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    const receipt = screen.getByRole("region", { name: "Comparison checks" });
     expect(receipt.getAttribute("id")).toBe("comparability-receipt");
     expect(within(receipt).getByText("No differences")).toBeTruthy();
     expect(receipt).toHaveTextContent("Benchmark");
@@ -72,7 +72,8 @@ describe("ComparabilityReceipt", () => {
     expect(receipt).toHaveTextContent("Query scope");
     expect(receipt).toHaveTextContent("2 queries");
     expect(receipt).toHaveTextContent("Cost model");
-    expect(receipt).toHaveTextContent("2026.05.0 (benchbox.core.cost.pricing)");
+    expect(receipt).toHaveTextContent("2026.05.0");
+    expect(receipt).not.toHaveTextContent("benchbox.core.cost.pricing");
   });
 
   it("flags normalized cost metadata differences", () => {
@@ -89,7 +90,7 @@ describe("ComparabilityReceipt", () => {
 
     expect(fields.find((field) => field.label === "Normalized cost")).toMatchObject({
       status: "diff",
-      detail: "DuckDB: $0.42; SQLite: unavailable",
+      detail: "DuckDB: $0.42; SQLite: Not recorded",
     });
   });
 
@@ -107,8 +108,8 @@ describe("ComparabilityReceipt", () => {
 
     render(<ComparabilityReceipt results={[duckdb, sqlite]} />);
 
-    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
-    expect(within(receipt).getAllByText("6 warnings")).toHaveLength(2);
+    const receipt = screen.getByRole("region", { name: "Comparison checks" });
+    expect(within(receipt).getAllByText("6 warnings")).toHaveLength(1);
     const warningTarget = screen.getByTestId("comparability-warning-target");
     expect(warningTarget.getAttribute("id")).toBe(COMPARABILITY_WARNING_TARGET_ID);
     expect(warningTarget.getAttribute("tabindex")).toBe("-1");
@@ -124,7 +125,7 @@ describe("ComparabilityReceipt", () => {
     expect(receipt).toHaveTextContent("Tuning");
     expect(receipt).toHaveTextContent("DuckDB: default; SQLite: manual");
     expect(receipt).toHaveTextContent("Architecture");
-    expect(receipt).toHaveTextContent("DuckDB: x64; SQLite: arm64");
+    expect(receipt).toHaveTextContent("DuckDB: x64; SQLite: Arm64");
     expect(receipt).toHaveTextContent("CPU count");
     expect(receipt).toHaveTextContent("DuckDB: 8 CPU; SQLite: 10 CPU");
     expect(receipt).toHaveTextContent("Memory");
@@ -143,9 +144,9 @@ describe("ComparabilityReceipt", () => {
       }),
     ]);
 
-    expect(fields.find((field) => field.label === "Phase")?.status).toBe("diff");
+    expect(fields.find((field) => field.label === "Test phase")?.status).toBe("diff");
     expect(fields.find((field) => field.label === "Query scope")?.status).toBe("diff");
-    expect(comparabilityWarningFields(fields).map((field) => field.label)).toEqual(["Phase", "Query scope"]);
+    expect(comparabilityWarningFields(fields).map((field) => field.label)).toEqual(["Test phase", "Query scope"]);
   });
 
   it("renders the receipt's Validation row with the reader-facing label, raw status kept alongside it", () => {
@@ -225,8 +226,8 @@ describe("ComparabilityReceipt", () => {
 
     render(<ComparabilityReceipt results={[duckdb, sqlite]} />);
 
-    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
-    expect(within(receipt).getAllByText("1 warning")).toHaveLength(2);
+    const receipt = screen.getByRole("region", { name: "Comparison checks" });
+    expect(within(receipt).getAllByText("1 warning")).toHaveLength(1);
     expect(receipt).not.toHaveTextContent("1 warnings");
     expect(receipt).toHaveTextContent("1 query");
     expect(receipt).not.toHaveTextContent("1 queries");
@@ -261,15 +262,15 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", physical_mechanisms: [] }),
       ]);
 
-      const field = fields.find((f) => f.label === "Physical tuning mechanisms");
-      expect(field).toMatchObject({ status: "diff", summary: "Tuned runs rendered different physical mechanisms" });
+      const field = fields.find((f) => f.label === "Applied tuning features");
+      expect(field).toMatchObject({ status: "diff", summary: "The selected runs applied different tuning features" });
       expect(field?.detail).toContain("DuckDB: indexes, clustering, distribution, sort, z_order, stats");
       expect(field?.detail).toContain("SQLite: none");
 
       // A warning, not a match failure: the overall receipt still stays
       // facet-matchable, it just surfaces in the warning list.
       const warnings = comparabilityWarningFields(fields);
-      expect(warnings.some((f) => f.label === "Physical tuning mechanisms")).toBe(true);
+      expect(warnings.some((f) => f.label === "Applied tuning features")).toBe(true);
     });
 
     it("matches (no warning) when two tuned runs render the same mechanism set", () => {
@@ -278,9 +279,9 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", physical_mechanisms: ["clustering", "indexes"] }),
       ]);
 
-      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toMatchObject({
+      expect(fields.find((f) => f.label === "Applied tuning features")).toMatchObject({
         status: "match",
-        summary: "2 mechanisms",
+        summary: "2 features",
       });
     });
 
@@ -290,7 +291,7 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "notuning" }),
       ]);
 
-      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toBeUndefined();
+      expect(fields.find((f) => f.label === "Applied tuning features")).toBeUndefined();
     });
 
     it("is omitted when any tuned result predates physical_mechanisms ingest (undefined, not empty)", () => {
@@ -299,7 +300,7 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", physical_mechanisms: undefined }),
       ]);
 
-      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toBeUndefined();
+      expect(fields.find((f) => f.label === "Applied tuning features")).toBeUndefined();
     });
   });
 
@@ -312,15 +313,15 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", tuning_policy_generation: undefined }),
       ]);
 
-      const field = fields.find((f) => f.label === "Tuning policy generation");
-      expect(field).toMatchObject({ status: "diff", summary: "Tuned runs span different tuning-policy generations" });
+      const field = fields.find((f) => f.label === "Tuning rules version");
+      expect(field).toMatchObject({ status: "diff", summary: "The selected runs used different generations of BenchBox tuning rules" });
       expect(field?.detail).toContain("DuckDB: adr-003");
-      expect(field?.detail).toContain("SQLite: pre-seam");
+      expect(field?.detail).toContain("SQLite: Earlier rules");
 
       // A warning, not a match failure: the receipt stays facet-matchable and
       // the difference only surfaces in the warning list.
       const warnings = comparabilityWarningFields(fields);
-      expect(warnings.some((f) => f.label === "Tuning policy generation")).toBe(true);
+      expect(warnings.some((f) => f.label === "Tuning rules version")).toBe(true);
     });
 
     it("matches (no warning) when two tuned runs share the same generation", () => {
@@ -329,7 +330,7 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", tuning_policy_generation: "adr-003" }),
       ]);
 
-      expect(fields.find((f) => f.label === "Tuning policy generation")).toMatchObject({
+      expect(fields.find((f) => f.label === "Tuning rules version")).toMatchObject({
         status: "match",
         summary: "adr-003",
       });
@@ -344,11 +345,11 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", tuning_policy_generation: undefined }),
       ]);
 
-      expect(fields.find((f) => f.label === "Tuning policy generation")).toMatchObject({
+      expect(fields.find((f) => f.label === "Tuning rules version")).toMatchObject({
         status: "match",
-        summary: "pre-seam",
+        summary: "Earlier rules",
       });
-      expect(comparabilityWarningFields(fields).some((f) => f.label === "Tuning policy generation")).toBe(false);
+      expect(comparabilityWarningFields(fields).some((f) => f.label === "Tuning rules version")).toBe(false);
     });
 
     it("is omitted when fewer than two results are labeled tuned", () => {
@@ -411,7 +412,7 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", platform_id: "sqlite", tuning_mode: "notuning" }),
       ]);
       const tuning = fields.find((f) => f.label === "Tuning");
-      expect(tuning?.detail).toContain("DuckDB: tuned");
+      expect(tuning?.detail).toContain("DuckDB: Tuned");
       expect(tuning?.detail).not.toContain("requested");
       expect(tuning?.detail).not.toContain("applied");
       expect(tuning?.detail).not.toContain("tuning123");
@@ -462,11 +463,11 @@ describe("ComparabilityReceipt", () => {
 
       expect(fields.find((f) => f.label === "Architecture")).toMatchObject({
         status: "match",
-        summary: "arm64",
+        summary: "Arm64",
       });
       expect(fields.find((f) => f.label === "CPU family")).toMatchObject({
         status: "match",
-        summary: "apple_silicon",
+        summary: "Apple silicon",
       });
       expect(fields.find((f) => f.label === "CPU model")).toMatchObject({
         status: "match",
@@ -525,7 +526,7 @@ describe("ComparabilityReceipt", () => {
       // Both axes MUST report status: "missing" ("Not recorded"), NEVER "diff" ("Differs")
       expect(cpuFamilyField.status).toBe("missing");
       expect(cpuFamilyField.summary).toBe("Not recorded");
-      expect(cpuFamilyField.detail).toBe("DuckDB: apple_silicon; SQLite: Not recorded");
+      expect(cpuFamilyField.detail).toBe("DuckDB: Apple silicon; SQLite: Not recorded");
 
       expect(cpuModelField.status).toBe("missing");
       expect(cpuModelField.summary).toBe("Not recorded");
@@ -573,7 +574,7 @@ describe("ComparabilityReceipt", () => {
 
       expect(cpuFamilyField.status).toBe("diff");
       expect(cpuFamilyField.summary).toBe("2 values differ");
-      expect(cpuFamilyField.detail).toBe("DuckDB: apple_silicon; ClickHouse: graviton");
+      expect(cpuFamilyField.detail).toBe("DuckDB: Apple silicon; ClickHouse: graviton");
 
       expect(cpuModelField.status).toBe("diff");
       expect(cpuModelField.summary).toBe("2 values differ");

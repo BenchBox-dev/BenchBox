@@ -226,7 +226,7 @@ export function QueryDiffTable({
       <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="query-diff-title" class="text-base font-semibold text-[var(--bb-data-fg-primary)]">
-            Query-Level Diff
+            Query-level differences
           </h2>
           <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
             Baseline: <span class="font-medium text-[var(--bb-data-fg-primary)]">{runLabels[normalizedBaselineIndex] ?? baseline.platform}</span>. Negative deltas mean the
@@ -240,7 +240,7 @@ export function QueryDiffTable({
 
       {suppressionReason && (
         <div class="mb-4 rounded-md tone-warning border border-[var(--bb-data-border)] px-3 py-2 text-xs">
-          Winner claims are suppressed because {suppressionReason}; use these query values as raw evidence only.
+          This page does not name a winner because {suppressionReason}. You can still review the individual query measurements.
         </div>
       )}
 

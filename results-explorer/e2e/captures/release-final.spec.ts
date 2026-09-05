@@ -32,7 +32,7 @@ const LOG = path.join(OUT, `console-network-${TODAY}.log`);
 const MANIFEST = path.join(OUT, `capture-manifest-${TODAY}.json`);
 
 const ROUTES: Array<{ slug: string; url: string; readyText: RegExp }> = [
-  { slug: "home", url: "/results/", readyText: /Cross-Benchmark Leaderboard/ },
+  { slug: "home", url: "/results/", readyText: /Cross-benchmark rankings/ },
   { slug: "benchmark-tpch-sf001", url: "/results/tpch/?sf=0.01&phase=standard", readyText: /TPC-H Results/ },
   {
     slug: "benchmark-star-schema-sf01",
@@ -49,7 +49,7 @@ const ROUTES: Array<{ slug: string; url: string; readyText: RegExp }> = [
   {
     slug: "result-detail-tpch-duckdb",
     url: `/results/r/${fixtureIds.ids.duckdb}`,
-    readyText: /Query Timings/,
+    readyText: /Query timings/,
   },
   { slug: "compare-same-cohort", url: `/results/compare?ids=${fixtureIds.shortIds.duckdb},${fixtureIds.shortIds.datafusion}`, readyText: /TPC-H Comparison/ },
   {
@@ -60,9 +60,9 @@ const ROUTES: Array<{ slug: string; url: string; readyText: RegExp }> = [
   {
     slug: "compare-empty",
     url: "/results/compare",
-    readyText: /Pick runs to compare|Cannot compare/,
+    readyText: /Choose runs to compare|Cannot compare/,
   },
-  { slug: "query", url: "/results/query", readyText: /matching result bundle/ },
+  { slug: "query", url: "/results/query", readyText: /matching run/ },
   { slug: "not-found", url: "/results/clickbench/", readyText: /No published results yet/ },
 ];
 const WIDTHS = [390, 768, 1280, 1600];
