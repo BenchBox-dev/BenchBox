@@ -82,7 +82,7 @@ def test_publication_deploy_permissions_valid_structure(tmp_path: Path) -> None:
                 "steps": [],
             },
             "deploy": {
-                "permissions": {"contents": "read", "pages": "write", "id-token": "write"},
+                "permissions": {"actions": "read", "contents": "read", "pages": "write", "id-token": "write"},
                 "runs-on": "ubuntu-latest",
                 "steps": [],
             },
@@ -148,7 +148,7 @@ def test_publication_deploy_permissions_detects_rollback_pages_write(tmp_path: P
         "name": "Forbidden Rollback Pages Write",
         "jobs": {
             "build": {"permissions": {"contents": "read"}},
-            "deploy": {"permissions": {"contents": "read", "pages": "write", "id-token": "write"}},
+            "deploy": {"permissions": {"actions": "read", "contents": "read", "pages": "write", "id-token": "write"}},
             "verify": {"permissions": {"contents": "read"}},
             "rollback": {"permissions": {"actions": "write", "pages": "write", "id-token": "write"}},
         },

@@ -16,10 +16,18 @@ Do not place the private key in a workflow input, artifact, commit, issue, or
 receipt. A missing secret makes the live-receipt stage fail closed.
 
 Choose exact 40-character lowercase commit SHAs for `develop_sha` and
-`published_results_sha`. Choose a unique, lowercase `generation`, and record
-the prior live receipt ID when the run replaces an earlier generation. Dispatch
-from the Actions page with `expect_noop=false` and `force_rollback=false`.
-This is an authorized production action; this runbook does not authorize it.
+`published_results_sha`. Generations are positive decimal CAS values: use `1`
+for the first independent deployment, then increment by one. Record the current
+attested live receipt ID when the run replaces an earlier generation.
+
+First dispatch the exact inputs with `expect_noop=true` and no
+`approved_manifest_digest`. Download `desired-manifest.json` from the candidate
+receipt artifact, inspect its pins and measured artifact closure, and record its
+`manifest_digest`. Dispatch the production run with the same inputs,
+`expect_noop=false`, `force_rollback=false`, and that reviewed digest as
+`approved_manifest_digest`. The workflow rebuilds and refuses deployment unless
+the complete candidate manifest matches the approved digest. This is an
+authorized production action; this runbook does not authorize it.
 
 For a no-write rehearsal, set `expect_noop=true`. That compares the candidate
 database with the freeze baseline and skips the deploy job. A rehearsal is not

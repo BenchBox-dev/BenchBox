@@ -41,6 +41,8 @@ def test_workflow_is_dispatch_only_with_required_inputs() -> None:
     assert "rollback_target_sha" in dispatch_inputs
     assert dispatch_inputs["develop_sha"]["required"] is True
     assert dispatch_inputs["published_results_sha"]["required"] is True
+    assert dispatch_inputs["generation"]["required"] is True
+    assert "approved_manifest_digest" in dispatch_inputs
 
 
 def test_workflow_permissions_follow_least_privilege() -> None:
@@ -52,7 +54,12 @@ def test_workflow_permissions_follow_least_privilege() -> None:
 
     assert jobs["build"]["permissions"] == {"actions": "read", "contents": "read"}
     assert jobs["verify"]["permissions"] == {"contents": "read"}
-    assert jobs["deploy"]["permissions"] == {"contents": "read", "pages": "write", "id-token": "write"}
+    assert jobs["deploy"]["permissions"] == {
+        "actions": "read",
+        "contents": "read",
+        "pages": "write",
+        "id-token": "write",
+    }
     assert jobs["rollback"]["permissions"] == {
         "actions": "read",
         "contents": "read",
@@ -138,12 +145,26 @@ def test_receipts_use_measured_provenance_and_valid_json_newlines() -> None:
 def test_build_receipt_enforces_attested_cas_lineage() -> None:
     text = _workflow_text()
 
-    assert "generation 1 is genesis and cannot name a prior live receipt" in text
+    assert "generation 1 cannot replace current live receipt" in text
     assert "requires prior_live_receipt_id" in text
     assert "verify_live_receipt_signature" in text
-    assert 'receipt.get("generation") != int(os.environ["GENERATION"]) - 1' in text
+    assert "prior_live_receipt_id is stale; current live head is" in text
+    assert "Revalidate authoritative live head" in text
+    assert "publication live head changed after build" in text
     assert '"parent_sha": os.environ.get("PARENT_SHA") or None' in text
-    assert "validate_manifest_dict(receipt)" in text
+    assert "validate_manifest_dict(manifest)" in text
+
+
+def test_production_requires_an_independently_approved_manifest() -> None:
+    text = _workflow_text()
+
+    assert "production deployment requires an independently reviewed approved_manifest_digest" in text
+    assert 'approved != manifest["manifest_digest"]' in text
+    assert 'open("receipt-dist/desired-manifest.json", "w")' in text
+    assert 'open("receipt-dist/assembly-receipt.json", "w")' in text
+    assert "--baseline-manifest receipt-dist/desired-manifest.json" in text
+    assert "WORKFLOW_SHA: ${{ github.sha }}" in text
+    assert '"workflow_sha": os.environ["WORKFLOW_SHA"]' in text
 
 
 def test_verify_step_invokes_verify_live_with_receipt() -> None:
@@ -165,6 +186,7 @@ def test_rollback_restores_only_a_cryptographically_attested_artifact() -> None:
     assert "Resolve last known-good attested receipt" in step_names
     assert "Download and verify known-good site artifact" in step_names
     assert "Create and sign rollback live receipt" in step_names
+    assert "Publish rollback as the new attested live head" in step_names
     assert "Upload rollback audit receipt" in step_names
     assert "Deploy attested rollback artifact to GitHub Pages" in step_names
     assert "Upload attested rollback Pages artifact" in step_names
@@ -175,6 +197,8 @@ def test_rollback_restores_only_a_cryptographically_attested_artifact() -> None:
     assert ".workflow_run.name" not in run_bodies
     assert "actions/runs/$RUN_ID" in run_bodies
     assert "['artifacts']['pages_assembly']['digest']" in run_bodies
+    assert "'generation': int(os.environ['BUILD_GENERATION'])" in run_bodies
+    assert "successor-live-receipt/live-receipt.json" in run_bodies
 
     assert any(step.get("uses") == DEPLOY_PAGES_ACTION for step in steps)
     assert any(step.get("uses") == UPLOAD_PAGES_ACTION for step in steps)

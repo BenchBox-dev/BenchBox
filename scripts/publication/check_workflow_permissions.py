@@ -136,7 +136,7 @@ def _check_deploy_job_perms(file_path: Path, jobs: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     deploy_job = jobs.get("deploy", {})
     deploy_perm = _normalize_permissions(deploy_job.get("permissions"))
-    expected = {"contents": "read", "pages": "write", "id-token": "write"}
+    expected = {"actions": "read", "contents": "read", "pages": "write", "id-token": "write"}
     if deploy_perm != expected:
         errors.append(
             f"{file_path.name} (job 'deploy'): must declare exactly {expected}; "

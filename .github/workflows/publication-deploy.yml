@@ -16,6 +16,11 @@ name: Publication Control Plane Deployment
         description: "Positive decimal CAS generation (1 for the first independent deployment)"
         required: true
         type: string
+      approved_manifest_digest:
+        description: "Reviewed candidate manifest SHA-256; required for a production deployment"
+        required: false
+        default: ""
+        type: string
       prior_live_receipt_id:
         description: "Prior attested live receipt ID, if this supersedes one"
         required: false
@@ -58,6 +63,9 @@ jobs:
       explorer_digest: ${{ steps.receipt.outputs.explorer_digest }}
       docs_digest: ${{ steps.receipt.outputs.docs_digest }}
       site_artifact: ${{ steps.inputs.outputs.site_artifact }}
+      parent_sha: ${{ steps.lineage.outputs.parent_sha }}
+      parent_generation: ${{ steps.lineage.outputs.parent_generation }}
+      parent_artifact_id: ${{ steps.lineage.outputs.parent_artifact_id }}
     steps:
       - name: Checkout control-plane source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -72,6 +80,7 @@ jobs:
           DEVELOP_SHA="$INPUT_DEVELOP_SHA"
           PUBLISHED_RESULTS_SHA="$INPUT_PUBLISHED_RESULTS_SHA"
           GENERATION="$INPUT_GENERATION"
+          APPROVED_MANIFEST_DIGEST="$INPUT_APPROVED_MANIFEST_DIGEST"
           for value in "$DEVELOP_SHA" "$PUBLISHED_RESULTS_SHA"; do
             printf '%s' "$value" | grep -qE '^[0-9a-f]{40}$' || {
               echo "::error::dispatch SHAs must be lowercase 40-hex commits"
@@ -96,6 +105,15 @@ jobs:
             echo "::error::generation must be a positive decimal CAS generation"
             exit 1
           }
+          if [ -n "$APPROVED_MANIFEST_DIGEST" ]; then
+            printf '%s' "$APPROVED_MANIFEST_DIGEST" | grep -qE '^[0-9a-f]{64}$' || {
+              echo "::error::approved_manifest_digest must be a lowercase SHA-256 digest"
+              exit 1
+            }
+          elif [ "$EXPECT_NOOP" != "true" ] && [ "$FORCE_ROLLBACK" != "true" ]; then
+            echo "::error::production deployment requires an independently reviewed approved_manifest_digest"
+            exit 1
+          fi
           {
             echo "generation=$GENERATION"
             echo "develop_sha=$DEVELOP_SHA"
@@ -106,6 +124,9 @@ jobs:
           INPUT_DEVELOP_SHA: ${{ inputs.develop_sha }}
           INPUT_PUBLISHED_RESULTS_SHA: ${{ inputs.published_results_sha }}
           INPUT_GENERATION: ${{ inputs.generation }}
+          INPUT_APPROVED_MANIFEST_DIGEST: ${{ inputs.approved_manifest_digest }}
+          EXPECT_NOOP: ${{ inputs.expect_noop }}
+          FORCE_ROLLBACK: ${{ inputs.force_rollback }}
 
       - name: Materialize pinned control plane and corpus
         shell: bash
@@ -138,33 +159,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "$GENERATION" = "1" ]; then
-            [ -z "$PRIOR_LIVE_RECEIPT_ID" ] || {
-              echo "::error::generation 1 is genesis and cannot name a prior live receipt"
-              exit 1
-            }
-            echo "parent_sha=" >> "$GITHUB_OUTPUT"
-            echo "parent_generation=" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          [ -n "$PRIOR_LIVE_RECEIPT_ID" ] || {
-            echo "::error::generation $GENERATION requires prior_live_receipt_id"
-            exit 1
-          }
           mkdir -p prior-live-receipt
-          gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
-            --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("publication-live-receipt-")) | "\(.id) \(.workflow_run.id)"' > prior-candidates.txt
+          gh api "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
+            --jq '.artifacts | map(select(.expired == false) | select(.name | startswith("publication-live-receipt-"))) | sort_by(.created_at) | reverse | .[] | "\(.id) \(.workflow_run.id)"' > prior-candidates.txt
           while read -r ARTIFACT_ID RUN_ID; do
             [ -n "${ARTIFACT_ID:-}" ] || continue
-            RUN_META=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID" --jq '[.name, .conclusion, .event] | @tsv')
-            IFS=$'\t' read -r RUN_NAME RUN_CONCLUSION RUN_EVENT <<< "$RUN_META"
-            if [[ "$RUN_NAME" != "Publication Control Plane Deployment" || "$RUN_CONCLUSION" != "success" || "$RUN_EVENT" != "workflow_dispatch" ]]; then
+            RUN_META=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID" --jq '[.name, .status, .conclusion, .event] | @tsv')
+            IFS=$'\t' read -r RUN_NAME RUN_STATUS RUN_CONCLUSION RUN_EVENT <<< "$RUN_META"
+            if [[ "$RUN_NAME" != "Publication Control Plane Deployment" || "$RUN_STATUS" != "completed" || "$RUN_EVENT" != "workflow_dispatch" ]]; then
               continue
             fi
             rm -rf prior-candidate && mkdir prior-candidate
             gh api "repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip" > prior-candidate.zip
             unzip -q prior-candidate.zip -d prior-candidate
-            if EXPECTED_RUN_ID="$RUN_ID" uv run python - <<'PY'
+            if EXPECTED_RUN_ID="$RUN_ID" RUN_CONCLUSION="$RUN_CONCLUSION" uv run python - <<'PY'
           import json
           import os
           import re
@@ -178,24 +186,50 @@ jobs:
           valid, _ = verify_live_receipt_signature(receipt)
           if not valid or receipt.get("target") != "benchbox.dev":
               raise SystemExit(1)
-          if receipt.get("receipt_id") != os.environ["PRIOR_LIVE_RECEIPT_ID"]:
-              raise SystemExit(1)
-          if receipt.get("generation") != int(os.environ["GENERATION"]) - 1:
-              raise SystemExit(1)
-          if str(receipt.get("artifact_run_id")) != os.environ["EXPECTED_RUN_ID"]:
+          if os.environ["RUN_CONCLUSION"] != "success":
+              if not str(receipt.get("receipt_id", "")).startswith("rollback-"):
+                  raise SystemExit(1)
+              if not receipt.get("routes") or not all(route.get("ok") for route in receipt["routes"]):
+                  raise SystemExit(1)
+          if str(receipt.get("receipt_run_id", receipt.get("artifact_run_id"))) != os.environ["EXPECTED_RUN_ID"]:
               raise SystemExit(1)
           if not re.fullmatch(r"[0-9a-f]{40}", str(receipt.get("source_commit", ""))):
               raise SystemExit(1)
           PY
             then
+              RECEIPT_ID=$(uv run python -c "import json; print(json.load(open('prior-candidate/live-receipt.json'))['receipt_id'])")
+              RECEIPT_GENERATION=$(uv run python -c "import json; print(json.load(open('prior-candidate/live-receipt.json'))['generation'])")
+              if [ "$GENERATION" = "1" ]; then
+                echo "::error::generation 1 cannot replace current live receipt $RECEIPT_ID"
+                exit 1
+              fi
+              [ -n "$PRIOR_LIVE_RECEIPT_ID" ] || {
+                echo "::error::generation $GENERATION requires prior_live_receipt_id"
+                exit 1
+              }
+              [ "$RECEIPT_ID" = "$PRIOR_LIVE_RECEIPT_ID" ] || {
+                echo "::error::prior_live_receipt_id is stale; current live head is $RECEIPT_ID"
+                exit 1
+              }
+              [ "$RECEIPT_GENERATION" = "$((GENERATION - 1))" ] || {
+                echo "::error::generation $GENERATION is not the successor of live generation $RECEIPT_GENERATION"
+                exit 1
+              }
               cp prior-candidate/live-receipt.json prior-live-receipt/live-receipt.json
               PARENT_SHA=$(uv run python -c "import json; print(json.load(open('prior-live-receipt/live-receipt.json'))['source_commit'])")
               echo "parent_sha=$PARENT_SHA" >> "$GITHUB_OUTPUT"
               echo "parent_generation=$((GENERATION - 1))" >> "$GITHUB_OUTPUT"
+              echo "parent_artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
               exit 0
             fi
           done < prior-candidates.txt
-          echo "::error::prior_live_receipt_id did not resolve to a valid attested predecessor"
+          if [ "$GENERATION" = "1" ] && [ -z "$PRIOR_LIVE_RECEIPT_ID" ]; then
+            echo "parent_sha=" >> "$GITHUB_OUTPUT"
+            echo "parent_generation=" >> "$GITHUB_OUTPUT"
+            echo "parent_artifact_id=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::error::no authoritative attested live head is available for generation $GENERATION"
           exit 1
 
       - name: Set up Node.js
@@ -245,8 +279,10 @@ jobs:
           BUILD_GENERATION: ${{ steps.inputs.outputs.generation }}
           BUILD_DEVELOP_SHA: ${{ steps.inputs.outputs.develop_sha }}
           BUILD_PUBLISHED_RESULTS_SHA: ${{ steps.inputs.outputs.published_results_sha }}
+          APPROVED_MANIFEST_DIGEST: ${{ inputs.approved_manifest_digest }}
           PARENT_SHA: ${{ steps.lineage.outputs.parent_sha }}
           PARENT_GENERATION: ${{ steps.lineage.outputs.parent_generation }}
+          WORKFLOW_SHA: ${{ github.sha }}
           SITE_ARTIFACT: ${{ steps.inputs.outputs.site_artifact }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         shell: bash
@@ -275,7 +311,7 @@ jobs:
           export GENERATION DEVELOP_SHA PUBLISHED_RESULTS_SHA PRIOR_LIVE_RECEIPT_ID SITE_DIGEST DOCS_DIGEST
           export EXPLORER_DIGEST DATABASE_DIGEST CORPUS_DIGEST LOCKFILE_DIGEST BUNDLE_COUNT PYTHON_VERSION
           export NODE_VERSION UV_VERSION IMAGE_OS SITE_ARTIFACT GITHUB_RUN_ID TIMESTAMP GITHUB_OUTPUT
-          export PARENT_SHA PARENT_GENERATION
+          export PARENT_SHA PARENT_GENERATION WORKFLOW_SHA APPROVED_MANIFEST_DIGEST
           python3 - <<'PY'
           import hashlib
           import json
@@ -285,7 +321,7 @@ jobs:
           def tree_size(path: str) -> int:
               return sum(item.stat().st_size for item in Path(path).rglob("*") if item.is_file())
 
-          receipt = {
+          manifest = {
               "schema_version": 2,
               "target": "benchbox.dev",
               "generation": int(os.environ["GENERATION"]),
@@ -301,7 +337,7 @@ jobs:
                   "node_version": os.environ["NODE_VERSION"],
                   "uv_version": os.environ["UV_VERSION"],
                   "lockfile_sha256": os.environ["LOCKFILE_DIGEST"],
-                  "workflow_sha": os.environ["DEVELOP_SHA"],
+                  "workflow_sha": os.environ["WORKFLOW_SHA"],
                   "action_shas": {
                       "actions/checkout": "11d5960a326750d5838078e36cf38b85af677262",
                       "actions/setup-python": "a26af69be951a213d495a4c3e4e4022e16d87065",
@@ -347,28 +383,52 @@ jobs:
                       "path": "/",
                   },
               },
-              "artifact_name": os.environ["SITE_ARTIFACT"],
-              "artifact_run_id": os.environ["GITHUB_RUN_ID"],
               "checksums": {"/results/data/results.duckdb": os.environ["DATABASE_DIGEST"]},
-              "timestamp": os.environ["TIMESTAMP"],
           }
-          if os.environ.get('PRIOR_LIVE_RECEIPT_ID'): receipt["prior_live_receipt_id"] = os.environ['PRIOR_LIVE_RECEIPT_ID']
+          if os.environ.get("PRIOR_LIVE_RECEIPT_ID"):
+              manifest["prior_live_receipt_id"] = os.environ["PRIOR_LIVE_RECEIPT_ID"]
           from scripts.publication.manifest import validate_manifest_dict
-          errors = validate_manifest_dict(receipt)
+          errors = validate_manifest_dict(manifest)
           if errors:
               raise SystemExit("invalid publication manifest: " + "; ".join(errors))
-          canonical = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
-          receipt["manifest_digest"] = hashlib.sha256(canonical).hexdigest()
-          for name in ("desired-manifest.json", "assembly-receipt.json"):
-              with open("receipt-dist/" + name, "w") as f: json.dump(receipt, f, sort_keys=True); f.write("\n")
+          canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+          manifest["manifest_digest"] = hashlib.sha256(canonical).hexdigest()
+          approved = os.environ.get("APPROVED_MANIFEST_DIGEST")
+          if approved and approved != manifest["manifest_digest"]:
+              raise SystemExit(
+                  "built manifest does not match approved_manifest_digest: "
+                  f"approved={approved} built={manifest['manifest_digest']}"
+              )
+          assembly = dict(manifest)
+          assembly.update({
+              "artifact_name": os.environ["SITE_ARTIFACT"],
+              "artifact_run_id": os.environ["GITHUB_RUN_ID"],
+              "timestamp": os.environ["TIMESTAMP"],
+              "status": "BUILT",
+          })
+          with open("receipt-dist/desired-manifest.json", "w") as f:
+              json.dump(manifest, f, sort_keys=True)
+              f.write("\n")
+          with open("receipt-dist/assembly-receipt.json", "w") as f:
+              json.dump(assembly, f, sort_keys=True)
+              f.write("\n")
           with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-              output.write(f"manifest_digest={receipt['manifest_digest']}\n")
+              output.write(f"manifest_digest={manifest['manifest_digest']}\n")
               output.write(f"assembly_digest={os.environ['SITE_DIGEST']}\n")
               output.write(f"database_digest={os.environ['DATABASE_DIGEST']}\n")
               output.write(f"explorer_digest={os.environ['EXPLORER_DIGEST']}\n")
               output.write(f"docs_digest={os.environ['DOCS_DIGEST']}\n")
           PY
           cp receipt-dist/assembly-receipt.json receipt-dist/publication-receipt.json
+
+      - name: Upload candidate receipts for independent review
+        if: always() && steps.receipt.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: publication-candidate-receipts-${{ steps.inputs.outputs.generation }}-${{ github.run_id }}
+          path: receipt-dist/
+          retention-days: 90
+
       - name: Pre-deploy candidate verification
         env:
           EXPECT_NOOP: ${{ inputs.expect_noop }}
@@ -383,7 +443,7 @@ jobs:
           else
             uv run python scripts/publication/verify_live.py \
               --candidate-manifest receipt-dist/publication-receipt.json \
-              --baseline-manifest receipt-dist/publication-receipt.json \
+              --baseline-manifest receipt-dist/desired-manifest.json \
               --pre-deploy --require-receipt
           fi
 
@@ -414,6 +474,7 @@ jobs:
     if: inputs.expect_noop != true && inputs.force_rollback != true
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       pages: write
       id-token: write
@@ -423,6 +484,20 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Revalidate authoritative live head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_PARENT_ARTIFACT_ID: ${{ needs.build.outputs.parent_artifact_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURRENT=$(gh api "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
+            --jq '[.artifacts | map(select(.expired == false) | select(.name | startswith("publication-live-receipt-"))) | sort_by(.created_at) | reverse | .[0].id][0] // ""')
+          [ "$CURRENT" = "$EXPECTED_PARENT_ARTIFACT_ID" ] || {
+            echo "::error::publication live head changed after build; refusing stale deployment"
+            exit 1
+          }
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
@@ -506,6 +581,7 @@ jobs:
           receipt = dict(assembly)
           receipt.update({
               'receipt_id': f"live-{os.environ['BUILD_GENERATION']}-{os.environ['GITHUB_RUN_ID']}",
+              'receipt_run_id': os.environ['GITHUB_RUN_ID'],
               'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
               'routes': probes,
               'nonce': f"{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}",
@@ -592,15 +668,15 @@ jobs:
           gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("publication-live-receipt-")) | "\(.id) \(.workflow_run.id)"' > candidates.txt
           while read -r ARTIFACT_ID RUN_ID; do
             [ -n "${ARTIFACT_ID:-}" ] || continue
-            RUN_META=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID" --jq '[.name, .conclusion, .event] | @tsv')
-            IFS=$'\t' read -r RUN_NAME RUN_CONCLUSION RUN_EVENT <<< "$RUN_META"
-            if [[ "$RUN_NAME" != "Publication Control Plane Deployment" || "$RUN_CONCLUSION" != "success" || "$RUN_EVENT" != "workflow_dispatch" ]]; then
+            RUN_META=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID" --jq '[.name, .status, .conclusion, .event] | @tsv')
+            IFS=$'\t' read -r RUN_NAME RUN_STATUS RUN_CONCLUSION RUN_EVENT <<< "$RUN_META"
+            if [[ "$RUN_NAME" != "Publication Control Plane Deployment" || "$RUN_STATUS" != "completed" || "$RUN_EVENT" != "workflow_dispatch" ]]; then
               continue
             fi
             rm -rf candidate && mkdir candidate
             gh api "repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip" > candidate.zip
             unzip -q candidate.zip -d candidate
-            if RUN_ID="$RUN_ID" uv run python - <<'PY'
+            if RUN_ID="$RUN_ID" RUN_CONCLUSION="$RUN_CONCLUSION" uv run python - <<'PY'
           import json, os
           from pathlib import Path
           from scripts.publication.reconciliation import verify_live_receipt_signature
@@ -609,11 +685,14 @@ jobs:
           receipt = json.loads(p.read_text())
           valid, _ = verify_live_receipt_signature(receipt)
           if not valid or receipt.get('target') != 'benchbox.dev': raise SystemExit(1)
+          if os.environ['RUN_CONCLUSION'] != 'success':
+              if not str(receipt.get('receipt_id', '')).startswith('rollback-'): raise SystemExit(1)
+              if not receipt.get('routes') or not all(route.get('ok') for route in receipt['routes']): raise SystemExit(1)
           prior_id = os.environ.get('PRIOR_LIVE_RECEIPT_ID', '').strip()
           current_gen = os.environ.get('CURRENT_GENERATION', '').strip()
           if prior_id and receipt.get('receipt_id') != prior_id: raise SystemExit(1)
           if current_gen and str(receipt.get('generation')) == current_gen: raise SystemExit(1)
-          if str(receipt.get('artifact_run_id')) != os.environ.get('RUN_ID'): raise SystemExit(1)
+          if str(receipt.get('receipt_run_id', receipt.get('artifact_run_id'))) != os.environ.get('RUN_ID'): raise SystemExit(1)
           if not receipt.get('artifact_name') or not receipt.get('artifacts', {}).get('pages_assembly', {}).get('digest'): raise SystemExit(1)
           PY
             then
@@ -665,6 +744,10 @@ jobs:
       - name: Create and sign rollback live receipt
         env:
           PUBLICATION_ATTESTOR_PRIVATE_KEY: ${{ secrets.PUBLICATION_ATTESTOR_PRIVATE_KEY }}
+          BUILD_GENERATION: ${{ needs.build.outputs.generation }}
+          PARENT_SHA: ${{ needs.build.outputs.parent_sha }}
+          PARENT_GENERATION: ${{ needs.build.outputs.parent_generation }}
+          PRIOR_LIVE_RECEIPT_ID: ${{ inputs.prior_live_receipt_id }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         shell: bash
@@ -675,19 +758,37 @@ jobs:
             exit 1
           }
           python3 - <<'PY'
-          import json, os
+          import hashlib, json, os
           from datetime import datetime, timezone
+          from scripts.publication.manifest import validate_manifest_dict
           prior = json.load(open('known-good-receipt/live-receipt.json'))
           probes = json.load(open('known-good-receipt/rollback-probe-report.json'))['probes']
           receipt = dict(prior)
           receipt.update({
+              'generation': int(os.environ['BUILD_GENERATION']),
+              'parent_sha': os.environ['PARENT_SHA'],
+              'parent_generation': int(os.environ['PARENT_GENERATION']),
               'receipt_id': f"rollback-{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}",
+              'receipt_run_id': os.environ['GITHUB_RUN_ID'],
               'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
               'routes': probes,
               'nonce': f"{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}",
-              'prior_live_receipt_id': prior['receipt_id'],
+              'prior_live_receipt_id': os.environ['PRIOR_LIVE_RECEIPT_ID'],
+              'rollback_source_receipt_id': prior['receipt_id'],
           })
           receipt.pop('signature', None)
+          manifest_keys = (
+              'schema_version', 'target', 'generation', 'parent_sha', 'parent_generation',
+              'source_commit', 'source_branch', 'develop_sha', 'published_results_sha',
+              'build_closure', 'corpus', 'artifacts', 'checksums', 'prior_live_receipt_id',
+          )
+          manifest = {key: receipt[key] for key in manifest_keys}
+          errors = validate_manifest_dict(manifest)
+          if errors:
+              raise SystemExit('invalid rollback manifest: ' + '; '.join(errors))
+          receipt['manifest_digest'] = hashlib.sha256(
+              json.dumps(manifest, sort_keys=True, separators=(',', ':')).encode()
+          ).hexdigest()
           open('known-good-receipt/rollback-live-receipt.json', 'w').write(json.dumps(receipt, sort_keys=True) + '\n')
           PY
           umask 077
@@ -715,6 +816,15 @@ jobs:
           valid, reason = verify_live_receipt_signature(json.load(open('known-good-receipt/rollback-live-receipt.json')))
           assert valid, reason
           PY
+          mkdir -p successor-live-receipt
+          cp known-good-receipt/rollback-live-receipt.json successor-live-receipt/live-receipt.json
+
+      - name: Publish rollback as the new attested live head
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: publication-live-receipt-${{ needs.build.outputs.generation }}
+          path: successor-live-receipt/
+          retention-days: 90
 
       - name: Upload rollback audit receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
