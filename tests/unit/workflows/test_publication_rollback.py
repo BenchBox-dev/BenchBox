@@ -149,6 +149,8 @@ def test_build_receipt_enforces_attested_cas_lineage() -> None:
     assert "requires prior_live_receipt_id" in text
     assert "verify_live_receipt_signature" in text
     assert "prior_live_receipt_id is stale; current live head is" in text
+    assert 'gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100"' in text
+    assert '"\\(.created_at) \\(.id) \\(.workflow_run.id)"' in text
     assert "Revalidate authoritative live head" in text
     assert "publication live head changed after build" in text
     assert '"parent_sha": os.environ.get("PARENT_SHA") or None' in text
@@ -187,6 +189,7 @@ def test_rollback_restores_only_a_cryptographically_attested_artifact() -> None:
     assert "Download and verify known-good site artifact" in step_names
     assert "Create and sign rollback live receipt" in step_names
     assert "Publish rollback as the new attested live head" in step_names
+    assert "Retain restored site artifact for the new rollback head" in step_names
     assert "Upload rollback audit receipt" in step_names
     assert "Deploy attested rollback artifact to GitHub Pages" in step_names
     assert "Upload attested rollback Pages artifact" in step_names
@@ -199,6 +202,8 @@ def test_rollback_restores_only_a_cryptographically_attested_artifact() -> None:
     assert "['artifacts']['pages_assembly']['digest']" in run_bodies
     assert "'generation': int(os.environ['BUILD_GENERATION'])" in run_bodies
     assert "successor-live-receipt/live-receipt.json" in run_bodies
+    assert "'artifact_name': os.environ['SITE_ARTIFACT']" in run_bodies
+    assert "'artifact_run_id': os.environ['GITHUB_RUN_ID']" in run_bodies
 
     assert any(step.get("uses") == DEPLOY_PAGES_ACTION for step in steps)
     assert any(step.get("uses") == UPLOAD_PAGES_ACTION for step in steps)

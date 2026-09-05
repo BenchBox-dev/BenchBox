@@ -160,9 +160,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p prior-live-receipt
-          gh api "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
-            --jq '.artifacts | map(select(.expired == false) | select(.name | startswith("publication-live-receipt-"))) | sort_by(.created_at) | reverse | .[] | "\(.id) \(.workflow_run.id)"' > prior-candidates.txt
-          while read -r ARTIFACT_ID RUN_ID; do
+          gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("publication-live-receipt-")) | "\(.created_at) \(.id) \(.workflow_run.id)"' \
+            | sort -r > prior-candidates.txt
+          while read -r _CREATED_AT ARTIFACT_ID RUN_ID; do
             [ -n "${ARTIFACT_ID:-}" ] || continue
             RUN_META=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID" --jq '[.name, .status, .conclusion, .event] | @tsv')
             IFS=$'\t' read -r RUN_NAME RUN_STATUS RUN_CONCLUSION RUN_EVENT <<< "$RUN_META"
@@ -491,8 +492,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          CURRENT=$(gh api "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
-            --jq '[.artifacts | map(select(.expired == false) | select(.name | startswith("publication-live-receipt-"))) | sort_by(.created_at) | reverse | .[0].id][0] // ""')
+          CURRENT=$(gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("publication-live-receipt-")) | "\(.created_at) \(.id)"' \
+            | sort -r | sed -n '1{s/^[^ ]* //;p;}')
           [ "$CURRENT" = "$EXPECTED_PARENT_ARTIFACT_ID" ] || {
             echo "::error::publication live head changed after build; refusing stale deployment"
             exit 1
@@ -728,6 +730,14 @@ jobs:
           name: publication-rollback-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: restored-site
 
+      - name: Retain restored site artifact for the new rollback head
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: publication-site-${{ needs.build.outputs.generation }}-rollback
+          path: restored-site
+          include-hidden-files: true
+          retention-days: 90
+
       - name: Deploy attested rollback artifact to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
@@ -748,6 +758,7 @@ jobs:
           PARENT_SHA: ${{ needs.build.outputs.parent_sha }}
           PARENT_GENERATION: ${{ needs.build.outputs.parent_generation }}
           PRIOR_LIVE_RECEIPT_ID: ${{ inputs.prior_live_receipt_id }}
+          SITE_ARTIFACT: publication-site-${{ needs.build.outputs.generation }}-rollback
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         shell: bash
@@ -770,6 +781,8 @@ jobs:
               'parent_generation': int(os.environ['PARENT_GENERATION']),
               'receipt_id': f"rollback-{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}",
               'receipt_run_id': os.environ['GITHUB_RUN_ID'],
+              'artifact_name': os.environ['SITE_ARTIFACT'],
+              'artifact_run_id': os.environ['GITHUB_RUN_ID'],
               'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
               'routes': probes,
               'nonce': f"{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}",
