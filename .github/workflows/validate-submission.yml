@@ -254,19 +254,11 @@ jobs:
             | grep -vi 'submission-manifest\.json$' \
             || true)
 
-          DELETED_BUNDLES=$(git diff --no-renames --name-only --diff-filter=D \
-            "$BASE_SHA...$EFFECTIVE_MERGE" -- \
-            ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
-            | grep -viE '\.(manifest|plans|tuning|applied)\.json$' \
-            | grep -vi 'corpus-inventory\.json$' \
-            | grep -vi 'submission-manifest\.json$' \
-            || true)
-          if [ -n "$DELETED_BUNDLES" ]; then
-            while IFS= read -r deleted_bundle; do
+          while IFS= read -r -d '' deleted_bundle; do
               stem="${deleted_bundle:0:${#deleted_bundle}-5}"
               for suffix in ".manifest.json" ".plans.json" ".tuning.json" ".applied.json"; do
-                companion=$(git ls-tree -r --name-only "$EFFECTIVE_MERGE" -- results-data/bundles \
-                  | awk -v stem="$stem" -v suffix="$suffix" \
+                companion=$(git ls-tree -rz --name-only "$EFFECTIVE_MERGE" -- results-data/bundles \
+                  | awk -v RS='\0' -v stem="$stem" -v suffix="$suffix" \
                     'length($0) == length(stem) + length(suffix) && \
                      substr($0, 1, length(stem)) == stem && \
                      tolower(substr($0, length(stem) + 1)) == tolower(suffix) { print; exit }')
@@ -275,8 +267,13 @@ jobs:
                   exit 1
                 fi
               done
-            done <<< "$DELETED_BUNDLES"
-          fi
+          done < <(git diff --no-renames --name-only -z --diff-filter=D \
+            "$BASE_SHA...$EFFECTIVE_MERGE" -- \
+            ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
+            | grep -vizE '\.(manifest|plans|tuning|applied)\.json$' \
+            | grep -viz 'corpus-inventory\.json$' \
+            | grep -viz 'submission-manifest\.json$' \
+            || true)
 
           CHANGED_MANIFESTS=$(git diff --no-renames --name-only --diff-filter=ACMRD \
             "$BASE_SHA...$EFFECTIVE_MERGE" -- \
