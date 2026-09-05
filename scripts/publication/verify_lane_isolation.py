@@ -122,6 +122,7 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
         ".github/workflows/validate-submission.yml",
         ".github/workflows/sync-results-data-to-published.yml",
         ".github/workflows/corpus-drift-check.yml",
+        ".github/workflows/publication-corpus-cutover.yml",
     ),
 }
 

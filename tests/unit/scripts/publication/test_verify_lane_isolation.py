@@ -43,6 +43,7 @@ def test_classify_path_identifies_correct_lanes() -> None:
     assert classify_path("results-data/bundles/bundle_123.json") == {"corpus"}
     assert classify_path("scripts/validate_submission.py") == {"corpus"}
     assert classify_path(".github/workflows/validate-submission.yml") == {"corpus"}
+    assert classify_path(".github/workflows/publication-corpus-cutover.yml") == {"corpus"}
 
     # Unclassified / root paths
     assert classify_path("README.md") == set()
@@ -175,6 +176,7 @@ def test_determine_affected_lanes() -> None:
     assert determine_affected_lanes(["docs/index.rst"]) == {"site"}
     assert determine_affected_lanes(["results-explorer/src/App.tsx"]) == {"explorer"}
     assert determine_affected_lanes(["results-data/bundles/bundle.json"]) == {"corpus"}
+    assert determine_affected_lanes([".github/workflows/publication-corpus-cutover.yml"]) == {"corpus"}
 
     # Mixed lanes
     assert determine_affected_lanes(["docs/index.rst", "results-explorer/src/App.tsx"]) == {"site", "explorer"}
