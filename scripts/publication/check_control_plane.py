@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
-"""Check publication control-plane contracts, GitHub App permissions, and branch rules (A3 w2, w4, w5).
+"""Check publication control-plane contracts, token permissions, and branch rules.
+
+Verifies:
+1. CODEOWNERS protection for publication files.
+2. Publication metadata ref existence and branch protection rules (no force-push, no deletion).
+3. Role-scoped permissions:
+   - 'journal' role requires only 'contents' write (least privilege for metadata ref updates).
+   - 'legacy_app' role requires 'contents', 'pull_requests', and 'workflows'.
 
 Usage:
-  uv run python scripts/publication/check_control_plane.py [--live] [--strict]
+  uv run python scripts/publication/check_control_plane.py [--live] [--strict] [--role {journal,legacy_app,all}]
 """
 
 from __future__ import annotations
@@ -19,7 +26,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 REPO = "BenchBox-dev/BenchBox"
 PUBLICATION_BRANCH = "publication"
-REQUIRED_APP_PERMISSIONS = {"contents", "pull_requests", "workflows"}
+
+# Journal updates require contents write only; PR/workflow writes are not required
+REQUIRED_JOURNAL_PERMISSIONS = {"contents"}
+REQUIRED_LEGACY_APP_PERMISSIONS = {"contents", "pull_requests", "workflows"}
+REQUIRED_APP_PERMISSIONS = REQUIRED_JOURNAL_PERMISSIONS
 
 
 def run(*args: str) -> str:
@@ -46,8 +57,48 @@ def check_codeowners() -> list[str]:
     return errors
 
 
-def check_live_app_and_branch() -> list[str]:
-    """Verify live GitHub App installation, token minting, and publication branch."""
+def check_permissions(perms: set[str], role: str = "journal") -> list[str]:
+    """Check that token/app permissions satisfy the least-privilege contract for the given role."""
+    errors: list[str] = []
+    if role in ("journal", "all"):
+        missing = REQUIRED_JOURNAL_PERMISSIONS - perms
+        if missing:
+            errors.append(f"Missing required permissions for journal role: {sorted(missing)}")
+    if role in ("legacy_app", "all"):
+        missing = REQUIRED_LEGACY_APP_PERMISSIONS - perms
+        if missing:
+            errors.append(f"Missing required permissions for legacy_app role: {sorted(missing)}")
+    return errors
+
+
+def check_branch_protection(
+    repo: str = REPO,
+    branch: str = PUBLICATION_BRANCH,
+    *,
+    gh_output: str | None = None,
+) -> list[str]:
+    """Verify that the publication metadata ref has branch protection blocking force-push and deletion."""
+    errors: list[str] = []
+    try:
+        if gh_output is None:
+            gh_output = run("gh", "api", f"repos/{repo}/branches/{branch}/protection")
+        data = json.loads(gh_output)
+    except Exception as e:
+        return [f"Branch '{branch}' lacks verified protection rules on {repo}: {e}"]
+
+    allow_force = data.get("allow_force_pushes", {}).get("enabled", False)
+    if allow_force:
+        errors.append(f"Branch '{branch}' permits force pushes (must be blocked for journal integrity)")
+
+    allow_deletions = data.get("allow_deletions", {}).get("enabled", False)
+    if allow_deletions:
+        errors.append(f"Branch '{branch}' permits deletions (must be blocked for journal integrity)")
+
+    return errors
+
+
+def check_live_app_and_branch(role: str = "journal") -> list[str]:
+    """Verify live GitHub App installation, token minting, and publication branch protection."""
     errors: list[str] = []
 
     # 1. Check publication branch on origin
@@ -55,16 +106,18 @@ def check_live_app_and_branch() -> list[str]:
         remote_heads = run("git", "ls-remote", "--heads", "origin", PUBLICATION_BRANCH)
         if not remote_heads:
             errors.append(f"Live check: branch '{PUBLICATION_BRANCH}' does not exist on origin")
+        else:
+            # Check branch protection rules
+            protection_errors = check_branch_protection(REPO, PUBLICATION_BRANCH)
+            errors.extend(protection_errors)
     except Exception as e:
         errors.append(f"Live check git ls-remote error: {e}")
 
     # 2. Check GitHub App credentials and installation
-    # Look for app ID and private key from env, repo secrets, or local downloads
     app_id = os.environ.get("PUBLICATION_APP_ID")
     pem_content = os.environ.get("PUBLICATION_APP_PRIVATE_KEY")
 
     if not app_id:
-        # Check if secret exists via gh secret list
         try:
             secrets_out = run("gh", "secret", "list", "-R", REPO)
             if "PUBLICATION_APP_ID" not in secrets_out:
@@ -74,7 +127,6 @@ def check_live_app_and_branch() -> list[str]:
         except Exception as e:
             errors.append(f"Live check gh secret list error: {e}")
 
-    # If App ID and Key are available in environment or verified, test JWT token minting
     if app_id and pem_content:
         try:
             import jwt
@@ -101,9 +153,8 @@ def check_live_app_and_branch() -> list[str]:
                     errors.append("Live check: GitHub App is not installed on account 'BenchBox-dev'")
                 else:
                     perms = set(matching[0].get("permissions", {}).keys())
-                    missing_perms = REQUIRED_APP_PERMISSIONS - perms
-                    if missing_perms:
-                        errors.append(f"Live check: GitHub App missing required permissions: {sorted(missing_perms)}")
+                    perm_errors = check_permissions(perms, role=role)
+                    errors.extend(perm_errors)
         except Exception as e:
             errors.append(f"Live check JWT validation error: {e}")
 
@@ -118,6 +169,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Require live checks; fail when --live was not used or live checks were skipped",
     )
+    parser.add_argument(
+        "--role",
+        choices=["journal", "legacy_app", "all"],
+        default="journal",
+        help="Permission role to validate (journal: contents only; legacy_app: contents, pull_requests, workflows)",
+    )
     args = parser.parse_args(argv)
 
     all_errors: list[str] = []
@@ -128,7 +185,7 @@ def main(argv: list[str] | None = None) -> int:
     all_errors.extend(codeowner_errors)
 
     if args.live:
-        live_errors = check_live_app_and_branch()
+        live_errors = check_live_app_and_branch(role=args.role)
         all_errors.extend(live_errors)
         live_checks_performed = True
 
@@ -141,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  - {err}")
         return 1
 
-    mode = "live + local" if args.live else "local"
+    mode = f"live ({args.role}) + local" if args.live else "local"
     print(f"✅ Publication control plane check passed ({mode}).")
     return 0
 
