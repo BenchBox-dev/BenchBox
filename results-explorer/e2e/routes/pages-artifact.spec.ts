@@ -26,12 +26,14 @@ test.describe("assembled GitHub Pages artifact", () => {
     const directRouteStatuses: number[] = [];
     const benchmarkIndexStatuses: number[] = [];
     const platformIndexStatuses: number[] = [];
+    const localPreviewStatuses: number[] = [];
     const docsStatuses: number[] = [];
     page.on("response", (response) => {
       const pathname = new URL(response.url()).pathname;
       if (pathname === "/results/p/polars/") directRouteStatuses.push(response.status());
       if (pathname === "/results/benchmarks/") benchmarkIndexStatuses.push(response.status());
       if (pathname === "/results/platforms/") platformIndexStatuses.push(response.status());
+      if (pathname === "/results/local/local-aabbccddeeff") localPreviewStatuses.push(response.status());
       if (pathname === "/docs/usage/installation.html") docsStatuses.push(response.status());
     });
 
@@ -60,6 +62,13 @@ test.describe("assembled GitHub Pages artifact", () => {
     await expect(page.getByRole("heading", { name: "Platforms" })).toBeVisible();
     await expect(page).toHaveURL(/\/results\/platforms\/$/);
     expect(platformIndexStatuses).toContain(404);
+
+    await page.goto("/results/local/local-aabbccddeeff");
+    await waitForShell(page);
+    await expect(page).toHaveURL(/\/results\/local\/local-aabbccddeeff$/);
+    await expect(page.getByRole("alert")).toContainText("no longer available");
+    await expect(page.getByRole("button", { name: "Open result file again" })).toBeVisible();
+    expect(localPreviewStatuses).toContain(404);
 
     await page.goto("/results/");
     await waitForDataLoaded(page, /Recent Results/i);
