@@ -1060,7 +1060,7 @@ describe("toggleFacetValue (w13)", () => {
     }));
     vi.mocked(queryRows).mockImplementation(async (sql: string) => {
       const s = String(sql).replace(/\s+/g, " ").trim();
-      if (s.includes("FROM bench.result_detail_metrics")) return hardwareRows;
+      if (s.includes("JOIN bench.result_detail_metrics")) return hardwareRows;
       if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
         return META_LEADERBOARD_ROWS;
       }
