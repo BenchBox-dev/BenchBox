@@ -502,6 +502,9 @@ describe("TimeSeries", () => {
     expect(points).toHaveLength(2);
     expect(points[0]?.querySelector("title")?.textContent).toContain("1111aaaa");
     expect(points[0]?.getAttribute("aria-label")).toContain("1111aaaa");
+    expect(points[0]?.querySelector("title")?.textContent).toMatch(/2026-04-01.*days ago/);
+    expect(points[0]?.getAttribute("aria-label")).toMatch(/2026-04-01.*days ago/);
+    expect(container.querySelector('text[aria-label*="days ago"]')).not.toBeNull();
     expect(points[0]?.querySelector("title")?.textContent).not.toContain("2222bbbb");
     expect(points[1]?.querySelector("title")?.textContent).toContain("2222bbbb");
     expect(points[1]?.getAttribute("aria-label")).toContain("2222bbbb");
@@ -520,6 +523,7 @@ describe("TimeSeries", () => {
     expect(container.querySelector("svg")).toBeNull();
     expect(state?.textContent).toContain("Trend line hidden");
     expect(state?.textContent).toContain("same-day runs");
+    expect(state?.textContent).toMatch(/2026-04-03.*days ago/);
     expect(state?.querySelectorAll("[data-result-id]")).toHaveLength(2);
     expect(state?.querySelector('a[href="/results/r/tpch-duckdb-sf0.01-20260403-1111aaaa"]')).toBeTruthy();
     expect(state?.querySelector('a[href="/results/r/tpch-duckdb-sf0.01-20260403-2222bbbb#run-receipt"]')).toBeTruthy();

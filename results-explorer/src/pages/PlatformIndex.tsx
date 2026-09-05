@@ -45,7 +45,7 @@ import { TableScrollHint } from "@/components/TableScrollHint";
 import { DataTable } from "@/components/DataTable";
 import { CompareTray } from "@/components/CompareTray";
 import { TrayAnnouncer } from "@/components/TrayAnnouncer";
-import { RunAge } from "@/components/RunAge";
+import { RunDateWithAge } from "@/components/RunAge";
 import type { SortState } from "@/types";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
@@ -1140,7 +1140,7 @@ function PlatformRow({ entry, runIdentityLabel, checked, onToggle, showMetricCon
           {primaryMetricContract(entry.primary_metric)}
         </td>
       )}
-      <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("date", showMetricContract)}>{entry.run_date}<RunAge runDate={entry.run_date} /></td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("date", showMetricContract)}><RunDateWithAge runDate={entry.run_date} /></td>
       <td class="table-td font-mono" aria-colindex={platformTableColumnIndex("power_score", showMetricContract)}>{fmtScore(entry.power_score)}</td>
       <td class="table-td font-mono" aria-colindex={platformTableColumnIndex("geomean", showMetricContract)}>{fmtGeomean(entry.geomean_ms)}</td>
       <td class="table-td" aria-colindex={platformTableColumnIndex("source", showMetricContract)}>
