@@ -9,6 +9,7 @@ import {
   HEADER_NAV_ARIA_LABEL,
   HEADER_TOGGLE_ARIA_LABEL,
 } from "@/components/headerContract";
+import { LocalResultPicker } from "@/components/LocalResultPicker";
 
 interface LayoutProps {
   children: ComponentChildren;
@@ -129,6 +130,13 @@ function Header() {
             <ExplorerNavLink href="/results/query" active={currentPath.startsWith("/results/query")}>
               Query
             </ExplorerNavLink>
+            <LocalResultPicker
+              className={`whitespace-nowrap rounded-sm border-b-2 bg-transparent py-3 font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)] ${
+                currentPath.startsWith("/results/local/")
+                  ? "border-[var(--bb-accent)] text-[var(--bb-fg-primary)]"
+                  : "border-transparent text-[var(--bb-fg-muted)] hover:border-[var(--bb-border-default)] hover:text-[var(--bb-fg-primary)]"
+              }`}
+            />
           </nav>
         </div>
       </div>
@@ -187,7 +195,7 @@ function ExplorerNavLink({
 }
 
 function isBenchmarkPath(path: string): boolean {
-  return /^\/results\/(?!compare\/?$|query\/?$|platforms\/?$|p\/|r\/)[^/]+\/?$/.test(path);
+  return /^\/results\/(?!compare\/?$|query\/?$|platforms\/?$|p\/|r\/|local\/)[^/]+\/?$/.test(path);
 }
 
 function themeLabel(choice: string): string {
