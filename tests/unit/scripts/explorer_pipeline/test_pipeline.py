@@ -137,8 +137,42 @@ def test_mismatched_query_sets_are_not_ranked(tmp_path: Path) -> None:
     with duckdb.connect(str(output / "results.duckdb"), read_only=True) as con:
         ranking_reasons = con.execute("SELECT DISTINCT ranking_exclusion_reason FROM benchmark_rankings").fetchall()
         detail_reasons = con.execute("SELECT DISTINCT ranking_exclusion_reason FROM result_detail_metrics").fetchall()
+        eligibility = con.execute("SELECT DISTINCT is_ranking_eligible FROM results").fetchall()
     assert ranking_reasons == [("mismatched_query_set",)]
     assert detail_reasons == [("mismatched_query_set",)]
+    assert eligibility == [(False,)]
+
+
+def test_non_rankable_query_gap_does_not_exclude_rankable_peers() -> None:
+    transformer = BundleTransformer()
+    path = Path("results-data/bundles/tpchavoc_sf001_duckdb_sql_20260826_163147_d96baca2.json")
+    entry = transformer.to_manifest_entry(path)
+    detail = transformer.to_detail_result(path, entry.result_id)
+    peer_entry = entry.model_copy(update={"result_id": "eligible-peer", "platform_id": "eligible-peer"})
+    peer_detail = detail.model_copy(update={"result_id": "eligible-peer"})
+    incomplete_entry = entry.model_copy(
+        update={
+            "result_id": "missing-metric",
+            "platform_id": "missing-metric",
+            "power_score": None,
+            "display_geomean_ms": None,
+            "ranking_exclusion_reason": "missing_primary_metric",
+        }
+    )
+    incomplete_detail = detail.model_copy(
+        update={"result_id": "missing-metric", "display_timings": detail.display_timings[:-1]}
+    )
+    pairs = [(entry, detail), (peer_entry, peer_detail), (incomplete_entry, incomplete_detail)]
+
+    summaries = _build_benchmark_summaries(
+        {("tpchavoc", 0.01, "power"): pairs},
+        {candidate.result_id: candidate.result_id[-8:] for candidate, _ in pairs},
+    )
+
+    rows = {row.result_id: row for row in summaries[0][1].platforms}
+    assert rows[entry.result_id].is_ranking_eligible is True
+    assert rows[peer_entry.result_id].is_ranking_eligible is True
+    assert rows[incomplete_entry.result_id].ranking_exclusion_reason == "missing_primary_metric"
 
 
 def _duckdb_results(output: Path) -> list[dict]:

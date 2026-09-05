@@ -854,6 +854,10 @@ class DuckDBSnapshotBuilder:
     ) -> None:
         rows: list[tuple] = []
         for entry in entries:
+            effective_ranking_reason = cohort_ranking_reasons.get(
+                entry.result_id,
+                entry.ranking_exclusion_reason,
+            )
             detail = details_map.get(entry.result_id)
             has_plans = detail.has_plans if detail is not None else False
             plans_published = detail.plans_published if detail is not None else False
@@ -893,7 +897,7 @@ class DuckDBSnapshotBuilder:
                     entry.zero_timing_count,
                     entry.display_exclusion_reason,
                     entry.comparison_exclusion_reason,
-                    cohort_ranking_reasons.get(entry.result_id, entry.ranking_exclusion_reason),
+                    effective_ranking_reason,
                     entry.trust_label,
                     entry.visibility,
                     entry.funding,
@@ -913,7 +917,7 @@ class DuckDBSnapshotBuilder:
                     *_environment_facet_column_values(entry),
                     *_legacy_cost_deployment_column_values(entry),
                     entry.compliance_class,
-                    is_ranking_eligible(entry),
+                    is_ranking_eligible(entry) and effective_ranking_reason is None,
                     has_plans,
                     plans_published,
                     has_tuning,

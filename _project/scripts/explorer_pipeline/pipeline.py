@@ -34,6 +34,7 @@ from _project.scripts.explorer_pipeline.models import (
     canonical_phase,
     get_ranking_config,
     is_ranking_eligible,
+    ranking_exclusion_reason,
 )
 from _project.scripts.explorer_pipeline.ranking import RankedCohort, rank_platforms
 from _project.scripts.explorer_pipeline.transformer import (
@@ -391,7 +392,7 @@ def _build_benchmark_summaries(
         query_id_sets = {
             frozenset(dt.query_id for dt in detail.display_timings)
             for entry, detail in pairs
-            if is_ranking_eligible(entry)
+            if ranking_exclusion_reason(entry) is None
         }
         cohort_query_sets_match = len(query_id_sets) <= 1
 
