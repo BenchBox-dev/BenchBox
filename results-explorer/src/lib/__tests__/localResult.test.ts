@@ -209,6 +209,27 @@ describe("local result import", () => {
     });
   });
 
+  it("marks missing normalized cost as unavailable", async () => {
+    const preview = await parseLocalResultText(JSON.stringify(bundle()));
+
+    expect(preview.detail).toMatchObject({
+      normalized_cost_usd: null,
+      cost_model_version: "2025.11",
+      cost_model_source: "benchbox.core.cost.pricing",
+      cost_scope: "compute_only",
+      cost_status: "unavailable",
+      billing_unit: "unknown",
+      pricing_region: "unknown",
+    });
+  });
+
+  it("derives the CPU family from a recorded CPU model", async () => {
+    const preview = await parseLocalResultText(JSON.stringify(bundle()));
+
+    expect(preview.detail.environment.cpu_model).toBe("Apple M4");
+    expect(preview.detail.environment.cpu_family).toBe("apple_silicon");
+  });
+
   it("matches publication fallbacks for optional display fields", async () => {
     const value = bundle({
       benchmark: { id: "tpch", name: "TPC-H", scale_factor: 1 },
