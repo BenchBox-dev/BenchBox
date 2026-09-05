@@ -308,7 +308,14 @@ jobs:
           DOCS_ENDPOINT_DIGEST=$(sha256sum site/docs/index.html | cut -d ' ' -f 1)
           EXPLORER_ENDPOINT_DIGEST=$(sha256sum site/results/index.html | cut -d ' ' -f 1)
           LOCKFILE_DIGEST=$(sha256sum uv.lock | cut -d ' ' -f 1)
-          BUNDLE_COUNT=$(find results-data/bundles -type f -name '*.json' | wc -l | tr -d ' ')
+          BUNDLE_COUNT=$(find results-data/bundles -type f -name '*.json' \
+            ! -name '*.manifest.json' ! -name '*.applied.json' \
+            ! -name '*.plans.json' ! -name '*.tuning.json' | wc -l | tr -d ' ')
+          INVENTORY_COUNT=$(python3 -c "import json; print(json.load(open('results-data/corpus-inventory.json'))['summary']['total_bundles'])")
+          [ "$BUNDLE_COUNT" = "$INVENTORY_COUNT" ] || {
+            echo "::error::primary bundle count $BUNDLE_COUNT differs from validated inventory count $INVENTORY_COUNT"
+            exit 1
+          }
           PYTHON_VERSION=$(python3 -c 'import platform; print(platform.python_version())')
           NODE_VERSION=$(node --version | sed 's/^v//')
           UV_VERSION=$(uv --version | awk '{print $2}')
@@ -814,6 +821,41 @@ jobs:
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
         with:
           artifact_name: publication-rollback-pages-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Record rollback provider acknowledgement
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          DEPLOYMENT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          PAGES_ARTIFACT: publication-rollback-pages-${{ github.run_id }}-${{ github.run_attempt }}
+          BUILD_GENERATION: ${{ needs.build.outputs.generation }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+
+          receipt = {
+              'schema_version': '1.0',
+              'target': 'benchbox.dev',
+              'generation': int(os.environ['BUILD_GENERATION']),
+              'deployment_id': os.environ['DEPLOYMENT_ID'],
+              'page_url': os.environ['PAGE_URL'],
+              'artifact_name': os.environ['PAGES_ARTIFACT'],
+              'artifact_run_id': os.environ['GITHUB_RUN_ID'],
+              'status': 'DEPLOYED_ROLLBACK',
+          }
+          open('known-good-receipt/rollback-deployment-receipt.json', 'w').write(
+              json.dumps(receipt, sort_keys=True) + '\n'
+          )
+          PY
+
+      - name: Upload rollback provider acknowledgement
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: publication-rollback-deployment-receipt-${{ needs.build.outputs.generation }}
+          path: known-good-receipt/rollback-deployment-receipt.json
+          retention-days: 90
 
       - name: Probe restored required live routes
         shell: bash

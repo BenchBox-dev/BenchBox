@@ -140,6 +140,9 @@ def test_receipts_use_measured_provenance_and_valid_json_newlines() -> None:
     assert '"size": 0' not in text
     assert "LOCKFILE_DIGEST=$(sha256sum uv.lock" in text
     assert "CORPUS_DIGEST=$(sha256sum receipt-dist/corpus-file-digests.txt" in text
+    assert "! -name '*.manifest.json' ! -name '*.applied.json'" in text
+    assert "! -name '*.plans.json' ! -name '*.tuning.json'" in text
+    assert "['summary']['total_bundles']" in text
     assert 'tree_size("site")' in text
     assert " + '\\\\n'" not in text
     assert '"artifact_name": os.environ["PAGES_ARTIFACT"]' in text
@@ -211,6 +214,11 @@ def test_rollback_restores_only_a_cryptographically_attested_artifact() -> None:
     assert "Upload rollback audit receipt" in step_names
     assert "Deploy attested rollback artifact to GitHub Pages" in step_names
     assert "Upload attested rollback Pages artifact" in step_names
+    assert "Record rollback provider acknowledgement" in step_names
+    assert "Upload rollback provider acknowledgement" in step_names
+    assert step_names.index("Upload rollback provider acknowledgement") < step_names.index(
+        "Probe restored required live routes"
+    )
 
     assert "verify_live_receipt_signature" in run_bodies
     assert "known-good artifact digest mismatch" in run_bodies
