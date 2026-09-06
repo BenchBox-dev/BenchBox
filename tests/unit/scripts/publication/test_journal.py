@@ -160,6 +160,15 @@ def test_write_journal_update_happy_path(git_repo: Path, genesis_tx: tx_mod.Tran
     assert t1.transaction_id == "genesis-tx-0001"
     assert t2.transaction_id == "tx-0002"
 
+    identity = subprocess.run(
+        ["git", "show", "-s", "--format=%an <%ae>", new_commit_oid],
+        cwd=git_repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert identity == "BenchBox Publication Controller <publication-controller@benchbox.dev>"
+
 
 def test_cas_conflict_detection(git_repo: Path, genesis_tx: tx_mod.Transaction) -> None:
     base_oid = subprocess.run(
