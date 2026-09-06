@@ -290,6 +290,9 @@ jobs:
           valid, _ = verify_live_receipt_signature(receipt)
           target = receipt.get("target")
           target_host = target.get("host") if isinstance(target, dict) else target
+          if isinstance(target, dict) and not target_host:
+              base_url = target.get("base_url") or target.get("url")
+              target_host = str(base_url or "").rstrip("/").split("://")[-1]
           if not valid or target_host != "benchbox.dev":
               raise SystemExit(1)
           receipt_run = (
