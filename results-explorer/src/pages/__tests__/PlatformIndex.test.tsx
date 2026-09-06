@@ -118,7 +118,6 @@ describe("PlatformIndex - sortable table headers", () => {
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
     await waitFor(() => expect(document.title).toBe("DuckDB · BenchBox Results"));
     expect(getRowOrder(container)).toEqual(["r-null-geo", "r-tpch-fast", "r-tpch-slow", "r-ssb-mid"]);
-    expect(screen.getAllByLabelText(/Run age:/)).toHaveLength(4);
   });
 
   it("matches lower-case platform URLs against mixed-case platform IDs", async () => {

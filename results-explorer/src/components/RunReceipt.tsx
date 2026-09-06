@@ -19,7 +19,6 @@ import { visibleResultIdForRow } from "@/lib/resultLinks";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TuningVerificationBadge } from "@/components/TuningVerificationBadge";
 import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
-import { formatRunDateWithAge } from "@/lib/runAge";
 
 interface RunReceiptProps {
   detail: DetailResult;
@@ -101,7 +100,6 @@ export function RunReceipt({
       rows: [
         recordedRow("Benchmark", humanizeBenchmark(detail.benchmark)),
         recordedRow("Scale factor", `SF ${detail.scale_factor}`),
-        recordedRow("Run date", formatRunDateWithAge(detail.run_date)),
         formattedRow("Test phase", detail.test_type, formatEnumLabel),
         recordedRow("Query count", String(queryCount)),
         recordedRow("Measurement samples", String(sampleCount)),

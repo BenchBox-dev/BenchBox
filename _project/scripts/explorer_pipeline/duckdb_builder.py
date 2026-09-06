@@ -337,13 +337,7 @@ class DuckDBSnapshotBuilder:
                 self._create_schema(con)
                 self._create_metadata(con)
                 self._populate_supporting_tables(con, entries, details_map)
-                cohort_ranking_reasons = {
-                    row.result_id: row.ranking_exclusion_reason
-                    for _, summary in summaries
-                    for row in summary.platforms
-                    if row.ranking_exclusion_reason is not None
-                }
-                self._populate_results(con, entries, details_map, prefix, cohort_ranking_reasons)
+                self._populate_results(con, entries, details_map, prefix)
                 self._populate_result_basis_availability(con, entries, details_map)
                 self._populate_query_display_timings(con, entries, details_map)
                 self._populate_query_executions(con, entries, details_map)
@@ -850,14 +844,9 @@ class DuckDBSnapshotBuilder:
         entries: list[ManifestEntry],
         details_map: dict[str, DetailResult],
         bundle_url_prefix: str,
-        cohort_ranking_reasons: dict[str, str],
     ) -> None:
         rows: list[tuple] = []
         for entry in entries:
-            effective_ranking_reason = cohort_ranking_reasons.get(
-                entry.result_id,
-                entry.ranking_exclusion_reason,
-            )
             detail = details_map.get(entry.result_id)
             has_plans = detail.has_plans if detail is not None else False
             plans_published = detail.plans_published if detail is not None else False
@@ -897,7 +886,7 @@ class DuckDBSnapshotBuilder:
                     entry.zero_timing_count,
                     entry.display_exclusion_reason,
                     entry.comparison_exclusion_reason,
-                    effective_ranking_reason,
+                    entry.ranking_exclusion_reason,
                     entry.trust_label,
                     entry.visibility,
                     entry.funding,
@@ -917,7 +906,7 @@ class DuckDBSnapshotBuilder:
                     *_environment_facet_column_values(entry),
                     *_legacy_cost_deployment_column_values(entry),
                     entry.compliance_class,
-                    is_ranking_eligible(entry) and effective_ranking_reason is None,
+                    is_ranking_eligible(entry),
                     has_plans,
                     plans_published,
                     has_tuning,
@@ -1060,8 +1049,8 @@ class DuckDBSnapshotBuilder:
                     if entry is not None
                     else _platform_row_timing_eligibility(platform_row, len(summary.query_ids))
                 )
-                ranking_reason = ranked_row.ranking_exclusion_reason or (
-                    entry.ranking_exclusion_reason if entry is not None else None
+                ranking_reason = (
+                    entry.ranking_exclusion_reason if entry is not None else ranked_row.ranking_exclusion_reason
                 )
                 ps = platform_row.percentile_stats
                 rows.append(
@@ -1142,8 +1131,7 @@ class DuckDBSnapshotBuilder:
                 )
                 ranking_context_by_result[ranked_row.row.result_id] = (
                     timing_contract,
-                    ranked_row.ranking_exclusion_reason
-                    or (entry.ranking_exclusion_reason if entry is not None else None),
+                    entry.ranking_exclusion_reason if entry is not None else ranked_row.ranking_exclusion_reason,
                     ranked.total_ranked,
                     cohort_reason,
                 )

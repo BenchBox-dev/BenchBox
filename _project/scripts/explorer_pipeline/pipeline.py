@@ -34,7 +34,6 @@ from _project.scripts.explorer_pipeline.models import (
     canonical_phase,
     get_ranking_config,
     is_ranking_eligible,
-    ranking_exclusion_reason,
 )
 from _project.scripts.explorer_pipeline.ranking import RankedCohort, rank_platforms
 from _project.scripts.explorer_pipeline.transformer import (
@@ -389,23 +388,6 @@ def _build_benchmark_summaries(
             {dt.query_id for _, detail in pairs for dt in detail.display_timings},
             key=_natural_sort_key,
         )
-        # A deliberately partial or otherwise outlier run must not poison the
-        # complete cohort.  Use a query set only when it has a strict majority
-        # among rows that are otherwise eligible for ranking; otherwise fail
-        # closed and mark every row as mismatched.  This preserves the old
-        # all-different behavior while allowing a single partial fixture to be
-        # shown as evidence without suppressing valid peer rankings.
-        query_set_counts: dict[frozenset[str], int] = {}
-        for entry, detail in pairs:
-            if ranking_exclusion_reason(entry) is None:
-                query_set = frozenset(dt.query_id for dt in detail.display_timings)
-                query_set_counts[query_set] = query_set_counts.get(query_set, 0) + 1
-        canonical_query_set: frozenset[str] | None = None
-        if query_set_counts:
-            candidate, candidate_count = max(query_set_counts.items(), key=lambda item: item[1])
-            eligible_count = sum(query_set_counts.values())
-            if candidate_count > eligible_count - candidate_count:
-                canonical_query_set = candidate
 
         platform_rows: list[PlatformRow] = []
         for entry, detail in pairs:
@@ -413,10 +395,6 @@ def _build_benchmark_summaries(
             for dt in detail.display_timings:
                 timings[dt.query_id] = dt.display_ms
 
-            row_ranking_reason = entry.ranking_exclusion_reason
-            row_query_set = frozenset(dt.query_id for dt in detail.display_timings)
-            if row_ranking_reason is None and (canonical_query_set is None or row_query_set != canonical_query_set):
-                row_ranking_reason = "mismatched_query_set"
             row = PlatformRow(
                 result_id=entry.result_id,
                 short_id=full_to_short.get(entry.result_id, ""),
@@ -428,8 +406,7 @@ def _build_benchmark_summaries(
                 execution_mode=entry.execution_mode,
                 trust_label=entry.trust_label,
                 run_date=entry.run_date,
-                is_ranking_eligible=is_ranking_eligible(entry) and row_ranking_reason is None,
-                ranking_exclusion_reason=row_ranking_reason,
+                is_ranking_eligible=is_ranking_eligible(entry),
                 power_score=entry.power_score,
                 display_geomean_ms=entry.display_geomean_ms,
                 sample_geomean_ms=entry.geomean_ms,

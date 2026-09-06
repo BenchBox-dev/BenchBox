@@ -1,5 +1,4 @@
 import { canonicalBenchmarkSlug, canonicalPhase, formatBenchmarkLabel } from "@/lib/displayLabels";
-import { formatRunDateWithAge } from "@/lib/runAge";
 import {
   basesEqual,
   formatBasisLabel,
@@ -242,8 +241,7 @@ export function compareSelectionLabel(input: CompareSelectionLabelInput): string
   const scale =
     input.scaleFactor === null || input.scaleFactor === undefined ? "" : String(input.scaleFactor).trim();
   const phase = (input.phase ?? "").toString().trim();
-  const rawRunDate = (input.runDate ?? "").toString();
-  const runDate = rawRunDate === "" ? "" : formatRunDateWithAge(rawRunDate);
+  const runDate = (input.runDate ?? "").toString().slice(0, 10);
   const resultId = (input.resultId ?? "").toString().trim();
 
   if (platform !== "") parts.push(platform);

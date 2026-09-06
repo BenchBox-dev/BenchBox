@@ -1,5 +1,3 @@
-import { formatRunDateWithAge } from "@/lib/runAge";
-
 export const MAX_COMPARE_SELECTIONS = 4;
 
 export interface ResultLinkSource {
@@ -33,7 +31,7 @@ export function visibleResultIdForRow(row: ResultLinkSource): string {
 
 export function resultIdentityAriaLabel(row: ResultLinkSource, target: "details" | "receipt"): string {
   const platform = row.platform ? `${row.platform} ` : "";
-  const date = row.run_date ? ` from ${formatRunDateWithAge(row.run_date)}` : "";
+  const date = row.run_date ? ` from ${row.run_date.slice(0, 10)}` : "";
   return `Open ${target} for ${platform}public ID ${visibleResultIdForRow(row)}${date}`;
 }
 

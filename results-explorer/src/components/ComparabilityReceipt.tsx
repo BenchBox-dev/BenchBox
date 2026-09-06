@@ -13,7 +13,6 @@ import {
 } from "@/lib/displayLabels";
 import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
 import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
-import { formatRunDate, formatRunDateWithAge } from "@/lib/runAge";
 
 interface ComparabilityReceiptProps {
   results: DetailResult[];
@@ -439,26 +438,24 @@ function compareValues(
 }
 
 function buildDateWindowField(results: DetailResult[]): ComparabilityField {
-  const dates = results.map((result) => formatRunDate(result.run_date));
+  const dates = results.map((result) => result.run_date.slice(0, 10));
   const uniqueDates = [...new Set(dates)];
   if (uniqueDates.length === 1) {
     return {
       label: "Date window",
       status: "match",
-      summary: formatRunDateWithAge(results[0]!.run_date),
+      summary: uniqueDates[0]!,
     };
   }
   const sortedDates = [...uniqueDates].sort();
-  const labelForDate = (date: string) =>
-    formatRunDateWithAge(results.find((result) => formatRunDate(result.run_date) === date)?.run_date);
   return {
     label: "Date window",
     status: "diff",
-    summary: `${labelForDate(sortedDates[0]!)} to ${labelForDate(sortedDates[sortedDates.length - 1]!)}`,
+    summary: `${sortedDates[0]} to ${sortedDates[sortedDates.length - 1]}`,
     detail: formatPerPlatform(
       results.map((result) => ({
         platform: result.platform,
-        value: formatRunDateWithAge(result.run_date),
+        value: result.run_date.slice(0, 10),
       })),
     ),
   };

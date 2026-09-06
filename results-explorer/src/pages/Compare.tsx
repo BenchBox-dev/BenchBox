@@ -65,7 +65,6 @@ import { isValidTimingValue, timingValueForQuery } from "@/lib/displayEligibilit
 import { formatWarningClassSummary, formatWarningCount } from "@/lib/copyFormatters";
 import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
-import { RunDateWithAge } from "@/components/RunAge";
 import { Select } from "@/components/Select";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
@@ -819,7 +818,7 @@ export function Compare({ url }: CompareProps) {
                 </div>
               </div>
               <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]">
-                <RunDateWithAge runDate={r.runDate} />
+                {r.runDate.slice(0, 10)}
                 {r.driverVersion && !r.label.includes(`v${r.driverVersion}`) && ` · v${r.driverVersion}`}
               </p>
               <p class="mb-3 font-mono text-xs text-[var(--bb-data-fg-muted)]">Public ID {r.publicId}</p>

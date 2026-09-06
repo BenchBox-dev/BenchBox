@@ -7,7 +7,6 @@ ManifestEntry and DetailResult shapes consumed by the explorer frontend.
 from __future__ import annotations
 
 import copy
-import datetime as _dt
 import hashlib
 import json
 import logging
@@ -39,10 +38,6 @@ from benchbox.core.tuning.modes import is_canonical_mode
 from benchbox.validation.bundle import APPLIED_COMPANION_MAX_BYTES, APPLIED_RECEIPT_MAX_ENTRIES, COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
-
-_UTC = _dt.timezone.utc
-_DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
-_TIMESTAMP_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})?$")
 
 # ---------------------------------------------------------------------------
 # Closed CPU-family vocabulary and normalization rules
@@ -314,37 +309,11 @@ def _sha256_prefix(raw: bytes, length: int = 8) -> str:
     return hashlib.sha256(raw).hexdigest()[:length]
 
 
-def _utc_run_date_from_timestamp(timestamp: object) -> str:
-    """Return the strict UTC calendar date for a bundle ``run.timestamp``.
-
-    ``YYYY-MM-DD`` is already an explicit UTC calendar date. Complete ISO
-    timestamps with ``Z`` or an offset are converted to UTC; complete legacy
-    timestamps without an offset are interpreted as UTC. Invalid, partial,
-    and trailing forms fail ingestion rather than being silently tokenized.
-    """
-    if not isinstance(timestamp, str):
-        raise ValueError(f"run.timestamp must be a string, got {timestamp!r}")
-    if _DATE_RE.fullmatch(timestamp):
-        try:
-            return _dt.date.fromisoformat(timestamp).isoformat()
-        except ValueError as exc:
-            raise ValueError(f"invalid run.timestamp: {timestamp!r}") from exc
-    if not _TIMESTAMP_RE.fullmatch(timestamp):
-        raise ValueError(f"invalid run.timestamp: {timestamp!r}")
-    try:
-        parsed = _dt.datetime.fromisoformat(f"{timestamp[:-1]}+00:00" if timestamp.endswith("Z") else timestamp)
-    except ValueError as exc:
-        raise ValueError(f"invalid run.timestamp: {timestamp!r}") from exc
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=_UTC)
-    return parsed.astimezone(_UTC).date().isoformat()
-
-
-def _run_date_from_timestamp(timestamp: object) -> str:
-    """Return the stable source-date token used in public result IDs."""
-    _utc_run_date_from_timestamp(timestamp)
-    assert isinstance(timestamp, str)
-    return timestamp[:10].replace("-", "")
+def _run_date_from_timestamp(timestamp: str) -> str:
+    """Extract YYYYMMDD from an ISO timestamp string."""
+    # Timestamp may be "2026-01-15T12:00:00" or "2026-01-15T12:00:00.123456"
+    date_part = timestamp[:10]  # "YYYY-MM-DD"
+    return date_part.replace("-", "")
 
 
 def _driver_version(data: dict[str, Any]) -> str | None:
@@ -1395,7 +1364,7 @@ class BundleTransformer:
         benchmark = bundle_data.get("benchmark", {}).get("id", "unknown")
         platform = str(bundle_data.get("platform", {}).get("name", "unknown")).lower().replace(" ", "-")
         scale_factor = bundle_data.get("benchmark", {}).get("scale_factor", 0.0)
-        timestamp = bundle_data.get("run", {}).get("timestamp")
+        timestamp = bundle_data.get("run", {}).get("timestamp", "19700101T000000")
         run_date = _run_date_from_timestamp(timestamp)
         sha_prefix = _sha256_prefix(file_raw)
         return f"{benchmark}-{platform}-sf{scale_factor}-{run_date}-{sha_prefix}"
@@ -1417,8 +1386,8 @@ class BundleTransformer:
         benchmark = bundle_data.get("benchmark", {}).get("id", "unknown")
         scale_factor = float(bundle_data.get("benchmark", {}).get("scale_factor", 0.0))
         platform = str(bundle_data.get("platform", {}).get("name", "unknown"))
-        timestamp = bundle_data.get("run", {}).get("timestamp")
-        run_date = _utc_run_date_from_timestamp(timestamp)
+        timestamp = bundle_data.get("run", {}).get("timestamp", "1970-01-01T00:00:00")
+        run_date = timestamp[:10]
         total_duration_ms = bundle_data.get("run", {}).get("total_duration_ms", 0.0)
         total_duration_s = float(total_duration_ms) / 1000.0
 
@@ -1501,8 +1470,8 @@ class BundleTransformer:
         benchmark = bundle_data.get("benchmark", {}).get("id", "unknown")
         scale_factor = float(bundle_data.get("benchmark", {}).get("scale_factor", 0.0))
         platform = str(bundle_data.get("platform", {}).get("name", "unknown"))
-        timestamp = bundle_data.get("run", {}).get("timestamp")
-        run_date = _utc_run_date_from_timestamp(timestamp)
+        timestamp = bundle_data.get("run", {}).get("timestamp", "1970-01-01T00:00:00")
+        run_date = timestamp[:10]
         total_duration_ms = bundle_data.get("run", {}).get("total_duration_ms", 0.0)
         total_duration_s = float(total_duration_ms) / 1000.0
 

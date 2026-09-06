@@ -15,7 +15,7 @@ import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
 import { formatLatencyMs } from "@/lib/metricFormatters";
-import { preserveUniqueAfterTruncation } from "@/lib/runIdentity";
+import { truncateRunIdentityLabel } from "@/lib/runIdentity";
 
 // Neutral gray for opacity-only legend swatches (shows opacity levels, not platform identity).
 const LEGEND_SWATCH_COLOR = "var(--bb-chart-axis)";
@@ -75,10 +75,6 @@ export function PercentileLadder({ rows }: Props) {
   const totalHeight = PADDING_TOP + rows.length * ROW_H + AXIS_H;
 
   const axisTicks = logLatencyTicks(logScale, 0.1);
-  const displayLabels = preserveUniqueAfterTruncation(
-    rows.map((row) => row.displayLabel ?? row.platform),
-    18,
-  );
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
@@ -123,7 +119,10 @@ export function PercentileLadder({ rows }: Props) {
                 class="text-xs fill-[var(--bb-data-fg-primary)]"
                 style={{ fontSize: "11px" }}
               >
-                {displayLabels[ri] ?? row.platform}
+                {(() => {
+                  const label = row.displayLabel ?? row.platform;
+                  return truncateRunIdentityLabel(label, 18);
+                })()}
               </text>
 
               {/* Rung bars */}

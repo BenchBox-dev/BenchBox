@@ -195,7 +195,7 @@ describe("MetaLeaderboard", () => {
         mode="times"
         onModeChange={vi.fn()}
         resultMetadataById={new Map([
-          ["r1", { trust_label: "maintainer-run", validation_status: "exact", run_date: "2026-04-01" }],
+          ["r1", { trust_label: "maintainer-run", validation_status: "exact" }],
           ["r2", { trust_label: "community-submission", validation_status: "loose" }],
         ])}
       />,
@@ -207,8 +207,6 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("Community")).toBeTruthy();
     expect(screen.getByText("exact")).toBeTruthy();
     expect(screen.getByText("loose")).toBeTruthy();
-    expect(screen.getAllByRole("gridcell", { name: /Run age:/ })).toHaveLength(2);
-    expect(screen.getByText(/Run age: .*ago/)).toBeTruthy();
   });
 
   it("shows coverage counts and can sort by covered ranking count", () => {
@@ -662,7 +660,7 @@ describe("MetaLeaderboard", () => {
         mode="times"
         onModeChange={vi.fn()}
         resultMetadataById={new Map([
-          ["polars-tpch-r1", { trust_label: "community-submission", validation_status: "passed", run_date: "2026-04-01" }],
+          ["polars-tpch-r1", { trust_label: "community-submission", validation_status: "passed" }],
         ])}
       />,
     );
@@ -675,8 +673,7 @@ describe("MetaLeaderboard", () => {
     const cell = screen.getByRole("gridcell", {
         name: /Polars has published evidence for TPC-H SF0\.1, but it is excluded: Results from this source are not included in rankings\./,
     });
-    expect(cell.textContent).toContain("Excluded");
-    expect(cell.textContent).toMatch(/Run age: .*ago/);
+    expect(cell.textContent).toBe("Excluded");
     expect(cell.getAttribute("title")).toContain("Results from this source are not included in rankings.");
     expect(cell.textContent).not.toContain("No run");
     expect((cell.querySelector("a") as HTMLAnchorElement | null)?.getAttribute("href")).toBe(
@@ -699,13 +696,12 @@ describe("MetaLeaderboard", () => {
       />,
     );
 
-    const failedCell = screen.getByRole("gridcell", { name: /DuckDB times for ClickBench SF0\.1: 10 ms/ });
+    const failedCell = screen.getByRole("gridcell", { name: "DuckDB times for ClickBench SF0.1: 10 ms" });
     const failedBadge = failedCell.querySelector('[data-role="validation"]');
     expect(failedBadge?.textContent).toBe("failed");
     expect(failedBadge?.getAttribute("data-tone")).toBe("danger");
-    expect(failedCell.textContent).toContain("Run age: not recorded");
 
-    const passedCell = screen.getByRole("gridcell", { name: /SQLite times for ClickBench SF0\.1: 20 ms/ });
+    const passedCell = screen.getByRole("gridcell", { name: "SQLite times for ClickBench SF0.1: 20 ms" });
     expect(passedCell.querySelector('[data-role="validation"]')).toBeNull();
     expect(passedCell.textContent).toContain("Community");
   });
