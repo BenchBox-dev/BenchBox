@@ -875,7 +875,7 @@ ALTER TABLE hits ALTER COLUMN ResolutionWidth TYPE USMALLINT;
 - **[AMPLab Benchmark](amplab.md)** - Big data processing benchmark
 - **[Star Schema Benchmark (SSB)](ssb.md)** - OLAP focused testing
 - **[Join Order Benchmark](join-order.md)** - Real-world IMDB join testing
-- **[Benchmark Catalog](README.md)** - Complete benchmark list
+- **[Benchmark Catalog](index.md)** - Complete benchmark list
 
 ### Understanding BenchBox
 

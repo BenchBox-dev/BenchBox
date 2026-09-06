@@ -100,7 +100,7 @@ Top-level object containing complete benchmark execution information.
 }
 ```
 
-See: [Result Schema v1 Reference](../reference/result_schema_v1.md)
+See: [Result Schema v1 Reference](../reference/result-schema-v1.md)
 
 ### QueryResult
 
@@ -509,7 +509,7 @@ BenchBox uses schema versioning to manage result format evolution.
 
 ## Related Documentation
 
-- [Result Schema v1 Reference](../reference/result_schema_v1.md) - Complete field documentation
+- [Result Schema v1 Reference](../reference/result-schema-v1.md) - Complete field documentation
 - [Architecture](architecture.md) - How results fit into system design
 - [Workflow](workflow.md) - Result collection in different workflows
 - [Performance Monitoring](../advanced/performance.md) - Analyzing results over time

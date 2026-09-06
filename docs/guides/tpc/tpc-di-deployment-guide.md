@@ -337,31 +337,21 @@ data_formats:
 
 ```python
 # config.py
-from benchbox.core.tpcdi.benchmark import TPCDIBenchmark, ParallelBenchmarkConfig, ParallelExecutionMode, ParallelWorkloadType
+from pathlib import Path
 
-# Basic configuration
-config = {
-    'scale_factor': 1.0,
-    'output_dir': '/data/tpcdi'
-}
+from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
+from benchbox.core.tpcdi.config import TPCDIConfig
 
-# Parallel processing configuration
-parallel_config = ParallelBenchmarkConfig(
-    mode=ParallelExecutionMode.ADAPTIVE,
+# Unified configuration with parallel processing enabled
+config = TPCDIConfig(
+    scale_factor=1.0,
+    output_dir=Path('/data/tpcdi'),
+    enable_parallel=True,
     max_workers=4,
-    workload_type=ParallelWorkloadType.MIXED,
-    enable_parallel_etl=True,
-    enable_parallel_queries=True,
-    enable_parallel_data_generation=True,
-    timeout_seconds=3600,
-    memory_limit_mb=8192
 )
 
 # Create benchmark instance
-benchmark = TPCDIBenchmark(
-    parallel_config=parallel_config,
-    **config
-)
+benchmark = TPCDIBenchmark(config=config)
 ```
 
 ## Deployment Scenarios
@@ -396,24 +386,23 @@ with sqlite3.connect(':memory:') as conn:
 # test_setup.py
 import os
 from pathlib import Path
-from benchbox.core.tpcdi.benchmark import TPCDIBenchmark, ParallelBenchmarkConfig
+
+from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
+from benchbox.core.tpcdi.config import TPCDIConfig
 
 # Configure for testing environment
 test_dir = Path(os.getenv('TEST_DATA_DIR', '/tmp/tpcdi_test'))
 test_dir.mkdir(exist_ok=True)
 
 # Test configuration with moderate scale
-parallel_config = ParallelBenchmarkConfig(
-    max_workers=2,
-    enable_parallel_etl=True,
-    timeout_seconds=600  # 10 minutes for tests
-)
-
-benchmark = TPCDIBenchmark(
+config = TPCDIConfig(
     scale_factor=0.1,
     output_dir=test_dir,
-    parallel_config=parallel_config
+    max_workers=2,
+    enable_parallel=True,
 )
+
+benchmark = TPCDIBenchmark(config=config)
 
 # Run systematic test suite
 def run_test_suite():
@@ -446,10 +435,12 @@ if __name__ == "__main__":
 
 ```python
 # staging_setup.py
-import os
 import logging
+import os
 from pathlib import Path
-from benchbox.core.tpcdi.benchmark import TPCDIBenchmark, ParallelBenchmarkConfig, ParallelExecutionMode
+
+from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
+from benchbox.core.tpcdi.config import TPCDIConfig
 
 # Configure logging
 logging.basicConfig(
@@ -465,20 +456,14 @@ logging.basicConfig(
 staging_dir = Path(os.getenv('STAGING_DATA_DIR', '/data/staging/tpcdi'))
 staging_dir.mkdir(parents=True, exist_ok=True)
 
-parallel_config = ParallelBenchmarkConfig(
-    mode=ParallelExecutionMode.ADAPTIVE,
-    max_workers=int(os.getenv('TPCDI_WORKERS', '4')),
-    enable_parallel_etl=True,
-    enable_parallel_queries=True,
-    timeout_seconds=1800,  # 30 minutes
-    memory_limit_mb=int(os.getenv('TPCDI_MEMORY_LIMIT', '4096'))
-)
-
-benchmark = TPCDIBenchmark(
+config = TPCDIConfig(
     scale_factor=float(os.getenv('TPCDI_SCALE_FACTOR', '0.5')),
     output_dir=staging_dir,
-    parallel_config=parallel_config
+    max_workers=int(os.getenv('TPCDI_WORKERS', '4')),
+    enable_parallel=True,
 )
+
+benchmark = TPCDIBenchmark(config=config)
 
 # Database connection (PostgreSQL example)
 import psycopg2
@@ -548,7 +533,8 @@ import signal
 import json
 from pathlib import Path
 from datetime import datetime
-from benchbox.core.tpcdi.benchmark import TPCDIBenchmark, ParallelBenchmarkConfig, ParallelExecutionMode
+from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
+from benchbox.core.tpcdi.config import TPCDIConfig
 
 # Production logging configuration
 log_dir = Path('/var/log/tpcdi')
@@ -584,25 +570,16 @@ class ProductionTPCDI:
         data_dir = Path(os.getenv('TPCDI_DATA_DIR', '/data/tpcdi'))
         data_dir.mkdir(parents=True, exist_ok=True)
 
-        parallel_config = ParallelBenchmarkConfig(
-            mode=ParallelExecutionMode.ADAPTIVE,
-            max_workers=int(os.getenv('TPCDI_WORKERS', '8')),
-            workload_type=ParallelWorkloadType.MIXED,
-            enable_parallel_etl=True,
-            enable_parallel_queries=True,
-            enable_parallel_data_generation=True,
-            timeout_seconds=int(os.getenv('TPCDI_TIMEOUT', '7200')),  # 2 hours
-            memory_limit_mb=int(os.getenv('TPCDI_MEMORY_LIMIT', '16384')),
-            enable_performance_monitoring=True,
-            enable_error_recovery=True,
-            max_retries=3
-        )
-
-        self.benchmark = TPCDIBenchmark(
+        config = TPCDIConfig(
             scale_factor=float(os.getenv('TPCDI_SCALE_FACTOR', '10.0')),
             output_dir=data_dir,
-            parallel_config=parallel_config
+            max_workers=int(os.getenv('TPCDI_WORKERS', '8')),
+            enable_parallel=True,
+            chunk_size=20000,
+            optimize_memory=True,
         )
+
+        self.benchmark = TPCDIBenchmark(config=config)
 
         self.logger.info(f"Production TPC-DI benchmark initialized with scale factor {self.benchmark.scale_factor}")
 
@@ -755,9 +732,8 @@ if __name__ == "__main__":
 
 ```python
 # memory_tuning.py
-import psutil
 import os
-from benchbox.core.tpcdi.benchmark import ParallelBenchmarkConfig
+import psutil
 
 def get_appropriate_memory_config():
     """Calculate appropriate memory configuration based on system resources."""
@@ -798,9 +774,10 @@ print(f"Recommended configuration: {memory_config}")
 
 ```python
 # cpu_tuning.py
-import os
 import multiprocessing
-from benchbox.core.tpcdi.benchmark import ParallelBenchmarkConfig, ParallelExecutionMode, ParallelWorkloadType
+import os
+
+from benchbox.core.tpcdi.config import TPCDIConfig
 
 def get_appropriate_cpu_config():
     """Calculate appropriate CPU configuration."""
@@ -808,29 +785,17 @@ def get_appropriate_cpu_config():
 
     # Determine appropriate worker configuration
     if cpu_count >= 16:  # High-end servers
-        etl_workers = min(12, cpu_count - 4)  # Reserve 4 cores for system
-        query_workers = min(8, cpu_count // 2)
-        mode = ParallelExecutionMode.ADAPTIVE
+        workers = min(12, cpu_count - 4)  # Reserve 4 cores for system
     elif cpu_count >= 8:  # Mid-range systems
-        etl_workers = min(6, cpu_count - 2)
-        query_workers = min(4, cpu_count // 2)
-        mode = ParallelExecutionMode.ADAPTIVE
+        workers = min(6, cpu_count - 2)
     elif cpu_count >= 4:  # Standard systems
-        etl_workers = min(3, cpu_count - 1)
-        query_workers = 2
-        mode = ParallelExecutionMode.THREAD_POOL
+        workers = min(3, cpu_count - 1)
     else:  # Low-end systems
-        etl_workers = 1
-        query_workers = 1
-        mode = ParallelExecutionMode.SEQUENTIAL
+        workers = 1
 
-    return ParallelBenchmarkConfig(
-        mode=mode,
-        max_workers=etl_workers,
-        workload_type=ParallelWorkloadType.MIXED,
-        enable_parallel_etl=etl_workers > 1,
-        enable_parallel_queries=query_workers > 1,
-        query_batch_size=min(5, query_workers)
+    return TPCDIConfig(
+        enable_parallel=workers > 1,
+        max_workers=workers,
     )
 
 # Apply CPU optimization
@@ -1194,14 +1159,15 @@ MemoryError: Unable to allocate array
 # Reduce scale factor
 benchmark = TPCDIBenchmark(scale_factor=0.1)  # Instead of 1.0
 
-# Enable memory limiting
-parallel_config = ParallelBenchmarkConfig(
-    memory_limit_mb=4096,  # Limit to 4GB
-    max_workers=2  # Reduce parallelism
+# Configure memory optimization and reduce workers
+config = TPCDIConfig(
+    scale_factor=0.1,
+    optimize_memory=True,
+    max_workers=2,
+    enable_parallel=True,
+    chunk_size=5000,  # Process data in smaller batches
 )
-
-# Process data in smaller batches
-benchmark.batch_size = 5000  # Reduce batch size
+benchmark = TPCDIBenchmark(config=config)
 ```
 
 #### 2. Performance Issues
@@ -1213,17 +1179,17 @@ ETL pipeline taking hours to complete
 
 **Solutions**:
 ```python
-# Enable parallel processing
-parallel_config = ParallelBenchmarkConfig(
-    mode=ParallelExecutionMode.ADAPTIVE,
-    enable_parallel_etl=True,
-    max_workers=multiprocessing.cpu_count()
-)
+import multiprocessing
 
-# Optimize database settings
-# Use faster storage (SSD vs HDD)
-# Increase database buffer sizes
-# Add appropriate indexes
+from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
+from benchbox.core.tpcdi.config import TPCDIConfig
+
+# Enable parallel processing across available CPU cores
+config = TPCDIConfig(
+    enable_parallel=True,
+    max_workers=multiprocessing.cpu_count(),
+)
+benchmark = TPCDIBenchmark(config=config)
 ```
 
 #### 3. File Permission Issues

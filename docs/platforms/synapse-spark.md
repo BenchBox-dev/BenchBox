@@ -255,5 +255,5 @@ Synapse Spark uses vCore-hour billing:
 
 - [Microsoft Fabric Spark](fabric-spark.md) - SaaS Spark platform
 - [Apache Spark Platform](spark.md) - Local/cluster Spark usage
-- [Azure Synapse SQL](synapse.md) - Dedicated SQL Pool
+- [Azure Synapse SQL](azure-platforms.md) - Dedicated SQL Pool
 - [Cloud Platforms Overview](cloud-platforms.rst) - All cloud platforms

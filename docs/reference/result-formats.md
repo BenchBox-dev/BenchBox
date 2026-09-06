@@ -672,5 +672,5 @@ print(f'PASS: Power@Size {power}')
 ## Related Documentation
 
 - [Getting Started](../usage/getting-started.md)
-- [Python API](python-api/results.md)
+- [Python API](python-api/results.rst)
 - [Understanding Results](../tutorials/understanding-results.md)
