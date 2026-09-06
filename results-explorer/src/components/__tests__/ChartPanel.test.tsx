@@ -922,4 +922,101 @@ describe("ChartPanel", () => {
 
     expect(screen.getByRole("img", { name: "Cumulative distribution of per-query latency" })).toBeTruthy();
   });
+
+  it("hides power scores for rows excluded from ranking in the long summary", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            ranking: { primary_metric: "power_score", secondary_metric: "display_geomean_ms", primary_order: "desc" },
+            platforms: [
+              makePlatformRow({ result_id: "rankable", platform: "Rankable", power_score: 1000 }),
+              makePlatformRow({
+                result_id: "excluded",
+                platform: "Excluded",
+                power_score: 9000,
+                ranking_exclusion_reason: "trust_not_rankable",
+              }),
+            ],
+          }),
+        }}
+        summaryLayout="long"
+      />,
+    );
+
+    const table = screen.getByRole("table", { name: "Speed and throughput by engine" });
+    expect(within(table).getByText("1,000")).toBeTruthy();
+    expect(within(table).queryByText("9,000")).toBeNull();
+  });
+
+  it("uses only eligible rows in long-layout thumbnails", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            platforms: [
+              makePlatformRow({ result_id: "rankable", platform: "Rankable", power_score: 1000 }),
+              makePlatformRow({
+                result_id: "excluded",
+                platform: "Excluded",
+                power_score: 9000,
+                ranking_exclusion_reason: "trust_not_rankable",
+              }),
+            ],
+          }),
+        }}
+        summaryLayout="long"
+      />,
+    );
+
+    const ranks = screen.getByTestId("summary-chart-preview-rank_table");
+    const grid = within(ranks).getByLabelText("Rank table thumbnail");
+    expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(1, minmax(0, 1fr))" });
+  });
+
+  it("keeps long-layout cost and trend thumbnails aligned with the ranking metric", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            ranking: { primary_metric: "power_score", secondary_metric: "display_geomean_ms", primary_order: "desc" },
+            platforms: [
+              makePlatformRow({
+                result_id: "high-power",
+                platform: "High power",
+                power_score: 9000,
+                display_geomean_ms: 100,
+                normalized_cost_usd: 1,
+              }),
+              makePlatformRow({
+                result_id: "low-power",
+                platform: "Low power",
+                power_score: 1000,
+                display_geomean_ms: 10,
+                normalized_cost_usd: 2,
+              }),
+            ],
+          }),
+          historical: [
+            makeHistoricalEntry({ result_id: "hist-1", run_date: "2026-04-17T12:00:00Z", power_score: 1000 }),
+            makeHistoricalEntry({ result_id: "hist-2", run_date: "2026-04-18T12:00:00Z", power_score: 2000 }),
+          ],
+        }}
+        summaryLayout="long"
+      />,
+    );
+
+    const cost = screen.getByTestId("summary-chart-preview-cost_scatter");
+    const highPowerDot = within(cost).getByTitle("High power") as HTMLElement;
+    const lowPowerDot = within(cost).getByTitle("Low power") as HTMLElement;
+    expect(Number.parseFloat(highPowerDot.style.top)).toBeLessThan(Number.parseFloat(lowPowerDot.style.top));
+
+    const trend = within(screen.getByTestId("summary-chart-preview-time_series")).getByRole("img", {
+      name: "Trend thumbnail",
+    });
+    expect(trend.querySelector("path")?.getAttribute("d")).toContain("M12.0,72.0 L228.0,10.0");
+  });
 });

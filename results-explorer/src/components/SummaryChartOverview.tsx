@@ -168,7 +168,9 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
                 const sourceIndex = rowIndexByResultId.get(platform.result_id) ?? rowIndex;
                 const color = paletteColor(sourceIndex);
                 const displayValue = validPrimaryMetricValue(platform, "display_geomean_ms");
-                const powerValue = validPrimaryMetricValue(platform, "power_score");
+                const powerValue = isRankable(platform)
+                  ? validPrimaryMetricValue(platform, "power_score")
+                  : null;
                 const displayFraction = displayValue !== null && displayScale
                   ? latencyScaleFraction(displayValue, displayScale)
                   : null;
@@ -302,11 +304,11 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
                           {CHART_QUESTIONS[chart.id] ?? chart.description}
                         </p>
                       </div>
-                          <ChartThumbnail
-                            chartId={chart.id}
-                            summary={summary}
-                            historical={context.historical ?? []}
-                          />
+                      <ChartThumbnail
+                        chartId={chart.id}
+                        summary={chartSummary}
+                        historical={context.historical ?? []}
+                      />
                       <span class="mt-auto pt-3 text-xs font-medium text-[var(--bb-accent)]">
                         {isOpen ? "Close full chart" : "Open full chart ↗"}
                       </span>
@@ -735,7 +737,8 @@ function MiniTrend({ summary, historical }: { summary: BenchmarkSummary; histori
           if (points.length < 2) return null;
           const d = points.map((entry, pointIndex) => {
             const x = 12 + (pointIndex / Math.max(points.length - 1, 1)) * 216;
-            const y = 10 + ((max - (entry[metric] as number)) / span) * 62;
+            const normalized = ((entry[metric] as number) - min) / span;
+            const y = metric === "power_score" ? 10 + (1 - normalized) * 62 : 10 + normalized * 62;
             return `${pointIndex === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
           }).join(" ");
           return <path key={index} d={d} fill="none" stroke={timeSeriesColor(index)} strokeWidth="1.5" />;
@@ -786,25 +789,29 @@ function MiniRanks({ summary }: { summary: BenchmarkSummary }) {
 }
 
 function MiniCost({ summary }: { summary: BenchmarkSummary }) {
+  const metric = summary.ranking?.primary_metric === "power_score" ? "power_score" : "display_geomean_ms";
   const points = summary.platforms.filter(
     (platform) =>
       Number.isFinite(platform.normalized_cost_usd) &&
       platform.normalized_cost_usd !== null &&
-      isValidTimingValue(platform.display_geomean_ms),
+      validPrimaryMetricValue(platform, metric) !== null,
   );
   if (points.length === 0) return <MiniUnavailable label="No normalized cost recorded" />;
   const costs = points.map((point) => point.normalized_cost_usd as number);
-  const timings = points.map((point) => point.display_geomean_ms as number);
+  const metricValues = points.map((point) => validPrimaryMetricValue(point, metric) as number);
   const minCost = Math.min(...costs);
   const maxCost = Math.max(...costs);
-  const minTiming = Math.min(...timings);
-  const maxTiming = Math.max(...timings);
+  const minMetric = Math.min(...metricValues);
+  const maxMetric = Math.max(...metricValues);
+  const higherIsBetter = metric === "power_score";
   return (
     <MiniFrame>
       <div class="summary-mini-plot relative h-[5.5rem] w-full border-b border-l border-[var(--bb-data-border)]">
         {points.map((point, index) => {
           const x = ((point.normalized_cost_usd as number) - minCost) / (maxCost - minCost || 1);
-          const y = 1 - ((point.display_geomean_ms as number) - minTiming) / (maxTiming - minTiming || 1);
+          const normalized = ((validPrimaryMetricValue(point, metric) as number) - minMetric) /
+            (maxMetric - minMetric || 1);
+          const y = higherIsBetter ? 1 - normalized : normalized;
           return (
             <span
               key={point.result_id}
