@@ -9,10 +9,30 @@ from scripts.publication import transaction as tx_mod
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
+@pytest.fixture(autouse=True)
+def valid_receipt_signature(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tx_mod, "validate_live_receipt_contract", lambda receipt: [])
+
+
+def receipt_for(tx: tx_mod.Transaction, observation_digest: str) -> dict[str, object]:
+    return {
+        "signature": "test-signature",
+        "target": tx.target,
+        "generation": tx.generation,
+        "manifest_digest": tx.content.get("manifest_digest"),
+        "artifact_digest": tx.artifact.get("archive_sha256"),
+        "observation_digest": observation_digest,
+    }
+
+
 def make_durable(tx: tx_mod.Transaction) -> tx_mod.Transaction:
     tx, _ = tx_mod.transition(tx, tx_mod.EVENT_START_WRITE, {"intent_commit_oid": "a" * 40})
     tx, _ = tx_mod.transition(tx, tx_mod.EVENT_ACKNOWLEDGE_WRITE, {"id": "durable-deployment"})
-    tx, _ = tx_mod.transition(tx, tx_mod.EVENT_VERIFY_SUCCESS, {"observation_digest": "verified"})
+    tx, _ = tx_mod.transition(
+        tx,
+        tx_mod.EVENT_VERIFY_SUCCESS,
+        {"observation_digest": "verified", "attestation": receipt_for(tx, "verified")},
+    )
     tx, _ = tx_mod.transition(tx, tx_mod.EVENT_COMMIT_DURABLE)
     return tx
 
@@ -107,11 +127,12 @@ def test_promotion_lifecycle_happy_path(base_context: dict[str, dict[str, str]])
     tx, effect = tx_mod.transition(
         tx,
         tx_mod.EVENT_VERIFY_SUCCESS,
-        {"observation_digest": obs_digest, "challenge": "ch-1"},
+        {"observation_digest": obs_digest, "challenge": "ch-1", "attestation": receipt_for(tx, obs_digest)},
     )
     assert tx.state == tx_mod.STATE_EXTERNALLY_VERIFIED
     assert effect.action == "commit_durable"
     assert tx.verification["observation_digest"] == obs_digest
+    assert tx.attestation["signature"] == "test-signature"
 
     # 4. Commit durable
     tx, effect = tx_mod.transition(tx, tx_mod.EVENT_COMMIT_DURABLE)
@@ -213,6 +234,41 @@ def test_prepare_rollback_rejects_non_durable_source(base_context: dict[str, dic
         )
 
 
+def test_prepare_rollback_requires_advancing_generation(base_context: dict[str, dict[str, str]]) -> None:
+    parent_tx, _ = tx_mod.prepare_promotion(
+        target=base_context["target"],
+        generation=9,
+        parent_transaction_id="g8",
+        approval=base_context["approval"],
+        controller=base_context["controller"],
+        owner=base_context["owner"],
+        content=base_context["content"],
+        artifact=base_context["artifact"],
+    )
+    parent_tx = make_durable(parent_tx)
+    failed_tx, _ = tx_mod.prepare_promotion(
+        target=base_context["target"],
+        generation=10,
+        parent_transaction_id=parent_tx.transaction_id,
+        approval=base_context["approval"],
+        controller=base_context["controller"],
+        owner=base_context["owner"],
+        content=base_context["content"],
+        artifact=base_context["artifact"],
+    )
+    failed_tx, _ = tx_mod.transition(failed_tx, tx_mod.EVENT_FAIL_WRITE, {"reason": "pre-send failure"})
+
+    with pytest.raises(tx_mod.TransactionError, match="generation must advance"):
+        tx_mod.prepare_rollback(
+            failed_transaction=failed_tx,
+            parent_durable_transaction=parent_tx,
+            generation=10,
+            controller=base_context["controller"],
+            owner=base_context["owner"],
+            barrier_evidence={},
+        )
+
+
 def test_prepare_rollback_rejects_nonterminal_provider(base_context: dict[str, dict[str, str]]) -> None:
     parent_tx, _ = tx_mod.prepare_promotion(
         target=base_context["target"],
@@ -287,7 +343,9 @@ def test_rollback_lifecycle_happy_path(base_context: dict[str, dict[str, str]]) 
         barrier_evidence={
             "provider_status": "canceled",
             "quiescence_observed": True,
-            "deployment_id": failed_tx.write["write_id"],
+            "provider_deployment_absent": True,
+            "artifact_id": failed_tx.artifact["artifact_id"],
+            "pages_build_version": failed_tx.write["pages_build_version"],
         },
     )
 
@@ -307,7 +365,11 @@ def test_rollback_lifecycle_happy_path(base_context: dict[str, dict[str, str]]) 
     assert effect.action == "probe_endpoints"
 
     # Verify rollback probes
-    rb_tx, effect = tx_mod.transition(rb_tx, tx_mod.EVENT_VERIFY_ROLLBACK, {"observation_digest": "rb-obs-999"})
+    rb_tx, effect = tx_mod.transition(
+        rb_tx,
+        tx_mod.EVENT_VERIFY_ROLLBACK,
+        {"observation_digest": "rb-obs-999", "attestation": receipt_for(rb_tx, "rb-obs-999")},
+    )
     assert rb_tx.state == tx_mod.STATE_ROLLBACK_VERIFIED
     assert effect.action == "commit_rollback"
 

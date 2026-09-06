@@ -843,6 +843,15 @@ def _check_receipt_freshness(
     return drifts, receipt_age_hours
 
 
+def validate_live_receipt_contract(
+    receipt: dict[str, Any], *, now: datetime | None = None, max_age_hours: float = DEFAULT_MAX_AGE_HOURS
+) -> list[DriftFinding]:
+    """Validate the complete signed live-receipt contract and freshness boundary."""
+    findings = _check_receipt_contract_fields(receipt)
+    freshness, _ = _check_receipt_freshness(receipt, True, max_age_hours, now or datetime.now(timezone.utc))
+    return [*findings, *freshness]
+
+
 def reconcile_states(
     desired: dict[str, Any],
     built: dict[str, Any] | None,

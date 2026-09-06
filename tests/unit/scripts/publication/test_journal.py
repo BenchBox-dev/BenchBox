@@ -13,6 +13,11 @@ from scripts.publication import journal as journal_mod, transaction as tx_mod
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
+@pytest.fixture(autouse=True)
+def valid_receipt_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tx_mod, "validate_live_receipt_contract", lambda receipt: [])
+
+
 @pytest.fixture
 def git_repo(tmp_path: Path) -> Path:
     """Create a temporary initialized Git repository with an initial commit."""
@@ -50,7 +55,14 @@ def genesis_tx() -> tx_mod.Transaction:
         transaction_id="genesis-tx-0001",
     )
     # Mark as durable genesis
-    return tx_mod.Transaction(**{**tx.to_dict(), "state": tx_mod.STATE_DURABLE})
+    attestation = {
+        "target": tx.target,
+        "generation": tx.generation,
+        "manifest_digest": tx.content["manifest_digest"],
+        "artifact_digest": tx.artifact["archive_sha256"],
+        "observation_digest": "genesis-observation",
+    }
+    return tx_mod.Transaction(**{**tx.to_dict(), "state": tx_mod.STATE_DURABLE, "attestation": attestation})
 
 
 def test_init_genesis_and_read(git_repo: Path, genesis_tx: tx_mod.Transaction) -> None:
@@ -315,13 +327,20 @@ def test_corrupt_journal_fails_closed(git_repo: Path) -> None:
 
 @pytest.mark.parametrize(
     "field,value",
-    [("object_type", "wrong"), ("transaction_schema_version", 99), ("state", "invented")],
+    [
+        ("object_type", "wrong"),
+        ("transaction_schema_version", 99),
+        ("state", "invented"),
+        ("kind", "invented"),
+        ("kind", tx_mod.KIND_ROLLBACK),
+    ],
 )
 def test_read_transaction_rejects_invalid_contract(monkeypatch: pytest.MonkeyPatch, field: str, value: object) -> None:
     data = {
         "object_type": tx_mod.OBJECT_TYPE,
         "transaction_schema_version": tx_mod.SCHEMA_VERSION,
         "state": tx_mod.STATE_PREPARED,
+        "kind": tx_mod.KIND_PROMOTION,
     }
     data[field] = value
     monkeypatch.setattr(journal_mod, "_run_git", lambda *args, **kwargs: json.dumps(data))
