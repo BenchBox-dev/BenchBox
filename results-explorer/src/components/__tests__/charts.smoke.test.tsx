@@ -396,6 +396,7 @@ describe("QueryHistogram", () => {
     const svg = container.querySelector("svg");
     expect(svg?.getAttribute("width")).toBe("100%");
     expect(svg?.getAttribute("viewBox")).toMatch(/^0 0 300 /);
+    expect(Number(svg?.getAttribute("height"))).toBeGreaterThan(200);
   });
 
   it("auto-splits into multiple panels when query count > 33", () => {
@@ -529,7 +530,9 @@ describe("TimeSeries", () => {
       makeEntry({ result_id: "r2", run_date: "2026-04-01", display_geomean_ms: 10 }),
     ];
     const { container } = render(<TimeSeries entries={entries} />);
-    expect(container.querySelector("svg")).not.toBeNull();
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeNull();
+    expect(Number(svg?.getAttribute("height"))).toBeGreaterThan(250);
     expect(container.querySelector("path")).not.toBeNull();
   });
 

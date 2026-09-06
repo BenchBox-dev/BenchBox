@@ -13,6 +13,7 @@ import { useElementSize } from "@/lib/useElementSize";
 import { PHASE_COLORS } from "@/lib/chartTheme";
 import { formatDurationSeconds } from "@/lib/metricFormatters";
 import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
+import { isNarrowChart, NARROW_CHART_MIN_WIDTH } from "@/lib/chartResponsive";
 
 // Phase display names (bundle phase name → human-readable)
 const PHASE_LABELS: Record<string, string> = {
@@ -46,14 +47,20 @@ interface Props {
 
 export function StackedPhase({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const w = Math.max(containerWidth, 400);
+  const narrow = isNarrowChart(containerWidth);
+  const w = Math.max(containerWidth, narrow ? NARROW_CHART_MIN_WIDTH : 400);
+  const labelWidth = narrow ? 112 : LABEL_W;
+  const rowHeight = narrow ? 48 : ROW_H;
+  const paddingTop = narrow ? 12 : PADDING_TOP;
+  const axisHeight = narrow ? 24 : AXIS_H;
+  const valueTrail = narrow ? 52 : VALUE_TRAIL;
 
   const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
   );
   const displayLabels = preserveUniqueAfterTruncation(
     cohortLabels.map((label) => label.disambiguated),
-    22,
+    narrow ? 14 : 22,
   );
   const rowLabelByResultId = new Map(
     summary.platforms.map((platform, index) => [platform.result_id, displayLabels[index] ?? platform.platform]),
@@ -93,8 +100,8 @@ export function StackedPhase({ summary }: Props) {
     Object.values(r.phase_durations!).reduce((a, b) => a + b, 0),
   );
   const maxTotal = Math.max(...allTotals, 1);
-  const plotW = w - LABEL_W - VALUE_TRAIL;
-  const totalH = PADDING_TOP + rows.length * ROW_H + AXIS_H;
+  const plotW = w - labelWidth - valueTrail;
+  const totalH = paddingTop + rows.length * rowHeight + axisHeight;
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
@@ -106,17 +113,17 @@ export function StackedPhase({ summary }: Props) {
         aria-label="Benchmark phase duration breakdown"
       >
         {rows.map((row, ri) => {
-          const y = PADDING_TOP + ri * ROW_H;
-          const midY = y + ROW_H * 0.5;
-          const barH = ROW_H * 0.55;
+          const y = paddingTop + ri * rowHeight;
+          const midY = y + rowHeight * 0.5;
+          const barH = rowHeight * 0.55;
           const pd = row.phase_durations!;
           const total = Object.values(pd).reduce((a, b) => a + b, 0);
 
-          let xOffset = LABEL_W;
+          let xOffset = labelWidth;
           return (
             <g key={row.result_id}>
               <text
-                x={LABEL_W - 6}
+                x={labelWidth - 6}
                 y={midY + 4}
                 textAnchor="end"
                 style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}
@@ -157,9 +164,9 @@ export function StackedPhase({ summary }: Props) {
               {ri < rows.length - 1 && (
                 <line
                   x1={0}
-                  y1={y + ROW_H}
-                  x2={w - VALUE_TRAIL}
-                  y2={y + ROW_H}
+                  y1={y + rowHeight}
+                  x2={w - valueTrail}
+                  y2={y + rowHeight}
                   stroke="var(--bb-chart-grid)"
                   strokeWidth={1}
                 />
@@ -169,10 +176,10 @@ export function StackedPhase({ summary }: Props) {
         })}
 
         <line
-          x1={LABEL_W}
-          y1={PADDING_TOP + rows.length * ROW_H}
-          x2={LABEL_W + plotW}
-          y2={PADDING_TOP + rows.length * ROW_H}
+          x1={labelWidth}
+          y1={paddingTop + rows.length * rowHeight}
+          x2={labelWidth + plotW}
+          y2={paddingTop + rows.length * rowHeight}
           stroke="var(--bb-chart-grid)"
           strokeWidth={1}
         />

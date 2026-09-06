@@ -15,6 +15,7 @@ import { buildLogLatencyScale, computeECDFPoints, logLatencyFraction, logLatency
 import { formatTimingExclusion, isTimingDisplayable, platformTimingValue } from "@/lib/displayEligibility";
 import { formatLatencyMs } from "@/lib/metricFormatters";
 import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
+import { isNarrowChart, NARROW_CHART_MIN_WIDTH } from "@/lib/chartResponsive";
 
 const Y_TICKS_PCT = [0, 25, 50, 75, 100];
 
@@ -30,7 +31,10 @@ interface Props {
 
 export function CDFChart({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const w = Math.max(containerWidth, 400);
+  const narrow = isNarrowChart(containerWidth);
+  const w = Math.max(containerWidth, narrow ? NARROW_CHART_MIN_WIDTH : 400);
+  const labelWidth = narrow ? 32 : LABEL_W;
+  const plotHeight = narrow ? 240 : PLOT_H;
 
   const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
@@ -52,19 +56,26 @@ export function CDFChart({ summary }: Props) {
   if (series.length === 0) return null;
   const excludedRows = summary.platforms.filter((platform) => !isTimingDisplayable(platform));
 
+  const legendColumns = Math.max(1, Math.floor((w - labelWidth) / 130));
+  const legendColumnWidth = (w - labelWidth) / legendColumns;
+  const legendRows = Math.ceil(series.length / legendColumns);
+  const legendHeight = 8 + legendRows * 18;
+  const paddingTop = Math.max(PADDING_TOP, legendHeight + 4);
+  const axisHeight = narrow ? 32 : AXIS_H;
+
   const allMs = series.flatMap((s) => s.points.map((p) => p.x));
   const scale = buildLogLatencyScale(allMs, { lowerPad: 0.2, upperPad: 0.2 });
   if (scale === null) return null;
   const logScale = scale;
 
-  const plotW = w - LABEL_W - PADDING_RIGHT;
-  const totalH = PADDING_TOP + PLOT_H + AXIS_H;
+  const plotW = w - labelWidth - PADDING_RIGHT;
+  const totalH = paddingTop + plotHeight + axisHeight;
 
   function xFor(ms: number): number {
-    return LABEL_W + logLatencyFraction(ms, logScale) * plotW;
+    return labelWidth + logLatencyFraction(ms, logScale) * plotW;
   }
   function yFor(pct: number): number {
-    return PADDING_TOP + PLOT_H * (1 - pct / 100);
+    return paddingTop + plotHeight * (1 - pct / 100);
   }
 
   const xTicks = logLatencyTicks(logScale);
@@ -77,8 +88,8 @@ export function CDFChart({ summary }: Props) {
           const y = yFor(pct);
           return (
             <g key={pct}>
-              <line x1={LABEL_W} y1={y} x2={w - PADDING_RIGHT} y2={y} stroke="var(--bb-chart-grid)" strokeWidth={1} />
-              <text x={LABEL_W - 4} y={y + 4} textAnchor="end" style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}>
+              <line x1={labelWidth} y1={y} x2={w - PADDING_RIGHT} y2={y} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+              <text x={labelWidth - 4} y={y + 4} textAnchor="end" style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}>
                 {pct}%
               </text>
             </g>
@@ -104,8 +115,8 @@ export function CDFChart({ summary }: Props) {
         })}
 
         {/* X-axis */}
-        <g transform={`translate(0, ${PADDING_TOP + PLOT_H})`}>
-          <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+        <g transform={`translate(0, ${paddingTop + plotHeight})`}>
+          <line x1={labelWidth} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
           {xTicks.map((ms) => {
             const x = xFor(ms);
             return (
@@ -122,7 +133,10 @@ export function CDFChart({ summary }: Props) {
         {/* Legend */}
         <g transform="translate(0, 8)">
           {series.map((s, i) => (
-            <g key={s.label} transform={`translate(${LABEL_W + i * 130}, 0)`}>
+            <g
+              key={s.label}
+              transform={`translate(${labelWidth + (i % legendColumns) * legendColumnWidth}, ${Math.floor(i / legendColumns) * 18})`}
+            >
               <line x1={0} y1={6} x2={16} y2={6} stroke={s.color} strokeWidth={2} />
               <text x={20} y={10} style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}>
                 <title>{s.fullLabel}</title>

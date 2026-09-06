@@ -15,6 +15,7 @@ import { paletteColor } from "@/lib/chartTheme";
 import { isRankable } from "@/lib/displayEligibility";
 import { formatPowerScore } from "@/lib/metricFormatters";
 import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
+import { isNarrowChart, NARROW_CHART_MIN_WIDTH } from "@/lib/chartResponsive";
 
 const LABEL_W = 160;
 const ROW_H = 36;
@@ -28,14 +29,20 @@ interface Props {
 
 export function PowerBar({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const w = Math.max(containerWidth, 400);
+  const narrow = isNarrowChart(containerWidth);
+  const w = Math.max(containerWidth, narrow ? NARROW_CHART_MIN_WIDTH : 400);
+  const labelWidth = narrow ? 112 : LABEL_W;
+  const rowHeight = narrow ? 48 : ROW_H;
+  const axisHeight = narrow ? 36 : AXIS_H;
+  const paddingTop = narrow ? 12 : PADDING_TOP;
+  const valueTrail = narrow ? 64 : VALUE_TRAIL;
 
   const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
   );
   const displayLabels = preserveUniqueAfterTruncation(
     cohortLabels.map((label) => label.disambiguated),
-    22,
+    narrow ? 14 : 22,
   );
   const rows = summary.platforms
     .map((p, i) => ({
@@ -52,22 +59,22 @@ export function PowerBar({ summary }: Props) {
   }
 
   const maxScore = Math.max(...rows.map((r) => r.power_score!));
-  const plotW = w - LABEL_W - VALUE_TRAIL;
-  const totalH = PADDING_TOP + rows.length * ROW_H + AXIS_H;
+  const plotW = w - labelWidth - valueTrail;
+  const totalH = paddingTop + rows.length * rowHeight + axisHeight;
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
       <svg class="bb-chart-svg" width={w} height={totalH} role="img" aria-label="TPC Power@Size comparison - higher is better">
         {rows.map((row, ri) => {
           const barW = (row.power_score! / maxScore) * plotW;
-          const y = PADDING_TOP + ri * ROW_H;
-          const midY = y + ROW_H * 0.5;
-          const barH = ROW_H * 0.55;
+          const y = paddingTop + ri * rowHeight;
+          const midY = y + rowHeight * 0.5;
+          const barH = rowHeight * 0.55;
           const color = paletteColor(row.colorIdx);
           return (
             <g key={row.result_id}>
               <text
-                x={LABEL_W - 6}
+                x={labelWidth - 6}
                 y={midY + 4}
                 textAnchor="end"
                 aria-label={row.fullLabel}
@@ -76,24 +83,24 @@ export function PowerBar({ summary }: Props) {
               >
                 {row.displayLabel}
               </text>
-              <rect x={LABEL_W} y={midY - barH / 2} width={Math.max(2, barW)} height={barH} fill={color} rx={2}>
+              <rect x={labelWidth} y={midY - barH / 2} width={Math.max(2, barW)} height={barH} fill={color} rx={2}>
                 <title>{`${row.fullLabel}: ${formatPowerScore(row.power_score).valueText} QphH`}</title>
               </rect>
-              <text x={LABEL_W + barW + 6} y={midY + 4} style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}>
+              <text x={labelWidth + barW + 6} y={midY + 4} style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}>
                 {formatPowerScore(row.power_score).valueText}
               </text>
               {ri < rows.length - 1 && (
-                <line x1={0} y1={y + ROW_H} x2={w} y2={y + ROW_H} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+                <line x1={0} y1={y + rowHeight} x2={w} y2={y + rowHeight} stroke="var(--bb-chart-grid)" strokeWidth={1} />
               )}
             </g>
           );
         })}
 
         {/* X-axis */}
-        <g transform={`translate(0, ${PADDING_TOP + rows.length * ROW_H})`}>
-          <line x1={LABEL_W} y1={0} x2={LABEL_W + plotW} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+        <g transform={`translate(0, ${paddingTop + rows.length * rowHeight})`}>
+          <line x1={labelWidth} y1={0} x2={labelWidth + plotW} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
           {[0, 0.25, 0.5, 0.75, 1].map((f) => {
-            const x = LABEL_W + f * plotW;
+            const x = labelWidth + f * plotW;
             const val = f * maxScore;
             return (
               <g key={f}>
@@ -105,8 +112,8 @@ export function PowerBar({ summary }: Props) {
             );
           })}
           <text
-            x={LABEL_W + plotW / 2}
-            y={AXIS_H - 2}
+            x={labelWidth + plotW / 2}
+            y={axisHeight - 2}
             textAnchor="middle"
             style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}
           >

@@ -16,6 +16,7 @@ import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
 import { costModelDisclosure, normalizedCostValue } from "@/lib/costDisplay";
 import { formatLatencyMs, formatPowerScore, formatUsd } from "@/lib/metricFormatters";
+import { isNarrowChart, NARROW_CHART_MIN_WIDTH } from "@/lib/chartResponsive";
 
 const AXIS_W = 54;
 const AXIS_H = 32;
@@ -41,7 +42,10 @@ type ScatterPoint = {
 
 export function CostScatter({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const w = Math.max(containerWidth, 400);
+  const narrow = isNarrowChart(containerWidth);
+  const w = Math.max(containerWidth, narrow ? NARROW_CHART_MIN_WIDTH : 400);
+  const axisWidth = narrow ? 46 : AXIS_W;
+  const chartHeight = narrow ? 260 : CHART_H;
 
   // Primary metric comes from the canonical DuckDB-persisted ranking row.
   // Fallback is safe: every result has a display_geomean_ms.
@@ -90,18 +94,18 @@ export function CostScatter({ summary }: Props) {
   const xRange = xMax - xMin || 1;
   const yRange = yMax - yMin || 1;
 
-  const plotW = w - AXIS_W - PADDING_RIGHT;
-  const totalH = PADDING_TOP + CHART_H + AXIS_H;
+  const plotW = w - axisWidth - PADDING_RIGHT;
+  const totalH = PADDING_TOP + chartHeight + AXIS_H;
 
   function xFor(cost: number): number {
-    return AXIS_W + ((cost - xMin) / xRange) * plotW;
+    return axisWidth + ((cost - xMin) / xRange) * plotW;
   }
 
   function yFor(perf: number): number {
     const normalized = (perf - yMin) / yRange;
     // Higher perf → top of chart when higher-is-better
     const pos = higherIsBetter ? normalized : 1 - normalized;
-    return PADDING_TOP + CHART_H * (1 - pos);
+    return PADDING_TOP + chartHeight * (1 - pos);
   }
 
   const metricLabel =
@@ -120,7 +124,7 @@ export function CostScatter({ summary }: Props) {
         {/* Grid - label orientation flips with higherIsBetter so the top
             of the chart always shows the better-performance value. */}
         {[0, 0.25, 0.5, 0.75, 1].map((f) => {
-          const y = PADDING_TOP + f * CHART_H;
+          const y = PADDING_TOP + f * chartHeight;
           const val = higherIsBetter ? yMax - f * yRange : yMin + f * yRange;
           const label =
             metric === "power_score"
@@ -129,7 +133,7 @@ export function CostScatter({ summary }: Props) {
           return (
             <g key={f}>
               <line
-                x1={AXIS_W}
+                x1={axisWidth}
                 y1={y}
                 x2={w - PADDING_RIGHT}
                 y2={y}
@@ -137,7 +141,7 @@ export function CostScatter({ summary }: Props) {
                 strokeWidth={1}
               />
               <text
-                x={AXIS_W - 4}
+                x={axisWidth - 4}
                 y={y + 4}
                 textAnchor="end"
                 style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
@@ -177,39 +181,39 @@ export function CostScatter({ summary }: Props) {
 
         {/* Axes */}
         <line
-          x1={AXIS_W}
+          x1={axisWidth}
           y1={PADDING_TOP}
-          x2={AXIS_W}
-          y2={PADDING_TOP + CHART_H}
+          x2={axisWidth}
+          y2={PADDING_TOP + chartHeight}
           stroke="var(--bb-chart-grid)"
           strokeWidth={1}
         />
         <line
-          x1={AXIS_W}
-          y1={PADDING_TOP + CHART_H}
+          x1={axisWidth}
+          y1={PADDING_TOP + chartHeight}
           x2={w - PADDING_RIGHT}
-          y2={PADDING_TOP + CHART_H}
+          y2={PADDING_TOP + chartHeight}
           stroke="var(--bb-chart-grid)"
           strokeWidth={1}
         />
 
         {/* X-axis labels */}
         {[0, 0.5, 1].map((f) => {
-          const x = AXIS_W + f * plotW;
+          const x = axisWidth + f * plotW;
           const cost = xMin + f * xRange;
           return (
             <g key={f}>
               <line
                 x1={x}
-                y1={PADDING_TOP + CHART_H}
+                y1={PADDING_TOP + chartHeight}
                 x2={x}
-                y2={PADDING_TOP + CHART_H + 4}
+                y2={PADDING_TOP + chartHeight + 4}
                 stroke="var(--bb-chart-label-muted)"
                 strokeWidth={1}
               />
               <text
                 x={x}
-                y={PADDING_TOP + CHART_H + 16}
+                y={PADDING_TOP + chartHeight + 16}
                 textAnchor="middle"
                 style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}
               >
@@ -219,8 +223,8 @@ export function CostScatter({ summary }: Props) {
           );
         })}
         <text
-          x={AXIS_W + plotW / 2}
-          y={PADDING_TOP + CHART_H + AXIS_H - 2}
+          x={axisWidth + plotW / 2}
+          y={PADDING_TOP + chartHeight + AXIS_H - 2}
           textAnchor="middle"
           style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}
         >
@@ -232,7 +236,7 @@ export function CostScatter({ summary }: Props) {
           x={0}
           y={0}
           style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
-          transform={`rotate(-90) translate(${-(PADDING_TOP + CHART_H / 2)}, 11)`}
+          transform={`rotate(-90) translate(${-(PADDING_TOP + chartHeight / 2)}, 11)`}
           textAnchor="middle"
         >
           {metricLabel}

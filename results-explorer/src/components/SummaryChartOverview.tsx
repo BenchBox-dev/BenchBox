@@ -275,8 +275,8 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
               return (
                 <details
                   key={chart.id}
-                  class="summary-chart-details rounded-lg border border-[var(--bb-data-border)]
-                    bg-[var(--bb-surface-data)]"
+                  class={`summary-chart-details rounded-lg border border-[var(--bb-data-border)]
+                    bg-[var(--bb-surface-data)] ${isOpen ? "sm:col-span-2 xl:col-span-4" : ""}`}
                   open={isOpen}
                   onToggle={(event) => {
                     const open = (event.currentTarget as HTMLDetailsElement).open;
@@ -551,7 +551,7 @@ function MiniHeatmap({ summary }: { summary: BenchmarkSummary }) {
   return (
     <MiniFrame>
       <div
-        class="grid w-full gap-px"
+        class="summary-mini-heatmap grid w-full gap-px"
         style={{ gridTemplateColumns: `repeat(${queryIds.length}, minmax(0, 1fr))` }}
         aria-label="Heatmap thumbnail"
       >
@@ -582,7 +582,7 @@ function MiniPercentiles({ summary }: { summary: BenchmarkSummary }) {
   const max = Math.max(...rows.map((row) => row.percentile_stats!.p99), 1);
   return (
     <MiniFrame>
-      <div class="w-full space-y-1.5">
+      <div class="summary-mini-stack w-full space-y-1.5">
         {rows.map((row, index) => (
           <div key={row.result_id} class="flex items-center gap-1">
             <span class="w-10 truncate text-[8px] text-[var(--bb-data-fg-subtle)]">{row.platform}</span>
@@ -621,7 +621,13 @@ function MiniCDF({ summary }: { summary: BenchmarkSummary }) {
   const height = 86;
   return (
     <MiniFrame>
-      <svg viewBox={`0 0 ${width} ${height}`} class="h-[5.5rem] w-full" role="img" aria-label="CDF thumbnail">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        class="summary-mini-plot h-[5.5rem] w-full"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="CDF thumbnail"
+      >
         <line x1="8" y1="76" x2="232" y2="76" stroke="var(--bb-chart-grid)" />
         <line x1="8" y1="8" x2="8" y2="76" stroke="var(--bb-chart-grid)" />
         {series.map((entry, index) => {
@@ -648,7 +654,7 @@ function MiniHistogram({ summary }: { summary: BenchmarkSummary }) {
   const max = Math.max(...values, 1);
   return (
     <MiniFrame>
-      <div class="flex h-[5.5rem] w-full items-end gap-1 border-b border-l border-[var(--bb-data-border)] px-2 pb-1">
+      <div class="summary-mini-plot flex h-[5.5rem] w-full items-end gap-1 border-b border-l border-[var(--bb-data-border)] px-2 pb-1">
         {values.map((value, index) => (
           <span
             key={index}
@@ -672,7 +678,7 @@ function MiniPhases({ summary }: { summary: BenchmarkSummary }) {
   );
   return (
     <MiniFrame>
-      <div class="w-full space-y-1.5">
+      <div class="summary-mini-stack w-full space-y-1.5">
         {rows.map((row) => {
           const phases = Object.entries(row.phase_durations!);
           const total = phases.reduce((sum, [, value]) => sum + value, 0);
@@ -714,7 +720,13 @@ function MiniTrend({ summary, historical }: { summary: BenchmarkSummary; histori
   });
   return (
     <MiniFrame>
-      <svg viewBox="0 0 240 86" class="h-[5.5rem] w-full" role="img" aria-label="Trend thumbnail">
+      <svg
+        viewBox="0 0 240 86"
+        class="summary-mini-plot h-[5.5rem] w-full"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="Trend thumbnail"
+      >
         <line x1="8" y1="76" x2="232" y2="76" stroke="var(--bb-chart-grid)" />
         {Array.from(byPlatform.values()).slice(0, 6).map((entries, index) => {
           const points = entries
@@ -747,7 +759,7 @@ function MiniRanks({ summary }: { summary: BenchmarkSummary }) {
   return (
     <MiniFrame>
       <div
-        class="grid w-full gap-px"
+        class="summary-mini-grid grid w-full gap-px"
         style={{ gridTemplateColumns: `repeat(${summary.platforms.length}, minmax(0, 1fr))` }}
         aria-label="Rank table thumbnail"
       >
@@ -789,7 +801,7 @@ function MiniCost({ summary }: { summary: BenchmarkSummary }) {
   const maxTiming = Math.max(...timings);
   return (
     <MiniFrame>
-      <div class="relative h-[5.5rem] w-full border-b border-l border-[var(--bb-data-border)]">
+      <div class="summary-mini-plot relative h-[5.5rem] w-full border-b border-l border-[var(--bb-data-border)]">
         {points.map((point, index) => {
           const x = ((point.normalized_cost_usd as number) - minCost) / (maxCost - minCost || 1);
           const y = 1 - ((point.display_geomean_ms as number) - minTiming) / (maxTiming - minTiming || 1);

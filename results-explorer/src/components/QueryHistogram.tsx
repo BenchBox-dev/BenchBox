@@ -14,6 +14,7 @@ import { paletteColor } from "@/lib/chartTheme";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 import { formatTimingExclusion, platformTimingValue } from "@/lib/displayEligibility";
 import { formatLatencyMs } from "@/lib/metricFormatters";
+import { isNarrowChart } from "@/lib/chartResponsive";
 
 const MAX_PER_PANEL = 33;
 const BAR_GAP = 3;
@@ -34,7 +35,11 @@ function fmtMs(ms: number): string {
 
 export function QueryHistogram({ summary, preserveOrder = false }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize(300);
+  const narrow = isNarrowChart(containerWidth);
   const w = Math.max(containerWidth, 300);
+  const chartHeight = narrow ? 240 : CHART_H;
+  const labelHeight = narrow ? 36 : LABEL_H;
+  const panelLimit = narrow ? 6 : MAX_PER_PANEL;
 
   const { platforms, query_ids } = summary;
   if (platforms.length === 0 || query_ids.length === 0) return null;
@@ -42,8 +47,8 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
 
   // Split into panels
   const panels: string[][] = [];
-  for (let i = 0; i < sortedQueryIds.length; i += MAX_PER_PANEL) {
-    panels.push(sortedQueryIds.slice(i, i + MAX_PER_PANEL));
+  for (let i = 0; i < sortedQueryIds.length; i += panelLimit) {
+    panels.push(sortedQueryIds.slice(i, i + panelLimit));
   }
 
   function renderPanel(qids: string[], panelIdx: number) {
@@ -66,20 +71,20 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
       <div key={panelIdx} class="mb-2">
         {panels.length > 1 && (
           <p class="mb-0.5 ml-[44px] text-[10px] text-[var(--bb-data-fg-subtle)]">
-            Queries {panelIdx * MAX_PER_PANEL + 1}-{Math.min((panelIdx + 1) * MAX_PER_PANEL, sortedQueryIds.length)}
+            Queries {panelIdx * panelLimit + 1}-{Math.min((panelIdx + 1) * panelLimit, sortedQueryIds.length)}
           </p>
         )}
         <svg
           class="bb-chart-svg"
           width="100%"
-          height={PADDING_TOP + CHART_H + LABEL_H}
-          viewBox={`0 0 ${w} ${PADDING_TOP + CHART_H + LABEL_H}`}
+          height={PADDING_TOP + chartHeight + labelHeight}
+          viewBox={`0 0 ${w} ${PADDING_TOP + chartHeight + labelHeight}`}
           role="img"
           aria-label={`Query latency histogram${panels.length > 1 ? ` (panel ${panelIdx + 1})` : ""}`}
         >
           {/* Y-axis guides */}
           {[0, 0.25, 0.5, 0.75, 1].map((f) => {
-            const y = PADDING_TOP + (1 - f) * CHART_H;
+            const y = PADDING_TOP + (1 - f) * chartHeight;
             return (
               <g key={f}>
                 <line x1={AXIS_W} y1={y} x2={w} y2={y} stroke="var(--bb-chart-grid-muted)" strokeWidth={1} />
@@ -101,7 +106,7 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
                   const raw = p.timings[qid];
                   const ms = platformTimingValue(p, qid);
                   const missing = ms === null;
-                  const barH = missing ? 0 : Math.max(1, (ms / maxMs) * CHART_H);
+                  const barH = missing ? 0 : Math.max(1, (ms / maxMs) * chartHeight);
                   if (missing) {
                     const reason = formatTimingExclusion(
                       p.timing_eligibility[qid]?.timing_exclusion_reason ?? (raw === 0 ? "zero_timing" : "missing_timing"),
@@ -112,9 +117,9 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
                       <line
                         key={p.result_id}
                         x1={groupX + pi * barW}
-                        y1={PADDING_TOP + CHART_H - 1}
+                        y1={PADDING_TOP + chartHeight - 1}
                         x2={groupX + pi * barW + (barW - 1)}
-                        y2={PADDING_TOP + CHART_H - 1}
+                        y2={PADDING_TOP + chartHeight - 1}
                         stroke={paletteColor(pi)}
                         strokeWidth={2}
                         strokeDasharray="2,1"
@@ -128,7 +133,7 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
                     <rect
                       key={p.result_id}
                       x={groupX + pi * barW}
-                      y={PADDING_TOP + CHART_H - barH}
+                      y={PADDING_TOP + chartHeight - barH}
                       width={barW - 1}
                       height={barH}
                       fill={paletteColor(pi)}
@@ -140,7 +145,7 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
                 })}
                 <text
                   x={groupX + innerW / 2}
-                  y={PADDING_TOP + CHART_H + 14}
+                  y={PADDING_TOP + chartHeight + 14}
                   textAnchor="middle"
                   data-query-label={qid}
                   style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
@@ -152,12 +157,12 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
           })}
 
           {/* Axes */}
-          <line x1={AXIS_W} y1={PADDING_TOP} x2={AXIS_W} y2={PADDING_TOP + CHART_H} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+          <line x1={AXIS_W} y1={PADDING_TOP} x2={AXIS_W} y2={PADDING_TOP + chartHeight} stroke="var(--bb-chart-grid)" strokeWidth={1} />
           <line
             x1={AXIS_W}
-            y1={PADDING_TOP + CHART_H}
+            y1={PADDING_TOP + chartHeight}
             x2={w}
-            y2={PADDING_TOP + CHART_H}
+            y2={PADDING_TOP + chartHeight}
             stroke="var(--bb-chart-grid)"
             strokeWidth={1}
           />

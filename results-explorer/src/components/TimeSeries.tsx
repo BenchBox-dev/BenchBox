@@ -23,6 +23,7 @@ import {
   visibleResultIdForRow,
 } from "@/lib/resultLinks";
 import { formatRunIdentityLabelsForCohort, type RunIdentitySource } from "@/lib/runIdentity";
+import { isNarrowChart } from "@/lib/chartResponsive";
 import { RunDateWithAge } from "@/components/RunAge";
 
 const LABEL_W = 58;
@@ -63,6 +64,8 @@ interface Series {
 export function TimeSeries({ entries, primaryMetric }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize(320);
   const w = Math.max(containerWidth, 320);
+  const narrow = isNarrowChart(containerWidth);
+  const plotHeight = narrow ? 260 : CHART_H;
 
   const metric = primaryMetric ?? "display_geomean_ms";
   const higherIsBetter = metric === "power_score";
@@ -172,7 +175,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
   const yRange = yMax - yMin || 1;
 
   const plotW = w - LABEL_W - PADDING_RIGHT;
-  const totalH = PADDING_TOP + CHART_H + AXIS_H;
+  const totalH = PADDING_TOP + plotHeight + AXIS_H;
 
   function xFor(date: string): number {
     const idx = dateIndex.get(date) ?? 0;
@@ -183,7 +186,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
     const normalized = (val - yMin) / yRange;
     // Higher value → top of chart for power_score; bottom for latency
     const pos = higherIsBetter ? normalized : 1 - normalized;
-    return PADDING_TOP + CHART_H * (1 - pos);
+    return PADDING_TOP + plotHeight * (1 - pos);
   }
 
   const metricLabel = metric === "power_score" ? "Power score" : "Geomean latency";
@@ -197,8 +200,9 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
       />
     ) : null;
 
-  // Show at most 7 x-axis labels when there are many dates
-  const step = Math.ceil(allDates.length / 7);
+  // A portrait chart needs fewer date labels to keep them legible.
+  const maxDateLabels = narrow ? 4 : 7;
+  const step = Math.ceil(allDates.length / maxDateLabels);
   const shownDates = allDates.filter((_, i) => i % step === 0 || i === allDates.length - 1);
 
   return (
@@ -271,7 +275,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
         })}
 
         {/* X-axis */}
-        <g transform={`translate(0, ${PADDING_TOP + CHART_H})`}>
+        <g transform={`translate(0, ${PADDING_TOP + plotHeight})`}>
           <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
           {shownDates.map((date) => {
             const x = xFor(date);

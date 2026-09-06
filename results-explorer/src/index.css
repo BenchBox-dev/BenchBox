@@ -492,9 +492,45 @@
         min-height: 7rem;
     }
 
+    .summary-mini-plot,
+    .summary-mini-stack,
+    .summary-mini-heatmap,
+    .summary-mini-grid {
+        min-width: 0;
+    }
+
     @media (max-width: 48rem) {
         .summary-metric-table {
             min-width: 34rem;
+        }
+
+        /* Give the preview cards a portrait canvas on phones. The full
+           charts use the same orientation change through their measured
+           narrow-container layouts below; previews should communicate that
+           shape before a reader opens one. */
+        .summary-chart-thumbnail {
+            min-height: 12rem;
+            padding: 0.75rem;
+        }
+
+        .summary-chart-thumbnail > .summary-mini-plot {
+            width: min(100%, 13rem);
+            height: 11rem !important;
+        }
+
+        .summary-chart-thumbnail > .summary-mini-stack {
+            display: flex;
+            width: min(100%, 13rem);
+            min-height: 10rem;
+            flex-direction: column;
+            justify-content: space-evenly;
+            gap: 0.35rem;
+        }
+
+        .summary-chart-thumbnail > .summary-mini-heatmap,
+        .summary-chart-thumbnail > .summary-mini-grid {
+            width: min(100%, 13rem);
+            align-content: center;
         }
     }
 

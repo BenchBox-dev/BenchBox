@@ -20,6 +20,7 @@ import { buildLogLatencyScale, computeBoxStats, logLatencyFraction, logLatencyTi
 import { formatTimingExclusion, isTimingDisplayable, platformTimingValue } from "@/lib/displayEligibility";
 import { formatLatencyMs } from "@/lib/metricFormatters";
 import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
+import { isNarrowChart, NARROW_CHART_MIN_WIDTH } from "@/lib/chartResponsive";
 
 const LABEL_W = 144;
 const ROW_H = 48;
@@ -33,7 +34,12 @@ interface Props {
 
 export function DistributionBox({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const w = Math.max(containerWidth, 400);
+  const narrow = isNarrowChart(containerWidth);
+  const w = Math.max(containerWidth, narrow ? NARROW_CHART_MIN_WIDTH : 400);
+  const labelWidth = narrow ? 112 : LABEL_W;
+  const rowHeight = narrow ? 56 : ROW_H;
+  const paddingTop = narrow ? 16 : PADDING_TOP;
+  const axisHeight = narrow ? 32 : AXIS_H;
 
   const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
@@ -44,7 +50,7 @@ export function DistributionBox({ summary }: Props) {
   // preserves the distinguishing suffix (date or short id) inside the same
   // budget. Audit finding #7.
   const rawLabels = summary.platforms.map((p, i) => cohortLabels[i]?.disambiguated ?? p.platform);
-  const displayLabels = preserveUniqueAfterTruncation(rawLabels, 20);
+  const displayLabels = preserveUniqueAfterTruncation(rawLabels, narrow ? 14 : 20);
   const rows = summary.platforms
     .map((p, i) => ({
       label: displayLabels[i] ?? p.platform,
@@ -69,11 +75,11 @@ export function DistributionBox({ summary }: Props) {
   if (scale === null) return null;
   const logScale = scale;
 
-  const plotW = w - LABEL_W - PADDING_RIGHT;
-  const totalH = PADDING_TOP + rows.length * ROW_H + AXIS_H;
+  const plotW = w - labelWidth - PADDING_RIGHT;
+  const totalH = paddingTop + rows.length * rowHeight + axisHeight;
 
   function xFor(ms: number): number {
-    return LABEL_W + logLatencyFraction(ms, logScale) * plotW;
+    return labelWidth + logLatencyFraction(ms, logScale) * plotW;
   }
 
   const xTicks = logLatencyTicks(logScale);
@@ -82,15 +88,15 @@ export function DistributionBox({ summary }: Props) {
     <div ref={containerRef} class="w-full overflow-x-auto">
       <svg class="bb-chart-svg" width={w} height={totalH} role="img" aria-label="Distribution box plots of per-query latency">
         {rows.map((row, ri) => {
-          const y = PADDING_TOP + ri * ROW_H;
-          const midY = y + ROW_H * 0.5;
-          const boxH = ROW_H * 0.46;
+          const y = paddingTop + ri * rowHeight;
+          const midY = y + rowHeight * 0.5;
+          const boxH = rowHeight * 0.46;
           const { min, q1, median, q3, max } = row.stats;
 
           return (
             <g key={row.label}>
               {/* Platform label */}
-              <text x={LABEL_W - 6} y={midY + 4} textAnchor="end" style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}>
+              <text x={labelWidth - 6} y={midY + 4} textAnchor="end" style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}>
                 <title>{row.fullLabel}</title>
                 {row.label}
               </text>
@@ -135,15 +141,15 @@ export function DistributionBox({ summary }: Props) {
 
               {/* Separator */}
               {ri < rows.length - 1 && (
-                <line x1={0} y1={y + ROW_H} x2={w} y2={y + ROW_H} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+                <line x1={0} y1={y + rowHeight} x2={w} y2={y + rowHeight} stroke="var(--bb-chart-grid)" strokeWidth={1} />
               )}
             </g>
           );
         })}
 
         {/* X-axis */}
-        <g transform={`translate(0, ${PADDING_TOP + rows.length * ROW_H})`}>
-          <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+        <g transform={`translate(0, ${paddingTop + rows.length * rowHeight})`}>
+          <line x1={labelWidth} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
           {xTicks.map((ms) => {
             const x = xFor(ms);
             return (
