@@ -259,5 +259,5 @@ Athena Spark uses DPU-hour billing:
 
 - [Amazon Athena SQL](athena.md) - SQL-based Athena (Trino)
 - [EMR Serverless](emr-serverless.md) - Batch Spark workloads
-- [AWS Glue](glue.md) - ETL-focused Spark
+- [AWS Glue](aws-glue.md) - ETL-focused Spark
 - [Cloud Platforms Overview](cloud-platforms.rst) - All cloud platforms

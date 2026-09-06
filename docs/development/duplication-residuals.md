@@ -15,7 +15,7 @@ collapse meaningful platform differences or require cross-boundary refactors
 owned by a different TODO.
 
 The full ranked inventory lives at
-[`duplication-inventory.csv`](./duplication-inventory.csv).
+`duplication-inventory.csv`.
 
 | Snapshot | Cluster pairs (≥15-line, full benchbox/) | Top cluster size |
 |---|---|---|

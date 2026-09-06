@@ -97,5 +97,5 @@ For cloud examples, see the [Configuration Guide](../../../examples/tunings/READ
 
 - [Getting Started Guide](../getting-started.md) - BenchBox fundamentals
 - [Configuration Guide](../configuration.md) - Platform configuration
-- [CLI Reference](../../reference/cli-reference.md) - Command-line interface
+- [CLI Reference](../../reference/cli/index.md) - Command-line interface
 - [API Reference](../../reference/api-reference.md) - Python API

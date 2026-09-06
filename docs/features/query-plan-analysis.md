@@ -730,9 +730,9 @@ The comparison engine uses:
 
 ## Further Reading
 
-- [API Documentation](../api/query-plan-models.md) - Programmatic usage
+- [Query Plans CLI Reference](../reference/cli/query-plans.md) - Programmatic usage
 - [Platform Guide](../platforms/) - Platform-specific details
-- [TPC-H Benchmark Guide](../benchmarks/tpch.md) - Query plan analysis examples
+- [TPC-H Benchmark Guide](../benchmarks/tpc-h.md) - Query plan analysis examples
 
 ## Support
 
