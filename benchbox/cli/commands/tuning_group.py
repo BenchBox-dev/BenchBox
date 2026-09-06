@@ -39,6 +39,8 @@ from benchbox.core.dataframe.tuning.profiles import (
     DATAFRAME_CAPABILITY_ROWS,
     DATAFRAME_PLATFORMS,
 )
+from benchbox.core.platform_manifest import get_platform_aliases
+from benchbox.platforms.adapter_factory import is_dataframe_mode
 
 
 @click.group("tuning")
@@ -109,21 +111,22 @@ def init(
       benchbox tuning init --platform dask --profile memory-constrained
     """
     platform_lower = platform.lower()
+    platform_key = get_platform_aliases("cli").get(platform_lower, platform_lower)
 
     # Auto-detect mode based on platform
     if mode == "auto":
-        mode = "dataframe" if platform_lower in DATAFRAME_PLATFORMS else "sql"
+        mode = "dataframe" if is_dataframe_mode(platform_lower) else "sql"
 
     # Validate mode/platform compatibility
-    if mode == "dataframe" and platform_lower not in DATAFRAME_PLATFORMS:
+    if mode == "dataframe" and platform_key not in DATAFRAME_PLATFORMS:
         console.print(f"[red]Platform '{platform}' does not support DataFrame mode[/red]")
         console.print(f"[yellow]DataFrame platforms: {', '.join(sorted(DATAFRAME_PLATFORMS))}[/yellow]")
         ctx.exit(1)
 
     if mode == "sql":
-        _init_sql_tuning(ctx, platform, output)
+        _init_sql_tuning(ctx, platform_key, output)
     else:
-        _init_dataframe_tuning(ctx, platform_lower, profile, output, smart_defaults)
+        _init_dataframe_tuning(ctx, platform_key, profile, output, smart_defaults)
 
 
 def _init_sql_tuning(ctx: click.Context, platform: str, output: Optional[str]) -> None:
@@ -228,7 +231,7 @@ def _create_profile_config(platform: str, profile: str) -> DataFrameTuningConfig
 @click.argument("config_file", type=click.Path(exists=True))
 @click.option(
     "--platform",
-    type=click.Choice(["polars", "pandas", "dask", "modin", "cudf"], case_sensitive=False),
+    type=click.Choice(["datafusion", "polars", "pandas", "dask", "modin", "cudf"], case_sensitive=False),
     required=True,
     help="Target DataFrame platform",
 )
@@ -240,6 +243,7 @@ def validate_config(config_file: str, platform: str) -> None:
 
     \b
     Examples:
+      benchbox tuning validate datafusion_tuning.yaml --platform datafusion
       benchbox tuning validate polars_tuning.yaml --platform polars
       benchbox tuning validate my_config.yaml --platform dask
     """
@@ -283,7 +287,7 @@ def validate_config(config_file: str, platform: str) -> None:
 @tuning_group.command("defaults")
 @click.option(
     "--platform",
-    type=click.Choice(["polars", "pandas", "dask", "modin", "cudf"], case_sensitive=False),
+    type=click.Choice(sorted(DATAFRAME_PLATFORMS), case_sensitive=False),
     required=True,
     help="Target DataFrame platform",
 )
@@ -330,7 +334,8 @@ def show_defaults(platform: str) -> None:
     console.print(f"\n[bold]Recommended Settings for {platform.title()}:[/bold]")
     _display_config_settings_table(config)
 
-    console.print(f"\n[dim]To use these settings: benchbox run --platform {platform} --tuning auto[/dim]")
+    mode_option = " --mode dataframe" if platform.lower() == "datafusion" else ""
+    console.print(f"\n[dim]To use these settings: benchbox run --platform {platform}{mode_option} --tuning auto[/dim]")
 
 
 def _display_config_settings_table(config: DataFrameTuningConfiguration) -> None:

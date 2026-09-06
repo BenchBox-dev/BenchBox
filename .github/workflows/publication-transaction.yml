@@ -4,13 +4,12 @@ name: Publication Transactions
   workflow_dispatch:
     inputs:
       kind:
-        description: "Transaction kind: promotion, rollback, or legacy_recovery"
+        description: "Transaction kind: promotion or rollback"
         required: true
         type: choice
         options:
           - promotion
           - rollback
-          - legacy_recovery
         default: promotion
       develop_sha:
         description: "Pinned develop commit SHA (40 hex)"
@@ -74,6 +73,7 @@ jobs:
       develop_sha: ${{ steps.inputs.outputs.develop_sha }}
       published_results_sha: ${{ steps.inputs.outputs.published_results_sha }}
       candidate_run_id: ${{ steps.inputs.outputs.candidate_run_id }}
+      candidate_manifest_digest: ${{ steps.prepare_tx.outputs.candidate_manifest_digest }}
       artifact_id: ${{ steps.prepare_tx.outputs.artifact_id }}
     steps:
       - name: Checkout control-plane source
@@ -88,6 +88,11 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+
+      - name: Fetch publication journal
+        shell: bash
+        run: |
+          git fetch origin refs/heads/publication:refs/heads/publication || true
 
       - name: Validate dispatch inputs
         id: inputs
@@ -187,6 +192,11 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
 
+      - name: Fetch publication journal
+        shell: bash
+        run: |
+          git fetch origin refs/heads/publication:refs/heads/publication || true
+
       - name: Download transaction permit
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
         with:
@@ -229,8 +239,40 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$CANDIDATE_RUN_ID" || { echo "::error::candidate run is required for promotion"; exit 1; }
+          CANDIDATE_RUN_INFO=$(gh run view "$CANDIDATE_RUN_ID" --json headSha,conclusion,status)
+          CANDIDATE_HEAD_SHA=$(echo "$CANDIDATE_RUN_INFO" | jq -r .headSha)
+          CANDIDATE_STATUS=$(echo "$CANDIDATE_RUN_INFO" | jq -r .status)
+          CANDIDATE_CONCLUSION=$(echo "$CANDIDATE_RUN_INFO" | jq -r .conclusion)
+          if [ "$CANDIDATE_STATUS" != "completed" ] || [ "$CANDIDATE_CONCLUSION" != "success" ]; then
+            echo "::error::candidate run $CANDIDATE_RUN_ID has not completed successfully ($CANDIDATE_STATUS, $CANDIDATE_CONCLUSION)"
+            exit 1
+          fi
+          if [ "$CANDIDATE_HEAD_SHA" != "${{ needs.prepare.outputs.develop_sha }}" ]; then
+            echo "::error::candidate run head SHA $CANDIDATE_HEAD_SHA does not match approved commit ${{ needs.prepare.outputs.develop_sha }}"
+            exit 1
+          fi
+          CANDIDATE_WORKFLOW=$(gh run view "$CANDIDATE_RUN_ID" --json workflowName --jq .workflowName)
+          CANDIDATE_BRANCH=$(gh run view "$CANDIDATE_RUN_ID" --json headBranch --jq .headBranch)
+          case "$CANDIDATE_WORKFLOW" in
+            "Publication Control Plane Deployment"|"Publication Preview Deploy (G2)") ;;
+            *) echo "::error::candidate run uses unexpected workflow: $CANDIDATE_WORKFLOW"; exit 1 ;;
+          esac
+          test "$CANDIDATE_BRANCH" = "develop" || {
+            echo "::error::candidate run head branch is not develop: $CANDIDATE_BRANCH"; exit 1;
+          }
           mkdir -p site
           gh run download "$CANDIDATE_RUN_ID" --name "publication-site-${{ needs.prepare.outputs.generation }}" --dir site
+          rm -rf candidate-receipts && mkdir -p candidate-receipts
+          gh run download "$CANDIDATE_RUN_ID" \
+            --name "publication-candidate-receipts-${{ needs.prepare.outputs.generation }}-${CANDIDATE_RUN_ID}" \
+            --dir candidate-receipts
+          test -s candidate-receipts/desired-manifest.json || {
+            echo "::error::candidate run did not provide its signed desired manifest"; exit 1;
+          }
+          test "$(jq -r .manifest_digest candidate-receipts/desired-manifest.json)" = \
+            "${{ needs.prepare.outputs.candidate_manifest_digest }}" || {
+            echo "::error::candidate manifest digest does not match the approved permit"; exit 1;
+          }
           test -s site/index.html || { echo "::error::candidate site is incomplete"; exit 1; }
           uv run python - <<'PY'
           import os
@@ -266,7 +308,8 @@ jobs:
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
         with:
           script: |
-            const { createDeployment } = require('./scripts/publication/pages.cjs');
+            const { createDeployment, getDeploymentStatus } = require('./scripts/publication/pages.cjs');
+            const deployedArtifactId = ${{ needs.prepare.outputs.kind == 'rollback' && needs.prepare.outputs.artifact_id || steps.upload_pages.outputs.artifact-id }};
             const result = await createDeployment({
               github,
               core,
@@ -274,14 +317,51 @@ jobs:
               effect: {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                artifact_id: ${{ needs.prepare.outputs.kind == 'rollback' && needs.prepare.outputs.artifact_id || steps.upload_pages.outputs.artifact_id }},
+                artifact_id: deployedArtifactId,
                 pages_build_version: '${{ steps.start_write.outputs.pages_build_version }}',
               }
             });
-            core.setOutput('deployment_id', result.id || 'pages-deploy-${{ github.run_id }}');
-            core.setOutput('status_url', result.status_url || '');
-            core.setOutput('page_url', result.page_url || 'https://benchbox.dev');
-            core.setOutput('status', 'SUCCESS');
+            const deploymentId = result.id || 'pages-deploy-${{ github.run_id }}';
+            let status = 'PENDING';
+            let terminal = false;
+            let statusUrl = result.status_url || '';
+            let pageUrl = result.page_url || 'https://benchbox.dev';
+            if (result.id) {
+              for (let i = 0; i < 12; i++) {
+                try {
+                  const s = await getDeploymentStatus({
+                    github,
+                    context,
+                    options: { owner: context.repo.owner, repo: context.repo.repo, deployment_id: result.id }
+                  });
+                  if (s.status === 'SUCCESS' || s.status === 'ACTIVE') {
+                    status = 'SUCCESS';
+                    terminal = true;
+                    if (s.page_url) pageUrl = s.page_url;
+                    break;
+                  } else if (s.status === 'FAILED' || s.status === 'FAILURE') {
+                    status = 'FAILED';
+                    terminal = true;
+                    break;
+                  }
+                } catch (e) {
+                  core.warning(`Status check warning: ${e.message}`);
+                }
+                await new Promise(r => setTimeout(r, 5000));
+              }
+            }
+            if (!terminal) {
+              status = 'FAILED';
+              throw new Error(`Pages deployment did not reach a terminal successful state for ${deploymentId}`);
+            }
+            core.setOutput('deployment_id', deploymentId);
+            core.setOutput('status_url', statusUrl);
+            core.setOutput('page_url', pageUrl);
+            core.setOutput('deployed_artifact_id', deployedArtifactId);
+            core.setOutput('status', status);
+            if (status === 'FAILED') {
+              throw new Error(`Pages deployment failed for ${deploymentId}`);
+            }
 
       - name: Record write acknowledgement in journal CAS
         shell: bash
@@ -292,7 +372,8 @@ jobs:
             "id": "${{ steps.pages_deploy.outputs.deployment_id }}",
             "status_url": "${{ steps.pages_deploy.outputs.status_url }}",
             "status": "SUCCESS",
-            "page_url": "${{ steps.pages_deploy.outputs.page_url }}"
+            "page_url": "${{ steps.pages_deploy.outputs.page_url }}",
+            "artifact_id": "${{ steps.pages_deploy.outputs.deployed_artifact_id }}"
           }
           EOF
           uv run python scripts/publication/transaction_executor.py acknowledge-write \
@@ -338,6 +419,11 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
 
+      - name: Fetch publication journal
+        shell: bash
+        run: |
+          git fetch origin refs/heads/publication:refs/heads/publication || true
+
       - name: Probe required live routes
         id: probe
         shell: bash
@@ -345,14 +431,17 @@ jobs:
           set -euo pipefail
           mkdir -p transaction-artifacts
           TARGET_URL="${{ needs.deploy.outputs.page_url }}"
+          CANDIDATE_MANIFEST="candidate-receipts/desired-manifest.json"
           uv run python scripts/publication/verify_live.py \
             --base-url "$TARGET_URL" \
+            --candidate-manifest "$CANDIDATE_MANIFEST" \
+            --require-receipt \
             --observation-origin github-actions:publication-transaction \
             --timeout 60 --json > transaction-artifacts/probe-report.json
           uv run python - <<'PY'
           import json
           report = json.load(open('transaction-artifacts/probe-report.json'))
-          if not report.get('success') or not report.get('probes'):
+          if not report.get('ok') or not report.get('probes'):
               raise SystemExit('live endpoint verification did not produce successful observations')
           if any(not probe.get('ok') for probe in report['probes']):
               raise SystemExit('one or more live endpoint observations failed')
@@ -394,6 +483,8 @@ jobs:
               'attestor': 'github-actions:publication-transaction',
               'signature_algorithm': 'ed25519',
               'prior_live_receipt_id': tx.parent_transaction_id,
+              'receipt_run_id': "${{ github.run_id }}",
+              'source_commit': tx.content.get('develop_sha'),
           }
           open('transaction-artifacts/live-receipt.json', 'w').write(json.dumps(receipt, sort_keys=True) + '\n')
           PY
@@ -470,6 +561,11 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+
+      - name: Fetch publication journal
+        shell: bash
+        run: |
+          git fetch origin refs/heads/publication:refs/heads/publication || true
 
       - name: Advance durable head in journal CAS
         shell: bash

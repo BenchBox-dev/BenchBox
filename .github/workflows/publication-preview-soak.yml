@@ -50,6 +50,7 @@ jobs:
       generation: ${{ steps.resolve.outputs.generation }}
       run_id: ${{ steps.resolve.outputs.run_id }}
       verdict: ${{ steps.probe.outputs.verdict }}
+      skipped: ${{ steps.resolve.outputs.skipped }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -79,8 +80,10 @@ jobs:
             --status=success --limit=1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || true)
           if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
             echo "::notice::no successful preview-deploy run found (preview deploy is disabled in code); skipping soak probe"
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          echo "skipped=false" >> "$GITHUB_OUTPUT"
           rm -rf deploy-record && mkdir -p deploy-record
           NAME=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts" \
             --jq '[.artifacts[].name | select(startswith("preview-deploy-record-"))][0]')
@@ -100,6 +103,7 @@ jobs:
           echo "probing generation $GENERATION from run $RUN_ID"
 
       - name: Build probe manifests from deploy record
+        if: steps.resolve.outputs.skipped != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -142,6 +146,7 @@ jobs:
           EOF
 
       - name: Probe root stability (inconclusive on failure)
+        if: steps.resolve.outputs.skipped != 'true'
         id: root
         shell: bash
         run: |
@@ -157,6 +162,7 @@ jobs:
           cat root-observation.json
 
       - name: Probe preview equivalence (fail on mismatch)
+        if: steps.resolve.outputs.skipped != 'true'
         id: preview
         shell: bash
         run: |
@@ -172,6 +178,7 @@ jobs:
           cat preview-observation.json
 
       - name: Record observation verdict
+        if: steps.resolve.outputs.skipped != 'true'
         id: probe
         shell: bash
         run: |
@@ -205,7 +212,7 @@ jobs:
           fi
 
       - name: Upload observation
-        if: always()
+        if: always() && steps.resolve.outputs.skipped != 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: preview-observation-${{ steps.resolve.outputs.generation }}-${{ github.run_id }}
@@ -215,7 +222,7 @@ jobs:
   conclude:
     name: Assemble live receipt after 12h green soak
     needs: probe
-    if: inputs.conclude == true
+    if: inputs.conclude == true && needs.probe.outputs.skipped != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

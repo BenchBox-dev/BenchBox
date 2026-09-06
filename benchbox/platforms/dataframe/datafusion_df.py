@@ -181,6 +181,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
 
         # Apply execution settings
         if config.execution.streaming_mode:
+            # Per-query only — not a global setting, so do not record as applied.
             self._log_verbose("Note: DataFusion streaming mode is per-query, not global")
 
         # Apply memory settings (DataFusion manages memory through Arrow)
@@ -214,6 +215,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         runtime = self._configure_runtime_environment()
 
         # Create session configuration
+        configured_context = False
         if SessionConfig is not None:
             try:
                 config = SessionConfig()
@@ -248,6 +250,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
                         ctx = SessionContext(config)
                 else:
                     ctx = SessionContext(config)
+                configured_context = True
 
             except Exception as e:
                 # Fall back to default context if configuration fails
@@ -255,6 +258,13 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
                 ctx = SessionContext()
         else:
             ctx = SessionContext()
+
+        if configured_context:
+            config = self._tuning_config
+            if config.parallelism.thread_count is not None:
+                self._record_runtime_tuning(f"target_partitions={self._target_partitions}")
+            if config.memory.chunk_size is not None:
+                self._record_runtime_tuning(f"batch_size={self._batch_size}")
 
         # Log configuration
         config_parts = [

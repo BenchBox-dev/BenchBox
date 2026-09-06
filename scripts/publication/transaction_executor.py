@@ -29,6 +29,7 @@ if str(ROOT) not in sys.path:
 import urllib.error
 import urllib.request
 import uuid
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -171,6 +172,9 @@ def cmd_prepare(args: argparse.Namespace) -> int:
         "generation": tx.generation,
         "parent_transaction_id": tx.parent_transaction_id,
         "content_digest": tx.content.get("manifest_digest"),
+        "candidate_run_id": getattr(args, "candidate_run_id", None),
+        "candidate_artifact_id": tx.artifact.get("artifact_id"),
+        "candidate_archive_sha256": tx.artifact.get("archive_sha256"),
         "desired_digest": tx.desired.get("digest"),
         "expected_parent_oid": journal_state.tip_commit_oid,
         "expected_journal_revision": journal_state.tip_commit_oid,
@@ -195,6 +199,8 @@ def cmd_prepare(args: argparse.Namespace) -> int:
             f.write(f"permit_sha256={permit_digest}\n")
             f.write(f"transaction_id={tx.transaction_id}\n")
             f.write(f"generation={tx.generation}\n")
+            if tx.content.get("manifest_digest") is not None:
+                f.write(f"candidate_manifest_digest={tx.content['manifest_digest']}\n")
             if tx.artifact.get("artifact_id") is not None:
                 f.write(f"artifact_id={tx.artifact['artifact_id']}\n")
 
@@ -364,18 +370,6 @@ def cmd_start_write(args: argparse.Namespace) -> int:
     if tx.state not in (STATE_PREPARED, STATE_ROLLBACK_WRITE_STARTED):
         raise TransactionError(f"Cannot start write from state {tx.state}")
 
-    if tx.kind == KIND_ROLLBACK and tx.state == STATE_ROLLBACK_WRITE_STARTED:
-        build_ver = tx.restore_source.get("manifest_digest", "")[:40] if tx.restore_source else tx.transaction_id[:40]
-        github_output = os.environ.get("GITHUB_OUTPUT")
-        if github_output:
-            with open(github_output, "a", encoding="utf-8") as gf:
-                gf.write(f"pages_build_version={build_ver}\n")
-                gf.write(f"write_id={tx.transaction_id}\n")
-        if args.output_tx:
-            _write_json(args.output_tx, tx.to_dict())
-        print(f"Rollback write ready for {tx.transaction_id}: pages_build_version={build_ver}")
-        return 0
-
     # Create a unique write-intent commit on the repository
     # Intent commit OID is the pages_build_version passed to Pages API
     msg = f"write-intent: transaction {tx.transaction_id} gen {tx.generation}"
@@ -386,19 +380,37 @@ def cmd_start_write(args: argparse.Namespace) -> int:
         text=True,
         check=True,
     ).stdout.strip()
+    intent_env = dict(os.environ)
+    intent_env.setdefault("GIT_AUTHOR_NAME", "BenchBox Publication Controller")
+    intent_env.setdefault("GIT_AUTHOR_EMAIL", "publication-controller@benchbox.dev")
+    intent_env.setdefault("GIT_COMMITTER_NAME", "BenchBox Publication Controller")
+    intent_env.setdefault("GIT_COMMITTER_EMAIL", "publication-controller@benchbox.dev")
     intent_commit_oid = subprocess.run(
         ["git", "commit-tree", tree_oid, "-p", journal_state.tip_commit_oid, "-m", msg],
         cwd=repo_path,
+        env=intent_env,
         capture_output=True,
         text=True,
         check=True,
     ).stdout.strip()
 
-    updated_tx, effect = transaction.transition(
-        tx,
-        EVENT_START_WRITE,
-        payload={"intent_commit_oid": intent_commit_oid, "write_id": tx.transaction_id},
-    )
+    if tx.kind == KIND_ROLLBACK:
+        updated_tx = replace(
+            tx,
+            write={
+                "write_id": tx.transaction_id,
+                "intent_commit_oid": intent_commit_oid,
+                "pages_build_version": intent_commit_oid,
+                "status": "in_flight",
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    else:
+        updated_tx, _ = transaction.transition(
+            tx,
+            EVENT_START_WRITE,
+            payload={"intent_commit_oid": intent_commit_oid, "write_id": tx.transaction_id},
+        )
 
     updated_state, commit_oid = journal.write_journal_update(
         repo_path=repo_path,
