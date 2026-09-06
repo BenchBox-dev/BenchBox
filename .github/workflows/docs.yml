@@ -288,11 +288,23 @@ jobs:
               raise SystemExit(1)
           receipt = json.loads(path.read_text())
           valid, _ = verify_live_receipt_signature(receipt)
-          if not valid or receipt.get("target") != "benchbox.dev":
+          target = receipt.get("target")
+          target_host = target.get("host") if isinstance(target, dict) else target
+          if isinstance(target, dict) and not target_host:
+              base_url = target.get("base_url") or target.get("url")
+              target_host = str(base_url or "").rstrip("/").split("://")[-1]
+          if not valid or target_host != "benchbox.dev":
               raise SystemExit(1)
-          if str(receipt.get("receipt_run_id", receipt.get("artifact_run_id"))) != os.environ["EXPECTED_RUN_ID"]:
+          receipt_run = (
+              receipt.get("receipt_run_id")
+              or receipt.get("artifact_run_id")
+              or receipt.get("workflow_run_id")
+              or receipt.get("writer_run_id")
+          )
+          if str(receipt_run) != os.environ["EXPECTED_RUN_ID"]:
               raise SystemExit(1)
-          if not re.fullmatch(r"[0-9a-f]{40}", str(receipt.get("source_commit", ""))):
+          source_commit = receipt.get("source_commit") or receipt.get("develop_sha")
+          if not re.fullmatch(r"[0-9a-f]{40}", str(source_commit or "")):
               raise SystemExit(1)
           if os.environ["RUN_CONCLUSION"] != "success":
               if not str(receipt.get("receipt_id", "")).startswith("rollback-"):

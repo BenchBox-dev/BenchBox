@@ -377,6 +377,9 @@ def _handle_write_started(
                 "observed_at": ev["timestamp"],
             }
         )
+        deployed_artifact_id = payload.get("artifact_id")
+        if deployed_artifact_id not in (None, ""):
+            data["artifact"] = {**(data.get("artifact") or {}), "artifact_id": int(deployed_artifact_id)}
         data["write"] = write_info
         tx = Transaction(**data)
         return tx, Effect(action="probe_endpoints", data={"write_id": write_info.get("write_id")})
