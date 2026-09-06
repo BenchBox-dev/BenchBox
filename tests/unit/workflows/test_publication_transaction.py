@@ -1,4 +1,4 @@
-"""Contract and architecture tests for publication transactions workflow (Slice C)."""
+"""Contract and architecture tests for publication transactions workflow."""
 
 from __future__ import annotations
 

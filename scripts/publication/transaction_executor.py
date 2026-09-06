@@ -196,6 +196,8 @@ def cmd_prepare(args: argparse.Namespace) -> int:
             f.write(f"permit_sha256={permit_digest}\n")
             f.write(f"transaction_id={tx.transaction_id}\n")
             f.write(f"generation={tx.generation}\n")
+            if tx.content.get("manifest_digest") is not None:
+                f.write(f"candidate_manifest_digest={tx.content['manifest_digest']}\n")
             if tx.artifact.get("artifact_id") is not None:
                 f.write(f"artifact_id={tx.artifact['artifact_id']}\n")
 
@@ -375,9 +377,15 @@ def cmd_start_write(args: argparse.Namespace) -> int:
         text=True,
         check=True,
     ).stdout.strip()
+    intent_env = dict(os.environ)
+    intent_env.setdefault("GIT_AUTHOR_NAME", "BenchBox Publication Controller")
+    intent_env.setdefault("GIT_AUTHOR_EMAIL", "publication-controller@benchbox.dev")
+    intent_env.setdefault("GIT_COMMITTER_NAME", "BenchBox Publication Controller")
+    intent_env.setdefault("GIT_COMMITTER_EMAIL", "publication-controller@benchbox.dev")
     intent_commit_oid = subprocess.run(
         ["git", "commit-tree", tree_oid, "-p", journal_state.tip_commit_oid, "-m", msg],
         cwd=repo_path,
+        env=intent_env,
         capture_output=True,
         text=True,
         check=True,
