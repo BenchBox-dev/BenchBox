@@ -128,7 +128,9 @@ def test_preview_deploy_stops_after_independent_publication_takes_ownership() ->
     guard_index = next(
         index for index, step in enumerate(steps) if step.get("name") == "Check for independent publication ownership"
     )
-    deploy_index = next(index for index, step in enumerate(steps) if step.get("uses") == "actions/deploy-pages@v4")
+    deploy_index = next(
+        index for index, step in enumerate(steps) if str(step.get("uses", "")).startswith("actions/deploy-pages@")
+    )
 
     assert deploy["permissions"]["actions"] == "read"
     assert guard_index < deploy_index

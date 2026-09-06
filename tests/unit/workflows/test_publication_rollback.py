@@ -39,7 +39,7 @@ def test_workflow_is_dispatch_only_with_required_inputs() -> None:
     assert dispatch_inputs["candidate_only"]["type"] == "boolean"
     assert "force_rollback" in dispatch_inputs
     assert dispatch_inputs["force_rollback"]["type"] == "boolean"
-    assert "rollback_target_sha" in dispatch_inputs
+    assert "rollback_target_sha" not in dispatch_inputs
     assert dispatch_inputs["develop_sha"]["required"] is True
     assert dispatch_inputs["published_results_sha"]["required"] is True
     assert dispatch_inputs["generation"]["required"] is True
@@ -73,11 +73,18 @@ def test_workflow_permissions_follow_least_privilege() -> None:
 
 
 def test_workflow_uses_pages_deploy_actions_only_in_write_jobs() -> None:
+    wf = _workflow()
     text = _workflow_text()
     assert DEPLOY_PAGES_ACTION in text
     assert UPLOAD_PAGES_ACTION in text
     assert "group: pages-deploy" in text
     assert "cancel-in-progress: false" in text
+
+    # Concurrency is scoped to write jobs, never candidate build
+    assert "concurrency" not in wf
+    assert wf["jobs"]["deploy"]["concurrency"] == {"group": "pages-deploy", "cancel-in-progress": False}
+    assert wf["jobs"]["rollback"]["concurrency"] == {"group": "pages-deploy", "cancel-in-progress": False}
+    assert "concurrency" not in wf["jobs"]["build"]
 
 
 def test_workflow_job_dependencies_and_ordering() -> None:
