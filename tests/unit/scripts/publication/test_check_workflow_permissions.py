@@ -206,6 +206,53 @@ def test_repo_publication_transaction_passes_audit() -> None:
     assert errors == [], f"Errors found in real publication-transaction.yml: {errors}"
 
 
+def test_repo_publication_recover_passes_audit() -> None:
+    real_wf = Path(__file__).parents[4] / ".github" / "workflows" / "publication-recover.yml"
+    assert real_wf.is_file()
+    errors = checker.audit_workflow_file(real_wf, strict=True)
+    assert errors == [], f"Errors found in real publication-recover.yml: {errors}"
+
+
+def test_publication_recover_permissions_detects_violations(tmp_path: Path) -> None:
+    wf = tmp_path / "publication-recover.yml"
+
+    # Top-level not contents: read
+    bad_top = {"permissions": {"contents": "write"}, "jobs": {}}
+    assert any(
+        "Top-level permissions must be 'contents: read'" in e
+        for e in checker.check_publication_recover_permissions(wf, bad_top)
+    )
+
+    # Scan job escalated
+    bad_scan = {
+        "permissions": {"contents": "read"},
+        "jobs": {
+            "scan": {"permissions": {"contents": "write"}},
+            "act": {
+                "permissions": {"actions": "read", "contents": "write", "id-token": "write", "pages": "write"},
+                "environment": "github-pages",
+            },
+        },
+    }
+    assert any("job 'scan'" in e for e in checker.check_publication_recover_permissions(wf, bad_scan))
+
+    # Act job wrong environment
+    bad_env = {
+        "permissions": {"contents": "read"},
+        "jobs": {
+            "scan": {"permissions": {"actions": "read", "contents": "read"}},
+            "act": {
+                "permissions": {"actions": "read", "contents": "write", "id-token": "write", "pages": "write"},
+                "environment": "production",
+            },
+        },
+    }
+    assert any(
+        "must target environment 'github-pages'" in e
+        for e in checker.check_publication_recover_permissions(wf, bad_env)
+    )
+
+
 def test_main_all_workflows_pass() -> None:
     rc = checker.main([])
     assert rc == 0
