@@ -8,6 +8,7 @@ import { formatCount } from "@/lib/copyFormatters";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { useUrlState, type UrlSerde } from "@/lib/useUrlState";
 import { errMsg } from "@/utils";
+import { RunAge } from "@/components/RunAge";
 
 type SectionKind = "benchmarks" | "platforms";
 type SectionSort = "name" | "results" | "recent";
@@ -131,7 +132,7 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
                     </div>
                   </dl>
                   <p class="mt-4 text-xs text-[var(--bb-data-fg-muted)]">
-                    Latest result {formatRunDate(entry.latestRun)}
+                    Latest result {formatRunDate(entry.latestRun)}<RunAge runDate={entry.latestRun} />
                   </p>
                 </a>
               </li>

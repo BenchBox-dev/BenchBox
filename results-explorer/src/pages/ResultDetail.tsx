@@ -23,6 +23,7 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { formatEnumLabel, formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
 import { formatDurationSeconds, formatLatencyMs } from "@/lib/metricFormatters";
 import { visibleResultIdForRow } from "@/lib/resultLinks";
+import { RunDateWithAge } from "@/components/RunAge";
 import { useLocalResultState } from "@/lib/localResultState";
 import { LocalResultPicker } from "@/components/LocalResultPicker";
 
@@ -307,8 +308,9 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
               )}
             </div>
             <p class="text-sm text-[var(--bb-data-fg-muted)]">
-              This {benchmarkLabel} run used scale factor {detail.scale_factor} for the {detail.test_type ? formatEnumLabel(detail.test_type) : "standard"} phase on{" "}
-              {detail.run_date.slice(0, 10)} · {isLocal ? "Local preview ID" : "Public ID"}{" "}
+              This {benchmarkLabel} run used scale factor {detail.scale_factor} for the{" "}
+              {detail.test_type ? formatEnumLabel(detail.test_type) : "standard"} phase on{" "}
+              <RunDateWithAge runDate={detail.run_date} /> · {isLocal ? "Local preview ID" : "Public ID"}{" "}
               <code class="font-mono text-[var(--bb-data-fg-primary)]">{visibleResultIdForRow(detail)}</code>
             </p>
           </div>
