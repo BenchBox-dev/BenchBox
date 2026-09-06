@@ -1,4 +1,4 @@
-name: Publication Watchdog & Recovery (G3)
+name: Publication Watchdog & Recovery
 
 on:
   workflow_run:

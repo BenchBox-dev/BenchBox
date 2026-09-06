@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Canonical CLI and execution engine for publication transactions (Slice C).
+"""Canonical CLI and execution engine for publication transactions.
 
 Drives the transactional publication lifecycle:
 - prepare: validates candidate bytes or restore source, queries journal, generates canonical permit
@@ -225,7 +225,10 @@ def cmd_resume(args: argparse.Namespace) -> int:
         "kind": tx.kind,
         "generation": tx.generation,
         "parent_transaction_id": tx.parent_transaction_id,
+        "restore_transaction_id": (tx.restore_source or {}).get("parent_transaction_id"),
         "content_digest": tx.content.get("manifest_digest"),
+        "artifact_id": tx.artifact.get("artifact_id"),
+        "artifact_archive_sha256": tx.artifact.get("archive_sha256"),
         "desired_digest": tx.desired.get("digest"),
         "expected_parent_oid": journal_state.tip_commit_oid,
         "expected_journal_revision": journal_state.tip_commit_oid,
@@ -237,7 +240,6 @@ def cmd_resume(args: argparse.Namespace) -> int:
         "nonce": uuid.uuid4().hex,
     }
     permit_digest = hashlib.sha256(canonical_json(permit).encode("utf-8")).hexdigest()
-    permit["permit_sha256"] = permit_digest
     _write_json(args.output_permit, permit)
     _write_json(args.output_tx, tx.to_dict())
     github_output = os.environ.get("GITHUB_OUTPUT")
