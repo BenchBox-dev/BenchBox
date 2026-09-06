@@ -13,6 +13,11 @@ from scripts.publication import journal as journal_mod, transaction as tx_mod
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
+@pytest.fixture(autouse=True)
+def valid_receipt_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tx_mod, "validate_live_receipt_contract", lambda receipt: [])
+
+
 @pytest.fixture
 def git_repo(tmp_path: Path) -> Path:
     """Create a temporary initialized Git repository with an initial commit."""
@@ -50,7 +55,14 @@ def genesis_tx() -> tx_mod.Transaction:
         transaction_id="genesis-tx-0001",
     )
     # Mark as durable genesis
-    return tx_mod.Transaction(**{**tx.to_dict(), "state": tx_mod.STATE_DURABLE})
+    attestation = {
+        "target": tx.target,
+        "generation": tx.generation,
+        "manifest_digest": tx.content["manifest_digest"],
+        "artifact_digest": tx.artifact["archive_sha256"],
+        "observation_digest": "genesis-observation",
+    }
+    return tx_mod.Transaction(**{**tx.to_dict(), "state": tx_mod.STATE_DURABLE, "attestation": attestation})
 
 
 def test_init_genesis_and_read(git_repo: Path, genesis_tx: tx_mod.Transaction) -> None:

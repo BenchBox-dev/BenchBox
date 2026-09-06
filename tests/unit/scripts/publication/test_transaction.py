@@ -11,7 +11,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 @pytest.fixture(autouse=True)
 def valid_receipt_signature(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(tx_mod, "verify_live_receipt_signature", lambda receipt: (True, ""))
+    monkeypatch.setattr(tx_mod, "validate_live_receipt_contract", lambda receipt: [])
 
 
 def receipt_for(tx: tx_mod.Transaction, observation_digest: str) -> dict[str, object]:
@@ -228,6 +228,41 @@ def test_prepare_rollback_rejects_non_durable_source(base_context: dict[str, dic
             failed_transaction=failed_tx,
             parent_durable_transaction=parent_tx,
             generation=11,
+            controller=base_context["controller"],
+            owner=base_context["owner"],
+            barrier_evidence={},
+        )
+
+
+def test_prepare_rollback_requires_advancing_generation(base_context: dict[str, dict[str, str]]) -> None:
+    parent_tx, _ = tx_mod.prepare_promotion(
+        target=base_context["target"],
+        generation=9,
+        parent_transaction_id="g8",
+        approval=base_context["approval"],
+        controller=base_context["controller"],
+        owner=base_context["owner"],
+        content=base_context["content"],
+        artifact=base_context["artifact"],
+    )
+    parent_tx = make_durable(parent_tx)
+    failed_tx, _ = tx_mod.prepare_promotion(
+        target=base_context["target"],
+        generation=10,
+        parent_transaction_id=parent_tx.transaction_id,
+        approval=base_context["approval"],
+        controller=base_context["controller"],
+        owner=base_context["owner"],
+        content=base_context["content"],
+        artifact=base_context["artifact"],
+    )
+    failed_tx, _ = tx_mod.transition(failed_tx, tx_mod.EVENT_FAIL_WRITE, {"reason": "pre-send failure"})
+
+    with pytest.raises(tx_mod.TransactionError, match="generation must advance"):
+        tx_mod.prepare_rollback(
+            failed_transaction=failed_tx,
+            parent_durable_transaction=parent_tx,
+            generation=10,
             controller=base_context["controller"],
             owner=base_context["owner"],
             barrier_evidence={},

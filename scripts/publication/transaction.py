@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from scripts.publication.reconciliation import verify_live_receipt_signature
+from scripts.publication.reconciliation import validate_live_receipt_contract
 
 SCHEMA_VERSION = 1
 OBJECT_TYPE = "publication-transaction"
@@ -83,9 +83,9 @@ def validate_live_receipt(current: Transaction, payload: dict[str, Any]) -> dict
     receipt = payload.get("attestation")
     if not isinstance(receipt, dict):
         raise TransactionError("A signed live-receipt attestation is required for verification success")
-    signature_valid, signature_error = verify_live_receipt_signature(receipt)
-    if not signature_valid:
-        raise TransactionError(f"Live-receipt attestation signature is invalid: {signature_error}")
+    contract_findings = validate_live_receipt_contract(receipt)
+    if contract_findings:
+        raise TransactionError(f"Live-receipt attestation is invalid: {contract_findings[0].description}")
 
     artifact = receipt.get("artifact") if isinstance(receipt.get("artifact"), dict) else {}
     bindings = {
@@ -210,6 +210,8 @@ def prepare_rollback(
     """Prepare a successor rollback transaction describing restored parent bytes."""
     if failed_transaction.state not in (STATE_RECOVERY_REQUIRED, STATE_WRITE_STARTED, STATE_WRITE_ACKNOWLEDGED):
         raise TransactionError(f"Cannot initiate rollback from non-recoverable state: {failed_transaction.state}")
+    if generation <= failed_transaction.generation:
+        raise TransactionError("Rollback generation must advance beyond the failed transaction generation")
 
     if parent_durable_transaction.state not in (STATE_DURABLE, STATE_ROLLBACK_DURABLE):
         raise TransactionError("Rollback source must be a durable transaction")

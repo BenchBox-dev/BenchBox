@@ -257,7 +257,13 @@ def write_journal_update(
                 raise CasConflictError(
                     f"CAS update on remote ref '{ref}' failed (expected {expected_parent_oid}): {p_update.stderr.strip()}"
                 )
-        _run_git(["update-ref", f"refs/heads/{ref}", commit_oid], cwd=repo_path)
+        elif not resolve_timeout_or_recheck(repo_path, commit_oid, ref=ref):
+            raise JournalError(f"Remote ref '{ref}' did not retain committed journal update {commit_oid}")
+
+        authoritative_tip = _run_git(["rev-parse", "FETCH_HEAD"], cwd=repo_path)
+        _run_git(["update-ref", f"refs/heads/{ref}", authoritative_tip], cwd=repo_path)
+        if authoritative_tip != commit_oid:
+            return read_journal_state(repo_path, ref=ref), authoritative_tip
 
         updated_state = JournalState(
             target=new_state.target,
@@ -266,11 +272,11 @@ def write_journal_update(
             durable_transaction_id=new_state.durable_transaction_id,
             write_block=new_state.write_block,
             policy_digest=new_state.policy_digest,
-            tip_commit_oid=commit_oid,
+            tip_commit_oid=authoritative_tip,
             object_type=new_state.object_type,
             journal_schema_version=new_state.journal_schema_version,
         )
-        return updated_state, commit_oid
+        return updated_state, authoritative_tip
 
     finally:
         if os.path.exists(index_file):
@@ -288,6 +294,12 @@ def init_genesis_journal(
     ref: str = DEFAULT_REF,
 ) -> tuple[JournalState, str]:
     """Initialize a fresh publication journal at genesis referencing an attested known-good transaction."""
+    if genesis_transaction.state not in (STATE_DURABLE, STATE_ROLLBACK_DURABLE):
+        raise CorruptJournalError("Genesis transaction must be durable")
+    if genesis_transaction.target != target:
+        raise CorruptJournalError("Genesis transaction target does not match journal target")
+    if not isinstance(genesis_transaction.attestation, dict):
+        raise CorruptJournalError("Genesis transaction must retain a valid live-receipt attestation")
     init_state = JournalState(
         target=target,
         next_generation=genesis_transaction.generation + 1,
