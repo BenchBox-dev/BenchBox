@@ -9,7 +9,7 @@ Verifies:
    - 'legacy_app' role requires 'contents', 'pull_requests', and 'workflows'.
 
 Usage:
-  uv run python scripts/publication/check_control_plane.py [--live] [--strict] [--role {journal,legacy_app,all}]
+  uv run python scripts/publication/check_control_plane.py [--live] [--strict] [--role {journal,legacy_app}]
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ def check_permissions(perms: dict[str, str], role: str = "journal") -> list[str]
     for name, level in required.items():
         if perms.get(name) != level:
             errors.append(f"Permission {name!r} must be {level!r}, got {perms.get(name)!r}")
-    excess = set(perms) - set(required)
+    excess = set(perms) - set(required) - {"metadata"}
     if excess:
         errors.append(f"Excess permissions for {role} role: {sorted(excess)}")
     return errors
@@ -93,10 +93,16 @@ def check_branch_protection(
     if allow_deletions:
         errors.append(f"Branch '{branch}' permits deletions (must be blocked for journal integrity)")
 
+    enforce_admins = data.get("enforce_admins", {}).get("enabled", False)
+    if not enforce_admins:
+        errors.append(
+            f"Branch '{branch}' does not enforce protection rules on administrators (enforce_admins must be enabled)"
+        )
+
     return errors
 
 
-def check_live_app_and_branch(role: str = "journal") -> list[str]:
+def check_live_app_and_branch(role: str = "journal", strict: bool = False) -> list[str]:
     """Verify live GitHub App installation, token minting, and publication branch protection."""
     errors: list[str] = []
 
@@ -156,6 +162,11 @@ def check_live_app_and_branch(role: str = "journal") -> list[str]:
                     errors.extend(perm_errors)
         except Exception as e:
             errors.append(f"Live check JWT validation error: {e}")
+    elif strict:
+        errors.append(
+            "Live check: PUBLICATION_APP_ID and PUBLICATION_APP_PRIVATE_KEY credentials are required in environment "
+            f"to verify app permissions for role {role!r} under --strict"
+        )
 
     return errors
 
@@ -170,7 +181,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--role",
-        choices=["journal", "legacy_app", "all"],
+        choices=["journal", "legacy_app"],
         default="journal",
         help="Permission role to validate (journal: contents only; legacy_app: contents, pull_requests, workflows)",
     )
@@ -184,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
     all_errors.extend(codeowner_errors)
 
     if args.live:
-        live_errors = check_live_app_and_branch(role=args.role)
+        live_errors = check_live_app_and_branch(role=args.role, strict=args.strict)
         all_errors.extend(live_errors)
         live_checks_performed = True
 
