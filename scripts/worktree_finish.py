@@ -34,12 +34,15 @@ from _project.scripts.worktree_audit import (  # noqa: E402
     fetch_prs_for_branch,
     get_primary_clone_path,
     get_ref_commit_sha,
-    get_reflog_shas,
     get_remote_repository_slug,
     is_ancestor,
     is_pr_merged,
     resolve_github_token,
     resolve_repository_identity,
+)
+from scripts.branch_prune_merged import (  # noqa: E402
+    RepositoryIdentity as BranchPruneRepositoryIdentity,
+    get_historical_head_at_merge,
 )
 from scripts.worktree_lifecycle_metadata import (  # noqa: E402
     WorktreeLifecycleMetadata,
@@ -121,6 +124,41 @@ def load_canned_evidence(evidence_file: Path) -> List[Dict[str, Any]]:
     if isinstance(data, dict):
         return [data]
     return []
+
+
+def _branch_ref_argument(branch: str) -> str:
+    """Return a shell-safe complete local branch ref for a proposed command."""
+    return shlex.quote(f"refs/heads/{branch}")
+
+
+def _refresh_target_ref(base_ref: str, repo_root: Path) -> Optional[str]:
+    """Refresh the exact structural target ref before checking reachability."""
+    code, _, stderr = _run_git(
+        ["fetch", "--quiet", "origin", f"{base_ref}:refs/remotes/origin/{base_ref}"],
+        repo_root,
+    )
+    if code != 0:
+        return stderr or f"git fetch failed for origin/{base_ref}"
+    return None
+
+
+def _historical_head_at_merge(
+    pr: Dict[str, Any],
+    repo_slug: str,
+    repo_root: Path,
+) -> Optional[str]:
+    """Resolve the PR head proven by timeline and commit-list evidence."""
+    canned_head = pr.get("_historical_head_sha")
+    if isinstance(canned_head, str) and HEX_40_RE.match(canned_head):
+        return canned_head.lower()
+
+    number = pr.get("number")
+    merge_commit = pr.get("merge_commit_sha")
+    if not isinstance(number, int) or not isinstance(merge_commit, str) or not merge_commit:
+        return None
+    identity = BranchPruneRepositoryIdentity(name_with_owner=repo_slug, node_id="")
+    historical_head = get_historical_head_at_merge(identity, number, merge_commit, repo_root)
+    return historical_head.lower() if isinstance(historical_head, str) else None
 
 
 def _make_hold_result(
@@ -345,7 +383,16 @@ def _fetch_prs_for_evaluation(
 ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
     """Fetch PRs either from canned evidence file or fresh GitHub API query."""
     if evidence_file:
-        return load_canned_evidence(evidence_file), None
+        prs = load_canned_evidence(evidence_file)
+        # Offline fixtures carry the historical proof as an explicit field when
+        # available; legacy fixtures use their immutable recorded head as the
+        # equivalent evidence rather than reaching out to GitHub.
+        for pr in prs:
+            if "_historical_head_sha" not in pr:
+                head = pr.get("head")
+                if isinstance(head, dict) and isinstance(head.get("sha"), str):
+                    pr["_historical_head_sha"] = head["sha"]
+        return prs, None
 
     remote_slug = get_remote_repository_slug(repo_root)
     if "/" not in repo_slug:
@@ -368,6 +415,7 @@ def _evaluate_pr_integration(
     expected_head_oid: str,
     actual_head: str,
     branch: str,
+    repo_slug: str,
     meta: WorktreeLifecycleMetadata,
     repo_root: Path,
     timestamp: str,
@@ -400,7 +448,6 @@ def _evaluate_pr_integration(
     latest = merged_prs[0]
     pr_num = latest.get("number", 0)
     pr_base = latest.get("base", {}).get("ref", "")
-    pr_head_sha = latest.get("head", {}).get("sha", "").lower()
     merge_commit_sha = latest.get("merge_commit_sha")
 
     if pr_base not in STRUCTURAL_BASES:
@@ -422,12 +469,50 @@ def _evaluate_pr_integration(
             pr_merged=True,
         )
 
-    reflog_shas = get_reflog_shas(branch, repo_root)
-    if pr_head_sha != actual_head and pr_head_sha not in reflog_shas:
+    historical_head = _historical_head_at_merge(latest, repo_slug, repo_root)
+    if not historical_head:
         return None, _make_hold_result(
             target_path,
             expected_head_oid,
-            f"Merged PR #{pr_num} head {pr_head_sha[:12]} does not match current or historical branch commits",
+            f"Merged PR #{pr_num} merge-time head could not be proven from PR history",
+            timestamp,
+            branch=branch,
+            current_head=actual_head,
+            provenance_state=meta.provenance_state,
+            owner_state=meta.owner_state,
+            controller_kind=meta.controller_kind,
+            controller_id=meta.controller_id,
+            manual_released=bool(meta.manual_released_at),
+            clean=True,
+            pr_number=pr_num,
+            pr_base=pr_base,
+            pr_merged=True,
+        )
+    if historical_head != actual_head and not is_ancestor(historical_head, actual_head, repo_root):
+        return None, _make_hold_result(
+            target_path,
+            expected_head_oid,
+            f"Merged PR #{pr_num} head {historical_head[:12]} does not match current or historical branch commits",
+            timestamp,
+            branch=branch,
+            current_head=actual_head,
+            provenance_state=meta.provenance_state,
+            owner_state=meta.owner_state,
+            controller_kind=meta.controller_kind,
+            controller_id=meta.controller_id,
+            manual_released=bool(meta.manual_released_at),
+            clean=True,
+            pr_number=pr_num,
+            pr_base=pr_base,
+            pr_merged=True,
+        )
+
+    refresh_error = _refresh_target_ref(pr_base, repo_root)
+    if refresh_error:
+        return None, _make_hold_result(
+            target_path,
+            expected_head_oid,
+            f"Target structural branch '{pr_base}' could not be refreshed: {refresh_error}",
             timestamp,
             branch=branch,
             current_head=actual_head,
@@ -462,7 +547,7 @@ def _evaluate_pr_integration(
             pr_merged=True,
         )
 
-    if not are_descendants_integrated(pr_head_sha, actual_head, target_tip, repo_root):
+    if not are_descendants_integrated(historical_head, actual_head, target_tip, repo_root):
         return None, _make_hold_result(
             target_path,
             expected_head_oid,
@@ -541,7 +626,7 @@ def evaluate_finish_preview(
         )
 
     latest_pr, pr_hold = _evaluate_pr_integration(
-        prs, target_path, expected_head_oid, actual_head, branch, meta, repo_root, now_utc
+        prs, target_path, expected_head_oid, actual_head, branch, repo_slug, meta, repo_root, now_utc
     )
     if pr_hold or not latest_pr:
         return pr_hold or _make_hold_result(target_path, expected_head_oid, "PR integration hold", now_utc)
@@ -560,7 +645,7 @@ def evaluate_finish_preview(
         {
             "action": "branch_deletion",
             "description": f"Atomically delete local branch ref refs/heads/{branch} with expected old OID {expected_head_oid}",
-            "command": f"{action_delete_ref} refs/heads/{branch} {expected_head_oid}",
+            "command": f"{action_delete_ref} {_branch_ref_argument(branch)} {expected_head_oid}",
         },
     ]
 

@@ -12,6 +12,7 @@ import pytest
 
 from scripts.worktree_finish import (
     FinishError,
+    _branch_ref_argument,
     evaluate_finish_preview,
     validate_inputs,
 )
@@ -122,6 +123,10 @@ def test_validate_inputs_wildcard_patterns():
 def test_validate_inputs_comma_separated_list():
     with pytest.raises(FinishError, match="contains list or wildcard characters"):
         validate_inputs("/tmp/wt1,/tmp/wt2", "a" * 40)
+
+
+def test_branch_ref_argument_quotes_shell_metacharacters():
+    assert _branch_ref_argument("feat/foo;id") == "'refs/heads/feat/foo;id'"
 
 
 # ---------------------------------------------------------------------------
