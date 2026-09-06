@@ -41,6 +41,9 @@ export type FixtureRole =
   | "duckdbSf01"
   | "duckdbTuned"
   | "gcpServerless"
+  | "pandas"
+  | "pandasTuned"
+  | "pandasVendor"
   | "polars"
   | "starSchema"
   | "zeroTiming";
