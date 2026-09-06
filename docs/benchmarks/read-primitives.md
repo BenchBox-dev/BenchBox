@@ -678,7 +678,7 @@ These enhancements would build upon the solid foundation of the current 109-quer
 ### Practical Guides
 
 - **[Getting Started](../usage/getting-started.md)** - Run your first benchmark
-- **[CLI Reference](../reference/cli-reference.md)** - Complete command documentation
+- **[CLI Reference](../reference/cli/index.md)** - Complete command documentation
 - **[API Reference](../reference/api-reference.md)** - Detailed API documentation
 - **[Data Generation Guide](../usage/data-generation.md)** - Advanced generation options
 - **[Platform Selection Guide](../platforms/platform-selection-guide.md)** - Choose the right database

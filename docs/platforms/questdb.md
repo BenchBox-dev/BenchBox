@@ -334,6 +334,6 @@ QuestDB requires autocommit mode on the PG wire protocol. The adapter sets `conn
 
 - [Platform Comparison Matrix](comparison-matrix.md) - Compare all platforms
 - [Platform Selection Guide](platform-selection-guide.md) - Choosing the right platform
-- [TPC-H Benchmark](../benchmarks/tpch.md) - TPC-H benchmark guide
-- [TPC-DS Benchmark](../benchmarks/tpcds.md) - TPC-DS benchmark guide
+- [TPC-H Benchmark](../benchmarks/tpc-h.md) - TPC-H benchmark guide
+- [TPC-DS Benchmark](../benchmarks/tpc-ds.md) - TPC-DS benchmark guide
 - [Deployment Modes Guide](deployment-modes.md) - Platform deployment architecture

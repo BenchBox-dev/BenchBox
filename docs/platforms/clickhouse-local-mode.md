@@ -328,4 +328,4 @@ To contribute to ClickHouse local mode support:
 - [chDB Official Repository](https://github.com/chdb-io/chdb)
 - [ClickHouse Documentation](https://clickhouse.com/docs)
 - [BenchBox Platform Documentation](index.md)
-- [TPC-H Benchmark Guide](../benchmarks/tpch.md)
+- [TPC-H Benchmark Guide](../benchmarks/tpc-h.md)
