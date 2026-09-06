@@ -315,8 +315,8 @@ def release_worktree(
         released_by = ident_res.stdout.strip() or os.environ.get("USER", "unknown-caller")
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    _set_worktree_config("manual-released-at", now, worktree_path)
     _set_worktree_config("manual-released-by", released_by, worktree_path)
+    _set_worktree_config("manual-released-at", now, worktree_path)
 
     return read_metadata(worktree_path)
 

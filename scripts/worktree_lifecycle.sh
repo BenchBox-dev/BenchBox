@@ -166,6 +166,7 @@ create_worktree() {
   [ ! -e "$worktree_path" ] && [ ! -L "$worktree_path" ] || die "Worktree path already exists: $worktree_path"
 
   git fetch origin develop --quiet
+  base_oid=$(git rev-parse origin/develop^{commit}) || die "Could not resolve fetched origin/develop"
   creation_started=yes
   git worktree add -b "$branch" "$worktree_path" origin/develop
   "$script_dir/set_worktree_identity.sh" "$worktree_path"
@@ -175,20 +176,23 @@ create_worktree() {
     py_runner="uv run --no-project -- python"
   fi
 
-  controller_args=""
-  if [ -n "${CONTROLLER_KIND:-}" ]; then
-    controller_args="$controller_args --controller-kind $CONTROLLER_KIND"
-  fi
-  if [ -n "${CONTROLLER_ID:-}" ]; then
-    controller_args="$controller_args --controller-id $CONTROLLER_ID"
-  fi
-
-  # shellcheck disable=SC2086
-  $py_runner "$script_dir/worktree_lifecycle_metadata.py" init \
+  set -- "$script_dir/worktree_lifecycle_metadata.py" init \
     --worktree-path "$worktree_path" \
     --branch "$branch" \
     --base-ref "origin/develop" \
-    $controller_args
+    --base-oid "$base_oid"
+  if [ -n "${CONTROLLER_KIND:-}" ]; then
+    set -- "$@" --controller-kind "$CONTROLLER_KIND"
+  fi
+  if [ -n "${CONTROLLER_ID:-}" ]; then
+    set -- "$@" --controller-id "$CONTROLLER_ID"
+  fi
+
+  if command -v uv >/dev/null 2>&1; then
+    uv run --no-project -- python "$@"
+  else
+    python3 "$@"
+  fi
 
   creation_started=no
   release_creation_lock
