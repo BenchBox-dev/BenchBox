@@ -14,8 +14,14 @@ make worktree-create BRANCH=fix/example WORKTREE_PATH="$WORKTREE_PATH"
 cd "$WORKTREE_PATH"
 make agent-write-preflight
 uv sync --group dev
-uv run -- pre-commit install
 ```
+
+Do not run `pre-commit install` inside a linked worktree. Git hooks live in the
+common Git directory and are shared across all linked worktrees. Running `pre-commit install`
+in a worktree captures the shared hook to that worktree's virtual environment, which
+causes hooks to dangle and break across all worktrees when the worktree is deleted.
+`make agent-write-preflight` automatically verifies shared hook health and repairs
+hooks from the primary clone when needed.
 
 The branch must use one of the repository's feature prefixes: `chore/`,
 `fix/`, `feat/`, or `docs/`. The standard base is `origin/develop`.
