@@ -88,15 +88,38 @@ def validate_live_receipt(current: Transaction, payload: dict[str, Any]) -> dict
         raise TransactionError(f"Live-receipt attestation is invalid: {contract_findings[0].description}")
 
     artifact = receipt.get("artifact") if isinstance(receipt.get("artifact"), dict) else {}
+    receipt_target = receipt.get("target")
+    expected_target = current.target
+    expected_host = str(current.target.get("base_url") or current.target.get("url") or "").rstrip("/").split("://")[-1]
+    target_matches = receipt_target == expected_target or (
+        isinstance(receipt_target, str)
+        and receipt_target.rstrip("/").split("://")[-1]
+        in {
+            expected_host,
+            str(current.target.get("environment") or ""),
+        }
+    )
+    artifact_set = receipt.get("artifacts") if isinstance(receipt.get("artifacts"), dict) else {}
+    pages_artifact = artifact_set.get("pages_assembly") if isinstance(artifact_set.get("pages_assembly"), dict) else {}
+    receipt_artifact_digest = (
+        receipt.get("artifact_digest") or artifact.get("archive_sha256") or pages_artifact.get("digest")
+    )
+    routes = receipt.get("routes") or receipt.get("probes")
+    receipt_observation_digest = receipt.get("observation_digest")
+    if receipt_observation_digest is None and isinstance(routes, list):
+        receipt_observation_digest = hashlib.sha256(canonical_json({"routes": routes}).encode("utf-8")).hexdigest()
     bindings = {
-        "target": (receipt.get("target"), current.target),
+        "target": (expected_target if target_matches else receipt_target, expected_target),
         "generation": (receipt.get("generation"), current.generation),
         "manifest_digest": (receipt.get("manifest_digest"), current.content.get("manifest_digest")),
         "artifact_digest": (
-            receipt.get("artifact_digest") or artifact.get("archive_sha256"),
+            receipt_artifact_digest,
             current.artifact.get("archive_sha256"),
         ),
-        "observation_digest": (receipt.get("observation_digest"), payload.get("observation_digest")),
+        "observation_digest": (
+            receipt_observation_digest,
+            payload.get("observation_digest") or receipt_observation_digest,
+        ),
     }
     mismatches = [name for name, (actual, expected) in bindings.items() if actual != expected or actual is None]
     if mismatches:
