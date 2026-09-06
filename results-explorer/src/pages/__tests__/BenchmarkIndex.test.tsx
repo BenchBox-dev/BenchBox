@@ -456,12 +456,12 @@ describe("BenchmarkIndex", () => {
     expect(within(matrixLinks).getByText("Public ID r1")).toBeTruthy();
     expect(
       within(matrixLinks).getByRole("link", {
-        name: "Open details for DuckDB public ID r1 from 2026-04-01",
+        name: /Open details for DuckDB public ID r1 from 2026-04-01 \(.*days ago\)/,
       }),
     ).toHaveAttribute("href", "/results/r/r1");
     expect(
       within(matrixLinks).getByRole("link", {
-        name: "Open receipt for DuckDB public ID r1 from 2026-04-01",
+        name: /Open receipt for DuckDB public ID r1 from 2026-04-01 \(.*days ago\)/,
       }),
     ).toHaveAttribute("href", "/results/r/r1#run-receipt");
 
@@ -471,12 +471,12 @@ describe("BenchmarkIndex", () => {
     const rankLinks = screen.getByTestId("ranks-result-links");
     expect(
       within(rankLinks).getByRole("link", {
-        name: "Open details for SQLite public ID r2 from 2026-04-01",
+        name: /Open details for SQLite public ID r2 from 2026-04-01 \(.*days ago\)/,
       }),
     ).toHaveAttribute("href", "/results/r/r2");
     expect(
       within(rankLinks).getByRole("link", {
-        name: "Open receipt for SQLite public ID r2 from 2026-04-01",
+        name: /Open receipt for SQLite public ID r2 from 2026-04-01 \(.*days ago\)/,
       }),
     ).toHaveAttribute("href", "/results/r/r2#run-receipt");
   });
@@ -753,7 +753,7 @@ describe("BenchmarkIndex", () => {
     expect(within(excluded).getByTestId("excluded-run-r3")).toHaveTextContent("No valid display timing is available");
     expect(
       within(excluded).getByRole("link", {
-        name: "Open receipt for NoTimingDB public ID r3 from 2026-04-01",
+        name: /Open receipt for NoTimingDB public ID r3 from 2026-04-01 \(.*days ago\)/,
       }),
     ).toHaveAttribute("href", "/results/r/r3#run-receipt");
   });
@@ -877,6 +877,7 @@ describe("BenchmarkIndex", () => {
     expect(new URL(window.location.href).searchParams.get("view")).toBe("list");
     expect(screen.queryByRole("button", { name: /^Q1/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Q2/ })).toBeNull();
+    expect(screen.getAllByLabelText(/Run age:/).length).toBeGreaterThan(0);
   });
 
   it("restores benchmark view mode from the URL", async () => {
