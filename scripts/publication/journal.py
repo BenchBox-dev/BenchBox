@@ -110,7 +110,11 @@ def read_journal_state(repo_path: Path, ref: str = DEFAULT_REF) -> JournalState:
     try:
         tip_oid = _run_git(["rev-parse", f"refs/heads/{ref}"], cwd=repo_path)
     except JournalError as e:
-        raise CorruptJournalError(f"Cannot resolve journal ref '{ref}': {e}") from e
+        try:
+            _run_git(["fetch", "--no-tags", "origin", f"refs/heads/{ref}:refs/heads/{ref}"], cwd=repo_path)
+            tip_oid = _run_git(["rev-parse", f"refs/heads/{ref}"], cwd=repo_path)
+        except JournalError as fetch_error:
+            raise CorruptJournalError(f"Cannot resolve journal ref '{ref}': {fetch_error}") from e
 
     state_path = f"{ref}:{SUBTREE_PATH}/state.json"
     try:
