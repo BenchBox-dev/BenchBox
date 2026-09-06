@@ -201,6 +201,97 @@ def check_publication_deploy_permissions(file_path: Path, data: dict[str, Any]) 
     return errors
 
 
+TARGET_PUBLICATION_TRANSACTION_NAME = "publication-transaction.yml"
+
+
+def check_publication_transaction_permissions(file_path: Path, data: dict[str, Any]) -> list[str]:
+    """Verify strict least-privilege rules for publication-transaction.yml."""
+    errors: list[str] = []
+    jobs = data.get("jobs", {})
+
+    if not isinstance(jobs, dict):
+        errors.append(f"{file_path.name}: 'jobs' section is missing or not a dictionary")
+        return errors
+
+    expected_jobs = {"prepare", "deploy", "verify", "finalize"}
+    missing_jobs = expected_jobs - set(jobs.keys())
+    if missing_jobs:
+        errors.append(f"{file_path.name}: missing required publication transaction jobs: {sorted(missing_jobs)}")
+
+    # prepare: read-only
+    prepare_job = jobs.get("prepare", {})
+    prepare_perm = _normalize_permissions(prepare_job.get("permissions"))
+    if isinstance(prepare_perm, dict):
+        write_scopes = [k for k, v in prepare_perm.items() if v == "write"]
+        if write_scopes:
+            errors.append(
+                f"{file_path.name} (job 'prepare'): declared write permissions: {write_scopes}. Must be read-only."
+            )
+    elif prepare_perm not in ("read-all", "contents: read"):
+        errors.append(f"{file_path.name} (job 'prepare'): invalid permissions '{prepare_perm}'. Must be read-only.")
+
+    # deploy: contents: write, pages: write, id-token: write, actions: read
+    deploy_job = jobs.get("deploy", {})
+    deploy_perm = _normalize_permissions(deploy_job.get("permissions"))
+    expected_deploy = {"actions": "read", "contents": "write", "pages": "write", "id-token": "write"}
+    if deploy_perm != expected_deploy:
+        errors.append(f"{file_path.name} (job 'deploy'): must declare exactly {expected_deploy}.")
+
+    # verify: contents: write
+    verify_job = jobs.get("verify", {})
+    verify_perm = _normalize_permissions(verify_job.get("permissions"))
+    expected_verify = {"contents": "write"}
+    if verify_perm != expected_verify:
+        errors.append(f"{file_path.name} (job 'verify'): must declare exactly {expected_verify}.")
+
+    # finalize: contents: write
+    fin_job = jobs.get("finalize", {})
+    fin_perm = _normalize_permissions(fin_job.get("permissions"))
+    expected_fin = {"contents": "write"}
+    if fin_perm != expected_fin:
+        errors.append(f"{file_path.name} (job 'finalize'): must declare exactly {expected_fin}.")
+
+    return errors
+
+
+TARGET_PUBLICATION_RECOVER_NAME = "publication-recover.yml"
+
+
+def check_publication_recover_permissions(file_path: Path, data: dict[str, Any]) -> list[str]:
+    """Specific least-privilege checks for publication-recover.yml."""
+    errors: list[str] = []
+    top_perm = _normalize_permissions(data.get("permissions"))
+    if top_perm != {"contents": "read"}:
+        errors.append(f"{file_path.name}: Top-level permissions must be 'contents: read', got {top_perm}.")
+
+    jobs = data.get("jobs", {})
+    if not isinstance(jobs, dict):
+        return errors
+
+    # scan: contents: read, actions: read
+    scan_job = jobs.get("scan", {})
+    scan_perm = _normalize_permissions(scan_job.get("permissions"))
+    expected_scan = {"actions": "read", "contents": "read"}
+    if scan_perm != expected_scan:
+        errors.append(f"{file_path.name} (job 'scan'): must declare exactly {expected_scan}, got {scan_perm}.")
+
+    # act: contents: write, pages: write, id-token: write, actions: read
+    act_job = jobs.get("act", {})
+    act_perm = _normalize_permissions(act_job.get("permissions"))
+    expected_act = {"actions": "read", "contents": "write", "id-token": "write", "pages": "write"}
+    if act_perm != expected_act:
+        errors.append(f"{file_path.name} (job 'act'): must declare exactly {expected_act}, got {act_perm}.")
+
+    # act must target github-pages environment
+    env_name = act_job.get("environment", {})
+    if isinstance(env_name, dict):
+        env_name = env_name.get("name")
+    if env_name != "github-pages":
+        errors.append(f"{file_path.name} (job 'act'): must target environment 'github-pages', got '{env_name}'.")
+
+    return errors
+
+
 def audit_workflow_file(file_path: Path, strict: bool = False) -> list[str]:
     """Audit a single workflow file for permissions compliance."""
     try:
@@ -217,6 +308,14 @@ def audit_workflow_file(file_path: Path, strict: bool = False) -> list[str]:
     # Special checks for publication-deploy.yml
     if file_path.name == TARGET_PUBLICATION_DEPLOY_NAME or "publication-deploy" in file_path.stem:
         errors.extend(check_publication_deploy_permissions(file_path, data))
+
+    # Special checks for publication-transaction.yml
+    if file_path.name == TARGET_PUBLICATION_TRANSACTION_NAME or "publication-transaction" in file_path.stem:
+        errors.extend(check_publication_transaction_permissions(file_path, data))
+
+    # Special checks for publication-recover.yml
+    if file_path.name == TARGET_PUBLICATION_RECOVER_NAME or "publication-recover" in file_path.stem:
+        errors.extend(check_publication_recover_permissions(file_path, data))
 
     return errors
 
