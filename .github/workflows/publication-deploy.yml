@@ -43,17 +43,9 @@ name: Publication Control Plane Deployment
         description: "Exercise rollback using a prior attested artifact"
         type: boolean
         default: false
-      rollback_target_sha:
-        description: "Deprecated: rollback selects an attested artifact, never a branch SHA"
-        type: string
-        default: ""
 
 permissions:
   contents: read
-
-concurrency:
-  group: pages-deploy
-  cancel-in-progress: false
 
 jobs:
   build:
@@ -679,6 +671,9 @@ jobs:
     needs: build
     if: inputs.expect_noop != true && inputs.candidate_only != true && inputs.force_rollback != true
     runs-on: ubuntu-latest
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
     permissions:
       actions: read
       contents: read
@@ -899,6 +894,9 @@ jobs:
         (github.event_name == 'workflow_dispatch' && inputs.force_rollback == true)
       )
     runs-on: ubuntu-latest
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
     permissions:
       actions: read
       contents: read
