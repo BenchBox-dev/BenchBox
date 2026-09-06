@@ -848,8 +848,9 @@ def validate_live_receipt_contract(
 ) -> list[DriftFinding]:
     """Validate the complete signed live-receipt contract and freshness boundary."""
     findings = _check_receipt_contract_fields(receipt)
+    probe_findings, _ = _check_observed_probes(receipt)
     freshness, _ = _check_receipt_freshness(receipt, True, max_age_hours, now or datetime.now(timezone.utc))
-    return [*findings, *freshness]
+    return [*findings, *probe_findings, *freshness]
 
 
 def reconcile_states(
