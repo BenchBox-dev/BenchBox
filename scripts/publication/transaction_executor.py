@@ -172,7 +172,7 @@ def cmd_prepare(args: argparse.Namespace) -> int:
         "generation": tx.generation,
         "parent_transaction_id": tx.parent_transaction_id,
         "content_digest": tx.content.get("manifest_digest"),
-        "candidate_run_id": args.candidate_run_id,
+        "candidate_run_id": getattr(args, "candidate_run_id", None),
         "candidate_artifact_id": tx.artifact.get("artifact_id"),
         "candidate_archive_sha256": tx.artifact.get("archive_sha256"),
         "desired_digest": tx.desired.get("digest"),
