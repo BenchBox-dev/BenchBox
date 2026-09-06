@@ -29,6 +29,7 @@ if str(ROOT) not in sys.path:
 import urllib.error
 import urllib.request
 import uuid
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -364,18 +365,6 @@ def cmd_start_write(args: argparse.Namespace) -> int:
     if tx.state not in (STATE_PREPARED, STATE_ROLLBACK_WRITE_STARTED):
         raise TransactionError(f"Cannot start write from state {tx.state}")
 
-    if tx.kind == KIND_ROLLBACK and tx.state == STATE_ROLLBACK_WRITE_STARTED:
-        build_ver = tx.restore_source.get("manifest_digest", "")[:40] if tx.restore_source else tx.transaction_id[:40]
-        github_output = os.environ.get("GITHUB_OUTPUT")
-        if github_output:
-            with open(github_output, "a", encoding="utf-8") as gf:
-                gf.write(f"pages_build_version={build_ver}\n")
-                gf.write(f"write_id={tx.transaction_id}\n")
-        if args.output_tx:
-            _write_json(args.output_tx, tx.to_dict())
-        print(f"Rollback write ready for {tx.transaction_id}: pages_build_version={build_ver}")
-        return 0
-
     # Create a unique write-intent commit on the repository
     # Intent commit OID is the pages_build_version passed to Pages API
     msg = f"write-intent: transaction {tx.transaction_id} gen {tx.generation}"
@@ -394,11 +383,23 @@ def cmd_start_write(args: argparse.Namespace) -> int:
         check=True,
     ).stdout.strip()
 
-    updated_tx, effect = transaction.transition(
-        tx,
-        EVENT_START_WRITE,
-        payload={"intent_commit_oid": intent_commit_oid, "write_id": tx.transaction_id},
-    )
+    if tx.kind == KIND_ROLLBACK:
+        updated_tx = replace(
+            tx,
+            write={
+                "write_id": tx.transaction_id,
+                "intent_commit_oid": intent_commit_oid,
+                "pages_build_version": intent_commit_oid,
+                "status": "in_flight",
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    else:
+        updated_tx, _ = transaction.transition(
+            tx,
+            EVENT_START_WRITE,
+            payload={"intent_commit_oid": intent_commit_oid, "write_id": tx.transaction_id},
+        )
 
     updated_state, commit_oid = journal.write_journal_update(
         repo_path=repo_path,
@@ -788,7 +789,14 @@ def cmd_watchdog_scan(args: argparse.Namespace) -> int:
         print(json.dumps(report, indent=2))
         return 1
 
-    action, status, reason = _resolve_watchdog_action(tx, journal_state, args.barrier_evidence)
+    if tx.state == STATE_PREPARED and str(args.trigger_run_id or "") != str(tx.owner.get("run_id", "")):
+        action, status, reason = (
+            "quarantine",
+            "awaiting_owner_run_completion",
+            "Prepared transaction owner run has not been confirmed complete.",
+        )
+    else:
+        action, status, reason = _resolve_watchdog_action(tx, journal_state, args.barrier_evidence)
     recovery_needed = tx.state != STATE_TERMINAL_FAILURE
 
     report = {

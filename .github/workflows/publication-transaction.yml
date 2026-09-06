@@ -4,13 +4,12 @@ name: Publication Transactions
   workflow_dispatch:
     inputs:
       kind:
-        description: "Transaction kind: promotion, rollback, or legacy_recovery"
+        description: "Transaction kind: promotion or rollback"
         required: true
         type: choice
         options:
           - promotion
           - rollback
-          - legacy_recovery
         default: promotion
       develop_sha:
         description: "Pinned develop commit SHA (40 hex)"

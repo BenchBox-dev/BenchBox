@@ -36,7 +36,7 @@ def test_transaction_workflow_is_dispatch_only_with_required_inputs() -> None:
     inputs = triggers["workflow_dispatch"].get("inputs", {})
     assert "kind" in inputs
     assert inputs["kind"]["type"] == "choice"
-    assert set(inputs["kind"]["options"]) == {"promotion", "rollback", "legacy_recovery"}
+    assert set(inputs["kind"]["options"]) == {"promotion", "rollback"}
     assert inputs["develop_sha"]["required"] is True
     assert inputs["published_results_sha"]["required"] is True
     assert "candidate_manifest_digest" in inputs

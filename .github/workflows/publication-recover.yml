@@ -159,10 +159,14 @@ jobs:
           ACTION: ${{ needs.scan.outputs.action }}
           TRANSACTION_ID: ${{ needs.scan.outputs.transaction_id }}
           BARRIER_EVIDENCE: ${{ inputs.barrier_evidence }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           args=(--repo-path . --ref publication --execute)
           if [ -n "$BARRIER_EVIDENCE" ]; then
             args+=(--barrier-evidence "$BARRIER_EVIDENCE")
+          fi
+          if [ -n "$TRIGGER_RUN_ID" ]; then
+            args+=(--trigger-run-id "$TRIGGER_RUN_ID")
           fi
           uv run python scripts/publication/transaction_executor.py watchdog-scan "${args[@]}"
 
