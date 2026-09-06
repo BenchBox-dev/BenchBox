@@ -256,41 +256,78 @@ test.describe("responsive explorer assertions", () => {
       await page.goto("/results/tpch/");
       await waitForDataLoaded(page, /Charts/);
 
-      const offenders = await page.evaluate(() => {
-        const problems: string[] = [];
-        for (const svg of Array.from(document.querySelectorAll("svg[role='img']"))) {
-          const box = svg.getBoundingClientRect();
-          if (box.width === 0) continue;
+      // Walk every question group and every chart within it. Checking only the
+      // default view leaves most of the chart set unmeasured, and the default
+      // is the one chart least likely to be wrong.
+      const groups = page.getByRole("tablist", { name: "Chart question groups" }).getByRole("tab");
+      const groupCount = await groups.count();
+      // If this ever reads zero the walk below is vacuous and the test would
+      // pass without measuring anything.
+      expect(groupCount, "chart question groups").toBeGreaterThan(1);
+      let chartsVisited = 0;
 
-          const viewBox = svg.getAttribute("viewBox");
-          if (viewBox === null) {
-            problems.push(`${svg.getAttribute("aria-label") ?? "chart"}: no viewBox`);
-            continue;
+      for (let g = 0; g < groupCount; g += 1) {
+        await groups.nth(g).click();
+        await page.waitForTimeout(150);
+        const chartButtons = page.locator('[aria-label$="charts"] button');
+        const chartCount = await chartButtons.count();
+
+        for (let c = 0; c < Math.max(chartCount, 1); c += 1) {
+          if (chartCount > 0) {
+            await chartButtons.nth(c).click();
+            await page.waitForTimeout(150);
           }
+          chartsVisited += 1;
 
-          // Drawing width must match rendered width, or the coordinate system
-          // and the box disagree and marks fall outside the paint area.
-          const drawWidth = Number(viewBox.split(/\s+/)[2]);
-          if (Math.abs(drawWidth - box.width) > 1.5) {
-            problems.push(
-              `${svg.getAttribute("aria-label") ?? "chart"}: draws ${drawWidth} in a ${box.width.toFixed(0)}px box`,
-            );
-          }
+          const offenders = await page.evaluate(() => {
+            const problems: string[] = [];
+            for (const svg of Array.from(
+              document.querySelectorAll("[data-chart-container] svg[role='img']"),
+            )) {
+              const box = svg.getBoundingClientRect();
+              if (box.width === 0) continue;
 
-          for (const text of Array.from(svg.querySelectorAll("text"))) {
-            const textBox = text.getBoundingClientRect();
-            if (textBox.width === 0) continue;
-            if (textBox.right > box.right + 1 || textBox.bottom > box.bottom + 1) {
-              problems.push(
-                `${svg.getAttribute("aria-label") ?? "chart"}: "${(text.textContent ?? "").slice(0, 24)}" falls outside the drawing`,
-              );
+              const viewBox = svg.getAttribute("viewBox");
+              if (viewBox === null) {
+                problems.push(`${svg.getAttribute("aria-label") ?? "chart"}: no viewBox`);
+                continue;
+              }
+
+              // A drawing narrower than its box is scaled UP, which magnifies
+              // every coordinate including the gaps bars were spaced by.
+              const drawWidth = Number(viewBox.split(/\s+/)[2]);
+              if (drawWidth < box.width - 1.5) {
+                problems.push(
+                  `${svg.getAttribute("aria-label") ?? "chart"}: draws ${drawWidth} into a ${box.width.toFixed(0)}px box`,
+                );
+              }
+
+              for (const mark of Array.from(svg.querySelectorAll("text, rect, circle, path"))) {
+                const markBox = mark.getBoundingClientRect();
+                if (markBox.width === 0 && markBox.height === 0) continue;
+                if (
+                  markBox.right > box.right + 1 ||
+                  markBox.left < box.left - 1 ||
+                  markBox.bottom > box.bottom + 1
+                ) {
+                  const what =
+                    mark.tagName === "text"
+                      ? `"${(mark.textContent ?? "").slice(0, 24)}"`
+                      : mark.tagName;
+                  problems.push(
+                    `${svg.getAttribute("aria-label") ?? "chart"}: ${what} falls outside the drawing`,
+                  );
+                }
+              }
             }
-          }
-        }
-        return problems;
-      });
+            return problems;
+          });
 
-      expect(offenders, offenders.join("\n")).toEqual([]);
+          expect(offenders, offenders.join("\n")).toEqual([]);
+        }
+      }
+
+      expect(chartsVisited, "charts measured").toBeGreaterThan(5);
     });
   }
 

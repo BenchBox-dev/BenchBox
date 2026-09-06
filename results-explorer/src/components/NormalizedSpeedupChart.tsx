@@ -22,7 +22,7 @@ import {
   paletteColor,
 } from "@/lib/chartTheme";
 import { useElementSize } from "@/lib/useElementSize";
-import { chartFrame } from "@/lib/chartFrame";
+import { chartFrame, edgeSafeValueLabel } from "@/lib/chartFrame";
 
 function toX(speedup: number, width: number): number {
   const clamped = Math.max(0.1, Math.min(speedup, 10));
@@ -205,12 +205,21 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
                       fill={isSlower ? SLOWER_FILL : FASTER_FILL}
                       opacity={0.75}
                     />
+                    {/* A speedup at the clamp reaches the end of the plot, so a
+                        label started past the bar would be drawn outside the
+                        viewBox and cropped. */}
                     <text
-                      x={isSlower ? barX - 2 : sx + 2}
+                      x={
+                        edgeSafeValueLabel(isSlower ? barX : sx, drawWidth, isSlower ? "left" : "right")
+                          .x
+                      }
                       y={barY + BAR_H / 2 + 3}
                       font-size="8"
                       fill={color}
-                      text-anchor={isSlower ? "end" : "start"}
+                      text-anchor={
+                        edgeSafeValueLabel(isSlower ? barX : sx, drawWidth, isSlower ? "left" : "right")
+                          .textAnchor
+                      }
                     >
                       {formatSpeedup(speedup, { unit: "×" }).valueText}
                     </text>

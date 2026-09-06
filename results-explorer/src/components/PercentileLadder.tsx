@@ -12,7 +12,7 @@
 
 import type { PercentileStats } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
-import { axisLabelAnchor, barRowLayout, chartFrame } from "@/lib/chartFrame";
+import { axisLabelAnchor, barRowLayout, chartFrame, edgeSafeValueLabel } from "@/lib/chartFrame";
 import { paletteColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
 import { formatLatencyMs } from "@/lib/metricFormatters";
@@ -159,10 +159,20 @@ export function PercentileLadder({ rows }: Props) {
               })}
 
               {/* P50 value label */}
+              {/* A p50 close to the axis maximum lands at the end of the plot,
+                  where a trailing label would be cropped. */}
               <text
-                x={layout.labelAbove ? drawWidth : xForMs(row.percentile_stats.p50) + 4}
+                x={
+                  layout.labelAbove
+                    ? drawWidth
+                    : edgeSafeValueLabel(xForMs(row.percentile_stats.p50), drawWidth, "right", 4).x
+                }
                 y={layout.labelAbove ? y + layout.labelBaseline : midY + 4}
-                text-anchor={layout.labelAbove ? "end" : "start"}
+                text-anchor={
+                  layout.labelAbove
+                    ? "end"
+                    : edgeSafeValueLabel(xForMs(row.percentile_stats.p50), drawWidth, "right", 4).textAnchor
+                }
                 class="text-[10px] fill-[var(--bb-data-fg-muted)] font-mono"
                 style={{ fontSize: "10px" }}
               >

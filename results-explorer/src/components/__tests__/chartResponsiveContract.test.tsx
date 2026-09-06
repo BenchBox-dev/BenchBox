@@ -25,8 +25,35 @@ import { CDFChart } from "@/components/CDFChart";
 import { StackedPhase } from "@/components/StackedPhase";
 import { PercentileLadder } from "@/components/PercentileLadder";
 import { ChartPanel } from "@/components/ChartPanel";
+import { CostScatter } from "@/components/CostScatter";
+import { TimeSeries } from "@/components/TimeSeries";
+import { NormalizedSpeedupChart } from "@/components/NormalizedSpeedupChart";
+import { DivergingBarChart } from "@/components/DivergingBarChart";
 
+const NARROW_COLUMN = 240;
 const PHONE_COLUMN = 293;
+/**
+ * jsdom lays out no text, so a label's width has to be estimated. 0.6em per
+ * character is a conservative bound for the proportional faces these charts
+ * use, and it is what the assertion below compares against - not the constant
+ * the production helper works to, which would make the check circular.
+ */
+function visibleLabel(text: Element): string {
+  // `textContent` swallows the <title> child these charts attach for tooltips,
+  // which is the full untruncated run identity and is never painted.
+  return Array.from(text.childNodes)
+    .filter((node) => node.nodeType === 3)
+    .map((node) => node.textContent ?? "")
+    .join("")
+    .trim();
+}
+
+function estimatedTextWidth(text: Element): number {
+  const label = visibleLabel(text);
+  const styled = /font-size:\s*([\d.]+)/.exec(text.getAttribute("style") ?? "");
+  const fontSize = Number(text.getAttribute("font-size") ?? styled?.[1] ?? 10);
+  return label.length * fontSize * 0.6;
+}
 const DESKTOP_COLUMN = 1166;
 
 function setContainerWidth(width: number): void {
@@ -86,6 +113,37 @@ function makePlatform(overrides: Partial<PlatformRow> = {}): PlatformRow {
   };
 }
 
+/**
+ * Two runs whose per-query gap is far past either chart's clamp, so the value
+ * label sits at the very end of the plot - the case that used to draw it
+ * outside the drawing.
+ */
+function clampedCompare() {
+  return {
+    queries: ["Q1", "Q2", "Q3"].map((queryId, index) => ({
+      queryId,
+      timings: [
+        { ms: 10 + index, status: "pass" },
+        { ms: (10 + index) * 40, status: "pass" },
+      ],
+    })),
+    results: [{ platform: "DuckDB" }, { platform: "SQLite" }],
+  };
+}
+
+/** The same cohort with normalized cost recorded, so the scatter has points. */
+function costCohort(): BenchmarkSummary {
+  const base = wideCohort();
+  return {
+    ...base,
+    platforms: base.platforms.map((platform, index) => ({
+      ...platform,
+      normalized_cost_usd: 0.02 * (index + 1),
+      cost_status: "normalized" as const,
+    })),
+  };
+}
+
 /** A cohort wide enough that a fixed label gutter cannot fit a phone column. */
 function wideCohort(): BenchmarkSummary {
   const names = [
@@ -119,28 +177,64 @@ function wideCohort(): BenchmarkSummary {
   };
 }
 
-/** Every x coordinate a chart draws, in user units. */
-function drawnRightEdges(root: ParentNode): number[] {
-  const edges: number[] = [];
+interface MarkExtent {
+  readonly what: string;
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
+ * Every point a chart actually draws, in user units.
+ *
+ * Covers rects, lines, circles, path and polyline geometry, and text origins.
+ * An earlier version looked only at rects, line endpoints and text x, which
+ * left the CDF's plotted curves - its entire data layer - unexamined, and
+ * checked no vertical extent at all.
+ */
+function drawnPoints(root: ParentNode): MarkExtent[] {
+  const points: MarkExtent[] = [];
+  const push = (what: string, x: number, y: number) => {
+    if (Number.isFinite(x) && Number.isFinite(y)) points.push({ what, x, y });
+  };
+  const num = (el: Element, name: string) => Number(el.getAttribute(name) ?? NaN);
+
   for (const rect of Array.from(root.querySelectorAll("rect"))) {
-    const x = Number(rect.getAttribute("x") ?? 0);
-    const width = Number(rect.getAttribute("width") ?? 0);
-    if (Number.isFinite(x) && Number.isFinite(width)) edges.push(x + width);
+    const x = num(rect, "x");
+    const y = num(rect, "y");
+    push("rect", x, y);
+    push("rect", x + (num(rect, "width") || 0), y + (num(rect, "height") || 0));
   }
   for (const line of Array.from(root.querySelectorAll("line"))) {
-    for (const attr of ["x1", "x2"]) {
-      const value = Number(line.getAttribute(attr) ?? 0);
-      if (Number.isFinite(value)) edges.push(value);
+    push("line", num(line, "x1"), num(line, "y1"));
+    push("line", num(line, "x2"), num(line, "y2"));
+  }
+  for (const circle of Array.from(root.querySelectorAll("circle"))) {
+    const r = num(circle, "r") || 0;
+    push("circle", num(circle, "cx") - r, num(circle, "cy") - r);
+    push("circle", num(circle, "cx") + r, num(circle, "cy") + r);
+  }
+  // Curves carry their geometry in an attribute, so read the coordinate pairs
+  // straight out of it: jsdom lays out no SVG and has no getBBox.
+  for (const el of Array.from(root.querySelectorAll("path, polyline"))) {
+    const raw = el.getAttribute("d") ?? el.getAttribute("points") ?? "";
+    const numbers = (raw.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+    for (let i = 0; i + 1 < numbers.length; i += 2) {
+      push(el.tagName.toLowerCase(), numbers[i]!, numbers[i + 1]!);
     }
   }
   for (const text of Array.from(root.querySelectorAll("text"))) {
-    const value = Number(text.getAttribute("x") ?? 0);
-    if (Number.isFinite(value)) edges.push(value);
+    push(`text "${(text.textContent ?? "").slice(0, 20)}"`, num(text, "x"), num(text, "y"));
   }
-  return edges;
+  return points;
 }
 
-const CHARTS: { name: string; render: () => { container: Element } }[] = [
+/**
+ * `minWidth` is the drawing floor a chart declares for itself. Below it the
+ * frame scales down rather than cropping, which is a deliberate trade and not
+ * the defect these tests guard. Omitted means the chart follows its container
+ * exactly.
+ */
+const CHARTS: { name: string; render: () => { container: Element }; minWidth?: number }[] = [
   { name: "PowerBar", render: () => render(<PowerBar summary={wideCohort()} />) },
   { name: "DistributionBox", render: () => render(<DistributionBox summary={wideCohort()} />) },
   { name: "CDFChart", render: () => render(<CDFChart summary={wideCohort()} />) },
@@ -154,7 +248,14 @@ const CHARTS: { name: string; render: () => { container: Element } }[] = [
             ...platform,
             colorIdx: index,
             displayLabel: platform.platform,
-            percentile_stats: { p50: 20 + index, p90: 40 + index, p95: 60 + index, p99: 90 + index },
+            // p50 close to p99 puts the value label at the very end of the
+            // plot, where a trailing label used to be drawn outside it.
+            percentile_stats: {
+              p50: 88 + index,
+              p90: 89 + index,
+              p95: 89.5 + index,
+              p99: 90 + index,
+            },
           }))}
         />,
       ),
@@ -162,6 +263,39 @@ const CHARTS: { name: string; render: () => { container: Element } }[] = [
   {
     name: "PerformanceBar",
     render: () => render(<ChartPanel context={{ kind: "summary", summary: wideCohort() }} />),
+  },
+  { name: "CostScatter", render: () => render(<CostScatter summary={costCohort()} />) },
+  {
+    name: "NormalizedSpeedupChart",
+    minWidth: 300,
+    render: () => render(<NormalizedSpeedupChart {...clampedCompare()} baselineIdx={0} />),
+  },
+  {
+    name: "DivergingBarChart",
+    minWidth: 300,
+    render: () => render(<DivergingBarChart {...clampedCompare()} baselineIdx={0} />),
+  },
+  {
+    name: "TimeSeries",
+    render: () =>
+      render(
+        <TimeSeries
+          entries={wideCohort().platforms.flatMap((platform) =>
+            // A trend needs at least two runs per platform.
+            ["2026-03-01", "2026-06-01", "2026-09-01"].map((run_date, run) => ({
+              result_id: `${platform.result_id}-${run}`,
+              platform_id: platform.platform_id,
+              platform: platform.platform,
+              benchmark: "tpch",
+              scale_factor: 1,
+              run_date,
+              power_score: (platform.power_score ?? 1000) - run * 50,
+              display_geomean_ms: (platform.display_geomean_ms ?? 30) + run * 3,
+              trust_label: platform.trust_label,
+            })),
+          )}
+        />,
+      ),
   },
 ];
 
@@ -173,27 +307,84 @@ describe("chart responsive contract", () => {
         async (width) => {
           setContainerWidth(width);
           const { container } = chart.render();
+          const expected = Math.max(width, chart.minWidth ?? 0);
 
           await waitFor(() => {
             const svg = container.querySelector("svg");
             expect(svg?.getAttribute("width")).toBe("100%");
-            expect(svg?.getAttribute("viewBox")).toMatch(new RegExp(`^0 0 ${width} `));
+            expect(svg?.getAttribute("viewBox")).toMatch(new RegExp(`^0 0 ${expected} `));
           });
+        },
+      );
+
+      it.each([NARROW_COLUMN, PHONE_COLUMN, DESKTOP_COLUMN])(
+        "anchors labels so they cannot run off an edge at %spx",
+        async (width) => {
+          // jsdom lays out no text, so its extent cannot be measured here. What
+          // can be checked is the rule that governs it: a label anchored at its
+          // start, placed hard against the right edge, has nowhere to go but
+          // outside the drawing. The same applies mirrored on the left.
+          setContainerWidth(width);
+          const { container } = chart.render();
+          const expected = Math.max(width, chart.minWidth ?? 0);
+
+          await waitFor(() => {
+            expect(container.querySelector("svg")).not.toBeNull();
+          });
+
+          const offenders: string[] = [];
+          for (const svg of Array.from(container.querySelectorAll("svg"))) {
+            for (const text of Array.from(svg.querySelectorAll("text"))) {
+              // A rotated label's x is expressed in its own rotated frame, so a
+              // flat comparison against the drawing width says nothing useful.
+              if (text.getAttribute("transform") !== null) continue;
+              const x = Number(text.getAttribute("x") ?? NaN);
+              if (!Number.isFinite(x)) continue;
+              const label = visibleLabel(text);
+              if (label === "") continue;
+              const anchorAttr = text.getAttribute("text-anchor") ?? "start";
+              const estimated = estimatedTextWidth(text);
+              const left =
+                anchorAttr === "end" ? x - estimated : anchorAttr === "middle" ? x - estimated / 2 : x;
+              const right = left + estimated;
+              if (left < -0.5 || right > expected + 0.5) {
+                offenders.push(
+                  `"${label.slice(0, 24)}" spans ${left.toFixed(1)}..${right.toFixed(1)} of ${expected}`,
+                );
+              }
+            }
+          }
+
+          expect(offenders, offenders.join("\n")).toEqual([]);
         },
       );
 
       it("keeps every mark inside the drawing at a phone column width", async () => {
         setContainerWidth(PHONE_COLUMN);
         const { container } = chart.render();
+        const expected = Math.max(PHONE_COLUMN, chart.minWidth ?? 0);
 
         await waitFor(() => {
           const svg = container.querySelector("svg");
-          expect(svg?.getAttribute("viewBox")).toMatch(new RegExp(`^0 0 ${PHONE_COLUMN} `));
+          expect(svg?.getAttribute("viewBox")).toMatch(new RegExp(`^0 0 ${expected} `));
         });
 
         const svg = container.querySelector("svg")!;
-        const overflowing = drawnRightEdges(svg).filter((edge) => edge > PHONE_COLUMN + 0.5);
-        expect(overflowing).toEqual([]);
+        const [, , boxWidth, boxHeight] = (svg.getAttribute("viewBox") ?? "")
+          .split(/\s+/)
+          .map(Number);
+
+        const outside = drawnPoints(svg)
+          .filter(
+            (point) =>
+              point.x < -0.5 ||
+              point.x > boxWidth! + 0.5 ||
+              point.y < -0.5 ||
+              point.y > boxHeight! + 0.5,
+          )
+          .map((point) => `${point.what} at (${point.x.toFixed(1)}, ${point.y.toFixed(1)})`);
+
+        expect(outside, outside.join("\n")).toEqual([]);
       });
     });
   }

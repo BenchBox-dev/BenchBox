@@ -31,7 +31,14 @@ export function GroupedQueryChart({ groups, unit = "ms", height = 260 }: Grouped
   const paddingBottom = 60;
   const groupGap = 8;
   const barGap = 2;
-  const viewWidth = Math.max(containerWidth, 300);
+  // This chart opts out of reflow: it stays wide and scrolls inside its own
+  // container. The viewBox must therefore be sized to the SAME minimum the CSS
+  // enforces below. Drawing 300 units into a box CSS has stretched to
+  // `groupCount * 60` px magnifies every coordinate by the ratio between them,
+  // so the bars are computed against a width the chart is not given, collide at
+  // their minimum width, and are then blown up along with the gaps.
+  const scrollMinWidth = Math.max(500, groups.length * 60);
+  const viewWidth = Math.max(containerWidth, scrollMinWidth);
   const chartWidth = viewWidth - paddingLeft - paddingRight;
   const chartHeight = height - paddingTop - paddingBottom;
 
@@ -57,7 +64,7 @@ export function GroupedQueryChart({ groups, unit = "ms", height = 260 }: Grouped
         width="100%"
         height={height}
         viewBox={`0 0 ${viewWidth} ${height}`}
-        style={{ minWidth: `${Math.max(500, groupCount * 60)}px` }}
+        style={{ minWidth: `${scrollMinWidth}px` }}
         role="img"
         aria-label="Grouped query timing bar chart"
       >

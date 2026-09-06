@@ -10,12 +10,19 @@
  * and no visual clue that a value was dropped - only labels that quietly sit
  * where they were never meant to sit.
  *
- * This shipped. Nine chart components used the camelCase spellings, and the
- * result was that every label meant to be centred on its tick or right-aligned
- * against its gutter was left-aligned instead, running across the plot; every
- * emphasised stroke rendered at the default 1px; every dashed stroke rendered
- * solid - including QueryHistogram's dashed marker, whose entire purpose was to
- * make a query that did not run look different from one that ran very fast.
+ * This shipped. Ten chart components used the camelCase spellings across 68
+ * occurrences, and the result was that every label meant to be centred on its
+ * tick or right-aligned against its gutter was left-aligned instead, running
+ * across the plot; every emphasised stroke rendered at the default 1px; every
+ * dashed stroke rendered solid - including QueryHistogram's dashed marker,
+ * whose entire purpose was to make a query that did not run look different
+ * from one that ran very fast.
+ *
+ * The scan is lexical: it reads source lines rather than rendered attributes,
+ * so it cannot see a spread, a computed key, or a name assembled at runtime,
+ * and it would object to a camelCase prop of the same name on a component of
+ * our own. It is a cheap guard against the mistake that was actually made, not
+ * a proof.
  */
 
 import { readdirSync, readFileSync } from "node:fs";

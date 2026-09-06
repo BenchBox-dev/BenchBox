@@ -4,8 +4,12 @@
  * A chart draws in a coordinate system whose width equals its measured
  * container width, and publishes that as `width="100%"` plus a matching
  * `viewBox`. Because the viewBox width and the rendered CSS width agree, the
- * user-unit scale is exactly 1: an 11-unit label is 11 screen pixels at every
- * viewport, and no part of the drawing falls outside the box.
+ * user-unit scale is 1 for any container at or above `CHART_MIN_WIDTH`: an
+ * 11-unit label is 11 screen pixels, and no part of the drawing falls outside
+ * the box. Below that floor the drawing does scale down, so text shrinks with
+ * it - a deliberate trade, because the alternative at 120px is a layout with
+ * no room for a bar. Scaling keeps the whole chart on screen; cropping did
+ * not.
  *
  * The alternative - authoring at a fixed floor and relying on
  * `max-width: 100%` - does not survive a narrow column. Without a viewBox the
@@ -127,4 +131,38 @@ export function axisLabelAnchor(x: number, width: number, inset = 24): "start" |
   if (x <= inset) return "start";
   if (x >= width - inset) return "end";
   return "middle";
+}
+
+export interface EdgeSafeLabel {
+  readonly x: number;
+  readonly textAnchor: "start" | "end";
+}
+
+/**
+ * Place a value label that trails the end of a bar.
+ *
+ * A bar at its maximum reaches the edge of the plot, and a label started just
+ * past it is drawn outside the drawing and cropped. Near either edge the label
+ * turns back on itself and sits inside the bar instead, which is always
+ * readable even though it costs the small gap.
+ *
+ * `inset` is the room the label is assumed to need. It is a bound, not a
+ * measurement: measuring text means laying it out first, which is the fragile
+ * path this file exists to avoid.
+ */
+export function edgeSafeValueLabel(
+  x: number,
+  width: number,
+  direction: "right" | "left",
+  gap = 2,
+  inset = 34,
+): EdgeSafeLabel {
+  if (direction === "right") {
+    return x + gap > width - inset
+      ? { x: Math.min(x - gap, width), textAnchor: "end" }
+      : { x: x + gap, textAnchor: "start" };
+  }
+  return x - gap < inset
+    ? { x: Math.max(x + gap, 0), textAnchor: "start" }
+    : { x: x - gap, textAnchor: "end" };
 }

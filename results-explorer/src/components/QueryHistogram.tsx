@@ -70,7 +70,15 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
     const n = qids.length;
     const groupW = (w - AXIS_W) / n;
     const innerW = groupW - BAR_GAP;
-    const barW = Math.max(MIN_BAR_W, Math.floor(innerW / platforms.length));
+    // The minimum bar width is a preference, not a guarantee: a cohort large
+    // enough that even one query group cannot hold a bar per platform at that
+    // width would otherwise overrun its own slot and paint over its neighbours.
+    // Past that point the bars go thin rather than the groups colliding.
+    const idealBarW = innerW / platforms.length;
+    const barW = idealBarW >= MIN_BAR_W ? Math.floor(idealBarW) : Math.max(0.5, idealBarW);
+    // A label needs roughly this much room at 9 units; below it, label every
+    // other group rather than overprinting them.
+    const labelStride = groupW >= 22 ? 1 : Math.ceil(22 / Math.max(groupW, 1));
 
     return (
       <div key={panelIdx} class="mb-2">
@@ -148,15 +156,17 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
                     </rect>
                   );
                 })}
-                <text
-                  x={groupX + innerW / 2}
-                  y={PADDING_TOP + CHART_H + 14}
-                  text-anchor="middle"
-                  data-query-label={qid}
-                  style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
-                >
-                  {queryDisplayLabel(qid)}
-                </text>
+                {qi % labelStride === 0 && (
+                  <text
+                    x={groupX + innerW / 2}
+                    y={PADDING_TOP + CHART_H + 14}
+                    text-anchor="middle"
+                    data-query-label={qid}
+                    style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
+                  >
+                    {queryDisplayLabel(qid)}
+                  </text>
+                )}
               </g>
             );
           })}

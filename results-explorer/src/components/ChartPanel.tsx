@@ -148,6 +148,22 @@ export function ChartPanel({
     }
   }, [activeId, charts, preferredId]);
 
+  // Router navigation between two routes that both host this panel uses
+  // pushState, which fires no popstate, so the panel stays mounted with the
+  // chart the reader chose while the destination URL says nothing about it.
+  // The parameter has to describe what is on screen, or a shared link does not
+  // reproduce the view it was copied from.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // Only an id this cohort can actually show belongs in the URL. Without this
+    // guard the effect races the canonicalisation above and writes back the
+    // very id that was just rejected.
+    if (!charts.some((chart) => chart.id === activeId)) return;
+    const inUrl = new URLSearchParams(window.location.search).get(CHART_URL_KEY);
+    const expected = activeId === preferredId ? null : activeId;
+    if (inUrl !== expected) setActiveId(activeId);
+  }, [activeId, charts, preferredId, setActiveId]);
+
   useEffect(() => {
     if (!isBaselineControlled) setLocalBaselineIdx(0);
   }, [context, isBaselineControlled]);
@@ -726,8 +742,14 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
   if (scale === null) return null;
 
   const ticks = latencyScaleTicks(scale);
-  const scaleLabel =
-    scale.mode === "log"
+  // The full caption is wider than a phone column, so a compact drawing names
+  // the scale and the direction and leaves the metric to the chart's heading
+  // and accessible name, which already say "geomean performance".
+  const scaleLabel = layout.labelAbove
+    ? scale.mode === "log"
+      ? "Log scale - lower is better"
+      : "Median of passing - lower is better"
+    : scale.mode === "log"
       ? "Geomean query time (log scale) - lower is better"
       : "Geomean query time (median-of-passing) - lower is better";
 
@@ -846,10 +868,12 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
               </g>
             );
           })}
+          {/* Centred, this caption is wider than a phone column and would spill
+              from both ends. A compact drawing anchors it at the left instead. */}
           <text
-            x={layout.plotX + plotWidth / 2}
+            x={layout.labelAbove ? 0 : layout.plotX + plotWidth / 2}
             y={axisHeight - 2}
-            text-anchor="middle"
+            text-anchor={layout.labelAbove ? "start" : "middle"}
             style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}
           >
             {scaleLabel}
