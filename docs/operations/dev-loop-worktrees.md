@@ -61,6 +61,23 @@ automated deletion. Removal remains strictly gated by `make worktree-remove`.
 
 ## Finish a task
 
+Before removing a worktree, you can preview single-target finish eligibility and view the exact proposed commands:
+
+```bash
+cd /Users/joe/Developer/BenchBox
+make worktree-finish WORKTREE_PATH="$WORKTREE_PATH" EXPECTED_HEAD_OID="$OID"
+make worktree-finish WORKTREE_PATH="$WORKTREE_PATH" EXPECTED_HEAD_OID="$OID" FORMAT=json
+```
+
+Finish preview performs comprehensive live revalidation:
+- Validates the target path (rejecting primary clone, unregistered paths, relative paths, wildcards, or lists).
+- Verifies attached branch and confirms worktree cleanliness (`git status --porcelain`).
+- Verifies that HEAD matches the expected full 40-character hexadecimal OID.
+- Inspects worktree lifecycle metadata (`benchbox.worktree.*`), rejecting malformed or foreign worktrees.
+- Enforces controller safety: worktrees bound to an external controller (e.g. `bossmode`) are held unless explicitly released.
+- Revalidates fresh GitHub PR integration evidence (merged PR, target base branch `develop`/`release`/`published-results`, merge commit reachability, tip commit match, and zero unintegrated descendants).
+- **Strictly read-only / zero mutation**: Emits human or JSON previews naming the exact proposed worktree removal and atomic expected-OID ref deletion commands, while performing zero changes to worktrees, branches, refs, locks, or tracker state.
+
 After the PR merges and the worktree is clean, remove the exact registration:
 
 ```bash
