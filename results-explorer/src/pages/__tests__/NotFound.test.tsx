@@ -6,7 +6,7 @@ describe("NotFound", () => {
   it("sets the not-found document title", () => {
     render(<NotFound />);
 
-    expect(screen.getByRole("heading", { name: "404" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Page not found" })).toBeTruthy();
     expect(document.title).toBe("Not found · BenchBox Results");
   });
 });

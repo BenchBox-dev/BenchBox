@@ -223,6 +223,35 @@ describe("ChartPanel", () => {
     expect(screen.queryByRole("button", { name: "Sparkline Table" })).toBeNull();
   });
 
+  it("moves through chart question tabs with arrows, Home, and End", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary(),
+          historical: [makeHistoricalEntry(), makeHistoricalEntry({ result_id: "hist-2" })],
+        }}
+      />,
+    );
+
+    const overview = screen.getByRole("tab", { name: "Overview" });
+    overview.focus();
+    fireEvent.keyDown(overview, { key: "ArrowRight" });
+    const perQuery = screen.getByRole("tab", { name: "Per-query" });
+    expect(perQuery).toHaveAttribute("aria-selected", "true");
+    expect(perQuery).toHaveAttribute("tabindex", "0");
+    expect(document.activeElement).toBe(perQuery);
+
+    fireEvent.keyDown(perQuery, { key: "End" });
+    const rank = screen.getByRole("tab", { name: "Rank" });
+    expect(document.activeElement).toBe(rank);
+    expect(rank).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(rank, { key: "Home" });
+    expect(document.activeElement).toBe(overview);
+    expect(overview).toHaveAttribute("aria-selected", "true");
+  });
+
   it("hides charts whose ids are listed in excludeChartIds", () => {
     render(
       <ChartPanel
@@ -242,7 +271,7 @@ describe("ChartPanel", () => {
     expect(screen.queryByRole("button", { name: "Query Heatmap" })).toBeNull();
     fireEvent.click(screen.getByRole("tab", { name: "Per-query" }));
     expect(screen.queryByRole("button", { name: "Query Heatmap" })).toBeNull();
-    expect(screen.getByRole("tabpanel", { name: "Per-query chart" })).toBeTruthy();
+    expect(screen.getByRole("tabpanel", { name: "Per-query" })).toBeTruthy();
   });
 
   it("threads cohort-aware labels into Compare per-query charts", () => {
@@ -272,13 +301,19 @@ describe("ChartPanel", () => {
       <ChartPanel context={{ kind: "compare", results: details, primaryMetric: "display_geomean_ms" }} />,
     );
 
-    expect(screen.getByText("DataFusion v44")).toBeTruthy();
-    expect(screen.getByText("DataFusion v45")).toBeTruthy();
+    expect(screen.getAllByText("DataFusion v44").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("DataFusion v45").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Comparison Bar" }));
     const tooltips = Array.from(container.querySelectorAll("rect title")).map((title) => title.textContent ?? "");
     expect(tooltips.some((text) => text.includes("DataFusion v44"))).toBe(true);
     expect(tooltips.some((text) => text.includes("DataFusion v45"))).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Diverging Bar" }));
+    const chart = screen.getByRole("img", { name: "Diverging bar chart" });
+    expect(chart.getAttribute("aria-describedby")).toBe("diverging-bar-description");
+    expect(screen.getByText(/An accessible table follows the chart/)).toBeTruthy();
+    expect(screen.getByRole("table", { name: /Per-query percentage changes relative to DataFusion v44/ })).toBeTruthy();
   });
 
   it("uses responsive segmented chart controls with short visible labels", () => {
@@ -428,7 +463,7 @@ describe("ChartPanel", () => {
     );
 
     expect(screen.getByRole("button", { name: "Comparison Bar" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Normalized Speedup" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Relative to selected baseline" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Query Heatmap" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Per-query" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.queryByRole("button", { name: "Performance Trend" })).toBeNull();
@@ -459,7 +494,7 @@ describe("ChartPanel", () => {
       />,
     );
 
-    expect(screen.queryByLabelText(/Baseline/i)).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Baseline" })).toBeNull();
     expect(screen.getByText("Baseline:")).toBeTruthy();
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
   });
@@ -506,7 +541,7 @@ describe("ChartPanel", () => {
     expect(screen.getByRole("button", { name: "Query Histogram" })).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "Rank" }));
     expect(screen.getByRole("table", { name: "Per-query platform rankings (1st = fastest)" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Normalized Speedup" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Relative to selected baseline" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Performance Trend" })).toBeNull();
   });
 
@@ -560,8 +595,8 @@ describe("ChartPanel", () => {
 
     expect(screen.getByRole("status", { name: "Rank Table unavailable" })).toBeTruthy();
     expect(screen.queryByRole("table", { name: "Per-query platform rankings (1st = fastest)" })).toBeNull();
-    expect(screen.getByText("No rankable rows")).toBeTruthy();
-    expect(screen.getByText(/Trust policy excludes this result from ranking/)).toBeTruthy();
+    expect(screen.getByText("No ranked runs")).toBeTruthy();
+    expect(screen.getByText(/Results from this source are not included in rankings/)).toBeTruthy();
     expect(screen.getByText(/Validation status excludes this result from ranking/)).toBeTruthy();
   });
 
@@ -638,8 +673,8 @@ describe("ChartPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Power@Size Bar" }));
 
     expect(screen.getByRole("status", { name: "Power@Size Bar unavailable" })).toBeTruthy();
-    expect(screen.getByText("No rankable rows")).toBeTruthy();
-    expect(screen.getByText(/Trust policy excludes this result from ranking/)).toBeTruthy();
+    expect(screen.getByText("No ranked runs")).toBeTruthy();
+    expect(screen.getByText(/Results from this source are not included in rankings/)).toBeTruthy();
     expect(screen.getByText(/Validation status excludes this result from ranking/)).toBeTruthy();
   });
 
@@ -672,7 +707,7 @@ describe("ChartPanel", () => {
 
     expect(screen.getByText("Rankable Low")).toBeTruthy();
     expect(screen.queryByText("Community High")).toBeNull();
-    expect(screen.getByText(/1 row excluded from this chart's rankable rows dataset/)).toBeTruthy();
+    expect(screen.getByText(/1 row excluded from this chart's ranked runs dataset/)).toBeTruthy();
   });
 
   it("uses winner language by default in the summary box", () => {

@@ -30,19 +30,38 @@ internal health check does not prove live publication.
 2. Apply orthogonal presentation policy. Record visibility, trust, withdrawal, and
    ranking eligibility independently. Do not create a second curated corpus membership
    list on `develop`.
-3. Have one authorized maintainer review and approve the manifest. Trust, admission,
-   workflow, credential, receipt, withdrawal, and ranking-policy changes require manual
-   review and may not auto-merge.
-4. Reserve the target generation with compare-and-set. A conflicting promotion stops;
-   it does not overwrite newer desired state.
-5. Build immutable artifacts from the pinned inputs and record provenance and digests.
-6. Deploy only the matching artifact. Record provider acknowledgement as `deployed`, not
-   `live`.
-7. Probe required public routes from outside the deployment boundary. Issue the attested
+3. Prepare the canonical immutable permit containing content digest, target, generation,
+   expected durable parent, and nonce.
+4. Have one authorized maintainer review and approve the environment deployment with
+   comment `publication-approval:<permit_sha256>`. Trust, admission, workflow, credential,
+   receipt, withdrawal, and ranking-policy changes require manual review and may not auto-merge.
+5. Reserve the target generation with Git compare-and-set on the `publication` metadata ref.
+   A conflicting promotion stops; it does not overwrite newer desired state.
+6. Verify provider feasibility gates before deployment:
+   - Unique correlation: write-intent commit OID passed as `pages_build_version`.
+   - Supported activation barrier: provider contract guaranteeing no late activation.
+   - Stop condition: if provider correlation or finality is indeterminate, transition to
+     `recovery-required` and fail closed.
+7. Build immutable artifacts from the pinned inputs and record provenance and digests.
+8. Deploy only the matching artifact using the pinned Pages adapter. Record provider
+   acknowledgement as `deployed`, not `live`.
+9. Probe required public routes from outside the deployment boundary. Issue the attested
    live receipt only when all observations match. Then and only then set the generation
    to `live`.
-8. If any stage fails, record `promotion_failed`; retain the previous live generation and
-   its receipt.
+10. If any stage fails, record `promotion_failed`; retain the previous live generation and
+    its receipt.
+
+## Provider feasibility and fail-closed fallback
+
+Before implementing or activating the production journal controller, two provider guarantees
+must be established in an isolated test repository:
+1. **Unique Write Correlation:** GitHub Pages must accept the unique write-intent commit OID as
+   `pages_build_version` without aliasing to workflow SHAs, and return deployment status by that version.
+2. **Supported Activation Barrier:** A documented provider contract specifying that an in-flight or
+   canceled request cannot activate after compensation.
+
+If either guarantee cannot be proven, the system fails closed: automated compensation is blocked,
+and operator escalation is required. Do not use unreviewed markers or SHA-only aliases.
 
 ## Required live receipt fields
 
@@ -96,10 +115,15 @@ known artifact, run fresh public probes, and issue a new receipt that references
 prior known-good receipt. Until the new receipt exists, report rollback as pending or
 failed, not complete.
 
-Automatic rollback may select only the last known-good receipt. It may not advance
-policy, add accepted inputs, change visibility or ranking, or select unattested bytes.
-The A0 release-based rollback remains the production fallback until later migration gates
-replace it with tested evidence.
+Automatic rollback may select only the last known-good receipt and its recorded durable
+parent. It must construct a self-consistent successor transaction whose desired manifest,
+artifact, acknowledgement, probes, receipt, generation, and parent all describe the
+restored bytes. It may not advance policy, add accepted inputs, change visibility or
+ranking, or select unattested bytes.
+
+Throughout migration and the 72-hour bounded soak, the legacy release fallback remains
+independently runnable and does not require reading or executing through the new journal.
+Retirement of the legacy fallback requires explicit user approval after soak completion.
 
 ## Emergency takedown
 

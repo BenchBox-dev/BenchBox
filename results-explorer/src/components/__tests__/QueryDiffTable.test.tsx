@@ -78,7 +78,7 @@ describe("buildQueryDiffRows", () => {
         candidatePlatform: "SQLite",
         baselineMs: 10,
         candidateMs: 20,
-        ratio: 2,
+        speedupRatio: 0.5,
         deltaMs: 10,
         status: "slower",
         baselineSamples: 3,
@@ -91,7 +91,7 @@ describe("buildQueryDiffRows", () => {
         candidatePlatform: "SQLite",
         baselineMs: 20,
         candidateMs: 10,
-        ratio: 0.5,
+        speedupRatio: 2,
         deltaMs: -10,
         status: "faster",
         baselineSamples: 3,
@@ -104,7 +104,7 @@ describe("buildQueryDiffRows", () => {
         candidatePlatform: "SQLite",
         baselineMs: null,
         candidateMs: null,
-        ratio: null,
+        speedupRatio: null,
         deltaMs: null,
         status: "missing",
         baselineSamples: 0,
@@ -199,7 +199,7 @@ describe("buildQueryDiffRows", () => {
       queryId: "Q1",
       baselineMs: 10,
       candidateMs: null,
-      ratio: null,
+      speedupRatio: null,
       deltaMs: null,
       status: "missing",
     });
@@ -225,7 +225,7 @@ describe("QueryDiffTable", () => {
       />,
     );
 
-    const table = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
+    const table = screen.getByRole("heading", { name: "Query-level differences" }).closest("section");
     expect(table).not.toBeNull();
     expect(table).toHaveTextContent("Baseline: DuckDB");
     // w4: every state names how many of how many are shown, so an empty
@@ -260,7 +260,7 @@ describe("QueryDiffTable", () => {
       />,
     );
 
-    const table = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
+    const table = screen.getByRole("heading", { name: "Query-level differences" }).closest("section");
     expect(table).toHaveTextContent("Showing 2 of 3 queries.");
     expect(table).not.toHaveTextContent("Showing 4 of 6 queries.");
   });
@@ -273,7 +273,7 @@ describe("the Top-N limiter", () => {
     candidatePlatform: "SQLite",
     baselineMs: 10,
     candidateMs: comparable ? 10 + (deltaMs ?? 0) : null,
-    ratio: comparable && deltaMs !== null ? (10 + deltaMs) / 10 : null,
+    speedupRatio: comparable && deltaMs !== null ? 10 / (10 + deltaMs) : null,
     deltaMs: comparable ? deltaMs : null,
     status: comparable ? (deltaMs === null ? "missing" : deltaMs < 0 ? "faster" : "slower") : "missing",
     baselineSamples: 3,

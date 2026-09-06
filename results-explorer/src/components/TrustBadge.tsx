@@ -28,55 +28,55 @@ const TRUST_CONFIG: Record<string, { label: string; tone: StatusTone; title: str
   "maintainer-run": {
     label: "Maintainer",
     tone: "success",
-    title: "Run by a BenchBox project maintainer under controlled conditions",
+    title: "A BenchBox maintainer ran and reviewed this result.",
   },
   "community-submission": {
     label: "Community",
     tone: "info",
-    title: "Submitted by a community member - see result detail for provenance",
+    title: "A community member submitted this result. Open it to review the source details.",
   },
   "vendor-supplied": {
     label: "Vendor",
     tone: "warning",
     title:
-      "Produced by the platform vendor - ranked, but the vendor has a direct interest in the outcome; verify against independent results",
+      "The platform vendor produced this result. Compare it with independent results before drawing conclusions.",
   },
   "ci-verified": {
     label: "CI",
     tone: "neutral",
-    title: "Validated by automated CI pipeline",
+    title: "An automated test run produced this result.",
   },
   "ci-validated": {
     label: "CI",
     tone: "neutral",
-    title: "Validated by automated CI pipeline",
+    title: "An automated test run produced this result.",
   },
   ci: {
     label: "CI",
     tone: "neutral",
-    title: "Validated by automated CI pipeline",
+    title: "An automated test run produced this result.",
   },
   "local-run": {
     label: "Local",
     tone: "neutral",
-    title: "Run on a developer machine - environment may vary",
+    title: "This result came from a developer machine, so its environment may differ from other runs.",
   },
   local: {
     label: "Local",
     tone: "neutral",
-    title: "Run on a developer machine - environment may vary",
+    title: "This result came from a developer machine, so its environment may differ from other runs.",
   },
   "unofficial-research": {
     label: "Unofficial",
     tone: "warning",
-    title: "Unofficial / non-standard configuration - not comparable and excluded from official rankings",
+    title: "This result used a nonstandard configuration and is not included in rankings.",
   },
 };
 
 const DEFAULT_CONFIG = {
   label: "Unknown",
   tone: "neutral" as StatusTone,
-  title: "Trust level not recorded",
+  title: "The source of this result was not recorded.",
 };
 
 /** Tooltip/legend prose for a trust label. Single source for both surfaces. */
@@ -107,7 +107,7 @@ export function TrustBadge({ trustLabel, compact = false }: TrustBadgeProps) {
       ? {
           ...DEFAULT_CONFIG,
           label: trustLabel,
-          title: `Trust tier: ${trustLabel} (unrecognised - contact maintainers)`,
+          title: `The source label “${trustLabel}” is not recognized. Contact the BenchBox maintainers for details.`,
         }
       : DEFAULT_CONFIG);
   const text = compact ? (config.label.split(" ")[0] ?? config.label) : config.label;
@@ -127,14 +127,14 @@ export function ValidationBadge({ validationStatus, showMissing = false }: Valid
   if (!validationStatus && !showMissing) return null;
   if (!validationStatus) {
     return (
-      <StatusBadge role="validation" tone="neutral" title="Validation status: not recorded">
-        validation n/a
+      <StatusBadge role="validation" tone="neutral" title="No validation status was recorded for this result.">
+        Not recorded
       </StatusBadge>
     );
   }
   const info = describeValidationStatus(validationStatus);
   return (
-    <StatusBadge role="validation" tone={info.tone} title={`Validation status: ${info.status} - ${info.description}`}>
+    <StatusBadge role="validation" tone={info.tone} title={`${info.description} Recorded status: ${info.status}.`}>
       {info.label}
     </StatusBadge>
   );

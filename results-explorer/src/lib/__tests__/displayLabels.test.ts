@@ -14,8 +14,8 @@ import {
 
 describe("formatTrustLabel", () => {
   it("humanizes the canonical trust labels", () => {
-    expect(formatTrustLabel("maintainer-run")).toBe("maintainer run");
-    expect(formatTrustLabel("community-submission")).toBe("community submission");
+    expect(formatTrustLabel("maintainer-run")).toBe("Maintainer run");
+    expect(formatTrustLabel("community-submission")).toBe("Community submission");
   });
 
   it("returns 'unknown' for null/empty values", () => {
@@ -37,16 +37,16 @@ describe("formatFunding", () => {
     expect(formatFunding("free-trial")).toBe("free trial");
     expect(formatFunding("vendor-sponsored")).toBe("vendor sponsored");
     expect(formatFunding("grant")).toBe("grant funded");
-    expect(formatFunding("unspecified")).toBe("unspecified");
+    expect(formatFunding("unspecified")).toBe("No funding information provided");
   });
 
   // Unlike formatTrustLabel, a missing value maps to "unspecified" rather than
   // "unknown": `unspecified` is the producer default, so absent and declared
   // carry the same meaning.
   it("returns 'unspecified' for null/empty values", () => {
-    expect(formatFunding(null)).toBe("unspecified");
-    expect(formatFunding("")).toBe("unspecified");
-    expect(formatFunding(undefined)).toBe("unspecified");
+    expect(formatFunding(null)).toBe("No funding information provided");
+    expect(formatFunding("")).toBe("No funding information provided");
+    expect(formatFunding(undefined)).toBe("No funding information provided");
   });
 
   it("falls back to underscore/dash humanization for unknown values", () => {
@@ -131,9 +131,9 @@ describe("describeValidationStatus", () => {
 
 describe("formatVisibility", () => {
   it("turns internal slug into a public-readable label", () => {
-    expect(formatVisibility("public-curated")).toBe("public (curated)");
-    expect(formatVisibility("public-community")).toBe("public (community)");
-    expect(formatVisibility("internal")).toBe("internal");
+    expect(formatVisibility("public-curated")).toBe("Published, maintainer reviewed");
+    expect(formatVisibility("public-community")).toBe("Published, community submitted");
+    expect(formatVisibility("internal")).toBe("Not public");
   });
 });
 

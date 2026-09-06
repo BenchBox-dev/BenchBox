@@ -96,18 +96,19 @@ describe("RunReceipt", () => {
     // `results-explorer-result-detail-metadata-density` w4 wires
     // RunReceipt onto the shared display-label formatters so the
     // hyphenated source slug renders as a humanized label here too.
-    expect(within(receipt).getByText("maintainer run")).toBeTruthy();
-    expect(within(receipt).getByText("public (curated)")).toBeTruthy();
+    expect(within(receipt).getByText("Maintainer run")).toBeTruthy();
+    expect(within(receipt).getByText("Published, maintainer reviewed")).toBeTruthy();
     expect(within(receipt).getByText("exact")).toBeTruthy();
     // Funding is recorded on the receipt even when undisclosed. The chip is
     // omitted for "unspecified"; the receipt states it.
     expect(within(receipt).getByText("Funding")).toBeTruthy();
-    expect(within(receipt).getByText("unspecified")).toBeTruthy();
+    expect(within(receipt).getByText("No funding information provided")).toBeTruthy();
     expect(within(receipt).getByText("Eligible")).toBeTruthy();
-    expect(within(receipt).getByText("abc12345")).toBeTruthy();
+    expect(within(receipt).getByText("Public ID abc12345")).toBeTruthy();
     expect(within(receipt).getByText("Plans not published")).toBeTruthy();
-    expect(within(receipt).getByText("unavailable")).toBeTruthy();
-    expect(within(receipt).getByText("2026.05.0 (benchbox.core.cost.pricing)")).toBeTruthy();
+    expect(within(receipt).getByText("Not recorded")).toBeTruthy();
+    expect(within(receipt).getByText("2026.05.0")).toBeTruthy();
+    expect(receipt).not.toHaveTextContent("benchbox.core.cost.pricing");
     // Sentinel "unknown" for billing/region is suppressed (finding #12);
     // only the cost scope renders.
     expect(within(receipt).getByText("compute only")).toBeTruthy();
@@ -127,7 +128,7 @@ describe("RunReceipt", () => {
 
     const receipt = screen.getByRole("region", { name: "Run receipt" });
     expect(within(receipt).getByText("$0.42")).toBeTruthy();
-    expect(within(receipt).getByText("compute only, billing: warehouse hour, region: us-east-1")).toBeTruthy();
+    expect(within(receipt).getByText("compute only, Billing unit: warehouse hour, Region: us-east-1")).toBeTruthy();
   });
 
   it("does not leak raw not_applicable enum into the Cost section copy (finding #12)", () => {
@@ -173,12 +174,12 @@ describe("RunReceipt", () => {
     expect(within(receipt).getAllByText(/\d+ fields? not recorded/)).toHaveLength(1);
     expect(costSection.queryByText("Cost model")).toBeNull();
     expect(costSection.queryByText("Cost scope")).toBeNull();
-    expect(costSection.getByText("unavailable")).toBeTruthy();
+    expect(costSection.getByText("Not recorded")).toBeTruthy();
 
-    fireEvent.click(within(receipt).getByRole("button", { name: /Show missing metadata/ }));
+    fireEvent.click(within(receipt).getByRole("button", { name: /Show missing fields/ }));
     expect(costSection.getByText("Cost model")).toBeTruthy();
     expect(costSection.getByText("Cost scope")).toBeTruthy();
-    expect(costSection.getAllByText("Not recorded")).toHaveLength(2);
+    expect(costSection.getAllByText("Not recorded")).toHaveLength(3);
   });
 
   it("keeps logical query count separate from measurement samples", () => {
@@ -220,7 +221,7 @@ describe("RunReceipt", () => {
     expect(within(receipt).getByText("Plans available")).toBeTruthy();
   });
 
-  it("hides missing metadata behind the Show missing metadata disclosure (w3)", () => {
+  it("hides missing metadata behind the Show missing fields disclosure (w3)", () => {
     // Sparse-metadata fixture: trust + visibility recorded, the entire
     // Platform/Environment surface unrecorded, validation/compliance
     // missing, no normalized cost. The default view should expose
@@ -257,8 +258,8 @@ describe("RunReceipt", () => {
     // remain visible without expanding the disclosure.
     expect(within(receipt).getByText("TPC-H")).toBeTruthy();
     expect(within(receipt).getByText("DuckDB")).toBeTruthy();
-    expect(within(receipt).getByText("maintainer run")).toBeTruthy();
-    expect(within(receipt).getByText("public (curated)")).toBeTruthy();
+    expect(within(receipt).getByText("Maintainer run")).toBeTruthy();
+    expect(within(receipt).getByText("Published, maintainer reviewed")).toBeTruthy();
 
     // Missing rows are NOT in the default DOM.
     expect(within(receipt).queryByText("Platform version")).toBeNull();
@@ -270,7 +271,7 @@ describe("RunReceipt", () => {
 
     // Click the global disclosure — every previously-hidden field
     // becomes visible.
-    const toggle = within(receipt).getByRole("button", { name: /Show missing metadata/ });
+    const toggle = within(receipt).getByRole("button", { name: /Show missing fields/ });
     fireEvent.click(toggle);
     expect(within(receipt).getByText("Platform version")).toBeTruthy();
     expect(within(receipt).getByText("OS")).toBeTruthy();
@@ -278,7 +279,7 @@ describe("RunReceipt", () => {
     expect(within(receipt).getAllByText("Not recorded").length).toBeGreaterThan(0);
 
     // The button copy flips and the disclosure round-trips.
-    const hideToggle = within(receipt).getByRole("button", { name: /Hide missing metadata/ });
+    const hideToggle = within(receipt).getByRole("button", { name: /Hide missing fields/ });
     fireEvent.click(hideToggle);
     expect(within(receipt).queryByText("Platform version")).toBeNull();
   });
@@ -293,9 +294,9 @@ describe("RunReceipt", () => {
     );
 
     const receipt = screen.getByRole("region", { name: "Run receipt" });
-    // No "Show missing metadata" toggle, no per-section "N field(s)
+    // No "Show missing fields" toggle, no per-section "N field(s)
     // not recorded" footer when every row is populated.
-    expect(within(receipt).queryByRole("button", { name: /Show missing metadata/ })).toBeNull();
+    expect(within(receipt).queryByRole("button", { name: /Show missing fields/ })).toBeNull();
     expect(within(receipt).queryByText(/\d+ fields? not recorded/)).toBeNull();
   });
 
@@ -360,7 +361,7 @@ describe("RunReceipt", () => {
     // Missing hash rows are hidden behind the disclosure, not rendered as a hash.
     expect(within(receipt).queryByText("Requested config hash")).toBeNull();
     expect(within(receipt).queryByText("Applied ledger hash")).toBeNull();
-    fireEvent.click(within(receipt).getByRole("button", { name: /Show missing metadata/ }));
+    fireEvent.click(within(receipt).getByRole("button", { name: /Show missing fields/ }));
     expect(within(receipt).getByText("Requested config hash")).toBeTruthy();
     expect(within(receipt).getByText("Applied ledger hash")).toBeTruthy();
     expect(within(receipt).getAllByText("Not recorded").length).toBeGreaterThan(0);
@@ -378,7 +379,7 @@ describe("RunReceipt", () => {
     render(<RunReceipt detail={makeDetail({ tuning_validation_status: "applied_unverified" })} />);
 
     const receipt = screen.getByRole("region", { name: "Run receipt" });
-    expect(within(receipt).getByText("Applied (self-attested)")).toBeTruthy();
+    expect(within(receipt).getByText("Applied, not independently checked")).toBeTruthy();
     expect(within(receipt).queryByText("Verified")).toBeNull();
   });
 
@@ -389,7 +390,7 @@ describe("RunReceipt", () => {
     // Legacy bundles: the row is hidden behind the disclosure, never shown as verified.
     expect(within(receipt).queryByText("Tuning verification")).toBeNull();
     expect(within(receipt).queryByText("Verified")).toBeNull();
-    fireEvent.click(within(receipt).getByRole("button", { name: /Show missing metadata/ }));
+    fireEvent.click(within(receipt).getByRole("button", { name: /Show missing fields/ }));
     expect(within(receipt).getByText("Tuning verification")).toBeTruthy();
   });
 });
@@ -524,7 +525,7 @@ describe("RunReceipt applied-tuning receipt drill-down", () => {
 
     const receipt = screen.getByRole("region", { name: "Run receipt" });
     // The drill-down never upgrades the badge - corroboration is not decided here.
-    expect(within(receipt).getByText("Applied (self-attested)")).toBeTruthy();
+    expect(within(receipt).getByText("Applied, not independently checked")).toBeTruthy();
     expect(within(receipt).queryByText("Verified")).toBeNull();
     expect(within(receipt).getByTestId("applied-receipt-drilldown")).toBeTruthy();
   });
@@ -535,7 +536,7 @@ describe("RunReceipt applied-tuning receipt drill-down", () => {
     const receipt = screen.getByRole("region", { name: "Run receipt" });
     expect(within(receipt).queryByText("Tuning verification")).toBeNull();
     expect(within(receipt).queryByTestId("applied-receipt-drilldown")).toBeNull();
-    fireEvent.click(within(receipt).getByRole("button", { name: /Show missing metadata/ }));
+    fireEvent.click(within(receipt).getByRole("button", { name: /Show missing fields/ }));
     expect(within(receipt).getByText("Tuning verification")).toBeTruthy();
     expect(within(receipt).getAllByText("Not recorded").length).toBeGreaterThan(0);
   });
@@ -545,7 +546,7 @@ describe("RunReceipt applied-tuning receipt drill-down", () => {
     const { unmount } = render(<RunReceipt detail={makeDetail()} />);
     let receipt = screen.getByRole("region", { name: "Run receipt" });
     expect(within(receipt).getByText("CPU family")).toBeTruthy();
-    expect(within(receipt).getByText("apple_silicon")).toBeTruthy();
+    expect(within(receipt).getByText("Apple silicon")).toBeTruthy();
     expect(within(receipt).getByText("CPU model")).toBeTruthy();
     expect(within(receipt).getByText("Apple M1 Max")).toBeTruthy();
     unmount();
@@ -569,7 +570,7 @@ describe("RunReceipt applied-tuning receipt drill-down", () => {
     expect(within(receipt).queryByText("CPU model")).toBeNull();
 
     // Expand disclosure
-    fireEvent.click(within(receipt).getByRole("button", { name: /Show missing metadata/ }));
+    fireEvent.click(within(receipt).getByRole("button", { name: /Show missing fields/ }));
     expect(within(receipt).getByText("CPU family")).toBeTruthy();
     expect(within(receipt).getByText("CPU model")).toBeTruthy();
   });

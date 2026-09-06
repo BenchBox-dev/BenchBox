@@ -13,7 +13,7 @@ test.describe("ResultDetail", () => {
 
     // The page heading is `<Benchmark> - <Platform>` once DuckDB-WASM has
     // attached and the detail metrics query resolves.
-    await waitForDataLoaded(page, /TPC-H\s+-\s+DuckDB/);
+    await waitForDataLoaded(page, /TPC-H result:\s+DuckDB/);
 
     // Trust badge and SF row are rendered synchronously beside the heading.
     const main = page.getByRole("main");
@@ -21,13 +21,13 @@ test.describe("ResultDetail", () => {
       main.getByRole("region", { name: "Result summary" }).getByText("SF 0.01", { exact: true }),
     ).toBeVisible();
 
-    // Query Timings header is the stable landmark for the medians table.
-    await expect(main.getByRole("heading", { name: /Query Timings/ })).toBeVisible();
+    // Query timings header is the stable landmark for the medians table.
+    await expect(main.getByRole("heading", { name: /Query timings/ })).toBeVisible();
   });
 
   test("sorting the median table toggles the indicator arrow", async ({ page }) => {
     await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
-    await waitForDataLoaded(page, /Query Timings/);
+    await waitForDataLoaded(page, /Query timings/);
 
     const header = page.getByRole("columnheader", { name: /Median latency/ });
     // First click sorts ascending; second click flips to descending. We
@@ -41,7 +41,7 @@ test.describe("ResultDetail", () => {
 
   test("sortable headers expose state and native Space activation does not scroll", async ({ page }) => {
     await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
-    await waitForDataLoaded(page, /Query Timings/);
+    await waitForDataLoaded(page, /Query timings/);
 
     const medianHeader = page.locator('th[aria-sort]').filter({ hasText: "Median latency" }).first();
     await expect(medianHeader).toHaveAttribute("aria-sort", "none");
@@ -62,15 +62,14 @@ test.describe("ResultDetail", () => {
     await expect(durationHeader).toHaveAttribute("aria-sort", "ascending");
   });
 
-  test("'Compare this result' opens the compare builder with the result pinned", async ({ page }) => {
+  test("'Find a run to compare' opens Find runs with the result selected", async ({ page }) => {
     await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
-    await waitForDataLoaded(page, /Query Timings/);
+    await waitForDataLoaded(page, /Query timings/);
 
-    await page.getByRole("link", { name: /Compare this result/i }).click();
-    await expect(page).toHaveURL(new RegExp(`/results/compare\\?ids=${TPCH_DUCKDB_ID}$`));
-    await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId("compare-builder-status")).toContainText("1 result selected");
-    await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
+    await page.getByRole("link", { name: "Find a run to compare" }).click();
+    await waitForDataLoaded(page, /matching run/);
+    await expect(page).toHaveURL(new RegExp(`/results/query\\?pick=${encodeURIComponent(TPCH_DUCKDB_ID)}`));
+    await expect(page.getByTestId(`query-compare-checkbox-${TPCH_DUCKDB_ID}`)).toBeChecked();
   });
 
   test("a missing result_id surfaces a user-visible error rather than a blank screen", async ({ page }) => {
@@ -85,14 +84,14 @@ test.describe("ResultDetail", () => {
   test("result detail zero timing omits absent metric and timing surfaces", async ({ page }) => {
     await page.goto(`/results/r/${TPCH_ZERO_TIMING_ID}`);
     await waitForShell(page);
-    await waitForDataLoaded(page, /TPC-H\s+-\s+DuckDB Zero Timing/);
+    await waitForDataLoaded(page, /TPC-H result:\s+DuckDB Zero Timing/);
 
     const main = page.getByRole("main");
     const summary = main.getByRole("region", { name: "Result summary" });
     await expect(summary).not.toContainText("N/A");
     await expect(summary.getByText(/Primary metric/)).toHaveCount(0);
     await expect(summary.locator('[data-role="validation"]')).toHaveCount(0);
-    await expect(main.getByRole("heading", { name: /Query Timings/ })).toHaveCount(0);
+    await expect(main.getByRole("heading", { name: /Query timings/ })).toHaveCount(0);
     await expect(main.getByText("Charts", { exact: true })).toHaveCount(0);
     await expect(main.getByText(/\d+ fields? not recorded for this run\./)).toHaveCount(1);
     await expect(main.getByRole("region", { name: "Run receipt" })).toBeVisible();

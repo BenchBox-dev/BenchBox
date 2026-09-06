@@ -4,11 +4,18 @@ import type { DetailResult } from "@/types";
 import { humanizeBenchmark, shortHash } from "@/utils";
 import { costModelSummary, costScopeSummary, normalizedCostLabel } from "@/lib/costDisplay";
 import {
+  formatArchitecture,
+  formatCpuFamily,
+  formatEnumLabel,
+  formatExecutionMode,
   formatFunding,
+  formatMemoryGb,
+  formatTuningMode,
   formatTrustLabel,
   formatValidationStatus,
   formatVisibility,
 } from "@/lib/displayLabels";
+import { visibleResultIdForRow } from "@/lib/resultLinks";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TuningVerificationBadge } from "@/components/TuningVerificationBadge";
 import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
@@ -24,7 +31,7 @@ interface ReceiptRow {
   label: string;
   value: ComponentChildren;
   // Marked when the row's value is the "Not recorded" placeholder rather than
-  // real data. Missing rows move behind the "Show missing metadata"
+  // real data. Missing rows move behind the "Show missing fields"
   // disclosure so the default view is dense with what is actually known.
   isMissing?: boolean;
 }
@@ -51,6 +58,12 @@ function rowFromString(
 function rowFromSummary(label: string, value: string): ReceiptRow {
   if (value === MISSING_PLACEHOLDER) return missingRow(label);
   return recordedRow(label, value);
+}
+
+function formattedRow(label: string, raw: string | null | undefined, format: (raw: string) => string): ReceiptRow {
+  if (raw === null || raw === undefined || raw === "") return missingRow(label);
+  const value = format(raw);
+  return recordedRow(label, value === raw ? value : <span title={`Recorded value: ${raw}`}>{value}</span>);
 }
 
 /**
@@ -87,7 +100,7 @@ export function RunReceipt({
       rows: [
         recordedRow("Benchmark", humanizeBenchmark(detail.benchmark)),
         recordedRow("Scale factor", `SF ${detail.scale_factor}`),
-        rowFromString("Phase", detail.test_type),
+        formattedRow("Test phase", detail.test_type, formatEnumLabel),
         recordedRow("Query count", String(queryCount)),
         recordedRow("Measurement samples", String(sampleCount)),
       ],
@@ -98,8 +111,8 @@ export function RunReceipt({
         recordedRow("Platform", detail.platform),
         rowFromString("Platform version", detail.platform_version),
         rowFromString("Driver version", detail.driver_version),
-        rowFromString("Execution mode", detail.execution_mode),
-        rowFromString("Tuning mode", detail.tuning_mode),
+        formattedRow("Execution mode", detail.execution_mode, formatExecutionMode),
+        formattedRow("Tuning mode", detail.tuning_mode, formatTuningMode),
         rowFromString("Tuning hash", detail.tuning_hash),
         // ADR-1 bundle-emitted tuning identities, shown as distinct labeled
         // kinds: the canonical requested-config hash and the physical
@@ -131,8 +144,8 @@ export function RunReceipt({
       title: "Environment",
       rows: [
         rowFromString("OS", detail.environment.os),
-        rowFromString("Arch", detail.environment.arch),
-        rowFromString("CPU family", detail.environment.cpu_family),
+        formattedRow("Architecture", detail.environment.arch, formatArchitecture),
+        formattedRow("CPU family", detail.environment.cpu_family, formatCpuFamily),
         rowFromString("CPU model", detail.environment.cpu_model),
         rowFromString("CPU evidence", detail.environment.cpu_identity_provenance, formatCpuIdentityProvenance),
         rowFromString("CPU count", detail.environment.cpu_count),
@@ -188,10 +201,10 @@ export function RunReceipt({
     <section id="run-receipt" aria-label="Run receipt" class="panel-elevated p-4">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Run Receipt</h2>
-          <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">Reproducibility, platform, and integrity metadata for this result.</p>
+          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Run receipt</h2>
+          <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">Recorded details for checking and reproducing this run.</p>
         </div>
-        <StatusBadge role="generic" tone="neutral">{detail.result_id.slice(0, 8)}</StatusBadge>
+        <StatusBadge role="generic" tone="neutral">Public ID {shortId ?? visibleResultIdForRow(detail)}</StatusBadge>
       </div>
       {totalMissing > 0 && (
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--bb-data-fg-muted)]">
@@ -203,7 +216,7 @@ export function RunReceipt({
             aria-expanded={showMissing}
             aria-controls="run-receipt-missing-fields-region"
           >
-            {showMissing ? "Hide missing metadata" : "Show missing metadata"}
+            {showMissing ? "Hide missing fields" : "Show missing fields"}
           </button>
         </div>
       )}
@@ -456,7 +469,8 @@ function reproduceRow(reproduceCommand: string | null): ReceiptRow {
 
 function memoryRow(value: number | null | undefined): ReceiptRow {
   if (value === null || value === undefined) return missingRow("Memory");
-  return recordedRow("Memory", `${value} GB`);
+  const formatted = formatMemoryGb(value);
+  return recordedRow("Memory", <span title={`Recorded value: ${value} GB`}>{formatted}</span>);
 }
 
 function buildClientLocalityRow(detail: DetailResult): ReceiptRow | null {

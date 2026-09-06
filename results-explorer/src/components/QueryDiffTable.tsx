@@ -1,6 +1,6 @@
 import type { DetailResult } from "@/types";
-import { queryDisagreementSpread } from "@/lib/chartMath";
-import { isValidTimingValue, timingValueForQuery } from "@/lib/displayEligibility";
+import { queryDisagreementSpread, speedupRatio } from "@/lib/chartMath";
+import { timingValueForQuery } from "@/lib/displayEligibility";
 import { formatSpeedup } from "@/lib/metricFormatters";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import { fmtMs } from "@/utils";
@@ -16,7 +16,8 @@ export interface QueryDiffRow {
   candidatePlatform: string;
   baselineMs: number | null;
   candidateMs: number | null;
-  ratio: number | null;
+  /** Baseline latency divided by candidate latency: above 1 means faster. */
+  speedupRatio: number | null;
   deltaMs: number | null;
   status: QueryDiffStatus;
   /** Executions behind each side's value under the current basis. */
@@ -116,11 +117,11 @@ export function selectQueryIdsForLimiter(
       .map((c) => timingValueForQuery(c, queryId))
       .filter((ms): ms is number => ms !== null && ms > 0);
 
-    const ratios = candidateTimings.map((ms) => ms / baseMs);
+    const ratios = candidateTimings.map((ms) => speedupRatio(baseMs, ms)!);
     const deltas = candidateTimings.map((ms) => ms - baseMs);
 
-    const bestRatio = Math.min(...ratios);
-    const worstRatio = Math.max(...ratios);
+    const bestSpeedup = Math.max(...ratios);
+    const worstSpeedup = Math.min(...ratios);
     const maxDisagreement =
       queryDisagreementSpread([1, ...ratios]) ??
       Math.max(...ratios.map((r) => Math.abs(Math.log2(r))));
@@ -128,8 +129,8 @@ export function selectQueryIdsForLimiter(
 
     return {
       queryId,
-      bestRatio,
-      worstRatio,
+      bestSpeedup,
+      worstSpeedup,
       maxDisagreement,
       maxDelta,
     };
@@ -139,13 +140,13 @@ export function selectQueryIdsForLimiter(
   switch (limiter) {
     case "speedups":
       filtered = scored
-        .filter((s) => s.bestRatio < 1.0)
-        .sort((a, b) => a.bestRatio - b.bestRatio);
+        .filter((s) => s.bestSpeedup > 1.0)
+        .sort((a, b) => b.bestSpeedup - a.bestSpeedup);
       break;
     case "slowdowns":
       filtered = scored
-        .filter((s) => s.worstRatio > 1.0)
-        .sort((a, b) => b.worstRatio - a.worstRatio);
+        .filter((s) => s.worstSpeedup < 1.0)
+        .sort((a, b) => a.worstSpeedup - b.worstSpeedup);
       break;
     case "movement":
       filtered = [...scored].sort((a, b) => b.maxDisagreement - a.maxDisagreement || b.maxDelta - a.maxDelta);
@@ -226,7 +227,7 @@ export function QueryDiffTable({
       <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="query-diff-title" class="text-base font-semibold text-[var(--bb-data-fg-primary)]">
-            Query-Level Diff
+            Query-level differences
           </h2>
           <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
             Baseline: <span class="font-medium text-[var(--bb-data-fg-primary)]">{runLabels[normalizedBaselineIndex] ?? baseline.platform}</span>. Negative deltas mean the
@@ -240,7 +241,7 @@ export function QueryDiffTable({
 
       {suppressionReason && (
         <div class="mb-4 rounded-md tone-warning border border-[var(--bb-data-border)] px-3 py-2 text-xs">
-          Winner claims are suppressed because {suppressionReason}; use these query values as raw evidence only.
+          This page does not name a winner because {suppressionReason}. You can still review the individual query measurements.
         </div>
       )}
 
@@ -262,7 +263,7 @@ export function QueryDiffTable({
               <th class="table-th">Baseline latency</th>
               <th class="table-th">Candidate latency</th>
               <th class="table-th">Passes</th>
-              <th class="table-th">Ratio</th>
+              <th class="table-th">Speedup vs baseline</th>
               <th class="table-th">Delta</th>
               <th class="table-th">Status</th>
             </tr>
@@ -275,7 +276,7 @@ export function QueryDiffTable({
                 <td class="table-td font-mono">{formatMsCell(row.baselineMs)}</td>
                 <td class="table-td font-mono">{formatMsCell(row.candidateMs)}</td>
                 <td class="table-td font-mono text-xs">{formatPasses(row)}</td>
-                <td class="table-td font-mono">{row.ratio !== null ? formatSpeedup(row.ratio).valueText : "-"}</td>
+                <td class="table-td font-mono">{row.speedupRatio !== null ? formatSpeedup(row.speedupRatio).valueText : "-"}</td>
                 <td class="table-td font-mono">{formatDelta(row.deltaMs)}</td>
                 <td class="table-td">
                   {row.comparable ? (
@@ -321,7 +322,7 @@ export function buildQueryDiffRows(
         candidatePlatform: runLabels?.[index] ?? candidate.platform,
         baselineMs,
         candidateMs,
-        ratio: isValidTimingValue(baselineMs) && isValidTimingValue(candidateMs) ? candidateMs / baselineMs : null,
+        speedupRatio: speedupRatio(baselineMs, candidateMs),
         deltaMs,
         status: diffStatus(deltaMs),
         baselineSamples: sampleCountForQuery(baseline, queryId),

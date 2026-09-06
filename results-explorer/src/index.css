@@ -632,7 +632,7 @@
         overflow: visible !important;
     }
 
-    table {
+    table:not(.sr-only) {
         width: 100% !important;
         min-width: 0 !important;
         table-layout: auto;

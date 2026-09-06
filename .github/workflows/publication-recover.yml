@@ -1,0 +1,171 @@
+name: Publication Watchdog & Recovery (G3)
+
+on:
+  workflow_run:
+    workflows:
+      - "Publication Transactions"
+      - "Publication Control Plane Deployment"
+      - "Publication Preview Deploy (G2)"
+    types:
+      - completed
+  schedule:
+    # Bounded 5-minute reconciliation scan (offset 2 min)
+    - cron: "2-57/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Recovery action to attempt"
+        type: choice
+        options:
+          - scan
+          - finalize
+          - compensate
+          - mark_terminal
+        default: scan
+      barrier_evidence:
+        description: "Provider activation barrier evidence JSON"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publication-watchdog
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  scan:
+    name: Scan journal state and evaluate recovery
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      recovery_needed: ${{ steps.watchdog.outputs.recovery_needed }}
+      action: ${{ steps.watchdog.outputs.action }}
+      transaction_id: ${{ steps.watchdog.outputs.transaction_id }}
+      state: ${{ steps.watchdog.outputs.state }}
+      status: ${{ steps.watchdog.outputs.status }}
+    steps:
+      - name: Checkout trusted controller code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Fetch publication journal
+        run: |
+          git fetch origin refs/heads/publication:refs/heads/publication || true
+
+      - name: Authenticate triggering event if workflow_run
+        id: auth_trigger
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TRIGGER_REPO_ID: ${{ github.event.workflow_run.repository.id }}
+          EXPECTED_REPO_ID: ${{ github.repository_id }}
+          TRIGGER_WORKFLOW_PATH: ${{ github.event.workflow_run.path }}
+          TRIGGER_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
+          TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            echo "Authenticating triggering workflow_run..."
+            if [ -n "$TRIGGER_REPO_ID" ] && [ "$TRIGGER_REPO_ID" != "$EXPECTED_REPO_ID" ]; then
+              echo "::error::Triggering repository mismatch: $TRIGGER_REPO_ID != $EXPECTED_REPO_ID"
+              exit 1
+            fi
+            if [ "$TRIGGER_EVENT" = "pull_request" ]; then
+              echo "Ignoring pull_request producer event"
+              exit 0
+            fi
+            echo "Authenticated workflow_run $TRIGGER_RUN_ID for $TRIGGER_WORKFLOW_PATH"
+          fi
+
+      - name: Run watchdog scan
+        id: watchdog
+        env:
+          BARRIER_EVIDENCE: ${{ inputs.barrier_evidence }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          args=(--repo-path . --ref publication --output-json /tmp/watchdog-scan.json)
+          if [ -n "$BARRIER_EVIDENCE" ]; then
+            args+=(--barrier-evidence "$BARRIER_EVIDENCE")
+          fi
+          if [ -n "$TRIGGER_RUN_ID" ]; then
+            args+=(--trigger-run-id "$TRIGGER_RUN_ID")
+          fi
+          uv run python scripts/publication/transaction_executor.py watchdog-scan "${args[@]}"
+
+          cat /tmp/watchdog-scan.json
+          rec_needed=$(jq -r '.recovery_needed' /tmp/watchdog-scan.json)
+          act=$(jq -r '.action' /tmp/watchdog-scan.json)
+          tx_id=$(jq -r '.active_transaction_id // empty' /tmp/watchdog-scan.json)
+          st=$(jq -r '.state // empty' /tmp/watchdog-scan.json)
+          status=$(jq -r '.status' /tmp/watchdog-scan.json)
+
+          echo "recovery_needed=$rec_needed" >> "$GITHUB_OUTPUT"
+          echo "action=$act" >> "$GITHUB_OUTPUT"
+          echo "transaction_id=$tx_id" >> "$GITHUB_OUTPUT"
+          echo "state=$st" >> "$GITHUB_OUTPUT"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+  act:
+    name: Execute recovery action
+    needs: scan
+    if: needs.scan.outputs.recovery_needed == 'true' && needs.scan.outputs.action != 'none' && needs.scan.outputs.action != 'quarantine'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+      actions: read
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+    steps:
+      - name: Checkout trusted controller code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Fetch publication journal
+        run: |
+          git fetch origin refs/heads/publication:refs/heads/publication
+
+      - name: Execute recovery action
+        env:
+          ACTION: ${{ needs.scan.outputs.action }}
+          TRANSACTION_ID: ${{ needs.scan.outputs.transaction_id }}
+          BARRIER_EVIDENCE: ${{ inputs.barrier_evidence }}
+        run: |
+          args=(--repo-path . --ref publication --execute)
+          if [ -n "$BARRIER_EVIDENCE" ]; then
+            args+=(--barrier-evidence "$BARRIER_EVIDENCE")
+          fi
+          uv run python scripts/publication/transaction_executor.py watchdog-scan "${args[@]}"
+
+      - name: Push journal changes
+        run: |
+          git push origin refs/heads/publication:refs/heads/publication

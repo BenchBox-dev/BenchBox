@@ -29,9 +29,9 @@ const AUDITED_ROUTES = [
   { path: "/results/", ready: /Recent Results/i },
   { path: "/results/tpch/", ready: /TPC-H Results/i },
   { path: "/results/p/duckdb/", ready: /DuckDB/i },
-  { path: `/results/r/${DETAIL_ID}`, ready: /Query Timings/i },
+  { path: `/results/r/${DETAIL_ID}`, ready: /Query timings/i },
   { path: `/results/compare?ids=${SHORT_DUCKDB},${SHORT_DATAFUSION}`, ready: /TPC-H Comparison/i },
-  { path: "/results/query", ready: /matching result bundle/ },
+  { path: "/results/query", ready: /matching run/ },
 ] as const;
 
 // Deliberately NOT serial. Every test here takes its own `page` fixture and
@@ -51,10 +51,10 @@ test.describe("responsive explorer assertions", () => {
       await waitForShell(page);
 
       const nav = page.getByTestId("results-explorer-nav");
-      for (const label of ["Leaderboards", "Benchmarks", "Platforms", "Compare", "Query"]) {
+      for (const label of ["Leaderboards", "Benchmarks", "Platforms", "Compare", "Find runs"]) {
         await expect(nav.getByRole("link", { name: label })).toBeVisible();
       }
-      await expect(nav.getByRole("link", { name: "Query" })).toHaveAttribute("aria-current", "page");
+      await expect(nav.getByRole("link", { name: "Find runs" })).toHaveAttribute("aria-current", "page");
     });
 
     test(`home keeps headline, cohort summary, and leaderboard rows high in the viewport at ${viewport.name}`, async ({
@@ -65,12 +65,12 @@ test.describe("responsive explorer assertions", () => {
       await waitForDataLoaded(page, /Recent Results/i);
 
       await expectTopWithin(
-        page.getByRole("heading", { name: "BenchBox Curated Results Preview" }),
+        page.getByRole("heading", { name: "Compare benchmark results" }),
         viewport.maxY,
         "home headline",
       );
       await expectTopWithin(
-        page.getByRole("region", { name: "Active leaderboard filters" }),
+        page.getByRole("region", { name: "Leaderboard ranking selector" }),
         viewport.maxY,
         "active leaderboard summary",
       );
@@ -112,10 +112,10 @@ test.describe("responsive explorer assertions", () => {
     }) => {
       await setViewport(page, viewport);
       await page.goto("/results/query");
-      await waitForDataLoaded(page, /matching result bundle/);
+      await waitForDataLoaded(page, /matching run/);
 
       await expectTopWithin(
-        page.getByRole("heading", { name: "Results Query Workbench" }),
+        page.getByRole("heading", { name: "Find benchmark runs" }),
         viewport.maxY,
         "query headline",
       );
@@ -136,8 +136,8 @@ test.describe("responsive explorer assertions", () => {
       await waitForDataLoaded(page, /TPC-H Comparison/);
 
       await expectTopWithin(page.getByRole("heading", { name: /TPC-H Comparison/ }), viewport.maxY, "compare headline");
-      const decisionSummary = page.getByRole("region", { name: "Decision Summary" });
-      const queryEvidence = page.getByRole("heading", { name: "Query-Level Diff" });
+      const decisionSummary = page.getByRole("region", { name: "Comparison summary" });
+      const queryEvidence = page.getByRole("heading", { name: "Query-level differences" });
       await expect(decisionSummary).toBeVisible();
       await expect(queryEvidence).toBeVisible();
       expect(await topOf(decisionSummary)).toBeLessThan(await topOf(queryEvidence));
@@ -199,7 +199,7 @@ test.describe("responsive explorer assertions", () => {
     await expect(page.getByTestId("query-heatmap-scroll-hint")).toBeVisible();
 
     await page.goto("/results/query");
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
     const queryResults = page.getByTestId("query-results-scroll-container");
     await queryResults.locator("table").evaluate((table) => {
       table.style.width = "1800px";
@@ -208,7 +208,7 @@ test.describe("responsive explorer assertions", () => {
     await expect(page.getByTestId("query-results-scroll-hint")).toBeVisible();
 
     await page.goto(`/results/r/${DETAIL_ID}`);
-    await waitForDataLoaded(page, /Query Timings/i);
+    await waitForDataLoaded(page, /Query timings/i);
     const timings = page.getByTestId("detail-timings-scroll-container");
     await expect.poll(() => timings.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(false);
     await expect(page.getByTestId("detail-timings-scroll-hint")).toHaveCount(0);
@@ -232,7 +232,7 @@ test.describe("responsive explorer assertions", () => {
       await expectScrollAffordance(page, "recent-results-scroll-container", "recent-results-scroll-hint");
 
       await page.goto(`/results/r/${DETAIL_ID}`);
-      await waitForDataLoaded(page, /Query Timings/i);
+      await waitForDataLoaded(page, /Query timings/i);
       await expectScrollAffordance(page, "detail-timings-scroll-container", "detail-timings-scroll-hint");
 
       await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DATAFUSION}`);
@@ -240,7 +240,7 @@ test.describe("responsive explorer assertions", () => {
       await expectScrollAffordance(page, "query-diff-scroll-container", "query-diff-scroll-hint");
 
       await page.goto("/results/query");
-      await waitForDataLoaded(page, /matching result bundle/);
+      await waitForDataLoaded(page, /matching run/);
       await expectScrollAffordance(page, "query-results-scroll-container", "query-results-scroll-hint");
     });
   }
@@ -274,7 +274,7 @@ test.describe("responsive explorer assertions", () => {
 
       releaseSnapshot();
       await expect(page.getByText("Recent Results")).toBeVisible({ timeout: 30_000 });
-      await expect(page.getByRole("region", { name: "Active leaderboard filters" })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Leaderboard ranking selector" })).toBeVisible();
       const loadedGeometry = await homeSharedGeometry(page);
 
       // The skeleton deliberately uses fewer, inert children, but reserves the

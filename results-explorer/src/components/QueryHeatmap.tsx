@@ -29,7 +29,8 @@ import { fmtMs as formatDurationMs, fmtGeomean } from "@/utils";
 import { formatLatencyMs, formatPowerScore, formatSpeedup } from "@/lib/metricFormatters";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 import { compareSelectionLabel } from "@/lib/compareCohort";
-import { MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
+import { MAX_COMPARE_SELECTIONS, resultIdentityAriaLabel, resultReceiptHref } from "@/lib/resultLinks";
+import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import {
   describeCompareExclusionReason,
   type CompareExclusionReasonCopy,
@@ -71,7 +72,7 @@ type StickyColKey = keyof typeof STICKY_COL_REM;
 export const BENCHMARK_MATRIX_DENSITY_CONTRACT = {
   maxCollapsedRowHeightPx: 72,
   frozenColumns: ["selection", "platform identity", "primary metric", "secondary geomean"] as const,
-  secondaryMetadataAffordance: "Receipt and metadata",
+  secondaryMetadataAffordance: "Run details",
 } as const;
 
 function cumulativeStickyLeft(
@@ -124,7 +125,7 @@ function fmtQueryMs(ms: number): string {
 function CompareDisabledReason({ id, copy }: { id?: string; copy: CompareExclusionReasonCopy }) {
   return (
     <div id={id} class="mt-1 text-xs text-[var(--bb-data-fg-muted)]" data-testid="query-heatmap-disabled-reason">
-      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Disabled reason: {copy.shortText}</span>
+      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Why unavailable: {copy.shortText}</span>
       <span class="block">{copy.recoveryHint}</span>
     </div>
   );
@@ -231,6 +232,18 @@ export function QueryHeatmap({
     () => [...platforms].sort((a, b) => compareMatrixRows(a, b, activeSort)),
     [activeSort, platforms],
   );
+  const rowIdentityLabels = useMemo(
+    () => formatRunIdentitiesForCohort(sorted.map((row) => ({
+      result_id: row.result_id,
+      short_id: row.short_id,
+      platform: row.platform,
+      platform_version: row.platform_version,
+      run_date: row.run_date,
+      scale_factor: summary.scale_factor,
+      trust_label: row.trust_label,
+    })), "table"),
+    [sorted, summary.scale_factor],
+  );
 
   function syncPageStickyHeaderScroll() {
     if (!scrollContainerRef.current || !pageStickyHeaderRef.current) return;
@@ -326,7 +339,7 @@ export function QueryHeatmap({
   if (platforms.length === 0) {
     return (
       <div class="rounded-lg border border-dashed border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] p-10 text-center text-[var(--bb-data-fg-subtle)]">
-        No results available for this configuration.
+        No results are available for these settings.
       </div>
     );
   }
@@ -344,7 +357,7 @@ export function QueryHeatmap({
   // cohorts. The primary score column keeps its own column header
   // explanation (`primaryLabel`/`primaryDirectionLabel`) below.
   const heatmapMeaning = suppressHeat
-    ? "Heat color is suppressed because this ranking has fewer than two comparable platforms."
+    ? "Heat color is unavailable because fewer than two platforms can be compared in this ranking."
     : "Heat color compares each query column with the fastest published timing; darker cells are slower.";
 
   function renderHeaderSortControl(
@@ -476,7 +489,7 @@ export function QueryHeatmap({
         </div>
         <div class="mt-1">
           A validation badge next to a platform name means that result was excluded from ranking on validation
-          grounds - the query cells shown are still published evidence, not a validated, comparable score.
+          reason. The query measurements remain visible, but they do not form a validated comparison score.
         </div>
       </div>
 
@@ -486,7 +499,8 @@ export function QueryHeatmap({
         role="list"
         aria-label={`${summary.benchmark} compact query result cards`}
       >
-        {sorted.map((row) => {
+        {sorted.map((row, rowIdx) => {
+          const rowIdentity = rowIdentityLabels[rowIdx] ?? row.platform;
           const isSelected = selectedIds?.has(rowKey(row)) ?? false;
           const comparable = isComparable(row);
           const capDisabled = selectionAtCap && !isSelected;
@@ -531,10 +545,11 @@ export function QueryHeatmap({
                 )}
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-1">
-                    <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{row.platform}</h2>
+                    <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{rowIdentity}</h2>
                     {rankingExclusion && (
                       <span
                         role="img"
+                        tabIndex={0}
                         class="text-xs text-[var(--bb-data-fg-subtle)] cursor-help"
                         title={rankingExclusion}
                         aria-label={rankingExclusion}
@@ -551,7 +566,8 @@ export function QueryHeatmap({
                     <CompareDisabledReason id={comparisonReasonId} copy={comparisonCopy} />
                   )}
                   <a
-                    href={`/results/r/${row.result_id}#run-receipt`}
+                    href={resultReceiptHref(row)}
+                    aria-label={resultIdentityAriaLabel(row, "receipt")}
                     class="mt-1 inline-block text-xs font-medium no-underline"
                   >
                     Receipt →
@@ -650,6 +666,7 @@ export function QueryHeatmap({
             <thead class="bg-[var(--bb-surface-data-muted)]">{renderHeaderRow()}</thead>
             <tbody class="divide-y divide-[var(--bb-data-border)]">
               {sorted.map((row, rowIdx) => {
+                const rowIdentity = rowIdentityLabels[rowIdx] ?? row.platform;
                 const isSelected = selectedIds?.has(rowKey(row)) ?? false;
                 const comparable = isComparable(row);
                 const capDisabled = selectionAtCap && !isSelected;
@@ -706,8 +723,8 @@ export function QueryHeatmap({
                     style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "platform"))}
                   >
                     <div class="flex items-center gap-1">
-                      <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
-                      {row.platform_version && (
+                      <span class="font-medium text-[var(--bb-data-fg-primary)]">{rowIdentity}</span>
+                      {row.platform_version && !rowIdentity.includes(row.platform_version) && (
                         <span class="text-xs text-[var(--bb-data-fg-subtle)]">
                           {formatPlatformVersion(row.platform_version)}
                         </span>
@@ -715,6 +732,7 @@ export function QueryHeatmap({
                       {rankingExclusion && (
                         <span
                           role="img"
+                          tabIndex={0}
                           class="text-xs text-[var(--bb-data-fg-subtle)] cursor-help"
                           title={rankingExclusion}
                           aria-label={rankingExclusion}
@@ -743,7 +761,8 @@ export function QueryHeatmap({
                           <ValidationBadge validationStatus={row.validation_status} showMissing />
                         )}
                         <a
-                          href={`/results/r/${row.result_id}#run-receipt`}
+                          href={resultReceiptHref(row)}
+                          aria-label={resultIdentityAriaLabel(row, "receipt")}
                           class="font-medium no-underline"
                         >
                           Receipt →

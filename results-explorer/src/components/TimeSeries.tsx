@@ -376,18 +376,16 @@ function DuplicateDayTrendState({
   observationCount: number;
 }) {
   const duplicateRunCount = groups.reduce((count, group) => count + group.runs.length, 0);
-  const duplicateRunLabel = duplicateRunCount === 1 ? "same-day run" : "same-day runs";
-  const observationLabel = observationCount === 1 ? "observation remains" : "observations remain";
-  const message =
-    `Trend line hidden: ${duplicateRunCount} ${duplicateRunLabel} in this ranking do not carry time-of-day ordering. ` +
-    `${observationCount} ${observationLabel} in the ranking; duplicate same-day runs are listed below.`;
   return (
-    <div
+    <details
       data-testid="time-series-duplicate-day"
       class="rounded-lg border border-dashed border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-3"
     >
-      <p class="text-sm text-[var(--bb-data-fg-muted)]">
-        {message}
+      <summary class="cursor-pointer text-sm font-medium text-[var(--bb-data-fg-primary)]">
+        {duplicateRunCount} same-day {duplicateRunCount === 1 ? "run cannot" : "runs cannot"} be ordered in this trend
+      </summary>
+      <p class="mt-2 text-sm text-[var(--bb-data-fg-muted)]">
+        These runs record a date but not a time, so the chart cannot place them in a reliable order. {observationCount} usable {observationCount === 1 ? "observation remains" : "observations remain"}.
       </p>
       <div class="mt-3 overflow-x-auto">
         <table class="min-w-max text-left text-xs">
@@ -425,6 +423,6 @@ function DuplicateDayTrendState({
           </tbody>
         </table>
       </div>
-    </div>
+    </details>
   );
 }

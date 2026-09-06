@@ -2,7 +2,15 @@ import type { DetailResult, Environment } from "@/types";
 import { humanizeBenchmark, shortHash } from "@/utils";
 import { costModelSummary, costScopeSummary, normalizedCostLabel } from "@/lib/costDisplay";
 import { formatCount, formatWarningCount } from "@/lib/copyFormatters";
-import { formatValidationStatus } from "@/lib/displayLabels";
+import {
+  formatArchitecture,
+  formatCpuFamily,
+  formatEnumLabel,
+  formatExecutionMode,
+  formatMemoryGb,
+  formatTuningMode,
+  formatValidationStatus,
+} from "@/lib/displayLabels";
 import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
 import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
 
@@ -30,12 +38,12 @@ export function ComparabilityReceipt({ results }: ComparabilityReceiptProps) {
   const warningCount = warningFields.length;
 
   return (
-    <section id={COMPARABILITY_RECEIPT_ID} aria-label="Comparability receipt" class="panel-elevated mb-8 p-4">
+    <section id={COMPARABILITY_RECEIPT_ID} aria-label="Comparison checks" class="panel-elevated mb-8 p-4">
       <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Comparability Receipt</h2>
+          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Comparison checks</h2>
           <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
-            Workload, version, validation, and environment checks for the selected result set.
+            Check the workload, software, validation, and hardware before you compare these runs.
           </p>
         </div>
         <StatusBadge role="comparison" tone={warningCount > 0 ? "warning" : "success"}>
@@ -51,7 +59,7 @@ export function ComparabilityReceipt({ results }: ComparabilityReceiptProps) {
           class="mb-4 rounded-md border border-[var(--bb-tone-warning-border)] bg-[var(--bb-tone-warning-bg)] px-3 py-2 text-xs text-[var(--bb-tone-warning-fg)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-accent)]"
           data-testid="comparability-warning-target"
         >
-          <h3 class="font-semibold">{formatWarningCount(warningCount)}</h3>
+          <p class="font-semibold">Review these differences before drawing a conclusion.</p>
           <ul class="mt-1 list-disc space-y-1 pl-4">
             {warningFields.map((field) => (
               <li key={field.label}>
@@ -80,16 +88,16 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
   const fields: ComparabilityField[] = [
     compareValues("Benchmark", results, (result) => humanizeBenchmark(result.benchmark)),
     compareValues("Scale factor", results, (result) => `SF ${result.scale_factor}`),
-    compareValues("Phase", results, (result) => valueOrMissing(result.test_type)),
+    compareValues("Test phase", results, (result) => result.test_type ? formatEnumLabel(result.test_type) : "Not recorded"),
     compareValues("Query scope", results, (result) => formatCount(queryCount(result), "query", "queries")),
     buildDateWindowField(results),
     compareValues("Platform version", results, (result) => valueOrMissing(result.platform_version)),
     compareValues("Driver version", results, (result) => valueOrMissing(result.driver_version)),
-    compareValues("Execution mode", results, (result) => valueOrMissing(result.execution_mode)),
+    compareValues("Execution mode", results, (result) => result.execution_mode ? formatExecutionMode(result.execution_mode) : "Not recorded"),
     buildTuningField(results),
     compareValues("Validation", results, (result) => formatValidationStatusReceiptValue(result.validation_status)),
-    compareHardwareValues("Architecture", results, (result) => valueOrMissing(result.environment?.arch)),
-    compareHardwareValues("CPU family", results, (result) => valueOrMissing(result.environment?.cpu_family)),
+    compareHardwareValues("Architecture", results, (result) => result.environment?.arch ? formatArchitecture(result.environment.arch) : "Not recorded"),
+    compareHardwareValues("CPU family", results, (result) => result.environment?.cpu_family ? formatCpuFamily(result.environment.cpu_family) : "Not recorded"),
     compareHardwareValues("CPU model", results, (result) => valueOrMissing(result.environment?.cpu_model)),
     compareHardwareValues("CPU evidence", results, (result) =>
       formatCpuIdentityProvenance(result.environment?.cpu_identity_provenance),
@@ -98,7 +106,7 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
       result.environment?.cpu_count !== undefined ? `${result.environment.cpu_count} CPU` : "Not recorded",
     ),
     compareHardwareValues("Memory", results, (result) =>
-      result.environment?.memory_gb !== undefined ? `${result.environment.memory_gb} GB` : "Not recorded",
+      result.environment?.memory_gb !== undefined ? formatMemoryGb(result.environment.memory_gb) : "Not recorded",
     ),
     buildLocalityField(results),
     compareValues("Normalized cost", results, normalizedCostLabel),
@@ -147,20 +155,20 @@ function buildTuningPolicyGenerationField(results: DetailResult[]): Comparabilit
 
   if (uniqueGenerations.length === 1) {
     return {
-      label: "Tuning policy generation",
+      label: "Tuning rules version",
       status: "match",
-      summary: uniqueGenerations[0]!,
+      summary: uniqueGenerations[0] === PRE_SEAM_GENERATION ? "Earlier rules" : uniqueGenerations[0]!,
     };
   }
 
   return {
-    label: "Tuning policy generation",
+    label: "Tuning rules version",
     status: "diff",
-    summary: "Tuned runs span different tuning-policy generations",
+    summary: "The selected runs used different generations of BenchBox tuning rules",
     detail: formatPerPlatform(
       tunedResults.map((result) => ({
         platform: result.platform,
-        value: generationOf(result),
+        value: generationOf(result) === PRE_SEAM_GENERATION ? "Earlier rules" : generationOf(result),
       })),
     ),
   };
@@ -187,16 +195,16 @@ function buildPhysicalMechanismsField(results: DetailResult[]): ComparabilityFie
   if (allMatch) {
     const count = sets[0]!.size;
     return {
-      label: "Physical tuning mechanisms",
+      label: "Applied tuning features",
       status: "match",
-      summary: count > 0 ? formatCount(count, "mechanism", "mechanisms") : "None rendered",
+      summary: count > 0 ? formatCount(count, "feature", "features") : "None applied",
     };
   }
 
   return {
-    label: "Physical tuning mechanisms",
+    label: "Applied tuning features",
     status: "diff",
-    summary: "Tuned runs rendered different physical mechanisms",
+    summary: "The selected runs applied different tuning features",
     detail: formatPerPlatform(
       tunedResults.map((result) => ({
         platform: result.platform,
@@ -518,7 +526,7 @@ function formatTuning(result: DetailResult) {
     return "Not recorded";
   }
   const parts = [
-    result.tuning_mode ? result.tuning_mode : "Recorded",
+    result.tuning_mode ? formatTuningMode(result.tuning_mode) : "Recorded",
     requestedHash ? `requested ${shortHash(requestedHash)}` : null,
     appliedHash ? `applied ${shortHash(appliedHash)}` : null,
   ].filter((part): part is string => part !== null);
@@ -544,9 +552,9 @@ function buildTuningField(results: DetailResult[]): ComparabilityField {
 function formatEnvironment(environment: Environment) {
   const parts = [
     environment.os,
-    environment.arch,
+    environment.arch ? formatArchitecture(environment.arch) : null,
     environment.cpu_count !== undefined ? `${environment.cpu_count} CPU` : null,
-    environment.memory_gb !== undefined ? `${environment.memory_gb} GB` : null,
+    environment.memory_gb !== undefined ? formatMemoryGb(environment.memory_gb) : null,
     environment.python ? `Python ${environment.python}` : null,
   ].filter((part): part is string => part !== null && part !== undefined && part !== "");
   return parts.length > 0 ? parts.join(", ") : "Not recorded";

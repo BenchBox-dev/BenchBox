@@ -27,7 +27,7 @@ export interface CompareEvidenceSummary {
 }
 
 const EXCLUSION_LABELS: Record<string, string> = {
-  compliance_not_rankable: "Result is outside the ranked compliance class.",
+  compliance_not_rankable: "This result does not meet the requirements for ranking.",
   display_metric_unavailable: "Display timing is unavailable.",
   failed_queries: "One or more queries failed.",
   hidden_result: "Result is not in the public comparison set.",
@@ -41,17 +41,17 @@ const EXCLUSION_LABELS: Record<string, string> = {
   missing_timing: "Timing is missing.",
   no_comparable_results: "No comparable results are available.",
   no_display_timing: "Display timing is unavailable.",
-  no_rankable_results: "No rankable results are available.",
+  no_rankable_results: "No results meet the requirements for ranking.",
   no_valid_display_timing: "No valid display timing is available.",
   non_positive_primary_metric: "Primary metric is not positive.",
   non_positive_timing: "Timing is not positive.",
   partial_query_coverage: "Result has partial query coverage.",
-  trust_not_rankable: "Trust policy excludes this result from ranking.",
-  tuning_not_applied: "Custom tuning was requested but no applied tuning evidence was recorded.",
+  trust_not_rankable: "Results from this source are not included in rankings.",
+  tuning_not_applied: "Custom tuning was requested, but the run recorded no applied settings.",
   validation_not_clean: "Validation status excludes this result from ranking.",
   visibility_not_comparable: "Visibility policy excludes this result from comparison.",
-  visibility_not_rankable: "Visibility policy excludes this result from ranking.",
-  zero_timing: "Exact zero timing is excluded from display evidence.",
+  visibility_not_rankable: "This result is not published for ranking.",
+  zero_timing: "A zero timing cannot be used in this ranking.",
   zero_timings_only: "Only exact zero timings are available.",
 };
 
@@ -137,7 +137,7 @@ export function chartDatasetClassLabel(eligibilityClass: ChartDatasetEligibility
     case "display_safe":
       return "valid display timings";
     case "rank_safe":
-      return "rankable rows";
+      return "ranked runs";
     case "compare_safe":
       return "comparable selected runs";
     case "cost_safe":
@@ -145,7 +145,7 @@ export function chartDatasetClassLabel(eligibilityClass: ChartDatasetEligibility
     case "trend_safe":
       return "trend-safe rows";
     case "provenance_only":
-      return "submitted evidence";
+      return "published runs";
   }
 }
 
@@ -154,15 +154,15 @@ export function chartDatasetEmptyTitle(eligibilityClass: ChartDatasetEligibility
     case "display_safe":
       return "No valid display timings";
     case "rank_safe":
-      return "No rankable rows";
+      return "No ranked runs";
     case "compare_safe":
-      return "No comparable query evidence";
+      return "No comparable query timings";
     case "cost_safe":
       return "No normalized cost data";
     case "trend_safe":
-      return "Not enough trend evidence";
+      return "Not enough runs for a trend";
     case "provenance_only":
-      return "No submitted evidence";
+      return "No published runs";
   }
 }
 
@@ -175,7 +175,7 @@ export function chartDatasetExclusionReason(
     case "display_safe":
       return formatTimingExclusion(row.display_exclusion_reason, "Display timing is unavailable.");
     case "rank_safe":
-      return formatTimingExclusion(row.ranking_exclusion_reason, "Result is not rankable.");
+      return formatTimingExclusion(row.ranking_exclusion_reason, "This result is not included in rankings.");
     case "compare_safe":
       return formatTimingExclusion(row.comparison_exclusion_reason, "Result is not comparable.");
     case "cost_safe":
@@ -212,7 +212,7 @@ export function validPrimaryMetricValue(row: PrimaryMetricRow, metric: PrimaryMe
 
 export function formatTimingExclusion(
   input: EligibilityRow | QueryDisplayTiming | string | null | undefined,
-  fallback = "Timing is excluded from display evidence.",
+  fallback = "This timing cannot be displayed.",
 ): string {
   const reason = exclusionReason(input);
   if (reason === null) return fallback;
@@ -225,7 +225,7 @@ export function formatCohortExclusion(cohort: BenchmarkSummary | MetaCohort): st
   }
   if ("platforms" in cohort && cohort.platforms && cohort.platforms.length > 0) {
     if (cohort.platforms.every((platform) => !isRankable(platform))) {
-      return EXCLUSION_LABELS.no_rankable_results ?? "No rankable results are available.";
+      return EXCLUSION_LABELS.no_rankable_results ?? "No results meet the requirements for ranking.";
     }
   }
   return null;
@@ -303,7 +303,7 @@ function humanizeReason(reason: string): string {
 
 function normalizedCostExclusionReason(row: PlatformRow): string {
   if (row.cost_status === "not_applicable_local") return "Local rows do not have normalized cloud cost.";
-  if (row.cost_status === "unavailable") return "Normalized cost metadata is unavailable.";
+  if (row.cost_status === "unavailable") return "Normalized cost was not recorded.";
   if (row.cost_status === null || row.cost_status === undefined) return "Cost status is not recorded.";
   return "No finite normalized cost value is available.";
 }
