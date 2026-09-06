@@ -15,12 +15,52 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from scripts.publication.transaction import OBJECT_TYPE, SCHEMA_VERSION, VALID_STATES, Transaction, canonical_json
+from scripts.publication.transaction import (
+    KIND_LEGACY_RECOVERY,
+    KIND_PROMOTION,
+    KIND_ROLLBACK,
+    OBJECT_TYPE,
+    SCHEMA_VERSION,
+    STATE_DURABLE,
+    STATE_EXTERNALLY_VERIFIED,
+    STATE_PREPARED,
+    STATE_RECOVERY_REQUIRED,
+    STATE_ROLLBACK_DURABLE,
+    STATE_ROLLBACK_VERIFIED,
+    STATE_ROLLBACK_WRITE_STARTED,
+    STATE_TERMINAL_FAILURE,
+    STATE_WRITE_ACKNOWLEDGED,
+    STATE_WRITE_STARTED,
+    VALID_KINDS,
+    VALID_STATES,
+    Transaction,
+    canonical_json,
+)
 
 JOURNAL_OBJECT_TYPE = "publication-journal"
 JOURNAL_SCHEMA_VERSION = 1
 SUBTREE_PATH = "publication/transaction-state"
 DEFAULT_REF = "publication"
+
+KIND_STATES = {
+    KIND_PROMOTION: {
+        STATE_PREPARED,
+        STATE_WRITE_STARTED,
+        STATE_WRITE_ACKNOWLEDGED,
+        STATE_EXTERNALLY_VERIFIED,
+        STATE_DURABLE,
+        STATE_RECOVERY_REQUIRED,
+        STATE_TERMINAL_FAILURE,
+    },
+    KIND_ROLLBACK: {
+        STATE_ROLLBACK_WRITE_STARTED,
+        STATE_WRITE_ACKNOWLEDGED,
+        STATE_ROLLBACK_VERIFIED,
+        STATE_ROLLBACK_DURABLE,
+        STATE_TERMINAL_FAILURE,
+    },
+    KIND_LEGACY_RECOVERY: {STATE_RECOVERY_REQUIRED, STATE_TERMINAL_FAILURE},
+}
 
 
 class JournalError(Exception):
@@ -70,7 +110,11 @@ def read_journal_state(repo_path: Path, ref: str = DEFAULT_REF) -> JournalState:
     try:
         tip_oid = _run_git(["rev-parse", f"refs/heads/{ref}"], cwd=repo_path)
     except JournalError as e:
-        raise CorruptJournalError(f"Cannot resolve journal ref '{ref}': {e}") from e
+        try:
+            _run_git(["fetch", "--no-tags", "origin", f"refs/heads/{ref}:refs/heads/{ref}"], cwd=repo_path)
+            tip_oid = _run_git(["rev-parse", f"refs/heads/{ref}"], cwd=repo_path)
+        except JournalError as fetch_error:
+            raise CorruptJournalError(f"Cannot resolve journal ref '{ref}': {fetch_error}") from e
 
     state_path = f"{ref}:{SUBTREE_PATH}/state.json"
     try:
@@ -115,6 +159,13 @@ def read_transaction(repo_path: Path, tx_id: str, ref: str = DEFAULT_REF) -> Tra
             )
         if data.get("state") not in VALID_STATES:
             raise CorruptJournalError(f"Invalid transaction state: {data.get('state')!r}")
+        kind = data.get("kind")
+        if kind not in VALID_KINDS:
+            raise CorruptJournalError(f"Invalid transaction kind: {kind!r}")
+        if data["state"] not in KIND_STATES[kind]:
+            raise CorruptJournalError(f"Invalid state {data['state']!r} for transaction kind {kind!r}")
+        if kind == KIND_ROLLBACK and not isinstance(data.get("restore_source"), dict):
+            raise CorruptJournalError("Rollback transaction requires restore_source data")
         return Transaction(**data)
     except Exception as e:
         raise JournalError(f"Failed to read transaction '{tx_id}' at {tx_path}: {e}") from e
@@ -210,7 +261,13 @@ def write_journal_update(
                 raise CasConflictError(
                     f"CAS update on remote ref '{ref}' failed (expected {expected_parent_oid}): {p_update.stderr.strip()}"
                 )
-        _run_git(["update-ref", f"refs/heads/{ref}", commit_oid], cwd=repo_path)
+        elif not resolve_timeout_or_recheck(repo_path, commit_oid, ref=ref):
+            raise JournalError(f"Remote ref '{ref}' did not retain committed journal update {commit_oid}")
+
+        authoritative_tip = _run_git(["rev-parse", "FETCH_HEAD"], cwd=repo_path)
+        _run_git(["update-ref", f"refs/heads/{ref}", authoritative_tip], cwd=repo_path)
+        if authoritative_tip != commit_oid:
+            return read_journal_state(repo_path, ref=ref), authoritative_tip
 
         updated_state = JournalState(
             target=new_state.target,
@@ -219,11 +276,11 @@ def write_journal_update(
             durable_transaction_id=new_state.durable_transaction_id,
             write_block=new_state.write_block,
             policy_digest=new_state.policy_digest,
-            tip_commit_oid=commit_oid,
+            tip_commit_oid=authoritative_tip,
             object_type=new_state.object_type,
             journal_schema_version=new_state.journal_schema_version,
         )
-        return updated_state, commit_oid
+        return updated_state, authoritative_tip
 
     finally:
         if os.path.exists(index_file):
@@ -241,6 +298,12 @@ def init_genesis_journal(
     ref: str = DEFAULT_REF,
 ) -> tuple[JournalState, str]:
     """Initialize a fresh publication journal at genesis referencing an attested known-good transaction."""
+    if genesis_transaction.state not in (STATE_DURABLE, STATE_ROLLBACK_DURABLE):
+        raise CorruptJournalError("Genesis transaction must be durable")
+    if genesis_transaction.target != target:
+        raise CorruptJournalError("Genesis transaction target does not match journal target")
+    if not isinstance(genesis_transaction.attestation, dict):
+        raise CorruptJournalError("Genesis transaction must retain a valid live-receipt attestation")
     init_state = JournalState(
         target=target,
         next_generation=genesis_transaction.generation + 1,

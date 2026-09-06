@@ -14,6 +14,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from scripts.publication.reconciliation import validate_live_receipt_contract
+
 SCHEMA_VERSION = 1
 OBJECT_TYPE = "publication-transaction"
 
@@ -46,6 +48,7 @@ VALID_STATES = {
     STATE_ROLLBACK_DURABLE,
     STATE_TERMINAL_FAILURE,
 }
+VALID_KINDS = {KIND_PROMOTION, KIND_ROLLBACK, KIND_LEGACY_RECOVERY}
 
 # Events
 EVENT_PREPARE = "prepare"
@@ -73,6 +76,32 @@ def canonical_json(data: dict[str, Any]) -> str:
 def compute_digest(data: dict[str, Any]) -> str:
     """Compute SHA-256 digest of canonical JSON."""
     return hashlib.sha256(canonical_json(data).encode("utf-8")).hexdigest()
+
+
+def validate_live_receipt(current: Transaction, payload: dict[str, Any]) -> dict[str, Any]:
+    """Validate signed receipt evidence and bind it to the current transaction."""
+    receipt = payload.get("attestation")
+    if not isinstance(receipt, dict):
+        raise TransactionError("A signed live-receipt attestation is required for verification success")
+    contract_findings = validate_live_receipt_contract(receipt)
+    if contract_findings:
+        raise TransactionError(f"Live-receipt attestation is invalid: {contract_findings[0].description}")
+
+    artifact = receipt.get("artifact") if isinstance(receipt.get("artifact"), dict) else {}
+    bindings = {
+        "target": (receipt.get("target"), current.target),
+        "generation": (receipt.get("generation"), current.generation),
+        "manifest_digest": (receipt.get("manifest_digest"), current.content.get("manifest_digest")),
+        "artifact_digest": (
+            receipt.get("artifact_digest") or artifact.get("archive_sha256"),
+            current.artifact.get("archive_sha256"),
+        ),
+        "observation_digest": (receipt.get("observation_digest"), payload.get("observation_digest")),
+    }
+    mismatches = [name for name, (actual, expected) in bindings.items() if actual != expected or actual is None]
+    if mismatches:
+        raise TransactionError(f"Live-receipt attestation does not match transaction fields: {', '.join(mismatches)}")
+    return receipt
 
 
 @dataclass(frozen=True)
@@ -181,6 +210,8 @@ def prepare_rollback(
     """Prepare a successor rollback transaction describing restored parent bytes."""
     if failed_transaction.state not in (STATE_RECOVERY_REQUIRED, STATE_WRITE_STARTED, STATE_WRITE_ACKNOWLEDGED):
         raise TransactionError(f"Cannot initiate rollback from non-recoverable state: {failed_transaction.state}")
+    if generation <= failed_transaction.generation:
+        raise TransactionError("Rollback generation must advance beyond the failed transaction generation")
 
     if parent_durable_transaction.state not in (STATE_DURABLE, STATE_ROLLBACK_DURABLE):
         raise TransactionError("Rollback source must be a durable transaction")
@@ -190,11 +221,20 @@ def prepare_rollback(
         raise TransactionError("Rollback source target must match the failed transaction target")
 
     failed_write = failed_transaction.write or {}
-    expected_deployment = failed_write.get("id") or failed_write.get("write_id")
+    expected_deployment = failed_write.get("id")
+    provider_identity_matches = (
+        expected_deployment is not None and barrier_evidence.get("deployment_id") == expected_deployment
+    )
+    provider_absence_matches = (
+        expected_deployment is None
+        and barrier_evidence.get("provider_deployment_absent") is True
+        and barrier_evidence.get("artifact_id") == failed_transaction.artifact.get("artifact_id")
+        and barrier_evidence.get("pages_build_version") == failed_write.get("pages_build_version")
+    )
     if (
         barrier_evidence.get("provider_status", "").upper() not in {"CANCELED", "FAILED", "ERROR"}
         or barrier_evidence.get("quiescence_observed") is not True
-        or barrier_evidence.get("deployment_id") != expected_deployment
+        or not (provider_identity_matches or provider_absence_matches)
     ):
         raise TransactionError("Affirmative provider activation barrier evidence is required before preparing rollback")
 
@@ -341,6 +381,7 @@ def _handle_write_acknowledged(
         obs_digest = payload.get("observation_digest")
         if not obs_digest:
             raise TransactionError("observation_digest is required for verification success")
+        attestation = validate_live_receipt(current, payload)
         data["state"] = STATE_ROLLBACK_VERIFIED if current.kind == KIND_ROLLBACK else STATE_EXTERNALLY_VERIFIED
         data["verification"] = {
             "challenge": payload.get("challenge"),
@@ -348,6 +389,7 @@ def _handle_write_acknowledged(
             "observation_digest": obs_digest,
             "verified_at": ev["timestamp"],
         }
+        data["attestation"] = attestation
         tx = Transaction(**data)
         next_action = "commit_rollback" if current.kind == KIND_ROLLBACK else "commit_durable"
         return tx, Effect(action=next_action, data={"transaction_id": tx.transaction_id})

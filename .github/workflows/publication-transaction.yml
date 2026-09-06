@@ -74,6 +74,7 @@ jobs:
       develop_sha: ${{ steps.inputs.outputs.develop_sha }}
       published_results_sha: ${{ steps.inputs.outputs.published_results_sha }}
       candidate_run_id: ${{ steps.inputs.outputs.candidate_run_id }}
+      artifact_id: ${{ steps.prepare_tx.outputs.artifact_id }}
     steps:
       - name: Checkout control-plane source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -219,21 +220,30 @@ jobs:
             --output-tx transaction-artifacts/tx_prepared.json
 
       - name: Materialize site bytes
+        if: needs.prepare.outputs.kind == 'promotion'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           CANDIDATE_RUN_ID: ${{ needs.prepare.outputs.candidate_run_id }}
+          EXPECTED_SITE_DIGEST: ${{ inputs.candidate_archive_sha256 }}
         run: |
           set -euo pipefail
+          test -n "$CANDIDATE_RUN_ID" || { echo "::error::candidate run is required for promotion"; exit 1; }
           mkdir -p site
-          if [ -n "$CANDIDATE_RUN_ID" ]; then
-            gh run download "$CANDIDATE_RUN_ID" --name "publication-site-${{ needs.prepare.outputs.generation }}" --dir site || true
-          fi
-          if [ ! -f site/index.html ]; then
-            echo '<!doctype html><html><head><meta charset="utf-8"><title>BenchBox</title></head><body><h1>BenchBox</h1></body></html>' > site/index.html
-          fi
+          gh run download "$CANDIDATE_RUN_ID" --name "publication-site-${{ needs.prepare.outputs.generation }}" --dir site
+          test -s site/index.html || { echo "::error::candidate site is incomplete"; exit 1; }
+          uv run python - <<'PY'
+          import os
+          from pathlib import Path
+          from scripts.publication.assembler import compute_tree_digest
+          expected = os.environ['EXPECTED_SITE_DIGEST']
+          actual, _, _ = compute_tree_digest(Path('site'))
+          if not expected or actual != expected:
+              raise SystemExit(f'candidate site digest mismatch: expected={expected!r} actual={actual!r}')
+          PY
 
       - name: Upload Pages artifact
+        if: needs.prepare.outputs.kind == 'promotion'
         id: upload_pages
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
@@ -261,10 +271,10 @@ jobs:
               github,
               core,
               context,
-              inputs: {
+              effect: {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                artifact_id: ${{ steps.upload_pages.outputs.artifact_id }},
+                artifact_id: ${{ needs.prepare.outputs.kind == 'rollback' && needs.prepare.outputs.artifact_id || steps.upload_pages.outputs.artifact_id }},
                 pages_build_version: '${{ steps.start_write.outputs.pages_build_version }}',
               }
             });
@@ -335,18 +345,76 @@ jobs:
           set -euo pipefail
           mkdir -p transaction-artifacts
           TARGET_URL="${{ needs.deploy.outputs.page_url }}"
-          cat > transaction-artifacts/probe-report.json <<EOF
-          {
-            "success": true,
-            "target": "$TARGET_URL",
-            "timestamp": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
-            "routes": [
-              {"url": "$TARGET_URL/", "ok": true, "status": 200},
-              {"url": "$TARGET_URL/docs/", "ok": true, "status": 200},
-              {"url": "$TARGET_URL/results/", "ok": true, "status": 200}
-            ]
+          uv run python scripts/publication/verify_live.py \
+            --base-url "$TARGET_URL" \
+            --observation-origin github-actions:publication-transaction \
+            --timeout 60 --json > transaction-artifacts/probe-report.json
+          uv run python - <<'PY'
+          import json
+          report = json.load(open('transaction-artifacts/probe-report.json'))
+          if not report.get('success') or not report.get('probes'):
+              raise SystemExit('live endpoint verification did not produce successful observations')
+          if any(not probe.get('ok') for probe in report['probes']):
+              raise SystemExit('one or more live endpoint observations failed')
+          PY
+
+      - name: Create and sign live receipt
+        env:
+          PUBLICATION_ATTESTOR_PRIVATE_KEY: ${{ secrets.PUBLICATION_ATTESTOR_PRIVATE_KEY }}
+          TRANSACTION_ID: ${{ needs.prepare.outputs.transaction_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PUBLICATION_ATTESTOR_PRIVATE_KEY" || { echo "::error::attestor key is required"; exit 1; }
+          uv run python - <<'PY'
+          import hashlib, json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from scripts.publication import journal
+          from scripts.publication.transaction import canonical_json
+          tx = journal.read_transaction(Path('.'), os.environ['TRANSACTION_ID'], ref='publication')
+          report = json.load(open('transaction-artifacts/probe-report.json'))
+          observation_digest = hashlib.sha256(canonical_json(report).encode()).hexdigest()
+          receipt = {
+              'schema_version': 1,
+              'receipt_id': f"live-{tx.generation}-{tx.transaction_id}",
+              'target': tx.target,
+              'generation': tx.generation,
+              'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+              'manifest_digest': tx.content.get('manifest_digest'),
+              'develop_sha': tx.content.get('develop_sha'),
+              'published_results_sha': tx.content.get('published_results_sha'),
+              'artifact': {'archive_sha256': tx.artifact.get('archive_sha256')},
+              'artifact_digest': tx.artifact.get('archive_sha256'),
+              'observation_digest': observation_digest,
+              'routes': report['probes'],
+              'observation_origin': report['observation_origin'],
+              'nonce': f"${{ github.run_id }}-${{ github.run_attempt }}",
+              'freshness_window': '24h',
+              'attestor': 'github-actions:publication-transaction',
+              'signature_algorithm': 'ed25519',
+              'prior_live_receipt_id': tx.parent_transaction_id,
           }
-          EOF
+          open('transaction-artifacts/live-receipt.json', 'w').write(json.dumps(receipt, sort_keys=True) + '\n')
+          PY
+          umask 077
+          printf '%s' "$PUBLICATION_ATTESTOR_PRIVATE_KEY" > /tmp/publication-attestor-private-key.pem
+          uv run python - <<'PY'
+          import json
+          from scripts.publication.reconciliation import canonical_live_receipt_payload
+          receipt = json.load(open('transaction-artifacts/live-receipt.json'))
+          open('/tmp/live-receipt-payload.json', 'wb').write(canonical_live_receipt_payload(receipt))
+          PY
+          openssl pkeyutl -sign -rawin -inkey /tmp/publication-attestor-private-key.pem -in /tmp/live-receipt-payload.json -out /tmp/live-receipt.sig
+          SIGNATURE=$(base64 -w 0 /tmp/live-receipt.sig)
+          rm -f /tmp/publication-attestor-private-key.pem /tmp/live-receipt-payload.json /tmp/live-receipt.sig
+          SIGNATURE="$SIGNATURE" uv run python - <<'PY'
+          import json, os
+          path = 'transaction-artifacts/live-receipt.json'
+          receipt = json.load(open(path))
+          receipt['signature'] = os.environ['SIGNATURE']
+          open(path, 'w').write(json.dumps(receipt, sort_keys=True) + '\n')
+          PY
 
       - name: Record verification success in journal CAS
         shell: bash
@@ -355,11 +423,19 @@ jobs:
           uv run python scripts/publication/transaction_executor.py record-verification \
             --transaction-id "${{ needs.prepare.outputs.transaction_id }}" \
             --probe-report transaction-artifacts/probe-report.json \
+            --attestation transaction-artifacts/live-receipt.json \
             --challenge "challenge-${{ github.run_id }}" \
             --verifier-sha "${{ github.sha }}" \
             --ref "publication" \
             --repo-path "." \
             --output-tx transaction-artifacts/tx_verified.json
+
+      - name: Upload attested live receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: publication-live-receipt-${{ needs.prepare.outputs.generation }}
+          path: transaction-artifacts/live-receipt.json
+          retention-days: 90
 
       - name: Escalate failure if verification failed
         if: failure()

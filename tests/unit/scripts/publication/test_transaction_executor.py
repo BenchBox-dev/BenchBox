@@ -44,7 +44,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 @pytest.fixture
-def test_repo(tmp_path: Path) -> Path:
+def test_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Initialize a Git repository with remote and publication branch for journal CAS testing."""
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -79,7 +79,9 @@ def test_repo(tmp_path: Path) -> Path:
         artifact={"artifact_id": 1, "archive_sha256": "g_art" * 16},
         transaction_id="genesis-tx-0001",
     )
-    durable_genesis = Transaction(**{**genesis_tx.to_dict(), "state": STATE_DURABLE})
+    attestation = {"observation_digest": "genesis-observation"}
+    durable_genesis = Transaction(**{**genesis_tx.to_dict(), "state": STATE_DURABLE, "attestation": attestation})
+    monkeypatch.setattr(transaction, "validate_live_receipt", lambda current, payload: attestation)
     base_oid = subprocess.run(
         ["git", "rev-parse", "refs/heads/publication"],
         cwd=repo,

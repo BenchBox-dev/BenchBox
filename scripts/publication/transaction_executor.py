@@ -195,6 +195,8 @@ def cmd_prepare(args: argparse.Namespace) -> int:
             f.write(f"permit_sha256={permit_digest}\n")
             f.write(f"transaction_id={tx.transaction_id}\n")
             f.write(f"generation={tx.generation}\n")
+            if tx.artifact.get("artifact_id") is not None:
+                f.write(f"artifact_id={tx.artifact['artifact_id']}\n")
 
     print(f"Prepared {tx.kind} transaction {tx.transaction_id} (gen {tx.generation})")
     print(f"Permit SHA-256: {permit_digest}")
