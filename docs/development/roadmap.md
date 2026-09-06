@@ -182,7 +182,7 @@ Enterprise users can sponsor specific platform or benchmark development. Contact
 
 ### Contributing Implementations
 
-See the [Platform Development Guide](platform-development.md) and [Adding New Platforms](adding-new-platforms.md) for implementation patterns.
+See the [Platform Development Guide](platform-development.rst) and [Adding New Platforms](adding-new-platforms.md) for implementation patterns.
 
 ---
 

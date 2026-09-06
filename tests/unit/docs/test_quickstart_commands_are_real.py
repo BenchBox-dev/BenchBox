@@ -94,3 +94,30 @@ def test_stated_step_count_is_not_contradicted() -> None:
     """The page said "four steps" and then listed Step 0 through Step 5."""
     text = QUICKSTART.read_text(encoding="utf-8")
     assert "four steps" not in text.lower()
+
+
+def test_tpcdi_deployment_guide_uses_real_config_symbols() -> None:
+    """TPC-DI deployment guide must import TPCDIConfig and not nonexistent parallel classes."""
+    doc_path = Path(__file__).resolve().parents[3] / "docs" / "guides" / "tpc" / "tpc-di-deployment-guide.md"
+    content = doc_path.read_text(encoding="utf-8")
+
+    assert "ParallelBenchmarkConfig" not in content
+    assert "ParallelExecutionMode" not in content
+    assert "ParallelWorkloadType" not in content
+    assert "from benchbox.core.tpcdi.config import TPCDIConfig" in content
+    assert "TPCDIConfig(" in content
+    assert "TPCDIBenchmark(config=config)" in content
+
+
+def test_databend_platform_doc_uses_platform_options() -> None:
+    """Databend platform doc must not advertise nonexistent top-level CLI flags."""
+    doc_path = Path(__file__).resolve().parents[3] / "docs" / "platforms" / "databend.md"
+    content = doc_path.read_text(encoding="utf-8")
+
+    # Fictional top-level CLI options in the table or solutions
+    assert "`--warehouse`" not in content
+    assert "--databend-no-ssl" not in content
+    assert "--disable-result-cache" not in content
+
+    assert "## Platform Options" in content
+    assert "--platform-option ssl=false" in content

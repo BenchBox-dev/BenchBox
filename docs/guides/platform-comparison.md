@@ -659,6 +659,6 @@ benchbox compare baseline/results.json current/results.json --include-plans
 
 ## Related Documentation
 
-- [CLI Reference](../reference/cli-reference.md) - Full command reference
+- [CLI Reference](../reference/cli/index.md) - Full command reference
 - [DataFrame Benchmarking Guide](dataframe-migration.md) - Adopting DataFrame benchmarking
 - [Visualization Guide](../visualization/chart-generation-guide.md) - Chart customization

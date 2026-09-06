@@ -461,7 +461,7 @@ query = tpch.get_query(1, seed=42)  # Reproducible
 - **[TPCHavoc](tpc-havoc.md)** - TPC-H query variants for optimizer stress testing
 - **[Read Primitives Benchmark](read-primitives.md)** - Microbenchmarks using TPC-H data
 - **[ClickBench](clickbench.md)** - Real-world analytics benchmark
-- **[Benchmark Catalog](README.md)** - Complete list of available benchmarks
+- **[Benchmark Catalog](index.md)** - Complete list of available benchmarks
 
 ### Understanding BenchBox
 
@@ -473,7 +473,7 @@ query = tpch.get_query(1, seed=42)  # Reproducible
 ### Practical Guides
 
 - **[Getting Started](../usage/getting-started.md)** - Run your first benchmark
-- **[CLI Reference](../reference/cli-reference.md)** - Complete command documentation
+- **[CLI Reference](../reference/cli/index.md)** - Complete command documentation
 - **[Platform Selection Guide](../platforms/platform-selection-guide.md)** - Choose the right database
 - **[Platform Quick Reference](../platforms/quick-reference.md)** - Setup for each platform
 - **[Data Generation Guide](../usage/data-generation.md)** - Advanced generation options

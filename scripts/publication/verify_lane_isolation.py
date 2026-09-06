@@ -90,6 +90,8 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "skill-sync.yaml",
     "skill-sync.lock",
     "scripts/skill_sync_ci_policy.py",
+    "scripts/check_doc_relative_links.py",
+    "scripts/doc_relative_link_baseline.txt",
     ".env.example",
     ".gitignore",
     ".mcp.json",

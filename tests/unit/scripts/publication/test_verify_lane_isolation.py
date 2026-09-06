@@ -192,7 +192,18 @@ def test_determine_affected_lanes() -> None:
     assert determine_affected_lanes(["uv.lock"]) == {"site", "explorer", "corpus"}
 
     # Non-lane inputs affect no lanes
-    assert determine_affected_lanes(["tests/unit/test_example.py", "Makefile", "AGENTS.md"]) == set()
+    assert (
+        determine_affected_lanes(
+            [
+                "tests/unit/test_example.py",
+                "Makefile",
+                "AGENTS.md",
+                "scripts/check_doc_relative_links.py",
+                "scripts/doc_relative_link_baseline.txt",
+            ]
+        )
+        == set()
+    )
 
     # Ignored paths affect no lanes
     assert determine_affected_lanes([".venv/bin/python", ".DS_Store", "tmp/scratch.txt"]) == set()
