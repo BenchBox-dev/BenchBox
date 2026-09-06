@@ -31,6 +31,7 @@ def test_classify_path_identifies_correct_lanes() -> None:
     assert classify_path("landing/index.html") == {"site"}
     assert classify_path("_blog/post.md") == {"site"}
     assert classify_path("scripts/assemble_public_site.py") == {"site"}
+    assert classify_path("scripts/publication/verify_lane_isolation.py") == set()
     assert classify_path(".github/workflows/publication-lane-docs.yml") == {"site"}
 
     # Explorer lane
@@ -189,6 +190,11 @@ def test_determine_affected_lanes() -> None:
     assert determine_affected_lanes(["benchbox/core/runner.py"]) == {"site", "explorer", "corpus"}
     assert determine_affected_lanes(["pyproject.toml"]) == {"site", "explorer", "corpus"}
     assert determine_affected_lanes(["uv.lock"]) == {"site", "explorer", "corpus"}
+    assert determine_affected_lanes(["scripts/publication/verify_lane_isolation.py"]) == {
+        "site",
+        "explorer",
+        "corpus",
+    }
 
     # Non-lane inputs affect no lanes
     assert determine_affected_lanes(["tests/unit/test_example.py", "Makefile", "AGENTS.md"]) == set()
