@@ -66,6 +66,12 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         ".github/workflows/validate-submission.yml",
         ".github/workflows/sync-results-data-to-published.yml",
         ".github/workflows/docs.yml",
+        ".github/workflows/publication-transaction.yml",
+        ".github/workflows/publication-recover.yml",
+        ".github/workflows/publication-canaries.yml",
+        ".github/workflows/publication-lane-docs.yml",
+        ".github/workflows/publication-lane-explorer.yml",
+        ".github/workflows/publication-corpus-cutover.yml",
         # Self-protection: the review-gate machinery and the PyPI-publishing
         # workflow. In-workflow checks are attacker-controlled for same-repo
         # PRs; the CODEOWNERS/ruleset layer this feeds is the durable control.
@@ -79,6 +85,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "docs/development/adr/adr-published-results-slim-corpus-branch.md",
         "docs/development/independent-publication-threat-model.md",
         "docs/operations/independent-publication-contract.md",
+        "docs/operations/publication-deployer-soak-and-retirement.md",
         "docs/operations/results-phase-2-runbook.md",
         "docs/operations/results-phase-3-runbook.md",
         "docs/reference/hosted-results-contract.md",

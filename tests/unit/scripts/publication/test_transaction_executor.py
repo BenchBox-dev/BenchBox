@@ -1,4 +1,4 @@
-"""Unit and contract tests for publication transaction executor (Slice C)."""
+"""Unit and contract tests for the publication transaction executor."""
 
 from __future__ import annotations
 
@@ -37,6 +37,7 @@ from scripts.publication.transaction_executor import (
     cmd_record_failure,
     cmd_record_prepared,
     cmd_record_verification,
+    cmd_resume,
     cmd_start_write,
 )
 
@@ -139,6 +140,63 @@ def test_prepare_promotion_generates_canonical_permit(test_repo: Path, tmp_path:
 
     tx = json.loads(output_tx.read_text(encoding="utf-8"))
     assert tx["state"] == STATE_PREPARED
+
+
+def test_resume_only_reissues_permit_for_active_rollback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = {
+        "repository": "BenchBox-dev/BenchBox",
+        "environment": "github-pages",
+        "url": "https://benchbox.dev",
+    }
+    tx = Transaction(
+        transaction_id="rollback-resume-1",
+        target=target,
+        kind=KIND_ROLLBACK,
+        generation=3,
+        parent_transaction_id="durable-1",
+        recovery_of="failed-1",
+        restore_source={"parent_transaction_id": "durable-1"},
+        approval={},
+        controller={"workflow_sha": "a" * 40},
+        owner={"run_id": "watchdog-1", "epoch": "3"},
+        content={"manifest_digest": "m" * 64},
+        desired={"digest": "d" * 64},
+        artifact={"artifact_id": 123, "archive_sha256": "s" * 64},
+        state=STATE_ROLLBACK_WRITE_STARTED,
+    )
+    state = journal.JournalState(
+        target=target,
+        next_generation=4,
+        active_transaction_id=tx.transaction_id,
+        durable_transaction_id="durable-1",
+        write_block=None,
+        policy_digest="p" * 64,
+        tip_commit_oid="tip-1",
+    )
+    monkeypatch.setattr(journal, "read_journal_state", lambda *args, **kwargs: state)
+    monkeypatch.setattr(journal, "read_transaction", lambda *args, **kwargs: tx)
+
+    permit_path = tmp_path / "permit.json"
+    tx_path = tmp_path / "tx.json"
+    rc = cmd_resume(
+        argparse.Namespace(
+            transaction_id=tx.transaction_id,
+            ref="publication",
+            repo_path=str(tmp_path),
+            output_permit=str(permit_path),
+            output_tx=str(tx_path),
+        )
+    )
+
+    assert rc == 0
+    permit = json.loads(permit_path.read_text(encoding="utf-8"))
+    assert permit["transaction_id"] == tx.transaction_id
+    assert permit["kind"] == KIND_ROLLBACK
+    assert permit["restore_transaction_id"] == "durable-1"
+    assert permit["artifact_id"] == 123
+    assert permit["artifact_archive_sha256"] == "s" * 64
+    assert "permit_sha256" not in permit
+    assert json.loads(tx_path.read_text(encoding="utf-8"))["state"] == STATE_ROLLBACK_WRITE_STARTED
 
 
 def test_authenticate_approval_enforces_run_attempt_and_comment(tmp_path: Path) -> None:

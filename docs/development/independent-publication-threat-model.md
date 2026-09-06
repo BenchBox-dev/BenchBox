@@ -19,6 +19,8 @@ archive lives on `published-results`.
 | Build artifact and provenance | Immutable output bound to the manifest and builder. Artifact existence or build success is not proof of deployment. |
 | Deployment credentials and GitHub tokens | Least-privilege secrets available only to trusted post-merge jobs. They must not be exposed to pull-request code or recursively trigger an equivalent privileged workflow. |
 | Live receipt signing key | Isolated attestation credential. It signs only fresh public observations that match the intended manifest and artifact. |
+| Transaction journal (`publication` ref) | Single state authority for monotonic generation reservations, durable transactions, and head advancement under non-forced Git CAS. |
+| Recovery watchdog | Out-of-band observer and recovery coordinator. Scanning is read-only; compensation enters protected environment. |
 | Withdrawal and ranking fields | Maintainer-controlled policy data. Contributor payloads cannot set or promote them. |
 | Audit evidence | Append-only manifests, provenance, deploy acknowledgements, receipts, approvals, withdrawal events, and rollback events retained outside replaceable read models. |
 
@@ -121,6 +123,48 @@ manifest and artifact digests, target, generation, required route observations, 
 digests or semantic checks, observation time, freshness window, nonce, and attestor
 identity. It is issued only after public-network probes. Expired, mismatched, replayed,
 partial, or internally sourced observations cannot transition state to `live`.
+
+### Lost-request ambiguity and late provider activation
+
+**Threat:** A provider request POST succeeds or remains queued on the hosting service,
+but the HTTP response is dropped or the initiating runner crashes. If compensation
+executes without knowing provider state, the unresolved write may activate late,
+overwriting newer content.
+
+**Controls:** Unique write-intent commit OIDs are passed as `pages_build_version` for provider
+correlation. On indeterminate request results, the transaction enters `recovery-required` /
+strict quarantine. Automatic compensation is blocked until an affirmative provider activation
+barrier proves the earlier request cannot activate.
+
+### Stale-writer fencing and concurrency displacement
+
+**Threat:** A delayed or partitioned runner wakes up and executes an obsolete deployment or
+advances the journal after a newer run has taken ownership.
+
+**Controls:** Pages deployment jobs serialize through `pages-deploy` concurrency with
+`cancel-in-progress: false`. Every state transition validates current journal state and epoch
+under non-forced Git CAS. Stale worker acknowledgements are recorded as audit evidence only and
+cannot move the durable head.
+
+### Archive extraction and container confinement
+
+**Threat:** Candidate build archives contain malicious path traversals, symlinks, or
+unexpected files that escape build directories or contaminate other publication lanes.
+
+**Controls:** Build candidate extraction verifies archive SHA-256 and unpacked tree digests,
+strictly rejecting path traversals, symlinks, and oversized files. Lane builds execute within
+materialized source closures with other lane inputs inaccessible. Candidate archives are
+never executed as code.
+
+### Watchdog privilege boundaries and runner loss
+
+**Threat:** An out-of-band recovery workflow (`publication-recover.yml`) has broad privileges
+that could be exploited by untrusted PR events or forge maintainer approvals.
+
+**Controls:** Watchdog scanning is strictly read-only (`contents: read, actions: read`). Only
+compensation enters the protected `github-pages` environment. Watchdog ignores pull-request
+events, authenticates workflow provenance, and cannot fabricate approvals; it strictly
+resumes durable journal intent or flags quarantine.
 
 ## Security invariants
 

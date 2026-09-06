@@ -45,6 +45,11 @@ scripts/validate_submission.py @joeharris76
 .github/workflows/publication-preview-deploy.yml @joeharris76
 .github/workflows/publication-preview-soak.yml @joeharris76
 .github/workflows/publication-lane-docs.yml @joeharris76
+.github/workflows/publication-lane-explorer.yml @joeharris76
+.github/workflows/publication-corpus-cutover.yml @joeharris76
+.github/workflows/publication-transaction.yml @joeharris76
+.github/workflows/publication-recover.yml @joeharris76
+.github/workflows/publication-canaries.yml @joeharris76
 scripts/publication/verify_lane_isolation.py @joeharris76
 # Self-protection: the review-gate machinery and the PyPI-publishing
 # workflow. In-workflow checks are attacker-controlled for same-repo PRs
@@ -68,6 +73,7 @@ docs/development/adr/adr-public-result-id-permanence.md @joeharris76
 docs/development/adr/adr-published-results-slim-corpus-branch.md @joeharris76
 docs/development/independent-publication-threat-model.md @joeharris76
 docs/operations/independent-publication-contract.md @joeharris76
+docs/operations/publication-deployer-soak-and-retirement.md @joeharris76
 docs/operations/results-phase-2-runbook.md @joeharris76
 docs/operations/results-phase-3-runbook.md @joeharris76
 docs/reference/hosted-results-contract.md @joeharris76
