@@ -64,7 +64,7 @@ def check_permissions(perms: dict[str, str], role: str = "journal") -> list[str]
     for name, level in required.items():
         if perms.get(name) != level:
             errors.append(f"Permission {name!r} must be {level!r}, got {perms.get(name)!r}")
-    excess = set(perms) - set(required)
+    excess = set(perms) - set(required) - {"metadata"}
     if excess:
         errors.append(f"Excess permissions for {role} role: {sorted(excess)}")
     return errors

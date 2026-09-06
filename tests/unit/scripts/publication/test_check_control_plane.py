@@ -47,6 +47,7 @@ def test_check_permissions_journal_role() -> None:
     # Journal role requires ONLY contents write
     journal_perms = {"contents": "write"}
     assert control_mod.check_permissions(journal_perms, role="journal") == []
+    assert control_mod.check_permissions({**journal_perms, "metadata": "read"}, role="journal") == []
 
     # Missing contents fails
     assert len(control_mod.check_permissions({}, role="journal")) == 1
