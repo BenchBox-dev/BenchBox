@@ -9,7 +9,7 @@
  */
 
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/preact";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { DetailResult } from "@/types";
 
 vi.mock("@/lib/duckdbQueries", async () => {
@@ -18,10 +18,11 @@ vi.mock("@/lib/duckdbQueries", async () => {
     ...actual,
     getDetailResult: vi.fn(),
     getPrimaryMetricForBenchmark: vi.fn().mockResolvedValue("power_score"),
+    resolveShortId: vi.fn((id: string) => Promise.resolve(id)),
   };
 });
 
-import { getDetailResult, getPrimaryMetricForBenchmark } from "@/lib/duckdbQueries";
+import { getDetailResult, getPrimaryMetricForBenchmark, resolveShortId } from "@/lib/duckdbQueries";
 import { ResultDetail } from "@/pages/ResultDetail";
 
 // ---------------------------------------------------------------------------
@@ -88,6 +89,40 @@ describe("ResultDetail - median-first contract", () => {
     vi.clearAllMocks();
     vi.mocked(getDetailResult).mockResolvedValue(makeDetail());
     vi.mocked(getPrimaryMetricForBenchmark).mockResolvedValue("power_score");
+    vi.mocked(resolveShortId).mockImplementation((id) => Promise.resolve(id));
+    window.history.replaceState(null, "", "/results/r/r1");
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("resolves a short ID and canonicalizes the route without losing URL state", async () => {
+    vi.mocked(resolveShortId).mockResolvedValue("result-full-id");
+    window.history.replaceState(null, "", "/results/r/1234abcd?view=receipt#run-receipt");
+
+    render(<ResultDetail resultId="1234abcd" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    expect(getDetailResult).toHaveBeenCalledWith("result-full-id");
+    expect(window.location.pathname).toBe("/results/r/result-full-id");
+    expect(window.location.search).toBe("?view=receipt");
+    expect(window.location.hash).toBe("#run-receipt");
+  });
+
+  it("exposes tuning disclosure state and its controlled region", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ has_tuning: true, tuning_mode: "tuned" }));
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => undefined)));
+
+    render(<ResultDetail resultId="r1" />);
+    const toggle = await screen.findByRole("button", { name: "Show settings ↓" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveAttribute("aria-controls", "tuning-settings-region");
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("region", { name: "Tuning settings" })).toHaveAttribute(
+      "id",
+      "tuning-settings-region",
+    );
   });
 
   it("gives an invalid result ID a recovery link", async () => {
@@ -97,7 +132,8 @@ describe("ResultDetail - median-first contract", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
 
     expect(screen.getByRole("alert")).toHaveTextContent('No result found for "stale-result".');
-    expect(screen.getByRole("link", { name: "Back to Results" })).toHaveAttribute("href", "/results/");
+    expect(screen.getByRole("link", { name: "Find runs" })).toHaveAttribute("href", "/results/query");
+    expect(screen.getByRole("link", { name: "Browse benchmarks" })).toHaveAttribute("href", "/results/benchmarks/");
   });
 
   it("(a) default table shows one row per display_timing, not per raw query", async () => {
@@ -105,7 +141,7 @@ describe("ResultDetail - median-first contract", () => {
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
     // Header should show display_timings count
-    expect(screen.getByText("Query Timings (2)")).toBeTruthy();
+    expect(screen.getByText("Query timings (2)")).toBeTruthy();
     await waitFor(() => expect(document.title).toBe("TPC-H · DuckDB · SF0.1 · BenchBox Results"));
 
     // The main table uses the display timing contract, not raw samples.
@@ -252,7 +288,7 @@ describe("ResultDetail - median-first contract", () => {
     expect(summary).toHaveTextContent("Primary metric · higher is better");
     expect(summary).toHaveTextContent("Power score");
     expect(summary).toHaveTextContent("Public ID r1");
-    expect(within(summary).getByRole("link", { name: "Compare this result" })).toBeTruthy();
+    expect(within(summary).getByRole("link", { name: "Find a run to compare" })).toHaveAttribute("href", "/results/query?pick=r1");
     expect(summary.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(chartsHeading.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(receipt).toHaveTextContent("Measurement samples");

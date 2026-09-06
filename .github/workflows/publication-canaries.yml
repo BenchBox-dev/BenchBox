@@ -1,10 +1,11 @@
 name: Publication Canaries & Drift Reconciliation
 
-# These canaries fail closed. Each tool requires real publication evidence
-# (a desired manifest plus attested built/deployed/observed receipts, or recorded
-# lane transitions, or real operational drill receipts). Until an independent
-# publication run produces and publishes that evidence for this workflow to
-# consume, these jobs are expected to exit nonzero: per
+# These canaries fail closed. Availability probing runs independently of
+# evidence acquisition (Defect D3). Each audit tool requires real publication
+# evidence (a desired manifest plus attested built/deployed/observed receipts,
+# or recorded lane transitions, or real operational drill receipts). Until an
+# independent publication run produces and publishes that evidence for this
+# workflow to consume, the audit jobs are expected to exit nonzero: per
 # docs/operations/independent-publication-contract.md lines 22-25 a green
 # workflow does not prove live publication, and we would rather this canary be
 # red than fabricate a passing result.
@@ -31,6 +32,42 @@ defaults:
     shell: bash
 
 jobs:
+  availability_probe:
+    name: Probe Live Publication Endpoints
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+
+      - name: Prepare report directory
+        run: mkdir -p diagnostic-reports
+
+      - name: Probe live publication endpoints
+        run: |
+          uv run python scripts/publication/verify_live.py \
+            --base-url https://benchbox.dev \
+            --json > diagnostic-reports/availability-report.json
+          cat diagnostic-reports/availability-report.json
+
+      - name: Upload availability probe report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: availability-probe-report
+          path: diagnostic-reports/availability-report.json
+          retention-days: 7
+
   canaries:
     name: Run Publication Canaries and Drift Reconciliation
     runs-on: ubuntu-latest
@@ -41,15 +78,15 @@ jobs:
       EVIDENCE_DIR: ${{ runner.temp }}/publication-evidence
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -104,10 +141,55 @@ jobs:
 
       - name: Upload diagnostic canary reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: publication-canary-reports
           path: diagnostic-reports/
           # Diagnostic canary output is a transient build/test artifact
           # (<= 7 day retention per the operational receipts taxonomy).
           retention-days: 7
+
+  certification:
+    name: Evaluate Five-Dimension Operational Certification
+    needs: [availability_probe, canaries]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+
+      - name: Prepare report directory
+        run: mkdir -p diagnostic-reports
+
+      - name: Download availability probe report
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          name: availability-probe-report
+          path: diagnostic-reports
+        continue-on-error: true
+
+      - name: Download diagnostic canary reports
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          name: publication-canary-reports
+          path: diagnostic-reports
+        continue-on-error: true
+
+      - name: Evaluate operational certification
+        run: |
+          uv run python scripts/publication/verify_live.py \
+            --certify-reports-dir diagnostic-reports/ \
+            --json > diagnostic-reports/certification-report.json || cert_rc=$?
+          cat diagnostic-reports/certification-report.json || true
+          exit "${cert_rc:-0}"

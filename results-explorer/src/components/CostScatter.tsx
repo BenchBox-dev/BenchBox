@@ -249,10 +249,10 @@ export function CostScatter({ summary }: Props) {
 function normalizedCostEmptyReason(platforms: PlatformRow[]): string {
   if (platforms.length === 0) return "No platforms are present in the selected ranking.";
   if (platforms.every((platform) => platform.cost_status === undefined || platform.cost_status === null)) {
-    return "These rows predate the normalized_cost contract; rebuild the DuckDB snapshot to emit cost_status and model metadata.";
+    return "These older runs do not include the cost details needed for comparison.";
   }
   if (platforms.every((platform) => platform.cost_status === "not_applicable_local")) {
-    return "Only local or self-hosted rows are present; BenchBox marks those as not_applicable_local instead of comparable cloud cost.";
+    return "Only local or self-hosted runs are shown, so cloud cost comparisons do not apply.";
   }
 
   const missing = new Set<string>();
@@ -266,7 +266,7 @@ function normalizedCostEmptyReason(platforms: PlatformRow[]): string {
     if (!platform.cost_model_version) missing.add("cost model version");
   }
   if (missing.size > 0) {
-    return `Missing normalized-cost metadata: ${[...missing].join(", ")}.`;
+    return `These runs are missing required cost details: ${[...missing].join(", ")}.`;
   }
-  return "No row has cost_status=normalized with a finite normalized_cost_usd value.";
+  return "None of these runs has a usable normalized cost.";
 }

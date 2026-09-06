@@ -17,12 +17,12 @@ test.describe("Compare guardrails", () => {
     await waitForDataLoaded(page, /Mixed Benchmark Comparison/);
 
     const main = page.getByRole("main");
-    const receipt = main.getByRole("region", { name: "Comparability receipt" });
-    const summary = main.getByRole("region", { name: "Decision Summary" });
+    const receipt = main.getByRole("region", { name: "Comparison checks" });
+    const summary = main.getByRole("region", { name: "Comparison summary" });
     await expect(receipt).toContainText("Benchmark");
     await expect(summary).toContainText("Not directly comparable: benchmarks differ");
-    await expect(summary).toContainText("Claims suppressed");
-    await expect(main.getByRole("heading", { name: "Query-Level Diff" })).toBeVisible();
+    await expect(summary).toContainText("No winner named");
+    await expect(main.getByRole("heading", { name: "Query-level differences" })).toBeVisible();
     await expect(main.getByRole("heading", { name: /Cannot compare/i })).toHaveCount(0);
   });
 
@@ -34,12 +34,12 @@ test.describe("Compare guardrails", () => {
     await waitForDataLoaded(page, /TPC-H Comparison/);
 
     const main = page.getByRole("main");
-    const receipt = main.getByRole("region", { name: "Comparability receipt" });
-    const summary = main.getByRole("region", { name: "Decision Summary" });
+    const receipt = main.getByRole("region", { name: "Comparison checks" });
+    const summary = main.getByRole("region", { name: "Comparison summary" });
     await expect(receipt).toContainText("Scale factor");
     await expect(summary).toContainText("Not directly comparable: scale factors differ");
-    await expect(summary).toContainText("Claims suppressed");
-    await expect(main.getByRole("heading", { name: "Query-Level Diff" })).toBeVisible();
+    await expect(summary).toContainText("No winner named");
+    await expect(main.getByRole("heading", { name: "Query-level differences" })).toBeVisible();
     await expect(main.getByRole("heading", { name: /Cannot compare/i })).toHaveCount(0);
   });
 
@@ -49,15 +49,15 @@ test.describe("Compare guardrails", () => {
     await page.goto(`/results/compare?ids=${TPCH_ID},tpch-unknown-does-not-exist`);
     await waitForShell(page);
 
-    await waitForDataLoaded(page, /TPC-H Comparison/);
+    await waitForDataLoaded(page, /Find another run/);
     await expect(page.getByTestId("compare-url-notice")).toContainText("Ignored unavailable result ID");
-    await expect(page.getByRole("heading", { name: "Decision Summary" })).toBeVisible();
+    await expect(page.getByTestId("compare-picker-query-link")).toHaveAttribute("href", /\/results\/query\?pick=/);
     await expect(page.getByRole("heading", { name: /Cannot compare/i })).toHaveCount(0);
 
     expect(page.url()).toContain("tpch-unknown-does-not-exist");
     await page.reload();
-    await waitForDataLoaded(page, /TPC-H Comparison/);
-    await expect(page.getByRole("heading", { name: "Decision Summary" })).toBeVisible();
+    await waitForDataLoaded(page, /Find another run/);
+    await expect(page.getByTestId("compare-picker-query-link")).toBeVisible();
   });
 
   test("all-unavailable compare IDs retain the removal-hint error", async ({ page }) => {
@@ -76,7 +76,7 @@ test.describe("Compare guardrails", () => {
     await expect(notice).toContainText("Ignored duplicate result ID");
     await expect(notice).toContainText("comparisons are limited to 4 unique results");
     await expect(notice).toContainText("Ignored unavailable result ID");
-    await expect(page.getByRole("heading", { name: "Decision Summary" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Comparison summary" })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Cannot compare/i })).toHaveCount(0);
   });
 });

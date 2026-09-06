@@ -41,16 +41,16 @@ test.describe("External corpus smoke", () => {
     await waitForShell(page);
     await waitForDataLoaded(
       page,
-      new RegExp(`${escapeRe(seed.benchmarkName)}\\s+-\\s+${escapeRe(seed.platformName)}`, "i"),
+      new RegExp(`${escapeRe(seed.benchmarkName)} result:\\s+${escapeRe(seed.platformName)}`, "i"),
     );
-    await expect(page.getByRole("heading", { name: /Query Timings/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Query timings/i })).toBeVisible();
     if (seed.queryId) {
       await expect(page.getByRole("main").getByText(seed.queryId, { exact: true }).first()).toBeVisible();
     }
 
     await page.goto("/results/query");
     await waitForShell(page);
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
     await expect(page.getByRole("main").getByText(seed.platformName, { exact: true }).first()).toBeVisible();
   });
 });

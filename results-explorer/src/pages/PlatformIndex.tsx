@@ -102,6 +102,8 @@ const PLATFORM_RESULT_FACET_KEYS: ExplorerFacetKey[] = [
   "cost_status",
   "date_window",
   "platform_version",
+  "arch",
+  "cpu_family",
 ];
 
 interface TrendCohort {
@@ -190,10 +192,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const { facets, setFacet } = useFacetState();
   const tuningFilter = singleFacetValue(facets.tuning_mode, "all") ?? "all";
   const setTuningFilter = (value: string) => setFacet("tuning_mode", value === "all" ? [] : [value]);
-  // w5 (table-sticky-density-and-semantics): single-select filters for the
-  // Platform detail table. Each maps to a FacetKey already plumbed through
-  // useFacetState/matchesFacetRow so the filtered count strip updates as
-  // soon as the user picks a value.
+  // Single-select filters for the platform detail table. Each maps to shared
+  // facet state, so the result count updates as soon as the user picks a value.
   const benchmarkFilter = singleFacetValue(facets.benchmark, "all") ?? "all";
   const scaleFilter = singleFacetValue(facets.scale_factor, "all") ?? "all";
   const phaseFilter = singleFacetValue(facets.phase, "all") ?? "all";
@@ -220,6 +220,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     "validation_status",
     "date_window",
     "platform_version",
+    "arch",
+    "cpu_family",
   ];
   const hasW5Filters = hasActiveFacets(facets, w5FilterKeys);
   const resetW5Filters = () => {
@@ -230,12 +232,14 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     setFacet("validation_status", []);
     setFacet("date_window", "all");
     setFacet("platform_version", []);
+    setFacet("arch", []);
+    setFacet("cpu_family", []);
   };
-  // Default: geomean_ms ascending (fastest first), nulls last. The empty-state
-  // ordering is observable behaviour — must_preserve in the parent TODO.
+  // Lead with recency. A cross-benchmark latency sort invites comparison
+  // across different workloads and metric contracts.
   const [sort, setSort] = useState<SortState<PlatformSortKey>>({
-    key: "geomean_ms",
-    direction: "asc",
+    key: "run_date",
+    direction: "desc",
   });
   const platformDisplayName = rows ? platformRowsForRequest(rows, platform)[0]?.platform ?? platform : platform;
   useDocumentTitle(`${platformDisplayName} · BenchBox Results`);
@@ -396,7 +400,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     // run_date is "YYYY-MM-DD" (ISO 8601); strict lexicographic compare matches
     // chronological order without dragging in locale-sensitive collation.
     if (sort.key === "run_date") {
-      if (a.run_date === b.run_date) return 0;
+      if (a.run_date === b.run_date) return a.result_id.localeCompare(b.result_id);
       return dir * (a.run_date < b.run_date ? -1 : 1);
     }
     const av = a[sort.key];
@@ -408,7 +412,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     if (av === null && bv === null) return 0;
     if (av === null) return 1;
     if (bv === null) return -1;
-    return dir * (av - bv);
+    const comparison = dir * (av - bv);
+    return comparison !== 0 ? comparison : a.result_id.localeCompare(b.result_id);
   });
   const visiblePlatformResults = platformResults.slice(0, visibleLimit);
   const groupedPlatformResults = limitCohortGroups(
@@ -484,6 +489,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     return reason;
   }
   const zeroSelectable = platformResults.length > 0 && platformResults.every((row) => comparisonExclusionReason(row));
+  const filtersCausedZeroSelectable = zeroSelectable && hasW5Filters && allPlatformResults.some((row) => !comparisonExclusionReason(row));
   const zeroSelectableReasons = summarizeCompareExclusionReasons(
     platformResults.map((row) => comparisonExclusionReason(row)),
   );
@@ -755,9 +761,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   : "The current filters do not expose a comparable run. Clear filters or choose another ranking."}
               </p>
             </div>
-            <button type="button" class="btn btn-secondary shrink-0 text-sm" onClick={resetW5Filters}>
-              Clear filters
-            </button>
+            {filtersCausedZeroSelectable && (
+              <button type="button" class="btn btn-secondary shrink-0 text-sm" onClick={resetW5Filters}>
+                Clear filters
+              </button>
+            )}
           </div>
         </section>
       )}
@@ -808,8 +816,9 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
           leaderboards cannot describe the same reduction differently.
           */}
           <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]" data-testid="basis-statement">
-          Every figure below uses the published measurement basis: the median of each run's warm
-          passes per query, then the geometric mean across queries. Warmup passes are excluded.
+          Geomean query time uses the median of each query's published measurement passes, then the
+          geometric mean across queries. Warmup passes are excluded. Dates, counts, and power scores use
+          the definitions shown in their columns and receipts.
           </p>
           <DataTable
             ariaLabel={`${platformDisplayName} results`}
@@ -991,10 +1000,9 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
 
       {platformResultsRaw.length > 0 && (
         <section class="card mt-8" aria-label="Performance trends by comparable ranking">
-          <h2 class="mb-2 text-base font-semibold text-[var(--bb-data-fg-primary)]">Performance Trends by Ranking</h2>
+          <h2 class="mb-2 text-base font-semibold text-[var(--bb-data-fg-primary)]">Performance trends by ranking</h2>
           <p class="mb-4 text-sm text-[var(--bb-data-fg-muted)]">
-            Trend rankings never mix benchmark, scale, phase, or metric. Charts require at least {MIN_TREND_OBSERVATIONS} observations;
-            smaller rankings stay visible as sparse-data states.
+            Each trend keeps the benchmark, scale, phase, and measurement fixed. A chart needs at least {MIN_TREND_OBSERVATIONS} runs.
           </p>
           {trendCohorts.length === 0 && sparseTrendCohorts.length === 0 ? (
             <p class="text-sm text-[var(--bb-data-fg-subtle)] italic">
@@ -1011,21 +1019,20 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   <TimeSeries entries={cohort.entries} primaryMetric={cohort.primaryMetric} />
                 </section>
               ))}
-              {sparseTrendCohorts.map((cohort) => (
-                <section
-                  key={cohort.key}
-                  data-testid={`trend-sparse-${cohort.key}`}
-                  class="rounded-lg border border-dashed border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-3"
-                >
-                  <h3 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">{cohort.label}</h3>
-                  <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]" aria-live="polite" aria-atomic="true">
-                    {`Limited observations: ${cohort.observationCount} published ${
-                      cohort.observationCount === 1 ? "run" : "runs"
-                    } in this comparable ranking. Trend chart hidden until at least ${MIN_TREND_OBSERVATIONS} observations exist.`}
-                  </p>
-                  <p class="mt-1 text-xs text-[var(--bb-data-fg-subtle)]">Metric: {cohort.metricDescription}.</p>
-                </section>
-              ))}
+              {sparseTrendCohorts.length > 0 && (
+                <details class="rounded-lg border border-dashed border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-3">
+                  <summary class="cursor-pointer text-sm font-medium text-[var(--bb-data-fg-primary)]">
+                    {sparseTrendCohorts.length} {sparseTrendCohorts.length === 1 ? "ranking has" : "rankings have"} too few runs for a trend
+                  </summary>
+                  <ul class="mt-3 space-y-2 text-sm text-[var(--bb-data-fg-muted)]">
+                    {sparseTrendCohorts.map((cohort) => (
+                      <li key={cohort.key} data-testid={`trend-sparse-${cohort.key}`}>
+                        <span class="font-medium text-[var(--bb-data-fg-primary)]">{cohort.label}</span>: {cohort.observationCount} published {cohort.observationCount === 1 ? "run" : "runs"} · {cohort.metricDescription}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
             </div>
           )}
         </section>
@@ -1183,7 +1190,7 @@ function PlatformCompareReasonStatus({
   }
   return (
     <div id={id} class="text-xs text-[var(--bb-data-fg-muted)]" data-testid="platform-disabled-reason">
-      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Disabled reason: {copy.shortText}</span>
+      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Why unavailable: {copy.shortText}</span>
       <span class="block">{copy.recoveryHint}</span>
     </div>
   );

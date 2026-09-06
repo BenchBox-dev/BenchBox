@@ -3,12 +3,12 @@
  *
  * Cases:
  *   (a) Known tuning modes render expected label and CSS class
- *   (b) Unknown tuning modes fall back to "Custom Tuning" yellow badge
+ *   (b) Unknown tuning modes fall back to "Custom tuning" yellow badge
  *   (c) All modes have a title attribute (tooltip)
  *   (d) tuningLabel() helper returns correct label for dropdown reuse
  *   (e) Color semantics: tuned=green, notuning=gray, auto=blue
  *   (f) null/undefined and the not-recorded sentinel render the neutral
- *       "Not Recorded" badge (never "Custom Tuning")
+ *       "Not recorded" badge (never "Custom tuning")
  *   (g) tuned-fallback (ADR-2) renders its own warning-tone badge, distinct
  *       from both "Tuned" and the generic unknown-mode fallback
  *   (h) custom is a pinned vocabulary entry, but its public claim depends on
@@ -28,25 +28,25 @@ describe("TuningBadge", () => {
     expect(badge?.textContent).toBe("Tuned");
   });
 
-  it("notuning renders with neutral tone and 'No Tuning' label", () => {
+  it("notuning renders with neutral tone and 'No tuning' label", () => {
     const { container } = render(<TuningBadge tuningMode="notuning" />);
     const badge = container.querySelector(".badge");
     expect(badge?.getAttribute("data-tone")).toBe("neutral");
-    expect(badge?.textContent).toBe("No Tuning");
+    expect(badge?.textContent).toBe("No tuning");
   });
 
   it("auto renders with info tone and 'Auto' label", () => {
     const { container } = render(<TuningBadge tuningMode="auto" />);
     const badge = container.querySelector(".badge");
     expect(badge?.getAttribute("data-tone")).toBe("info");
-    expect(badge?.textContent).toBe("Auto");
+    expect(badge?.textContent).toBe("Automatic tuning");
   });
 
-  it("unknown mode falls back to warning 'Custom Tuning' badge", () => {
+  it("unknown mode falls back to warning 'Custom tuning' badge", () => {
     const { container } = render(<TuningBadge tuningMode="bespoke-tweaks" />);
     const badge = container.querySelector(".badge");
     expect(badge?.getAttribute("data-tone")).toBe("warning");
-    expect(badge?.textContent).toBe("Custom Tuning");
+    expect(badge?.textContent).toBe("Custom tuning");
   });
 
   it("emits data-role=computed for downstream targeting", () => {
@@ -71,78 +71,78 @@ describe("TuningBadge", () => {
 
   it("tuningLabel() returns dropdown-friendly text for known modes", () => {
     expect(tuningLabel("tuned")).toBe("Tuned");
-    expect(tuningLabel("notuning")).toBe("No Tuning");
-    expect(tuningLabel("auto")).toBe("Auto");
+    expect(tuningLabel("notuning")).toBe("No tuning");
+    expect(tuningLabel("auto")).toBe("Automatic tuning");
   });
 
-  it("tuningLabel() returns 'Custom Tuning' for unknown modes", () => {
-    expect(tuningLabel("mystery")).toBe("Custom Tuning");
+  it("tuningLabel() returns 'Custom tuning' for unknown modes", () => {
+    expect(tuningLabel("mystery")).toBe("Custom tuning");
   });
 
-  it("null tuning mode renders the neutral 'Not Recorded' badge, not 'Custom Tuning'", () => {
+  it("null tuning mode renders the neutral 'Not recorded' badge, not 'Custom tuning'", () => {
     const { container } = render(<TuningBadge tuningMode={null} />);
     const badge = container.querySelector(".badge");
     expect(badge?.getAttribute("data-tone")).toBe("neutral");
-    expect(badge?.textContent).toBe("Not Recorded");
+    expect(badge?.textContent).toBe("Not recorded");
     expect(badge?.getAttribute("title")).toMatch(/predates tuning metadata|did not record/);
   });
 
-  it("undefined tuning mode renders the neutral 'Not Recorded' badge", () => {
+  it("undefined tuning mode renders the neutral 'Not recorded' badge", () => {
     const { container } = render(<TuningBadge tuningMode={undefined} />);
     const badge = container.querySelector(".badge");
     expect(badge?.getAttribute("data-tone")).toBe("neutral");
-    expect(badge?.textContent).toBe("Not Recorded");
+    expect(badge?.textContent).toBe("Not recorded");
   });
 
-  it("the not-recorded sentinel token renders the same 'Not Recorded' badge", () => {
+  it("the not-recorded sentinel token renders the same 'Not recorded' badge", () => {
     const { container } = render(<TuningBadge tuningMode={NOT_RECORDED_TUNING_MODE} />);
     const badge = container.querySelector(".badge");
     expect(badge?.getAttribute("data-tone")).toBe("neutral");
-    expect(badge?.textContent).toBe("Not Recorded");
+    expect(badge?.textContent).toBe("Not recorded");
     expect(badge?.getAttribute("title")).toBeTruthy();
   });
 
-  it("tuningLabel() returns 'Not Recorded' for null/undefined/sentinel", () => {
-    expect(tuningLabel(null)).toBe("Not Recorded");
-    expect(tuningLabel(undefined)).toBe("Not Recorded");
-    expect(tuningLabel(NOT_RECORDED_TUNING_MODE)).toBe("Not Recorded");
+  it("tuningLabel() returns 'Not recorded' for null/undefined/sentinel", () => {
+    expect(tuningLabel(null)).toBe("Not recorded");
+    expect(tuningLabel(undefined)).toBe("Not recorded");
+    expect(tuningLabel(NOT_RECORDED_TUNING_MODE)).toBe("Not recorded");
   });
 
   it("tuned-fallback (ADR-2) renders its own warning-tone badge, distinct from 'Tuned'", () => {
     const { container } = render(<TuningBadge tuningMode="tuned-fallback" />);
     const badge = container.querySelector(".badge");
     expect(badge?.getAttribute("data-tone")).toBe("warning");
-    expect(badge?.textContent).toBe("Tuned (Fallback)");
-    expect(badge?.getAttribute("title")).toMatch(/no platform\/benchmark template|ADR-2/i);
+    expect(badge?.textContent).toBe("Tuned with fallback settings");
+    expect(badge?.getAttribute("title")).toMatch(/no recommended settings/i);
   });
 
-  it("custom with applied evidence renders the pinned Custom Tuning badge", () => {
+  it("custom with applied evidence renders the pinned Custom tuning badge", () => {
     const { container } = render(
       <TuningBadge tuningMode="custom" tuningValidationStatus="applied_unverified" />,
     );
     const badge = container.querySelector(".badge");
     expect(badge?.getAttribute("data-tone")).toBe("warning");
-    expect(badge?.textContent).toBe("Custom Tuning");
-    expect(badge?.getAttribute("title")).toBe("User-supplied tuning configuration file");
+    expect(badge?.textContent).toBe("Custom tuning");
+    expect(badge?.getAttribute("title")).toBe("This run used tuning settings supplied by the person who ran it.");
   });
 
-  it("custom noop does not claim Custom Tuning was applied", () => {
+  it("custom noop does not claim Custom tuning was applied", () => {
     const { container } = render(<TuningBadge tuningMode="custom" tuningValidationStatus="noop" />);
     const badge = container.querySelector(".badge");
     expect(badge?.getAttribute("data-tone")).toBe("neutral");
-    expect(badge?.textContent).toBe("No Tuning Applied");
-    expect(badge?.getAttribute("title")).toMatch(/recorded no applied tuning operations/i);
+    expect(badge?.textContent).toBe("No tuning applied");
+    expect(badge?.getAttribute("title")).toMatch(/recorded no applied tuning settings/i);
   });
 
   it("custom without applied evidence is labeled as requested rather than applied", () => {
     const { container } = render(<TuningBadge tuningMode="custom" />);
     const badge = container.querySelector(".badge");
     expect(badge?.getAttribute("data-tone")).toBe("warning");
-    expect(badge?.textContent).toBe("Custom Tuning Requested");
+    expect(badge?.textContent).toBe("Custom tuning requested");
   });
 
   it("tuningLabel() recognizes tuned-fallback and custom as pinned vocabulary", () => {
-    expect(tuningLabel("tuned-fallback")).toBe("Tuned (Fallback)");
-    expect(tuningLabel("custom")).toBe("Custom Tuning");
+    expect(tuningLabel("tuned-fallback")).toBe("Tuned with fallback settings");
+    expect(tuningLabel("custom")).toBe("Custom tuning");
   });
 });

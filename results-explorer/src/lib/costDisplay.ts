@@ -15,9 +15,9 @@ export function normalizedCostLabel(row: CostDeploymentFields): string {
 }
 
 export function costStatusLabel(row: CostDeploymentFields): string {
-  if (row.cost_status === "not_applicable_local") return "local";
-  if (row.cost_status === "unavailable") return "unavailable";
-  return "-";
+  if (row.cost_status === "not_applicable_local") return "Not applicable to this local run";
+  if (row.cost_status === "unavailable") return "Not recorded";
+  return "Not recorded";
 }
 
 export function costModelDisclosure(rows: readonly CostDeploymentFields[]): string {
@@ -40,9 +40,7 @@ export function costModelDisclosure(rows: readonly CostDeploymentFields[]): stri
 }
 
 export function costModelSummary(row: CostDeploymentFields): string {
-  const version = row.cost_model_version || "Not recorded";
-  const source = row.cost_model_source ? ` (${row.cost_model_source})` : "";
-  return `${version}${source}`;
+  return row.cost_model_version || "Not recorded";
 }
 
 export function costScopeSummary(row: CostDeploymentFields): string {
@@ -50,8 +48,8 @@ export function costScopeSummary(row: CostDeploymentFields): string {
   const region = humanizeBillingFragment(row.pricing_region);
   return [
     formatCostScope(row.cost_scope) ?? "Not recorded",
-    billing !== null ? `billing: ${billing}` : null,
-    region !== null ? `region: ${region}` : null,
+    billing !== null ? `Billing unit: ${billing}` : null,
+    region !== null ? `Region: ${region}` : null,
   ].filter((part): part is string => part !== null).join(", ");
 }
 

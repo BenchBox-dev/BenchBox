@@ -88,7 +88,7 @@ test.describe("large corpus fixture", () => {
   // before the browser assertions begin.
   test.describe.configure({ timeout: 240_000 });
 
-  test("large corpus Compare builder is bounded after retirement (no unbounded candidate table)", async ({ browser }) => {
+  test("large corpus Compare selection state is bounded (no candidate table)", async ({ browser }) => {
     await withLargeFixture(async (baseUrl) => {
       for (const viewport of [
         { width: 1440, height: 900 },
@@ -99,7 +99,8 @@ test.describe("large corpus fixture", () => {
         await page.goto(`${baseUrl}/results/compare`);
         await waitForShell(page);
 
-        await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Choose runs to compare" })).toBeVisible();
+        await expect(page.getByTestId("compare-picker-query-link")).toBeVisible();
         await expect(page.locator("table")).toHaveCount(0);
         const documentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
         expect(documentHeight).toBeLessThan(6000);

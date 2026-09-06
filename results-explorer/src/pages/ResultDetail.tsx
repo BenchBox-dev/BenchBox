@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import type { DetailResult, QueryDisplayTiming, QueryTiming, SortState } from "@/types";
 import type { ChartContext } from "@/lib/chartRegistry";
-import { getDetailResult, getPrimaryMetricForBenchmark } from "@/lib/duckdbQueries";
+import { getDetailResult, getPrimaryMetricForBenchmark, resolveShortId } from "@/lib/duckdbQueries";
 import { humanizeBenchmark, errMsg, fmtGeomean, fmtScoreCompact, fmtScoreExact } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -11,7 +11,7 @@ import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { PassStrip } from "@/components/PassStrip";
-import { withinRunCompareHref } from "@/lib/resultLinks";
+import { resultDetailHref, withinRunCompareHref } from "@/lib/resultLinks";
 import { encodeBasis, selectComparableBasisPair } from "@/lib/measurementBasis";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { TuningBadge } from "@/components/TuningBadge";
@@ -20,14 +20,16 @@ import { MethodologyDisclosure } from "@/components/MethodologyDisclosure";
 import { RunReceipt, planDownloadUrl } from "@/components/RunReceipt";
 import { ChartPanel } from "@/components/ChartPanel";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
-import { formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
+import { formatEnumLabel, formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
 import { formatDurationSeconds, formatLatencyMs } from "@/lib/metricFormatters";
 import { visibleResultIdForRow } from "@/lib/resultLinks";
-import { usePickingState } from "@/lib/pickingState";
 import { RunDateWithAge } from "@/components/RunAge";
+import { useLocalResultState } from "@/lib/localResultState";
+import { LocalResultPicker } from "@/components/LocalResultPicker";
 
 interface ResultDetailProps extends RoutableProps {
   resultId?: string;
+  source?: "public" | "local";
 }
 
 type MedianSortKey = "query_id" | "display_ms" | "sample_count";
@@ -39,7 +41,7 @@ interface DetailState {
   primaryMetric: PrimaryMetric;
 }
 
-export function ResultDetail({ resultId = "" }: ResultDetailProps) {
+export function ResultDetail({ resultId = "", source = "public" }: ResultDetailProps) {
   const timingsScrollerRef = useRef<HTMLDivElement>(null);
   const samplesScrollerRef = useRef<HTMLDivElement>(null);
   const [detailState, setDetailState] = useState<DetailState | null>(null);
@@ -58,6 +60,8 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   const [tuningLoading, setTuningLoading] = useState(false);
   const [tuningError, setTuningError] = useState<string | null>(null);
   const tuningAbortRef = useRef<AbortController | null>(null);
+  const localResultState = useLocalResultState();
+  const isLocal = source === "local";
   const detail = detailState?.detail ?? null;
   const primaryMetric = detailState?.primaryMetric ?? "display_geomean_ms";
   const documentTitle = detail
@@ -79,7 +83,27 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
     tuningAbortRef.current?.abort();
     tuningAbortRef.current = null;
     let cancelled = false;
-    getDetailResult(resultId)
+    if (isLocal) {
+      const preview = localResultState.preview;
+      if (preview?.detail.result_id !== resultId) {
+        setError("This local preview is no longer available. Open the result file again to restore it.");
+      } else {
+        setDetailState({ detail: preview.detail, primaryMetric: preview.primaryMetric });
+      }
+      return () => {
+        cancelled = true;
+        tuningAbortRef.current?.abort();
+        tuningAbortRef.current = null;
+      };
+    }
+    resolveShortId(resultId)
+      .then(async (resolvedId) => {
+        if (cancelled) return null;
+        if (resolvedId !== resultId && typeof window !== "undefined") {
+          history.replaceState(null, "", `${resultDetailHref(resolvedId)}${window.location.search}${window.location.hash}`);
+        }
+        return getDetailResult(resolvedId);
+      })
       .then(async (data) => {
         if (cancelled) return;
         if (data === null) {
@@ -96,7 +120,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
       tuningAbortRef.current?.abort();
       tuningAbortRef.current = null;
     };
-  }, [resultId]);
+  }, [isLocal, localResultState.preview, resultId]);
 
   // Hooks must run in the same order on every render - compute memos before
   // any conditional return, guarding inside the factory for the null case.
@@ -140,28 +164,20 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   if (error) {
     return (
       <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: "Result detail" }]} />
+        <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: isLocal ? "Local preview" : "Result detail" }]} />
         <div class="mt-8">
           <ErrorMessage message={error} />
-          <a href="/results/" class="mt-4 inline-block btn btn-secondary no-underline">
-            Back to Results
-          </a>
+          <div class="mt-4 flex flex-wrap gap-2">
+            {isLocal && <LocalResultPicker label="Open result file again" />}
+            <a href="/results/query" class="btn btn-primary no-underline">Find runs</a>
+            <a href="/results/benchmarks/" class="btn btn-secondary no-underline">Browse benchmarks</a>
+          </div>
         </div>
       </div>
     );
   }
   if (!detail || !chartContext) return <LoadingSpinner message="Loading result..." />;
 
-  let picking: ReturnType<typeof usePickingState> | null = null;
-  try {
-    picking = usePickingState();
-  } catch {
-    // Unit tests may not wrap with provider.
-  }
-  const isPicked = detail && picking ? picking.pickedIds.includes(detail.result_id) : false;
-  const pickingFull = picking ? picking.pickedIds.length >= 4 && !isPicked : false;
-  const resultPickingCompareHref = picking?.compareHref ?? null;
-  const resultPickingCount = picking?.pickedIds.length ?? 0;
   const benchmarkLabel = humanizeBenchmark(detail.benchmark);
 
   function toggleSort(key: MedianSortKey) {
@@ -221,13 +237,13 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
         })
         .catch((err: unknown) => {
           if (err instanceof DOMException && err.name === "AbortError") return;
-          setTuningError("Could not load tuning config.");
+          setTuningError("Could not load tuning settings.");
           setTuningLoading(false);
         });
     }
   }
 
-  const showTuningSection = detail.tuning_mode !== null || detail.has_tuning;
+  const showTuningSection = true;
   const plansUrl = planDownloadUrl(detail);
   const showSidebar = showTuningSection || (detail.has_plans && !plansUrl);
   const hasTimings = detail.display_timings.length > 0 || detail.queries.length > 0;
@@ -245,19 +261,36 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <Breadcrumb
-        crumbs={[
-          { label: "Results", href: "/results/" },
-          { label: benchmarkLabel, href: `/results/${detail.benchmark}/` },
-          { label: detail.platform },
-        ]}
+        crumbs={isLocal
+          ? [{ label: "Results", href: "/results/" }, { label: "Local preview" }, { label: detail.platform }]
+          : [
+              { label: "Results", href: "/results/" },
+              { label: benchmarkLabel, href: `/results/${detail.benchmark}/` },
+              { label: detail.platform },
+            ]}
       />
+
+      {isLocal && (
+        <aside
+          role="status"
+          class="mt-6 rounded-lg border border-[var(--bb-data-border-strong)] bg-[var(--bb-tone-info-bg)] p-4 text-sm text-[var(--bb-tone-info-fg)]"
+          data-testid="local-result-banner"
+          aria-label="Local result preview"
+        >
+          <p class="font-semibold">Local preview</p>
+          <p class="mt-1">
+            Viewing <span class="font-medium">{localResultState.preview?.fileName}</span> in this browser tab. This result
+            has not been uploaded, reviewed, or added to the public rankings.
+          </p>
+        </aside>
+      )}
 
       <section aria-label="Result summary" class="mt-6 mb-8 panel-elevated p-5">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="min-w-0">
             <div class="mb-3 flex flex-wrap items-center gap-3">
               <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">
-                {benchmarkLabel} - {detail.platform}
+                {benchmarkLabel} result: {detail.platform}
               </h1>
               <TrustBadge trustLabel={detail.trust_label} />
               <FundingChip funding={detail.funding} />
@@ -271,46 +304,42 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                 />
               )}
               {detail.visibility === "public-curated" && (
-                <StatusBadge role="visibility" tone="success">curated</StatusBadge>
+                <StatusBadge role="visibility" tone="success">Published</StatusBadge>
               )}
             </div>
             <p class="text-sm text-[var(--bb-data-fg-muted)]">
-              {benchmarkLabel} · SF {detail.scale_factor} · {detail.test_type ?? "standard"} · run{" "}
-              <RunDateWithAge runDate={detail.run_date} /> · Public ID{" "}
+              This {benchmarkLabel} run used scale factor {detail.scale_factor} for the{" "}
+              {detail.test_type ? formatEnumLabel(detail.test_type) : "standard"} phase on{" "}
+              <RunDateWithAge runDate={detail.run_date} /> · {isLocal ? "Local preview ID" : "Public ID"}{" "}
               <code class="font-mono text-[var(--bb-data-fg-primary)]">{visibleResultIdForRow(detail)}</code>
             </p>
           </div>
           <div class="flex flex-wrap gap-2">
-            <a href={`/results/compare?ids=${detail.result_id}`} class="btn btn-primary" data-testid="result-detail-compare-link">
-              Compare this result
-            </a>
-            <button
-              type="button"
-              class={`btn ${isPicked ? "btn-secondary" : "btn-secondary"}`}
-              aria-pressed={isPicked ? "true" : "false"}
-              aria-describedby={pickingFull ? "result-detail-picking-full" : undefined}
-              title={pickingFull ? "Up to 4 runs can be compared." : undefined}
-              disabled={pickingFull}
-              data-testid="result-detail-picking-toggle"
-              onClick={() => picking?.toggle(detail.result_id)}
-            >
-              {isPicked ? "Remove from comparison" : "Add to comparison"}
-            </button>
-            {pickingFull && (
-              <span id="result-detail-picking-full" class="text-xs text-[var(--bb-tone-warning-fg)]">Up to 4 runs can be compared.</span>
-            )}
-            {resultPickingCompareHref && resultPickingCount >= 2 && (
-              <a href={resultPickingCompareHref} class="btn btn-primary" data-testid="result-detail-compare-picked">
-                Compare {resultPickingCount} selected →
-              </a>
-            )}
-            <a href={detail.bundle_download_url} class="btn btn-secondary" download>
-              Download bundle
-            </a>
-            {detail.has_plans && plansUrl && (
-              <a href={plansUrl} class="btn btn-secondary" download>
-                Download plans
-              </a>
+            {isLocal ? (
+              <>
+                <LocalResultPicker label="Open another result" />
+                <a
+                  href="/docs/contributing-results.html"
+                  referrerPolicy="no-referrer"
+                  class="btn btn-primary no-underline"
+                >
+                  Submit for public review
+                </a>
+              </>
+            ) : (
+              <>
+                <a href={`/results/query?pick=${encodeURIComponent(detail.result_id)}`} class="btn btn-primary" data-testid="result-detail-compare-link">
+                  Find a run to compare
+                </a>
+                <a href={detail.bundle_download_url} class="btn btn-secondary" download>
+                  Download bundle
+                </a>
+                {detail.has_plans && plansUrl && (
+                  <a href={plansUrl} class="btn btn-secondary" download>
+                    Download plans
+                  </a>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -325,9 +354,9 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             />
           )}
           <ResultMetricCard
-            label="Scale / phase"
+            label="Scale factor"
             value={`SF ${detail.scale_factor}`}
-            helper={detail.test_type ?? "standard"}
+            helper={`Phase: ${detail.test_type ? formatEnumLabel(detail.test_type) : "Standard"}`}
           />
           <ResultMetricCard
             label="Trust / validation"
@@ -346,7 +375,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
         <div class={showSidebar ? "space-y-6" : "hidden"}>
           {showTuningSection && (
             <section class="card">
-              <h2 class="mb-3 text-base font-semibold text-[var(--bb-data-fg-primary)]">Tuning Config</h2>
+              <h2 class="mb-3 text-base font-semibold text-[var(--bb-data-fg-primary)]">Tuning</h2>
               <div class="space-y-2 text-sm">
                 {detail.tuning_mode ? (
                   <div class="flex items-center gap-2">
@@ -357,19 +386,22 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                     />
                   </div>
                 ) : (
-                  <p class="text-[var(--bb-data-fg-muted)]">Tuning mode not recorded.</p>
+                  <p class="text-[var(--bb-data-fg-muted)]">Tuning status was not recorded.</p>
                 )}
                 {tuningUrl ? (
                   <div>
                     <button
+                      type="button"
                       class="mt-1 cursor-pointer border-0 bg-transparent p-0 text-xs text-[var(--bb-accent-hover)] underline hover:text-[var(--bb-accent)]"
                       onClick={handleTuningExpand}
+                      aria-expanded={tuningExpanded}
+                      aria-controls="tuning-settings-region"
                     >
-                      {tuningExpanded ? "Hide config ↑" : "Show config ↓"}
+                      {tuningExpanded ? "Hide settings ↑" : "Show settings ↓"}
                     </button>
                     {tuningExpanded && (
-                      <div class="mt-2">
-                        {tuningLoading && <p class="text-xs text-[var(--bb-data-fg-subtle)]">Loading...</p>}
+                      <div id="tuning-settings-region" class="mt-2" role="region" aria-label="Tuning settings">
+                        {tuningLoading && <p role="status" aria-live="polite" class="text-xs text-[var(--bb-data-fg-subtle)]">Loading tuning settings...</p>}
                         {tuningError && <p role="alert" class="text-xs text-[var(--bb-tone-danger-fg)]">{tuningError}</p>}
                         {tuningData && (
                           <pre class="overflow-x-auto rounded panel-muted p-2 text-xs text-[var(--bb-data-fg-primary)]">
@@ -380,7 +412,9 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                     )}
                   </div>
                 ) : (
-                  <p class="text-xs text-[var(--bb-data-fg-subtle)]">No tuning config recorded.</p>
+                  <p class="text-xs text-[var(--bb-data-fg-subtle)]">
+                    {detail.tuning_mode === "notuning" ? "No tuning settings were applied." : "Tuning details were not published."}
+                  </p>
                 )}
               </div>
             </section>
@@ -399,12 +433,16 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             <ChartPanel context={chartContext} />
           )}
 
-          <RunReceipt detail={detail} />
+          <RunReceipt
+            detail={detail}
+            isRankingEligible={isLocal ? false : null}
+            reproduceCommand={isLocal ? null : undefined}
+          />
 
           {hasTimings && (
             <section class="card">
             <h2 class="mb-4 text-base font-semibold text-[var(--bb-data-fg-primary)]">
-              Query Timings ({detail.display_timings.length})
+              Query timings ({detail.display_timings.length})
             </h2>
             <TableScrollHint scrollerRef={timingsScrollerRef} testId="detail-timings-scroll-hint" />
             <div ref={timingsScrollerRef} class="overflow-x-auto" data-testid="detail-timings-scroll-container">
@@ -450,7 +488,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             {detail.queries.length > 0 && (
               <>
               <PassStrip queries={detail.queries} />
-              {withinRunBases !== null && (
+              {!isLocal && withinRunBases !== null && (
                 <p class="mb-6 text-sm">
                   <a
                     class="link"

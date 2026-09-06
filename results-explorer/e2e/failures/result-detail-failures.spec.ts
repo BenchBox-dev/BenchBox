@@ -19,13 +19,13 @@ test.describe("ResultDetail failure paths", () => {
     await waitForShell(page);
 
     // The Home page surfaces the attach failure through the ErrorMessage
-    // component, which renders an explicit `<h3>Error</h3>` over a message
-    // paragraph and now carries `role="alert"` (post-retheme). Asserting
+    // component, which renders an explicit heading over a message paragraph
+    // and carries `role="alert"`. Asserting
     // on role="alert" + the inner heading keeps this tight without
     // coupling to a Tailwind color literal that the token migration
     // dropped.
     const errorBox = page.locator("[role='alert']").filter({
-      has: page.getByRole("heading", { name: /^Error$/ }),
+      has: page.getByRole("heading", { name: "Could not load results" }),
     });
     await expect(errorBox).toBeVisible({ timeout: 20_000 });
   });
@@ -38,13 +38,13 @@ test.describe("ResultDetail failure paths", () => {
     // Routed through the shared helper so the cold-snapshot zero-row race
     // is retried by re-navigation; the sidecar route below is installed
     // afterwards and so is unaffected by those retries.
-    await waitForDataElement(page, page.getByRole("heading", { name: /TPC-H\s+-\s+DuckDB/ }));
+    await waitForDataElement(page, page.getByRole("heading", { name: /TPC-H result:\s+DuckDB/ }));
 
     // Route the sidecar request to a 500 before the user expands the
     // collapsed Tuning Config panel.
     await page.route("**/*.tuning.json", (route) => route.fulfill({ status: 500, body: "simulated sidecar failure" }));
 
-    await page.getByRole("button", { name: /Show config/ }).click();
-    await expect(page.getByText(/Could not load tuning config/)).toBeVisible();
+    await page.getByRole("button", { name: /Show settings/ }).click();
+    await expect(page.getByText(/Could not load tuning settings/)).toBeVisible();
   });
 });

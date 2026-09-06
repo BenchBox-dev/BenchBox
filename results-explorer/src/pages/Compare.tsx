@@ -1,31 +1,17 @@
 import type { JSX } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { route } from "preact-router";
 import type { RoutableProps } from "preact-router";
 import type { DetailResult } from "@/types";
 import {
   getDetailResult,
   getExistingResultIds,
   getPrimaryMetricForBenchmark,
-  // listResults retired: loading unbounded bench.results bypassed (rx-19)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  listResults,
   resolveShortId,
   toShortIds,
-  type ResultRow,
 } from "@/lib/duckdbQueries";
-import { humanizeBenchmark, errMsg, fmtGeomean } from "@/utils";
+import { errMsg, fmtGeomean } from "@/utils";
 import { canonicalBenchmarkSlug, canonicalPhase, formatBenchmarkLabel } from "@/lib/displayLabels";
-import { buildCompareUrl, resultDetailHref, visibleResultIdForRow, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
-import {
-  compareCohortLockReason,
-  compareCohortMismatches,
-  compareCohortPartition,
-  compareCohortSignatureForRow,
-  compareSelectionLabel,
-  hiddenIncompatibleSuffix,
-  type CompareCohortSignature,
-} from "@/lib/compareCohort";
+import { resultDetailHref, visibleResultIdForRow, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import { formatRunIdentitiesForCohort, type RunIdentitySource } from "@/lib/runIdentity";
 import { CompareSummarySkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -60,7 +46,7 @@ import { IdentityDiffStrip } from "@/components/IdentityDiffStrip";
 import { MultiRunHeatmap } from "@/components/MultiRunHeatmap";
 import { MultiRunStandings } from "@/components/MultiRunStandings";
 import { MeasurementBasisBar } from "@/components/MeasurementBasisBar";
-import { useUrlState } from "@/lib/useUrlState";
+import { stringSerde, useUrlState, type UrlSerde } from "@/lib/useUrlState";
 import { getResultBasisAvailability } from "@/lib/duckdbQueries";
 import {
   BASIS_URL_KEY,
@@ -76,24 +62,13 @@ import {
 } from "@/lib/measurementBasis";
 import { formatDurationSeconds, formatPowerScore, formatSpeedup } from "@/lib/metricFormatters";
 import { isValidTimingValue, timingValueForQuery } from "@/lib/displayEligibility";
-import {
-  describeCompareExclusionReason,
-  summarizeCompareExclusionReasons,
-  type CompareExclusionReasonCopy,
-} from "@/lib/compareExclusionReasons";
-import {
-  formatCandidateCount,
-  formatCount,
-  formatSelectedCount,
-  formatWarningClassSummary,
-  formatWarningCount,
-} from "@/lib/copyFormatters";
+import { formatWarningClassSummary, formatWarningCount } from "@/lib/copyFormatters";
 import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
+import { RunDateWithAge } from "@/components/RunAge";
 import { Select } from "@/components/Select";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
-import { RunDateWithAge } from "@/components/RunAge";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import {
   planCompareIds,
@@ -112,6 +87,13 @@ const EMPTY_RESULTS: DetailResult[] = [];
 interface CompareProps extends RoutableProps {
   url?: string;
 }
+
+const QUERY_LIMITER_URL_KEY = "queries";
+const BASELINE_URL_KEY = "baseline";
+const queryLimiterSerde: UrlSerde<QueryDiffLimiter> = {
+  encode: (value) => value,
+  decode: (raw) => raw in QUERY_DIFF_LIMITER_LABELS ? raw as QueryDiffLimiter : null,
+};
 
 function currentCompareUrl(url: string | undefined): string {
   if (url) return url;
@@ -188,11 +170,12 @@ export function compareLayoutForSelection(resultIds: readonly string[]): Compare
 
 export function Compare({ url }: CompareProps) {
   const activeUrl = currentCompareUrl(url);
+  const requestedIdsToken = searchParamsFromUrl(activeUrl).get("ids") ?? "";
   const [compareState, setCompareState] = useState<CompareState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [baselineIndex, setBaselineIndex] = useState(0);
+  const [baselineResultId, setBaselineResultId] = useUrlState(BASELINE_URL_KEY, "", stringSerde);
   // Through the model's serde, not a hand-rolled parser: the grammar is the
   // model's to define, and a shared link has to reproduce the sender's figures
   // exactly. One `basis` parameter, because a cross-run comparison carries
@@ -201,9 +184,9 @@ export function Compare({ url }: CompareProps) {
   // ONE limiter drives the chart and the table. Two independent controls would
   // let the page show a chart of one subset above a table of another, which
   // reads as a data error rather than as two filters.
-  const [queryLimiter, setQueryLimiter] = useState<QueryDiffLimiter>("all");
-  // Builder mode: rendered when 0 ids are supplied, or when 1 id is supplied
-  // (single-result entry from ResultDetail "Compare this result" button).
+  const [queryLimiter, setQueryLimiter] = useUrlState<QueryDiffLimiter>(QUERY_LIMITER_URL_KEY, "all", queryLimiterSerde);
+  // Selection-launch mode: rendered when 0 ids are supplied, or when 1 id is
+  // supplied from a result page.
   // Was previously an error string ("No result IDs provided. Add ?ids=...")
   // or a silent redirect back to ResultDetail; both forced URL editing or
   // dead-ended the user on the page they came from.
@@ -258,7 +241,8 @@ export function Compare({ url }: CompareProps) {
     );
   }, [results, availabilityRows]);
   const primaryMetric = compareState?.primaryMetric ?? "display_geomean_ms";
-  const normalizedBaselineIndex = results[baselineIndex] ? baselineIndex : 0;
+  const baselineIndex = results.findIndex((result) => result.result_id === baselineResultId);
+  const normalizedBaselineIndex = baselineIndex >= 0 ? baselineIndex : 0;
   const resolvedResults = useMemo(
     () => resolveResultsForBasis(results, basis),
     [results, basis],
@@ -286,8 +270,7 @@ export function Compare({ url }: CompareProps) {
     setCompareNotice(null);
     setPreserveRequestedIds(false);
 
-    const params = searchParamsFromUrl(activeUrl);
-    const idsParam = params.get("ids") ?? "";
+    const idsParam = requestedIdsToken;
     const rawIds = idsParam.split(",");
     // Resolve every requested ID before applying the comparison limit so a
     // short ID and its long-form alias consume one slot, not two.
@@ -322,10 +305,8 @@ export function Compare({ url }: CompareProps) {
             setLoading(false);
             return;
           }
-          // Pin this run in the builder rather than redirecting back to
-          // ResultDetail. The user clicked "Compare this result"; the
-          // expected outcome is a comparison surface, not the page they
-          // came from.
+          // Keep this run selected and send the reader to the shared run
+          // finder instead of returning to the page they came from.
           setBuilderPinnedId(resolvedId);
           setShowBuilder(true);
           setLoading(false);
@@ -400,8 +381,12 @@ export function Compare({ url }: CompareProps) {
 
         const metric = await getPrimaryMetricForBenchmark(details[0]!.benchmark);
         if (cancelled) return;
-        setBaselineIndex(0);
-        setShowBuilder(false);
+        if (details.length === 1) {
+          setBuilderPinnedId(details[0]!.result_id);
+          setShowBuilder(true);
+        } else {
+          setShowBuilder(false);
+        }
         setCompareState({ results: details, primaryMetric: metric });
         setLoading(false);
       })
@@ -416,7 +401,16 @@ export function Compare({ url }: CompareProps) {
       cancelled = true;
       if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
     };
-  }, [activeUrl]);
+  }, [requestedIdsToken]);
+
+  // A stale baseline token must not make the visible selector disagree with
+  // the figures. Fall back to the first selected run and remove the invalid
+  // token so a copied URL describes the state it actually renders.
+  useEffect(() => {
+    if (!baselineResultId || results.length === 0) return;
+    if (results.some((result) => result.result_id === baselineResultId)) return;
+    setBaselineResultId("");
+  }, [baselineResultId, results, setBaselineResultId]);
 
   // Canonicalize URL to the retained short IDs once data is loaded. This also
   // removes stale, duplicate, or excess entries so a copied URL reproduces
@@ -484,7 +478,7 @@ export function Compare({ url }: CompareProps) {
     );
 
   if (showBuilder) {
-    return <CompareBuilder pinnedId={builderPinnedId} notice={compareNotice} />;
+    return <ComparePickerLaunch pinnedId={builderPinnedId} notice={compareNotice} />;
   }
 
   if (results.length === 0) return null;
@@ -579,6 +573,7 @@ export function Compare({ url }: CompareProps) {
     suppressWinnerClaims: severeMismatchReason !== null,
     suppressionReason: severeMismatchReason ?? undefined,
     runLabels: summaryRunLabels,
+    comparisonBoundary: buildComparisonBoundary(comparabilityFields),
   });
 
   const validPrimaries = primaries.filter(isValidTimingValue);
@@ -586,6 +581,13 @@ export function Compare({ url }: CompareProps) {
     validPrimaries.length > 0 ? (higherIsBetter ? Math.max(...validPrimaries) : Math.min(...validPrimaries)) : null;
   const slowestPrimary =
     validPrimaries.length > 0 ? (higherIsBetter ? Math.min(...validPrimaries) : Math.max(...validPrimaries)) : null;
+  const selectionRatio =
+    fastestPrimary !== null && slowestPrimary !== null
+      ? higherIsBetter
+        ? fastestPrimary / slowestPrimary
+        : slowestPrimary / fastestPrimary
+      : null;
+  const selectionIsTie = isWithinTieBand(selectionRatio);
 
   // Cohort-aware run identity labels. When the comparison includes
   // multiple runs of the same platform (e.g., DataFusion v44 vs v53,
@@ -658,14 +660,14 @@ export function Compare({ url }: CompareProps) {
         </div>
       )}
 
-      <section class="mt-6 mb-8 panel-elevated p-5" aria-label="Comparison summary">
+      <section class="mt-6 mb-8 panel-elevated p-5">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p class="text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Compare</p>
             <h1 class="mt-1 text-3xl font-bold text-[var(--bb-data-fg-primary)]">{benchmarkLabel} Comparison</h1>
             <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
               Scale factor: {scaleFactorLabel} - {rowCount}{" "}
-              {new Set(results.map((r) => r.platform)).size === results.length ? "platforms" : "runs"}
+              runs
             </p>
             {/* Trust tier diversity note - informational, not a warning */}
             {(() => {
@@ -686,6 +688,7 @@ export function Compare({ url }: CompareProps) {
         warningLabels={comparabilityWarningLabels}
         claimSuppressed={decisionSummary.claimSuppressed}
         suppressionReason={decisionSummary.claimSuppressionReason}
+        comparisonBoundary={decisionSummary.comparisonBoundary}
       />
       <CompareSummary summary={decisionSummary} />
       <IdentityDiffStrip
@@ -710,15 +713,15 @@ export function Compare({ url }: CompareProps) {
             <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="compare-baseline">
               Baseline
             </label>
-            <p class="text-xs text-[var(--bb-data-fg-muted)]">Ratios and deltas compare every candidate against this run.</p>
+            <p class="text-xs text-[var(--bb-data-fg-muted)]">Ratios and differences compare every other selected run with this run.</p>
           </div>
           <Select
             id="compare-baseline"
             ariaLabel="Baseline"
-            value={String(normalizedBaselineIndex)}
-            onChange={(value) => setBaselineIndex(Number(value))}
-            options={results.map((_result, index) => ({
-              value: String(index),
+            value={results[normalizedBaselineIndex]?.result_id ?? ""}
+            onChange={setBaselineResultId}
+            options={results.map((result, index) => ({
+              value: result.result_id,
               label: cohortIdentitiesCompact[index]!,
             }))}
             size="sm"
@@ -755,7 +758,7 @@ export function Compare({ url }: CompareProps) {
           <ChartPanel
             context={{ kind: "compare", results: resolvedResults, primaryMetric: effectivePrimaryMetric }}
             baselineIndex={normalizedBaselineIndex}
-            onBaselineIndexChange={setBaselineIndex}
+            onBaselineIndexChange={(index) => setBaselineResultId(results[index]?.result_id ?? "")}
             suppressWinnerClaims={decisionSummary.claimSuppressed}
             suppressionReason={decisionSummary.claimSuppressionReason ?? undefined}
             queryFilter={queryLimiter === "all" ? undefined : limitedQueryIds}
@@ -774,8 +777,10 @@ export function Compare({ url }: CompareProps) {
               ? primary / slowestPrimary
               : null
             : vsSlowestRatio(primary, slowestPrimary);
-          const vsLabel = higherIsBetter ? "vs worst" : "vs slowest";
+          const vsLabel = higherIsBetter ? "Compared with lowest selected score" : "Compared with slowest selected run";
           const showPrimaryClaims = !decisionSummary.claimSuppressed;
+          const isComparisonBaseline =
+            showPrimaryClaims && !selectionIsTie && primary !== null && primary === slowestPrimary;
           const isFastest =
             showPrimaryClaims && primary !== null && fastestPrimary !== null && primary === fastestPrimary;
 
@@ -792,7 +797,7 @@ export function Compare({ url }: CompareProps) {
                       type="radio"
                       name="compare-baseline-radio"
                       checked={i === normalizedBaselineIndex}
-                      onChange={() => setBaselineIndex(i)}
+                      onChange={() => setBaselineResultId(r.resultId)}
                       aria-label={`Set ${r.label} as baseline`}
                       data-testid={`baseline-radio-${r.resultId}`}
                     />
@@ -847,14 +852,20 @@ export function Compare({ url }: CompareProps) {
                 )}
                 {showPrimaryClaims && speedup !== null && (
                   <div class="flex justify-between">
-                    <dt class="text-[var(--bb-data-fg-muted)]">{vsLabel}</dt>
+                    <dt class="text-[var(--bb-data-fg-muted)]">
+                      {isComparisonBaseline ? "Relative position" : vsLabel}
+                    </dt>
                     {/*
                       Inside the tie band a ratio is not a win in EITHER
                       direction. Rendering the number alone would let a 1.002x
                       read as an advantage once it is rounded to "1.00x" and
                       sat under a "vs slowest" label.
                     */}
-                    {isWithinTieBand(speedup) ? (
+                    {isComparisonBaseline ? (
+                      <dd class="text-[var(--bb-data-fg-muted)]">
+                        {higherIsBetter ? "Lowest selected" : "Slowest selected"}
+                      </dd>
+                    ) : isWithinTieBand(speedup) ? (
                       <dd class="text-[var(--bb-data-fg-muted)]" data-testid="headline-tie">
                         Tied
                       </dd>
@@ -944,11 +955,13 @@ function CompareGuardrailSummary({
   warningLabels,
   claimSuppressed,
   suppressionReason,
+  comparisonBoundary,
 }: {
   warningCount: number;
   warningLabels: string[];
   claimSuppressed: boolean;
   suppressionReason: string | null;
+  comparisonBoundary: string | null;
 }) {
   const warningText = warningCount > 0 ? formatWarningClassSummary(warningCount, warningLabels) : null;
   function focusWarningTarget(event: JSX.TargetedMouseEvent<HTMLAnchorElement>) {
@@ -964,17 +977,22 @@ function CompareGuardrailSummary({
     <section aria-label="Compare guardrails" class="mb-4 panel-elevated p-4">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Comparability guardrails</h2>
+          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Before you compare</h2>
           <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
             {claimSuppressed
-              ? `Winner claims are suppressed because ${suppressionReason ?? "selected runs are not comparable"}.`
-              : "Selected runs share the same benchmark, scale, and phase for winner claims."}
+              ? `The summary does not rank these runs because ${suppressionReason ?? "they are not comparable"}.`
+              : "These runs share the same benchmark, scale, and test phase. Review the differences below before drawing conclusions."}
           </p>
+          {comparisonBoundary && (
+            <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]" data-testid="comparison-boundary">
+              {comparisonBoundary}
+            </p>
+          )}
           {warningText && (
             <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
               {warningText}{" "}
               <a href={`#${COMPARABILITY_WARNING_TARGET_ID}`} onClick={focusWarningTarget}>
-                Review receipt warnings
+                Review differences
               </a>.
             </p>
           )}
@@ -984,7 +1002,7 @@ function CompareGuardrailSummary({
             href={`#${COMPARABILITY_WARNING_TARGET_ID}`}
             class="no-underline"
             data-testid="compare-warning-link"
-            aria-label={`${formatWarningCount(warningCount)}; review comparability receipt warnings`}
+            aria-label={`${formatWarningCount(warningCount)}; review comparison differences`}
             onClick={focusWarningTarget}
           >
             <StatusBadge role="comparison" tone="warning">
@@ -993,12 +1011,44 @@ function CompareGuardrailSummary({
           </a>
         ) : (
           <StatusBadge role="comparison" tone={claimSuppressed ? "warning" : "success"}>
-            {claimSuppressed ? "Claims suppressed" : "Comparable"}
+            {claimSuppressed ? "No winner named" : "Same ranking"}
           </StatusBadge>
         )}
       </div>
     </section>
   );
+}
+
+const HARDWARE_BOUNDARY_FIELDS = ["Architecture", "CPU family", "CPU model", "CPU count", "Memory", "Locality"];
+
+export function buildComparisonBoundary(fields: readonly { label: string; status: string }[]): string {
+  const hardware = fields.filter((field) => HARDWARE_BOUNDARY_FIELDS.includes(field.label));
+  const differing = hardware.filter((field) => field.status === "diff").map((field) => sentenceCaseField(field.label));
+  const missing = hardware.filter((field) => field.status === "missing").map((field) => sentenceCaseField(field.label));
+  const limits: string[] = [];
+  if (differing.length > 0) {
+    limits.push(`${formatPlainList(differing)} ${differing.length === 1 ? "differs" : "differ"}`);
+  }
+  if (missing.length > 0) {
+    limits.push(
+      `${formatPlainList(missing)} ${missing.length === 1 ? "is" : "are"} not recorded for every run`,
+    );
+  }
+  if (limits.length > 0) {
+    return `Hardware boundary: ${limits.join("; ")}. This compares recorded runs, not engines in isolation.`;
+  }
+  return "Hardware boundary: the recorded architecture, CPU family, CPU model, CPU count, memory, and locality match. Other hardware details may differ.";
+}
+
+function sentenceCaseField(label: string): string {
+  if (/^[A-Z]{2,}\b/.test(label)) return label;
+  return `${label.charAt(0).toLowerCase()}${label.slice(1)}`;
+}
+
+function formatPlainList(values: readonly string[]): string {
+  if (values.length < 2) return values[0] ?? "hardware fields";
+  if (values.length === 2) return `${values[0]} and ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")}, and ${values[values.length - 1]}`;
 }
 
 function severeCohortMismatchReason(results: DetailResult[]) {
@@ -1019,168 +1069,13 @@ function severeCohortMismatchReason(results: DetailResult[]) {
   return reasons.length > 0 ? reasons.join(" and ") : null;
 }
 
-function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice: string | null }) {
-  // candidates retained for parity but not fetched (rx-19); table is hidden
-  const [candidates] = useState<ResultRow[] | null>(null);
-  const [_loadError] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    () => new Set(pinnedId ? [pinnedId] : []),
-  );
-  const [benchmarkFilter, setBenchmarkFilter] = useState<string>("");
-  const [scaleFilter, setScaleFilter] = useState<string>("");
-  const [phaseFilter, setPhaseFilter] = useState<string>("");
-
-  useDocumentTitle("Compare · BenchBox Results");
-
-  useEffect(() => {
-    void listResults;
-    // rx-19: Candidate table retired; picking lives in Query. Do not load unbounded bench.results.
-    return;
-  }, [pinnedId]);
-
-  // First selected run sets the comparable cohort: benchmark + scale + phase
-  // must match. This is what `severeCohortMismatchReason` enforces post-hoc;
-  // here we enforce it pre-hoc so users can't choose mixed-cohort sets.
-  const cohortLock = useMemo(() => {
-    if (candidates === null) return null;
-    const firstId = Array.from(selectedIds)[0];
-    if (!firstId) return null;
-    const first = candidates.find((row) => row.result_id === firstId);
-    if (!first) return null;
-    return {
-      benchmark: first.benchmark,
-      scale_factor: first.scale_factor,
-      test_type: canonicalPhase(first.test_type),
-    };
-  }, [candidates, selectedIds]);
-
-  const cohortSignature = useMemo<CompareCohortSignature | null>(() => {
-    if (cohortLock === null) return null;
-    return compareCohortSignatureForRow({
-      benchmark: cohortLock.benchmark,
-      scale_factor: cohortLock.scale_factor,
-      test_type: cohortLock.test_type,
-    });
-  }, [cohortLock]);
-
-  const [compatibleOnly, setCompatibleOnly] = useState(true);
-
-  const benchmarkOptions = useMemo(() => {
-    if (candidates === null) return [];
-    return Array.from(new Set(candidates.map((row) => canonicalBenchmarkSlug(row.benchmark)))).sort();
-  }, [candidates]);
-  const scaleOptions = useMemo(() => {
-    if (candidates === null) return [];
-    const filtered = benchmarkFilter
-      ? candidates.filter((row) => canonicalBenchmarkSlug(row.benchmark) === benchmarkFilter)
-      : candidates;
-    return Array.from(new Set(filtered.map((row) => String(row.scale_factor)))).sort();
-  }, [candidates, benchmarkFilter]);
-  const phaseOptions = useMemo(() => {
-    if (candidates === null) return [];
-    const filtered = candidates.filter(
-      (row) =>
-        (!benchmarkFilter || canonicalBenchmarkSlug(row.benchmark) === benchmarkFilter) &&
-        (!scaleFilter || String(row.scale_factor) === scaleFilter),
-    );
-    return Array.from(new Set(filtered.map((row) => canonicalPhase(row.test_type)))).sort();
-  }, [candidates, benchmarkFilter, scaleFilter]);
-
-  function matchesBuilderFilters(row: ResultRow): boolean {
-    if (benchmarkFilter && canonicalBenchmarkSlug(row.benchmark) !== benchmarkFilter) return false;
-    if (scaleFilter && String(row.scale_factor) !== scaleFilter) return false;
-    if (phaseFilter && canonicalPhase(row.test_type) !== phaseFilter) return false;
-    return true;
-  }
-
-  const userFilteredRows = useMemo(() => {
-    if (candidates === null) return [];
-    return candidates.filter(matchesBuilderFilters);
-  }, [candidates, benchmarkFilter, scaleFilter, phaseFilter]);
-
-  // Partition by compatibility against the locked cohort. Compatible rows
-  // surface above incompatibles so users do not have to scroll past hundreds
-  // of disabled rows to find a second compatible candidate (finding #2).
-  const partitioned = useMemo(
-    () => compareCohortPartition(userFilteredRows, cohortSignature),
-    [userFilteredRows, cohortSignature],
-  );
-  const incompatibleHiddenCount = cohortSignature !== null && compatibleOnly ? partitioned.incompatible.length : 0;
-  const selectedRowsForDisplay = useMemo(
-    () => candidates?.filter((row) => selectedIds.has(row.result_id)) ?? [],
-    [candidates, selectedIds],
-  );
-  const filteredRows = useMemo(() => {
-    const visibleCandidates =
-      cohortSignature !== null && compatibleOnly
-        ? partitioned.compatible
-        : [...partitioned.compatible, ...partitioned.incompatible];
-    if (selectedRowsForDisplay.length === 0) return visibleCandidates;
-    const selectedResultIds = new Set(selectedRowsForDisplay.map((row) => row.result_id));
-    return [...selectedRowsForDisplay, ...visibleCandidates.filter((row) => !selectedResultIds.has(row.result_id))];
-  }, [cohortSignature, compatibleOnly, partitioned, selectedRowsForDisplay]);
-  const selectableFilteredRows = filteredRows.filter(
-    (row) => isCompatible(row) && comparisonExclusionReason(row) === null,
-  );
-  const zeroSelectable = candidates !== null && filteredRows.length > 0 && selectableFilteredRows.length === 0;
-  const zeroSelectableReasons = summarizeCompareExclusionReasons(
-    filteredRows.map((row) => comparisonExclusionReason(row) ?? compareCohortLockReason(row, cohortSignature)),
-  );
-
-  function isCompatible(row: ResultRow): boolean {
-    if (cohortSignature === null) return true;
-    return compareCohortMismatches(row, cohortSignature).length === 0;
-  }
-
-  function comparisonExclusionReason(row: ResultRow): string | null {
-    const reason = row.comparison_exclusion_reason;
-    if (typeof reason !== "string" || reason.length === 0) return null;
-    return reason;
-  }
-
-  function toggleSelection(row: ResultRow) {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(row.result_id)) {
-        next.delete(row.result_id);
-      } else if (next.size < MAX_COMPARE_SELECTIONS && isCompatible(row) && comparisonExclusionReason(row) === null) {
-        next.add(row.result_id);
-      }
-      return next;
-    });
-  }
-
-  function clearSelection() {
-    setSelectedIds(new Set());
-  }
-
-  function clearFilters() {
-    setBenchmarkFilter("");
-    setScaleFilter("");
-    setPhaseFilter("");
-  }
-
-  const selectedCount = selectedIds.size;
-  const selectedStatus = formatSelectedCount(selectedCount, "result", MAX_COMPARE_SELECTIONS);
-  const selectedRowsForLaunch = candidates?.filter((row) => selectedIds.has(row.result_id)) ?? [];
-  const selectedHasComparisonExclusion = selectedRowsForLaunch.some((row) => comparisonExclusionReason(row) !== null);
-  const canLaunch = selectedCount >= 2 && selectedCount <= MAX_COMPARE_SELECTIONS && !selectedHasComparisonExclusion;
-
-  function launch() {
-    if (!canLaunch) return;
-    toShortIds(Array.from(selectedIds))
-      .then((shortIds) => {
-        route(buildCompareUrl(shortIds));
-      })
-      .catch(() => {
-        // Fallback: use long ids directly. The existing canonicalize-to-short
-        // effect on Compare load will replace them.
-        route(buildCompareUrl(Array.from(selectedIds)));
-      });
-  }
+function ComparePickerLaunch({ pinnedId, notice }: { pinnedId: string | null; notice: string | null }) {
+  const queryHref = pinnedId
+    ? `/results/query?pick=${encodeURIComponent(pinnedId)}`
+    : "/results/query";
 
   return (
-    <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8" data-testid="compare-builder">
+    <div class="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8" data-testid="compare-picker-launch">
       <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: "Compare" }]} />
 
       {notice && (
@@ -1193,286 +1088,20 @@ function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice:
         </div>
       )}
 
-      <section class="mt-6 mb-6 panel-elevated p-5" aria-label="Compare builder intro">
+      <section class="mt-6 panel-elevated p-5" aria-labelledby="compare-picker-title">
         <p class="text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Compare</p>
-        <h1 class="mt-1 text-2xl font-bold text-[var(--bb-data-fg-primary)]">Pick runs to compare</h1>
+        <h1 id="compare-picker-title" class="mt-1 text-2xl font-bold text-[var(--bb-data-fg-primary)]">
+          {pinnedId ? "Find another run" : "Choose runs to compare"}
+        </h1>
         <p class="mt-2 text-sm text-[var(--bb-data-fg-muted)]">
-          Choose two to four compatible runs. Your first choice sets the benchmark, scale, and phase; unavailable runs explain
-          why they cannot be compared.
+          {pinnedId
+            ? "One run is selected. Find another run from the same benchmark, scale, and test phase."
+            : "Find two to four runs from the same benchmark, scale, and test phase."}
         </p>
+        <a href={queryHref} class="btn btn-primary mt-4 no-underline" data-testid="compare-picker-query-link">
+          Find runs
+        </a>
       </section>
-
-      {_loadError && <ErrorMessage title="Could not load candidate runs" message={_loadError} />}
-
-      <section class="mb-4 panel p-4" aria-label="Filters">
-        <div class="flex flex-wrap gap-3">
-          <label class="flex flex-col text-sm">
-            <span class="text-xs font-medium text-[var(--bb-data-fg-muted)]">Benchmark</span>
-            <select
-              class="mt-1 rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm"
-              value={benchmarkFilter}
-              onChange={(e) => setBenchmarkFilter((e.target as HTMLSelectElement).value)}
-            >
-              <option value="">Any benchmark</option>
-              {benchmarkOptions.map((bm) => (
-                <option key={bm} value={bm}>{formatBenchmarkLabel(bm)}</option>
-              ))}
-            </select>
-          </label>
-          <label class="flex flex-col text-sm">
-            <span class="text-xs font-medium text-[var(--bb-data-fg-muted)]">Scale</span>
-            <select
-              class="mt-1 rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm"
-              value={scaleFilter}
-              onChange={(e) => setScaleFilter((e.target as HTMLSelectElement).value)}
-            >
-              <option value="">Any scale</option>
-              {scaleOptions.map((sf) => (
-                <option key={sf} value={sf}>SF {sf}</option>
-              ))}
-            </select>
-          </label>
-          <label class="flex flex-col text-sm">
-            <span class="text-xs font-medium text-[var(--bb-data-fg-muted)]">Phase</span>
-            <select
-              class="mt-1 rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm"
-              value={phaseFilter}
-              onChange={(e) => setPhaseFilter((e.target as HTMLSelectElement).value)}
-            >
-              <option value="">Any phase</option>
-              {phaseOptions.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </label>
-          {cohortSignature !== null && (
-            <label
-              class="flex items-center gap-2 self-end pb-1 text-sm text-[var(--bb-data-fg-muted)]"
-              data-testid="compare-builder-compatible-only-label"
-            >
-              <input
-                type="checkbox"
-                checked={compatibleOnly}
-                onChange={(e) => setCompatibleOnly((e.target as HTMLInputElement).checked)}
-                class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
-                data-testid="compare-builder-compatible-only"
-              />
-              Compatible only
-            </label>
-          )}
-        </div>
-      </section>
-
-      <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
-        <p class="text-[var(--bb-data-fg-muted)]" data-testid="compare-builder-status">
-          {selectedCount === 0
-            ? `${formatCandidateCount(filteredRows.length)}. ${selectedStatus}. Select at least 2 to launch a comparison.`
-            : selectedCount < 2
-            ? `${selectedStatus}. Select 1 more compatible run to launch.${hiddenIncompatibleSuffix(incompatibleHiddenCount)}`
-            : `${selectedStatus}. ${
-                cohortLock
-                  ? `Ranking: ${humanizeBenchmark(cohortLock!.benchmark)} · SF ${cohortLock!.scale_factor}${
-                      cohortLock.test_type ? ` · ${cohortLock.test_type}` : ""
-                    }`
-                  : ""
-              }`}
-        </p>
-        <div class="flex gap-2">
-          <button
-            type="button"
-            class="btn btn-secondary"
-            onClick={clearSelection}
-            disabled={selectedCount === 0}
-          >
-            Clear selection
-          </button>
-          <button
-            type="button"
-            class="btn btn-primary"
-            onClick={launch}
-            disabled={!canLaunch}
-            data-testid="compare-builder-launch"
-          >
-            Compare {formatCount(selectedCount, "run")}
-          </button>
-        </div>
-      </div>
-
-      {zeroSelectable && (
-        <section
-          class="mb-4 rounded-lg border border-[var(--bb-tone-warning-border)] bg-[var(--bb-tone-warning-bg)] px-4 py-3 text-sm text-[var(--bb-tone-warning-fg)]"
-          data-testid="compare-builder-zero-selectable"
-          aria-label="No selectable compare rows"
-        >
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 class="font-semibold">No selectable compare rows</h2>
-              <p class="mt-1">
-                {zeroSelectableReasons.length > 0
-                  ? `${zeroSelectableReasons[0]!.count} ${zeroSelectableReasons[0]!.copy.shortText.toLowerCase()} row${
-                      zeroSelectableReasons[0]!.count === 1 ? "" : "s"
-                    }. ${zeroSelectableReasons[0]!.copy.recoveryHint}`
-                  : "The current filters do not expose a comparable run. Clear filters or choose another ranking."}
-              </p>
-            </div>
-            <button type="button" class="btn btn-secondary shrink-0 text-sm" onClick={clearFilters}>
-              Clear filters
-            </button>
-          </div>
-        </section>
-      )}
-
-      <section class="rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] p-4 text-sm" data-testid="compare-builder-query-cta">
-        <p class="font-medium text-[var(--bb-data-fg-primary)]">Pick the second run in Query</p>
-        <p class="mt-1 text-[var(--bb-data-fg-muted)]">
-          Candidate picking now lives in the paged Query Workbench. Use Query to find the second run and return via the generated compare link. The builder below is limited to the pinned result from ResultDetail or the empty state.
-        </p>
-        <div class="mt-3 flex flex-wrap items-center gap-3">
-          <a href="/results/query" class="btn btn-primary" data-testid="compare-builder-query-link">Open Query</a>
-
-        </div>
-      </section>
-      {false && (
-      <div class="overflow-x-auto rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
-        <table class="min-w-full divide-y divide-[var(--bb-data-border)] text-sm">
-          <thead class="bg-[var(--bb-surface-data-muted)]">
-            <tr>
-              <th scope="col" class="table-th w-12 px-3" aria-label="Select for comparison" />
-              <th scope="col" class="table-th text-left">Platform</th>
-              <th scope="col" class="table-th text-left">Benchmark</th>
-              <th scope="col" class="table-th text-left">Scale</th>
-              <th scope="col" class="table-th text-left">Phase</th>
-              <th scope="col" class="table-th text-left">Run date</th>
-              <th scope="col" class="table-th text-left">Trust</th>
-              <th scope="col" class="table-th text-left">Compare state</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-[var(--bb-data-border)]">
-            {candidates === null && (
-              <tr>
-                <td colSpan={8} class="px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
-                  Loading candidate runs...
-                </td>
-              </tr>
-            )}
-            {candidates !== null && filteredRows.length === 0 && (
-              <tr>
-                <td colSpan={8} class="px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
-                  No candidates match the current filters.
-                </td>
-              </tr>
-            )}
-            {filteredRows.map((row) => {
-              const isSelected = selectedIds.has(row.result_id);
-              const compatible = isCompatible(row);
-              const comparisonExclusion = comparisonExclusionReason(row);
-              const disabledReason = comparisonExclusion !== null
-                ? comparisonExclusion
-                : !compatible
-                ? `Different ranking from selection (${cohortLock?.benchmark}/SF${cohortLock?.scale_factor}${cohortLock?.test_type ? `/${cohortLock.test_type}` : ""})`
-                : selectedCount >= MAX_COMPARE_SELECTIONS && !isSelected
-                ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared`
-                : "";
-              const isPinned = row.result_id === pinnedId;
-              const disabledCopy = describeCompareExclusionReason(disabledReason);
-              const reasonId = disabledCopy ? `compare-builder-reason-${row.result_id}` : undefined;
-              const selectedOutsideFilters = isSelected && !matchesBuilderFilters(row);
-              return (
-                <tr
-                  key={row.result_id}
-                  class={`${isSelected ? "bg-[var(--bb-tone-info-bg)]" : ""} ${
-                    !compatible ? "opacity-60" : ""
-                  }`}
-                  data-testid={`compare-builder-row-${row.result_id}`}
-                >
-                  <td class="px-3 py-2 align-middle">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      disabled={!isSelected && !!disabledReason}
-                      aria-label={compareSelectionLabel({
-                        platform: row.platform,
-                        benchmark: row.benchmark,
-                        scaleFactor: row.scale_factor,
-                        phase: row.test_type ?? null,
-                        runDate: row.run_date,
-                        resultId: row.result_id,
-                      })}
-                      aria-describedby={reasonId}
-                      title={disabledCopy?.detailText ?? (disabledReason || undefined)}
-                      onChange={() => toggleSelection(row)}
-                      class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
-                    />
-                  </td>
-                  <td class="table-td">
-                    <div class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</div>
-                    <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                      <span class="font-mono text-xs text-[var(--bb-data-fg-subtle)]">
-                        Public ID {visibleResultIdForRow(row)}
-                      </span>
-                      {isPinned && (
-                        <span class="rounded-full bg-[var(--bb-surface-data-muted)] px-1.5 py-0.5 text-xs text-[var(--bb-data-fg-subtle)]">
-                          (from result detail)
-                        </span>
-                      )}
-                      {selectedOutsideFilters && (
-                        <span class="rounded-full bg-[var(--bb-surface-data-muted)] px-1.5 py-0.5 text-xs text-[var(--bb-data-fg-subtle)]">
-                          selected outside filters
-                        </span>
-                      )}
-                    </div>
-                    {row.platform_version && (
-                      <div class="text-xs text-[var(--bb-data-fg-subtle)]">{row.platform_version}</div>
-                    )}
-                  </td>
-                  <td class="table-td">{humanizeBenchmark(row.benchmark)}</td>
-                  <td class="table-td font-mono">SF {row.scale_factor}</td>
-                  <td class="table-td">{row.test_type ?? "-"}</td>
-                  <td class="table-td"><RunDateWithAge runDate={row.run_date} /></td>
-                  <td class="table-td">
-                    <div class="flex flex-wrap gap-1">
-                      <TrustBadge trustLabel={row.trust_label} compact />
-                      <FundingChip funding={row.funding} compact />
-                    </div>
-                  </td>
-                  <td class="table-td max-w-[16rem]">
-                    <CompareReasonStatus
-                      id={reasonId}
-                      copy={disabledCopy}
-                      selected={isSelected}
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      )}
-    </div>
-  );
-}
-
-function CompareReasonStatus({
-  id,
-  copy,
-  selected,
-}: {
-  id?: string;
-  copy: CompareExclusionReasonCopy | null;
-  selected: boolean;
-}) {
-  if (copy === null) {
-    return (
-      <span class="text-xs text-[var(--bb-data-fg-muted)]">
-        {selected ? "Selected" : "Selectable"}
-      </span>
-    );
-  }
-  return (
-    <div id={id} class="text-xs text-[var(--bb-data-fg-muted)]" data-testid="compare-disabled-reason">
-      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Disabled reason: {copy.shortText}</span>
-      <span class="block">{copy.recoveryHint}</span>
     </div>
   );
 }

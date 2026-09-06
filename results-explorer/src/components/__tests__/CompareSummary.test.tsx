@@ -72,10 +72,10 @@ describe("CompareSummary", () => {
 
     render(<CompareSummary summary={summary} />);
 
-    const summaryRegion = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    const summaryRegion = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
     expect(summaryRegion).not.toBeNull();
-    expect(summaryRegion).toHaveTextContent("DuckDB leads by 10.00x on power score.");
-    expect(summaryRegion).toHaveTextContent("2 fastest of 2 comparable");
+    expect(summaryRegion).toHaveTextContent("In these selected runs, DuckDB's power score was 10.00x the lowest selected score.");
+    expect(summaryRegion).toHaveTextContent("DuckDB was fastest on 2 of 2 comparable queries");
     expect(summaryRegion).toHaveTextContent("p50 15 ms");
     expect(summaryRegion).toHaveTextContent("winner cost $0.50");
     expect(summaryRegion).toHaveTextContent("30.00x cost/performance");
@@ -101,11 +101,11 @@ describe("CompareSummary", () => {
 
     render(<CompareSummary summary={summary} />);
 
-    const summaryRegion = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    const summaryRegion = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
     expect(summaryRegion).toHaveTextContent("Not directly comparable: benchmarks differ.");
-    expect(summaryRegion).toHaveTextContent("Claims suppressed");
+    expect(summaryRegion).toHaveTextContent("No winner named");
     expect(summaryRegion).toHaveTextContent("Not claimed");
-    expect(summaryRegion).toHaveTextContent("Winner claim suppressed");
+    expect(summaryRegion).toHaveTextContent("Review the individual query measurements below");
   });
 
   // -----------------------------------------------------------------------
@@ -140,12 +140,12 @@ describe("CompareSummary", () => {
     expect(summary.claimSuppressed).toBe(false);
     expect(summary.winner?.platform).toBe("DuckDB");
     // ...but the headline itself must not read as a clean, confident claim.
-    expect(summary.headline).toContain("DuckDB leads by");
+    expect(summary.headline).toContain("DuckDB's power score was");
     expect(summary.headline).toContain("Validation caution");
     expect(summary.headline).toContain("Pandas is no validation");
 
     render(<CompareSummary summary={summary} />);
-    const summaryRegion = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    const summaryRegion = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
     expect(summaryRegion).toHaveTextContent("Unvalidated result");
     expect(summaryRegion).toHaveTextContent("Validation caution:");
     expect(summaryRegion).toHaveTextContent("Pandas is no validation");
@@ -173,10 +173,10 @@ describe("CompareSummary", () => {
 
     expect(summary.nonCleanValidation).toHaveLength(0);
     expect(summary.validationCaveat).toBeNull();
-    expect(summary.headline).toBe("DuckDB leads by 10.00x on power score.");
+    expect(summary.headline).toBe("In these selected runs, DuckDB's power score was 10.00x the lowest selected score.");
 
     render(<CompareSummary summary={summary} />);
-    const summaryRegion = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    const summaryRegion = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
     expect(summaryRegion).not.toHaveTextContent("Unvalidated result");
     expect(screen.queryByTestId("compare-validation-caveat")).toBeNull();
   });
@@ -201,7 +201,7 @@ describe("CompareSummary", () => {
 
     expect(summary.nonCleanValidation).toHaveLength(0);
     render(<CompareSummary summary={summary} />);
-    const summaryRegion = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    const summaryRegion = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
     expect(summaryRegion).not.toHaveTextContent("Unvalidated result");
   });
 });

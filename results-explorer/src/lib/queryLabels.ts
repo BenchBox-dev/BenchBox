@@ -8,6 +8,14 @@ import {
 } from "@/lib/metricFormatters";
 import { humanizeBenchmark } from "@/utils";
 import { formatRunDateWithAge } from "@/lib/runAge";
+import {
+  formatArchitecture,
+  formatExecutionMode,
+  formatTrustLabel,
+  formatTuningMode,
+  formatValidationStatus,
+  formatVisibility,
+} from "@/lib/displayLabels";
 
 const QUERY_ID_COLLATOR = new Intl.Collator(undefined, {
   numeric: true,
@@ -88,6 +96,12 @@ export function formatQueryFacetValue(key: string, value: string): string {
   if (trimmed === "") return "unknown";
   if (key === "benchmark") return humanizeBenchmark(trimmed);
   if (key === "scale_factor") return `SF ${trimmed}`;
+  if (key === "execution_mode") return formatExecutionMode(trimmed);
+  if (key === "tuning_mode") return formatTuningMode(trimmed);
+  if (key === "trust_label") return formatTrustLabel(trimmed);
+  if (key === "validation_status") return formatValidationStatus(trimmed);
+  if (key === "visibility") return formatVisibility(trimmed);
+  if (key === "arch") return formatArchitecture(trimmed);
   if (PUBLIC_IDENTIFIER_FACETS.has(key)) return trimmed;
   return formatFacetDisplayValue(key, trimmed);
 }

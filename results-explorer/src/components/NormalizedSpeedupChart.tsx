@@ -89,6 +89,7 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
     !hasMissingSpeedups &&
     measuredSpeedups.length > 0 &&
     measuredSpeedups.every((speedup) => Math.abs(speedup - 1) <= 0.01);
+  const chartDescription = `Per-query speedup relative to ${results[baselineIdx]?.platform ?? "the selected baseline"}. Values above 1 are faster; values below 1 are slower. ${entries.length} queries are shown. An accessible table follows the chart.`;
 
   if (allNearEqual && hiddenEntryCount === 0) {
     return (
@@ -102,6 +103,7 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
+      <p id="normalized-speedup-description" class="sr-only">{chartDescription}</p>
       {(hiddenEntryCount > 0 || (!showComparableOnly && fullyComparableEntries.length < allEntries.length)) && (
         <div class="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--bb-data-fg-muted)]">
           <span>
@@ -126,7 +128,9 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
         width="100%"
         height={totalHeight}
         viewBox={`0 0 ${drawWidth} ${totalHeight}`}
-        aria-label="Normalized speedup chart"
+        role="img"
+        aria-label="Per-query results relative to the selected baseline"
+        aria-describedby="normalized-speedup-description"
       >
         {/* Grid lines and axis labels */}
         {SPEEDUP_GRID_STOPS.map((stop) => {
@@ -217,6 +221,24 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
         })}
       </svg>
 
+      <table class="sr-only">
+        <caption>Per-query speedups relative to {results[baselineIdx]?.platform ?? "the selected baseline"}</caption>
+        <thead>
+          <tr><th>Query</th><th>Candidate</th><th>Speedup</th></tr>
+        </thead>
+        <tbody>
+          {entries.flatMap((entry, entryIndex) =>
+            entry.speedups.map((speedup, candidateIndex) => (
+              <tr key={`${entry.queryId}-${entryIndex}-${candidateIndex}`}>
+                <td>{entry.queryId}</td>
+                <td>{nonBaselineResults[candidateIndex]?.platform ?? "Candidate"}</td>
+                <td>{speedup === null ? "Not available" : formatSpeedup(speedup).valueText}</td>
+              </tr>
+            )),
+          )}
+        </tbody>
+      </table>
+
       {/* Legend */}
       <div class="mt-2 flex flex-wrap gap-3 text-xs text-[var(--bb-data-fg-muted)]">
         <span>Baseline: <strong>{results[baselineIdx]?.platform}</strong></span>
@@ -254,9 +276,9 @@ function SpeedupParityState({
 }) {
   return (
     <div class="rounded-lg panel-muted p-4 text-sm">
-      <p class="font-semibold text-[var(--bb-data-fg-primary)]">No meaningful per-query speedup difference</p>
+      <p class="font-semibold text-[var(--bb-data-fg-primary)]">No meaningful per-query difference</p>
       <p class="mt-1 text-[var(--bb-data-fg-muted)]">
-        All {speedupCount.toLocaleString()} compared query speedups are 1.00× versus baseline {baseline}.
+        All {speedupCount.toLocaleString()} compared queries are 1.00× relative to {baseline}.
       </p>
       <p class="mt-2 text-xs text-[var(--bb-data-fg-muted)]">
         Baseline: <strong>{baseline}</strong>

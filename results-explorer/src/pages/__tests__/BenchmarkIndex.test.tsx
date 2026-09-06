@@ -402,7 +402,7 @@ describe("BenchmarkIndex", () => {
 
   it("sets the not-found title for unknown benchmark slugs", async () => {
     render(<BenchmarkIndex benchmark="does-not-exist" />);
-    await waitFor(() => expect(screen.getByRole("heading", { name: "404" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Page not found" })).toBeTruthy());
     await waitFor(() => expect(document.title).toBe("Not found · BenchBox Results"));
   });
 
@@ -439,10 +439,10 @@ describe("BenchmarkIndex", () => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
 
-    for (const details of screen.getAllByText("Receipt and metadata")) {
+    for (const details of screen.getAllByText("Run details")) {
       fireEvent.click(details);
     }
-    const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];
+    const receiptLinks = screen.getAllByRole("link", { name: /Open receipt for/ }) as HTMLAnchorElement[];
     expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r1#run-receipt");
     expect(screen.getAllByText("exact").length).toBeGreaterThan(0);
     expect(screen.getAllByText("loose").length).toBeGreaterThan(0);
@@ -775,7 +775,7 @@ describe("BenchmarkIndex", () => {
     await waitFor(() => expect(screen.getByTestId("rank-gate-notice")).toBeTruthy());
     expect(screen.getByRole("radio", { name: "Rank Evidence" })).toBeTruthy();
     expect(screen.getByTestId("rank-gate-notice").textContent).toContain("Ranks are unavailable");
-    expect(screen.getByTestId("rank-gate-notice").textContent).toContain("No rankable results are available");
+    expect(screen.getByTestId("rank-gate-notice").textContent).toContain("No results meet the requirements for ranking");
     expect(new URL(window.location.href).searchParams.get("view")).toBe("ranks");
     expect(screen.queryByRole("table", { name: /Rank/i })).toBeNull();
   });
@@ -802,7 +802,7 @@ describe("BenchmarkIndex", () => {
       const describedBy = sqliteCheckbox.getAttribute("aria-describedby");
       expect(describedBy).toBeTruthy();
       expect(document.getElementById(describedBy!)?.textContent).toContain(
-        "Disabled reason: Insufficient valid timings",
+        "Why unavailable: Insufficient valid timings",
       );
     }
   });
@@ -825,7 +825,7 @@ describe("BenchmarkIndex", () => {
       "/results/compare",
     );
     expect(screen.getAllByTestId("query-heatmap-disabled-reason")[0]?.textContent).toContain(
-      "Disabled reason: Insufficient query coverage",
+      "Why unavailable: Insufficient query coverage",
     );
   });
 

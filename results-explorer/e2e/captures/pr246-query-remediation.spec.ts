@@ -58,8 +58,8 @@ test.describe("@pr246-capture Query Workbench remediation", () => {
       try {
         await page.goto(route.url, { waitUntil: "domcontentloaded" });
         await page.waitForLoadState("load", { timeout: 10_000 }).catch(() => {});
-        await expect(page.getByRole("heading", { name: "Results Query Workbench" })).toBeVisible();
-        await expect(page.getByTestId("query-result-summary")).toContainText(/matching result bundle/);
+        await expect(page.getByRole("heading", { name: "Find benchmark runs" })).toBeVisible();
+        await expect(page.getByTestId("query-result-summary")).toContainText(/matching run/);
         await expect(page.locator("body")).not.toContainText(/Binder Error|Stack trace|Results snapshot incomplete/i);
 
         if (route.openMobileFilters) {

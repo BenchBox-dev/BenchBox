@@ -259,9 +259,9 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   },
   {
     id: "normalized_speedup",
-    title: "Normalized Speedup",
-    shortTitle: "Speedup",
-    description: "Normalized speedup chart relative to a selected baseline platform",
+    title: "Relative to selected baseline",
+    shortTitle: "Relative result",
+    description: "Compare each query with the selected baseline run",
     questionGroup: "per_query",
     eligibilityClass: "compare_safe",
     requires: { requiresTwoResults: true },

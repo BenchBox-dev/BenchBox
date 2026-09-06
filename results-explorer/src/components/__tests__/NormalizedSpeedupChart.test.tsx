@@ -35,6 +35,10 @@ describe("NormalizedSpeedupChart", () => {
     render(<NormalizedSpeedupChart queries={QUERIES} results={RESULTS} baselineIdx={0} />);
     expect(screen.getByText(/Baseline/)).toBeTruthy();
     expect(screen.getByText("DuckDB")).toBeTruthy();
+    const chart = screen.getByRole("img", { name: "Per-query results relative to the selected baseline" });
+    expect(chart.getAttribute("aria-describedby")).toBe("normalized-speedup-description");
+    expect(screen.getByText(/Values above 1 are faster; values below 1 are slower/)).toBeTruthy();
+    expect(screen.getByRole("table", { name: /Per-query speedups relative to DuckDB/ })).toBeTruthy();
   });
 
   it("returns null for single result", () => {
@@ -88,8 +92,8 @@ describe("NormalizedSpeedupChart", () => {
     ];
     const { container } = render(<NormalizedSpeedupChart queries={equalQueries} results={RESULTS} baselineIdx={0} />);
 
-    expect(screen.getByText("No meaningful per-query speedup difference")).toBeTruthy();
-    expect(screen.getByText(/2 compared query speedups are 1.00×/)).toBeTruthy();
+    expect(screen.getByText("No meaningful per-query difference")).toBeTruthy();
+    expect(screen.getByText(/All 2 compared queries are 1.00×/)).toBeTruthy();
     expect(container.querySelector("svg")).toBeNull();
   });
 
@@ -144,7 +148,7 @@ describe("NormalizedSpeedupChart", () => {
       <NormalizedSpeedupChart queries={sparseParityQueries} results={RESULTS} baselineIdx={0} />,
     );
 
-    expect(screen.queryByText("No meaningful per-query speedup difference")).toBeNull();
+    expect(screen.queryByText("No meaningful per-query difference")).toBeNull();
     expect(screen.getByTestId("normalized-speedup-comparable-only-toggle")).toBeTruthy();
     const queryLabels = Array.from(container.querySelectorAll("text"))
       .map((el) => el.textContent ?? "")

@@ -56,10 +56,10 @@ test.describe("direct route parity", () => {
     await waitForDataElement(page, page.getByRole("heading", { name: /^TPC-H Results$/ }));
 
     await page.goto("/results/query");
-    await waitForDataElement(page, page.getByRole("heading", { name: /^Results Query Workbench$/ }));
+    await waitForDataElement(page, page.getByRole("heading", { name: /^Find benchmark runs$/ }));
 
     await page.goto("/results/compare");
-    await waitForDataElement(page, page.getByRole("heading", { name: /^Pick runs to compare$/ }));
+    await waitForDataElement(page, page.getByRole("heading", { name: /^Choose runs to compare$/ }));
   });
 
   test("flywheel documentation CTAs use real native navigation", async ({ page }) => {
@@ -92,7 +92,7 @@ test.describe("direct route parity", () => {
     await waitForShell(page);
     await waitForDataElement(page, page.getByRole("heading", { name: /^TPC-H Comparison$/ }));
     const guardrails = page.getByRole("region", { name: "Compare guardrails" });
-    const receipt = page.getByRole("region", { name: "Comparability receipt" });
+    const receipt = page.getByRole("region", { name: "Comparison checks" });
     await expect(guardrails).toContainText("1 warning");
     await expect(guardrails).not.toContainText("1 warnings");
     await expect(receipt).toContainText("1 warning");

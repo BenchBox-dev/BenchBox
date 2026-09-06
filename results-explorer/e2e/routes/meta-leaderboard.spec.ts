@@ -31,7 +31,7 @@ test.describe("cross-benchmark leaderboard disclosure", () => {
     await waitForDataElement(page, state);
 
     await expect(state).toContainText("No ranked evidence");
-    await expect(state).toContainText("Trust policy excludes this result from ranking.");
+    await expect(state).toContainText("Results from this source are not included in rankings.");
     await expect(state).toContainText("Open ranking for details.");
     const grid = page.getByRole("grid", { name: "Cross-benchmark leaderboard" });
     await expect(grid.getByRole("gridcell")).toHaveCount(0);
@@ -41,7 +41,7 @@ test.describe("cross-benchmark leaderboard disclosure", () => {
     }).click();
     await expect(
       grid.getByRole("gridcell", {
-        name: /Fixture AWS SQL has published evidence.*Trust policy excludes this result from ranking/,
+        name: /Fixture AWS SQL has published evidence.*Results from this source are not included in rankings/,
       }),
     ).toBeVisible();
   });

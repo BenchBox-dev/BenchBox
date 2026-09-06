@@ -9,6 +9,7 @@ import {
   HEADER_NAV_ARIA_LABEL,
   HEADER_TOGGLE_ARIA_LABEL,
 } from "@/components/headerContract";
+import { LocalResultPicker } from "@/components/LocalResultPicker";
 
 interface LayoutProps {
   children: ComponentChildren;
@@ -127,8 +128,15 @@ function Header() {
               Compare
             </ExplorerNavLink>
             <ExplorerNavLink href="/results/query" active={currentPath.startsWith("/results/query")}>
-              Query
+              Find runs
             </ExplorerNavLink>
+            <LocalResultPicker
+              className={`whitespace-nowrap rounded-sm border-b-2 bg-transparent py-3 font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)] ${
+                currentPath.startsWith("/results/local/")
+                  ? "border-[var(--bb-accent)] text-[var(--bb-fg-primary)]"
+                  : "border-transparent text-[var(--bb-fg-muted)] hover:border-[var(--bb-border-default)] hover:text-[var(--bb-fg-primary)]"
+              }`}
+            />
           </nav>
         </div>
       </div>
@@ -187,7 +195,7 @@ function ExplorerNavLink({
 }
 
 function isBenchmarkPath(path: string): boolean {
-  return /^\/results\/(?!compare\/?$|query\/?$|platforms\/?$|p\/|r\/)[^/]+\/?$/.test(path);
+  return /^\/results\/(?!compare\/?$|query\/?$|platforms\/?$|p\/|r\/|local\/)[^/]+\/?$/.test(path);
 }
 
 function themeLabel(choice: string): string {
@@ -200,16 +208,14 @@ function Footer() {
       <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="flex flex-col items-center justify-between gap-4 sm:flex-row">
           <p class="text-sm text-[var(--bb-fg-muted)]">
-            &copy; {new Date().getFullYear()} BenchBox. The current public corpus is{" "}
-            <span class="font-medium text-[var(--bb-fg-primary)]">maintainer-curated</span>, and new submissions go through PR
-            validation and maintainer review before they appear here. Reproduce runs with{" "}
+            &copy; {new Date().getFullYear()} BenchBox. Maintainers review every result before publishing it. You can reproduce a run with{" "}
             <code class="rounded bg-[var(--bb-bg-elevated)] px-1 py-0.5 text-xs text-[var(--bb-fg-primary)]">benchbox run</code>.
           </p>
           <nav class="flex items-center gap-4">
             <a href="https://benchbox.dev" class="text-sm text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)] no-underline">
               benchbox.dev
             </a>
-            <a href="https://github.com/joeharris76/BenchBox" class="text-sm text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)] no-underline">
+            <a href="https://github.com/BenchBox-dev/BenchBox" class="text-sm text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)] no-underline">
               GitHub
             </a>
           </nav>

@@ -1,5 +1,6 @@
 import {
   FACET_KEYS,
+  ALL_FACET_KEYS,
   FACET_URL_KEYS,
   LEGACY_UNLABELLED_TUNING_MODE,
   NOT_RECORDED_TUNING_MODE,
@@ -66,7 +67,7 @@ export function toDateWindowFacet(value: string): DateWindowFacet {
 }
 
 export function appendFacetParams(params: URLSearchParams, facets: FacetState, omit: ReadonlySet<ExplorerFacetKey>) {
-  for (const key of [...FACET_KEYS, "platform_version"] as const) {
+  for (const key of ALL_FACET_KEYS) {
     if (omit.has(key)) continue;
     const value = facets[key];
     if (Array.isArray(value)) {

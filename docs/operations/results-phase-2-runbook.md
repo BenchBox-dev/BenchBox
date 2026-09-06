@@ -86,10 +86,13 @@ must never wipe.
 
 For a maintainer-approved removal from the public archive, open a hand-created
 PR against `published-results` that is **deletion-only**: it may remove the
-affected archive paths and regenerate the inventory, but it must not add or
-replace bundles. If an affected bundle path also exists on `develop`, remove it
-from `develop` first as part of the same coordinated change; otherwise the
-next union mirror will copy it back onto `published-results`. There is no
+affected primary bundle, every same-stem `.manifest.json`, `.plans.json`,
+`.tuning.json`, and `.applied.json` companion, and regenerate the inventory,
+but it must not add or replace bundles. Submission CI rejects a primary
+deletion while any of those companions remains. If an affected bundle path
+also exists on `develop`, remove it from `develop` first as part of the same
+coordinated change; otherwise the next union mirror will copy it back onto
+`published-results`. There is no
 durable archive exclusion or tombstone mechanism in this workflow. After the
 `develop` removal is in place, open the deletion-only `published-results` PR.
 PRs #1882 and #1940 are worked examples. During the A0 freeze, do not delete
@@ -106,8 +109,11 @@ gh workflow run sync-results-data-to-published.yml
 ```
 
 Review and merge the resulting `auto/results-mirror-*` PR. Hand-opened
-*maintainer* PRs against `published-results` must stay deletion-only; do not
-use them to add maintainer or seed archive content. The sync uses a union
+*maintainer archive-content* PRs against `published-results` must stay
+deletion-only; do not use them to add maintainer or seed archive content. A
+hand-opened workflow-only PR is the required exception whenever
+`.github/workflows/validate-submission.yml` changes on `develop`, because the
+mirror token cannot update workflow files. The sync uses a union
 overlay so an automated mirror never deletes public content. Its four-signal
 waiver for trusted mirror content requires all of the following: base
 `published-results`, `head.repo.fork == false`, PR author

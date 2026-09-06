@@ -133,6 +133,34 @@ policy.
 - Public artifacts and indexes are derived and rebuildable. The accepted archive and
   audit evidence are preservation floors.
 
+### 6. Provider feasibility gates and activation finality
+
+GitHub Pages provides neither conditional activation nor atomic commits with our journal.
+Therefore, controller implementation requires two independent provider feasibility gates:
+
+1. **Unique Write Correlation:** GitHub Pages must accept a unique, real write-intent commit
+   OID as `pages_build_version` independently of the workflow source commit SHA, and must
+   reliably return deployment status by that build version without aliasing across runs.
+2. **Supported Activation Barrier:** A supported guarantee (by provider documentation or written
+   confirmation) must exist specifying the status or cancellation barrier that guarantees an
+   in-flight, timed-out, or canceled request cannot activate after a later compensation write.
+
+**Stop condition:** If either guarantee cannot be established, automated controller implementation
+must halt. The system falls back to a fail-closed operator quarantine: any indeterminate request
+sets `recovery-required` and blocks automated compensation and new promotions until manual
+reconciliation occurs.
+
+### 7. Single metadata journal authority
+
+The publication state machine is recorded in a single durable, append-only Git journal on
+the existing `publication` ref (`publication/transaction-state/`).
+- State transitions use Git fast-forward commit CAS (no force-push, no merge).
+- Trusted execution code is always loaded from a reviewed `develop` commit, never from the
+  metadata ref.
+- Journal writer tokens follow least privilege (`contents: write` only; no `pull_requests`
+  or `workflows` permissions).
+- The `publication` branch must be protected against force-pushes and deletions.
+
 ## Threat boundaries
 
 The normative threat analysis is
@@ -151,6 +179,8 @@ emergency takedown abuse or delay.
   must never be described as live without a matching attested live receipt.
 - Explorer presentation remains policy-driven while archive authority stays singular.
 - Package-release gates remain at least as strong as the current release process.
+- Provider feasibility gates must pass in an isolated test repository before production
+  journal controller implementation.
 
 ## Reconciled prior decisions
 
@@ -173,3 +203,5 @@ emergency takedown abuse or delay.
 | Use one status for accepted, trusted, visible, ranked, and live | These dimensions change independently and require different authorization and rollback. |
 | Require two maintainers for every promotion or takedown | Exceeds the approved current operating model and can delay emergency response. |
 | Let policy or workflow changes auto-merge after tests | Tests cannot authorize changes to the trust boundary or credential-bearing control plane. |
+| Assume GitHub Pages status implies an activation fence | GitHub Pages status/cancellation is not a documented no-late-activation contract; experiments alone cannot prove future non-activation. |
+| Use workflow commit SHA for Pages write correlation | Repeated writes of different artifacts at the same workflow commit alias; unique write-intent commit OID is required. |

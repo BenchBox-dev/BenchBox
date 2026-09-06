@@ -5,9 +5,10 @@ import type { DetailResult } from "@/types";
 
 vi.mock("@/lib/duckdbQueries", () => ({
   getDetailResult: vi.fn(),
+  resolveShortId: vi.fn((id: string) => Promise.resolve(id)),
 }));
 
-import { getDetailResult } from "@/lib/duckdbQueries";
+import { getDetailResult, resolveShortId } from "@/lib/duckdbQueries";
 
 function makeDetail(): DetailResult {
   return {
@@ -66,14 +67,28 @@ describe("CompareWithinRun page component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (getDetailResult as any).mockResolvedValue(makeDetail());
+    vi.mocked(resolveShortId).mockImplementation((id) => Promise.resolve(id));
     window.history.replaceState(null, "", "/results/r/res-123/passes");
+  });
+
+  it("resolves a short ID and canonicalizes the passes route", async () => {
+    vi.mocked(resolveShortId).mockResolvedValue("res-123");
+    window.history.replaceState(null, "", "/results/r/1234abcd/passes?bases=default,warm_pass_1#comparison");
+
+    render(<CompareWithinRun resultId="1234abcd" />);
+    await waitFor(() => expect(screen.getByText("Compare measurements from one DuckDB run")).toBeTruthy());
+
+    expect(getDetailResult).toHaveBeenCalledWith("res-123");
+    expect(window.location.pathname).toBe("/results/r/res-123/passes");
+    expect(window.location.search).toContain("bases=");
+    expect(window.location.hash).toBe("#comparison");
   });
 
   it("renders within-run comparisons with reference badge and ratio calculations", async () => {
     render(<CompareWithinRun resultId="res-123" />);
 
     await waitFor(() => {
-      expect(screen.getByText("DuckDB — measurement bases compared")).toBeTruthy();
+      expect(screen.getByText("Compare measurements from one DuckDB run")).toBeTruthy();
     });
 
     // Check table headers and cells
@@ -183,7 +198,7 @@ describe("CompareWithinRun page component", () => {
     render(<CompareWithinRun resultId="res-123" />);
 
     await waitFor(() => expect(window.location.search).toContain("default"));
-    expect(screen.getByText("DuckDB — measurement bases compared")).toBeTruthy();
+    expect(screen.getByText("Compare measurements from one DuckDB run")).toBeTruthy();
     expect(screen.getByText("1 of 2 queries comparable")).toBeTruthy();
   });
 
@@ -192,7 +207,7 @@ describe("CompareWithinRun page component", () => {
     render(<CompareWithinRun resultId="res-123" />);
 
     await waitFor(() => {
-      expect(screen.getByText("DuckDB — measurement bases compared")).toBeTruthy();
+      expect(screen.getByText("Compare measurements from one DuckDB run")).toBeTruthy();
     });
 
     const radioWarmPass1 = screen.getByTestId("reference-radio-warm_pass_1");
@@ -206,7 +221,7 @@ describe("CompareWithinRun page component", () => {
     render(<CompareWithinRun resultId="res-123" />);
 
     await waitFor(() => {
-      expect(screen.getByText("DuckDB — measurement bases compared")).toBeTruthy();
+      expect(screen.getByText("Compare measurements from one DuckDB run")).toBeTruthy();
     });
 
     const removeButtons = screen.getAllByRole("button", { name: /^Remove / });
@@ -224,7 +239,7 @@ describe("CompareWithinRun page component", () => {
     render(<CompareWithinRun resultId="res-123" />);
 
     await waitFor(() => {
-      expect(screen.getByText("DuckDB — measurement bases compared")).toBeTruthy();
+      expect(screen.getByText("Compare measurements from one DuckDB run")).toBeTruthy();
     });
 
     const addButton = screen.getByRole("button", { name: "+ Add basis" });
@@ -275,7 +290,7 @@ describe("CompareWithinRun page component", () => {
     render(<CompareWithinRun resultId="res-123" />);
 
     await waitFor(() => {
-      expect(screen.getByText("DuckDB — measurement bases compared")).toBeTruthy();
+      expect(screen.getByText("Compare measurements from one DuckDB run")).toBeTruthy();
     });
     const displayedTieRatios = screen.getAllByText(/^1\.00x \(/);
     expect(displayedTieRatios.length).toBeGreaterThan(0);
