@@ -251,8 +251,28 @@ jobs:
             echo "::error::candidate run head SHA $CANDIDATE_HEAD_SHA does not match approved commit ${{ needs.prepare.outputs.develop_sha }}"
             exit 1
           fi
+          CANDIDATE_WORKFLOW=$(gh run view "$CANDIDATE_RUN_ID" --json workflowName --jq .workflowName)
+          CANDIDATE_BRANCH=$(gh run view "$CANDIDATE_RUN_ID" --json headBranch --jq .headBranch)
+          case "$CANDIDATE_WORKFLOW" in
+            "Publication Control Plane Deployment"|"Publication Preview Deploy (G2)") ;;
+            *) echo "::error::candidate run uses unexpected workflow: $CANDIDATE_WORKFLOW"; exit 1 ;;
+          esac
+          test "$CANDIDATE_BRANCH" = "develop" || {
+            echo "::error::candidate run head branch is not develop: $CANDIDATE_BRANCH"; exit 1;
+          }
           mkdir -p site
           gh run download "$CANDIDATE_RUN_ID" --name "publication-site-${{ needs.prepare.outputs.generation }}" --dir site
+          rm -rf candidate-receipts && mkdir -p candidate-receipts
+          gh run download "$CANDIDATE_RUN_ID" \
+            --name "publication-candidate-receipts-${{ needs.prepare.outputs.generation }}-${CANDIDATE_RUN_ID}" \
+            --dir candidate-receipts
+          test -s candidate-receipts/desired-manifest.json || {
+            echo "::error::candidate run did not provide its signed desired manifest"; exit 1;
+          }
+          test "$(jq -r .manifest_digest candidate-receipts/desired-manifest.json)" = \
+            "${{ needs.prepare.outputs.candidate_manifest_digest }}" || {
+            echo "::error::candidate manifest digest does not match the approved permit"; exit 1;
+          }
           test -s site/index.html || { echo "::error::candidate site is incomplete"; exit 1; }
           uv run python - <<'PY'
           import os
@@ -289,7 +309,7 @@ jobs:
         with:
           script: |
             const { createDeployment, getDeploymentStatus } = require('./scripts/publication/pages.cjs');
-            const deployedArtifactId = ${{ needs.prepare.outputs.kind == 'rollback' && needs.prepare.outputs.artifact_id || steps.upload_pages.outputs.artifact_id }};
+            const deployedArtifactId = ${{ needs.prepare.outputs.kind == 'rollback' && needs.prepare.outputs.artifact_id || steps.upload_pages.outputs.artifact-id }};
             const result = await createDeployment({
               github,
               core,
@@ -302,7 +322,8 @@ jobs:
               }
             });
             const deploymentId = result.id || 'pages-deploy-${{ github.run_id }}';
-            let status = 'SUCCESS';
+            let status = 'PENDING';
+            let terminal = false;
             let statusUrl = result.status_url || '';
             let pageUrl = result.page_url || 'https://benchbox.dev';
             if (result.id) {
@@ -315,10 +336,12 @@ jobs:
                   });
                   if (s.status === 'SUCCESS' || s.status === 'ACTIVE') {
                     status = 'SUCCESS';
+                    terminal = true;
                     if (s.page_url) pageUrl = s.page_url;
                     break;
                   } else if (s.status === 'FAILED' || s.status === 'FAILURE') {
                     status = 'FAILED';
+                    terminal = true;
                     break;
                   }
                 } catch (e) {
@@ -326,6 +349,10 @@ jobs:
                 }
                 await new Promise(r => setTimeout(r, 5000));
               }
+            }
+            if (!terminal) {
+              status = 'FAILED';
+              throw new Error(`Pages deployment did not reach a terminal successful state for ${deploymentId}`);
             }
             core.setOutput('deployment_id', deploymentId);
             core.setOutput('status_url', statusUrl);
@@ -404,10 +431,11 @@ jobs:
           set -euo pipefail
           mkdir -p transaction-artifacts
           TARGET_URL="${{ needs.deploy.outputs.page_url }}"
-          CANDIDATE_DIGEST="${{ needs.prepare.outputs.candidate_manifest_digest }}"
+          CANDIDATE_MANIFEST="candidate-receipts/desired-manifest.json"
           uv run python scripts/publication/verify_live.py \
             --base-url "$TARGET_URL" \
-            ${CANDIDATE_DIGEST:+--candidate-digest "$CANDIDATE_DIGEST"} \
+            --candidate-manifest "$CANDIDATE_MANIFEST" \
+            --require-receipt \
             --observation-origin github-actions:publication-transaction \
             --timeout 60 --json > transaction-artifacts/probe-report.json
           uv run python - <<'PY'
