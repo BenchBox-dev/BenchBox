@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from scripts.publication import transaction as transaction_module
 from scripts.publication.transaction import (
     KIND_LEGACY_RECOVERY,
     KIND_PROMOTION,
@@ -34,6 +35,7 @@ from scripts.publication.transaction import (
     VALID_KINDS,
     VALID_STATES,
     Transaction,
+    TransactionError,
     canonical_json,
 )
 
@@ -166,7 +168,26 @@ def read_transaction(repo_path: Path, tx_id: str, ref: str = DEFAULT_REF) -> Tra
             raise CorruptJournalError(f"Invalid state {data['state']!r} for transaction kind {kind!r}")
         if kind == KIND_ROLLBACK and not isinstance(data.get("restore_source"), dict):
             raise CorruptJournalError("Rollback transaction requires restore_source data")
-        return Transaction(**data)
+        loaded = Transaction(**data)
+        if loaded.state in {
+            STATE_EXTERNALLY_VERIFIED,
+            STATE_ROLLBACK_VERIFIED,
+            STATE_DURABLE,
+            STATE_ROLLBACK_DURABLE,
+        }:
+            if not isinstance(loaded.attestation, dict):
+                raise CorruptJournalError("Verified transaction must retain a live-receipt attestation")
+            try:
+                transaction_module.validate_live_receipt(
+                    loaded,
+                    {
+                        "attestation": loaded.attestation,
+                        "observation_digest": loaded.attestation.get("observation_digest"),
+                    },
+                )
+            except TransactionError as error:
+                raise CorruptJournalError(f"Verified transaction attestation is invalid: {error}") from error
+        return loaded
     except Exception as e:
         raise JournalError(f"Failed to read transaction '{tx_id}' at {tx_path}: {e}") from e
 
@@ -184,6 +205,10 @@ def write_journal_update(
         index_file = tmp_idx.name
 
     env = dict(os.environ, GIT_INDEX_FILE=index_file)
+    env.setdefault("GIT_AUTHOR_NAME", "BenchBox Publication Controller")
+    env.setdefault("GIT_AUTHOR_EMAIL", "publication-controller@benchbox.dev")
+    env.setdefault("GIT_COMMITTER_NAME", "BenchBox Publication Controller")
+    env.setdefault("GIT_COMMITTER_EMAIL", "publication-controller@benchbox.dev")
     try:
         # 1. Initialize temporary index from parent commit tree
         _run_git(["read-tree", expected_parent_oid], cwd=repo_path, env=env)
@@ -240,6 +265,7 @@ def write_journal_update(
         commit_oid = _run_git(
             ["commit-tree", tree_oid, "-p", expected_parent_oid, "-m", msg],
             cwd=repo_path,
+            env=env,
         )
 
         # 6. Atomically reserve the shared ref on the remote authority.
@@ -304,6 +330,16 @@ def init_genesis_journal(
         raise CorruptJournalError("Genesis transaction target does not match journal target")
     if not isinstance(genesis_transaction.attestation, dict):
         raise CorruptJournalError("Genesis transaction must retain a valid live-receipt attestation")
+    try:
+        transaction_module.validate_live_receipt(
+            genesis_transaction,
+            {
+                "attestation": genesis_transaction.attestation,
+                "observation_digest": genesis_transaction.attestation.get("observation_digest"),
+            },
+        )
+    except TransactionError as error:
+        raise CorruptJournalError(f"Genesis transaction attestation is invalid: {error}") from error
     init_state = JournalState(
         target=target,
         next_generation=genesis_transaction.generation + 1,
