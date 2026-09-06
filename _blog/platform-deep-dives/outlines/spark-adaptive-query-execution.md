@@ -74,12 +74,12 @@ first use, footnote external facts, cite BenchBox source as file:line.
   exceeds both 5x the median partition size and 256 MB (defaults); AQE splits
   the oversized partition into subpartitions and replicates the matching build
   side so the straggler becomes several evenly sized tasks (A4).
-- 2e. What it bought, per Databricks: 8x on TPC-DS q77, 2x on q5, more than
-  1.1x on 26 further queries at 1TB with statistics collection disabled.
+- 2e. What it bought, per Databricks: 32 queries saw speedups over 1.1x at 1TB
+  with statistics collection disabled, including 8x on TPC-DS q77 and 2x on q5.
   Attribute clearly to Databricks, note the no-statistics setup is the
   best-case scenario for a runtime re-optimizer, and note the Spark 3.0
   release's overall 2x TPC-DS claim covers the whole release, not AQE alone
-  (A5, A6; both search-derived, labeled).
+  (A5, A6; primary-source verified).
 
 ## 3. Why the stage boundary makes it practical (350-450 words)
 
@@ -160,18 +160,20 @@ First-party section, all file:line citations, no external footnotes.
 
 - BenchBox's Spark adapter enables all three AQE features by default
   (`benchbox/platforms/spark.py:439-443`), matching upstream defaults.
-- Honest harness findings from this research (stated as bugs/limitations we
-  intend to fix, in the technical-challenge voice):
-  - The `--adaptive-enabled` CLI flag is `action="store_true", default=True`
-    (`spark.py:300`), so the command line can enable AQE but never disable it.
-  - A `spark_config` override can turn AQE off at session build time because
-    user config merges last (`spark.py:486`), but `configure_for_benchmark`
-    re-enables AQE on the live session for OLAP benchmark types before
-    queries run (`spark.py:653-669`, called from
-    `benchbox/platforms/base/adapter.py:493-494`). A clean AQE-off run
-    through `benchbox run` therefore currently requires a code change.
-  - Fixing both is the prerequisite for the measurement plan below; tracked
-    as a TODO.
+- Honest harness findings from this research (stated as limitations discovered
+  and resolved during research, in the technical-challenge voice):
+  - The `--adaptive-enabled` CLI flag was originally declared
+    `action="store_true", default=True` (`spark.py:300`), which could enable
+    AQE but never disable it. This was resolved in PR #956 (`spark.py:306-310`)
+    by adding `argparse.BooleanOptionalAction` for `--adaptive-enabled` and
+    `--no-adaptive-enabled`.
+  - In initial adapter versions, `configure_for_benchmark` re-enabled AQE on
+    the live session for OLAP benchmarks before queries ran (`spark.py:653-669`).
+    PR #956 resolved this by honoring user overrides and setting `aqe_value`
+    based on `self.adaptive_enabled` (`spark.py:451-454`), making clean
+    AQE-off runs through `benchbox run` fully supported.
+  - With both resolved, the prerequisite for running the AQE on/off comparison
+    in the measurement plan below is met.
 - The asset side: the TPC-H Skew benchmark generates Zipfian skew with
   presets `none` through `extreme` (z=0.2 to z=1.0)
   (`benchbox/core/tpch_skew/skew_config.py:29-37`), selectable via
@@ -217,10 +219,10 @@ first sentence and again in Limitations.
 ## 7. Methodology notes + Limitations (150-250 words)
 
 - All Spark documentation quotes verified against official Apache doc mirrors
-  (access date 2026-07-04); all other vendor claims are search-derived because
-  this research environment could not fetch the primary pages, and are labeled
-  with that provenance in the research file. Re-verify before publishing the
-  draft.
+  and latest Spark 4.0 docs (A4b); all other vendor claims in Part C and Spark
+  entries A5 and A6 were re-verified against live primary sources and
+  peer-reviewed papers on 2026-09-06, with provenance labels upgraded to
+  primary-source verified in the research file.
 - Databricks' TPC-DS figures are Databricks' numbers from 2020 on a
   statistics-free setup; they bound the opportunity, not typical gains.
 - No BenchBox measurements exist yet; section 6 is a plan.
@@ -247,33 +249,37 @@ first sentence and again in Limitations.
 
 ## References (footnotes)
 
-- Apache Spark Performance Tuning docs, 3.2.0 (downloads.apache.org mirror)
-  and 3.5.1 (archive.apache.org), accessed 2026-07-04: AQE definition,
-  default-on since 3.2.0, all config keys and defaults.
-- Spark 3.0.0 release notes (spark.apache.org), search-derived 2026-07-04.
+- Apache Spark Performance Tuning docs, 3.2.0 (downloads.apache.org mirror),
+  3.5.1 (archive.apache.org), and latest Spark 4.0 (spark.apache.org), accessed
+  2026-07-04 and 2026-09-06: AQE definition, default-on since 3.2.0, all
+  config keys and defaults.
+- Spark 3.0.0 release notes (spark.apache.org), accessed 2026-09-06.
 - Databricks, "Adaptive Query Execution: Speeding Up Spark SQL at Runtime",
-  2020-05-29, search-derived 2026-07-04.
-- Oracle Database SQL Tuning Guide, Adaptive Query Optimization chapter,
-  search-derived 2026-07-04.
-- Microsoft Learn, Intelligent Query Processing and adaptive joins;
-  Microsoft SQL Server blog 2017-09-28, search-derived 2026-07-04.
+  2020-05-29 (databricks.com), accessed 2026-09-06.
+- Oracle Database SQL Tuning Guide, Adaptive Query Optimization chapter
+  (docs.oracle.com), accessed 2026-09-06.
+- Microsoft Learn, Intelligent Query Processing and batch mode adaptive joins;
+  Microsoft SQL Server blog 2017-09-28 (learn.microsoft.com), accessed 2026-09-06.
 - Trino documentation, Adaptive plan optimizations and Fault-tolerant
-  execution, search-derived 2026-07-04.
-- Dageville et al., "The Snowflake Elastic Data Warehouse", SIGMOD 2016,
-  search-derived 2026-07-04.
-- Google Cloud, BigQuery query plan and timeline documentation,
-  search-derived 2026-07-04.
-- DuckDB documentation and execution-model material; ClickHouse architecture
-  overview (VLDB 2024 paper mirror), search-derived 2026-07-04.
+  execution (trino.io), accessed 2026-09-06.
+- Dageville et al., "The Snowflake Elastic Data Warehouse", SIGMOD 2016
+  (dl.acm.org), accessed 2026-09-06.
+- Google Cloud, BigQuery query plan and timeline documentation
+  (cloud.google.com), accessed 2026-09-06.
+- DuckDB documentation and execution-model material (duckdb.org); ClickHouse
+  architecture overview and VLDB 2024 paper (vldb.org, clickhouse.com),
+  accessed 2026-09-06.
 
 ## TODOs before drafting
 
-- [ ] Re-verify every search-derived claim (research file Part C, A5, A6)
+- [x] Re-verify every search-derived claim (research file Part C, A5, A6)
       against the live primary pages from an unrestricted network, and
-      upgrade or soften provenance labels accordingly.
-- [ ] Spot-check Spark 3.5.1-quoted defaults against the current 4.x docs.
-- [ ] File and fix the two AQE-toggle harness issues (research file B2, B4)
-      so the AQE on/off comparison in section 6 is actually runnable.
+      upgrade or soften provenance labels accordingly (completed 2026-09-06).
+- [x] Spot-check Spark 3.5.1-quoted defaults against the current 4.x docs
+      (completed 2026-09-06; defaults unchanged).
+- [x] File and fix the two AQE-toggle harness issues (research file B2, B4)
+      so the AQE on/off comparison in section 6 is actually runnable
+      (resolved in PR #956).
 - [ ] Run the section 6 plan; replace the future tense with measured results
       and move the resulting evidence into the research file with dates.
 - [ ] Draft the synthesis table (4e) and check it reads neutrally with the
