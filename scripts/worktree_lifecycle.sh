@@ -9,7 +9,7 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 operation=${1:-}
 
 usage() {
-  echo "Usage: $0 create|remove" >&2
+  echo "Usage: $0 create|remove|release" >&2
   exit 1
 }
 
@@ -166,9 +166,34 @@ create_worktree() {
   [ ! -e "$worktree_path" ] && [ ! -L "$worktree_path" ] || die "Worktree path already exists: $worktree_path"
 
   git fetch origin develop --quiet
+  base_oid=$(git rev-parse origin/develop^{commit}) || die "Could not resolve fetched origin/develop"
   creation_started=yes
   git worktree add -b "$branch" "$worktree_path" origin/develop
   "$script_dir/set_worktree_identity.sh" "$worktree_path"
+
+  py_runner="python3"
+  if command -v uv >/dev/null 2>&1; then
+    py_runner="uv run --no-project -- python"
+  fi
+
+  set -- "$script_dir/worktree_lifecycle_metadata.py" init \
+    --worktree-path "$worktree_path" \
+    --branch "$branch" \
+    --base-ref "origin/develop" \
+    --base-oid "$base_oid"
+  if [ -n "${CONTROLLER_KIND:-}" ]; then
+    set -- "$@" --controller-kind "$CONTROLLER_KIND"
+  fi
+  if [ -n "${CONTROLLER_ID:-}" ]; then
+    set -- "$@" --controller-id "$CONTROLLER_ID"
+  fi
+
+  if command -v uv >/dev/null 2>&1; then
+    uv run --no-project -- python "$@"
+  else
+    python3 "$@"
+  fi
+
   creation_started=no
   release_creation_lock
   trap - EXIT HUP INT TERM
@@ -227,8 +252,24 @@ remove_worktree() {
   echo "Removed worktree: $target"
 }
 
+release_worktree() {
+  worktree_input=${WORKTREE_PATH:-}
+  [ -n "$worktree_input" ] || die "Usage: make worktree-release WORKTREE_PATH=<path>"
+
+  target=$(canonical_path "$worktree_input")
+  [ -d "$target" ] || die "Refusing: worktree directory does not exist: $target"
+
+  py_runner="python3"
+  if command -v uv >/dev/null 2>&1; then
+    py_runner="uv run --no-project -- python"
+  fi
+
+  $py_runner "$script_dir/worktree_lifecycle_metadata.py" release --worktree-path "$target"
+}
+
 case "$operation" in
   create) create_worktree ;;
   remove) remove_worktree ;;
+  release) release_worktree ;;
   *) usage ;;
 esac
