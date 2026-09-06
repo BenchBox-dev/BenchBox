@@ -307,6 +307,14 @@ jobs:
           name: publication-pages-${{ needs.prepare.outputs.generation }}
           path: site
 
+      - name: Retain candidate receipts for verification and audit
+        if: needs.prepare.outputs.kind == 'promotion'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: publication-candidate-receipts-${{ needs.prepare.outputs.transaction_id }}
+          path: candidate-receipts/
+          retention-days: 90
+
       - name: Record write intent in journal CAS
         id: start_write
         shell: bash
@@ -439,19 +447,67 @@ jobs:
         run: |
           git fetch origin refs/heads/publication:refs/heads/publication || true
 
+      - name: Download candidate receipts
+        if: needs.prepare.outputs.kind == 'promotion'
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          name: publication-candidate-receipts-${{ needs.prepare.outputs.transaction_id }}
+          path: candidate-receipts
+
+      - name: Materialize verification manifest
+        shell: bash
+        env:
+          TRANSACTION_ID: ${{ needs.prepare.outputs.transaction_id }}
+          KIND: ${{ needs.prepare.outputs.kind }}
+        run: |
+          set -euo pipefail
+          mkdir -p transaction-artifacts
+          if [ "$KIND" = "promotion" ]; then
+            test -s candidate-receipts/desired-manifest.json || {
+              echo "::error::candidate desired manifest missing in verify job"; exit 1;
+            }
+            cp candidate-receipts/desired-manifest.json transaction-artifacts/verification-manifest.json
+          elif [ "$KIND" = "rollback" ]; then
+            uv run python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from scripts.publication import journal
+          tx = journal.read_transaction(Path('.'), os.environ['TRANSACTION_ID'], ref='publication')
+          parent_id = (tx.restore_source or {}).get('parent_transaction_id')
+          if not parent_id:
+              raise SystemExit('rollback transaction missing restore_source parent_transaction_id')
+          parent_tx = journal.read_transaction(Path('.'), parent_id, ref='publication')
+          if not parent_tx.attestation or not parent_tx.attestation.get('routes'):
+              raise SystemExit(f'parent transaction {parent_id} lacks live attestation routes for rollback verification')
+          manifest = {
+              'manifest_digest': tx.content.get('manifest_digest'),
+              'checksums': {
+                  r['path']: r['sha256']
+                  for r in parent_tx.attestation['routes']
+                  if r.get('sha256') and r.get('ok')
+              }
+          }
+          with open('transaction-artifacts/verification-manifest.json', 'w') as f:
+              json.dump(manifest, f, indent=2)
+          PY
+          else
+            echo "::error::unrecognized transaction kind: $KIND"
+            exit 1
+          fi
+
       - name: Probe required live routes
         id: probe
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p transaction-artifacts
           TARGET_URL="${{ needs.deploy.outputs.page_url }}"
-          VERIFY_ARGS=(--base-url "$TARGET_URL" --observation-origin github-actions:publication-transaction --timeout 60 --json)
-          if [ "${{ needs.prepare.outputs.kind }}" = "promotion" ]; then
-            VERIFY_ARGS+=(--candidate-manifest candidate-receipts/desired-manifest.json --require-receipt)
-          fi
-          uv run python scripts/publication/verify_live.py "${VERIFY_ARGS[@]}" \
-            > transaction-artifacts/probe-report.json
+          uv run python scripts/publication/verify_live.py \
+            --base-url "$TARGET_URL" \
+            --manifest transaction-artifacts/verification-manifest.json \
+            --observation-origin github-actions:publication-transaction \
+            --require-receipt \
+            --timeout 60 \
+            --json > transaction-artifacts/probe-report.json
           uv run python - <<'PY'
           import json
           report = json.load(open('transaction-artifacts/probe-report.json'))
