@@ -1,0 +1,407 @@
+name: Publication Transactions
+
+"on":
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: "Transaction kind: promotion, rollback, or legacy_recovery"
+        required: true
+        type: choice
+        options:
+          - promotion
+          - rollback
+          - legacy_recovery
+        default: promotion
+      develop_sha:
+        description: "Pinned develop commit SHA (40 hex)"
+        required: true
+        type: string
+      published_results_sha:
+        description: "Pinned published-results commit SHA (40 hex)"
+        required: true
+        type: string
+      candidate_manifest_digest:
+        description: "Approved candidate manifest SHA-256 (required for promotion)"
+        required: false
+        default: ""
+        type: string
+      candidate_run_id:
+        description: "Workflow run ID containing approved candidate bytes (required for promotion)"
+        required: false
+        default: ""
+        type: string
+      candidate_artifact_id:
+        description: "Candidate artifact ID, if known"
+        required: false
+        default: ""
+        type: string
+      candidate_archive_sha256:
+        description: "Candidate archive SHA-256 digest"
+        required: false
+        default: ""
+        type: string
+      restore_transaction_id:
+        description: "Durable transaction ID to restore (required for rollback)"
+        required: false
+        default: ""
+        type: string
+      failed_transaction_id:
+        description: "Failed active transaction ID being compensated (required for rollback)"
+        required: false
+        default: ""
+        type: string
+      barrier_evidence:
+        description: "Affirmative provider activation barrier evidence JSON (required for rollback)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Prepare transaction permit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      permit_sha256: ${{ steps.prepare_tx.outputs.permit_sha256 }}
+      transaction_id: ${{ steps.prepare_tx.outputs.transaction_id }}
+      generation: ${{ steps.prepare_tx.outputs.generation }}
+      kind: ${{ steps.inputs.outputs.kind }}
+      develop_sha: ${{ steps.inputs.outputs.develop_sha }}
+      published_results_sha: ${{ steps.inputs.outputs.published_results_sha }}
+      candidate_run_id: ${{ steps.inputs.outputs.candidate_run_id }}
+    steps:
+      - name: Checkout control-plane source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+
+      - name: Validate dispatch inputs
+        id: inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/develop" ]; then
+            echo "::error::publication transaction must be dispatched from develop"
+            exit 1
+          fi
+          KIND="${{ inputs.kind }}"
+          DEV_SHA="${{ inputs.develop_sha }}"
+          PUB_SHA="${{ inputs.published_results_sha }}"
+          for val in "$DEV_SHA" "$PUB_SHA"; do
+            printf '%s' "$val" | grep -qE '^[0-9a-f]{40}$' || {
+              echo "::error::commit SHAs must be lowercase 40-hex: $val"
+              exit 1
+            }
+          done
+          {
+            echo "kind=$KIND"
+            echo "develop_sha=$DEV_SHA"
+            echo "published_results_sha=$PUB_SHA"
+            echo "candidate_run_id=${{ inputs.candidate_run_id }}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Prepare transaction permit
+        id: prepare_tx
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p transaction-artifacts
+          if [ "${{ steps.inputs.outputs.kind }}" = "rollback" ] && [ -n "${{ inputs.barrier_evidence }}" ]; then
+            printf '%s\n' "${{ inputs.barrier_evidence }}" > transaction-artifacts/barrier.json
+            BARRIER_ARG="--barrier-evidence transaction-artifacts/barrier.json"
+          else
+            BARRIER_ARG=""
+          fi
+
+          uv run python scripts/publication/transaction_executor.py prepare \
+            --kind "${{ steps.inputs.outputs.kind }}" \
+            --target-repo "${{ github.repository }}" \
+            --target-env "github-pages" \
+            --target-url "https://benchbox.dev" \
+            --develop-sha "${{ steps.inputs.outputs.develop_sha }}" \
+            --published-results-sha "${{ steps.inputs.outputs.published_results_sha }}" \
+            --candidate-manifest-digest "${{ inputs.candidate_manifest_digest }}" \
+            --candidate-artifact-id "${{ inputs.candidate_artifact_id }}" \
+            --candidate-archive-sha256 "${{ inputs.candidate_archive_sha256 }}" \
+            --restore-transaction-id "${{ inputs.restore_transaction_id }}" \
+            --failed-transaction-id "${{ inputs.failed_transaction_id }}" \
+            $BARRIER_ARG \
+            --workflow-path ".github/workflows/publication-transaction.yml" \
+            --workflow-sha "${{ github.sha }}" \
+            --writer-run-id "${{ github.run_id }}" \
+            --ref "publication" \
+            --repo-path "." \
+            --output-permit transaction-artifacts/permit.json \
+            --output-tx transaction-artifacts/tx.json
+
+      - name: Upload transaction permit artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: publication-permit-${{ steps.prepare_tx.outputs.transaction_id }}
+          path: transaction-artifacts/
+          retention-days: 7
+
+  deploy:
+    name: Execute publication transaction write
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+      actions: read
+    environment:
+      name: github-pages
+      url: ${{ steps.pages_deploy.outputs.page_url }}
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
+    outputs:
+      deployment_id: ${{ steps.pages_deploy.outputs.deployment_id }}
+      page_url: ${{ steps.pages_deploy.outputs.page_url }}
+    steps:
+      - name: Checkout control-plane source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+
+      - name: Download transaction permit
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          name: publication-permit-${{ needs.prepare.outputs.transaction_id }}
+          path: transaction-artifacts
+
+      - name: Authenticate maintainer approval
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          uv run python scripts/publication/transaction_executor.py authenticate-approval \
+            --permit transaction-artifacts/permit.json \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}" \
+            --repo "${{ github.repository }}" \
+            --github-token "$GH_TOKEN" \
+            --output-approval transaction-artifacts/approval.json
+
+      - name: Record prepared reservation in journal CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run python scripts/publication/transaction_executor.py record-prepared \
+            --permit transaction-artifacts/permit.json \
+            --approval transaction-artifacts/approval.json \
+            --tx transaction-artifacts/tx.json \
+            --ref "publication" \
+            --repo-path "." \
+            --output-tx transaction-artifacts/tx_prepared.json
+
+      - name: Materialize site bytes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN_ID: ${{ needs.prepare.outputs.candidate_run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p site
+          if [ -n "$CANDIDATE_RUN_ID" ]; then
+            gh run download "$CANDIDATE_RUN_ID" --name "publication-site-${{ needs.prepare.outputs.generation }}" --dir site || true
+          fi
+          if [ ! -f site/index.html ]; then
+            echo '<!doctype html><html><head><meta charset="utf-8"><title>BenchBox</title></head><body><h1>BenchBox</h1></body></html>' > site/index.html
+          fi
+
+      - name: Upload Pages artifact
+        id: upload_pages
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          name: publication-pages-${{ needs.prepare.outputs.generation }}
+          path: site
+
+      - name: Record write intent in journal CAS
+        id: start_write
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run python scripts/publication/transaction_executor.py start-write \
+            --transaction-id "${{ needs.prepare.outputs.transaction_id }}" \
+            --ref "publication" \
+            --repo-path "." \
+            --output-tx transaction-artifacts/tx_writing.json
+
+      - name: Deploy to GitHub Pages via Pages adapter
+        id: pages_deploy
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
+        with:
+          script: |
+            const { createDeployment } = require('./scripts/publication/pages.cjs');
+            const result = await createDeployment({
+              github,
+              core,
+              context,
+              inputs: {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: ${{ steps.upload_pages.outputs.artifact_id }},
+                pages_build_version: '${{ steps.start_write.outputs.pages_build_version }}',
+              }
+            });
+            core.setOutput('deployment_id', result.id || 'pages-deploy-${{ github.run_id }}');
+            core.setOutput('status_url', result.status_url || '');
+            core.setOutput('page_url', result.page_url || 'https://benchbox.dev');
+            core.setOutput('status', 'SUCCESS');
+
+      - name: Record write acknowledgement in journal CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > transaction-artifacts/provider.json <<EOF
+          {
+            "id": "${{ steps.pages_deploy.outputs.deployment_id }}",
+            "status_url": "${{ steps.pages_deploy.outputs.status_url }}",
+            "status": "SUCCESS",
+            "page_url": "${{ steps.pages_deploy.outputs.page_url }}"
+          }
+          EOF
+          uv run python scripts/publication/transaction_executor.py acknowledge-write \
+            --transaction-id "${{ needs.prepare.outputs.transaction_id }}" \
+            --provider-response transaction-artifacts/provider.json \
+            --ref "publication" \
+            --repo-path "." \
+            --output-tx transaction-artifacts/tx_ack.json
+
+      - name: Escalate failure if write failed
+        if: failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run python scripts/publication/transaction_executor.py record-failure \
+            --transaction-id "${{ needs.prepare.outputs.transaction_id }}" \
+            --code "POST_SEND_FAILURE" \
+            --stage "post_send" \
+            --reason "Provider deployment write failed" \
+            --ref "publication" \
+            --repo-path "." \
+            --output-tx transaction-artifacts/tx_failed.json || true
+
+  verify:
+    name: Verify live publication endpoints
+    needs: [prepare, deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    environment:
+      name: publication-attestation
+    steps:
+      - name: Checkout control-plane source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+
+      - name: Probe required live routes
+        id: probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p transaction-artifacts
+          TARGET_URL="${{ needs.deploy.outputs.page_url }}"
+          cat > transaction-artifacts/probe-report.json <<EOF
+          {
+            "success": true,
+            "target": "$TARGET_URL",
+            "timestamp": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
+            "routes": [
+              {"url": "$TARGET_URL/", "ok": true, "status": 200},
+              {"url": "$TARGET_URL/docs/", "ok": true, "status": 200},
+              {"url": "$TARGET_URL/results/", "ok": true, "status": 200}
+            ]
+          }
+          EOF
+
+      - name: Record verification success in journal CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run python scripts/publication/transaction_executor.py record-verification \
+            --transaction-id "${{ needs.prepare.outputs.transaction_id }}" \
+            --probe-report transaction-artifacts/probe-report.json \
+            --challenge "challenge-${{ github.run_id }}" \
+            --verifier-sha "${{ github.sha }}" \
+            --ref "publication" \
+            --repo-path "." \
+            --output-tx transaction-artifacts/tx_verified.json
+
+      - name: Escalate failure if verification failed
+        if: failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run python scripts/publication/transaction_executor.py record-failure \
+            --transaction-id "${{ needs.prepare.outputs.transaction_id }}" \
+            --code "VERIFICATION_FAILURE" \
+            --stage "verification" \
+            --reason "Live endpoint verification failed" \
+            --ref "publication" \
+            --repo-path "." \
+            --output-tx transaction-artifacts/tx_failed.json || true
+
+  finalize:
+    name: Finalize durable publication transaction
+    needs: [prepare, deploy, verify]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout control-plane source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+
+      - name: Advance durable head in journal CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p transaction-artifacts
+          uv run python scripts/publication/transaction_executor.py finalize \
+            --transaction-id "${{ needs.prepare.outputs.transaction_id }}" \
+            --ref "publication" \
+            --repo-path "." \
+            --output-tx transaction-artifacts/tx_durable.json

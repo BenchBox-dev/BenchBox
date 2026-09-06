@@ -251,7 +251,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Check for independent publication ownership
         id: independent
@@ -269,7 +269,7 @@ jobs:
             RUN_META=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID" \
               --jq '[.name, .status, .conclusion, .event, .head_branch] | @tsv')
             IFS=$'\t' read -r RUN_NAME RUN_STATUS RUN_CONCLUSION RUN_EVENT RUN_BRANCH <<< "$RUN_META"
-            if [[ "$RUN_NAME" != "Publication Control Plane Deployment" || "$RUN_STATUS" != "completed" || \
+            if [[ ( "$RUN_NAME" != "Publication Control Plane Deployment" && "$RUN_NAME" != "Publication Transactions" ) || "$RUN_STATUS" != "completed" || \
                   "$RUN_EVENT" != "workflow_dispatch" || "$RUN_BRANCH" != "develop" ]]; then
               continue
             fi
@@ -313,7 +313,7 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         if: steps.independent.outputs.active != 'true'
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
 
   # Validate example files and documentation references
   # Blocking: failures should fail the workflow

@@ -167,6 +167,45 @@ def test_repo_publication_deploy_passes_audit() -> None:
     assert errors == [], f"Errors found in real publication-deploy.yml: {errors}"
 
 
+def test_publication_transaction_permissions_valid_structure(tmp_path: Path) -> None:
+    wf = tmp_path / "publication-transaction.yml"
+    data = {
+        "name": "Publication Transactions",
+        "permissions": {"contents": "read"},
+        "jobs": {
+            "prepare": {
+                "permissions": {"contents": "read", "actions": "read"},
+                "runs-on": "ubuntu-latest",
+                "steps": [],
+            },
+            "deploy": {
+                "permissions": {"actions": "read", "contents": "write", "pages": "write", "id-token": "write"},
+                "runs-on": "ubuntu-latest",
+                "steps": [],
+            },
+            "verify": {
+                "permissions": {"contents": "write"},
+                "runs-on": "ubuntu-latest",
+                "steps": [],
+            },
+            "finalize": {
+                "permissions": {"contents": "write"},
+                "runs-on": "ubuntu-latest",
+                "steps": [],
+            },
+        },
+    }
+    errors = checker.check_publication_transaction_permissions(wf, data)
+    assert errors == []
+
+
+def test_repo_publication_transaction_passes_audit() -> None:
+    real_wf = Path(__file__).parents[4] / ".github" / "workflows" / "publication-transaction.yml"
+    assert real_wf.is_file()
+    errors = checker.audit_workflow_file(real_wf, strict=True)
+    assert errors == [], f"Errors found in real publication-transaction.yml: {errors}"
+
+
 def test_main_all_workflows_pass() -> None:
     rc = checker.main([])
     assert rc == 0
