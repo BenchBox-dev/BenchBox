@@ -723,6 +723,7 @@ describe("Compare", () => {
     expect(screen.getAllByText(/Compared with lowest selected score/i).length).toBeGreaterThan(0);
     // The computed ratio: 10.00x
     expect(screen.getAllByText("10.00x").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/2026-04-01.*days ago/).length).toBeGreaterThan(0);
   });
 
   it("labels the lowest selected score instead of calling a run tied with itself", async () => {

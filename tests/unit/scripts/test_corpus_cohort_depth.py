@@ -21,6 +21,7 @@ workflow job.
 
 from __future__ import annotations
 
+import datetime as dt
 import importlib.util
 import json
 from pathlib import Path
@@ -53,6 +54,7 @@ def _write_bundle(
     platform: str,
     platform_version: str | None = None,
     execution_version: str | None = None,
+    run_timestamp: str = "2026-08-01T12:00:00",
 ) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     platform_payload = {"name": platform}
@@ -61,6 +63,7 @@ def _write_bundle(
     payload = {
         "benchmark": {"id": benchmark, "scale_factor": scale},
         "platform": platform_payload,
+        "run": {"timestamp": run_timestamp},
     }
     if execution_version is not None:
         payload["execution"] = {"driver_version_resolved": execution_version}
@@ -224,3 +227,186 @@ def test_the_entry_point_returns_the_right_exit_code(
         _write_bundle(tmp_path, f"{platform}.json", benchmark="tpcds", scale=10.0, platform=platform)
 
     assert validator.main(tmp_path) == expected_exit
+
+
+def test_recency_report_uses_bundle_timestamps(tmp_path: Path) -> None:
+    """Per-cohort and overall ages come from run.timestamp, not file mtime."""
+    validator = _load_validator()
+    as_of = dt.date(2026, 9, 4)
+    _write_bundle(
+        tmp_path,
+        "old.json",
+        benchmark="tpch",
+        scale=1.0,
+        platform="DuckDB",
+        run_timestamp="2026-05-02T10:00:00",
+    )
+    _write_bundle(
+        tmp_path,
+        "new.json",
+        benchmark="tpch",
+        scale=1.0,
+        platform="DataFusion",
+        run_timestamp="2026-08-26T10:00:00",
+    )
+    _write_bundle(
+        tmp_path,
+        "other.json",
+        benchmark="tpcds",
+        scale=10.0,
+        platform="Spark",
+        run_timestamp="2026-07-01T10:00:00",
+    )
+
+    overall, per_cohort, warnings = validator.cohort_recency(validator.discover_bundles(tmp_path), as_of=as_of)
+
+    assert warnings == []
+    assert overall is not None
+    assert overall.oldest == dt.date(2026, 5, 2)
+    assert overall.newest == dt.date(2026, 8, 26)
+    assert overall.oldest_age_days == 125
+    assert overall.newest_age_days == 9
+    assert overall.bundle_count == 3
+    assert per_cohort[("tpch", "1.0")].oldest_age_days == 125
+    assert per_cohort[("tpch", "1.0")].newest_age_days == 9
+    assert per_cohort[("tpcds", "10.0")].oldest_age_days == 65
+
+
+@pytest.mark.parametrize(
+    ("timestamp", "expected"),
+    [
+        ("2026-09-05", dt.date(2026, 9, 5)),
+        ("2026-09-04T23:59:59-12:00", dt.date(2026, 9, 5)),
+        ("2026-09-05T00:15:00+14:00", dt.date(2026, 9, 4)),
+        ("2026-09-05T12:00:00Z", dt.date(2026, 9, 5)),
+        ("2026-09-05T12:00:00", dt.date(2026, 9, 5)),
+    ],
+)
+def test_run_timestamp_contract_uses_utc_calendar_days(timestamp: str, expected: dt.date) -> None:
+    """Offsets become UTC dates; legacy naive timestamps are explicitly UTC."""
+    validator = _load_validator()
+    assert validator.parse_run_date({"run": {"timestamp": timestamp}}) == expected
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    [
+        "2026-09-05Tnot-a-time",
+        "2026-09-05T12:00",
+        "2026-09-05T12:00:00Z trailing",
+        "2026-02-30",
+        "2026-09-05 12:00:00",
+        "2026-09-05T12:00:00+24:00",
+    ],
+)
+def test_run_timestamp_contract_rejects_malformed_or_trailing_text(timestamp: str) -> None:
+    validator = _load_validator()
+    with pytest.raises(validator.CorpusReadError, match="unparseable run.timestamp"):
+        validator.parse_run_date({"run": {"timestamp": timestamp}})
+
+
+def test_recency_defaults_to_the_utc_current_day(monkeypatch: pytest.MonkeyPatch) -> None:
+    validator = _load_validator()
+    monkeypatch.setattr(validator, "utc_today", lambda: dt.date(2026, 9, 5))
+    assert validator.age_days(dt.date(2026, 9, 4)) == 1
+
+
+def test_age_does_not_fail_a_deep_enough_cohort(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Stale timestamps remain visible in the report without flipping exit status."""
+    validator = _load_validator()
+    as_of = dt.date(2026, 9, 4)
+    for platform in ("DuckDB", "DataFusion", "Spark"):
+        _write_bundle(
+            tmp_path,
+            f"{platform}.json",
+            benchmark="tpch",
+            scale=1.0,
+            platform=platform,
+            run_timestamp="2026-01-01T00:00:00",
+        )
+
+    assert validator.main(tmp_path, as_of=as_of) == 0
+    captured = capsys.readouterr().out
+    assert "Recency" in captured
+    assert "oldest=2026-01-01 (246 days)" in captured
+    assert "informational only" in captured
+    assert "does not affect ranking eligibility" in captured
+
+
+def test_missing_run_timestamp_is_omitted_from_recency(tmp_path: Path) -> None:
+    """A timestamp-less bundle is warned and omitted; parseable peers remain."""
+    validator = _load_validator()
+    as_of = dt.date(2026, 9, 4)
+    _write_bundle(
+        tmp_path,
+        "ok.json",
+        benchmark="tpch",
+        scale=1.0,
+        platform="DuckDB",
+        run_timestamp="2026-05-02T10:00:00",
+    )
+    bare = {
+        "benchmark": {"id": "tpch", "scale_factor": 1.0},
+        "platform": {"name": "DataFusion"},
+    }
+    (tmp_path / "bare.json").write_text(json.dumps(bare), encoding="utf-8")
+
+    overall, per_cohort, warnings = validator.cohort_recency(validator.discover_bundles(tmp_path), as_of=as_of)
+
+    assert len(warnings) == 1
+    assert "run.timestamp" in warnings[0]
+    assert warnings[0].startswith("WARN")
+    assert overall is not None
+    assert overall.bundle_count == 1
+    assert overall.oldest == dt.date(2026, 5, 2)
+    assert per_cohort[("tpch", "1.0")].bundle_count == 1
+
+
+def test_recency_names_missing_parseable_timestamps_when_bundles_exist(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A populated corpus with bad dates is distinct from an empty corpus."""
+    validator = _load_validator()
+    for platform in ("DuckDB", "DataFusion", "Spark"):
+        _write_bundle(
+            tmp_path,
+            f"{platform}.json",
+            benchmark="tpch",
+            scale=1.0,
+            platform=platform,
+            run_timestamp="2026-09-05Tnot-a-time",
+        )
+
+    assert validator.main(tmp_path, as_of=dt.date(2026, 9, 5)) == 0
+    captured = capsys.readouterr().out
+    assert "Overall: no parseable run timestamps" in captured
+    assert "Overall: no bundles" not in captured
+
+
+def test_timestamp_less_bundle_does_not_fail_depth_exit(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """main() on a deep-enough cohort with a timestamp-less bundle exits 0."""
+    validator = _load_validator()
+    as_of = dt.date(2026, 9, 4)
+    for platform in ("DuckDB", "DataFusion", "Spark"):
+        _write_bundle(
+            tmp_path,
+            f"{platform}.json",
+            benchmark="tpch",
+            scale=1.0,
+            platform=platform,
+            run_timestamp="2026-08-01T00:00:00",
+        )
+    bare = {
+        "benchmark": {"id": "tpch", "scale_factor": 1.0},
+        "platform": {"name": "ClickHouse"},
+    }
+    (tmp_path / "bare.json").write_text(json.dumps(bare), encoding="utf-8")
+
+    assert validator.main(tmp_path, as_of=as_of) == 0
+    captured = capsys.readouterr().out
+    assert "WARN" in captured
+    assert "run.timestamp" in captured
+    assert "Recency" in captured
+    assert "oldest=2026-08-01" in captured
+    assert "3 bundles" in captured
+    assert "All 1 cohort(s) meet" in captured

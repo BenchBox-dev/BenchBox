@@ -177,6 +177,7 @@ def test_determine_affected_lanes() -> None:
     assert determine_affected_lanes(["docs/index.rst"]) == {"site"}
     assert determine_affected_lanes(["results-explorer/src/App.tsx"]) == {"explorer"}
     assert determine_affected_lanes(["results-data/bundles/bundle.json"]) == {"corpus"}
+    assert determine_affected_lanes(["publication/ledger-seed.json"]) == {"corpus"}
     assert determine_affected_lanes([".github/workflows/publication-corpus-cutover.yml"]) == {"corpus"}
 
     # Mixed lanes
