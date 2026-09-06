@@ -160,6 +160,7 @@ jobs:
           TRANSACTION_ID: ${{ needs.scan.outputs.transaction_id }}
           BARRIER_EVIDENCE: ${{ inputs.barrier_evidence }}
           TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
+          PUBLICATION_ATTESTOR_PRIVATE_KEY: ${{ secrets.PUBLICATION_ATTESTOR_PRIVATE_KEY }}
         run: |
           args=(--repo-path . --ref publication --execute)
           if [ -n "$BARRIER_EVIDENCE" ]; then
@@ -173,3 +174,23 @@ jobs:
       - name: Push journal changes
         run: |
           git push origin refs/heads/publication:refs/heads/publication
+
+      - name: Dispatch prepared rollback transaction
+        if: needs.scan.outputs.action == 'prepare_rollback' || needs.scan.outputs.action == 'dispatch_rollback'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TX_ID=$(git show refs/heads/publication:publication/transaction-state/state.json | jq -r .active_transaction_id)
+          TX_JSON=$(git show refs/heads/publication:publication/transaction-state/transactions/${TX_ID}.json)
+          DEV_SHA=$(printf '%s' "$TX_JSON" | jq -r '.content.develop_sha // empty')
+          PUB_SHA=$(printf '%s' "$TX_JSON" | jq -r '.content.published_results_sha // empty')
+          DEV_SHA=${DEV_SHA:-$(git rev-parse origin/develop)}
+          PUB_SHA=${PUB_SHA:-0000000000000000000000000000000000000000}
+          printf '%s' "$DEV_SHA" | grep -qE '^[0-9a-f]{40}$'
+          printf '%s' "$PUB_SHA" | grep -qE '^[0-9a-f]{40}$'
+          gh workflow run publication-transaction.yml --ref develop \
+            -f kind=rollback \
+            -f develop_sha="$DEV_SHA" \
+            -f published_results_sha="$PUB_SHA" \
+            -f resume_transaction_id="$TX_ID"
