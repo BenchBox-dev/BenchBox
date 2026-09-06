@@ -104,6 +104,9 @@ def test_tpcdi_deployment_guide_uses_real_config_symbols() -> None:
     assert "ParallelBenchmarkConfig" not in content
     assert "ParallelExecutionMode" not in content
     assert "ParallelWorkloadType" not in content
+    assert "run_parallel_" not in content
+    assert "get_parallel_status" not in content
+    assert "parallel_config" not in content
     assert "from benchbox.core.tpcdi.config import TPCDIConfig" in content
     assert "TPCDIConfig(" in content
     assert "TPCDIBenchmark(config=config)" in content
@@ -121,3 +124,13 @@ def test_databend_platform_doc_uses_platform_options() -> None:
 
     assert "## Platform Options" in content
     assert "--platform-option ssl=false" in content
+
+
+def test_databend_documented_boolean_options_are_registered() -> None:
+    """Databend platform-option booleans must survive CLI option parsing."""
+    import benchbox.platforms  # noqa: F401 - registers the platform option specs
+    from benchbox.core.hooks.platform_hooks import PlatformHookRegistry
+
+    parsed = PlatformHookRegistry.parse_options("databend", [("ssl", "false"), ("disable_result_cache", "false")])
+    assert parsed["ssl"] is False
+    assert parsed["disable_result_cache"] is False
