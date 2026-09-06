@@ -713,6 +713,44 @@ def _execute_watchdog_action(
         cmd_record_failure(fail_args)
         return True
 
+    if action == "prepare_rollback":
+        repo_path = Path(args.repo_path).resolve()
+        journal_state = journal.read_journal_state(repo_path, ref=args.ref)
+        if not journal_state.durable_transaction_id:
+            raise TransactionError("Cannot prepare rollback without a durable journal head")
+        durable_tx = journal.read_transaction(repo_path, journal_state.durable_transaction_id, ref=args.ref)
+        barrier_source = args.barrier_evidence
+        if not barrier_source:
+            raise TransactionError("Rollback preparation requires activation barrier evidence")
+        barrier_path = Path(barrier_source)
+        barrier = _load_json(barrier_path) if barrier_path.is_file() else json.loads(barrier_source)
+        rollback_tx, _ = transaction.prepare_rollback(
+            failed_transaction=tx,
+            parent_durable_transaction=durable_tx,
+            generation=journal_state.next_generation,
+            controller=tx.controller,
+            owner=tx.owner,
+            barrier_evidence=barrier,
+        )
+        new_state = journal.JournalState(
+            target=journal_state.target,
+            next_generation=rollback_tx.generation + 1,
+            active_transaction_id=rollback_tx.transaction_id,
+            durable_transaction_id=journal_state.durable_transaction_id,
+            write_block=None,
+            policy_digest=journal_state.policy_digest,
+            tip_commit_oid=journal_state.tip_commit_oid,
+        )
+        journal.write_journal_update(
+            repo_path=repo_path,
+            expected_parent_oid=journal_state.tip_commit_oid,
+            new_state=new_state,
+            transaction=rollback_tx,
+            ref=args.ref,
+            commit_message=f"transaction: prepare watchdog rollback for {tx.transaction_id}",
+        )
+        return True
+
     return False
 
 

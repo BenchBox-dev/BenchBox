@@ -317,6 +317,55 @@ def test_defect_d4_kill_after_signing_before_durable(tmp_path: Path, monkeypatch
     assert status == "verified_unfinalized"
 
 
+def test_watchdog_executes_prepare_rollback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, journal_state = _setup_test_journal(tmp_path)
+    failed_tx = transaction.Transaction(
+        transaction_id="failed-tx",
+        target={"repository": "BenchBox-dev/BenchBox", "environment": "github-pages"},
+        kind=transaction.KIND_PROMOTION,
+        generation=2,
+        parent_transaction_id="durable-tx",
+        recovery_of=None,
+        restore_source=None,
+        approval={},
+        controller={},
+        owner={},
+        content={},
+        desired={},
+        artifact={},
+        state=transaction.STATE_RECOVERY_REQUIRED,
+    )
+    durable_tx = transaction.Transaction(
+        **{**failed_tx.to_dict(), "transaction_id": "durable-tx", "state": transaction.STATE_DURABLE}
+    )
+    rollback_tx = transaction.Transaction(
+        **{
+            **failed_tx.to_dict(),
+            "transaction_id": "rollback-tx",
+            "kind": transaction.KIND_ROLLBACK,
+            "generation": journal_state.next_generation,
+            "state": transaction.STATE_ROLLBACK_WRITE_STARTED,
+        }
+    )
+    journal_state = journal.JournalState(
+        **{
+            **journal_state.to_dict(),
+            "active_transaction_id": failed_tx.transaction_id,
+            "durable_transaction_id": durable_tx.transaction_id,
+        }
+    )
+    writes = []
+    monkeypatch.setattr(journal, "read_journal_state", lambda *args, **kwargs: journal_state)
+    monkeypatch.setattr(journal, "read_transaction", lambda *args, **kwargs: durable_tx)
+    monkeypatch.setattr(transaction, "prepare_rollback", lambda **kwargs: (rollback_tx, None))
+    monkeypatch.setattr(journal, "write_journal_update", lambda **kwargs: writes.append(kwargs))
+    args = argparse.Namespace(repo_path=repo, ref="publication", barrier_evidence='{"provider_status":"failed"}')
+
+    assert transaction_executor._execute_watchdog_action("prepare_rollback", failed_tx, args, "failed") is True
+    assert writes[0]["transaction"].transaction_id == "rollback-tx"
+    assert writes[0]["new_state"].active_transaction_id == "rollback-tx"
+
+
 def test_defect_d4_legacy_recovery_with_unreadable_journal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Case 5: Unreadable or corrupt journal.
 
