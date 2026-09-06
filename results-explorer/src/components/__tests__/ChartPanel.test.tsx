@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/preact";
+import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 import { ChartPanel } from "@/components/ChartPanel";
 import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
@@ -889,5 +889,37 @@ describe("ChartPanel", () => {
       />,
     );
     expect(screen.queryByRole("tab", { name: "Cost" })).toBeNull();
+  });
+
+  it("uses the long summary layout without duplicating the page-owned heatmap", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary(),
+          historical: [
+            makeHistoricalEntry(),
+            makeHistoricalEntry({ result_id: "hist-2", run_date: "2026-04-18T12:00:00Z" }),
+          ],
+        }}
+        summaryLayout="long"
+        excludeChartIds={["query_heatmap"]}
+      />,
+    );
+
+    expect(screen.getByTestId("summary-chart-overview")).toBeTruthy();
+    const metricTable = screen.getByRole("table", { name: "Speed and throughput by engine" });
+    expect(metricTable).toBeTruthy();
+    expect(within(metricTable).getByText("DuckDB")).toBeTruthy();
+    expect(screen.getByTestId("summary-chart-preview-cdf_chart")).toBeTruthy();
+    expect(screen.queryByTestId("summary-chart-preview-query_heatmap")).toBeNull();
+    expect(screen.queryByRole("tablist", { name: "Chart question groups" })).toBeNull();
+    expect(screen.queryByRole("img", { name: "Cumulative distribution of per-query latency" })).toBeNull();
+
+    const cdfCard = screen.getByTestId("summary-chart-preview-cdf_chart");
+    fireEvent.click(within(cdfCard).getByText("Open full chart ↗", { selector: "span" }));
+    fireEvent(cdfCard, new Event("toggle"));
+
+    expect(screen.getByRole("img", { name: "Cumulative distribution of per-query latency" })).toBeTruthy();
   });
 });

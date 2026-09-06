@@ -904,6 +904,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               summary: analysisSummary,
               historical: historicalEntries,
             }}
+            summaryLayout={viewMode === "matrix" ? "long" : "tabs"}
             excludeChartIds={viewMode === "matrix" ? ["query_heatmap"] : undefined}
           />
         </div>
