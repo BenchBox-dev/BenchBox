@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Canonical CLI and execution engine for publication transactions (Slice C).
+"""Canonical CLI and execution engine for publication transactions.
 
 Drives the transactional publication lifecycle:
 - prepare: validates candidate bytes or restore source, queries journal, generates canonical permit
@@ -194,6 +194,8 @@ def cmd_prepare(args: argparse.Namespace) -> int:
             f.write(f"permit_sha256={permit_digest}\n")
             f.write(f"transaction_id={tx.transaction_id}\n")
             f.write(f"generation={tx.generation}\n")
+            if tx.content.get("manifest_digest") is not None:
+                f.write(f"candidate_manifest_digest={tx.content['manifest_digest']}\n")
             if tx.artifact.get("artifact_id") is not None:
                 f.write(f"artifact_id={tx.artifact['artifact_id']}\n")
 
@@ -363,17 +365,11 @@ def cmd_start_write(args: argparse.Namespace) -> int:
     if tx.state not in (STATE_PREPARED, STATE_ROLLBACK_WRITE_STARTED):
         raise TransactionError(f"Cannot start write from state {tx.state}")
 
-    if tx.kind == KIND_ROLLBACK and tx.state == STATE_ROLLBACK_WRITE_STARTED:
-        build_ver = tx.restore_source.get("manifest_digest", "")[:40] if tx.restore_source else tx.transaction_id[:40]
-        github_output = os.environ.get("GITHUB_OUTPUT")
-        if github_output:
-            with open(github_output, "a", encoding="utf-8") as gf:
-                gf.write(f"pages_build_version={build_ver}\n")
-                gf.write(f"write_id={tx.transaction_id}\n")
-        if args.output_tx:
-            _write_json(args.output_tx, tx.to_dict())
-        print(f"Rollback write ready for {tx.transaction_id}: pages_build_version={build_ver}")
-        return 0
+    env = dict(os.environ)
+    env.setdefault("GIT_AUTHOR_NAME", "BenchBox Publication Controller")
+    env.setdefault("GIT_AUTHOR_EMAIL", "publication-controller@benchbox.dev")
+    env.setdefault("GIT_COMMITTER_NAME", "BenchBox Publication Controller")
+    env.setdefault("GIT_COMMITTER_EMAIL", "publication-controller@benchbox.dev")
 
     # Create a unique write-intent commit on the repository
     # Intent commit OID is the pages_build_version passed to Pages API
@@ -388,16 +384,31 @@ def cmd_start_write(args: argparse.Namespace) -> int:
     intent_commit_oid = subprocess.run(
         ["git", "commit-tree", tree_oid, "-p", journal_state.tip_commit_oid, "-m", msg],
         cwd=repo_path,
+        env=env,
         capture_output=True,
         text=True,
         check=True,
     ).stdout.strip()
 
-    updated_tx, effect = transaction.transition(
-        tx,
-        EVENT_START_WRITE,
-        payload={"intent_commit_oid": intent_commit_oid, "write_id": tx.transaction_id},
-    )
+    if tx.kind == KIND_ROLLBACK:
+        from dataclasses import replace
+
+        updated_tx = replace(
+            tx,
+            write={
+                "write_id": tx.transaction_id,
+                "intent_commit_oid": intent_commit_oid,
+                "pages_build_version": intent_commit_oid,
+                "status": "in_flight",
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    else:
+        updated_tx, effect = transaction.transition(
+            tx,
+            EVENT_START_WRITE,
+            payload={"intent_commit_oid": intent_commit_oid, "write_id": tx.transaction_id},
+        )
 
     updated_state, commit_oid = journal.write_journal_update(
         repo_path=repo_path,

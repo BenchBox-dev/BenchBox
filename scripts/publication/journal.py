@@ -184,6 +184,10 @@ def write_journal_update(
         index_file = tmp_idx.name
 
     env = dict(os.environ, GIT_INDEX_FILE=index_file)
+    env.setdefault("GIT_AUTHOR_NAME", "BenchBox Publication Controller")
+    env.setdefault("GIT_AUTHOR_EMAIL", "publication-controller@benchbox.dev")
+    env.setdefault("GIT_COMMITTER_NAME", "BenchBox Publication Controller")
+    env.setdefault("GIT_COMMITTER_EMAIL", "publication-controller@benchbox.dev")
     try:
         # 1. Initialize temporary index from parent commit tree
         _run_git(["read-tree", expected_parent_oid], cwd=repo_path, env=env)
@@ -240,6 +244,7 @@ def write_journal_update(
         commit_oid = _run_git(
             ["commit-tree", tree_oid, "-p", expected_parent_oid, "-m", msg],
             cwd=repo_path,
+            env=env,
         )
 
         # 6. Atomically reserve the shared ref on the remote authority.
