@@ -112,4 +112,4 @@ uv run -- benchbox check-deps --matrix
 - `uv run -- benchbox validate --config benchbox.yaml` - ensure configuration syntax and schema are valid.
 - `uv run -- benchbox platforms setup` - interactively enable adapters defined in your config.
 
-See the [CLI reference](../reference/cli-reference.md) for detailed command usage and the [examples library](examples.md) for advanced automation patterns.
+See the [CLI reference](../reference/cli/index.md) for detailed command usage and the [examples library](examples.md) for advanced automation patterns.

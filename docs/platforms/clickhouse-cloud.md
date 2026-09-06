@@ -211,4 +211,4 @@ At runtime, BenchBox captures platform metadata:
 - [ClickHouse Local Mode](clickhouse-local-mode.md) - Embedded ClickHouse via chDB
 - [Deployment Modes Guide](deployment-modes.md) - Platform deployment architecture
 - [Platform Comparison Matrix](comparison-matrix.md) - Compare all platforms
-- [TPC-H Benchmark](../benchmarks/tpch.md) - TPC-H benchmark guide
+- [TPC-H Benchmark](../benchmarks/tpc-h.md) - TPC-H benchmark guide

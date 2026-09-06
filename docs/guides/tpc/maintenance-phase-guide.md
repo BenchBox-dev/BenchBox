@@ -635,7 +635,7 @@ A: No. Maintenance tests are specific to TPC benchmarks. Other benchmarks (Click
 
 - [TPC-H Official Guide](./tpc-h-official-guide.md) - Complete TPC-H implementation details
 - [TPC-DS Official Guide](./tpc-ds-official-guide.md) - Complete TPC-DS implementation details
-- [CLI Reference](../../reference/cli-reference.md) - Command-line options for running benchmarks
+- [CLI Reference](../../reference/cli/index.md) - Command-line options for running benchmarks
 - [Test Types Example](../../../examples/features/test_types.py) - Runnable code demonstrating all three test types
 - [TPC-H Specification](https://www.tpc.org/tpc_documents_current_versions/current_specifications5.asp) - Official TPC-H specification
 - [TPC-DS Specification](https://www.tpc.org/tpc_documents_current_versions/current_specifications5.asp) - Official TPC-DS specification
