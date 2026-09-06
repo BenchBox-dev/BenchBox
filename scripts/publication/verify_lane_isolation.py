@@ -52,6 +52,7 @@ SHARED_BUILD_INPUTS: tuple[str, ...] = (
     "benchbox/",
     "pyproject.toml",
     "uv.lock",
+    "scripts/publication/verify_lane_isolation.py",
 )
 
 # Tracked repo inputs that belong to no publication lane and are never read
@@ -101,7 +102,6 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
         "landing/",
         "_blog/",
         "scripts/assemble_public_site.py",
-        "scripts/publication/verify_lane_isolation.py",
         ".github/workflows/publication-lane-docs.yml",
     ),
     "explorer": (
