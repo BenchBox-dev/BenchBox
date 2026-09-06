@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Canonical CLI and execution engine for publication transactions.
+"""Canonical CLI and execution engine for publication transactions (Slice C).
 
 Drives the transactional publication lifecycle:
 - prepare: validates candidate bytes or restore source, queries journal, generates canonical permit
@@ -20,6 +20,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,6 +29,7 @@ if str(ROOT) not in sys.path:
 import urllib.error
 import urllib.request
 import uuid
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -365,12 +367,6 @@ def cmd_start_write(args: argparse.Namespace) -> int:
     if tx.state not in (STATE_PREPARED, STATE_ROLLBACK_WRITE_STARTED):
         raise TransactionError(f"Cannot start write from state {tx.state}")
 
-    env = dict(os.environ)
-    env.setdefault("GIT_AUTHOR_NAME", "BenchBox Publication Controller")
-    env.setdefault("GIT_AUTHOR_EMAIL", "publication-controller@benchbox.dev")
-    env.setdefault("GIT_COMMITTER_NAME", "BenchBox Publication Controller")
-    env.setdefault("GIT_COMMITTER_EMAIL", "publication-controller@benchbox.dev")
-
     # Create a unique write-intent commit on the repository
     # Intent commit OID is the pages_build_version passed to Pages API
     msg = f"write-intent: transaction {tx.transaction_id} gen {tx.generation}"
@@ -381,18 +377,21 @@ def cmd_start_write(args: argparse.Namespace) -> int:
         text=True,
         check=True,
     ).stdout.strip()
+    intent_env = dict(os.environ)
+    intent_env.setdefault("GIT_AUTHOR_NAME", "BenchBox Publication Controller")
+    intent_env.setdefault("GIT_AUTHOR_EMAIL", "publication-controller@benchbox.dev")
+    intent_env.setdefault("GIT_COMMITTER_NAME", "BenchBox Publication Controller")
+    intent_env.setdefault("GIT_COMMITTER_EMAIL", "publication-controller@benchbox.dev")
     intent_commit_oid = subprocess.run(
         ["git", "commit-tree", tree_oid, "-p", journal_state.tip_commit_oid, "-m", msg],
         cwd=repo_path,
-        env=env,
+        env=intent_env,
         capture_output=True,
         text=True,
         check=True,
     ).stdout.strip()
 
     if tx.kind == KIND_ROLLBACK:
-        from dataclasses import replace
-
         updated_tx = replace(
             tx,
             write={
@@ -404,7 +403,7 @@ def cmd_start_write(args: argparse.Namespace) -> int:
             },
         )
     else:
-        updated_tx, effect = transaction.transition(
+        updated_tx, _ = transaction.transition(
             tx,
             EVENT_START_WRITE,
             payload={"intent_commit_oid": intent_commit_oid, "write_id": tx.transaction_id},
@@ -587,6 +586,240 @@ def cmd_record_failure(args: argparse.Namespace) -> int:
     return 0
 
 
+def _resolve_watchdog_action(
+    tx: transaction.Transaction,
+    journal_state: journal.JournalState,
+    barrier_evidence: str | None,
+) -> tuple[str, str, str]:
+    """Resolve (action, status, reason) for active transaction during watchdog scan."""
+    if tx.state == STATE_PREPARED:
+        return (
+            "record_failure",
+            "run_lost_before_write",
+            "Initiating run completed or was lost before starting write; no provider write occurred.",
+        )
+    if tx.state == transaction.STATE_WRITE_STARTED:
+        if barrier_evidence:
+            return (
+                "record_failure",
+                "write_failed_with_barrier",
+                "Provider write failed or lost; provider activation barrier verified.",
+            )
+        return (
+            "quarantine",
+            "awaiting_activation_barrier",
+            "Write started but provider status unknown; cannot compensate without documented activation barrier.",
+        )
+    if tx.state == transaction.STATE_WRITE_ACKNOWLEDGED:
+        return (
+            "verify_and_finalize",
+            "write_acknowledged_unverified",
+            "Provider write succeeded; external verification needed to advance durable head.",
+        )
+    if tx.state in (transaction.STATE_EXTERNALLY_VERIFIED, transaction.STATE_ROLLBACK_VERIFIED):
+        return (
+            "finalize",
+            "verified_unfinalized",
+            "Transaction verified; ready for durable CAS advance.",
+        )
+    if tx.state == STATE_RECOVERY_REQUIRED:
+        if tx.kind == KIND_PROMOTION and barrier_evidence and tx.parent_transaction_id:
+            return (
+                "prepare_rollback",
+                "ready_for_rollback",
+                "Promotion failed; activation barrier verified; eligible for automatic rollback.",
+            )
+        if not barrier_evidence:
+            return (
+                "quarantine",
+                "awaiting_activation_barrier",
+                "Recovery required but awaiting activation barrier evidence.",
+            )
+        return (
+            "escalate_operator",
+            "requires_operator",
+            "Recovery required; operator intervention needed.",
+        )
+    if tx.state == STATE_TERMINAL_FAILURE:
+        return (
+            "none",
+            "terminal_failure",
+            f"Journal blocked under terminal failure: {journal_state.write_block}",
+        )
+    return ("none", "unknown_state", f"Unknown transaction state: {tx.state}")
+
+
+def _execute_watchdog_action(
+    action: str,
+    tx: transaction.Transaction,
+    args: argparse.Namespace,
+    reason: str,
+) -> bool:
+    """Execute the resolved watchdog action."""
+    if action == "record_failure":
+        stage = "prepared" if tx.state == STATE_PREPARED else "write"
+        code = "INITIATING_RUN_LOST" if tx.state == STATE_PREPARED else "PROVIDER_WRITE_FAILED"
+        fail_args = argparse.Namespace(
+            repo_path=args.repo_path,
+            ref=args.ref,
+            transaction_id=tx.transaction_id,
+            code=code,
+            stage=stage,
+            reason=reason,
+            output_tx=None,
+        )
+        cmd_record_failure(fail_args)
+        return True
+
+    if action == "finalize":
+        fin_args = argparse.Namespace(
+            repo_path=args.repo_path,
+            ref=args.ref,
+            transaction_id=tx.transaction_id,
+            output_tx=None,
+        )
+        cmd_finalize(fin_args)
+        return True
+
+    if action == "verify_and_finalize":
+        from scripts.publication.verify_live import verify_live
+
+        target_url = tx.target.get("base_url", args.base_url) if isinstance(tx.target, dict) else args.base_url
+        probe_report = verify_live(base_url=target_url, timeout=10.0)
+        if probe_report.ok:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as tf:
+                json.dump(probe_report.to_dict(), tf)
+                tf_path = tf.name
+            ver_args = argparse.Namespace(
+                repo_path=args.repo_path,
+                ref=args.ref,
+                transaction_id=tx.transaction_id,
+                probe_report=tf_path,
+                attestation=None,
+                challenge=None,
+                verifier_sha=None,
+                output_tx=None,
+            )
+            cmd_record_verification(ver_args)
+            fin_args = argparse.Namespace(
+                repo_path=args.repo_path,
+                ref=args.ref,
+                transaction_id=tx.transaction_id,
+                output_tx=None,
+            )
+            cmd_finalize(fin_args)
+            return True
+
+        fail_args = argparse.Namespace(
+            repo_path=args.repo_path,
+            ref=args.ref,
+            transaction_id=tx.transaction_id,
+            code="WATCHDOG_PROBE_FAILED",
+            stage="verification",
+            reason=f"Watchdog live verification failed: {'; '.join(probe_report.errors)}",
+            output_tx=None,
+        )
+        cmd_record_failure(fail_args)
+        return True
+
+    if action == "prepare_rollback":
+        repo_path = Path(args.repo_path).resolve()
+        journal_state = journal.read_journal_state(repo_path, ref=args.ref)
+        if not journal_state.durable_transaction_id:
+            raise TransactionError("Cannot prepare rollback without a durable journal head")
+        durable_tx = journal.read_transaction(repo_path, journal_state.durable_transaction_id, ref=args.ref)
+        barrier_source = args.barrier_evidence
+        if not barrier_source:
+            raise TransactionError("Rollback preparation requires activation barrier evidence")
+        barrier_path = Path(barrier_source)
+        barrier = _load_json(barrier_path) if barrier_path.is_file() else json.loads(barrier_source)
+        rollback_tx, _ = transaction.prepare_rollback(
+            failed_transaction=tx,
+            parent_durable_transaction=durable_tx,
+            generation=journal_state.next_generation,
+            controller=tx.controller,
+            owner=tx.owner,
+            barrier_evidence=barrier,
+        )
+        new_state = journal.JournalState(
+            target=journal_state.target,
+            next_generation=rollback_tx.generation + 1,
+            active_transaction_id=rollback_tx.transaction_id,
+            durable_transaction_id=journal_state.durable_transaction_id,
+            write_block=None,
+            policy_digest=journal_state.policy_digest,
+            tip_commit_oid=journal_state.tip_commit_oid,
+        )
+        journal.write_journal_update(
+            repo_path=repo_path,
+            expected_parent_oid=journal_state.tip_commit_oid,
+            new_state=new_state,
+            transaction=rollback_tx,
+            ref=args.ref,
+            commit_message=f"transaction: prepare watchdog rollback for {tx.transaction_id}",
+        )
+        return True
+
+    return False
+
+
+def cmd_watchdog_scan(args: argparse.Namespace) -> int:
+    repo_path = Path(args.repo_path).resolve()
+    journal_state = journal.read_journal_state(repo_path, ref=args.ref)
+
+    if not journal_state or not journal_state.active_transaction_id:
+        report = {
+            "status": "idle",
+            "recovery_needed": False,
+            "action": "none",
+            "active_transaction_id": None,
+            "state": None,
+            "message": "Journal is idle; no in-flight active transaction.",
+        }
+        if args.output_json:
+            _write_json(args.output_json, report)
+        print(json.dumps(report, indent=2))
+        return 0
+
+    tx_id = journal_state.active_transaction_id
+    tx = journal.read_transaction(repo_path, tx_id, ref=args.ref)
+    if not tx:
+        report = {
+            "status": "corrupt_journal",
+            "recovery_needed": True,
+            "action": "mark_terminal",
+            "active_transaction_id": tx_id,
+            "state": None,
+            "message": f"Active transaction {tx_id} declared in state.json but missing from transactions/",
+        }
+        if args.output_json:
+            _write_json(args.output_json, report)
+        print(json.dumps(report, indent=2))
+        return 1
+
+    action, status, reason = _resolve_watchdog_action(tx, journal_state, args.barrier_evidence)
+    recovery_needed = tx.state != STATE_TERMINAL_FAILURE
+
+    report = {
+        "status": status,
+        "recovery_needed": recovery_needed,
+        "action": action,
+        "active_transaction_id": tx.transaction_id,
+        "state": tx.state,
+        "kind": tx.kind,
+        "reason": reason,
+    }
+
+    if args.execute and action not in ("none", "quarantine", "escalate_operator"):
+        print(f"Executing watchdog recovery action '{action}' for transaction {tx.transaction_id}...")
+        report["action_executed"] = _execute_watchdog_action(action, tx, args, reason)
+
+    if args.output_json:
+        _write_json(args.output_json, report)
+    print(json.dumps(report, indent=2))
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # Main CLI Parser
 # ---------------------------------------------------------------------------
@@ -691,6 +924,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_fail.add_argument("--repo-path", default=".")
     p_fail.add_argument("--output-tx", default=None)
     p_fail.set_defaults(func=cmd_record_failure)
+
+    # watchdog-scan
+    p_watch = sub.add_parser("watchdog-scan", help="Scan journal state and execute recovery")
+    p_watch.add_argument("--repo-path", default=".")
+    p_watch.add_argument("--ref", default=journal.DEFAULT_REF)
+    p_watch.add_argument("--base-url", default="https://benchbox.dev")
+    p_watch.add_argument("--barrier-evidence", default=None)
+    p_watch.add_argument("--trigger-run-id", default=None)
+    p_watch.add_argument("--output-json", default=None)
+    p_watch.add_argument("--execute", action="store_true", help="Execute resolved recovery action")
+    p_watch.set_defaults(func=cmd_watchdog_scan)
 
     return parser
 

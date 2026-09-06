@@ -334,3 +334,118 @@ def test_pre_deploy_without_manifests_fails() -> None:
     assert report.pre_deploy_check_performed is False
     assert report.live_probes_performed is False
     assert any("Pre-deploy check requires both a candidate and a baseline" in err for err in report.errors)
+
+
+def test_defect_d3_availability_runs_without_evidence_acquisition(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Falsifying test for Defect D3:
+
+    Delete/expire evidence while service is up:
+    - availability remains measured and OK
+    - content and certification are UNAVAILABLE
+    - certification fails closed (certified is False)
+    """
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        lambda req, timeout=30: MockHTTPResponse(b"OK", status=200),
+    )
+
+    # 1. Run live probe without any evidence or receipts
+    probe_report = verify_live_mod.verify_live(
+        base_url="https://benchbox.dev",
+        endpoints=["/", "/docs/", "/docs/api.html", "/results/", "/results/data/results.duckdb"],
+    )
+    assert probe_report.ok is True
+    assert probe_report.live_probes_performed is True
+    assert len(probe_report.probes) == 5
+    assert all(p.ok for p in probe_report.probes)
+
+    # 2. Write probe report to diagnostic-reports directory (no evidence/receipts exist)
+    reports_dir = tmp_path / "diagnostic-reports"
+    reports_dir.mkdir()
+    (reports_dir / "availability-report.json").write_text(json.dumps(probe_report.to_dict()))
+
+    # 3. Evaluate 5-dimension operational certification
+    cert = verify_live_mod.evaluate_certification_reports(reports_dir)
+
+    # Availability must be measured as PASS
+    assert cert.dimensions[verify_live_mod.DIMENSION_AVAILABILITY].status == verify_live_mod.STATUS_PASS
+
+    # Evidence is absent/expired: content identity, reconciliation, independence, and operational recovery are UNAVAILABLE
+    assert cert.dimensions[verify_live_mod.DIMENSION_CONTENT_IDENTITY].status == verify_live_mod.STATUS_UNAVAILABLE
+    assert cert.dimensions[verify_live_mod.DIMENSION_RECONCILIATION].status == verify_live_mod.STATUS_UNAVAILABLE
+    assert cert.dimensions[verify_live_mod.DIMENSION_INDEPENDENCE].status == verify_live_mod.STATUS_UNAVAILABLE
+    assert cert.dimensions[verify_live_mod.DIMENSION_OPERATIONAL_RECOVERY].status == verify_live_mod.STATUS_UNAVAILABLE
+
+    # Overall certification MUST fail closed (not certified)
+    assert cert.certified is False
+
+    # CLI exits 1
+    rc = verify_live_mod.main(["--certify-reports-dir", str(reports_dir)])
+    assert rc == 1
+
+
+def test_defect_d3_return_503_fails_availability(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Falsifying test for Defect D3:
+
+    When endpoints return 503 while receipts are valid, availability fails immediately.
+    """
+
+    def mock_503(req, timeout=30):
+        raise urllib.error.HTTPError(
+            url=req.get_full_url(),
+            code=503,
+            msg="Service Unavailable",
+            hdrs={},
+            fp=io.BytesIO(b"Service Unavailable"),
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", mock_503)
+
+    probe_report = verify_live_mod.verify_live(
+        base_url="https://benchbox.dev",
+        endpoints=["/"],
+    )
+    assert probe_report.ok is False
+    assert probe_report.probes[0].status_code == 503
+
+    reports_dir = tmp_path / "diagnostic-reports"
+    reports_dir.mkdir()
+    (reports_dir / "availability-report.json").write_text(json.dumps(probe_report.to_dict()))
+
+    # Even if reconciliation report was valid
+    (reports_dir / "reconciliation-report.json").write_text(json.dumps({"reconciled": True, "violations": []}))
+
+    cert = verify_live_mod.evaluate_certification_reports(reports_dir)
+    assert cert.dimensions[verify_live_mod.DIMENSION_AVAILABILITY].status == verify_live_mod.STATUS_FAIL
+    assert cert.certified is False
+
+
+def test_evaluate_certification_all_dimensions_pass(tmp_path: Path) -> None:
+    reports_dir = tmp_path / "diagnostic-reports"
+    reports_dir.mkdir()
+
+    avail_data = {
+        "ok": True,
+        "probes": [{"path": "/", "ok": True, "status_code": 200}],
+        "matched_checksums": {"/results/data/results.duckdb": "abc"},
+        "mismatched_checksums": {},
+        "errors": [],
+    }
+    (reports_dir / "availability-report.json").write_text(json.dumps(avail_data))
+    (reports_dir / "reconciliation-report.json").write_text(json.dumps({"reconciled": True, "violations": []}))
+    (reports_dir / "independence-matrix-report.json").write_text(
+        json.dumps({"valid": True, "violations": [], "transitions_checked": 4})
+    )
+    (reports_dir / "operational-receipts-report.json").write_text(
+        json.dumps({"passed": True, "all_violations": [], "drills": {"rollback": {"passed": True}}})
+    )
+
+    cert = verify_live_mod.evaluate_certification_reports(reports_dir)
+    assert cert.certified is True
+    assert all(d.status == verify_live_mod.STATUS_PASS for d in cert.dimensions.values())
+
+    rc = verify_live_mod.main(["--certify-reports-dir", str(reports_dir)])
+    assert rc == 0
