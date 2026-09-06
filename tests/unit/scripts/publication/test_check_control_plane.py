@@ -73,6 +73,7 @@ def test_check_branch_protection_passes_when_safe() -> None:
         {
             "allow_force_pushes": {"enabled": False},
             "allow_deletions": {"enabled": False},
+            "enforce_admins": {"enabled": True},
         }
     )
     errors = control_mod.check_branch_protection("BenchBox-dev/BenchBox", "publication", gh_output=gh_output)
@@ -84,6 +85,7 @@ def test_check_branch_protection_detects_force_push() -> None:
         {
             "allow_force_pushes": {"enabled": True},
             "allow_deletions": {"enabled": False},
+            "enforce_admins": {"enabled": True},
         }
     )
     errors = control_mod.check_branch_protection("BenchBox-dev/BenchBox", "publication", gh_output=gh_output)
@@ -96,6 +98,7 @@ def test_check_branch_protection_detects_deletion() -> None:
         {
             "allow_force_pushes": {"enabled": False},
             "allow_deletions": {"enabled": True},
+            "enforce_admins": {"enabled": True},
         }
     )
     errors = control_mod.check_branch_protection("BenchBox-dev/BenchBox", "publication", gh_output=gh_output)
@@ -103,7 +106,35 @@ def test_check_branch_protection_detects_deletion() -> None:
     assert "permits deletions" in errors[0]
 
 
+def test_check_branch_protection_detects_admin_bypass() -> None:
+    gh_output = json.dumps(
+        {
+            "allow_force_pushes": {"enabled": False},
+            "allow_deletions": {"enabled": False},
+            "enforce_admins": {"enabled": False},
+        }
+    )
+    errors = control_mod.check_branch_protection("BenchBox-dev/BenchBox", "publication", gh_output=gh_output)
+    assert len(errors) == 1
+    assert "enforce_admins must be enabled" in errors[0]
+
+
 def test_check_branch_protection_handles_api_error() -> None:
     errors = control_mod.check_branch_protection("BenchBox-dev/BenchBox", "publication", gh_output="invalid json")
     assert len(errors) == 1
     assert "lacks verified protection rules" in errors[0]
+
+
+def test_strict_live_requires_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(control_mod, "check_codeowners", list)
+    monkeypatch.setattr(
+        control_mod,
+        "check_branch_protection",
+        lambda repo, branch, gh_output=None: [],
+    )
+    monkeypatch.setattr(control_mod, "run", lambda *args, **kwargs: "some-ref")
+    monkeypatch.delenv("PUBLICATION_APP_ID", raising=False)
+    monkeypatch.delenv("PUBLICATION_APP_PRIVATE_KEY", raising=False)
+
+    rc = control_mod.main(["--live", "--strict"])
+    assert rc != 0
