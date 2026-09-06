@@ -1,105 +1,100 @@
 # Publication deployer soak and retirement
 
-`publication-deploy.yml` is an armed, dispatch-only Pages deployer. It builds
-one complete site from an exact `develop` SHA and an exact
-`published-results` SHA, then deploys that immutable artifact only after its
-pre-deploy checks pass. It does not run on a push. The `docs.yml` release job
-shares its deployment lock and stops writing Pages after the first successful
-independent live-receipt run, preventing a queued legacy artifact from
-overwriting an attested deployment during the soak.
+`publication-transaction.yml` and its controller `scripts/publication/transaction_executor.py`
+supply the replacement publication transaction engine for benchbox.dev. State authority is
+anchored by an append-only Git journal on the `publication` metadata ref (`publication/transaction-state/state.json`),
+replacing ad-hoc artifact scans and mutable GitHub Deployment queries.
+
+Throughout the migration and bounded soak, the legacy release builder in `.github/workflows/docs.yml`
+remains independently runnable and does not route through `transaction_executor.py` or require
+reading the new journal.
+
+## Operator migration from legacy dispatch
+
+The legacy `publication-deploy.yml` workflow accepted manual decimal `generation` inputs and
+arbitrary rollback references. In the canonical transaction engine:
+
+1. **Automatic Monotonic Generations:** Operators do not specify generation numbers. The journal
+   CAS reserves monotonically increasing generations atomically on the `publication` ref.
+2. **Elimination of Rollback SHA:** Operators cannot roll back to arbitrary Git commit SHAs.
+   Rollback transactions restore exact, previously verified durable parent transactions by
+   `restore_transaction_id`.
+3. **Affirmative Activation Barrier:** Automated and manual rollbacks require affirmative provider
+   activation barrier evidence (`barrier_evidence`) demonstrating that in-flight or canceled provider
+   requests cannot activate late.
+4. **Digest-Bound Permits:** Promotion requests require an immutable permit verified and approved
+   by a maintainer environment review comment (`publication-approval:<permit_sha256>`).
 
 ## Prerequisites
 
-Before the first dispatch, configure the `PUBLICATION_ATTESTOR_PRIVATE_KEY`
-environment secret in both `publication-attestation` and `github-pages`. The
-former must allow only `develop`; the latter must continue to allow `develop`
-and `release` during the bounded soak so the legacy release deploy remains
-available until its retirement is approved. Disable the obsolete
-`publication-preview-deploy.yml` workflow at repository level before activation;
-its in-file ownership guard remains defense in depth if it is later re-enabled.
-Do not configure a repository-level copy,
-because unmerged branch workflow code could request it. The secret must be the
-PEM Ed25519 private key
-whose public half is committed at
-[`publication-attestor-public-key.pem`](publication-attestor-public-key.pem).
-Do not place the private key in a workflow input, artifact, commit, issue, or
-receipt. A missing secret makes the live-receipt stage fail closed.
+Before the first production dispatch:
 
-Choose exact 40-character lowercase commit SHAs for `develop_sha` and
-`published_results_sha`. Generations are positive decimal CAS values: use `1`
-for the first independent deployment, then increment by one. Record the current
-attested live receipt ID when the run replaces an earlier generation.
+1. **Attestor Secrets:** Configure `PUBLICATION_ATTESTOR_PRIVATE_KEY` in both
+   `publication-attestation` and `github-pages` environments. The secret must match the committed
+   public key at [`publication-attestor-public-key.pem`](publication-attestor-public-key.pem). Never
+   place the private key in repository files or workflow inputs.
+2. **Metadata Ref Protection:** Verify that the `publication` Git ref exists and has branch protection
+   blocking force-pushes and deletion (`scripts/publication/check_control_plane.py`).
+3. **Provider Feasibility Gates:** Prove unique write-intent commit correlation as
+   `pages_build_version` and supported cancellation finality in an isolated test repository before
+   enabling production writes.
+4. **External Heartbeat Alert:** Configure an external availability monitor outside GitHub Actions
+   to detect missed controller heartbeats within 10 minutes.
+5. **Preview Deploy Disabled:** Keep `.github/workflows/publication-preview-deploy.yml` disabled in
+   code and at the repository level.
 
-For a publication that changes corpus content, first dispatch the exact inputs
-with `candidate_only=true`, `expect_noop=false`, and no
-`approved_manifest_digest`. Download `desired-manifest.json` from the candidate
-receipt artifact, inspect its pins and measured artifact closure, and record its
-`manifest_digest` and workflow run ID. Dispatch the production run with the same inputs,
-`expect_noop=false`, `force_rollback=false`, and that reviewed digest as
-`approved_manifest_digest`; pass the recorded run ID as
-`approved_candidate_run_id`. The workflow authenticates the successful no-write
-run, rechecks its pins and manifest digest, downloads its retained site, and
-refuses deployment unless the site's exact byte digest matches the reviewed
-manifest. It promotes those reviewed bytes without rebuilding the DuckDB file.
-This is an authorized production action; this runbook does not authorize it.
+## 72-Hour Bounded Production Soak
 
-For a no-op rehearsal, set `expect_noop=true` and `candidate_only=false`. That compares the candidate
-database with the freeze baseline and skips the deploy job. A rehearsal is not
-a live receipt and cannot count toward soak.
+A successful production soak requires 72 continuous hours after the last controller change without
+unresolved incidents, digest mismatches, or missing samples.
 
-## Evidence for each soak run
+### Required drill matrix
 
-Collect the build, deployment, and live-receipt artifacts from the same run.
-The run is a successful production observation only when all are present:
+The soak must execute and record evidence for:
 
-- `desired-manifest.json` identifies the pinned inputs and generation.
-- `assembly-receipt.json` records distinct site, docs, Explorer, and DuckDB
-  digests; the retained site artifact has the same site digest.
-- `deployment-receipt.json` is provider acknowledgement, not proof of live
-  service.
-- `live-receipt.json` follows external probes of `/`, `/docs/`, `/results/`, and
-  `/results/data/results.duckdb`, has a fresh nonce and timestamp, includes the
-  source SHAs, digest set, prior receipt ID where applicable, and verifies with
-  `scripts/publication/reconciliation.py` against the repository public key.
+- At least 3 acknowledged and verified candidate promotions.
+- 1 independent update for each required publication lane (site, Explorer, corpus).
+- 1 whole-workflow cancellation recovery where the independent watchdog (`publication-recover.yml`)
+  detects the dropped worker and either finalizes or safely quarantines intent.
+- 1 independently initiated rollback restoring the durable parent artifact after simulated failure.
+- 1 older-release recovery drill demonstrating restoration from an attested historical release.
 
-Digest equivalence means that the whole-site digest and its component docs,
-Explorer, and DuckDB digests from the new lane are compared with the equivalent
-artifact produced by the current `docs.yml` release lane for the same pinned
-inputs. Compare like with like: a deployment acknowledgement is not a digest,
-and a live route hash is not a substitute for the retained artifact digest.
-The required DuckDB route must also equal the assembly receipt checksum. Any
-mismatch, stale receipt, signature failure, or partial route success fails the
-soak run.
+### Sampling and timing targets
 
-Run the bounded soak for the approved window and preserve each attested receipt
-and comparison record. A `docs.yml` release deployment during a run changes
-the observed target; mark that sample inconclusive and start a fresh comparison
-for the new release generation. Do not call an artifact live before its
-external probes and signature have completed.
+- Sample public route availability (`/`, `/docs/`, `/results/`, `/results/data/results.duckdb`) every
+  5 minutes from outside the writer.
+- Detect a stale in-flight transaction within 10 minutes.
+- Complete restoration after an approved barrier within 15 minutes.
+- Perform full DuckDB content-stream verification hourly during soak.
 
-## Rollback boundary
+Any unhandled failure, missed required sample, or unverified digest restarts the 72-hour window.
 
-On a deployment or probe failure, the workflow searches retained
-`publication-live-receipt-*` artifacts, verifies the newest eligible receipt
-with the public key, downloads its named site artifact, recomputes its digest,
-and only then permits the rollback Pages write. It never rebuilds a site from a
-branch name or uses `rollback_target_sha` as bytes. If no unexpired attested
-artifact exists, rollback fails closed.
+## Maintainer Exclusive Publication Window
 
-## Retirement decision
+During production trials, maintainers enforce an exclusive publication window:
+
+1. Inventory and drain queued legacy release writers.
+2. Approve only designated `publication-transaction.yml` runs.
+3. Keep the legacy `docs.yml` release deploy available as an emergency fallback.
+4. If the new controller fails, stop admission, drain active workers, establish provider quiescence
+   through the activation barrier, and approve the legacy restore from its attested checkpoint.
+   Observations from an emergency legacy restore do not advance the new journal head.
+
+## Retirement Decision
 
 The freeze closure at
 [`publication-freeze-closure-2026-09-04.json`](publication-freeze-closure-2026-09-04.json)
-records that G1–G5 passed but that retirement was deferred because there was no
-independent production deployer. This workflow supplies the replacement; it
-does not itself prove retirement.
+deferred A10 retirement until an independent deployer passed production soak.
 
-Do not remove the `docs.yml` release Pages deploy, retire or disable
-`sync-results-data-to-published.yml`, or remove `develop` from the GitHub Pages
-branch policy (policy id 59059907) until the bounded soak has preserved the
-digest-equivalence and attested-live evidence above and an authorized follow-up
-approves the retirement change.
+Only after the 72-hour bounded soak passes all required drills and receives explicit maintainer
+approval may the retirement steps execute:
 
-Corpus mirror pull requests are reconciled by the exact `results-data` path set
-and content digests against the target branch. Recency, title, and a newer open
-mirror PR are not grounds to close an older mirror PR.
+1. Remove the release-to-Pages deployment job in `.github/workflows/docs.yml`.
+2. Retire `.github/workflows/sync-results-data-to-published.yml`.
+3. Drop `develop` from the GitHub Pages branch deployment policy (leaving `release` only if required
+   for emergency fallback, or removing branch policy entirely for workflow-based deploy).
+4. Reconcile open corpus mirror pull requests by exact `results-data` path set and content digests
+   against the target branch. Do not close older mirror PRs based on recency or title alone.
+5. Close out tracking items `independent-production-deployer-and-retirement`,
+   `independent-publication-a10-release-and-mirror-retirement`, and
+   `independent-publication-a11-operations-canaries-and-closeout`.
