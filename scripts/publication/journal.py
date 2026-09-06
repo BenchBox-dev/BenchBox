@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from scripts.publication import transaction as transaction_module
 from scripts.publication.transaction import (
     KIND_LEGACY_RECOVERY,
     KIND_PROMOTION,
@@ -34,6 +35,7 @@ from scripts.publication.transaction import (
     VALID_KINDS,
     VALID_STATES,
     Transaction,
+    TransactionError,
     canonical_json,
 )
 
@@ -300,6 +302,16 @@ def init_genesis_journal(
         raise CorruptJournalError("Genesis transaction target does not match journal target")
     if not isinstance(genesis_transaction.attestation, dict):
         raise CorruptJournalError("Genesis transaction must retain a valid live-receipt attestation")
+    try:
+        transaction_module.validate_live_receipt(
+            genesis_transaction,
+            {
+                "attestation": genesis_transaction.attestation,
+                "observation_digest": genesis_transaction.attestation.get("observation_digest"),
+            },
+        )
+    except TransactionError as error:
+        raise CorruptJournalError(f"Genesis transaction attestation is invalid: {error}") from error
     init_state = JournalState(
         target=target,
         next_generation=genesis_transaction.generation + 1,
