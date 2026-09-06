@@ -389,12 +389,23 @@ def _build_benchmark_summaries(
             {dt.query_id for _, detail in pairs for dt in detail.display_timings},
             key=_natural_sort_key,
         )
-        query_id_sets = {
-            frozenset(dt.query_id for dt in detail.display_timings)
-            for entry, detail in pairs
-            if ranking_exclusion_reason(entry) is None
-        }
-        cohort_query_sets_match = len(query_id_sets) <= 1
+        # A deliberately partial or otherwise outlier run must not poison the
+        # complete cohort.  Use a query set only when it has a strict majority
+        # among rows that are otherwise eligible for ranking; otherwise fail
+        # closed and mark every row as mismatched.  This preserves the old
+        # all-different behavior while allowing a single partial fixture to be
+        # shown as evidence without suppressing valid peer rankings.
+        query_set_counts: dict[frozenset[str], int] = {}
+        for entry, detail in pairs:
+            if ranking_exclusion_reason(entry) is None:
+                query_set = frozenset(dt.query_id for dt in detail.display_timings)
+                query_set_counts[query_set] = query_set_counts.get(query_set, 0) + 1
+        canonical_query_set: frozenset[str] | None = None
+        if query_set_counts:
+            candidate, candidate_count = max(query_set_counts.items(), key=lambda item: item[1])
+            eligible_count = sum(query_set_counts.values())
+            if candidate_count > eligible_count - candidate_count:
+                canonical_query_set = candidate
 
         platform_rows: list[PlatformRow] = []
         for entry, detail in pairs:
@@ -403,7 +414,8 @@ def _build_benchmark_summaries(
                 timings[dt.query_id] = dt.display_ms
 
             row_ranking_reason = entry.ranking_exclusion_reason
-            if row_ranking_reason is None and not cohort_query_sets_match:
+            row_query_set = frozenset(dt.query_id for dt in detail.display_timings)
+            if row_ranking_reason is None and (canonical_query_set is None or row_query_set != canonical_query_set):
                 row_ranking_reason = "mismatched_query_set"
             row = PlatformRow(
                 result_id=entry.result_id,
