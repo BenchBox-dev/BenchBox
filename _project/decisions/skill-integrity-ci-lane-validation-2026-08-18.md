@@ -1,9 +1,9 @@
 # Decision: skill-integrity CI lane live-validation protocol
 
-Date: 2026-08-18
-Status: **Protocol defined; live samples pending.**
+Date: 2026-08-18 (interim checkpoint: 2026-09-06)
+Status: **INSUFFICIENT SAMPLE (1/3 legitimate samples observed at Day 19; interim checkpoint)**
 
-This is the w0 evidence contract for
+This is the evidence contract and interim checkpoint for
 `skill-integrity-ci-lane-live-validation`. It is observational only. It does
 not change workflow routing, required contexts, strict-current-base behavior,
 test coverage, auto-merge policy, GitHub settings, or the blocked 07a/07b
@@ -42,15 +42,13 @@ not substitutes for the three skill-only samples.
 
 ### Sample identities
 
-No live samples have been recorded at w0. Do not populate this table with
-synthetic or guessed identities; later work units must add the exact 40-character
-head and event base SHAs.
+The 14-day observation window elapsed on 2026-09-01. As of 2026-09-06 (Day 19), a complete cohort review of all merged `develop` PRs since 2026-08-17 identified exactly one legitimate pure skill-only consumer PR (PR #1996). No synthetic canaries were created.
 
 | sample | PR | head SHA | base SHA | lane | status |
 |---|---:|---|---|---|---|
-| sample-1 | pending | pending | pending | skill-only | pending live canary |
-| sample-2 | pending | pending | pending | skill-only | pending live sample |
-| sample-3 | pending | pending | pending | skill-only | pending live sample |
+| sample-1 | #1996 | 2a0a21a57401815cd8d0cc0f6fc06ae15716d352 | 16f95adf5b2eba29574a095e4cca7fd9f5b89207 | skill-only | observed / verified |
+| sample-2 | pending | pending | pending | skill-only | pending legitimate consumer PR |
+| sample-3 | pending | pending | pending | skill-only | pending legitimate consumer PR |
 
 ## Evidence captured per sample
 
@@ -173,3 +171,71 @@ or authorization to activate 07a/07b.
 07a and 07b remain `SHADOW_ONLY` regardless of the eventual observational
 result. Any recommendation or activation decision requires its own explicit
 authorization and tracker path.
+
+## Interim checkpoint: INSUFFICIENT SAMPLE (2026-09-06)
+
+At Day 19 of the observation window (exceeding the 14-calendar-day threshold), only one legitimate skill-only PR has merged into `develop`. Per Spec §11 and the publication gate, this interim report records `INSUFFICIENT SAMPLE`, captures the observed sample-1 evidence, documents cohort exclusions, and sets the next review date without deriving a premature durable budget.
+
+### Sample-1 observed evidence: PR #1996
+
+- **Identity and classification:**
+  - PR: #1996 (`chore(skills): sync shared-agent-execution consolidation (b11bddc)`)
+  - Head SHA: `2a0a21a57401815cd8d0cc0f6fc06ae15716d352`
+  - Event base SHA: `16f95adf5b2eba29574a095e4cca7fd9f5b89207`
+  - Changed paths: 18 files, strictly `.claude/skills/**`, `skill-sync.yaml`, and `skill-sync.lock`.
+  - Path-decision artifact: `9801126363` (`skill_integrity_only=true`, `needs_code_ci=false`, `content_guard_needed=false`, `manifest_decision_reason=approved_ref_only_change`).
+  - Merge commit: `0cdd1101f0993b97f9c4fe5d6a999777eae5b26f`, merged 2026-09-01T16:48:18Z.
+- **Routing:**
+  - `Develop PR` (run `33509786001`): `skill-integrity` succeeded (46s), `certification-identity` succeeded (13s), `ci-required-result` succeeded (5s).
+  - All 17 product test/build/integration jobs skipped (`medium-test`, `correctness-gate`, plan capture, product fast tests, foreign-platform framing, database integrations, etc.). Zero product jobs falsely started; zero false skips.
+  - Sibling required workflows: `PR base guard` (run `33509785991`, 8s), `Auto-merge revocation` (run `33509786055`, 15s), `Develop ruleset drift` (run `33509786281`, 19s), `Develop refresh shadow` (run `33509785994`, 16s), `Results Explorer browser tests` (run `33509785961`, 29s).
+- **Certification:**
+  - Certification artifacts: `9801136596`, `9801177912`.
+  - Certification kind was correctly labeled non-full (`prior_certification_not_full`), which is expected ineligibility by design for skill-only changes and confirms 02's pre-lane 0/10 baseline without classifier defect.
+- **Timing and runner measurements:**
+  - Required-gate / merge-unblock wall time: 98 seconds (~1.63 minutes).
+  - All-workflow wall time: 99 seconds (~1.65 minutes).
+  - Successful runner-minutes: ~2.55 runner-minutes (skill-integrity ~0.77m, certification ~0.22m, ci-required-result ~0.08m, sibling workflows ~1.48m).
+  - Cancelled runner-minutes: 0.
+  - Queue delay: ~4 hours (entered merge queue and landed cleanly).
+  - Post-merge `Develop post-merge`: 22 minutes 32 seconds (run `33533992629`).
+- **Interference and system-level throughput:**
+  - PR #1996 was current with base at open (not open-stale).
+  - Strict-current-base refreshes remained correctly bound.
+  - During PR #1996's gate, no in-flight full-product PR suffered interference or became BEHIND due to this skill-only merge.
+  - open PR lanes during its gate were checked without queue conflict.
+  - Time to refresh: 0s (no refresh required).
+  - Aggregate refresh churn attributable to PR #1996: 0.
+  - Cancelled runner-minutes: 0.
+
+### Cohort scan and non-sample exclusions
+
+All 62 PRs merged to `develop` between 2026-08-17 and 2026-09-06 were examined:
+- **PR #1907:** Classified as `manifest_structural_change`, `skill_integrity_only=false`, `needs_code_ci=true` (run `32879004472`, artifact `9575096618`). Product jobs ran as a documented safe fallback, not a false skip. Excluded from pure skill-only cohort.
+- **PR #1779 and #1928:** Touched scripts and tests alongside skills; executed code CI. Excluded from pure skill-only cohort.
+- **PR #1942:** Touched blog and docs alongside skills; classified as mixed lane. Excluded from pure skill-only cohort.
+- **All other PRs:** Full-product or publication lane PRs.
+
+### System throughput stratification
+
+| Dimension | Full-product baseline (02 / PR #1756) | Observed skill-only (Sample-1 / PR #1996) | Mixed / publication cohort |
+|---|---|---|---|
+| required-gate wall time | 27.0–31.4 min | 1.63 min (98s) | 4.5–12.0 min |
+| merge-unblock wall time | 27.0–31.4 min | 1.63 min (98s) | 4.5–12.0 min |
+| all-workflow wall time | 28.5–33.0 min | 1.65 min (99s) | 5.0–14.0 min |
+| successful runner-minutes | 80.4–83.7 min | ~2.55 min | 12.0–35.0 min |
+| cancelled runner-minutes | variable (superseded runs) | 0.0 min | variable |
+| interarrival by lane | p50 31.3 min (all develop merges) | N/A (single skill sample) | variable |
+| open-stale vs in-flight | in-flight staleness frequent | current at open, 0 in-flight drift | open-stale occasionally |
+| BEHIND causes | full-product merge arrivals | 0 full-product PRs became BEHIND | publication merge arrivals |
+| time to refresh | 15–45 min queue turnaround | 0 min (no refresh required) | 5–15 min |
+| aggregate refresh churn | high under concurrent full PRs | 0 churn attributable to skill PR | moderate |
+
+### Blocker Status and Next Review
+
+- **Status:** `INSUFFICIENT SAMPLE`
+- **Observed samples:** 1 of 3 required legitimate skill-only samples (`sample-1`: PR #1996).
+- **Missing samples:** 2 (`sample-2`, `sample-3`).
+- **Action:** TODO item `skill-integrity-ci-lane-live-validation` remains blocked awaiting two additional legitimate consumer PRs. No synthetic canaries or artificial triggers will be created.
+- **Next review date:** `2026-09-20` (14 days from this interim checkpoint).
+- **Durable budget:** Unmeasured. No durable budget or gate weakening is derived from an incomplete 1-sample cohort.
