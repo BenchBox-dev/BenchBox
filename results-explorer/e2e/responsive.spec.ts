@@ -245,6 +245,55 @@ test.describe("responsive explorer assertions", () => {
     });
   }
 
+  // The document-overflow audit above exempts anything inside `svg[role='img']`,
+  // so it cannot see a chart that overflows its own drawing. That exemption is
+  // why charts shipped clipping their right-hand quarter and bottom rows on a
+  // phone: the SVG box fitted the page, and the marks outside it were simply
+  // never painted.
+  for (const viewport of VIEWPORTS.filter((item) => item.width <= 768)) {
+    test(`chart drawings fit their own box at ${viewport.name}`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto("/results/tpch/");
+      await waitForDataLoaded(page, /Charts/);
+
+      const offenders = await page.evaluate(() => {
+        const problems: string[] = [];
+        for (const svg of Array.from(document.querySelectorAll("svg[role='img']"))) {
+          const box = svg.getBoundingClientRect();
+          if (box.width === 0) continue;
+
+          const viewBox = svg.getAttribute("viewBox");
+          if (viewBox === null) {
+            problems.push(`${svg.getAttribute("aria-label") ?? "chart"}: no viewBox`);
+            continue;
+          }
+
+          // Drawing width must match rendered width, or the coordinate system
+          // and the box disagree and marks fall outside the paint area.
+          const drawWidth = Number(viewBox.split(/\s+/)[2]);
+          if (Math.abs(drawWidth - box.width) > 1.5) {
+            problems.push(
+              `${svg.getAttribute("aria-label") ?? "chart"}: draws ${drawWidth} in a ${box.width.toFixed(0)}px box`,
+            );
+          }
+
+          for (const text of Array.from(svg.querySelectorAll("text"))) {
+            const textBox = text.getBoundingClientRect();
+            if (textBox.width === 0) continue;
+            if (textBox.right > box.right + 1 || textBox.bottom > box.bottom + 1) {
+              problems.push(
+                `${svg.getAttribute("aria-label") ?? "chart"}: "${(text.textContent ?? "").slice(0, 24)}" falls outside the drawing`,
+              );
+            }
+          }
+        }
+        return problems;
+      });
+
+      expect(offenders, offenders.join("\n")).toEqual([]);
+    });
+  }
+
   for (const homeRoute of [
     { name: "default", path: "/results/" },
     {

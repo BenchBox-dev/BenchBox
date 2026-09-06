@@ -814,7 +814,10 @@ export function QueryHeatmap({
                         ? ratio !== null
                           ? ratio <= 1.005
                             ? `${fmtQueryMs(ms)}, fastest in column`
-                            : `${fmtQueryMs(ms)}, ${formatSpeedup(ratio, { unit: "×" }).valueText} fastest in column`
+                            : // The ratio is this cell over the column minimum, so a
+                              // value above 1 is SLOWER than the fastest run, not
+                              // faster than it.
+                              `${fmtQueryMs(ms)}, ${formatSpeedup(ratio, { unit: "×" }).valueText} slower than fastest in column`
                           : fmtQueryMs(ms)
                         : isExcludedTiming
                           ? `${formatDurationMs(rawMs)}, excluded: ${excludedReason}`
@@ -899,5 +902,6 @@ function queryOutliers(
 function queryRatioLabel(ratio: number | null): string {
   if (ratio === null) return "No ranking baseline";
   if (ratio <= 1.005) return "Fastest in ranking";
-  return `${formatSpeedup(ratio, { unit: "×" }).valueText} fastest`;
+  // Ratio is this run over the fastest run in the column: above 1 is slower.
+  return `${formatSpeedup(ratio, { unit: "×" }).valueText} slower than fastest`;
 }

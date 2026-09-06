@@ -11,6 +11,7 @@
 import { deltaPct, sortByMagnitudeDesc } from "@/lib/chartMath";
 import { DIVERGING_MAX_PCT, FASTER_FILL, SLOWER_FILL, paletteColor } from "@/lib/chartTheme";
 import { useElementSize } from "@/lib/useElementSize";
+import { chartFrame } from "@/lib/chartFrame";
 
 interface DivergingEntry {
   queryId: string;
@@ -27,7 +28,7 @@ interface Props {
 
 export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const drawWidth = Math.max(containerWidth, 300);
+  const drawWidth = chartFrame(containerWidth, { minWidth: 300 }).width;
 
   if (queries.length === 0 || results.length < 2) return null;
 

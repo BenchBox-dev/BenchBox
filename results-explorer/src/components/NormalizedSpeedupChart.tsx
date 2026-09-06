@@ -22,6 +22,7 @@ import {
   paletteColor,
 } from "@/lib/chartTheme";
 import { useElementSize } from "@/lib/useElementSize";
+import { chartFrame } from "@/lib/chartFrame";
 
 function toX(speedup: number, width: number): number {
   const clamped = Math.max(0.1, Math.min(speedup, 10));
@@ -42,7 +43,7 @@ interface Props {
 export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
   // Use measured width; fall back to 600 if not yet observed (before first paint).
-  const drawWidth = Math.max(containerWidth, 300);
+  const drawWidth = chartFrame(containerWidth, { minWidth: 300 }).width;
 
   // w6 (chart-panel-scope-and-labeling): default to "comparable only"
   // so cohorts with hundreds of queries (e.g. read_primitives' ~149)

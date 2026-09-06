@@ -1,4 +1,14 @@
 import "@testing-library/jest-dom";
+import { beforeEach } from "vitest";
+
+// URL-backed component state (useUrlState) writes with history.replaceState,
+// and jsdom keeps one location per test file. Without this reset, a parameter
+// one test sets is still there when the next test renders.
+beforeEach(() => {
+  if (typeof window !== "undefined") {
+    window.history.replaceState(null, "", "/");
+  }
+});
 
 class TestResizeObserver implements ResizeObserver {
   constructor(private readonly callback: ResizeObserverCallback) {}

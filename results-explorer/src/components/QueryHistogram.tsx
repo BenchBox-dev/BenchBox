@@ -10,12 +10,15 @@
 
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
+import { chartFrame } from "@/lib/chartFrame";
 import { paletteColor } from "@/lib/chartTheme";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 import { formatTimingExclusion, platformTimingValue } from "@/lib/displayEligibility";
 import { formatLatencyMs } from "@/lib/metricFormatters";
 
 const MAX_PER_PANEL = 33;
+/** Narrowest bar that still reads as a bar rather than a hairline. */
+const MIN_BAR_W = 3;
 const BAR_GAP = 3;
 const AXIS_W = 44;
 const LABEL_H = 28;
@@ -34,16 +37,23 @@ function fmtMs(ms: number): string {
 
 export function QueryHistogram({ summary, preserveOrder = false }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize(300);
-  const w = Math.max(containerWidth, 300);
+  const frame = chartFrame(containerWidth, { minWidth: 300 });
+  const w = frame.width;
 
   const { platforms, query_ids } = summary;
   if (platforms.length === 0 || query_ids.length === 0) return null;
   const sortedQueryIds = preserveOrder ? query_ids : sortQueryIds(query_ids);
 
-  // Split into panels
+  // A query group holds one bar per platform, so how many groups fit is a
+  // function of the cohort size, not just the query count. Splitting on query
+  // count alone let a wide cohort clamp its bars to a floor wider than the
+  // group itself, and each group then painted over its neighbours.
+  const minGroupW = platforms.length * MIN_BAR_W + BAR_GAP;
+  const perPanel = Math.max(1, Math.min(MAX_PER_PANEL, Math.floor((w - AXIS_W) / minGroupW)));
+
   const panels: string[][] = [];
-  for (let i = 0; i < sortedQueryIds.length; i += MAX_PER_PANEL) {
-    panels.push(sortedQueryIds.slice(i, i + MAX_PER_PANEL));
+  for (let i = 0; i < sortedQueryIds.length; i += perPanel) {
+    panels.push(sortedQueryIds.slice(i, i + perPanel));
   }
 
   function renderPanel(qids: string[], panelIdx: number) {
@@ -60,13 +70,13 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
     const n = qids.length;
     const groupW = (w - AXIS_W) / n;
     const innerW = groupW - BAR_GAP;
-    const barW = Math.max(2, Math.floor(innerW / platforms.length));
+    const barW = Math.max(MIN_BAR_W, Math.floor(innerW / platforms.length));
 
     return (
       <div key={panelIdx} class="mb-2">
         {panels.length > 1 && (
           <p class="mb-0.5 ml-[44px] text-[10px] text-[var(--bb-data-fg-subtle)]">
-            Queries {panelIdx * MAX_PER_PANEL + 1}-{Math.min((panelIdx + 1) * MAX_PER_PANEL, sortedQueryIds.length)}
+            Queries {panelIdx * perPanel + 1}-{Math.min((panelIdx + 1) * perPanel, sortedQueryIds.length)}
           </p>
         )}
         <svg
@@ -82,9 +92,9 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
             const y = PADDING_TOP + (1 - f) * CHART_H;
             return (
               <g key={f}>
-                <line x1={AXIS_W} y1={y} x2={w} y2={y} stroke="var(--bb-chart-grid-muted)" strokeWidth={1} />
+                <line x1={AXIS_W} y1={y} x2={w} y2={y} stroke="var(--bb-chart-grid-muted)" stroke-width={1} />
                 {f > 0 && (
-                  <text x={AXIS_W - 3} y={y + 3} textAnchor="end" style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}>
+                  <text x={AXIS_W - 3} y={y + 3} text-anchor="end" style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}>
                     {fmtMs(f * maxMs)}
                   </text>
                 )}
@@ -116,8 +126,8 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
                         x2={groupX + pi * barW + (barW - 1)}
                         y2={PADDING_TOP + CHART_H - 1}
                         stroke={paletteColor(pi)}
-                        strokeWidth={2}
-                        strokeDasharray="2,1"
+                        stroke-width={2}
+                        stroke-dasharray="2,1"
                         opacity={0.5}
                       >
                         <title>{`${p.platform} · ${queryDisplayLabel(qid)}: ${reason}`}</title>
@@ -132,7 +142,7 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
                       width={barW - 1}
                       height={barH}
                       fill={paletteColor(pi)}
-                      fillOpacity={0.85}
+                      fill-opacity={0.85}
                     >
                       <title>{`${p.platform} · ${queryDisplayLabel(qid)}: ${fmtMs(ms)}`}</title>
                     </rect>
@@ -141,7 +151,7 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
                 <text
                   x={groupX + innerW / 2}
                   y={PADDING_TOP + CHART_H + 14}
-                  textAnchor="middle"
+                  text-anchor="middle"
                   data-query-label={qid}
                   style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
                 >
@@ -152,14 +162,14 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
           })}
 
           {/* Axes */}
-          <line x1={AXIS_W} y1={PADDING_TOP} x2={AXIS_W} y2={PADDING_TOP + CHART_H} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+          <line x1={AXIS_W} y1={PADDING_TOP} x2={AXIS_W} y2={PADDING_TOP + CHART_H} stroke="var(--bb-chart-grid)" stroke-width={1} />
           <line
             x1={AXIS_W}
             y1={PADDING_TOP + CHART_H}
             x2={w}
             y2={PADDING_TOP + CHART_H}
             stroke="var(--bb-chart-grid)"
-            strokeWidth={1}
+            stroke-width={1}
           />
         </svg>
       </div>
