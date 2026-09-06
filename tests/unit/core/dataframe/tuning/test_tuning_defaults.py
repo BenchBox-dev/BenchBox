@@ -14,11 +14,18 @@ from benchbox.core.dataframe.tuning import (
     get_profile_summary,
     get_smart_defaults,
 )
+from benchbox.core.dataframe.tuning.profiles import create_profile_config
 
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+@pytest.mark.parametrize("profile", ["streaming", "memory-constrained", "gpu"])
+def test_datafusion_rejects_unsupported_profiles(profile: str) -> None:
+    with pytest.raises(ValueError, match="DataFusion does not support"):
+        create_profile_config("datafusion", profile)
 
 
 class TestSystemProfile:
@@ -100,6 +107,14 @@ class TestGetSmartDefaults:
         """Test that get_smart_defaults returns valid config."""
         config = get_smart_defaults("polars")
         assert isinstance(config, DataFrameTuningConfiguration)
+
+    def test_datafusion_defaults_use_only_supported_controls(self):
+        profile = SystemProfile(cpu_cores=6, available_memory_gb=2.0)
+        config = get_smart_defaults("datafusion", profile)
+
+        assert config.parallelism.thread_count == 6
+        assert config.memory.chunk_size == 50_000
+        assert config.execution.streaming_mode is False
 
     def test_polars_defaults(self):
         """Test Polars-specific defaults."""

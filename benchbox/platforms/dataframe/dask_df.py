@@ -197,6 +197,7 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
 
         if use_distributed or scheduler_address:
             self._setup_distributed()
+            self._record_distributed_tuning()
 
     def _apply_tuning(self) -> None:
         """Apply Dask-specific tuning configuration.
@@ -236,6 +237,24 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         spill_directory = getattr(config.memory, "spill_directory", None)
         if spill_directory is not None:
             self._configured_spill_directory = Path(spill_directory).expanduser()
+
+    def _record_distributed_tuning(self) -> None:
+        """Record settings consumed by a newly created local Dask cluster."""
+        if not self.use_distributed or self.scheduler_address:
+            return
+
+        config = self._tuning_config
+        if config.parallelism.worker_count is not None:
+            self._record_runtime_tuning(f"n_workers={self.n_workers}")
+        if config.parallelism.threads_per_worker is not None:
+            self._record_runtime_tuning(f"threads_per_worker={self.threads_per_worker}")
+        if config.memory.memory_limit is not None:
+            self._record_runtime_tuning(f"memory_limit={self._memory_limit}")
+        if config.memory.spill_to_disk:
+            self._record_runtime_tuning("spill_to_disk=on")
+            spill_directory = getattr(config.memory, "spill_directory", None)
+            if spill_directory is not None:
+                self._record_runtime_tuning(f"spill_directory={self._configured_spill_directory}")
 
     def _apply_local_resource_envelope_defaults(self) -> None:
         """Apply conservative defaults for local distributed Dask runs."""
