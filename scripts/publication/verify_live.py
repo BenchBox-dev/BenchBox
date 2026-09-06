@@ -33,6 +33,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -41,9 +42,44 @@ DEFAULT_TIMEOUT = 30.0
 DEFAULT_ENDPOINTS = (
     "/",
     "/docs/",
+    "/docs/api.html",
     "/results/",
     "/results/data/results.duckdb",
 )
+
+DIMENSION_AVAILABILITY = "service_availability"
+DIMENSION_CONTENT_IDENTITY = "exact_content_identity"
+DIMENSION_RECONCILIATION = "state_reconciliation"
+DIMENSION_INDEPENDENCE = "lane_independence"
+DIMENSION_OPERATIONAL_RECOVERY = "operational_recovery"
+
+STATUS_PASS = "pass"
+STATUS_FAIL = "fail"
+STATUS_UNAVAILABLE = "unavailable"
+
+
+@dataclass
+class DimensionResult:
+    status: str  # "pass", "fail", "unavailable"
+    reason: str | None = None
+    details: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class FiveDimensionCertification:
+    certified: bool
+    dimensions: dict[str, DimensionResult] = field(default_factory=dict)
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "certified": self.certified,
+            "dimensions": {k: v.to_dict() for k, v in self.dimensions.items()},
+            "timestamp": self.timestamp,
+        }
 
 
 @dataclass
@@ -403,6 +439,167 @@ def verify_live(
     return report
 
 
+def evaluate_certification_reports(reports_dir: Path) -> FiveDimensionCertification:
+    """Evaluate 5 operational dimensions from diagnostic reports.
+
+    Dimensions:
+    1. service_availability: probe report shows 200 OK across public routes
+    2. exact_content_identity: matched checksums across required routes
+    3. state_reconciliation: 4-way reconciliation report shows 0 drift
+    4. lane_independence: lane independence matrix shows valid transitions
+    5. operational_recovery: operational receipts report shows valid drills & capacity
+
+    A missing drill/evidence is UNAVAILABLE, never green or not-applicable.
+    """
+    dimensions: dict[str, DimensionResult] = {}
+
+    # 1. Service Availability & 2. Content Identity (from availability-report.json)
+    avail_file = reports_dir / "availability-report.json"
+    if not avail_file.is_file():
+        dimensions[DIMENSION_AVAILABILITY] = DimensionResult(
+            status=STATUS_UNAVAILABLE, reason="Missing availability-report.json"
+        )
+        dimensions[DIMENSION_CONTENT_IDENTITY] = DimensionResult(
+            status=STATUS_UNAVAILABLE, reason="Missing availability report for content verification"
+        )
+    else:
+        try:
+            avail_data = json.loads(avail_file.read_text(encoding="utf-8"))
+            is_ok = avail_data.get("ok", False)
+            probes = avail_data.get("probes", [])
+            http_errors = [p for p in probes if not p.get("ok", False)]
+
+            if is_ok and not http_errors:
+                dimensions[DIMENSION_AVAILABILITY] = DimensionResult(
+                    status=STATUS_PASS, details={"probes_count": len(probes)}
+                )
+            else:
+                dimensions[DIMENSION_AVAILABILITY] = DimensionResult(
+                    status=STATUS_FAIL,
+                    reason=f"Probe failures detected: {len(http_errors)} route(s) failed",
+                    details={"failed_probes": http_errors},
+                )
+
+            # Content identity
+            matched = avail_data.get("matched_checksums", {})
+            mismatched = avail_data.get("mismatched_checksums", {})
+            if mismatched:
+                dimensions[DIMENSION_CONTENT_IDENTITY] = DimensionResult(
+                    status=STATUS_FAIL,
+                    reason=f"Content checksum mismatch on {len(mismatched)} route(s)",
+                    details={"mismatches": mismatched},
+                )
+            elif matched and is_ok:
+                dimensions[DIMENSION_CONTENT_IDENTITY] = DimensionResult(
+                    status=STATUS_PASS, details={"matched_routes": list(matched.keys())}
+                )
+            else:
+                dimensions[DIMENSION_CONTENT_IDENTITY] = DimensionResult(
+                    status=STATUS_UNAVAILABLE,
+                    reason="No verified checksums or content identity evidence in report",
+                )
+        except Exception as exc:
+            dimensions[DIMENSION_AVAILABILITY] = DimensionResult(
+                status=STATUS_FAIL, reason=f"Unreadable availability report: {exc}"
+            )
+            dimensions[DIMENSION_CONTENT_IDENTITY] = DimensionResult(
+                status=STATUS_UNAVAILABLE, reason=f"Unreadable availability report: {exc}"
+            )
+
+    # 3. State Reconciliation (from reconciliation-report.json)
+    recon_file = reports_dir / "reconciliation-report.json"
+    if not recon_file.is_file():
+        dimensions[DIMENSION_RECONCILIATION] = DimensionResult(
+            status=STATUS_UNAVAILABLE, reason="Missing reconciliation-report.json"
+        )
+    else:
+        try:
+            recon_data = json.loads(recon_file.read_text(encoding="utf-8"))
+            reconciled = recon_data.get("reconciled", False)
+            violations = recon_data.get("violations", [])
+            if reconciled and not violations:
+                dimensions[DIMENSION_RECONCILIATION] = DimensionResult(status=STATUS_PASS, details={"reconciled": True})
+            else:
+                dimensions[DIMENSION_RECONCILIATION] = DimensionResult(
+                    status=STATUS_FAIL,
+                    reason=f"Reconciliation drift: {len(violations)} violation(s)",
+                    details={"violations": violations},
+                )
+        except Exception as exc:
+            dimensions[DIMENSION_RECONCILIATION] = DimensionResult(
+                status=STATUS_UNAVAILABLE, reason=f"Unreadable reconciliation report: {exc}"
+            )
+
+    # 4. Lane Independence (from independence-matrix-report.json)
+    indep_file = reports_dir / "independence-matrix-report.json"
+    if not indep_file.is_file():
+        dimensions[DIMENSION_INDEPENDENCE] = DimensionResult(
+            status=STATUS_UNAVAILABLE, reason="Missing independence-matrix-report.json"
+        )
+    else:
+        try:
+            indep_data = json.loads(indep_file.read_text(encoding="utf-8"))
+            valid = indep_data.get("valid", False)
+            violations = indep_data.get("violations", [])
+            transitions_checked = indep_data.get("transitions_checked", 0)
+            if valid and not violations and transitions_checked > 0:
+                dimensions[DIMENSION_INDEPENDENCE] = DimensionResult(
+                    status=STATUS_PASS, details={"transitions_checked": transitions_checked}
+                )
+            elif violations:
+                dimensions[DIMENSION_INDEPENDENCE] = DimensionResult(
+                    status=STATUS_FAIL,
+                    reason=f"Cross-lane coupling: {len(violations)} violation(s)",
+                    details={"violations": violations},
+                )
+            else:
+                dimensions[DIMENSION_INDEPENDENCE] = DimensionResult(
+                    status=STATUS_UNAVAILABLE,
+                    reason="No transitions checked in independence report",
+                )
+        except Exception as exc:
+            dimensions[DIMENSION_INDEPENDENCE] = DimensionResult(
+                status=STATUS_UNAVAILABLE, reason=f"Unreadable independence report: {exc}"
+            )
+
+    # 5. Operational Recovery (from operational-receipts-report.json)
+    op_file = reports_dir / "operational-receipts-report.json"
+    if not op_file.is_file():
+        dimensions[DIMENSION_OPERATIONAL_RECOVERY] = DimensionResult(
+            status=STATUS_UNAVAILABLE, reason="Missing operational-receipts-report.json"
+        )
+    else:
+        try:
+            op_data = json.loads(op_file.read_text(encoding="utf-8"))
+            passed = op_data.get("passed", False)
+            violations = op_data.get("all_violations", op_data.get("violations", []))
+            drills = op_data.get("drills", {})
+            missing_drills = [k for k, v in drills.items() if isinstance(v, dict) and not v.get("passed", False)]
+            if passed and not violations:
+                dimensions[DIMENSION_OPERATIONAL_RECOVERY] = DimensionResult(
+                    status=STATUS_PASS, details={"drills": list(drills.keys())}
+                )
+            elif missing_drills:
+                dimensions[DIMENSION_OPERATIONAL_RECOVERY] = DimensionResult(
+                    status=STATUS_UNAVAILABLE,
+                    reason=f"Missing or expired operational drill(s): {', '.join(missing_drills)}",
+                    details={"missing_drills": missing_drills, "violations": violations},
+                )
+            else:
+                dimensions[DIMENSION_OPERATIONAL_RECOVERY] = DimensionResult(
+                    status=STATUS_FAIL,
+                    reason=f"Operational policy violation: {len(violations)} violation(s)",
+                    details={"violations": violations},
+                )
+        except Exception as exc:
+            dimensions[DIMENSION_OPERATIONAL_RECOVERY] = DimensionResult(
+                status=STATUS_UNAVAILABLE, reason=f"Unreadable operational receipts report: {exc}"
+            )
+
+    all_pass = all(d.status == STATUS_PASS for d in dimensions.values())
+    return FiveDimensionCertification(certified=all_pass, dimensions=dimensions)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -476,6 +673,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Additional specific endpoint path(s) to probe",
     )
     parser.add_argument(
+        "--certify-reports-dir",
+        type=Path,
+        default=None,
+        help="Evaluate 5 operational dimensions from directory of diagnostic reports",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Output full verification report in JSON format",
@@ -486,6 +689,19 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.certify_reports_dir is not None:
+        cert = evaluate_certification_reports(args.certify_reports_dir)
+        if args.json:
+            print(json.dumps(cert.to_dict(), indent=2))
+        else:
+            print("=== Five-Dimension Operational Certification ===")
+            print(f"Overall Certification: {'PASS (CERTIFIED)' if cert.certified else 'FAIL (UNCERTIFIED)'}")
+            for dim_name, dim_res in cert.dimensions.items():
+                print(f"  [{dim_res.status.upper()}] {dim_name}")
+                if dim_res.reason:
+                    print(f"        Reason: {dim_res.reason}")
+        return 0 if cert.certified else 1
 
     report = verify_live(
         base_url=args.base_url if not args.pre_deploy else None,

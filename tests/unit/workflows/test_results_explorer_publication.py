@@ -44,7 +44,9 @@ def test_release_docs_workflow_deploys_only_from_protected_release_push() -> Non
     guard_index = next(
         i for i, step in enumerate(steps) if step.get("name") == "Check for independent publication ownership"
     )
-    deploy_index = next(i for i, step in enumerate(steps) if step.get("uses") == "actions/deploy-pages@v4")
+    deploy_index = next(
+        i for i, step in enumerate(steps) if str(step.get("uses", "")).startswith("actions/deploy-pages@")
+    )
     assert guard_index < deploy_index
     assert steps[deploy_index]["if"] == "steps.independent.outputs.active != 'true'"
     guard_run = steps[guard_index]["run"]
