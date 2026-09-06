@@ -70,15 +70,52 @@ def test_schedule_runs_the_full_matrix() -> None:
     assert "github.event_name == 'schedule'" in selected
 
 
-def test_tpcds_runs_are_official() -> None:
-    """Unofficial TPC-DS must not be published as official."""
-    run = next(
-        step["run"]
-        for step in _workflow()["jobs"]["generate-seed-corpus"]["steps"]
-        if step.get("name") == "Run benchmark"
+def test_supported_matrix_has_three_local_identities_per_cohort() -> None:
+    """Scheduled seed updates must not depend on cloud secrets to meet the floor."""
+    entries = _workflow()["jobs"]["generate-seed-corpus"]["strategy"]["matrix"]["include"]
+    cohorts: dict[tuple[str, str], set[str]] = {}
+    for entry in entries:
+        assert "cloud" not in entry["platform"]
+        assert entry["extras"] in {"duckdb", "datafusion", "polars", "clickhouse-local"}
+        cohorts.setdefault((entry["benchmark"], entry["scale_factor"]), set()).add(entry["platform"])
+
+    assert set(cohorts) == {
+        ("tpch", "0.01"),
+        ("tpch", "0.1"),
+        ("tpch", "1.0"),
+        ("tpcds", "1"),
+        ("ssb", "0.01"),
+        ("ssb", "0.1"),
+    }
+    assert all(len(platforms) == 3 for platforms in cohorts.values())
+
+
+def test_seed_corpus_local_jobs_do_not_reference_cloud_credentials() -> None:
+    """The recurring local matrix has no optional-cloud execution path."""
+    workflow_text = WORKFLOW_PATH.read_text(encoding="utf-8").lower()
+    assert "clickhouse-cloud" not in workflow_text
+    assert "clickhouse_cloud" not in workflow_text
+    assert "cloud_host" not in workflow_text
+    assert "cloud_password" not in workflow_text
+    assert "matrix.optional" not in workflow_text
+
+
+def test_tpcds_matrix_jobs_run_with_official_seeded_command() -> None:
+    """TPC-DS output is merge-ready only when the scheduled command is official and seeded."""
+    workflow = _workflow()
+    entries = workflow["jobs"]["generate-seed-corpus"]["strategy"]["matrix"]["include"]
+    assert all(
+        entry["benchmark"] == "tpcds" and entry["scale_factor"] == "1"
+        for entry in entries
+        if entry["benchmark"] == "tpcds"
     )
-    assert "--official" in run
-    assert "tpcds" in run
+
+    run_step = next(
+        step["run"] for step in workflow["jobs"]["generate-seed-corpus"]["steps"] if step.get("name") == "Run benchmark"
+    )
+    assert 'if [ "${{ matrix.benchmark }}" = "tpcds" ]; then' in run_step
+    assert "command+=(--official --seed 42)" in run_step
+    assert '"${command[@]}"' in run_step
 
 
 def test_seed_corpus_pr_targets_develop() -> None:

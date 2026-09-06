@@ -120,6 +120,10 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
     ),
     "corpus": (
         "results-data/",
+        # The disposition seed is consumed by the corpus cutover and must be
+        # fingerprinted with that lane rather than treated as an unclassified
+        # repository-wide input.
+        "publication/ledger-seed.json",
         "scripts/validate_submission.py",
         "scripts/publication/create_ledger_seed.py",
         "scripts/publication/assembler.py",

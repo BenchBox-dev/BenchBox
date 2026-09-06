@@ -2,8 +2,7 @@ name: Seed Corpus
 
 # NOTE: Actual benchmark runs require meaningful compute resources and wall-clock time.
 # SF 0.01 / SF 0.1 jobs typically complete in a few minutes on a GitHub-hosted runner.
-# SF 1.0 jobs (especially TPC-DS) may take 10-30+ minutes depending on the platform.
-# ClickHouse Cloud jobs require CLICKHOUSE_CLOUD_HOST and CLICKHOUSE_CLOUD_PASSWORD secrets.
+# The supported matrix contains only local, three-identity cohorts.
 
 on:
   schedule:
@@ -24,9 +23,6 @@ jobs:
     name: "${{ matrix.benchmark }} / ${{ matrix.platform }} / sf${{ matrix.scale_factor }}"
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # ClickHouse Cloud requires external credentials - skip gracefully when absent.
-    # All other matrix entries are unconditional.
-    continue-on-error: ${{ matrix.optional == true }}
 
     strategy:
       fail-fast: false
@@ -70,13 +66,11 @@ jobs:
             scale_factor: "1.0"
             extras: datafusion
           - benchmark: tpch
-            platform: clickhouse-cloud
+            platform: clickhouse-local
             scale_factor: "1.0"
-            extras: clickhouse-cloud
-            optional: true # requires CLICKHOUSE_CLOUD_HOST + CLICKHOUSE_CLOUD_PASSWORD secrets
+            extras: clickhouse-local
 
-          # TPC-DS SF 1 (integer-only scale factors - do not use fractional values)
-          # polars-df is intentionally omitted because BenchBox does not ship a TPC-DS DataFrame adapter.
+          # TPC-DS SF 1 (integer-only scale factors)
           - benchmark: tpcds
             platform: duckdb
             scale_factor: "1"
@@ -85,6 +79,10 @@ jobs:
             platform: datafusion
             scale_factor: "1"
             extras: datafusion
+          - benchmark: tpcds
+            platform: clickhouse-local
+            scale_factor: "1"
+            extras: clickhouse-local
 
           # SSB SF 0.01
           - benchmark: ssb
@@ -148,21 +146,17 @@ jobs:
 
       - name: Run benchmark
         if: env.SELECTED == 'true'
-        env:
-          CLICKHOUSE_CLOUD_HOST: ${{ secrets.CLICKHOUSE_CLOUD_HOST }}
-          CLICKHOUSE_CLOUD_PASSWORD: ${{ secrets.CLICKHOUSE_CLOUD_PASSWORD }}
         run: |
-          EXTRA=()
-          if [ "${{ matrix.benchmark }}" = "tpcds" ]; then
-            EXTRA+=(--official --seed 42)
-          fi
-          uv run benchbox run \
+          command=(uv run benchbox run \
             --platform "${{ matrix.platform }}" \
             --benchmark "${{ matrix.benchmark }}" \
             --scale "${{ matrix.scale_factor }}" \
             --phases generate,load,power \
-            --compression zstd:9 \
-            "${EXTRA[@]}"
+            --compression zstd:9)
+          if [ "${{ matrix.benchmark }}" = "tpcds" ]; then
+            command+=(--official --seed 42)
+          fi
+          "${command[@]}"
 
       - name: Locate result bundle
         if: env.SELECTED == 'true'

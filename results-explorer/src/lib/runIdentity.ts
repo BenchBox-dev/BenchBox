@@ -18,6 +18,8 @@
 //     deployment fingerprint → trust tier → short result_id (last
 //     resort, only when nothing else differs).
 
+import { formatRunDateWithAge } from "@/lib/runAge";
+
 export interface RunIdentitySource {
   result_id: string;
   short_id?: string | null;
@@ -68,7 +70,7 @@ const NATURAL_QUALIFIERS: QualifierDescriptor[] = [
     key: "version",
     value: (s) => versionLabel(s.driver_version ?? s.platform_version ?? null),
   },
-  { key: "run_date", value: (s) => (s.run_date ? s.run_date.slice(0, 10) : null) },
+  { key: "run_date", value: (s) => (s.run_date ? formatRunDateWithAge(s.run_date) : null) },
   {
     key: "scale_factor",
     value: (s) => (s.scale_factor !== null && s.scale_factor !== undefined ? `SF ${s.scale_factor}` : null),
@@ -274,7 +276,7 @@ export function formatRunIdentityFull(source: RunIdentitySource): string {
   const parts = [
     source.platform,
     versionLabel(source.driver_version ?? source.platform_version ?? null),
-    source.run_date ? source.run_date.slice(0, 10) : null,
+    source.run_date ? formatRunDateWithAge(source.run_date) : null,
     source.scale_factor !== null && source.scale_factor !== undefined ? `SF ${source.scale_factor}` : null,
     NATURAL_QUALIFIERS.find((qualifier) => qualifier.key === "deployment")?.value(source) ?? null,
     source.trust_label ?? null,
