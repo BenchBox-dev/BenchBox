@@ -168,7 +168,26 @@ def read_transaction(repo_path: Path, tx_id: str, ref: str = DEFAULT_REF) -> Tra
             raise CorruptJournalError(f"Invalid state {data['state']!r} for transaction kind {kind!r}")
         if kind == KIND_ROLLBACK and not isinstance(data.get("restore_source"), dict):
             raise CorruptJournalError("Rollback transaction requires restore_source data")
-        return Transaction(**data)
+        loaded = Transaction(**data)
+        if loaded.state in {
+            STATE_EXTERNALLY_VERIFIED,
+            STATE_ROLLBACK_VERIFIED,
+            STATE_DURABLE,
+            STATE_ROLLBACK_DURABLE,
+        }:
+            if not isinstance(loaded.attestation, dict):
+                raise CorruptJournalError("Verified transaction must retain a live-receipt attestation")
+            try:
+                transaction_module.validate_live_receipt(
+                    loaded,
+                    {
+                        "attestation": loaded.attestation,
+                        "observation_digest": loaded.attestation.get("observation_digest"),
+                    },
+                )
+            except TransactionError as error:
+                raise CorruptJournalError(f"Verified transaction attestation is invalid: {error}") from error
+        return loaded
     except Exception as e:
         raise JournalError(f"Failed to read transaction '{tx_id}' at {tx_path}: {e}") from e
 
