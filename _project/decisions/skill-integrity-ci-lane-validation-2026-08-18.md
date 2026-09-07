@@ -195,7 +195,7 @@ At Day 19 of the observation window (exceeding the 14-calendar-day threshold), o
 - **Timing and runner measurements:**
   - Required-gate / merge-unblock wall time on the synchronize event: 98 seconds (~1.63 minutes).
   - All-workflow wall time: 99 seconds (~1.65 minutes).
-  - Successful runner-minutes on the synchronize event: 2.67 runner-minutes, summed from every successful completed job (ci-paths 11s, skill-integrity 72s, certification-identity 13s, ci-required-result 5s, Results Explorer `explorer-changes` 13s, Results Explorer browser gate 9s, ruleset-drift 14s, refresh-shadow 12s, and auto-merge revocation 11s).
+  - Successful runner-minutes on the synchronize event: 2.80 runner-minutes, summed from every successful completed job (ci-paths 11s, skill-integrity 72s, certification-identity 13s, ci-required-result 5s, PR base guard 8s, Results Explorer `explorer-changes` 13s, Results Explorer browser gate 9s, ruleset-drift 14s, refresh-shadow 12s, and auto-merge revocation 11s).
   - Cancelled runner-minutes: 0.
   - Queue delay: ~4 hours (entered merge queue and landed cleanly).
   - Post-merge `Develop post-merge`: 22 minutes 32 seconds (run `33533992629`).
@@ -233,7 +233,7 @@ All 274 PRs merged to `develop` between 2026-08-17 and 2026-09-06 were examined 
 - **PR #1779 and #1928:** Touched scripts and tests alongside skills; executed code CI. Excluded from pure skill-only cohort.
 - **PR #1942:** Touched blog and docs alongside skills; classified as mixed lane. Excluded from pure skill-only cohort.
 - **PR #1996:** The only candidate whose path decision was `skill_integrity_only=true`, `needs_code_ci=false`, and `content_guard_needed=false`; it is the single legitimate sample listed above.
-- **All other 270 PRs:** Full-product or publication lane PRs.
+- **All other 268 PRs:** Full-product or publication lane PRs.
 
 ### System throughput stratification
 
@@ -242,7 +242,7 @@ All 274 PRs merged to `develop` between 2026-08-17 and 2026-09-06 were examined 
 | required-gate wall time | 27.0–31.4 min | 1.63 min (98s) | 4.5–12.0 min |
 | merge-unblock wall time | 27.0–31.4 min | 1.63 min (98s) | 4.5–12.0 min |
 | all-workflow wall time | 28.5–33.0 min | 1.65 min (99s) | 5.0–14.0 min |
-| successful runner-minutes | 80.4–83.7 min | ~2.55 min | 12.0–35.0 min |
+| successful runner-minutes | 80.4–83.7 min | 2.80 min (synchronize; 2.22 min merge-group) | 12.0–35.0 min |
 | cancelled runner-minutes | variable (superseded runs) | 0.0 min | variable |
 | interarrival by lane | p50 31.3 min (all develop merges) | N/A (single skill sample) | variable |
 | open-stale vs in-flight | in-flight staleness frequent | current at open, 0 in-flight drift | open-stale occasionally |
