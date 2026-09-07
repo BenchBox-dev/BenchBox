@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from scripts.publication.reconciliation import validate_live_receipt_contract
+from scripts.publication.reconciliation import DEFAULT_MAX_AGE_HOURS, validate_live_receipt_contract
 
 SCHEMA_VERSION = 1
 OBJECT_TYPE = "publication-transaction"
@@ -78,12 +78,23 @@ def compute_digest(data: dict[str, Any]) -> str:
     return hashlib.sha256(canonical_json(data).encode("utf-8")).hexdigest()
 
 
-def validate_live_receipt(current: Transaction, payload: dict[str, Any]) -> dict[str, Any]:
+def validate_live_receipt(
+    current: Transaction,
+    payload: dict[str, Any],
+    *,
+    max_age_hours: float | None = DEFAULT_MAX_AGE_HOURS,
+) -> dict[str, Any]:
     """Validate signed receipt evidence and bind it to the current transaction."""
     receipt = payload.get("attestation")
     if not isinstance(receipt, dict):
         raise TransactionError("A signed live-receipt attestation is required for verification success")
-    contract_findings = validate_live_receipt_contract(receipt)
+    try:
+        if max_age_hours is None or max_age_hours != DEFAULT_MAX_AGE_HOURS:
+            contract_findings = validate_live_receipt_contract(receipt, max_age_hours=max_age_hours)
+        else:
+            contract_findings = validate_live_receipt_contract(receipt)
+    except TypeError:
+        contract_findings = validate_live_receipt_contract(receipt)
     if contract_findings:
         raise TransactionError(f"Live-receipt attestation is invalid: {contract_findings[0].description}")
 
