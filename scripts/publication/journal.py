@@ -178,13 +178,23 @@ def read_transaction(repo_path: Path, tx_id: str, ref: str = DEFAULT_REF) -> Tra
             if not isinstance(loaded.attestation, dict):
                 raise CorruptJournalError("Verified transaction must retain a live-receipt attestation")
             try:
-                transaction_module.validate_live_receipt(
-                    loaded,
-                    {
-                        "attestation": loaded.attestation,
-                        "observation_digest": loaded.attestation.get("observation_digest"),
-                    },
-                )
+                try:
+                    transaction_module.validate_live_receipt(
+                        loaded,
+                        {
+                            "attestation": loaded.attestation,
+                            "observation_digest": loaded.attestation.get("observation_digest"),
+                        },
+                        max_age_hours=None,
+                    )
+                except TypeError:
+                    transaction_module.validate_live_receipt(
+                        loaded,
+                        {
+                            "attestation": loaded.attestation,
+                            "observation_digest": loaded.attestation.get("observation_digest"),
+                        },
+                    )
             except TransactionError as error:
                 raise CorruptJournalError(f"Verified transaction attestation is invalid: {error}") from error
         return loaded
@@ -331,13 +341,23 @@ def init_genesis_journal(
     if not isinstance(genesis_transaction.attestation, dict):
         raise CorruptJournalError("Genesis transaction must retain a valid live-receipt attestation")
     try:
-        transaction_module.validate_live_receipt(
-            genesis_transaction,
-            {
-                "attestation": genesis_transaction.attestation,
-                "observation_digest": genesis_transaction.attestation.get("observation_digest"),
-            },
-        )
+        try:
+            transaction_module.validate_live_receipt(
+                genesis_transaction,
+                {
+                    "attestation": genesis_transaction.attestation,
+                    "observation_digest": genesis_transaction.attestation.get("observation_digest"),
+                },
+                max_age_hours=None,
+            )
+        except TypeError:
+            transaction_module.validate_live_receipt(
+                genesis_transaction,
+                {
+                    "attestation": genesis_transaction.attestation,
+                    "observation_digest": genesis_transaction.attestation.get("observation_digest"),
+                },
+            )
     except TransactionError as error:
         raise CorruptJournalError(f"Genesis transaction attestation is invalid: {error}") from error
     init_state = JournalState(

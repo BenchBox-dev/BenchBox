@@ -844,12 +844,14 @@ def _check_receipt_freshness(
 
 
 def validate_live_receipt_contract(
-    receipt: dict[str, Any], *, now: datetime | None = None, max_age_hours: float = DEFAULT_MAX_AGE_HOURS
+    receipt: dict[str, Any], *, now: datetime | None = None, max_age_hours: float | None = DEFAULT_MAX_AGE_HOURS
 ) -> list[DriftFinding]:
     """Validate the complete signed live-receipt contract and freshness boundary."""
     findings = _check_receipt_contract_fields(receipt)
     probe_findings, _ = _check_observed_probes(receipt)
-    freshness, _ = _check_receipt_freshness(receipt, True, max_age_hours, now or datetime.now(timezone.utc))
+    freshness: list[DriftFinding] = []
+    if max_age_hours is not None and max_age_hours > 0:
+        freshness, _ = _check_receipt_freshness(receipt, True, max_age_hours, now or datetime.now(timezone.utc))
     return [*findings, *probe_findings, *freshness]
 
 
