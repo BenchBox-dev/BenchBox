@@ -254,31 +254,27 @@ test.describe("responsive explorer assertions", () => {
     test(`chart drawings fit their own box at ${viewport.name}`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await page.goto("/results/tpch/");
-      await waitForDataLoaded(page, /Charts/);
+      // The matrix view renders the long summary overview instead of the
+      // tabbed chart panel, so every chart is on the page at once: the
+      // distribution section plus one collapsible card per additional view.
+      await waitForDataLoaded(page, /More views/);
 
-      // Walk every question group and every chart within it. Checking only the
-      // default view leaves most of the chart set unmeasured, and the default
-      // is the one chart least likely to be wrong.
-      const groups = page.getByRole("tablist", { name: "Chart question groups" }).getByRole("tab");
-      const groupCount = await groups.count();
-      // If this ever reads zero the walk below is vacuous and the test would
-      // pass without measuring anything.
-      expect(groupCount, "chart question groups").toBeGreaterThan(1);
-      let chartsVisited = 0;
+      // Open every preview card so each full chart (not just its thumbnail)
+      // is measured. Checking only the default view leaves most of the chart
+      // set unmeasured, and the default is the one chart least likely to be
+      // wrong.
+      const previews = page.getByTestId("summary-more-views").locator("details");
+      const previewCount = await previews.count();
+      for (let p = 0; p < previewCount; p += 1) {
+        const details = previews.nth(p);
+        const isOpen = await details.evaluate((node) => (node as HTMLDetailsElement).open);
+        if (!isOpen) {
+          await details.locator("summary").first().click();
+          await page.waitForTimeout(150);
+        }
+      }
 
-      for (let g = 0; g < groupCount; g += 1) {
-        await groups.nth(g).click();
-        await page.waitForTimeout(150);
-        const chartButtons = page.locator('[aria-label$="charts"] button');
-        const chartCount = await chartButtons.count();
-
-        for (let c = 0; c < Math.max(chartCount, 1); c += 1) {
-          if (chartCount > 0) {
-            await chartButtons.nth(c).click();
-            await page.waitForTimeout(150);
-          }
-          chartsVisited += 1;
-
+      {
           const offenders = await page.evaluate(() => {
             const problems: string[] = [];
             for (const svg of Array.from(
@@ -324,9 +320,11 @@ test.describe("responsive explorer assertions", () => {
           });
 
           expect(offenders, offenders.join("\n")).toEqual([]);
-        }
       }
 
+      const chartsVisited = await page.locator("[data-chart-container] svg[role='img']").count();
+      // If this ever reads too low the measurement above is vacuous and the
+      // test would pass without measuring anything.
       expect(chartsVisited, "charts measured").toBeGreaterThan(5);
     });
   }

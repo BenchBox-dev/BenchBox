@@ -26,6 +26,7 @@ import { StackedPhase } from "@/components/StackedPhase";
 import { SparklineTable } from "@/components/SparklineTable";
 import { CDFChart } from "@/components/CDFChart";
 import { RankTable } from "@/components/RankTable";
+import { SummaryChartOverview } from "@/components/SummaryChartOverview";
 import { fmtGeomean, fmtScore } from "@/utils";
 import { paletteColor } from "@/lib/chartTheme";
 import { formatRunDateWithAge } from "@/lib/runAge";
@@ -55,6 +56,8 @@ import {
 
 interface ChartPanelProps {
   context: ChartContext;
+  /** Use the long summary layout when the page already owns the matrix view. */
+  summaryLayout?: "tabs" | "long";
   baselineIndex?: number;
   onBaselineIndexChange?: (baselineIndex: number) => void;
   // w18: thread the Compare-page guardrail (cohort mismatch → suppress
@@ -86,7 +89,14 @@ interface ValueLabelPlacement {
   placement: "outside" | "inside" | "gutter";
 }
 
-export function ChartPanel({
+export function ChartPanel(props: ChartPanelProps) {
+  if (props.summaryLayout === "long" && props.context.kind === "summary" && props.context.summary !== null) {
+    return <SummaryChartOverview context={props.context} excludeChartIds={props.excludeChartIds} />;
+  }
+  return <ChartPanelTabs {...props} />;
+}
+
+function ChartPanelTabs({
   context,
   baselineIndex,
   onBaselineIndexChange,

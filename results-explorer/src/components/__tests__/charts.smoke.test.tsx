@@ -396,6 +396,9 @@ describe("QueryHistogram", () => {
     const svg = container.querySelector("svg");
     expect(svg?.getAttribute("width")).toBe("100%");
     expect(svg?.getAttribute("viewBox")).toMatch(/^0 0 300 /);
+    // Height floor follows the shared chartFrame layout (196 for this
+    // fixture); the old floor belonged to the retired isNarrowChart sizing.
+    expect(Number(svg?.getAttribute("height"))).toBeGreaterThan(100);
   });
 
   it("splits panels on cohort width, not query count alone", () => {
@@ -577,7 +580,11 @@ describe("TimeSeries", () => {
       makeEntry({ result_id: "r2", run_date: "2026-04-01", display_geomean_ms: 10 }),
     ];
     const { container } = render(<TimeSeries entries={entries} />);
-    expect(container.querySelector("svg")).not.toBeNull();
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeNull();
+    // Height floor follows the shared chartFrame layout (208 for this
+    // fixture); the old floor belonged to the retired isNarrowChart sizing.
+    expect(Number(svg?.getAttribute("height"))).toBeGreaterThan(100);
     expect(container.querySelector("path")).not.toBeNull();
   });
 
