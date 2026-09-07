@@ -492,7 +492,7 @@ def run_staging_benchmark():
         # Run ETL pipeline
         with get_database_connection() as conn:
             logger.info("Running ETL pipeline...")
-            etl_result = benchmark.run_parallel_etl_pipeline(
+            etl_result = benchmark.run_etl_pipeline(
                 conn, batch_type='historical', validate_data=True
             )
 
@@ -505,7 +505,7 @@ def run_staging_benchmark():
 
             # Run benchmark queries
             logger.info("Running benchmark queries...")
-            query_result = benchmark.run_parallel_benchmark(conn, iterations=3)
+            query_result = benchmark.run_benchmark(conn, iterations=3)
 
             successful_queries = sum(1 for q in query_result['queries'].values()
                                    if q.get('avg_time', 0) > 0)
@@ -617,9 +617,8 @@ class ProductionTPCDI:
             'start_time': datetime.now().isoformat(),
             'scale_factor': self.benchmark.scale_factor,
             'configuration': {
-                'workers': self.benchmark.parallel_config.max_workers,
-                'parallel_etl': self.benchmark.parallel_config.enable_parallel_etl,
-                'parallel_queries': self.benchmark.parallel_config.enable_parallel_queries
+                'workers': self.benchmark.max_workers,
+                'parallel_enabled': self.benchmark.enable_parallel,
             },
             'phases': {},
             'metrics': {},
@@ -650,7 +649,7 @@ class ProductionTPCDI:
                 self.logger.info("Phase 2: Running ETL pipeline")
                 etl_start = datetime.now()
 
-                etl_result = self.benchmark.run_parallel_etl_pipeline(
+                etl_result = self.benchmark.run_etl_pipeline(
                     conn, batch_type='historical', validate_data=True
                 )
 
@@ -674,7 +673,7 @@ class ProductionTPCDI:
                 self.logger.info("Phase 3: Running query benchmark")
                 query_start = datetime.now()
 
-                query_result = self.benchmark.run_parallel_benchmark(
+                query_result = self.benchmark.run_benchmark(
                     conn, iterations=int(os.getenv('TPCDI_ITERATIONS', '5'))
                 )
 
@@ -689,7 +688,7 @@ class ProductionTPCDI:
                 self.logger.info(f"Query benchmark completed in {query_time:.2f}s")
 
                 # Collect final metrics
-                results['metrics'] = self.benchmark.get_parallel_status()
+                results['metrics'] = self.benchmark.get_enhanced_etl_status()
                 results['success'] = True
                 results['end_time'] = datetime.now().isoformat()
 
@@ -985,7 +984,7 @@ class TPCDIMonitor:
                 system_metrics = self.collect_system_metrics()
 
                 # Collect benchmark metrics
-                benchmark_metrics = benchmark.get_parallel_status()
+                benchmark_metrics = benchmark.get_enhanced_etl_status()
                 etl_metrics = benchmark.get_etl_status()
 
                 combined_metrics = {
