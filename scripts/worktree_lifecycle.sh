@@ -9,7 +9,7 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 operation=${1:-}
 
 usage() {
-  echo "Usage: $0 create|remove|release" >&2
+  echo "Usage: $0 create|remove|release|finish" >&2
   exit 1
 }
 
@@ -267,9 +267,38 @@ release_worktree() {
   $py_runner "$script_dir/worktree_lifecycle_metadata.py" release --worktree-path "$target"
 }
 
+finish_worktree() {
+  worktree_input=${WORKTREE_PATH:-}
+  [ -n "$worktree_input" ] || die "Usage: make worktree-finish WORKTREE_PATH=<path> EXPECTED_HEAD_OID=<oid>"
+
+  oid_input=${EXPECTED_HEAD_OID:-}
+  [ -n "$oid_input" ] || die "Usage: make worktree-finish WORKTREE_PATH=<path> EXPECTED_HEAD_OID=<oid>"
+
+  primary_clone=$(dirname "$(git_common_dir)")
+  target=$(canonical_path "$worktree_input")
+
+  py_runner="python3"
+  if command -v uv >/dev/null 2>&1; then
+    py_runner="uv run --no-project -- python"
+  fi
+
+  format_args=""
+  if [ -n "${FORMAT:-}" ]; then
+    format_args="--format $FORMAT"
+  fi
+
+  # shellcheck disable=SC2086
+  $py_runner "$script_dir/worktree_finish.py" \
+    --repo-root "$primary_clone" \
+    --worktree-path "$target" \
+    --expected-head-oid "$oid_input" \
+    $format_args
+}
+
 case "$operation" in
   create) create_worktree ;;
   remove) remove_worktree ;;
   release) release_worktree ;;
+  finish) finish_worktree ;;
   *) usage ;;
 esac

@@ -464,11 +464,23 @@ def test_failure_id_test_paths_extracts_junit_paths_only() -> None:
     paths = failure_id_test_paths(
         [
             "tests/unit/test_query_generation_preflight.py::test_tpcds_throughput_preflight_detects_generation_failures",
+            "tests.unit.platforms.credentials.test_bigquery_defaults.TestBigQueryCredentialDefaults::test_partial_existing_credentials",
             "lint:Run CI lint mirror",
             12,
         ]
     )
-    assert paths == ["tests/unit/test_query_generation_preflight.py"]
+    assert paths == [
+        "tests/unit/test_query_generation_preflight.py",
+        "tests/unit/platforms/credentials/test_bigquery_defaults.py",
+    ]
+
+
+def test_attribution_advisory_for_unrelated_dotted_junit_classname() -> None:
+    failure_ids = [
+        "tests.unit.platforms.credentials.test_bigquery_defaults.TestBigQueryCredentialDefaults::test_partial_existing_credentials"
+    ]
+    changed = ["results-data/README.md", ".github/workflows/seed-corpus.yml"]
+    assert attribution_action(failure_ids, changed) == "advisory"
 
 
 def test_attribution_advisory_when_blamed_sha_misses_failing_test() -> None:

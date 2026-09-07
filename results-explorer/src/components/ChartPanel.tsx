@@ -10,6 +10,8 @@ import {
   type ChartRegistryEntry,
 } from "@/lib/chartRegistry";
 import { useElementSize } from "@/lib/useElementSize";
+import { stringSerde, useUrlState } from "@/lib/useUrlState";
+import { axisLabelAnchor, barRowLayout, chartFrame } from "@/lib/chartFrame";
 import { PowerBar } from "@/components/PowerBar";
 import { DistributionBox } from "@/components/DistributionBox";
 import { QueryHeatmap } from "@/components/QueryHeatmap";
@@ -72,6 +74,9 @@ interface ChartPanelProps {
   queryFilter?: readonly string[];
 }
 
+/** URL parameter carrying the open chart. */
+const CHART_URL_KEY = "chart";
+
 interface CompareQueryRow {
   queryId: string;
   timings: ({ ms: number; status: "pass" } | null)[];
@@ -132,7 +137,12 @@ function ChartPanelTabs({
     [summary],
   );
   const preferredId = useMemo(() => preferredChartId(context, charts), [context, charts]);
-  const [activeId, setActiveId] = useState<string>(preferredId);
+  // The open chart belongs in the URL: a reader who finds the view that answers
+  // their question should be able to send that view, not an address that lands
+  // the recipient back on the default. An unknown or no-longer-applicable id is
+  // canonicalised to the preferred chart by the effect below, which rewrites
+  // the parameter as it goes.
+  const [activeId, setActiveId] = useUrlState<string>(CHART_URL_KEY, preferredId, stringSerde);
   const [localBaselineIdx, setLocalBaselineIdx] = useState(0);
   const groupTabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const isBaselineControlled = baselineIndex !== undefined;
@@ -147,6 +157,22 @@ function ChartPanelTabs({
       setActiveId(preferredId);
     }
   }, [activeId, charts, preferredId]);
+
+  // Router navigation between two routes that both host this panel uses
+  // pushState, which fires no popstate, so the panel stays mounted with the
+  // chart the reader chose while the destination URL says nothing about it.
+  // The parameter has to describe what is on screen, or a shared link does not
+  // reproduce the view it was copied from.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // Only an id this cohort can actually show belongs in the URL. Without this
+    // guard the effect races the canonicalisation above and writes back the
+    // very id that was just rejected.
+    if (!charts.some((chart) => chart.id === activeId)) return;
+    const inUrl = new URLSearchParams(window.location.search).get(CHART_URL_KEY);
+    const expected = activeId === preferredId ? null : activeId;
+    if (inUrl !== expected) setActiveId(activeId);
+  }, [activeId, charts, preferredId, setActiveId]);
 
   useEffect(() => {
     if (!isBaselineControlled) setLocalBaselineIdx(0);
@@ -508,8 +534,12 @@ function preferredChartId(
     if (ids.has("summary_box")) return "summary_box";
   }
 
-  if (context.kind === "summary" && ids.has("sparkline_table")) {
-    return "sparkline_table";
+  // A section headed "Charts" should open on a chart. The sparkline table is an
+  // HTML metrics table; it stays available in the Overview group, but leading
+  // with it meant a reader who never touched the controls saw no chart at all.
+  if (context.kind === "summary") {
+    if (ids.has("performance_bar")) return "performance_bar";
+    if (ids.has("sparkline_table")) return "sparkline_table";
   }
 
   return charts[0]?.id ?? "";
@@ -678,7 +708,8 @@ function renderChart(
 
 function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const width = Math.max(containerWidth, 400);
+  const frame = chartFrame(containerWidth);
+  const width = frame.width;
   const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
   );
@@ -710,19 +741,25 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
     );
   }
 
-  const labelWidth = 160;
-  const rowHeight = 36;
+  const layout = barRowLayout(frame, { labelWidth: 160, rowHeight: 36, valueTrail: 96 });
+  const labelWidth = layout.labelWidth;
+  const rowHeight = layout.rowHeight;
   const axisHeight = 32;
   const topPadding = 8;
-  const valueLabelGutter = 96;
-  const plotWidth = width - labelWidth - valueLabelGutter;
+  const plotWidth = layout.plotWidth;
   const totalHeight = topPadding + rows.length * rowHeight + axisHeight;
   const scale = buildLatencyBarScale(rows.map((row) => row.display_geomean_ms));
   if (scale === null) return null;
 
   const ticks = latencyScaleTicks(scale);
-  const scaleLabel =
-    scale.mode === "log"
+  // The full caption is wider than a phone column, so a compact drawing names
+  // the scale and the direction and leaves the metric to the chart's heading
+  // and accessible name, which already say "geomean performance".
+  const scaleLabel = layout.labelAbove
+    ? scale.mode === "log"
+      ? "Log scale - lower is better"
+      : "Median of passing - lower is better"
+    : scale.mode === "log"
       ? "Geomean query time (log scale) - lower is better"
       : "Geomean query time (median-of-passing) - lower is better";
 
@@ -730,8 +767,9 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
     <div ref={containerRef} class="w-full overflow-x-auto">
       <svg
         class="bb-chart-svg"
-        width={width}
+        width="100%"
         height={totalHeight}
+        viewBox={`0 0 ${width} ${totalHeight}`}
         role="img"
         aria-label={
           scale.mode === "log"
@@ -744,28 +782,33 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
           const barWidth = fraction * plotWidth;
           const renderedBarWidth = Math.max(2, barWidth);
           const valueLabel = fmtGeomean(row.display_geomean_ms);
-          const valueLabelPlacement = placePerformanceValueLabel({
-            barWidth: renderedBarWidth,
-            plotWidth,
-            labelWidth,
-            valueText: valueLabel,
-          });
+          // A compact row has no gutter to place the value in: it shares the
+          // label line, at the opposite end, where no bar length can displace
+          // it. Wide rows keep the measured three-way placement.
+          const valueLabelPlacement: ValueLabelPlacement = layout.labelAbove
+            ? { x: width, textAnchor: "end", fill: "var(--bb-chart-label)", placement: "outside" }
+            : placePerformanceValueLabel({
+                barWidth: renderedBarWidth,
+                plotWidth,
+                labelWidth,
+                valueText: valueLabel,
+              });
           const y = topPadding + index * rowHeight;
-          const midY = y + rowHeight * 0.5;
-          const barHeight = rowHeight * 0.55;
+          const midY = y + layout.barCenter;
+          const barHeight = 36 * 0.55;
           return (
             <g key={row.result_id}>
               <text
-                x={labelWidth - 6}
-                y={midY + 4}
-                textAnchor="end"
+                x={layout.labelAbove ? 0 : labelWidth - 6}
+                y={y + layout.labelBaseline}
+                text-anchor={layout.labelAbove ? "start" : "end"}
                 style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}
               >
                 <title>{row.fullLabel}</title>
                 {row.displayLabel}
               </text>
               <rect
-                x={labelWidth}
+                x={layout.plotX}
                 y={midY - barHeight / 2}
                 width={renderedBarWidth}
                 height={barHeight}
@@ -777,19 +820,19 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
               </rect>
               {valueLabelPlacement.placement === "gutter" && (
                 <line
-                  x1={labelWidth + renderedBarWidth + 4}
+                  x1={layout.plotX + renderedBarWidth + 4}
                   y1={midY}
                   x2={valueLabelPlacement.x - 5}
                   y2={midY}
                   stroke="var(--bb-chart-grid)"
-                  strokeWidth={1}
-                  strokeDasharray="2 2"
+                  stroke-width={1}
+                  stroke-dasharray="2 2"
                 />
               )}
               <text
                 x={valueLabelPlacement.x}
-                y={midY + 4}
-                textAnchor={valueLabelPlacement.textAnchor}
+                y={layout.labelAbove ? y + layout.labelBaseline : midY + 4}
+                text-anchor={valueLabelPlacement.textAnchor}
                 data-value-placement={valueLabelPlacement.placement}
                 style={{ fontSize: "11px", fill: valueLabelPlacement.fill }}
               >
@@ -802,7 +845,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
                   x2={width}
                   y2={y + rowHeight}
                   stroke="var(--bb-chart-grid)"
-                  strokeWidth={1}
+                  stroke-width={1}
                 />
               )}
             </g>
@@ -811,23 +854,23 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
 
         <g transform={`translate(0, ${topPadding + rows.length * rowHeight})`}>
           <line
-            x1={labelWidth}
+            x1={layout.plotX}
             y1={0}
-            x2={labelWidth + plotWidth}
+            x2={layout.plotX + plotWidth}
             y2={0}
             stroke="var(--bb-chart-grid)"
-            strokeWidth={1}
+            stroke-width={1}
           />
           {ticks.map((value) => {
             const fraction = latencyScaleFraction(value, scale) ?? 0;
-            const x = labelWidth + fraction * plotWidth;
+            const x = layout.plotX + fraction * plotWidth;
             return (
               <g key={value}>
-                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" strokeWidth={1} />
+                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" stroke-width={1} />
                 <text
                   x={x}
                   y={16}
-                  textAnchor="middle"
+                  text-anchor={axisLabelAnchor(x, width)}
                   style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}
                 >
                   {fmtGeomean(value)}
@@ -835,10 +878,12 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
               </g>
             );
           })}
+          {/* Centred, this caption is wider than a phone column and would spill
+              from both ends. A compact drawing anchors it at the left instead. */}
           <text
-            x={labelWidth + plotWidth / 2}
+            x={layout.labelAbove ? 0 : layout.plotX + plotWidth / 2}
             y={axisHeight - 2}
-            textAnchor="middle"
+            text-anchor={layout.labelAbove ? "start" : "middle"}
             style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}
           >
             {scaleLabel}

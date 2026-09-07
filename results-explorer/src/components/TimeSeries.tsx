@@ -13,6 +13,7 @@
 
 import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
 import { useElementSize } from "@/lib/useElementSize";
+import { axisLabelAnchor, chartFrame } from "@/lib/chartFrame";
 import { timeSeriesColor } from "@/lib/chartTheme";
 import { formatLatencyMs, formatPowerScore } from "@/lib/metricFormatters";
 import { formatRunDateWithAge } from "@/lib/runAge";
@@ -23,7 +24,6 @@ import {
   visibleResultIdForRow,
 } from "@/lib/resultLinks";
 import { formatRunIdentityLabelsForCohort, type RunIdentitySource } from "@/lib/runIdentity";
-import { isNarrowChart } from "@/lib/chartResponsive";
 import { RunDateWithAge } from "@/components/RunAge";
 
 const LABEL_W = 58;
@@ -63,9 +63,8 @@ interface Series {
 
 export function TimeSeries({ entries, primaryMetric }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize(320);
-  const w = Math.max(containerWidth, 320);
-  const narrow = isNarrowChart(containerWidth);
-  const plotHeight = narrow ? 260 : CHART_H;
+  const frame = chartFrame(containerWidth);
+  const w = frame.width;
 
   const metric = primaryMetric ?? "display_geomean_ms";
   const higherIsBetter = metric === "power_score";
@@ -175,7 +174,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
   const yRange = yMax - yMin || 1;
 
   const plotW = w - LABEL_W - PADDING_RIGHT;
-  const totalH = PADDING_TOP + plotHeight + AXIS_H;
+  const totalH = PADDING_TOP + CHART_H + AXIS_H;
 
   function xFor(date: string): number {
     const idx = dateIndex.get(date) ?? 0;
@@ -186,7 +185,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
     const normalized = (val - yMin) / yRange;
     // Higher value → top of chart for power_score; bottom for latency
     const pos = higherIsBetter ? normalized : 1 - normalized;
-    return PADDING_TOP + plotHeight * (1 - pos);
+    return PADDING_TOP + CHART_H * (1 - pos);
   }
 
   const metricLabel = metric === "power_score" ? "Power score" : "Geomean latency";
@@ -200,19 +199,19 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
       />
     ) : null;
 
-  // A portrait chart needs fewer date labels to keep them legible.
-  const maxDateLabels = narrow ? 4 : 7;
-  const step = Math.ceil(allDates.length / maxDateLabels);
+  // Show at most 7 x-axis labels when there are many dates
+  const step = Math.ceil(allDates.length / 7);
   const shownDates = allDates.filter((_, i) => i % step === 0 || i === allDates.length - 1);
 
   return (
     <div class={duplicateDayState ? "space-y-3" : undefined}>
       {duplicateDayState}
-      <div ref={containerRef} class="w-full overflow-x-auto">
+      <div ref={containerRef} class="w-full">
         <svg
           class="bb-chart-svg"
-          width={w}
+          width="100%"
           height={totalH}
+          viewBox={`0 0 ${w} ${totalH}`}
           role="img"
           aria-label={`${metricLabel} trend over time`}
         >
@@ -231,12 +230,12 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
                   x2={w - PADDING_RIGHT}
                   y2={y}
                   stroke="var(--bb-chart-grid)"
-                  strokeWidth={1}
+                  stroke-width={1}
                 />
                 <text
                   x={LABEL_W - 4}
                   y={y + 4}
-                  textAnchor="end"
+                  text-anchor="end"
                   style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
                 >
                   {label}
@@ -255,7 +254,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
             .join(" ");
           return (
             <g key={s.platformId}>
-              <path d={d} stroke={s.color} strokeWidth={2} fill="none" strokeLinejoin="round" />
+              <path d={d} stroke={s.color} stroke-width={2} fill="none" stroke-linejoin="round" />
               {s.points.map((p) => (
                 <circle
                   key={p.resultId}
@@ -275,17 +274,17 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
         })}
 
         {/* X-axis */}
-        <g transform={`translate(0, ${PADDING_TOP + plotHeight})`}>
-          <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+        <g transform={`translate(0, ${PADDING_TOP + CHART_H})`}>
+          <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" stroke-width={1} />
           {shownDates.map((date) => {
             const x = xFor(date);
             return (
               <g key={date}>
-                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" strokeWidth={1} />
+                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" stroke-width={1} />
                 <text
                   x={x}
                   y={20}
-                  textAnchor="middle"
+                  text-anchor={axisLabelAnchor(x, w)}
                   aria-label={formatRunDateWithAge(date)}
                   style={{ fontSize: "9px", fill: "var(--bb-chart-axis)" }}
                 >

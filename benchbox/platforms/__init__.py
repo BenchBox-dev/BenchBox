@@ -790,6 +790,8 @@ databend|password|Databend password (or set DATABEND_PASSWORD env var)|{}
 databend|database|Database name (default: benchbox)|{'default': 'benchbox'}
 databend|dsn|Full Databend DSN (overrides individual connection params)|{}
 databend|warehouse|Databend Cloud warehouse name|{}
+databend|ssl|Enable SSL/TLS for Databend connections|{'parser': 'parse_bool', 'default': True}
+databend|disable_result_cache|Disable Databend query result cache during benchmark execution|{'parser': 'parse_bool', 'default': True}
 doris|host|Doris FE node hostname|{'default': 'localhost'}
 doris|port|Doris MySQL protocol port|{'parser': 'int', 'default': 9030}
 doris|http_port|Doris Stream Load HTTP port (FE)|{'parser': 'int', 'default': 8030}

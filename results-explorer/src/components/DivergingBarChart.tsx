@@ -11,6 +11,7 @@
 import { deltaPct, sortByMagnitudeDesc } from "@/lib/chartMath";
 import { DIVERGING_MAX_PCT, FASTER_FILL, SLOWER_FILL, paletteColor } from "@/lib/chartTheme";
 import { useElementSize } from "@/lib/useElementSize";
+import { chartFrame, edgeSafeValueLabel } from "@/lib/chartFrame";
 
 interface DivergingEntry {
   queryId: string;
@@ -27,7 +28,7 @@ interface Props {
 
 export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const drawWidth = Math.max(containerWidth, 300);
+  const drawWidth = chartFrame(containerWidth, { minWidth: 300 }).width;
 
   if (queries.length === 0 || results.length < 2) return null;
 
@@ -157,12 +158,27 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
                       fill={isRegression ? SLOWER_FILL : FASTER_FILL}
                       opacity={0.75}
                     />
+                    {/* A delta at the clamp reaches the end of its half of the
+                        plot; a label started past the bar would fall outside
+                        the viewBox and be cropped. */}
                     <text
-                      x={isRegression ? barX + barW + 2 : barX - 2}
+                      x={
+                        edgeSafeValueLabel(
+                          isRegression ? barX + barW : barX,
+                          drawWidth,
+                          isRegression ? "right" : "left",
+                        ).x
+                      }
                       y={barY + BAR_H / 2 + 3}
                       font-size="8"
                       fill={entry.color}
-                      text-anchor={isRegression ? "start" : "end"}
+                      text-anchor={
+                        edgeSafeValueLabel(
+                          isRegression ? barX + barW : barX,
+                          drawWidth,
+                          isRegression ? "right" : "left",
+                        ).textAnchor
+                      }
                     >
                       {entry.deltaPct >= 0 ? "+" : ""}{entry.deltaPct.toFixed(1)}%
                     </text>

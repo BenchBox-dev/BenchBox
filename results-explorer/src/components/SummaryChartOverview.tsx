@@ -638,7 +638,7 @@ function MiniCDF({ summary }: { summary: BenchmarkSummary }) {
             const y = 76 - (point.y / 100) * 68;
             return pointIndex === 0 ? `M${x.toFixed(1)},${y.toFixed(1)}` : `H${x.toFixed(1)} V${y.toFixed(1)}`;
           }).join(" ");
-          return <path key={index} d={d} fill="none" stroke={entry.color} strokeWidth="1.5" />;
+          return <path key={index} d={d} fill="none" stroke={entry.color} stroke-width="1.5" />;
         })}
       </svg>
     </MiniFrame>
@@ -741,7 +741,7 @@ function MiniTrend({ summary, historical }: { summary: BenchmarkSummary; histori
             const y = metric === "power_score" ? 10 + (1 - normalized) * 62 : 10 + normalized * 62;
             return `${pointIndex === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
           }).join(" ");
-          return <path key={index} d={d} fill="none" stroke={timeSeriesColor(index)} strokeWidth="1.5" />;
+          return <path key={index} d={d} fill="none" stroke={timeSeriesColor(index)} stroke-width="1.5" />;
         })}
       </svg>
     </MiniFrame>

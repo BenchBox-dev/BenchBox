@@ -13,10 +13,10 @@
 
 import type { BenchmarkSummary, PlatformRow } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
+import { axisLabelAnchor, chartFrame } from "@/lib/chartFrame";
 import { paletteColor } from "@/lib/chartTheme";
 import { costModelDisclosure, normalizedCostValue } from "@/lib/costDisplay";
 import { formatLatencyMs, formatPowerScore, formatUsd } from "@/lib/metricFormatters";
-import { isNarrowChart, NARROW_CHART_MIN_WIDTH } from "@/lib/chartResponsive";
 
 const AXIS_W = 54;
 const AXIS_H = 32;
@@ -42,10 +42,8 @@ type ScatterPoint = {
 
 export function CostScatter({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const narrow = isNarrowChart(containerWidth);
-  const w = Math.max(containerWidth, narrow ? NARROW_CHART_MIN_WIDTH : 400);
-  const axisWidth = narrow ? 46 : AXIS_W;
-  const chartHeight = narrow ? 260 : CHART_H;
+  const frame = chartFrame(containerWidth);
+  const w = frame.width;
 
   // Primary metric comes from the canonical DuckDB-persisted ranking row.
   // Fallback is safe: every result has a display_geomean_ms.
@@ -94,18 +92,18 @@ export function CostScatter({ summary }: Props) {
   const xRange = xMax - xMin || 1;
   const yRange = yMax - yMin || 1;
 
-  const plotW = w - axisWidth - PADDING_RIGHT;
-  const totalH = PADDING_TOP + chartHeight + AXIS_H;
+  const plotW = w - AXIS_W - PADDING_RIGHT;
+  const totalH = PADDING_TOP + CHART_H + AXIS_H;
 
   function xFor(cost: number): number {
-    return axisWidth + ((cost - xMin) / xRange) * plotW;
+    return AXIS_W + ((cost - xMin) / xRange) * plotW;
   }
 
   function yFor(perf: number): number {
     const normalized = (perf - yMin) / yRange;
     // Higher perf → top of chart when higher-is-better
     const pos = higherIsBetter ? normalized : 1 - normalized;
-    return PADDING_TOP + chartHeight * (1 - pos);
+    return PADDING_TOP + CHART_H * (1 - pos);
   }
 
   const metricLabel =
@@ -113,18 +111,19 @@ export function CostScatter({ summary }: Props) {
   const modelDisclosure = costModelDisclosure(summary.platforms);
 
   return (
-    <div ref={containerRef} class="w-full overflow-x-auto">
+    <div ref={containerRef} class="w-full">
       <svg
         class="bb-chart-svg"
-        width={w}
+        width="100%"
         height={totalH}
+        viewBox={`0 0 ${w} ${totalH}`}
         role="img"
         aria-label={`Normalized cost vs ${metricLabel} scatter plot (${modelDisclosure})`}
       >
         {/* Grid - label orientation flips with higherIsBetter so the top
             of the chart always shows the better-performance value. */}
         {[0, 0.25, 0.5, 0.75, 1].map((f) => {
-          const y = PADDING_TOP + f * chartHeight;
+          const y = PADDING_TOP + f * CHART_H;
           const val = higherIsBetter ? yMax - f * yRange : yMin + f * yRange;
           const label =
             metric === "power_score"
@@ -133,17 +132,17 @@ export function CostScatter({ summary }: Props) {
           return (
             <g key={f}>
               <line
-                x1={axisWidth}
+                x1={AXIS_W}
                 y1={y}
                 x2={w - PADDING_RIGHT}
                 y2={y}
                 stroke="var(--bb-chart-grid-muted)"
-                strokeWidth={1}
+                stroke-width={1}
               />
               <text
-                x={axisWidth - 4}
+                x={AXIS_W - 4}
                 y={y + 4}
-                textAnchor="end"
+                text-anchor="end"
                 style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
               >
                 {label}
@@ -160,17 +159,19 @@ export function CostScatter({ summary }: Props) {
           const regionLabel = [p.provider, p.region].filter(Boolean).join(" ");
           return (
             <g key={p.result_id}>
-              <circle cx={cx} cy={cy} r={7} fill={p.color} fillOpacity={0.85}>
+              <circle cx={cx} cy={cy} r={7} fill={p.color} fill-opacity={0.85}>
                 <title>
                   {`${p.platform}: normalized ${formatUsd(p.cost).valueText} / ${
                     metric === "power_score" ? formatPowerScore(p.perf).valueText : formatLatencyMs(p.perf).valueText
                   } (${p.modelVersion ?? "model unknown"}${regionLabel ? `, ${regionLabel}` : ""})`}
                 </title>
               </circle>
+              {/* A point near either edge cannot carry a centred label: half of
+                  it would fall outside the drawing and be cropped. */}
               <text
                 x={cx}
                 y={cy - 11}
-                textAnchor="middle"
+                text-anchor={axisLabelAnchor(cx, w, 40)}
                 style={{ fontSize: "10px", fill: "var(--bb-chart-label)" }}
               >
                 {shortLabel}
@@ -181,40 +182,40 @@ export function CostScatter({ summary }: Props) {
 
         {/* Axes */}
         <line
-          x1={axisWidth}
+          x1={AXIS_W}
           y1={PADDING_TOP}
-          x2={axisWidth}
-          y2={PADDING_TOP + chartHeight}
+          x2={AXIS_W}
+          y2={PADDING_TOP + CHART_H}
           stroke="var(--bb-chart-grid)"
-          strokeWidth={1}
+          stroke-width={1}
         />
         <line
-          x1={axisWidth}
-          y1={PADDING_TOP + chartHeight}
+          x1={AXIS_W}
+          y1={PADDING_TOP + CHART_H}
           x2={w - PADDING_RIGHT}
-          y2={PADDING_TOP + chartHeight}
+          y2={PADDING_TOP + CHART_H}
           stroke="var(--bb-chart-grid)"
-          strokeWidth={1}
+          stroke-width={1}
         />
 
         {/* X-axis labels */}
         {[0, 0.5, 1].map((f) => {
-          const x = axisWidth + f * plotW;
+          const x = AXIS_W + f * plotW;
           const cost = xMin + f * xRange;
           return (
             <g key={f}>
               <line
                 x1={x}
-                y1={PADDING_TOP + chartHeight}
+                y1={PADDING_TOP + CHART_H}
                 x2={x}
-                y2={PADDING_TOP + chartHeight + 4}
+                y2={PADDING_TOP + CHART_H + 4}
                 stroke="var(--bb-chart-label-muted)"
-                strokeWidth={1}
+                stroke-width={1}
               />
               <text
                 x={x}
-                y={PADDING_TOP + chartHeight + 16}
-                textAnchor="middle"
+                y={PADDING_TOP + CHART_H + 16}
+                text-anchor={axisLabelAnchor(x, w)}
                 style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}
               >
                 {formatUsd(cost).valueText}
@@ -223,9 +224,9 @@ export function CostScatter({ summary }: Props) {
           );
         })}
         <text
-          x={axisWidth + plotW / 2}
-          y={PADDING_TOP + chartHeight + AXIS_H - 2}
-          textAnchor="middle"
+          x={AXIS_W + plotW / 2}
+          y={PADDING_TOP + CHART_H + AXIS_H - 2}
+          text-anchor="middle"
           style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}
         >
           Normalized cost (USD)
@@ -236,8 +237,8 @@ export function CostScatter({ summary }: Props) {
           x={0}
           y={0}
           style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
-          transform={`rotate(-90) translate(${-(PADDING_TOP + chartHeight / 2)}, 11)`}
-          textAnchor="middle"
+          transform={`rotate(-90) translate(${-(PADDING_TOP + CHART_H / 2)}, 11)`}
+          text-anchor="middle"
         >
           {metricLabel}
         </text>

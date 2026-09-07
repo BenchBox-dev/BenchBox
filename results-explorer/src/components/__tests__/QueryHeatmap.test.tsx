@@ -357,7 +357,7 @@ describe("QueryHeatmap rendering", () => {
     expect(fastest?.textContent).toBe("10 ms");
     expect(fastest?.getAttribute("aria-label")).toBe("10 ms, fastest in column");
     expect(slowest?.textContent).toBe("100 ms");
-    expect(slowest?.getAttribute("aria-label")).toBe("100 ms, 10.00× fastest in column");
+    expect(slowest?.getAttribute("aria-label")).toBe("100 ms, 10.00× slower than fastest in column");
   });
 
   it("shows the metric/heatmap legend, excludes exact zeroes, and formats positive sub-millisecond timings", () => {
@@ -446,7 +446,7 @@ describe("QueryHeatmap rendering", () => {
     expect(sqliteCard.textContent).toContain("Query outliers");
     expect(sqliteCard.textContent).toContain("Q2");
     expect(sqliteCard.textContent).toContain("200 ms");
-    expect(sqliteCard.textContent).toContain("10.00× fastest");
+    expect(sqliteCard.textContent).toContain("10.00× slower than fastest");
   });
 
   it("uses the same comparison selection ids from compact mobile cards", () => {

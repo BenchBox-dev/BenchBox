@@ -355,3 +355,58 @@ def test_read_transaction_rejects_invalid_contract(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(journal_mod, "_run_git", lambda *args, **kwargs: json.dumps(data))
     with pytest.raises(journal_mod.JournalError):
         journal_mod.read_transaction(Path("."), "bad")
+
+
+def test_historical_durable_transaction_reads_without_stale_receipt_error(
+    git_repo: Path, genesis_tx: tx_mod.Transaction, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Historical durable transactions in the journal must not fail read due to wall-clock receipt age."""
+    from scripts.publication.reconciliation import validate_live_receipt_contract as real_validate
+
+    # Restore the real validator to test real contract validation
+    monkeypatch.setattr(tx_mod, "validate_live_receipt_contract", real_validate)
+    monkeypatch.setattr("scripts.publication.reconciliation.verify_live_receipt_signature", lambda r: (True, None))
+
+    base_oid = subprocess.run(
+        ["git", "rev-parse", "refs/heads/publication"],
+        cwd=git_repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    target = {"repository": "BenchBox-dev/BenchBox", "environment": "github-pages", "url": "https://benchbox.dev"}
+    genesis_tx.attestation.update(
+        {
+            "schema_version": 2,
+            "receipt_id": "live-genesis-test",
+            "timestamp": "2026-08-01T00:00:00Z",
+            "develop_sha": "0" * 40,
+            "published_results_sha": "0" * 40,
+            "artifact": {"archive_sha256": genesis_tx.artifact["archive_sha256"]},
+            "artifacts": {"pages_assembly": {"digest": genesis_tx.artifact["archive_sha256"]}},
+            "observation_origin": "github-actions:publication-verify",
+            "nonce": "test-nonce",
+            "freshness_window": "24h",
+            "attestor": "github-actions:publication-deploy",
+            "signature": "mock-sig",
+            "status": "BUILT",
+            "target": "benchbox.dev",
+            "routes": [
+                {"path": "/", "status_code": 200, "ok": True, "sha256": "abc"},
+                {"path": "/docs/", "status_code": 200, "ok": True, "sha256": "abc"},
+                {"path": "/results/", "status_code": 200, "ok": True, "sha256": "abc"},
+                {"path": "/results/data/results.duckdb", "status_code": 200, "ok": True, "sha256": "abc"},
+            ],
+        }
+    )
+
+    state, commit_oid = journal_mod.init_genesis_journal(
+        repo_path=git_repo,
+        target=target,
+        genesis_transaction=genesis_tx,
+        base_commit_oid=base_oid,
+        ref="publication",
+    )
+    loaded = journal_mod.read_transaction(git_repo, state.durable_transaction_id, ref="publication")
+    assert loaded.transaction_id == genesis_tx.transaction_id

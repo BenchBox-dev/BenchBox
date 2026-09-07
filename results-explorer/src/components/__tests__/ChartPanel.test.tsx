@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/preact";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 import { ChartPanel } from "@/components/ChartPanel";
 import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
@@ -268,6 +268,61 @@ describe("ChartPanel", () => {
     fireEvent.keyDown(rank, { key: "Home" });
     expect(document.activeElement).toBe(overview);
     expect(overview).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("opens a summary cohort on a chart rather than on the sparkline table", () => {
+    // A section headed "Charts" used to open on an HTML metrics table, so a
+    // reader who never touched the controls saw no chart at all.
+    render(<ChartPanel context={{ kind: "summary", summary: makeSummary() }} />);
+
+    expect(screen.getByRole("img", { name: /performance comparison/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Performance Bar" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+  });
+
+  it("records the open chart in the URL so the view can be shared", () => {
+    render(<ChartPanel context={{ kind: "summary", summary: makeSummary() }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sparkline Table" }));
+
+    expect(new URLSearchParams(window.location.search).get("chart")).toBe("sparkline_table");
+  });
+
+  it("restores the chart named in the URL", () => {
+    window.history.replaceState(null, "", "/?chart=stacked_phase");
+
+    render(<ChartPanel context={{ kind: "summary", summary: makeSummary() }} />);
+
+    expect(screen.getByRole("button", { name: "Stacked Phase Breakdown" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+  });
+
+  it("canonicalises a chart id that does not apply to this cohort", async () => {
+    window.history.replaceState(null, "", "/?chart=comparison_bar");
+
+    render(<ChartPanel context={{ kind: "summary", summary: makeSummary() }} />);
+
+    // comparison_bar needs two results; a summary cohort cannot show it.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Performance Bar" }).getAttribute("aria-pressed")).toBe(
+        "true",
+      );
+    });
+    expect(new URLSearchParams(window.location.search).get("chart")).toBeNull();
+  });
+
+  it("leaves the route's own parameters alone", () => {
+    window.history.replaceState(null, "", "/results/tpch/?sf=1&phase=power");
+
+    render(<ChartPanel context={{ kind: "summary", summary: makeSummary() }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Sparkline Table" }));
+
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get("sf")).toBe("1");
+    expect(params.get("phase")).toBe("power");
+    expect(params.get("chart")).toBe("sparkline_table");
   });
 
   it("hides charts whose ids are listed in excludeChartIds", () => {

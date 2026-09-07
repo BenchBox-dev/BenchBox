@@ -12,11 +12,11 @@
 
 import type { PercentileStats } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
+import { axisLabelAnchor, barRowLayout, chartFrame, edgeSafeValueLabel } from "@/lib/chartFrame";
 import { paletteColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
 import { formatLatencyMs } from "@/lib/metricFormatters";
 import { preserveUniqueAfterTruncation } from "@/lib/runIdentity";
-import { isNarrowChart, NARROW_CHART_MIN_WIDTH } from "@/lib/chartResponsive";
 
 // Neutral gray for opacity-only legend swatches (shows opacity levels, not platform identity).
 const LEGEND_SWATCH_COLOR = "var(--bb-chart-axis)";
@@ -53,12 +53,9 @@ const PADDING_TOP = 28; // space for legend
 
 export function PercentileLadder({ rows }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const narrow = isNarrowChart(containerWidth);
-  const drawWidth = Math.max(containerWidth, narrow ? NARROW_CHART_MIN_WIDTH : 400);
-  const labelWidth = narrow ? 108 : LABEL_W;
-  const rowHeight = narrow ? 48 : ROW_H;
-  const paddingTop = narrow ? 32 : PADDING_TOP;
-  const axisHeight = narrow ? 30 : AXIS_H;
+  const frame = chartFrame(containerWidth);
+  const drawWidth = frame.width;
+  const layout = barRowLayout(frame, { labelWidth: LABEL_W, rowHeight: ROW_H, valueTrail: 8 });
 
   if (rows.length === 0) return null;
 
@@ -72,29 +69,39 @@ export function PercentileLadder({ rows }: Props) {
   if (scale === null) return null;
   const logScale = scale;
 
-  const barAreaWidth = drawWidth - labelWidth - 8;
+  const barAreaWidth = layout.plotWidth;
 
   function xForMs(ms: number): number {
-    return labelWidth + logLatencyFraction(ms, logScale) * barAreaWidth;
+    return layout.plotX + logLatencyFraction(ms, logScale) * barAreaWidth;
   }
 
-  const totalHeight = paddingTop + rows.length * rowHeight + axisHeight;
+  const totalHeight = PADDING_TOP + rows.length * layout.rowHeight + AXIS_H;
 
   const axisTicks = logLatencyTicks(logScale, 0.1);
+  // A label on its own line has the full column to itself; one in the gutter
+  // has 140 units. preserveUniqueAfterTruncation keeps the distinguishing
+  // suffix inside whichever budget applies.
   const displayLabels = preserveUniqueAfterTruncation(
     rows.map((row) => row.displayLabel ?? row.platform),
-    narrow ? 14 : 18,
+    layout.labelAbove ? 32 : 18,
   );
 
   return (
-    <div ref={containerRef} class="w-full overflow-x-auto">
-      <svg class="bb-chart-svg" width={drawWidth} height={totalHeight} role="img" aria-label="Percentile latency ladder chart">
+    <div ref={containerRef} class="w-full">
+      <svg
+        class="bb-chart-svg"
+        width="100%"
+        height={totalHeight}
+        viewBox={`0 0 ${drawWidth} ${totalHeight}`}
+        role="img"
+        aria-label="Percentile latency ladder chart"
+      >
         {/* Legend */}
         <g transform="translate(0, 4)">
           {PERCENTILE_LABELS.map((label, li) => {
             const opacity = RUNG_OPACITY[li];
             return (
-              <g key={label} transform={`translate(${labelWidth + li * 56}, 0)`}>
+              <g key={label} transform={`translate(${layout.plotX + li * 56}, 0)`}>
                 <rect width={14} height={10} y={3} fill={LEGEND_SWATCH_COLOR} opacity={opacity} rx={1} />
                 <text x={18} y={12} class="text-[10px] fill-[var(--bb-data-fg-muted)] font-mono">
                   {label}
@@ -107,9 +114,9 @@ export function PercentileLadder({ rows }: Props) {
         {/* Platform rows */}
         {rows.map((row, ri) => {
           const color = paletteColor(row.colorIdx ?? ri);
-          const y = paddingTop + ri * rowHeight;
-          const midY = y + rowHeight * 0.5;
-          const barH = rowHeight * 0.55;
+          const y = PADDING_TOP + ri * layout.rowHeight;
+          const midY = y + layout.barCenter;
+          const barH = ROW_H * 0.55;
 
           // Draw P99 → P95 → P90 → P50 (widest first, darkest last)
           const rungs: { label: string; ms: number; opacity: number }[] = [
@@ -123,9 +130,9 @@ export function PercentileLadder({ rows }: Props) {
             <g key={row.result_id} data-result-id={row.result_id}>
               {/* Platform label */}
               <text
-                x={labelWidth - 6}
-                y={midY + 4}
-                textAnchor="end"
+                x={layout.labelAbove ? 0 : LABEL_W - 6}
+                y={y + layout.labelBaseline}
+                text-anchor={layout.labelAbove ? "start" : "end"}
                 class="text-xs fill-[var(--bb-data-fg-primary)]"
                 style={{ fontSize: "11px" }}
               >
@@ -152,9 +159,20 @@ export function PercentileLadder({ rows }: Props) {
               })}
 
               {/* P50 value label */}
+              {/* A p50 close to the axis maximum lands at the end of the plot,
+                  where a trailing label would be cropped. */}
               <text
-                x={xForMs(row.percentile_stats.p50) + 4}
-                y={midY + 4}
+                x={
+                  layout.labelAbove
+                    ? drawWidth
+                    : edgeSafeValueLabel(xForMs(row.percentile_stats.p50), drawWidth, "right", 4).x
+                }
+                y={layout.labelAbove ? y + layout.labelBaseline : midY + 4}
+                text-anchor={
+                  layout.labelAbove
+                    ? "end"
+                    : edgeSafeValueLabel(xForMs(row.percentile_stats.p50), drawWidth, "right", 4).textAnchor
+                }
                 class="text-[10px] fill-[var(--bb-data-fg-muted)] font-mono"
                 style={{ fontSize: "10px" }}
               >
@@ -163,24 +181,38 @@ export function PercentileLadder({ rows }: Props) {
 
               {/* Separator line */}
               {ri < rows.length - 1 && (
-                <line x1={0} y1={y + rowHeight} x2={drawWidth} y2={y + rowHeight} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+                <line
+                  x1={0}
+                  y1={y + layout.rowHeight}
+                  x2={drawWidth}
+                  y2={y + layout.rowHeight}
+                  stroke="var(--bb-chart-grid)"
+                  stroke-width={1}
+                />
               )}
             </g>
           );
         })}
 
         {/* X-axis */}
-        <g transform={`translate(0, ${paddingTop + rows.length * rowHeight})`}>
-          <line x1={labelWidth} y1={0} x2={drawWidth - 4} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+        <g transform={`translate(0, ${PADDING_TOP + rows.length * layout.rowHeight})`}>
+          <line
+            x1={layout.plotX}
+            y1={0}
+            x2={layout.plotX + barAreaWidth}
+            y2={0}
+            stroke="var(--bb-chart-grid)"
+            stroke-width={1}
+          />
           {axisTicks.map((ms) => {
             const x = xForMs(ms);
             return (
               <g key={ms}>
-                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" strokeWidth={1} />
+                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" stroke-width={1} />
                 <text
                   x={x}
                   y={16}
-                  textAnchor="middle"
+                  text-anchor={axisLabelAnchor(x, drawWidth)}
                   class="text-[10px] fill-[var(--bb-data-fg-subtle)] font-mono"
                   style={{ fontSize: "10px" }}
                 >
