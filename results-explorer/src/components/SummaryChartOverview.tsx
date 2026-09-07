@@ -254,7 +254,9 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
             Full distribution view for display-safe rows. Whiskers show the observed per-query range.
           </p>
         </div>
-        <DistributionBox summary={summary} />
+        <div data-chart-container>
+          <DistributionBox summary={summary} />
+        </div>
       </section>
 
       {charts.length > 0 && (
@@ -317,6 +319,7 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
                   <div
                     class="border-t border-[var(--bb-data-border)] p-4"
                     data-testid={`summary-chart-full-${chart.id}`}
+                    data-chart-container
                   >
                     {isOpen && (
                       <>
