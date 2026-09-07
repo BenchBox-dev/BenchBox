@@ -122,8 +122,12 @@ def load_signature(path: Path) -> dict[str, object]:
 def failure_id_test_paths(failure_ids: list[object]) -> list[str]:
     """Extract repository test paths from junit-style failure IDs.
 
-    ``tests/unit/foo.py::test_bar`` yields ``tests/unit/foo.py``. Job-level
-    IDs such as ``lint:Run CI lint mirror`` yield nothing.
+    ``tests/unit/foo.py::test_bar`` yields ``tests/unit/foo.py``. Some JUnit
+    writers omit the testcase ``file`` attribute, leaving pytest's dotted
+    classname instead (for example,
+    ``tests.unit.foo.TestFoo::test_bar``); that form is normalized back to
+    ``tests/unit/foo.py`` as well. Job-level IDs such as ``lint:Run CI lint
+    mirror`` yield nothing.
     """
     paths: list[str] = []
     seen: set[str] = set()
@@ -131,13 +135,23 @@ def failure_id_test_paths(failure_ids: list[object]) -> list[str]:
         if not isinstance(raw, str):
             continue
         candidate = raw.split("::", 1)[0].strip()
-        if not candidate.endswith(".py"):
+        if candidate.endswith(".py"):
+            path = candidate
+        elif candidate.startswith("tests.") and "." in candidate:
+            # pytest's JUnit fallback classname is the dotted test module,
+            # optionally followed by the test class. Class names conventionally
+            # start with an uppercase letter; preserve module-level test IDs.
+            parts = candidate.split(".")
+            if parts[-1] and parts[-1][0].isupper():
+                parts = parts[:-1]
+            path = "/".join(parts) + ".py"
+        else:
             continue
-        if "/" not in candidate and not candidate.startswith("tests"):
+        if "/" not in path and not path.startswith("tests"):
             continue
-        if candidate not in seen:
-            seen.add(candidate)
-            paths.append(candidate)
+        if path not in seen:
+            seen.add(path)
+            paths.append(path)
     return paths
 
 
