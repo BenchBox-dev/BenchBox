@@ -398,6 +398,54 @@ describe("QueryHistogram", () => {
     expect(svg?.getAttribute("viewBox")).toMatch(/^0 0 300 /);
   });
 
+  it("splits panels on cohort width, not query count alone", () => {
+    // A query group holds one bar per platform. Splitting on query count alone
+    // let a wide cohort clamp each bar to a minimum wider than the group it sat
+    // in, so consecutive groups painted over one another. Reproduced at the
+    // narrow width where the clamp actually bites.
+    Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+      configurable: true,
+      get: () => 300,
+    });
+    try {
+      const query_ids = Array.from({ length: 22 }, (_, i) => `Q${i + 1}`);
+      const timings = Object.fromEntries(query_ids.map((qid) => [qid, 10]));
+      const platforms = Array.from({ length: 12 }, (_, i) =>
+        makePlatform({ result_id: `r${i}`, platform_id: `p${i}`, platform: `Platform ${i}`, timings }),
+      );
+      const { container } = render(<QueryHistogram summary={makeSummary({ query_ids, platforms })} />);
+
+      for (const svg of Array.from(container.querySelectorAll("svg"))) {
+        const extents = Array.from(svg.querySelectorAll("g"))
+          .filter((group) => group.querySelector("[data-query-label]"))
+          .map((group) => {
+            const marks = Array.from(group.querySelectorAll("rect, line"));
+            const xs = marks.map((mark) =>
+              Number(mark.getAttribute("x") ?? mark.getAttribute("x1") ?? NaN),
+            );
+            const rights = marks.map((mark) =>
+              mark.tagName === "rect"
+                ? Number(mark.getAttribute("x") ?? 0) + Number(mark.getAttribute("width") ?? 0)
+                : Number(mark.getAttribute("x2") ?? 0),
+            );
+            return { left: Math.min(...xs), right: Math.max(...rights) };
+          })
+          .filter((extent) => Number.isFinite(extent.left) && Number.isFinite(extent.right))
+          .sort((a, b) => a.left - b.left);
+
+        expect(extents.length).toBeGreaterThan(1);
+        for (let i = 1; i < extents.length; i += 1) {
+          expect(extents[i - 1]!.right).toBeLessThanOrEqual(extents[i]!.left);
+        }
+      }
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+        configurable: true,
+        get: () => 0,
+      });
+    }
+  });
+
   it("auto-splits into multiple panels when query count > 33", () => {
     const query_ids = Array.from({ length: 70 }, (_, i) => `Q${i + 1}`);
     const timings: Record<string, number> = {};

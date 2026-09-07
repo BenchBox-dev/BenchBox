@@ -15,6 +15,7 @@
 
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
+import { axisLabelAnchor, barRowLayout, chartFrame } from "@/lib/chartFrame";
 import { paletteColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, computeBoxStats, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
 import { formatTimingExclusion, isTimingDisplayable, platformTimingValue } from "@/lib/displayEligibility";
@@ -33,7 +34,9 @@ interface Props {
 
 export function DistributionBox({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const w = Math.max(containerWidth, 400);
+  const frame = chartFrame(containerWidth);
+  const w = frame.width;
+  const layout = barRowLayout(frame, { labelWidth: LABEL_W, rowHeight: ROW_H, valueTrail: PADDING_RIGHT });
 
   const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
@@ -69,28 +72,40 @@ export function DistributionBox({ summary }: Props) {
   if (scale === null) return null;
   const logScale = scale;
 
-  const plotW = w - LABEL_W - PADDING_RIGHT;
-  const totalH = PADDING_TOP + rows.length * ROW_H + AXIS_H;
+  const plotW = layout.plotWidth;
+  const totalH = PADDING_TOP + rows.length * layout.rowHeight + AXIS_H;
 
   function xFor(ms: number): number {
-    return LABEL_W + logLatencyFraction(ms, logScale) * plotW;
+    return layout.plotX + logLatencyFraction(ms, logScale) * plotW;
   }
 
   const xTicks = logLatencyTicks(logScale);
 
   return (
-    <div ref={containerRef} class="w-full overflow-x-auto">
-      <svg class="bb-chart-svg" width={w} height={totalH} role="img" aria-label="Distribution box plots of per-query latency">
+    <div ref={containerRef} class="w-full">
+      <svg
+        class="bb-chart-svg"
+        width="100%"
+        height={totalH}
+        viewBox={`0 0 ${w} ${totalH}`}
+        role="img"
+        aria-label="Distribution box plots of per-query latency"
+      >
         {rows.map((row, ri) => {
-          const y = PADDING_TOP + ri * ROW_H;
-          const midY = y + ROW_H * 0.5;
+          const y = PADDING_TOP + ri * layout.rowHeight;
+          const midY = y + layout.barCenter;
           const boxH = ROW_H * 0.46;
           const { min, q1, median, q3, max } = row.stats;
 
           return (
             <g key={row.label}>
               {/* Platform label */}
-              <text x={LABEL_W - 6} y={midY + 4} textAnchor="end" style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}>
+              <text
+                x={layout.labelAbove ? 0 : LABEL_W - 6}
+                y={y + layout.labelBaseline}
+                text-anchor={layout.labelAbove ? "start" : "end"}
+                style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}
+              >
                 <title>{row.fullLabel}</title>
                 {row.label}
               </text>
@@ -102,13 +117,13 @@ export function DistributionBox({ summary }: Props) {
                 x2={xFor(max)}
                 y2={midY}
                 stroke={row.color}
-                strokeWidth={1.5}
-                strokeDasharray="3 2"
+                stroke-width={1.5}
+                stroke-dasharray="3 2"
               />
               {/* Min cap */}
-              <line x1={xFor(min)} y1={midY - 5} x2={xFor(min)} y2={midY + 5} stroke={row.color} strokeWidth={1.5} />
+              <line x1={xFor(min)} y1={midY - 5} x2={xFor(min)} y2={midY + 5} stroke={row.color} stroke-width={1.5} />
               {/* Max cap */}
-              <line x1={xFor(max)} y1={midY - 5} x2={xFor(max)} y2={midY + 5} stroke={row.color} strokeWidth={1.5} />
+              <line x1={xFor(max)} y1={midY - 5} x2={xFor(max)} y2={midY + 5} stroke={row.color} stroke-width={1.5} />
 
               {/* IQR box (Q1-Q3) */}
               <rect
@@ -117,9 +132,9 @@ export function DistributionBox({ summary }: Props) {
                 width={Math.max(2, xFor(q3) - xFor(q1))}
                 height={boxH}
                 fill={row.color}
-                fillOpacity={0.18}
+                fill-opacity={0.18}
                 stroke={row.color}
-                strokeWidth={1.5}
+                stroke-width={1.5}
                 rx={2}
               />
 
@@ -130,26 +145,38 @@ export function DistributionBox({ summary }: Props) {
                 x2={xFor(median)}
                 y2={midY + boxH / 2}
                 stroke={row.color}
-                strokeWidth={2.5}
+                stroke-width={2.5}
               />
 
               {/* Separator */}
               {ri < rows.length - 1 && (
-                <line x1={0} y1={y + ROW_H} x2={w} y2={y + ROW_H} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+                <line
+                  x1={0}
+                  y1={y + layout.rowHeight}
+                  x2={w}
+                  y2={y + layout.rowHeight}
+                  stroke="var(--bb-chart-grid)"
+                  stroke-width={1}
+                />
               )}
             </g>
           );
         })}
 
         {/* X-axis */}
-        <g transform={`translate(0, ${PADDING_TOP + rows.length * ROW_H})`}>
-          <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+        <g transform={`translate(0, ${PADDING_TOP + rows.length * layout.rowHeight})`}>
+          <line x1={layout.plotX} y1={0} x2={layout.plotX + plotW} y2={0} stroke="var(--bb-chart-grid)" stroke-width={1} />
           {xTicks.map((ms) => {
             const x = xFor(ms);
             return (
               <g key={ms}>
-                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" strokeWidth={1} />
-                <text x={x} y={16} textAnchor="middle" style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}>
+                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" stroke-width={1} />
+                <text
+                  x={x}
+                  y={16}
+                  text-anchor={axisLabelAnchor(x, w)}
+                  style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}
+                >
                   {formatLatencyMs(ms, { subMillisecond: "compact" }).valueText}
                 </text>
               </g>

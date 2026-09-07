@@ -10,6 +10,7 @@
 
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
+import { axisLabelAnchor, chartFrame } from "@/lib/chartFrame";
 import { timeSeriesColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, computeECDFPoints, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
 import { formatTimingExclusion, isTimingDisplayable, platformTimingValue } from "@/lib/displayEligibility";
@@ -20,7 +21,7 @@ const Y_TICKS_PCT = [0, 25, 50, 75, 100];
 
 const LABEL_W = 36;
 const AXIS_H = 28;
-const PADDING_TOP = 30; // legend space
+const PADDING_TOP = 8;
 const PADDING_RIGHT = 12;
 const PLOT_H = 180;
 
@@ -30,7 +31,8 @@ interface Props {
 
 export function CDFChart({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const w = Math.max(containerWidth, 400);
+  const frame = chartFrame(containerWidth);
+  const w = frame.width;
 
   const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
@@ -70,15 +72,22 @@ export function CDFChart({ summary }: Props) {
   const xTicks = logLatencyTicks(logScale);
 
   return (
-    <div ref={containerRef} class="w-full overflow-x-auto">
-      <svg class="bb-chart-svg" width={w} height={totalH} role="img" aria-label="Cumulative distribution of per-query latency">
+    <div ref={containerRef} class="w-full">
+      <svg
+        class="bb-chart-svg"
+        width="100%"
+        height={totalH}
+        viewBox={`0 0 ${w} ${totalH}`}
+        role="img"
+        aria-label="Cumulative distribution of per-query latency"
+      >
         {/* Y-axis grid lines + labels */}
         {Y_TICKS_PCT.map((pct) => {
           const y = yFor(pct);
           return (
             <g key={pct}>
-              <line x1={LABEL_W} y1={y} x2={w - PADDING_RIGHT} y2={y} stroke="var(--bb-chart-grid)" strokeWidth={1} />
-              <text x={LABEL_W - 4} y={y + 4} textAnchor="end" style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}>
+              <line x1={LABEL_W} y1={y} x2={w - PADDING_RIGHT} y2={y} stroke="var(--bb-chart-grid)" stroke-width={1} />
+              <text x={LABEL_W - 4} y={y + 4} text-anchor="end" style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}>
                 {pct}%
               </text>
             </g>
@@ -97,7 +106,7 @@ export function CDFChart({ summary }: Props) {
             })
             .join(" ");
           return (
-            <path key={s.label} d={d} stroke={s.color} strokeWidth={2} fill="none">
+            <path key={s.label} d={d} stroke={s.color} stroke-width={2} fill="none">
               <title>{s.fullLabel}</title>
             </path>
           );
@@ -105,33 +114,42 @@ export function CDFChart({ summary }: Props) {
 
         {/* X-axis */}
         <g transform={`translate(0, ${PADDING_TOP + PLOT_H})`}>
-          <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+          <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" stroke-width={1} />
           {xTicks.map((ms) => {
             const x = xFor(ms);
             return (
               <g key={ms}>
-                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" strokeWidth={1} />
-                <text x={x} y={16} textAnchor="middle" style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}>
+                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" stroke-width={1} />
+                <text
+                  x={x}
+                  y={16}
+                  text-anchor={axisLabelAnchor(x, w)}
+                  style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}
+                >
                   {formatLatencyMs(ms, { subMillisecond: "compact" }).valueText}
                 </text>
               </g>
             );
           })}
         </g>
-
-        {/* Legend */}
-        <g transform="translate(0, 8)">
-          {series.map((s, i) => (
-            <g key={s.label} transform={`translate(${LABEL_W + i * 130}, 0)`}>
-              <line x1={0} y1={6} x2={16} y2={6} stroke={s.color} strokeWidth={2} />
-              <text x={20} y={10} style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}>
-                <title>{s.fullLabel}</title>
-                {s.label}
-              </text>
-            </g>
-          ))}
-        </g>
       </svg>
+
+      {/* Legend. One SVG row at a fixed 130-unit stride silently drops every
+          entry past the drawing width, and the entries it drops are the slowest
+          runs - the ones a reader is most likely asking about. HTML wraps, so
+          the key always holds every series, matching StackedPhase and
+          TimeSeries. */}
+      <ul class="mt-1.5 flex list-none flex-wrap gap-x-3 gap-y-1 p-0 text-xs text-[var(--bb-data-fg-muted)]">
+        {series.map((s) => (
+          <li key={s.label} class="flex items-center gap-1.5" title={s.fullLabel}>
+            <span
+              class="inline-block h-0.5 w-4 flex-shrink-0 rounded-sm"
+              style={{ backgroundColor: s.color }}
+            />
+            {s.label}
+          </li>
+        ))}
+      </ul>
       {excludedRows.length > 0 && (
         <p class="mt-1 text-[10px] text-[var(--bb-data-fg-subtle)]">
           {excludedRows.length} row(s) excluded from CDF: {formatTimingExclusion(excludedRows[0])}

@@ -245,6 +245,92 @@ test.describe("responsive explorer assertions", () => {
     });
   }
 
+  // The document-overflow audit above exempts anything inside `svg[role='img']`,
+  // so it cannot see a chart that overflows its own drawing. That exemption is
+  // why charts shipped clipping their right-hand quarter and bottom rows on a
+  // phone: the SVG box fitted the page, and the marks outside it were simply
+  // never painted.
+  for (const viewport of VIEWPORTS.filter((item) => item.width <= 768)) {
+    test(`chart drawings fit their own box at ${viewport.name}`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto("/results/tpch/");
+      await waitForDataLoaded(page, /Charts/);
+
+      // Walk every question group and every chart within it. Checking only the
+      // default view leaves most of the chart set unmeasured, and the default
+      // is the one chart least likely to be wrong.
+      const groups = page.getByRole("tablist", { name: "Chart question groups" }).getByRole("tab");
+      const groupCount = await groups.count();
+      // If this ever reads zero the walk below is vacuous and the test would
+      // pass without measuring anything.
+      expect(groupCount, "chart question groups").toBeGreaterThan(1);
+      let chartsVisited = 0;
+
+      for (let g = 0; g < groupCount; g += 1) {
+        await groups.nth(g).click();
+        await page.waitForTimeout(150);
+        const chartButtons = page.locator('[aria-label$="charts"] button');
+        const chartCount = await chartButtons.count();
+
+        for (let c = 0; c < Math.max(chartCount, 1); c += 1) {
+          if (chartCount > 0) {
+            await chartButtons.nth(c).click();
+            await page.waitForTimeout(150);
+          }
+          chartsVisited += 1;
+
+          const offenders = await page.evaluate(() => {
+            const problems: string[] = [];
+            for (const svg of Array.from(
+              document.querySelectorAll("[data-chart-container] svg[role='img']"),
+            )) {
+              const box = svg.getBoundingClientRect();
+              if (box.width === 0) continue;
+
+              const viewBox = svg.getAttribute("viewBox");
+              if (viewBox === null) {
+                problems.push(`${svg.getAttribute("aria-label") ?? "chart"}: no viewBox`);
+                continue;
+              }
+
+              // A drawing narrower than its box is scaled UP, which magnifies
+              // every coordinate including the gaps bars were spaced by.
+              const drawWidth = Number(viewBox.split(/\s+/)[2]);
+              if (drawWidth < box.width - 1.5) {
+                problems.push(
+                  `${svg.getAttribute("aria-label") ?? "chart"}: draws ${drawWidth} into a ${box.width.toFixed(0)}px box`,
+                );
+              }
+
+              for (const mark of Array.from(svg.querySelectorAll("text, rect, circle, path"))) {
+                const markBox = mark.getBoundingClientRect();
+                if (markBox.width === 0 && markBox.height === 0) continue;
+                if (
+                  markBox.right > box.right + 1 ||
+                  markBox.left < box.left - 1 ||
+                  markBox.bottom > box.bottom + 1
+                ) {
+                  const what =
+                    mark.tagName === "text"
+                      ? `"${(mark.textContent ?? "").slice(0, 24)}"`
+                      : mark.tagName;
+                  problems.push(
+                    `${svg.getAttribute("aria-label") ?? "chart"}: ${what} falls outside the drawing`,
+                  );
+                }
+              }
+            }
+            return problems;
+          });
+
+          expect(offenders, offenders.join("\n")).toEqual([]);
+        }
+      }
+
+      expect(chartsVisited, "charts measured").toBeGreaterThan(5);
+    });
+  }
+
   for (const homeRoute of [
     { name: "default", path: "/results/" },
     {
