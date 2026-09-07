@@ -344,7 +344,8 @@ search-summarizer artifact in C4 remains discarded.
 - Verbatim (configuration property):
   `fault-tolerant-execution-adaptive-query-planning-enabled` (default `true`
   when FTE is enabled).
-- Verbatim (mechanism and spooling): Fault-tolerant execution works by spooling
+- Source-grounded summary (mechanism and spooling): Fault-tolerant execution
+  works by spooling
   intermediate exchange data through an exchange manager (such as S3, MinIO, or
   an external filesystem) rather than streaming directly between worker nodes.
   Because intermediate data is buffered at exchange boundaries, Trino can
@@ -404,7 +405,7 @@ search-summarizer artifact in C4 remains discarded.
 - Verbatim (runtime stages): "For example, BigQuery dynamically adds
   repartitioning and coalescing stages to rebalance data across worker slots,
   adjusting the number of parallel workers dynamically."
-- Verbatim (shuffle architecture): Stages communicate through BigQuery's
+- Source-grounded summary (shuffle architecture): Stages communicate through BigQuery's
   distributed in-memory shuffle tier (BigQuery Shuffle Architecture). The
   runtime-inserted stages adjust parallel worker counts and data distribution
   across shuffle partitions to handle data skew and unexpected intermediate
@@ -426,12 +427,12 @@ search-summarizer artifact in C4 remains discarded.
   Proceedings of the 2019 ACM SIGMOD International Conference on Management of
   Data (SIGMOD 2019), <https://doi.org/10.1145/3299869.3320212>, accessed
   2026-09-06.
-- Verbatim: DuckDB is an in-process, single-node analytical database engine using
+- Source-grounded summary: DuckDB is an in-process, single-node analytical database engine using
   vectorized query execution with vectors of 2,048 tuples
   (`STANDARD_VECTOR_SIZE = 2048`). It uses a push-based execution model with
   morsel-driven parallelism (Leis et al., SIGMOD 2014), parallelizing one
   pipeline at a time across threads.
-- Verbatim (pipeline breakers in shared memory): Pipeline breakers (such as
+- Source-grounded summary (pipeline breakers in shared memory): Pipeline breakers (such as
   hash tables for joins and aggregates) are materialized in shared process
   memory. There is no distributed network shuffle tier and no staged
   intermediate file serialization; tasks operate concurrently across worker
@@ -453,16 +454,16 @@ search-summarizer artifact in C4 remains discarded.
   <https://www.vldb.org/pvldb/vol17/p3793-zaitsev.pdf>, and ClickHouse
   Architecture Overview (<https://clickhouse.com/docs/en/development/architecture>),
   accessed 2026-09-06.
-- Verbatim: ClickHouse is a column-oriented analytical DBMS using vectorized
+- Source-grounded summary: ClickHouse is a column-oriented analytical DBMS using vectorized
   execution processing blocks of 1,024 to 4,096 rows, with multi-threaded
   parallelism on each server.
-- Verbatim (runtime adaptivity inside operators): ClickHouse plan operators
+- Source-grounded summary (runtime adaptivity inside operators): ClickHouse plan operators
   adapt dynamically at runtime based on memory consumption and system
-  resources. When memory thresholds are reached (e.g.,
-  `max_bytes_before_external_group_by`, `max_bytes_before_external_sort`,
-  `max_bytes_in_join`), operators dynamically instantiate alternative
-  external (two-pass, disk-spilling) algorithms for aggregation, sorting, or
-  joins.
+  resources. The aggregation and sort thresholds enable external algorithms;
+  join handling is separate: `max_bytes_in_join` is the memory bound,
+  `join_overflow_mode` controls the overflow behavior, and automatic fallback
+  from hash join to partial-merge join requires a suitable `join_algorithm`,
+  such as `auto`.
 - Confidence: high, primary source.
 - Architectural contrast for the draft: this is runtime adaptivity, but of a
   local, resource-driven kind (switch this operator's implementation when

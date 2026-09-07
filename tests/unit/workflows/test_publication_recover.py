@@ -1,4 +1,4 @@
-"""Contract and architecture tests for publication-recover.yml workflow (Slice D)."""
+"""Contract and architecture tests for the publication recovery workflow."""
 
 from __future__ import annotations
 
@@ -74,6 +74,21 @@ def test_recover_workflow_permissions_follow_least_privilege() -> None:
         "actions": "read",
     }
     assert jobs["act"]["environment"]["name"] == "github-pages"
+
+
+def test_recover_workflow_resumes_prepared_rollbacks() -> None:
+    tx_workflow = yaml.safe_load(
+        (ROOT / ".github" / "workflows" / "publication-transaction.yml").read_text(encoding="utf-8")
+    )
+    tx_triggers = tx_workflow.get("on") or tx_workflow.get(True) or {}
+    tx_inputs = tx_triggers["workflow_dispatch"]["inputs"]
+
+    assert "resume_transaction_id" in tx_inputs
+    assert tx_inputs["resume_transaction_id"]["required"] is False
+    recovery_text = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "gh workflow run publication-transaction.yml --ref develop" in recovery_text
+    assert '-f resume_transaction_id="$TX_ID"' in recovery_text
+    assert "(G3)" not in recovery_text
 
 
 def test_recover_workflow_concurrency_scoped_to_act_job() -> None:

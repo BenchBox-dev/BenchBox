@@ -129,11 +129,11 @@ foothold. Survey order groups by mechanism, not by vendor ranking.
     so there is nothing to re-plan around; add spooled exchanges and the
     adaptation point appears. Strongest single piece of evidence for the
     thesis (C3).
-  - BigQuery: Google's docs state the plan can be modified while the query
-    runs; repartition and coalesce stages are inserted dynamically around the
-    in-memory shuffle tier and hidden from the displayed plan (C5). Note
-    explicitly that this corrects a common framing of BigQuery as purely
-    compile-time (our research file logs the correction).
+  - BigQuery: Google's docs state that the plan can be modified while the query
+  runs, with repartitioning and coalescing stages inserted dynamically around
+  the in-memory shuffle tier (C5). Treat this as a source-grounded paraphrase,
+  not a vendor quotation, and note that it corrects a common framing of BigQuery
+  as purely compile-time (our research file logs the correction).
 - 4c. Reducing the need instead: Snowflake. Cascades-style top-down
   cost-based optimization over automatically maintained metadata; the SIGMOD
   2016 paper describes deliberately postponing some decisions (join data
