@@ -42,7 +42,7 @@ not substitutes for the three skill-only samples.
 
 ### Sample identities
 
-The 14-day observation window elapsed on 2026-09-01. As of 2026-09-06 (Day 19), a complete cohort review of all merged `develop` PRs since 2026-08-17 identified exactly one legitimate pure skill-only consumer PR (PR #1996). No synthetic canaries were created.
+The 14-day observation window elapsed on 2026-09-01. As of 2026-09-06 (Day 19), the first-parent `develop` range and the merged-PR listing each contained 274 PR-numbered merges since 2026-08-17. Reviewing that complete cohort found three path-only candidates, but exactly one legitimate pure skill-only consumer PR (PR #1996): PR #1754 and PR #1907 touched only the allowed paths but their live classifier set `needs_code_ci=true`, and product jobs ran. No synthetic canaries were created.
 
 | sample | PR | head SHA | base SHA | lane | status |
 |---|---:|---|---|---|---|
@@ -193,12 +193,29 @@ At Day 19 of the observation window (exceeding the 14-calendar-day threshold), o
   - Certification artifacts: `9801136596`, `9801177912`.
   - Certification kind was correctly labeled non-full (`prior_certification_not_full`), which is expected ineligibility by design for skill-only changes and confirms 02's pre-lane 0/10 baseline without classifier defect.
 - **Timing and runner measurements:**
-  - Required-gate / merge-unblock wall time: 98 seconds (~1.63 minutes).
+  - Required-gate / merge-unblock wall time on the synchronize event: 98 seconds (~1.63 minutes).
   - All-workflow wall time: 99 seconds (~1.65 minutes).
-  - Successful runner-minutes: ~2.55 runner-minutes (skill-integrity ~0.77m, certification ~0.22m, ci-required-result ~0.08m, sibling workflows ~1.48m).
+  - Successful runner-minutes on the synchronize event: 2.80 runner-minutes, summed from every successful completed job (ci-paths 11s, skill-integrity 72s, certification-identity 13s, ci-required-result 5s, PR base guard 8s, Results Explorer `explorer-changes` 13s, Results Explorer browser gate 9s, ruleset-drift 14s, refresh-shadow 12s, and auto-merge revocation 11s).
   - Cancelled runner-minutes: 0.
   - Queue delay: ~4 hours (entered merge queue and landed cleanly).
   - Post-merge `Develop post-merge`: 22 minutes 32 seconds (run `33533992629`).
+
+### Merge-group gate for PR #1996
+
+The merge queue ran the required merge-group workflows for the synthetic queue
+head `0cdd1101f0993b97f9c4fe5d6a999777eae5b26f` (run group created at
+2026-09-01T16:26:11Z). The `Develop PR` merge-group run `33531757088`
+completed successfully at 16:28:09Z, so the merge-group required gate was 118
+seconds. `Results Explorer browser tests` (`33531757073`) and `Develop ruleset
+drift` (`33531757103`) also completed successfully before the gate closed.
+The merge-group fan-out contained seven successful completed jobs and summed to
+2.22 runner-minutes: `ci-paths` 13s, `skill-integrity` 74s,
+`certification-identity` 14s, `ci-required-result` 3s,
+`explorer-changes` 10s, `Results Explorer browser gate` 9s, and
+`ruleset-drift` 10s. Skipped product jobs contributed no successful runner
+minutes. This merge-group observation is reported separately from the
+synchronize-event fan-out above; the two clocks must not be combined as one
+PR-head measurement.
 - **Interference and system-level throughput:**
   - PR #1996 was current with base at open (not open-stale).
   - Strict-current-base refreshes remained correctly bound.
@@ -210,11 +227,13 @@ At Day 19 of the observation window (exceeding the 14-calendar-day threshold), o
 
 ### Cohort scan and non-sample exclusions
 
-All 62 PRs merged to `develop` between 2026-08-17 and 2026-09-06 were examined:
+All 274 PRs merged to `develop` between 2026-08-17 and 2026-09-06 were examined from the first-parent range and the merged-PR listing:
+- **PR #1754:** Changed only the allowed skill paths, but its live path decision recorded `needs_code_ci=true` and `estimated_runner_minutes_saved=0` (run `31983530245`, artifact `9273062801`). Product jobs ran; it is not a pure skill-only sample.
 - **PR #1907:** Classified as `manifest_structural_change`, `skill_integrity_only=false`, `needs_code_ci=true` (run `32879004472`, artifact `9575096618`). Product jobs ran as a documented safe fallback, not a false skip. Excluded from pure skill-only cohort.
 - **PR #1779 and #1928:** Touched scripts and tests alongside skills; executed code CI. Excluded from pure skill-only cohort.
 - **PR #1942:** Touched blog and docs alongside skills; classified as mixed lane. Excluded from pure skill-only cohort.
-- **All other PRs:** Full-product or publication lane PRs.
+- **PR #1996:** The only candidate whose path decision was `skill_integrity_only=true`, `needs_code_ci=false`, and `content_guard_needed=false`; it is the single legitimate sample listed above.
+- **All other 268 PRs:** Full-product or publication lane PRs.
 
 ### System throughput stratification
 
@@ -223,7 +242,7 @@ All 62 PRs merged to `develop` between 2026-08-17 and 2026-09-06 were examined:
 | required-gate wall time | 27.0–31.4 min | 1.63 min (98s) | 4.5–12.0 min |
 | merge-unblock wall time | 27.0–31.4 min | 1.63 min (98s) | 4.5–12.0 min |
 | all-workflow wall time | 28.5–33.0 min | 1.65 min (99s) | 5.0–14.0 min |
-| successful runner-minutes | 80.4–83.7 min | ~2.55 min | 12.0–35.0 min |
+| successful runner-minutes | 80.4–83.7 min | 2.80 min (synchronize; 2.22 min merge-group) | 12.0–35.0 min |
 | cancelled runner-minutes | variable (superseded runs) | 0.0 min | variable |
 | interarrival by lane | p50 31.3 min (all develop merges) | N/A (single skill sample) | variable |
 | open-stale vs in-flight | in-flight staleness frequent | current at open, 0 in-flight drift | open-stale occasionally |
