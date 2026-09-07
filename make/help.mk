@@ -132,6 +132,7 @@ help:
 	@echo "  make worktree-create BRANCH=name WORKTREE_PATH=path  Create from origin/develop; verify local/remote branch collisions"
 	@echo "  make worktree-remove WORKTREE_PATH=path              Remove an exact clean, attached, unlocked worktree"
 	@echo "  make worktree-release WORKTREE_PATH=path             Record manual owner release for caller-owned worktree (non-destructive)"
+	@echo "  make worktree-finish WORKTREE_PATH=path EXPECTED_HEAD_OID=oid [FORMAT=json]  Preview single-target removal and ref deletion (read-only)"
 	@echo "  make worktree-list                                   List registered worktrees"
 	@echo "  make worktree-audit [FORMAT=json]                    Read-only inventory and lifecycle audit of worktrees and branches"
 	@echo "  make branch-prune-merged [DRY_RUN=1]                 Delete worktree-less branches at a proven merge-time PR head (requires gh)"

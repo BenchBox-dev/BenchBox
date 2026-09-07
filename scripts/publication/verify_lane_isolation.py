@@ -95,6 +95,7 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "scripts/set_worktree_identity.sh",
     "scripts/worktree_lifecycle.sh",
     "scripts/worktree_lifecycle_metadata.py",
+    "scripts/worktree_finish.py",
     "scripts/check_doc_relative_links.py",
     "scripts/doc_relative_link_baseline.txt",
     ".env.example",
