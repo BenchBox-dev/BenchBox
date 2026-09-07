@@ -90,11 +90,6 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "skill-sync.yaml",
     "skill-sync.lock",
     "scripts/skill_sync_ci_policy.py",
-    # Worktree and agent lifecycle tooling: developer loop only.
-    "scripts/agent_write_preflight.sh",
-    "scripts/set_worktree_identity.sh",
-    "scripts/worktree_lifecycle.sh",
-    "scripts/worktree_lifecycle_metadata.py",
     "scripts/check_doc_relative_links.py",
     "scripts/doc_relative_link_baseline.txt",
     ".env.example",

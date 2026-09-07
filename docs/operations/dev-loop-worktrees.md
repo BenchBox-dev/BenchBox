@@ -29,36 +29,6 @@ Creation checks both local and `origin` branch refs before creating anything,
 so `origin` must be reachable; it fails closed when remote collision state
 cannot be verified.
 
-## Lifecycle provenance and manual release
-
-Newly created worktrees automatically record immutable provenance in per-worktree
-Git configuration (`benchbox.worktree.*`):
-- `lifecycle-id`: UUID4 identifying the worktree instance.
-- `created-at`: ISO 8601 UTC creation timestamp.
-- `branch`: the allocated feature branch.
-- `base-ref`: base reference (`origin/develop`).
-- `base-oid`: commit OID of the base reference at creation time.
-- `initial-head`: initial commit OID of the worktree HEAD.
-- `controller-kind` / `controller-id`: optional external controller bindings (e.g. `bossmode`).
-
-Mutable controller state (tasks, claims, runs, evaluation) remains external in the controller
-and is never duplicated locally.
-
-For caller-owned worktrees (without an external controller binding), a non-destructive manual
-owner-release record can be logged when work is complete:
-
-```bash
-make worktree-release WORKTREE_PATH="$WORKTREE_PATH"
-```
-
-Manual release records `manual-released-at` and `manual-released-by` in `--worktree` scope. It
-is non-destructive: it never removes worktrees, deletes branches, or alters working tree files.
-Worktrees bound to an external controller refuse manual release, as the controller manages
-their lifecycle.
-
-Zero deletion authority: No metadata field (including manual release status) authorizes
-automated deletion. Removal remains strictly gated by `make worktree-remove`.
-
 ## Finish a task
 
 After the PR merges and the worktree is clean, remove the exact registration:
