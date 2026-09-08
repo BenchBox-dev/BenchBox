@@ -757,6 +757,7 @@ export function Compare({ url }: CompareProps) {
         <div class="mb-8">
           <ChartPanel
             context={{ kind: "compare", results: resolvedResults, primaryMetric: effectivePrimaryMetric }}
+            summaryLayout="long"
             baselineIndex={normalizedBaselineIndex}
             onBaselineIndexChange={(index) => setBaselineResultId(results[index]?.result_id ?? "")}
             suppressWinnerClaims={decisionSummary.claimSuppressed}
