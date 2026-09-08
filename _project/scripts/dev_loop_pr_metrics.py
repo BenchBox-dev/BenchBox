@@ -43,6 +43,7 @@ Usage:
     uv run -- python _project/scripts/dev_loop_pr_metrics.py --collect-durations
     uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-lifecycle-baseline LIFECYCLE --process-baseline PROCESS
     uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-refresh-audit AUDIT --baseline LIFECYCLE
+    uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-process-acceptance ACCEPTANCE --process-baseline PROCESS
 
 --collect-durations is a separate, local-machine-only mode: it runs the fast
 test lane under `pytest --durations=20` and prints the slowest tests. It does
@@ -87,6 +88,11 @@ LIFECYCLE_SCHEMA = "ci_lifecycle_baseline_v1"
 # Machine-readable refresh-audit block embedded in the exact-refresh Markdown
 # audit; the validator recomputes it from the shared lifecycle baseline.
 REFRESH_AUDIT_SCHEMA = "refresh_audit_v1"
+# Final integrated acceptance record: binds the frozen preregistration,
+# incident replays, prospective cohort, and efficiency targets. The validator
+# exits non-zero listing gaps until every dimension passes; incomplete stays
+# incomplete, never provisionally green.
+PROCESS_ACCEPTANCE_SCHEMA = "pr_process_acceptance_v1"
 # Full-required reasons that must stay separate counters: gate-timing loss vs
 # prior-head identity/binding failure. Conflating them hides which mechanism
 # to fix; the refresh-audit validator rejects reports that merge them.
@@ -1125,6 +1131,161 @@ def run_validate_lifecycle_baseline(lifecycle_path: str, process_path: str) -> i
     return 0
 
 
+def _git_show_bytes(revision: str, path: str) -> bytes | None:
+    try:
+        proc = subprocess.run(
+            ["git", "show", f"{revision}:{path}"],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def _is_ancestor(commit: str, head: str = "HEAD") -> bool:
+    try:
+        proc = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", commit, head],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return proc.returncode == 0
+
+
+def validate_process_acceptance(
+    acceptance: dict,
+    process: dict,
+    process_digest: str,
+    process_relpath: str = "_project/analysis/pr-process-acceptance-baseline.json",
+) -> list[str]:
+    """Check the final acceptance record against the frozen preregistration.
+
+    Binds criteria version + content digest, proves the frozen file existed
+    verbatim at the recorded registration commit (freeze precedes dependent
+    implementation), rejects unreported cohort changes, and requires every
+    incident replay, cohort dimension, and efficiency target to pass.
+    Returns failure strings; empty means accepted.
+    """
+
+    errors: list[str] = []
+    if not isinstance(acceptance, dict) or acceptance.get("schema") != PROCESS_ACCEPTANCE_SCHEMA:
+        return [f"acceptance record schema must be {PROCESS_ACCEPTANCE_SCHEMA!r}"]
+    if not isinstance(process, dict):
+        return ["process baseline must be a JSON object"]
+    errors.extend(_check_acceptance_binding(acceptance, process, process_digest, process_relpath))
+    errors.extend(_check_acceptance_cohort(acceptance))
+    errors.extend(_check_acceptance_replays(acceptance))
+    errors.extend(_check_acceptance_efficiency(acceptance))
+    return errors
+
+
+def _check_acceptance_binding(acceptance: dict, process: dict, process_digest: str, process_relpath: str) -> list[str]:
+    """Criteria binding plus freeze-before-implementation proof."""
+    errors: list[str] = []
+    binding = acceptance.get("process_binding") or {}
+    if binding.get("criteria_version") != process.get("criteria_version"):
+        errors.append("acceptance binds a different criteria_version than the process file (criteria changed)")
+    if binding.get("process_digest") != process_digest:
+        errors.append("process baseline content differs from the bound digest (thresholds or scenarios changed)")
+    registration = acceptance.get("registration") or {}
+    reg_commit = str(registration.get("commit") or "")
+    if not reg_commit:
+        errors.append("acceptance must record its preregistration commit")
+        return errors
+    frozen = _git_show_bytes(reg_commit, process_relpath)
+    if frozen is None:
+        errors.append(f"registration commit {reg_commit[:12]} not resolvable in this tree")
+    elif _sha256_bytes(frozen) != process_digest:
+        errors.append("process file at the registration commit differs from the bound digest")
+    if not _is_ancestor(reg_commit):
+        errors.append("registration commit is not an ancestor of HEAD (freeze must precede implementation)")
+    return errors
+
+
+def _check_acceptance_cohort(acceptance: dict) -> list[str]:
+    """Cohort sufficiency with unreported-change rejection."""
+    errors: list[str] = []
+    required_cohort = ((acceptance.get("cohort") or {}).get("required")) or {}
+    observed_cohort = ((acceptance.get("cohort") or {}).get("observed")) or {}
+    if observed_cohort.get("window_start") != required_cohort.get("window_start") or observed_cohort.get(
+        "window_end"
+    ) != required_cohort.get("window_end"):
+        errors.append("observed cohort window differs from the preregistered window (unreported cohort change)")
+    for dimension in ("prs", "days"):
+        minimum = int(required_cohort.get(f"min_{dimension}") or 0)
+        if int(observed_cohort.get(dimension) or 0) < minimum:
+            errors.append(f"cohort {dimension} insufficient: {observed_cohort.get(dimension)} < {minimum}")
+    for stratum in required_cohort.get("strata") or []:
+        if stratum not in (observed_cohort.get("strata") or []):
+            errors.append(f"cohort stratum missing: {stratum}")
+    for delivery in observed_cohort.get("batch_deliveries") or []:
+        if not isinstance(delivery, dict) or not delivery.get("members") or len(delivery["members"]) < 2:
+            errors.append(f"batch delivery not cohesive: {delivery!r}")
+    return errors
+
+
+def _check_acceptance_replays(acceptance: dict) -> list[str]:
+    """Every recorded incident replay must pass."""
+    replays = acceptance.get("incident_replays") or []
+    if not replays:
+        return ["no incident replays recorded"]
+    return [
+        f"incident replay not passing: {replay.get('scenario', '?')}"
+        for replay in replays
+        if not isinstance(replay, dict) or replay.get("status") != "pass"
+    ]
+
+
+def _check_acceptance_efficiency(acceptance: dict) -> list[str]:
+    """50% avoidable-action reduction with safety and p95 guards."""
+    errors: list[str] = []
+    efficiency = acceptance.get("efficiency") or {}
+    baseline_actions = efficiency.get("baseline_avoidable_actions")
+    observed_actions = efficiency.get("observed_avoidable_actions")
+    if baseline_actions is None or observed_actions is None:
+        errors.append("efficiency unmeasured: baseline or observed avoidable actions missing")
+    elif float(baseline_actions) <= 0:
+        errors.append("efficiency baseline must be positive")
+    elif (float(baseline_actions) - float(observed_actions)) / float(baseline_actions) < 0.5:
+        errors.append("avoidable-action reduction below 50%")
+    if efficiency.get("added_required_lane_failure"):
+        errors.append("added required-lane failure attributable to coordination")
+    if efficiency.get("p95_regression_attributable"):
+        errors.append("measured p95 regression attributable to coordination")
+    return errors
+
+
+def run_validate_process_acceptance(acceptance_path: str, process_path: str) -> int:
+    """CLI entry: exit 0 only on a fully satisfied acceptance record."""
+
+    try:
+        acceptance = json.loads(Path(acceptance_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"INCOMPLETE acceptance {acceptance_path}: {exc}")
+        return 1
+    try:
+        process_raw = Path(process_path).read_bytes()
+        process = json.loads(process_raw.decode("utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"INCOMPLETE process baseline {process_path}: {exc}")
+        return 1
+    errors = validate_process_acceptance(acceptance, process, _sha256_bytes(process_raw))
+    if errors:
+        print(f"INCOMPLETE acceptance {acceptance_path}:")
+        for error in errors:
+            print(f"  - {error}")
+        return 1
+    print(f"ACCEPTED {acceptance_path}")
+    return 0
+
+
 def run_validate_refresh_audit(audit_path: str, baseline_path: str) -> int:
     """CLI entry: exit 0 only on a fully reconciled refresh audit block."""
 
@@ -1272,10 +1433,26 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="shared lifecycle baseline the refresh audit reconciles against.",
     )
+    parser.add_argument(
+        "--validate-process-acceptance",
+        metavar="ACCEPTANCE_JSON",
+        default=None,
+        help=(
+            "validate the final integrated acceptance record against the frozen "
+            "preregistration (--process-baseline). Exits non-zero listing gaps "
+            "until every dimension passes."
+        ),
+    )
     args = parser.parse_args(argv)
 
     if args.collect_durations:
         return run_collect_durations()
+
+    if args.validate_process_acceptance:
+        if not args.process_baseline:
+            print("ERROR: --validate-process-acceptance requires --process-baseline.")
+            return 2
+        return run_validate_process_acceptance(args.validate_process_acceptance, args.process_baseline)
 
     if args.validate_lifecycle_baseline or args.process_baseline:
         if not args.validate_lifecycle_baseline or not args.process_baseline:

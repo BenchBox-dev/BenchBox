@@ -537,3 +537,85 @@ def test_cohort_enumeration_fails_closed_on_short_page() -> None:
     client = _SearchClient(3, [{"number": 7}])
     with pytest.raises(metrics.ApiFailure, match="truncated"):
         metrics.fetch_cohort_pr_numbers(client, "2026-08-11T00:00:00+00:00", "2026-09-08T00:00:00+00:00")
+
+
+def _acceptance_doc(**overrides: object) -> dict:
+    doc: dict = {
+        "schema": "pr_process_acceptance_v1",
+        "process_binding": {"criteria_version": "1.0.0", "process_digest": "digest"},
+        "registration": {"commit": "abc123", "time": "2026-09-08T12:33:43Z"},
+        "incident_replays": [{"scenario": "s1", "status": "pass"}],
+        "cohort": {
+            "required": {"window_start": "W0", "window_end": "W1", "min_prs": 10, "min_days": 7, "strata": ["product"]},
+            "observed": {
+                "window_start": "W0",
+                "window_end": "W1",
+                "prs": 10,
+                "days": 7,
+                "strata": ["product"],
+                "batch_deliveries": [],
+            },
+        },
+        "efficiency": {
+            "baseline_avoidable_actions": 65,
+            "observed_avoidable_actions": 20,
+            "added_required_lane_failure": False,
+            "p95_regression_attributable": False,
+        },
+    }
+    doc.update(overrides)
+    return doc
+
+
+def _process_doc() -> dict:
+    return {"schema": "pr_process_acceptance_baseline_v1", "criteria_version": "1.0.0"}
+
+
+def test_acceptance_validator_rejects_changed_criteria_and_cohort() -> None:
+    acceptance = _acceptance_doc()
+    errors = metrics.validate_process_acceptance(acceptance, {"criteria_version": "2.0.0"}, "digest")
+    assert any("criteria" in e for e in errors)
+    errors = metrics.validate_process_acceptance(acceptance, _process_doc(), "other-digest")
+    assert any("bound digest" in e for e in errors)
+    moved = _acceptance_doc()
+    moved["cohort"]["observed"]["window_end"] = "W2"
+    errors = metrics.validate_process_acceptance(moved, _process_doc(), "digest")
+    assert any("unreported cohort change" in e for e in errors)
+
+
+def test_acceptance_validator_holds_incomplete_cohort_and_replays() -> None:
+    acceptance = _acceptance_doc()
+    acceptance["cohort"]["observed"]["prs"] = 4
+    acceptance["incident_replays"] = [{"scenario": "s1", "status": "pending"}]
+    acceptance["efficiency"]["observed_avoidable_actions"] = None
+    errors = metrics.validate_process_acceptance(acceptance, _process_doc(), "digest")
+    assert any("prs" in e for e in errors)
+    assert any("not passing" in e for e in errors)
+    assert any("unmeasured" in e for e in errors)
+
+
+def test_acceptance_validator_accepts_complete_record() -> None:
+    """The validator can pass: guards against a firewall that never opens."""
+    import hashlib
+    import json as _json2
+    import subprocess
+
+    repo_root = Path(metrics.__file__).resolve().parents[2]
+    process_path = repo_root / "_project" / "analysis" / "pr-process-acceptance-baseline.json"
+    process_raw = process_path.read_bytes()
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    process = _json2.loads(process_raw.decode("utf-8"))
+    acceptance = _acceptance_doc()
+    acceptance["process_binding"] = {
+        "criteria_version": process["criteria_version"],
+        "process_digest": hashlib.sha256(process_raw).hexdigest(),
+    }
+    acceptance["registration"] = {"commit": head, "time": "2026-09-08T12:33:43Z"}
+    errors = metrics.validate_process_acceptance(acceptance, process, hashlib.sha256(process_raw).hexdigest())
+    assert errors == []
