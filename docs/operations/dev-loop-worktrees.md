@@ -171,3 +171,16 @@ Gate authors avoid duplicate invocations against identical trees with
   preparation evidence never certifies the later integrated tree because the
   integration HEAD differs. Pre-PR effort stays counted: receipts record
   executions, they do not erase them from delivery accounting.
+
+## Queue-aware publication and resumable follow-up
+
+- Stale-base publication follows `_project/decisions/native-queue-local-landing.md`:
+  verified queue means publish without an ancestry-only refresh; conflict
+  means resolve first; otherwise the conservative ancestry gate stands.
+- Follow-up ownership persists per key under `~/.benchbox/pr-landing/`
+  (`make pr-followup-record/resume`, `scripts/pr_landing.py followup-*`):
+  explicit owner, session, scope, attempts, due date, and next action from
+  pre-PR assembly through post-merge. Terminal outcomes are explicit
+  (`merged`, `closed-merged`, `abandoned`, `superseded`); an empty queue or
+  missing state is never completion. Retries are bounded (one rerun per
+  failed job, one re-entry per unchanged head) and only on unchanged heads.

@@ -181,3 +181,30 @@ def test_github_api_failure_is_reported_without_traceback(
 
     assert rc == 1
     assert json.loads(output.read_text()) == {"status": "error", "error": "api unavailable"}
+
+
+def _live_with_queue(params: dict | None) -> dict:
+    live = _live_ruleset("refs/heads/develop", ["ci-required-result"])
+    live["name"] = "develop-squash-only"
+    if params is not None:
+        live["rules"].append({"type": "merge_queue", "parameters": dict(params)})
+    return live
+
+
+def test_merge_queue_approved_params_pass() -> None:
+    live = _live_with_queue(dict(ruleset_drift_check.APPROVED_MERGE_QUEUE))
+    assert ruleset_drift_check.merge_queue_findings(live, "develop-squash-only") == []
+
+
+def test_merge_queue_param_change_is_blocking() -> None:
+    params = dict(ruleset_drift_check.APPROVED_MERGE_QUEUE)
+    params["grouping_strategy"] = "HEADGREEN"
+    findings = ruleset_drift_check.merge_queue_findings(_live_with_queue(params), "develop-squash-only")
+    assert any("grouping_strategy" in f for f in findings)
+    assert ruleset_drift_check.blocking_findings(findings) == findings
+
+
+def test_merge_queue_absent_is_warning_only() -> None:
+    findings = ruleset_drift_check.merge_queue_findings(_live_with_queue(None), "develop-squash-only")
+    assert len(findings) == 1
+    assert ruleset_drift_check.blocking_findings(findings) == []

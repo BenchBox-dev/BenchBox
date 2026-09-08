@@ -1338,6 +1338,33 @@ local-validation-show:
 	@[ -n "$(GATE)" ] || { echo "GATE is required" >&2; exit 2; }; \
 	uv run -- python scripts/local_validation.py show --gate "$(GATE)" $(BATCH_ARGS)
 
+# Revision/readiness transactions behind one helper (scripts/pr_landing.py).
+# Existing pr-open/pr-ready recipes are unchanged; these stage readiness
+# explicitly: start records identity, withdraw disarms auto-merge before a
+# revision, ready verifies the exact head and enqueues only with --arm.
+pr-landing-start:
+	uv run -- python scripts/pr_landing.py --worktree . start
+
+pr-landing-withdraw:
+	@[ -n "$(PR)" ] || { echo "PR is required" >&2; exit 2; }; \
+	uv run -- python scripts/pr_landing.py --worktree . withdraw --pr "$(PR)"
+
+pr-landing-ready:
+	@[ -n "$(PR)" ] || { echo "PR is required" >&2; exit 2; }; \
+	@[ -n "$(HEAD)" ] || { echo "HEAD is required" >&2; exit 2; }; \
+	@[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required" >&2; exit 2; }; \
+	uv run -- python scripts/pr_landing.py --worktree . ready --pr "$(PR)" \
+		--expected-head "$(HEAD)" --evidence-json "$(EVIDENCE)" $(if $(ARM),--arm,)
+
+pr-followup-record:
+	@[ -n "$(KEY)" ] || { echo "KEY is required" >&2; exit 2; }; \
+	@[ -n "$(STATE)" ] || { echo "STATE is required" >&2; exit 2; }; \
+	uv run -- python scripts/pr_landing.py --worktree . followup-record --key "$(KEY)" --state-json "$(STATE)"
+
+pr-followup-resume:
+	@[ -n "$(KEY)" ] || { echo "KEY is required" >&2; exit 2; }; \
+	uv run -- python scripts/pr_landing.py --worktree . followup-resume --key "$(KEY)"
+
 pr-content-guard:
 	@[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
 	EXISTING=$$(mktemp); \

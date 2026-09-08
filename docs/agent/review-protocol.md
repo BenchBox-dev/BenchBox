@@ -27,6 +27,18 @@ mechanical enumeration, a rejected case per instance, and a
 producer-to-persistence-to-consumer seam trace. Records live in
 `_project/audits/remediation-contract-evidence.md`.
 
+## Revision readiness
+
+Revisions run inside one transaction (`scripts/pr_landing.py`, `make
+pr-landing-start/withdraw/ready`): record the start-revision identity
+(repo, PR, expected head, branch, worktree), withdraw readiness
+(auto-merge disabled and re-verified) before the first edit, and re-verify
+on the exact head before enqueue. Wrong-PR resolution, unpublished work,
+head races, and durable holds refuse loudly; a merge that wins the race
+stops modification and routes to follow-up. Batch readiness additionally
+binds id/version, member heads (ancestors of the integration head), owner
+generation, and writer quiescence.
+
 ## Architecture and plan review axes
 
 - **Operational corpus.** Inventory the operational corpus: test:source
