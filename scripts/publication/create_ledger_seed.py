@@ -158,6 +158,9 @@ def materialize_union(
         )
     check_expect_source(accepted_sha, expect_source, f"ledger seed {ledger_seed}")
     _ = accepted_ref  # retained for CLI compatibility; the recorded SHA is authoritative
+    dispositions = seed.get("dispositions") or {}
+    main_source = str(seed.get("main_source") or "")
+    main_sha = main_source if re.fullmatch(r"[0-9a-f]{40}", main_source) else ""
     dest.mkdir(parents=True, exist_ok=True)
     written = 0
     for path in union:
@@ -168,6 +171,13 @@ def materialize_union(
         worktree_path = repo_root / path
         if worktree_path.is_file() and hashlib.sha256(worktree_path.read_bytes()).hexdigest() == expected:
             data = worktree_path.read_bytes()
+        elif dispositions.get(path) == "legacy_overlay" and main_sha:
+            data = blob_bytes_at_ref(main_sha, path, repo_root)
+        elif dispositions.get(path) == "legacy_overlay":
+            raise LedgerSeedError(
+                f"mirror-only path {path} differs from the live tree and the seed records "
+                "no immutable main SHA; regenerate with --main-ref instead of guessing"
+            )
         else:
             data = blob_bytes_at_ref(accepted_sha, path, repo_root)
 

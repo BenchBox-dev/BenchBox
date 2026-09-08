@@ -48,6 +48,17 @@ def _config_set(repo: Path, key: str, value: str) -> None:
     _git(repo, "config", "--worktree", f"{CONFIG_PREFIX}.{key}", value)
 
 
+def _config_delete(repo: Path, key: str) -> None:
+    subprocess.run(
+        ["git", "config", "--worktree", "--unset", f"{CONFIG_PREFIX}.{key}"],
+        cwd=repo,
+        check=False,
+        text=True,
+        capture_output=True,
+        timeout=60,
+    )
+
+
 def _config_get(repo: Path, key: str) -> str | None:
     proc = subprocess.run(
         ["git", "config", "--worktree", "--get", f"{CONFIG_PREFIX}.{key}"],
@@ -77,6 +88,7 @@ def record_start(
     _config_set(repo, "base-oid", base_oid)
     _config_set(repo, "started-at", started_at)
     _config_set(repo, "members", json.dumps(sorted(set(members))))
+    _config_set(repo, "sealed", "1")
     return {
         "batch_id": batch_id,
         "base_ref": base_ref,
@@ -86,10 +98,20 @@ def record_start(
     }
 
 
+def reset_batch(repo: Path) -> None:
+    """Clear a batch start record (audited recovery from a crashed start)."""
+    for key in ("id", "base-ref", "base-oid", "started-at", "members", "sealed"):
+        _config_delete(repo, key)
+
+
 def read_batch(repo: Path) -> dict | None:
-    """Read the recorded batch start, or None when absent."""
+    """Read the recorded batch start, or None when absent or unsealed.
+
+    A crash between the individual config writes leaves no `sealed` marker;
+    such partial records fail closed instead of binding half a start.
+    """
     batch_id = _config_get(repo, "id")
-    if batch_id is None:
+    if batch_id is None or _config_get(repo, "sealed") != "1":
         return None
     members_raw = _config_get(repo, "members") or "[]"
     try:
@@ -111,15 +133,21 @@ def verify_base(repo: Path, record: dict) -> dict:
     return {"recorded_oid": record["base_oid"], "current_oid": current, "moved": current != record["base_oid"]}
 
 
-def authors_since_base(repo: Path, base_oid: str) -> list[str]:
-    """Distinct author identities committed on top of the base."""
-    out = _git(repo, "log", f"{base_oid}..HEAD", "--format=%an <%ae>")
+def committers_since_base(repo: Path, base_oid: str) -> list[str]:
+    """Distinct committer identities on the first-parent chain past the base.
+
+    Committer (who applied), not author (who wrote), and first-parent only:
+    legitimate member merges preserve member authorship/committer off-chain,
+    while any commit applied directly to the integration branch — member or
+    rogue — records its writer as a first-parent committer.
+    """
+    out = _git(repo, "log", "--first-parent", f"{base_oid}..HEAD", "--format=%cn <%ce>")
     return sorted(set(out.splitlines()) if out else [])
 
 
 def verify_single_integrator(repo: Path, base_oid: str, integrator: str) -> list[str]:
-    """Offending authors when anyone but the integrator committed (w3)."""
-    return [author for author in authors_since_base(repo, base_oid) if author != integrator]
+    """Offending committers when anyone but the integrator applied work (w3)."""
+    return [committer for committer in committers_since_base(repo, base_oid) if committer != integrator]
 
 
 def member_ancestry(repo: Path, members: object, integration_head: str) -> dict[str, bool]:
@@ -145,10 +173,14 @@ def member_ancestry(repo: Path, members: object, integration_head: str) -> dict[
     return result
 
 
-def branch_timestamps(repo: Path, base_oid: str) -> dict:
-    """First commit (preparation evidence) and first merge (integration evidence)."""
-    first = _git(repo, "log", "--reverse", "--format=%H %cI", f"{base_oid}..HEAD").splitlines()
-    merges = _git(repo, "log", "--reverse", "--merges", "--format=%H %cI", f"{base_oid}..HEAD").splitlines()
+def branch_timestamps(repo: Path, base_oid: str, head: str) -> dict:
+    """First commit (preparation evidence) and first merge (integration evidence).
+
+    Ranges are pinned to one resolved *head* so a concurrent commit cannot mix
+    an old integration head with new history.
+    """
+    first = _git(repo, "log", "--reverse", "--format=%H %cI", f"{base_oid}..{head}").splitlines()
+    merges = _git(repo, "log", "--reverse", "--merges", "--format=%H %cI", f"{base_oid}..{head}").splitlines()
     return {
         "first_commit": first[0] if first else None,
         "first_merge": merges[0] if merges else None,
@@ -159,13 +191,34 @@ def branch_timestamps(repo: Path, base_oid: str) -> dict:
 def delivery_receipt(repo: Path, member_heads: list[dict], acceptance: dict) -> dict:
     """Bind tracker-side per-item acceptance to the exact integration head.
 
-    Refuses when the acceptance head differs from HEAD, when a member head
-    is missing from the integration head, or when the base moved without a
-    re-recorded start. Late members and content edits invalidate the binding.
+    Refuses when the acceptance head differs from HEAD, when the member set
+    differs from the recorded start (late or dropped members), when any
+    member lacks passing acceptance, when anyone but the named integrator
+    applied work, when a member head is missing from the integration head,
+    or when the base moved without a re-recorded start.
     """
     record = read_batch(repo)
     if record is None or not record.get("base_oid"):
         raise BatchError("no batch start recorded; run start before receipt")
+    if not member_heads:
+        raise BatchError("empty member manifest binds nothing; refusing vacuous receipt")
+    recorded = set(record.get("members") or [])
+    manifested = set(str(member.get("id", "?")) for member in member_heads if isinstance(member, dict))
+    if manifested != recorded:
+        raise BatchError(
+            f"member set {sorted(manifested)} != recorded start {sorted(recorded)}; "
+            "late and dropped members invalidate the binding"
+        )
+    integrator = acceptance.get("integrator")
+    if not integrator:
+        raise BatchError("acceptance names no integrator; single-integrator gate cannot pass")
+    offenders = verify_single_integrator(repo, record["base_oid"], str(integrator))
+    if offenders:
+        raise BatchError(f"work applied by someone other than the integrator: {offenders}")
+    items = acceptance.get("items", {}) or {}
+    unaccepted = sorted(mid for mid in manifested if not items.get(mid))
+    if unaccepted:
+        raise BatchError(f"members without passing acceptance: {unaccepted}")
     head = _git(repo, "rev-parse", "HEAD")
     if acceptance.get("integration_head") != head:
         raise BatchError("acceptance names a different integration head; re-evaluate, never carry forward")
@@ -181,9 +234,10 @@ def delivery_receipt(repo: Path, member_heads: list[dict], acceptance: dict) -> 
         "base": {"ref": record["base_ref"], "oid": record["base_oid"]},
         "integration_head": head,
         "started_at": record["started_at"],
-        "history": branch_timestamps(repo, record["base_oid"]),
+        "history": branch_timestamps(repo, record["base_oid"], head),
         "member_ancestry": ancestry,
-        "acceptance": acceptance.get("items", {}),
+        "integrator": str(integrator),
+        "acceptance": items,
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
@@ -198,6 +252,7 @@ def main(argv: list[str] | None = None) -> int:
     start.add_argument("--member", action="append", default=[], dest="members")
     start.add_argument("--base-ref", default="origin/develop")
 
+    sub.add_parser("reset", help="clear a batch start record after a crashed start")
     verify = sub.add_parser("verify", help="check base, integrator, and ancestry gates")
     verify.add_argument("--integrator", required=True)
     verify.add_argument("--members-json", type=Path, required=True)
@@ -213,6 +268,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "start":
             print(json.dumps(record_start(repo, args.batch_id, args.members, args.base_ref), indent=2))
             return 0
+        if args.command == "reset":
+            reset_batch(repo)
+            print("reset batch start record")
+            return 0
         if args.command == "verify":
             record = read_batch(repo)
             if record is None:
@@ -221,13 +280,13 @@ def main(argv: list[str] | None = None) -> int:
             members = json.loads(args.members_json.read_text(encoding="utf-8"))
             report = {
                 "base": verify_base(repo, record),
-                "offending_authors": verify_single_integrator(repo, record["base_oid"], args.integrator),
+                "offending_committers": verify_single_integrator(repo, record["base_oid"], args.integrator),
                 "member_ancestry": member_ancestry(repo, members, head),
             }
             print(json.dumps(report, indent=2))
             ok = (
                 not report["base"]["moved"]
-                and not report["offending_authors"]
+                and not report["offending_committers"]
                 and all(report["member_ancestry"].values())
             )
             return 0 if ok else 1

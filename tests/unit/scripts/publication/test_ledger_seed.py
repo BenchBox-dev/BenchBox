@@ -535,3 +535,24 @@ def test_isolated_replay_mirror_drift_breaks_bidirectional(tmp_path: Path) -> No
     regen = json.loads(regen_path.read_text(encoding="utf-8"))
     assert regen["union"] == seed["union"]
     assert regen["digests"] == seed["digests"]
+
+    # The drifted mirror-only overlay materializes from the recorded main SHA,
+    # not the accepted snapshot (which never contained it) — even when the
+    # live worktree no longer carries those bytes.
+    main_sha = subprocess.run(
+        ["git", "rev-parse", "main"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    (Path(repo) / "results-data" / "bundles" / "d.json").unlink()
+    (Path(repo) / "results-data" / "bundles" / "c.json").unlink()
+    dest = tmp_path / "archive"
+    result = cli(
+        "--accepted-ref",
+        snapshot,
+        "--ledger-seed",
+        str(drift_path),
+        "--materialize-dest",
+        str(dest),
+    )
+    assert result.returncode == 0, result.stderr
+    assert drift["main_source"] == main_sha
+    assert json.loads((dest / "d.json").read_text(encoding="utf-8")) == {"id": "d"}
