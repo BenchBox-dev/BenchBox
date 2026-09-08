@@ -1223,6 +1223,32 @@ class TestWritePrimitivesSCD2DuckDB:
         assert result.status == "VALIDATION_FAILED"
         assert result.error and "every_unchanged_key_has_current_version_matching_hash" in result.error
 
+    def test_no_change_companion_check_is_load_bearing(self, scd2_env):
+        """Per-instance control: the pre-companion query set is blind to deleted keys.
+
+        Reproduces the N2 vacuous pass from observed query outcomes without
+        touching the catalog: after deleting the unchanged keys and running
+        the real write SQL, the three zero-row offending queries still pass
+        while only the positive companion fires. If the companion is ever
+        dropped, this test fails on its final assertion.
+        """
+        write_bench, conn = scd2_env
+        conn.execute("DELETE FROM scd2_ops_dim_customer WHERE c_custkey BETWEEN 21 AND 40")
+        op = write_bench.get_operation("merge_scd_type2_no_change")
+        first, _, second = op.write_sql.partition(";")
+        conn.execute(first)
+        if second.strip():
+            conn.execute(second)
+        by_id = {q.id: q.sql for q in op.validation_queries}
+        for query_id in (
+            "at_most_one_current_per_business_key",
+            "no_rows_closed_by_batch",
+            "no_new_versions_inserted",
+        ):
+            assert conn.execute(by_id[query_id]).fetchall() == [], f"{query_id} should pass vacuously here"
+        companion_rows = conn.execute(by_id["every_unchanged_key_has_current_version_matching_hash"]).fetchall()
+        assert len(companion_rows) == 20
+
     def test_basic_wrong_insert_count_fails_cardinality_bound(self, scd2_env):
         """N3: if basic's write under-inserts new versions relative to what's
         staged, the cardinality bound catches it even though every offending-row

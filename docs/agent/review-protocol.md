@@ -20,6 +20,13 @@ It supersedes `docs/agent/review-protocol-legacy.md`.
 Numbers bind to their measurement tree. `make audit-sha-check` enforces it;
 see `docs/agent/audit-evidence-provenance.md`.
 
+## Review remediation evidence
+
+Remediation closeout follows `docs/agent/pr-review-evidence.md`: per-instance
+mechanical enumeration, a rejected case per instance, and a
+producer-to-persistence-to-consumer seam trace. Records live in
+`_project/audits/remediation-contract-evidence.md`.
+
 ## Architecture and plan review axes
 
 - **Operational corpus.** Inventory the operational corpus: test:source
