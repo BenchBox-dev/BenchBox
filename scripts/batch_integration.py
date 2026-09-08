@@ -122,10 +122,14 @@ def verify_single_integrator(repo: Path, base_oid: str, integrator: str) -> list
     return [author for author in authors_since_base(repo, base_oid) if author != integrator]
 
 
-def member_ancestry(repo: Path, members: list[dict], integration_head: str) -> dict[str, bool]:
+def member_ancestry(repo: Path, members: object, integration_head: str) -> dict[str, bool]:
     """Whether each member prepared head is an ancestor of the integration head."""
+    if not isinstance(members, list):
+        raise BatchError("members manifest must be a list")
     result: dict[str, bool] = {}
     for member in members:
+        if not isinstance(member, dict):
+            raise BatchError(f"member entry must be an object: {member!r}")
         sha = str(member.get("head") or "")
         if not sha:
             result[str(member.get("id", "?"))] = False

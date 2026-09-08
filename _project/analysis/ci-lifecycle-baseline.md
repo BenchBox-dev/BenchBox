@@ -1,5 +1,11 @@
 # CI lifecycle baseline (representative 28-day remeasurement)
 
+> SUPERSEDED COHORT WARNING: this file currently covers 65 PRs enumerated
+> from a single pulls-list page. Date-bounded search verifies 349 merged
+> develop PRs in the window; the remaining 284 are being collected and this
+> file will be rebuilt with a correction commit. Do not cite totals from
+> this file as whole-cohort numbers until the warning is removed.
+
 Frozen cohort: merged develop PRs 2026-08-11 through 2026-09-08 (registration commit d2fa960e4).
 Method: every synchronize head enumerated via pulls/commits; runs+jobs+checks per head;
 heads with zero observable runs recorded as missing-artifact, never dropped.

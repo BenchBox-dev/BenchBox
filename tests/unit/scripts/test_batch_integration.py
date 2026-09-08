@@ -149,3 +149,9 @@ def test_cli_verify_end_to_end(tmp_path: Path, capsys: pytest.CaptureFixture[str
         == 0
     )
     assert '"A": true' in capsys.readouterr().out
+
+
+def test_member_ancestry_rejects_non_list_manifest(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    with pytest.raises(bi.BatchError, match="must be a list"):
+        bi.member_ancestry(repo, {"A": {}}, "0" * 40)

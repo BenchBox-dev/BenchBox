@@ -619,3 +619,26 @@ def test_acceptance_validator_accepts_complete_record() -> None:
     acceptance["registration"] = {"commit": head, "time": "2026-09-08T12:33:43Z"}
     errors = metrics.validate_process_acceptance(acceptance, process, hashlib.sha256(process_raw).hexdigest())
     assert errors == []
+
+
+def test_lifecycle_validator_rejects_unbound_attempts() -> None:
+    import copy
+    import json as _json
+
+    lifecycle = _json.loads((FIXTURES / "lifecycle_sample.json").read_text(encoding="utf-8"))
+    lifecycle = copy.deepcopy(lifecycle)
+    lifecycle["prs"][0]["attempts"]["dddddddddddddddddddddddddddddddddddddddd"] = 1
+    process = {"schema": "pr_process_acceptance_baseline_v1", "criteria_version": "1.0.0"}
+    errors = metrics.validate_lifecycle_baseline(lifecycle, process, "digest-of-frozen-process-baseline")
+    assert any("unobserved head" in e for e in errors)
+
+
+def test_refresh_audit_rejects_non_list_denominator() -> None:
+    import json as _json
+
+    lifecycle = _json.loads((FIXTURES / "lifecycle_sample.json").read_text())
+    audit = (
+        (FIXTURES / "refresh_audit_sample.md").read_text().replace('"denominator_prs": [101]', '"denominator_prs": 101')
+    )
+    errors = metrics.validate_refresh_audit(audit, lifecycle, REASONS)
+    assert any("must be a list" in e for e in errors)

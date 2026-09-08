@@ -239,3 +239,16 @@ def test_retry_bounds() -> None:
     spent = landing.FollowupState(owner="o", session="s", scope="pr", head=HEAD, attempts=1, reentries=1)
     assert landing.allow_retry(spent, "rerun", HEAD)["allowed"] is False
     assert landing.allow_retry(spent, "requeue", HEAD)["allowed"] is False
+
+
+def test_resolve_pr_rejects_non_list_payload() -> None:
+    with pytest.raises(landing.LandingError, match="non-list"):
+        landing.resolve_pr(FakeRun([(0, {"message": "ok"})]), "o/r", "feat/x")
+
+
+def test_followup_coerce_refuses_missing_owner(tmp_path: Path) -> None:
+    with pytest.raises(landing.LandingError, match="owner"):
+        landing.coerce_followup({"session": "s", "scope": "pr"})
+    with pytest.raises(landing.LandingError, match="object"):
+        landing.coerce_followup([])
+    assert landing.load_followup(tmp_path, "absent") is None

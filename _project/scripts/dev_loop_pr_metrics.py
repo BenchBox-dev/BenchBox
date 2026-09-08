@@ -956,6 +956,9 @@ def _check_lifecycle_entry(entry: dict) -> list[str]:
     for sha in per_head:
         if sha not in attempts:
             errors.append(f"PR #{number}: observed head {sha[:12]} lacks an attempt count")
+    for sha in attempts:
+        if sha not in per_head:
+            errors.append(f"PR #{number}: attempt count for unobserved head {sha[:12]}")
     errors.extend(_check_lifecycle_totals(number, heads, per_head, attempts, missing_shas, totals))
     return errors
 
@@ -1028,6 +1031,8 @@ def validate_refresh_audit(audit_text: str, lifecycle: dict, reason_codes: tuple
         baseline_prs.add(number)
         baseline_heads[number] = set(entry.get("heads") or [])
     denominator = block.get("denominator_prs") or []
+    if not isinstance(denominator, list):
+        return errors + ["refresh audit denominator_prs must be a list"]
     unknown = [n for n in denominator if n not in baseline_prs]
     if unknown:
         errors.append(f"refresh audit denominator uses PRs outside the frozen baseline: {unknown!r}")
@@ -1219,9 +1224,14 @@ def _check_acceptance_cohort(acceptance: dict) -> list[str]:
     ) != required_cohort.get("window_end"):
         errors.append("observed cohort window differs from the preregistered window (unreported cohort change)")
     for dimension in ("prs", "days"):
-        minimum = int(required_cohort.get(f"min_{dimension}") or 0)
-        if int(observed_cohort.get(dimension) or 0) < minimum:
-            errors.append(f"cohort {dimension} insufficient: {observed_cohort.get(dimension)} < {minimum}")
+        try:
+            minimum = int(required_cohort.get(f"min_{dimension}") or 0)
+            observed = int(observed_cohort.get(dimension) or 0)
+        except (TypeError, ValueError):
+            errors.append(f"cohort {dimension} counts must be integers")
+            continue
+        if observed < minimum:
+            errors.append(f"cohort {dimension} insufficient: {observed} < {minimum}")
     for stratum in required_cohort.get("strata") or []:
         if stratum not in (observed_cohort.get("strata") or []):
             errors.append(f"cohort stratum missing: {stratum}")

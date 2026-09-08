@@ -142,6 +142,8 @@ def resolve_pr(run: Runner, repo_full: str, branch: str) -> dict | None:
         matches = json.loads(out or "[]")
     except ValueError as exc:
         raise LandingError(f"unparseable gh pr list output: {exc}") from exc
+    if not isinstance(matches, list):
+        raise LandingError("gh pr list returned a non-list payload; refusing to guess")
     if not matches:
         return None
     pr = matches[0]
@@ -363,12 +365,29 @@ def followup_path(directory: Path, key: str) -> Path:
 
 def record_followup(directory: Path, key: str, state: FollowupState) -> Path:
     """Atomically persist continuation state (crash-safe via rename)."""
+    for field in ("owner", "session", "scope"):
+        if not getattr(state, field, None):
+            raise LandingError(f"followup state lacks required field {field!r}")
     directory.mkdir(parents=True, exist_ok=True)
     path = followup_path(directory, key)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(asdict(state), indent=2) + "\n", encoding="utf-8")
     tmp.replace(path)
     return path
+
+
+def coerce_followup(data: object) -> FollowupState:
+    """Build state from untrusted input, refusing missing required fields."""
+    if not isinstance(data, dict):
+        raise LandingError("followup state must be an object")
+    try:
+        state = FollowupState(**{k: data.get(k) for k in FollowupState.__dataclass_fields__})
+    except TypeError as exc:
+        raise LandingError(f"followup state has an unexpected shape: {exc}") from exc
+    for field in ("owner", "session", "scope"):
+        if not getattr(state, field, None):
+            raise LandingError(f"followup state lacks required field {field!r}")
+    return state
 
 
 def load_followup(directory: Path, key: str) -> FollowupState | None:
@@ -378,8 +397,8 @@ def load_followup(directory: Path, key: str) -> FollowupState | None:
     except (OSError, ValueError):
         return None
     try:
-        return FollowupState(**{k: data.get(k) for k in FollowupState.__dataclass_fields__})
-    except TypeError:
+        return coerce_followup(data)
+    except LandingError:
         return None
 
 
@@ -498,10 +517,11 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         directory = state_dir(repo)
         if args.command == "followup-record":
-            data = json.loads(args.state_json.read_text(encoding="utf-8"))
-            path = record_followup(
-                directory, args.key, FollowupState(**{k: data.get(k) for k in FollowupState.__dataclass_fields__})
-            )
+            try:
+                data = json.loads(args.state_json.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise LandingError(f"unreadable state file: {exc}") from exc
+            path = record_followup(directory, args.key, coerce_followup(data))
             print(f"recorded {path}")
             return 0
         state = load_followup(directory, args.key)
