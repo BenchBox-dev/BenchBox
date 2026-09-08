@@ -71,6 +71,40 @@ def joinorder_canonical_tiny(tmp_path: Path) -> Path:
 # ── Parallel test run mutual exclusion ──────────────────────────────────────
 _test_lock_fd: int | None = None  # Kept open to hold the flock for the session lifetime.
 _test_databases_created = False
+_lock_waiter: Any = None  # Lazily loaded wait_on_fd from scripts/local_validation.py.
+_lock_waiter_attempted = False
+
+
+def _load_lock_waiter() -> Any:
+    """Shared bounded-wait helper; None when the script is unavailable.
+
+    Falls back to immediate fail-fast so pytest startup never depends on it.
+    """
+    global _lock_waiter, _lock_waiter_attempted
+    if _lock_waiter_attempted:
+        return _lock_waiter
+    _lock_waiter_attempted = True
+    try:
+        import importlib.util
+
+        path = Path(__file__).resolve().parents[1] / "scripts" / "local_validation.py"
+        spec = importlib.util.spec_from_file_location("benchbox_local_validation", path)
+        if spec is None or spec.loader is None:
+            return None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        _lock_waiter = module
+    except Exception:
+        _lock_waiter = None
+    return _lock_waiter
+
+
+def _lock_wait_seconds() -> float:
+    try:
+        return max(0.0, float(os.environ.get("BENCHBOX_TEST_LOCK_WAIT_SECONDS", "0") or 0))
+    except ValueError:
+        return 0.0
 
 
 def _get_test_lock_path() -> Path:
@@ -149,20 +183,34 @@ def pytest_configure(config) -> None:
 
     # Acquire exclusive lock to prevent concurrent parallel test runs from
     # competing for CPU. Only the controller process (not xdist workers) locks.
+    # BENCHBOX_TEST_LOCK_WAIT_SECONDS=0 (default) keeps the historical
+    # immediate fail-fast; a positive value waits that long with owner
+    # visibility before failing the same way. Ctrl-C cancels the wait.
     if _should_acquire_test_lock(config):
         test_lock_path = _get_test_lock_path()
         test_lock_path.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(str(test_lock_path), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
-        try:
-            if sys.platform == "win32":
-                import msvcrt
+        waiter = None if sys.platform == "win32" else _load_lock_waiter()
+        wait_seconds = 0.0 if waiter is None else _lock_wait_seconds()
+        lock_error: Exception | None = None
+        if waiter is not None and wait_seconds > 0:
+            try:
+                waiter.wait_on_fd(fd, test_lock_path, wait_seconds)
+            except TimeoutError as exc:
+                lock_error = exc
+        else:
+            try:
+                if sys.platform == "win32":
+                    import msvcrt
 
-                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
 
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except (BlockingIOError, OSError):
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except (BlockingIOError, OSError) as exc:
+                lock_error = exc
+        if lock_error is not None:
             # Another parallel run holds the lock - fail fast with a clear message.
             try:
                 holder_info = test_lock_path.read_text(encoding="utf-8").strip()
@@ -172,10 +220,14 @@ def pytest_configure(config) -> None:
             # Use os._exit() rather than sys.exit(): pytest_configure is called
             # before the session loop so SystemExit bubbles up as INTERNALERROR.
             # os._exit() terminates the process immediately with the given code.
+            waited_note = (
+                f"  Waited    : {wait_seconds:g}s (BENCHBOX_TEST_LOCK_WAIT_SECONDS)\n" if wait_seconds > 0 else ""
+            )
             sys.stderr.write(
                 f"\n\033[91m[benchbox] BLOCKED: A parallel test run is already active.\033[0m\n"
                 f"  Lock file : {test_lock_path}\n"
-                f"  Holder    : {holder_info}\n\n"
+                f"  Holder    : {holder_info}\n"
+                f"{waited_note}\n"
                 f"  Options:\n"
                 f"    \u2022 Wait for the other run to finish and retry.\n"
                 f"    \u2022 Kill the other run, then retry.\n"

@@ -1324,6 +1324,20 @@ pr-preflight-fast-tests:
 		echo "No code changes detected; skipping fast tests."; \
 	fi
 
+# Local validation singleflight. Runs CMD once per identical validated input
+# across worktrees; identical repeats reuse the recorded receipt instead of
+# re-executing and colliding on the shared test lock. Receipts never certify
+# hosted checks and never cross changed trees. Usage:
+#   make local-validation GATE=fast-tests CMD="pytest tests/unit -q"
+local-validation:
+	@[ -n "$(GATE)" ] || { echo "GATE is required" >&2; exit 2; }; \
+	@[ -n "$(CMD)" ] || { echo "CMD is required" >&2; exit 2; }; \
+	uv run -- python scripts/local_validation.py run --gate "$(GATE)" $(BATCH_ARGS) -- $(CMD)
+
+local-validation-show:
+	@[ -n "$(GATE)" ] || { echo "GATE is required" >&2; exit 2; }; \
+	uv run -- python scripts/local_validation.py show --gate "$(GATE)" $(BATCH_ARGS)
+
 pr-content-guard:
 	@[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
 	EXISTING=$$(mktemp); \
