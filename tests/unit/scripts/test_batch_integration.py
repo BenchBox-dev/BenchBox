@@ -155,3 +155,36 @@ def test_member_ancestry_rejects_non_list_manifest(tmp_path: Path) -> None:
     repo = _repo(tmp_path / "r")
     with pytest.raises(bi.BatchError, match="must be a list"):
         bi.member_ancestry(repo, {"A": {}}, "0" * 40)
+
+
+def _head(path: Path) -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=path, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def test_late_member_after_readiness_requires_revalidation(tmp_path: Path) -> None:
+    """Replay: a member integrated after readiness invalidates the old binding."""
+    repo = _repo(tmp_path / "r")
+    _start(repo)
+    member_a = _commit(repo, "member-a.txt")
+    head1 = _head(repo)
+    receipt = bi.delivery_receipt(
+        repo, [{"id": "A", "head": member_a}], {"integration_head": head1, "items": {"A": "pass"}}
+    )
+    assert receipt["integration_head"] == head1
+    member_b = _commit(repo, "member-b.txt")
+    head2 = _head(repo)
+    assert head2 != head1
+    with pytest.raises(bi.BatchError, match="different integration head"):
+        bi.delivery_receipt(
+            repo,
+            [{"id": "A", "head": member_a}, {"id": "B", "head": member_b}],
+            {"integration_head": head1, "items": {"A": "pass"}},
+        )
+    receipt2 = bi.delivery_receipt(
+        repo,
+        [{"id": "A", "head": member_a}, {"id": "B", "head": member_b}],
+        {"integration_head": head2, "items": {"A": "pass", "B": "pass"}},
+    )
+    assert receipt2["member_ancestry"] == {"A": True, "B": True}

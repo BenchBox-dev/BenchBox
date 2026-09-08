@@ -494,3 +494,44 @@ def test_isolated_replay_moved_ref_fails_closed_snapshot_reproduces(tmp_path: Pa
     )
     assert result.returncode == 0, result.stderr
     assert json.loads((dest / "b.json").read_text(encoding="utf-8")) == {"id": "b"}
+
+
+def test_isolated_replay_mirror_drift_breaks_bidirectional(tmp_path: Path) -> None:
+    """Replay the mirror-drift incident in an isolated local repository.
+
+    A seed built while the mirror matches the accepted snapshot is
+    bidirectional. After the mirror (main ref) drifts, a rebuild reports
+    legacy_overlay and clears bidirectional instead of silently accepting
+    the drifted content, while the pre-drift seed still reproduces.
+    """
+    repo, snapshot = _isolated_corpus_repo(tmp_path / "iso")
+
+    def cli(*args: str) -> subprocess.CompletedProcess[str]:
+        return _run_cli("--repo-root", repo, *args, cwd=Path(repo))
+
+    seed_path = tmp_path / "seed.json"
+    result = cli("--accepted-ref", snapshot, "--main-ref", "published-results", "--output", str(seed_path))
+    assert result.returncode == 0, result.stderr
+    seed = json.loads(seed_path.read_text(encoding="utf-8"))
+    assert seed["bidirectional"] is True
+    assert seed["legacy_overlay"] == []
+
+    subprocess.run(["git", "checkout", "-q", "main"], cwd=repo, check=True)
+    (Path(repo) / "results-data" / "bundles" / "d.json").write_text('{"id": "d"}')
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "mirror drift"], cwd=repo, check=True)
+
+    drift_path = tmp_path / "drift.json"
+    result = cli("--accepted-ref", snapshot, "--main-ref", "main", "--output", str(drift_path))
+    assert result.returncode == 0, result.stderr
+    drift = json.loads(drift_path.read_text(encoding="utf-8"))
+    assert drift["bidirectional"] is False
+    assert drift["dispositions"]["results-data/bundles/d.json"] == "legacy_overlay"
+    assert drift["union"] != seed["union"]
+
+    regen_path = tmp_path / "regen.json"
+    result = cli("--accepted-ref", snapshot, "--main-ref", "published-results", "--output", str(regen_path))
+    assert result.returncode == 0, result.stderr
+    regen = json.loads(regen_path.read_text(encoding="utf-8"))
+    assert regen["union"] == seed["union"]
+    assert regen["digests"] == seed["digests"]

@@ -202,8 +202,7 @@ def test_missing_check_evidence_never_clean(tmp_path: Path) -> None:
 def test_substantive_post_merge_regression_clears_innocent_sha(tmp_path: Path) -> None:
     """A cleared blamed SHA gets advisory, never a revert."""
     del tmp_path
-    action, _ = post_merge.attribution_action(["tests/unit/foo.py::test_x"], ["other/part.py"])
-    assert action == "advisory"
+    assert post_merge.attribution_action(["tests/unit/foo.py::test_x"], ["other/part.py"]) == "advisory"
 
 
 def test_wrong_pr_branch_never_mutates() -> None:
