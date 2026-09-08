@@ -22,24 +22,38 @@ IGNORED_SUFFIXES = (".manifest.json", ".applied.json", ".plans.json", ".tuning.j
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
-# The seed pins an immutable snapshot of the accepted corpus (M8). Bumping this
-# constant is the deliberate, reviewable act that regenerates the committed seed.
+# The moving accepted ref. Reproducibility checks resolve it once and bind the
+# result to the recorded input with --expect-source, so an advancing mirror
+# cannot turn unchanged code red. Only the freshness path reads the live tip.
 PINNED_SOURCE_REF = "origin/published-results"
 
-# How many ref-dependent tests MUST run. If the accepted ref is unreachable and
-# this is not explicitly allowed, the suite fails loudly instead of silently
-# skipping ~half its coverage (M8).
+
+def _recorded_source() -> str:
+    try:
+        return str(json.loads(SEED_PATH.read_text(encoding="utf-8")).get("source") or "")
+    except (OSError, ValueError):
+        return ""
+
+
+# The immutable snapshot recorded in the committed seed (M8). Reproducibility
+# checks read bytes from this SHA, never from the current tip of the branch.
+RECORDED_SOURCE = _recorded_source()
+
+# How many ref-dependent tests MUST run. If the recorded snapshot is
+# unreachable and this is not explicitly allowed, the suite fails loudly
+# instead of silently skipping ~half its coverage (M8).
 _ALLOW_MISSING_REF = os.environ.get("BENCHBOX_ALLOW_MISSING_PUBLISHED_REF") == "1"
 
 
-def _accepted_ref_exists() -> bool:
+def _recorded_source_available() -> bool:
+    if not COMMIT_SHA_RE.match(RECORDED_SOURCE):
+        return False
     try:
         subprocess.run(
-            ["git", "rev-parse", "--verify", f"{PINNED_SOURCE_REF}^{{commit}}"],
+            ["git", "cat-file", "-e", RECORDED_SOURCE],
             cwd=REPO_ROOT,
             check=True,
             capture_output=True,
-            text=True,
         )
         return True
     except subprocess.CalledProcessError:
@@ -51,15 +65,21 @@ def _accepted_ref_exists() -> bool:
                 capture_output=True,
                 text=True,
             )
+            subprocess.run(
+                ["git", "cat-file", "-e", RECORDED_SOURCE],
+                cwd=REPO_ROOT,
+                check=True,
+                capture_output=True,
+            )
             return True
         except (subprocess.CalledProcessError, FileNotFoundError):
             return False
 
 
-REF_AVAILABLE = _accepted_ref_exists()
+REF_AVAILABLE = _recorded_source_available()
 skip_no_ref = pytest.mark.skipif(
     not REF_AVAILABLE,
-    reason="origin/published-results not reachable",
+    reason="recorded ledger source snapshot not reachable",
 )
 
 
@@ -107,10 +127,11 @@ def _blob_sha256(ref: str, path: str) -> str:
 
 
 def test_ref_dependent_suite_is_not_silently_skipped() -> None:
-    """If the accepted ref is unreachable and not explicitly allowed, fail — don't skip."""
+    """If the recorded snapshot is unreachable and not explicitly allowed, fail — don't skip."""
     assert REF_AVAILABLE or _ALLOW_MISSING_REF, (
-        f"{PINNED_SOURCE_REF} is unreachable; set BENCHBOX_ALLOW_MISSING_PUBLISHED_REF=1 to allow "
-        "an offline run, otherwise fetch the ref so the ledger-seed contract is actually tested"
+        f"recorded source {RECORDED_SOURCE or '<missing>'} is unreachable; set "
+        "BENCHBOX_ALLOW_MISSING_PUBLISHED_REF=1 to allow an offline run, otherwise fetch "
+        "the accepted ref so the ledger-seed contract is actually tested"
     )
 
 
@@ -135,6 +156,8 @@ def test_seed_has_required_keys() -> None:
         "generated_at",
         "source",
         "source_ref",
+        "source_resolved_at",
+        "source_resolved_from",
         "main_source",
         "bidirectional",
         "union",
@@ -145,6 +168,14 @@ def test_seed_has_required_keys() -> None:
         "count",
     ):
         assert key in data, f"missing key: {key}"
+
+
+def test_seed_provenance_binds_recorded_snapshot() -> None:
+    """w0: the seed persists which ref resolved to the recorded SHA and when."""
+    data = _seed()
+    assert COMMIT_SHA_RE.match(data["source"])
+    assert data["source_resolved_from"] == data["source_ref"] == PINNED_SOURCE_REF
+    assert re.match(r"^\d{4}-\d{2}-\d{2}T", data["source_resolved_at"]), "resolved_at must be a UTC timestamp"
 
 
 def test_seed_source_is_pinned_commit_sha() -> None:
@@ -248,21 +279,46 @@ def _run_cli(*args: str, cwd: Path = REPO_ROOT) -> subprocess.CompletedProcess[s
 
 @skip_no_ref
 def test_cli_regenerates_committed_seed_content(tmp_path: Path) -> None:
-    """The committed seed must be reproducible from the pinned ref (no manual drift)."""
+    """The committed seed must be reproducible from the recorded input (no manual drift).
+
+    The moving ref is resolved once and bound to the recorded SHA: an advancing
+    mirror fails here with an actionable moved-ref message instead of silently
+    switching inputs and turning unchanged code red.
+    """
     out = tmp_path / "seed.json"
-    result = _run_cli("--accepted-ref", PINNED_SOURCE_REF, "--output", str(out))
+    result = _run_cli("--accepted-ref", PINNED_SOURCE_REF, "--expect-source", RECORDED_SOURCE, "--output", str(out))
     assert result.returncode == 0, result.stderr
     regen = json.loads(out.read_text(encoding="utf-8"))
     committed = _seed()
+    assert regen["source"] == committed["source"] == RECORDED_SOURCE
     for key in ("union", "dispositions", "digests", "published_only", "legacy_overlay", "count"):
         assert regen[key] == committed[key], f"regenerated seed drifted at {key}"
 
 
 @skip_no_ref
+def test_cli_expect_source_rejects_moved_ref(tmp_path: Path) -> None:
+    """A ref that no longer resolves to the recorded snapshot fails closed."""
+    out = tmp_path / "seed.json"
+    result = _run_cli("--accepted-ref", "HEAD", "--expect-source", RECORDED_SOURCE, "--output", str(out))
+    assert result.returncode != 0
+    assert "moved" in result.stderr
+    assert not out.exists()
+
+
+@skip_no_ref
 def test_cli_classifies_forced_legacy_overlay(tmp_path: Path) -> None:
     out = tmp_path / "seed.json"
-    first = _bundles_at_ref(PINNED_SOURCE_REF)[0]
-    result = _run_cli("--accepted-ref", PINNED_SOURCE_REF, "--output", str(out), "--legacy-overlay", first)
+    first = _bundles_at_ref(RECORDED_SOURCE)[0]
+    result = _run_cli(
+        "--accepted-ref",
+        RECORDED_SOURCE,
+        "--expect-source",
+        RECORDED_SOURCE,
+        "--output",
+        str(out),
+        "--legacy-overlay",
+        first,
+    )
     assert result.returncode == 0, result.stderr
     data = json.loads(out.read_text(encoding="utf-8"))
     assert data["dispositions"][first] == "legacy_overlay"
@@ -302,11 +358,13 @@ def test_cli_reports_bad_ref_distinctly(tmp_path: Path) -> None:
 
 @skip_no_ref
 def test_cli_materialize_dest_writes_union_and_verifies_digests(tmp_path: Path) -> None:
-    """--materialize-dest writes every seed-union path and fails on digest mismatch."""
+    """--materialize-dest reads bytes from the recorded snapshot, not the live tip."""
     dest = tmp_path / "corpus_archive"
     result = _run_cli(
         "--accepted-ref",
-        PINNED_SOURCE_REF,
+        RECORDED_SOURCE,
+        "--expect-source",
+        RECORDED_SOURCE,
         "--ledger-seed",
         str(SEED_PATH),
         "--materialize-dest",
@@ -328,7 +386,9 @@ def test_cli_materialize_dest_writes_union_and_verifies_digests(tmp_path: Path) 
     bad_dest = tmp_path / "bad_archive"
     bad = _run_cli(
         "--accepted-ref",
-        PINNED_SOURCE_REF,
+        RECORDED_SOURCE,
+        "--expect-source",
+        RECORDED_SOURCE,
         "--ledger-seed",
         str(bad_seed),
         "--materialize-dest",
@@ -336,3 +396,22 @@ def test_cli_materialize_dest_writes_union_and_verifies_digests(tmp_path: Path) 
     )
     assert bad.returncode != 0
     assert "digest mismatch" in bad.stderr
+
+
+@skip_no_ref
+def test_cli_materialize_rejects_seed_without_recorded_source(tmp_path: Path) -> None:
+    """A legacy seed with no immutable source SHA must be regenerated, not guessed."""
+    legacy = tmp_path / "legacy-seed.json"
+    seed = _seed()
+    stripped = {k: v for k, v in seed.items() if k != "source"}
+    legacy.write_text(json.dumps(stripped), encoding="utf-8")
+    result = _run_cli(
+        "--accepted-ref",
+        PINNED_SOURCE_REF,
+        "--ledger-seed",
+        str(legacy),
+        "--materialize-dest",
+        str(tmp_path / "legacy_archive"),
+    )
+    assert result.returncode != 0
+    assert "no immutable source SHA" in result.stderr

@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -109,17 +110,29 @@ def worktree_sha256(path: str, repo_root: Path = ROOT) -> str:
     return hashlib.sha256((repo_root / path).read_bytes()).hexdigest()
 
 
+def check_expect_source(resolved_sha: str, expect_source: str | None, where: str) -> None:
+    """Fail closed when a moving ref no longer resolves to the recorded input."""
+    if expect_source and resolved_sha != expect_source:
+        raise LedgerSeedError(
+            f"{where} resolved to {resolved_sha}, expected recorded input {expect_source}: "
+            "the accepted ref moved; revalidate freshness through the corpus flow instead of "
+            "silently generating from new input"
+        )
+
+
 def materialize_union(
     accepted_ref: str,
     ledger_seed: Path,
     dest: Path,
     repo_root: Path = ROOT,
+    expect_source: str | None = None,
 ) -> int:
     """Write every seed-union path's bytes into *dest*, verifying digests.
 
     Paths whose worktree bytes match the seed digest are copied from the
     worktree. ``published_only`` paths and digest mismatches are taken from
-    ``git show`` of *accepted_ref*. Returns the number of primary bundles written.
+    ``git show`` of the seed's recorded immutable ``source`` SHA, never from
+    the current tip of a moving ref. Returns the number of primary bundles written.
     """
     if not ledger_seed.is_file():
         raise LedgerSeedError(f"ledger seed not found: {ledger_seed}")
@@ -129,7 +142,16 @@ def materialize_union(
     if not union:
         raise LedgerSeedError(f"ledger seed {ledger_seed} has an empty union (no vacuous pass)")
 
-    accepted_sha = resolve_ref(accepted_ref, repo_root)
+    # Reproducibility: bytes come from the recorded snapshot. Seeds predating
+    # provenance capture (no `source` SHA) must be regenerated, not guessed.
+    accepted_sha = str(seed.get("source") or "")
+    if not re.fullmatch(r"[0-9a-f]{40}", accepted_sha):
+        raise LedgerSeedError(
+            f"ledger seed {ledger_seed} records no immutable source SHA; regenerate it "
+            "with --accepted-ref resolved once, instead of materializing from a moving ref"
+        )
+    check_expect_source(accepted_sha, expect_source, f"ledger seed {ledger_seed}")
+    _ = accepted_ref  # retained for CLI compatibility; the recorded SHA is authoritative
     dest.mkdir(parents=True, exist_ok=True)
     written = 0
     for path in union:
@@ -161,13 +183,18 @@ def build_seed(
     main_ref: str | None = None,
     published_only_override: list[str] | None = None,
     legacy_overlay_override: list[str] | None = None,
+    expect_source: str | None = None,
 ) -> dict:
     """Build the full seed JSON structure from real two-sided set membership.
 
     ``main_ref`` selects the main-line corpus source. When omitted the working
     tree is used (so a fresh checkout still produces a correct union).
+    ``expect_source`` fails closed when the moving accepted ref no longer
+    resolves to the recorded snapshot: resolve the moving ref once before
+    generation, persist that provenance, and never silently switch inputs.
     """
     accepted_sha = resolve_ref(accepted_ref, repo_root)
+    check_expect_source(accepted_sha, expect_source, f"accepted ref {accepted_ref!r}")
     accepted_paths = set(list_bundles_at_ref(accepted_sha, repo_root))
 
     if main_ref:
@@ -215,11 +242,14 @@ def build_seed(
     # N12: derived, not hardcoded -- true only when both sides hold the same set.
     bidirectional = not published_only and not legacy_overlay and not po_override and not lo_override
 
+    now = datetime.now(UTC).isoformat()
     return {
         "schema_version": SCHEMA_VERSION,
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": now,
         "source": accepted_sha,
         "source_ref": accepted_ref,
+        "source_resolved_at": now,
+        "source_resolved_from": accepted_ref,
         "main_source": main_source,
         "bidirectional": bidirectional,
         "union": union,
@@ -237,6 +267,15 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--accepted-ref",
         default="origin/published-results",
         help="Git ref for accepted published-results (default: origin/published-results)",
+    )
+    parser.add_argument(
+        "--expect-source",
+        default=None,
+        help=(
+            "Fail unless the accepted ref (generate) or the seed's recorded source "
+            "(materialize) equals this immutable commit SHA. Pass the recorded seed "
+            "SHA to prove a moved mirror cannot change validation of the old snapshot."
+        ),
     )
     parser.add_argument(
         "--main-ref",
@@ -293,6 +332,7 @@ def main(argv: list[str] | None = None) -> int:
                 ledger_seed=args.ledger_seed,
                 dest=args.materialize_dest,
                 repo_root=repo_root,
+                expect_source=args.expect_source,
             )
         except LedgerSeedError as exc:
             print(f"error: {exc}", file=sys.stderr)
@@ -307,6 +347,7 @@ def main(argv: list[str] | None = None) -> int:
             main_ref=args.main_ref,
             published_only_override=args.published_only or None,
             legacy_overlay_override=args.legacy_overlay or None,
+            expect_source=args.expect_source,
         )
     except LedgerSeedError as exc:
         print(f"error: {exc}", file=sys.stderr)
