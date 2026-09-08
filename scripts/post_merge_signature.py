@@ -23,6 +23,11 @@ break can still make that SHA the first red run even when the blamed commit
 did not touch the failing test. ``attribute`` downgrades that case to an
 advisory when every extractable failing test path is outside the SHA's diff.
 Job-level failures (lint, missing junit paths) stay fail-closed (revert).
+Failure IDs no classifier understands escalate: the verdict carries
+``action: escalate`` with the unrecognized IDs and the workflow must fail
+loudly for human classification instead of reverting. The verdict always
+records the blamed ``sha`` and ``attribution_basis`` so evidence applies
+only to the commit it was computed against.
 
 Stdlib-only by design (see scripts/path_filter_decision.py for the same
 precedent): this runs in a bare `python` step with no dependency sync.
@@ -119,6 +124,35 @@ def load_signature(path: Path) -> dict[str, object]:
     return data
 
 
+def classify_failure_id(raw: object) -> tuple[str, str | None]:
+    """Classify one failure ID, returning (class, test path or None).
+
+    Classes: ``file-path`` (``tests/unit/foo.py::...``), ``dotted-module``
+    (``tests.unit.foo[.TestFoo]::...``), ``job-level`` (``lint:...`` with no
+    test path), ``unrecognized`` (a form no classifier understands — these
+    must escalate, never silently drop, so the next unknown writer becomes a
+    loud failure instead of a wrong revert).
+    """
+    if not isinstance(raw, str):
+        return "unrecognized", None
+    candidate = raw.split("::", 1)[0].strip()
+    if candidate.endswith(".py"):
+        # Any .py candidate has a test-path shape; a bare filename that
+        # matches nothing resolves to advisory downstream, not escalation.
+        return "file-path", candidate
+    if candidate.startswith("tests.") and "." in candidate:
+        # pytest's JUnit fallback classname is the dotted test module,
+        # optionally followed by the test class. Class names conventionally
+        # start with an uppercase letter; preserve module-level test IDs.
+        parts = candidate.split(".")
+        if parts[-1] and parts[-1][0].isupper():
+            parts = parts[:-1]
+        return "dotted-module", "/".join(parts) + ".py"
+    if ":" in raw and not candidate.startswith(("tests", ".")):
+        return "job-level", None
+    return "unrecognized", None
+
+
 def failure_id_test_paths(failure_ids: list[object]) -> list[str]:
     """Extract repository test paths from junit-style failure IDs.
 
@@ -127,32 +161,23 @@ def failure_id_test_paths(failure_ids: list[object]) -> list[str]:
     classname instead (for example,
     ``tests.unit.foo.TestFoo::test_bar``); that form is normalized back to
     ``tests/unit/foo.py`` as well. Job-level IDs such as ``lint:Run CI lint
-    mirror`` yield nothing.
+    mirror`` yield nothing. Unrecognized forms yield nothing here and are
+    reported separately by :func:`unrecognized_failure_ids`.
     """
     paths: list[str] = []
     seen: set[str] = set()
     for raw in failure_ids:
-        if not isinstance(raw, str):
+        _class, path = classify_failure_id(raw)
+        if path is None or path in seen:
             continue
-        candidate = raw.split("::", 1)[0].strip()
-        if candidate.endswith(".py"):
-            path = candidate
-        elif candidate.startswith("tests.") and "." in candidate:
-            # pytest's JUnit fallback classname is the dotted test module,
-            # optionally followed by the test class. Class names conventionally
-            # start with an uppercase letter; preserve module-level test IDs.
-            parts = candidate.split(".")
-            if parts[-1] and parts[-1][0].isupper():
-                parts = parts[:-1]
-            path = "/".join(parts) + ".py"
-        else:
-            continue
-        if "/" not in path and not path.startswith("tests"):
-            continue
-        if path not in seen:
-            seen.add(path)
-            paths.append(path)
+        seen.add(path)
+        paths.append(path)
     return paths
+
+
+def unrecognized_failure_ids(failure_ids: list[object]) -> list[str]:
+    """Failure IDs no classifier understands. Never silently dropped."""
+    return [str(raw) for raw in failure_ids if classify_failure_id(raw)[0] == "unrecognized"]
 
 
 def paths_related_to_test(test_path: str) -> list[str]:
@@ -251,32 +276,40 @@ def attribution_action(
     failure_ids: list[object],
     changed_paths: list[str],
     repo_root: Path | None = None,
-) -> str:
-    """Return ``revert`` or ``advisory`` for a blamed SHA's changed paths.
+) -> tuple[str, str]:
+    """Return ``(action, basis)`` for a blamed SHA's changed paths.
 
-    Checks two signals before downgrading to advisory: the test path/stem
-    heuristic (``paths_related_to_test``) and, since that heuristic misses a
-    dependency whose basename differs from the test file, real import
-    analysis (``imported_module_paths``) - a changed path the test file
-    actually imports still triggers revert even when neither its name nor
-    its stem matches. Advisory only when both signals clear the blamed SHA
-    for every extractable failing test path. No extractable test path keeps
-    revert so lint/job failures stay fail-closed.
+    Actions: ``revert`` (evidence ties a failure to the SHA), ``advisory``
+    (every extractable failing test path clears the SHA), ``escalate`` (an
+    ID class no classifier understands — a human must classify it before any
+    revert, so the next unknown writer becomes a loud failure instead of a
+    wrong revert). Basis records which signal decided: ``test-path``,
+    ``import``, ``no-extractable-path`` (fail-closed revert; job-level and
+    lint failures stay revert), or ``unrecognized-class``.
+
+    Checks two owning signals before downgrading to advisory: the test
+    path/stem heuristic (``paths_related_to_test``) and real import analysis
+    (``imported_module_paths``) - a changed path the test file actually
+    imports still triggers revert even when neither its name nor its stem
+    matches.
     """
+    unrecognized = unrecognized_failure_ids(failure_ids)
+    if unrecognized:
+        return "escalate", "unrecognized-class"
     test_paths = failure_id_test_paths(failure_ids)
     if not test_paths:
-        return "revert"
+        return "revert", "no-extractable-path"
     root = repo_root or Path.cwd()
     changed = set(changed_paths)
     changed_names = {Path(path).name for path in changed_paths}
     for test_path in test_paths:
         for related in paths_related_to_test(test_path):
             if related in changed or Path(related).name in changed_names:
-                return "revert"
+                return "revert", "test-path"
         for imported in imported_module_paths(test_path, root):
             if imported in changed:
-                return "revert"
-    return "advisory"
+                return "revert", "import"
+    return "advisory", "cleared"
 
 
 def diff_signatures(previous: dict[str, object], current: dict[str, object]) -> list[str]:
@@ -352,11 +385,14 @@ def _attribute_command(args: argparse.Namespace) -> int:
     except SignatureError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    action = attribution_action(failure_ids, changed_paths)
+    action, basis = attribution_action(failure_ids, changed_paths)
     result = {
         "action": action,
+        "attribution_basis": basis,
+        "sha": args.sha,
         "test_paths": failure_id_test_paths(failure_ids),
         "changed_paths": changed_paths,
+        "unrecognized_ids": unrecognized_failure_ids(failure_ids),
     }
     text = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.out:

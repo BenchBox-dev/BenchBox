@@ -662,9 +662,19 @@ jobs:
           fi
           echo "revert-suppressed=${revert_suppressed}" >> "${GITHUB_OUTPUT}"
 
+      - name: Fail loudly on unattributable failure classes
+        id: escalate-attribution
+        if: steps.signature-decision.outputs.should-revert == 'true' && steps.attribute.outputs.action == 'escalate'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Unrecognized failure-ID class needs human classification before any revert." >&2
+          echo "Classify the IDs, extend scripts/post_merge_signature.py, then re-run." >&2
+          exit 1
+
       - name: Open revert PR or conflict issue
         id: open-revert
-        if: steps.signature-decision.outputs.should-revert == 'true' && steps.attribute.outputs.action != 'advisory'
+        if: steps.signature-decision.outputs.should-revert == 'true' && steps.attribute.outputs.action == 'revert'
         shell: bash
         env:
           FAIL_OPEN_REASON: ${{ steps.signature-decision.outputs.fail-open-reason }}
