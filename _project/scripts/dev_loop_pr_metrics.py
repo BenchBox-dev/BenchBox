@@ -41,6 +41,8 @@ Usage:
     uv run -- python _project/scripts/dev_loop_pr_metrics.py
     uv run -- python _project/scripts/dev_loop_pr_metrics.py --days 28 --json
     uv run -- python _project/scripts/dev_loop_pr_metrics.py --collect-durations
+    uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-lifecycle-baseline LIFECYCLE --process-baseline PROCESS
+    uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-refresh-audit AUDIT --baseline LIFECYCLE
 
 --collect-durations is a separate, local-machine-only mode: it runs the fast
 test lane under `pytest --durations=20` and prints the slowest tests. It does
@@ -78,6 +80,18 @@ API_RETRY_ATTEMPTS = 3
 # Versioned synchronize-event fan-out schema. Existing PrMetrics / summarize
 # keys stay unchanged so current consumers keep working.
 EVENT_FANOUT_SCHEMA = "event_fanout_v1"
+# Complete-lifecycle baseline schema: every synchronize head plus every run
+# attempt per PR, with expired/unobservable evidence as explicit missingness
+# instead of silent exclusion (ci-baseline w1/w2).
+LIFECYCLE_SCHEMA = "ci_lifecycle_baseline_v1"
+# Machine-readable refresh-audit block embedded in the exact-refresh Markdown
+# audit; the validator recomputes it from the shared lifecycle baseline.
+REFRESH_AUDIT_SCHEMA = "refresh_audit_v1"
+# Full-required reasons that must stay separate counters: gate-timing loss vs
+# prior-head identity/binding failure. Conflating them hides which mechanism
+# to fix; the refresh-audit validator rejects reports that merge them.
+REFRESH_REASON_TIMING = "prior_check_not_success"
+REFRESH_REASON_IDENTITY = "prior_check_unbound"
 REQUIRED_CONTEXT_NAMES: tuple[str, ...] = (
     "ci-required-result",
     "Results Explorer browser gate",
@@ -695,6 +709,101 @@ def event_fanout_metrics(
     }
 
 
+def pr_synchronize_heads(client: GitHubClient, number: int) -> list[str]:
+    """Every commit SHA pushed to the PR, oldest first.
+
+    Each entry is one synchronize head: the final merged head alone cannot
+    establish total refresh/cancellation cost, so lifecycle accounting must
+    enumerate all of these, not just the head the PR merged with.
+    """
+
+    commits = client.get_paginated(f"/repos/{client.repo}/pulls/{number}/commits")
+    heads: list[str] = []
+    for commit in commits:
+        sha = str(commit.get("sha") or "")
+        if sha and sha not in heads:
+            heads.append(sha)
+    return heads
+
+
+def lifecycle_for_pr(client: GitHubClient, pr: dict) -> dict:
+    """All-head fan-out for one PR, with explicit missing-artifact entries.
+
+    Returns heads (every synchronize SHA in push order), per_head fan-out
+    keyed by SHA, attempts per SHA, missing entries for heads with no
+    observable runs (expired retention or never scheduled -- censored, never
+    silently dropped), and totals that validators recompute from per-head
+    data. Speculative merge_group and post-merge runs are intentionally out
+    of scope here: runs are queried per authored head SHA, so queue-generated
+    speculative heads never enter these totals.
+    """
+
+    number = pr["number"]
+    heads = pr_synchronize_heads(client, number)
+    final_sha = str((pr.get("head") or {}).get("sha") or "")
+    per_head: dict[str, dict] = {}
+    attempts: dict[str, int] = {}
+    missing: list[dict] = []
+    for sha in heads:
+        runs = client.get_paginated(
+            f"/repos/{client.repo}/actions/runs?head_sha={sha}",
+            item_key="workflow_runs",
+        )
+        if not runs:
+            missing.append(
+                {
+                    "head_sha": sha,
+                    "status": "missing-artifact",
+                    "reason": "no observable workflow runs for head (expired retention or never scheduled)",
+                }
+            )
+            continue
+        jobs: list[dict] = []
+        head_attempts = 0
+        for run in runs:
+            jobs.extend(
+                client.get_paginated(
+                    f"/repos/{client.repo}/actions/runs/{run['id']}/jobs",
+                    item_key="jobs",
+                )
+            )
+            try:
+                head_attempts += int(run.get("run_attempt") or 1)
+            except (TypeError, ValueError):
+                head_attempts += 1
+        check_runs = client.get_paginated(
+            f"/repos/{client.repo}/commits/{sha}/check-runs",
+            item_key="check_runs",
+        )
+        per_head[sha] = event_fanout_metrics(
+            runs=runs,
+            jobs=jobs,
+            check_runs=check_runs,
+            merged_at=pr.get("merged_at") if sha == final_sha else None,
+        )
+        attempts[sha] = head_attempts
+    totals = {
+        "head_count": len(heads),
+        "observed_head_count": len(per_head),
+        "missing_head_count": len(missing),
+        "total_attempts": sum(attempts.values()),
+        "completed_runner_minutes": sum(
+            float(per_head[sha].get("completed_runner_minutes") or 0.0) for sha in per_head
+        ),
+        "cancelled_runner_minutes": sum(
+            float(per_head[sha].get("cancelled_runner_minutes") or 0.0) for sha in per_head
+        ),
+    }
+    return {
+        "number": number,
+        "heads": heads,
+        "per_head": per_head,
+        "attempts": attempts,
+        "missing": missing,
+        "totals": totals,
+    }
+
+
 def _medium_budget_warning(p95_seconds: float | None) -> str | None:
     """Return a resize warning when medium-test p95 approaches its timeout."""
     if p95_seconds is None:
@@ -737,6 +846,302 @@ def summarize(metrics: list[PrMetrics]) -> dict:
         # right up to the moment the lane starts failing.
         "medium_test_budget_warning": _medium_budget_warning(_pct(medium_job, 95)),
     }
+
+
+# ---------------------------------------------------------------------------
+# Local report validators: recompute frozen report numbers from the same
+# data instead of trusting selected manual sums. These validate local JSON /
+# Markdown reports; they are not CI gates and they fetch nothing.
+# ---------------------------------------------------------------------------
+def _sha256_bytes(data: bytes) -> str:
+    import hashlib
+
+    return hashlib.sha256(data).hexdigest()
+
+
+def validate_lifecycle_baseline(lifecycle: dict, process: dict, process_digest: str) -> list[str]:
+    """Check a ci_lifecycle_baseline_v1 report against the frozen process baseline.
+
+    Verifies immutable identity completeness (every synchronize head present
+    exactly once across per_head/missing), recomputed all-head/run-attempt
+    totals, explicit missingness, and that the preregistered process criteria
+    are unchanged. Returns a list of failure strings; empty means valid.
+    """
+
+    errors: list[str] = []
+    if not isinstance(lifecycle, dict) or lifecycle.get("schema") != LIFECYCLE_SCHEMA:
+        return [f"lifecycle baseline schema must be {LIFECYCLE_SCHEMA!r}"]
+    if not isinstance(process, dict):
+        return ["process baseline must be a JSON object"]
+    proc_ref = lifecycle.get("process_baseline")
+    if not isinstance(proc_ref, dict):
+        errors.append("lifecycle baseline must record its process_baseline binding")
+    else:
+        if proc_ref.get("criteria_version") != process.get("criteria_version"):
+            errors.append(
+                "process criteria changed after registration: "
+                f"lifecycle binds {proc_ref.get('criteria_version')!r}, "
+                f"process file declares {process.get('criteria_version')!r} "
+                "(bump criteria_version and disclose instead of re-scoring)"
+            )
+        if proc_ref.get("process_digest") != process_digest:
+            errors.append("process baseline content differs from the frozen digest (thresholds or scenarios changed)")
+    prs = lifecycle.get("prs")
+    if not isinstance(prs, list) or not prs:
+        errors.append("lifecycle baseline must list at least one PR entry")
+        return errors
+    for entry in prs:
+        if not isinstance(entry, dict):
+            errors.append("PR entry must be an object")
+            continue
+        errors.extend(_check_lifecycle_entry(entry))
+    return errors
+
+
+def _check_lifecycle_entry(entry: dict) -> list[str]:
+    """Identity completeness and recomputed totals for one lifecycle PR entry."""
+
+    errors: list[str] = []
+    number = entry.get("number")
+    heads = entry.get("heads") or []
+    per_head = entry.get("per_head") or {}
+    attempts = entry.get("attempts") or {}
+    missing = entry.get("missing") or []
+    totals = entry.get("totals") or {}
+    if len(heads) != len(set(heads)):
+        errors.append(f"PR #{number}: duplicate head SHAs in heads list")
+    missing_shas = [m.get("head_sha") for m in missing if isinstance(m, dict)]
+    if set(per_head) & set(missing_shas):
+        errors.append(f"PR #{number}: head recorded as both observed and missing")
+    if set(per_head) | set(missing_shas) != set(heads):
+        errors.append(
+            f"PR #{number}: heads/per_head/missing disagree "
+            f"({len(heads)} heads, {len(per_head)} observed, {len(missing_shas)} missing)"
+        )
+    for m in missing:
+        if not isinstance(m, dict) or not m.get("status") or not m.get("reason"):
+            errors.append(f"PR #{number}: missing entry must carry explicit status and reason")
+    for sha in per_head:
+        if sha not in attempts:
+            errors.append(f"PR #{number}: observed head {sha[:12]} lacks an attempt count")
+    errors.extend(_check_lifecycle_totals(number, heads, per_head, attempts, missing_shas, totals))
+    return errors
+
+
+def _check_lifecycle_totals(
+    number: object,
+    heads: list,
+    per_head: dict,
+    attempts: dict,
+    missing_shas: list,
+    totals: dict,
+) -> list[str]:
+    """Recompute one entry's integer counts and runner-minute totals."""
+
+    errors: list[str] = []
+    for key, expected in (
+        ("head_count", len(heads)),
+        ("observed_head_count", len(per_head)),
+        ("missing_head_count", len(missing_shas)),
+        ("total_attempts", sum(int(attempts.get(sha) or 0) for sha in per_head)),
+    ):
+        if totals.get(key) != expected:
+            errors.append(f"PR #{number}: totals.{key} is {totals.get(key)!r}, recomputed {expected!r}")
+    for key in ("completed_runner_minutes", "cancelled_runner_minutes"):
+        expected = sum(float((per_head[sha] or {}).get(key) or 0.0) for sha in per_head)
+        actual = totals.get(key)
+        if not isinstance(actual, (int, float)) or abs(float(actual) - expected) > 1e-6:
+            errors.append(f"PR #{number}: totals.{key} is {actual!r}, recomputed {expected!r}")
+    return errors
+
+
+_REFRESH_AUDIT_FENCE_RE = re.compile(r"(?ms)```json\s*\n(.*?)```")
+
+
+def _load_refresh_audit_block(audit_text: str) -> tuple[dict | None, str | None]:
+    for match in _REFRESH_AUDIT_FENCE_RE.finditer(audit_text or ""):
+        try:
+            block = json.loads(match.group(1))
+        except ValueError:
+            continue
+        if isinstance(block, dict) and block.get("schema") == REFRESH_AUDIT_SCHEMA:
+            return block, None
+    return None, f"no {REFRESH_AUDIT_SCHEMA} JSON block found in refresh audit"
+
+
+def validate_refresh_audit(audit_text: str, lifecycle: dict, reason_codes: tuple[str, ...]) -> list[str]:
+    """Recompute an exact-refresh audit block from the shared lifecycle baseline.
+
+    Rejects omitted/duplicate observation identities, changed windows,
+    unknown denominators, unknown reason codes, and conflated timing vs
+    identity reasons. Returns a list of failure strings; empty means valid.
+    """
+
+    errors: list[str] = []
+    block, block_error = _load_refresh_audit_block(audit_text)
+    if block is None or block_error:
+        return [block_error or "unreadable refresh audit block"]
+    if not isinstance(lifecycle, dict) or lifecycle.get("schema") != LIFECYCLE_SCHEMA:
+        return [f"refresh audit baseline must be a {LIFECYCLE_SCHEMA} report"]
+    cohort = lifecycle.get("cohort") or {}
+    for key in ("window_start", "window_end"):
+        if block.get(key) != cohort.get(key):
+            errors.append(f"refresh audit {key} {block.get(key)!r} != baseline cohort {cohort.get(key)!r}")
+    baseline_prs = set()
+    baseline_heads: dict[int, set[str]] = {}
+    for entry in lifecycle.get("prs") or []:
+        if not isinstance(entry, dict):
+            continue
+        number = entry.get("number")
+        baseline_prs.add(number)
+        baseline_heads[number] = set(entry.get("heads") or [])
+    denominator = block.get("denominator_prs") or []
+    unknown = [n for n in denominator if n not in baseline_prs]
+    if unknown:
+        errors.append(f"refresh audit denominator uses PRs outside the frozen baseline: {unknown!r}")
+    observations = block.get("observations") or []
+    recomputed = _check_audit_observations(observations, reason_codes, errors)
+    _check_audit_counts(block, observations, recomputed, errors)
+    _check_audit_missing(block, denominator, baseline_heads, observations, errors)
+    return errors
+
+
+def _check_audit_observations(observations: list, reason_codes: tuple[str, ...], errors: list[str]) -> dict[str, int]:
+    """Validate observation identities/codes; return recomputed reason counts."""
+
+    seen: set[tuple] = set()
+    recomputed: dict[str, int] = {}
+    for obs in observations:
+        if not isinstance(obs, dict):
+            errors.append("refresh observation must be an object")
+            continue
+        identity = (obs.get("pr"), obs.get("head_sha"), obs.get("run_id"), obs.get("attempt"))
+        if None in identity:
+            errors.append(f"refresh observation lacks a full pr/head/run/attempt identity: {obs!r}")
+            continue
+        if identity in seen:
+            errors.append(f"duplicate refresh observation identity: {identity!r}")
+        seen.add(identity)
+        reason = obs.get("reason")
+        if reason not in reason_codes:
+            errors.append(f"unknown refresh reason code: {reason!r}")
+            continue
+        recomputed[reason] = recomputed.get(reason, 0) + 1
+    return recomputed
+
+
+def _check_audit_counts(block: dict, observations: list, recomputed: dict[str, int], errors: list[str]) -> None:
+    """Recompute reason counts and the timing-only share from observations."""
+
+    claimed_counts = block.get("reason_counts") or {}
+    for required_key in (REFRESH_REASON_TIMING, REFRESH_REASON_IDENTITY):
+        if required_key not in claimed_counts:
+            # Counters must be reported separately even when zero so a later
+            # reader can tell timing loss from identity failure.
+            errors.append(f"reason_counts must report {required_key!r} separately (zero allowed), not conflate it")
+    comparable = {
+        key: value
+        for key, value in claimed_counts.items()
+        if not (value == 0 and key in (REFRESH_REASON_TIMING, REFRESH_REASON_IDENTITY))
+    }
+    if comparable != dict(recomputed):
+        errors.append(f"reason_counts {claimed_counts!r} != recomputed {recomputed!r}")
+    full_required = sum(1 for o in observations if isinstance(o, dict) and o.get("verdict") == "full_required")
+    timing = recomputed.get(REFRESH_REASON_TIMING, 0)
+    expected_share = (timing / full_required) if full_required else 0.0
+    actual_share = block.get("timing_only_share")
+    if not isinstance(actual_share, (int, float)) or abs(float(actual_share) - expected_share) > 1e-9:
+        errors.append(f"timing_only_share is {actual_share!r}, recomputed {expected_share!r}")
+
+
+def _check_audit_missing(
+    block: dict,
+    denominator: list,
+    baseline_heads: dict[int, set[str]],
+    observations: list,
+    errors: list[str],
+) -> None:
+    """Every denominator head must be observed or explicitly missing."""
+
+    observed_pairs = {(o.get("pr"), o.get("head_sha")) for o in observations if isinstance(o, dict)}
+    missing = block.get("missing") or []
+    missing_pairs = {(m.get("pr"), m.get("head_sha")) for m in missing if isinstance(m, dict)}
+    for number in denominator:
+        for sha in baseline_heads.get(number, set()):
+            if (number, sha) not in observed_pairs and (number, sha) not in missing_pairs:
+                errors.append(f"PR #{number} head {str(sha)[:12]} neither observed nor listed as missing")
+    for m in missing:
+        if not isinstance(m, dict) or not m.get("pr") or not m.get("head_sha") or not m.get("status"):
+            errors.append(f"missing entry must carry pr/head/status: {m!r}")
+
+
+def run_validate_lifecycle_baseline(lifecycle_path: str, process_path: str) -> int:
+    """CLI entry: exit 0 only on a fully reconciled lifecycle report."""
+
+    try:
+        lifecycle = json.loads(Path(lifecycle_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"INVALID lifecycle baseline {lifecycle_path}: {exc}")
+        return 1
+    try:
+        process_raw = Path(process_path).read_bytes()
+        process = json.loads(process_raw.decode("utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"INVALID process baseline {process_path}: {exc}")
+        return 1
+    errors = validate_lifecycle_baseline(lifecycle, process, _sha256_bytes(process_raw))
+    if errors:
+        print(f"INVALID lifecycle baseline {lifecycle_path}:")
+        for error in errors:
+            print(f"  - {error}")
+        return 1
+    print(f"VALID lifecycle baseline {lifecycle_path}")
+    return 0
+
+
+def run_validate_refresh_audit(audit_path: str, baseline_path: str) -> int:
+    """CLI entry: exit 0 only on a fully reconciled refresh audit block."""
+
+    try:
+        audit_text = Path(audit_path).read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"INVALID refresh audit {audit_path}: {exc}")
+        return 1
+    try:
+        lifecycle = json.loads(Path(baseline_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"INVALID lifecycle baseline {baseline_path}: {exc}")
+        return 1
+    try:
+        reason_codes = load_refresh_reason_codes()
+    except RuntimeError as exc:
+        print(f"INVALID refresh audit {audit_path}: {exc}")
+        return 1
+    errors = validate_refresh_audit(audit_text, lifecycle, reason_codes)
+    if errors:
+        print(f"INVALID refresh audit {audit_path}:")
+        for error in errors:
+            print(f"  - {error}")
+        return 1
+    print(f"VALID refresh audit {audit_path}")
+    return 0
+
+
+def load_refresh_reason_codes() -> tuple[str, ...]:
+    """Reason codes owned by scripts/pr_refresh_certification.py (single source)."""
+
+    import importlib.util
+
+    path = REPO_ROOT / "scripts" / "pr_refresh_certification.py"
+    spec = importlib.util.spec_from_file_location("pr_refresh_certification_codes", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load refresh reason codes from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    codes = getattr(module, "REASON_CODES", None)
+    if not codes:
+        raise RuntimeError(f"no REASON_CODES in {path}")
+    return tuple(str(code) for code in codes)
 
 
 # ---------------------------------------------------------------------------
@@ -810,10 +1215,53 @@ def main(argv: list[str] | None = None) -> int:
             "touch the GitHub API; mutually exclusive with the default mode."
         ),
     )
+    parser.add_argument(
+        "--validate-lifecycle-baseline",
+        metavar="LIFECYCLE_JSON",
+        default=None,
+        help=(
+            "validate a ci_lifecycle_baseline_v1 report (all-head/run-attempt "
+            "totals, explicit missingness) against --process-baseline. Local "
+            "report check only; touches no API and changes no CI routing."
+        ),
+    )
+    parser.add_argument(
+        "--process-baseline",
+        metavar="PROCESS_JSON",
+        default=None,
+        help="frozen preregistered process baseline the lifecycle report binds.",
+    )
+    parser.add_argument(
+        "--validate-refresh-audit",
+        metavar="AUDIT_MD",
+        default=None,
+        help=(
+            "recompute the refresh_audit_v1 JSON block embedded in a Markdown "
+            "audit from --baseline. Local report check only."
+        ),
+    )
+    parser.add_argument(
+        "--baseline",
+        metavar="LIFECYCLE_JSON",
+        default=None,
+        help="shared lifecycle baseline the refresh audit reconciles against.",
+    )
     args = parser.parse_args(argv)
 
     if args.collect_durations:
         return run_collect_durations()
+
+    if args.validate_lifecycle_baseline or args.process_baseline:
+        if not args.validate_lifecycle_baseline or not args.process_baseline:
+            print("ERROR: --validate-lifecycle-baseline and --process-baseline must be given together.")
+            return 2
+        return run_validate_lifecycle_baseline(args.validate_lifecycle_baseline, args.process_baseline)
+
+    if args.validate_refresh_audit or args.baseline:
+        if not args.validate_refresh_audit or not args.baseline:
+            print("ERROR: --validate-refresh-audit and --baseline must be given together.")
+            return 2
+        return run_validate_refresh_audit(args.validate_refresh_audit, args.baseline)
 
     client = make_client(args.repo)
     if client is None:

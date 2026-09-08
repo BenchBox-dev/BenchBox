@@ -1,0 +1,87 @@
+{
+  "schema": "ci_lifecycle_baseline_v1",
+  "repository": "owner/repo",
+  "cohort": {
+    "window_start": "2026-08-11T00:00:00+00:00",
+    "window_end": "2026-09-08T00:00:00+00:00"
+  },
+  "process_baseline": {
+    "criteria_version": "1.0.0",
+    "process_digest": "digest-of-frozen-process-baseline"
+  },
+  "prs": [
+    {
+      "number": 101,
+      "heads": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "per_head": {
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {
+          "schema": "event_fanout_v1",
+          "required_gate_seconds": null,
+          "merge_unblock_seconds": null,
+          "all_workflow_seconds": 600.0,
+          "queue_delay_seconds": null,
+          "workflow_run_counts": {"Develop PR": 1},
+          "completed_runner_minutes": 10.0,
+          "cancelled_runner_minutes": 5.0,
+          "cancelled_job_count": 1,
+          "incomplete_job_count": 0,
+          "setup_runner_minutes": 0.0,
+          "execution_runner_minutes": 0.0,
+          "public_standard_runner_usd": 0.0
+        },
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {
+          "schema": "event_fanout_v1",
+          "required_gate_seconds": 120.0,
+          "merge_unblock_seconds": 120.0,
+          "all_workflow_seconds": 300.0,
+          "queue_delay_seconds": 60.0,
+          "workflow_run_counts": {"Develop PR": 1},
+          "completed_runner_minutes": 20.0,
+          "cancelled_runner_minutes": 0.0,
+          "cancelled_job_count": 0,
+          "incomplete_job_count": 0,
+          "setup_runner_minutes": 0.0,
+          "execution_runner_minutes": 0.0,
+          "public_standard_runner_usd": 0.0
+        }
+      },
+      "attempts": {
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 2,
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": 1
+      },
+      "missing": [],
+      "totals": {
+        "head_count": 2,
+        "observed_head_count": 2,
+        "missing_head_count": 0,
+        "total_attempts": 3,
+        "completed_runner_minutes": 30.0,
+        "cancelled_runner_minutes": 5.0
+      }
+    },
+    {
+      "number": 102,
+      "heads": ["cccccccccccccccccccccccccccccccccccccccc"],
+      "per_head": {},
+      "attempts": {},
+      "missing": [
+        {
+          "head_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "status": "missing-artifact",
+          "reason": "no observable workflow runs for head (expired retention or never scheduled)"
+        }
+      ],
+      "totals": {
+        "head_count": 1,
+        "observed_head_count": 0,
+        "missing_head_count": 1,
+        "total_attempts": 0,
+        "completed_runner_minutes": 0.0,
+        "cancelled_runner_minutes": 0.0
+      }
+    }
+  ]
+}

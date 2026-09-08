@@ -331,3 +331,179 @@ def test_event_fanout_schema_is_versioned_and_help_documents_flag() -> None:
     with pytest.raises(SystemExit) as exc:
         metrics.main(["--help"])
     assert exc.value.code == 0
+
+
+FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "dev_loop_metrics"
+REASONS = (
+    "not_synchronize",
+    "missing_event_sha",
+    "not_exactly_two_parents",
+    "chained_refresh",
+    "prior_check_not_success",
+    "prior_check_unbound",
+    "prior_certification_not_full",
+)
+
+
+class _LifecycleClient:
+    repo = "owner/repo"
+
+    def __init__(
+        self,
+        commits: list[dict],
+        runs_by_sha: dict[str, list[dict]],
+        jobs_by_run: dict[int, list[dict]],
+        checks_by_sha: dict[str, list[dict]],
+    ) -> None:
+        self.commits = commits
+        self.runs_by_sha = runs_by_sha
+        self.jobs_by_run = jobs_by_run
+        self.checks_by_sha = checks_by_sha
+
+    def get_paginated(self, path: str, item_key: str | None = None) -> list[dict]:
+        if "pulls/" in path and path.endswith("/commits"):
+            return self.commits
+        if "actions/runs?head_sha=" in path:
+            return self.runs_by_sha.get(path.rsplit("head_sha=", 1)[1], [])
+        if path.endswith("/jobs"):
+            run_id = int(path.rsplit("/runs/", 1)[1].split("/jobs", 1)[0])
+            return self.jobs_by_run.get(run_id, [])
+        assert "check-runs" in path
+        return self.checks_by_sha.get(path.rsplit("/commits/", 1)[1].split("/", 1)[0], [])
+
+
+def _timed_job(minutes: float) -> dict:
+    del minutes
+    return {
+        "conclusion": "success",
+        "status": "completed",
+        "started_at": "2026-08-14T00:00:00Z",
+        "completed_at": "2026-08-14T00:06:00Z",
+        "steps": [],
+    }
+
+
+def test_lifecycle_enumerates_superseded_heads_and_explicit_missing() -> None:
+    heads = ["a" * 40, "b" * 40, "c" * 40]
+    client = _LifecycleClient(
+        commits=[{"sha": sha} for sha in heads],
+        runs_by_sha={
+            heads[0]: [{"id": 1, "run_attempt": 2, "name": "Develop PR"}],
+            heads[2]: [{"id": 3, "name": "Develop PR"}],
+        },
+        jobs_by_run={1: [_timed_job(6.0)], 3: [_timed_job(6.0)]},
+        checks_by_sha={},
+    )
+    pr = {"number": 7, "head": {"sha": heads[2]}, "merged_at": None}
+    lifecycle = metrics.lifecycle_for_pr(client, pr)
+    assert lifecycle["heads"] == heads
+    assert set(lifecycle["per_head"]) == {heads[0], heads[2]}
+    assert lifecycle["attempts"] == {heads[0]: 2, heads[2]: 1}
+    assert [m["head_sha"] for m in lifecycle["missing"]] == [heads[1]]
+    assert lifecycle["missing"][0]["status"] == "missing-artifact"
+    assert lifecycle["totals"]["head_count"] == 3
+    assert lifecycle["totals"]["total_attempts"] == 3
+    assert lifecycle["totals"]["completed_runner_minutes"] == pytest.approx(12.0)
+
+
+def _process_doc(version: str = "1.0.0") -> tuple[dict, str]:
+    doc = {"schema": "pr_process_acceptance_baseline_v1", "criteria_version": version}
+    import hashlib
+    import json as _json
+
+    return doc, hashlib.sha256(_json.dumps(doc).encode()).hexdigest()
+
+
+def test_lifecycle_validator_accepts_consistent_report() -> None:
+    import json as _json
+
+    lifecycle = _json.loads((FIXTURES / "lifecycle_sample.json").read_text())
+    process = {"schema": "pr_process_acceptance_baseline_v1", "criteria_version": "1.0.0"}
+    assert metrics.validate_lifecycle_baseline(lifecycle, process, "digest-of-frozen-process-baseline") == []
+
+
+def test_lifecycle_validator_rejects_tampered_totals() -> None:
+    import copy
+    import json as _json
+
+    lifecycle = _json.loads((FIXTURES / "lifecycle_tampered_totals.json").read_text())
+    process = {"schema": "pr_process_acceptance_baseline_v1", "criteria_version": "1.0.0"}
+    errors = metrics.validate_lifecycle_baseline(lifecycle, process, "digest-of-frozen-process-baseline")
+    assert any("totals.completed_runner_minutes" in e for e in errors)
+
+
+def test_lifecycle_validator_rejects_omitted_superseded_head() -> None:
+    import copy
+    import json as _json
+
+    lifecycle = _json.loads((FIXTURES / "lifecycle_sample.json").read_text())
+    lifecycle = copy.deepcopy(lifecycle)
+    entry = lifecycle["prs"][0]
+    dropped = entry["heads"][0]
+    del entry["per_head"][dropped]
+    del entry["attempts"][dropped]
+    process = {"schema": "pr_process_acceptance_baseline_v1", "criteria_version": "1.0.0"}
+    errors = metrics.validate_lifecycle_baseline(lifecycle, process, "digest-of-frozen-process-baseline")
+    assert any("disagree" in e for e in errors)
+
+
+def test_lifecycle_validator_rejects_changed_thresholds() -> None:
+    import json as _json
+
+    lifecycle = _json.loads((FIXTURES / "lifecycle_sample.json").read_text())
+    changed = {"schema": "pr_process_acceptance_baseline_v1", "criteria_version": "1.1.0"}
+    errors = metrics.validate_lifecycle_baseline(lifecycle, changed, "digest-of-frozen-process-baseline")
+    assert any("criteria changed" in e for e in errors)
+    same_version = {"schema": "pr_process_acceptance_baseline_v1", "criteria_version": "1.0.0"}
+    errors = metrics.validate_lifecycle_baseline(lifecycle, same_version, "different-digest")
+    assert any("frozen digest" in e for e in errors)
+
+
+def test_refresh_audit_recompute_accepts_consistent_block() -> None:
+    import json as _json
+
+    lifecycle = _json.loads((FIXTURES / "lifecycle_sample.json").read_text())
+    audit = (FIXTURES / "refresh_audit_sample.md").read_text()
+    assert metrics.validate_refresh_audit(audit, lifecycle, REASONS) == []
+
+
+def test_refresh_audit_rejects_duplicate_identity() -> None:
+    import json as _json
+
+    lifecycle = _json.loads((FIXTURES / "lifecycle_sample.json").read_text())
+    audit = (FIXTURES / "refresh_audit_sample.md").read_text()
+    block_text = audit.replace(
+        '"head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",\n      "run_id": 12,',
+        '"head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",\n      "run_id": 11,',
+    )
+    errors = metrics.validate_refresh_audit(block_text, lifecycle, REASONS)
+    assert any("duplicate" in e for e in errors)
+
+
+def test_refresh_audit_rejects_conflated_timing_and_identity() -> None:
+    import json as _json
+
+    lifecycle = _json.loads((FIXTURES / "lifecycle_sample.json").read_text())
+    audit = (FIXTURES / "refresh_audit_sample.md").read_text()
+    merged = audit.replace('"prior_check_unbound": 0,\n    ', "")
+    errors = metrics.validate_refresh_audit(merged, lifecycle, REASONS)
+    assert any("prior_check_unbound" in e for e in errors)
+
+
+def test_refresh_audit_rejects_unknown_denominator_and_changed_window() -> None:
+    import json as _json
+
+    lifecycle = _json.loads((FIXTURES / "lifecycle_sample.json").read_text())
+    audit = (FIXTURES / "refresh_audit_sample.md").read_text()
+    errors = metrics.validate_refresh_audit(audit.replace("[101]", "[101, 999]"), lifecycle, REASONS)
+    assert any("outside the frozen baseline" in e for e in errors)
+    errors = metrics.validate_refresh_audit(
+        audit.replace("2026-08-11T00:00:00+00:00", "2026-08-01T00:00:00+00:00"), lifecycle, REASONS
+    )
+    assert any("window_start" in e for e in errors)
+
+
+def test_refresh_reason_codes_come_from_classifier() -> None:
+    codes = metrics.load_refresh_reason_codes()
+    assert metrics.REFRESH_REASON_TIMING in codes
+    assert metrics.REFRESH_REASON_IDENTITY in codes
