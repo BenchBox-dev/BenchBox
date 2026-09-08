@@ -23,14 +23,18 @@
           "merge_unblock_seconds": null,
           "all_workflow_seconds": 600.0,
           "queue_delay_seconds": null,
-          "workflow_run_counts": {"Develop PR": 1},
+          "workflow_run_counts": {
+            "Develop PR": 1
+          },
           "completed_runner_minutes": 10.0,
           "cancelled_runner_minutes": 5.0,
           "cancelled_job_count": 1,
           "incomplete_job_count": 0,
           "setup_runner_minutes": 0.0,
           "execution_runner_minutes": 0.0,
-          "public_standard_runner_usd": 0.0
+          "public_standard_runner_usd": 0.0,
+          "failed_runner_minutes": 0.0,
+          "failed_job_count": 0
         },
         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {
           "schema": "event_fanout_v1",
@@ -38,14 +42,18 @@
           "merge_unblock_seconds": 120.0,
           "all_workflow_seconds": 300.0,
           "queue_delay_seconds": 60.0,
-          "workflow_run_counts": {"Develop PR": 1},
+          "workflow_run_counts": {
+            "Develop PR": 1
+          },
           "completed_runner_minutes": 20.0,
           "cancelled_runner_minutes": 0.0,
           "cancelled_job_count": 0,
           "incomplete_job_count": 0,
           "setup_runner_minutes": 0.0,
           "execution_runner_minutes": 0.0,
-          "public_standard_runner_usd": 0.0
+          "public_standard_runner_usd": 0.0,
+          "failed_runner_minutes": 0.0,
+          "failed_job_count": 0
         }
       },
       "attempts": {
@@ -59,12 +67,16 @@
         "missing_head_count": 0,
         "total_attempts": 3,
         "completed_runner_minutes": 30.0,
-        "cancelled_runner_minutes": 5.0
+        "cancelled_runner_minutes": 5.0,
+        "failed_runner_minutes": 0.0,
+        "non_tip_head_count": 0
       }
     },
     {
       "number": 102,
-      "heads": ["cccccccccccccccccccccccccccccccccccccccc"],
+      "heads": [
+        "cccccccccccccccccccccccccccccccccccccccc"
+      ],
       "per_head": {},
       "attempts": {},
       "missing": [
@@ -80,7 +92,9 @@
         "missing_head_count": 1,
         "total_attempts": 0,
         "completed_runner_minutes": 0.0,
-        "cancelled_runner_minutes": 0.0
+        "cancelled_runner_minutes": 0.0,
+        "failed_runner_minutes": 0.0,
+        "non_tip_head_count": 0
       }
     }
   ]

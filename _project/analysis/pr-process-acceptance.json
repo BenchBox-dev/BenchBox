@@ -81,7 +81,8 @@
       "prs": 0,
       "days": 0,
       "strata": [],
-      "batch_deliveries": []
+      "batch_deliveries": [],
+      "human_hold": false
     }
   },
   "efficiency": {

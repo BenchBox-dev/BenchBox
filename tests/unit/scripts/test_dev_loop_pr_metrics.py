@@ -354,15 +354,19 @@ class _LifecycleClient:
         runs_by_sha: dict[str, list[dict]],
         jobs_by_run: dict[int, list[dict]],
         checks_by_sha: dict[str, list[dict]],
+        timeline: list[dict] | None = None,
     ) -> None:
         self.commits = commits
         self.runs_by_sha = runs_by_sha
         self.jobs_by_run = jobs_by_run
         self.checks_by_sha = checks_by_sha
+        self.timeline = timeline or []
 
     def get_paginated(self, path: str, item_key: str | None = None) -> list[dict]:
         if "pulls/" in path and path.endswith("/commits"):
             return self.commits
+        if "/timeline" in path:
+            return self.timeline
         if "actions/runs?head_sha=" in path:
             return self.runs_by_sha.get(path.rsplit("head_sha=", 1)[1], [])
         if path.endswith("/jobs"):
@@ -495,8 +499,10 @@ def test_refresh_audit_rejects_unknown_denominator_and_changed_window() -> None:
 
     lifecycle = _json.loads((FIXTURES / "lifecycle_sample.json").read_text())
     audit = (FIXTURES / "refresh_audit_sample.md").read_text()
-    errors = metrics.validate_refresh_audit(audit.replace("[101]", "[101, 999]"), lifecycle, REASONS)
+    errors = metrics.validate_refresh_audit(audit.replace("[101, 102]", "[101, 999]"), lifecycle, REASONS)
     assert any("outside the frozen baseline" in e for e in errors)
+    errors = metrics.validate_refresh_audit(audit.replace("[101, 102]", "[101]"), lifecycle, REASONS)
+    assert any("omits frozen baseline PRs" in e for e in errors)
     errors = metrics.validate_refresh_audit(
         audit.replace("2026-08-11T00:00:00+00:00", "2026-08-01T00:00:00+00:00"), lifecycle, REASONS
     )
@@ -611,14 +617,87 @@ def test_acceptance_validator_accepts_complete_record() -> None:
         text=True,
     ).stdout.strip()
     process = _json2.loads(process_raw.decode("utf-8"))
+    frozen = process["prospective_cohort"]
     acceptance = _acceptance_doc()
     acceptance["process_binding"] = {
         "criteria_version": process["criteria_version"],
         "process_digest": hashlib.sha256(process_raw).hexdigest(),
     }
     acceptance["registration"] = {"commit": head, "time": "2026-09-08T12:33:43Z"}
+    acceptance["incident_replays"] = [{"scenario": name, "status": "pass"} for name in process["incident_scenarios"]]
+    acceptance["cohort"]["required"]["min_prs"] = frozen["min_prs"]
+    acceptance["cohort"]["required"]["min_days"] = frozen["min_days"]
+    acceptance["cohort"]["required"]["strata"] = list(frozen["strata"])
+    acceptance["cohort"]["observed"]["prs"] = frozen["min_prs"]
+    acceptance["cohort"]["observed"]["days"] = frozen["min_days"]
+    acceptance["cohort"]["observed"]["strata"] = list(frozen["strata"])
+    acceptance["cohort"]["observed"]["human_hold"] = True
+    acceptance["cohort"]["observed"]["batch_deliveries"] = [
+        {"members": ["a", "b"]},
+        {"members": ["c", "d"]},
+    ]
+    acceptance["efficiency"]["observed_avoidable_actions"] = 20
     errors = metrics.validate_process_acceptance(acceptance, process, hashlib.sha256(process_raw).hexdigest())
     assert errors == []
+
+
+def test_acceptance_validator_rejects_weakened_frozen_requirements() -> None:
+    import hashlib
+    import json as _json2
+
+    repo_root = Path(metrics.__file__).resolve().parents[2]
+    process_path = repo_root / "_project" / "analysis" / "pr-process-acceptance-baseline.json"
+    process_raw = process_path.read_bytes()
+    process = _json2.loads(process_raw.decode("utf-8"))
+    digest = hashlib.sha256(process_raw).hexdigest()
+    frozen = process["prospective_cohort"]
+
+    def conforming() -> dict:
+        acceptance = _acceptance_doc()
+        acceptance["process_binding"] = {
+            "criteria_version": process["criteria_version"],
+            "process_digest": digest,
+        }
+        acceptance["incident_replays"] = [
+            {"scenario": name, "status": "pass"} for name in process["incident_scenarios"]
+        ]
+        acceptance["cohort"]["required"]["min_prs"] = frozen["min_prs"]
+        acceptance["cohort"]["required"]["min_days"] = frozen["min_days"]
+        acceptance["cohort"]["required"]["strata"] = list(frozen["strata"])
+        acceptance["cohort"]["observed"]["prs"] = frozen["min_prs"]
+        acceptance["cohort"]["observed"]["days"] = frozen["min_days"]
+        acceptance["cohort"]["observed"]["strata"] = list(frozen["strata"])
+        acceptance["cohort"]["observed"]["human_hold"] = True
+        acceptance["cohort"]["observed"]["batch_deliveries"] = [
+            {"members": ["a", "b"]},
+            {"members": ["c", "d"]},
+        ]
+        return acceptance
+
+    weakened = conforming()
+    weakened["cohort"]["required"]["min_prs"] = frozen["min_prs"] - 1
+    errors = metrics.validate_process_acceptance(weakened, process, digest)
+    assert any("weakens the frozen floor" in e for e in errors)
+
+    dropped = conforming()
+    dropped["incident_replays"] = dropped["incident_replays"][:-1]
+    errors = metrics.validate_process_acceptance(dropped, process, digest)
+    assert any("replay scenario set" in e for e in errors)
+
+    invented = conforming()
+    invented["incident_replays"].append({"scenario": "invented-easy", "status": "pass"})
+    errors = metrics.validate_process_acceptance(invented, process, digest)
+    assert any("replay scenario set" in e for e in errors)
+
+    few = conforming()
+    few["cohort"]["observed"]["batch_deliveries"] = [{"members": ["a", "b"]}]
+    errors = metrics.validate_process_acceptance(few, process, digest)
+    assert any("batch deliveries insufficient" in e for e in errors)
+
+    no_hold = conforming()
+    del no_hold["cohort"]["observed"]["human_hold"]
+    errors = metrics.validate_process_acceptance(no_hold, process, digest)
+    assert any("human hold" in e for e in errors)
 
 
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:
@@ -638,7 +717,55 @@ def test_refresh_audit_rejects_non_list_denominator() -> None:
 
     lifecycle = _json.loads((FIXTURES / "lifecycle_sample.json").read_text())
     audit = (
-        (FIXTURES / "refresh_audit_sample.md").read_text().replace('"denominator_prs": [101]', '"denominator_prs": 101')
+        (FIXTURES / "refresh_audit_sample.md")
+        .read_text()
+        .replace('"denominator_prs": [101, 102]', '"denominator_prs": 101')
     )
     errors = metrics.validate_refresh_audit(audit, lifecycle, REASONS)
     assert any("must be a list" in e for e in errors)
+
+
+def _failed_job(minutes: float) -> dict:
+    return {
+        "conclusion": "failure",
+        "status": "completed",
+        "started_at": "2026-08-14T00:00:00Z",
+        "completed_at": "2026-08-14T00:04:00Z",
+        "steps": [],
+    }
+
+
+def test_lifecycle_timeline_union_nontip_and_failed() -> None:
+    tip, mid, root, orphan = "a" * 40, "b" * 40, "c" * 40, "d" * 40
+    commits = [
+        {"sha": root, "parents": []},
+        {"sha": mid, "parents": [{"sha": root}]},
+        {"sha": tip, "parents": [{"sha": mid}]},
+    ]
+    timeline = [
+        {"event": "committed", "sha": root},
+        {"event": "committed", "sha": mid},
+        {"event": "committed", "sha": tip},
+        {"event": "head_ref_force_pushed", "before": orphan, "after": mid},
+        {"event": "committed", "sha": orphan},
+    ]
+    client = _LifecycleClient(
+        commits=commits,
+        runs_by_sha={
+            tip: [{"id": 1, "run_attempt": 1, "name": "Develop PR"}],
+            orphan: [{"id": 2, "run_attempt": 1, "name": "Develop PR"}],
+        },
+        jobs_by_run={1: [_timed_job(6.0), _failed_job(4.0)], 2: [_timed_job(6.0)]},
+        checks_by_sha={},
+        timeline=timeline,
+    )
+    pr = {"number": 7, "head": {"sha": tip}, "merged_at": None}
+    lifecycle = metrics.lifecycle_for_pr(client, pr)
+    assert lifecycle["heads"] == [root, mid, tip, orphan]
+    assert set(lifecycle["per_head"]) == {tip, orphan}
+    statuses = {m["head_sha"]: m["status"] for m in lifecycle["missing"]}
+    assert statuses == {root: "non-tip-commit", mid: "non-tip-commit"}
+    assert lifecycle["totals"]["missing_head_count"] == 0
+    assert lifecycle["totals"]["non_tip_head_count"] == 2
+    assert lifecycle["totals"]["failed_runner_minutes"] == pytest.approx(4.0)
+    assert lifecycle["totals"]["completed_runner_minutes"] == pytest.approx(12.0)

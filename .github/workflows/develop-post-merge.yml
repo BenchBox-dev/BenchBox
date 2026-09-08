@@ -543,10 +543,13 @@ jobs:
             # predecessor. Mis-selection errs toward reverting (an older
             # baseline makes more failures look new), which is the safe
             # direction.
+            # The baseline is restricted to runs of the same event type:
+            # scheduled runs omit medium tests, so a push run must never
+            # diff against a scheduled lane set (or vice versa).
             if ! runs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/develop-post-merge.yml/runs?branch=develop&status=completed&per_page=10")"; then
               fail_open_reason="Could not list previous develop-post-merge runs via gh api."
-            elif ! prev_run_json="$(jq -c --argjson current "${GITHUB_RUN_NUMBER}" \
-              '[.workflow_runs[] | select(.run_number < $current)] | sort_by(.run_number) | last // empty' \
+            elif ! prev_run_json="$(jq -c --argjson current "${GITHUB_RUN_NUMBER}" --arg event "${{ github.event_name }}" \
+              '[.workflow_runs[] | select(.run_number < $current and .event == $event)] | sort_by(.run_number) | last // empty' \
               <<<"${runs_json}")"; then
               fail_open_reason="Could not parse the previous-runs listing."
             elif [ -z "${prev_run_json}" ] || [ "${prev_run_json}" = "null" ]; then

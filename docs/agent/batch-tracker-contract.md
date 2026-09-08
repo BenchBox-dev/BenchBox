@@ -24,8 +24,9 @@ must provide before parallel member preparation is safe.
 Parallel member worktrees plus canonical claim handoff, multi-member
 delivery records, and dependency-as-delivered transitions need a
 `prepared` batch mechanism in the canonical tracker. Verified absent as
-of todo-db `8fe1cb7` (upstream `references/batch.md` specifies the serial
-loop only; no `prepared` state in the MCP surface). Until that lands:
+of todo-db `8fe1cb7` and re-verified at remote HEAD `5e491e3` on
+2026-09-08 (upstream `references/batch.md` specifies the serial loop
+only; no `prepared` state in the MCP surface). Until that lands:
 
 - No parallel member worktrees, no canonical claim handoff, no
   `_project/analysis/batch-source-delivery.json` (a receipt without a

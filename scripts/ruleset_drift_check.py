@@ -359,13 +359,21 @@ APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (
 def merge_queue_findings(live: dict[str, Any], name: str) -> list[str]:
     """Validate the live merge_queue rule against the approved parameters.
 
-    A missing rule yields a non-blocking warning (parameters not visible from
-    this payload); present-but-different parameters are blocking findings for
-    operator action.
+    A missing rule is blocking when the payload is otherwise well-formed
+    (other rules visible proves the API is not redacting): an absent queue
+    rule invalidates queue-aware publication policy. Only an empty or
+    unreadable payload stays a non-blocking warning; present-but-different
+    parameters are blocking findings for operator action.
     """
     findings: list[str] = []
     rule = _rule_by_type(live, "merge_queue")
     if rule is None:
+        if live.get("rules"):
+            return [
+                f"{name}: ruleset payload lists rules but no merge_queue rule; "
+                "queue-aware publication is unverified, verify queue parameters "
+                "(SQUASH/ALLGREEN/1/5/5/60m/0) in repository settings"
+            ]
         return [
             f"{WARNING_PREFIX}{name}: no merge_queue rule in this ruleset payload; "
             "verify queue parameters (SQUASH/ALLGREEN/1/5/5/60m/0) in repository settings"

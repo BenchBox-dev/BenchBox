@@ -367,9 +367,13 @@ def _build_command(args: argparse.Namespace) -> int:
 
 
 def changed_paths_for_sha(sha: str) -> list[str]:
-    """List paths changed by ``sha`` (stdlib git, no shell)."""
+    """List paths changed by ``sha`` (stdlib git, no shell).
+
+    ``--first-parent`` keeps merge commits honest: a bare multi-parent
+    diff-tree otherwise yields no paths and would downgrade real failures.
+    """
     result = subprocess.run(
-        ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", sha],
+        ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "--first-parent", sha],
         check=False,
         capture_output=True,
         text=True,

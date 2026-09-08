@@ -637,11 +637,18 @@ def job_setup_execution_seconds(job: dict) -> tuple[float | None, float | None, 
 
 
 def runner_minute_report(jobs: list[dict]) -> dict[str, float | int]:
-    """Split completed runner-minutes from cancelled/incomplete observations."""
+    """Split completed/cancelled/failed runner-minutes from incomplete observations.
+
+    Failed jobs burned runners too: excluding them understates consumed
+    compute, so they get their own bucket instead of vanishing into
+    `incomplete` (reserved for jobs with no usable conclusion or duration).
+    """
 
     completed = 0.0
     cancelled = 0.0
+    failed = 0.0
     cancelled_count = 0
+    failed_count = 0
     incomplete_count = 0
     setup = 0.0
     execution = 0.0
@@ -652,6 +659,14 @@ def runner_minute_report(jobs: list[dict]) -> dict[str, float | int]:
             elapsed = _elapsed_seconds(job.get("started_at"), job.get("completed_at"))
             if elapsed is not None:
                 cancelled += elapsed / 60.0
+            continue
+        if conclusion in ("failure", "timed_out"):
+            failed_count += 1
+            elapsed = _elapsed_seconds(job.get("started_at"), job.get("completed_at"))
+            if elapsed is not None:
+                failed += elapsed / 60.0
+            else:
+                incomplete_count += 1
             continue
         if conclusion != "success":
             incomplete_count += 1
@@ -668,7 +683,9 @@ def runner_minute_report(jobs: list[dict]) -> dict[str, float | int]:
     return {
         "completed_runner_minutes": completed,
         "cancelled_runner_minutes": cancelled,
+        "failed_runner_minutes": failed,
         "cancelled_job_count": cancelled_count,
+        "failed_job_count": failed_count,
         "incomplete_job_count": incomplete_count,
         "setup_runner_minutes": setup,
         "execution_runner_minutes": execution,
@@ -741,21 +758,76 @@ def fetch_cohort_pr_numbers(client: GitHubClient, since_iso: str, until_iso: str
     return numbers
 
 
-def pr_synchronize_heads(client: GitHubClient, number: int) -> list[str]:
-    """Every commit SHA pushed to the PR, oldest first.
+def pr_history_commits(client: GitHubClient, number: int) -> list[dict]:
+    """Current-history commits of the PR (each entry carries parent SHAs)."""
+    return client.get_paginated(f"/repos/{client.repo}/pulls/{number}/commits")
 
-    Each entry is one synchronize head: the final merged head alone cannot
-    establish total refresh/cancellation cost, so lifecycle accounting must
-    enumerate all of these, not just the head the PR merged with.
+
+def pr_timeline_shas(client: GitHubClient, number: int) -> list[str]:
+    """Historical SHAs from the issue timeline, oldest first.
+
+    `committed` events list pushed commits (including force-pushed-away ones
+    the current history no longer contains); `head_ref_force_pushed` events
+    contribute their before/after tips. Raises ApiFailure on a failed page so
+    a partial timeline never reads as a complete head set.
     """
+    events = client.get_paginated(f"/repos/{client.repo}/issues/{number}/timeline")
+    shas: list[str] = []
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        candidates: list[object] = []
+        if event.get("event") == "committed":
+            candidates = [event.get("sha")]
+        elif event.get("event") == "head_ref_force_pushed":
+            candidates = [event.get("before"), event.get("after")]
+        for candidate in candidates:
+            sha = str(candidate or "")
+            if len(sha) == 40 and sha not in shas:
+                shas.append(sha)
+    return shas
 
-    commits = client.get_paginated(f"/repos/{client.repo}/pulls/{number}/commits")
+
+def pr_nontip_shas(commits: list[dict]) -> set[str]:
+    """Current-history SHAs that have a child in the same history.
+
+    A multi-commit push lists every commit, but only the tip ever ran CI: a
+    non-tip commit with no observable runs was never a synchronize head, so
+    it must not inflate the missing-artifact count.
+    """
+    by_sha = {str(c.get("sha") or ""): c for c in commits if isinstance(c, dict)}
+    children: set[str] = set()
+    for commit in by_sha.values():
+        parents = commit.get("parents") or []
+        for parent in parents:
+            if isinstance(parent, dict) and str(parent.get("sha") or "") in by_sha:
+                children.add(str(parent.get("sha")))
+    return children
+
+
+def pr_synchronize_heads_from_parts(commits: list[dict], timeline_shas: list[str]) -> list[str]:
+    """Ordered union of current-history SHAs and timeline-only SHAs."""
     heads: list[str] = []
     for commit in commits:
-        sha = str(commit.get("sha") or "")
+        sha = str(commit.get("sha") or "") if isinstance(commit, dict) else ""
         if sha and sha not in heads:
             heads.append(sha)
+    for sha in timeline_shas:
+        if sha not in heads:
+            heads.append(sha)
     return heads
+
+
+def pr_synchronize_heads(client: GitHubClient, number: int) -> list[str]:
+    """Every synchronize head SHA of the PR, oldest first.
+
+    Current history first, then timeline-only SHAs (force-pushed-away tips)
+    in timeline order. The final merged head alone cannot establish total
+    refresh/cancellation cost, so lifecycle accounting must enumerate all of
+    these, not just the head the PR merged with.
+    """
+
+    return pr_synchronize_heads_from_parts(pr_history_commits(client, number), pr_timeline_shas(client, number))
 
 
 def lifecycle_for_pr(client: GitHubClient, pr: dict) -> dict:
@@ -771,7 +843,9 @@ def lifecycle_for_pr(client: GitHubClient, pr: dict) -> dict:
     """
 
     number = pr["number"]
-    heads = pr_synchronize_heads(client, number)
+    commits = pr_history_commits(client, number)
+    heads = pr_synchronize_heads_from_parts(commits, pr_timeline_shas(client, number))
+    nontips = pr_nontip_shas(commits)
     final_sha = str((pr.get("head") or {}).get("sha") or "")
     per_head: dict[str, dict] = {}
     attempts: dict[str, int] = {}
@@ -782,13 +856,23 @@ def lifecycle_for_pr(client: GitHubClient, pr: dict) -> dict:
             item_key="workflow_runs",
         )
         if not runs:
-            missing.append(
-                {
-                    "head_sha": sha,
-                    "status": "missing-artifact",
-                    "reason": "no observable workflow runs for head (expired retention or never scheduled)",
-                }
-            )
+            if sha in nontips:
+                missing.append(
+                    {
+                        "head_sha": sha,
+                        "status": "non-tip-commit",
+                        "reason": "intra-push commit with a child in the same history; "
+                        "only the push tip ever ran CI, so this SHA was never a head",
+                    }
+                )
+            else:
+                missing.append(
+                    {
+                        "head_sha": sha,
+                        "status": "missing-artifact",
+                        "reason": "no observable workflow runs for head (expired retention or never scheduled)",
+                    }
+                )
             continue
         jobs: list[dict] = []
         head_attempts = 0
@@ -817,7 +901,8 @@ def lifecycle_for_pr(client: GitHubClient, pr: dict) -> dict:
     totals = {
         "head_count": len(heads),
         "observed_head_count": len(per_head),
-        "missing_head_count": len(missing),
+        "missing_head_count": len([m for m in missing if m.get("status") == "missing-artifact"]),
+        "non_tip_head_count": len([m for m in missing if m.get("status") == "non-tip-commit"]),
         "total_attempts": sum(attempts.values()),
         "completed_runner_minutes": sum(
             float(per_head[sha].get("completed_runner_minutes") or 0.0) for sha in per_head
@@ -825,6 +910,7 @@ def lifecycle_for_pr(client: GitHubClient, pr: dict) -> dict:
         "cancelled_runner_minutes": sum(
             float(per_head[sha].get("cancelled_runner_minutes") or 0.0) for sha in per_head
         ),
+        "failed_runner_minutes": sum(float(per_head[sha].get("failed_runner_minutes") or 0.0) for sha in per_head),
     }
     return {
         "number": number,
@@ -959,7 +1045,7 @@ def _check_lifecycle_entry(entry: dict) -> list[str]:
     for sha in attempts:
         if sha not in per_head:
             errors.append(f"PR #{number}: attempt count for unobserved head {sha[:12]}")
-    errors.extend(_check_lifecycle_totals(number, heads, per_head, attempts, missing_shas, totals))
+    errors.extend(_check_lifecycle_totals(number, heads, per_head, attempts, missing, totals))
     return errors
 
 
@@ -968,21 +1054,23 @@ def _check_lifecycle_totals(
     heads: list,
     per_head: dict,
     attempts: dict,
-    missing_shas: list,
+    missing: list,
     totals: dict,
 ) -> list[str]:
     """Recompute one entry's integer counts and runner-minute totals."""
 
     errors: list[str] = []
+    statuses = [m.get("status") if isinstance(m, dict) else None for m in missing]
     for key, expected in (
         ("head_count", len(heads)),
         ("observed_head_count", len(per_head)),
-        ("missing_head_count", len(missing_shas)),
+        ("missing_head_count", statuses.count("missing-artifact")),
+        ("non_tip_head_count", statuses.count("non-tip-commit")),
         ("total_attempts", sum(int(attempts.get(sha) or 0) for sha in per_head)),
     ):
         if totals.get(key) != expected:
             errors.append(f"PR #{number}: totals.{key} is {totals.get(key)!r}, recomputed {expected!r}")
-    for key in ("completed_runner_minutes", "cancelled_runner_minutes"):
+    for key in ("completed_runner_minutes", "cancelled_runner_minutes", "failed_runner_minutes"):
         expected = sum(float((per_head[sha] or {}).get(key) or 0.0) for sha in per_head)
         actual = totals.get(key)
         if not isinstance(actual, (int, float)) or abs(float(actual) - expected) > 1e-6:
@@ -1036,6 +1124,12 @@ def validate_refresh_audit(audit_text: str, lifecycle: dict, reason_codes: tuple
     unknown = [n for n in denominator if n not in baseline_prs]
     if unknown:
         errors.append(f"refresh audit denominator uses PRs outside the frozen baseline: {unknown!r}")
+    omitted = sorted(set(baseline_prs) - set(denominator))
+    if omitted:
+        errors.append(
+            f"refresh audit denominator omits frozen baseline PRs (subset audits hide "
+            f"unfavorable observations): {omitted!r}"
+        )
     observations = block.get("observations") or []
     recomputed = _check_audit_observations(observations, reason_codes, errors)
     _check_audit_counts(block, observations, recomputed, errors)
@@ -1185,9 +1279,9 @@ def validate_process_acceptance(
     if not isinstance(process, dict):
         return ["process baseline must be a JSON object"]
     errors.extend(_check_acceptance_binding(acceptance, process, process_digest, process_relpath))
-    errors.extend(_check_acceptance_cohort(acceptance))
-    errors.extend(_check_acceptance_replays(acceptance))
-    errors.extend(_check_acceptance_efficiency(acceptance))
+    errors.extend(_check_acceptance_cohort(acceptance, process))
+    errors.extend(_check_acceptance_replays(acceptance, process))
+    errors.extend(_check_acceptance_efficiency(acceptance, process))
     return errors
 
 
@@ -1214,57 +1308,100 @@ def _check_acceptance_binding(acceptance: dict, process: dict, process_digest: s
     return errors
 
 
-def _check_acceptance_cohort(acceptance: dict) -> list[str]:
-    """Cohort sufficiency with unreported-change rejection."""
+def _check_acceptance_cohort(acceptance: dict, process: dict) -> list[str]:
+    """Cohort sufficiency with unreported-change rejection.
+
+    Required minimums are floors from the frozen baseline (stronger is
+    allowed, weaker is tampering); the strata set must equal the frozen set
+    exactly (no dropped or invented strata).
+    """
     errors: list[str] = []
     required_cohort = ((acceptance.get("cohort") or {}).get("required")) or {}
     observed_cohort = ((acceptance.get("cohort") or {}).get("observed")) or {}
+    frozen_cohort = process.get("prospective_cohort") or {}
     if observed_cohort.get("window_start") != required_cohort.get("window_start") or observed_cohort.get(
         "window_end"
     ) != required_cohort.get("window_end"):
         errors.append("observed cohort window differs from the preregistered window (unreported cohort change)")
     for dimension in ("prs", "days"):
         try:
+            floor = int(frozen_cohort.get(f"min_{dimension}") or 0)
             minimum = int(required_cohort.get(f"min_{dimension}") or 0)
             observed = int(observed_cohort.get(dimension) or 0)
         except (TypeError, ValueError):
             errors.append(f"cohort {dimension} counts must be integers")
             continue
+        if minimum < floor:
+            errors.append(f"required cohort min_{dimension} {minimum} weakens the frozen floor {floor}")
         if observed < minimum:
             errors.append(f"cohort {dimension} insufficient: {observed} < {minimum}")
+    frozen_strata = frozen_cohort.get("strata") or []
+    if set(required_cohort.get("strata") or []) != set(frozen_strata):
+        errors.append(
+            f"required strata {sorted(required_cohort.get('strata') or [])} != frozen strata {sorted(frozen_strata)}"
+        )
     for stratum in required_cohort.get("strata") or []:
         if stratum not in (observed_cohort.get("strata") or []):
             errors.append(f"cohort stratum missing: {stratum}")
-    for delivery in observed_cohort.get("batch_deliveries") or []:
+    deliveries = observed_cohort.get("batch_deliveries") or []
+    try:
+        min_deliveries = int((frozen_cohort.get("batch_deliveries") or {}).get("min_deliveries") or 0)
+    except (TypeError, ValueError):
+        errors.append("frozen batch delivery minimum must be an integer")
+        min_deliveries = 0
+    if len(deliveries) < min_deliveries:
+        errors.append(f"batch deliveries insufficient: {len(deliveries)} < {min_deliveries}")
+    for delivery in deliveries:
         if not isinstance(delivery, dict) or not delivery.get("members") or len(delivery["members"]) < 2:
             errors.append(f"batch delivery not cohesive: {delivery!r}")
+    if not observed_cohort.get("human_hold"):
+        errors.append("human hold flow (operator-approved soundness hold) not evidenced in the observed cohort")
     return errors
 
 
-def _check_acceptance_replays(acceptance: dict) -> list[str]:
-    """Every recorded incident replay must pass."""
+def _check_acceptance_replays(acceptance: dict, process: dict) -> list[str]:
+    """Every recorded incident replay must pass, on the frozen scenario set.
+
+    The scenario set must equal the preregistered set exactly: no dropped
+    hard replays, no invented easy ones.
+    """
     replays = acceptance.get("incident_replays") or []
     if not replays:
         return ["no incident replays recorded"]
-    return [
+    frozen = process.get("incident_scenarios") or []
+    recorded = sorted(r.get("scenario", "?") for r in replays if isinstance(r, dict))
+    errors = []
+    if recorded != sorted(frozen):
+        errors.append(f"replay scenario set {recorded} != frozen set {sorted(frozen)}")
+    errors.extend(
         f"incident replay not passing: {replay.get('scenario', '?')}"
         for replay in replays
         if not isinstance(replay, dict) or replay.get("status") != "pass"
-    ]
+    )
+    return errors
 
 
-def _check_acceptance_efficiency(acceptance: dict) -> list[str]:
-    """50% avoidable-action reduction with safety and p95 guards."""
+def _check_acceptance_efficiency(acceptance: dict, process: dict) -> list[str]:
+    """Frozen avoidable-action reduction target with safety and p95 guards.
+
+    The reduction threshold comes from the frozen baseline, never from the
+    acceptance document under test.
+    """
     errors: list[str] = []
     efficiency = acceptance.get("efficiency") or {}
     baseline_actions = efficiency.get("baseline_avoidable_actions")
     observed_actions = efficiency.get("observed_avoidable_actions")
+    try:
+        frozen_reduction = float((process.get("thresholds") or {}).get("avoidable_action_reduction"))
+    except (TypeError, ValueError):
+        errors.append("frozen baseline fixes no numeric avoidable-action reduction threshold")
+        frozen_reduction = 0.0
     if baseline_actions is None or observed_actions is None:
         errors.append("efficiency unmeasured: baseline or observed avoidable actions missing")
     elif float(baseline_actions) <= 0:
         errors.append("efficiency baseline must be positive")
-    elif (float(baseline_actions) - float(observed_actions)) / float(baseline_actions) < 0.5:
-        errors.append("avoidable-action reduction below 50%")
+    elif (float(baseline_actions) - float(observed_actions)) / float(baseline_actions) < frozen_reduction:
+        errors.append(f"avoidable-action reduction below frozen {frozen_reduction:.0%}")
     if efficiency.get("added_required_lane_failure"):
         errors.append("added required-lane failure attributable to coordination")
     if efficiency.get("p95_regression_attributable"):

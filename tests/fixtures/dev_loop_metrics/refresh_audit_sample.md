@@ -8,7 +8,7 @@ Sample audit for validator tests. Window and identities reconcile with
   "schema": "refresh_audit_v1",
   "window_start": "2026-08-11T00:00:00+00:00",
   "window_end": "2026-09-08T00:00:00+00:00",
-  "denominator_prs": [101],
+  "denominator_prs": [101, 102],
   "observations": [
     {
       "pr": 101,
@@ -33,6 +33,12 @@ Sample audit for validator tests. Window and identities reconcile with
     "not_synchronize": 1
   },
   "timing_only_share": 1.0,
-  "missing": []
+  "missing": [
+    {
+      "pr": 102,
+      "head_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "status": "missing-artifact"
+    }
+  ]
 }
 ```
