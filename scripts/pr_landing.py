@@ -296,19 +296,30 @@ def ready_failures(
 def enqueue_pr(run: Runner, repo_full: str, pr_number: int, expected_head: str, remote_head: str) -> dict:
     """Arm queue enrollment after a final expected-head check.
 
-    `gh pr merge --auto` has no compare-and-set flag, so the helper re-reads
-    the remote head immediately before arming and refuses on mismatch. The
-    residual window (a push landing between this check and admission) is
-    outside participating writers and is recorded, not hidden: admission
-    itself re-validates via the queue's speculative checks, and any surprise
-    there routes to follow-up ownership, never to a silent merge.
+    The helper re-reads the remote head immediately before arming and refuses
+    on mismatch, then passes `--match-head-commit` so admission itself is an
+    atomic compare-and-set on the expected head. A push landing between the
+    check and admission is refused server-side rather than armed.
     """
     if remote_head != expected_head:
         raise LandingError(
             f"remote head moved to {remote_head[:12]} during enqueue; "
             "readiness is invalid, re-evaluate instead of arming"
         )
-    rc, out = run(["gh", "pr", "merge", "--repo", repo_full, "--auto", "--squash", str(pr_number)])
+    rc, out = run(
+        [
+            "gh",
+            "pr",
+            "merge",
+            "--repo",
+            repo_full,
+            "--auto",
+            "--squash",
+            "--match-head-commit",
+            expected_head,
+            str(pr_number),
+        ]
+    )
     if rc != 0:
         raise LandingError(f"enqueue refused for PR #{pr_number}: {out.strip()[:300]}")
     return {"pr": pr_number, "enqueued": True, "note": "API success is not proof of merge"}
@@ -364,13 +375,20 @@ def followup_path(directory: Path, key: str) -> Path:
 
 
 def record_followup(directory: Path, key: str, state: FollowupState) -> Path:
-    """Atomically persist continuation state (crash-safe via rename)."""
+    """Atomically persist continuation state (crash-safe via rename).
+
+    Refuses to overwrite another owner's record: same-principal sessions may
+    rotate `session`, but a different `owner` must use its own key.
+    """
     for field in ("owner", "session", "scope"):
         if not getattr(state, field, None):
             raise LandingError(f"followup state lacks required field {field!r}")
     directory.mkdir(parents=True, exist_ok=True)
     path = followup_path(directory, key)
-    tmp = path.with_suffix(".tmp")
+    existing = load_followup(directory, key)
+    if existing is not None and existing.owner != state.owner:
+        raise LandingError(f"followup {key!r} is owned by {existing.owner!r}; refusing cross-owner overwrite")
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(asdict(state), indent=2) + "\n", encoding="utf-8")
     tmp.replace(path)
     return path
@@ -428,6 +446,39 @@ def allow_retry(state: FollowupState, kind: str, head: str) -> dict:
     return {"allowed": False, "reason": f"unknown retry kind {kind!r}"}
 
 
+def consume_retry(directory: Path, key: str, kind: str, head: str) -> dict:
+    """Decide a retry AND persist the consumed budget atomically.
+
+    A pure decision function would authorize the same retry forever; consuming
+    here makes the second identical call observe the spent budget.
+    """
+    state = load_followup(directory, key)
+    if state is None:
+        raise LandingError(f"no followup {key!r} recorded; record state before retrying")
+    decision = allow_retry(state, kind, head)
+    if not decision["allowed"]:
+        return decision
+    if kind == "rerun":
+        state.attempts += 1
+    else:
+        state.reentries += 1
+    record_followup(directory, key, state)
+    return {**decision, "remaining": True}
+
+
+def bound_withdraw(run: Runner, repo_full: str, branch: str, pr_number: int) -> dict:
+    """Withdraw readiness only for the PR owned by *branch*.
+
+    A branch that owns no PR yet (pre-PR assembly) may name an explicit PR;
+    a branch that owns one refuses any other number, so a stale or mistaken
+    `--pr` can never disarm another PR.
+    """
+    owned = resolve_pr(run, repo_full, branch)
+    if owned is not None and owned.get("number") != pr_number:
+        raise WrongPR(f"branch {branch} owns PR #{owned.get('number')}, not PR #{pr_number}")
+    return withdraw_readiness(run, repo_full, pr_number)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--repo", default="BenchBox-dev/BenchBox")
@@ -478,7 +529,8 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(record, indent=2))
             return 0
         if args.command == "withdraw":
-            print(json.dumps(withdraw_readiness(live_run, args.repo, args.pr), indent=2))
+            identity = git_identity(repo)
+            print(json.dumps(bound_withdraw(live_run, args.repo, identity.branch, args.pr), indent=2))
             return 0
         if args.command == "ready":
             identity = git_identity(repo)
@@ -531,7 +583,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "followup-resume":
             print(json.dumps(resume_followup(state), indent=2))
             return 0
-        print(json.dumps(allow_retry(state, args.kind, args.head), indent=2))
+        print(json.dumps(consume_retry(directory, args.key, args.kind, args.head), indent=2))
         return 0
     except (LandingError, MergedRace, WrongPR) as exc:
         print(f"REFUSED: {exc}", file=sys.stderr)

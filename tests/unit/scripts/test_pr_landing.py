@@ -252,3 +252,46 @@ def test_followup_coerce_refuses_missing_owner(tmp_path: Path) -> None:
     with pytest.raises(landing.LandingError, match="object"):
         landing.coerce_followup([])
     assert landing.load_followup(tmp_path, "absent") is None
+
+
+def test_enqueue_arms_with_match_head_commit() -> None:
+    run = FakeRun([(0, "")])
+    assert landing.enqueue_pr(run, "o/r", 3, HEAD, HEAD)["enqueued"] is True
+    assert "--match-head-commit" in run.calls[0]
+    assert HEAD in run.calls[0]
+
+
+def test_bound_withdraw_refuses_foreign_pr() -> None:
+    owned = [{"number": 7, "headRefName": "feat/x", "headRefOid": HEAD}]
+    run = FakeRun([(0, owned)])
+    with pytest.raises(landing.WrongPR, match="owns PR #7"):
+        landing.bound_withdraw(run, "o/r", "feat/x", 9)
+    assert all("disable-auto" not in " ".join(c) for c in run.calls)
+
+
+def test_bound_withdraw_allows_pre_pr_explicit_number() -> None:
+    run = FakeRun(
+        [
+            (0, []),
+            (0, {"number": 9, "state": "OPEN", "autoMergeRequest": {"enabledAt": "t"}, "labels": []}),
+            (0, ""),
+            (0, {"autoMergeRequest": None}),
+        ]
+    )
+    assert landing.bound_withdraw(run, "o/r", "feat/new", 9)["withdrew"] == "auto-merge"
+
+
+def test_record_followup_refuses_cross_owner_overwrite(tmp_path: Path) -> None:
+    landing.record_followup(tmp_path, "k", landing.FollowupState(owner="o", session="s", scope="pr"))
+    with pytest.raises(landing.LandingError, match="owned by 'o'"):
+        landing.record_followup(tmp_path, "k", landing.FollowupState(owner="r", session="t", scope="pr"))
+    same = landing.FollowupState(owner="o", session="s2", scope="pr")
+    landing.record_followup(tmp_path, "k", same)
+    assert landing.load_followup(tmp_path, "k").session == "s2"
+
+
+def test_consume_retry_persists_spent_budget(tmp_path: Path) -> None:
+    landing.record_followup(tmp_path, "k", landing.FollowupState(owner="o", session="s", scope="pr", head=HEAD))
+    assert landing.consume_retry(tmp_path, "k", "rerun", HEAD)["allowed"] is True
+    second = landing.consume_retry(tmp_path, "k", "rerun", HEAD)
+    assert second["allowed"] is False and "exhausted" in second["reason"]

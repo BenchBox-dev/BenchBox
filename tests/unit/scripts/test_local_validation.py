@@ -141,11 +141,14 @@ def test_concurrent_identical_requests_execute_once(repo: Path, tmp_path: Path) 
 
 
 def test_show_reports_receipt_status(repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    assert lv.show_gate("g", None, repo, lv.store_dir(repo)) == 0
+    gate = _counter_gate(tmp_path / "count.txt")
+    assert lv.show_gate("g", None, repo, lv.store_dir(repo), gate) == 0
     assert "receipt=absent" in capsys.readouterr().out
-    assert lv.run_gate("g", _counter_gate(tmp_path / "count.txt"), None, 5.0, repo, lv.store_dir(repo)) == 0
-    assert lv.show_gate("g", None, repo, lv.store_dir(repo)) == 0
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+    assert lv.show_gate("g", None, repo, lv.store_dir(repo), gate) == 0
     assert "receipt=present" in capsys.readouterr().out
+    assert lv.show_gate("g", None, repo, lv.store_dir(repo), gate + ["--extra"]) == 0
+    assert "receipt=absent" in capsys.readouterr().out
 
 
 def test_missing_base_forces_execution_without_receipt(repo: Path, tmp_path: Path) -> None:
@@ -194,3 +197,27 @@ def test_receipt_file_records_gate_and_exit(repo: Path, tmp_path: Path) -> None:
     assert len(receipts) == 1
     data = json.loads(receipts[0].read_text(encoding="utf-8"))
     assert data["gate"] == "g" and data["exit"] == 0 and data["identity"]["head"]
+
+
+def test_changed_command_invalidates_receipt(repo: Path, tmp_path: Path) -> None:
+    marker_a = tmp_path / "a.txt"
+    marker_b = tmp_path / "b.txt"
+    gate_a = [sys.executable, "-c", f"open({str(marker_a)!r}, 'a').write('x')"]
+    gate_b = [sys.executable, "-c", f"open({str(marker_b)!r}, 'a').write('x')"]
+    assert lv.run_gate("g", gate_a, None, 5.0, repo, lv.store_dir(repo)) == 0
+    assert lv.run_gate("g", gate_b, None, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker_a) == 1 and _count(marker_b) == 1
+
+
+def test_tracked_edit_preserving_status_invalidates(repo: Path, tmp_path: Path) -> None:
+    tracked = Path(str(repo)) / "tracked.txt"
+    tracked.write_text("v1")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 1
+    tracked.write_text("v2")
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 2
