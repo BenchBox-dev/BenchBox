@@ -170,6 +170,31 @@ describe("SummaryChartOverview section chrome", () => {
     }
   });
 
+  it("clears the pending copy timer on unmount", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const setSpy = vi.spyOn(window, "setTimeout");
+    const clearSpy = vi.spyOn(window, "clearTimeout");
+    try {
+      const { unmount } = renderOverview();
+      fireEvent.click(screen.getByRole("button", { name: "Copy chart-section link" }));
+      await screen.findByRole("button", { name: /Link copied/ });
+      // The component resets its confirmation on a 1500ms timer; locate that
+      // timer id so the assertion cannot pass on unrelated clearTimeout calls.
+      const timerCallIndex = setSpy.mock.calls.findIndex((args) => args[1] === 1500);
+      expect(timerCallIndex).toBeGreaterThanOrEqual(0);
+      const timerId = setSpy.mock.results[timerCallIndex]?.value;
+      clearSpy.mockClear();
+      unmount();
+      expect(clearSpy).toHaveBeenCalledWith(timerId);
+    } finally {
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
+      // @ts-expect-error jsdom has no clipboard; restore the missing default.
+      delete navigator.clipboard;
+    }
+  });
+
   it("reports failure when every copy path fails", async () => {
     const execCommand = vi.fn(() => false);
     const original = document.execCommand;

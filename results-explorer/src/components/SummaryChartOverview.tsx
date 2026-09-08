@@ -87,9 +87,8 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const copyTimer = useRef<number | undefined>(undefined);
   useEffect(() => {
-    const timer = copyTimer.current;
     return () => {
-      if (timer !== undefined) window.clearTimeout(timer);
+      if (copyTimer.current !== undefined) window.clearTimeout(copyTimer.current);
     };
   }, []);
 
