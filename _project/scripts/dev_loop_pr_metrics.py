@@ -763,31 +763,6 @@ def pr_history_commits(client: GitHubClient, number: int) -> list[dict]:
     return client.get_paginated(f"/repos/{client.repo}/pulls/{number}/commits")
 
 
-def pr_timeline_shas(client: GitHubClient, number: int) -> list[str]:
-    """Historical SHAs from the issue timeline, oldest first.
-
-    `committed` events list pushed commits (including force-pushed-away ones
-    the current history no longer contains); `head_ref_force_pushed` events
-    contribute their before/after tips. Raises ApiFailure on a failed page so
-    a partial timeline never reads as a complete head set.
-    """
-    events = client.get_paginated(f"/repos/{client.repo}/issues/{number}/timeline")
-    shas: list[str] = []
-    for event in events:
-        if not isinstance(event, dict):
-            continue
-        candidates: list[object] = []
-        if event.get("event") == "committed":
-            candidates = [event.get("sha")]
-        elif event.get("event") == "head_ref_force_pushed":
-            candidates = [event.get("before"), event.get("after")]
-        for candidate in candidates:
-            sha = str(candidate or "")
-            if len(sha) == 40 and sha not in shas:
-                shas.append(sha)
-    return shas
-
-
 def pr_nontip_shas(commits: list[dict]) -> set[str]:
     """Current-history SHAs that have a child in the same history.
 
@@ -805,29 +780,22 @@ def pr_nontip_shas(commits: list[dict]) -> set[str]:
     return children
 
 
-def pr_synchronize_heads_from_parts(commits: list[dict], timeline_shas: list[str]) -> list[str]:
-    """Ordered union of current-history SHAs and timeline-only SHAs."""
+def pr_synchronize_heads(client: GitHubClient, number: int) -> list[str]:
+    """Every current-history commit SHA of the PR, oldest first.
+
+    Force-pushed-away tips are NOT recoverable from the issue timeline
+    (verified: `committed` events mirror current history and
+    `head_ref_force_pushed` carries no before-SHA), so orphan-tip recovery
+    runs as a separate branch-runs pass documented in the baseline report
+    instead of pretending the timeline covers it.
+    """
+
     heads: list[str] = []
-    for commit in commits:
+    for commit in pr_history_commits(client, number):
         sha = str(commit.get("sha") or "") if isinstance(commit, dict) else ""
         if sha and sha not in heads:
             heads.append(sha)
-    for sha in timeline_shas:
-        if sha not in heads:
-            heads.append(sha)
     return heads
-
-
-def pr_synchronize_heads(client: GitHubClient, number: int) -> list[str]:
-    """Every synchronize head SHA of the PR, oldest first.
-
-    Current history first, then timeline-only SHAs (force-pushed-away tips)
-    in timeline order. The final merged head alone cannot establish total
-    refresh/cancellation cost, so lifecycle accounting must enumerate all of
-    these, not just the head the PR merged with.
-    """
-
-    return pr_synchronize_heads_from_parts(pr_history_commits(client, number), pr_timeline_shas(client, number))
 
 
 def lifecycle_for_pr(client: GitHubClient, pr: dict) -> dict:
@@ -844,7 +812,11 @@ def lifecycle_for_pr(client: GitHubClient, pr: dict) -> dict:
 
     number = pr["number"]
     commits = pr_history_commits(client, number)
-    heads = pr_synchronize_heads_from_parts(commits, pr_timeline_shas(client, number))
+    heads = []
+    for commit in commits:
+        sha = str(commit.get("sha") or "") if isinstance(commit, dict) else ""
+        if sha and sha not in heads:
+            heads.append(sha)
     nontips = pr_nontip_shas(commits)
     final_sha = str((pr.get("head") or {}).get("sha") or "")
     per_head: dict[str, dict] = {}

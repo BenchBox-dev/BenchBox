@@ -124,15 +124,17 @@ Sections 1–5 above are preserved unchanged as the w0–w2 record. Their final-
 aggregate (§3.1) understated cancellation cost: it measured 0.27 cancelled
 runner-minutes on terminal heads only. Recomputed from the full-cohort lifecycle
 baseline (`_project/analysis/ci-lifecycle-baseline.json`, 349 in-window PRs,
-1145 synchronize heads, every run attempt per head):
+1384 synchronize heads including 239 branch-runs-recovered orphan tips,
+9112 attempts, every run attempt per head):
 
 | Metric | Value |
 |---|---|
-| Cancelled runner-minutes, all heads | 5503.3 |
-| Cancelled on final (merged) heads | 25.5 |
-| Cancelled on superseded (non-final) heads | 5477.8 |
-| PRs with any superseded-head cancellation | 94 of 349 |
-| Superseded-head cancelled minutes per head | mean 6.9, p50 0.0, max 61.2 (n = 796) |
+| Cancelled runner-minutes, all heads | 7719.0 |
+| Cancelled on final (merged) heads | 499.8 |
+| Cancelled on superseded (non-final) heads | 7219.3 |
+| Failed-job runner-minutes (own bucket since the method correction) | 2715.1 |
+| PRs with any superseded-head cancellation | 108 of 349 |
+| Superseded-head cancelled minutes per head | mean 7.0, p50 0.0, max 62.2 (n = 1035) |
 
 Superseded-head cancellations split by the refresh classifier:
 
@@ -140,18 +142,20 @@ Superseded-head cancellations split by the refresh classifier:
 |---|---|
 | Ancestry-only refresh (exact two-parent, no feature edits) | 1438.6 |
 | Ordinary feature push | 3122.4 |
-| Head absent from the PR commits listing (e.g. force-push-orphaned) | 916.8 |
+| Unclassifiable (orphan tips outside PR history, externally-based) | 2658.2 |
 
-The 916.8-minute remainder is conservatively excluded from both named buckets:
-those heads cannot be classified, so they are not counted as refresh waste.
+The 2658.2-minute remainder is conservatively excluded from both named buckets:
+those heads cannot be classified by the history-based classifier, so they are
+not counted as refresh waste.
 
-Corrected reading: whole-lifecycle cancellation cost is ~20,000× the final-head
+Corrected reading: whole-lifecycle cancellation cost is ~28,000× the final-head
 figure, concentrated on superseded heads as the item description predicted. The
 w0–w2 recommendation stands: cancellation remains optimal for ordinary feature
 pushes (3122.4 minutes were already spent when those runs were superseded;
 letting them finish would have cost full gates on obsolete commits), and the
 refresh-following portion (1438.6 minutes over 28 days) is the only arguably
 avoidable share — already addressed structurally by the native merge queue
-(§4.2), which this item does not modify. Missing-artifact heads (296 of 1145,
-quantified in the lifecycle baseline) are excluded from both totals; both
-figures are therefore lower bounds.
+(§4.2), which this item does not modify. Non-tip intra-push commits (296 of
+1384, classified separately in the lifecycle baseline) never ran CI and are
+excluded from both totals; missing-artifact heads are zero, so both figures
+are lower bounds only via retention loss, not via unobserved history.

@@ -32,13 +32,13 @@ window start/end match the baseline cohort exactly.
 From baseline `merged_at` ordering and final-head `required_gate_seconds`:
 
 - Merge interarrival: p50 41.1 min, p90 283.6 min (n = 349).
-- Final-head required-gate wall: p50 21.7 min, p95 32.0 min (n = 311 heads
+- Final-head required-gate wall: p50 21.6 min, p95 33.3 min (n = 267 heads
   with an observed gate).
 
 The gate wall (p50 21.7) fits inside one typical interarrival gap (p50 41.1),
 so a refreshed PR usually finishes before the next merge lands; starvation
-needs a merge cluster inside the ~22–32 minute gate window, consistent with
-the 94 PRs that show superseded-head cancellations in the concurrency audit
+needs a merge cluster inside the ~22–33 minute gate window, consistent with
+the 108 PRs that show superseded-head cancellations in the concurrency audit
 correction. Timing alone does not make a refresh eligible: the classifier
 still requires the prior gate green on the exact parent (`prior_check_not_success`
 otherwise), the check bound to that parent (`prior_check_unbound` otherwise),

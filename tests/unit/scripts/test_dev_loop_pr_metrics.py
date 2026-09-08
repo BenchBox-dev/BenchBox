@@ -725,7 +725,7 @@ def test_refresh_audit_rejects_non_list_denominator() -> None:
     assert any("must be a list" in e for e in errors)
 
 
-def _failed_job(minutes: float) -> dict:
+def _failed_job() -> dict:
     return {
         "conclusion": "failure",
         "status": "completed",
@@ -735,37 +735,26 @@ def _failed_job(minutes: float) -> dict:
     }
 
 
-def test_lifecycle_timeline_union_nontip_and_failed() -> None:
-    tip, mid, root, orphan = "a" * 40, "b" * 40, "c" * 40, "d" * 40
+def test_lifecycle_nontip_split_and_failed_bucket() -> None:
+    tip, mid, root = "a" * 40, "b" * 40, "c" * 40
     commits = [
         {"sha": root, "parents": []},
         {"sha": mid, "parents": [{"sha": root}]},
         {"sha": tip, "parents": [{"sha": mid}]},
     ]
-    timeline = [
-        {"event": "committed", "sha": root},
-        {"event": "committed", "sha": mid},
-        {"event": "committed", "sha": tip},
-        {"event": "head_ref_force_pushed", "before": orphan, "after": mid},
-        {"event": "committed", "sha": orphan},
-    ]
     client = _LifecycleClient(
         commits=commits,
-        runs_by_sha={
-            tip: [{"id": 1, "run_attempt": 1, "name": "Develop PR"}],
-            orphan: [{"id": 2, "run_attempt": 1, "name": "Develop PR"}],
-        },
-        jobs_by_run={1: [_timed_job(6.0), _failed_job(4.0)], 2: [_timed_job(6.0)]},
+        runs_by_sha={tip: [{"id": 1, "run_attempt": 1, "name": "Develop PR"}]},
+        jobs_by_run={1: [_timed_job(6.0), _failed_job()]},
         checks_by_sha={},
-        timeline=timeline,
     )
     pr = {"number": 7, "head": {"sha": tip}, "merged_at": None}
     lifecycle = metrics.lifecycle_for_pr(client, pr)
-    assert lifecycle["heads"] == [root, mid, tip, orphan]
-    assert set(lifecycle["per_head"]) == {tip, orphan}
+    assert lifecycle["heads"] == [root, mid, tip]
+    assert set(lifecycle["per_head"]) == {tip}
     statuses = {m["head_sha"]: m["status"] for m in lifecycle["missing"]}
     assert statuses == {root: "non-tip-commit", mid: "non-tip-commit"}
     assert lifecycle["totals"]["missing_head_count"] == 0
     assert lifecycle["totals"]["non_tip_head_count"] == 2
     assert lifecycle["totals"]["failed_runner_minutes"] == pytest.approx(4.0)
-    assert lifecycle["totals"]["completed_runner_minutes"] == pytest.approx(12.0)
+    assert lifecycle["totals"]["completed_runner_minutes"] == pytest.approx(6.0)
