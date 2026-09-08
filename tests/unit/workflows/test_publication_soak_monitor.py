@@ -33,10 +33,10 @@ def test_soak_monitor_samples_every_five_minutes() -> None:
 
 def test_soak_monitor_never_cancels_a_sample() -> None:
     wf = _load_yaml(MONITOR_PATH)
-    concurrency = wf.get("concurrency", {})
-    assert concurrency.get("cancel-in-progress") is False, (
-        "a cancelled sample would be indistinguishable from a missed required sample"
-    )
+    # Every scheduled sample must execute: GitHub replaces a queued run in a
+    # fixed concurrency group even with cancel-in-progress: false, and a
+    # replaced sample would be indistinguishable from a missed required sample.
+    assert "concurrency" not in wf, "a queued sample replaced by a later tick would restart the soak window"
 
 
 def test_soak_monitor_compares_live_against_durable_head() -> None:
@@ -52,6 +52,19 @@ def test_soak_monitor_compares_live_against_durable_head() -> None:
     assert "--require-receipt" in text
 
 
+def test_soak_monitor_defers_while_transaction_in_flight() -> None:
+    wf = _load_yaml(MONITOR_PATH)
+    steps = wf["jobs"]["sample"]["steps"]
+    text = "\n".join(str(step.get("run", "")) for step in steps)
+
+    # The live site may already serve the new bytes after Pages activation
+    # while the durable head still attests the previous transaction; comparing
+    # in that window would record a false digest mismatch.
+    assert "active_transaction_id" in text
+    assert "deferred" in text
+    assert "live publication and durable head may disagree" in text
+
+
 def test_soak_monitor_records_heartbeat_and_fails_closed() -> None:
     wf = _load_yaml(MONITOR_PATH)
     steps = wf["jobs"]["sample"]["steps"]
@@ -59,6 +72,7 @@ def test_soak_monitor_records_heartbeat_and_fails_closed() -> None:
 
     assert "heartbeat.json" in text
     assert "window restarts per runbook" in text
+    assert 'heartbeat["deferred"]' in text
     upload_step = next(
         (
             s
