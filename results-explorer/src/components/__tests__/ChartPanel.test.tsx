@@ -1074,4 +1074,122 @@ describe("ChartPanel", () => {
     });
     expect(trend.querySelector("path")?.getAttribute("d")).toContain("M12.0,72.0 L228.0,10.0");
   });
+
+  it("renders every compare chart openly with no tab gating in the long layout", () => {
+    const { container } = render(
+      <ChartPanel
+        summaryLayout="long"
+        context={{
+          kind: "compare",
+          results: [
+            makeDetail(),
+            makeDetail({
+              result_id: "detail-2",
+              platform: "SQLite",
+              platform_id: "sqlite",
+              display_geomean_ms: 18,
+              geomean_ms: 18,
+              display_timings: [
+                { query_id: "Q1", display_ms: 18, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+                { query_id: "Q2", display_ms: 22, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+              ],
+            }),
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("chart-panel-long")).toBeTruthy();
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    expect(screen.getByRole("heading", { name: "What does this comparison show?" })).toBeTruthy();
+    expect(screen.getByTestId("chart-panel-chart-comparison_bar")).toHaveTextContent(
+      "How does each query compare with the baseline?",
+    );
+    expect(screen.getByTestId("chart-panel-chart-query_heatmap")).toHaveTextContent(
+      "Which queries drive the difference?",
+    );
+    expect(screen.queryByText("Top-line metric summaries and phase composition")).toBeNull();
+    expect(
+      screen.queryByText("Paired side-by-side bars comparing two runs per query with % change annotations"),
+    ).toBeNull();
+    // Question-group sections carry their chrome without any clicks.
+    expect(screen.getByTestId("chart-panel-group-overview")).toBeTruthy();
+    expect(screen.getByTestId("chart-panel-group-per_query")).toBeTruthy();
+    // Charts from several groups are on the page at once.
+    expect(screen.getByTestId("chart-panel-chart-comparison_bar")).toBeTruthy();
+    expect(screen.getByTestId("chart-panel-chart-query_heatmap")).toBeTruthy();
+    expect(container.querySelectorAll("[data-chart-container]").length).toBeGreaterThan(1);
+    // Comparison content that used to hide behind the Overview/Per-query tabs
+    // renders immediately.
+    expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
+  });
+
+  it("honors excludeChartIds in the long layout", () => {
+    render(
+      <ChartPanel
+        summaryLayout="long"
+        excludeChartIds={["performance_bar", "power_bar"]}
+        context={{
+          kind: "compare",
+          results: [makeDetail(), makeDetail({ result_id: "detail-2" })],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("chart-panel-long")).toBeTruthy();
+    expect(screen.queryByTestId("chart-panel-chart-performance_bar")).toBeNull();
+    expect(screen.queryByTestId("chart-panel-chart-power_bar")).toBeNull();
+    expect(screen.getByTestId("chart-panel-chart-sparkline_table")).toBeTruthy();
+    expect(screen.getByTestId("chart-panel-chart-comparison_bar")).toBeTruthy();
+  });
+
+  it("suppresses winner language across openly rendered compare charts when suppressWinnerClaims is on", () => {
+    render(
+      <ChartPanel
+        summaryLayout="long"
+        suppressWinnerClaims
+        suppressionReason="benchmarks differ across results"
+        context={{
+          kind: "compare",
+          results: [makeDetail(), makeDetail({ result_id: "detail-2" })],
+        }}
+      />,
+    );
+
+    expect(screen.queryByText("Best geomean")).toBeNull();
+    expect(screen.getByText("Lowest geomean in ranking")).toBeTruthy();
+    expect(screen.getByText(/ranking mismatch — not comparable/)).toBeTruthy();
+  });
+
+  it("uses a controlled compare baseline without rendering a second selector in the long layout", () => {
+    render(
+      <ChartPanel
+        summaryLayout="long"
+        baselineIndex={1}
+        onBaselineIndexChange={() => undefined}
+        context={{
+          kind: "compare",
+          results: [
+            makeDetail(),
+            makeDetail({
+              result_id: "detail-2",
+              platform: "SQLite",
+              platform_id: "sqlite",
+              display_geomean_ms: 18,
+              geomean_ms: 18,
+              display_timings: [
+                { query_id: "Q1", display_ms: 18, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+                { query_id: "Q2", display_ms: 22, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+              ],
+            }),
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("chart-panel-long")).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: "Baseline" })).toBeNull();
+    expect(screen.queryByRole("tablist")).toBeNull();
+  });
 });

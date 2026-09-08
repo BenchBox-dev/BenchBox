@@ -90,10 +90,92 @@ interface ValueLabelPlacement {
 }
 
 export function ChartPanel(props: ChartPanelProps) {
-  if (props.summaryLayout === "long" && props.context.kind === "summary" && props.context.summary !== null) {
-    return <SummaryChartOverview context={props.context} excludeChartIds={props.excludeChartIds} />;
+  if (props.summaryLayout === "long") {
+    if (props.context.kind === "summary") {
+      if (props.context.summary !== null) {
+        return <SummaryChartOverview context={props.context} excludeChartIds={props.excludeChartIds} />;
+      }
+      return <ChartPanelTabs {...props} />;
+    }
+    return <ChartPanelLong {...props} />;
   }
   return <ChartPanelTabs {...props} />;
+}
+
+function selectPanelCharts(
+  context: ChartContext,
+  excludeChartIds: readonly string[] | undefined,
+  queryFilter: readonly string[] | undefined,
+): ChartRegistryEntry[] {
+  const applicable = applicableCharts(context);
+  const exclude = new Set(excludeChartIds ?? []);
+  if (queryFilter) {
+    exclude.add("cost_scatter");
+    exclude.add("power_bar");
+  }
+  if (exclude.size === 0) return [...applicable];
+  return applicable.filter((entry) => !exclude.has(entry.id));
+}
+
+function buildChartSummary(
+  summary: BenchmarkSummary | null,
+  eligibilityClass: ChartDatasetEligibilityClass,
+  queryFilter: readonly string[] | undefined,
+): BenchmarkSummary | null {
+  if (!summary) return null;
+  const base = filterSummaryForChartDataset(summary, eligibilityClass);
+  if (!queryFilter) return base;
+  const filteredQueryIds = queryFilter.filter((q) => base.query_ids.includes(q));
+  // Invariant: compute aggregate geomeans over the query IDs valid across every platform in the cohort
+  const sharedValidQueryIds = filteredQueryIds.filter((q) =>
+    base.platforms.every((p) => {
+      const v = p.timings[q];
+      return v !== null && v !== undefined && Number.isFinite(v) && v > 0;
+    }),
+  );
+  const filteredPlatforms = base.platforms.map((platform) => {
+    const filteredTimings: Record<string, number | null> = {};
+    for (const q of filteredQueryIds) {
+      if (q in platform.timings) {
+        filteredTimings[q] = platform.timings[q] ?? null;
+      }
+    }
+    const geomean =
+      sharedValidQueryIds.length >= 2
+        ? geomeanMs(sharedValidQueryIds.map((q) => platform.timings[q]!))
+        : null;
+    return {
+      ...platform,
+      timings: filteredTimings,
+      display_geomean_ms: geomean,
+      sample_geomean_ms: geomean,
+      power_score: null,
+      normalized_cost_usd: null,
+      cost_status: "unavailable" as const,
+    };
+  });
+  const ranking: RankingConfig | null =
+    queryFilter && base.ranking && base.ranking.primary_metric === "power_score"
+      ? {
+          primary_metric: "display_geomean_ms",
+          secondary_metric: base.ranking.secondary_metric,
+          primary_order: "asc",
+        }
+      : base.ranking;
+  return {
+    ...base,
+    ranking,
+    query_ids: filteredQueryIds,
+    platforms: filteredPlatforms,
+  };
+}
+
+function chartSummaryLabelList(chartSummary: BenchmarkSummary | null): string[] {
+  if (!chartSummary) return [];
+  return formatRunIdentitiesForCohort(
+    chartSummary.platforms.map((platform) => ({ ...platform, scale_factor: chartSummary.scale_factor })),
+    "chart",
+  );
 }
 
 function ChartPanelTabs({
@@ -105,16 +187,10 @@ function ChartPanelTabs({
   excludeChartIds,
   queryFilter,
 }: ChartPanelProps) {
-  const charts = useMemo(() => {
-    const applicable = applicableCharts(context);
-    const exclude = new Set(excludeChartIds ?? []);
-    if (queryFilter) {
-      exclude.add("cost_scatter");
-      exclude.add("power_bar");
-    }
-    if (exclude.size === 0) return applicable;
-    return applicable.filter((entry) => !exclude.has(entry.id));
-  }, [context, excludeChartIds, queryFilter]);
+  const charts = useMemo(
+    () => selectPanelCharts(context, excludeChartIds, queryFilter),
+    [context, excludeChartIds, queryFilter],
+  );
   const chartGroups = useMemo(() => groupChartsByQuestion(charts), [charts]);
   const summary = useMemo(() => buildRenderableSummary(context), [context]);
   const historical = useMemo(
@@ -191,64 +267,11 @@ function ChartPanelTabs({
     !isBaselineControlled &&
     context.kind === "compare" &&
     (activeChart?.id === "normalized_speedup" || activeChart?.id === "diverging_bar");
-  const chartSummary = useMemo(() => {
-    if (!summary) return null;
-    const base = filterSummaryForChartDataset(summary, activeEligibilityClass);
-    if (!queryFilter) return base;
-    const filteredQueryIds = queryFilter.filter((q) => base.query_ids.includes(q));
-    // Invariant: compute aggregate geomeans over the query IDs valid across every platform in the cohort
-    const sharedValidQueryIds = filteredQueryIds.filter((q) =>
-      base.platforms.every((p) => {
-        const v = p.timings[q];
-        return v !== null && v !== undefined && Number.isFinite(v) && v > 0;
-      }),
-    );
-    const filteredPlatforms = base.platforms.map((platform) => {
-      const filteredTimings: Record<string, number | null> = {};
-      for (const q of filteredQueryIds) {
-        if (q in platform.timings) {
-          filteredTimings[q] = platform.timings[q] ?? null;
-        }
-      }
-      const geomean =
-        sharedValidQueryIds.length >= 2
-          ? geomeanMs(sharedValidQueryIds.map((q) => platform.timings[q]!))
-          : null;
-      return {
-        ...platform,
-        timings: filteredTimings,
-        display_geomean_ms: geomean,
-        sample_geomean_ms: geomean,
-        power_score: null,
-        normalized_cost_usd: null,
-        cost_status: "unavailable" as const,
-      };
-    });
-    const ranking: RankingConfig | null =
-      queryFilter && base.ranking && base.ranking.primary_metric === "power_score"
-        ? {
-            primary_metric: "display_geomean_ms",
-            secondary_metric: base.ranking.secondary_metric,
-            primary_order: "asc",
-          }
-        : base.ranking;
-    return {
-      ...base,
-      ranking,
-      query_ids: filteredQueryIds,
-      platforms: filteredPlatforms,
-    };
-  }, [activeEligibilityClass, summary, queryFilter]);
-  const chartPlatformLabels = useMemo(
-    () =>
-      chartSummary
-        ? formatRunIdentitiesForCohort(
-            chartSummary.platforms.map((platform) => ({ ...platform, scale_factor: chartSummary.scale_factor })),
-            "chart",
-          )
-        : [],
-    [chartSummary],
+  const chartSummary = useMemo(
+    () => buildChartSummary(summary, activeEligibilityClass, queryFilter),
+    [activeEligibilityClass, summary, queryFilter],
   );
+  const chartPlatformLabels = useMemo(() => chartSummaryLabelList(chartSummary), [chartSummary]);
   const compareRows = useMemo(() => {
     if (context.kind !== "compare" || !chartSummary) return [];
     return chartSummary.query_ids.map((queryId) => ({
@@ -445,6 +468,339 @@ function chartButtonLabel(chart: ChartRegistryEntry): string {
   return chart.shortTitle;
 }
 
+const LONG_LAYOUT_GROUP_COPY: Readonly<
+  Record<string, { label: string; description: string }>
+> = {
+  overview: {
+    label: "Headline metrics",
+    description: "Start with the aggregate measures, then inspect the queries behind them.",
+  },
+  per_query: {
+    label: "Per-query evidence",
+    description: "See where the selected runs separate query by query.",
+  },
+  distribution: {
+    label: "Distribution",
+    description: "See the middle and the tail across the selected queries.",
+  },
+  cost: {
+    label: "Cost",
+    description: "Compare normalized cost only where the pricing record supports it.",
+  },
+  trend: {
+    label: "Trend",
+    description: "Put these runs in historical context when prior runs are available.",
+  },
+  rank: {
+    label: "Rankings",
+    description: "See which engine wins individual queries, not just the average.",
+  },
+};
+
+const LONG_LAYOUT_CHART_COPY: Readonly<
+  Record<string, { title: string; description: string }>
+> = {
+  performance_bar: {
+    title: "Which engines minimize display geomean latency?",
+    description: "Aggregate display timing across comparable queries. Lower is better.",
+  },
+  power_bar: {
+    title: "Which engines maximize Power@Size?",
+    description: "Throughput at size for rank-safe rows. Higher is better.",
+  },
+  sparkline_table: {
+    title: "Which engines lead on speed and throughput?",
+    description: "Display geomean and Power@Size in one compact comparison.",
+  },
+  distribution_box: {
+    title: "How wide is the query-latency spread?",
+    description: "Variation across queries, not run-to-run variability. Whiskers show the observed range.",
+  },
+  query_heatmap: {
+    title: "Which queries drive the difference?",
+    description: "Per-query latency across the selected runs. Lower is better.",
+  },
+  comparison_bar: {
+    title: "How does each query compare with the baseline?",
+    description: "Paired query timings for the selected runs. Lower is better.",
+  },
+  diverging_bar: {
+    title: "Where are the largest regressions and improvements?",
+    description: "Per-query change relative to the selected baseline, sorted by magnitude.",
+  },
+  normalized_speedup: {
+    title: "How much faster or slower is each query?",
+    description: "Per-query results relative to the selected baseline.",
+  },
+  query_histogram: {
+    title: "Which individual queries are slow?",
+    description: "Latency for each query across the selected runs.",
+  },
+  percentile_ladder: {
+    title: "Where does the tail sit, not just the middle?",
+    description: "P50, P90, P95, and P99 across the selected runs. Lower is better.",
+  },
+  cdf_chart: {
+    title: "What share of queries finish under a given time?",
+    description: "Cumulative query-latency share across the selected runs.",
+  },
+  stacked_phase: {
+    title: "Where does the wall-clock time go?",
+    description: "Phase durations for the selected runs, shown as a breakdown of total time.",
+  },
+  time_series: {
+    title: "Is this platform getting faster over time?",
+    description: "Historical performance for the selected runs, ordered by run date.",
+  },
+  rank_table: {
+    title: "Who wins query by query, not on average?",
+    description: "Per-query ranks show how the aggregate result is assembled.",
+  },
+  cost_scatter: {
+    title: "What does a unit of speed cost?",
+    description: "Normalized cost versus performance where comparable cost data exists.",
+  },
+  summary_box: {
+    title: "What is the aggregate result?",
+    description: "Aggregate geomean, total time, and per-query outcome counts.",
+  },
+};
+
+function longLayoutGroupCopy(group: { id: string; label: string; description: string }) {
+  return LONG_LAYOUT_GROUP_COPY[group.id] ?? group;
+}
+
+function longLayoutChartCopy(chart: ChartRegistryEntry) {
+  return LONG_LAYOUT_CHART_COPY[chart.id] ?? {
+    title: chart.title,
+    description: chart.description,
+  };
+}
+
+// The open layout renders every applicable chart group and chart at once,
+// with no tab or disclosure gating: a reader who lands on the page sees the
+// charts, not the controls that would reveal them.
+function ChartPanelLong({
+  context,
+  baselineIndex,
+  onBaselineIndexChange,
+  suppressWinnerClaims = false,
+  suppressionReason,
+  excludeChartIds,
+  queryFilter,
+}: ChartPanelProps) {
+  const charts = useMemo(
+    () => selectPanelCharts(context, excludeChartIds, queryFilter),
+    [context, excludeChartIds, queryFilter],
+  );
+  const chartGroups = useMemo(() => groupChartsByQuestion(charts), [charts]);
+  const summary = useMemo(() => buildRenderableSummary(context), [context]);
+  const historical = useMemo(
+    () =>
+      context.kind === "summary"
+        ? context.historical ?? []
+        : context.kind === "detail"
+          ? context.historical ?? []
+          : [],
+    [context],
+  );
+  const summaryPlatformSelectLabels = useMemo(
+    () =>
+      summary
+        ? formatRunIdentitiesForCohort(
+            summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+            "selectOption",
+          )
+        : [],
+    [summary],
+  );
+  const isBaselineControlled = baselineIndex !== undefined;
+  const [localBaselineIdx, setLocalBaselineIdx] = useState(0);
+  const baselineIdx = normalizeBaselineIndex(
+    summary?.platforms.length ?? 0,
+    isBaselineControlled ? baselineIndex : localBaselineIdx,
+  );
+  const setBaselineIdx = onBaselineIndexChange ?? setLocalBaselineIdx;
+
+  useEffect(() => {
+    if (!isBaselineControlled) setLocalBaselineIdx(0);
+  }, [context, isBaselineControlled]);
+
+  if (charts.length === 0) return null;
+
+  const showBaseline =
+    !isBaselineControlled &&
+    context.kind === "compare" &&
+    charts.some((chart) => chart.id === "normalized_speedup" || chart.id === "diverging_bar");
+
+  return (
+    <section class="card" data-testid="chart-panel-long">
+      <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div>
+          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">What does this comparison show?</h2>
+          <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
+            Aggregate results first, then the per-query evidence behind them.
+          </p>
+        </div>
+        {showBaseline && summary && summary.platforms.length > 1 && (
+          <div class="ml-auto flex items-center gap-2">
+            <label class="text-xs text-[var(--bb-data-fg-muted)]" for="chart-panel-long-baseline">
+              Baseline:
+            </label>
+            <select
+              id="chart-panel-long-baseline"
+              class="min-w-0 max-w-full rounded border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-xs text-[var(--bb-data-fg-primary)]"
+              value={String(baselineIdx)}
+              onChange={(event) => setBaselineIdx(Number((event.target as HTMLSelectElement).value))}
+            >
+              {summary.platforms.map((platform, index) => (
+                <option key={platform.result_id} value={String(index)}>
+                  {summaryPlatformSelectLabels[index] ?? platform.platform}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+      <div class="space-y-8">
+        {chartGroups.map((group) => {
+          const groupCopy = longLayoutGroupCopy(group);
+          return (
+            <section
+              key={group.id}
+              aria-labelledby={`chart-panel-group-${group.id}`}
+              data-testid={`chart-panel-group-${group.id}`}
+            >
+            <h3
+              id={`chart-panel-group-${group.id}`}
+              class="text-sm font-semibold text-[var(--bb-data-fg-primary)]"
+            >
+              {groupCopy.label}
+            </h3>
+            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">{groupCopy.description}</p>
+            <div class="mt-4 space-y-8">
+              {group.charts.map((chart) => (
+                <ChartFigure
+                  key={chart.id}
+                  chart={chart}
+                  context={context}
+                  summary={summary}
+                  historical={historical}
+                  baselineIdx={baselineIdx}
+                  suppressWinnerClaims={suppressWinnerClaims}
+                  suppressionReason={suppressionReason}
+                  queryFilter={queryFilter}
+                />
+              ))}
+            </div>
+            </section>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ChartFigure({
+  chart,
+  context,
+  summary,
+  historical,
+  baselineIdx,
+  suppressWinnerClaims = false,
+  suppressionReason,
+  queryFilter,
+}: {
+  chart: ChartRegistryEntry;
+  context: ChartContext;
+  summary: BenchmarkSummary | null;
+  historical: ChartHistoricalEntry[];
+  baselineIdx: number;
+  suppressWinnerClaims?: boolean;
+  suppressionReason?: string;
+  queryFilter?: readonly string[];
+}) {
+  const chartSummary = useMemo(
+    () => buildChartSummary(summary, chart.eligibilityClass, queryFilter),
+    [summary, chart.eligibilityClass, queryFilter],
+  );
+  const platformLabels = useMemo(() => chartSummaryLabelList(chartSummary), [chartSummary]);
+  const compareRows = useMemo(() => {
+    if (context.kind !== "compare" || !chartSummary) return [];
+    return chartSummary.query_ids.map((queryId) => ({
+      queryId,
+      timings: chartSummary.platforms.map((platform) => {
+        const ms = platformTimingValue(platform, queryId);
+        return ms !== null ? { ms, status: "pass" as const } : null;
+      }),
+    }));
+  }, [chartSummary, context]);
+  const compareGroups = useMemo(() => {
+    if (context.kind !== "compare" || !chartSummary) return [];
+    return chartSummary.query_ids.map((queryId) => ({
+      queryId,
+      values: chartSummary.platforms.map((platform, index) => {
+        const timing = platformTimingValue(platform, queryId);
+        return {
+          label: platformLabels[index] ?? platform.platform,
+          value: timing ?? null,
+          color: paletteColor(index),
+        };
+      }),
+    }));
+  }, [chartSummary, context, platformLabels]);
+  const exclusionReasons = useMemo(
+    () => (summary ? summarizeChartDatasetExclusions(summary.platforms, chart.eligibilityClass) : []),
+    [summary, chart.eligibilityClass],
+  );
+  const datasetEmpty = shouldShowChartDatasetEmpty(chart.eligibilityClass, summary, chartSummary);
+  const fewUsableQueries = Boolean(queryFilter && (chartSummary?.query_ids.length ?? 0) < 2);
+  const copy = longLayoutChartCopy(chart);
+
+  return (
+    <div data-chart-container data-chart-id={chart.id} data-testid={`chart-panel-chart-${chart.id}`}>
+      <h4 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{copy.title}</h4>
+      <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">{copy.description}</p>
+      <div class="mt-3">
+        {datasetEmpty ? (
+          <ChartDatasetEmptyState chart={chart} summary={summary!} displayTitle={copy.title} />
+        ) : queryFilter && chartSummary && chartSummary.query_ids.length === 0 ? (
+          <div class="panel-muted rounded p-6 text-center text-sm text-[var(--bb-data-fg-muted)]">
+            No queries match the selected filter.
+          </div>
+        ) : (
+          <>
+            {renderChart(chart, {
+              context,
+              summary: chartSummary,
+              historical,
+              compareRows,
+              compareGroups,
+              baselineIdx,
+              platformLabels,
+              suppressWinnerClaims: suppressWinnerClaims || fewUsableQueries,
+              suppressionReason:
+                suppressionReason ??
+                (fewUsableQueries
+                  ? "No winner is named when fewer than two usable queries are selected"
+                  : undefined),
+              queryFilter,
+            })}
+            {summary && chartSummary && chartSummary.platforms.length > 0 && exclusionReasons.length > 0 && (
+              <ChartDatasetExclusionSummary
+                eligibilityClass={chart.eligibilityClass}
+                originalCount={summary.platforms.length}
+                renderedCount={chartSummary.platforms.length}
+                reasons={exclusionReasons}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function normalizeBaselineIndex(platformCount: number, baselineIndex: number) {
   return baselineIndex >= 0 && baselineIndex < platformCount ? baselineIndex : 0;
 }
@@ -461,15 +817,17 @@ function shouldShowChartDatasetEmpty(
 function ChartDatasetEmptyState({
   chart,
   summary,
+  displayTitle,
 }: {
   chart: ChartRegistryEntry;
   summary: BenchmarkSummary;
+  displayTitle?: string;
 }) {
   const reasons = summarizeChartDatasetExclusions(summary.platforms, chart.eligibilityClass);
   return (
     <div
       role="status"
-      aria-label={`${chart.title} unavailable`}
+      aria-label={`${displayTitle ?? chart.title} unavailable`}
       class="rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-sm"
     >
       <p class="font-semibold text-[var(--bb-data-fg-primary)]">{chartDatasetEmptyTitle(chart.eligibilityClass)}</p>

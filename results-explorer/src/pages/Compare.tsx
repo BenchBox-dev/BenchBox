@@ -757,11 +757,16 @@ export function Compare({ url }: CompareProps) {
         <div class="mb-8">
           <ChartPanel
             context={{ kind: "compare", results: resolvedResults, primaryMetric: effectivePrimaryMetric }}
+            summaryLayout="long"
             baselineIndex={normalizedBaselineIndex}
             onBaselineIndexChange={(index) => setBaselineResultId(results[index]?.result_id ?? "")}
             suppressWinnerClaims={decisionSummary.claimSuppressed}
             suppressionReason={decisionSummary.claimSuppressionReason ?? undefined}
             queryFilter={queryLimiter === "all" ? undefined : limitedQueryIds}
+            // The compact sparkline table already carries the per-platform
+            // geomean and Power@Size figures, so the large single-metric bar
+            // charts would only repeat them.
+            excludeChartIds={["performance_bar", "power_bar"]}
           />
         </div>
       )}
