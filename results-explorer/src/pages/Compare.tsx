@@ -763,6 +763,10 @@ export function Compare({ url }: CompareProps) {
             suppressWinnerClaims={decisionSummary.claimSuppressed}
             suppressionReason={decisionSummary.claimSuppressionReason ?? undefined}
             queryFilter={queryLimiter === "all" ? undefined : limitedQueryIds}
+            // The compact sparkline table already carries the per-platform
+            // geomean and Power@Size figures, so the large single-metric bar
+            // charts would only repeat them.
+            excludeChartIds={["performance_bar", "power_bar"]}
           />
         </div>
       )}

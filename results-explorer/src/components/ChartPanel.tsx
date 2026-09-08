@@ -468,6 +468,115 @@ function chartButtonLabel(chart: ChartRegistryEntry): string {
   return chart.shortTitle;
 }
 
+const LONG_LAYOUT_GROUP_COPY: Readonly<
+  Record<string, { label: string; description: string }>
+> = {
+  overview: {
+    label: "Headline metrics",
+    description: "Start with the aggregate measures, then inspect the queries behind them.",
+  },
+  per_query: {
+    label: "Per-query evidence",
+    description: "See where the selected runs separate query by query.",
+  },
+  distribution: {
+    label: "Distribution",
+    description: "See the middle and the tail across the selected queries.",
+  },
+  cost: {
+    label: "Cost",
+    description: "Compare normalized cost only where the pricing record supports it.",
+  },
+  trend: {
+    label: "Trend",
+    description: "Put these runs in historical context when prior runs are available.",
+  },
+  rank: {
+    label: "Rankings",
+    description: "See which engine wins individual queries, not just the average.",
+  },
+};
+
+const LONG_LAYOUT_CHART_COPY: Readonly<
+  Record<string, { title: string; description: string }>
+> = {
+  performance_bar: {
+    title: "Which engines minimize display geomean latency?",
+    description: "Aggregate display timing across comparable queries. Lower is better.",
+  },
+  power_bar: {
+    title: "Which engines maximize Power@Size?",
+    description: "Throughput at size for rank-safe rows. Higher is better.",
+  },
+  sparkline_table: {
+    title: "Which engines lead on speed and throughput?",
+    description: "Display geomean and Power@Size in one compact comparison.",
+  },
+  distribution_box: {
+    title: "How wide is the query-latency spread?",
+    description: "Variation across queries, not run-to-run variability. Whiskers show the observed range.",
+  },
+  query_heatmap: {
+    title: "Which queries drive the difference?",
+    description: "Per-query latency across the selected runs. Lower is better.",
+  },
+  comparison_bar: {
+    title: "How does each query compare with the baseline?",
+    description: "Paired query timings for the selected runs. Lower is better.",
+  },
+  diverging_bar: {
+    title: "Where are the largest regressions and improvements?",
+    description: "Per-query change relative to the selected baseline, sorted by magnitude.",
+  },
+  normalized_speedup: {
+    title: "How much faster or slower is each query?",
+    description: "Per-query results relative to the selected baseline.",
+  },
+  query_histogram: {
+    title: "Which individual queries are slow?",
+    description: "Latency for each query across the selected runs.",
+  },
+  percentile_ladder: {
+    title: "Where does the tail sit, not just the middle?",
+    description: "P50, P90, P95, and P99 across the selected runs. Lower is better.",
+  },
+  cdf_chart: {
+    title: "What share of queries finish under a given time?",
+    description: "Cumulative query-latency share across the selected runs.",
+  },
+  stacked_phase: {
+    title: "Where does the wall-clock time go?",
+    description: "Phase durations for the selected runs, shown as a breakdown of total time.",
+  },
+  time_series: {
+    title: "Is this platform getting faster over time?",
+    description: "Historical performance for the selected runs, ordered by run date.",
+  },
+  rank_table: {
+    title: "Who wins query by query, not on average?",
+    description: "Per-query ranks show how the aggregate result is assembled.",
+  },
+  cost_scatter: {
+    title: "What does a unit of speed cost?",
+    description: "Normalized cost versus performance where comparable cost data exists.",
+  },
+  summary_box: {
+    title: "What is the aggregate result?",
+    description: "Aggregate geomean, total time, and per-query outcome counts.",
+  },
+};
+
+function longLayoutGroupCopy(group: { id: string; label: string; description: string }) {
+  return LONG_LAYOUT_GROUP_COPY[group.id] ?? group;
+}
+
+function longLayoutChartCopy(chart: ChartRegistryEntry) {
+  return LONG_LAYOUT_CHART_COPY[chart.id] ?? {
+    title: chart.title,
+    description: chart.description,
+  };
+}
+
 // The open layout renders every applicable chart group and chart at once,
 // with no tab or disclosure gating: a reader who lands on the page sees the
 // charts, not the controls that would reveal them.
@@ -527,7 +636,12 @@ function ChartPanelLong({
   return (
     <section class="card" data-testid="chart-panel-long">
       <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Charts</h2>
+        <div>
+          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">What does this comparison show?</h2>
+          <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
+            Aggregate results first, then the per-query evidence behind them.
+          </p>
+        </div>
         {showBaseline && summary && summary.platforms.length > 1 && (
           <div class="ml-auto flex items-center gap-2">
             <label class="text-xs text-[var(--bb-data-fg-muted)]" for="chart-panel-long-baseline">
@@ -549,19 +663,21 @@ function ChartPanelLong({
         )}
       </div>
       <div class="space-y-8">
-        {chartGroups.map((group) => (
-          <section
-            key={group.id}
-            aria-labelledby={`chart-panel-group-${group.id}`}
-            data-testid={`chart-panel-group-${group.id}`}
-          >
+        {chartGroups.map((group) => {
+          const groupCopy = longLayoutGroupCopy(group);
+          return (
+            <section
+              key={group.id}
+              aria-labelledby={`chart-panel-group-${group.id}`}
+              data-testid={`chart-panel-group-${group.id}`}
+            >
             <h3
               id={`chart-panel-group-${group.id}`}
               class="text-sm font-semibold text-[var(--bb-data-fg-primary)]"
             >
-              {group.label}
+              {groupCopy.label}
             </h3>
-            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">{group.description}</p>
+            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">{groupCopy.description}</p>
             <div class="mt-4 space-y-8">
               {group.charts.map((chart) => (
                 <ChartFigure
@@ -577,8 +693,9 @@ function ChartPanelLong({
                 />
               ))}
             </div>
-          </section>
-        ))}
+            </section>
+          );
+        })}
       </div>
     </section>
   );
@@ -638,14 +755,15 @@ function ChartFigure({
   );
   const datasetEmpty = shouldShowChartDatasetEmpty(chart.eligibilityClass, summary, chartSummary);
   const fewUsableQueries = Boolean(queryFilter && (chartSummary?.query_ids.length ?? 0) < 2);
+  const copy = longLayoutChartCopy(chart);
 
   return (
     <div data-chart-container data-chart-id={chart.id} data-testid={`chart-panel-chart-${chart.id}`}>
-      <h4 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{chart.title}</h4>
-      <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">{chart.description}</p>
+      <h4 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{copy.title}</h4>
+      <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">{copy.description}</p>
       <div class="mt-3">
         {datasetEmpty ? (
-          <ChartDatasetEmptyState chart={chart} summary={summary!} />
+          <ChartDatasetEmptyState chart={chart} summary={summary!} displayTitle={copy.title} />
         ) : queryFilter && chartSummary && chartSummary.query_ids.length === 0 ? (
           <div class="panel-muted rounded p-6 text-center text-sm text-[var(--bb-data-fg-muted)]">
             No queries match the selected filter.
@@ -699,15 +817,17 @@ function shouldShowChartDatasetEmpty(
 function ChartDatasetEmptyState({
   chart,
   summary,
+  displayTitle,
 }: {
   chart: ChartRegistryEntry;
   summary: BenchmarkSummary;
+  displayTitle?: string;
 }) {
   const reasons = summarizeChartDatasetExclusions(summary.platforms, chart.eligibilityClass);
   return (
     <div
       role="status"
-      aria-label={`${chart.title} unavailable`}
+      aria-label={`${displayTitle ?? chart.title} unavailable`}
       class="rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-sm"
     >
       <p class="font-semibold text-[var(--bb-data-fg-primary)]">{chartDatasetEmptyTitle(chart.eligibilityClass)}</p>

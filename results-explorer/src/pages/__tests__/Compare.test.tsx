@@ -763,7 +763,7 @@ describe("Compare", () => {
     });
 
     const summary = screen.getByRole("heading", { name: "Comparison summary" });
-    const chartsHeading = screen.getByText("Charts");
+    const chartsHeading = screen.getByRole("heading", { name: "What does this comparison show?" });
     const queryDiffHeading = screen.getByRole("heading", { name: "Query-level differences" });
 
     expect(summary.closest("section")).toHaveTextContent("In these selected runs, DuckDB's power score was 10.00x the lowest selected score.");
@@ -1391,7 +1391,7 @@ describe("Compare", () => {
     });
 
     const receipt = screen.getByRole("region", { name: "Comparison checks" });
-    const chartsHeading = screen.getByText("Charts");
+    const chartsHeading = screen.getByRole("heading", { name: "What does this comparison show?" });
     const queryDiffHeading = screen.getByRole("heading", { name: "Query-level differences" });
 
     expect(receipt).toHaveTextContent("Benchmark");

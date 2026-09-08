@@ -1102,6 +1102,17 @@ describe("ChartPanel", () => {
     expect(screen.getByTestId("chart-panel-long")).toBeTruthy();
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    expect(screen.getByRole("heading", { name: "What does this comparison show?" })).toBeTruthy();
+    expect(screen.getByTestId("chart-panel-chart-comparison_bar")).toHaveTextContent(
+      "How does each query compare with the baseline?",
+    );
+    expect(screen.getByTestId("chart-panel-chart-query_heatmap")).toHaveTextContent(
+      "Which queries drive the difference?",
+    );
+    expect(screen.queryByText("Top-line metric summaries and phase composition")).toBeNull();
+    expect(
+      screen.queryByText("Paired side-by-side bars comparing two runs per query with % change annotations"),
+    ).toBeNull();
     // Question-group sections carry their chrome without any clicks.
     expect(screen.getByTestId("chart-panel-group-overview")).toBeTruthy();
     expect(screen.getByTestId("chart-panel-group-per_query")).toBeTruthy();
@@ -1112,6 +1123,25 @@ describe("ChartPanel", () => {
     // Comparison content that used to hide behind the Overview/Per-query tabs
     // renders immediately.
     expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
+  });
+
+  it("honors excludeChartIds in the long layout", () => {
+    render(
+      <ChartPanel
+        summaryLayout="long"
+        excludeChartIds={["performance_bar", "power_bar"]}
+        context={{
+          kind: "compare",
+          results: [makeDetail(), makeDetail({ result_id: "detail-2" })],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("chart-panel-long")).toBeTruthy();
+    expect(screen.queryByTestId("chart-panel-chart-performance_bar")).toBeNull();
+    expect(screen.queryByTestId("chart-panel-chart-power_bar")).toBeNull();
+    expect(screen.getByTestId("chart-panel-chart-sparkline_table")).toBeTruthy();
+    expect(screen.getByTestId("chart-panel-chart-comparison_bar")).toBeTruthy();
   });
 
   it("suppresses winner language across openly rendered compare charts when suppressWinnerClaims is on", () => {
