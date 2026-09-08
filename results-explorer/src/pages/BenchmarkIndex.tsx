@@ -768,7 +768,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         </div>
       )}
 
-      {viewMode === "matrix" && analysisSummary && analysisSummary.platforms.length > 0 && (
+      {viewMode === "matrix" && filteredSummary && filteredSummary.platforms.length > 0 && (
         <section class="card mb-4" data-testid="cohort-hero" aria-label="Cohort overview">
           <div class="flex flex-wrap items-start justify-between gap-4">
             <p class="max-w-2xl text-sm text-[var(--bb-data-fg-muted)]">
@@ -779,9 +779,9 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               class="rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-center font-mono text-sm text-[var(--bb-data-fg-primary)]"
               data-testid="cohort-counts"
             >
-              {analysisSummary.platforms.length} published runs
+              {filteredSummary.platforms.length} published runs
               <br />
-              {analysisSummary.query_ids.length} queries · SF{analysisSummary.scale_factor} ·{" "}
+              {filteredSummary.query_ids.length} queries · SF{filteredSummary.scale_factor} ·{" "}
               {effectivePhase}
             </p>
           </div>
@@ -874,7 +874,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               </p>
             </div>
           ) : (
-            <div id="evidence-matrix" class="contents" data-testid="evidence-matrix">
+            <div id="evidence-matrix" class="scroll-mt-24" data-testid="evidence-matrix">
               {(analysisSummary ?? filteredSummary).platforms.some((row) => row.ranking_exclusion_reason !== null) && (
                 <RankingEligibilityLegend />
               )}
@@ -969,7 +969,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           onClear={() => setSelectedIds(new Set())}
         />
       )}
-      <div id="provenance-legend">
+      <div id="provenance-legend" class="scroll-mt-24">
         <ProvenanceLegend />
       </div>
 </div>
