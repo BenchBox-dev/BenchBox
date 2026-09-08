@@ -206,6 +206,17 @@ def test_transaction_workflow_manifest_transfer_across_jobs_contract() -> None:
     assert "--candidate-manifest" not in probe_run
 
 
+def test_transaction_verify_fails_closed_without_per_route_checksums() -> None:
+    """Promotion verify must refuse manifests that would reduce probing to HTTP-only checks."""
+    wf = _load_yaml(TX_WORKFLOW_PATH)
+    verify_steps = wf["jobs"]["verify"]["steps"]
+    mat_step = next((s for s in verify_steps if s.get("name") == "Materialize verification manifest"), None)
+    assert mat_step is not None, "verify job must materialize verification manifest"
+    run_text = mat_step.get("run", "")
+    assert ".checksums" in run_text, "promotion path must assert per-route checksums exist"
+    assert "byte-equivalence" in run_text
+
+
 class _MockHTTPResponse:
     def __init__(self, content: bytes, status: int = 200) -> None:
         self._content = content
