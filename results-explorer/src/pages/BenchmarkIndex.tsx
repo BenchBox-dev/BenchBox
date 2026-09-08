@@ -768,6 +768,40 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         </div>
       )}
 
+      {viewMode === "matrix" && analysisSummary && analysisSummary.platforms.length > 0 && (
+        <section class="card mb-4" data-testid="cohort-hero" aria-label="Cohort overview">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <p class="max-w-2xl text-sm text-[var(--bb-data-fg-muted)]">
+              A readable path from the cohort&rsquo;s headline result to its distribution and execution
+              shape. The matrix remains the source for per-query evidence.
+            </p>
+            <p
+              class="rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-center font-mono text-sm text-[var(--bb-data-fg-primary)]"
+              data-testid="cohort-counts"
+            >
+              {analysisSummary.platforms.length} published runs
+              <br />
+              {analysisSummary.query_ids.length} queries · SF{analysisSummary.scale_factor} ·{" "}
+              {effectivePhase}
+            </p>
+          </div>
+          <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3">
+            <div>
+              <p class="font-semibold text-[var(--bb-data-fg-primary)]">Evidence matrix</p>
+              <p class="text-sm text-[var(--bb-data-fg-muted)]">
+                Per-query timings, validation badges, run receipts, and comparison selection stay here.
+              </p>
+            </div>
+            <a
+              class="font-medium text-[var(--bb-accent)]"
+              href="#evidence-matrix"
+            >
+              Jump to matrix ↓
+            </a>
+          </div>
+        </section>
+      )}
+
       <section
         class="mb-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-sm"
         data-testid="benchmark-compare-guidance"
@@ -840,7 +874,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               </p>
             </div>
           ) : (
-            <>
+            <div id="evidence-matrix" class="contents" data-testid="evidence-matrix">
               {(analysisSummary ?? filteredSummary).platforms.some((row) => row.ranking_exclusion_reason !== null) && (
                 <RankingEligibilityLegend />
               )}
@@ -851,7 +885,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
                 selectionLimitReasonId={selectionLimitCopy ? BENCHMARK_SELECTION_LIMIT_REASON_ID : undefined}
                 highContrast={highContrast}
               />
-            </>
+            </div>
           )}
         </>
       )}
@@ -935,7 +969,9 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           onClear={() => setSelectedIds(new Set())}
         />
       )}
-      <ProvenanceLegend />
+      <div id="provenance-legend">
+        <ProvenanceLegend />
+      </div>
 </div>
   );
 }

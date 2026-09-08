@@ -414,6 +414,18 @@ describe("BenchmarkIndex", () => {
     });
   });
 
+  it("shows the cohort hero with live counts and anchored sections", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByTestId("cohort-hero")).toBeTruthy());
+    expect(screen.getByTestId("cohort-counts").textContent).toMatch(
+      /\d+ published runs\s*\d+ queries · SF/,
+    );
+    const jump = screen.getByText(/Jump to matrix/) as HTMLAnchorElement;
+    expect(jump.getAttribute("href")).toBe("#evidence-matrix");
+    expect(container.querySelector("#evidence-matrix")).not.toBeNull();
+    expect(container.querySelector("#provenance-legend")).not.toBeNull();
+  });
+
   it("matrix view sorts rows from query headers", async () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());

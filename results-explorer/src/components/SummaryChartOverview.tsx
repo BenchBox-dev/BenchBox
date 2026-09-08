@@ -80,6 +80,27 @@ const CHART_DISPLAY_TITLES: Record<string, string> = {
 export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
   const summary = buildRenderableSummary(context);
   const [openChartIds, setOpenChartIds] = useState<Set<string>>(() => new Set());
+  const [sectionLinkCopied, setSectionLinkCopied] = useState(false);
+
+  async function copySectionLink() {
+    const url = `${window.location.origin}${window.location.pathname}#cohort-charts`;
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        throw new Error("clipboard unavailable");
+      }
+    } catch {
+      const area = document.createElement("textarea");
+      area.value = url;
+      document.body.appendChild(area);
+      area.select();
+      document.execCommand("copy");
+      area.remove();
+    }
+    setSectionLinkCopied(true);
+    window.setTimeout(() => setSectionLinkCopied(false), 1500);
+  }
 
   const charts = useMemo(() => {
     const applicableById = new Map(applicableCharts(context).map((chart) => [chart.id, chart]));
@@ -120,7 +141,34 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
   const powerExclusions = summarizeChartDatasetExclusions(summary.platforms, "rank_safe");
 
   return (
-    <div class="space-y-6" data-testid="summary-chart-overview">
+    <div class="space-y-6" data-testid="summary-chart-overview" id="cohort-charts">
+      <div>
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 class="text-xl font-bold text-[var(--bb-data-fg-primary)]">What does this cohort show?</h2>
+            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
+              Headline metrics first, then the distribution and supporting analyses.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void copySectionLink()}
+            class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm font-medium text-[var(--bb-accent)] shadow-sm"
+          >
+            {sectionLinkCopied ? "Copied ✓" : "Copy chart-section link"}
+          </button>
+        </div>
+        <div
+          class="mt-3 rounded-md border border-[var(--bb-data-border)] border-l-4 border-l-[var(--bb-accent)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]"
+          role="note"
+        >
+          <p>
+            <strong class="font-semibold text-[var(--bb-data-fg-primary)]">Shared scope:</strong> every card
+            below names its own eligible population. Rows excluded by a chart&rsquo;s evidence policy remain
+            available in the matrix and receipts.
+          </p>
+        </div>
+      </div>
       <section class="card" aria-labelledby="summary-metric-overview-title">
         <div class="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-[var(--bb-data-border)] pb-4">
           <div>
@@ -257,6 +305,23 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
         <div data-chart-container>
           <DistributionBox summary={summary} />
         </div>
+        <div class="mt-3 space-y-1 border-t border-[var(--bb-data-border)] pt-3 text-sm text-[var(--bb-data-fg-muted)]">
+          <p>
+            <strong class="font-semibold text-[var(--bb-data-fg-primary)]">Key:</strong> whiskers min/max ·
+            band Q1–Q3 · line median
+          </p>
+          <p>
+            <strong class="font-semibold text-[var(--bb-data-fg-primary)]">Boundary:</strong> across different
+            queries, not run-to-run variability.{" "}
+            <a class="font-medium text-[var(--bb-accent)]" href="#evidence-matrix">
+              Open per-query matrix ↗
+            </a>{" "}
+            ·{" "}
+            <a class="font-medium text-[var(--bb-accent)]" href="#provenance-legend">
+              Inspect exclusions ↗
+            </a>
+          </p>
+        </div>
       </section>
 
       {charts.length > 0 && (
@@ -265,6 +330,9 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
             <h2 id="summary-more-views-title" class="text-lg font-semibold text-[var(--bb-data-fg-primary)]">
               More views
             </h2>
+            <p class="ml-auto text-sm font-medium text-[var(--bb-accent)]">
+              {charts.length} additional {charts.length === 1 ? "analysis" : "analyses"}
+            </p>
             <p class="text-sm text-[var(--bb-data-fg-muted)]">
               {excludeChartIds.includes("query_heatmap") ? "The full query heatmap is above. " : ""}
               Each thumbnail is drawn from this cohort. Open a card to inspect the full chart and its data scope.
