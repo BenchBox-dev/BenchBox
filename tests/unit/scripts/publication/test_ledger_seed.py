@@ -415,3 +415,82 @@ def test_cli_materialize_rejects_seed_without_recorded_source(tmp_path: Path) ->
     )
     assert result.returncode != 0
     assert "no immutable source SHA" in result.stderr
+
+
+def _isolated_corpus_repo(path: Path) -> tuple[str, str]:
+    """Build a scratch repo with an accepted branch; return (repo, snapshot sha)."""
+    path.mkdir(parents=True, exist_ok=True)
+
+    def git(*args: str) -> str:
+        result = subprocess.run(["git", *args], cwd=path, check=True, capture_output=True, text=True)
+        return result.stdout.strip()
+
+    git("init", "-b", "main")
+    git("config", "user.email", "test@example.com")
+    git("config", "user.name", "Test")
+    git("config", "commit.gpgsign", "false")
+    bundles = path / "results-data" / "bundles"
+    bundles.mkdir(parents=True)
+    (bundles / "a.json").write_text('{"id": "a"}')
+    (bundles / "b.json").write_text('{"id": "b"}')
+    git("add", ".")
+    git("commit", "-m", "accepted snapshot")
+    git("branch", "published-results")
+    snapshot = git("rev-parse", "HEAD")
+    (bundles / "c.json").write_text('{"id": "c"}')
+    git("add", ".")
+    git("commit", "-m", "main-only addition")
+    return str(path), snapshot
+
+
+def test_isolated_replay_moved_ref_fails_closed_snapshot_reproduces(tmp_path: Path) -> None:
+    """w3: replay the moving-ref incident in an isolated local repository.
+
+    Advancing the accepted branch must not change validation of the recorded
+    snapshot: regeneration bound to the old SHA reproduces it byte-identical,
+    generation from the moved ref with --expect-source fails closed, and
+    materialize still serves accepted bytes from the recorded snapshot.
+    """
+    repo, snapshot = _isolated_corpus_repo(tmp_path / "iso")
+
+    def cli(*args: str) -> subprocess.CompletedProcess[str]:
+        return _run_cli("--repo-root", repo, *args, cwd=Path(repo))
+
+    seed_path = tmp_path / "seed.json"
+    result = cli("--accepted-ref", snapshot, "--expect-source", snapshot, "--output", str(seed_path))
+    assert result.returncode == 0, result.stderr
+    seed = json.loads(seed_path.read_text(encoding="utf-8"))
+    assert seed["source"] == snapshot
+    assert seed["count"] == 3
+    assert seed["dispositions"]["results-data/bundles/c.json"] == "legacy_overlay"
+
+    # Advance the accepted branch: the recorded snapshot must still reproduce.
+    subprocess.run(["git", "checkout", "-q", "published-results"], cwd=repo, check=True)
+    (Path(repo) / "results-data" / "bundles" / "d.json").write_text('{"id": "d"}')
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "mirror advance"], cwd=repo, check=True)
+    subprocess.run(["git", "checkout", "-q", "main"], cwd=repo, check=True)
+
+    regen_path = tmp_path / "regen.json"
+    result = cli("--accepted-ref", snapshot, "--expect-source", snapshot, "--output", str(regen_path))
+    assert result.returncode == 0, result.stderr
+    regen = json.loads(regen_path.read_text(encoding="utf-8"))
+    assert regen["union"] == seed["union"]
+    assert regen["digests"] == seed["digests"]
+
+    # The moved ref bound to the old snapshot fails closed, never switches input.
+    moved = cli(
+        "--accepted-ref", "published-results", "--expect-source", snapshot, "--output", str(tmp_path / "moved.json")
+    )
+    assert moved.returncode != 0
+    assert "moved" in moved.stderr
+
+    # Materialize still serves accepted bytes from the recorded snapshot
+    # (dest layout strips the corpus prefix, as in the cutover workflow).
+    (Path(repo) / "results-data" / "bundles" / "b.json").unlink()
+    dest = tmp_path / "archive"
+    result = cli(
+        "--accepted-ref", "published-results", "--ledger-seed", str(seed_path), "--materialize-dest", str(dest)
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads((dest / "b.json").read_text(encoding="utf-8")) == {"id": "b"}

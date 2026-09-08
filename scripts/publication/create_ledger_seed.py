@@ -14,6 +14,12 @@ real set membership rather than manual CLI flags:
 Usage:
   uv run python scripts/publication/create_ledger_seed.py \
     --accepted-ref origin/published-results --output publication/ledger-seed.json
+
+Reproduction and validation must additionally pass --expect-source with the
+seed's recorded ``source`` SHA so a moved mirror fails closed instead of
+silently switching inputs. Generation without --expect-source exists only
+for the cutover workflow's regen-and-diff freshness detector; freshness
+itself belongs to docs/operations/corpus-refresh.md, never to this tool.
 """
 
 from __future__ import annotations
