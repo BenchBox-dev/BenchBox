@@ -145,7 +145,11 @@ Maintainer-run refreshes are monthly via `.github/workflows/seed-corpus.yml`
 (see [`docs/operations/corpus-refresh.md`](operations/corpus-refresh.md)). That
 path is not a substitute for community `benchbox submit` PRs.
 
-The Results Explorer is not built directly from `published-results`; the documented `docs.yml` workflow builds on the curated release path and deploys only after a protected push to `release`. The Explorer is a curated preview, not a broad leaderboard claim. See [`docs/operations/results-phase-2-runbook.md`](operations/results-phase-2-runbook.md#13-explorer-publish-path) for the publication path and launch evidence.
+The Results Explorer is built from the exact `published-results` commit selected by
+the publication candidate. A candidate build does not publish by itself; the
+protected transaction writer deploys one validated bundle and records the public
+receipt. The Explorer remains a presentation surface, not a broad leaderboard
+claim. See [`docs/operations/results-phase-2-runbook.md`](operations/results-phase-2-runbook.md#13-explorer-publish-path) for the publication path and launch evidence.
 
 ## What Makes a Good Submission
 

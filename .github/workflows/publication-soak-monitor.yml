@@ -1,22 +1,12 @@
-name: Publication Soak Monitor
+name: Publication Availability Monitor
 
-# Five-minute availability sampler for the bounded production soak.
-# Each run compares the live site against the journal's durable-head
-# attestation (self-updating across promotions) and uploads a timestamped
-# heartbeat artifact. A failed run -- or a missing heartbeat artifact --
-# is a missed required sample and restarts the 72-hour soak window per
-# docs/operations/publication-deployer-soak-and-retirement.md.
-# Fail-closed: no durable head, no routes, or any digest mismatch exits nonzero.
-# No concurrency gate: every scheduled sample must execute, because GitHub
-# replaces a queued run in a fixed concurrency group even with
-# cancel-in-progress: false, and a replaced sample would look like a miss.
-# While a promotion or rollback transaction is in flight, the sample defers
-# (the live site may already serve the new bytes before the durable head
-# advances) and the transaction's own verify job attests that window.
+# Five-minute availability observations are retained as outcomes. Full content
+# hashing, including DuckDB, runs hourly and after a publication transaction.
+# This workflow reports unknown during an active transaction; it never turns a
+# transition or a missing observation into healthy coverage.
 
 on:
   schedule:
-    # Every 5 minutes during soak trials
     - cron: "*/5 * * * *"
   workflow_dispatch:
 
@@ -29,7 +19,7 @@ defaults:
 
 jobs:
   sample:
-    name: Sample live routes against durable head
+    name: Observe publication availability
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -53,79 +43,77 @@ jobs:
           set -euo pipefail
           git fetch origin refs/heads/publication:refs/heads/publication
 
-      - name: Probe live routes against durable head
+      - name: Observe live routes
         id: probe
         run: |
           set -euo pipefail
-          mkdir -p soak-monitor
+          mkdir -p monitor
           uv run python - <<'PY'
           import json
+          from datetime import datetime, timezone
           from pathlib import Path
           from scripts.publication import journal
+          from scripts.publication.verify_live import verify_live
 
           state = journal.read_journal_state(Path("."), ref="publication")
-          active_id = state.active_transaction_id
-          if active_id:
-              # A promotion or rollback is in flight: the live site may already
-              # serve the new bytes while the durable head still attests the
-              # previous ones. Comparing now would record a false digest
-              # mismatch, so defer this sample; the transaction's own verify
-              # job attests the live bytes for this window.
-              deferred = {
-                  "ok": True,
-                  "deferred": (
-                      f"in-flight transaction {active_id}; "
-                      "live publication and durable head may disagree"
-                  ),
+          report = None
+          if state.active_transaction_id:
+              report = verify_live(
+                  base_url="https://benchbox.dev",
+                  endpoints=["/", "/docs/", "/docs/api.html", "/results/"],
+                  availability_only=True,
+                  timeout=60,
+                  observation_origin="github-actions:publication-availability-monitor",
+              ).to_dict()
+              report["ok"] = False
+              report["status"] = "unknown"
+              report["deferred"] = (
+                  f"in-flight transaction {state.active_transaction_id}; "
+                  "content identity is unknown until transaction verification"
+              )
+              report["errors"].insert(0, "active transaction prevents a healthy content assertion")
+          elif not state.durable_transaction_id:
+              report = {
+                  "ok": False,
+                  "status": "unknown",
                   "probes": [],
                   "matched_checksums": {},
-                  "errors": [],
+                  "errors": ["journal has no durable head"],
               }
-              Path("soak-monitor/sample-report.json").write_text(
-                  json.dumps(deferred, indent=2, sort_keys=True) + "\n",
-                  encoding="utf-8",
-              )
-              print(f"deferred active_transaction_id={active_id}")
           else:
-              durable_id = state.durable_transaction_id
-              if not durable_id:
-                  raise SystemExit("soak monitor: journal has no durable head; cannot evidence soak samples")
-              tx = journal.read_transaction(Path("."), durable_id, ref="publication")
+              tx = journal.read_transaction(Path("."), state.durable_transaction_id, ref="publication")
               routes = (tx.attestation or {}).get("routes") or []
               checksums = {
-                  r["path"]: r["sha256"]
-                  for r in routes
-                  if r.get("ok") and r.get("path") and r.get("sha256")
+                  route["path"]: route["sha256"]
+                  for route in routes
+                  if route.get("ok") and route.get("path") and route.get("sha256")
               }
-              if not checksums:
-                  raise SystemExit(
-                      f"soak monitor: durable transaction {durable_id} carries no usable route checksums"
-                  )
-              Path("soak-monitor/expected-manifest.json").write_text(
-                  json.dumps({"checksums": checksums}, indent=2, sort_keys=True) + "\n",
+              Path("monitor/expected-manifest.json").write_text(
+                  json.dumps({"checksums": checksums}, sort_keys=True) + "\n",
                   encoding="utf-8",
               )
-              print(f"durable={durable_id} routes={len(checksums)}")
-          PY
-          if [ -f soak-monitor/sample-report.json ]; then
-          cat soak-monitor/sample-report.json
-          else
-          uv run python scripts/publication/verify_live.py \
-            --base-url https://benchbox.dev \
-            --manifest soak-monitor/expected-manifest.json \
-            --require-receipt \
-            --timeout 60 \
-            --json > soak-monitor/sample-report.json
-          cat soak-monitor/sample-report.json
-          python3 - <<'PY'
-          import json
-          report = json.load(open("soak-monitor/sample-report.json"))
+              full_content_check = datetime.now(timezone.utc).minute == 0
+              report = verify_live(
+                  base_url="https://benchbox.dev",
+                  manifest_path=Path("monitor/expected-manifest.json"),
+                  require_receipt=True,
+                  require_complete_checksums=full_content_check,
+                  availability_only=not full_content_check,
+                  endpoints=None if full_content_check else ["/", "/docs/", "/docs/api.html", "/results/"],
+                  timeout=60,
+                  observation_origin="github-actions:publication-availability-monitor",
+              ).to_dict()
+              report["status"] = "healthy" if report["ok"] else "failed"
+              report["content_check"] = "full" if full_content_check else "availability"
+          Path("monitor/sample-report.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
           if not report.get("ok"):
-              raise SystemExit(f"soak sample failed: {report.get('errors')}")
+              raise SystemExit("publication monitor recorded a non-healthy outcome")
           PY
-          fi
 
-      - name: Write heartbeat receipt
+      - name: Write observation receipt
         if: always()
         run: |
           set -euo pipefail
@@ -134,31 +122,31 @@ jobs:
           from datetime import datetime, timezone
           from pathlib import Path
           try:
-              report = json.load(open("soak-monitor/sample-report.json"))
+              report = json.loads(Path("monitor/sample-report.json").read_text())
           except FileNotFoundError:
-              report = {"ok": False, "errors": ["probe step did not produce a report"]}
-          heartbeat = {
+              report = {"ok": False, "status": "unknown", "errors": ["observation produced no report"]}
+          receipt = {
               "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
               "run_id": "${{ github.run_id }}",
               "run_attempt": "${{ github.run_attempt }}",
               "ok": bool(report.get("ok")),
+              "status": report.get("status", "unknown"),
+              "content_check": report.get("content_check"),
+              "deferred": report.get("deferred"),
+              "probes": report.get("probes", []),
               "matched_checksums": report.get("matched_checksums", {}),
               "errors": report.get("errors", []),
           }
-          if report.get("deferred"):
-              heartbeat["deferred"] = report["deferred"]
-          Path("soak-monitor/heartbeat.json").write_text(
-              json.dumps(heartbeat, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          Path("monitor/observation.json").write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
           )
-          print(json.dumps(heartbeat, sort_keys=True))
-          if not heartbeat["ok"]:
-              raise SystemExit("soak heartbeat records failure; window restarts per runbook")
+          print(json.dumps(receipt, sort_keys=True))
           PY
 
-      - name: Upload heartbeat receipt
+      - name: Upload observation receipt
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: publication-soak-heartbeat-${{ github.run_id }}-${{ github.run_attempt }}
-          path: soak-monitor/
-          retention-days: 7
+          name: publication-monitor-observation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: monitor/
+          retention-days: 30

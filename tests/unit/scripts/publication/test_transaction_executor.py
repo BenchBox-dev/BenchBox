@@ -142,6 +142,37 @@ def test_prepare_promotion_generates_canonical_permit(test_repo: Path, tmp_path:
     assert tx["state"] == STATE_PREPARED
 
 
+def test_prepare_rejects_candidate_parent_that_moved(test_repo: Path, tmp_path: Path) -> None:
+    args = argparse.Namespace(
+        kind=KIND_PROMOTION,
+        target_repo="BenchBox-dev/BenchBox",
+        target_env="github-pages",
+        target_url="https://benchbox.dev",
+        develop_sha="1" * 40,
+        published_results_sha="2" * 40,
+        candidate_manifest_digest="a" * 64,
+        candidate_artifact_id="12345",
+        candidate_archive_sha256="b" * 64,
+        candidate_site_tree_sha256="c" * 64,
+        candidate_parent_sha="d" * 40,
+        candidate_parent_generation="1",
+        restore_transaction_id=None,
+        failed_transaction_id=None,
+        barrier_evidence=None,
+        transaction_id="test-tx-stale-parent",
+        workflow_path=".github/workflows/publication-transaction.yml",
+        workflow_sha="3" * 40,
+        writer_run_id="999",
+        ref="publication",
+        repo_path=str(test_repo),
+        output_permit=str(tmp_path / "permit.json"),
+        output_tx=str(tmp_path / "tx.json"),
+    )
+
+    with pytest.raises(TransactionError, match="current durable publication head"):
+        cmd_prepare(args)
+
+
 def test_resume_only_reissues_permit_for_active_rollback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     target = {
         "repository": "BenchBox-dev/BenchBox",
@@ -199,7 +230,7 @@ def test_resume_only_reissues_permit_for_active_rollback(tmp_path: Path, monkeyp
     assert json.loads(tx_path.read_text(encoding="utf-8"))["state"] == STATE_ROLLBACK_WRITE_STARTED
 
 
-def test_authenticate_approval_enforces_run_attempt_and_comment(tmp_path: Path) -> None:
+def test_authenticate_approval_enforces_run_attempt_and_environment(tmp_path: Path) -> None:
     permit = {"transaction_id": "tx-1", "generation": 2, "target": {"url": "https://benchbox.dev"}}
     permit_digest = hashlib.sha256(canonical_json(permit).encode("utf-8")).hexdigest()
 
@@ -232,16 +263,18 @@ def test_authenticate_approval_enforces_run_attempt_and_comment(tmp_path: Path) 
             simulated_approval=valid_simulated,
         )
 
-    # 3. Wrong comment must fail
-    bad_comment_simulated = {**valid_simulated, "comment": "publication-approval:wrong-digest"}
-    with pytest.raises(TransactionError, match="Approval authentication failed"):
+    # 3. Comments are audit data, not a second authentication channel.
+    no_comment = {key: value for key, value in valid_simulated.items() if key != "comment"}
+    assert (
         authenticate_approval_record(
             permit=permit,
             run_id="100",
             run_attempt=1,
             repo="BenchBox-dev/BenchBox",
-            simulated_approval=bad_comment_simulated,
-        )
+            simulated_approval=no_comment,
+        )["authenticated"]
+        is True
+    )
 
     # 4. Wrong environment must fail
     bad_env_simulated = {**valid_simulated, "environment": {"name": "staging"}}

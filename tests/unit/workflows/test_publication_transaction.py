@@ -37,9 +37,9 @@ def test_transaction_workflow_is_dispatch_only_with_required_inputs() -> None:
     assert "kind" in inputs
     assert inputs["kind"]["type"] == "choice"
     assert set(inputs["kind"]["options"]) == {"promotion", "rollback"}
-    assert inputs["develop_sha"]["required"] is True
-    assert inputs["published_results_sha"]["required"] is True
-    assert "candidate_manifest_digest" in inputs
+    assert "develop_sha" not in inputs
+    assert "published_results_sha" not in inputs
+    assert inputs["candidate_artifact_id"]["required"] is False
     assert "restore_transaction_id" in inputs
     assert "barrier_evidence" in inputs
 
@@ -203,6 +203,7 @@ def test_transaction_workflow_manifest_transfer_across_jobs_contract() -> None:
     probe_run = probe_step.get("run", "")
     assert "--manifest transaction-artifacts/verification-manifest.json" in probe_run
     assert "--require-receipt" in probe_run
+    assert "--require-complete-checksums" in probe_run
     assert "--candidate-manifest" not in probe_run
 
 
@@ -215,6 +216,8 @@ def test_transaction_verify_fails_closed_without_per_route_checksums() -> None:
     run_text = mat_step.get("run", "")
     assert ".checksums" in run_text, "promotion path must assert per-route checksums exist"
     assert "byte-equivalence" in run_text
+    probe_step = next((s for s in verify_steps if s.get("name") == "Probe required live routes"), None)
+    assert probe_step and "--require-complete-checksums" in probe_step.get("run", "")
 
 
 class _MockHTTPResponse:

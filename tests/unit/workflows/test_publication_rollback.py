@@ -1,4 +1,4 @@
-"""Contract and simulation tests for publication deployment and automated rollback mechanism."""
+"""Contract and simulation tests for publication deployment and legacy rollback fallback."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def _workflow_text() -> str:
     return WORKFLOW_PATH.read_text(encoding="utf-8")
 
 
-def test_workflow_is_dispatch_only_with_required_inputs() -> None:
+def test_workflow_is_dispatch_only_with_automatic_candidate_inputs() -> None:
     wf = _workflow()
     triggers = wf.get("on") or wf.get(True) or {}
 
@@ -40,9 +40,9 @@ def test_workflow_is_dispatch_only_with_required_inputs() -> None:
     assert "force_rollback" in dispatch_inputs
     assert dispatch_inputs["force_rollback"]["type"] == "boolean"
     assert "rollback_target_sha" not in dispatch_inputs
-    assert dispatch_inputs["develop_sha"]["required"] is True
-    assert dispatch_inputs["published_results_sha"]["required"] is True
-    assert dispatch_inputs["generation"]["required"] is True
+    assert dispatch_inputs["develop_sha"]["required"] is False
+    assert dispatch_inputs["published_results_sha"]["required"] is False
+    assert dispatch_inputs["generation"]["required"] is False
     assert "approved_manifest_digest" in dispatch_inputs
     assert "approved_candidate_run_id" in dispatch_inputs
 
@@ -171,8 +171,8 @@ def test_receipts_use_measured_provenance_and_valid_json_newlines() -> None:
 def test_build_receipt_enforces_attested_cas_lineage() -> None:
     text = _workflow_text()
 
-    assert "generation 1 cannot replace current live receipt" in text
-    assert "requires prior_live_receipt_id" in text
+    assert "requires an attested live head" in text
+    assert "durable-parent.json" in text
     assert "verify_live_receipt_signature" in text
     assert "prior_live_receipt_id is stale; current live head is" in text
     assert 'gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100"' in text

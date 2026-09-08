@@ -125,7 +125,7 @@ def validate_live_receipt(
         "manifest_digest": (receipt.get("manifest_digest"), current.content.get("manifest_digest")),
         "artifact_digest": (
             receipt_artifact_digest,
-            current.artifact.get("archive_sha256"),
+            current.artifact.get("archive_sha256") or current.artifact.get("site_tree_sha256"),
         ),
         "observation_digest": (
             receipt_observation_digest,
@@ -278,7 +278,8 @@ def prepare_rollback(
         "parent_transaction_id": parent_durable_transaction.transaction_id,
         "parent_generation": parent_durable_transaction.generation,
         "manifest_digest": parent_durable_transaction.content.get("manifest_digest"),
-        "artifact_digest": parent_durable_transaction.artifact.get("archive_sha256"),
+        "artifact_digest": parent_durable_transaction.artifact.get("archive_sha256")
+        or parent_durable_transaction.artifact.get("site_tree_sha256"),
         "barrier_evidence": barrier_evidence,
     }
 

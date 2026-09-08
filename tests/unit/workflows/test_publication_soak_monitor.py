@@ -47,9 +47,9 @@ def test_soak_monitor_compares_live_against_durable_head() -> None:
     assert "read_journal_state" in text
     assert "durable_transaction_id" in text
     assert "no durable head" in text
-    assert "no usable route checksums" in text
-    assert "--manifest soak-monitor/expected-manifest.json" in text
-    assert "--require-receipt" in text
+    assert "checksums =" in text
+    assert "monitor/expected-manifest.json" in text
+    assert "require_receipt=True" in text
 
 
 def test_soak_monitor_defers_while_transaction_in_flight() -> None:
@@ -62,7 +62,8 @@ def test_soak_monitor_defers_while_transaction_in_flight() -> None:
     # in that window would record a false digest mismatch.
     assert "active_transaction_id" in text
     assert "deferred" in text
-    assert "live publication and durable head may disagree" in text
+    assert "content identity is unknown" in text
+    assert 'report["ok"] = False' in text
 
 
 def test_soak_monitor_records_heartbeat_and_fails_closed() -> None:
@@ -70,19 +71,19 @@ def test_soak_monitor_records_heartbeat_and_fails_closed() -> None:
     steps = wf["jobs"]["sample"]["steps"]
     text = "\n".join(str(step.get("run", "")) for step in steps)
 
-    assert "heartbeat.json" in text
-    assert "window restarts per runbook" in text
-    assert 'heartbeat["deferred"]' in text
+    assert "observation.json" in text
+    assert '"status": report.get' in text
+    assert '"deferred": report.get' in text
     upload_step = next(
         (
             s
             for s in steps
-            if "heartbeat" in str(s.get("name", "")).lower() and "upload" in str(s.get("name", "")).lower()
+            if "observation" in str(s.get("name", "")).lower() and "upload" in str(s.get("name", "")).lower()
         ),
         None,
     )
     assert upload_step is not None, "heartbeat receipt must be uploaded as a retained artifact"
-    assert upload_step["with"]["retention-days"] == 7
+    assert upload_step["with"]["retention-days"] == 30
 
 
 def test_soak_monitor_pins_all_actions() -> None:

@@ -10,58 +10,43 @@ workflow or modify the A0 freeze.
 | Claim | Minimum evidence |
 |---|---|
 | accepted | Bundle and sidecar are validator-clean and reachable from the pinned `published-results` SHA. |
-| desired | Manually reviewed manifest digest pins exact `develop` and `published-results` SHAs, policy version, builder, target, and generation. |
-| built | Immutable artifact digest plus provenance matches the desired manifest. |
-| deployed | Provider acknowledgement names the exact artifact, target, and generation. |
-| live | Fresh attested live receipt matches the manifest, artifact, target, generation, and required public probes. |
+| desired | One selected immutable candidate artifact is validated against exact `develop` and `published-results` SHAs, policy, builder, target, and parent. |
+| built | The retained candidate artifact ID, manifest digest, unpacked site-tree digest, and provenance match the candidate contents. |
+| deployed | Provider acknowledgement names the exact artifact, target, and transaction generation. |
+| live | Fresh attested public probes match the candidate and the signed receipt binds those observations to it. |
 | promotion_failed | The build, deployment, or observation lane ended without a valid matching live receipt. |
 | withdrawal_requested | Authorized withdrawal event is present in desired state and excluded from candidate public and ranking read models. |
 | withdrawn | A matching live receipt confirms that the deployed generation suppresses the result from public presentation and ranking. |
 
-Only an attested live receipt proves publication. Only `live` permits an operator or
-document to say a publication succeeded. A `published-results` merge proves acceptance
-only. A green workflow, uploaded artifact, provider deployment object, or successful
-internal health check does not prove live publication.
+Only an attested live receipt proves publication. A merge, green workflow, uploaded
+artifact, provider deployment object, or successful internal health check is supporting
+evidence only.
 
 ## Promotion procedure
 
-1. Select exact `develop` and `published-results` SHAs. The latter includes every valid
-   accepted result as publication input by default.
-2. Apply orthogonal presentation policy. Record visibility, trust, withdrawal, and
-   ranking eligibility independently. Do not create a second curated corpus membership
-   list on `develop`.
-3. Prepare the canonical immutable permit containing content digest, target, generation,
-   expected durable parent, and nonce.
-4. Have one authorized maintainer review and approve the environment deployment with
-   comment `publication-approval:<permit_sha256>`. Trust, admission, workflow, credential,
-   receipt, withdrawal, and ranking-policy changes require manual review and may not auto-merge.
-5. Reserve the target generation with Git compare-and-set on the `publication` metadata ref.
-   A conflicting promotion stops; it does not overwrite newer desired state.
-6. Verify provider feasibility gates before deployment:
-   - Unique correlation: write-intent commit OID passed as `pages_build_version`.
-   - Supported activation barrier: provider contract guaranteeing no late activation.
-   - Stop condition: if provider correlation or finality is indeterminate, transition to
-     `recovery-required` and fail closed.
-7. Build immutable artifacts from the pinned inputs and record provenance and digests.
-8. Deploy only the matching artifact using the pinned Pages adapter. Record provider
-   acknowledgement as `deployed`, not `live`.
-9. Probe required public routes from outside the deployment boundary. Issue the attested
-   live receipt only when all observations match. Then and only then set the generation
-   to `live`.
-10. If any stage fails, record `promotion_failed`; retain the previous live generation and
-    its receipt.
+1. Dispatch the candidate builder from `develop`. It resolves current source pins, builds
+   the site, validates privacy and lane inputs, and uploads one immutable candidate bundle.
+2. The transaction writer validates the numeric artifact ID, producing run, workflow
+   revision, manifest, target, parent, archive extraction, site-tree digest, and complete
+   required route checksum set before the approval job.
+3. One authorized maintainer reviews the generated summary and approves the protected
+   `github-pages` environment. The permit digest and Git author metadata are audit fields;
+   neither is a value the maintainer must type or paste.
+4. After approval, the writer revalidates the same artifact, records intent with journal
+   CAS, deploys the exact bytes, records provider acknowledgement, probes the required
+   public routes, and signs the live receipt.
+5. A failed or uncertain operation remains blocked. A retry starts a fresh transaction
+   against the same immutable artifact and obtains fresh environment approval.
 
 ## Provider feasibility and fail-closed fallback
 
-Before implementing or activating the production journal controller, two provider guarantees
-must be established in an isolated test repository:
-1. **Unique Write Correlation:** GitHub Pages must accept the unique write-intent commit OID as
-   `pages_build_version` without aliasing to workflow SHAs, and return deployment status by that version.
-2. **Supported Activation Barrier:** A documented provider contract specifying that an in-flight or
-   canceled request cannot activate after compensation.
+The writer records a unique write intent and requires a provider response before calling a
+publication deployed. The Pages adapter passes the intent commit as `pages_build_version`.
+The provider does not supply a documented late-activation fence, so an uncertain response
+remains `recovery-required` and blocks new operations. The watchdog reports that state; it
+does not compensate or guess what the provider did.
 
-If either guarantee cannot be proven, the system fails closed: automated compensation is blocked,
-and operator escalation is required. Do not use unreviewed markers or SHA-only aliases.
+
 
 ## Required live receipt fields
 
@@ -109,21 +94,18 @@ Ed25519 PEM private key in the protected `publication-attestation` and
 
 ## Rollback
 
-Rollback targets the last known-good attested manifest and exact artifact. Do not rebuild
-from a branch name and call the result equivalent. Reserve a new generation, deploy the
-known artifact, run fresh public probes, and issue a new receipt that references the
-prior known-good receipt. Until the new receipt exists, report rollback as pending or
-failed, not complete.
+Rollback targets the last known-good attested manifest and retained exact artifact. It uses
+the same protected transaction writer, reserves a new generation, deploys the known bytes,
+runs fresh public probes, and issues a successor receipt. It never rebuilds from a branch or
+uses an artifact name as a substitute for identity.
 
-Automatic rollback may select only the last known-good receipt and its recorded durable
-parent. It must construct a self-consistent successor transaction whose desired manifest,
-artifact, acknowledgement, probes, receipt, generation, and parent all describe the
-restored bytes. It may not advance policy, add accepted inputs, change visibility or
-ranking, or select unattested bytes.
+The watchdog is observational. It reports an unresolved provider outcome or stale operation
+and does not finalize, compensate, or select a rollback. Once provider finality is established,
+an authorized maintainer starts a fresh protected transaction for restoration.
 
-Throughout migration and the 72-hour bounded soak, the legacy release fallback remains
-independently runnable and does not require reading or executing through the new journal.
-Retirement of the legacy fallback requires explicit user approval after soak completion.
+During cutover, legacy writers are drained and normal admission is disabled. The historical
+fallback remains documented until the replacement has deployed and the outcome-based cutover
+evidence is complete; it is not a second normal authority.
 
 ## Emergency takedown
 

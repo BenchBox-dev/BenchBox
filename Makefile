@@ -56,6 +56,15 @@ $(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required
 		exit 2; \
 	fi
 
+.PHONY: publication-help
+publication-help:
+	@echo "Publication flow:"
+	@echo "  1. gh workflow run publication-deploy.yml --ref develop -f candidate_only=true"
+	@echo "  2. Select the numeric artifact ID from that run."
+	@echo "  3. gh workflow run publication-transaction.yml --ref develop -f kind=promotion -f candidate_artifact_id=<id>"
+	@echo "  4. Approve the github-pages environment once; the workflow validates and records the result."
+	@echo "  Retry with a new transaction run against the same artifact after a pre-write failure."
+
 test-all:
 	@echo "Running non-resource-heavy tests in parallel..."
 	uv run -- python -m pytest -m "not (slow or stress or resource_heavy or live_integration)"
