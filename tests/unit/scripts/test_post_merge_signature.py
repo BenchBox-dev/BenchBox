@@ -31,22 +31,22 @@ def test_dotted_bigquery_style_classname_normalizes() -> None:
 
 
 def test_job_level_ids_stay_fail_closed_revert() -> None:
-    action, basis = sig.attribution_action(["lint:Run CI lint mirror"], ["docs/x.md"])
+    action, basis = sig.attribution_detail(["lint:Run CI lint mirror"], ["docs/x.md"])
     assert (action, basis) == ("revert", "no-extractable-path")
 
 
 def test_cleared_sha_is_advisory() -> None:
-    action, basis = sig.attribution_action(["tests/unit/foo.py::test_bar"], ["benchbox/other.py"])
+    action, basis = sig.attribution_detail(["tests/unit/foo.py::test_bar"], ["benchbox/other.py"])
     assert (action, basis) == ("advisory", "cleared")
 
 
 def test_owning_test_path_reverts() -> None:
-    action, basis = sig.attribution_action(["tests/unit/foo.py::test_bar"], ["tests/unit/foo.py"])
+    action, basis = sig.attribution_detail(["tests/unit/foo.py::test_bar"], ["tests/unit/foo.py"])
     assert (action, basis) == ("revert", "test-path")
 
 
 def test_unrecognized_class_escalates(tmp_path: Path) -> None:
-    action, basis = sig.attribution_action(["weird-id-without-shape"], ["anything.py"])
+    action, basis = sig.attribution_detail(["weird-id-without-shape"], ["anything.py"])
     assert (action, basis) == ("escalate", "unrecognized-class")
     assert sig.unrecognized_failure_ids(["weird-id-without-shape", 42]) == [
         "weird-id-without-shape",
@@ -58,7 +58,7 @@ def test_unrecognized_class_escalates(tmp_path: Path) -> None:
 def test_import_signal_reverts_on_unrelated_basename(tmp_path: Path) -> None:
     (tmp_path / "helper_dep.py").write_text("VALUE = 1\n")
     (tmp_path / "test_owner.py").write_text("from helper_dep import VALUE\n\n\ndef test_v():\n    assert VALUE\n")
-    action, basis = sig.attribution_action(["test_owner.py::test_v"], ["helper_dep.py"], repo_root=tmp_path)
+    action, basis = sig.attribution_detail(["test_owner.py::test_v"], ["helper_dep.py"], repo_root=tmp_path)
     assert (action, basis) == ("revert", "import")
 
 
@@ -96,10 +96,10 @@ def test_isolated_bad_fix_verification(tmp_path: Path, monkeypatch: pytest.Monke
     failing = ["test_owner.py::test_v"]
     bad_paths = sig.changed_paths_for_sha(bad)
     assert bad_paths == ["helper_dep.py"]
-    assert sig.attribution_action(failing, bad_paths, repo_root=tmp_path / "repo")[0] == "revert"
+    assert sig.attribution_detail(failing, bad_paths, repo_root=tmp_path / "repo")[0] == "revert"
     other_paths = sig.changed_paths_for_sha(other)
     assert other_paths == ["unrelated.txt"]
-    assert sig.attribution_action(failing, other_paths, repo_root=tmp_path / "repo")[0] == "advisory"
+    assert sig.attribution_detail(failing, other_paths, repo_root=tmp_path / "repo")[0] == "advisory"
 
 
 def test_attribute_cli_binds_sha_and_basis(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

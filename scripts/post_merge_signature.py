@@ -276,6 +276,18 @@ def attribution_action(
     failure_ids: list[object],
     changed_paths: list[str],
     repo_root: Path | None = None,
+) -> str:
+    """Return ``revert``, ``advisory``, or ``escalate`` for a blamed SHA.
+
+    See :func:`attribution_detail` for the deciding basis.
+    """
+    return attribution_detail(failure_ids, changed_paths, repo_root)[0]
+
+
+def attribution_detail(
+    failure_ids: list[object],
+    changed_paths: list[str],
+    repo_root: Path | None = None,
 ) -> tuple[str, str]:
     """Return ``(action, basis)`` for a blamed SHA's changed paths.
 
@@ -385,7 +397,7 @@ def _attribute_command(args: argparse.Namespace) -> int:
     except SignatureError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    action, basis = attribution_action(failure_ids, changed_paths)
+    action, basis = attribution_detail(failure_ids, changed_paths)
     result = {
         "action": action,
         "attribution_basis": basis,

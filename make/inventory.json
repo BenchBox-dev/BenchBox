@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "8f5b0182820fd11cf688244ac18fb00d0c414ba96ee4201c6931fb2bfc2c92df",
+  "contract_sha256": "80e7d8c25dd3c405bd63a3fae16cb6662b83e1ae067e8b5e8a59364ac6c652af",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -167,7 +167,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 190,
+  "public_target_count": 197,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -237,6 +237,8 @@
     "lint-imports",
     "lint-markers",
     "lint-site-theme-tokens",
+    "local-validation",
+    "local-validation-show",
     "makefile-inventory-check",
     "mutation-test",
     "oracle-coverage-map",
@@ -250,6 +252,11 @@
     "pr-conflict-scan",
     "pr-content-guard",
     "pr-fanout",
+    "pr-followup-record",
+    "pr-followup-resume",
+    "pr-landing-ready",
+    "pr-landing-start",
+    "pr-landing-withdraw",
     "pr-open",
     "pr-preflight",
     "pr-preflight-fast-tests",
@@ -968,6 +975,20 @@
         "recipe_sha256": "76732d26e86e9e3bcad25148b1d28c6545c07a4b57b5c41550018f477ea97811"
       }
     ],
+    "local-validation": [
+      {
+        "header": "local-validation:",
+        "recipe": "\t@[ -n \"$(GATE)\" ] || { echo \"GATE is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(CMD)\" ] || { echo \"CMD is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/local_validation.py run --gate \"$(GATE)\" $(BATCH_ARGS) -- $(CMD)",
+        "recipe_sha256": "5a7b5d0fb8cb7651655952deb85741a963d8adab95c4955fa773101d26ca50a9"
+      }
+    ],
+    "local-validation-show": [
+      {
+        "header": "local-validation-show:",
+        "recipe": "\t@[ -n \"$(GATE)\" ] || { echo \"GATE is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/local_validation.py show --gate \"$(GATE)\" $(BATCH_ARGS)",
+        "recipe_sha256": "3f124fdbcde8bdfb8c3f6207b0ba28e86c173073f7e2d6c1d6ee1a5621ef01db"
+      }
+    ],
     "makefile-inventory-check": [
       {
         "header": "makefile-inventory-check:",
@@ -1082,6 +1103,41 @@
         "header": "pr-fanout:",
         "recipe": "\t@MAIN_CLONE=$$(dirname \"$$(realpath \"$$(git rev-parse --git-common-dir)\")\"); \\\n\tTMP=$$(mktemp); \\\n\tLOGDIR=$$(mktemp -d); \\\n\ttrap 'rm -f \"$$TMP\"; rm -rf \"$$LOGDIR\"' EXIT; \\\n\tgit worktree list --porcelain | sed -n 's/^worktree //p' | while IFS= read -r wt; do \\\n\t\t[ \"$$(realpath \"$$wt\")\" = \"$$MAIN_CLONE\" ] && { echo \"(skip $$wt: main clone)\"; continue; }; \\\n\t\tBR=$$(git -C \"$$wt\" branch --show-current 2>/dev/null); \\\n\t\tcase \"$$BR\" in develop|main|release|\"\") echo \"(skip $$wt: branch=$$BR)\"; continue ;; esac; \\\n\t\tIDX=$$(($${IDX:-0} + 1)); \\\n\t\tprintf '%06d|%s\\0' \"$$IDX\" \"$$wt\" >> \"$$TMP\"; \\\n\tdone; \\\n\tif [ ! -s \"$$TMP\" ]; then exit 0; fi; \\\n\txargs -0 -n 1 -P \"$(PR_FANOUT_JOBS)\" sh -c 'logdir=\"$$1\"; record=\"$$2\"; idx=\"$${record%%|*}\"; wt=\"$${record#*|}\"; br=$$(git -C \"$$wt\" branch --show-current 2>/dev/null); { echo \"==> $$wt [$$br]\"; ( cd \"$$wt\" && $(MAKE) -s pr-open ) || { echo \"(failed: $$wt)\"; exit 1; }; } > \"$$logdir/$$idx.log\" 2>&1' sh \"$$LOGDIR\" < \"$$TMP\"; \\\n\tSTATUS=$$?; \\\n\tfor log in \"$$LOGDIR\"/*.log; do [ -e \"$$log\" ] && cat \"$$log\"; done; \\\n\texit $$STATUS",
         "recipe_sha256": "14390e95dfe234b8e812e24eef39c74ebc5278b70c5cade102caa1dc0191f75e"
+      }
+    ],
+    "pr-followup-record": [
+      {
+        "header": "pr-followup-record:",
+        "recipe": "\t@[ -n \"$(KEY)\" ] || { echo \"KEY is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(STATE)\" ] || { echo \"STATE is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --worktree . followup-record --key \"$(KEY)\" --state-json \"$(STATE)\"",
+        "recipe_sha256": "040269f9012f4c43b8f7dcea6986e724d1e478ee31f559745574224397c35f5c"
+      }
+    ],
+    "pr-followup-resume": [
+      {
+        "header": "pr-followup-resume:",
+        "recipe": "\t@[ -n \"$(KEY)\" ] || { echo \"KEY is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --worktree . followup-resume --key \"$(KEY)\"",
+        "recipe_sha256": "daa7d47c26d31e278a686bf9a23531a4c7367b231a9f540ff26ed4be299f9c13"
+      }
+    ],
+    "pr-landing-ready": [
+      {
+        "header": "pr-landing-ready:",
+        "recipe": "\t@[ -n \"$(PR)\" ] || { echo \"PR is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(HEAD)\" ] || { echo \"HEAD is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(EVIDENCE)\" ] || { echo \"EVIDENCE is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --worktree . ready --pr \"$(PR)\" \\\n\t\t--expected-head \"$(HEAD)\" --evidence-json \"$(EVIDENCE)\" $(if $(ARM),--arm,)",
+        "recipe_sha256": "9814c9421f8342f8a9dda6320240035691176070388b9ef4cd491d31b54dbb5d"
+      }
+    ],
+    "pr-landing-start": [
+      {
+        "header": "pr-landing-start:",
+        "recipe": "\tuv run -- python scripts/pr_landing.py --worktree . start",
+        "recipe_sha256": "346369efd3eb54733b40a27c624855e87284bc0d1feb8a435572f3ea596a52dc"
+      }
+    ],
+    "pr-landing-withdraw": [
+      {
+        "header": "pr-landing-withdraw:",
+        "recipe": "\t@[ -n \"$(PR)\" ] || { echo \"PR is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --worktree . withdraw --pr \"$(PR)\"",
+        "recipe_sha256": "69a33ffb60b4b357cc16af67b7cac96d1a1c78f8ebed443d0531b7ab232612b1"
       }
     ],
     "pr-open": [
@@ -1975,7 +2031,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "4c3eed03883d4cf19ae2d11e999c86af4b2d6f74a673db30f76aec5fe1579000",
+  "semantic_sha256": "3906ea384e6e27d227424b33bb52fdd36abcdd315eb9912ffbcb0c66e0897fac",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3570,6 +3626,62 @@
       ]
     },
     {
+      "body": "local-validation:\n\t@[ -n \"$(GATE)\" ] || { echo \"GATE is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(CMD)\" ] || { echo \"CMD is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/local_validation.py run --gate \"$(GATE)\" $(BATCH_ARGS) -- $(CMD)",
+      "kind": "rule",
+      "sha256": "d6592210a940da73877a46e78c6cbe765a15557205deb429290aa643abcdca95",
+      "targets": [
+        "local-validation"
+      ]
+    },
+    {
+      "body": "local-validation-show:\n\t@[ -n \"$(GATE)\" ] || { echo \"GATE is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/local_validation.py show --gate \"$(GATE)\" $(BATCH_ARGS)",
+      "kind": "rule",
+      "sha256": "939f68b1fce55d9a9fee8153fa76380739d65bb24344cc2450f56c3fcdb5fcb3",
+      "targets": [
+        "local-validation-show"
+      ]
+    },
+    {
+      "body": "pr-landing-start:\n\tuv run -- python scripts/pr_landing.py --worktree . start",
+      "kind": "rule",
+      "sha256": "6f9b45bc776b2d5b6d71cc8c41e135e4318b4a853e98b5a3d46aa643a444893c",
+      "targets": [
+        "pr-landing-start"
+      ]
+    },
+    {
+      "body": "pr-landing-withdraw:\n\t@[ -n \"$(PR)\" ] || { echo \"PR is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --worktree . withdraw --pr \"$(PR)\"",
+      "kind": "rule",
+      "sha256": "832add41e7e63f0681714f7cfd181b2234353914bf68fe5a9b3942f6d9258310",
+      "targets": [
+        "pr-landing-withdraw"
+      ]
+    },
+    {
+      "body": "pr-landing-ready:\n\t@[ -n \"$(PR)\" ] || { echo \"PR is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(HEAD)\" ] || { echo \"HEAD is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(EVIDENCE)\" ] || { echo \"EVIDENCE is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --worktree . ready --pr \"$(PR)\" \\\n\t\t--expected-head \"$(HEAD)\" --evidence-json \"$(EVIDENCE)\" $(if $(ARM),--arm,)",
+      "kind": "rule",
+      "sha256": "2e68cdd77417ead5e0b4e498c5b26229d82af96f6723962094890a273cd628bf",
+      "targets": [
+        "pr-landing-ready"
+      ]
+    },
+    {
+      "body": "pr-followup-record:\n\t@[ -n \"$(KEY)\" ] || { echo \"KEY is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(STATE)\" ] || { echo \"STATE is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --worktree . followup-record --key \"$(KEY)\" --state-json \"$(STATE)\"",
+      "kind": "rule",
+      "sha256": "4663f6eb41677cf0a5f3c37f4f45a9fb11840f4a8ec9157b2a706d857793e8ac",
+      "targets": [
+        "pr-followup-record"
+      ]
+    },
+    {
+      "body": "pr-followup-resume:\n\t@[ -n \"$(KEY)\" ] || { echo \"KEY is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --worktree . followup-resume --key \"$(KEY)\"",
+      "kind": "rule",
+      "sha256": "ff85c5202bcdd3dee1209823f5ee6efc8ff79b026bbed3571a76a4f6b02e51ee",
+      "targets": [
+        "pr-followup-resume"
+      ]
+    },
+    {
       "body": "pr-content-guard:\n\t@[ -n \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\"; exit 2; }; \\\n\tEXISTING=$$(mktemp); \\\n\ttrap 'rm -f \"$$EXISTING\"' EXIT; \\\n\t$(MAKE) artifact-hygiene; \\\n\tif [ -s \"$(PATH_LISTS)/yaml.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted YAML path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/yaml.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run check-yaml --files $$(cat \"$$EXISTING\"); else echo \"No existing YAML content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No YAML content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/markdown.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted markdown path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/markdown.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run markdownlint --files $$(cat \"$$EXISTING\"); else echo \"No existing markdown content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No markdown content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/docs.txt\" ]; then \\\n\t\t$(MAKE) docs-validate; \\\n\telse \\\n\t\techo \"No docs paths changed.\"; \\\n\tfi",
       "kind": "rule",
       "sha256": "393b19c8695caa41d53845f4c1c3b2e4d2930aa49ed4f92e4a69692d6900d44b",
@@ -4012,7 +4124,7 @@
       ]
     }
   ],
-  "target_count": 196,
+  "target_count": 203,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -4085,6 +4197,8 @@
     "lint-imports",
     "lint-markers",
     "lint-site-theme-tokens",
+    "local-validation",
+    "local-validation-show",
     "makefile-inventory-check",
     "mutation-test",
     "oracle-coverage-map",
@@ -4098,6 +4212,11 @@
     "pr-conflict-scan",
     "pr-content-guard",
     "pr-fanout",
+    "pr-followup-record",
+    "pr-followup-resume",
+    "pr-landing-ready",
+    "pr-landing-start",
+    "pr-landing-withdraw",
     "pr-open",
     "pr-preflight",
     "pr-preflight-fast-tests",
