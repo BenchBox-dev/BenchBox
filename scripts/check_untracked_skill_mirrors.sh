@@ -3,9 +3,11 @@
 #
 # The shared agents mirror and the curated-out `blog` skill are deliberately
 # untracked: cloud is Claude-only and `blog` is published
-# separately. `skill-sync verify` only inspects the tracked `claude` target
-# (it skips untracked targets and `ignore`d paths), so it cannot catch these
-# being force-added. Fail the build if any become git-tracked.
+# separately. `skill-sync verify` checks every selected skill's bytes against
+# its target manifest, but it cannot tell a force-added (git-tracked) mirror
+# from a legitimate local one — Git tracking state is outside what the
+# manifest records. Fail the build if any deliberately-untracked path becomes
+# git-tracked.
 #
 # Rationale: _project/decisions/claude-settings-cloud-ownership-2026-06-29.md
 #
@@ -18,7 +20,9 @@
 #
 # The consolidated `.agents/skills` path is checked explicitly even though the
 # broader `.agents/` rule also ignores it, so a force-added mirror is visible
-# to this guard rather than hidden by the parent rule.
+# to this guard rather than hidden by the parent rule. The retired
+# `.codex`/`.gemini` mirror paths are kept in the list so resurrecting one
+# fails closed instead of silently reviving an unguarded surface.
 #
 # Run locally:
 #   scripts/check_untracked_skill_mirrors.sh

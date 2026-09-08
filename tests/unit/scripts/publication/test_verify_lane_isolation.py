@@ -153,7 +153,7 @@ def test_non_lane_inputs_skipped_in_changed_paths() -> None:
         "_project/specs/example.md",
         "_project/scripts/agent_instruction_audit.py",
         "AGENTS.md",
-        "skill-sync.yaml",
+        "skill-sync.conf",
         "scripts/skill_sync_ci_policy.py",
         ".mcp.json",
         ".todo-db/config.json",

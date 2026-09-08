@@ -82,13 +82,13 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     # Lane-owned exact files under here (e.g. the explorer pipeline, this
     # verifier) still classify to their lane first.
     "_project/",
-    # Repo-root agent docs, skill manifest, and local-tooling config.
+    # Repo-root agent docs, skill config, and local-tooling config.
     "AGENTS.md",
     "CLAUDE.md",
     "GEMINI.md",
     "ANTIGRAVITY.md",
-    "skill-sync.yaml",
-    "skill-sync.lock",
+    "skill-sync.conf",
+    "tools/skill-sync",
     "scripts/skill_sync_ci_policy.py",
     # Worktree and agent lifecycle tooling: developer loop only.
     "scripts/agent_write_preflight.sh",

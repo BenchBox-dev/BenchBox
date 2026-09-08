@@ -77,8 +77,8 @@ def test_skill_integrity_only_skips_product_ci(rules: dict[str, list[str]]) -> N
     paths = [
         ".claude/skills/todo-db/SKILL.md",
         ".claude/skills/todo-db/references/batch.md",
-        "skill-sync.yaml",
-        "skill-sync.lock",
+        "skill-sync.conf",
+        "tools/skill-sync",
     ]
 
     decision = classify_paths(paths, rules)
@@ -108,16 +108,16 @@ def test_skill_integrity_plus_product_code_runs_both_required_lanes(rules: dict[
 
 def test_structural_manifest_decision_forces_product_ci(rules: dict[str, list[str]]) -> None:
     decision = classify_paths(
-        ["skill-sync.yaml", "skill-sync.lock"],
+        ["skill-sync.conf", "tools/skill-sync"],
         rules,
-        forced_code_paths=["skill-sync.yaml"],
+        forced_code_paths=["skill-sync.conf"],
         manifest_decision_reason="manifest_structural_change",
     )
 
     assert decision["skill_integrity_needed"] is True
     assert decision["skill_integrity_only"] is False
     assert decision["needs_code_ci"] is True
-    assert decision["forced_code_paths"] == ["skill-sync.yaml"]
+    assert decision["forced_code_paths"] == ["skill-sync.conf"]
     assert decision["unknown_paths"] == []
 
 
@@ -316,18 +316,17 @@ def test_event_base_sha_stays_authoritative_when_origin_develop_moves(tmp_path: 
     _git(repo, "init", "--initial-branch=develop", "-q")
     _git(repo, "config", "user.email", "test@example.com")
     _git(repo, "config", "user.name", "Test")
-    manifest = (REPO_RULES.parents[1] / "skill-sync.yaml").read_text(encoding="utf-8")
-    (repo / "skill-sync.yaml").write_text(manifest, encoding="utf-8")
-    (repo / "skill-sync.lock").write_text("{}\n", encoding="utf-8")
-    _git(repo, "add", "skill-sync.yaml", "skill-sync.lock")
+    manifest = (REPO_RULES.parents[1] / "skill-sync.conf").read_text(encoding="utf-8")
+    (repo / "skill-sync.conf").write_text(manifest, encoding="utf-8")
+    _git(repo, "add", "skill-sync.conf")
     _git(repo, "commit", "-m", "base", "-q")
     event_base = _git(repo, "rev-parse", "HEAD").strip()
 
     _git(repo, "checkout", "-b", "feature", "-q")
-    canonical_ref = re.search(r"name:\s*canonical.*?ref:\s*([0-9a-f]{40})", manifest, re.DOTALL).group(1)
-    feature_manifest = manifest.replace(canonical_ref, "a" * 40, 1)
-    (repo / "skill-sync.yaml").write_text(feature_manifest, encoding="utf-8")
-    _git(repo, "add", "skill-sync.yaml")
+    first_rev = re.search(r"^rev *= *([0-9a-f]{40})", manifest, re.MULTILINE).group(1)
+    feature_manifest = manifest.replace(first_rev, "a" * 40, 1)
+    (repo / "skill-sync.conf").write_text(feature_manifest, encoding="utf-8")
+    _git(repo, "add", "skill-sync.conf")
     _git(repo, "commit", "-m", "ref only", "-q")
 
     _git(repo, "checkout", "-b", "moving-base", event_base, "-q")
@@ -339,7 +338,7 @@ def test_event_base_sha_stays_authoritative_when_origin_develop_moves(tmp_path: 
     _git(repo, "checkout", "feature", "-q")
 
     changed = repo / "changed.txt"
-    changed.write_text("skill-sync.yaml\nskill-sync.lock\n", encoding="utf-8")
+    changed.write_text("skill-sync.conf\n", encoding="utf-8")
     script = REPO_RULES.parents[1] / "scripts" / "path_filter_decision.py"
     result = subprocess.run(
         [
