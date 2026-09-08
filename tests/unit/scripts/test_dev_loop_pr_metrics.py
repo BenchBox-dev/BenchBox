@@ -507,3 +507,33 @@ def test_refresh_reason_codes_come_from_classifier() -> None:
     codes = metrics.load_refresh_reason_codes()
     assert metrics.REFRESH_REASON_TIMING in codes
     assert metrics.REFRESH_REASON_IDENTITY in codes
+
+
+class _SearchClient:
+    repo = "owner/repo"
+
+    def __init__(self, total: int, items: list[dict]) -> None:
+        self.total = total
+        self.items = items
+
+    def get(self, _path: str) -> dict:
+        return {"total_count": self.total, "items": self.items[:1]}
+
+    def get_paginated(self, _path: str, item_key: str | None = None) -> list[dict]:
+        assert item_key == "items"
+        return self.items
+
+
+def test_cohort_enumeration_is_complete_against_total_count() -> None:
+    client = _SearchClient(3, [{"number": 7}, {"number": 8}, {"number": 9}])
+    assert metrics.fetch_cohort_pr_numbers(client, "2026-08-11T00:00:00+00:00", "2026-09-08T00:00:00+00:00") == [
+        7,
+        8,
+        9,
+    ]
+
+
+def test_cohort_enumeration_fails_closed_on_short_page() -> None:
+    client = _SearchClient(3, [{"number": 7}])
+    with pytest.raises(metrics.ApiFailure, match="truncated"):
+        metrics.fetch_cohort_pr_numbers(client, "2026-08-11T00:00:00+00:00", "2026-09-08T00:00:00+00:00")

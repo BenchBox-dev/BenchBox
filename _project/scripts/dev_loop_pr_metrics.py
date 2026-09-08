@@ -709,6 +709,32 @@ def event_fanout_metrics(
     }
 
 
+def fetch_cohort_pr_numbers(client: GitHubClient, since_iso: str, until_iso: str) -> list[int]:
+    """Every merged develop PR number in [since, until] via date-bounded search.
+
+    The pulls list endpoint paginates by recency of update, so a single page
+    silently drops in-window merges pushed past the page edge by later
+    activity. Search by merged-date range enumerates the cohort completely;
+    a short page against total_count fails closed instead of understating.
+    """
+
+    import urllib.parse
+
+    raw_query = f"repo:{client.repo} is:pr is:merged base:develop merged:{since_iso[:10]}..{until_iso[:10]}"
+    query = urllib.parse.quote(raw_query, safe="")
+    first = client.get(f"/search/issues?q={query}&per_page=1")
+    if not isinstance(first, dict) or not isinstance(first.get("total_count"), int):
+        raise ApiFailure(f"cohort search failed: {query}")
+    items = client.get_paginated(f"/search/issues?q={query}", item_key="items")
+    numbers = [int(item["number"]) for item in items if isinstance(item, dict) and item.get("number")]
+    if len(numbers) < int(first["total_count"]):
+        raise ApiFailure(
+            f"cohort search truncated: {len(numbers)} of {first['total_count']} "
+            "(1000-result search cap or failed page; narrow the window instead of understating)"
+        )
+    return numbers
+
+
 def pr_synchronize_heads(client: GitHubClient, number: int) -> list[str]:
     """Every commit SHA pushed to the PR, oldest first.
 
