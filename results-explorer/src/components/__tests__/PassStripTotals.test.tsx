@@ -1,0 +1,111 @@
+/**
+ * Run totals for the pass table.
+ *
+ * The table reports one row per query; a reader comparing two runs needs the
+ * whole number without adding 22 rows up. Each total covers only the queries
+ * that recorded the value it sums, and the warmup ratio is recomputed from the
+ * totals rather than averaged, so a run where only some queries recorded a
+ * warmup cannot report a penalty diluted by the queries that did not.
+ */
+
+import { render, screen, within } from "@testing-library/preact";
+import { describe, it, expect } from "vitest";
+import type { QueryTiming } from "@/types";
+
+import { PassStrip, summarizeQueryPasses, summarizeRunPasses } from "@/components/PassStrip";
+
+function measurement(queryId: string, ms: number, iter: number): QueryTiming {
+  return { query_id: queryId, duration_ms: ms, status: "pass", run_type: "measurement", iter, stream: null };
+}
+
+function warmup(queryId: string, ms: number): QueryTiming {
+  return { query_id: queryId, duration_ms: ms, status: "pass", run_type: "warmup", iter: 0, stream: null };
+}
+
+function failedMeasurement(queryId: string, ms: number): QueryTiming {
+  return { query_id: queryId, duration_ms: ms, status: "fail", run_type: "measurement", iter: 1, stream: null };
+}
+
+const QUERIES: QueryTiming[] = [
+  warmup("Q1", 30),
+  measurement("Q1", 10, 1),
+  measurement("Q1", 12, 2),
+  measurement("Q1", 14, 3),
+  warmup("Q2", 40),
+  measurement("Q2", 20, 1),
+  measurement("Q2", 22, 2),
+  measurement("Q2", 24, 3),
+];
+
+describe("summarizeRunPasses", () => {
+  it("sums each column over the queries that recorded it", () => {
+    const totals = summarizeRunPasses(summarizeQueryPasses(QUERIES));
+    expect(totals.queryCount).toBe(2);
+    expect(totals.passCount).toBe(6);
+    expect(totals.warmMedianMs).toBe(34); // 12 + 22
+    expect(totals.warmMinMs).toBe(30); // 10 + 20
+    expect(totals.spreadMs).toBe(8); // 4 + 4
+    expect(totals.warmupMs).toBe(70); // 30 + 40
+    expect(totals.warmupRatio).toBeCloseTo(70 / 34, 10);
+  });
+
+  it("measures the warmup ratio against the same queries the warmup total covers", () => {
+    // Q2 recorded no warmup. Dividing 30 ms of warmup by both queries' warm
+    // total (34 ms) would report a 0.88x penalty for a run whose only
+    // measured warmup was 2.5x its query's warm median.
+    const totals = summarizeRunPasses(
+      summarizeQueryPasses(QUERIES.filter((row) => !(row.query_id === "Q2" && row.run_type === "warmup"))),
+    );
+    expect(totals.warmupQueryCount).toBe(1);
+    expect(totals.warmupMs).toBe(30);
+    expect(totals.warmupRatio).toBeCloseTo(30 / 12, 10);
+  });
+
+  it("reports a missing column as absent rather than zero", () => {
+    const totals = summarizeRunPasses(
+      summarizeQueryPasses(QUERIES.filter((row) => row.run_type !== "warmup")),
+    );
+    expect(totals.warmupMs).toBeNull();
+    expect(totals.warmupRatio).toBeNull();
+    expect(totals.warmupQueryCount).toBe(0);
+  });
+
+  it("drops a query with a warmup but no warm median from both sides of the ratio", () => {
+    // The warmup on Q2 has nothing to be measured against. Counting it in the
+    // numerator alone would report a penalty the run never demonstrated.
+    const totals = summarizeRunPasses(
+      summarizeQueryPasses([
+        warmup("Q1", 30),
+        measurement("Q1", 10, 1),
+        warmup("Q2", 900),
+        failedMeasurement("Q2", 20),
+      ]),
+    );
+    expect(totals.warmupRatio).toBeCloseTo(30 / 10, 10);
+    expect(totals.warmupMs).toBe(930);
+    expect(totals.warmupQueryCount).toBe(2);
+  });
+
+  it("has no spread to report when a query ran once", () => {
+    const totals = summarizeRunPasses(summarizeQueryPasses([measurement("Q1", 10, 1)]));
+    expect(totals.spreadMs).toBeNull();
+    expect(totals.warmMedianMs).toBe(10);
+  });
+});
+
+describe("PassStrip totals row", () => {
+  it("closes the table with the run's own totals", () => {
+    render(<PassStrip queries={QUERIES} />);
+    const totals = screen.getByTestId("pass-strip-totals");
+    expect(within(totals).getByText("Overall")).toBeTruthy();
+    expect(totals.textContent).toContain("34 ms");
+    expect(within(totals).getByTestId("warmup-ratio-overall").textContent).toBe("2.06x");
+  });
+
+  it("says the totals cover queries the truncated table does not list", () => {
+    const many = Array.from({ length: 30 }, (_, index) => measurement(`Q${index + 1}`, 10, 1));
+    render(<PassStrip queries={many} limit={25} />);
+    expect(screen.getByTestId("pass-strip-totals").textContent).toContain("300 ms");
+    expect(screen.getByText(/including the 5 not listed above/)).toBeTruthy();
+  });
+});

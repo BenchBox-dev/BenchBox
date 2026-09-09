@@ -146,10 +146,13 @@ runner that lacks it:
   environment fact, not a defect.
 - **Silently no-op and report success while checking nothing.** This is the
   more dangerous failure mode: a guard that cannot fail reads as coverage in
-  the Actions log and is never investigated. `skill-sync-check` does this
-  today if left unguarded -- it shells out to `$(SKILL_SYNC)`, a local
-  absolute developer path that plainly does not exist on a runner, hits its
-  own "not installed; skipping" branch, and exits 0.
+  the Actions log and is never investigated. The old `skill-sync-check` did
+  this before the rsync migration -- it shelled out to `$(SKILL_SYNC)`, a
+  local absolute developer path that plainly did not exist on a runner, hit
+  its own "not installed; skipping" branch, and exited 0. The migrated
+  `skill-sync-check` fails closed instead (a missing wrapper is exit 1), and
+  stays in this table only because `check` needs the developer-local source
+  checkouts that no runner has.
 
 `_project/scripts/ci_lint_environment_gate.py` is the single place that
 draws this boundary: a small, declarative `RUNNER_INAPPLICABLE_GUARDS` table
@@ -192,31 +195,39 @@ unless that guard is *also* covered for real somewhere else in CI:
   never in the gate's table; it keeps running unconditionally, in `ci-lint`
   and in `pr.yml`.
 - `skill-sync-check`'s real CI-side coverage is `pr.yml`'s required
-  `skill-integrity` job. It runs when `.claude/skills/**`, `skill-sync.yaml`,
-  or `skill-sync.lock` changes, validates the approved source/target policy,
-  builds an independently pinned public skill-sync verifier, verifies the
-  tracked Claude mirror and lock, and runs instruction/wrapper/identity
-  controls before `ci-required-result` can pass. Skipping the
-  local-path-based `skill-sync-check` inside `ci-lint`'s own CI invocation
-  does not remove coverage that existed there -- it removes a guard that was
-  already structurally unable to check anything on a runner.
+  `skill-integrity` job. It runs when `.claude/skills/**`, `skill-sync.conf`,
+  or `tools/skill-sync` changes, validates the config/receipt/tool-pin
+  policy, clones the skill sources, runs the full
+  preview/apply/verify/check cycle with the vendored wrapper, and runs
+  instruction/identity controls before `ci-required-result` can pass.
+  Skipping the checkout-dependent `skill-sync-check` inside `ci-lint`'s own
+  CI invocation does not remove coverage that existed there -- it removes a
+  guard that is structurally unable to check anything on a runner.
 
 ### Required skill-integrity lane
 
 Skill integrity is a specialized control-plane lane, not generic content and
-not BenchBox product execution. Pure approved ref/mirror/lock changes skip
+not BenchBox product execution. Pure approved rev/mirror changes skip
 product tests because BenchBox does not import or execute skill Markdown.
-Unknown paths, structural manifest changes, workflow/classifier/policy edits,
+Unknown paths, structural config changes, workflow/classifier/policy edits,
 and mixed product changes still run full product CI; mixed changes also run
 skill integrity. Generated skill Markdown has no generic markdownlint or
-spellcheck contract: the required lane proves trusted provenance, byte/lock
-integrity, instruction anchors, focused wrapper budgets, tracked-artifact
-hygiene, and commit identity. It does not claim that arbitrary prose is
-semantically safe or human-reviewed.
+spellcheck contract: the required lane proves trusted provenance, byte
+integrity against the per-target manifest, instruction anchors, focused
+wrapper budgets, tracked-artifact hygiene, and commit identity. It does not
+claim that arbitrary prose is semantically safe or human-reviewed.
 
-The verifier revision is fixed independently in
-`scripts/skill_sync_ci_policy.py`. A maintainer advances it only with an
-empty-home clean clone/build/verify proof and full CI. GitHub classification
+What the lane proves and does not prove: `verify` proves the committed
+payload is byte-for-byte what the wrapper wrote (hashes, executable bits,
+exact membership, no symlinks, receipt/manifest agreement) -- it does not
+prove the payload matches any catalog revision. Tying bytes to revisions is
+the job of the preview/apply/check cycle the same job runs from freshly
+cloned sources, plus PR review of the receipt's recorded revs. The
+untracked-mirror guard proves tracking state, not content parity.
+
+The tool pin is fixed independently in
+`scripts/skill_sync_ci_policy.py`. A maintainer advances it only with a
+clean preview/apply/check/verify proof and full CI. GitHub classification
 binds to `github.event.pull_request.base.sha`, never a mutable branch tip; if
 `develop` advances during the run, strict current-base enforcement may mark
 that correctly certified run BEHIND. Refresh such PRs one at a time.
@@ -239,14 +250,11 @@ no skill path globs of its own. Its lane output is explicit:
 - A mixed skill/product diff prints both `product` and `skill-integrity` and
   runs both lanes.
 
-The focused local target validates source/target policy, obtains the verifier
-revision from `scripts/skill_sync_ci_policy.py`, clean-clones and builds that
-exact revision in a temporary directory, and verifies with an empty `HOME`.
-It then enforces tracked/untracked mirror integrity, instruction authority,
-resolved and commit-range identity, wrapper budgets, and tracked-artifact
-hygiene. Missing `git`, `npm`, `node`, the trusted revision, or the built CLI
-fails the preflight; the older local-path `skill-sync-check` skip is not proof
-for this lane.
+The focused local target validates config/receipt/tool-pin policy and runs
+the vendored wrapper's offline `verify` directly -- no network, no Node, no
+build. It then enforces tracked/untracked mirror integrity, instruction
+authority, resolved and commit-range identity, wrapper budgets, and
+tracked-artifact hygiene. A missing wrapper fails the preflight.
 
 Routing does not inspect or consume `STALE`, merge `develop`, call `pr-refresh`
 or `pr-fanout`, push, open a PR, or arm auto-merge. `pr-open` remains the sole

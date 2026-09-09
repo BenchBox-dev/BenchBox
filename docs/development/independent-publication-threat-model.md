@@ -15,12 +15,13 @@ archive lives on `published-results`.
 | Pull-request branch and merge commit | Untrusted until the protected target's checks and required human review complete. A PR must not gain secrets or production write credentials. |
 | Explorer builder, validators, admission policy, manifest schema, and attestor | Trusted control-plane code pinned from an exact reviewed `develop` SHA. |
 | `published-results` archive | Corpus acceptance authority. A manifest consumes one exact SHA, not a moving branch ref. Acceptance does not imply trust, ranking, visibility, or liveness. |
-| Publication manifest | Desired-state authority after manual review. It pins source SHAs, policy version, builder identity, artifact expectations, target, and generation. |
+| Candidate bundle | Immutable artifact selected by ID. Its producer, source pins, manifest, unpacked tree, target, parent, and required route checksums are validated before approval. |
+| Publication manifest | Desired-state content inside the candidate bundle. It pins source SHAs, policy version, builder identity, artifact expectations, target, and parent. |
 | Build artifact and provenance | Immutable output bound to the manifest and builder. Artifact existence or build success is not proof of deployment. |
 | Deployment credentials and GitHub tokens | Least-privilege secrets available only to trusted post-merge jobs. They must not be exposed to pull-request code or recursively trigger an equivalent privileged workflow. |
 | Live receipt signing key | Isolated attestation credential. It signs only fresh public observations that match the intended manifest and artifact. |
 | Transaction journal (`publication` ref) | Single state authority for monotonic generation reservations, durable transactions, and head advancement under non-forced Git CAS. |
-| Recovery watchdog | Out-of-band observer and recovery coordinator. Scanning is read-only; compensation enters protected environment. |
+| Recovery watchdog | Read-only observer. It reports aged or unresolved work; protected transaction workflows perform every write and restoration. |
 | Withdrawal and ranking fields | Maintainer-controlled policy data. Contributor payloads cannot set or promote them. |
 | Audit evidence | Append-only manifests, provenance, deploy acknowledgements, receipts, approvals, withdrawal events, and rollback events retained outside replaceable read models. |
 
@@ -67,11 +68,12 @@ broader credentials, bypass review, recursively publish, or approve its own outp
 **Threat:** A branch moves after approval, an artifact is swapped, or a deployment uses
 bytes not produced from the reviewed manifest.
 
-**Controls:** Manifests pin exact `develop` and `published-results` SHAs. Provenance binds
-the manifest digest, builder identity, inputs, artifact digests, and policy version.
-Deployment verifies artifact digest before activation. The attested live receipt binds
-that same manifest and artifact to public route observations. A branch name, workflow
-run number, or mutable artifact label is never sufficient.
+**Controls:** The operator supplies one immutable artifact ID. Trusted preparation binds the
+producer run, workflow path and revision, exact `develop` and `published-results` SHAs,
+manifest digest, archive digest, unpacked site-tree digest, target, parent, and complete
+required route checksums before approval. Deployment revalidates the same artifact after
+approval. The attested live receipt binds it to public route observations. A branch name,
+workflow run number, or mutable artifact label is never sufficient.
 
 ### Promotion races and stale completion
 
@@ -92,8 +94,8 @@ or labels a provider acknowledgement as recovered service.
 **Controls:** Rollback chooses a previously attested manifest and exact artifact digest.
 The rollback operation emits a new event referencing the prior live receipt and requires
 fresh public probes plus a new live receipt. The previous receipt remains immutable.
-Automatic rollback is bounded to the last known-good receipt and cannot change policy,
-accept new corpus input, or select an unattested artifact.
+Rollback is bounded to the last known-good receipt and cannot change policy, accept new
+corpus input, or select an unattested artifact. The watchdog cannot initiate rollback.
 
 ### Takedown abuse, delay, and resurrection
 
@@ -131,10 +133,10 @@ but the HTTP response is dropped or the initiating runner crashes. If compensati
 executes without knowing provider state, the unresolved write may activate late,
 overwriting newer content.
 
-**Controls:** Unique write-intent commit OIDs are passed as `pages_build_version` for provider
-correlation. On indeterminate request results, the transaction enters `recovery-required` /
-strict quarantine. Automatic compensation is blocked until an affirmative provider activation
-barrier proves the earlier request cannot activate.
+**Controls:** Durable intent is recorded before submission and the unique write-intent commit
+OID is passed as `pages_build_version` for provider correlation. On indeterminate request
+results, the transaction enters `recovery-required` and blocks new work. The watchdog reports
+the state; it cannot compensate without a proven provider finality condition.
 
 ### Stale-writer fencing and concurrency displacement
 
@@ -143,8 +145,8 @@ advances the journal after a newer run has taken ownership.
 
 **Controls:** Pages deployment jobs serialize through `pages-deploy` concurrency with
 `cancel-in-progress: false`. Every state transition validates current journal state and epoch
-under non-forced Git CAS. Stale worker acknowledgements are recorded as audit evidence only and
-cannot move the durable head.
+under non-forced Git CAS. This coordinates the workflow but is not a provider activation fence.
+Stale worker acknowledgements are recorded as audit evidence only and cannot move the durable head.
 
 ### Archive extraction and container confinement
 
@@ -161,10 +163,9 @@ never executed as code.
 **Threat:** An out-of-band recovery workflow (`publication-recover.yml`) has broad privileges
 that could be exploited by untrusted PR events or forge maintainer approvals.
 
-**Controls:** Watchdog scanning is strictly read-only (`contents: read, actions: read`). Only
-compensation enters the protected `github-pages` environment. Watchdog ignores pull-request
-events, authenticates workflow provenance, and cannot fabricate approvals; it strictly
-resumes durable journal intent or flags quarantine.
+**Controls:** Watchdog scanning is strictly read-only (`contents: read, actions: read`). It
+authenticates workflow provenance, ignores pull-request events, reports operations older than
+ten minutes, and cannot fabricate approvals, journal writes, Pages writes, or compensation.
 
 ## Security invariants
 

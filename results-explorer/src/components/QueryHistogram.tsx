@@ -1,5 +1,6 @@
+import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 // ---------------------------------------------------------------------------
-// QueryHistogram - vertical bar chart of per-query latency
+// QueryHistogram - responsive grouped bars of per-query latency
 //
 // Each bar = one query's display_ms value for a platform.
 // Multiple platforms → grouped bars per query.
@@ -10,7 +11,7 @@
 
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
-import { chartFrame } from "@/lib/chartFrame";
+import { chartFrame, CHART_COMPACT_BELOW } from "@/lib/chartFrame";
 import { paletteColor } from "@/lib/chartTheme";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 import { formatTimingExclusion, platformTimingValue } from "@/lib/displayEligibility";
@@ -42,7 +43,9 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
 
   const { platforms, query_ids } = summary;
   if (platforms.length === 0 || query_ids.length === 0) return null;
+  const runLabels = formatRunIdentitiesForCohort(platforms, "chart");
   const sortedQueryIds = preserveOrder ? query_ids : sortQueryIds(query_ids);
+  const maxMs = Math.max(1, ...platforms.flatMap((p) => sortedQueryIds.map((qid) => platformTimingValue(p, qid) ?? 0)));
 
   // A query group holds one bar per platform, so how many groups fit is a
   // function of the cohort size, not just the query count. Splitting on query
@@ -56,16 +59,36 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
     panels.push(sortedQueryIds.slice(i, i + perPanel));
   }
 
+  function renderHorizontalPanel(qids: string[], panelIdx: number) {
+    const rowHeight = 18;
+    const groupHeight = platforms.length * rowHeight + 10;
+    const labelWidth = Math.min(100, w / 3);
+    const plotWidth = w - labelWidth - 8;
+    const height = qids.length * groupHeight + 32;
+    return <svg key={panelIdx} class="bb-chart-svg" width="100%" height={height}
+      viewBox={`0 0 ${w} ${height}`} role="img" aria-label={`Query latency bar chart (panel ${panelIdx + 1})`} data-orientation="horizontal">
+      {[0, 0.5, 1].map((fraction) => <g key={fraction}>
+        <line x1={labelWidth + fraction * plotWidth} x2={labelWidth + fraction * plotWidth} y1={24} y2={height} stroke="var(--bb-chart-grid-muted)" />
+        <text x={labelWidth + fraction * plotWidth} y={14} text-anchor={fraction === 1 ? "end" : "middle"} style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}>{fmtMs(fraction * maxMs)}</text>
+      </g>)}
+      {qids.map((qid, qi) => <g key={qid}>
+        <text x={labelWidth - 6} y={32 + qi * groupHeight} text-anchor="end" data-query-label={qid} style={{ fontSize: "11px", fill: "var(--bb-chart-label-muted)" }}>{queryDisplayLabel(qid)}</text>
+        {platforms.map((p, pi) => {
+          const ms = platformTimingValue(p, qid);
+          const y = 24 + qi * groupHeight + pi * rowHeight;
+          const title = `${runLabels[pi] ?? p.platform} · ${queryDisplayLabel(qid)}: ${ms === null ? formatTimingExclusion(p.timing_eligibility[qid]?.timing_exclusion_reason ?? "missing_timing") : fmtMs(ms)}`;
+          return ms === null
+            ? <line key={p.result_id} x1={labelWidth} x2={labelWidth + 4} y1={y + 6} y2={y + 6} stroke={paletteColor(pi)} stroke-dasharray="2,1"><title>{title}</title></line>
+            : <rect key={p.result_id} x={labelWidth} y={y} width={Math.max(1, ms / maxMs * plotWidth)} height={12} fill={paletteColor(pi)} fill-opacity={0.85}><title>{title}</title></rect>;
+        })}
+      </g>)}
+    </svg>;
+  }
+
   function renderPanel(qids: string[], panelIdx: number) {
     // Only positive timings contribute to the y-scale; null/0 represent
     // "did not run" and render as a tiny hatched tick so they're visibly
     // distinct from a genuine fast-but-present result.
-    const allMs = platforms.flatMap((p) =>
-      qids.map((qid) => {
-        return platformTimingValue(p, qid) ?? 0;
-      }),
-    );
-    const maxMs = Math.max(...allMs, 1);
 
     const n = qids.length;
     const groupW = (w - AXIS_W) / n;
@@ -138,7 +161,7 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
                         stroke-dasharray="2,1"
                         opacity={0.5}
                       >
-                        <title>{`${p.platform} · ${queryDisplayLabel(qid)}: ${reason}`}</title>
+                        <title>{`${runLabels[pi] ?? p.platform} · ${queryDisplayLabel(qid)}: ${reason}`}</title>
                       </line>
                     );
                   }
@@ -152,7 +175,7 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
                       fill={paletteColor(pi)}
                       fill-opacity={0.85}
                     >
-                      <title>{`${p.platform} · ${queryDisplayLabel(qid)}: ${fmtMs(ms)}`}</title>
+                      <title>{`${runLabels[pi] ?? p.platform} · ${queryDisplayLabel(qid)}: ${fmtMs(ms)}`}</title>
                     </rect>
                   );
                 })}
@@ -188,13 +211,13 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
 
   return (
     <div ref={containerRef} class="w-full">
-      {panels.map((slice, pi) => renderPanel(slice, pi))}
+      {panels.map((slice, pi) => w < CHART_COMPACT_BELOW ? renderHorizontalPanel(slice, pi) : renderPanel(slice, pi))}
       {platforms.length > 1 && (
         <div class="mt-1 flex flex-wrap gap-3 text-xs text-[var(--bb-data-fg-muted)]">
           {platforms.map((p, i) => (
             <span key={p.result_id} class="flex items-center gap-1">
               <span class="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: paletteColor(i) }} />
-              {p.platform}
+              {runLabels[i] ?? p.platform}
             </span>
           ))}
         </div>

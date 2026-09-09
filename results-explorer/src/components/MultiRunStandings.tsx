@@ -204,7 +204,7 @@ export function MultiRunStandings({ results, baselineIndex, runLabels }: MultiRu
               <tr key={row.resultId} class="hover:bg-[var(--bb-surface-data-muted)]">
                 <td class="table-td font-mono">{row.rank}</td>
                 <td class="table-td">
-                  {row.label}
+                  <span title={row.engine}>{row.label}</span>
                   {row.isBaseline ? (
                     <StatusBadge role="comparison" tone="neutral" class="ml-2">
                       Baseline

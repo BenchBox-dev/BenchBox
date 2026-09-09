@@ -132,7 +132,11 @@ export function buildCompareDecisionSummary(
   const winner = suppressWinnerClaims ? null : metricWinner;
   const comparison = sortedMetrics.length > 1 ? sortedMetrics[sortedMetrics.length - 1]! : null;
   const comparisonRatio = winner && comparison ? metricRatio(winner.value, comparison.value, higherIsBetter) : null;
-  const comparisonLabel = higherIsBetter ? "the lowest selected score" : "the slowest selected run";
+  // Say what the ratio means, not what it is measured against: "1.29x" beside
+  // "the lowest selected score" leaves the reader to work out the direction.
+  const comparisonLabel = higherIsBetter
+    ? "better than the lowest selected run"
+    : "faster than the slowest selected run";
   const queryRecord = buildWinnerQueryRecord(results, winner?.resultId ?? null);
   const percentiles = results.map((result) => buildPercentiles(result));
   const cost = buildCostSummary(results, winner, primaryMetric);
@@ -223,7 +227,7 @@ function buildHeadline(
     return `The selected runs are within the tie threshold (${formatRatio(comparisonRatio)}) on the primary metric.${caveatSuffix}`;
   }
   if (primaryMetric === "power_score") {
-    return `In these selected runs, ${winnerLabel}'s power score was ${formatRatio(comparisonRatio)} the lowest selected score.${caveatSuffix}`;
+    return `In these selected runs, ${winnerLabel}'s power score was ${formatRatio(comparisonRatio)} better than the lowest selected run.${caveatSuffix}`;
   }
   return `In these selected runs, ${winnerLabel}'s geomean query time was ${formatRatio(comparisonRatio)} faster than the slowest selected run.${caveatSuffix}`;
 }

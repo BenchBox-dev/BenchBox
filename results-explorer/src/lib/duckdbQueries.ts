@@ -748,6 +748,16 @@ export async function getQueryExecutions(resultId: string): Promise<QueryExecuti
  * Returns null for a result the table does not cover, which is the honest
  * answer for a snapshot built before the basis columns existed.
  */
+/** Fetch the small basis inventory in one query for a platform page. */
+export async function getResultsBasisAvailability(resultIds: readonly string[]): Promise<ResultBasisAvailabilityRow[]> {
+  if (resultIds.length === 0) return [];
+  return queryRows<ResultBasisAvailabilityRow>(
+    "SELECT result_id, has_warmup, measurement_pass_count, warmup_status, available_bases, varying_pass_queries" +
+      ` FROM bench.result_basis_availability WHERE result_id IN (${resultIds.map(() => "?").join(",")})`,
+    [...resultIds],
+  );
+}
+
 export async function getResultBasisAvailability(
   resultId: string,
 ): Promise<ResultBasisAvailabilityRow | null> {

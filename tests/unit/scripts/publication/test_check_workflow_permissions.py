@@ -247,10 +247,7 @@ def test_publication_recover_permissions_detects_violations(tmp_path: Path) -> N
             },
         },
     }
-    assert any(
-        "must target environment 'github-pages'" in e
-        for e in checker.check_publication_recover_permissions(wf, bad_env)
-    )
+    assert any("autonomous recovery job" in e for e in checker.check_publication_recover_permissions(wf, bad_env))
 
 
 def test_main_all_workflows_pass() -> None:

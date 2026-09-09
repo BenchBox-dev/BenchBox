@@ -2,14 +2,15 @@
 // DivergingBarChart - per-query improvement/regression vs baseline
 //
 // delta_pct = (this_ms - baseline_ms) / baseline_ms * 100
-//   negative (green): faster than baseline
-//   positive (red): slower than baseline
+//   negative (left of centre): faster than baseline
+//   positive (right of centre): slower than baseline
+//   bar color: the run the bar belongs to
 //
 // Sorted by abs(delta_pct) descending so biggest changes appear first.
 // ---------------------------------------------------------------------------
 
 import { deltaPct, sortByMagnitudeDesc } from "@/lib/chartMath";
-import { DIVERGING_MAX_PCT, FASTER_FILL, SLOWER_FILL, paletteColor } from "@/lib/chartTheme";
+import { DIVERGING_MAX_PCT, paletteColor } from "@/lib/chartTheme";
 import { useElementSize } from "@/lib/useElementSize";
 import { chartFrame, edgeSafeValueLabel } from "@/lib/chartFrame";
 
@@ -46,8 +47,10 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
     if (!baselineMs) continue;
     timings.forEach((t, i) => {
       if (i === baselineIdx || !t || t.ms <= 0) return;
-      const colorIdx = i < baselineIdx ? i : i + 1;
-      const color = paletteColor(colorIdx);
+      // The run's own index, not a baseline-relative one. Shifting later runs
+      // up by one to skip the baseline's color wraps the last run back onto the
+      // first run's color once the shift passes the end of the palette.
+      const color = paletteColor(i);
       const dp = deltaPct(t.ms, baselineMs);
       if (dp === null) return;
       rawEntries.push({
@@ -144,6 +147,11 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
                 const isRegression = entry.deltaPct > 0;
                 const barX = isRegression ? centerX : centerX - barW;
                 return (
+                  // Bars are colored by the run they belong to, not by
+                  // direction: which side of the centre line a bar falls on
+                  // already says faster or slower, so spending fill on that
+                  // too would leave nothing to say WHICH run it is.
+                  //
                   // Composite key: a single platform name can appear twice
                   // in `entries` if the caller passes variant rows (same
                   // platform, different tuning_mode). The loop index `si`
@@ -155,8 +163,8 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
                       y={barY}
                       width={Math.max(barW, 1)}
                       height={BAR_H}
-                      fill={isRegression ? SLOWER_FILL : FASTER_FILL}
-                      opacity={0.75}
+                      fill={entry.color}
+                      opacity={0.85}
                     />
                     {/* A delta at the clamp reaches the end of its half of the
                         plot; a label started past the bar would fall outside
@@ -206,15 +214,23 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
         </tbody>
       </table>
 
-      {/* Legend */}
-      <div class="mt-2 flex flex-wrap gap-3 text-xs text-[var(--bb-data-fg-muted)]">
-        <span>Baseline: <strong>{results[baselineIdx]?.platform}</strong></span>
-        <span class="ml-2">
-            <span class="inline-block h-2 w-3 rounded-sm mr-1" style={{ backgroundColor: FASTER_FILL }} />faster (negative %)
-        </span>
+      {/* Legend: colors name the runs, position names the direction. */}
+      <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--bb-data-fg-muted)]">
         <span>
-          <span class="inline-block h-2 w-3 rounded-sm mr-1" style={{ backgroundColor: SLOWER_FILL }} />slower (positive %)
+          Baseline: <strong>{results[baselineIdx]?.platform}</strong>
         </span>
+        {results.map((result, index) =>
+          index === baselineIdx ? null : (
+            <span key={result.platform} class="flex items-center gap-1">
+              <span
+                class="inline-block h-2 w-3 rounded-sm"
+                style={{ backgroundColor: paletteColor(index) }}
+              />
+              {result.platform}
+            </span>
+          ),
+        )}
+        <span>Left of centre is faster than the baseline, right is slower.</span>
       </div>
     </div>
   );

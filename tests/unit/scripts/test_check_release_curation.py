@@ -96,6 +96,35 @@ def test_real_makefile_curation_list_parses_to_paths_only():
     assert not flags, f"parser leaked flags into the curation list: {sorted(flags)}"
 
 
+def _write_decision_doc(tmp_path: Path, ending: str) -> Path:
+    doc = tmp_path / "single-repo-migration.md"
+    doc.write_text(
+        "- **`main` only**: `benchbox/`, `Makefile`.\n"
+        "\n"
+        "## Amendment — trailing entry\n"
+        "\n"
+        "- **`main` only** (extension to A3): `publication/`." + ending,
+        encoding="utf-8",
+    )
+    return doc
+
+
+def test_parse_main_only_allowlist_accepts_trailing_bullet_at_eof(tmp_path: Path) -> None:
+    """A main-only bullet at end of file must parse with no blank line after it.
+
+    end-of-file-fixer strips trailing blank lines, so the final amendment
+    bullet is terminated by end of input, not by a blank line.
+    """
+    paths = check_release_curation.parse_main_only_allowlist(_write_decision_doc(tmp_path, "\n"))
+    assert {"benchbox", "Makefile", "publication"} <= paths
+
+
+def test_parse_main_only_allowlist_accepts_trailing_bullet_with_blank_line(tmp_path: Path) -> None:
+    """The historical blank-line-terminated trailing bullet keeps parsing."""
+    paths = check_release_curation.parse_main_only_allowlist(_write_decision_doc(tmp_path, "\n\n"))
+    assert {"benchbox", "Makefile", "publication"} <= paths
+
+
 def test_release_make_runtime_is_main_only_not_curated() -> None:
     main_only = check_release_curation.parse_main_only_allowlist(
         REPO_ROOT / "_project" / "decisions" / "single-repo-migration.md"
@@ -143,7 +172,7 @@ def test_curated_release_make_runtime_executes_help_and_inventory(tmp_path: Path
     assert help_result.returncode == 0, help_result.stderr
     assert "makefile-inventory-check" in help_result.stdout
     assert inventory_result.returncode == 0, inventory_result.stderr
-    assert "Makefile inventory OK: 203 targets, 197 public, default=test" in inventory_result.stdout
+    assert "Makefile inventory OK: 204 targets, 198 public, default=test" in inventory_result.stdout
 
 
 @pytest.mark.parametrize(

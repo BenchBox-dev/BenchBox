@@ -98,5 +98,5 @@ def test_results_secondary_nav_remains_separate_from_global_header() -> None:
     assert 'export const HEADER_NAV_ARIA_LABEL = "BenchBox"' in contract
     assert "aria-label={HEADER_NAV_ARIA_LABEL}" in layout
     assert 'aria-label="Results Explorer"' in layout
-    for label in ["Leaderboards", "Benchmarks", "Platforms", "Compare", "Query"]:
+    for label in ["Overview", "Benchmarks", "Platforms", "Compare", "Find runs"]:
         assert label in layout

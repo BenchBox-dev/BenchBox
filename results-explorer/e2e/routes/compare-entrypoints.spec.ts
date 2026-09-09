@@ -30,7 +30,7 @@ test.describe("compare entrypoint happy paths", () => {
     await checkRow(page.getByTestId(DUCKDB.id));
     await checkRow(page.getByTestId(DATAFUSION.id));
 
-    const compareLink = page.getByRole("link", { name: /Compare 2 selected/ });
+    const compareLink = page.getByTestId("compare-tray-compare-link");
     await expect(compareLink).toBeVisible();
     await compareLink.click();
 
@@ -46,7 +46,7 @@ test.describe("compare entrypoint happy paths", () => {
     await expect(page.getByTestId("platform-compare-guidance")).toContainText("1 result selected");
 
     await checkRow(page.getByTestId(DUCKDB_TUNED.id));
-    const compareLink = page.getByRole("link", { name: /Compare 2 selected/ });
+    const compareLink = page.getByTestId("compare-tray-compare-link");
     await expect(compareLink).toBeVisible();
     await compareLink.click();
 
@@ -93,8 +93,8 @@ test.describe("compare entrypoint happy paths", () => {
   test("compare entrypoint: empty Compare page can start and complete a comparison", async ({ page }) => {
     await page.goto("/results/compare");
     await waitForShell(page);
-    await expect(page.getByRole("heading", { name: "Choose runs to compare" })).toBeVisible({ timeout: 20_000 });
-    await page.getByTestId("compare-picker-query-link").click();
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible({ timeout: 20_000 });
+    await page.getByRole("navigation", { name: "Results Explorer" }).getByRole("link", { name: "Find runs" }).click();
     await waitForShell(page);
     await waitForDataLoaded(page, /matching run/);
     await facetCheckbox(page, "Benchmark", "TPC-H").check();
@@ -135,9 +135,9 @@ async function expectCompletedComparison(
     await expect(main.locator(`a[href="/results/r/${run.id}"]`).first()).toBeVisible();
   }
   await expect(main.getByRole("heading", { name: "Comparison summary" })).toBeVisible();
-  await expect(main.getByRole("heading", { name: "What does this comparison show?" })).toBeVisible();
+  await expect(main.getByTestId("chart-panel-chart-summary_box")).toBeVisible();
   await expect(main.getByRole("region", { name: "Comparison checks" })).toBeVisible();
-  await expect(main.getByRole("button", { name: /Share URL/ })).toBeVisible();
+  await expect(main.getByTestId("page-header")).toBeVisible();
 
   if (options.reload) {
     await page.reload();

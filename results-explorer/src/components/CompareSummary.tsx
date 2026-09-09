@@ -55,7 +55,7 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
       )}
 
       <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Leading recorded run">
+        <SummaryCard label={`Leading run on ${summary.primaryMetricLabel}`}>
           {summary.claimSuppressed ? (
             <p class="text-sm text-[var(--bb-data-fg-muted)]">Not claimed</p>
           ) : summary.isTie ? (
@@ -88,7 +88,9 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
           )}
         </SummaryCard>
 
-        <SummaryCard label={summary.winnerLabel ? `Queries where ${summary.winnerLabel} was fastest` : "Query comparison"}>
+        {/* The card label already names the run and the question, so the
+            value says the number and nothing else. */}
+        <SummaryCard label={summary.winnerLabel ? `Where ${summary.winnerLabel} wins` : "Query comparison"}>
           {summary.claimSuppressed ? (
             <>
               <p class="text-sm text-[var(--bb-data-fg-muted)]">No winner named</p>
@@ -97,7 +99,7 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
           ) : (
             <>
               <p class="font-mono text-sm font-semibold text-[var(--bb-data-fg-primary)]">
-                {summary.winnerLabel ?? summary.winner?.platform} was fastest on {summary.queryRecord.wins} of {summary.queryRecord.comparableQueries} comparable queries
+                {summary.queryRecord.wins} of {summary.queryRecord.comparableQueries} queries
               </p>
               <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
                 {summary.queryRecord.losses} slower · {summary.queryRecord.ties} tied
@@ -114,15 +116,27 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
           )}
         </SummaryCard>
 
-        <SummaryCard label={summary.winnerLabel ? `${summary.winnerLabel} query-time distribution` : "Query-time distribution"}>
+        <SummaryCard
+          label={summary.winnerLabel ? `Latency profile · ${summary.winnerLabel}` : "Latency profile"}
+        >
           {winnerPercentiles?.p50 !== null &&
           winnerPercentiles?.p50 !== undefined &&
           winnerPercentiles.p90 !== null &&
           winnerPercentiles.p99 !== null ? (
-            <p class="font-mono text-xs text-[var(--bb-data-fg-primary)]">
-              p50 {fmtMs(winnerPercentiles.p50)} · p90 {fmtMs(winnerPercentiles.p90)} · p99{" "}
-              {fmtMs(winnerPercentiles.p99)}
-            </p>
+            <dl class="grid grid-cols-3 gap-x-2 text-center">
+              {(
+                [
+                  ["p50", winnerPercentiles.p50],
+                  ["p90", winnerPercentiles.p90],
+                  ["p99", winnerPercentiles.p99],
+                ] as const
+              ).map(([name, value]) => (
+                <div key={name}>
+                  <dt class="text-xs text-[var(--bb-data-fg-muted)]">{name}</dt>
+                  <dd class="font-mono text-sm font-semibold text-[var(--bb-data-fg-primary)]">{fmtMs(value)}</dd>
+                </div>
+              ))}
+            </dl>
           ) : (
             <p class="text-sm text-[var(--bb-data-fg-muted)]">Percentiles unavailable</p>
           )}

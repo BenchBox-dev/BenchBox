@@ -3,7 +3,7 @@
 
 Drives the transactional publication lifecycle:
 - prepare: validates candidate bytes or restore source, queries journal, generates canonical permit
-- authenticate-approval: validates GitHub environment approval comment 'publication-approval:<permit_sha256>'
+- authenticate-approval: validates the protected GitHub environment approval
 - record-prepared: atomically reserves generation and commits 'prepared' state to the journal via CAS
 - start-write: creates unique intent commit OID, records 'write-started' in journal
 - acknowledge-write: records provider deployment outcome in journal ('write-acknowledged')
@@ -20,12 +20,6 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 import urllib.error
 import urllib.request
 import uuid
@@ -33,6 +27,10 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from scripts.publication import journal, transaction
 from scripts.publication.transaction import (
@@ -56,6 +54,8 @@ from scripts.publication.transaction import (
     canonical_json,
 )
 
+WATCHDOG_MAX_AGE_MINUTES = 10
+
 
 def _load_json(path: Path | str) -> dict[str, Any]:
     with open(path, encoding="utf-8") as f:
@@ -77,7 +77,7 @@ def _write_json(path: Path | str, data: dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def cmd_prepare(args: argparse.Namespace) -> int:
+def cmd_prepare(args: argparse.Namespace) -> int:  # noqa: C901
     repo_path = Path(args.repo_path).resolve()
     target = {
         "repository": args.target_repo,
@@ -123,14 +123,39 @@ def cmd_prepare(args: argparse.Namespace) -> int:
     }
 
     if args.kind == KIND_PROMOTION:
+        candidate_parent_sha = getattr(args, "candidate_parent_sha", "") or ""
+        candidate_parent_generation = getattr(args, "candidate_parent_generation", "") or ""
+        if bool(candidate_parent_sha) != bool(candidate_parent_generation):
+            raise TransactionError("candidate parent SHA and generation must be supplied together")
+        if candidate_parent_generation:
+            try:
+                candidate_parent_generation_int = int(candidate_parent_generation)
+            except ValueError as exc:
+                raise TransactionError("candidate parent generation must be a positive integer") from exc
+            if candidate_parent_generation_int <= 0:
+                raise TransactionError("candidate parent generation must be a positive integer")
+            if generation <= 1:
+                raise TransactionError("genesis promotion cannot declare a parent")
+            if not parent_tx_id:
+                raise TransactionError("candidate declares a parent but the journal has no durable transaction")
+            parent_tx = journal.read_transaction(repo_path, parent_tx_id, ref=args.ref)
+            parent_source_sha = str(
+                (parent_tx.attestation or {}).get("source_commit") or parent_tx.content.get("develop_sha") or ""
+            )
+            if candidate_parent_sha != parent_source_sha or candidate_parent_generation_int != parent_tx.generation:
+                raise TransactionError("candidate parent does not match the current durable publication head")
         content = {
             "manifest_digest": args.candidate_manifest_digest,
             "develop_sha": args.develop_sha,
             "published_results_sha": args.published_results_sha,
         }
+        if candidate_parent_sha:
+            content["parent_sha"] = candidate_parent_sha
+            content["parent_generation"] = candidate_parent_generation_int
         artifact = {
             "artifact_id": int(args.candidate_artifact_id) if args.candidate_artifact_id else None,
-            "archive_sha256": args.candidate_archive_sha256,
+            "archive_sha256": getattr(args, "candidate_archive_sha256", "") or None,
+            "site_tree_sha256": getattr(args, "candidate_site_tree_sha256", "") or None,
         }
         tx, _ = transaction.prepare_promotion(
             target=target,
@@ -175,6 +200,7 @@ def cmd_prepare(args: argparse.Namespace) -> int:
         "candidate_run_id": getattr(args, "candidate_run_id", None),
         "candidate_artifact_id": tx.artifact.get("artifact_id"),
         "candidate_archive_sha256": tx.artifact.get("archive_sha256"),
+        "candidate_site_tree_sha256": tx.artifact.get("site_tree_sha256"),
         "desired_digest": tx.desired.get("digest"),
         "expected_parent_oid": journal_state.tip_commit_oid,
         "expected_journal_revision": journal_state.tip_commit_oid,
@@ -203,15 +229,18 @@ def cmd_prepare(args: argparse.Namespace) -> int:
                 f.write(f"candidate_manifest_digest={tx.content['manifest_digest']}\n")
             if tx.artifact.get("artifact_id") is not None:
                 f.write(f"artifact_id={tx.artifact['artifact_id']}\n")
+            if tx.artifact.get("archive_sha256") is not None:
+                f.write(f"candidate_archive_sha256={tx.artifact['archive_sha256']}\n")
+            if tx.artifact.get("site_tree_sha256") is not None:
+                f.write(f"candidate_site_tree_sha256={tx.artifact['site_tree_sha256']}\n")
 
     print(f"Prepared {tx.kind} transaction {tx.transaction_id} (gen {tx.generation})")
     print(f"Permit SHA-256: {permit_digest}")
-    print(f"Expected approval comment: publication-approval:{permit_digest}")
     return 0
 
 
 def cmd_resume(args: argparse.Namespace) -> int:
-    """Create a permit for a watchdog-created rollback transaction."""
+    """Create a permit for a prepared rollback after operator reconciliation."""
     repo_path = Path(args.repo_path).resolve()
     journal_state = journal.read_journal_state(repo_path, ref=args.ref)
     tx = journal.read_transaction(repo_path, args.transaction_id, ref=args.ref)
@@ -275,8 +304,6 @@ def authenticate_approval_record(
         )
 
     permit_digest = hashlib.sha256(canonical_json(permit).encode("utf-8")).hexdigest()
-    expected_comment = f"publication-approval:{permit_digest}"
-
     if simulated_approval is not None:
         approvals = [simulated_approval]
     else:
@@ -304,17 +331,14 @@ def authenticate_approval_record(
         env = app.get("environments", [{}])[0] if app.get("environments") else app.get("environment", {})
         env_name = env.get("name") if isinstance(env, dict) else str(env)
         state = app.get("state", "").lower()
-        comment = (app.get("comment") or "").strip()
-
         if env_name == "github-pages" and state == "approved":
-            if comment == expected_comment:
-                matched = app
-                break
+            matched = app
+            break
 
     if not matched:
         raise TransactionError(
             f"Approval authentication failed: no approval found on run {run_id} "
-            f"for environment 'github-pages' with comment '{expected_comment}'"
+            "for protected environment 'github-pages'"
         )
 
     user = matched.get("user") or {}
@@ -632,12 +656,31 @@ def cmd_record_failure(args: argparse.Namespace) -> int:
     return 0
 
 
+def _transaction_age_seconds(tx: transaction.Transaction) -> float | None:
+    """Return the age of the durable transaction event when it is parseable."""
+    timestamp = tx.event.get("timestamp") if isinstance(tx.event, dict) else None
+    if not timestamp:
+        return None
+    try:
+        created = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return max(0.0, (datetime.now(timezone.utc) - created).total_seconds())
+
+
 def _resolve_watchdog_action(
     tx: transaction.Transaction,
     journal_state: journal.JournalState,
     barrier_evidence: str | None,
 ) -> tuple[str, str, str]:
     """Resolve (action, status, reason) for active transaction during watchdog scan."""
+    age_seconds = _transaction_age_seconds(tx)
+    if age_seconds is not None and age_seconds > WATCHDOG_MAX_AGE_MINUTES * 60:
+        return (
+            "alert",
+            "stale_transaction",
+            f"Active transaction is {age_seconds / 60:.1f} minutes old; operator reconciliation is required.",
+        )
     if tx.state == STATE_PREPARED:
         return (
             "record_failure",
@@ -664,9 +707,9 @@ def _resolve_watchdog_action(
         )
     if tx.state == STATE_ROLLBACK_WRITE_STARTED:
         return (
-            "dispatch_rollback",
+            "operator_reconcile",
             "rollback_write_pending",
-            "Rollback transaction is prepared and awaiting its provider write workflow.",
+            "Rollback transaction is prepared; an operator must reconcile it through the protected writer.",
         )
     if tx.state in (transaction.STATE_EXTERNALLY_VERIFIED, transaction.STATE_ROLLBACK_VERIFIED):
         return (
@@ -675,12 +718,6 @@ def _resolve_watchdog_action(
             "Transaction verified; ready for durable CAS advance.",
         )
     if tx.state == STATE_RECOVERY_REQUIRED:
-        if tx.kind == KIND_PROMOTION and barrier_evidence and tx.parent_transaction_id:
-            return (
-                "prepare_rollback",
-                "ready_for_rollback",
-                "Promotion failed; activation barrier verified; eligible for automatic rollback.",
-            )
         if not barrier_evidence:
             return (
                 "quarantine",
@@ -688,9 +725,9 @@ def _resolve_watchdog_action(
                 "Recovery required but awaiting activation barrier evidence.",
             )
         return (
-            "escalate_operator",
-            "requires_operator",
-            "Recovery required; operator intervention needed.",
+            "operator_restore",
+            "ready_for_operator",
+            "Recovery required; provider finality evidence is present and an operator must start restoration.",
         )
     if tx.state == STATE_TERMINAL_FAILURE:
         return (
@@ -699,174 +736,6 @@ def _resolve_watchdog_action(
             f"Journal blocked under terminal failure: {journal_state.write_block}",
         )
     return ("none", "unknown_state", f"Unknown transaction state: {tx.state}")
-
-
-def _execute_watchdog_action(
-    action: str,
-    tx: transaction.Transaction,
-    args: argparse.Namespace,
-    reason: str,
-) -> bool:
-    """Execute the resolved watchdog action."""
-    if action == "record_failure":
-        stage = "prepared" if tx.state == STATE_PREPARED else "write"
-        code = "INITIATING_RUN_LOST" if tx.state == STATE_PREPARED else "PROVIDER_WRITE_FAILED"
-        fail_args = argparse.Namespace(
-            repo_path=args.repo_path,
-            ref=args.ref,
-            transaction_id=tx.transaction_id,
-            code=code,
-            stage=stage,
-            reason=reason,
-            output_tx=None,
-        )
-        cmd_record_failure(fail_args)
-        return True
-
-    if action == "finalize":
-        fin_args = argparse.Namespace(
-            repo_path=args.repo_path,
-            ref=args.ref,
-            transaction_id=tx.transaction_id,
-            output_tx=None,
-        )
-        cmd_finalize(fin_args)
-        return True
-
-    if action == "verify_and_finalize":
-        from scripts.publication.reconciliation import canonical_live_receipt_payload
-        from scripts.publication.verify_live import verify_live
-
-        target_url = tx.target.get("base_url", args.base_url) if isinstance(tx.target, dict) else args.base_url
-        probe_report = verify_live(base_url=target_url, timeout=10.0)
-        if probe_report.ok:
-            observation_digest = hashlib.sha256(canonical_json(probe_report.to_dict()).encode("utf-8")).hexdigest()
-            receipt = {
-                "schema_version": 1,
-                "receipt_id": f"live-{tx.generation}-{tx.transaction_id}",
-                "target": tx.target,
-                "generation": tx.generation,
-                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-                "manifest_digest": tx.content.get("manifest_digest"),
-                "develop_sha": tx.content.get("develop_sha"),
-                "published_results_sha": tx.content.get("published_results_sha"),
-                "artifact": {"archive_sha256": tx.artifact.get("archive_sha256")},
-                "artifact_digest": tx.artifact.get("archive_sha256"),
-                "observation_digest": observation_digest,
-                "routes": probe_report.to_dict().get("probes", []),
-                "observation_origin": probe_report.to_dict().get("observation_origin"),
-                "nonce": f"{os.environ.get('GITHUB_RUN_ID', 'watchdog')}-{os.environ.get('GITHUB_RUN_ATTEMPT', '1')}",
-                "freshness_window": "24h",
-                "attestor": "github-actions:publication-recover",
-                "signature_algorithm": "ed25519",
-                "prior_live_receipt_id": tx.parent_transaction_id,
-                "receipt_run_id": os.environ.get("GITHUB_RUN_ID", "watchdog"),
-                "source_commit": tx.content.get("develop_sha"),
-            }
-            private_key = os.environ.get("PUBLICATION_ATTESTOR_PRIVATE_KEY")
-            if not private_key:
-                raise TransactionError("Watchdog attestation key is required for recovery finalization")
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_path = Path(temp_dir)
-                key_path = temp_path / "attestor.pem"
-                payload_path = temp_path / "receipt-payload"
-                signature_path = temp_path / "receipt-signature"
-                key_path.write_text(private_key, encoding="utf-8")
-                payload_path.write_bytes(canonical_live_receipt_payload(receipt))
-                subprocess.run(
-                    [
-                        "openssl",
-                        "pkeyutl",
-                        "-sign",
-                        "-rawin",
-                        "-inkey",
-                        str(key_path),
-                        "-in",
-                        str(payload_path),
-                        "-out",
-                        str(signature_path),
-                    ],
-                    check=True,
-                    capture_output=True,
-                )
-                receipt["signature"] = __import__("base64").b64encode(signature_path.read_bytes()).decode("ascii")
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as probe_tf:
-                json.dump(probe_report.to_dict(), probe_tf)
-                probe_path = probe_tf.name
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as receipt_tf:
-                json.dump(receipt, receipt_tf)
-                receipt_path = receipt_tf.name
-            ver_args = argparse.Namespace(
-                repo_path=args.repo_path,
-                ref=args.ref,
-                transaction_id=tx.transaction_id,
-                probe_report=probe_path,
-                attestation=receipt_path,
-                challenge=None,
-                verifier_sha=None,
-                output_tx=None,
-            )
-            cmd_record_verification(ver_args)
-            fin_args = argparse.Namespace(
-                repo_path=args.repo_path,
-                ref=args.ref,
-                transaction_id=tx.transaction_id,
-                output_tx=None,
-            )
-            cmd_finalize(fin_args)
-            return True
-
-        fail_args = argparse.Namespace(
-            repo_path=args.repo_path,
-            ref=args.ref,
-            transaction_id=tx.transaction_id,
-            code="WATCHDOG_PROBE_FAILED",
-            stage="verification",
-            reason=f"Watchdog live verification failed: {'; '.join(probe_report.errors)}",
-            output_tx=None,
-        )
-        cmd_record_failure(fail_args)
-        return True
-
-    if action == "prepare_rollback":
-        repo_path = Path(args.repo_path).resolve()
-        journal_state = journal.read_journal_state(repo_path, ref=args.ref)
-        if not journal_state.durable_transaction_id:
-            raise TransactionError("Cannot prepare rollback without a durable journal head")
-        durable_tx = journal.read_transaction(repo_path, journal_state.durable_transaction_id, ref=args.ref)
-        barrier_source = args.barrier_evidence
-        if not barrier_source:
-            raise TransactionError("Rollback preparation requires activation barrier evidence")
-        barrier_path = Path(barrier_source)
-        barrier = _load_json(barrier_path) if barrier_path.is_file() else json.loads(barrier_source)
-        rollback_tx, _ = transaction.prepare_rollback(
-            failed_transaction=tx,
-            parent_durable_transaction=durable_tx,
-            generation=journal_state.next_generation,
-            controller=tx.controller,
-            owner=tx.owner,
-            barrier_evidence=barrier,
-        )
-        new_state = journal.JournalState(
-            target=journal_state.target,
-            next_generation=rollback_tx.generation + 1,
-            active_transaction_id=rollback_tx.transaction_id,
-            durable_transaction_id=journal_state.durable_transaction_id,
-            write_block=None,
-            policy_digest=journal_state.policy_digest,
-            tip_commit_oid=journal_state.tip_commit_oid,
-        )
-        journal.write_journal_update(
-            repo_path=repo_path,
-            expected_parent_oid=journal_state.tip_commit_oid,
-            new_state=new_state,
-            transaction=rollback_tx,
-            ref=args.ref,
-            commit_message=f"transaction: prepare watchdog rollback for {tx.transaction_id}",
-        )
-        return True
-
-    return False
 
 
 def cmd_watchdog_scan(args: argparse.Namespace) -> int:
@@ -921,11 +790,8 @@ def cmd_watchdog_scan(args: argparse.Namespace) -> int:
         "state": tx.state,
         "kind": tx.kind,
         "reason": reason,
+        "age_seconds": _transaction_age_seconds(tx),
     }
-
-    if args.execute and action not in ("none", "quarantine", "escalate_operator"):
-        print(f"Executing watchdog recovery action '{action}' for transaction {tx.transaction_id}...")
-        report["action_executed"] = _execute_watchdog_action(action, tx, args, reason)
 
     if args.output_json:
         _write_json(args.output_json, report)
@@ -955,7 +821,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_prep.add_argument("--published-results-sha", default="0" * 40)
     p_prep.add_argument("--candidate-manifest-digest", default="0" * 64)
     p_prep.add_argument("--candidate-artifact-id", default=None)
-    p_prep.add_argument("--candidate-archive-sha256", default="0" * 64)
+    p_prep.add_argument("--candidate-archive-sha256", default="")
+    p_prep.add_argument("--candidate-site-tree-sha256", default="")
+    p_prep.add_argument("--candidate-parent-sha", default="")
+    p_prep.add_argument("--candidate-parent-generation", default="")
     p_prep.add_argument("--restore-transaction-id", default=None)
     p_prep.add_argument("--failed-transaction-id", default=None)
     p_prep.add_argument("--barrier-evidence", default=None)
@@ -970,7 +839,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_prep.set_defaults(func=cmd_prepare)
 
     # authenticate-approval
-    p_auth = sub.add_parser("authenticate-approval", help="Authenticate GitHub environment approval comment")
+    p_auth = sub.add_parser("authenticate-approval", help="Authenticate GitHub environment approval")
     p_auth.add_argument("--permit", required=True)
     p_auth.add_argument("--run-id", default=None)
     p_auth.add_argument("--run-attempt", type=int, default=None)
@@ -1039,17 +908,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_fail.set_defaults(func=cmd_record_failure)
 
     # watchdog-scan
-    p_watch = sub.add_parser("watchdog-scan", help="Scan journal state and execute recovery")
+    p_watch = sub.add_parser("watchdog-scan", help="Scan journal state without changing it")
     p_watch.add_argument("--repo-path", default=".")
     p_watch.add_argument("--ref", default=journal.DEFAULT_REF)
     p_watch.add_argument("--base-url", default="https://benchbox.dev")
     p_watch.add_argument("--barrier-evidence", default=None)
     p_watch.add_argument("--trigger-run-id", default=None)
     p_watch.add_argument("--output-json", default=None)
-    p_watch.add_argument("--execute", action="store_true", help="Execute resolved recovery action")
     p_watch.set_defaults(func=cmd_watchdog_scan)
 
-    # resume a watchdog-created rollback
+    # resume an operator-reconciled rollback
     p_resume = sub.add_parser("resume", help="Create a permit for a prepared rollback")
     p_resume.add_argument("--transaction-id", required=True)
     p_resume.add_argument("--ref", default=journal.DEFAULT_REF)

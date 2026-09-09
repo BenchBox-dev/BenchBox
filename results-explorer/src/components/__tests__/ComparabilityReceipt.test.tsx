@@ -121,7 +121,8 @@ describe("ComparabilityReceipt", () => {
     expect(receipt).toHaveTextContent("Driver version");
     expect(receipt).toHaveTextContent("DuckDB: 1.0; SQLite: 2.0");
     expect(receipt).toHaveTextContent("Date window");
-    expect(receipt.textContent).toMatch(/2026-04-01.*days ago.*to 2026-04-03.*days ago/);
+    expect(receipt.querySelectorAll("[data-testid=run-date-chip]")).toHaveLength(4);
+    expect(receipt.querySelector("[data-testid=run-date-chip]")?.getAttribute("aria-label")).toMatch(/2026-04-01.*days ago/);
     expect(receipt).toHaveTextContent("Tuning");
     expect(receipt).toHaveTextContent("DuckDB: default; SQLite: manual");
     expect(receipt).toHaveTextContent("Architecture");

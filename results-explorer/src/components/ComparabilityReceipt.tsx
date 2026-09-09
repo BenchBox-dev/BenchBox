@@ -1,3 +1,4 @@
+import { RunDateChip } from "@/components/RunAge";
 import type { DetailResult, Environment } from "@/types";
 import { humanizeBenchmark, shortHash } from "@/utils";
 import { costModelSummary, costScopeSummary, normalizedCostLabel } from "@/lib/costDisplay";
@@ -29,6 +30,7 @@ export interface ComparabilityField {
   status: ComparabilityStatus;
   summary: string;
   detail?: string;
+  dates?: { platform: string; runDate: string }[];
 }
 
 export function ComparabilityReceipt({ results }: ComparabilityReceiptProps) {
@@ -64,7 +66,7 @@ export function ComparabilityReceipt({ results }: ComparabilityReceiptProps) {
           <ul class="mt-1 list-disc space-y-1 pl-4">
             {warningFields.map((field) => (
               <li key={field.label}>
-                <span class="font-medium">{field.label}:</span> {field.summary}
+                <span class="font-medium">{field.label}:</span> {field.dates ? <DateWindowChips dates={field.dates} /> : field.summary}
               </li>
             ))}
           </ul>
@@ -391,6 +393,10 @@ export function orderWarningLabelsForSummary(warningFields: readonly Comparabili
   return [...priority, ...rest];
 }
 
+function DateWindowChips({ dates }: { dates: NonNullable<ComparabilityField["dates"]> }) {
+  return <span class="inline-flex flex-wrap gap-2">{dates.map((entry, index) => <span key={index} class="inline-flex items-center gap-1">{entry.platform} <RunDateChip runDate={entry.runDate} /></span>)}</span>;
+}
+
 function ComparabilityFieldRow({ field }: { field: ComparabilityField }) {
   return (
     <div class="rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-2">
@@ -398,8 +404,8 @@ function ComparabilityFieldRow({ field }: { field: ComparabilityField }) {
         <h3 class="text-xs font-semibold uppercase text-[var(--bb-data-fg-subtle)]">{field.label}</h3>
         <StatusBadge role="comparison" tone={statusTone(field.status)}>{statusLabel(field.status)}</StatusBadge>
       </div>
-      <p class="break-words text-xs font-medium text-[var(--bb-data-fg-primary)]">{field.summary}</p>
-      {field.detail && <p class="mt-1 break-words text-xs text-[var(--bb-data-fg-muted)]">{field.detail}</p>}
+      <p class="break-words text-xs font-medium text-[var(--bb-data-fg-primary)]">{field.dates ? <DateWindowChips dates={field.dates} /> : field.summary}</p>
+      {field.detail && !field.dates && <p class="mt-1 break-words text-xs text-[var(--bb-data-fg-muted)]">{field.detail}</p>}
     </div>
   );
 }
@@ -439,6 +445,7 @@ function compareValues(
 }
 
 function buildDateWindowField(results: DetailResult[]): ComparabilityField {
+  const dateEntries = results.map((result) => ({ platform: result.platform, runDate: result.run_date }));
   const dates = results.map((result) => formatRunDate(result.run_date));
   const uniqueDates = [...new Set(dates)];
   if (uniqueDates.length === 1) {
@@ -446,6 +453,7 @@ function buildDateWindowField(results: DetailResult[]): ComparabilityField {
       label: "Date window",
       status: "match",
       summary: formatRunDateWithAge(results[0]!.run_date),
+      dates: dateEntries,
     };
   }
   const sortedDates = [...uniqueDates].sort();
@@ -455,6 +463,7 @@ function buildDateWindowField(results: DetailResult[]): ComparabilityField {
     label: "Date window",
     status: "diff",
     summary: `${labelForDate(sortedDates[0]!)} to ${labelForDate(sortedDates[sortedDates.length - 1]!)}`,
+    dates: dateEntries,
     detail: formatPerPlatform(
       results.map((result) => ({
         platform: result.platform,

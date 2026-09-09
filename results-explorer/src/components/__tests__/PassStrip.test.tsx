@@ -6,7 +6,7 @@
  * displayed beside it.
  */
 
-import { render, screen } from "@testing-library/preact";
+import { render, screen, fireEvent, within } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 
 import { PassStrip, hasNoRecordedWarmup, summarizeQueryPasses } from "@/components/PassStrip";
@@ -148,4 +148,14 @@ describe("hasNoRecordedWarmup", () => {
       ),
     ).toBe(false);
   });
+});
+
+it("makes every summary reachable beyond the initial 200-query page", () => {
+  render(<PassStrip queries={Array.from({ length: 220 }, (_, i) => exec(`Q${i + 1}`, i + 1, "measurement", 1))} limit={200} />);
+  expect(screen.queryByText("Q220")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Show more query summaries" }));
+  const row = screen.getByText("Q220").closest("tr")!;
+  expect(within(row).getAllByText("220 ms").length).toBeGreaterThan(0);
+  expect(screen.getByText(/Showing 220 of 220 queries/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Show more query summaries" })).toBeNull();
 });

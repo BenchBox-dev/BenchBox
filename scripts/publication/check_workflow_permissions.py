@@ -275,19 +275,8 @@ def check_publication_recover_permissions(file_path: Path, data: dict[str, Any])
     if scan_perm != expected_scan:
         errors.append(f"{file_path.name} (job 'scan'): must declare exactly {expected_scan}, got {scan_perm}.")
 
-    # act: contents: write, pages: write, id-token: write, actions: read
-    act_job = jobs.get("act", {})
-    act_perm = _normalize_permissions(act_job.get("permissions"))
-    expected_act = {"actions": "read", "contents": "write", "id-token": "write", "pages": "write"}
-    if act_perm != expected_act:
-        errors.append(f"{file_path.name} (job 'act'): must declare exactly {expected_act}, got {act_perm}.")
-
-    # act must target github-pages environment
-    env_name = act_job.get("environment", {})
-    if isinstance(env_name, dict):
-        env_name = env_name.get("name")
-    if env_name != "github-pages":
-        errors.append(f"{file_path.name} (job 'act'): must target environment 'github-pages', got '{env_name}'.")
+    if "act" in jobs:
+        errors.append(f"{file_path.name}: watchdog must not contain an autonomous recovery job")
 
     return errors
 

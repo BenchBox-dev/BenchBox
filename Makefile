@@ -56,6 +56,15 @@ $(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required
 		exit 2; \
 	fi
 
+.PHONY: publication-help
+publication-help:
+	@echo "Publication flow:"
+	@echo "  1. gh workflow run publication-deploy.yml --ref develop -f candidate_only=true"
+	@echo "  2. Select the numeric artifact ID from that run."
+	@echo "  3. gh workflow run publication-transaction.yml --ref develop -f kind=promotion -f candidate_artifact_id=<id>"
+	@echo "  4. Approve the github-pages environment once; the workflow validates and records the result."
+	@echo "  Retry with a new transaction run against the same artifact after a pre-write failure."
+
 test-all:
 	@echo "Running non-resource-heavy tests in parallel..."
 	uv run -- python -m pytest -m "not (slow or stress or resource_heavy or live_integration)"
@@ -510,62 +519,70 @@ agent-commit-range-check:
 	@git fetch origin $(patsubst origin/%,%,$(AGENT_IDENTITY_BASE_REF)) --quiet 2>/dev/null || true
 	uv run -- python _project/scripts/agent_instruction_audit.py --check-commit-range $(AGENT_IDENTITY_BASE_REF)
 
-# skill-sync — materialize project-local skills from ~/.skill-sync/skills.
-# Manifest is tracked (skill-sync.yaml/skill-sync.lock). The `claude` target
-# (.claude/skills) is a TRACKED snapshot committed for cloud/CI parity —
-# integrity comes from PR review of the mirror diff, plus the untracked-mirror
-# drift guard (`scripts/check_untracked_skill_mirrors.sh`). The
-# codex/gemini/antigravity mirrors stay gitignored and are regenerated locally
-# per developer. Override SKILL_SYNC to point at a different install (e.g. an
-# npm-installed copy).
-SKILL_SYNC ?= /Users/joe/Developer/skill-sync/dist/cli/index.js
+# skill-sync — materialize project-local skills with the vendored rsync
+# wrapper (tools/skill-sync, pinned at product v1.0.0-rc1). Selection is
+# tracked (skill-sync.conf); per-target provenance and hashes land next to
+# the payload (skill-sync.receipt / skill-sync.manifest). The `.claude/skills`
+# target is a TRACKED snapshot committed for cloud/CI parity — integrity
+# comes from PR review of the mirror diff, plus `skill-sync-check` and the
+# untracked-mirror drift guard
+# (`scripts/check_untracked_skill_mirrors.sh`). The `.agents/skills` mirror
+# (Codex/Gemini/Antigravity) stays gitignored and is regenerated locally per
+# developer. Override SKILL_SYNC to point at a different wrapper copy.
+SKILL_SYNC ?= tools/skill-sync
 
 skill-sync:
-	@# This recipe contains $$(MAKE), so make runs it even under `-n` (recursive
-	@# dry-run passthrough). Without the guard below, `make -n skill-sync` and
-	@# `make -n guards-fix` really execute `node ... sync` and mutate the skill
-	@# mirrors, so a documented "preview" was not read-only.
-	@case "$(firstword -$(MAKEFLAGS))" in \
-		*n*) echo "dry-run (-n): skipping skill-sync"; exit 0 ;; \
-	esac; \
-	if [ -f "$(SKILL_SYNC)" ]; then \
-		$(MAKE) -s agent-write-preflight; \
-		node "$(SKILL_SYNC)" sync; \
-	else \
-		echo "skill-sync not installed at $(SKILL_SYNC); skipping (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
-	fi
+	@# This recipe contains $$(MAKE), so make executes this whole logical line
+	@# even under `-n` (recursive dry-run passthrough). The guard below must
+	@# therefore stay in the SAME logical line: its `exit 0` is what stops
+	@# `make -n skill-sync` and `make -n guards-fix` from really executing
+	@# the apply and mutating the skill mirrors. Short flags arrive grouped
+	@# and sorted in MAKEFLAGS (`make -nw` becomes `wn`), so a bare-word
+	@# match misses them: scan every word for a bare `n` or a letter-only
+	@# cluster containing `n` instead. For a real read-only preview, run
+	@# `tools/skill-sync preview` directly.
+	@dry_run=""; \
+	for flag_word in $(MAKEFLAGS); do \
+		case "$$flag_word" in \
+			n|-n|--dry-run|--just-print) dry_run=1; break ;; \
+			-*) ;; \
+			*n*) case "$$flag_word" in *[!a-zA-Z]*) ;; *) dry_run=1; break ;; esac ;; \
+		esac; \
+	done; \
+	if [ -n "$$dry_run" ]; then echo "dry-run (-n): skipping skill-sync"; exit 0; fi; \
+	if [ ! -x "$(SKILL_SYNC)" ]; then \
+		echo "skill-sync wrapper not found or not executable at $(SKILL_SYNC); refusing to report success without syncing (override with SKILL_SYNC=path/to/skill-sync)" >&2; \
+		exit 1; \
+	fi; \
+	$(MAKE) -s agent-write-preflight && \
+	"$(SKILL_SYNC)" apply && \
+	cp .claude/skills/skill-sync.config.yaml .agents/skills/skill-sync.config.yaml
+	@# The project-owned settings file lives at the path the skills read
+	@# (`.claude/skills/skill-sync.config.yaml`, tracked). The wrapper owns
+	@# only skill directories plus receipt/manifest, so the recipe mirrors the
+	@# same file into the untracked agents workspace for local parity.
 
-# Fresh worktrees lack the gitignored codex/gemini/antigravity mirrors, so
-# doctor reports materialization/drift there until `make skill-sync` runs in
-# THIS worktree. Judge those rows only after that; a clean primary-clone check
-# does not certify a worktree that changed skill-sync.yaml or tracked Claude
-# mirrors. The tracked `.claude/skills` rows are the durable signal.
+# Fresh worktrees lack the gitignored agents mirror, so check reports pending
+# additions there until `make skill-sync` runs in THIS worktree. Judge those
+# rows only after that; a clean primary-clone check does not certify a
+# worktree that changed skill-sync.conf or tracked Claude mirrors. The
+# tracked `.claude/skills` rows are the durable signal. A missing wrapper is
+# a hard failure, never a skip-and-succeed.
 skill-sync-check:
-	@if [ -f "$(SKILL_SYNC)" ]; then \
-		node "$(SKILL_SYNC)" doctor; \
-	else \
-		echo "skill-sync not installed at $(SKILL_SYNC); skipping (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
+	@if [ ! -x "$(SKILL_SYNC)" ]; then \
+		echo "skill-sync wrapper not found or not executable at $(SKILL_SYNC); cannot verify the mirror (override with SKILL_SYNC=path/to/skill-sync)" >&2; \
+		exit 1; \
 	fi
+	@"$(SKILL_SYNC)" check
 
 # Fail-closed local counterpart of pr.yml's required skill-integrity job. The
-# verifier revision comes from the same policy module as CI, is built in an
-# isolated temporary directory on every run, and uses an empty HOME so a
-# developer's global skill-sync configuration cannot make verification pass.
-# Missing git/npm/node or an unavailable trusted revision is a hard failure.
+# tool pin comes from the same policy module as CI; the vendored wrapper
+# needs no network, no Node, and no build, so verification runs directly
+# against the committed payload. A missing wrapper is a hard failure.
 skill-integrity-check:
 	@set -eu; \
-	uv run -- python scripts/skill_sync_ci_policy.py validate --manifest skill-sync.yaml; \
-	VERIFIER=$$(uv run -- python -c 'from scripts.skill_sync_ci_policy import VERIFIER_REF, VERIFIER_REPOSITORY; print(VERIFIER_REF, VERIFIER_REPOSITORY)'); \
-	set -- $$VERIFIER; VERIFIER_REF=$$1; VERIFIER_REPOSITORY=$$2; \
-	VERIFIER_DIR=$$(mktemp -d "$${TMPDIR:-/tmp}/benchbox-skill-sync-verifier.XXXXXX"); \
-	trap 'rm -rf "$$VERIFIER_DIR"' EXIT; \
-	mkdir -p "$$VERIFIER_DIR/home"; \
-	git clone --quiet "$$VERIFIER_REPOSITORY" "$$VERIFIER_DIR/tool"; \
-	git -C "$$VERIFIER_DIR/tool" checkout --detach --quiet "$$VERIFIER_REF"; \
-	test "$$(git -C "$$VERIFIER_DIR/tool" rev-parse HEAD)" = "$$VERIFIER_REF"; \
-	(cd "$$VERIFIER_DIR/tool" && npm ci --ignore-scripts && npm run build); \
-	test -f "$$VERIFIER_DIR/tool/dist/cli/index.js"; \
-	env HOME="$$VERIFIER_DIR/home" node "$$VERIFIER_DIR/tool/dist/cli/index.js" verify --project "$(CURDIR)"; \
+	uv run -- python scripts/skill_sync_ci_policy.py validate --manifest skill-sync.conf; \
+	"$(SKILL_SYNC)" verify; \
 	sh scripts/check_untracked_skill_mirrors.sh; \
 	$(MAKE) agent-instructions-check; \
 	$(MAKE) agent-identity-check; \
@@ -627,8 +644,9 @@ guards-fix:
 	@echo "== guards-fix: regenerating every mechanically-regenerable drift-guard artifact =="
 	@# Enforce the linked-worktree write rule BEFORE the first regen rewrites a
 	@# checked-in artifact. skill-sync runs this guard too, but only after
-	@# several earlier write steps -- and not at all when the skill-sync CLI is
-	@# absent, which would leave this whole write target unguarded.
+	@# several earlier write steps -- and `make skill-sync` itself fails
+	@# closed when the wrapper is absent, so this whole write target stays
+	@# guarded either way.
 	@$(MAKE) -s agent-write-preflight
 	@echo "-- dependency inventory (audit-raw) --"
 	@$(MAKE) -s audit-raw
@@ -638,13 +656,14 @@ guards-fix:
 	@$(MAKE) -s parity-fixtures
 	@echo "-- sql_compat capability matrix / skip-reference docs --"
 	@$(MAKE) -s compat-docs
-	@echo "-- skill-sync (no-ops with a notice if the skill-sync CLI is not installed) --"
-	@# Last regen step, contained: a failing skill-sync CLI (e.g. "unable to
-	@# read tree <sha>" in a fresh worktree) used to abort guards-fix here,
-	@# AFTER every other artifact had already been rewritten -- the summary and
-	@# the reviewable diff below never printed. Surface the failure loudly and
-	@# still finish the report; direct `make skill-sync` keeps its hard failure,
-	@# and genuine mirror drift is still enforced by skill-sync-check in CI.
+	@echo "-- skill-sync (fail-closed: a missing wrapper aborts instead of no-op-ing) --"
+	@# Last regen step, contained: a failing skill-sync apply (e.g. an
+	@# unresolvable source rev in a fresh worktree) used to abort guards-fix
+	@# here, AFTER every other artifact had already been rewritten -- the
+	@# summary and the reviewable diff below never printed. Surface the failure
+	@# loudly and still finish the report; direct `make skill-sync` keeps its
+	@# hard failure, and genuine mirror drift is still enforced by
+	@# skill-sync-check in CI.
 	@status=0; $(MAKE) -s skill-sync || status=$$?; \
 	if [ "$$status" -ne 0 ]; then \
 		echo "guards-fix: WARNING - the skill-sync step FAILED (see its output above); every other drift-guard artifact was still regenerated. Fix and re-run 'make skill-sync' separately."; \
@@ -1089,8 +1108,8 @@ release-cut: .release-cut-tree-required
 	@# curation on that line (v0.3.1 shipped uncurated because of this). With
 	@# --ignore-unmatch, unmatched paths are a no-op and any remaining failure
 	@# is real, so no `-` prefix: real failures must abort the cut.
-	git rm -rf --ignore-unmatch _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini
-	git rm -f --ignore-unmatch .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md
+	git rm -rf --ignore-unmatch _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini tools
+	git rm -f --ignore-unmatch .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.conf .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md
 	git rm -f --ignore-unmatch .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml
 	@# Tests that import _project/dev-only tooling, depend on development-only
 	@# fixtures, or enforce contracts for curated-out development surfaces cannot
@@ -1102,7 +1121,7 @@ release-cut: .release-cut-tree-required
 	git rm -f --ignore-unmatch tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_timing_policy_modes.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py
 	git rm -f --ignore-unmatch tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py
 	@# Post-curation guard: every curated path must be gone from the index.
-	@LEFTOVER=$$(git ls-files _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_timing_policy_modes.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py); \
+	@LEFTOVER=$$(git ls-files _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.conf tools .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_timing_policy_modes.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py); \
 	if [ -n "$$LEFTOVER" ]; then \
 		echo "ERROR: release curation incomplete; development-only paths still tracked:" >&2; \
 		echo "$$LEFTOVER" | sed 's/^/  /' >&2; \

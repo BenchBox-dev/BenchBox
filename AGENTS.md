@@ -2,7 +2,7 @@
 
 This file is the project authority for agent work. Keep it compact: detailed
 operations belong in the linked docs, and generated skill mirrors belong to
-`/Users/joe/.skill-sync/skills`.
+the catalog checkouts named in `skill-sync.conf`.
 
 ## Authority and provenance
 
@@ -108,7 +108,7 @@ Apple/macOS: correctness-gate digests are Linux-generated; use `make ci-linux` (
 
 ## Skills and generated mirrors
 
-Stable wrappers are `code`, `test`, `todo-db`, `docs`, `blog`, `benchbox`, `skill-sync`, and `tidy-perms`. `todo-db` authors ideas/specs and owns tracker actions. Skill source is `/Users/joe/.skill-sync/skills`; only `.claude/skills` is tracked. `.agents/skills` is the shared, gitignored local materialization for Codex, Gemini, and Antigravity. Regenerate mirrors with `make skill-sync` in a write worktree; never hand-edit one. `scripts/check_untracked_skill_mirrors.sh` guards tracking state, not content parity.
+Stable wrappers are `code`, `test`, `todo-db`, `docs`, `blog`, `benchbox`, `skill-sync`, and `tidy-perms`. `todo-db` authors ideas/specs and owns tracker actions. Skill sources are the local catalog checkouts named in `skill-sync.conf`, copied by the vendored `tools/skill-sync` wrapper; only `.claude/skills` is tracked. `.agents/skills` is the shared, gitignored local materialization for Codex, Gemini, and Antigravity. Regenerate mirrors with `make skill-sync` in a write worktree; never hand-edit one. `scripts/check_untracked_skill_mirrors.sh` guards tracking state, not content parity.
 
 ## Operational references
 

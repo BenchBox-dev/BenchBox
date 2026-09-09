@@ -337,7 +337,7 @@ export type CohortGroupBy = "none" | "engine_version";
 
 export const COHORT_GROUP_BY_LABELS: Record<CohortGroupBy, string> = {
   none: "No grouping",
-  engine_version: "Engine version",
+  engine_version: "Platform version",
 };
 
 export interface CohortGroup<T> {

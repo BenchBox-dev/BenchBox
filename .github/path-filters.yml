@@ -116,8 +116,8 @@ code-ci:
 
 skill-integrity:
   - ".claude/skills/**"
-  - "skill-sync.yaml"
-  - "skill-sync.lock"
+  - "skill-sync.conf"
+  - "tools/skill-sync"
 
 # Packaging-metadata changes: build/install/audit signal (package-smoke,
 # dependency-audit jobs in pr.yml) only needs to run when one of these
