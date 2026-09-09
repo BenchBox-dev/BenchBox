@@ -146,10 +146,11 @@ _sources/tpc-ds/tools/tpcds.idx*
 _sources/tpc-ds/tools/.ctags*
 _sources/tpc-h/dbgen/dbgen_x86_64
 
-# skill-sync mirrors (regenerate locally via `make skill-sync`). The `claude`
-# target is a TRACKED snapshot — committed for cloud/CI. The `.agents/skills`
-# mirror is the single untracked interoperable workspace (Codex/Gemini/
-# Antigravity) and is ignored via the skill-sync managed block below.
+# skill-sync mirrors (regenerate locally via `make skill-sync`). The
+# `.claude/skills` target is a TRACKED snapshot — committed for cloud/CI.
+# The `.agents/skills` mirror is the single untracked interoperable workspace
+# (Codex/Gemini/Antigravity) and is ignored via the hand-maintained
+# skill-sync block below.
 .antigravitycli/
 
 # TODO system infrastructure (added for distributed TODO structure)
@@ -232,8 +233,12 @@ ci-log.txt
 # Node - declared in results-explorer/package.json; never vendor at repo root.
 node_modules/
 
-# >>> skill-sync managed (do not edit) >>>
+# skill-sync untracked mirrors (hand-maintained; the rsync wrapper owns no
+# ignore machinery). `.agents/skills/` is the regenerated interoperable
+# workspace. `.claude/skills/.system/` is loader-owned. `.claude/skills/blog/`
+# is the curated-out blog skill: still materialized locally by
+# `skill-sync.conf`, but never committed (cloud is Claude-only and `blog` is
+# published separately) — see scripts/check_untracked_skill_mirrors.sh.
 /.agents/skills/
 /.claude/skills/.system/
 /.claude/skills/blog/
-# <<< skill-sync managed <<<
