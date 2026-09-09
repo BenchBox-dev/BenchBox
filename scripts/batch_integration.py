@@ -31,6 +31,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 CONFIG_PREFIX = "benchbox.batch"
+DELIVERY_RECEIPT_SCHEMA = "batch_delivery_receipt_v1"
 
 
 class BatchError(RuntimeError):
@@ -183,6 +184,54 @@ def member_ancestry(repo: Path, members: object, integration_head: str) -> dict[
     return result
 
 
+def normalize_members(members: object) -> list[dict[str, str]]:
+    """Validate and normalize a member manifest for a durable receipt."""
+    if not isinstance(members, list):
+        raise BatchError("members manifest must be a list")
+    normalized: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for member in members:
+        if not isinstance(member, dict):
+            raise BatchError(f"member entry must be an object: {member!r}")
+        member_id = member.get("id")
+        head = member.get("head")
+        if not isinstance(member_id, str) or not member_id or not isinstance(head, str) or not head:
+            raise BatchError(f"member entry requires non-empty string id and head: {member!r}")
+        if member_id in seen:
+            raise BatchError(f"duplicate member id in manifest: {member_id!r}")
+        seen.add(member_id)
+        normalized.append({"id": member_id, "head": head})
+    return sorted(normalized, key=lambda member: member["id"])
+
+
+def normalize_dependencies(value: object, member_ids: set[str]) -> list[dict[str, str]]:
+    """Validate tracker-side internal implementation dependency evidence."""
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise BatchError("internal_implementation_dependencies must be a list")
+    normalized: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for edge in value:
+        if not isinstance(edge, dict):
+            raise BatchError(f"internal dependency must be an object: {edge!r}")
+        member = edge.get("member")
+        depends_on = edge.get("depends_on")
+        evidence = edge.get("evidence")
+        if not isinstance(member, str) or not isinstance(depends_on, str):
+            raise BatchError(f"internal dependency endpoints must be member IDs: {edge!r}")
+        if member not in member_ids or depends_on not in member_ids or member == depends_on:
+            raise BatchError(f"internal dependency endpoints must be distinct manifested members: {edge!r}")
+        if not isinstance(evidence, str) or not evidence.strip():
+            raise BatchError(f"internal dependency requires non-empty evidence: {edge!r}")
+        identity = (str(member), str(depends_on))
+        if identity in seen:
+            raise BatchError(f"duplicate internal dependency: {identity!r}")
+        seen.add(identity)
+        normalized.append({"member": str(member), "depends_on": str(depends_on), "evidence": evidence.strip()})
+    return normalized
+
+
 def branch_timestamps(repo: Path, base_oid: str, head: str) -> dict:
     """Branch-history timestamps: first commit and first merge since the base.
 
@@ -210,13 +259,16 @@ def delivery_receipt(repo: Path, member_heads: list[dict], acceptance: dict) -> 
     applied work, when a member head is missing from the integration head,
     or when the base moved without a re-recorded start.
     """
+    if not isinstance(acceptance, dict):
+        raise BatchError("acceptance must be a JSON object")
     record = read_batch(repo)
     if record is None or not record.get("base_oid"):
         raise BatchError("no batch start recorded; run start before receipt")
-    if not member_heads:
+    normalized_members = normalize_members(member_heads)
+    if not normalized_members:
         raise BatchError("empty member manifest binds nothing; refusing vacuous receipt")
     recorded = set(record.get("members") or [])
-    manifested = set(str(member.get("id", "?")) for member in member_heads if isinstance(member, dict))
+    manifested = {member["id"] for member in normalized_members}
     if manifested != recorded:
         raise BatchError(
             f"member set {sorted(manifested)} != recorded start {sorted(recorded)}; "
@@ -229,28 +281,40 @@ def delivery_receipt(repo: Path, member_heads: list[dict], acceptance: dict) -> 
     offenders = verify_single_integrator(repo, record["base_oid"], str(integrator), head)
     if offenders:
         raise BatchError(f"work applied by someone other than the integrator: {offenders}")
-    items = acceptance.get("items", {}) or {}
-    unaccepted = sorted(mid for mid in manifested if not items.get(mid))
+    items = acceptance.get("items")
+    if not isinstance(items, dict):
+        raise BatchError("acceptance items must be an object keyed by manifested member id")
+    missing_items = sorted(manifested - set(items))
+    extra_items = sorted(set(items) - manifested)
+    if missing_items or extra_items:
+        raise BatchError(
+            f"acceptance item set must exactly match manifested members; missing={missing_items}, extra={extra_items}"
+        )
+    unaccepted = sorted(mid for mid in manifested if items[mid] != "pass")
     if unaccepted:
         raise BatchError(f"members without passing acceptance: {unaccepted}")
+    dependencies = normalize_dependencies(acceptance.get("internal_implementation_dependencies"), manifested)
     if acceptance.get("integration_head") != head:
         raise BatchError("acceptance names a different integration head; re-evaluate, never carry forward")
     base_check = verify_base(repo, record)
     if base_check["moved"]:
         raise BatchError("recorded base moved; re-record the start before binding acceptance")
-    ancestry = member_ancestry(repo, member_heads, head)
+    ancestry = member_ancestry(repo, normalized_members, head)
     missing = sorted(name for name, present in ancestry.items() if not present)
     if missing:
         raise BatchError(f"member heads missing from integration head: {missing}")
     return {
+        "schema": DELIVERY_RECEIPT_SCHEMA,
         "batch_id": record["batch_id"],
         "base": {"ref": record["base_ref"], "oid": record["base_oid"]},
         "integration_head": head,
         "started_at": record["started_at"],
         "history": branch_timestamps(repo, record["base_oid"], head),
+        "members": normalized_members,
         "member_ancestry": ancestry,
         "integrator": str(integrator),
-        "acceptance": items,
+        "acceptance": {member_id: items[member_id] for member_id in sorted(items)},
+        "internal_implementation_dependencies": dependencies,
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 

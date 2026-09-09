@@ -30,6 +30,17 @@ One shared integration branch per batch, one recorded base, one integrator.
    edits, a moved head, or a moved base invalidate the binding. Member
    preparation evidence never certifies the integrated tree.
 
+The acceptance input is an object with `integration_head`, `integrator`, and
+an `items` object whose keys exactly equal the manifested member IDs and whose
+values are the case-sensitive string `pass`. Other truthy values do not pass.
+When members have an internal implementation dependency, record it in
+`internal_implementation_dependencies` as a list of
+`{"member": "B", "depends_on": "A", "evidence": "..."}` objects. Both
+endpoints must be distinct manifested members and `evidence` must name the
+tracker-side proof. An empty list is valid for a delivery with no such edge;
+the prospective process cohort applies its separate minimum across recorded
+deliveries.
+
 ## This batch
 
 - Batch `pr-batch-process-improvements`, base `origin/develop`

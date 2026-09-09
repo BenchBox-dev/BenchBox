@@ -93,6 +93,7 @@ REFRESH_AUDIT_SCHEMA = "refresh_audit_v1"
 # exits non-zero listing gaps until every dimension passes; incomplete stays
 # incomplete, never provisionally green.
 PROCESS_ACCEPTANCE_SCHEMA = "pr_process_acceptance_v1"
+BATCH_DELIVERY_RECEIPT_SCHEMA = "batch_delivery_receipt_v1"
 # Full-required reasons that must stay separate counters: gate-timing loss vs
 # prior-head identity/binding failure. Conflating them hides which mechanism
 # to fix; the refresh-audit validator rejects reports that merge them.
@@ -1015,11 +1016,69 @@ def validate_lifecycle_baseline(lifecycle: dict, process: dict, process_digest: 
     if not isinstance(prs, list) or not prs:
         errors.append("lifecycle baseline must list at least one PR entry")
         return errors
+    errors.extend(_check_lifecycle_cohort(lifecycle, prs))
     for entry in prs:
         if not isinstance(entry, dict):
             errors.append("PR entry must be an object")
             continue
         errors.extend(_check_lifecycle_entry(entry))
+    return errors
+
+
+def _check_lifecycle_cohort(lifecycle: dict, prs: list) -> list[str]:
+    """Reconcile the declared cohort with the exact PR and gap identities."""
+    errors: list[str] = []
+    cohort = lifecycle.get("cohort")
+    gaps = lifecycle.get("collection_gaps")
+    if not isinstance(cohort, dict):
+        return ["lifecycle cohort must be an object"]
+    if not isinstance(gaps, list):
+        return ["lifecycle collection_gaps must be a list"]
+
+    counts: dict[str, int] = {}
+    for field in ("candidate_prs", "collected_prs"):
+        value = cohort.get(field)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            errors.append(f"lifecycle cohort {field} must be a nonnegative integer")
+        else:
+            counts[field] = value
+
+    pr_numbers = [entry.get("number") for entry in prs if isinstance(entry, dict)]
+    if any(not isinstance(number, int) or isinstance(number, bool) for number in pr_numbers):
+        errors.append("lifecycle PR numbers must be integers")
+    valid_pr_numbers = [number for number in pr_numbers if isinstance(number, int) and not isinstance(number, bool)]
+    if len(valid_pr_numbers) != len(set(valid_pr_numbers)):
+        errors.append("lifecycle PR entries contain duplicate numbers")
+
+    gap_numbers: list[int] = []
+    for gap in gaps:
+        if not isinstance(gap, dict):
+            errors.append(f"lifecycle collection gap must be an object: {gap!r}")
+            continue
+        number = gap.get("number")
+        status = gap.get("status")
+        if not isinstance(number, int) or isinstance(number, bool):
+            errors.append(f"lifecycle collection gap number must be an integer: {gap!r}")
+            continue
+        if not isinstance(status, str) or not status.strip():
+            errors.append(f"lifecycle collection gap status must be non-empty: {gap!r}")
+        gap_numbers.append(number)
+    if len(gap_numbers) != len(set(gap_numbers)):
+        errors.append("lifecycle collection_gaps contain duplicate PR numbers")
+    overlap = sorted(set(valid_pr_numbers) & set(gap_numbers))
+    if overlap:
+        errors.append(f"lifecycle PRs and collection_gaps overlap: {overlap}")
+    if counts.get("collected_prs") != len(set(valid_pr_numbers)):
+        errors.append(
+            f"lifecycle cohort collected_prs {counts.get('collected_prs')!r} "
+            f"!= {len(set(valid_pr_numbers))} unique PR entries"
+        )
+    expected_candidates = len(set(valid_pr_numbers)) + len(set(gap_numbers))
+    if counts.get("candidate_prs") != expected_candidates:
+        errors.append(
+            f"lifecycle cohort candidate_prs {counts.get('candidate_prs')!r} "
+            f"!= {len(set(valid_pr_numbers))} collected + {len(set(gap_numbers))} gaps"
+        )
     return errors
 
 
@@ -1357,20 +1416,183 @@ def _check_acceptance_cohort(acceptance: dict, process: dict) -> list[str]:
     for stratum in required_cohort.get("strata") or []:
         if stratum not in (observed_cohort.get("strata") or []):
             errors.append(f"cohort stratum missing: {stratum}")
-    deliveries = observed_cohort.get("batch_deliveries") or []
+    deliveries = observed_cohort.get("batch_deliveries")
     try:
         min_deliveries = int((frozen_cohort.get("batch_deliveries") or {}).get("min_deliveries") or 0)
     except (TypeError, ValueError):
         errors.append("frozen batch delivery minimum must be an integer")
         min_deliveries = 0
-    if len(deliveries) < min_deliveries:
-        errors.append(f"batch deliveries insufficient: {len(deliveries)} < {min_deliveries}")
-    for delivery in deliveries:
-        if not isinstance(delivery, dict) or not delivery.get("members") or len(delivery["members"]) < 2:
-            errors.append(f"batch delivery not cohesive: {delivery!r}")
+    if not isinstance(deliveries, list):
+        errors.append("batch_deliveries must be a list of bound delivery receipts")
+    else:
+        errors.extend(_check_delivery_receipts(deliveries, frozen_cohort, min_deliveries))
     if not observed_cohort.get("human_hold"):
         errors.append("human hold flow (operator-approved soundness hold) not evidenced in the observed cohort")
     return errors
+
+
+def _check_delivery_receipts(deliveries: list, frozen_cohort: dict, min_deliveries: int) -> list[str]:
+    """Validate distinct, reachable delivery receipts and dependency evidence."""
+    errors: list[str] = []
+    batch_requirements = frozen_cohort.get("batch_deliveries") or {}
+    if not isinstance(batch_requirements, dict):
+        return ["frozen batch delivery requirements must be an object"]
+    try:
+        members_min = int(batch_requirements.get("members_per_delivery_min") or 0)
+        dependencies_min = int(batch_requirements.get("internal_implementation_dependency_min") or 0)
+    except (TypeError, ValueError):
+        return ["frozen batch delivery requirements must be integers"]
+
+    valid_receipts = 0
+    dependency_edges: set[tuple[str, str, str]] = set()
+    seen_batches: set[str] = set()
+    seen_heads: set[str] = set()
+    sha_pattern = re.compile(r"^[0-9a-f]{40}$")
+    for index, delivery in enumerate(deliveries):
+        prefix = f"batch delivery #{index + 1}"
+        if not isinstance(delivery, dict):
+            errors.append(f"{prefix} must be a receipt object")
+            continue
+        receipt_errors: list[str] = []
+        if delivery.get("schema") != BATCH_DELIVERY_RECEIPT_SCHEMA:
+            receipt_errors.append(f"{prefix} schema must be {BATCH_DELIVERY_RECEIPT_SCHEMA!r}")
+        batch_id, integration_head, identity_errors = _check_delivery_identity(
+            delivery, prefix, sha_pattern, seen_batches, seen_heads
+        )
+        receipt_errors.extend(identity_errors)
+        member_ids, member_errors = _check_delivery_members(
+            delivery, prefix, integration_head, sha_pattern, members_min
+        )
+        receipt_errors.extend(member_errors)
+        attestation_errors, edges = _check_delivery_attestations(delivery, prefix, member_ids, batch_id)
+        receipt_errors.extend(attestation_errors)
+        dependency_edges.update(edges)
+        errors.extend(receipt_errors)
+        if not receipt_errors:
+            valid_receipts += 1
+
+    if valid_receipts < min_deliveries:
+        errors.append(f"batch deliveries insufficient: {valid_receipts} valid distinct receipts < {min_deliveries}")
+    if len(dependency_edges) < dependencies_min:
+        errors.append(
+            f"internal implementation dependency evidence insufficient: {len(dependency_edges)} < {dependencies_min}"
+        )
+    return errors
+
+
+def _check_delivery_identity(
+    delivery: dict,
+    prefix: str,
+    sha_pattern: re.Pattern[str],
+    seen_batches: set[str],
+    seen_heads: set[str],
+) -> tuple[str, str, list[str]]:
+    errors: list[str] = []
+    batch_id = delivery.get("batch_id")
+    if not isinstance(batch_id, str) or not batch_id:
+        errors.append(f"{prefix} lacks a batch_id")
+        batch_id = ""
+    elif batch_id in seen_batches:
+        errors.append(f"{prefix} duplicates batch_id {batch_id!r}")
+    else:
+        seen_batches.add(batch_id)
+    integration_head = delivery.get("integration_head")
+    if not isinstance(integration_head, str) or sha_pattern.fullmatch(integration_head) is None:
+        errors.append(f"{prefix} integration_head must be a full Git SHA")
+        integration_head = ""
+    elif integration_head in seen_heads:
+        errors.append(f"{prefix} duplicates integration_head {integration_head}")
+    elif not _is_ancestor(integration_head):
+        errors.append(f"{prefix} integration_head {integration_head} is not reachable from HEAD")
+    else:
+        seen_heads.add(integration_head)
+    return batch_id, integration_head, errors
+
+
+def _check_delivery_members(
+    delivery: dict,
+    prefix: str,
+    integration_head: str,
+    sha_pattern: re.Pattern[str],
+    members_min: int,
+) -> tuple[set[str], list[str]]:
+    errors: list[str] = []
+    members = delivery.get("members")
+    if not isinstance(members, list):
+        return set(), [f"{prefix} members must be a list"]
+    member_ids: list[str] = []
+    for member in members:
+        if not isinstance(member, dict):
+            errors.append(f"{prefix} member must be an object: {member!r}")
+            continue
+        member_id = member.get("id")
+        member_head = member.get("head")
+        if not isinstance(member_id, str) or not member_id:
+            errors.append(f"{prefix} member lacks a non-empty id")
+            continue
+        member_ids.append(member_id)
+        if not isinstance(member_head, str) or sha_pattern.fullmatch(member_head) is None:
+            errors.append(f"{prefix} member {member_id!r} head must be a full Git SHA")
+        elif integration_head and not _is_ancestor(member_head, integration_head):
+            errors.append(f"{prefix} member {member_id!r} head is not in its integration head")
+    unique_ids = set(member_ids)
+    if len(member_ids) != len(unique_ids):
+        errors.append(f"{prefix} contains duplicate member IDs")
+    if len(unique_ids) < members_min:
+        errors.append(f"{prefix} has {len(unique_ids)} members; minimum is {members_min}")
+    return unique_ids, errors
+
+
+def _check_delivery_attestations(
+    delivery: dict, prefix: str, expected_members: set[str], batch_id: str
+) -> tuple[list[str], set[tuple[str, str, str]]]:
+    errors: list[str] = []
+    ancestry = delivery.get("member_ancestry")
+    if not isinstance(ancestry, dict) or set(ancestry) != expected_members:
+        errors.append(f"{prefix} member_ancestry keys must exactly match members")
+    elif any(value is not True for value in ancestry.values()):
+        errors.append(f"{prefix} member_ancestry must be exactly true for every member")
+    item_acceptance = delivery.get("acceptance")
+    if not isinstance(item_acceptance, dict) or set(item_acceptance) != expected_members:
+        errors.append(f"{prefix} acceptance keys must exactly match members")
+    elif any(value != "pass" for value in item_acceptance.values()):
+        errors.append(f"{prefix} acceptance must be exactly 'pass' for every member")
+    dependency_errors, dependency_edges = _check_delivery_dependencies(
+        delivery.get("internal_implementation_dependencies"), prefix, expected_members, batch_id
+    )
+    errors.extend(dependency_errors)
+    return errors, dependency_edges
+
+
+def _check_delivery_dependencies(
+    dependencies: object, prefix: str, expected_members: set[str], batch_id: str
+) -> tuple[list[str], set[tuple[str, str, str]]]:
+    if not isinstance(dependencies, list):
+        return [f"{prefix} internal_implementation_dependencies must be a list"], set()
+    errors: list[str] = []
+    receipt_edges: set[tuple[str, str]] = set()
+    bound_edges: set[tuple[str, str, str]] = set()
+    for edge in dependencies:
+        if not isinstance(edge, dict):
+            errors.append(f"{prefix} internal dependency must be an object: {edge!r}")
+            continue
+        member = edge.get("member")
+        depends_on = edge.get("depends_on")
+        evidence = edge.get("evidence")
+        if not isinstance(member, str) or not isinstance(depends_on, str):
+            errors.append(f"{prefix} internal dependency endpoints must be member IDs: {edge!r}")
+            continue
+        identity = (member, depends_on)
+        if member not in expected_members or depends_on not in expected_members or member == depends_on:
+            errors.append(f"{prefix} internal dependency endpoints must be distinct members: {edge!r}")
+        elif identity in receipt_edges:
+            errors.append(f"{prefix} duplicates internal dependency {identity!r}")
+        elif not isinstance(evidence, str) or not evidence.strip():
+            errors.append(f"{prefix} internal dependency lacks evidence: {edge!r}")
+        else:
+            receipt_edges.add(identity)
+            bound_edges.add((batch_id, member, depends_on))
+    return errors, bound_edges
 
 
 def _check_acceptance_replays(acceptance: dict, process: dict) -> list[str]:

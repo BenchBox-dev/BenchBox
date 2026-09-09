@@ -137,6 +137,8 @@ def test_member_ancestry_and_receipt_binding(tmp_path: Path) -> None:
         {"integration_head": head, "integrator": "T <t@example.com>", "items": {"A": "pass"}},
     )
     assert receipt["integration_head"] == head
+    assert receipt["schema"] == "batch_delivery_receipt_v1"
+    assert receipt["members"] == [{"id": "A", "head": member_head}]
     assert receipt["member_ancestry"] == {"A": True}
     assert receipt["history"]["commit_count"] >= 1
 
@@ -225,10 +227,51 @@ def test_receipt_refuses_empty_manifest_and_unaccepted_member(tmp_path: Path) ->
     head = _commit(repo, "member-a.txt")
     with pytest.raises(bi.BatchError, match="vacuous receipt"):
         bi.delivery_receipt(repo, [], _acceptance(head, {}))
-    with pytest.raises(bi.BatchError, match="without passing acceptance"):
+    with pytest.raises(bi.BatchError, match="exactly match"):
         bi.delivery_receipt(repo, [{"id": "A", "head": head}], _acceptance(head, {}))
     with pytest.raises(bi.BatchError, match="no integrator"):
         bi.delivery_receipt(repo, [{"id": "A", "head": head}], {"integration_head": head, "items": {"A": "pass"}})
+
+
+@pytest.mark.parametrize("value", ["fail", {"passed": False}, True])
+def test_receipt_requires_exact_pass_value(tmp_path: Path, value: object) -> None:
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A"])
+    head = _commit(repo, "member-a.txt")
+    with pytest.raises(bi.BatchError, match="without passing acceptance"):
+        bi.delivery_receipt(repo, [{"id": "A", "head": head}], _acceptance(head, {"A": value}))
+
+
+def test_receipt_rejects_extra_acceptance_member(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A"])
+    head = _commit(repo, "member-a.txt")
+    with pytest.raises(bi.BatchError, match="exactly match"):
+        bi.delivery_receipt(repo, [{"id": "A", "head": head}], _acceptance(head, {"A": "pass", "B": "pass"}))
+
+
+def test_receipt_binds_validated_internal_dependencies(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A", "B"])
+    head = _commit(repo, "members.txt")
+    members = [{"id": "A", "head": head}, {"id": "B", "head": head}]
+    acceptance = {
+        **_acceptance(head, {"A": "pass", "B": "pass"}),
+        "internal_implementation_dependencies": [
+            {"member": "B", "depends_on": "A", "evidence": "tracker dependency B requires A"}
+        ],
+    }
+    receipt = bi.delivery_receipt(repo, members, acceptance)
+    assert receipt["internal_implementation_dependencies"] == acceptance["internal_implementation_dependencies"]
+
+    bad_acceptance = {
+        **acceptance,
+        "internal_implementation_dependencies": [
+            {"member": "B", "depends_on": "missing", "evidence": "not bound to the manifest"}
+        ],
+    }
+    with pytest.raises(bi.BatchError, match="distinct manifested members"):
+        bi.delivery_receipt(repo, members, bad_acceptance)
 
 
 def test_receipt_refuses_rogue_committer(tmp_path: Path) -> None:

@@ -463,6 +463,30 @@ def test_lifecycle_validator_rejects_changed_thresholds() -> None:
     assert any("frozen digest" in e for e in errors)
 
 
+def test_lifecycle_validator_reconciles_cohort_identities() -> None:
+    import copy
+    import json as _json
+
+    source = _json.loads((FIXTURES / "lifecycle_sample.json").read_text())
+    process = {"schema": "pr_process_acceptance_baseline_v1", "criteria_version": "1.0.0"}
+
+    truncated = copy.deepcopy(source)
+    truncated["prs"] = truncated["prs"][:1]
+    errors = metrics.validate_lifecycle_baseline(truncated, process, "digest-of-frozen-process-baseline")
+    assert any("collected_prs" in error for error in errors)
+
+    duplicate = copy.deepcopy(source)
+    duplicate["prs"][1]["number"] = duplicate["prs"][0]["number"]
+    errors = metrics.validate_lifecycle_baseline(duplicate, process, "digest-of-frozen-process-baseline")
+    assert any("duplicate" in error for error in errors)
+
+    overlap = copy.deepcopy(source)
+    overlap["cohort"]["candidate_prs"] = 3
+    overlap["collection_gaps"] = [{"number": overlap["prs"][0]["number"], "status": "outside-window"}]
+    errors = metrics.validate_lifecycle_baseline(overlap, process, "digest-of-frozen-process-baseline")
+    assert any("overlap" in error for error in errors)
+
+
 def test_refresh_audit_recompute_accepts_consistent_block() -> None:
     import json as _json
 
@@ -577,6 +601,51 @@ def _process_doc() -> dict:
     return {"schema": "pr_process_acceptance_baseline_v1", "criteria_version": "1.0.0"}
 
 
+def _valid_delivery_receipts() -> list[dict]:
+    import subprocess
+
+    repo_root = Path(metrics.__file__).resolve().parents[2]
+    head, parent, grandparent = subprocess.run(
+        ["git", "rev-parse", "HEAD", "HEAD^", "HEAD^^"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+
+    def receipt(batch_id: str, integration_head: str, member_heads: list[str], dependency: bool) -> dict:
+        members = [
+            {"id": f"{batch_id}-member-{index}", "head": member_head}
+            for index, member_head in enumerate(member_heads, start=1)
+        ]
+        member_ids = [member["id"] for member in members]
+        dependencies = (
+            [
+                {
+                    "member": member_ids[1],
+                    "depends_on": member_ids[0],
+                    "evidence": f"tracker edge for {batch_id}",
+                }
+            ]
+            if dependency
+            else []
+        )
+        return {
+            "schema": "batch_delivery_receipt_v1",
+            "batch_id": batch_id,
+            "integration_head": integration_head,
+            "members": members,
+            "member_ancestry": dict.fromkeys(member_ids, True),
+            "acceptance": dict.fromkeys(member_ids, "pass"),
+            "internal_implementation_dependencies": dependencies,
+        }
+
+    return [
+        receipt("batch-one", head, [head, parent], True),
+        receipt("batch-two", parent, [parent, grandparent], False),
+    ]
+
+
 def test_acceptance_validator_rejects_changed_criteria_and_cohort() -> None:
     acceptance = _acceptance_doc()
     errors = metrics.validate_process_acceptance(acceptance, {"criteria_version": "2.0.0"}, "digest")
@@ -632,10 +701,7 @@ def test_acceptance_validator_accepts_complete_record() -> None:
     acceptance["cohort"]["observed"]["days"] = frozen["min_days"]
     acceptance["cohort"]["observed"]["strata"] = list(frozen["strata"])
     acceptance["cohort"]["observed"]["human_hold"] = True
-    acceptance["cohort"]["observed"]["batch_deliveries"] = [
-        {"members": ["a", "b"]},
-        {"members": ["c", "d"]},
-    ]
+    acceptance["cohort"]["observed"]["batch_deliveries"] = _valid_delivery_receipts()
     acceptance["efficiency"]["observed_avoidable_actions"] = 20
     errors = metrics.validate_process_acceptance(acceptance, process, hashlib.sha256(process_raw).hexdigest())
     assert errors == []
@@ -668,10 +734,7 @@ def test_acceptance_validator_rejects_weakened_frozen_requirements() -> None:
         acceptance["cohort"]["observed"]["days"] = frozen["min_days"]
         acceptance["cohort"]["observed"]["strata"] = list(frozen["strata"])
         acceptance["cohort"]["observed"]["human_hold"] = True
-        acceptance["cohort"]["observed"]["batch_deliveries"] = [
-            {"members": ["a", "b"]},
-            {"members": ["c", "d"]},
-        ]
+        acceptance["cohort"]["observed"]["batch_deliveries"] = _valid_delivery_receipts()
         return acceptance
 
     weakened = conforming()
@@ -690,7 +753,7 @@ def test_acceptance_validator_rejects_weakened_frozen_requirements() -> None:
     assert any("replay scenario set" in e for e in errors)
 
     few = conforming()
-    few["cohort"]["observed"]["batch_deliveries"] = [{"members": ["a", "b"]}]
+    few["cohort"]["observed"]["batch_deliveries"] = _valid_delivery_receipts()[:1]
     errors = metrics.validate_process_acceptance(few, process, digest)
     assert any("batch deliveries insufficient" in e for e in errors)
 
@@ -708,6 +771,29 @@ def test_acceptance_validator_rejects_weakened_frozen_requirements() -> None:
     changed_strata["cohort"]["required"]["strata"] = list(frozen["strata"]) + ["invented"]
     errors = metrics.validate_process_acceptance(changed_strata, process, digest)
     assert any("frozen strata" in e for e in errors)
+
+    duplicate = conforming()
+    duplicate_receipt = _valid_delivery_receipts()[0]
+    duplicate["cohort"]["observed"]["batch_deliveries"] = [duplicate_receipt, duplicate_receipt]
+    errors = metrics.validate_process_acceptance(duplicate, process, digest)
+    assert any("duplicates batch_id" in e or "duplicates integration_head" in e for e in errors)
+
+    unbound = conforming()
+    unbound["cohort"]["observed"]["batch_deliveries"][0]["integration_head"] = "f" * 40
+    errors = metrics.validate_process_acceptance(unbound, process, digest)
+    assert any("not reachable" in e for e in errors)
+
+    failed_member = conforming()
+    first_acceptance = failed_member["cohort"]["observed"]["batch_deliveries"][0]["acceptance"]
+    first_acceptance[next(iter(first_acceptance))] = "fail"
+    errors = metrics.validate_process_acceptance(failed_member, process, digest)
+    assert any("exactly 'pass'" in e for e in errors)
+
+    no_dependency = conforming()
+    for receipt in no_dependency["cohort"]["observed"]["batch_deliveries"]:
+        receipt["internal_implementation_dependencies"] = []
+    errors = metrics.validate_process_acceptance(no_dependency, process, digest)
+    assert any("dependency evidence insufficient" in e for e in errors)
 
     weak_reduction = conforming()
     weak_reduction["efficiency"]["observed_avoidable_actions"] = 60
