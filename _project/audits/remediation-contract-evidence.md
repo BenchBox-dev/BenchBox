@@ -1,3 +1,9 @@
+---
+develop_sha: b221e852dba0ec2aa4bce79f15100fb909ff5599
+measured_at_sha: c0b4ce94de3514939338c3e05457816e42356b7e
+checked_sha: c0b4ce94de3514939338c3e05457816e42356b7e
+---
+
 # Remediation contract evidence
 
 Per-instance record for the SCD2 N2 remediation class
