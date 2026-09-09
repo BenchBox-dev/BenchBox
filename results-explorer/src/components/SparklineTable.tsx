@@ -88,7 +88,7 @@ export function SparklineTable({ summary }: Props) {
   return (
     <div class="w-full overflow-x-auto">
       <table
-        class="text-xs border-collapse min-w-full"
+        class="text-xs border-collapse"
         role="grid"
         aria-label="Compact performance metrics overview"
       >

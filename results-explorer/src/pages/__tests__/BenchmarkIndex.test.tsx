@@ -414,6 +414,23 @@ describe("BenchmarkIndex", () => {
     });
   });
 
+  it("shows the cohort hero with live counts and anchored sections", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByTestId("cohort-hero")).toBeTruthy());
+    expect(screen.getByTestId("cohort-counts").textContent).toContain("2 published runs");
+    expect(screen.getByTestId("cohort-counts").textContent).toContain("2 queries");
+    const jump = screen.getByText(/Jump to matrix/) as HTMLAnchorElement;
+    expect(jump.getAttribute("href")).toBe("#evidence-matrix");
+    expect(container.querySelector("#evidence-matrix")).not.toBeNull();
+    expect(container.querySelector("#provenance-legend")).not.toBeNull();
+    // The matrix itself is the heatmap: the long layout must not render a
+    // duplicate heatmap preview card.
+    expect(
+      container.querySelector("[data-testid='summary-chart-preview-query_heatmap']"),
+    ).toBeNull();
+    expect(container.querySelector("[data-testid^='summary-chart-preview-']")).not.toBeNull();
+  });
+
   it("matrix view sorts rows from query headers", async () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());

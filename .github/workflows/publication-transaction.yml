@@ -466,6 +466,9 @@ jobs:
             test -s candidate-receipts/desired-manifest.json || {
               echo "::error::candidate desired manifest missing in verify job"; exit 1;
             }
+            test "$(jq -r '(.checksums // {}) | length' candidate-receipts/desired-manifest.json)" -gt 0 || {
+              echo "::error::candidate desired manifest carries no per-route checksums; byte-equivalence verification would be HTTP-only"; exit 1;
+            }
             cp candidate-receipts/desired-manifest.json transaction-artifacts/verification-manifest.json
           elif [ "$KIND" = "rollback" ]; then
             uv run python - <<'PY'

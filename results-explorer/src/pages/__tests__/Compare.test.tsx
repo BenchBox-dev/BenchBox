@@ -763,7 +763,7 @@ describe("Compare", () => {
     });
 
     const summary = screen.getByRole("heading", { name: "Comparison summary" });
-    const chartsHeading = screen.getByText("Charts");
+    const chartsHeading = screen.getByRole("heading", { name: "What does this comparison show?" });
     const queryDiffHeading = screen.getByRole("heading", { name: "Query-level differences" });
 
     expect(summary.closest("section")).toHaveTextContent("In these selected runs, DuckDB's power score was 10.00x the lowest selected score.");
@@ -1113,15 +1113,13 @@ describe("Compare", () => {
   // (d) Baseline selector changes baseline in chart section
   // -----------------------------------------------------------------------
 
-  it("baseline selector shows both platforms as options when Relative to selected baseline tab is active", async () => {
+  it("baseline selector shows both platforms as options", async () => {
     render(<Compare />);
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
-    // Click the Relative to selected baseline chart tab to reveal the baseline selector
-    const speedupTab = screen.getByRole("button", { name: /Relative to selected baseline/i });
-    fireEvent.click(speedupTab);
-    // The baseline selector should now be visible
+    // The compare charts render openly, so the page-level baseline selector is
+    // visible without opening any chart tab.
     await waitFor(() => {
       expect(screen.getByRole("combobox", { name: "Baseline" })).toBeTruthy();
     });
@@ -1137,8 +1135,6 @@ describe("Compare", () => {
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
-    const speedupTab = screen.getByRole("button", { name: /Relative to selected baseline/i });
-    fireEvent.click(speedupTab);
     await waitFor(() => {
       expect(screen.getByRole("combobox", { name: "Baseline" })).toBeTruthy();
     });
@@ -1395,7 +1391,7 @@ describe("Compare", () => {
     });
 
     const receipt = screen.getByRole("region", { name: "Comparison checks" });
-    const chartsHeading = screen.getByText("Charts");
+    const chartsHeading = screen.getByRole("heading", { name: "What does this comparison show?" });
     const queryDiffHeading = screen.getByRole("heading", { name: "Query-level differences" });
 
     expect(receipt).toHaveTextContent("Benchmark");

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import type { BenchmarkSummary } from "@/types";
 import {
@@ -77,9 +77,52 @@ const CHART_DISPLAY_TITLES: Record<string, string> = {
   rank_table: "Query ranks",
 };
 
+export function additionalAnalysesLabel(count: number): string {
+  return `${count} additional ${count === 1 ? "analysis" : "analyses"}`;
+}
+
 export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
   const summary = buildRenderableSummary(context);
   const [openChartIds, setOpenChartIds] = useState<Set<string>>(() => new Set());
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const copyTimer = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    return () => {
+      if (copyTimer.current !== undefined) window.clearTimeout(copyTimer.current);
+    };
+  }, []);
+
+  async function copySectionLink() {
+    // Keep the cohort facets (scale/phase/tuning in the query string) so the
+    // pasted link resolves to the section being viewed, not the defaults.
+    const url = `${window.location.origin}${window.location.pathname}${window.location.search}#cohort-charts`;
+    let ok = false;
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        ok = true;
+      } else {
+        throw new Error("clipboard unavailable");
+      }
+    } catch {
+      try {
+        const area = document.createElement("textarea");
+        area.value = url;
+        area.setAttribute("readonly", "");
+        area.style.position = "fixed";
+        area.style.opacity = "0";
+        document.body.appendChild(area);
+        area.select();
+        ok = document.execCommand("copy");
+        area.remove();
+      } catch {
+        ok = false;
+      }
+    }
+    if (copyTimer.current !== undefined) window.clearTimeout(copyTimer.current);
+    setCopyState(ok ? "copied" : "failed");
+    copyTimer.current = window.setTimeout(() => setCopyState("idle"), 1500);
+  }
 
   const charts = useMemo(() => {
     const applicableById = new Map(applicableCharts(context).map((chart) => [chart.id, chart]));
@@ -120,7 +163,36 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
   const powerExclusions = summarizeChartDatasetExclusions(summary.platforms, "rank_safe");
 
   return (
-    <div class="space-y-6" data-testid="summary-chart-overview">
+    <div class="scroll-mt-24 space-y-6" data-testid="summary-chart-overview" id="cohort-charts">
+      <div>
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 class="text-xl font-bold text-[var(--bb-data-fg-primary)]">What does this cohort show?</h2>
+            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
+              Headline metrics first, then the distribution and supporting analyses.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void copySectionLink()}
+            aria-live="polite"
+            class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm font-medium text-[var(--bb-accent)] shadow-sm"
+          >
+            {copyState === "copied"
+              ? "Link copied ✓"
+              : copyState === "failed"
+                ? "Copy failed — copy the URL manually"
+                : "Copy chart-section link"}
+          </button>
+        </div>
+        <aside class="mt-3 rounded-md border border-[var(--bb-data-border)] border-l-4 border-l-[var(--bb-accent)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
+          <p>
+            <strong class="font-semibold text-[var(--bb-data-fg-primary)]">Shared scope:</strong> every card
+            below names its own eligible population. Rows excluded by a chart&rsquo;s evidence policy remain
+            available in the matrix and receipts.
+          </p>
+        </aside>
+      </div>
       <section class="card" aria-labelledby="summary-metric-overview-title">
         <div class="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-[var(--bb-data-border)] pb-4">
           <div>
@@ -257,6 +329,19 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
         <div data-chart-container>
           <DistributionBox summary={summary} />
         </div>
+        <div class="mt-3 space-y-1 border-t border-[var(--bb-data-border)] pt-3 text-sm text-[var(--bb-data-fg-muted)]">
+          <p>
+            <strong class="font-semibold text-[var(--bb-data-fg-primary)]">Boundary:</strong> across different
+            queries, not run-to-run variability.{" "}
+            <a class="font-medium text-[var(--bb-accent)]" href="#evidence-matrix">
+              Open per-query matrix ↗
+            </a>{" "}
+            ·{" "}
+            <a class="font-medium text-[var(--bb-accent)]" href="#provenance-legend">
+              Inspect exclusions ↗
+            </a>
+          </p>
+        </div>
       </section>
 
       {charts.length > 0 && (
@@ -265,9 +350,15 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
             <h2 id="summary-more-views-title" class="text-lg font-semibold text-[var(--bb-data-fg-primary)]">
               More views
             </h2>
+            <p class="ml-auto text-sm font-medium text-[var(--bb-accent)]">
+              {additionalAnalysesLabel(charts.length)}
+            </p>
             <p class="text-sm text-[var(--bb-data-fg-muted)]">
-              {excludeChartIds.includes("query_heatmap") ? "The full query heatmap is above. " : ""}
-              Each thumbnail is drawn from this cohort. Open a card to inspect the full chart and its data scope.
+              {excludeChartIds.includes("query_heatmap")
+                ? "The evidence matrix above is the query heatmap. "
+                : ""}
+              Each thumbnail is drawn from this cohort when the cohort has data for it. Open a card to
+              inspect the full chart and its data scope.
             </p>
           </div>
           <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
