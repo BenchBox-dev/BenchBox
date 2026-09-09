@@ -605,13 +605,10 @@ def _valid_delivery_receipts() -> list[dict]:
     import subprocess
 
     repo_root = Path(metrics.__file__).resolve().parents[2]
-    head, parent = subprocess.run(
-        ["git", "rev-parse", "HEAD", "HEAD^"],
-        cwd=repo_root,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.splitlines()
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo_root, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    parent = "1" * 40
 
     def receipt(batch_id: str, integration_head: str, member_heads: list[str], dependency: bool) -> dict:
         members = [
@@ -669,7 +666,7 @@ def test_acceptance_validator_holds_incomplete_cohort_and_replays() -> None:
     assert any("unmeasured" in e for e in errors)
 
 
-def test_acceptance_validator_accepts_complete_record() -> None:
+def test_acceptance_validator_accepts_complete_record(monkeypatch: pytest.MonkeyPatch) -> None:
     """The validator can pass: guards against a firewall that never opens."""
     import hashlib
     import json as _json2
@@ -701,13 +698,21 @@ def test_acceptance_validator_accepts_complete_record() -> None:
     acceptance["cohort"]["observed"]["days"] = frozen["min_days"]
     acceptance["cohort"]["observed"]["strata"] = list(frozen["strata"])
     acceptance["cohort"]["observed"]["human_hold"] = True
-    acceptance["cohort"]["observed"]["batch_deliveries"] = _valid_delivery_receipts()
+    receipts = _valid_delivery_receipts()
+    synthetic_heads = {receipt["integration_head"] for receipt in receipts[1:]}
+    real_is_ancestor = metrics._is_ancestor
+    monkeypatch.setattr(
+        metrics,
+        "_is_ancestor",
+        lambda commit, head="HEAD": True if commit in synthetic_heads else real_is_ancestor(commit, head),
+    )
+    acceptance["cohort"]["observed"]["batch_deliveries"] = receipts
     acceptance["efficiency"]["observed_avoidable_actions"] = 20
     errors = metrics.validate_process_acceptance(acceptance, process, hashlib.sha256(process_raw).hexdigest())
     assert errors == []
 
 
-def test_acceptance_validator_rejects_weakened_frozen_requirements() -> None:
+def test_acceptance_validator_rejects_weakened_frozen_requirements(monkeypatch: pytest.MonkeyPatch) -> None:
     import hashlib
     import json as _json2
 
@@ -717,6 +722,14 @@ def test_acceptance_validator_rejects_weakened_frozen_requirements() -> None:
     process = _json2.loads(process_raw.decode("utf-8"))
     digest = hashlib.sha256(process_raw).hexdigest()
     frozen = process["prospective_cohort"]
+    receipts = _valid_delivery_receipts()
+    synthetic_heads = {receipt["integration_head"] for receipt in receipts[1:]}
+    real_is_ancestor = metrics._is_ancestor
+    monkeypatch.setattr(
+        metrics,
+        "_is_ancestor",
+        lambda commit, head="HEAD": True if commit in synthetic_heads else real_is_ancestor(commit, head),
+    )
 
     def conforming() -> dict:
         acceptance = _acceptance_doc()
@@ -734,7 +747,7 @@ def test_acceptance_validator_rejects_weakened_frozen_requirements() -> None:
         acceptance["cohort"]["observed"]["days"] = frozen["min_days"]
         acceptance["cohort"]["observed"]["strata"] = list(frozen["strata"])
         acceptance["cohort"]["observed"]["human_hold"] = True
-        acceptance["cohort"]["observed"]["batch_deliveries"] = _valid_delivery_receipts()
+        acceptance["cohort"]["observed"]["batch_deliveries"] = receipts
         return acceptance
 
     weakened = conforming()
@@ -753,7 +766,7 @@ def test_acceptance_validator_rejects_weakened_frozen_requirements() -> None:
     assert any("replay scenario set" in e for e in errors)
 
     few = conforming()
-    few["cohort"]["observed"]["batch_deliveries"] = _valid_delivery_receipts()[:1]
+    few["cohort"]["observed"]["batch_deliveries"] = receipts[:1]
     errors = metrics.validate_process_acceptance(few, process, digest)
     assert any("batch deliveries insufficient" in e for e in errors)
 
@@ -773,7 +786,7 @@ def test_acceptance_validator_rejects_weakened_frozen_requirements() -> None:
     assert any("frozen strata" in e for e in errors)
 
     duplicate = conforming()
-    duplicate_receipt = _valid_delivery_receipts()[0]
+    duplicate_receipt = receipts[0]
     duplicate["cohort"]["observed"]["batch_deliveries"] = [duplicate_receipt, duplicate_receipt]
     errors = metrics.validate_process_acceptance(duplicate, process, digest)
     assert any("duplicates batch_id" in e or "duplicates integration_head" in e for e in errors)
