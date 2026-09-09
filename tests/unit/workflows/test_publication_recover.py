@@ -48,12 +48,7 @@ def test_recover_workflow_triggers_and_schedules() -> None:
     crons = [s.get("cron", "") for s in schedules]
     assert "2-57/5 * * * *" in crons
 
-    # workflow_dispatch inputs
     assert "workflow_dispatch" in triggers
-    inputs = triggers["workflow_dispatch"].get("inputs", {})
-    assert "action" in inputs
-    assert set(inputs["action"].get("options", [])) == {"scan", "finalize", "compensate", "mark_terminal"}
-    assert "barrier_evidence" in inputs
 
 
 def test_recover_workflow_permissions_follow_least_privilege() -> None:
@@ -66,14 +61,7 @@ def test_recover_workflow_permissions_follow_least_privilege() -> None:
     # scan: read-only
     assert jobs["scan"]["permissions"] == {"contents": "read", "actions": "read"}
 
-    # act: contents: write (for journal CAS), pages: write, id-token: write, actions: read
-    assert jobs["act"]["permissions"] == {
-        "contents": "write",
-        "pages": "write",
-        "id-token": "write",
-        "actions": "read",
-    }
-    assert jobs["act"]["environment"]["name"] == "github-pages"
+    assert set(jobs) == {"scan"}
 
 
 def test_recover_workflow_resumes_prepared_rollbacks() -> None:
@@ -86,8 +74,8 @@ def test_recover_workflow_resumes_prepared_rollbacks() -> None:
     assert "resume_transaction_id" in tx_inputs
     assert tx_inputs["resume_transaction_id"]["required"] is False
     recovery_text = WORKFLOW_PATH.read_text(encoding="utf-8")
-    assert "gh workflow run publication-transaction.yml --ref develop" in recovery_text
-    assert '-f resume_transaction_id="$TX_ID"' in recovery_text
+    assert "watchdog-scan" in recovery_text
+    assert "--execute" not in recovery_text
     assert "(G3)" not in recovery_text
 
 
@@ -97,23 +85,18 @@ def test_recover_workflow_concurrency_scoped_to_act_job() -> None:
     # Top-level has watchdog group
     assert wf.get("concurrency", {}).get("group") == "publication-watchdog"
 
-    # act job participates in pages-deploy concurrency
-    assert wf["jobs"]["act"]["concurrency"] == {
-        "group": "pages-deploy",
-        "cancel-in-progress": False,
-    }
+    assert "pages-deploy" not in WORKFLOW_PATH.read_text(encoding="utf-8")
 
 
 def test_recover_workflow_job_dependencies() -> None:
     jobs = _workflow()["jobs"]
-    assert jobs["act"]["needs"] == "scan"
-    assert "needs.scan.outputs.recovery_needed == 'true'" in jobs["act"]["if"]
+    assert jobs["scan"].get("needs") is None
 
 
 def test_recover_workflow_pins_all_actions() -> None:
     text = WORKFLOW_PATH.read_text(encoding="utf-8")
     action_refs = re.findall(r"uses:\s+([^\s#]+)", text)
-    assert len(action_refs) >= 4
+    assert len(action_refs) >= 3
     for ref in action_refs:
         assert "@" in ref, f"Action reference '{ref}' must specify a version"
         _, sha_or_tag = ref.split("@", 1)
@@ -193,6 +176,42 @@ def test_defect_d4_kill_before_write_started_zero_posts(tmp_path: Path, monkeypa
     assert action == "record_failure"
     assert status == "run_lost_before_write"
     assert "no provider write occurred" in reason
+
+
+def test_watchdog_reports_aged_transaction_without_mutation() -> None:
+    from datetime import datetime, timedelta, timezone
+
+    tx = transaction.Transaction(
+        transaction_id="tx-stale",
+        target={"repo": "BenchBox-dev/BenchBox", "env": "github-pages"},
+        kind=transaction.KIND_PROMOTION,
+        generation=1,
+        parent_transaction_id=None,
+        recovery_of=None,
+        restore_source=None,
+        approval={},
+        controller={},
+        owner={},
+        content={},
+        desired={},
+        artifact={},
+        state=transaction.STATE_PREPARED,
+        event={"timestamp": (datetime.now(timezone.utc) - timedelta(minutes=11)).isoformat()},
+    )
+    state = journal.JournalState(
+        target="BenchBox-dev/BenchBox:github-pages",
+        next_generation=2,
+        active_transaction_id=tx.transaction_id,
+        durable_transaction_id=None,
+        write_block=None,
+        policy_digest="p" * 64,
+        tip_commit_oid="tip",
+    )
+
+    action, status, reason = transaction_executor._resolve_watchdog_action(tx, state, barrier_evidence=None)
+    assert action == "alert"
+    assert status == "stale_transaction"
+    assert "11.0 minutes" in reason
 
 
 def test_defect_d4_unknown_finality_forbids_compensation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -332,55 +351,6 @@ def test_defect_d4_kill_after_signing_before_durable(tmp_path: Path, monkeypatch
     assert status == "verified_unfinalized"
 
 
-def test_watchdog_executes_prepare_rollback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    repo, journal_state = _setup_test_journal(tmp_path)
-    failed_tx = transaction.Transaction(
-        transaction_id="failed-tx",
-        target={"repository": "BenchBox-dev/BenchBox", "environment": "github-pages"},
-        kind=transaction.KIND_PROMOTION,
-        generation=2,
-        parent_transaction_id="durable-tx",
-        recovery_of=None,
-        restore_source=None,
-        approval={},
-        controller={},
-        owner={},
-        content={},
-        desired={},
-        artifact={},
-        state=transaction.STATE_RECOVERY_REQUIRED,
-    )
-    durable_tx = transaction.Transaction(
-        **{**failed_tx.to_dict(), "transaction_id": "durable-tx", "state": transaction.STATE_DURABLE}
-    )
-    rollback_tx = transaction.Transaction(
-        **{
-            **failed_tx.to_dict(),
-            "transaction_id": "rollback-tx",
-            "kind": transaction.KIND_ROLLBACK,
-            "generation": journal_state.next_generation,
-            "state": transaction.STATE_ROLLBACK_WRITE_STARTED,
-        }
-    )
-    journal_state = journal.JournalState(
-        **{
-            **journal_state.to_dict(),
-            "active_transaction_id": failed_tx.transaction_id,
-            "durable_transaction_id": durable_tx.transaction_id,
-        }
-    )
-    writes = []
-    monkeypatch.setattr(journal, "read_journal_state", lambda *args, **kwargs: journal_state)
-    monkeypatch.setattr(journal, "read_transaction", lambda *args, **kwargs: durable_tx)
-    monkeypatch.setattr(transaction, "prepare_rollback", lambda **kwargs: (rollback_tx, None))
-    monkeypatch.setattr(journal, "write_journal_update", lambda **kwargs: writes.append(kwargs))
-    args = argparse.Namespace(repo_path=repo, ref="publication", barrier_evidence='{"provider_status":"failed"}')
-
-    assert transaction_executor._execute_watchdog_action("prepare_rollback", failed_tx, args, "failed") is True
-    assert writes[0]["transaction"].transaction_id == "rollback-tx"
-    assert writes[0]["new_state"].active_transaction_id == "rollback-tx"
-
-
 def test_defect_d4_legacy_recovery_with_unreadable_journal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Case 5: Unreadable or corrupt journal.
 
@@ -411,7 +381,6 @@ def test_defect_d4_legacy_recovery_with_unreadable_journal(tmp_path: Path, monke
         barrier_evidence=None,
         trigger_run_id=None,
         output_json=None,
-        execute=False,
     )
     rc = transaction_executor.cmd_watchdog_scan(args)
     assert rc == 1  # Fails closed on corrupt journal

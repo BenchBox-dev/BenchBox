@@ -21,6 +21,8 @@ users can observe.
 This ADR extends, rather than discards, the slim-branch decision in
 [`adr-published-results-slim-corpus-branch.md`](adr-published-results-slim-corpus-branch.md).
 It also makes the A0 desired, built, deployed, and observed distinction normative.
+A `published-results` merge proves acceptance only; it does not prove that the
+new publication is deployed or publicly observable.
 
 ## Decision
 
@@ -83,7 +85,7 @@ never became live.
 
 ### 3. Desired, built, deployed, and observed transitions
 
-1. **Desired:** a reviewed manifest pins exact source SHAs and policy inputs.
+1. **Desired:** one selected immutable candidate artifact contains a manifest that pins exact source SHAs and policy inputs. The candidate is validated before approval.
 2. **Built:** a trusted builder emits immutable artifacts and provenance tied to that
    manifest. Build success does not imply deployment.
 3. **Deployed:** the deployment provider acknowledges the exact artifact for the target
@@ -103,9 +105,11 @@ One authorized maintainer may approve normal promotion. One authorized maintaine
 also order an emergency takedown. Separation of duties is desirable but is not a
 liveness dependency for the current maintainer model.
 
-Changes to trust policy, admission policy, promotion workflow semantics, credential
-scope, receipt verification, withdrawal rules, or ranking policy require manual
-maintainer review and MUST NOT auto-merge. Data-only submissions may use their separately
+The protected `github-pages` environment supplies the one normal publication approval.
+The operator reviews the generated candidate summary; no permit digest, generation,
+tracker claim, or author attribution is an approval input. Changes to trust policy,
+admission policy, promotion workflow semantics, credential scope, receipt verification,
+withdrawal rules, or ranking policy require manual maintainer review and MUST NOT auto-merge. Data-only submissions may use their separately
 defined validation and merge policy, but no data PR may modify trusted executable code or
 policy.
 
@@ -113,8 +117,9 @@ policy.
 
 - Rollback selects a previously attested manifest and artifact. Rebuilding an equivalent
   tree without matching provenance is not the same rollback object.
-- Automatic rollback is bounded by the last known-good attested receipt. It must not
-  advance desired state or accept new input.
+- Rollback is bounded by the last known-good attested receipt and retained exact artifact.
+  It uses the normal protected writer and requires a fresh live receipt. The watchdog cannot
+  initiate rollback or compensate an unknown provider outcome.
 - Emergency takedown fails closed for the candidate presentation: an authorized maintainer
   may record `withdrawal_requested` and republish without waiting for a second approver.
   The result becomes `withdrawn` only when a matching live receipt confirms suppression.
@@ -133,22 +138,15 @@ policy.
 - Public artifacts and indexes are derived and rebuildable. The accepted archive and
   audit evidence are preservation floors.
 
-### 6. Provider feasibility gates and activation finality
+### 6. Provider finality and quarantine
 
-GitHub Pages provides neither conditional activation nor atomic commits with our journal.
-Therefore, controller implementation requires two independent provider feasibility gates:
-
-1. **Unique Write Correlation:** GitHub Pages must accept a unique, real write-intent commit
-   OID as `pages_build_version` independently of the workflow source commit SHA, and must
-   reliably return deployment status by that build version without aliasing across runs.
-2. **Supported Activation Barrier:** A supported guarantee (by provider documentation or written
-   confirmation) must exist specifying the status or cancellation barrier that guarantees an
-   in-flight, timed-out, or canceled request cannot activate after a later compensation write.
-
-**Stop condition:** If either guarantee cannot be established, automated controller implementation
-must halt. The system falls back to a fail-closed operator quarantine: any indeterminate request
-sets `recovery-required` and blocks automated compensation and new promotions until manual
-reconciliation occurs.
+The Pages adapter records a durable write intent before submission and passes its unique
+intent commit as `pages_build_version`. Workflow concurrency and journal CAS serialize the
+normal writer, but neither is a provider activation fence. If a request may have been
+submitted and its finality is unknown, the transaction enters `recovery-required` and blocks
+new writes. The watchdog reports that state; it cannot compensate, finalize, or invent a
+provider barrier. Restoration proceeds through a fresh protected transaction after finality
+is established.
 
 ### 7. Single metadata journal authority
 
@@ -179,8 +177,8 @@ emergency takedown abuse or delay.
   must never be described as live without a matching attested live receipt.
 - Explorer presentation remains policy-driven while archive authority stays singular.
 - Package-release gates remain at least as strong as the current release process.
-- Provider feasibility gates must pass in an isolated test repository before production
-  journal controller implementation.
+- Provider finality remains a safety condition for recovery; an unknown result is quarantined
+  instead of being resolved by a timer, HTTP probe, or second approval.
 
 ## Reconciled prior decisions
 

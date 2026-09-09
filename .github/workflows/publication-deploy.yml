@@ -1,20 +1,25 @@
 name: Publication Control Plane Deployment
 
-# Dispatch-only during soak: docs.yml still owns release-push deployment.
+# Candidate builder for the single publication transaction writer. Normal
+# production writes use the transaction workflow; the explicit approved-manifest
+# path remains available as a bounded migration fallback.
 "on":
   workflow_dispatch:
     inputs:
       develop_sha:
         description: "Pinned develop commit SHA (40 hex)"
-        required: true
+        required: false
+        default: ""
         type: string
       published_results_sha:
         description: "Pinned published-results commit SHA (40 hex)"
-        required: true
+        required: false
+        default: ""
         type: string
       generation:
         description: "Positive decimal CAS generation (1 for the first independent deployment)"
-        required: true
+        required: false
+        default: ""
         type: string
       approved_manifest_digest:
         description: "Reviewed candidate manifest SHA-256; required for a production deployment"
@@ -67,6 +72,7 @@ jobs:
       parent_sha: ${{ steps.lineage.outputs.parent_sha || steps.approved.outputs.parent_sha }}
       parent_generation: ${{ steps.lineage.outputs.parent_generation || steps.approved.outputs.parent_generation }}
       parent_artifact_id: ${{ steps.lineage.outputs.parent_artifact_id || steps.approved.outputs.parent_artifact_id }}
+      candidate_artifact_id: ${{ steps.upload_candidate.outputs.artifact-id }}
     steps:
       - name: Checkout control-plane source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -78,13 +84,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          DEVELOP_SHA="$INPUT_DEVELOP_SHA"
-          PUBLISHED_RESULTS_SHA="$INPUT_PUBLISHED_RESULTS_SHA"
+          git fetch --no-tags origin develop:refs/remotes/origin/develop
+          git fetch --no-tags origin published-results:refs/remotes/origin/published-results
+          git fetch origin refs/heads/publication:refs/heads/publication || true
+          DEVELOP_SHA="${INPUT_DEVELOP_SHA:-$(git rev-parse refs/remotes/origin/develop)}"
+          PUBLISHED_RESULTS_SHA="${INPUT_PUBLISHED_RESULTS_SHA:-$(git rev-parse refs/remotes/origin/published-results)}"
           GENERATION="$INPUT_GENERATION"
+          if [ -z "$GENERATION" ]; then
+            GENERATION=$(git show refs/heads/publication:publication/transaction-state/state.json 2>/dev/null | jq -r '.next_generation // 1' || echo 1)
+          fi
           APPROVED_MANIFEST_DIGEST="$INPUT_APPROVED_MANIFEST_DIGEST"
           APPROVED_CANDIDATE_RUN_ID="$INPUT_APPROVED_CANDIDATE_RUN_ID"
           if [ "$GITHUB_REF" != "refs/heads/develop" ]; then
             echo "::error::publication deployment must be dispatched from develop"
+            exit 1
+          fi
+          if [ "$EXPECT_NOOP" != "true" ] && [ "$CANDIDATE_ONLY" != "true" ] && [ "$FORCE_ROLLBACK" != "true" ] && [ -z "$APPROVED_MANIFEST_DIGEST" ]; then
+            echo "::error::production writes use Publication Transactions; run this workflow with candidate_only=true"
             exit 1
           fi
           if { [ "$EXPECT_NOOP" = "true" ] && [ "$FORCE_ROLLBACK" = "true" ]; } || \
@@ -184,6 +200,47 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p prior-live-receipt
+          if [ -z "$PRIOR_LIVE_RECEIPT_ID" ]; then
+            STATE_JSON=$(git show refs/heads/publication:publication/transaction-state/state.json 2>/dev/null || echo '{}')
+            DURABLE_ID=$(printf '%s' "$STATE_JSON" | jq -r '.durable_transaction_id // empty')
+            if [ -n "$DURABLE_ID" ]; then
+              git show "refs/heads/publication:publication/transaction-state/transactions/$DURABLE_ID.json" > durable-parent.json
+              if EXPECTED_PARENT_GENERATION="$((GENERATION - 1))" uv run python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from scripts.publication.reconciliation import verify_live_receipt_signature
+
+          tx = json.loads(Path("durable-parent.json").read_text())
+          receipt = tx.get("attestation")
+          if not isinstance(receipt, dict):
+              raise SystemExit(1)
+          valid, _ = verify_live_receipt_signature(receipt)
+          if not valid or receipt.get("target") != "benchbox.dev":
+              raise SystemExit(1)
+          if receipt.get("generation") != int(os.environ["EXPECTED_PARENT_GENERATION"]):
+              raise SystemExit(1)
+          PY
+              then
+                PRIOR_LIVE_RECEIPT_ID=$(jq -r '.attestation.receipt_id // empty' durable-parent.json)
+                PARENT_SHA=$(jq -r '.attestation.source_commit // .content.develop_sha // empty' durable-parent.json)
+                PARENT_GENERATION=$(jq -r '.generation' durable-parent.json)
+                PARENT_ARTIFACT_ID=$(jq -r '.artifact.artifact_id // empty' durable-parent.json)
+                [ -n "$PRIOR_LIVE_RECEIPT_ID" ] && [ -n "$PARENT_SHA" ] && [ -n "$PARENT_ARTIFACT_ID" ] || {
+                  echo "::error::durable publication head lacks a complete attested parent binding"
+                  exit 1
+                }
+                printf '%s\n' "$PARENT_SHA" > prior-live-receipt/parent-sha
+                printf '%s\n' "$PARENT_GENERATION" > prior-live-receipt/parent-generation
+                printf '%s\n' "$PARENT_ARTIFACT_ID" > prior-live-receipt/parent-artifact-id
+                cp durable-parent.json prior-live-receipt/transaction.json
+                echo "parent_sha=$PARENT_SHA" >> "$GITHUB_OUTPUT"
+                echo "parent_generation=$PARENT_GENERATION" >> "$GITHUB_OUTPUT"
+                echo "parent_artifact_id=$PARENT_ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+          fi
           gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
             --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("publication-live-receipt-")) | "\(.created_at) \(.id) \(.workflow_run.id)"' \
             | sort -r > prior-candidates.txt
@@ -222,14 +279,13 @@ jobs:
               raise SystemExit(1)
           PY
             then
+              if [ "$GENERATION" = "1" ]; then
+                continue
+              fi
               RECEIPT_ID=$(uv run python -c "import json; print(json.load(open('prior-candidate/live-receipt.json'))['receipt_id'])")
               RECEIPT_GENERATION=$(uv run python -c "import json; print(json.load(open('prior-candidate/live-receipt.json'))['generation'])")
-              if [ "$GENERATION" = "1" ]; then
-                echo "::error::generation 1 cannot replace current live receipt $RECEIPT_ID"
-                exit 1
-              fi
               [ -n "$PRIOR_LIVE_RECEIPT_ID" ] || {
-                echo "::error::generation $GENERATION requires prior_live_receipt_id"
+                echo "::error::generation $GENERATION requires an attested live head"
                 exit 1
               }
               [ "$RECEIPT_ID" = "$PRIOR_LIVE_RECEIPT_ID" ] || {
@@ -443,8 +499,18 @@ jobs:
           DEVELOP_SHA="$BUILD_DEVELOP_SHA"
           PUBLISHED_RESULTS_SHA="$BUILD_PUBLISHED_RESULTS_SHA"
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          (cd site && find . -type f -exec sha256sum {} + | sort) > receipt-dist/site-file-digests.txt
-          SITE_DIGEST=$(sha256sum receipt-dist/site-file-digests.txt | cut -d ' ' -f 1)
+          uv run python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.publication.assembler import compute_tree_digest
+
+          digest, _, files = compute_tree_digest(Path("site"))
+          Path("receipt-dist/site-file-digests.json").write_text(
+              json.dumps(files, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+          )
+          Path("receipt-dist/site-tree-sha256").write_text(digest + "\n", encoding="utf-8")
+          PY
+          SITE_DIGEST=$(cat receipt-dist/site-tree-sha256)
           (cd prose-site && find . -type f -exec sha256sum {} + | sort) > receipt-dist/prose-file-digests.txt
           PROSE_DIGEST=$(sha256sum receipt-dist/prose-file-digests.txt | cut -d ' ' -f 1)
           (cd explorer-app && find . -type f -exec sha256sum {} + | sort) > receipt-dist/explorer-file-digests.txt
@@ -619,6 +685,35 @@ jobs:
           path: receipt-dist/
           retention-days: 90
 
+      - name: Create immutable candidate bundle
+        id: candidate_bundle
+        if: inputs.approved_manifest_digest == '' && (inputs.candidate_only == true || inputs.expect_noop == true)
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf candidate-bundle
+          mkdir -p candidate-bundle
+          cp -R site candidate-bundle/site
+          cp receipt-dist/desired-manifest.json candidate-bundle/desired-manifest.json
+          cp receipt-dist/assembly-receipt.json candidate-bundle/assembly-receipt.json
+          uv run python scripts/publication/candidate.py create \
+            --manifest candidate-bundle/desired-manifest.json \
+            --assembly candidate-bundle/assembly-receipt.json \
+            --site candidate-bundle/site \
+            --producer-run-id "${{ github.run_id }}" \
+            --output candidate-bundle/candidate.json
+          cat candidate-bundle/candidate.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload immutable candidate bundle
+        id: upload_candidate
+        if: inputs.approved_manifest_digest == '' && (inputs.candidate_only == true || inputs.expect_noop == true)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: publication-candidate-${{ github.run_id }}
+          path: candidate-bundle/
+          include-hidden-files: true
+          retention-days: 90
+
       - name: Pre-deploy candidate verification
         if: inputs.approved_manifest_digest == ''
         env:
@@ -642,7 +737,7 @@ jobs:
             uv run python scripts/publication/verify_live.py \
               --candidate-manifest receipt-dist/publication-receipt.json \
               --baseline-manifest receipt-dist/desired-manifest.json \
-              --pre-deploy --require-receipt
+              --pre-deploy --require-receipt --require-complete-checksums
           fi
 
       - name: Upload Pages artifact
@@ -811,7 +906,7 @@ jobs:
             --base-url "$TARGET_URL" \
             --manifest receipt-dist/publication-receipt.json \
             --observation-origin github-actions:publication-verify \
-            --require-receipt --timeout 60 --json > receipt-dist/live-probe-report.json
+            --require-receipt --require-complete-checksums --timeout 60 --json > receipt-dist/live-probe-report.json
 
       - name: Create and sign live receipt
         env:

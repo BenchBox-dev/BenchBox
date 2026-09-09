@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "869a123acc338010bf92b8375e3462161b24b722f576614f0e5e19c3f4b0fad0",
+  "contract_sha256": "3448bf0e3c0a543325e20d2b7224e84f738ec674a4e3115ee727b258e637a7ad",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -103,6 +103,7 @@
     "pr-review-followups",
     "pr-review-followups-list",
     "pr-status",
+    "publication-help",
     "quality-governance-typecheck",
     "read-primitives-cross-surface-equivalence-report",
     "release-cut",
@@ -167,7 +168,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 190,
+  "public_target_count": 191,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -260,6 +261,7 @@
     "pr-status",
     "prompt-quickstarts-check",
     "prompt-quickstarts-write",
+    "publication-help",
     "quality-governance-typecheck",
     "read-primitives-cross-surface-equivalence-report",
     "release-cut",
@@ -1164,6 +1166,13 @@
         "recipe_sha256": "cf42d3d0c2f34b7d66eb50bc4215cec7387bd5fc4b7bbcb9885ea7c8ec36df43"
       }
     ],
+    "publication-help": [
+      {
+        "header": "publication-help:",
+        "recipe": "\t@echo \"Publication flow:\"\n\t@echo \"  1. gh workflow run publication-deploy.yml --ref develop -f candidate_only=true\"\n\t@echo \"  2. Select the numeric artifact ID from that run.\"\n\t@echo \"  3. gh workflow run publication-transaction.yml --ref develop -f kind=promotion -f candidate_artifact_id=<id>\"\n\t@echo \"  4. Approve the github-pages environment once; the workflow validates and records the result.\"\n\t@echo \"  Retry with a new transaction run against the same artifact after a pre-write failure.\"",
+        "recipe_sha256": "cf6d0eba4e692b63432bf8cb1d3653135a627799222ff5a3dfb281e69af9f7d3"
+      }
+    ],
     "quality-governance-typecheck": [
       {
         "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
@@ -1975,7 +1984,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "cf4068a5439b676bddcd58e4bdfd6cb2dafe10d33f9871ad9451d8b2990dd6b8",
+  "semantic_sha256": "b08f4a834a04c9129259b8920fed2f7b59ac171911479fa06af74ac24ce7bfad",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2167,6 +2176,22 @@
       "sha256": "cddef3cbf402a63c61520635df6fbaa5c3ad6485820d37c496a88e68f30d8f59",
       "targets": [
         ".development-tree-required"
+      ]
+    },
+    {
+      "body": ".PHONY: publication-help",
+      "kind": "rule",
+      "sha256": "b4fae1c18029da232a1c80d14e4a413154bcd5dbb4984c46a18f0b2b67c9b865",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
+      "body": "publication-help:\n\t@echo \"Publication flow:\"\n\t@echo \"  1. gh workflow run publication-deploy.yml --ref develop -f candidate_only=true\"\n\t@echo \"  2. Select the numeric artifact ID from that run.\"\n\t@echo \"  3. gh workflow run publication-transaction.yml --ref develop -f kind=promotion -f candidate_artifact_id=<id>\"\n\t@echo \"  4. Approve the github-pages environment once; the workflow validates and records the result.\"\n\t@echo \"  Retry with a new transaction run against the same artifact after a pre-write failure.\"",
+      "kind": "rule",
+      "sha256": "5e32d1249a43b41b09c313897ce3fe43bae4faf3243d04fa3b723ede69bc821f",
+      "targets": [
+        "publication-help"
       ]
     },
     {
@@ -4012,7 +4037,7 @@
       ]
     }
   ],
-  "target_count": 196,
+  "target_count": 197,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -4108,6 +4133,7 @@
     "pr-status",
     "prompt-quickstarts-check",
     "prompt-quickstarts-write",
+    "publication-help",
     "quality-governance-typecheck",
     "read-primitives-cross-surface-equivalence-report",
     "release-cut",

@@ -46,6 +46,7 @@ DEFAULT_ENDPOINTS = (
     "/results/",
     "/results/data/results.duckdb",
 )
+REQUIRED_ROUTE_CHECKSUMS = DEFAULT_ENDPOINTS
 
 DIMENSION_AVAILABILITY = "service_availability"
 DIMENSION_CONTENT_IDENTITY = "exact_content_identity"
@@ -340,6 +341,26 @@ def _run_pre_deploy_check(
         report.errors.append("Receipt verification was required (--require-receipt), but no manifest was provided.")
 
 
+def _require_complete_route_checksums(checksums: dict[str, str], report: VerificationReport, label: str) -> None:
+    missing = [path for path in REQUIRED_ROUTE_CHECKSUMS if path not in checksums]
+    malformed = [
+        path
+        for path in REQUIRED_ROUTE_CHECKSUMS
+        if path in checksums
+        and (
+            not isinstance(checksums[path], str)
+            or len(checksums[path]) != 64
+            or any(c not in "0123456789abcdef" for c in checksums[path])
+        )
+    ]
+    if missing:
+        report.ok = False
+        report.errors.append(f"{label} is missing required route checksums: {missing}")
+    if malformed:
+        report.ok = False
+        report.errors.append(f"{label} has malformed required route checksums: {malformed}")
+
+
 def _run_live_probes(
     base_url: str,
     expected_checksums: dict[str, str],
@@ -347,16 +368,18 @@ def _run_live_probes(
     timeout: float,
     endpoints: list[str] | None,
     expect_noop: bool,
+    availability_only: bool = False,
 ) -> None:
     report.live_probes_performed = True
     paths_to_probe = list(endpoints or DEFAULT_ENDPOINTS)
-    for path in expected_checksums:
-        if path not in paths_to_probe:
-            paths_to_probe.append(path)
+    if not availability_only:
+        for path in expected_checksums:
+            if path not in paths_to_probe:
+                paths_to_probe.append(path)
 
     probe_map: dict[str, EndpointProbeResult] = {}
     for path in paths_to_probe:
-        probe = probe_endpoint(base_url, path, timeout=timeout, compute_hash=True)
+        probe = probe_endpoint(base_url, path, timeout=timeout, compute_hash=not availability_only)
         report.probes.append(probe)
         probe_map[probe.path] = probe
 
@@ -366,7 +389,7 @@ def _run_live_probes(
                 f"Endpoint probe failed for {probe.path}: {probe.error or f'HTTP {probe.status_code}'}"
             )
 
-    if expected_checksums:
+    if expected_checksums and not availability_only:
         for path, exp_sha in expected_checksums.items():
             probe = probe_map.get(path)
             if probe is None or not probe.ok or not probe.sha256:
@@ -404,6 +427,8 @@ def verify_live(
     skip_live_probes: bool = False,
     pre_deploy: bool = False,
     observation_origin: str | None = None,
+    require_complete_checksums: bool = False,
+    availability_only: bool = False,
 ) -> VerificationReport:
     """Perform comprehensive pre-deploy candidate and/or live verification."""
     report = VerificationReport(
@@ -415,6 +440,12 @@ def verify_live(
 
     candidate_checksums = _resolve_candidate_checksums(candidate_manifest, candidate_digest, report)
     baseline_checksums = _resolve_baseline_checksums(baseline_manifest or manifest_path, baseline_digest, report)
+
+    if require_complete_checksums:
+        if candidate_manifest is not None or candidate_digest:
+            _require_complete_route_checksums(candidate_checksums, report, "Candidate checksum set")
+        if baseline_manifest is not None or manifest_path is not None or baseline_digest:
+            _require_complete_route_checksums(baseline_checksums, report, "Baseline checksum set")
 
     if pre_deploy:
         missing: list[str] = []
@@ -435,7 +466,15 @@ def verify_live(
         return report
 
     expected_live_checksums = candidate_checksums or baseline_checksums
-    _run_live_probes(base_url, expected_live_checksums, report, timeout, endpoints, expect_noop)
+    _run_live_probes(
+        base_url,
+        expected_live_checksums,
+        report,
+        timeout,
+        endpoints,
+        expect_noop,
+        availability_only=availability_only,
+    )
     return report
 
 
@@ -651,6 +690,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Require valid receipt and verify endpoint/candidate checksums match exactly",
     )
     parser.add_argument(
+        "--require-complete-checksums",
+        action="store_true",
+        help="Require SHA-256 checksums for every required public route",
+    )
+    parser.add_argument(
+        "--availability-only",
+        action="store_true",
+        help="Probe availability without downloading or comparing response bodies",
+    )
+    parser.add_argument(
         "--expect-noop",
         action="store_true",
         help="Assert that no unexpected mutation occurred against the manifest/baseline",
@@ -717,6 +766,8 @@ def main(argv: list[str] | None = None) -> int:
         skip_live_probes=args.pre_deploy,
         pre_deploy=args.pre_deploy,
         observation_origin=args.observation_origin,
+        require_complete_checksums=args.require_complete_checksums,
+        availability_only=args.availability_only,
     )
 
     if args.json:

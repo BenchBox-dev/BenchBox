@@ -161,6 +161,23 @@ def test_verify_live_passes_matching_checksums(tmp_path: Path, monkeypatch: pyte
     assert "/results/data/results.duckdb" in report.matched_checksums
 
 
+def test_verify_live_requires_complete_route_checksums(tmp_path: Path) -> None:
+    manifest_file = tmp_path / "receipt.json"
+    manifest_file.write_text(
+        json.dumps({"checksums": {"/": "a" * 64}}),
+        encoding="utf-8",
+    )
+    report = verify_live_mod.verify_live(
+        base_url=None,
+        manifest_path=manifest_file,
+        require_receipt=True,
+        require_complete_checksums=True,
+        skip_live_probes=True,
+    )
+    assert report.ok is False
+    assert any("missing required route checksums" in error for error in report.errors)
+
+
 def test_verify_live_fails_mismatched_checksum(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     live_content = b"live mutated content"
     manifest_file = tmp_path / "receipt.json"

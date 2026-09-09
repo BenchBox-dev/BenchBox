@@ -11,31 +11,8 @@ name: Publication Transactions
           - promotion
           - rollback
         default: promotion
-      develop_sha:
-        description: "Pinned develop commit SHA (40 hex)"
-        required: true
-        type: string
-      published_results_sha:
-        description: "Pinned published-results commit SHA (40 hex)"
-        required: true
-        type: string
-      candidate_manifest_digest:
-        description: "Approved candidate manifest SHA-256 (required for promotion)"
-        required: false
-        default: ""
-        type: string
-      candidate_run_id:
-        description: "Workflow run ID containing approved candidate bytes (required for promotion)"
-        required: false
-        default: ""
-        type: string
       candidate_artifact_id:
-        description: "Candidate artifact ID, if known"
-        required: false
-        default: ""
-        type: string
-      candidate_archive_sha256:
-        description: "Candidate archive SHA-256 digest"
+        description: "Immutable candidate bundle artifact ID (required for promotion)"
         required: false
         default: ""
         type: string
@@ -45,7 +22,7 @@ name: Publication Transactions
         default: ""
         type: string
       failed_transaction_id:
-        description: "Failed active transaction ID being compensated (required for rollback)"
+        description: "Failed active transaction ID being restored (required for rollback)"
         required: false
         default: ""
         type: string
@@ -55,7 +32,7 @@ name: Publication Transactions
         default: ""
         type: string
       resume_transaction_id:
-        description: "Prepared rollback transaction to resume (watchdog only)"
+        description: "Prepared rollback transaction to resume after provider reconciliation"
         required: false
         default: ""
         type: string
@@ -75,10 +52,13 @@ jobs:
       transaction_id: ${{ steps.prepare_tx.outputs.transaction_id }}
       generation: ${{ steps.prepare_tx.outputs.generation }}
       kind: ${{ steps.inputs.outputs.kind }}
-      develop_sha: ${{ steps.inputs.outputs.develop_sha }}
-      published_results_sha: ${{ steps.inputs.outputs.published_results_sha }}
-      candidate_run_id: ${{ steps.inputs.outputs.candidate_run_id }}
-      candidate_manifest_digest: ${{ steps.prepare_tx.outputs.candidate_manifest_digest }}
+      develop_sha: ${{ steps.candidate.outputs.develop_sha }}
+      published_results_sha: ${{ steps.candidate.outputs.published_results_sha }}
+      candidate_artifact_id: ${{ steps.candidate.outputs.artifact_id }}
+      candidate_site_tree_sha256: ${{ steps.prepare_tx.outputs.candidate_site_tree_sha256 }}
+      candidate_archive_sha256: ${{ steps.prepare_tx.outputs.candidate_archive_sha256 }}
+      candidate_parent_sha: ${{ steps.candidate.outputs.expected_parent_sha }}
+      candidate_parent_generation: ${{ steps.candidate.outputs.expected_parent_generation }}
       artifact_id: ${{ steps.prepare_tx.outputs.artifact_id }}
     steps:
       - name: Checkout control-plane source
@@ -109,20 +89,60 @@ jobs:
             exit 1
           fi
           KIND="${{ inputs.kind }}"
-          DEV_SHA="${{ inputs.develop_sha }}"
-          PUB_SHA="${{ inputs.published_results_sha }}"
-          for val in "$DEV_SHA" "$PUB_SHA"; do
-            printf '%s' "$val" | grep -qE '^[0-9a-f]{40}$' || {
-              echo "::error::commit SHAs must be lowercase 40-hex: $val"
+          case "$KIND" in promotion|rollback) ;; *) echo "::error::unsupported transaction kind: $KIND"; exit 1 ;; esac
+          if [ "$KIND" = "promotion" ]; then
+            printf '%s' "${{ inputs.candidate_artifact_id }}" | grep -qE '^[1-9][0-9]*$' || {
+              echo "::error::promotion requires one immutable candidate_artifact_id"
               exit 1
             }
-          done
+          fi
           {
             echo "kind=$KIND"
-            echo "develop_sha=$DEV_SHA"
-            echo "published_results_sha=$PUB_SHA"
-            echo "candidate_run_id=${{ inputs.candidate_run_id }}"
+            echo "candidate_artifact_id=${{ inputs.candidate_artifact_id }}"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Resolve and validate selected candidate before approval
+        id: candidate
+        if: steps.inputs.outputs.kind == 'promotion'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_ARTIFACT_ID: ${{ steps.inputs.outputs.candidate_artifact_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p candidate-validation
+          gh api "repos/${{ github.repository }}/actions/artifacts/$CANDIDATE_ARTIFACT_ID" > candidate-validation/artifact.json
+          PRODUCER_RUN_ID=$(jq -r '.workflow_run.id // empty' candidate-validation/artifact.json)
+          test -n "$PRODUCER_RUN_ID" || { echo "::error::candidate artifact has no producing workflow run"; exit 1; }
+          gh api "repos/${{ github.repository }}/actions/runs/$PRODUCER_RUN_ID" > candidate-validation/run.json
+          gh api "repos/${{ github.repository }}/actions/artifacts/$CANDIDATE_ARTIFACT_ID/zip" > candidate-validation/candidate.zip
+          EXPECTED_DEVELOP_SHA=$(git rev-parse refs/remotes/origin/develop)
+          EXPECTED_PUBLISHED_RESULTS_SHA=$(git rev-parse refs/remotes/origin/published-results)
+          STATE_JSON=$(git show refs/heads/publication:publication/transaction-state/state.json 2>/dev/null || echo '{}')
+          EXPECTED_GENERATION=$(printf '%s' "$STATE_JSON" | jq -r '.next_generation // 1')
+          DURABLE_ID=$(printf '%s' "$STATE_JSON" | jq -r '.durable_transaction_id // empty')
+          EXPECTED_PARENT_SHA=""
+          EXPECTED_PARENT_GENERATION=""
+          if [ -n "$DURABLE_ID" ]; then
+            PARENT_JSON=$(git show "refs/heads/publication:publication/transaction-state/transactions/$DURABLE_ID.json")
+            EXPECTED_PARENT_SHA=$(printf '%s' "$PARENT_JSON" | jq -r '.attestation.source_commit // .content.develop_sha // empty')
+            EXPECTED_PARENT_GENERATION=$(printf '%s' "$PARENT_JSON" | jq -r '.generation')
+          fi
+          PARENT_ARGS=()
+          [ -z "$EXPECTED_PARENT_SHA" ] || PARENT_ARGS+=(--expected-parent-sha "$EXPECTED_PARENT_SHA")
+          [ -z "$EXPECTED_PARENT_GENERATION" ] || PARENT_ARGS+=(--expected-parent-generation "$EXPECTED_PARENT_GENERATION")
+          uv run python scripts/publication/candidate.py validate \
+            --archive candidate-validation/candidate.zip \
+            --output-dir candidate-validation/extracted \
+            --artifact-id "$CANDIDATE_ARTIFACT_ID" \
+            --artifact-metadata candidate-validation/artifact.json \
+            --run-metadata candidate-validation/run.json \
+            --expected-develop-sha "$EXPECTED_DEVELOP_SHA" \
+            --expected-published-results-sha "$EXPECTED_PUBLISHED_RESULTS_SHA" \
+            --expected-generation "$EXPECTED_GENERATION" \
+            "${PARENT_ARGS[@]}" \
+            --output-summary candidate-validation/summary.json
+          jq -r '"artifact_id=" + (.artifact_id|tostring), "producer_run_id=" + .producer_run_id, "develop_sha=" + .develop_sha, "published_results_sha=" + .published_results_sha, "manifest_digest=" + .manifest_digest, "site_tree_sha256=" + .site_tree_sha256, "archive_sha256=" + .archive_sha256, "expected_parent_sha=" + (.expected_parent_sha // ""), "expected_parent_generation=" + ((.expected_parent_generation // "")|tostring)' candidate-validation/summary.json >> "$GITHUB_OUTPUT"
 
       - name: Prepare transaction permit
         id: prepare_tx
@@ -149,11 +169,14 @@ jobs:
             --target-repo "${{ github.repository }}" \
             --target-env "github-pages" \
             --target-url "https://benchbox.dev" \
-            --develop-sha "${{ steps.inputs.outputs.develop_sha }}" \
-            --published-results-sha "${{ steps.inputs.outputs.published_results_sha }}" \
-            --candidate-manifest-digest "${{ inputs.candidate_manifest_digest }}" \
-            --candidate-artifact-id "${{ inputs.candidate_artifact_id }}" \
-            --candidate-archive-sha256 "${{ inputs.candidate_archive_sha256 }}" \
+            --develop-sha "${{ steps.candidate.outputs.develop_sha || '0' }}" \
+            --published-results-sha "${{ steps.candidate.outputs.published_results_sha || '0' }}" \
+            --candidate-manifest-digest "${{ steps.candidate.outputs.manifest_digest || '0' }}" \
+            --candidate-artifact-id "${{ steps.candidate.outputs.artifact_id || '' }}" \
+            --candidate-archive-sha256 "${{ steps.candidate.outputs.archive_sha256 || '' }}" \
+            --candidate-site-tree-sha256 "${{ steps.candidate.outputs.site_tree_sha256 || '' }}" \
+            --candidate-parent-sha "${{ steps.candidate.outputs.expected_parent_sha || '' }}" \
+            --candidate-parent-generation "${{ steps.candidate.outputs.expected_parent_generation || '' }}" \
             --restore-transaction-id "${{ inputs.restore_transaction_id }}" \
             --failed-transaction-id "${{ inputs.failed_transaction_id }}" \
             $BARRIER_ARG \
@@ -231,6 +254,55 @@ jobs:
             --github-token "$GH_TOKEN" \
             --output-approval transaction-artifacts/approval.json
 
+      - name: Materialize site bytes
+        if: needs.prepare.outputs.kind == 'promotion'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_ARTIFACT_ID: ${{ needs.prepare.outputs.candidate_artifact_id }}
+          EXPECTED_SITE_DIGEST: ${{ needs.prepare.outputs.candidate_site_tree_sha256 }}
+          EXPECTED_ARCHIVE_DIGEST: ${{ needs.prepare.outputs.candidate_archive_sha256 }}
+          EXPECTED_DEVELOP_SHA: ${{ needs.prepare.outputs.develop_sha }}
+          EXPECTED_PUBLISHED_RESULTS_SHA: ${{ needs.prepare.outputs.published_results_sha }}
+          EXPECTED_GENERATION: ${{ needs.prepare.outputs.generation }}
+          EXPECTED_PARENT_SHA: ${{ needs.prepare.outputs.candidate_parent_sha }}
+          EXPECTED_PARENT_GENERATION: ${{ needs.prepare.outputs.candidate_parent_generation }}
+        run: |
+          set -euo pipefail
+          mkdir -p candidate-validation
+          gh api "repos/${{ github.repository }}/actions/artifacts/$CANDIDATE_ARTIFACT_ID" > candidate-validation/artifact.json
+          PRODUCER_RUN_ID=$(jq -r '.workflow_run.id // empty' candidate-validation/artifact.json)
+          test -n "$PRODUCER_RUN_ID" || { echo "::error::candidate artifact has no producing run"; exit 1; }
+          gh api "repos/${{ github.repository }}/actions/runs/$PRODUCER_RUN_ID" > candidate-validation/run.json
+          gh api "repos/${{ github.repository }}/actions/artifacts/$CANDIDATE_ARTIFACT_ID/zip" > candidate-validation/candidate.zip
+          PARENT_ARGS=()
+          [ -z "$EXPECTED_PARENT_SHA" ] || PARENT_ARGS+=(--expected-parent-sha "$EXPECTED_PARENT_SHA")
+          [ -z "$EXPECTED_PARENT_GENERATION" ] || PARENT_ARGS+=(--expected-parent-generation "$EXPECTED_PARENT_GENERATION")
+          uv run python scripts/publication/candidate.py validate \
+            --archive candidate-validation/candidate.zip \
+            --output-dir candidate-validation/extracted \
+            --artifact-id "$CANDIDATE_ARTIFACT_ID" \
+            --artifact-metadata candidate-validation/artifact.json \
+            --run-metadata candidate-validation/run.json \
+            --expected-develop-sha "$EXPECTED_DEVELOP_SHA" \
+            --expected-published-results-sha "$EXPECTED_PUBLISHED_RESULTS_SHA" \
+            --expected-generation "$EXPECTED_GENERATION" \
+            "${PARENT_ARGS[@]}" \
+            --output-summary candidate-validation/summary.json
+          SUMMARY_DIGEST=$(jq -r .site_tree_sha256 candidate-validation/summary.json)
+          test "$SUMMARY_DIGEST" = "$EXPECTED_SITE_DIGEST" || {
+            echo "::error::candidate site digest changed after approval"; exit 1;
+          }
+          SUMMARY_ARCHIVE=$(jq -r .archive_sha256 candidate-validation/summary.json)
+          test "$SUMMARY_ARCHIVE" = "$EXPECTED_ARCHIVE_DIGEST" || {
+            echo "::error::candidate archive digest changed after approval"; exit 1;
+          }
+          cp -R candidate-validation/extracted/site ./site
+          mkdir -p candidate-receipts
+          cp candidate-validation/extracted/candidate.json candidate-receipts/
+          cp candidate-validation/extracted/desired-manifest.json candidate-receipts/
+          cp candidate-validation/extracted/assembly-receipt.json candidate-receipts/
+
       - name: Record prepared reservation in journal CAS
         if: inputs.resume_transaction_id == ''
         shell: bash
@@ -243,61 +315,6 @@ jobs:
             --ref "publication" \
             --repo-path "." \
             --output-tx transaction-artifacts/tx_prepared.json
-
-      - name: Materialize site bytes
-        if: needs.prepare.outputs.kind == 'promotion'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CANDIDATE_RUN_ID: ${{ needs.prepare.outputs.candidate_run_id }}
-          EXPECTED_SITE_DIGEST: ${{ inputs.candidate_archive_sha256 }}
-        run: |
-          set -euo pipefail
-          test -n "$CANDIDATE_RUN_ID" || { echo "::error::candidate run is required for promotion"; exit 1; }
-          CANDIDATE_RUN_INFO=$(gh run view "$CANDIDATE_RUN_ID" --json headSha,conclusion,status)
-          CANDIDATE_HEAD_SHA=$(echo "$CANDIDATE_RUN_INFO" | jq -r .headSha)
-          CANDIDATE_STATUS=$(echo "$CANDIDATE_RUN_INFO" | jq -r .status)
-          CANDIDATE_CONCLUSION=$(echo "$CANDIDATE_RUN_INFO" | jq -r .conclusion)
-          if [ "$CANDIDATE_STATUS" != "completed" ] || [ "$CANDIDATE_CONCLUSION" != "success" ]; then
-            echo "::error::candidate run $CANDIDATE_RUN_ID has not completed successfully ($CANDIDATE_STATUS, $CANDIDATE_CONCLUSION)"
-            exit 1
-          fi
-          if [ "$CANDIDATE_HEAD_SHA" != "${{ needs.prepare.outputs.develop_sha }}" ]; then
-            echo "::error::candidate run head SHA $CANDIDATE_HEAD_SHA does not match approved commit ${{ needs.prepare.outputs.develop_sha }}"
-            exit 1
-          fi
-          CANDIDATE_WORKFLOW=$(gh run view "$CANDIDATE_RUN_ID" --json workflowName --jq .workflowName)
-          CANDIDATE_BRANCH=$(gh run view "$CANDIDATE_RUN_ID" --json headBranch --jq .headBranch)
-          case "$CANDIDATE_WORKFLOW" in
-            "Publication Control Plane Deployment"|"Publication Preview Deploy (G2)") ;;
-            *) echo "::error::candidate run uses unexpected workflow: $CANDIDATE_WORKFLOW"; exit 1 ;;
-          esac
-          test "$CANDIDATE_BRANCH" = "develop" || {
-            echo "::error::candidate run head branch is not develop: $CANDIDATE_BRANCH"; exit 1;
-          }
-          mkdir -p site
-          gh run download "$CANDIDATE_RUN_ID" --name "publication-site-${{ needs.prepare.outputs.generation }}" --dir site
-          rm -rf candidate-receipts && mkdir -p candidate-receipts
-          gh run download "$CANDIDATE_RUN_ID" \
-            --name "publication-candidate-receipts-${{ needs.prepare.outputs.generation }}-${CANDIDATE_RUN_ID}" \
-            --dir candidate-receipts
-          test -s candidate-receipts/desired-manifest.json || {
-            echo "::error::candidate run did not provide its signed desired manifest"; exit 1;
-          }
-          test "$(jq -r .manifest_digest candidate-receipts/desired-manifest.json)" = \
-            "${{ needs.prepare.outputs.candidate_manifest_digest }}" || {
-            echo "::error::candidate manifest digest does not match the approved permit"; exit 1;
-          }
-          test -s site/index.html || { echo "::error::candidate site is incomplete"; exit 1; }
-          uv run python - <<'PY'
-          import os
-          from pathlib import Path
-          from scripts.publication.assembler import compute_tree_digest
-          expected = os.environ['EXPECTED_SITE_DIGEST']
-          actual, _, _ = compute_tree_digest(Path('site'))
-          if not expected or actual != expected:
-              raise SystemExit(f'candidate site digest mismatch: expected={expected!r} actual={actual!r}')
-          PY
 
       - name: Upload Pages artifact
         if: needs.prepare.outputs.kind == 'promotion'
@@ -509,6 +526,7 @@ jobs:
             --manifest transaction-artifacts/verification-manifest.json \
             --observation-origin github-actions:publication-transaction \
             --require-receipt \
+            --require-complete-checksums \
             --timeout 60 \
             --json > transaction-artifacts/probe-report.json
           uv run python - <<'PY'
@@ -546,8 +564,11 @@ jobs:
               'manifest_digest': tx.content.get('manifest_digest'),
               'develop_sha': tx.content.get('develop_sha'),
               'published_results_sha': tx.content.get('published_results_sha'),
-              'artifact': {'archive_sha256': tx.artifact.get('archive_sha256')},
-              'artifact_digest': tx.artifact.get('archive_sha256'),
+              'artifact': {
+                  'archive_sha256': tx.artifact.get('archive_sha256'),
+                  'site_tree_sha256': tx.artifact.get('site_tree_sha256'),
+              },
+              'artifact_digest': tx.artifact.get('archive_sha256') or tx.artifact.get('site_tree_sha256'),
               'observation_digest': observation_digest,
               'routes': report['probes'],
               'observation_origin': report['observation_origin'],
