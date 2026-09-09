@@ -535,8 +535,8 @@ describe("MetaLeaderboard", () => {
 
     const { container } = render(<MetaLeaderboard data={data} mode="times" onModeChange={vi.fn()} />);
 
-    expect(screen.getByText("Showing 200 of 205 ranked-scope platforms across 1 leaderboard ranking")).toBeTruthy();
-    expect(container.querySelectorAll("tbody tr")).toHaveLength(200);
+    expect(screen.getByText("Showing 25 of 205 ranked-scope platforms across 1 leaderboard ranking")).toBeTruthy();
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(25);
     expect(screen.queryByText("Platform 204")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Show more platforms" }));
