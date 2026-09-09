@@ -20,9 +20,11 @@ const UNSPECIFIED_ID = fixtureIds.ids.duckdb;
 // Scope header assertions to the summary region: the expanded legend renders
 // its own sample chips, so an unscoped [data-role="funding"] would match those
 // too and make the "no chip" assertion depend on legend state.
-const summary = (page: Page) => page.getByRole("region", { name: "Result summary" });
-const fundingChip = (page: Page) => summary(page).locator('[data-role="funding"]');
-const trustBadge = (page: Page) => summary(page).locator('[data-role="trust"]');
+// Trust and funding are run identity, so they sit in the page header beside
+// the run's date and public id, not among the metric cards.
+const identity = (page: Page) => page.getByTestId("page-header");
+const fundingChip = (page: Page) => identity(page).locator('[data-role="funding"]');
+const trustBadge = (page: Page) => identity(page).locator('[data-role="trust"]');
 
 test.describe("Funding chip", () => {
   test("@smoke a funded result renders its funding chip beside the trust badge", async ({ page }) => {

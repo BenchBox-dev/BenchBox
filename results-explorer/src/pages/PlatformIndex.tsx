@@ -1,8 +1,13 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import type { DetailResult } from "@/types";
+import { PlatformBasisControl } from "@/components/PlatformBasisControl";
+import { platformRowsForBasis } from "@/lib/platformMeasurementBasis";
+import { BASIS_URL_KEY, DEFAULT_BASIS, basisSerde, encodeBasis, formatBasisLabel, isDefaultBasis, parseAvailableBases } from "@/lib/measurementBasis";
+import { useUrlState } from "@/lib/useUrlState";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import { route } from "preact-router";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
-import { getPlatformIndexRows } from "@/lib/duckdbQueries";
+import { getDetailResult, getResultsBasisAvailability, getPlatformIndexRows } from "@/lib/duckdbQueries";
 import { useFacetState, type DateWindowFacet, type ExplorerFacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue, toDateWindowFacet } from "@/lib/facetMatching";
 import {
@@ -40,12 +45,13 @@ import { FundingChip } from "@/components/FundingChip";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 import { TimeSeries } from "@/components/TimeSeries";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
-import { RunIdentityLabel } from "@/components/DataTable";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { DataTable } from "@/components/DataTable";
 import { CompareTray } from "@/components/CompareTray";
 import { TrayAnnouncer } from "@/components/TrayAnnouncer";
-import { RunDateWithAge } from "@/components/RunAge";
+import { RunDateChip } from "@/components/RunAge";
+import { splitVersion } from "@/lib/versionLabel";
+import { PageHeader } from "@/components/PageHeader";
 import type { SortState } from "@/types";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
@@ -67,8 +73,7 @@ const TABLE_RENDER_INCREMENT = 200;
 const MIN_TREND_OBSERVATIONS = 3;
 const PLATFORM_TABLE_COLUMNS = [
   "compare",
-  "compare_state",
-  "run",
+  "version",
   "benchmark",
   "scale",
   "phase",
@@ -77,7 +82,6 @@ const PLATFORM_TABLE_COLUMNS = [
   "power_score",
   "geomean",
   "source",
-  "receipt",
 ] as const;
 type PlatformTableColumn = (typeof PLATFORM_TABLE_COLUMNS)[number];
 const PLATFORM_ROUTE_ALIASES: Readonly<Record<string, string>> = {
@@ -138,13 +142,46 @@ function trendMetricDescription(metric: TrendMetric): string {
   return metric === "power_score" ? "Power score (higher is better)" : "Geomean latency (lower is better)";
 }
 
+/** The version this row reports, normalized, or null when none is recorded. */
+function versionText(entry: { driver_version: string | null; platform_version?: string | null }): string | null {
+  const parts = splitVersion(entry.driver_version ?? entry.platform_version ?? null);
+  return parts ? (parts.suffix ? `${parts.core}…` : parts.core) : null;
+}
+
+/**
+ * Labels for the Version column, parallel to `rows`.
+ *
+ * Leads with the version. Rows that would be indistinguishable from another
+ * row on everything this table displays - version, benchmark, scale, phase,
+ * and run date - also carry their short id, which is the row's own handle.
+ */
+function buildVersionCellLabels(rows: readonly PlatformIndexRowRow[]): string[] {
+  const base = rows.map((row) => versionText(row) ?? row.short_id);
+  const displayedKey = (row: PlatformIndexRowRow, index: number) =>
+    [base[index], row.benchmark, row.scale_factor, row.phase, row.run_date].join("\u0000");
+  const counts = new Map<string, number>();
+  rows.forEach((row, index) => {
+    const key = displayedKey(row, index);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  });
+  return rows.map((row, index) =>
+    (counts.get(displayedKey(row, index)) ?? 0) > 1 ? `${base[index]} · ${row.short_id}` : base[index]!,
+  );
+}
+
 function primaryMetricContract(metric: string): string {
   return trendMetricDescription(normalizeTrendMetric(metric));
 }
 
+/** Short form for the per-row "Ranked on" cell; the full contract is its title. */
+function primaryMetricShort(metric: string): string {
+  return normalizeTrendMetric(metric) === "power_score" ? "Power score ↑" : "Geomean ↓";
+}
+
 function platformTableColumnIndex(column: PlatformTableColumn, showMetricContract: boolean): number {
   const baseIndex = PLATFORM_TABLE_COLUMNS.indexOf(column) + 1;
-  return !showMetricContract && baseIndex > 7 ? baseIndex - 1 : baseIndex;
+  const metricContractIndex = PLATFORM_TABLE_COLUMNS.indexOf("metric_contract") + 1;
+  return !showMetricContract && baseIndex > metricContractIndex ? baseIndex - 1 : baseIndex;
 }
 
 function selectedCohortDifferences(rows: PlatformIndexRowRow[]): string[] {
@@ -185,6 +222,69 @@ function platformCompareGuidanceMessage(
 export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const resultsScrollerRef = useRef<HTMLDivElement>(null);
   const [rows, setRows] = useState<PlatformIndexRowRow[] | null>(null);
+  const [basis, setBasis] = useUrlState(BASIS_URL_KEY, DEFAULT_BASIS, basisSerde);
+  const detailCache = useRef(new Map<string, Promise<DetailResult | null>>());
+  const [basisDetails, setBasisDetails] = useState<Map<string, DetailResult>>(new Map());
+  const [basisOptions, setBasisOptions] = useState([DEFAULT_BASIS, { ...DEFAULT_BASIS, statistic: "min" as const }]);
+  const [basisLoading, setBasisLoading] = useState(false);
+  const [basisError, setBasisError] = useState<string | null>(null);
+  const requestedRows = useMemo(() => platformRowsForRequest(rows ?? [], platform), [rows, platform]);
+  useEffect(() => {
+    let cancelled = false;
+    const defaults = [DEFAULT_BASIS, { ...DEFAULT_BASIS, statistic: "min" as const }];
+    setBasisOptions(defaults);
+    if (requestedRows.length === 0) return;
+    void getResultsBasisAvailability(requestedRows.map((row) => row.result_id)).catch(() => []).then((available) => {
+      if (cancelled) return;
+      const options = new Map(defaults.map((option) => [encodeBasis(option), option]));
+      for (const row of available) for (const option of parseAvailableBases(row?.available_bases)) options.set(encodeBasis(option), option);
+      options.set(encodeBasis(basis), basis);
+      setBasisOptions([...options.values()]);
+    });
+    return () => { cancelled = true; };
+  }, [requestedRows]);
+  useEffect(() => {
+    let cancelled = false;
+    setBasisError(null);
+    if (isDefaultBasis(basis)) {
+      setBasisLoading(false);
+      setSelected((current) => new Set([...current].filter((id) => requestedRows.some((row) => row.result_id === id && !row.comparison_exclusion_reason))));
+      return;
+    }
+    setBasisLoading(true);
+    const loadDetails = async () => {
+      const details: DetailResult[] = [];
+      let next = 0;
+      await Promise.all(Array.from({ length: Math.min(4, requestedRows.length) }, async () => {
+        while (next < requestedRows.length && !cancelled) {
+          const row = requestedRows[next++]!;
+          let pending = detailCache.current.get(row.result_id);
+          if (!pending) {
+            pending = getDetailResult(row.result_id).catch((error: unknown) => { detailCache.current.delete(row.result_id); throw error; });
+            detailCache.current.set(row.result_id, pending);
+          }
+          const detail = await pending;
+          if (detail) details.push(detail);
+        }
+      }));
+      return details;
+    };
+    void loadDetails().then((details) => {
+      if (cancelled) return;
+      const byId = new Map(details.map((detail) => [detail.result_id, detail]));
+      setBasisDetails(byId);
+      const eligibleIds = new Set(platformRowsForBasis(requestedRows, byId, basis).filter((row) => !row.comparison_exclusion_reason).map((row) => row.result_id));
+      setSelected((current) => new Set([...current].filter((id) => eligibleIds.has(id))));
+      setBasisLoading(false);
+    }).catch(() => {
+      if (cancelled) return;
+      setBasisDetails(new Map());
+      setSelected(new Set());
+      setBasisError("Could not load measurement passes. Choose the published basis or retry.");
+      setBasisLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [requestedRows, basis]);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [visibleLimit, setVisibleLimit] = useState(TABLE_RENDER_LIMIT);
@@ -316,7 +416,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   // Match by platform_id (URL slug) - platform_id is stable and URL-safe.
   // Fall back to matching by display name for backward compatibility with any
   // old links constructed from the display name.
-  const allPlatformResults = platformRowsForRequest(rows, platform);
+  const allPlatformResults = platformRowsForBasis(requestedRows, basisDetails, basis);
   const routeMetricContracts = new Set(
     allPlatformResults.map((row) => primaryMetricContract(row.primary_metric)),
   );
@@ -391,7 +491,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     const row = rowsByResultId.get(resultId);
     return row ? compareIdForRow(row) : resultId;
   });
-  const compareUrl = selected.size >= 2 ? buildCompareUrl(selectedCompareIds) : null;
+  const compareUrl = !basisLoading && selected.size >= 2 ? `${buildCompareUrl(selectedCompareIds)}${isDefaultBasis(basis) ? "" : `&basis=${encodeBasis(basis)}`}` : null;
   const compareGuidance = platformCompareGuidanceMessage(selectedRows, selected.size, platformDisplayName);
 
   const platformResults = [...platformResultsRaw].sort((a, b) => {
@@ -426,6 +526,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     visibleLimit,
   );
   const runIdentityLabels = formatRunIdentitiesForCohort(platformResults, "table");
+  // What the Version cell shows. The version alone identifies a row on this
+  // page, because the platform is fixed and benchmark, scale, phase, and date
+  // are their own columns - except when two runs agree on all of those, which
+  // is exactly when the short id has to appear.
+  const versionCellLabels = buildVersionCellLabels(platformResults);
 
   function toggleSort(key: PlatformSortKey) {
     setSort((prev) =>
@@ -496,12 +601,26 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: platformDisplayName }]} />
-
-      <div class="mt-6 mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">{platformDisplayName} Results</h1>
-
-        <div class="flex flex-wrap items-center gap-4">
+      <PageHeader
+        crumbs={[{ label: "Results", href: "/results/" }, { label: platformDisplayName }]}
+        eyebrow="Platform"
+        title={`${platformDisplayName} Results`}
+        meta={
+          allPlatformResults.length > 0 ? (
+            <>
+              <span class="bb-meta-chip" data-testid="platform-run-count">
+                {platformResults.length === allPlatformResults.length
+                  ? `${allPlatformResults.length} published runs`
+                  : `${platformResults.length} of ${allPlatformResults.length} published runs`}
+              </span>
+              <span class="bb-meta-chip">
+                {new Set(allPlatformResults.map((row) => row.benchmark)).size} benchmarks
+              </span>
+            </>
+          ) : undefined
+        }
+        actions={
+          <>
           {/* Platform switcher (sibling pivot). Tuning is platform-specific
               so we do not preserve it across the switch. */}
           {platformOptions.length > 1 && (
@@ -551,8 +670,9 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               </select>
             </div>
           )}
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {showW5Filters && (
         <section
@@ -668,7 +788,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             </div>
             <div class="flex flex-col gap-1">
               <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-version">
-                Engine version
+                Platform version
               </label>
               <select
                 id="platform-filter-version"
@@ -736,10 +856,20 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               {compareGuidance}
             </p>
           </div>
-          {!compareUrl && (
-            <button type="button" class="btn btn-secondary shrink-0 text-sm" disabled>
-              {selected.size === 1 ? "Select 1 more result" : "Select 2 comparable results"}
-            </button>
+          {/* One slot, whatever the state - see BenchmarkIndex for why a
+              disabled button that later relocates is worse than status text. */}
+          {compareUrl ? (
+            <a
+              href={compareUrl}
+              class="btn btn-primary shrink-0 text-sm no-underline"
+              data-testid="platform-compare-cta"
+            >
+              Compare {selected.size} selected
+            </a>
+          ) : (
+            <p class="shrink-0 text-sm text-[var(--bb-data-fg-subtle)]" data-testid="platform-compare-cta-pending">
+              {selected.size === 1 ? "Select 1 more result" : "Select 2 results to compare"}
+            </p>
           )}
         </div>
       </section>
@@ -770,6 +900,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         </section>
       )}
 
+      <PlatformBasisControl basis={basis} options={basisOptions} onChange={setBasis} loading={basisLoading} error={basisError} />
       {platformResults.length === 0 ? (
         <p class="text-[var(--bb-data-fg-muted)]">
           {allPlatformResults.length > 0 && hasActivePlatformResultFacets(facets)
@@ -779,8 +910,15 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       ) : (
         <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
+            {/* The header states the cohort size; this line exists only to
+                say when the render limit is holding rows back. */}
             <div>
-              <span>Showing {visiblePlatformResults.length.toLocaleString()} of {platformResults.length.toLocaleString()} results</span>
+              {visiblePlatformResults.length === platformResults.length ? null : (
+                <span>
+                  Showing {visiblePlatformResults.length.toLocaleString()} of{" "}
+                  {platformResults.length.toLocaleString()} published runs
+                </span>
+              )}
             </div>
             <div class="flex items-center gap-2">
               <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-group-by">
@@ -800,13 +938,13 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
           </div>
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-xs text-[var(--bb-data-fg-muted)]">
             <span>
-              Rows are labelled by comparable ranking: benchmark, scale, phase, and primary metric. A validation
-              badge under the run label means that result was excluded from ranking on validation grounds.
+              Rows are labelled by comparable ranking: benchmark, scale, phase, and primary metric. A
+              non-clean validation label means that result was excluded from ranking on validation grounds.
             </span>
             <TableScrollHint
               scrollerRef={resultsScrollerRef}
               testId="platform-table-scroll-hint"
-              label="Scroll table for source and receipt columns →"
+              label="Scroll for dates, timings, and source labels →"
               wrapperClassName={null}
             />
           </div>
@@ -816,9 +954,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
           leaderboards cannot describe the same reduction differently.
           */}
           <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]" data-testid="basis-statement">
-          Geomean query time uses the median of each query's published measurement passes, then the
-          geometric mean across queries. Warmup passes are excluded. Dates, counts, and power scores use
-          the definitions shown in their columns and receipts.
+          {isDefaultBasis(basis) ? "Geomean query time uses the median of each query’s published measurement passes, then the geometric mean across queries. Warmup passes are excluded." : `Geomean query time uses ${formatBasisLabel(basis)} across each run’s available queries. Published power scores are hidden for this basis.`}
           </p>
           <DataTable
             ariaLabel={`${platformDisplayName} results`}
@@ -826,7 +962,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             caption={
               hoistedMetricContract ? (
                 <span data-testid="platform-hoisted-metric-contract">
-                  Route-wide metric contract: {hoistedMetricContract}
+                  Results are ranked by: {hoistedMetricContract}
                 </span>
               ) : (
                 "Platform results"
@@ -839,8 +975,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                 <th class="table-th w-8" aria-colindex={platformTableColumnIndex("compare", showMetricContract)}>
                   <span class="sr-only">Compare</span>
                 </th>
-                <th class="table-th" aria-colindex={platformTableColumnIndex("compare_state", showMetricContract)}>Compare state</th>
-                <th class="table-th" aria-colindex={platformTableColumnIndex("run", showMetricContract)}>Run</th>
+                <th class="table-th" aria-colindex={platformTableColumnIndex("version", showMetricContract)}>Version</th>
                 <th class="p-0" scope="col" aria-sort={ariaSort("benchmark")} aria-colindex={platformTableColumnIndex("benchmark", showMetricContract)}>
                   <button
                     type="button"
@@ -863,7 +998,13 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                 </th>
                 <th class="table-th" aria-colindex={platformTableColumnIndex("phase", showMetricContract)}>Phase</th>
                 {showMetricContract && (
-                  <th class="table-th" aria-colindex={platformTableColumnIndex("metric_contract", true)}>Metric contract</th>
+                  <th
+                    class="table-th"
+                    aria-colindex={platformTableColumnIndex("metric_contract", true)}
+                    title="The metric each run is ranked on, and the direction that counts as better."
+                  >
+                    Ranked on
+                  </th>
                 )}
                 <th class="p-0" scope="col" aria-sort={ariaSort("run_date")} aria-colindex={platformTableColumnIndex("date", showMetricContract)}>
                   <button
@@ -897,12 +1038,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                     class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
                     onClick={() => toggleSort("geomean_ms")}
                   >
-                    Geomean latency{sortArrow("geomean_ms")}
+                    Geomean{sortArrow("geomean_ms")}
                     {ariaSortAnnouncement("geomean_ms")}
                   </button>
                 </th>
-                <th class="table-th" aria-colindex={platformTableColumnIndex("source", showMetricContract)}>Source</th>
-                <th class="table-th" aria-colindex={platformTableColumnIndex("receipt", showMetricContract)} />
+                <th class="table-th" aria-colindex={platformTableColumnIndex("source", showMetricContract)}>Labels</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
@@ -912,6 +1052,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                       key={r.result_id}
                       entry={r}
                       runIdentityLabel={runIdentityLabels[index] ?? r.platform}
+                      versionLabel={versionCellLabels[index] ?? r.short_id}
                       checked={selected.has(r.result_id)}
                       onToggle={() => toggleSelect(r.result_id)}
                       showMetricContract={showMetricContract}
@@ -941,6 +1082,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                             key={r.result_id}
                             entry={r}
                             runIdentityLabel={runIdentityLabels[index] ?? r.platform}
+                            versionLabel={versionCellLabels[index] ?? r.short_id}
                             checked={selected.has(r.result_id)}
                             onToggle={() => toggleSelect(r.result_id)}
                             showMetricContract={showMetricContract}
@@ -1091,6 +1233,7 @@ function trendValue(row: PlatformIndexRowRow, metric: TrendMetric): number | nul
 interface PlatformRowProps {
   entry: PlatformIndexRowRow;
   runIdentityLabel: string;
+  versionLabel: string;
   checked: boolean;
   onToggle: () => void;
   showMetricContract: boolean;
@@ -1103,7 +1246,7 @@ interface PlatformRowProps {
   disabledReason?: string;
 }
 
-function PlatformRow({ entry, runIdentityLabel, checked, onToggle, showMetricContract, disabledReason }: PlatformRowProps) {
+function PlatformRow({ entry, runIdentityLabel, versionLabel, checked, onToggle, showMetricContract, disabledReason }: PlatformRowProps) {
   const disabledCopy = describeCompareExclusionReason(disabledReason);
   const reasonId = disabledCopy ? `platform-compare-reason-${entry.result_id}` : undefined;
   return (
@@ -1128,26 +1271,40 @@ function PlatformRow({ entry, runIdentityLabel, checked, onToggle, showMetricCon
           data-testid={`platform-compare-checkbox-${entry.result_id}`}
         />
       </td>
-      <td class="table-td max-w-[16rem]" aria-colindex={platformTableColumnIndex("compare_state", showMetricContract)}>
-        <PlatformCompareReasonStatus id={reasonId} copy={disabledCopy} selected={checked} />
-      </td>
-      <td class="table-td max-w-[24rem]" aria-colindex={platformTableColumnIndex("run", showMetricContract)}>
-        <RunIdentityLabel label={runIdentityLabel} />
+      {/* The platform is fixed for the whole page, and this table already has
+          columns for date, scale, phase, and labels. The only part of a run's
+          identity this cell has to carry is the version, plus the receipt it
+          links to. */}
+      <td class="table-td" aria-colindex={platformTableColumnIndex("version", showMetricContract)}>
+        <a
+          href={resultReceiptHref(entry)}
+          aria-label={resultIdentityAriaLabel(entry, "receipt")}
+          title={`${runIdentityLabel} · ${splitVersion(entry.driver_version ?? entry.platform_version)?.full ?? "Version not recorded"}`}
+          class="font-medium no-underline hover:underline"
+          data-testid="run-identity-label"
+        >
+          {versionLabel}
+        </a>
         {isValidationNotClean(entry.validation_status) && (
           <div class="mt-0.5" data-testid={`platform-validation-flag-${entry.result_id}`}>
             <ValidationBadge validationStatus={entry.validation_status} showMissing />
           </div>
         )}
+        <PlatformCompareReasonStatus id={reasonId} copy={disabledCopy} />
       </td>
       <td class="table-td font-medium" aria-colindex={platformTableColumnIndex("benchmark", showMetricContract)}>{humanizeBenchmark(entry.benchmark)}</td>
       <td class="table-td" aria-colindex={platformTableColumnIndex("scale", showMetricContract)}>SF {entry.scale_factor}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("phase", showMetricContract)}>{entry.phase}</td>
       {showMetricContract && (
-        <td class="table-td max-w-[12rem] text-xs text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("metric_contract", true)}>
-          {primaryMetricContract(entry.primary_metric)}
+        <td
+          class="table-td whitespace-nowrap text-xs text-[var(--bb-data-fg-muted)]"
+          aria-colindex={platformTableColumnIndex("metric_contract", true)}
+          title={primaryMetricContract(entry.primary_metric)}
+        >
+          {primaryMetricShort(entry.primary_metric)}
         </td>
       )}
-      <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("date", showMetricContract)}><RunDateWithAge runDate={entry.run_date} /></td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("date", showMetricContract)}><RunDateChip runDate={entry.run_date} /></td>
       <td class="table-td font-mono" aria-colindex={platformTableColumnIndex("power_score", showMetricContract)}>{fmtScore(entry.power_score)}</td>
       <td class="table-td font-mono" aria-colindex={platformTableColumnIndex("geomean", showMetricContract)}>{fmtGeomean(entry.geomean_ms)}</td>
       <td class="table-td" aria-colindex={platformTableColumnIndex("source", showMetricContract)}>
@@ -1163,15 +1320,6 @@ function PlatformRow({ entry, runIdentityLabel, checked, onToggle, showMetricCon
           )}
         </div>
       </td>
-      <td class="table-td text-right" aria-colindex={platformTableColumnIndex("receipt", showMetricContract)}>
-        <a
-          href={resultReceiptHref(entry)}
-          aria-label={resultIdentityAriaLabel(entry, "receipt")}
-          class="text-xs font-medium no-underline"
-        >
-          Receipt →
-        </a>
-      </td>
     </tr>
   );
 }
@@ -1179,17 +1327,16 @@ function PlatformRow({ entry, runIdentityLabel, checked, onToggle, showMetricCon
 function PlatformCompareReasonStatus({
   id,
   copy,
-  selected,
 }: {
   id?: string;
   copy: CompareExclusionReasonCopy | null;
-  selected: boolean;
 }) {
-  if (copy === null) {
-    return <span class="text-xs text-[var(--bb-data-fg-muted)]">{selected ? "Selected" : "Selectable"}</span>;
-  }
+  // Only the exceptional state is worth a line. The checkbox already says
+  // whether a row is selected or selectable; repeating that beside every
+  // version reads as part of the version.
+  if (copy === null) return null;
   return (
-    <div id={id} class="text-xs text-[var(--bb-data-fg-muted)]" data-testid="platform-disabled-reason">
+    <div id={id} class="mt-1 text-xs text-[var(--bb-data-fg-muted)]" data-testid="platform-disabled-reason">
       <span class="font-medium text-[var(--bb-tone-warning-fg)]">Why unavailable: {copy.shortText}</span>
       <span class="block">{copy.recoveryHint}</span>
     </div>

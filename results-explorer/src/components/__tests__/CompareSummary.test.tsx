@@ -74,9 +74,12 @@ describe("CompareSummary", () => {
 
     const summaryRegion = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
     expect(summaryRegion).not.toBeNull();
-    expect(summaryRegion).toHaveTextContent("In these selected runs, DuckDB's power score was 10.00x the lowest selected score.");
-    expect(summaryRegion).toHaveTextContent("DuckDB was fastest on 2 of 2 comparable queries");
-    expect(summaryRegion).toHaveTextContent("p50 15 ms");
+    expect(summaryRegion).toHaveTextContent("In these selected runs, DuckDB's power score was 10.00x better than the lowest selected run.");
+    // The card label names the run and the question; the value is the count.
+    expect(summaryRegion).toHaveTextContent("Where DuckDB wins");
+    expect(summaryRegion).toHaveTextContent("2 of 2 queries");
+    expect(summaryRegion).toHaveTextContent("p50");
+    expect(summaryRegion).toHaveTextContent("15 ms");
     expect(summaryRegion).toHaveTextContent("winner cost $0.50");
     expect(summaryRegion).toHaveTextContent("30.00x cost/performance");
   });
@@ -173,7 +176,7 @@ describe("CompareSummary", () => {
 
     expect(summary.nonCleanValidation).toHaveLength(0);
     expect(summary.validationCaveat).toBeNull();
-    expect(summary.headline).toBe("In these selected runs, DuckDB's power score was 10.00x the lowest selected score.");
+    expect(summary.headline).toBe("In these selected runs, DuckDB's power score was 10.00x better than the lowest selected run.");
 
     render(<CompareSummary summary={summary} />);
     const summaryRegion = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");

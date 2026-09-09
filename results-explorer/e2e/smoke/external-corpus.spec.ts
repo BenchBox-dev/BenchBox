@@ -35,7 +35,7 @@ test.describe("External corpus smoke", () => {
     await page.goto(`/results/p/${seed.platformId}/`);
     await waitForShell(page);
     await expect(page.getByRole("heading", { name: new RegExp(`${escapeRe(seed.platformName)} Results`, "i") })).toBeVisible();
-    await expect(page.getByText(/Showing \d+ of \d+ results/i)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("platform-run-count")).toBeVisible({ timeout: 30_000 });
 
     await page.goto(`/results/r/${seed.resultId}`);
     await waitForShell(page);

@@ -132,8 +132,8 @@ async function collectPerformanceSample(
 }
 
 async function collectHomePerformanceSample(page: Page, index: number): Promise<HomePerformanceSample> {
-  await page.goto(`/results/?bb_perf=1&perf_run=${index}`);
-  await waitForPerformanceDataLoaded(page, /Recent Results/i);
+  await page.goto(`/results/compare/?bb_perf=1&perf_run=${index}`);
+  await waitForPerformanceDataLoaded(page, /Compare benchmark results/i);
   await waitForMeasure(page, MEASURES.DB_INIT);
   await waitForMeasure(page, MEASURES.LEADERBOARD_RENDER_AFTER_DATA);
 

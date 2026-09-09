@@ -88,7 +88,7 @@ test.describe("large corpus fixture", () => {
   // before the browser assertions begin.
   test.describe.configure({ timeout: 240_000 });
 
-  test("large corpus Compare selection state is bounded (no candidate table)", async ({ browser }) => {
+  test("large comparison rankings cap initial rows and expose the remaining platforms", async ({ browser }) => {
     await withLargeFixture(async (baseUrl) => {
       for (const viewport of [
         { width: 1440, height: 900 },
@@ -99,12 +99,26 @@ test.describe("large corpus fixture", () => {
         await page.goto(`${baseUrl}/results/compare`);
         await waitForShell(page);
 
-        await expect(page.getByRole("heading", { name: "Choose runs to compare" })).toBeVisible();
-        await expect(page.getByTestId("compare-picker-query-link")).toBeVisible();
-        await expect(page.locator("table")).toHaveCount(0);
+        await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible();
+        await expect(page.getByRole("grid", { name: "Cross-benchmark leaderboard" })).toBeVisible();
+        const grid = page.getByRole("grid", { name: "Cross-benchmark leaderboard" });
+        await expect(grid.locator("tbody tr")).toHaveCount(25);
         const documentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
         expect(documentHeight).toBeLessThan(6000);
         expect(documentHeight).toBeLessThan(viewport.height * 8);
+        const showMore = page.getByRole("button", { name: "Show more platforms" });
+        await expect(showMore).toBeVisible();
+        await showMore.click();
+        await expect.poll(() => grid.locator("tbody tr").count()).toBeGreaterThan(200);
+        expect(await grid.locator("tbody tr").count()).toBeLessThanOrEqual(400);
+        await showMore.click();
+        await expect.poll(() => grid.locator("tbody tr").count()).toBeGreaterThan(225);
+        await expect(showMore).toHaveCount(0);
+        // The ranking is deliberately a long table; filtering remains usable
+        // after expansion and starts from the complete corpus.
+        await page.goto(`${baseUrl}/results/compare?platform=duckdb`);
+        await expect(grid.locator("tbody tr")).toHaveCount(1);
+        await expect(grid.locator("tbody tr").getByRole("link", { name: "DuckDB", exact: true })).toBeVisible();
 
         await context.close();
       }

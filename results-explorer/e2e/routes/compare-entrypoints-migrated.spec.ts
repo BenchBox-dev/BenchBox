@@ -4,18 +4,14 @@ import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures
 test.describe("compare entrypoints after tray migration (rx-18)", () => {
   test.describe.configure({ mode: "serial" });
 
-  test("Home compare entry shows picking count and links to compareHref when picking non-empty", async ({ page }) => {
+  test("Overview links to comparison rankings", async ({ page }) => {
     await page.goto("/results/");
     await waitForShell(page);
     await waitForDataLoaded(page, /Recent Results/i);
-    // Home entry always visible, with empty picking it shows Compare →
-    const homeEntry = page.getByTestId("home-compare-entrypoint");
+    const homeEntry = page.getByTestId("overview-compare-cta");
     await expect(homeEntry).toBeVisible();
     await expect(homeEntry).toContainText(/Compare/);
-    // With no picks, href is builder
-    await expect(homeEntry).toHaveAttribute("href", "/results/compare/");
-    // PickingState is in-memory; selecting via other routes in same session via SPA routing would reflect it,
-    // but full page.goto resets it. Verify empty state badge is correct.
+    await expect(homeEntry).toHaveAttribute("href", "/results/compare");
   });
 
   test("ResultDetail links to Find runs with the current result selected", async ({ page }) => {
@@ -31,19 +27,19 @@ test.describe("compare entrypoints after tray migration (rx-18)", () => {
     await expect(page.getByTestId("query-compare-tray")).toContainText("pick a compatible second row");
   });
 
-  test("all entrypoints share one disabled rule: compare enabled only at >=2", async ({ page }) => {
+  test("overview, benchmark, and receipt pages expose comparison entrypoints", async ({ page }) => {
     // Home
     await page.goto("/results/");
     await waitForShell(page);
     await waitForDataLoaded(page, /Recent Results/i);
     // Home entry is always a link, but its text reflects picking count
-    await expect(page.getByTestId("home-compare-entrypoint")).toBeVisible();
+    await expect(page.getByTestId("overview-compare-cta")).toBeVisible();
 
     // BenchmarkIndex guidance is disabled below 2
     await page.goto("/results/tpch/");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
-    await expect(page.getByRole("button", { name: "Select 2 comparable results" })).toBeVisible();
+    await expect(page.getByTestId("benchmark-compare-cta-pending")).toHaveText("Select 2 results to compare");
 
     // ResultDetail sends the current run to Find runs, where the second run is selected.
     await page.goto(`/results/r/${fixtureIds.ids.duckdb}`);
@@ -62,6 +58,6 @@ test.describe("compare entrypoints after tray migration (rx-18)", () => {
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
     // Should have BenchmarkIndex's tray once 2 selected, not old 'Compare 0 runs'
-    await expect(page.getByText("Select 2 comparable results")).toBeVisible();
+    await expect(page.getByTestId("benchmark-compare-cta-pending")).toHaveText("Select 2 results to compare");
   });
 });

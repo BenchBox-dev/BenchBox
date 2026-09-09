@@ -177,7 +177,8 @@ describe("QueryHeatmap rendering", () => {
     const platformHeader = within(thead).getByRole("columnheader", { name: /^Platform/ });
     expect(platformHeader.getAttribute("style")).toContain("left: 0rem");
     expect(platformHeader.className).toContain("sticky");
-    expect(primaryHeader.getAttribute("style")).toContain("left: 11rem");
+    // platform (10rem) + run (6.5rem)
+    expect(primaryHeader.getAttribute("style")).toContain("left: 16.5rem");
     expect(within(thead).queryByRole("columnheader", { name: "Trust" })).toBeNull();
   });
 
@@ -186,8 +187,9 @@ describe("QueryHeatmap rendering", () => {
     const thead = matrixThead();
     const platformHeader = within(thead).getByRole("columnheader", { name: /^Platform/ });
     const primaryHeader = within(thead).getByRole("columnheader", { name: /^Power score/ });
-    expect(platformHeader.getAttribute("style")).toContain("left: 3rem");
-    expect(primaryHeader.getAttribute("style")).toContain("left: 14rem");
+    expect(platformHeader.getAttribute("style")).toContain("left: 2.5rem");
+    // checkbox (2.5rem) + platform (10rem) + run (6.5rem)
+    expect(primaryHeader.getAttribute("style")).toContain("left: 19rem");
   });
 
   it("renders the page-sticky header outside the horizontal scroll container", () => {
@@ -206,7 +208,7 @@ describe("QueryHeatmap rendering", () => {
     expect(platformHeader.className).toMatch(/\bz-30\b/);
   });
 
-  it("keeps only identity and compact metadata affordance in the frozen platform cell", () => {
+  it("keeps the frozen platform cell to one line of identity", () => {
     const { container } = render(
       <QueryHeatmap
         summary={makeSummary({
@@ -219,11 +221,14 @@ describe("QueryHeatmap rendering", () => {
     const cells = firstRow!.querySelectorAll('td[role="gridcell"]');
     expect(within(cells[0] as HTMLElement).getByText("V1.2.3")).toBeTruthy();
     expect(cells[0]?.textContent ?? "").not.toContain("vV1.2.3");
-    const details = within(cells[0] as HTMLElement).getByText(
-      BENCHMARK_MATRIX_DENSITY_CONTRACT.secondaryMetadataAffordance,
-    ).closest("details");
-    expect(details?.hasAttribute("open")).toBe(false);
-    expect(firstRow!.querySelectorAll("td.sticky")).toHaveLength(3);
+    // The run date and the trust/validation labels are their own columns now,
+    // so nothing in this cell needs a disclosure to stay compact.
+    expect(cells[0]?.querySelector("details")).toBeNull();
+    // The frozen set is declared, so a column added or dropped without
+    // updating the contract fails here rather than silently.
+    expect(firstRow!.querySelectorAll("td.sticky")).toHaveLength(
+      BENCHMARK_MATRIX_DENSITY_CONTRACT.frozenColumns.length - 1, // no selection column
+    );
   });
 
   it("renders a nameable compliance marker instead of inline parenthetical text", () => {
@@ -249,11 +254,8 @@ describe("QueryHeatmap rendering", () => {
     expect(screen.queryByText("(subscale)")).toBeNull();
   });
 
-  it("renders compact receipt links and validation status badges", () => {
+  it("links the platform name to its receipt and shows validation status without a disclosure", () => {
     render(<QueryHeatmap summary={makeSummary()} />);
-    for (const details of screen.getAllByText(BENCHMARK_MATRIX_DENSITY_CONTRACT.secondaryMetadataAffordance)) {
-      fireEvent.click(details);
-    }
     const receiptLinks = screen.getAllByRole("link", { name: /Open receipt for/ }) as HTMLAnchorElement[];
 
     expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r1#run-receipt");
@@ -275,11 +277,10 @@ describe("QueryHeatmap rendering", () => {
       />,
     );
 
-    expect(screen.getAllByText(/aaaaaaaa/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/bbbbbbbb/).length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("visible-run-qualifier").map((node) => node.textContent)).toEqual(["aaaaaaaa", "bbbbbbbb"]);
   });
 
-  it("surfaces a not_run validation badge next to the platform name without expanding the disclosure", () => {
+  it("surfaces a not_run validation badge in the labels column without expanding anything", () => {
     const summary = makeSummary({
       platforms: [
         {
@@ -292,8 +293,8 @@ describe("QueryHeatmap rendering", () => {
     });
     render(<QueryHeatmap summary={summary} />);
 
-    // Visible without clicking any "Receipt and metadata" disclosure.
-    const flag = screen.getByTestId("heatmap-validation-flag-platform-not-run");
+    // Visible without clicking any disclosure.
+    const flag = screen.getByTestId("heatmap-labels-platform-not-run");
     const badge = within(flag).getByText("no validation");
     expect(badge.closest("details")).toBeNull();
     // Tone (warning vs. neutral) for "not_run" is owned by
@@ -301,15 +302,14 @@ describe("QueryHeatmap rendering", () => {
     // this test only asserts the badge is visible without expanding anything.
     expect(badge.getAttribute("data-role")).toBe("validation");
 
-    // The disclosure for that row no longer duplicates the badge - it stays
-    // reserved for trust/funding/receipt, so the not_run flag has exactly one
-    // rendered instance for this row.
+    // The labels cell is the badge's only home, so the not_run flag has
+    // exactly one rendered instance for this row.
     const row = flag.closest("tr");
     expect(row).not.toBeNull();
     expect(within(row as HTMLElement).getAllByText("no validation")).toHaveLength(1);
   });
 
-  it("does not add a validation flag for a clean (passed) result", () => {
+  it("states a clean validation status once, in the labels column", () => {
     const summary = makeSummary({
       platforms: [
         {
@@ -319,8 +319,11 @@ describe("QueryHeatmap rendering", () => {
         },
       ],
     });
-    render(<QueryHeatmap summary={summary} />);
-    expect(screen.queryByTestId("heatmap-validation-flag-platform-passed")).toBeNull();
+    const { container } = render(<QueryHeatmap summary={summary} />);
+    const labels = screen.getByTestId("heatmap-labels-platform-passed");
+    expect(within(labels).getByText("passed")).toBeTruthy();
+    const row = container.querySelector('tbody tr[data-testid="platform-passed"]')!;
+    expect(within(row as HTMLElement).getAllByText("passed")).toHaveLength(1);
   });
 
   it("clicking a query header sorts rows by that query", () => {
@@ -380,7 +383,7 @@ describe("QueryHeatmap rendering", () => {
     // heading describes the cell metric (per-query latency with shared units),
     // not the cohort's primary score column. The primary score column
     // keeps its own metric/direction copy in the secondary line.
-    expect(legend.textContent).toContain("Per-query latency: lower is better");
+    expect(legend.textContent).toContain("Lower is better");
     expect(legend.textContent).toContain("Power score");
     expect(legend.textContent).toContain("higher is better");
     expect(legend.textContent).toContain("<1 ms");
@@ -424,13 +427,13 @@ describe("QueryHeatmap rendering", () => {
     scrollContainer.scrollLeft = 96;
     fireEvent.scroll(scrollContainer);
     expect(pageStickyHeader.scrollLeft).toBe(96);
-    expect(screen.getByTestId("query-heatmap-scroll-hint").textContent).toContain("Query columns");
+    expect(screen.getByTestId("query-heatmap-scroll-hint").textContent).toContain("query columns");
     expect(screen.getByRole("grid").className).toContain("min-w-max");
 
     const queryHeaders = Array.from(matrixThead().querySelectorAll("th"));
     expect(queryHeaders.some((header) => header.className.includes("min-w-[7rem]"))).toBe(true);
     const queryCells = Array.from(container.querySelectorAll("tbody td[data-cell]"));
-    expect(queryCells.every((cell) => cell.className.includes("min-w-[7rem]"))).toBe(true);
+    expect(queryCells.every((cell) => cell.className.includes("min-w-[6rem]"))).toBe(true);
   });
 
   it("renders compact mobile cards grouped by platform with aggregate metric and query outliers", () => {
@@ -731,4 +734,11 @@ describe("QueryHeatmap rendering", () => {
     );
     await expectNoAxeViolations(container);
   });
+});
+
+it("allows metadata after the identity column to scroll past the frozen region", () => {
+  const { container } = render(<QueryHeatmap summary={makeSummary()} />);
+  const table = container.querySelector("table")!;
+  const headers = [...table.querySelectorAll("thead th")];
+  expect(headers.filter((cell) => (cell as HTMLElement).style.position === "static").length).toBeGreaterThanOrEqual(3);
 });

@@ -203,7 +203,7 @@ describe("ChartPanel", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Overview" }));
-    expect(screen.getByText("Latest run").parentElement?.textContent).toMatch(/2026-04-18.*days ago/);
+    expect(screen.getByText("Latest run").parentElement?.querySelector("button")?.getAttribute("aria-label")).toMatch(/2026-04-18.*days ago/);
   });
 
   it("groups summary charts by analytical question", () => {
@@ -963,7 +963,7 @@ describe("ChartPanel", () => {
     );
 
     expect(screen.getByTestId("summary-chart-overview")).toBeTruthy();
-    const metricTable = screen.getByRole("table", { name: "Speed and throughput by engine" });
+    const metricTable = screen.getByRole("table", { name: "Speed and throughput by platform" });
     expect(metricTable).toBeTruthy();
     expect(within(metricTable).getByText("DuckDB")).toBeTruthy();
     expect(screen.getByTestId("summary-chart-preview-cdf_chart")).toBeTruthy();
@@ -1000,7 +1000,7 @@ describe("ChartPanel", () => {
       />,
     );
 
-    const table = screen.getByRole("table", { name: "Speed and throughput by engine" });
+    const table = screen.getByRole("table", { name: "Speed and throughput by platform" });
     expect(within(table).getByText("1,000")).toBeTruthy();
     expect(within(table).queryByText("9,000")).toBeNull();
   });
@@ -1102,7 +1102,10 @@ describe("ChartPanel", () => {
     expect(screen.getByTestId("chart-panel-long")).toBeTruthy();
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryAllByRole("tab")).toHaveLength(0);
-    expect(screen.getByRole("heading", { name: "What does this comparison show?" })).toBeTruthy();
+    // The panel no longer restates the page: each chart carries its own
+    // question, so a panel-level and a group-level paraphrase of it are gone.
+    expect(screen.queryByRole("heading", { name: "What does this comparison show?" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Headline metrics" })).toBeTruthy();
     expect(screen.getByTestId("chart-panel-chart-comparison_bar")).toHaveTextContent(
       "How does each query compare with the baseline?",
     );

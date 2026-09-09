@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useMemo, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import type { BenchmarkSummary } from "@/types";
 import {
@@ -84,46 +84,6 @@ export function additionalAnalysesLabel(count: number): string {
 export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
   const summary = buildRenderableSummary(context);
   const [openChartIds, setOpenChartIds] = useState<Set<string>>(() => new Set());
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
-  const copyTimer = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    return () => {
-      if (copyTimer.current !== undefined) window.clearTimeout(copyTimer.current);
-    };
-  }, []);
-
-  async function copySectionLink() {
-    // Keep the cohort facets (scale/phase/tuning in the query string) so the
-    // pasted link resolves to the section being viewed, not the defaults.
-    const url = `${window.location.origin}${window.location.pathname}${window.location.search}#cohort-charts`;
-    let ok = false;
-    try {
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(url);
-        ok = true;
-      } else {
-        throw new Error("clipboard unavailable");
-      }
-    } catch {
-      try {
-        const area = document.createElement("textarea");
-        area.value = url;
-        area.setAttribute("readonly", "");
-        area.style.position = "fixed";
-        area.style.opacity = "0";
-        document.body.appendChild(area);
-        area.select();
-        ok = document.execCommand("copy");
-        area.remove();
-      } catch {
-        ok = false;
-      }
-    }
-    if (copyTimer.current !== undefined) window.clearTimeout(copyTimer.current);
-    setCopyState(ok ? "copied" : "failed");
-    copyTimer.current = window.setTimeout(() => setCopyState("idle"), 1500);
-  }
-
   const charts = useMemo(() => {
     const applicableById = new Map(applicableCharts(context).map((chart) => [chart.id, chart]));
     const excluded = new Set(excludeChartIds);
@@ -164,72 +124,40 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
 
   return (
     <div class="scroll-mt-24 space-y-6" data-testid="summary-chart-overview" id="cohort-charts">
-      <div>
-        <div class="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 class="text-xl font-bold text-[var(--bb-data-fg-primary)]">What does this cohort show?</h2>
-            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
-              Headline metrics first, then the distribution and supporting analyses.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void copySectionLink()}
-            aria-live="polite"
-            class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm font-medium text-[var(--bb-accent)] shadow-sm"
-          >
-            {copyState === "copied"
-              ? "Link copied ✓"
-              : copyState === "failed"
-                ? "Copy failed — copy the URL manually"
-                : "Copy chart-section link"}
-          </button>
-        </div>
-        <aside class="mt-3 rounded-md border border-[var(--bb-data-border)] border-l-4 border-l-[var(--bb-accent)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
-          <p>
-            <strong class="font-semibold text-[var(--bb-data-fg-primary)]">Shared scope:</strong> every card
-            below names its own eligible population. Rows excluded by a chart&rsquo;s evidence policy remain
-            available in the matrix and receipts.
-          </p>
-        </aside>
-      </div>
       <section class="card" aria-labelledby="summary-metric-overview-title">
         <div class="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-[var(--bb-data-border)] pb-4">
           <div>
             <h2 id="summary-metric-overview-title" class="text-lg font-semibold text-[var(--bb-data-fg-primary)]">
-              Which engines lead on speed and throughput?
+              Which platforms lead on speed and throughput?
             </h2>
             <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
-              Display geomean and Power@Size in one compact comparison. Lower latency and higher throughput are better.
+              Geomean query time and power score in one comparison. Lower latency and higher throughput are better.
             </p>
           </div>
-          <p class="font-mono text-xs text-[var(--bb-data-fg-subtle)]">display_geomean_ms · Power@Size</p>
+          <p class="font-mono text-xs text-[var(--bb-data-fg-subtle)]">Geomean query time · Power score</p>
         </div>
 
         <div class="overflow-x-auto">
           <table
             class="summary-metric-table min-w-[38rem] w-full border-collapse"
-            aria-label="Speed and throughput by engine"
+            aria-label="Speed and throughput by platform"
           >
             <caption class="sr-only">
-              Display geomean latency and Power@Size for every submitted engine in this cohort
+              Display geomean latency and Power@Size for every submitted platform in this cohort
             </caption>
             <thead>
               <tr class="border-b border-[var(--bb-data-border-strong)]">
-                <th scope="col" class="px-2 py-2 text-left text-xs font-medium text-[var(--bb-data-fg-muted)]">
-                  Engine
-                </th>
                 <th
                   scope="col"
-                  class="w-[15rem] px-2 py-2 text-left text-xs font-medium text-[var(--bb-data-fg-muted)]"
+                  class="w-[14rem] px-2 py-2 text-left text-xs font-medium text-[var(--bb-data-fg-muted)]"
                 >
+                  Platform
+                </th>
+                <th scope="col" class="px-2 py-2 text-left text-xs font-medium text-[var(--bb-data-fg-muted)]">
                   <span class="block">Display geomean</span>
                   <span class="font-normal text-[var(--bb-data-fg-subtle)]">lower is better</span>
                 </th>
-                <th
-                  scope="col"
-                  class="w-[15rem] px-2 py-2 text-left text-xs font-medium text-[var(--bb-data-fg-muted)]"
-                >
+                <th scope="col" class="px-2 py-2 text-left text-xs font-medium text-[var(--bb-data-fg-muted)]">
                   <span class="block">Power@Size</span>
                   <span class="font-normal text-[var(--bb-data-fg-subtle)]">higher is better</span>
                 </th>
@@ -249,7 +177,7 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
                 const powerFraction = powerValue !== null ? Math.min(1, powerValue / maxPower) : null;
                 return (
                   <tr key={platform.result_id} class="border-b border-[var(--bb-data-border)] align-middle">
-                    <th scope="row" class="px-2 py-2.5 text-left text-sm font-medium text-[var(--bb-data-fg-primary)]">
+                    <th scope="row" class="px-2 py-1.5 text-left text-sm font-medium text-[var(--bb-data-fg-primary)]">
                       <span
                         class="flex min-w-0 items-center gap-2"
                         title={labels[sourceIndex]?.full ?? platform.platform}
@@ -303,10 +231,6 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
             <strong class="text-[var(--bb-data-fg-primary)]">Ranking:</strong> {powerRows.length} rank-safe rows ·
             values stay tied to the persisted ranking contract
           </p>
-          <p class="sm:col-span-2 text-[var(--bb-status-success)]">
-            <span aria-hidden="true">●</span> Validation status remains per run · rows excluded from a metric are
-            shown as — and named before plotting.
-          </p>
           {(displayExclusions.length > 0 || powerExclusions.length > 0) && (
             <p class="sm:col-span-2 text-xs text-[var(--bb-data-fg-subtle)]">
               {formatExclusionCount(displayExclusions, "display chart")}
@@ -329,17 +253,13 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
         <div data-chart-container>
           <DistributionBox summary={summary} />
         </div>
-        <div class="mt-3 space-y-1 border-t border-[var(--bb-data-border)] pt-3 text-sm text-[var(--bb-data-fg-muted)]">
+        <div class="mt-3 border-t border-[var(--bb-data-border)] pt-3 text-sm text-[var(--bb-data-fg-muted)]">
           <p>
-            <strong class="font-semibold text-[var(--bb-data-fg-primary)]">Boundary:</strong> across different
-            queries, not run-to-run variability.{" "}
+            The spread is across different queries, not repeated runs of the same query.{" "}
             <a class="font-medium text-[var(--bb-accent)]" href="#evidence-matrix">
-              Open per-query matrix ↗
-            </a>{" "}
-            ·{" "}
-            <a class="font-medium text-[var(--bb-accent)]" href="#provenance-legend">
-              Inspect exclusions ↗
+              See the per-query matrix
             </a>
+            .
           </p>
         </div>
       </section>
@@ -388,7 +308,11 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
                     class="cursor-pointer list-none p-4 outline-none focus-visible:ring-2
                       focus-visible:ring-[var(--bb-focus-ring)] focus-visible:ring-inset"
                   >
-                    <div class="flex min-h-[13rem] flex-col">
+                    {/* The preview exists to say what the card contains before
+                        it is opened. Once the full chart is rendered below,
+                        keeping the thumbnail draws the same chart twice, and
+                        only one of the two carries readable detail. */}
+                    <div class={`flex flex-col ${isOpen ? "" : "min-h-[13rem]"}`}>
                       <div>
                         <h3 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">
                           {CHART_DISPLAY_TITLES[chart.id] ?? chart.shortTitle}
@@ -397,11 +321,13 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
                           {CHART_QUESTIONS[chart.id] ?? chart.description}
                         </p>
                       </div>
-                      <ChartThumbnail
-                        chartId={chart.id}
-                        summary={chartSummary}
-                        historical={context.historical ?? []}
-                      />
+                      {!isOpen && (
+                        <ChartThumbnail
+                          chartId={chart.id}
+                          summary={chartSummary}
+                          historical={context.historical ?? []}
+                        />
+                      )}
                       <span class="mt-auto pt-3 text-xs font-medium text-[var(--bb-accent)]">
                         {isOpen ? "Close full chart" : "Open full chart ↗"}
                       </span>
@@ -458,16 +384,18 @@ function InlineMetricCell({
   title: string;
 }) {
   return (
-    <td class="summary-metric-cell px-2 py-2.5" title={title}>
-      <div class="flex items-baseline justify-between gap-2">
-        <span class="font-mono text-sm text-[var(--bb-data-fg-primary)]">{formatted}</span>
+    <td class="summary-metric-cell px-2 py-1.5" title={title}>
+      <div class="flex items-center gap-2">
+        <span class="w-[4.5rem] shrink-0 text-right font-mono text-sm text-[var(--bb-data-fg-primary)]">
+          {formatted}
+        </span>
         <span class="sr-only">{value === null ? "unavailable" : "measured"}</span>
-      </div>
-      <div class="summary-metric-track mt-1" aria-hidden="true">
-        <span
-          class="summary-metric-fill"
-          style={{ width: `${fraction === null ? 0 : Math.max(3, fraction * 100)}%`, backgroundColor: color }}
-        />
+        <div class="summary-metric-track min-w-0 flex-1" aria-hidden="true">
+          <span
+            class="summary-metric-fill"
+            style={{ width: `${fraction === null ? 0 : Math.max(3, fraction * 100)}%`, backgroundColor: color }}
+          />
+        </div>
       </div>
     </td>
   );

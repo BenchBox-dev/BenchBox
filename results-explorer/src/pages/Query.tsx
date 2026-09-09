@@ -30,6 +30,7 @@ import {
 import { buildCompareUrl, compareIdForRow, MAX_COMPARE_SELECTIONS, visibleResultIdForRow } from "@/lib/resultLinks";
 import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCategory } from "@/lib/starterQueries";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { PageHeader } from "@/components/PageHeader";
 import {
   buildQueryResultExportQuery,
   buildQueryResultPageQueries,
@@ -762,12 +763,12 @@ export function Query({ url }: QueryProps) {
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div class="mb-6">
-        <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">Find benchmark runs</h1>
-        <p class="mt-2 max-w-3xl text-sm text-[var(--bb-data-fg-muted)]">
-          Filter published runs, open their evidence, or select up to four runs to compare. Your filters stay in the page link.
-        </p>
-      </div>
+      <PageHeader
+        crumbs={[{ label: "Results", href: "/results/" }, { label: "Find runs" }]}
+        eyebrow="Find runs"
+        title="Find benchmark runs"
+        subtitle="Filter published runs, open their evidence, or select up to four runs to compare. Your filters stay in the page link."
+      />
 
       <div class="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <section class="flex min-w-0 flex-col gap-4 lg:col-start-2">

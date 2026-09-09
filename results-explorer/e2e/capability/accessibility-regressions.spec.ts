@@ -5,8 +5,8 @@ test.describe("accessibility and responsive regressions", () => {
   test("reduced motion and forced contrast preserve keyboard focus", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce", forcedColors: "active" });
     await page.setViewportSize({ width: 640, height: 900 });
-    await page.goto("/results/");
-    await waitForDataLoaded(page, /Recent Results/i);
+    await page.goto("/results/compare/");
+    await waitForDataLoaded(page, /Compare benchmark results/i);
 
     await page.getByText("Advanced filters").click();
     const control = page.getByRole("button", { name: /All (tuning labels|trust tiers|time)/ }).first();
@@ -27,21 +27,39 @@ test.describe("accessibility and responsive regressions", () => {
     expect(media.scrollWidth).toBeLessThanOrEqual(media.clientWidth);
   });
 
-  test("the home surface remains horizontally contained at 200 percent zoom", async ({ page }) => {
+  test("comparison loading and controls stay usable at 200 percent zoom", async ({ page }) => {
     await page.setViewportSize({ width: 640, height: 900 });
-    await page.goto("/results/");
-    await waitForDataLoaded(page, /Recent Results/i);
-
-    await page.evaluate(() => {
-      document.documentElement.style.zoom = "2";
+    let releaseSnapshot!: () => void;
+    const snapshotGate = new Promise<void>((resolve) => { releaseSnapshot = resolve; });
+    await page.route("**/results/data/results.duckdb", async (route) => {
+      await snapshotGate;
+      await route.continue();
     });
-
-    const dimensions = await page.evaluate(() => ({
-      scrollWidth: document.documentElement.scrollWidth,
-      clientWidth: document.documentElement.clientWidth,
-      bodyScrollWidth: document.body.scrollWidth,
+    await page.goto("/results/compare/");
+    await expect(page.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toBeVisible();
+    await page.evaluate(() => { document.documentElement.style.zoom = "2"; });
+    const widths = () => page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      body: document.body.scrollWidth,
+      client: document.documentElement.clientWidth,
     }));
-    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
-    expect(dimensions.bodyScrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+    const loading = await widths();
+    expect(loading.scroll).toBeLessThanOrEqual(loading.client);
+    expect(loading.body).toBeLessThanOrEqual(loading.client);
+    releaseSnapshot();
+    await expect(page.getByRole("grid", { name: "Cross-benchmark leaderboard" })).toBeVisible();
+    const loaded = await widths();
+    expect(loaded.scroll).toBeLessThanOrEqual(loaded.client);
+    expect(loaded.body).toBeLessThanOrEqual(loaded.client);
+    const controls = page.getByRole("group", { name: "Leaderboard display controls" });
+    for (const radio of await controls.getByRole("radio").all()) {
+      await radio.scrollIntoViewIfNeeded();
+      const box = await radio.boundingBox();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(640);
+    }
+    const recent = controls.getByRole("radio", { name: "Recent", exact: true });
+    await recent.click();
+    await expect(recent).toHaveAttribute("aria-checked", "true");
   });
 });

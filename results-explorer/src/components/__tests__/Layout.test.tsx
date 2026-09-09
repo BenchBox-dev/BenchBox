@@ -119,31 +119,31 @@ describe("Layout", () => {
     renderAt("/results/query");
 
     const explorerNav = screen.getByRole("navigation", { name: "Results Explorer" });
-    for (const label of ["Leaderboards", "Benchmarks", "Platforms", "Compare", "Find runs"]) {
+    for (const label of ["Overview", "Benchmarks", "Platforms", "Compare", "Find runs"]) {
       expect(within(explorerNav).getByRole("link", { name: label })).toBeTruthy();
     }
     expect(within(explorerNav).getByRole("link", { name: "Find runs" })).toHaveAttribute("aria-current", "page");
     expect(within(explorerNav).getByRole("button", { name: "Open local result" })).toBeTruthy();
     expect(within(explorerNav).getByTestId("local-result-file-input")).toHaveAttribute("aria-hidden", "true");
     expect(within(explorerNav).getByTestId("local-result-file-input")).toHaveAttribute("tabindex", "-1");
-    expect(within(explorerNav).getByRole("link", { name: "Leaderboards" })).not.toHaveAttribute("aria-current");
+    expect(within(explorerNav).getByRole("link", { name: "Overview" })).not.toHaveAttribute("aria-current");
   });
 
   it("updates the active explorer subnav after a client-side route() call", async () => {
     // Regression: prior to this fix, Layout read `window.location.pathname`
-    // once at module render time, so navigating from Leaderboards to Query
-    // via preact-router left "Leaderboards" highlighted indefinitely.
+    // once at module render time, so navigating from Overview to Query
+    // via preact-router left "Overview" highlighted indefinitely.
     renderWithRouter("/results/");
 
     const explorerNav = screen.getByRole("navigation", { name: "Results Explorer" });
-    expect(within(explorerNav).getByRole("link", { name: "Leaderboards" })).toHaveAttribute("aria-current", "page");
+    expect(within(explorerNav).getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
 
     route("/results/query");
 
     await waitFor(() => {
       expect(within(explorerNav).getByRole("link", { name: "Find runs" })).toHaveAttribute("aria-current", "page");
     });
-    expect(within(explorerNav).getByRole("link", { name: "Leaderboards" })).not.toHaveAttribute("aria-current");
+    expect(within(explorerNav).getByRole("link", { name: "Overview" })).not.toHaveAttribute("aria-current");
   });
 
   it("global and Results nav links use the theme-aware focus-visible outline token", () => {

@@ -6,12 +6,11 @@ import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getBenchmarkSummaryFromDuckDB, listBenchmarksWithPublicResults, listResults } from "@/lib/duckdbQueries";
 import { BENCHMARK_LABELS, humanizeBenchmark, isKnownBenchmark, fmtScore, fmtGeomean, errMsg, complianceLabel } from "@/utils";
-import { facetsToWhereClause, useFacetState, type ExplorerFacetKey, type FacetState } from "@/lib/facetModel";
+import { facetsToWhereClause, useFacetState, type DateWindowFacet, type ExplorerFacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue } from "@/lib/facetMatching";
 import {
   buildCompareUrl,
   compareIdForRow,
-  resultDetailHref,
   resultIdentityAriaLabel,
   resultReceiptHref,
   visibleResultIdForRow,
@@ -36,13 +35,14 @@ import { RankTable } from "@/components/RankTable";
 import { ChartPanel } from "@/components/ChartPanel";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
-import { RankingEligibilityLegend, RunIdentityLabel } from "@/components/DataTable";
+import { RunIdentityLabel } from "@/components/DataTable";
+import { PageHeader } from "@/components/PageHeader";
 import { CompareTray } from "@/components/CompareTray";
 import { TrayAnnouncer } from "@/components/TrayAnnouncer";
-import { RunDateWithAge } from "@/components/RunAge";
+import { RunDateChip } from "@/components/RunAge";
 import { NotFound } from "@/pages/NotFound";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
-import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
+import { canonicalBenchmarkSlug, canonicalPhase, formatValidationStatus } from "@/lib/displayLabels";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import { formatSelectedCount } from "@/lib/copyFormatters";
 import {
@@ -53,6 +53,13 @@ import {
 } from "@/lib/queryFilters";
 
 const BENCHMARK_SELECTION_LIMIT_REASON_ID = "benchmark-selection-limit";
+
+const DATE_WINDOW_OPTIONS: { value: DateWindowFacet; label: string }[] = [
+  { value: "all", label: "Any time" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "90d", label: "Last 90 days" },
+  { value: "365d", label: "Last year" },
+];
 
 interface BenchmarkIndexProps extends RoutableProps {
   benchmark?: string;
@@ -477,6 +484,18 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const trustLabels = summaryWithResultMetadata
     ? [...new Set(summaryWithResultMetadata.platforms.map((p) => p.trust_label))].sort()
     : [];
+  const platformOptions = summaryWithResultMetadata
+    ? [...new Set(summaryWithResultMetadata.platforms.map((p) => p.platform))].sort((a, b) => a.localeCompare(b))
+    : [];
+  const validationOptions = summaryWithResultMetadata
+    ? [
+        ...new Set(
+          summaryWithResultMetadata.platforms
+            .map((p) => p.validation_status)
+            .filter((status): status is string => status !== null && status !== ""),
+        ),
+      ].sort()
+    : [];
   const platformVersions = [
     ...new Set(
       (platformVersionDomainResults ?? benchmarkResults)
@@ -552,17 +571,27 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <Breadcrumb
+      <PageHeader
         crumbs={[
           { label: "Results", href: "/results/" },
           { label: title },
         ]}
-      />
-
-      <div class="mt-6 mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">{title} Results</h1>
-
-        <div class="flex flex-wrap items-center gap-3">
+        eyebrow="Benchmark"
+        title={`${title} Results`}
+        meta={
+          filteredSummary && filteredSummary.platforms.length > 0 ? (
+            <>
+              <span class="bb-meta-chip" data-testid="cohort-counts">
+                {filteredSummary.platforms.length} published runs
+              </span>
+              <span class="bb-meta-chip">{filteredSummary.query_ids.length} queries</span>
+              <span class="bb-meta-chip">SF {filteredSummary.scale_factor}</span>
+              <span class="bb-meta-chip">{effectivePhase}</span>
+            </>
+          ) : undefined
+        }
+        actions={
+          <>
           {/* Benchmark switcher (sibling pivot). View mode is the only piece
               of UI state that survives the switch; scale, phase, and tuning
               are benchmark-specific so we drop them rather than risk an
@@ -596,6 +625,31 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             </select>
           </div>
 
+          {/* View toggle */}
+          <SegmentedControl
+            ariaLabel="Benchmark view"
+            value={viewMode}
+            onChange={(value) => setViewMode(value)}
+            options={[
+              { value: "matrix", label: "Matrix" },
+              { value: "ranks", label: rankGateReason ? "Rank Evidence" : "Ranks" },
+              { value: "list", label: "List" },
+            ]}
+          />
+
+          </>
+        }
+      />
+
+      {/* Every filter that narrows the cohort, in one place. These were
+          previously split between the title row and nowhere at all: platform,
+          validation status, and the date window were plumbed through the facet
+          model but had no control. */}
+      <section
+        class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3"
+        data-testid="benchmark-filters"
+        aria-label="Cohort filters"
+      >
           {/* Scale factor filter */}
           {scaleFactors.length > 1 && (
             <div class="flex items-center gap-2">
@@ -663,7 +717,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           {(platformVersionFilter !== "all" || platformVersions.length > 1) && (
             <div class="flex items-center gap-2">
               <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-version-filter">
-                Engine version:
+                Platform version:
               </label>
               <select
                 id="benchmark-version-filter"
@@ -725,39 +779,89 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             </div>
           )}
 
-          {/* View toggle */}
-          <SegmentedControl
-            ariaLabel="Benchmark view"
-            value={viewMode}
-            onChange={(value) => setViewMode(value)}
-            options={[
-              { value: "matrix", label: "Matrix" },
-              { value: "ranks", label: rankGateReason ? "Rank Evidence" : "Ranks" },
-              { value: "list", label: "List" },
-            ]}
-          />
 
-          {/* Reduced-color (grayscale) toggle - only meaningful in matrix (heatmap) view.
-              Renamed from "High contrast" because the implementation is a
-              greyscale lightness palette, not a true high-contrast palette;
-              calling greyscale "high contrast" mismatched the rendered cells
-              for users who toggled it expecting WCAG-style luminance bumps. */}
-          {viewMode === "matrix" && (
-            <button
-              class={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                highContrast
-                  ? "border-[var(--bb-accent-hover)] bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
-                  : "border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data-muted)]"
-              }`}
-              onClick={() => setHighContrast((v) => !v)}
-              aria-pressed={highContrast}
-              title="Switch the heatmap palette to greyscale for color-vision accessibility"
+          {platformOptions.length > 1 && (
+            <div class="flex items-center gap-2">
+              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-platform-filter">
+                Platform:
+              </label>
+              <select
+                id="benchmark-platform-filter"
+                data-testid="benchmark-platform-filter"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
+                value={facets.platform.length === 1 ? facets.platform[0]! : "all"}
+                onChange={(event) => {
+                  const value = (event.target as HTMLSelectElement).value;
+                  setFacet("platform", value === "all" ? [] : [value]);
+                }}
+              >
+                <option value="all">All platforms</option>
+                {platformOptions.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {validationOptions.length > 1 && (
+            <div class="flex items-center gap-2">
+              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-validation-filter">
+                Validation:
+              </label>
+              <select
+                id="benchmark-validation-filter"
+                data-testid="benchmark-validation-filter"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
+                value={facets.validation_status.length === 1 ? facets.validation_status[0]! : "all"}
+                onChange={(event) => {
+                  const value = (event.target as HTMLSelectElement).value;
+                  setFacet("validation_status", value === "all" ? [] : [value]);
+                }}
+              >
+                <option value="all">Any status</option>
+                {validationOptions.map((status) => (
+                  <option key={status} value={status}>{formatValidationStatus(status)}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div class="flex items-center gap-2">
+            <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-date-window-filter">
+              Run date:
+            </label>
+            <select
+              id="benchmark-date-window-filter"
+              data-testid="benchmark-date-window-filter"
+              class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
+              value={facets.date_window}
+              onChange={(event) => {
+                setFacet("date_window", (event.target as HTMLSelectElement).value as DateWindowFacet);
+              }}
             >
-              Reduced color
+              {DATE_WINDOW_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {hasActiveFacets(facets, BENCHMARK_ROW_FACET_KEYS) && (
+            <button
+              type="button"
+              class="btn btn-subtle text-sm"
+              data-testid="benchmark-clear-filters"
+              onClick={() => {
+                for (const key of BENCHMARK_ROW_FACET_KEYS) {
+                  if (key === "date_window") continue;
+                  setFacet(key, [] as never);
+                }
+                setFacet("date_window", "all");
+              }}
+            >
+              Clear filters
             </button>
           )}
-        </div>
-      </div>
+      </section>
 
       {contextNote && (
         <div
@@ -768,39 +872,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         </div>
       )}
 
-      {viewMode === "matrix" && filteredSummary && filteredSummary.platforms.length > 0 && (
-        <section class="card mb-4" data-testid="cohort-hero" aria-label="Cohort overview">
-          <div class="flex flex-wrap items-start justify-between gap-4">
-            <p class="max-w-2xl text-sm text-[var(--bb-data-fg-muted)]">
-              A readable path from the cohort&rsquo;s headline result to its distribution and execution
-              shape. The matrix remains the source for per-query evidence.
-            </p>
-            <p
-              class="rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-center font-mono text-sm text-[var(--bb-data-fg-primary)]"
-              data-testid="cohort-counts"
-            >
-              {filteredSummary.platforms.length} published runs
-              <br />
-              {filteredSummary.query_ids.length} queries · SF{filteredSummary.scale_factor} ·{" "}
-              {effectivePhase}
-            </p>
-          </div>
-          <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3">
-            <div>
-              <p class="font-semibold text-[var(--bb-data-fg-primary)]">Evidence matrix</p>
-              <p class="text-sm text-[var(--bb-data-fg-muted)]">
-                Per-query timings, validation badges, run receipts, and comparison selection stay here.
-              </p>
-            </div>
-            <a
-              class="font-medium text-[var(--bb-accent)]"
-              href="#evidence-matrix"
-            >
-              Jump to matrix ↓
-            </a>
-          </div>
-        </section>
-      )}
 
       <section
         class="mb-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-sm"
@@ -826,10 +897,19 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               </p>
             )}
           </div>
-          {!compareUrl && (
-            <button type="button" class="btn btn-secondary shrink-0 text-sm" disabled>
-              {selectedIds.size === 1 ? "Select 1 more result" : "Select 2 comparable results"}
-            </button>
+          {/* One slot, whatever the state. A disabled button that looks
+              clickable and then relocates the moment it becomes clickable
+              costs the reader two mistakes; the affordance appears here only
+              when it can actually be used, and the pending state reads as
+              status text. */}
+          {compareUrl ? (
+            <a href={compareUrl} class="btn btn-primary shrink-0 text-sm no-underline" data-testid="benchmark-compare-cta">
+              Compare {selectedComparableCount} selected
+            </a>
+          ) : (
+            <p class="shrink-0 text-sm text-[var(--bb-data-fg-subtle)]" data-testid="benchmark-compare-cta-pending">
+              {selectedIds.size === 1 ? "Select 1 more result" : "Select 2 results to compare"}
+            </p>
           )}
         </div>
       </section>
@@ -875,9 +955,23 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             </div>
           ) : (
             <div id="evidence-matrix" class="scroll-mt-24" data-testid="evidence-matrix">
-              {(analysisSummary ?? filteredSummary).platforms.some((row) => row.ranking_exclusion_reason !== null) && (
-                <RankingEligibilityLegend />
-              )}
+              {/* Palette control sits with the thing it repaints. In the page
+                  filter row it read as another cohort filter. */}
+              <div class="mb-2 flex justify-end">
+                <button
+                  type="button"
+                  class={`rounded-md border px-3 py-1 text-xs transition-colors ${
+                    highContrast
+                      ? "border-[var(--bb-accent-hover)] bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
+                      : "border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data-muted)]"
+                  }`}
+                  onClick={() => setHighContrast((v) => !v)}
+                  aria-pressed={highContrast}
+                  title="Switch the heatmap palette to greyscale for color-vision accessibility"
+                >
+                  Reduced color
+                </button>
+              </div>
               <QueryHeatmap
                 summary={analysisSummary ?? filteredSummary}
                 selectedIds={selectedIds}
@@ -915,7 +1009,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           ) : (
             <div class="card">
               <RankTable summary={analysisSummary ?? filteredSummary} />
-              <BenchmarkResultLinks summary={analysisSummary ?? filteredSummary} viewMode="ranks" />
             </div>
           )}
         </>
@@ -925,8 +1018,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       {viewMode === "list" && (
         <ListTable benchmark={benchmark} results={results} scaleFactor={effectiveSf} facets={facets} />
       )}
-
-      {viewMode === "matrix" && analysisSummary && <BenchmarkResultLinks summary={analysisSummary} viewMode="matrix" />}
 
       {viewMode !== "list" && <ExcludedRunsDisclosure rows={excludedRows} />}
 
@@ -973,50 +1064,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         <ProvenanceLegend />
       </div>
 </div>
-  );
-}
-
-function BenchmarkResultLinks({ summary, viewMode }: { summary: BenchmarkSummary; viewMode: "matrix" | "ranks" }) {
-  if (summary.platforms.length === 0) return null;
-  const label = viewMode === "matrix" ? "Matrix result links" : "Ranks result links";
-
-  return (
-    <section
-      class="mt-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm shadow-sm"
-      aria-label={label}
-      data-testid={`${viewMode}-result-links`}
-    >
-      <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Result links</h2>
-        <p class="text-xs text-[var(--bb-data-fg-muted)]">Public IDs use the canonical result identity.</p>
-      </div>
-      <ul class="grid gap-2 sm:grid-cols-2" role="list">
-        {summary.platforms.map((row) => (
-          <li
-            key={row.result_id}
-            class="flex flex-wrap items-center gap-2 rounded-md bg-[var(--bb-surface-data-muted)] px-2 py-1.5 text-xs"
-            data-testid={`${viewMode}-result-link-${row.result_id}`}
-          >
-            <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
-            <span class="font-mono text-[var(--bb-data-fg-muted)]">Public ID {visibleResultIdForRow(row)}</span>
-            <a
-              href={resultDetailHref(row)}
-              aria-label={resultIdentityAriaLabel(row, "details")}
-              class="font-medium no-underline"
-            >
-              Details
-            </a>
-            <a
-              href={resultReceiptHref(row)}
-              aria-label={resultIdentityAriaLabel(row, "receipt")}
-              class="font-medium no-underline"
-            >
-              Receipt
-            </a>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }
 
@@ -1330,7 +1377,7 @@ function BenchmarkRow({ entry, runIdentityLabel }: { entry: ResultRow; runIdenti
         )}
       </td>
       <td class="table-td">SF {entry.scale_factor}</td>
-      <td class="table-td text-[var(--bb-data-fg-muted)]"><RunDateWithAge runDate={entry.run_date} /></td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]"><RunDateChip runDate={entry.run_date} /></td>
       <td class="table-td font-mono">{fmtScore(entry.power_score)}</td>
       <td class="table-td font-mono">{fmtGeomean(entry.display_geomean_ms ?? entry.geomean_ms)}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.query_count}</td>

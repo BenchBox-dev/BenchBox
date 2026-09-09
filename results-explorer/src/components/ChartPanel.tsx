@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { JSX } from "preact";
+import type { ComponentChildren, JSX } from "preact";
 import type { BenchmarkSummary, RankingConfig } from "@/types";
 import {
   applicableCharts,
@@ -29,7 +29,7 @@ import { RankTable } from "@/components/RankTable";
 import { SummaryChartOverview } from "@/components/SummaryChartOverview";
 import { fmtGeomean, fmtScore } from "@/utils";
 import { paletteColor } from "@/lib/chartTheme";
-import { formatRunDateWithAge } from "@/lib/runAge";
+import { RunDateChip } from "@/components/RunAge";
 import {
   formatRunIdentitiesForCohort,
   formatRunIdentityLabelsForCohort,
@@ -570,7 +570,25 @@ function longLayoutGroupCopy(group: { id: string; label: string; description: st
   return LONG_LAYOUT_GROUP_COPY[group.id] ?? group;
 }
 
-function longLayoutChartCopy(chart: ChartRegistryEntry) {
+// A single run has nothing to lead and no difference to drive, so the few
+// cohort-shaped questions get a run-shaped one instead.
+const SINGLE_RUN_CHART_COPY: Readonly<Record<string, { title: string; description: string }>> = {
+  query_heatmap: {
+    title: "How long did each query take?",
+    description: "Per-query latency for this run. Lower is better.",
+  },
+  summary_box: {
+    title: "What did this run record?",
+    description: "Aggregate geomean, total time, and per-query outcome counts.",
+  },
+  distribution_box: {
+    title: "How wide is the query-latency spread?",
+    description: "Variation across queries in this run, not run-to-run variability.",
+  },
+};
+
+function longLayoutChartCopy(chart: ChartRegistryEntry, singleRun = false) {
+  if (singleRun && SINGLE_RUN_CHART_COPY[chart.id]) return SINGLE_RUN_CHART_COPY[chart.id]!;
   return LONG_LAYOUT_CHART_COPY[chart.id] ?? {
     title: chart.title,
     description: chart.description,
@@ -632,16 +650,14 @@ function ChartPanelLong({
     !isBaselineControlled &&
     context.kind === "compare" &&
     charts.some((chart) => chart.id === "normalized_speedup" || chart.id === "diverging_bar");
+  const singleRun = context.kind === "detail";
 
   return (
     <section class="card" data-testid="chart-panel-long">
+      {/* No panel-level or group-level restatement of the question: each
+          chart already carries the question it answers, and three nested
+          headings that paraphrase each other read as scaffolding. */}
       <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div>
-          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">What does this comparison show?</h2>
-          <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
-            Aggregate results first, then the per-query evidence behind them.
-          </p>
-        </div>
         {showBaseline && summary && summary.platforms.length > 1 && (
           <div class="ml-auto flex items-center gap-2">
             <label class="text-xs text-[var(--bb-data-fg-muted)]" for="chart-panel-long-baseline">
@@ -673,11 +689,10 @@ function ChartPanelLong({
             >
             <h3
               id={`chart-panel-group-${group.id}`}
-              class="text-sm font-semibold text-[var(--bb-data-fg-primary)]"
+              class="sr-only"
             >
               {groupCopy.label}
             </h3>
-            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">{groupCopy.description}</p>
             <div class="mt-4 space-y-8">
               {group.charts.map((chart) => (
                 <ChartFigure
@@ -690,6 +705,7 @@ function ChartPanelLong({
                   suppressWinnerClaims={suppressWinnerClaims}
                   suppressionReason={suppressionReason}
                   queryFilter={queryFilter}
+                  singleRun={singleRun}
                 />
               ))}
             </div>
@@ -710,6 +726,7 @@ function ChartFigure({
   suppressWinnerClaims = false,
   suppressionReason,
   queryFilter,
+  singleRun = false,
 }: {
   chart: ChartRegistryEntry;
   context: ChartContext;
@@ -719,6 +736,7 @@ function ChartFigure({
   suppressWinnerClaims?: boolean;
   suppressionReason?: string;
   queryFilter?: readonly string[];
+  singleRun?: boolean;
 }) {
   const chartSummary = useMemo(
     () => buildChartSummary(summary, chart.eligibilityClass, queryFilter),
@@ -755,7 +773,7 @@ function ChartFigure({
   );
   const datasetEmpty = shouldShowChartDatasetEmpty(chart.eligibilityClass, summary, chartSummary);
   const fewUsableQueries = Boolean(queryFilter && (chartSummary?.query_ids.length ?? 0) < 2);
-  const copy = longLayoutChartCopy(chart);
+  const copy = longLayoutChartCopy(chart, singleRun);
 
   return (
     <div data-chart-container data-chart-id={chart.id} data-testid={`chart-panel-chart-${chart.id}`}>
@@ -1315,7 +1333,7 @@ function SummaryBoxPanel({
       <div class="grid gap-3 sm:grid-cols-3">
         <SummaryStat label="Runs" value={String(historical.length)} />
         <SummaryStat label="Benchmarks" value={String(benchmarks.size)} />
-        <SummaryStat label="Latest run" value={latest ? formatRunDateWithAge(latest.run_date) : "-"} />
+        <SummaryStat label="Latest run" value={latest ? <RunDateChip runDate={latest.run_date} /> : "-"} />
       </div>
     );
   }
@@ -1381,7 +1399,7 @@ function SummaryBoxPanel({
   );
 }
 
-function SummaryStat({ label, value, title }: { label: string; value: string; title?: string }) {
+function SummaryStat({ label, value, title }: { label: string; value: ComponentChildren; title?: string }) {
   return (
     <div class="rounded-lg panel-muted px-4 py-3" title={title}>
       <div class="text-xs font-medium uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">{label}</div>

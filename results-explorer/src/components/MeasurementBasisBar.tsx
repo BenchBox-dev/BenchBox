@@ -41,6 +41,12 @@ export interface MeasurementBasisBarProps {
   statisticCollapsed: boolean;
   /** Why a basis is unavailable, when one is. */
   unavailableReason?: Parameters<typeof basisUnavailableLabel>[0] | null;
+  /**
+   * "bar" (default) is the standalone full-width panel. "card" drops the
+   * panel chrome and stacks label over controls, so the bar can sit beside
+   * the other comparison-wide controls in one row.
+   */
+  layout?: "bar" | "card";
 }
 
 const STATISTIC_OPTIONS: { value: BasisStatistic; label: string }[] = [
@@ -79,7 +85,9 @@ export function MeasurementBasisBar({
   runCount,
   statisticCollapsed,
   unavailableReason = null,
+  layout = "bar",
 }: MeasurementBasisBarProps) {
+  const isCard = layout === "card";
   const excluded = totalQueryCount - comparableQueryCount;
   const measuring = isDefaultBasis(basis)
     ? "the published median over all warm passes"
@@ -87,7 +95,11 @@ export function MeasurementBasisBar({
 
   return (
     <section
-      class="panel mb-4 flex flex-wrap items-start justify-between gap-3 px-3 py-2 shadow-sm"
+      class={
+        isCard
+          ? "min-w-0"
+          : "panel mb-4 flex flex-wrap items-start justify-between gap-3 px-3 py-2 shadow-sm"
+      }
       aria-label="Measurement basis"
     >
       <div class="min-w-0">
@@ -111,7 +123,7 @@ export function MeasurementBasisBar({
         ) : null}
       </div>
 
-      <div class="flex flex-wrap items-center gap-3">
+      <div class={`flex flex-wrap items-center gap-3 ${isCard ? "mt-2" : ""}`}>
         <div>
           <label class="text-xs font-medium text-[var(--bb-data-fg-primary)]" for="basis-passes">
             Passes
