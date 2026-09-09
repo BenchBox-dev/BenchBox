@@ -989,3 +989,30 @@ describe("platform measurement basis", () => {
     expect(getResultsBasisAvailability).toHaveBeenCalledTimes(1);
   });
 });
+
+it("updates selection eligibility when warmup availability differs from the published basis", async () => {
+  vi.clearAllMocks();
+  window.history.replaceState(null, "", "/results/p/duckdb/");
+  const rows = [
+    makeRow({ result_id: "no-warmup", short_id: "cccccccc" }),
+    makeRow({ result_id: "warmup-only", short_id: "dddddddd", comparison_exclusion_reason: "missing_timings", display_exclusion_reason: "missing_timings" }),
+  ];
+  vi.mocked(getPlatformIndexRows).mockResolvedValue(rows);
+  vi.mocked(getResultsBasisAvailability).mockResolvedValue([{ result_id: "warmup-only", available_bases: "default,warmup", has_warmup: true, measurement_pass_count: 0, warmup_status: "available", varying_pass_queries: null }]);
+  vi.mocked(getDetailResult).mockImplementation(async (id) => ({
+    ...rows.find((row) => row.result_id === id)!,
+    queries: ["Q1", "Q2"].map((query_id) => ({ query_id, duration_ms: 10, status: "pass", run_type: id === "warmup-only" ? "warmup" : "measurement", iter: id === "warmup-only" ? 0 : 1, stream: null })),
+    display_timings: [], logical_query_count: 2,
+  } as unknown as import("@/types").DetailResult));
+  render(<PlatformIndex platform="duckdb" />);
+  const selector = await screen.findByRole("combobox", { name: "Measurement basis" });
+  const unavailable = screen.getByTestId("platform-compare-checkbox-no-warmup") as HTMLInputElement;
+  fireEvent.click(unavailable);
+  expect(unavailable.checked).toBe(true);
+  expect((screen.getByTestId("platform-compare-checkbox-warmup-only") as HTMLInputElement).disabled).toBe(true);
+  await waitFor(() => expect(selector.querySelector('option[value="warmup"]')).toBeTruthy());
+  fireEvent.change(selector, { target: { value: "warmup" } });
+  await waitFor(() => expect(unavailable.disabled).toBe(true));
+  await waitFor(() => expect(unavailable.checked).toBe(false));
+  expect((screen.getByTestId("platform-compare-checkbox-warmup-only") as HTMLInputElement).disabled).toBe(false);
+});

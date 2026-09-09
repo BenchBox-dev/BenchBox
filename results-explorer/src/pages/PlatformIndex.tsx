@@ -246,7 +246,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   useEffect(() => {
     let cancelled = false;
     setBasisError(null);
-    if (isDefaultBasis(basis)) { setBasisLoading(false); return; }
+    if (isDefaultBasis(basis)) {
+      setBasisLoading(false);
+      setSelected((current) => new Set([...current].filter((id) => requestedRows.some((row) => row.result_id === id && !row.comparison_exclusion_reason))));
+      return;
+    }
     setBasisLoading(true);
     const loadDetails = async () => {
       const details: DetailResult[] = [];
@@ -267,7 +271,10 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     };
     void loadDetails().then((details) => {
       if (cancelled) return;
-      setBasisDetails(new Map(details.filter((detail): detail is DetailResult => detail !== null).map((detail) => [detail.result_id, detail])));
+      const byId = new Map(details.map((detail) => [detail.result_id, detail]));
+      setBasisDetails(byId);
+      const eligibleIds = new Set(platformRowsForBasis(requestedRows, byId, basis).filter((row) => !row.comparison_exclusion_reason).map((row) => row.result_id));
+      setSelected((current) => new Set([...current].filter((id) => eligibleIds.has(id))));
       setBasisLoading(false);
     }).catch(() => {
       if (cancelled) return;
