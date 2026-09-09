@@ -117,7 +117,23 @@ export function latencyScaleTicks(scale: LatencyBarScale): number[] {
 // Used by SVG views that plot latency distributions on a log2 ms axis.
 // ---------------------------------------------------------------------------
 
+/**
+ * Decade ticks. Kept as the coarsest rung for callers that want them, but a
+ * latency axis is rarely a whole decade wide: a run whose queries all land
+ * between 7 ms and 29 ms falls inside one decade, and a decade-only axis then
+ * carries a single label, which is not an axis.
+ */
 export const LOG_LATENCY_TICKS_MS = [0.1, 1, 10, 100, 1000, 10000];
+
+/**
+ * Subdivisions of each decade, used when whole decades do not label the axis.
+ * Wider than the usual 1-2-5 because latency ranges inside one decade are the
+ * common case here: 22-55 ms would otherwise carry two labels.
+ */
+const LOG_LATENCY_TICK_MANTISSAS = [1, 1.5, 2, 3, 5, 7];
+
+/** Most labels a latency axis should carry before they crowd each other. */
+const MAX_LOG_LATENCY_TICKS = 8;
 
 export interface LogLatencyScale {
   logMin: number;
@@ -160,12 +176,59 @@ export function logLatencyFraction(ms: number, scale: LogLatencyScale): number {
   return (logLatencyValue(ms, scale.floorMs) - scale.logMin) / scale.logRange;
 }
 
+/**
+ * Ticks for a log latency axis, coarsest set that still labels the axis.
+ *
+ * Tries decades first, then 1-2-5 within each decade, and only then the axis
+ * endpoints. A caller gets at least two labels whenever the scale spans a
+ * range at all, so no chart renders an axis with one number on it.
+ */
 export function logLatencyTicks(scale: LogLatencyScale, tolerance = 0.05): number[] {
-  return LOG_LATENCY_TICKS_MS.filter(
-    (ms) =>
-      logLatencyValue(ms, scale.floorMs) >= scale.logMin - tolerance &&
-      logLatencyValue(ms, scale.floorMs) <= scale.logMax + tolerance,
-  );
+  const inRange = (ms: number, slack: number) =>
+    logLatencyValue(ms, scale.floorMs) >= scale.logMin - slack &&
+    logLatencyValue(ms, scale.floorMs) <= scale.logMax + slack;
+
+  // Decades get the caller's tolerance: it absorbs float wobble on the exact
+  // powers of ten a padded scale is often built around.
+  const decades = LOG_LATENCY_TICKS_MS.filter((ms) => inRange(ms, tolerance));
+  if (decades.length >= 3) return decades;
+
+  const lowestDecade = Math.floor(Math.log10(Math.max(2 ** scale.logMin, Number.MIN_VALUE)));
+  const highestDecade = Math.ceil(Math.log10(2 ** scale.logMax));
+  const subdivided: number[] = [];
+  for (let exponent = lowestDecade; exponent <= highestDecade; exponent += 1) {
+    for (const mantissa of LOG_LATENCY_TICK_MANTISSAS) {
+      const ms = mantissa * 10 ** exponent;
+      // Subdivided rungs must be strictly inside the domain. A rung admitted
+      // on tolerance alone is drawn past the end of the axis, where its label
+      // runs off the edge of the drawing.
+      if (inRange(ms, 0)) subdivided.push(ms);
+    }
+  }
+  if (subdivided.length >= 2) return thinTicks(subdivided, MAX_LOG_LATENCY_TICKS);
+
+  // Nothing lands inside the range - a very narrow span such as 11-13 ms.
+  // Label its ends rather than one arbitrary rung, or nothing at all.
+  const min = 2 ** scale.logMin;
+  const max = 2 ** scale.logMax;
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return subdivided;
+  return [min, (min + max) / 2, max].map((ms) => roundToTwoSignificantDigits(ms));
+}
+
+/** Keeps the first and last tick and drops interior ones evenly until it fits. */
+function thinTicks(ticks: readonly number[], max: number): number[] {
+  if (ticks.length <= max) return [...ticks];
+  const stride = Math.ceil((ticks.length - 1) / (max - 1));
+  const kept = ticks.filter((_, index) => index % stride === 0);
+  const last = ticks[ticks.length - 1]!;
+  if (kept[kept.length - 1] !== last) kept.push(last);
+  return kept;
+}
+
+function roundToTwoSignificantDigits(value: number): number {
+  if (value === 0) return 0;
+  const magnitude = 10 ** (Math.floor(Math.log10(Math.abs(value))) - 1);
+  return Math.round(value / magnitude) * magnitude;
 }
 
 // ---------------------------------------------------------------------------

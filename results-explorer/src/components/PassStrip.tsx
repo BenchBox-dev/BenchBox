@@ -1,4 +1,6 @@
+import { useRef } from "preact/hooks";
 import type { QueryTiming } from "@/types";
+import { TableScrollHint } from "@/components/TableScrollHint";
 import { median } from "@/lib/measurementBasis";
 import { fmtMs } from "@/utils";
 
@@ -76,6 +78,63 @@ export function summarizeQueryPasses(queries: QueryTiming[]): QueryPassSummary[]
     });
 }
 
+export interface RunPassTotals {
+  /** Queries the totals cover. */
+  queryCount: number;
+  /** Warm passes executed across every query. */
+  passCount: number;
+  /** Sum of the per-query warm medians: the run's total under that reduction. */
+  warmMedianMs: number | null;
+  /** Sum of the per-query warm minima. */
+  warmMinMs: number | null;
+  /** Sum of the per-query spreads: how wide the total could swing. */
+  spreadMs: number | null;
+  /** Sum of the recorded warmup passes. */
+  warmupMs: number | null;
+  /** Queries that recorded a warmup, which may be fewer than `queryCount`. */
+  warmupQueryCount: number;
+  /**
+   * Total warmup over the total warm median FOR THE SAME QUERIES.
+   *
+   * Not an average of the per-query ratios, and never the full-run median
+   * total as the denominator: comparing every query's warmup against every
+   * query's warm time would understate the penalty whenever some queries
+   * recorded no warmup at all.
+   */
+  warmupRatio: number | null;
+}
+
+/**
+ * Run-level totals for the pass table's closing row.
+ *
+ * Each total covers only the queries that recorded the value, so a column with
+ * gaps sums what exists rather than treating a missing measurement as zero.
+ */
+export function summarizeRunPasses(summaries: readonly QueryPassSummary[]): RunPassTotals {
+  const sum = (pick: (s: QueryPassSummary) => number | null): number | null => {
+    const values = summaries.map(pick).filter((value): value is number => value !== null);
+    return values.length > 0 ? values.reduce((total, value) => total + value, 0) : null;
+  };
+  const withWarmup = summaries.filter((s) => s.warmupMs !== null);
+  const warmupMs = sum((s) => s.warmupMs);
+  const warmupWarmMedianMs = withWarmup
+    .map((s) => s.warmMedian)
+    .filter((value): value is number => value !== null)
+    .reduce((total, value) => total + value, 0);
+
+  return {
+    queryCount: summaries.length,
+    passCount: summaries.reduce((total, s) => total + s.warmValues.length, 0),
+    warmMedianMs: sum((s) => s.warmMedian),
+    warmMinMs: sum((s) => s.warmMin),
+    spreadMs: sum((s) => s.spreadMs),
+    warmupMs,
+    warmupQueryCount: withWarmup.length,
+    warmupRatio:
+      warmupMs !== null && warmupWarmMedianMs > 0 ? warmupMs / warmupWarmMedianMs : null,
+  };
+}
+
 /** True when no query in the run recorded a warmup pass. */
 export function hasNoRecordedWarmup(summaries: readonly QueryPassSummary[]): boolean {
   return summaries.every((s) => s.warmupMs === null);
@@ -87,10 +146,16 @@ function ratioText(ratio: number | null): string {
 }
 
 export function PassStrip({ queries, limit = 25 }: PassStripProps) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const summaries = summarizeQueryPasses(queries);
   if (summaries.length === 0) return null;
   const shown = summaries.slice(0, limit);
   const noWarmup = hasNoRecordedWarmup(summaries);
+  const totals = summarizeRunPasses(summaries);
+  const totalsScope =
+    shown.length === summaries.length
+      ? `Totals across all ${summaries.length} ${summaries.length === 1 ? "query" : "queries"}.`
+      : `Totals across all ${summaries.length} queries, including the ${summaries.length - shown.length} not listed above.`;
 
   return (
     <section class="card mb-8" aria-labelledby="pass-view-title">
@@ -115,7 +180,8 @@ export function PassStrip({ queries, limit = 25 }: PassStripProps) {
         ) : null}
       </div>
 
-      <div class="overflow-x-auto">
+      <TableScrollHint scrollerRef={scrollerRef} testId="detail-passes-scroll-hint" />
+      <div ref={scrollerRef} class="overflow-x-auto" data-testid="detail-passes-scroll-container">
         <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)] text-sm">
           <thead class="bg-[var(--bb-surface-data-muted)]">
             <tr>
@@ -143,8 +209,39 @@ export function PassStrip({ queries, limit = 25 }: PassStripProps) {
               </tr>
             ))}
           </tbody>
+          {/* The run's own totals. A reader comparing two runs needs the whole
+              number, not 22 rows to add up; the ratio is recomputed from the
+              totals rather than averaged, and each total covers only the
+              queries that recorded the value it sums. */}
+          <tfoot class="border-t-2 border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data-muted)]">
+            <tr data-testid="pass-strip-totals">
+              <th scope="row" class="table-td text-left font-semibold" title={totalsScope}>
+                Overall
+              </th>
+              <td class="table-td font-mono text-xs">{totals.passCount}</td>
+              <td class="table-td font-mono font-semibold">
+                {totals.warmMedianMs !== null ? fmtMs(totals.warmMedianMs) : "—"}
+              </td>
+              <td class="table-td font-mono">{totals.warmMinMs !== null ? fmtMs(totals.warmMinMs) : "—"}</td>
+              <td class="table-td font-mono">{totals.spreadMs !== null ? fmtMs(totals.spreadMs) : "—"}</td>
+              <td
+                class="table-td font-mono"
+                title={
+                  totals.warmupQueryCount === totals.queryCount
+                    ? undefined
+                    : `Summed over the ${totals.warmupQueryCount} of ${totals.queryCount} queries that recorded a warmup pass.`
+                }
+              >
+                {totals.warmupMs !== null ? fmtMs(totals.warmupMs) : "—"}
+              </td>
+              <td class="table-td font-mono" data-testid="warmup-ratio-overall">
+                {ratioText(totals.warmupRatio)}
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
+      <p class="mt-2 text-xs text-[var(--bb-data-fg-subtle)]">{totalsScope}</p>
     </section>
   );
 }

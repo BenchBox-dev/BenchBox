@@ -10,7 +10,7 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
-import { PassStrip } from "@/components/PassStrip";
+import { PassStrip, summarizeQueryPasses } from "@/components/PassStrip";
 import { resultDetailHref, withinRunCompareHref } from "@/lib/resultLinks";
 import { encodeBasis, selectComparableBasisPair } from "@/lib/measurementBasis";
 import { TableScrollHint } from "@/components/TableScrollHint";
@@ -23,7 +23,8 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { formatEnumLabel, formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
 import { formatDurationSeconds, formatLatencyMs } from "@/lib/metricFormatters";
 import { visibleResultIdForRow } from "@/lib/resultLinks";
-import { RunDateWithAge } from "@/components/RunAge";
+import { RunDateChip } from "@/components/RunAge";
+import { PageHeader } from "@/components/PageHeader";
 import { useLocalResultState } from "@/lib/localResultState";
 import { LocalResultPicker } from "@/components/LocalResultPicker";
 
@@ -31,6 +32,9 @@ interface ResultDetailProps extends RoutableProps {
   resultId?: string;
   source?: "public" | "local";
 }
+
+/** Per-query rows to render on a run page before the pass table truncates. */
+const PASS_STRIP_DETAIL_LIMIT = 200;
 
 type MedianSortKey = "query_id" | "display_ms" | "sample_count";
 type RawSortKey = "query_id" | "duration_ms" | "status";
@@ -244,8 +248,10 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
   }
 
   const showTuningSection = true;
+  // How many queries the pass table can actually report on. Zero means it
+  // renders nothing, and the median-latency table is the only per-query view.
+  const passSummaryCount = summarizeQueryPasses(detail.queries).length;
   const plansUrl = planDownloadUrl(detail);
-  const showSidebar = showTuningSection || (detail.has_plans && !plansUrl);
   const hasTimings = detail.display_timings.length > 0 || detail.queries.length > 0;
   const withinRunBases = selectComparableBasisPair(detail.queries, detail.display_timings);
   const hasPrimaryMetric = primaryMetric === "power_score"
@@ -260,20 +266,10 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <Breadcrumb
-        crumbs={isLocal
-          ? [{ label: "Results", href: "/results/" }, { label: "Local preview" }, { label: detail.platform }]
-          : [
-              { label: "Results", href: "/results/" },
-              { label: benchmarkLabel, href: `/results/${detail.benchmark}/` },
-              { label: detail.platform },
-            ]}
-      />
-
       {isLocal && (
         <aside
           role="status"
-          class="mt-6 rounded-lg border border-[var(--bb-data-border-strong)] bg-[var(--bb-tone-info-bg)] p-4 text-sm text-[var(--bb-tone-info-fg)]"
+          class="mb-6 rounded-lg border border-[var(--bb-data-border-strong)] bg-[var(--bb-tone-info-bg)] p-4 text-sm text-[var(--bb-tone-info-fg)]"
           data-testid="local-result-banner"
           aria-label="Local result preview"
         >
@@ -285,35 +281,44 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
         </aside>
       )}
 
-      <section aria-label="Result summary" class="mt-6 mb-8 panel-elevated p-5">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div class="min-w-0">
-            <div class="mb-3 flex flex-wrap items-center gap-3">
-              <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">
-                {benchmarkLabel} result: {detail.platform}
-              </h1>
-              <TrustBadge trustLabel={detail.trust_label} />
-              <FundingChip funding={detail.funding} />
-              {!isPassingValidationStatus(detail.validation_status) && (
-                <ValidationBadge validationStatus={detail.validation_status} showMissing />
-              )}
-              {detail.tuning_mode && (
-                <TuningBadge
-                  tuningMode={detail.tuning_mode}
-                  tuningValidationStatus={detail.tuning_validation_status}
-                />
-              )}
-              {detail.visibility === "public-curated" && (
-                <StatusBadge role="visibility" tone="success">Published</StatusBadge>
-              )}
-            </div>
-            <p class="text-sm text-[var(--bb-data-fg-muted)]">
-              This {benchmarkLabel} run used scale factor {detail.scale_factor} for the{" "}
-              {detail.test_type ? formatEnumLabel(detail.test_type) : "standard"} phase on{" "}
-              <RunDateWithAge runDate={detail.run_date} /> · {isLocal ? "Local preview ID" : "Public ID"}{" "}
-              <code class="font-mono text-[var(--bb-data-fg-primary)]">{visibleResultIdForRow(detail)}</code>
-            </p>
-          </div>
+      <PageHeader
+        crumbs={isLocal
+          ? [{ label: "Results", href: "/results/" }, { label: "Local preview" }, { label: detail.platform }]
+          : [
+              { label: "Results", href: "/results/" },
+              { label: benchmarkLabel, href: `/results/${detail.benchmark}/` },
+              { label: detail.platform },
+            ]}
+        eyebrow="Run"
+        title={`${benchmarkLabel} result: ${detail.platform}`}
+        subtitle={
+          <>
+            Scale factor {detail.scale_factor}, {detail.test_type ? formatEnumLabel(detail.test_type) : "standard"} phase.
+          </>
+        }
+        meta={
+          <>
+            <RunDateChip runDate={detail.run_date} />
+            <span class="bb-meta-chip">
+              {isLocal ? "Local preview ID" : "Public ID"} {visibleResultIdForRow(detail)}
+            </span>
+            <TrustBadge trustLabel={detail.trust_label} />
+            <FundingChip funding={detail.funding} />
+            {!isPassingValidationStatus(detail.validation_status) && (
+              <ValidationBadge validationStatus={detail.validation_status} showMissing />
+            )}
+            {detail.tuning_mode && (
+              <TuningBadge
+                tuningMode={detail.tuning_mode}
+                tuningValidationStatus={detail.tuning_validation_status}
+              />
+            )}
+            {detail.visibility === "public-curated" && (
+              <StatusBadge role="visibility" tone="success">Published</StatusBadge>
+            )}
+          </>
+        }
+        actions={
           <div class="flex flex-wrap gap-2">
             {isLocal ? (
               <>
@@ -342,9 +347,14 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
               </>
             )}
           </div>
-        </div>
+        }
+      />
 
-        <div class={`mt-5 grid gap-3 sm:grid-cols-2 ${hasPrimaryMetric ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
+      {/* One row of cards. The tuning card used to sit in a left sidebar that
+          took a third of the page from `lg` up, so the charts got NARROWER as
+          the window got wider while the sidebar held one small card. */}
+      <section aria-label="Result summary" class="mb-8">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-[repeat(auto-fit,minmax(12rem,1fr))]">
           {hasPrimaryMetric && (
             <ResultMetricCard
               label={`Primary metric · ${primaryMetricDirection}`}
@@ -368,11 +378,6 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
             value={formatDurationSeconds(detail.total_duration_s).valueText}
             helper="Run duration"
           />
-        </div>
-      </section>
-
-      <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div class={showSidebar ? "space-y-6" : "hidden"}>
           {showTuningSection && (
             <section class="card">
               <h2 class="mb-3 text-base font-semibold text-[var(--bb-data-fg-primary)]">Tuning</h2>
@@ -427,10 +432,22 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
             </section>
           )}
         </div>
+      </section>
 
-        <div class={showSidebar ? "lg:col-span-2 space-y-6" : "lg:col-span-3 space-y-6"}>
+      <div class="space-y-6">
+          {/* The same open layout the cohort and comparison pages use: a run's
+              charts are the point of the page, not something to go looking for
+              behind a row of controls. */}
           {hasTimings && (
-            <ChartPanel context={chartContext} />
+            <ChartPanel
+              context={chartContext}
+              summaryLayout="long"
+              // A single run cannot be led, ranked against, or compared: a
+              // one-bar bar chart, a one-row sparkline table, and a rank table
+              // where everything is first say nothing the summary does not.
+              // The per-query matrix is the "Query timings" table below.
+              excludeChartIds={["performance_bar", "power_bar", "sparkline_table", "rank_table", "query_heatmap"]}
+            />
           )}
 
           <RunReceipt
@@ -444,6 +461,12 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
             <h2 class="mb-4 text-base font-semibold text-[var(--bb-data-fg-primary)]">
               Query timings ({detail.display_timings.length})
             </h2>
+            {/* The pass table below reports the same per-query median, next to
+                the passes it was reduced from, so this three-column table is
+                only worth rendering when this run published no pass data for
+                it to stand in for. */}
+            {passSummaryCount === 0 && (
+            <>
             <TableScrollHint scrollerRef={timingsScrollerRef} testId="detail-timings-scroll-hint" />
             <div ref={timingsScrollerRef} class="overflow-x-auto" data-testid="detail-timings-scroll-container">
               <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
@@ -485,9 +508,11 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
                 </tbody>
               </table>
             </div>
+            </>
+            )}
             {detail.queries.length > 0 && (
               <>
-              <PassStrip queries={detail.queries} />
+              <PassStrip queries={detail.queries} limit={PASS_STRIP_DETAIL_LIMIT} />
               {!isLocal && withinRunBases !== null && (
                 <p class="mb-6 text-sm">
                   <a
@@ -558,7 +583,6 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
           <MethodologyDisclosure detail={detail} />
 
           <ProvenanceLegend />
-        </div>
       </div>
     </div>
   );

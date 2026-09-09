@@ -136,7 +136,7 @@ describe("ResultDetail - median-first contract", () => {
     expect(screen.getByRole("link", { name: "Browse benchmarks" })).toHaveAttribute("href", "/results/benchmarks/");
   });
 
-  it("(a) default table shows one row per display_timing, not per raw query", async () => {
+  it("(a) reports one row per display_timing, from the pass table, not per raw sample", async () => {
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
@@ -144,25 +144,37 @@ describe("ResultDetail - median-first contract", () => {
     expect(screen.getByText("Query timings (2)")).toBeTruthy();
     await waitFor(() => expect(document.title).toBe("TPC-H · DuckDB · SF0.1 · BenchBox Results"));
 
-    // The main table uses the display timing contract, not raw samples.
-    expect(screen.getAllByText(/Median latency/i).length).toBeGreaterThan(0);
+    // The pass table reports the same per-query median next to the passes it
+    // was reduced from, so the three-column median table would only repeat it.
+    const passes = screen.getByRole("region", { name: "Passes within this run" });
+    expect(within(passes).getAllByText(/Warm median/i).length).toBeGreaterThan(0);
+    // header + Q1 + Q2 + the run totals row
+    expect(within(passes).getAllByRole("row")).toHaveLength(4);
+    expect(screen.queryByTestId("detail-timings-scroll-container")).toBeNull();
+  });
 
-    // Two data rows: Q1 and Q2 (one each from display_timings)
-    const q1Cells = screen.getAllByText("Q1");
-    const q2Cells = screen.getAllByText("Q2");
-    expect(q1Cells.length).toBeGreaterThanOrEqual(1);
-    expect(q2Cells.length).toBeGreaterThanOrEqual(1);
+  it("(a2) falls back to the median table for a run that published no passes", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ queries: [] }));
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    expect(screen.queryByRole("region", { name: "Passes within this run" })).toBeNull();
+    expect(screen.getByTestId("detail-timings-scroll-container")).toBeTruthy();
+    expect(screen.getAllByText(/Median latency/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Q1").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Q2").length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows the run age beside the result date and in the receipt", async () => {
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
-    expect(screen.getByLabelText(/Run age:/)).toBeTruthy();
+    expect(screen.getByTestId("run-date-chip").getAttribute("aria-label")).toMatch(/^Run date .* ago\)\./);
     expect(screen.getByRole("region", { name: "Run receipt" })).toHaveTextContent(/Run date.*ago/);
   });
 
   it("(b) sample_count cell matches display_timings[i].sample_count", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ queries: [] }));
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
@@ -250,7 +262,8 @@ describe("ResultDetail - median-first contract", () => {
     expect(screen.queryByTestId("within-run-compare-link")).toBeNull();
   });
 
-  it("announces sort state on native median and raw table controls", async () => {
+  it("announces sort state on the median table when it is the per-query view", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ queries: [] }));
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
@@ -258,6 +271,11 @@ describe("ResultDetail - median-first contract", () => {
     expect(medianHeader).toHaveAttribute("aria-sort", "none");
     fireEvent.click(within(medianHeader).getByRole("button"));
     expect(medianHeader).toHaveAttribute("aria-sort", "ascending");
+  });
+
+  it("announces sort state on the raw samples table controls", async () => {
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
     fireEvent.click(screen.getByText(/Individual samples \(6\)/i));
     const rawDurationHeader = screen.getByRole("columnheader", { name: /Duration/ });
@@ -273,24 +291,28 @@ describe("ResultDetail - median-first contract", () => {
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
-    expect(screen.getByText("Charts")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Query Histogram" })).toBeTruthy();
+    // Every applicable chart is on the page at once; none is behind a control.
+    expect(screen.getByTestId("chart-panel-long")).toBeTruthy();
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.getByTestId("chart-panel-chart-query_histogram")).toBeTruthy();
   });
 
   it("renders primary summary and actions before the run receipt", async () => {
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
+    const header = screen.getByTestId("page-header");
     const summary = screen.getByRole("region", { name: "Result summary" });
     const receipt = screen.getByRole("region", { name: "Run receipt" });
-    const chartsHeading = screen.getByText("Charts");
+    const charts = screen.getByTestId("chart-panel-long");
 
     expect(summary).toHaveTextContent("Primary metric · higher is better");
     expect(summary).toHaveTextContent("Power score");
-    expect(summary).toHaveTextContent("Public ID r1");
-    expect(within(summary).getByRole("link", { name: "Find a run to compare" })).toHaveAttribute("href", "/results/query?pick=r1");
+    // Run identity and the page's actions belong to the shared page header.
+    expect(header).toHaveTextContent("Public ID r1");
+    expect(within(header).getByRole("link", { name: "Find a run to compare" })).toHaveAttribute("href", "/results/query?pick=r1");
     expect(summary.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(chartsHeading.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(charts.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(receipt).toHaveTextContent("Measurement samples");
     expect(receipt).toHaveTextContent("Download bundle");
   });
@@ -314,7 +336,7 @@ describe("ResultDetail - median-first contract", () => {
     expect(summary).not.toHaveTextContent("Primary metric");
     expect(summary).not.toHaveTextContent("N/A");
     expect(screen.queryByRole("heading", { name: /Query Timings/ })).toBeNull();
-    expect(screen.queryByText("Charts")).toBeNull();
+    expect(screen.queryByTestId("chart-panel-long")).toBeNull();
     expect(screen.getByRole("region", { name: "Run receipt" })).toBeTruthy();
   });
 
@@ -323,17 +345,15 @@ describe("ResultDetail - median-first contract", () => {
 
     const passing = render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
-    expect(
-      screen.getByRole("region", { name: "Result summary" }).querySelector('[data-role="validation"]'),
-    ).toBeNull();
+    expect(screen.getByTestId("page-header").querySelector('[data-role="validation"]')).toBeNull();
 
     passing.unmount();
     vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ validation_status: "failed" }));
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
-    expect(
-      screen.getByRole("region", { name: "Result summary" }).querySelector('[data-role="validation"]'),
-    ).toHaveTextContent("failed");
+    expect(screen.getByTestId("page-header").querySelector('[data-role="validation"]')).toHaveTextContent(
+      "failed",
+    );
   });
 
   it("uses scan precision in the primary summary while keeping exact power score available", async () => {

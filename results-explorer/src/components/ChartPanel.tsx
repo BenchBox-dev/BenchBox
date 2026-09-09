@@ -570,7 +570,25 @@ function longLayoutGroupCopy(group: { id: string; label: string; description: st
   return LONG_LAYOUT_GROUP_COPY[group.id] ?? group;
 }
 
-function longLayoutChartCopy(chart: ChartRegistryEntry) {
+// A single run has nothing to lead and no difference to drive, so the few
+// cohort-shaped questions get a run-shaped one instead.
+const SINGLE_RUN_CHART_COPY: Readonly<Record<string, { title: string; description: string }>> = {
+  query_heatmap: {
+    title: "How long did each query take?",
+    description: "Per-query latency for this run. Lower is better.",
+  },
+  summary_box: {
+    title: "What did this run record?",
+    description: "Aggregate geomean, total time, and per-query outcome counts.",
+  },
+  distribution_box: {
+    title: "How wide is the query-latency spread?",
+    description: "Variation across queries in this run, not run-to-run variability.",
+  },
+};
+
+function longLayoutChartCopy(chart: ChartRegistryEntry, singleRun = false) {
+  if (singleRun && SINGLE_RUN_CHART_COPY[chart.id]) return SINGLE_RUN_CHART_COPY[chart.id]!;
   return LONG_LAYOUT_CHART_COPY[chart.id] ?? {
     title: chart.title,
     description: chart.description,
@@ -632,6 +650,7 @@ function ChartPanelLong({
     !isBaselineControlled &&
     context.kind === "compare" &&
     charts.some((chart) => chart.id === "normalized_speedup" || chart.id === "diverging_bar");
+  const singleRun = context.kind === "detail";
 
   return (
     <section class="card" data-testid="chart-panel-long">
@@ -686,6 +705,7 @@ function ChartPanelLong({
                   suppressWinnerClaims={suppressWinnerClaims}
                   suppressionReason={suppressionReason}
                   queryFilter={queryFilter}
+                  singleRun={singleRun}
                 />
               ))}
             </div>
@@ -706,6 +726,7 @@ function ChartFigure({
   suppressWinnerClaims = false,
   suppressionReason,
   queryFilter,
+  singleRun = false,
 }: {
   chart: ChartRegistryEntry;
   context: ChartContext;
@@ -715,6 +736,7 @@ function ChartFigure({
   suppressWinnerClaims?: boolean;
   suppressionReason?: string;
   queryFilter?: readonly string[];
+  singleRun?: boolean;
 }) {
   const chartSummary = useMemo(
     () => buildChartSummary(summary, chart.eligibilityClass, queryFilter),
@@ -751,7 +773,7 @@ function ChartFigure({
   );
   const datasetEmpty = shouldShowChartDatasetEmpty(chart.eligibilityClass, summary, chartSummary);
   const fewUsableQueries = Boolean(queryFilter && (chartSummary?.query_ids.length ?? 0) < 2);
-  const copy = longLayoutChartCopy(chart);
+  const copy = longLayoutChartCopy(chart, singleRun);
 
   return (
     <div data-chart-container data-chart-id={chart.id} data-testid={`chart-panel-chart-${chart.id}`}>

@@ -207,11 +207,14 @@ test.describe("responsive explorer assertions", () => {
     await expect.poll(() => queryResults.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
     await expect(page.getByTestId("query-results-scroll-hint")).toBeVisible();
 
+    // A run that published passes reports them in the pass table; the
+    // three-column median table only stands in when it has nothing to show.
     await page.goto(`/results/r/${DETAIL_ID}`);
     await waitForDataLoaded(page, /Query timings/i);
-    const timings = page.getByTestId("detail-timings-scroll-container");
-    await expect.poll(() => timings.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(false);
-    await expect(page.getByTestId("detail-timings-scroll-hint")).toHaveCount(0);
+    await expect(page.getByTestId("detail-timings-scroll-container")).toHaveCount(0);
+    const passes = page.getByTestId("detail-passes-scroll-container");
+    await expect.poll(() => passes.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(false);
+    await expect(page.getByTestId("detail-passes-scroll-hint")).toHaveCount(0);
   });
 
   for (const viewport of VIEWPORTS.filter((item) => item.width <= 768)) {
@@ -233,7 +236,7 @@ test.describe("responsive explorer assertions", () => {
 
       await page.goto(`/results/r/${DETAIL_ID}`);
       await waitForDataLoaded(page, /Query timings/i);
-      await expectScrollAffordance(page, "detail-timings-scroll-container", "detail-timings-scroll-hint");
+      await expectScrollAffordance(page, "detail-passes-scroll-container", "detail-passes-scroll-hint");
 
       await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DATAFUSION}`);
       await waitForDataLoaded(page, /TPC-H Comparison/i);
