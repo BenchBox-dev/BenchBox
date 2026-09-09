@@ -208,7 +208,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("Compare", () => {
-  it("sends a pinned run to Query without losing its ID", async () => {
+  it("shows the ranking table when a single run is pinned", async () => {
     setupUrl(["a556e716"]);
     vi.mocked(resolveShortId).mockResolvedValue("tpch-duckdb-sf0.01-20260403-7fe93365");
     vi.mocked(getDetailResult).mockResolvedValue(DUCKDB);
@@ -223,13 +223,10 @@ describe("Compare", () => {
 
     render(<Compare />);
 
-    await waitFor(() => expect(screen.getByTestId("compare-picker-launch")).toBeTruthy());
-    expect(screen.getByRole("heading", { name: "Find another run" })).toBeTruthy();
-    expect(screen.getByText(/One run is selected/)).toBeTruthy();
-    expect(screen.getByTestId("compare-picker-query-link")).toHaveAttribute(
-      "href",
-      "/results/query?pick=tpch-duckdb-sf0.01-20260403-7fe93365",
-    );
+    // One run is not a comparison, so the compare route falls back to the
+    // ranking table rather than to a page whose only content was a link.
+    await waitFor(() => expect(screen.getByTestId("home-hero-filter-band")).toBeTruthy());
+    expect(screen.getByRole("heading", { level: 1, name: "Compare benchmark results" })).toBeTruthy();
     expect(route).not.toHaveBeenCalledWith(expect.stringMatching(/^\/results\/r\//), true);
   });
 
@@ -365,14 +362,13 @@ describe("Compare", () => {
     expect(new URL(window.location.href).searchParams.get("ids")).toBe("r1,r2,r3");
   });
 
-  it("offers a direct path to find runs when no IDs are provided", async () => {
+  it("shows the ranking table when no IDs are provided", async () => {
     setupUrl([]);
 
     render(<Compare />);
 
-    await waitFor(() => expect(screen.getByTestId("compare-picker-launch")).toBeTruthy());
-    expect(screen.getByRole("heading", { name: "Choose runs to compare" })).toBeTruthy();
-    expect(screen.getByTestId("compare-picker-query-link")).toHaveAttribute("href", "/results/query");
+    await waitFor(() => expect(screen.getByTestId("home-hero-filter-band")).toBeTruthy());
+    expect(screen.getByRole("heading", { level: 1, name: "Compare benchmark results" })).toBeTruthy();
     expect(screen.queryByText(/Add \?ids=/)).toBeNull();
     expect(route).not.toHaveBeenCalled();
   });

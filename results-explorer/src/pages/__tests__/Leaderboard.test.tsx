@@ -13,279 +13,8 @@ import {
   clearExplorerPerformanceEntriesForTests,
 } from "@/lib/performanceMarks";
 import { toggleFacetValue } from "@/lib/facetMatching";
-import { HOME_SHELL_GEOMETRY_CLASSES, Home } from "@/pages/Home";
-
-const TIMING_ELIGIBLE = {
-  has_display_timing: true,
-  valid_query_count: 2,
-  missing_query_count: 0,
-  zero_timing_count: 0,
-  display_exclusion_reason: null,
-  comparison_exclusion_reason: null,
-  ranking_exclusion_reason: null,
-};
-
-/**
- * ResultRow fixtures - shape mirrors the explicit `bench.results` projection
- * used by `listResults()`.
- */
-const RESULT_ROWS = [
-  {
-    result_id: "r1",
-    benchmark: "clickbench",
-    scale_factor: 0.1,
-    platform: "DuckDB",
-    platform_id: "duckdb",
-    driver_version: null,
-    run_date: "2026-04-17T12:00:00Z",
-    power_score: null,
-    total_duration_s: 12,
-    geomean_ms: 10,
-    display_geomean_ms: 10,
-    query_count: 2,
-    ...TIMING_ELIGIBLE,
-    trust_label: "maintainer-run",
-    visibility: "public-curated",
-    platform_version: null,
-    execution_mode: "sql",
-    tuning_mode: "tuned",
-    tuning_hash: null,
-    test_type: "power",
-    validation_status: "exact",
-    cost_usd: 1.1,
-    normalized_cost_usd: 1.1,
-    cost_status: "normalized",
-    cost_scope: "compute_only",
-    cost_model_version: "2026.05.0",
-    deployment_class: "cloud",
-    cloud_provider: "aws",
-    cloud_region: "us-east-1",
-    instance_or_warehouse: "MEDIUM",
-    warehouse_size: "MEDIUM",
-    storage_format: "parquet",
-    compliance_class: null,
-    is_ranking_eligible: true,
-    has_plans: false,
-    plans_published: false,
-    has_tuning: true,
-    bundle_download_url: "",
-  },
-  {
-    result_id: "r2",
-    benchmark: "clickbench",
-    scale_factor: 0.1,
-    platform: "SQLite",
-    platform_id: "sqlite",
-    driver_version: null,
-    run_date: "2026-04-17T12:00:00Z",
-    power_score: null,
-    total_duration_s: 24,
-    geomean_ms: 20,
-    display_geomean_ms: 20,
-    query_count: 2,
-    ...TIMING_ELIGIBLE,
-    trust_label: "community-submission",
-    visibility: "public-curated",
-    platform_version: null,
-    execution_mode: "sql",
-    tuning_mode: "auto",
-    tuning_hash: null,
-    test_type: "power",
-    validation_status: "exact",
-    cost_usd: 2.3,
-    normalized_cost_usd: null,
-    cost_status: "not_applicable_local",
-    cost_scope: null,
-    cost_model_version: null,
-    deployment_class: "local",
-    cloud_provider: null,
-    cloud_region: null,
-    instance_or_warehouse: null,
-    warehouse_size: null,
-    storage_format: null,
-    compliance_class: null,
-    is_ranking_eligible: true,
-    has_plans: false,
-    plans_published: false,
-    has_tuning: false,
-    bundle_download_url: "",
-  },
-  {
-    result_id: "r3",
-    benchmark: "tpch",
-    scale_factor: 1,
-    platform: "DuckDB",
-    platform_id: "duckdb",
-    driver_version: null,
-    run_date: "2026-04-16T12:00:00Z",
-    power_score: 3000,
-    total_duration_s: 60,
-    geomean_ms: 30,
-    display_geomean_ms: 30,
-    query_count: 22,
-    has_display_timing: true,
-    valid_query_count: 22,
-    missing_query_count: 0,
-    zero_timing_count: 0,
-    display_exclusion_reason: null,
-    comparison_exclusion_reason: null,
-    ranking_exclusion_reason: null,
-    trust_label: "maintainer-run",
-    visibility: "public-curated",
-    platform_version: null,
-    execution_mode: "sql",
-    tuning_mode: "tuned",
-    tuning_hash: null,
-    test_type: "power",
-    validation_status: "exact",
-    cost_usd: 5.5,
-    normalized_cost_usd: 5.5,
-    cost_status: "normalized",
-    cost_scope: "compute_only",
-    cost_model_version: "2026.05.0",
-    deployment_class: "cloud",
-    cloud_provider: "gcp",
-    cloud_region: "us-central1",
-    instance_or_warehouse: "LARGE",
-    warehouse_size: "LARGE",
-    storage_format: "parquet",
-    compliance_class: null,
-    is_ranking_eligible: true,
-    has_plans: false,
-    plans_published: false,
-    has_tuning: true,
-    bundle_download_url: "",
-  },
-  {
-    result_id: "r4",
-    benchmark: "star_schema",
-    scale_factor: 1,
-    platform: "Postgres",
-    platform_id: "postgres",
-    driver_version: null,
-    run_date: "2026-04-15T12:00:00Z",
-    power_score: null,
-    total_duration_s: 42,
-    geomean_ms: 21,
-    display_geomean_ms: 21,
-    query_count: 13,
-    ...TIMING_ELIGIBLE,
-    trust_label: "maintainer-run",
-    visibility: "public-curated",
-    platform_version: null,
-    execution_mode: "sql",
-    tuning_mode: null,
-    tuning_hash: null,
-    test_type: "power",
-    validation_status: "exact",
-    cost_usd: null,
-    normalized_cost_usd: null,
-    cost_status: "not_applicable_local",
-    cost_scope: null,
-    cost_model_version: null,
-    deployment_class: "local",
-    cloud_provider: null,
-    cloud_region: null,
-    instance_or_warehouse: null,
-    warehouse_size: null,
-    storage_format: null,
-    compliance_class: null,
-    is_ranking_eligible: true,
-    has_plans: false,
-    plans_published: false,
-    has_tuning: false,
-    bundle_download_url: "",
-  },
-];
-
-/** Per-platform summary rows - shape mirrors `bench.meta_leaderboard`. */
-const META_LEADERBOARD_ROWS = [
-  { platform_id: "duckdb", platform: "DuckDB", avg_rank: 1, n_cohorts: 2 },
-  { platform_id: "sqlite", platform: "SQLite", avg_rank: 2, n_cohorts: 1 },
-];
-
-/**
- * Per-variant cohort rows - shape mirrors `bench.cohort_metadata`.
- * The pivot in `getMetaLeaderboardData` reconstructs the nested MetaLeaderboard
- * from these rows.
- */
-const COHORT_ROWS = [
-  {
-    cohort_key: "clickbench-sf0.1-power",
-    benchmark: "clickbench",
-    scale_factor: 0.1,
-    phase: "power",
-    cohort_label: "ClickBench SF0.1",
-    cohort_href: "/results/clickbench/",
-    platform_count: 2,
-    cohort_ranked_count: 2,
-    cohort_ranking_exclusion_reason: null,
-    primary_metric: "display_geomean_ms",
-    primary_order: "asc",
-    platform_id: "duckdb",
-    platform: "DuckDB",
-    result_id: "r1",
-    short_id: "",
-    tuning_mode: "tuned",
-    trust_label: "maintainer-run",
-    ...TIMING_ELIGIBLE,
-    rank: 1,
-    metric_value: 10,
-    speedup_vs_best: 1,
-  },
-  {
-    cohort_key: "clickbench-sf0.1-power",
-    benchmark: "clickbench",
-    scale_factor: 0.1,
-    phase: "power",
-    cohort_label: "ClickBench SF0.1",
-    cohort_href: "/results/clickbench/",
-    platform_count: 2,
-    cohort_ranked_count: 2,
-    cohort_ranking_exclusion_reason: null,
-    primary_metric: "display_geomean_ms",
-    primary_order: "asc",
-    platform_id: "sqlite",
-    platform: "SQLite",
-    result_id: "r2",
-    short_id: "",
-    tuning_mode: "auto",
-    trust_label: "community-submission",
-    ...TIMING_ELIGIBLE,
-    rank: 2,
-    metric_value: 20,
-    speedup_vs_best: 0.5,
-  },
-  {
-    cohort_key: "tpch-sf1-power",
-    benchmark: "tpch",
-    scale_factor: 1,
-    phase: "power",
-    cohort_label: "TPC-H SF1",
-    cohort_href: "/results/tpch/",
-    platform_count: 1,
-    cohort_ranked_count: 1,
-    cohort_ranking_exclusion_reason: null,
-    primary_metric: "power_score",
-    primary_order: "desc",
-    platform_id: "duckdb",
-    platform: "DuckDB",
-    result_id: "r3",
-    short_id: "",
-    tuning_mode: "tuned",
-    trust_label: "maintainer-run",
-    has_display_timing: true,
-    valid_query_count: 22,
-    missing_query_count: 0,
-    zero_timing_count: 0,
-    display_exclusion_reason: null,
-    comparison_exclusion_reason: null,
-    ranking_exclusion_reason: null,
-    rank: 1,
-    metric_value: 3000,
-    speedup_vs_best: 1,
-  },
-];
+import { LEADERBOARD_SHELL_GEOMETRY_CLASSES, Leaderboard } from "@/pages/Leaderboard";
+import { COHORT_ROWS, META_LEADERBOARD_ROWS, RESULT_ROWS } from "./fixtures/corpus";
 
 function deferred<T>() {
   let resolve: (value: T) => void = () => {};
@@ -315,7 +44,7 @@ beforeEach(() => {
   });
 });
 
-describe("Home", () => {
+describe("Leaderboard", () => {
   it("keeps the leaderboard shell stable until a no-leaderboard snapshot finishes loading", async () => {
     const resultRows = deferred<typeof RESULT_ROWS>();
     vi.mocked(queryRows).mockImplementation(async (sql: string) => {
@@ -326,7 +55,7 @@ describe("Home", () => {
       return [];
     });
 
-    render(<Home />);
+    render(<Leaderboard />);
 
     await waitFor(() => {
       expect(performance.getEntriesByName(EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_READY, "mark"))
@@ -339,40 +68,14 @@ describe("Home", () => {
     );
 
     resultRows.resolve(RESULT_ROWS);
-    await waitFor(() => expect(screen.getByText("Recent results")).toBeTruthy());
-    expect(document.title).toBe("Results · BenchBox");
+    await waitFor(() =>
+      expect(screen.queryByRole("region", { name: "Cross-benchmark leaderboard loading" })).toBeNull(),
+    );
+    expect(document.title).toBe("Compare benchmark results · BenchBox");
     expect(screen.queryByText("Initializing static DuckDB snapshot...")).toBeNull();
     expect(screen.queryByText("Cross-benchmark rankings")).toBeNull();
   });
 
-  it("shows normalized cost in recent results only when normalized cost metadata is present", async () => {
-    const rows = RESULT_ROWS.map((row, index) =>
-      index === 0
-        ? {
-            ...row,
-            normalized_cost_usd: 1.1,
-            cost_status: "normalized",
-            cost_scope: "compute_only",
-            cost_model_version: "2026.05.0",
-          }
-        : row,
-    );
-    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
-      const s = String(sql).replace(/\s+/g, " ").trim();
-      if (s.includes("FROM bench.results")) return rows;
-      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
-        return [];
-      }
-      if (s.includes("FROM bench.cohort_metadata")) return [];
-      return [];
-    });
-
-    render(<Home />);
-
-    await waitFor(() => expect(screen.getByText("Recent results")).toBeTruthy());
-    expect(screen.getByText("Normalized cost")).toBeTruthy();
-    expect(screen.getByText("$1.10")).toBeTruthy();
-  });
 
   it("keeps the loading state while an empty result snapshot conflicts with leaderboard metadata", async () => {
     const metaRows = deferred<typeof META_LEADERBOARD_ROWS>();
@@ -395,11 +98,11 @@ describe("Home", () => {
       return [];
     });
 
-    render(<Home />);
+    render(<Leaderboard />);
 
     await waitFor(() => expect(resultCalls).toBe(1));
     await waitFor(() => expect(screen.getByText("Initializing static DuckDB snapshot...")).toBeTruthy());
-    // Headline stability is enforced by HOME_SHELL_GEOMETRY_CLASSES.
+    // Headline stability is enforced by LEADERBOARD_SHELL_GEOMETRY_CLASSES.
     expect(screen.getByRole("heading", { level: 1, name: "Compare benchmark results" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toHaveAttribute(
       "aria-busy",
@@ -441,7 +144,7 @@ describe("Home", () => {
       return [];
     });
 
-    render(<Home />);
+    render(<Leaderboard />);
 
     await waitFor(() => expect(resultCalls).toBe(2));
     expect(screen.getByText("Could not load all results")).toBeTruthy();
@@ -451,7 +154,7 @@ describe("Home", () => {
   });
 
   it("renders the leaderboard-first product identity and dense cohort controls", async () => {
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     expect(screen.getByRole("heading", { level: 1, name: "Compare benchmark results" })).toBeTruthy();
@@ -471,71 +174,8 @@ describe("Home", () => {
     expect(within(selector).getByRole("button", { name: /not recorded/i })).toBeTruthy();
   });
 
-  it("distinguishes supported benchmark coverage from published public corpus counts", async () => {
-    render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
-    const summary = screen.getByRole("region", { name: "Corpus summary" });
-    expect(within(summary).getByText("supported benchmarks")).toBeTruthy();
-    expect(within(summary).getByText("3 with public results")).toBeTruthy();
-    expect(within(summary).getByText("published runs")).toBeTruthy();
-    expect(within(summary).getByText("platforms with public results")).toBeTruthy();
-    expect(within(summary).getByText("leaderboard rankings")).toBeTruthy();
-    expect(within(summary).getByText("2 visible; 2/2 ranked-scope platforms")).toBeTruthy();
-    expect(within(summary).queryByText(/^Benchmarks$/)).toBeNull();
-  });
 
-  it("renders singular Corpus Summary labels when the count is one", async () => {
-    const singleCohort = COHORT_ROWS.filter((row) => row.cohort_key === "tpch-sf1-power");
-    const singleResultRow = RESULT_ROWS.filter((row) => row.result_id === "r3");
-    const singleMetaLeaderboard = [{ platform_id: "duckdb", platform: "DuckDB", avg_rank: 1, n_cohorts: 1 }];
-    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
-      const s = String(sql).replace(/\s+/g, " ").trim();
-      if (s.includes("FROM bench.results")) return singleResultRow;
-      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
-        return singleMetaLeaderboard;
-      }
-      if (s.includes("FROM bench.cohort_metadata")) return singleCohort;
-      return [];
-    });
-
-    render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
-
-    const summary = screen.getByRole("region", { name: "Corpus summary" });
-    expect(within(summary).getByText("published run")).toBeTruthy();
-    expect(within(summary).queryByText("published runs")).toBeNull();
-    expect(within(summary).getByText("platform with public results")).toBeTruthy();
-    expect(within(summary).queryByText("platforms with public results")).toBeNull();
-    expect(within(summary).getByText("leaderboard ranking")).toBeTruthy();
-    expect(within(summary).queryByText("leaderboard rankings")).toBeNull();
-    expect(
-      screen.getByText("1 public benchmark set. Leaderboard filters above include 1 ranked leaderboard."),
-    ).toBeTruthy();
-    expect(
-      screen.getByText("1 published platform ID in the public corpus, independent of current leaderboard coverage."),
-    ).toBeTruthy();
-  });
-
-  it("renders plural Corpus Summary labels when no leaderboard rankings exist", async () => {
-    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
-      const s = String(sql).replace(/\s+/g, " ").trim();
-      if (s.includes("FROM bench.results")) return RESULT_ROWS;
-      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
-        return META_LEADERBOARD_ROWS;
-      }
-      if (s.includes("FROM bench.cohort_metadata")) return [];
-      return [];
-    });
-
-    render(<Home />);
-    await waitFor(() => expect(screen.getByText("Recent results")).toBeTruthy());
-
-    const summary = screen.getByRole("region", { name: "Corpus summary" });
-    // 0 cohorts must read as "0 leaderboard rankings", not "0 leaderboard ranking".
-    expect(within(summary).getByText("leaderboard rankings")).toBeTruthy();
-    expect(within(summary).queryByText(/^leaderboard ranking$/)).toBeNull();
-  });
 
   it("keeps tuning metadata visible while hiding a non-discriminating tuning filter", async () => {
     const unlabelledRows = RESULT_ROWS.map((row) => ({ ...row, tuning_mode: null }));
@@ -549,7 +189,7 @@ describe("Home", () => {
       return [];
     });
 
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const selector = screen.getByRole("region", { name: "Leaderboard ranking selector" });
@@ -562,7 +202,7 @@ describe("Home", () => {
   });
 
   it("states leaderboard cohort scope separately from public browse scope", async () => {
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     expect(screen.getByText("Showing 2 of 2 ranked-scope platforms across 2 leaderboard rankings")).toBeTruthy();
@@ -570,11 +210,6 @@ describe("Home", () => {
     expect(screen.getAllByText(/SSB/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/1 published platform is not represented in the rankings/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/1 of 4 public results is not recorded for tuning/).length).toBeGreaterThan(0);
-    expect(screen.getByRole("heading", { name: "Browse public benchmark results" })).toBeTruthy();
-    expect(
-      screen.getByText("3 public benchmark sets. Leaderboard filters above include 2 ranked leaderboards."),
-    ).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Browse public platform results" })).toBeTruthy();
   });
 
   it("does not describe mixed ranked and unranked leaderboard evidence totals as ranked", async () => {
@@ -622,7 +257,7 @@ describe("Home", () => {
       return [];
     });
 
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const selector = screen.getByRole("region", { name: "Leaderboard ranking selector" });
@@ -636,7 +271,7 @@ describe("Home", () => {
   });
 
   it("keeps the home filter band on the dark surface and data sections on the light surface", async () => {
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const hero = screen.getByTestId("home-hero-filter-band");
@@ -674,27 +309,27 @@ describe("Home", () => {
         screen.queryByTestId("leaderboard-advanced-filters") ??
         screen.getByTestId("home-loading-advanced-details-reserve");
       const pairs: Array<[HTMLElement, string]> = [
-        [screen.getByTestId("home-hero-filter-band"), HOME_SHELL_GEOMETRY_CLASSES.heroSurface],
-        [screen.getByTestId("home-hero-wrapper"), HOME_SHELL_GEOMETRY_CLASSES.heroWrapper],
-        [screen.getByTestId("home-hero-intro"), HOME_SHELL_GEOMETRY_CLASSES.heroIntro],
+        [screen.getByTestId("home-hero-filter-band"), LEADERBOARD_SHELL_GEOMETRY_CLASSES.heroSurface],
+        [screen.getByTestId("home-hero-wrapper"), LEADERBOARD_SHELL_GEOMETRY_CLASSES.heroWrapper],
+        [screen.getByTestId("home-hero-intro"), LEADERBOARD_SHELL_GEOMETRY_CLASSES.heroIntro],
         [
           screen.getByRole("heading", { level: 1, name: "Compare benchmark results" }),
-          HOME_SHELL_GEOMETRY_CLASSES.headline,
+          LEADERBOARD_SHELL_GEOMETRY_CLASSES.headline,
         ],
         [
           screen.getByText(
             "See how published platform runs compare across BenchBox rankings. Open any result to inspect its evidence.",
           ),
-          HOME_SHELL_GEOMETRY_CLASSES.subtitle,
+          LEADERBOARD_SHELL_GEOMETRY_CLASSES.subtitle,
         ],
         [
           screen.getByRole("region", { name: "Leaderboard ranking selector" }),
-          HOME_SHELL_GEOMETRY_CLASSES.rankingSelector,
+          LEADERBOARD_SHELL_GEOMETRY_CLASSES.rankingSelector,
         ],
-        [screen.getByTestId("home-ranking-selector-grid"), HOME_SHELL_GEOMETRY_CLASSES.rankingGrid],
-        [scopeDetails, HOME_SHELL_GEOMETRY_CLASSES.scopeDetails],
-        [advancedDetails, HOME_SHELL_GEOMETRY_CLASSES.advancedDetails],
-        [screen.getByTestId("home-data-surface"), HOME_SHELL_GEOMETRY_CLASSES.dataSurface],
+        [screen.getByTestId("home-ranking-selector-grid"), LEADERBOARD_SHELL_GEOMETRY_CLASSES.rankingGrid],
+        [scopeDetails, LEADERBOARD_SHELL_GEOMETRY_CLASSES.scopeDetails],
+        [advancedDetails, LEADERBOARD_SHELL_GEOMETRY_CLASSES.advancedDetails],
+        [screen.getByTestId("home-data-surface"), LEADERBOARD_SHELL_GEOMETRY_CLASSES.dataSurface],
       ];
 
       for (const [element, expectedClasses] of pairs) {
@@ -702,7 +337,7 @@ describe("Home", () => {
       }
     };
 
-    render(<Home />);
+    render(<Leaderboard />);
 
     expectSharedGeometry();
     expect(screen.queryByRole("region", { name: "Active leaderboard filters" })).toBeNull();
@@ -718,24 +353,20 @@ describe("Home", () => {
     expect(screen.getByText("What counts as a ranked result?")).toBeTruthy();
   });
 
-  it("keeps the leaderboard region before secondary workflow and recent-result sections", async () => {
-    render(<Home />);
+  it("keeps the ranking selector between the headline and the matrix", async () => {
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const headline = screen.getByRole("heading", { level: 1, name: "Compare benchmark results" });
     const leaderboard = screen.getByRole("region", { name: "Cross-benchmark rankings" });
     const selector = screen.getByRole("region", { name: "Leaderboard ranking selector" });
-    const workflow = screen.getByRole("navigation", { name: "Result contribution workflow" });
-    const recentHeading = screen.getByRole("heading", { name: "Recent results" });
 
     expectDocumentOrder(headline, selector);
     expectDocumentOrder(selector, leaderboard);
-    expectDocumentOrder(leaderboard, workflow);
-    expectDocumentOrder(leaderboard, recentHeading);
   });
 
   it("records first leaderboard data and render performance entries", async () => {
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     await waitFor(() => {
@@ -750,10 +381,10 @@ describe("Home", () => {
     });
   });
 
-  it("restores and updates Home leaderboard mode through the URL", async () => {
+  it("restores and updates the leaderboard mode through the URL", async () => {
     window.history.replaceState(null, "", "/results/");
 
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     expect(screen.getByRole("radio", { name: "Relative to best" }).getAttribute("aria-checked")).toBe("true");
@@ -772,7 +403,7 @@ describe("Home", () => {
   });
 
   it("renders a Compare entrypoint inside the leaderboard ranking selector", async () => {
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const entrypoint = screen.getByTestId("home-compare-entrypoint");
@@ -781,27 +412,9 @@ describe("Home", () => {
     expect(selector.contains(entrypoint)).toBe(true);
   });
 
-  it("renders a compact run-compare-submit workflow near the leaderboard", async () => {
-    render(<Home />);
-    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
-
-    expect(screen.getByText("Run, compare, and submit")).toBeTruthy();
-    const workflow = screen.getByRole("navigation", { name: "Result contribution workflow" });
-    const runLink = within(workflow).getByRole("link", { name: "Run a benchmark" });
-    expect(runLink).toHaveAttribute("href", "/docs/usage/installation.html");
-    expect(runLink).toHaveAttribute("data-native", "true");
-    expect(within(workflow).getByRole("link", { name: "Compare your result" })).toHaveAttribute(
-      "href",
-      "/results/query",
-    );
-    const submitLink = within(workflow).getByRole("link", { name: "Submit a bundle" });
-    expect(submitLink).toHaveAttribute("href", "/docs/contributing-results.html");
-    expect(submitLink).toHaveAttribute("data-native", "true");
-    expect(screen.queryByText("Run BenchBox on your platform and submit your results")).toBeNull();
-  });
 
   it("treats a benchmark selector change as isolate-not-exclude from the default all state", async () => {
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
@@ -819,7 +432,7 @@ describe("Home", () => {
   it("shows active facet combination and targeted reset actions when filters remove all coverage", async () => {
     window.history.replaceState(null, "", "/results/?sf=999&platform=duckdb");
 
-    render(<Home />);
+    render(<Leaderboard />);
 
     const emptyState = await screen.findByRole("region", {
       name: "No leaderboard cells match the current filters",
@@ -842,14 +455,14 @@ describe("Home", () => {
     expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy();
   });
 
-  it("restores canonical URL facets and applies them to the Home result query", async () => {
+  it("restores canonical URL facets and applies them to the leaderboard result query", async () => {
     window.history.replaceState(
       null,
       "",
       "/results/?benchmark=clickbench&sf=0.1&phase=power&platform=DuckDB&deployment=cloud&cost_status=normalized",
     );
 
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
@@ -883,7 +496,7 @@ describe("Home", () => {
       "/results/?bm=clickbench&scale_factor=0.1&trust_tier=maintainer-run",
     );
 
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     await waitFor(() => {
@@ -903,7 +516,7 @@ describe("Home", () => {
   });
 
   it("surfaces leaderboard receipt links with trust and validation metadata", async () => {
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
@@ -918,7 +531,7 @@ describe("Home", () => {
 
 
   it("filters the matrix by trust tier and preserves tuning in cohort links", async () => {
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
@@ -958,7 +571,7 @@ describe("Home", () => {
       return [];
     });
 
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
@@ -1012,7 +625,7 @@ describe("toggleFacetValue (w13)", () => {
       return [];
     });
 
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
     const grid = screen.getByTestId("home-ranking-selector-grid");
     expect(within(grid).getByText("Platform version")).toBeTruthy();
@@ -1039,7 +652,7 @@ describe("toggleFacetValue (w13)", () => {
       return [];
     });
 
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const versionControl = screen.getByRole("combobox", { name: "Platform version" });
@@ -1069,7 +682,7 @@ describe("toggleFacetValue (w13)", () => {
       return [];
     });
 
-    render(<Home />);
+    render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
     const activeFilters = screen.getByLabelText("Active filter chips");

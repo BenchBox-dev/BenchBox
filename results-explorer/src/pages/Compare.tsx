@@ -15,7 +15,6 @@ import { resultDetailHref, visibleResultIdForRow, MAX_COMPARE_SELECTIONS } from 
 import { formatRunIdentitiesForCohort, type RunIdentitySource } from "@/lib/runIdentity";
 import { CompareSummarySkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
-import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
 import { TuningBadge } from "@/components/TuningBadge";
@@ -67,6 +66,7 @@ import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
 import { RunDateChip } from "@/components/RunAge";
 import { PageHeader } from "@/components/PageHeader";
+import { Leaderboard } from "@/pages/Leaderboard";
 import { Select } from "@/components/Select";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
@@ -191,7 +191,6 @@ export function Compare({ url }: CompareProps) {
   // Was previously an error string ("No result IDs provided. Add ?ids=...")
   // or a silent redirect back to ResultDetail; both forced URL editing or
   // dead-ended the user on the page they came from.
-  const [builderPinnedId, setBuilderPinnedId] = useState<string | null>(null);
   const [showBuilder, setShowBuilder] = useState(false);
   const [compareNotice, setCompareNotice] = useState<string | null>(null);
   const [preserveRequestedIds, setPreserveRequestedIds] = useState(false);
@@ -266,7 +265,6 @@ export function Compare({ url }: CompareProps) {
     setCompareState(null);
     setError(null);
     setLoading(true);
-    setBuilderPinnedId(null);
     setShowBuilder(false);
     setCompareNotice(null);
     setPreserveRequestedIds(false);
@@ -285,7 +283,6 @@ export function Compare({ url }: CompareProps) {
 
     if (ids.length === 0) {
       setShowBuilder(true);
-      setBuilderPinnedId(null);
       setLoading(false);
       return () => {
         cancelled = true;
@@ -308,7 +305,6 @@ export function Compare({ url }: CompareProps) {
           }
           // Keep this run selected and send the reader to the shared run
           // finder instead of returning to the page they came from.
-          setBuilderPinnedId(resolvedId);
           setShowBuilder(true);
           setLoading(false);
         })
@@ -383,7 +379,6 @@ export function Compare({ url }: CompareProps) {
         const metric = await getPrimaryMetricForBenchmark(details[0]!.benchmark);
         if (cancelled) return;
         if (details.length === 1) {
-          setBuilderPinnedId(details[0]!.result_id);
           setShowBuilder(true);
         } else {
           setShowBuilder(false);
@@ -478,8 +473,11 @@ export function Compare({ url }: CompareProps) {
       </div>
     );
 
+  // The compare route with nothing selected is where a reader arrives wanting
+  // to rank runs against each other. The ranking table and its filters answer
+  // that directly, so they stand in for what used to be a link to a picker.
   if (showBuilder) {
-    return <ComparePickerLaunch pinnedId={builderPinnedId} notice={compareNotice} />;
+    return <Leaderboard notice={compareNotice} />;
   }
 
   if (results.length === 0) return null;
@@ -1080,41 +1078,4 @@ function severeCohortMismatchReason(results: DetailResult[]) {
     reasons.push("phases differ");
   }
   return reasons.length > 0 ? reasons.join(" and ") : null;
-}
-
-function ComparePickerLaunch({ pinnedId, notice }: { pinnedId: string | null; notice: string | null }) {
-  const queryHref = pinnedId
-    ? `/results/query?pick=${encodeURIComponent(pinnedId)}`
-    : "/results/query";
-
-  return (
-    <div class="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8" data-testid="compare-picker-launch">
-      <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: "Compare" }]} />
-
-      {notice && (
-        <div
-          class="mt-4 rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]"
-          role="status"
-          data-testid="compare-url-notice"
-        >
-          {notice}
-        </div>
-      )}
-
-      <section class="mt-6 panel-elevated p-5" aria-labelledby="compare-picker-title">
-        <p class="text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Compare</p>
-        <h1 id="compare-picker-title" class="mt-1 text-2xl font-bold text-[var(--bb-data-fg-primary)]">
-          {pinnedId ? "Find another run" : "Choose runs to compare"}
-        </h1>
-        <p class="mt-2 text-sm text-[var(--bb-data-fg-muted)]">
-          {pinnedId
-            ? "One run is selected. Find another run from the same benchmark, scale, and test phase."
-            : "Find two to four runs from the same benchmark, scale, and test phase."}
-        </p>
-        <a href={queryHref} class="btn btn-primary mt-4 no-underline" data-testid="compare-picker-query-link">
-          Find runs
-        </a>
-      </section>
-    </div>
-  );
 }
