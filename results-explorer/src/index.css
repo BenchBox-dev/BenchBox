@@ -713,6 +713,15 @@
         overflow: visible !important;
     }
 
+    /* Grouped query charts keep a scroll floor on screen so dense query sets
+       remain readable. Printed pages have a fixed landscape width instead;
+       let the SVG viewBox scale to that page rather than widening the whole
+       document past the printable area. */
+    [data-chart-container] .bb-chart-svg {
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+
     table:not(.sr-only) {
         width: 100% !important;
         min-width: 0 !important;
