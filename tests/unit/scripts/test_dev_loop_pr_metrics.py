@@ -668,6 +668,7 @@ def test_acceptance_validator_holds_incomplete_cohort_and_replays() -> None:
 
 def test_acceptance_validator_accepts_complete_record(monkeypatch: pytest.MonkeyPatch) -> None:
     """The validator can pass: guards against a firewall that never opens."""
+    import copy
     import hashlib
     import json as _json2
     import subprocess
@@ -706,13 +707,14 @@ def test_acceptance_validator_accepts_complete_record(monkeypatch: pytest.Monkey
         "_is_ancestor",
         lambda commit, head="HEAD": True if commit in synthetic_heads else real_is_ancestor(commit, head),
     )
-    acceptance["cohort"]["observed"]["batch_deliveries"] = receipts
+    acceptance["cohort"]["observed"]["batch_deliveries"] = copy.deepcopy(receipts)
     acceptance["efficiency"]["observed_avoidable_actions"] = 20
     errors = metrics.validate_process_acceptance(acceptance, process, hashlib.sha256(process_raw).hexdigest())
     assert errors == []
 
 
 def test_acceptance_validator_rejects_weakened_frozen_requirements(monkeypatch: pytest.MonkeyPatch) -> None:
+    import copy
     import hashlib
     import json as _json2
 
@@ -747,7 +749,7 @@ def test_acceptance_validator_rejects_weakened_frozen_requirements(monkeypatch: 
         acceptance["cohort"]["observed"]["days"] = frozen["min_days"]
         acceptance["cohort"]["observed"]["strata"] = list(frozen["strata"])
         acceptance["cohort"]["observed"]["human_hold"] = True
-        acceptance["cohort"]["observed"]["batch_deliveries"] = receipts
+        acceptance["cohort"]["observed"]["batch_deliveries"] = copy.deepcopy(receipts)
         return acceptance
 
     weakened = conforming()
