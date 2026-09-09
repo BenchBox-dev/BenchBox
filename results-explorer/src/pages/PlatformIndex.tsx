@@ -279,6 +279,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     }).catch(() => {
       if (cancelled) return;
       setBasisDetails(new Map());
+      setSelected(new Set());
       setBasisError("Could not load measurement passes. Choose the published basis or retry.");
       setBasisLoading(false);
     });
@@ -490,7 +491,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     const row = rowsByResultId.get(resultId);
     return row ? compareIdForRow(row) : resultId;
   });
-  const compareUrl = selected.size >= 2 ? `${buildCompareUrl(selectedCompareIds)}${isDefaultBasis(basis) ? "" : `&basis=${encodeBasis(basis)}`}` : null;
+  const compareUrl = !basisLoading && selected.size >= 2 ? `${buildCompareUrl(selectedCompareIds)}${isDefaultBasis(basis) ? "" : `&basis=${encodeBasis(basis)}`}` : null;
   const compareGuidance = platformCompareGuidanceMessage(selectedRows, selected.size, platformDisplayName);
 
   const platformResults = [...platformResultsRaw].sort((a, b) => {
@@ -943,7 +944,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             <TableScrollHint
               scrollerRef={resultsScrollerRef}
               testId="platform-table-scroll-hint"
-              label="Scroll table for source and receipt columns →"
+              label="Scroll for dates, timings, and source labels →"
               wrapperClassName={null}
             />
           </div>

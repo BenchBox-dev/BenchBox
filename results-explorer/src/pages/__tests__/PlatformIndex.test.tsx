@@ -1016,3 +1016,29 @@ it("updates selection eligibility when warmup availability differs from the publ
   await waitFor(() => expect(unavailable.checked).toBe(false));
   expect((screen.getByTestId("platform-compare-checkbox-warmup-only") as HTMLInputElement).disabled).toBe(false);
 });
+
+it("suspends comparison during pass loading and clears selections after a failed load", async () => {
+  vi.clearAllMocks();
+  window.history.replaceState(null, "", "/results/p/duckdb/");
+  vi.mocked(getPlatformIndexRows).mockResolvedValue([makeRow({ result_id: "first" }), makeRow({ result_id: "second" })]);
+  vi.mocked(getResultsBasisAvailability).mockResolvedValue([]);
+  let reject!: (error: Error) => void;
+  vi.mocked(getDetailResult).mockImplementation(() => new Promise((_resolve, fail) => { reject = fail; }));
+  render(<PlatformIndex platform="duckdb" />);
+  const selector = await screen.findByRole("combobox", { name: "Measurement basis" });
+  fireEvent.click(screen.getByTestId("platform-compare-checkbox-first"));
+  fireEvent.click(screen.getByTestId("platform-compare-checkbox-second"));
+  expect(screen.getByTestId("compare-tray-compare-link")).toBeTruthy();
+  fireEvent.change(selector, { target: { value: "all_warm:min" } });
+  await waitFor(() => expect(screen.queryByTestId("compare-tray-compare-link")).toBeNull());
+  reject(new Error("Pass loading failed"));
+  await waitFor(() => expect(screen.getByText(/Could not load measurement passes/)).toBeTruthy());
+  expect((screen.getByTestId("platform-compare-checkbox-first") as HTMLInputElement).checked).toBe(false);
+  expect((screen.getByTestId("platform-compare-checkbox-second") as HTMLInputElement).checked).toBe(false);
+  expect(screen.queryByTestId("compare-tray-compare-link")).toBeNull();
+  fireEvent.change(selector, { target: { value: "default" } });
+  await waitFor(() => expect((screen.getByTestId("platform-compare-checkbox-first") as HTMLInputElement).disabled).toBe(false));
+  fireEvent.click(screen.getByTestId("platform-compare-checkbox-first"));
+  fireEvent.click(screen.getByTestId("platform-compare-checkbox-second"));
+  expect(screen.getByTestId("compare-tray-compare-link")).toBeTruthy();
+});
