@@ -54,10 +54,16 @@ export function SubmissionActivity({ rows, subject, reference, maxRows = 20 }: P
     const latest = parsed.flatMap((row) => row.days).reduce((max, day) => (day > max ? day : max), 0);
     if (latest === 0) return null;
 
-    // The window ends on the most recent submission, not on today: a corpus
-    // whose newest run is a year old would otherwise render as 26 empty
-    // columns, which says nothing about how the runs are distributed.
-    const lastWeek = weekStart(Math.max(latest, (reference ?? new Date()).getTime()));
+    // The window normally ends on today, so a current corpus shows the weeks it
+    // has been quiet. Once the newest submission falls outside that window it
+    // anchors to that submission instead: ending on today would put every row
+    // out of range and render nothing at all, hiding a corpus that was active
+    // in the past. A submission dated ahead of today anchors the same way.
+    const referenceWeek = weekStart((reference ?? new Date()).getTime());
+    const latestWeek = weekStart(latest);
+    const latestInWindow =
+      latestWeek <= referenceWeek && referenceWeek - latestWeek <= (WEEKS - 1) * WEEK_MS;
+    const lastWeek = latestInWindow ? referenceWeek : latestWeek;
     const firstWeek = lastWeek - (WEEKS - 1) * WEEK_MS;
     const weeks = Array.from({ length: WEEKS }, (_, index) => firstWeek + index * WEEK_MS);
 

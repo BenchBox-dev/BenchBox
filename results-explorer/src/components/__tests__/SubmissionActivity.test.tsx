@@ -50,6 +50,20 @@ describe("SubmissionActivity", () => {
     expect(rowLabels()).not.toContain("Ancient");
   });
 
+  it("anchors the window to the newest submission when the corpus is stale", () => {
+    // Every run predates the 26-week window ending today. Anchoring to today
+    // would drop all of them and render nothing, hiding a corpus that was
+    // active in the past - the one case this chart most needs to show.
+    render(
+      <SubmissionActivity
+        rows={[{ id: "tpch", label: "TPC-H", href: "/results/tpch/", dates: ["2024-03-04", "2024-03-11"] }]}
+        subject="benchmark"
+        reference={REFERENCE}
+      />,
+    );
+    expect(rowLabels()).toEqual(["TPC-H"]);
+  });
+
   it("renders nothing when no run carries a usable date", () => {
     const { container } = render(
       <SubmissionActivity

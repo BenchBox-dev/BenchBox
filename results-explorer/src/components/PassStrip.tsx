@@ -99,7 +99,8 @@ export interface RunPassTotals {
    * Not an average of the per-query ratios, and never the full-run median
    * total as the denominator: comparing every query's warmup against every
    * query's warm time would understate the penalty whenever some queries
-   * recorded no warmup at all.
+   * recorded no warmup at all. Queries holding only one of the two values are
+   * excluded from both sides, so the ratio never mixes populations.
    */
   warmupRatio: number | null;
 }
@@ -116,11 +117,14 @@ export function summarizeRunPasses(summaries: readonly QueryPassSummary[]): RunP
     return values.length > 0 ? values.reduce((total, value) => total + value, 0) : null;
   };
   const withWarmup = summaries.filter((s) => s.warmupMs !== null);
+  // The ratio needs one query population on both sides. A query that recorded a
+  // warmup but no passing measurement pass has a warmup with nothing to compare
+  // it against, so it is excluded from the numerator as well as the denominator
+  // rather than inflating the ratio against a smaller denominator.
+  const comparable = withWarmup.filter((s) => s.warmMedian !== null);
   const warmupMs = sum((s) => s.warmupMs);
-  const warmupWarmMedianMs = withWarmup
-    .map((s) => s.warmMedian)
-    .filter((value): value is number => value !== null)
-    .reduce((total, value) => total + value, 0);
+  const comparableWarmupMs = comparable.reduce((total, s) => total + (s.warmupMs ?? 0), 0);
+  const comparableWarmMedianMs = comparable.reduce((total, s) => total + (s.warmMedian ?? 0), 0);
 
   return {
     queryCount: summaries.length,
@@ -130,8 +134,7 @@ export function summarizeRunPasses(summaries: readonly QueryPassSummary[]): RunP
     spreadMs: sum((s) => s.spreadMs),
     warmupMs,
     warmupQueryCount: withWarmup.length,
-    warmupRatio:
-      warmupMs !== null && warmupWarmMedianMs > 0 ? warmupMs / warmupWarmMedianMs : null,
+    warmupRatio: comparableWarmMedianMs > 0 ? comparableWarmupMs / comparableWarmMedianMs : null,
   };
 }
 

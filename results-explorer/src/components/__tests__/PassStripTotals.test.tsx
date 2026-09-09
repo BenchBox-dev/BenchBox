@@ -22,6 +22,10 @@ function warmup(queryId: string, ms: number): QueryTiming {
   return { query_id: queryId, duration_ms: ms, status: "pass", run_type: "warmup", iter: 0, stream: null };
 }
 
+function failedMeasurement(queryId: string, ms: number): QueryTiming {
+  return { query_id: queryId, duration_ms: ms, status: "fail", run_type: "measurement", iter: 1, stream: null };
+}
+
 const QUERIES: QueryTiming[] = [
   warmup("Q1", 30),
   measurement("Q1", 10, 1),
@@ -64,6 +68,22 @@ describe("summarizeRunPasses", () => {
     expect(totals.warmupMs).toBeNull();
     expect(totals.warmupRatio).toBeNull();
     expect(totals.warmupQueryCount).toBe(0);
+  });
+
+  it("drops a query with a warmup but no warm median from both sides of the ratio", () => {
+    // The warmup on Q2 has nothing to be measured against. Counting it in the
+    // numerator alone would report a penalty the run never demonstrated.
+    const totals = summarizeRunPasses(
+      summarizeQueryPasses([
+        warmup("Q1", 30),
+        measurement("Q1", 10, 1),
+        warmup("Q2", 900),
+        failedMeasurement("Q2", 20),
+      ]),
+    );
+    expect(totals.warmupRatio).toBeCloseTo(30 / 10, 10);
+    expect(totals.warmupMs).toBe(930);
+    expect(totals.warmupQueryCount).toBe(2);
   });
 
   it("has no spread to report when a query ran once", () => {

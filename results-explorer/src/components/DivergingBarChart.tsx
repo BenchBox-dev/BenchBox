@@ -47,8 +47,10 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
     if (!baselineMs) continue;
     timings.forEach((t, i) => {
       if (i === baselineIdx || !t || t.ms <= 0) return;
-      const colorIdx = i < baselineIdx ? i : i + 1;
-      const color = paletteColor(colorIdx);
+      // The run's own index, not a baseline-relative one. Shifting later runs
+      // up by one to skip the baseline's color wraps the last run back onto the
+      // first run's color once the shift passes the end of the palette.
+      const color = paletteColor(i);
       const dp = deltaPct(t.ms, baselineMs);
       if (dp === null) return;
       rawEntries.push({
@@ -222,7 +224,7 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
             <span key={result.platform} class="flex items-center gap-1">
               <span
                 class="inline-block h-2 w-3 rounded-sm"
-                style={{ backgroundColor: paletteColor(index < baselineIdx ? index : index + 1) }}
+                style={{ backgroundColor: paletteColor(index) }}
               />
               {result.platform}
             </span>

@@ -250,7 +250,16 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
   const showTuningSection = true;
   // How many queries the pass table can actually report on. Zero means it
   // renders nothing, and the median-latency table is the only per-query view.
-  const passSummaryCount = summarizeQueryPasses(detail.queries).length;
+  const passSummaries = summarizeQueryPasses(detail.queries);
+  // The pass table reports the same per-query median next to the passes it was
+  // reduced from, so the three-column median table is redundant — but only for
+  // the queries the pass table can render. A query with a published median and
+  // no execution rows appears in no pass summary, so the median table stays
+  // whenever one exists rather than dropping that query from the page.
+  const passQueryIds = new Set(passSummaries.map((summary) => summary.queryId));
+  const passesCoverAllTimings =
+    passSummaries.length > 0 &&
+    detail.display_timings.every((timing) => passQueryIds.has(timing.query_id));
   const plansUrl = planDownloadUrl(detail);
   const hasTimings = detail.display_timings.length > 0 || detail.queries.length > 0;
   const withinRunBases = selectComparableBasisPair(detail.queries, detail.display_timings);
@@ -461,11 +470,7 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
             <h2 class="mb-4 text-base font-semibold text-[var(--bb-data-fg-primary)]">
               Query timings ({detail.display_timings.length})
             </h2>
-            {/* The pass table below reports the same per-query median, next to
-                the passes it was reduced from, so this three-column table is
-                only worth rendering when this run published no pass data for
-                it to stand in for. */}
-            {passSummaryCount === 0 && (
+            {!passesCoverAllTimings && (
             <>
             <TableScrollHint scrollerRef={timingsScrollerRef} testId="detail-timings-scroll-hint" />
             <div ref={timingsScrollerRef} class="overflow-x-auto" data-testid="detail-timings-scroll-container">
