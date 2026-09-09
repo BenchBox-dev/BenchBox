@@ -444,6 +444,8 @@ def soundness_paths_changed(repo: Path, base: str | None, head: str) -> bool:
     """Derive the auto-merge classification from the canonical path predicate."""
     if not base:
         raise LandingError("origin/develop is unavailable; cannot classify soundness paths")
+    if base == head:
+        return False
     try:
         paths = _git(repo, "diff", "--name-only", "--no-renames", f"{base}...{head}").splitlines()
     except subprocess.CalledProcessError as exc:
