@@ -12,10 +12,15 @@ import argparse
 import hashlib
 import json
 import shutil
+import sys
 import zipfile
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from scripts.publication.assembler import compute_tree_digest
 from scripts.publication.manifest import validate_manifest_dict
@@ -388,7 +393,12 @@ def main(argv: list[str] | None = None) -> int:
                 expected_parent_generation=args.expected_parent_generation,
             )
             summary = replace(summary, archive_sha256=archive_sha256(args.archive))
-        args.output_summary.write_text(json.dumps(summary.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        # Only `validate` defines --output-summary; `create` records the
+        # candidate through --output instead.
+        if args.command == "validate":
+            args.output_summary.write_text(
+                json.dumps(summary.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
         print(json.dumps(summary.to_dict(), sort_keys=True))
         return 0
     except CandidateValidationError as exc:

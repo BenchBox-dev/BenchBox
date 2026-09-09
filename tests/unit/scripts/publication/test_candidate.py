@@ -210,3 +210,47 @@ def test_candidate_rejects_route_metadata_substitution(tmp_path: Path) -> None:
             run_metadata=run_metadata,
             expected_develop_sha=manifest["develop_sha"],
         )
+
+
+def test_main_create_writes_output_without_summary_flag(tmp_path: Path) -> None:
+    """`create` defines no --output-summary; main must not touch that attribute."""
+    from scripts.publication.candidate import main
+
+    site = tmp_path / "site"
+    for relative, content in {
+        "index.html": b"home",
+        "docs/index.html": b"docs",
+        "docs/api.html": b"api",
+        "results/index.html": b"results",
+        "results/data/results.duckdb": b"duckdb",
+    }.items():
+        path = site / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    manifest_path = tmp_path / "desired-manifest.json"
+    manifest_path.write_text(json.dumps(_manifest(site)), encoding="utf-8")
+    assembly_path = tmp_path / "assembly-receipt.json"
+    assembly_path.write_text(
+        json.dumps({"candidate_mode": "candidate-only", "artifact_run_id": "123"}), encoding="utf-8"
+    )
+    output_path = tmp_path / "candidate.json"
+
+    assert (
+        main(
+            [
+                "create",
+                "--manifest",
+                str(manifest_path),
+                "--assembly",
+                str(assembly_path),
+                "--site",
+                str(site),
+                "--producer-run-id",
+                "123",
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
+    assert json.loads(output_path.read_text(encoding="utf-8"))["producer_run_id"] == "123"

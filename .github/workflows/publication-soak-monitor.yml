@@ -92,7 +92,11 @@ jobs:
                   json.dumps({"checksums": checksums}, sort_keys=True) + "\n",
                   encoding="utf-8",
               )
-              full_content_check = datetime.now(timezone.utc).minute == 0
+              # The schedule runs every five minutes, so the top-of-hour run
+              # starts within minute 00-04 barring a long scheduler delay.
+              # An exact minute==0 equality would skip the hourly full check
+              # whenever that run starts late.
+              full_content_check = datetime.now(timezone.utc).minute < 5
               report = verify_live(
                   base_url="https://benchbox.dev",
                   manifest_path=Path("monitor/expected-manifest.json"),
