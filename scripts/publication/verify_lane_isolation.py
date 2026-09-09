@@ -87,9 +87,17 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "CLAUDE.md",
     "GEMINI.md",
     "ANTIGRAVITY.md",
+    # Deleted skill manifests still appear in the changed-paths of the
+    # migration that removes them, so they stay classified.
+    "skill-sync.yaml",
+    "skill-sync.lock",
     "skill-sync.conf",
     "tools/skill-sync",
     "scripts/skill_sync_ci_policy.py",
+    # CI/dev plumbing never read by lane artifact builds.
+    "scripts/check_untracked_skill_mirrors.sh",
+    "scripts/path_filter_decision.py",
+    "scripts/pr_refresh_certification.py",
     # Worktree and agent lifecycle tooling: developer loop only.
     "scripts/agent_write_preflight.sh",
     "scripts/set_worktree_identity.sh",
@@ -100,6 +108,7 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "scripts/doc_relative_link_baseline.txt",
     ".env.example",
     ".gitignore",
+    ".gitattributes",
     ".mcp.json",
     ".todo-db/",
 )
