@@ -106,8 +106,9 @@ test.describe("Compare", () => {
     await duckdb.first().check();
     await datafusion.first().check();
 
-    // Sticky compare bar materializes once two platforms are selected.
-    const compareLink = page.getByRole("link", { name: /Compare 2 selected/ });
+    // Sticky compare bar materializes once two platforms are selected. The
+    // page-level guidance slot offers the same link, so target the tray.
+    const compareLink = page.getByTestId("compare-tray-compare-link");
     await expect(compareLink).toBeVisible();
     await compareLink.click();
 

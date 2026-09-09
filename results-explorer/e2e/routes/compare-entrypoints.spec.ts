@@ -30,7 +30,7 @@ test.describe("compare entrypoint happy paths", () => {
     await checkRow(page.getByTestId(DUCKDB.id));
     await checkRow(page.getByTestId(DATAFUSION.id));
 
-    const compareLink = page.getByRole("link", { name: /Compare 2 selected/ });
+    const compareLink = page.getByTestId("compare-tray-compare-link");
     await expect(compareLink).toBeVisible();
     await compareLink.click();
 
@@ -46,7 +46,7 @@ test.describe("compare entrypoint happy paths", () => {
     await expect(page.getByTestId("platform-compare-guidance")).toContainText("1 result selected");
 
     await checkRow(page.getByTestId(DUCKDB_TUNED.id));
-    const compareLink = page.getByRole("link", { name: /Compare 2 selected/ });
+    const compareLink = page.getByTestId("compare-tray-compare-link");
     await expect(compareLink).toBeVisible();
     await compareLink.click();
 

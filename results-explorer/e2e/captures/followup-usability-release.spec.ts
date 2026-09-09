@@ -87,7 +87,7 @@ async function launchFirstBuilderComparison(page: Page): Promise<void> {
   if (await duckdb.count() > 0 && await datafusion.count() > 0) {
     await duckdb.check().catch(() => {});
     await datafusion.check().catch(() => {});
-    const link = page.getByRole("link", { name: /Compare 2 selected/ });
+    const link = page.getByTestId("compare-tray-compare-link");
     if (await link.count() > 0) {
       await link.click();
       await waitForDataLoaded(page, /Comparison/i);

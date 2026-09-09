@@ -142,6 +142,27 @@ function versionText(entry: { driver_version: string | null; platform_version?: 
   return splitVersion(entry.driver_version ?? entry.platform_version ?? null)?.full ?? null;
 }
 
+/**
+ * Labels for the Version column, parallel to `rows`.
+ *
+ * Leads with the version. Rows that would be indistinguishable from another
+ * row on everything this table displays - version, benchmark, scale, phase,
+ * and run date - also carry their short id, which is the row's own handle.
+ */
+function buildVersionCellLabels(rows: readonly PlatformIndexRowRow[]): string[] {
+  const base = rows.map((row) => versionText(row) ?? row.short_id);
+  const displayedKey = (row: PlatformIndexRowRow, index: number) =>
+    [base[index], row.benchmark, row.scale_factor, row.phase, row.run_date].join("\u0000");
+  const counts = new Map<string, number>();
+  rows.forEach((row, index) => {
+    const key = displayedKey(row, index);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  });
+  return rows.map((row, index) =>
+    (counts.get(displayedKey(row, index)) ?? 0) > 1 ? `${base[index]} · ${row.short_id}` : base[index]!,
+  );
+}
+
 function primaryMetricContract(metric: string): string {
   return trendMetricDescription(normalizeTrendMetric(metric));
 }
@@ -436,6 +457,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     visibleLimit,
   );
   const runIdentityLabels = formatRunIdentitiesForCohort(platformResults, "table");
+  // What the Version cell shows. The version alone identifies a row on this
+  // page, because the platform is fixed and benchmark, scale, phase, and date
+  // are their own columns - except when two runs agree on all of those, which
+  // is exactly when the short id has to appear.
+  const versionCellLabels = buildVersionCellLabels(platformResults);
 
   function toggleSort(key: PlatformSortKey) {
     setSort((prev) =>
@@ -958,6 +984,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                       key={r.result_id}
                       entry={r}
                       runIdentityLabel={runIdentityLabels[index] ?? r.platform}
+                      versionLabel={versionCellLabels[index] ?? r.short_id}
                       checked={selected.has(r.result_id)}
                       onToggle={() => toggleSelect(r.result_id)}
                       showMetricContract={showMetricContract}
@@ -987,6 +1014,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                             key={r.result_id}
                             entry={r}
                             runIdentityLabel={runIdentityLabels[index] ?? r.platform}
+                            versionLabel={versionCellLabels[index] ?? r.short_id}
                             checked={selected.has(r.result_id)}
                             onToggle={() => toggleSelect(r.result_id)}
                             showMetricContract={showMetricContract}
@@ -1137,6 +1165,7 @@ function trendValue(row: PlatformIndexRowRow, metric: TrendMetric): number | nul
 interface PlatformRowProps {
   entry: PlatformIndexRowRow;
   runIdentityLabel: string;
+  versionLabel: string;
   checked: boolean;
   onToggle: () => void;
   showMetricContract: boolean;
@@ -1149,7 +1178,7 @@ interface PlatformRowProps {
   disabledReason?: string;
 }
 
-function PlatformRow({ entry, runIdentityLabel, checked, onToggle, showMetricContract, disabledReason }: PlatformRowProps) {
+function PlatformRow({ entry, runIdentityLabel, versionLabel, checked, onToggle, showMetricContract, disabledReason }: PlatformRowProps) {
   const disabledCopy = describeCompareExclusionReason(disabledReason);
   const reasonId = disabledCopy ? `platform-compare-reason-${entry.result_id}` : undefined;
   return (
@@ -1186,7 +1215,7 @@ function PlatformRow({ entry, runIdentityLabel, checked, onToggle, showMetricCon
           class="font-medium no-underline hover:underline"
           data-testid="run-identity-label"
         >
-          {versionText(entry) ?? entry.short_id}
+          {versionLabel}
         </a>
         {isValidationNotClean(entry.validation_status) && (
           <div class="mt-0.5" data-testid={`platform-validation-flag-${entry.result_id}`}>
