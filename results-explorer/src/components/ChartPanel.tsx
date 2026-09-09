@@ -635,13 +635,10 @@ function ChartPanelLong({
 
   return (
     <section class="card" data-testid="chart-panel-long">
+      {/* No panel-level or group-level restatement of the question: each
+          chart already carries the question it answers, and three nested
+          headings that paraphrase each other read as scaffolding. */}
       <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div>
-          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">What does this comparison show?</h2>
-          <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
-            Aggregate results first, then the per-query evidence behind them.
-          </p>
-        </div>
         {showBaseline && summary && summary.platforms.length > 1 && (
           <div class="ml-auto flex items-center gap-2">
             <label class="text-xs text-[var(--bb-data-fg-muted)]" for="chart-panel-long-baseline">
@@ -673,11 +670,10 @@ function ChartPanelLong({
             >
             <h3
               id={`chart-panel-group-${group.id}`}
-              class="text-sm font-semibold text-[var(--bb-data-fg-primary)]"
+              class="border-b border-[var(--bb-data-border)] pb-1 text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]"
             >
               {groupCopy.label}
             </h3>
-            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">{groupCopy.description}</p>
             <div class="mt-4 space-y-8">
               {group.charts.map((chart) => (
                 <ChartFigure

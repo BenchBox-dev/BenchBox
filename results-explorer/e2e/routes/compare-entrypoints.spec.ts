@@ -135,7 +135,7 @@ async function expectCompletedComparison(
     await expect(main.locator(`a[href="/results/r/${run.id}"]`).first()).toBeVisible();
   }
   await expect(main.getByRole("heading", { name: "Comparison summary" })).toBeVisible();
-  await expect(main.getByRole("heading", { name: "What does this comparison show?" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Headline metrics" })).toBeVisible();
   await expect(main.getByRole("region", { name: "Comparison checks" })).toBeVisible();
   await expect(main.getByRole("button", { name: /Share URL/ })).toBeVisible();
 

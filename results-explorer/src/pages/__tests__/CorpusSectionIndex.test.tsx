@@ -104,7 +104,9 @@ describe("corpus section indexes", () => {
       expect(listResults).toHaveBeenCalledTimes(2);
       expect(within(list).getAllByRole("link")).toHaveLength(expectedCount);
       expect(within(list).getByRole("link", { name: expectedLinkName })).toHaveAttribute("href", expectedHref);
-      expect(within(list).getAllByLabelText(/Run age:/)).toHaveLength(expectedCount);
+      // Each card carries its latest run date as one chip; the age rides in
+      // the title rather than lengthening the line.
+      expect(within(list).getAllByText(/^Latest$/)).toHaveLength(expectedCount);
       expect(screen.queryByText(new RegExp(`No published ${kind}`, "i"))).toBeNull();
       expect(document.title).toBe(`${title} · BenchBox Results`);
     },

@@ -1102,7 +1102,10 @@ describe("ChartPanel", () => {
     expect(screen.getByTestId("chart-panel-long")).toBeTruthy();
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryAllByRole("tab")).toHaveLength(0);
-    expect(screen.getByRole("heading", { name: "What does this comparison show?" })).toBeTruthy();
+    // The panel no longer restates the page: each chart carries its own
+    // question, so a panel-level and a group-level paraphrase of it are gone.
+    expect(screen.queryByRole("heading", { name: "What does this comparison show?" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Headline metrics" })).toBeTruthy();
     expect(screen.getByTestId("chart-panel-chart-comparison_bar")).toHaveTextContent(
       "How does each query compare with the baseline?",
     );

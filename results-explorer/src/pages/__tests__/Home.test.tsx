@@ -997,7 +997,7 @@ describe("toggleFacetValue (w13)", () => {
     expect(input).toEqual(["tpch", "clickbench"]);
   });
 
-  it("renders Engine version selector in the ranking selector grid when results have engine versions", async () => {
+  it("renders Platform version selector in the ranking selector grid when results have engine versions", async () => {
     const versionedRows = RESULT_ROWS.map((r, i) => ({
       ...r,
       platform_version: i === 0 ? "1.4.0" : "1.3.2",
@@ -1015,7 +1015,7 @@ describe("toggleFacetValue (w13)", () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
     const grid = screen.getByTestId("home-ranking-selector-grid");
-    expect(within(grid).getByText("Engine version")).toBeTruthy();
+    expect(within(grid).getByText("Platform version")).toBeTruthy();
     expect(within(grid).getByText("All versions")).toBeTruthy();
   });
 
@@ -1042,7 +1042,7 @@ describe("toggleFacetValue (w13)", () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
-    const versionControl = screen.getByRole("combobox", { name: "Engine version" });
+    const versionControl = screen.getByRole("combobox", { name: "Platform version" });
     expect(within(versionControl).getByRole("option", { name: "1.3.2" })).toBeTruthy();
 
     const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });

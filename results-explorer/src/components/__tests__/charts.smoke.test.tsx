@@ -620,7 +620,7 @@ describe("TimeSeries", () => {
     expect(container.querySelector("svg")).toBeNull();
     expect(state?.textContent).toContain("cannot be ordered in this trend");
     expect(state?.textContent).toContain("same-day runs");
-    expect(state?.textContent).toMatch(/2026-04-03.*days ago/);
+    expect(state?.textContent).toMatch(/2026-04-03/);
     expect(state?.querySelectorAll("[data-result-id]")).toHaveLength(2);
     expect(state?.querySelector('a[href="/results/r/tpch-duckdb-sf0.01-20260403-1111aaaa"]')).toBeTruthy();
     expect(state?.querySelector('a[href="/results/r/tpch-duckdb-sf0.01-20260403-2222bbbb#run-receipt"]')).toBeTruthy();

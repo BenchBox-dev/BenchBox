@@ -24,7 +24,7 @@ import {
   visibleResultIdForRow,
 } from "@/lib/resultLinks";
 import { formatRunIdentityLabelsForCohort, type RunIdentitySource } from "@/lib/runIdentity";
-import { RunDateWithAge } from "@/components/RunAge";
+import { RunDateChip } from "@/components/RunAge";
 
 const LABEL_W = 58;
 const AXIS_H = 32;
@@ -410,7 +410,7 @@ function DuplicateDayTrendState({
             {groups.flatMap((group) =>
               group.runs.map(({ entry, value, title }) => (
                 <tr key={entry.result_id} data-result-id={entry.result_id} title={title}>
-                  <td class="pr-4 py-1 font-mono text-[var(--bb-data-fg-muted)]"><RunDateWithAge runDate={group.date} /></td>
+                  <td class="pr-4 py-1 font-mono text-[var(--bb-data-fg-muted)]"><RunDateChip runDate={group.date} /></td>
                   <td class="pr-4 py-1">{group.platform}</td>
                   <td class="pr-4 py-1 font-mono">Public ID {visibleResultIdForRow(entry)}</td>
                   <td class="pr-4 py-1 font-mono">{formatMetricValue(value, metric)}</td>

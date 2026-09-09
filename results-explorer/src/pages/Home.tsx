@@ -38,7 +38,7 @@ import { formatFacetDisplayValue } from "@/lib/facetDisplay";
 import { stringSerde, useUrlState } from "@/lib/useUrlState";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { usePickingState } from "@/lib/pickingState";
-import { RunDateWithAge } from "@/components/RunAge";
+import { RunDateChip } from "@/components/RunAge";
 import {
   EXPLORER_PERFORMANCE_MARKS,
   EXPLORER_PERFORMANCE_MEASURES,
@@ -527,7 +527,7 @@ export function Home(_: RoutableProps) {
                 />
                 {platformVersionOptions.length > 0 || platformVersionFilters.length > 0 ? (
                   <MultiSelectFilter
-                    label="Engine version"
+                    label="Platform version"
                     allLabel="All versions"
                     options={platformVersionOptions}
                     current={platformVersionFilters}
@@ -795,7 +795,7 @@ function HomeLoadingSkeleton({
               <SkeletonSelect label="Benchmark" />
               <SkeletonSelect label="Scale" />
               <SkeletonSelect label="Phase" />
-              <SkeletonSelect label="Engine version" />
+              <SkeletonSelect label="Platform version" />
               <CoverageSummary />
             </div>
             <div aria-hidden="true" class="sm:hidden">
@@ -870,7 +870,7 @@ const FACET_LABELS: Record<ExplorerFacetKey, string> = {
   storage_format: "Storage format",
   cost_status: "Cost status",
   date_window: "Date window",
-  platform_version: "Engine version",
+  platform_version: "Platform version",
   arch: "Architecture",
   cpu_family: "CPU family",
 };
@@ -1394,7 +1394,7 @@ function RecentRow({ entry, showCost }: { entry: ResultRow; showCost: boolean })
         <span class="badge badge-blue">{entry.platform}</span>
       </td>
       <td class="table-td">SF {entry.scale_factor}</td>
-      <td class="table-td text-[var(--bb-data-fg-muted)]"><RunDateWithAge runDate={entry.run_date} /></td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]"><RunDateChip runDate={entry.run_date} /></td>
       <td
         class="table-td font-mono"
         title={entry.power_score != null ? `Exact power score: ${fmtScoreExact(entry.power_score)}` : undefined}

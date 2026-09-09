@@ -75,7 +75,7 @@ describe("buildCompareDecisionSummary", () => {
 
     expect(summary.winner?.platform).toBe("DuckDB");
     expect(summary.comparisonRatio).toBe(10);
-    expect(summary.headline).toBe("In these selected runs, DuckDB's power score was 10.00x the lowest selected score.");
+    expect(summary.headline).toBe("In these selected runs, DuckDB's power score was 10.00x better than the lowest selected run.");
     expect(summary.queryRecord).toMatchObject({
       totalQueries: 2,
       comparableQueries: 2,

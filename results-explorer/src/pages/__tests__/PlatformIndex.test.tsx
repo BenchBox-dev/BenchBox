@@ -118,7 +118,7 @@ describe("PlatformIndex - sortable table headers", () => {
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
     await waitFor(() => expect(document.title).toBe("DuckDB · BenchBox Results"));
     expect(getRowOrder(container)).toEqual(["r-null-geo", "r-tpch-fast", "r-tpch-slow", "r-ssb-mid"]);
-    expect(screen.getAllByLabelText(/Run age:/)).toHaveLength(4);
+    expect(screen.getAllByLabelText(/^Run date /)).toHaveLength(4);
   });
 
   it("matches lower-case platform URLs against mixed-case platform IDs", async () => {
@@ -264,15 +264,15 @@ describe("PlatformIndex - sortable table headers", () => {
 
     const filterStrip = screen.getByTestId("platform-detail-filters");
     expect(filterStrip).toBeTruthy();
-    expect(screen.getByText("Showing 30 of 30 results")).toBeTruthy();
+    expect(screen.getByTestId("platform-run-count").textContent).toBe("30 published runs");
 
     fireEvent.change(screen.getByTestId("platform-filter-benchmark"), {
       target: { value: "clickbench" },
     });
-    await waitFor(() => expect(screen.getByText("Showing 12 of 12 results")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("platform-run-count").textContent).toBe("12 of 30 published runs"));
 
     fireEvent.click(screen.getByTestId("platform-filter-reset"));
-    await waitFor(() => expect(screen.getByText("Showing 30 of 30 results")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("platform-run-count").textContent).toBe("30 published runs"));
     expect(screen.queryByTestId("platform-filter-reset")).toBeNull();
   });
 
@@ -388,7 +388,7 @@ describe("PlatformIndex - sortable table headers", () => {
       "4 results selected (maximum)",
     );
     expect(screen.queryByText("Use sticky tray to compare")).toBeNull();
-    expect(screen.getByText("Showing 5 of 5 results").parentElement?.textContent).toBe("Showing 5 of 5 results");
+    expect(screen.getByTestId("platform-run-count").textContent).toBe("5 published runs");
   });
 
   it("disables Platform compare selection for non-comparable rows", async () => {
@@ -483,7 +483,12 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(status).toHaveAttribute("aria-atomic", "true");
     expect(status?.textContent).toContain("0 results selected");
     expect(guidance.textContent).toContain("Select two or more DuckDB results");
-    expect((screen.getByRole("button", { name: "Select 2 comparable results" }) as HTMLButtonElement).disabled).toBe(true);
+    // No dead button: the pending state is status text, and the real
+    // affordance appears in the same slot once it can be used.
+    expect(screen.queryByRole("button", { name: /Select 2 / })).toBeNull();
+    expect(screen.getByTestId("platform-compare-cta-pending").textContent).toBe(
+      "Select 2 results to compare",
+    );
     expect(screen.getByTestId("platform-table-scroll-hint").textContent).toContain("Scroll table");
     expect(screen.getAllByText(/Geomean latency \(lower is better\)/).length).toBeGreaterThan(0);
   });
@@ -695,7 +700,7 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(screen.getByTestId("platform-compare-guidance").textContent).toContain("differ by benchmark");
     expect(screen.queryByText("Use sticky tray to compare")).toBeNull();
 
-    const compareLink = screen.getByRole("link", { name: /Compare 2 selected/ }) as HTMLAnchorElement;
+    const compareLink = screen.getAllByRole("link", { name: /Compare 2 selected/ })[0] as HTMLAnchorElement;
     expect(compareLink.getAttribute("href")).toBe("/results/compare?ids=aaaabbbb,ccccdddd");
   });
 
@@ -715,13 +720,13 @@ describe("PlatformIndex - sortable table headers", () => {
     const { container } = render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
-    expect(screen.getByText("Showing 200 of 205 results")).toBeTruthy();
+    expect(screen.getByText("Showing 200 of 205 published runs")).toBeTruthy();
     expect(getRowOrder(container)).toHaveLength(200);
 
     fireEvent.click(screen.getByRole("button", { name: "Show more results" }));
 
     expect(getRowOrder(container)).toHaveLength(205);
-    expect(screen.getByText("Showing 205 of 205 results")).toBeTruthy();
+    expect(screen.queryByText(/^Showing /)).toBeNull();
   });
 
   it("splits platform trend charts by comparable benchmark cohorts", async () => {

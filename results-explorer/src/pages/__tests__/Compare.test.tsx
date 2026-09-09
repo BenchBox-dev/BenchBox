@@ -763,11 +763,14 @@ describe("Compare", () => {
     });
 
     const summary = screen.getByRole("heading", { name: "Comparison summary" });
-    const chartsHeading = screen.getByRole("heading", { name: "What does this comparison show?" });
+    const chartsHeading = screen.getByRole("heading", { name: "Headline metrics" });
     const queryDiffHeading = screen.getByRole("heading", { name: "Query-level differences" });
 
-    expect(summary.closest("section")).toHaveTextContent("In these selected runs, DuckDB's power score was 10.00x the lowest selected score.");
-    expect(summary.closest("section")).toHaveTextContent("DuckDB was fastest on 2 of 2 comparable queries");
+    expect(summary.closest("section")).toHaveTextContent(
+      "In these selected runs, DuckDB's power score was 10.00x better than the lowest selected run.",
+    );
+    expect(summary.closest("section")).toHaveTextContent("Where DuckDB wins");
+    expect(summary.closest("section")).toHaveTextContent("2 of 2 queries");
     expect(summary.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(summary.compareDocumentPosition(queryDiffHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(chartsHeading.compareDocumentPosition(queryDiffHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -1220,7 +1223,7 @@ describe("Compare", () => {
     render(<Compare />);
     const summary = await screen.findByRole("heading", { name: "Comparison summary" });
     const summarySection = summary.closest("section");
-    expect(summarySection).toHaveTextContent("Leading recorded run");
+    expect(summarySection).toHaveTextContent("Leading run on Power score");
     expect(summarySection).toHaveTextContent("This compares recorded runs, not engines in isolation.");
     expect(summarySection).toHaveTextContent("architecture");
     expect(summarySection).toHaveTextContent("CPU model");
@@ -1247,7 +1250,7 @@ describe("Compare", () => {
     const options = Array.from(select.options).map((option) => option.text);
     const beforeIds = new URL(window.location.href).searchParams.get("ids");
 
-    expect(summary).toHaveTextContent("In these selected runs, DuckDB's power score was 10.00x the lowest selected score.");
+    expect(summary).toHaveTextContent("In these selected runs, DuckDB's power score was 10.00x better than the lowest selected run.");
     expect(options).toEqual(["DuckDB", "SQLite", "PostgreSQL"]);
     expect(screen.getByRole("heading", { name: "Query by run" }).closest("section")).toHaveTextContent(
       "Showing 2 of 2 queries.",
@@ -1391,7 +1394,7 @@ describe("Compare", () => {
     });
 
     const receipt = screen.getByRole("region", { name: "Comparison checks" });
-    const chartsHeading = screen.getByRole("heading", { name: "What does this comparison show?" });
+    const chartsHeading = screen.getByRole("heading", { name: "Headline metrics" });
     const queryDiffHeading = screen.getByRole("heading", { name: "Query-level differences" });
 
     expect(receipt).toHaveTextContent("Benchmark");

@@ -43,7 +43,7 @@ test.describe("compare entrypoints after tray migration (rx-18)", () => {
     await page.goto("/results/tpch/");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
-    await expect(page.getByRole("button", { name: "Select 2 comparable results" })).toBeVisible();
+    await expect(page.getByTestId("benchmark-compare-cta-pending")).toHaveText("Select 2 results to compare");
 
     // ResultDetail sends the current run to Find runs, where the second run is selected.
     await page.goto(`/results/r/${fixtureIds.ids.duckdb}`);
@@ -62,6 +62,6 @@ test.describe("compare entrypoints after tray migration (rx-18)", () => {
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
     // Should have BenchmarkIndex's tray once 2 selected, not old 'Compare 0 runs'
-    await expect(page.getByText("Select 2 comparable results")).toBeVisible();
+    await expect(page.getByTestId("benchmark-compare-cta-pending")).toHaveText("Select 2 results to compare");
   });
 });

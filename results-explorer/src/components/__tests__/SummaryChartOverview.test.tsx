@@ -1,14 +1,14 @@
 /**
  * Tests for the long summary overview section chrome.
  *
- * Covers the artboard-parity additions around the shared charts: the cohort
- * section heading with its scope callout and section-link button, the
- * distribution population/key/boundary footer with matrix and exclusion
- * links, and the dynamic additional-analyses count.
+ * Covers what the shared chart section commits to: leading with a chart
+ * rather than a restatement of the page, consistent column naming, the
+ * distribution boundary footnote, drawing each chart once, and the dynamic
+ * additional-analyses count.
  */
 
-import { render, screen, fireEvent } from "@testing-library/preact";
-import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent, within } from "@testing-library/preact";
+import { describe, it, expect } from "vitest";
 import type { BenchmarkSummary, PlatformRow } from "@/types";
 
 import { SummaryChartOverview } from "@/components/SummaryChartOverview";
@@ -86,49 +86,52 @@ function renderOverview(summary: BenchmarkSummary = makeSummary()) {
 }
 
 describe("SummaryChartOverview section chrome", () => {
-  it("heads the section with the cohort question, scope callout, and link button", () => {
+  it("leads with the first chart rather than a restatement of the page", () => {
     const { container } = renderOverview();
-    expect(screen.getByText("What does this cohort show?")).not.toBeNull();
-    expect(screen.getByText(/Shared scope:/)).not.toBeNull();
-    expect(
-      screen.getByRole("button", { name: "Copy chart-section link" }),
-    ).not.toBeNull();
+    // The section used to open with a question heading, a "shared scope"
+    // callout, and a copy-link button, none of which said anything the charts
+    // below do not say for themselves.
+    expect(screen.queryByText("What does this cohort show?")).toBeNull();
+    expect(screen.queryByText(/Shared scope:/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Copy chart-section link/ })).toBeNull();
+    expect(screen.getByText("Which engines lead on speed and throughput?")).not.toBeNull();
     const root = container.querySelector("[data-testid='summary-chart-overview']");
     expect(root?.getAttribute("id")).toBe("cohort-charts");
   });
 
-  it("copies the chart-section link with facets and confirms", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.assign(navigator, { clipboard: { writeText } });
-    window.history.replaceState({}, "", "/results/tpch/?scale_factor=0.1&phase=power");
-    try {
-      renderOverview();
-      fireEvent.click(screen.getByRole("button", { name: "Copy chart-section link" }));
-      await screen.findByRole("button", { name: /Link copied/ });
-      expect(writeText).toHaveBeenCalledOnce();
-      const copied = String(writeText.mock.calls[0]?.[0] ?? "");
-      expect(copied).toContain("?scale_factor=0.1&phase=power");
-      expect(copied.endsWith("#cohort-charts")).toBe(true);
-    } finally {
-      window.history.replaceState({}, "", "/");
-      // @ts-expect-error jsdom has no clipboard; restore the missing default.
-      delete navigator.clipboard;
-    }
+  it("names the platform column consistently and puts each value beside its bar", () => {
+    const { container } = renderOverview();
+    const table = container.querySelector("table.summary-metric-table")!;
+    expect(within(table as HTMLElement).getByText("Platform")).not.toBeNull();
+    expect(within(table as HTMLElement).queryByText("Engine")).toBeNull();
+    const cell = table.querySelector("td.summary-metric-cell")!;
+    // Value and bar share one flex row; the bar is not stacked under the value.
+    expect(cell.querySelector(".summary-metric-track")?.parentElement).toBe(
+      cell.querySelector("div"),
+    );
   });
 
-  it("footers the distribution with boundary and links (key lives on the chart)", () => {
+  it("states the distribution boundary once and does not link exclusions to the provenance legend", () => {
     renderOverview();
-    // The whisker key belongs to DistributionBox's own footer; the overview
-    // must not restate it.
     expect(screen.queryByText(/whiskers min\/max/)).toBeNull();
     const paragraphs = screen
-      .getAllByText(/across different queries, not run-to-run variability/)
+      .getAllByText(/across different queries, not repeated runs/)
       .filter((el) => el.tagName === "P");
     expect(paragraphs).toHaveLength(1);
-    const matrixLink = screen.getByText(/Open per-query matrix/) as HTMLAnchorElement;
+    const matrixLink = screen.getByText(/See the per-query matrix/) as HTMLAnchorElement;
     expect(matrixLink.getAttribute("href")).toBe("#evidence-matrix");
-    const exclusionsLink = screen.getByText(/Inspect exclusions/) as HTMLAnchorElement;
-    expect(exclusionsLink.getAttribute("href")).toBe("#provenance-legend");
+    // The old "Inspect exclusions" link pointed at the provenance legend,
+    // which is not where a chart's excluded rows are named.
+    expect(screen.queryByText(/Inspect exclusions/)).toBeNull();
+  });
+
+  it("drops the preview once the full chart is open, so the chart is drawn once", () => {
+    const { container } = renderOverview();
+    const card = container.querySelector<HTMLDetailsElement>("[data-testid^='summary-chart-preview-']")!;
+    expect(card.querySelector(".summary-chart-thumbnail")).not.toBeNull();
+    card.open = true;
+    fireEvent(card, new Event("toggle"));
+    expect(card.querySelector(".summary-chart-thumbnail")).toBeNull();
   });
 
   it("labels the more-views count from the rendered cards", () => {
@@ -154,59 +157,4 @@ describe("SummaryChartOverview section chrome", () => {
     expect(additionalAnalysesLabel(7)).toBe("7 additional analyses");
   });
 
-  it("falls back to execCommand when the async clipboard is missing", async () => {
-    const execCommand = vi.fn(() => true);
-    const original = document.execCommand;
-    // @ts-expect-error jsdom has no clipboard; ensure the fallback path runs.
-    delete navigator.clipboard;
-    document.execCommand = execCommand;
-    try {
-      renderOverview();
-      fireEvent.click(screen.getByRole("button", { name: "Copy chart-section link" }));
-      await screen.findByRole("button", { name: /Link copied/ });
-      expect(execCommand).toHaveBeenCalledOnce();
-    } finally {
-      document.execCommand = original;
-    }
-  });
-
-  it("clears the pending copy timer on unmount", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.assign(navigator, { clipboard: { writeText } });
-    const setSpy = vi.spyOn(window, "setTimeout");
-    const clearSpy = vi.spyOn(window, "clearTimeout");
-    try {
-      const { unmount } = renderOverview();
-      fireEvent.click(screen.getByRole("button", { name: "Copy chart-section link" }));
-      await screen.findByRole("button", { name: /Link copied/ });
-      // The component resets its confirmation on a 1500ms timer; locate that
-      // timer id so the assertion cannot pass on unrelated clearTimeout calls.
-      const timerCallIndex = setSpy.mock.calls.findIndex((args) => args[1] === 1500);
-      expect(timerCallIndex).toBeGreaterThanOrEqual(0);
-      const timerId = setSpy.mock.results[timerCallIndex]?.value;
-      clearSpy.mockClear();
-      unmount();
-      expect(clearSpy).toHaveBeenCalledWith(timerId);
-    } finally {
-      setSpy.mockRestore();
-      clearSpy.mockRestore();
-      // @ts-expect-error jsdom has no clipboard; restore the missing default.
-      delete navigator.clipboard;
-    }
-  });
-
-  it("reports failure when every copy path fails", async () => {
-    const execCommand = vi.fn(() => false);
-    const original = document.execCommand;
-    // @ts-expect-error jsdom has no clipboard; ensure the fallback path runs.
-    delete navigator.clipboard;
-    document.execCommand = execCommand;
-    try {
-      renderOverview();
-      fireEvent.click(screen.getByRole("button", { name: "Copy chart-section link" }));
-      await screen.findByRole("button", { name: /Copy failed/ });
-    } finally {
-      document.execCommand = original;
-    }
-  });
 });

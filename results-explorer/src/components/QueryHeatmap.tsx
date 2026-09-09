@@ -31,6 +31,8 @@ import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 import { compareSelectionLabel } from "@/lib/compareCohort";
 import { MAX_COMPARE_SELECTIONS, resultIdentityAriaLabel, resultReceiptHref } from "@/lib/resultLinks";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
+import { RunDateChip } from "@/components/RunAge";
+import { VersionLabel } from "@/components/VersionLabel";
 import {
   describeCompareExclusionReason,
   type CompareExclusionReasonCopy,
@@ -42,7 +44,6 @@ import {
   platformTimingValue,
   validPrimaryMetricValue,
 } from "@/lib/displayEligibility";
-import { isValidationNotClean } from "@/lib/displayLabels";
 
 // ---------------------------------------------------------------------------
 // Color math - sourced from chartMath.ts (single source of truth for parity)
@@ -61,34 +62,46 @@ export { colorForCell, lightnessForCell };
 // ---------------------------------------------------------------------------
 
 const STICKY_COL_REM = {
-  checkbox: 3, // w-12
-  platform: 11, // w-44
-  primary: 8, // w-32
-  geomean: 8, // w-32
+  checkbox: 2.5, // w-10
+  platform: 10, // w-40
+  run: 6.5, // w-26
+  primary: 6.5, // w-26
+  geomean: 6, // w-24
+  labels: 12, // w-48
 } as const;
 
 type StickyColKey = keyof typeof STICKY_COL_REM;
 
 export const BENCHMARK_MATRIX_DENSITY_CONTRACT = {
-  maxCollapsedRowHeightPx: 72,
-  frozenColumns: ["selection", "platform identity", "primary metric", "secondary geomean"] as const,
-  secondaryMetadataAffordance: "Run details",
+  maxCollapsedRowHeightPx: 44,
+  frozenColumns: [
+    "selection",
+    "platform identity",
+    "run date",
+    "primary metric",
+    "secondary geomean",
+    "labels",
+  ] as const,
 } as const;
+
+const STICKY_ORDER: StickyColKey[] = ["checkbox", "platform", "run", "primary", "geomean", "labels"];
 
 function cumulativeStickyLeft(
   options: { hasSelection: boolean; showGeomeanCol: boolean },
   target: StickyColKey,
 ): number {
   let offset = 0;
-  if (target === "checkbox") return offset;
-  if (options.hasSelection) offset += STICKY_COL_REM.checkbox;
-  if (target === "platform") return offset;
-  offset += STICKY_COL_REM.platform;
-  if (target === "primary") return offset;
-  offset += STICKY_COL_REM.primary;
-  if (target === "geomean") return offset;
-  if (options.showGeomeanCol) offset += STICKY_COL_REM.geomean;
+  for (const key of STICKY_ORDER) {
+    if (key === target) return offset;
+    if (key === "checkbox" && !options.hasSelection) continue;
+    if (key === "geomean" && !options.showGeomeanCol) continue;
+    offset += STICKY_COL_REM[key];
+  }
   return offset;
+}
+
+function stickyWidthStyle(rem: number): JSX.CSSProperties {
+  return { width: `${rem}rem`, minWidth: `${rem}rem` };
 }
 
 function stickyLeftStyle(rem: number): JSX.CSSProperties {
@@ -129,10 +142,6 @@ function CompareDisabledReason({ id, copy }: { id?: string; copy: CompareExclusi
       <span class="block">{copy.recoveryHint}</span>
     </div>
   );
-}
-
-function formatPlatformVersion(version: string): string {
-  return version.startsWith("v") || version.startsWith("V") ? version : `v${version}`;
 }
 
 export function QueryHeatmap({
@@ -347,7 +356,10 @@ export function QueryHeatmap({
   // Single-platform: suppress heat coloring (no relative comparison to show).
   const suppressHeat = sorted.length < 2;
 
-  const primaryLabel = primaryMetric === "power_score" ? "Power score" : "Geomean latency";
+  // Column headers name the measure, not its unit: every rendered value in
+  // these columns already carries its unit ("5.9 ms"), so "latency" in the
+  // header only costs width.
+  const primaryLabel = primaryMetric === "power_score" ? "Power score" : "Geomean";
   const primaryDirectionLabel = primaryMetric === "power_score" ? "higher is better" : "lower is better";
   // The legend heading describes what the *cells* show, not the cohort's
   // primary score metric. Heatmap cells are always per-query latency values,
@@ -371,7 +383,7 @@ export function QueryHeatmap({
     } = {},
   ) {
     const className =
-      options.className ?? "table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left";
+      options.className ?? "table-th-dense block w-full cursor-pointer select-none border-0 bg-transparent text-left";
     const content = (
       <>
         {label}{sortArrow(key)}
@@ -393,6 +405,15 @@ export function QueryHeatmap({
     );
   }
 
+  function stickyHeaderStyle(target: StickyColKey): JSX.CSSProperties {
+    return {
+      ...stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, target)),
+      ...stickyWidthStyle(STICKY_COL_REM[target]),
+    };
+  }
+
+  const stickyCellStyle = stickyHeaderStyle;
+
   function renderHeaderRow(pageSticky = false) {
     return (
       <tr role="row" class="bg-[var(--bb-surface-data-muted)]">
@@ -401,15 +422,15 @@ export function QueryHeatmap({
             role="columnheader"
             scope="col"
             aria-label="Select for comparison"
-            class="table-th sticky z-30 w-12 min-w-12 bg-[var(--bb-surface-data-muted)] px-2"
-            style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "checkbox"))}
+            class="table-th-dense sticky z-30 bg-[var(--bb-surface-data-muted)] px-2"
+            style={stickyHeaderStyle("checkbox")}
           />
         )}
         <th
           role="columnheader"
           scope="col"
-          class="sticky z-30 w-44 min-w-44 bg-[var(--bb-surface-data-muted)] p-0"
-          style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "platform"))}
+          class="sticky z-30 bg-[var(--bb-surface-data-muted)] p-0"
+          style={stickyHeaderStyle("platform")}
           aria-sort={ariaSort("platform")}
         >
           {renderHeaderSortControl("Platform", "platform", { pageSticky })}
@@ -417,9 +438,17 @@ export function QueryHeatmap({
         <th
           role="columnheader"
           scope="col"
+          class="table-th-dense sticky z-30 whitespace-nowrap bg-[var(--bb-surface-data-muted)]"
+          style={stickyHeaderStyle("run")}
+        >
+          Run
+        </th>
+        <th
+          role="columnheader"
+          scope="col"
           aria-sort={ariaSort("primary")}
-          class="sticky z-30 w-32 min-w-32 whitespace-nowrap bg-[var(--bb-surface-data-muted)] p-0"
-          style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "primary"))}
+          class="sticky z-30 whitespace-nowrap bg-[var(--bb-surface-data-muted)] p-0"
+          style={stickyHeaderStyle("primary")}
           title={primaryLabel}
         >
           {renderHeaderSortControl(primaryLabel, "primary", {
@@ -431,18 +460,26 @@ export function QueryHeatmap({
           <th
             role="columnheader"
             scope="col"
-            class="sticky z-30 w-32 min-w-32 whitespace-nowrap bg-[var(--bb-surface-data-muted)] p-0"
-            style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "geomean"))}
+            class="sticky z-30 whitespace-nowrap bg-[var(--bb-surface-data-muted)] p-0"
+            style={stickyHeaderStyle("geomean")}
             aria-sort={ariaSort("geomean")}
             title="Geometric mean of per-query display times"
           >
-            {renderHeaderSortControl("Geomean latency", "geomean", {
+            {renderHeaderSortControl("Geomean", "geomean", {
               className:
-                "table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left text-[var(--bb-data-fg-subtle)]",
+                "table-th-dense block w-full cursor-pointer select-none border-0 bg-transparent text-left text-[var(--bb-data-fg-subtle)]",
               pageSticky,
             })}
           </th>
         )}
+        <th
+          role="columnheader"
+          scope="col"
+          class="table-th-dense sticky z-30 whitespace-nowrap bg-[var(--bb-surface-data-muted)]"
+          style={stickyHeaderStyle("labels")}
+        >
+          Labels
+        </th>
         {sortedQueryIds.map((qid) => (
           <th
             key={qid}
@@ -453,7 +490,7 @@ export function QueryHeatmap({
           >
             {renderHeaderSortControl(queryDisplayLabel(qid), `query:${qid}`, {
               className:
-                "table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left font-mono",
+                "table-th-dense block w-full cursor-pointer select-none border-0 bg-transparent text-left font-mono",
               pageSticky,
               queryLabel: pageSticky ? undefined : qid,
             })}
@@ -462,6 +499,39 @@ export function QueryHeatmap({
       </tr>
     );
   }
+
+  const hasUnrankableRow = sorted.some((row) => !isRankable(row));
+
+  // The legend explains the cells it sits on, so it is part of the matrix
+  // container rather than a free-floating block above it, and it stays
+  // collapsed until a reader asks for it.
+  const renderLegend = (testId: string) => (
+    <details
+      class="bg-[var(--bb-surface-data-muted)] text-xs text-[var(--bb-data-fg-muted)]"
+      data-testid={testId}
+    >
+      <summary class="cursor-pointer px-3 py-2 font-semibold text-[var(--bb-data-fg-primary)]">
+        Lower is better. How to read this matrix
+      </summary>
+      <div class="space-y-1 px-3 pb-2">
+        <p>
+          {heatmapMeaning} <strong>&lt;1 ms</strong> means a positive sub-millisecond timing; exact zero timings are{" "}
+          excluded from heat, ranks, and comparisons. <strong>No run</strong> means missing data. The{" "}
+          {primaryLabel} column uses its own metric and direction ({primaryDirectionLabel}).
+        </p>
+        <p>
+          A validation badge in the Labels column means that result was excluded from ranking on validation reason.
+          The query measurements remain visible, but they do not form a validated comparison score.
+        </p>
+        {hasUnrankableRow && (
+          <p data-testid="ranking-eligibility-legend">
+            <span aria-hidden="true" class="font-semibold">*</span> after a platform name means the run is not
+            eligible for ranking; hover or focus the marker for the reason.
+          </p>
+        )}
+      </div>
+    </details>
+  );
 
   return (
     <div class={`relative ${highContrast ? "heatmap-reduced-color" : ""}`}>
@@ -475,22 +545,8 @@ export function QueryHeatmap({
         {announcement}
       </div>
 
-      <div
-        class="mb-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-2 text-xs text-[var(--bb-data-fg-muted)]"
-        data-testid="query-heatmap-legend"
-      >
-        <div class="font-semibold text-[var(--bb-data-fg-primary)]">
-          Per-query latency: lower is better
-        </div>
-        <div class="mt-1">
-          {heatmapMeaning} <strong>&lt;1 ms</strong> means a positive sub-millisecond timing; exact zero timings are{" "}
-          excluded from heat, ranks, and comparisons. <strong>No run</strong> means missing data. The primary score column (
-          {primaryLabel}) on the left of each row uses its own metric and direction ({primaryDirectionLabel}).
-        </div>
-        <div class="mt-1">
-          A validation badge next to a platform name means that result was excluded from ranking on validation
-          reason. The query measurements remain visible, but they do not form a validated comparison score.
-        </div>
+      <div class="mb-3 overflow-hidden rounded-lg border border-[var(--bb-data-border)] md:hidden">
+        {renderLegend("query-heatmap-legend-mobile")}
       </div>
 
       <div
@@ -630,11 +686,14 @@ export function QueryHeatmap({
           <TableScrollHint
             scrollerRef={scrollContainerRef}
             testId="query-heatmap-scroll-hint"
-            label="Query columns →"
+            label="Scroll for query columns →"
             wrapperClassName={null}
-            className="rounded-full border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-2.5 py-1 font-medium shadow-sm"
+            className="italic"
           />
           <span>{sortedQueryIds.length.toLocaleString()} queries</span>
+        </div>
+        <div class="overflow-hidden rounded-t-lg border border-b-0 border-[var(--bb-data-border)]">
+          {renderLegend("query-heatmap-legend")}
         </div>
         <div
           aria-hidden="true"
@@ -653,7 +712,7 @@ export function QueryHeatmap({
         </div>
         <div
           ref={scrollContainerRef}
-          class="overflow-x-auto rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm"
+          class="overflow-x-auto rounded-b-lg border border-t-0 border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm"
           data-testid="query-heatmap-scroll-container"
           onScroll={syncPageStickyHeaderScroll}
         >
@@ -679,7 +738,6 @@ export function QueryHeatmap({
                     ? selectionLimitReasonId
                     : undefined;
                 const rankingExclusion = isRankable(row) ? null : formatTimingExclusion(row.ranking_exclusion_reason);
-                const validationNotClean = isValidationNotClean(row.validation_status);
                 return (
                   <tr
                     key={row.result_id}
@@ -691,10 +749,10 @@ export function QueryHeatmap({
                   {hasSelection && (
                     <td
                       role="gridcell"
-                      class={`table-td sticky z-10 w-12 min-w-12 px-2 ${
+                      class={`table-td-dense sticky z-10 px-2 ${
                         isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
                       }`}
-                      style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "checkbox"))}
+                      style={stickyCellStyle("checkbox")}
                     >
                       <input
                         type="checkbox"
@@ -717,23 +775,28 @@ export function QueryHeatmap({
                   )}
                   <td
                     role="gridcell"
-                    class={`table-td sticky z-10 w-44 min-w-44 ${
+                    class={`table-td-dense sticky z-10 ${
                       isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
                     }`}
-                    style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "platform"))}
+                    style={stickyCellStyle("platform")}
                   >
-                    <div class="flex items-center gap-1">
-                      <span class="font-medium text-[var(--bb-data-fg-primary)]">{rowIdentity}</span>
-                      {row.platform_version && !rowIdentity.includes(row.platform_version) && (
-                        <span class="text-xs text-[var(--bb-data-fg-subtle)]">
-                          {formatPlatformVersion(row.platform_version)}
-                        </span>
+                    <div class="flex items-baseline gap-1.5">
+                      <a
+                        href={resultReceiptHref(row)}
+                        aria-label={resultIdentityAriaLabel(row, "receipt")}
+                        title={rowIdentity}
+                        class="truncate font-medium text-[var(--bb-data-fg-primary)] no-underline hover:text-[var(--bb-accent-hover)] hover:underline"
+                      >
+                        {row.platform}
+                      </a>
+                      {row.platform_version && (
+                        <VersionLabel version={row.platform_version} plain class="shrink-0 text-[var(--bb-data-fg-subtle)]" />
                       )}
                       {rankingExclusion && (
                         <span
                           role="img"
                           tabIndex={0}
-                          class="text-xs text-[var(--bb-data-fg-subtle)] cursor-help"
+                          class="shrink-0 text-xs text-[var(--bb-data-fg-subtle)] cursor-help"
                           title={rankingExclusion}
                           aria-label={rankingExclusion}
                           data-testid={`heatmap-compliance-marker-${row.result_id}`}
@@ -742,57 +805,53 @@ export function QueryHeatmap({
                         </span>
                       )}
                     </div>
-                    {validationNotClean && (
-                      <div
-                        class="mt-0.5 flex flex-wrap items-center gap-1"
-                        data-testid={`heatmap-validation-flag-${row.result_id}`}
-                      >
-                        <ValidationBadge validationStatus={row.validation_status} showMissing />
-                      </div>
-                    )}
-                    <details class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
-                      <summary class="cursor-pointer font-medium text-[var(--bb-accent-hover)]">
-                        {BENCHMARK_MATRIX_DENSITY_CONTRACT.secondaryMetadataAffordance}
-                      </summary>
-                      <div class="mt-1 flex flex-wrap items-center gap-1">
-                        <TrustBadge trustLabel={row.trust_label} compact />
-                        <FundingChip funding={row.funding} compact />
-                        {!validationNotClean && (
-                          <ValidationBadge validationStatus={row.validation_status} showMissing />
-                        )}
-                        <a
-                          href={resultReceiptHref(row)}
-                          aria-label={resultIdentityAriaLabel(row, "receipt")}
-                          class="font-medium no-underline"
-                        >
-                          Receipt →
-                        </a>
-                      </div>
-                    </details>
                     {hasSelection && comparisonCopy && (
                       <CompareDisabledReason id={comparisonReasonId} copy={comparisonCopy} />
                     )}
                   </td>
                   <td
                     role="gridcell"
-                    class={`table-td sticky z-10 w-32 min-w-32 whitespace-nowrap font-mono ${
+                    class={`table-td-dense sticky z-10 whitespace-nowrap ${
                       isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
                     }`}
-                    style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "primary"))}
+                    style={stickyCellStyle("run")}
+                  >
+                    <RunDateChip runDate={row.run_date} />
+                  </td>
+                  <td
+                    role="gridcell"
+                    class={`table-td-dense sticky z-10 whitespace-nowrap font-mono ${
+                      isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
+                    }`}
+                    style={stickyCellStyle("primary")}
                   >
                     {fmtPrimary(getPrimaryValue(row))}
                   </td>
                   {showGeomeanCol && (
                     <td
                       role="gridcell"
-                      class={`table-td sticky z-10 w-32 min-w-32 whitespace-nowrap font-mono text-[var(--bb-data-fg-muted)] ${
+                      class={`table-td-dense sticky z-10 whitespace-nowrap font-mono text-[var(--bb-data-fg-muted)] ${
                         isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
                       }`}
-                      style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "geomean"))}
+                      style={stickyCellStyle("geomean")}
                     >
                       {fmtGeomean(validPrimaryMetricValue(row, "display_geomean_ms"))}
                     </td>
                   )}
+                  <td
+                    role="gridcell"
+                    class={`table-td-dense sticky z-10 ${
+                      isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
+                    }`}
+                    style={stickyCellStyle("labels")}
+                    data-testid={`heatmap-labels-${row.result_id}`}
+                  >
+                    <div class="flex flex-nowrap items-center gap-1">
+                      <TrustBadge trustLabel={row.trust_label} compact />
+                      <FundingChip funding={row.funding} compact />
+                      <ValidationBadge validationStatus={row.validation_status} showMissing />
+                    </div>
+                  </td>
                   {sortedQueryIds.map((qid, colIdx) => {
                     const rawMs = row.timings[qid] ?? null;
                     const timingExclusionReason = row.timing_eligibility[qid]?.timing_exclusion_reason ?? null;
@@ -839,7 +898,7 @@ export function QueryHeatmap({
                         role="gridcell"
                         data-cell={`${rowIdx}-${colIdx}`}
                         tabIndex={isFocused ? 0 : -1}
-                        class={`table-td min-w-[7rem] whitespace-nowrap text-right font-mono ${
+                        class={`table-td-dense min-w-[6rem] whitespace-nowrap text-right font-mono ${
                           hue !== null ? "heatmap-cell" : ms === null ? "bg-[var(--bb-surface-data-muted)] text-[var(--bb-data-fg-subtle)]" : ""
                         }`}
                         style={cellStyle}

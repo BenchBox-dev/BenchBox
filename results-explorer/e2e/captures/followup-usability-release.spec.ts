@@ -198,10 +198,9 @@ test.describe("@followup-usability release-gate route walk", () => {
 
     const firstHeatmapRow = page.locator("tbody tr[data-testid]").first();
     await expect(firstHeatmapRow).toBeVisible();
-    // Matrix reachability now lives behind the compact per-row
-    // "Run details" disclosure so the dense timing cells stay
-    // scannable. Open the disclosure before asserting receipt links.
-    await firstHeatmapRow.locator("summary", { hasText: /Run details/ }).click();
+    // The platform name is the receipt link, so matrix reachability needs no
+    // disclosure and costs the row no extra height.
+    await expect(firstHeatmapRow.locator("summary")).toHaveCount(0);
     await expect(firstHeatmapRow.getByRole("link", { name: /^Open receipt for / }).first()).toBeVisible();
 
     await maybeCapture(page, "benchmark-detail-switcher-and-sticky-header");

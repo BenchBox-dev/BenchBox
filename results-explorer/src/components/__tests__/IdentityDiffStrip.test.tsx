@@ -121,7 +121,7 @@ describe("multi-run identity matrix (N > 2 runs)", () => {
     expect(screen.getByText("Run 1 (baseline)")).toBeTruthy();
     expect(screen.getByText("Run 2")).toBeTruthy();
     expect(screen.getByText("Run 3")).toBeTruthy();
-    expect(screen.getByText("Engine version")).toBeTruthy();
+    expect(screen.getByText("Platform version")).toBeTruthy();
     expect(screen.getByText("Architecture")).toBeTruthy();
     expect(screen.getByText(/1 of 7 axis varies across the whole selection/)).toBeTruthy();
   });
