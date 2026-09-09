@@ -388,7 +388,7 @@ def changed_paths_for_sha(sha: str) -> list[str]:
             text=True,
         )
     if result.returncode != 0:
-        raise SignatureError(result.stderr.strip() or f"git diff-tree failed for {sha}")
+        raise SignatureError(result.stderr.strip() or f"git diff failed for {sha}")
     return [line for line in result.stdout.splitlines() if line]
 
 

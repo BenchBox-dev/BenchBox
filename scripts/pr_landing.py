@@ -231,12 +231,11 @@ def live_check_verdicts(run: Runner, repo_full: str, head: str) -> dict[str, dic
         [
             "gh",
             "api",
-            f"repos/{repo_full}/commits/{head}/check-runs",
-            "--paginate=false",
-            "-F",
-            "per_page=100",
+            # Query in the path with no -F fields: gh api sends POST when
+            # fields are present, and list endpoints answer GET only.
+            f"repos/{repo_full}/commits/{head}/check-runs?per_page=100",
             "--jq",
-            "{total: .total_count, runs: [.check_runs[] | {name, conclusion, head_sha}]}",
+            "{total: .total_count, runs: [.check_runs[] | {name, conclusion, head_sha, status, started_at}]}",
         ]
     )
     if rc != 0:
@@ -250,7 +249,12 @@ def live_check_verdicts(run: Runner, repo_full: str, head: str) -> dict[str, dic
         raise LandingError("live check runs exceed the single-page verification bound; refusing")
     verdicts: dict[str, dict] = {}
     for check in runs:
-        verdicts.setdefault(str(check.get("name") or ""), check)
+        name = str(check.get("name") or "")
+        # Latest by start time wins, mirroring checks_green_at_head: API
+        # order is not a recency contract, and first-wins could accept a
+        # stale success over a newer failure.
+        if name not in verdicts or str(check.get("started_at") or "") > str(verdicts[name].get("started_at") or ""):
+            verdicts[name] = check
     return verdicts
 
 

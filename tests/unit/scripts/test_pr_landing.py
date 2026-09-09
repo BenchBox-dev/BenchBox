@@ -298,7 +298,16 @@ def test_consume_retry_persists_spent_budget(tmp_path: Path) -> None:
 
 
 def _live_checks_payload(head: str, conclusion: str = "success") -> dict:
-    runs = [{"name": name, "conclusion": conclusion, "head_sha": head} for name in landing.REQUIRED_CONTEXTS]
+    runs = [
+        {
+            "name": name,
+            "conclusion": conclusion,
+            "head_sha": head,
+            "status": "completed",
+            "started_at": "2026-09-08T19:00:00Z",
+        }
+        for name in landing.REQUIRED_CONTEXTS
+    ]
     return {"total": len(runs), "runs": runs}
 
 
@@ -357,3 +366,32 @@ def test_rerecord_never_restores_spent_budget(tmp_path: Path) -> None:
     landing.record_followup(tmp_path, "k", landing.FollowupState(owner="o", session="s2", scope="pr", head=HEAD))
     assert landing.load_followup(tmp_path, "k").attempts == 1
     assert landing.consume_retry(tmp_path, "k", "rerun", HEAD)["allowed"] is False
+
+
+def test_live_check_verdicts_uses_get_only_invocation() -> None:
+    # gh api sends POST whenever -F/--field/--paginate flags are present, and
+    # list endpoints answer GET only: a POST 404s, rc != 0, and every landing
+    # arm would refuse. Pin the GET-only shape.
+    run = FakeRun([(0, _live_checks_payload(HEAD))])
+    landing.live_check_verdicts(run, "o/r", HEAD)
+    (cmd,) = run.calls
+    assert cmd[:2] == ["gh", "api"]
+    assert not any(part in ("-F", "--field", "--raw-field", "--paginate") for part in cmd)
+    assert cmd[2].startswith("repos/o/r/commits/") and "per_page=100" in cmd[2]
+
+
+def test_verify_evidence_live_prefers_latest_run_over_stale_success() -> None:
+    payload = _live_checks_payload(HEAD)
+    payload["runs"].append(
+        {
+            "name": landing.REQUIRED_CONTEXTS[0],
+            "conclusion": "failure",
+            "head_sha": HEAD,
+            "status": "completed",
+            "started_at": "2026-09-08T20:00:00Z",
+        }
+    )
+    payload["total"] = len(payload["runs"])
+    run = FakeRun([(0, payload)])
+    with pytest.raises(landing.LandingError, match="live verification"):
+        landing.verify_evidence_live(run, "o/r", _live_pr(HEAD), _evidence(HEAD))
