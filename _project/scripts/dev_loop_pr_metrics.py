@@ -41,6 +41,9 @@ Usage:
     uv run -- python _project/scripts/dev_loop_pr_metrics.py
     uv run -- python _project/scripts/dev_loop_pr_metrics.py --days 28 --json
     uv run -- python _project/scripts/dev_loop_pr_metrics.py --collect-durations
+    uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-lifecycle-baseline LIFECYCLE --process-baseline PROCESS
+    uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-refresh-audit AUDIT --baseline LIFECYCLE
+    uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-process-acceptance ACCEPTANCE --process-baseline PROCESS
 
 --collect-durations is a separate, local-machine-only mode: it runs the fast
 test lane under `pytest --durations=20` and prints the slowest tests. It does
@@ -78,6 +81,24 @@ API_RETRY_ATTEMPTS = 3
 # Versioned synchronize-event fan-out schema. Existing PrMetrics / summarize
 # keys stay unchanged so current consumers keep working.
 EVENT_FANOUT_SCHEMA = "event_fanout_v1"
+# Complete-lifecycle baseline schema: every synchronize head plus every run
+# attempt per PR, with expired/unobservable evidence as explicit missingness
+# instead of silent exclusion (ci-baseline w1/w2).
+LIFECYCLE_SCHEMA = "ci_lifecycle_baseline_v1"
+# Machine-readable refresh-audit block embedded in the exact-refresh Markdown
+# audit; the validator recomputes it from the shared lifecycle baseline.
+REFRESH_AUDIT_SCHEMA = "refresh_audit_v1"
+# Final integrated acceptance record: binds the frozen preregistration,
+# incident replays, prospective cohort, and efficiency targets. The validator
+# exits non-zero listing gaps until every dimension passes; incomplete stays
+# incomplete, never provisionally green.
+PROCESS_ACCEPTANCE_SCHEMA = "pr_process_acceptance_v1"
+BATCH_DELIVERY_RECEIPT_SCHEMA = "batch_delivery_receipt_v1"
+# Full-required reasons that must stay separate counters: gate-timing loss vs
+# prior-head identity/binding failure. Conflating them hides which mechanism
+# to fix; the refresh-audit validator rejects reports that merge them.
+REFRESH_REASON_TIMING = "prior_check_not_success"
+REFRESH_REASON_IDENTITY = "prior_check_unbound"
 REQUIRED_CONTEXT_NAMES: tuple[str, ...] = (
     "ci-required-result",
     "Results Explorer browser gate",
@@ -617,11 +638,18 @@ def job_setup_execution_seconds(job: dict) -> tuple[float | None, float | None, 
 
 
 def runner_minute_report(jobs: list[dict]) -> dict[str, float | int]:
-    """Split completed runner-minutes from cancelled/incomplete observations."""
+    """Split completed/cancelled/failed runner-minutes from incomplete observations.
+
+    Failed jobs burned runners too: excluding them understates consumed
+    compute, so they get their own bucket instead of vanishing into
+    `incomplete` (reserved for jobs with no usable conclusion or duration).
+    """
 
     completed = 0.0
     cancelled = 0.0
+    failed = 0.0
     cancelled_count = 0
+    failed_count = 0
     incomplete_count = 0
     setup = 0.0
     execution = 0.0
@@ -632,6 +660,14 @@ def runner_minute_report(jobs: list[dict]) -> dict[str, float | int]:
             elapsed = _elapsed_seconds(job.get("started_at"), job.get("completed_at"))
             if elapsed is not None:
                 cancelled += elapsed / 60.0
+            continue
+        if conclusion in ("failure", "timed_out"):
+            failed_count += 1
+            elapsed = _elapsed_seconds(job.get("started_at"), job.get("completed_at"))
+            if elapsed is not None:
+                failed += elapsed / 60.0
+            else:
+                incomplete_count += 1
             continue
         if conclusion != "success":
             incomplete_count += 1
@@ -648,7 +684,9 @@ def runner_minute_report(jobs: list[dict]) -> dict[str, float | int]:
     return {
         "completed_runner_minutes": completed,
         "cancelled_runner_minutes": cancelled,
+        "failed_runner_minutes": failed,
         "cancelled_job_count": cancelled_count,
+        "failed_job_count": failed_count,
         "incomplete_job_count": incomplete_count,
         "setup_runner_minutes": setup,
         "execution_runner_minutes": execution,
@@ -691,7 +729,204 @@ def event_fanout_metrics(
         "all_workflow_seconds": all_workflow_seconds(runs),
         "queue_delay_seconds": queue_delay_seconds(gate_end, merged_at),
         "workflow_run_counts": by_workflow,
+        "retrieval_ids": retrieval_identities(runs, jobs, check_runs),
         **report,
+    }
+
+
+def retrieval_identities(runs: list[dict], jobs: list[dict], check_runs: list[dict]) -> dict[str, list[dict]]:
+    """Slim retrieval identities so aggregates stay replayable.
+
+    Only IDs, names, conclusions, and attempts — enough to re-fetch the
+    exact runs/jobs/checks behind any number. Full payloads would bloat the
+    baseline without adding replay power.
+    """
+    return {
+        "runs": [
+            {"id": run.get("id"), "attempt": run.get("run_attempt"), "name": str(run.get("name") or "")}
+            for run in runs
+            if isinstance(run, dict)
+        ],
+        "jobs": [
+            {
+                "id": job.get("id"),
+                "name": str(job.get("name") or ""),
+                "conclusion": job.get("conclusion"),
+            }
+            for job in jobs
+            if isinstance(job, dict)
+        ],
+        "checks": [
+            {
+                "id": check.get("id"),
+                "name": str(check.get("name") or ""),
+                "conclusion": check.get("conclusion"),
+            }
+            for check in check_runs
+            if isinstance(check, dict)
+        ],
+    }
+
+
+def fetch_cohort_pr_numbers(client: GitHubClient, since_iso: str, until_iso: str) -> list[int]:
+    """Every merged develop PR number in [since, until] via date-bounded search.
+
+    The pulls list endpoint paginates by recency of update, so a single page
+    silently drops in-window merges pushed past the page edge by later
+    activity. Search by merged-date range enumerates the cohort completely;
+    a short page against total_count fails closed instead of understating.
+    """
+
+    import urllib.parse
+
+    raw_query = f"repo:{client.repo} is:pr is:merged base:develop merged:{since_iso[:10]}..{until_iso[:10]}"
+    query = urllib.parse.quote(raw_query, safe="")
+    first = client.get(f"/search/issues?q={query}&per_page=1")
+    if not isinstance(first, dict) or not isinstance(first.get("total_count"), int):
+        raise ApiFailure(f"cohort search failed: {query}")
+    items = client.get_paginated(f"/search/issues?q={query}", item_key="items")
+    numbers = [int(item["number"]) for item in items if isinstance(item, dict) and item.get("number")]
+    if len(numbers) < int(first["total_count"]):
+        raise ApiFailure(
+            f"cohort search truncated: {len(numbers)} of {first['total_count']} "
+            "(1000-result search cap or failed page; narrow the window instead of understating)"
+        )
+    return numbers
+
+
+def pr_history_commits(client: GitHubClient, number: int) -> list[dict]:
+    """Current-history commits of the PR (each entry carries parent SHAs)."""
+    return client.get_paginated(f"/repos/{client.repo}/pulls/{number}/commits")
+
+
+def pr_nontip_shas(commits: list[dict]) -> set[str]:
+    """Current-history SHAs that have a child in the same history.
+
+    A multi-commit push lists every commit, but only the tip ever ran CI: a
+    non-tip commit with no observable runs was never a synchronize head, so
+    it must not inflate the missing-artifact count.
+    """
+    by_sha = {str(c.get("sha") or ""): c for c in commits if isinstance(c, dict)}
+    children: set[str] = set()
+    for commit in by_sha.values():
+        parents = commit.get("parents") or []
+        for parent in parents:
+            if isinstance(parent, dict) and str(parent.get("sha") or "") in by_sha:
+                children.add(str(parent.get("sha")))
+    return children
+
+
+def pr_synchronize_heads(client: GitHubClient, number: int) -> list[str]:
+    """Every current-history commit SHA of the PR, oldest first.
+
+    Force-pushed-away tips are NOT recoverable from the issue timeline
+    (verified: `committed` events mirror current history and
+    `head_ref_force_pushed` carries no before-SHA), so orphan-tip recovery
+    runs as a separate branch-runs pass documented in the baseline report
+    instead of pretending the timeline covers it.
+    """
+
+    heads: list[str] = []
+    for commit in pr_history_commits(client, number):
+        sha = str(commit.get("sha") or "") if isinstance(commit, dict) else ""
+        if sha and sha not in heads:
+            heads.append(sha)
+    return heads
+
+
+def lifecycle_for_pr(client: GitHubClient, pr: dict) -> dict:
+    """All-head fan-out for one PR, with explicit missing-artifact entries.
+
+    Returns heads (every synchronize SHA in push order), per_head fan-out
+    keyed by SHA, attempts per SHA, missing entries for heads with no
+    observable runs (expired retention or never scheduled -- censored, never
+    silently dropped), and totals that validators recompute from per-head
+    data. Speculative merge_group and post-merge runs are intentionally out
+    of scope here: runs are queried per authored head SHA, so queue-generated
+    speculative heads never enter these totals.
+    """
+
+    number = pr["number"]
+    commits = pr_history_commits(client, number)
+    heads = []
+    for commit in commits:
+        sha = str(commit.get("sha") or "") if isinstance(commit, dict) else ""
+        if sha and sha not in heads:
+            heads.append(sha)
+    nontips = pr_nontip_shas(commits)
+    final_sha = str((pr.get("head") or {}).get("sha") or "")
+    per_head: dict[str, dict] = {}
+    attempts: dict[str, int] = {}
+    missing: list[dict] = []
+    for sha in heads:
+        runs = client.get_paginated(
+            f"/repos/{client.repo}/actions/runs?head_sha={sha}",
+            item_key="workflow_runs",
+        )
+        if not runs:
+            if sha in nontips:
+                missing.append(
+                    {
+                        "head_sha": sha,
+                        "status": "non-tip-commit",
+                        "reason": "intra-push commit with a child in the same history; "
+                        "only the push tip ever ran CI, so this SHA was never a head",
+                    }
+                )
+            else:
+                missing.append(
+                    {
+                        "head_sha": sha,
+                        "status": "missing-artifact",
+                        "reason": "no observable workflow runs for head (expired retention or never scheduled)",
+                    }
+                )
+            continue
+        jobs: list[dict] = []
+        head_attempts = 0
+        for run in runs:
+            jobs.extend(
+                client.get_paginated(
+                    f"/repos/{client.repo}/actions/runs/{run['id']}/jobs",
+                    item_key="jobs",
+                )
+            )
+            try:
+                head_attempts += int(run.get("run_attempt") or 1)
+            except (TypeError, ValueError):
+                head_attempts += 1
+        check_runs = client.get_paginated(
+            f"/repos/{client.repo}/commits/{sha}/check-runs",
+            item_key="check_runs",
+        )
+        per_head[sha] = event_fanout_metrics(
+            runs=runs,
+            jobs=jobs,
+            check_runs=check_runs,
+            merged_at=pr.get("merged_at") if sha == final_sha else None,
+        )
+        attempts[sha] = head_attempts
+    totals = {
+        "head_count": len(heads),
+        "observed_head_count": len(per_head),
+        "missing_head_count": len([m for m in missing if m.get("status") == "missing-artifact"]),
+        "non_tip_head_count": len([m for m in missing if m.get("status") == "non-tip-commit"]),
+        "total_attempts": sum(attempts.values()),
+        "completed_runner_minutes": sum(
+            float(per_head[sha].get("completed_runner_minutes") or 0.0) for sha in per_head
+        ),
+        "cancelled_runner_minutes": sum(
+            float(per_head[sha].get("cancelled_runner_minutes") or 0.0) for sha in per_head
+        ),
+        "failed_runner_minutes": sum(float(per_head[sha].get("failed_runner_minutes") or 0.0) for sha in per_head),
+    }
+    return {
+        "number": number,
+        "heads": heads,
+        "per_head": per_head,
+        "attempts": attempts,
+        "missing": missing,
+        "totals": totals,
     }
 
 
@@ -737,6 +972,746 @@ def summarize(metrics: list[PrMetrics]) -> dict:
         # right up to the moment the lane starts failing.
         "medium_test_budget_warning": _medium_budget_warning(_pct(medium_job, 95)),
     }
+
+
+# ---------------------------------------------------------------------------
+# Local report validators: recompute frozen report numbers from the same
+# data instead of trusting selected manual sums. These validate local JSON /
+# Markdown reports; they are not CI gates and they fetch nothing.
+# ---------------------------------------------------------------------------
+def _sha256_bytes(data: bytes) -> str:
+    import hashlib
+
+    return hashlib.sha256(data).hexdigest()
+
+
+def validate_lifecycle_baseline(lifecycle: dict, process: dict, process_digest: str) -> list[str]:
+    """Check a ci_lifecycle_baseline_v1 report against the frozen process baseline.
+
+    Verifies immutable identity completeness (every synchronize head present
+    exactly once across per_head/missing), recomputed all-head/run-attempt
+    totals, explicit missingness, and that the preregistered process criteria
+    are unchanged. Returns a list of failure strings; empty means valid.
+    """
+
+    errors: list[str] = []
+    if not isinstance(lifecycle, dict) or lifecycle.get("schema") != LIFECYCLE_SCHEMA:
+        return [f"lifecycle baseline schema must be {LIFECYCLE_SCHEMA!r}"]
+    if not isinstance(process, dict):
+        return ["process baseline must be a JSON object"]
+    proc_ref = lifecycle.get("process_baseline")
+    if not isinstance(proc_ref, dict):
+        errors.append("lifecycle baseline must record its process_baseline binding")
+    else:
+        if proc_ref.get("criteria_version") != process.get("criteria_version"):
+            errors.append(
+                "process criteria changed after registration: "
+                f"lifecycle binds {proc_ref.get('criteria_version')!r}, "
+                f"process file declares {process.get('criteria_version')!r} "
+                "(bump criteria_version and disclose instead of re-scoring)"
+            )
+        if proc_ref.get("process_digest") != process_digest:
+            errors.append("process baseline content differs from the frozen digest (thresholds or scenarios changed)")
+    prs = lifecycle.get("prs")
+    if not isinstance(prs, list) or not prs:
+        errors.append("lifecycle baseline must list at least one PR entry")
+        return errors
+    errors.extend(_check_lifecycle_cohort(lifecycle, prs))
+    for entry in prs:
+        if not isinstance(entry, dict):
+            errors.append("PR entry must be an object")
+            continue
+        errors.extend(_check_lifecycle_entry(entry))
+    return errors
+
+
+def _check_lifecycle_cohort(lifecycle: dict, prs: list) -> list[str]:
+    """Reconcile the declared cohort with the exact PR and gap identities."""
+    errors: list[str] = []
+    cohort = lifecycle.get("cohort")
+    gaps = lifecycle.get("collection_gaps")
+    if not isinstance(cohort, dict):
+        return ["lifecycle cohort must be an object"]
+    if not isinstance(gaps, list):
+        return ["lifecycle collection_gaps must be a list"]
+
+    counts: dict[str, int] = {}
+    for field in ("candidate_prs", "collected_prs"):
+        value = cohort.get(field)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            errors.append(f"lifecycle cohort {field} must be a nonnegative integer")
+        else:
+            counts[field] = value
+
+    pr_numbers = [entry.get("number") for entry in prs if isinstance(entry, dict)]
+    if any(not isinstance(number, int) or isinstance(number, bool) for number in pr_numbers):
+        errors.append("lifecycle PR numbers must be integers")
+    valid_pr_numbers = [number for number in pr_numbers if isinstance(number, int) and not isinstance(number, bool)]
+    if len(valid_pr_numbers) != len(set(valid_pr_numbers)):
+        errors.append("lifecycle PR entries contain duplicate numbers")
+
+    gap_numbers: list[int] = []
+    for gap in gaps:
+        if not isinstance(gap, dict):
+            errors.append(f"lifecycle collection gap must be an object: {gap!r}")
+            continue
+        number = gap.get("number")
+        status = gap.get("status")
+        if not isinstance(number, int) or isinstance(number, bool):
+            errors.append(f"lifecycle collection gap number must be an integer: {gap!r}")
+            continue
+        if not isinstance(status, str) or not status.strip():
+            errors.append(f"lifecycle collection gap status must be non-empty: {gap!r}")
+        gap_numbers.append(number)
+    if len(gap_numbers) != len(set(gap_numbers)):
+        errors.append("lifecycle collection_gaps contain duplicate PR numbers")
+    overlap = sorted(set(valid_pr_numbers) & set(gap_numbers))
+    if overlap:
+        errors.append(f"lifecycle PRs and collection_gaps overlap: {overlap}")
+    if counts.get("collected_prs") != len(set(valid_pr_numbers)):
+        errors.append(
+            f"lifecycle cohort collected_prs {counts.get('collected_prs')!r} "
+            f"!= {len(set(valid_pr_numbers))} unique PR entries"
+        )
+    expected_candidates = len(set(valid_pr_numbers)) + len(set(gap_numbers))
+    if counts.get("candidate_prs") != expected_candidates:
+        errors.append(
+            f"lifecycle cohort candidate_prs {counts.get('candidate_prs')!r} "
+            f"!= {len(set(valid_pr_numbers))} collected + {len(set(gap_numbers))} gaps"
+        )
+    return errors
+
+
+def _check_lifecycle_entry(entry: dict) -> list[str]:
+    """Identity completeness and recomputed totals for one lifecycle PR entry."""
+
+    errors: list[str] = []
+    number = entry.get("number")
+    heads = entry.get("heads") or []
+    per_head = entry.get("per_head") or {}
+    attempts = entry.get("attempts") or {}
+    missing = entry.get("missing") or []
+    totals = entry.get("totals") or {}
+    if len(heads) != len(set(heads)):
+        errors.append(f"PR #{number}: duplicate head SHAs in heads list")
+    missing_shas = [m.get("head_sha") for m in missing if isinstance(m, dict)]
+    if set(per_head) & set(missing_shas):
+        errors.append(f"PR #{number}: head recorded as both observed and missing")
+    if set(per_head) | set(missing_shas) != set(heads):
+        errors.append(
+            f"PR #{number}: heads/per_head/missing disagree "
+            f"({len(heads)} heads, {len(per_head)} observed, {len(missing_shas)} missing)"
+        )
+    for m in missing:
+        if not isinstance(m, dict) or not m.get("status") or not m.get("reason"):
+            errors.append(f"PR #{number}: missing entry must carry explicit status and reason")
+    for sha in per_head:
+        if sha not in attempts:
+            errors.append(f"PR #{number}: observed head {sha[:12]} lacks an attempt count")
+    for sha in attempts:
+        if sha not in per_head:
+            errors.append(f"PR #{number}: attempt count for unobserved head {sha[:12]}")
+    for sha in per_head:
+        ids = (per_head[sha].get("retrieval_ids") or {}).get("runs") or []
+        if not any(isinstance(r, dict) and r.get("id") for r in ids):
+            errors.append(
+                f"PR #{number}: observed head {sha[:12]} carries no run retrieval IDs; "
+                "aggregates without IDs are not replayable"
+            )
+    errors.extend(_check_lifecycle_totals(number, heads, per_head, attempts, missing, totals))
+    return errors
+
+
+def _check_lifecycle_totals(
+    number: object,
+    heads: list,
+    per_head: dict,
+    attempts: dict,
+    missing: list,
+    totals: dict,
+) -> list[str]:
+    """Recompute one entry's integer counts and runner-minute totals."""
+
+    errors: list[str] = []
+    statuses = [m.get("status") if isinstance(m, dict) else None for m in missing]
+    for key, expected in (
+        ("head_count", len(heads)),
+        ("observed_head_count", len(per_head)),
+        ("missing_head_count", statuses.count("missing-artifact")),
+        ("non_tip_head_count", statuses.count("non-tip-commit")),
+        ("total_attempts", sum(int(attempts.get(sha) or 0) for sha in per_head)),
+    ):
+        if totals.get(key) != expected:
+            errors.append(f"PR #{number}: totals.{key} is {totals.get(key)!r}, recomputed {expected!r}")
+    for key in ("completed_runner_minutes", "cancelled_runner_minutes", "failed_runner_minutes"):
+        expected = sum(float((per_head[sha] or {}).get(key) or 0.0) for sha in per_head)
+        actual = totals.get(key)
+        if not isinstance(actual, (int, float)) or abs(float(actual) - expected) > 1e-6:
+            errors.append(f"PR #{number}: totals.{key} is {actual!r}, recomputed {expected!r}")
+    return errors
+
+
+_REFRESH_AUDIT_FENCE_RE = re.compile(r"(?ms)```json\s*\n(.*?)```")
+
+
+def _load_refresh_audit_block(audit_text: str) -> tuple[dict | None, str | None]:
+    for match in _REFRESH_AUDIT_FENCE_RE.finditer(audit_text or ""):
+        try:
+            block = json.loads(match.group(1))
+        except ValueError:
+            continue
+        if isinstance(block, dict) and block.get("schema") == REFRESH_AUDIT_SCHEMA:
+            return block, None
+    return None, f"no {REFRESH_AUDIT_SCHEMA} JSON block found in refresh audit"
+
+
+def validate_refresh_audit(audit_text: str, lifecycle: dict, reason_codes: tuple[str, ...]) -> list[str]:
+    """Recompute an exact-refresh audit block from the shared lifecycle baseline.
+
+    Rejects omitted/duplicate observation identities, changed windows,
+    unknown denominators, unknown reason codes, and conflated timing vs
+    identity reasons. Returns a list of failure strings; empty means valid.
+    """
+
+    errors: list[str] = []
+    block, block_error = _load_refresh_audit_block(audit_text)
+    if block is None or block_error:
+        return [block_error or "unreadable refresh audit block"]
+    if not isinstance(lifecycle, dict) or lifecycle.get("schema") != LIFECYCLE_SCHEMA:
+        return [f"refresh audit baseline must be a {LIFECYCLE_SCHEMA} report"]
+    cohort = lifecycle.get("cohort") or {}
+    for key in ("window_start", "window_end"):
+        if block.get(key) != cohort.get(key):
+            errors.append(f"refresh audit {key} {block.get(key)!r} != baseline cohort {cohort.get(key)!r}")
+    baseline_prs = set()
+    baseline_heads: dict[int, set[str]] = {}
+    for entry in lifecycle.get("prs") or []:
+        if not isinstance(entry, dict):
+            continue
+        number = entry.get("number")
+        baseline_prs.add(number)
+        baseline_heads[number] = set(entry.get("heads") or [])
+    denominator = block.get("denominator_prs") or []
+    if not isinstance(denominator, list):
+        return errors + ["refresh audit denominator_prs must be a list"]
+    unknown = [n for n in denominator if n not in baseline_prs]
+    if unknown:
+        errors.append(f"refresh audit denominator uses PRs outside the frozen baseline: {unknown!r}")
+    omitted = sorted(set(baseline_prs) - set(denominator))
+    if omitted:
+        errors.append(
+            f"refresh audit denominator omits frozen baseline PRs (subset audits hide "
+            f"unfavorable observations): {omitted!r}"
+        )
+    observations = block.get("observations") or []
+    recomputed = _check_audit_observations(observations, reason_codes, errors)
+    _check_audit_counts(block, observations, recomputed, errors)
+    _check_audit_missing(block, denominator, baseline_heads, observations, errors)
+    return errors
+
+
+def _check_audit_observations(observations: list, reason_codes: tuple[str, ...], errors: list[str]) -> dict[str, int]:
+    """Validate observation identities/codes; return recomputed reason counts."""
+
+    seen: set[tuple] = set()
+    recomputed: dict[str, int] = {}
+    for obs in observations:
+        if not isinstance(obs, dict):
+            errors.append("refresh observation must be an object")
+            continue
+        identity = (obs.get("pr"), obs.get("head_sha"), obs.get("run_id"), obs.get("attempt"))
+        if None in identity:
+            errors.append(f"refresh observation lacks a full pr/head/run/attempt identity: {obs!r}")
+            continue
+        if identity in seen:
+            errors.append(f"duplicate refresh observation identity: {identity!r}")
+        seen.add(identity)
+        reason = obs.get("reason")
+        if reason not in reason_codes:
+            errors.append(f"unknown refresh reason code: {reason!r}")
+            continue
+        recomputed[reason] = recomputed.get(reason, 0) + 1
+    return recomputed
+
+
+def _check_audit_counts(block: dict, observations: list, recomputed: dict[str, int], errors: list[str]) -> None:
+    """Recompute reason counts and the timing-only share from observations."""
+
+    claimed_counts = block.get("reason_counts") or {}
+    for required_key in (REFRESH_REASON_TIMING, REFRESH_REASON_IDENTITY):
+        if required_key not in claimed_counts:
+            # Counters must be reported separately even when zero so a later
+            # reader can tell timing loss from identity failure.
+            errors.append(f"reason_counts must report {required_key!r} separately (zero allowed), not conflate it")
+    comparable = {
+        key: value
+        for key, value in claimed_counts.items()
+        if not (value == 0 and key in (REFRESH_REASON_TIMING, REFRESH_REASON_IDENTITY))
+    }
+    if comparable != dict(recomputed):
+        errors.append(f"reason_counts {claimed_counts!r} != recomputed {recomputed!r}")
+    full_required = sum(1 for o in observations if isinstance(o, dict) and o.get("verdict") == "full_required")
+    timing = recomputed.get(REFRESH_REASON_TIMING, 0)
+    expected_share = (timing / full_required) if full_required else 0.0
+    actual_share = block.get("timing_only_share")
+    if not isinstance(actual_share, (int, float)) or abs(float(actual_share) - expected_share) > 1e-9:
+        errors.append(f"timing_only_share is {actual_share!r}, recomputed {expected_share!r}")
+
+
+def _check_audit_missing(
+    block: dict,
+    denominator: list,
+    baseline_heads: dict[int, set[str]],
+    observations: list,
+    errors: list[str],
+) -> None:
+    """Every denominator head must be observed or explicitly missing."""
+
+    observed_pairs = {(o.get("pr"), o.get("head_sha")) for o in observations if isinstance(o, dict)}
+    missing = block.get("missing") or []
+    missing_pairs = {(m.get("pr"), m.get("head_sha")) for m in missing if isinstance(m, dict)}
+    for number in denominator:
+        for sha in baseline_heads.get(number, set()):
+            if (number, sha) not in observed_pairs and (number, sha) not in missing_pairs:
+                errors.append(f"PR #{number} head {str(sha)[:12]} neither observed nor listed as missing")
+    for m in missing:
+        if not isinstance(m, dict) or not m.get("pr") or not m.get("head_sha") or not m.get("status"):
+            errors.append(f"missing entry must carry pr/head/status: {m!r}")
+
+
+def run_validate_lifecycle_baseline(lifecycle_path: str, process_path: str) -> int:
+    """CLI entry: exit 0 only on a fully reconciled lifecycle report."""
+
+    try:
+        lifecycle = json.loads(Path(lifecycle_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"INVALID lifecycle baseline {lifecycle_path}: {exc}")
+        return 1
+    try:
+        process_raw = Path(process_path).read_bytes()
+        process = json.loads(process_raw.decode("utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"INVALID process baseline {process_path}: {exc}")
+        return 1
+    errors = validate_lifecycle_baseline(lifecycle, process, _sha256_bytes(process_raw))
+    if errors:
+        print(f"INVALID lifecycle baseline {lifecycle_path}:")
+        for error in errors:
+            print(f"  - {error}")
+        return 1
+    print(f"VALID lifecycle baseline {lifecycle_path}")
+    return 0
+
+
+def _git_show_bytes(revision: str, path: str) -> bytes | None:
+    try:
+        proc = subprocess.run(
+            ["git", "show", f"{revision}:{path}"],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def _is_ancestor(commit: str, head: str = "HEAD") -> bool:
+    try:
+        proc = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", commit, head],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return proc.returncode == 0
+
+
+def validate_process_acceptance(
+    acceptance: dict,
+    process: dict,
+    process_digest: str,
+    process_relpath: str = "_project/analysis/pr-process-acceptance-baseline.json",
+) -> list[str]:
+    """Check the final acceptance record against the frozen preregistration.
+
+    Binds criteria version + content digest, proves the frozen file existed
+    verbatim at the recorded registration commit (freeze precedes dependent
+    implementation), rejects unreported cohort changes, and requires every
+    incident replay, cohort dimension, and efficiency target to pass.
+    Returns failure strings; empty means accepted.
+    """
+
+    errors: list[str] = []
+    if not isinstance(acceptance, dict) or acceptance.get("schema") != PROCESS_ACCEPTANCE_SCHEMA:
+        return [f"acceptance record schema must be {PROCESS_ACCEPTANCE_SCHEMA!r}"]
+    if not isinstance(process, dict):
+        return ["process baseline must be a JSON object"]
+    errors.extend(_check_acceptance_binding(acceptance, process, process_digest, process_relpath))
+    errors.extend(_check_acceptance_cohort(acceptance, process))
+    errors.extend(_check_acceptance_replays(acceptance, process))
+    errors.extend(_check_acceptance_efficiency(acceptance, process))
+    return errors
+
+
+def _check_acceptance_binding(acceptance: dict, process: dict, process_digest: str, process_relpath: str) -> list[str]:
+    """Criteria binding plus freeze-before-implementation proof."""
+    errors: list[str] = []
+    binding = acceptance.get("process_binding") or {}
+    if binding.get("criteria_version") != process.get("criteria_version"):
+        errors.append("acceptance binds a different criteria_version than the process file (criteria changed)")
+    if binding.get("process_digest") != process_digest:
+        errors.append("process baseline content differs from the bound digest (thresholds or scenarios changed)")
+    registration = acceptance.get("registration") or {}
+    reg_commit = str(registration.get("commit") or "")
+    if not reg_commit:
+        errors.append("acceptance must record its preregistration commit")
+        return errors
+    frozen = _git_show_bytes(reg_commit, process_relpath)
+    if frozen is None:
+        errors.append(f"registration commit {reg_commit[:12]} not resolvable in this tree")
+    elif _sha256_bytes(frozen) != process_digest:
+        errors.append("process file at the registration commit differs from the bound digest")
+    if not _is_ancestor(reg_commit):
+        errors.append("registration commit is not an ancestor of HEAD (freeze must precede implementation)")
+    return errors
+
+
+def _check_acceptance_cohort(acceptance: dict, process: dict) -> list[str]:
+    """Cohort sufficiency with unreported-change rejection.
+
+    Required minimums are floors from the frozen baseline (stronger is
+    allowed, weaker is tampering); the strata set must equal the frozen set
+    exactly (no dropped or invented strata).
+    """
+    errors: list[str] = []
+    required_cohort = ((acceptance.get("cohort") or {}).get("required")) or {}
+    observed_cohort = ((acceptance.get("cohort") or {}).get("observed")) or {}
+    frozen_cohort = process.get("prospective_cohort") or {}
+    if observed_cohort.get("window_start") != required_cohort.get("window_start") or observed_cohort.get(
+        "window_end"
+    ) != required_cohort.get("window_end"):
+        errors.append("observed cohort window differs from the preregistered window (unreported cohort change)")
+    for dimension in ("prs", "days"):
+        try:
+            floor = int(frozen_cohort.get(f"min_{dimension}") or 0)
+            minimum = int(required_cohort.get(f"min_{dimension}") or 0)
+            observed = int(observed_cohort.get(dimension) or 0)
+        except (TypeError, ValueError):
+            errors.append(f"cohort {dimension} counts must be integers")
+            continue
+        if minimum < floor:
+            errors.append(f"required cohort min_{dimension} {minimum} weakens the frozen floor {floor}")
+        if observed < minimum:
+            errors.append(f"cohort {dimension} insufficient: {observed} < {minimum}")
+    frozen_strata = frozen_cohort.get("strata") or []
+    if set(required_cohort.get("strata") or []) != set(frozen_strata):
+        errors.append(
+            f"required strata {sorted(required_cohort.get('strata') or [])} != frozen strata {sorted(frozen_strata)}"
+        )
+    for stratum in required_cohort.get("strata") or []:
+        if stratum not in (observed_cohort.get("strata") or []):
+            errors.append(f"cohort stratum missing: {stratum}")
+    deliveries = observed_cohort.get("batch_deliveries")
+    try:
+        min_deliveries = int((frozen_cohort.get("batch_deliveries") or {}).get("min_deliveries") or 0)
+    except (TypeError, ValueError):
+        errors.append("frozen batch delivery minimum must be an integer")
+        min_deliveries = 0
+    if not isinstance(deliveries, list):
+        errors.append("batch_deliveries must be a list of bound delivery receipts")
+    else:
+        errors.extend(_check_delivery_receipts(deliveries, frozen_cohort, min_deliveries))
+    if not observed_cohort.get("human_hold"):
+        errors.append("human hold flow (operator-approved soundness hold) not evidenced in the observed cohort")
+    return errors
+
+
+def _check_delivery_receipts(deliveries: list, frozen_cohort: dict, min_deliveries: int) -> list[str]:
+    """Validate distinct, reachable delivery receipts and dependency evidence."""
+    errors: list[str] = []
+    batch_requirements = frozen_cohort.get("batch_deliveries") or {}
+    if not isinstance(batch_requirements, dict):
+        return ["frozen batch delivery requirements must be an object"]
+    try:
+        members_min = int(batch_requirements.get("members_per_delivery_min") or 0)
+        dependencies_min = int(batch_requirements.get("internal_implementation_dependency_min") or 0)
+    except (TypeError, ValueError):
+        return ["frozen batch delivery requirements must be integers"]
+
+    valid_receipts = 0
+    dependency_edges: set[tuple[str, str, str]] = set()
+    seen_batches: set[str] = set()
+    seen_heads: set[str] = set()
+    sha_pattern = re.compile(r"^[0-9a-f]{40}$")
+    for index, delivery in enumerate(deliveries):
+        prefix = f"batch delivery #{index + 1}"
+        if not isinstance(delivery, dict):
+            errors.append(f"{prefix} must be a receipt object")
+            continue
+        receipt_errors: list[str] = []
+        if delivery.get("schema") != BATCH_DELIVERY_RECEIPT_SCHEMA:
+            receipt_errors.append(f"{prefix} schema must be {BATCH_DELIVERY_RECEIPT_SCHEMA!r}")
+        batch_id, integration_head, identity_errors = _check_delivery_identity(
+            delivery, prefix, sha_pattern, seen_batches, seen_heads
+        )
+        receipt_errors.extend(identity_errors)
+        member_ids, member_errors = _check_delivery_members(
+            delivery, prefix, integration_head, sha_pattern, members_min
+        )
+        receipt_errors.extend(member_errors)
+        attestation_errors, edges = _check_delivery_attestations(delivery, prefix, member_ids, batch_id)
+        receipt_errors.extend(attestation_errors)
+        dependency_edges.update(edges)
+        errors.extend(receipt_errors)
+        if not receipt_errors:
+            valid_receipts += 1
+
+    if valid_receipts < min_deliveries:
+        errors.append(f"batch deliveries insufficient: {valid_receipts} valid distinct receipts < {min_deliveries}")
+    if len(dependency_edges) < dependencies_min:
+        errors.append(
+            f"internal implementation dependency evidence insufficient: {len(dependency_edges)} < {dependencies_min}"
+        )
+    return errors
+
+
+def _check_delivery_identity(
+    delivery: dict,
+    prefix: str,
+    sha_pattern: re.Pattern[str],
+    seen_batches: set[str],
+    seen_heads: set[str],
+) -> tuple[str, str, list[str]]:
+    errors: list[str] = []
+    batch_id = delivery.get("batch_id")
+    if not isinstance(batch_id, str) or not batch_id:
+        errors.append(f"{prefix} lacks a batch_id")
+        batch_id = ""
+    elif batch_id in seen_batches:
+        errors.append(f"{prefix} duplicates batch_id {batch_id!r}")
+    else:
+        seen_batches.add(batch_id)
+    integration_head = delivery.get("integration_head")
+    if not isinstance(integration_head, str) or sha_pattern.fullmatch(integration_head) is None:
+        errors.append(f"{prefix} integration_head must be a full Git SHA")
+        integration_head = ""
+    elif integration_head in seen_heads:
+        errors.append(f"{prefix} duplicates integration_head {integration_head}")
+    elif not _is_ancestor(integration_head):
+        errors.append(f"{prefix} integration_head {integration_head} is not reachable from HEAD")
+    else:
+        seen_heads.add(integration_head)
+    return batch_id, integration_head, errors
+
+
+def _check_delivery_members(
+    delivery: dict,
+    prefix: str,
+    integration_head: str,
+    sha_pattern: re.Pattern[str],
+    members_min: int,
+) -> tuple[set[str], list[str]]:
+    errors: list[str] = []
+    members = delivery.get("members")
+    if not isinstance(members, list):
+        return set(), [f"{prefix} members must be a list"]
+    member_ids: list[str] = []
+    for member in members:
+        if not isinstance(member, dict):
+            errors.append(f"{prefix} member must be an object: {member!r}")
+            continue
+        member_id = member.get("id")
+        member_head = member.get("head")
+        if not isinstance(member_id, str) or not member_id:
+            errors.append(f"{prefix} member lacks a non-empty id")
+            continue
+        member_ids.append(member_id)
+        if not isinstance(member_head, str) or sha_pattern.fullmatch(member_head) is None:
+            errors.append(f"{prefix} member {member_id!r} head must be a full Git SHA")
+        elif integration_head and not _is_ancestor(member_head, integration_head):
+            errors.append(f"{prefix} member {member_id!r} head is not in its integration head")
+    unique_ids = set(member_ids)
+    if len(member_ids) != len(unique_ids):
+        errors.append(f"{prefix} contains duplicate member IDs")
+    if len(unique_ids) < members_min:
+        errors.append(f"{prefix} has {len(unique_ids)} members; minimum is {members_min}")
+    return unique_ids, errors
+
+
+def _check_delivery_attestations(
+    delivery: dict, prefix: str, expected_members: set[str], batch_id: str
+) -> tuple[list[str], set[tuple[str, str, str]]]:
+    errors: list[str] = []
+    ancestry = delivery.get("member_ancestry")
+    if not isinstance(ancestry, dict) or set(ancestry) != expected_members:
+        errors.append(f"{prefix} member_ancestry keys must exactly match members")
+    elif any(value is not True for value in ancestry.values()):
+        errors.append(f"{prefix} member_ancestry must be exactly true for every member")
+    item_acceptance = delivery.get("acceptance")
+    if not isinstance(item_acceptance, dict) or set(item_acceptance) != expected_members:
+        errors.append(f"{prefix} acceptance keys must exactly match members")
+    elif any(value != "pass" for value in item_acceptance.values()):
+        errors.append(f"{prefix} acceptance must be exactly 'pass' for every member")
+    dependency_errors, dependency_edges = _check_delivery_dependencies(
+        delivery.get("internal_implementation_dependencies"), prefix, expected_members, batch_id
+    )
+    errors.extend(dependency_errors)
+    return errors, dependency_edges
+
+
+def _check_delivery_dependencies(
+    dependencies: object, prefix: str, expected_members: set[str], batch_id: str
+) -> tuple[list[str], set[tuple[str, str, str]]]:
+    if not isinstance(dependencies, list):
+        return [f"{prefix} internal_implementation_dependencies must be a list"], set()
+    errors: list[str] = []
+    receipt_edges: set[tuple[str, str]] = set()
+    bound_edges: set[tuple[str, str, str]] = set()
+    for edge in dependencies:
+        if not isinstance(edge, dict):
+            errors.append(f"{prefix} internal dependency must be an object: {edge!r}")
+            continue
+        member = edge.get("member")
+        depends_on = edge.get("depends_on")
+        evidence = edge.get("evidence")
+        if not isinstance(member, str) or not isinstance(depends_on, str):
+            errors.append(f"{prefix} internal dependency endpoints must be member IDs: {edge!r}")
+            continue
+        identity = (member, depends_on)
+        if member not in expected_members or depends_on not in expected_members or member == depends_on:
+            errors.append(f"{prefix} internal dependency endpoints must be distinct members: {edge!r}")
+        elif identity in receipt_edges:
+            errors.append(f"{prefix} duplicates internal dependency {identity!r}")
+        elif not isinstance(evidence, str) or not evidence.strip():
+            errors.append(f"{prefix} internal dependency lacks evidence: {edge!r}")
+        else:
+            receipt_edges.add(identity)
+            bound_edges.add((batch_id, member, depends_on))
+    return errors, bound_edges
+
+
+def _check_acceptance_replays(acceptance: dict, process: dict) -> list[str]:
+    """Every recorded incident replay must pass, on the frozen scenario set.
+
+    The scenario set must equal the preregistered set exactly: no dropped
+    hard replays, no invented easy ones.
+    """
+    replays = acceptance.get("incident_replays") or []
+    if not replays:
+        return ["no incident replays recorded"]
+    frozen = process.get("incident_scenarios") or []
+    recorded = sorted(r.get("scenario", "?") for r in replays if isinstance(r, dict))
+    errors = []
+    if recorded != sorted(frozen):
+        errors.append(f"replay scenario set {recorded} != frozen set {sorted(frozen)}")
+    errors.extend(
+        f"incident replay not passing: {replay.get('scenario', '?')}"
+        for replay in replays
+        if not isinstance(replay, dict) or replay.get("status") != "pass"
+    )
+    return errors
+
+
+def _check_acceptance_efficiency(acceptance: dict, process: dict) -> list[str]:
+    """Frozen avoidable-action reduction target with safety and p95 guards.
+
+    The reduction threshold comes from the frozen baseline, never from the
+    acceptance document under test.
+    """
+    errors: list[str] = []
+    efficiency = acceptance.get("efficiency") or {}
+    baseline_actions = efficiency.get("baseline_avoidable_actions")
+    observed_actions = efficiency.get("observed_avoidable_actions")
+    try:
+        frozen_reduction = float((process.get("thresholds") or {}).get("avoidable_action_reduction"))
+    except (TypeError, ValueError):
+        errors.append("frozen baseline fixes no numeric avoidable-action reduction threshold")
+        frozen_reduction = 0.0
+    if baseline_actions is None or observed_actions is None:
+        errors.append("efficiency unmeasured: baseline or observed avoidable actions missing")
+    elif float(baseline_actions) <= 0:
+        errors.append("efficiency baseline must be positive")
+    elif (float(baseline_actions) - float(observed_actions)) / float(baseline_actions) < frozen_reduction:
+        errors.append(f"avoidable-action reduction below frozen {frozen_reduction:.0%}")
+    if efficiency.get("added_required_lane_failure"):
+        errors.append("added required-lane failure attributable to coordination")
+    if efficiency.get("p95_regression_attributable"):
+        errors.append("measured p95 regression attributable to coordination")
+    return errors
+
+
+def run_validate_process_acceptance(acceptance_path: str, process_path: str) -> int:
+    """CLI entry: exit 0 only on a fully satisfied acceptance record."""
+
+    try:
+        acceptance = json.loads(Path(acceptance_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"INCOMPLETE acceptance {acceptance_path}: {exc}")
+        return 1
+    try:
+        process_raw = Path(process_path).read_bytes()
+        process = json.loads(process_raw.decode("utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"INCOMPLETE process baseline {process_path}: {exc}")
+        return 1
+    errors = validate_process_acceptance(acceptance, process, _sha256_bytes(process_raw))
+    if errors:
+        print(f"INCOMPLETE acceptance {acceptance_path}:")
+        for error in errors:
+            print(f"  - {error}")
+        return 1
+    print(f"ACCEPTED {acceptance_path}")
+    return 0
+
+
+def run_validate_refresh_audit(audit_path: str, baseline_path: str) -> int:
+    """CLI entry: exit 0 only on a fully reconciled refresh audit block."""
+
+    try:
+        audit_text = Path(audit_path).read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"INVALID refresh audit {audit_path}: {exc}")
+        return 1
+    try:
+        lifecycle = json.loads(Path(baseline_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"INVALID lifecycle baseline {baseline_path}: {exc}")
+        return 1
+    try:
+        reason_codes = load_refresh_reason_codes()
+    except RuntimeError as exc:
+        print(f"INVALID refresh audit {audit_path}: {exc}")
+        return 1
+    errors = validate_refresh_audit(audit_text, lifecycle, reason_codes)
+    if errors:
+        print(f"INVALID refresh audit {audit_path}:")
+        for error in errors:
+            print(f"  - {error}")
+        return 1
+    print(f"VALID refresh audit {audit_path}")
+    return 0
+
+
+def load_refresh_reason_codes() -> tuple[str, ...]:
+    """Reason codes owned by scripts/pr_refresh_certification.py (single source)."""
+
+    import importlib.util
+
+    path = REPO_ROOT / "scripts" / "pr_refresh_certification.py"
+    spec = importlib.util.spec_from_file_location("pr_refresh_certification_codes", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load refresh reason codes from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    codes = getattr(module, "REASON_CODES", None)
+    if not codes:
+        raise RuntimeError(f"no REASON_CODES in {path}")
+    return tuple(str(code) for code in codes)
 
 
 # ---------------------------------------------------------------------------
@@ -810,10 +1785,69 @@ def main(argv: list[str] | None = None) -> int:
             "touch the GitHub API; mutually exclusive with the default mode."
         ),
     )
+    parser.add_argument(
+        "--validate-lifecycle-baseline",
+        metavar="LIFECYCLE_JSON",
+        default=None,
+        help=(
+            "validate a ci_lifecycle_baseline_v1 report (all-head/run-attempt "
+            "totals, explicit missingness) against --process-baseline. Local "
+            "report check only; touches no API and changes no CI routing."
+        ),
+    )
+    parser.add_argument(
+        "--process-baseline",
+        metavar="PROCESS_JSON",
+        default=None,
+        help="frozen preregistered process baseline the lifecycle report binds.",
+    )
+    parser.add_argument(
+        "--validate-refresh-audit",
+        metavar="AUDIT_MD",
+        default=None,
+        help=(
+            "recompute the refresh_audit_v1 JSON block embedded in a Markdown "
+            "audit from --baseline. Local report check only."
+        ),
+    )
+    parser.add_argument(
+        "--baseline",
+        metavar="LIFECYCLE_JSON",
+        default=None,
+        help="shared lifecycle baseline the refresh audit reconciles against.",
+    )
+    parser.add_argument(
+        "--validate-process-acceptance",
+        metavar="ACCEPTANCE_JSON",
+        default=None,
+        help=(
+            "validate the final integrated acceptance record against the frozen "
+            "preregistration (--process-baseline). Exits non-zero listing gaps "
+            "until every dimension passes."
+        ),
+    )
     args = parser.parse_args(argv)
 
     if args.collect_durations:
         return run_collect_durations()
+
+    if args.validate_process_acceptance:
+        if not args.process_baseline:
+            print("ERROR: --validate-process-acceptance requires --process-baseline.")
+            return 2
+        return run_validate_process_acceptance(args.validate_process_acceptance, args.process_baseline)
+
+    if args.validate_lifecycle_baseline or args.process_baseline:
+        if not args.validate_lifecycle_baseline or not args.process_baseline:
+            print("ERROR: --validate-lifecycle-baseline and --process-baseline must be given together.")
+            return 2
+        return run_validate_lifecycle_baseline(args.validate_lifecycle_baseline, args.process_baseline)
+
+    if args.validate_refresh_audit or args.baseline:
+        if not args.validate_refresh_audit or not args.baseline:
+            print("ERROR: --validate-refresh-audit and --baseline must be given together.")
+            return 2
+        return run_validate_refresh_audit(args.validate_refresh_audit, args.baseline)
 
     client = make_client(args.repo)
     if client is None:

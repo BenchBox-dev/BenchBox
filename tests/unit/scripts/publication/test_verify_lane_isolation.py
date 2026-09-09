@@ -158,6 +158,11 @@ def test_non_lane_inputs_skipped_in_changed_paths() -> None:
         "skill-sync.conf",
         "tools/skill-sync",
         "scripts/skill_sync_ci_policy.py",
+        "scripts/batch_integration.py",
+        "scripts/local_validation.py",
+        "scripts/post_merge_signature.py",
+        "scripts/pr_landing.py",
+        "scripts/ruleset_drift_check.py",
         "scripts/check_release_curation.py",
         "scripts/check_untracked_skill_mirrors.sh",
         "scripts/path_filter_decision.py",
@@ -208,6 +213,11 @@ def test_determine_affected_lanes() -> None:
                 "AGENTS.md",
                 "scripts/check_doc_relative_links.py",
                 "scripts/doc_relative_link_baseline.txt",
+                "scripts/batch_integration.py",
+                "scripts/local_validation.py",
+                "scripts/post_merge_signature.py",
+                "scripts/pr_landing.py",
+                "scripts/ruleset_drift_check.py",
             ]
         )
         == set()

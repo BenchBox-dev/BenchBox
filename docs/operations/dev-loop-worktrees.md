@@ -144,3 +144,43 @@ Per Spec §9, audit reports carry zero deletion authority; removal requires manu
 Existing registrations created by the retired workflow are not automatically
 reset or removed by this workflow. Review and remove them separately,
 preserving dirty, locked, divergent, or ambiguous worktrees.
+
+## Local validation singleflight
+
+Parallel pytest runs serialize on the shared flock in `tests/conftest.py`.
+The default is immediate fail-fast with holder info; set
+`BENCHBOX_TEST_LOCK_WAIT_SECONDS` to a positive bound to wait with
+owner/progress visibility instead (Ctrl-C cancels; the wait never steals,
+deletes, or bypasses — a held flock always means a live holder).
+
+Gate authors avoid duplicate invocations against identical trees with
+`scripts/local_validation.py` (see `make local-validation GATE=... CMD=...`):
+
+- Ordered local path: focused checks first
+  (`pytest -m "fast and not (slow or stress or resource_heavy or live_integration)"`),
+  then the classifier-selected `make pr-preflight`. One gate name per stage;
+  a hook that does no work reports `skipped`, never `tested`/`passed`.
+- `run` executes the command unless a completed receipt binds the identical
+  input identity (HEAD, base ref, status incl. untracked digests, tool
+  versions, gate, batch block). Simultaneous identical requests execute once:
+  waiters re-check under the store lock and reuse the winner's receipt.
+- Changed files/refs/tools, unknown identity, failed priors, and different
+  gates always execute. Receipts are local-only evidence and never satisfy
+  hosted required checks.
+- Batch members pass `--batch-id/--batch-member/--batch-role`; member
+  preparation evidence never certifies the later integrated tree because the
+  integration HEAD differs. Pre-PR effort stays counted: receipts record
+  executions, they do not erase them from delivery accounting.
+
+## Queue-aware publication and resumable follow-up
+
+- Stale-base publication follows `_project/decisions/native-queue-local-landing.md`:
+  verified queue means publish without an ancestry-only refresh; conflict
+  means resolve first; otherwise the conservative ancestry gate stands.
+- Follow-up ownership persists per key under `~/.benchbox/pr-landing/`
+  (`make pr-followup-record/resume`, `scripts/pr_landing.py followup-*`):
+  explicit owner, session, scope, attempts, due date, and next action from
+  pre-PR assembly through post-merge. Terminal outcomes are explicit
+  (`merged`, `closed-merged`, `abandoned`, `superseded`); an empty queue or
+  missing state is never completion. Retries are bounded (one rerun per
+  failed job, one re-entry per unchanged head) and only on unchanged heads.

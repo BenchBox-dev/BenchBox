@@ -43,3 +43,21 @@ gh workflow run seed-corpus.yml
 After the develop PR merges, confirm the mirror draft against
 `published-results` and merge it. `corpus-drift-check.yml` remains the
 loud canary if a push-triggered mirror is dropped.
+
+## Freshness ownership
+
+Freshness — whether the accepted corpus moved and when the ledger seed
+must be regenerated — belongs to this flow, not to the ledger. The seed
+(`publication/ledger-seed.json`) records the exact snapshot SHA it
+validated (`source` plus `source_resolved_at/from` provenance). Ledger
+interfaces never fetch, resolve, or reconcile freshness: `materialize`
+reads bytes from the recorded SHA, and reproduction/validation passes
+`--expect-source` with the recorded SHA so a moved mirror fails with an
+actionable message instead of silently switching inputs.
+
+Regenerating the seed against a new source SHA is a deliberate, reviewed
+act (regenerate, inspect the union diff, commit). The cutover workflow's
+regen-and-diff step is the loud detector: it regenerates from the live
+ref, and any content drift against the committed seed means the mirror
+moved and freshness must be revalidated through this flow. Generation
+without `--expect-source` exists only for that detection step.

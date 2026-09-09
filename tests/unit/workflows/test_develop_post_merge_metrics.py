@@ -269,3 +269,15 @@ def test_post_merge_explorer_tokens_job_runs_unconditionally() -> None:
     assert job.get("if") is None, (
         f"post-merge explorer-tokens job must have no `if:` (always runs); found: {job.get('if')!r}"
     )
+
+
+def test_baseline_selection_filters_by_event() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+
+    assert ".event == $event" in workflow
+
+
+def test_advisory_issue_creation_failure_is_loud() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+
+    assert '--body "${body}" || true' not in workflow

@@ -543,10 +543,13 @@ jobs:
             # predecessor. Mis-selection errs toward reverting (an older
             # baseline makes more failures look new), which is the safe
             # direction.
+            # The baseline is restricted to runs of the same event type:
+            # scheduled runs omit medium tests, so a push run must never
+            # diff against a scheduled lane set (or vice versa).
             if ! runs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/develop-post-merge.yml/runs?branch=develop&status=completed&per_page=10")"; then
               fail_open_reason="Could not list previous develop-post-merge runs via gh api."
-            elif ! prev_run_json="$(jq -c --argjson current "${GITHUB_RUN_NUMBER}" \
-              '[.workflow_runs[] | select(.run_number < $current)] | sort_by(.run_number) | last // empty' \
+            elif ! prev_run_json="$(jq -c --argjson current "${GITHUB_RUN_NUMBER}" --arg event "${{ github.event_name }}" \
+              '[.workflow_runs[] | select(.run_number < $current and .event == $event)] | sort_by(.run_number) | last // empty' \
               <<<"${runs_json}")"; then
               fail_open_reason="Could not parse the previous-runs listing."
             elif [ -z "${prev_run_json}" ] || [ "${prev_run_json}" = "null" ]; then
@@ -662,9 +665,19 @@ jobs:
           fi
           echo "revert-suppressed=${revert_suppressed}" >> "${GITHUB_OUTPUT}"
 
+      - name: Fail loudly on unattributable failure classes
+        id: escalate-attribution
+        if: steps.signature-decision.outputs.should-revert == 'true' && steps.attribute.outputs.action == 'escalate'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Unrecognized failure-ID class needs human classification before any revert." >&2
+          echo "Classify the IDs, extend scripts/post_merge_signature.py, then re-run." >&2
+          exit 1
+
       - name: Open revert PR or conflict issue
         id: open-revert
-        if: steps.signature-decision.outputs.should-revert == 'true' && steps.attribute.outputs.action != 'advisory'
+        if: steps.signature-decision.outputs.should-revert == 'true' && steps.attribute.outputs.action == 'revert'
         shell: bash
         env:
           FAIL_OPEN_REASON: ${{ steps.signature-decision.outputs.fail-open-reason }}
@@ -889,7 +902,7 @@ jobs:
           gh issue create \
             --title "Auto-revert advisory: ${FAILING_SHA:0:12} did not own the failing test" \
             --label incident:develop-red \
-            --body "${body}" || true
+            --body "${body}"
 
       - name: Upsert develop-red incident issue
         id: upsert-incident
