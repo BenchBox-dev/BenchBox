@@ -15,13 +15,7 @@ export function RunAge({ runDate, reference }: RunAgeProps) {
 
 /** Displays a run's UTC calendar date together with its informational age. */
 export function RunDateWithAge({ runDate, reference }: RunAgeProps) {
-  const age = formatRunAge(runDate, reference);
-  return (
-    <span>
-      {formatRunDate(runDate)}
-      {age !== null && <span aria-label={`Run age: ${age}`}> · {age}</span>}
-    </span>
-  );
+  return <RunDateChip runDate={runDate} reference={reference} />;
 }
 
 interface RunDateChipProps extends RunAgeProps {

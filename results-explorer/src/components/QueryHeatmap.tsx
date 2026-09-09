@@ -241,6 +241,14 @@ export function QueryHeatmap({
     () => [...platforms].sort((a, b) => compareMatrixRows(a, b, activeSort)),
     [activeSort, platforms],
   );
+  const identityCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of sorted) {
+      const key = `${row.platform}\0${row.platform_version}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  }, [sorted]);
   const rowIdentityLabels = useMemo(
     () => formatRunIdentitiesForCohort(sorted.map((row) => ({
       result_id: row.result_id,
@@ -409,6 +417,8 @@ export function QueryHeatmap({
     return {
       ...stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, target)),
       ...stickyWidthStyle(STICKY_COL_REM[target]),
+      // Keep query cells reachable when metadata exceeds the viewport width.
+      ...(target !== "checkbox" && target !== "platform" ? { position: "static" as const } : {}),
     };
   }
 
@@ -520,8 +530,7 @@ export function QueryHeatmap({
           {primaryLabel} column uses its own metric and direction ({primaryDirectionLabel}).
         </p>
         <p>
-          A validation badge in the Labels column means that result was excluded from ranking on validation reason.
-          The query measurements remain visible, but they do not form a validated comparison score.
+          Labels show each run’s trust and validation status. A failed or unverified validation excludes the run from ranking; its query timings remain visible.
         </p>
         {hasUnrankableRow && (
           <p data-testid="ranking-eligibility-legend">
@@ -616,9 +625,9 @@ export function QueryHeatmap({
                     )}
                   </div>
                   {row.platform_version && (
-                    <div class="mt-0.5 text-xs text-[var(--bb-data-fg-subtle)]">{row.platform_version}</div>
+                    <VersionLabel version={row.platform_version} plain class="mt-0.5 text-[var(--bb-data-fg-subtle)]" />
                   )}
-                  {hasSelection && comparisonCopy && (
+                    {hasSelection && comparisonCopy && (
                     <CompareDisabledReason id={comparisonReasonId} copy={comparisonCopy} />
                   )}
                   <a
@@ -805,6 +814,9 @@ export function QueryHeatmap({
                         </span>
                       )}
                     </div>
+                    {(identityCounts.get(`${row.platform}\0${row.platform_version}`) ?? 0) > 1 && (
+                      <span class="block font-mono text-xs text-[var(--bb-data-fg-muted)]" data-testid="visible-run-qualifier">{row.short_id || row.result_id}</span>
+                    )}
                     {hasSelection && comparisonCopy && (
                       <CompareDisabledReason id={comparisonReasonId} copy={comparisonCopy} />
                     )}

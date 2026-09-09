@@ -10,7 +10,7 @@ import { useUrlState, type UrlSerde } from "@/lib/useUrlState";
 import { errMsg } from "@/utils";
 import { SubmissionActivity } from "@/components/SubmissionActivity";
 import { PageHeader } from "@/components/PageHeader";
-import { formatRunAge } from "@/lib/runAge";
+import { RunDateChip } from "@/components/RunAge";
 
 type SectionKind = "benchmarks" | "platforms";
 type SectionSort = "name" | "results" | "recent";
@@ -126,31 +126,23 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
             data-testid={`${kind}-index-list`}
           >
             {entries.map((entry) => {
-              const age = formatRunAge(entry.latestRun);
-              const latest = formatRunDate(entry.latestRun);
               return (
                 <li key={entry.id}>
-                  <a
-                    href={entry.href}
+                  <div
                     class="group block h-full rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 no-underline shadow-sm transition-colors hover:border-[var(--bb-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring)]"
                   >
                     <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)] group-hover:text-[var(--bb-accent)]">
-                      {entry.label}
+                      <a href={entry.href}>{entry.label}</a>
                     </h2>
                     <p class="mt-1.5 text-sm text-[var(--bb-data-fg-muted)]">
                       {entry.resultCount.toLocaleString()} runs ·{" "}
                       {entry.coverageCount.toLocaleString()} {isBenchmarks ? "platforms" : "benchmarks"}
                     </p>
-                    {/* The card is one big link, so the date cannot be the
-                        interactive chip used elsewhere; the age rides in the
-                        title instead of doubling the line length. */}
                     <p class="mt-2.5 text-xs text-[var(--bb-data-fg-muted)]">
                       Latest{" "}
-                      <span class="bb-meta-chip" title={age === null ? latest : `${latest} (${age})`}>
-                        {latest}
-                      </span>
+                      <RunDateChip runDate={entry.latestRun} />
                     </p>
-                  </a>
+                  </div>
                 </li>
               );
             })}
@@ -195,13 +187,4 @@ function sortEntries(entries: SectionEntry[], sort: SectionSort): SectionEntry[]
     if (sort === "recent" && left.latestRun !== right.latestRun) return right.latestRun.localeCompare(left.latestRun);
     return left.label.localeCompare(right.label);
   });
-}
-
-function formatRunDate(raw: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(raw));
 }

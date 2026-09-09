@@ -313,16 +313,6 @@ describe("Leaderboard", () => {
         [screen.getByTestId("home-hero-wrapper"), LEADERBOARD_SHELL_GEOMETRY_CLASSES.heroWrapper],
         [screen.getByTestId("home-hero-intro"), LEADERBOARD_SHELL_GEOMETRY_CLASSES.heroIntro],
         [
-          screen.getByRole("heading", { level: 1, name: "Compare benchmark results" }),
-          LEADERBOARD_SHELL_GEOMETRY_CLASSES.headline,
-        ],
-        [
-          screen.getByText(
-            "See how published platform runs compare across BenchBox rankings. Open any result to inspect its evidence.",
-          ),
-          LEADERBOARD_SHELL_GEOMETRY_CLASSES.subtitle,
-        ],
-        [
           screen.getByRole("region", { name: "Leaderboard ranking selector" }),
           LEADERBOARD_SHELL_GEOMETRY_CLASSES.rankingSelector,
         ],

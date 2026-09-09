@@ -94,7 +94,7 @@ describe("SummaryChartOverview section chrome", () => {
     expect(screen.queryByText("What does this cohort show?")).toBeNull();
     expect(screen.queryByText(/Shared scope:/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Copy chart-section link/ })).toBeNull();
-    expect(screen.getByText("Which engines lead on speed and throughput?")).not.toBeNull();
+    expect(screen.getByText("Which platforms lead on speed and throughput?")).not.toBeNull();
     const root = container.querySelector("[data-testid='summary-chart-overview']");
     expect(root?.getAttribute("id")).toBe("cohort-charts");
   });

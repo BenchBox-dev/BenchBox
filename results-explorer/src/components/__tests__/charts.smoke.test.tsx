@@ -423,15 +423,15 @@ describe("QueryHistogram", () => {
           .filter((group) => group.querySelector("[data-query-label]"))
           .map((group) => {
             const marks = Array.from(group.querySelectorAll("rect, line"));
-            const xs = marks.map((mark) =>
-              Number(mark.getAttribute("x") ?? mark.getAttribute("x1") ?? NaN),
+            const starts = marks.map((mark) =>
+              Number(mark.getAttribute("y") ?? mark.getAttribute("y1") ?? NaN),
             );
-            const rights = marks.map((mark) =>
+            const ends = marks.map((mark) =>
               mark.tagName === "rect"
-                ? Number(mark.getAttribute("x") ?? 0) + Number(mark.getAttribute("width") ?? 0)
-                : Number(mark.getAttribute("x2") ?? 0),
+                ? Number(mark.getAttribute("y") ?? 0) + Number(mark.getAttribute("height") ?? 0)
+                : Number(mark.getAttribute("y2") ?? 0),
             );
-            return { left: Math.min(...xs), right: Math.max(...rights) };
+            return { left: Math.min(...starts), right: Math.max(...ends) };
           })
           .filter((extent) => Number.isFinite(extent.left) && Number.isFinite(extent.right))
           .sort((a, b) => a.left - b.left);

@@ -4,7 +4,7 @@ import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
 
 vi.mock("@/lib/duckdbQueries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/duckdbQueries")>("@/lib/duckdbQueries");
-  return { ...actual, getPlatformIndexRows: vi.fn() };
+  return { ...actual, getPlatformIndexRows: vi.fn(), getResultsBasisAvailability: vi.fn().mockResolvedValue([]) };
 });
 
 vi.mock("preact-router", async () => {
@@ -81,7 +81,7 @@ describe("PlatformIndex route-constant columns", () => {
     const table = screen.getByRole("table", { name: "DuckDB results" });
     expect(table).toHaveAttribute("aria-colcount", "9");
     expect(screen.getByTestId("platform-hoisted-metric-contract")).toHaveTextContent(
-      "Route-wide metric contract: Geomean latency (lower is better)",
+      "Results are ranked by: Geomean latency (lower is better)",
     );
     expect(within(table).queryByRole("columnheader", { name: "Ranked on" })).toBeNull();
     expect(within(table).getByRole("button", { name: /Power score/ }).closest("th")).toHaveAttribute(

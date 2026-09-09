@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { buildLogLatencyScale, logLatencyTicks } from "@/lib/chartMath";
+import { buildLogLatencyScale, logLatencyTicks, logLatencyFraction } from "@/lib/chartMath";
 
 describe("logLatencyTicks", () => {
   it("uses whole decades when the range spans several", () => {
@@ -39,4 +39,15 @@ describe("logLatencyTicks", () => {
     const scale = buildLogLatencyScale([1.2, 90])!;
     expect(logLatencyTicks(scale).length).toBeLessThanOrEqual(8);
   });
+});
+
+it("keeps tick coordinates distinct and inside subfloor and narrow domains", () => {
+  for (const values of [[0.01, 0.03], [11.1, 11.2], [0.09, 0.11]]) {
+    const scale = buildLogLatencyScale(values)!;
+    const ticks = logLatencyTicks(scale, 0);
+    const positions = ticks.map((tick) => logLatencyFraction(tick, scale));
+    expect(new Set(positions).size).toBe(positions.length);
+    expect(ticks.every((tick) => tick >= scale.floorMs)).toBe(true);
+    expect(positions.every((position) => position >= -1e-10 && position <= 1 + 1e-10)).toBe(true);
+  }
 });

@@ -1,3 +1,4 @@
+import { RunDateChip } from "@/components/RunAge";
 import type { JSX } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { route } from "preact-router";
@@ -446,7 +447,7 @@ export function MetaLeaderboard({
                         )}
                         {metadata && cellState.kind !== "missing" && (
                           <div class="mt-0.5 text-[10px] font-normal text-[var(--bb-data-fg-muted)]">
-                            Run age: {runAgeLabel}
+                            <RunDateChip runDate={metadata.run_date} />
                           </div>
                         )}
                         {metadata && cellState.kind !== "missing" && (

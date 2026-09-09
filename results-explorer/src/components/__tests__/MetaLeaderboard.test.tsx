@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/preact";
+import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MetaLeaderboard } from "@/components/MetaLeaderboard";
 import type { MetaLeaderboard as MetaLeaderboardData } from "@/types";
@@ -208,7 +208,7 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("exact")).toBeTruthy();
     expect(screen.getByText("loose")).toBeTruthy();
     expect(screen.getAllByRole("gridcell", { name: /Run age:/ })).toHaveLength(2);
-    expect(screen.getByText(/Run age: .*ago/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Run date .*ago/ })).toBeTruthy();
   });
 
   it("shows coverage counts and can sort by covered ranking count", () => {
@@ -676,7 +676,7 @@ describe("MetaLeaderboard", () => {
         name: /Polars has published evidence for TPC-H SF0\.1, but it is excluded: Results from this source are not included in rankings\./,
     });
     expect(cell.textContent).toContain("Excluded");
-    expect(cell.textContent).toMatch(/Run age: .*ago/);
+    expect(within(cell).getByRole("button", { name: /Run date .*ago/ })).toBeTruthy();
     expect(cell.getAttribute("title")).toContain("Results from this source are not included in rankings.");
     expect(cell.textContent).not.toContain("No run");
     expect((cell.querySelector("a") as HTMLAnchorElement | null)?.getAttribute("href")).toBe(
@@ -703,7 +703,7 @@ describe("MetaLeaderboard", () => {
     const failedBadge = failedCell.querySelector('[data-role="validation"]');
     expect(failedBadge?.textContent).toBe("failed");
     expect(failedBadge?.getAttribute("data-tone")).toBe("danger");
-    expect(failedCell.textContent).toContain("Run age: not recorded");
+    expect(failedCell.textContent).toContain("Not recorded");
 
     const passedCell = screen.getByRole("gridcell", { name: /SQLite times for ClickBench SF0\.1: 20 ms/ });
     expect(passedCell.querySelector('[data-role="validation"]')).toBeNull();

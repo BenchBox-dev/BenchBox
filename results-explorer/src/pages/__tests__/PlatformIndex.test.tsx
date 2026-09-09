@@ -14,6 +14,8 @@ vi.mock("@/lib/duckdbQueries", async () => {
   return {
     ...actual,
     getPlatformIndexRows: vi.fn(),
+    getResultsBasisAvailability: vi.fn().mockResolvedValue([]),
+    getDetailResult: vi.fn().mockResolvedValue(null),
   };
 });
 
@@ -25,7 +27,7 @@ vi.mock("preact-router", async () => {
   };
 });
 
-import { getPlatformIndexRows } from "@/lib/duckdbQueries";
+import { getDetailResult, getResultsBasisAvailability, getPlatformIndexRows } from "@/lib/duckdbQueries";
 import { PlatformIndex } from "@/pages/PlatformIndex";
 
 function makeRow(overrides: Partial<PlatformIndexRowRow> = {}): PlatformIndexRowRow {
@@ -956,5 +958,34 @@ describe("PlatformIndex - sortable table headers", () => {
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
     expect(getRowOrder(container)).toEqual(["r14"]);
+  });
+});
+
+describe("platform measurement basis", () => {
+  it("reduces mixed benchmarks independently and reuses loaded executions", async () => {
+    vi.clearAllMocks();
+    window.history.replaceState(null, "", "/results/p/duckdb/");
+    const rows = [makeRow({ result_id: "run-a", benchmark: "tpch", short_id: "aaaaaaaa" }), makeRow({ result_id: "run-b", benchmark: "clickbench", short_id: "bbbbbbbb" })];
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(rows);
+    vi.mocked(getResultsBasisAvailability).mockResolvedValue([]);
+    vi.mocked(getDetailResult).mockImplementation(async (id) => ({
+      ...rows.find((row) => row.result_id === id)!,
+      queries: [{ query_id: id === "run-a" ? "Q1" : "Q99", duration_ms: id === "run-a" ? 4 : 25, status: "pass", run_type: "measurement", iter: 1, stream: null }],
+      display_timings: [],
+      logical_query_count: 1,
+    } as unknown as import("@/types").DetailResult));
+    render(<PlatformIndex platform="duckdb" />);
+    const selector = await screen.findByRole("combobox", { name: "Measurement basis" });
+    expect(getDetailResult).not.toHaveBeenCalled();
+    fireEvent.change(selector, { target: { value: "all_warm:min" } });
+    await waitFor(() => expect(within(screen.getByTestId("run-a")).getByText("4 ms")).toBeTruthy());
+    expect(within(screen.getByTestId("run-b")).getByText("25 ms")).toBeTruthy();
+    expect(screen.queryByText("3,000")).toBeNull();
+    fireEvent.change(selector, { target: { value: "default" } });
+    await waitFor(() => expect(within(screen.getByTestId("run-a")).getByText("15 ms")).toBeTruthy());
+    fireEvent.change(selector, { target: { value: "all_warm:min" } });
+    await waitFor(() => expect(within(screen.getByTestId("run-a")).getByText("4 ms")).toBeTruthy());
+    expect(getDetailResult).toHaveBeenCalledTimes(2);
+    expect(getResultsBasisAvailability).toHaveBeenCalledTimes(1);
   });
 });

@@ -169,8 +169,10 @@ describe("ResultDetail - median-first contract", () => {
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
-    expect(screen.getByTestId("run-date-chip").getAttribute("aria-label")).toMatch(/^Run date .* ago\)\./);
-    expect(screen.getByRole("region", { name: "Run receipt" })).toHaveTextContent(/Run date.*ago/);
+    expect(within(screen.getByTestId("page-header")).getByTestId("run-date-chip").getAttribute("aria-label")).toMatch(/^Run date .* ago\)\./);
+    const chip = within(screen.getByRole("region", { name: "Run receipt" })).getByTestId("run-date-chip");
+    fireEvent.click(chip);
+    expect(chip.textContent).toMatch(/ago/);
   });
 
   it("(b) sample_count cell matches display_timings[i].sample_count", async () => {

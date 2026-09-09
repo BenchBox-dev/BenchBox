@@ -185,6 +185,7 @@ export function logLatencyFraction(ms: number, scale: LogLatencyScale): number {
  */
 export function logLatencyTicks(scale: LogLatencyScale, tolerance = 0.05): number[] {
   const inRange = (ms: number, slack: number) =>
+    ms >= scale.floorMs &&
     logLatencyValue(ms, scale.floorMs) >= scale.logMin - slack &&
     logLatencyValue(ms, scale.floorMs) <= scale.logMax + slack;
 
@@ -209,10 +210,10 @@ export function logLatencyTicks(scale: LogLatencyScale, tolerance = 0.05): numbe
 
   // Nothing lands inside the range - a very narrow span such as 11-13 ms.
   // Label its ends rather than one arbitrary rung, or nothing at all.
-  const min = 2 ** scale.logMin;
+  const min = Math.max(scale.floorMs, 2 ** scale.logMin);
   const max = 2 ** scale.logMax;
   if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return subdivided;
-  return [min, (min + max) / 2, max].map((ms) => roundToTwoSignificantDigits(ms));
+  return [min, Math.sqrt(min * max), max];
 }
 
 /** Keeps the first and last tick and drops interior ones evenly until it fits. */
@@ -223,12 +224,6 @@ function thinTicks(ticks: readonly number[], max: number): number[] {
   const last = ticks[ticks.length - 1]!;
   if (kept[kept.length - 1] !== last) kept.push(last);
   return kept;
-}
-
-function roundToTwoSignificantDigits(value: number): number {
-  if (value === 0) return 0;
-  const magnitude = 10 ** (Math.floor(Math.log10(Math.abs(value))) - 1);
-  return Math.round(value / magnitude) * magnitude;
 }
 
 // ---------------------------------------------------------------------------

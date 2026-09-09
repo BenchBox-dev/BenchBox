@@ -1,8 +1,13 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import type { DetailResult } from "@/types";
+import { PlatformBasisControl } from "@/components/PlatformBasisControl";
+import { platformRowsForBasis } from "@/lib/platformMeasurementBasis";
+import { BASIS_URL_KEY, DEFAULT_BASIS, basisSerde, encodeBasis, formatBasisLabel, isDefaultBasis, parseAvailableBases } from "@/lib/measurementBasis";
+import { useUrlState } from "@/lib/useUrlState";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import { route } from "preact-router";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
-import { getPlatformIndexRows } from "@/lib/duckdbQueries";
+import { getDetailResult, getResultsBasisAvailability, getPlatformIndexRows } from "@/lib/duckdbQueries";
 import { useFacetState, type DateWindowFacet, type ExplorerFacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue, toDateWindowFacet } from "@/lib/facetMatching";
 import {
@@ -139,7 +144,8 @@ function trendMetricDescription(metric: TrendMetric): string {
 
 /** The version this row reports, normalized, or null when none is recorded. */
 function versionText(entry: { driver_version: string | null; platform_version?: string | null }): string | null {
-  return splitVersion(entry.driver_version ?? entry.platform_version ?? null)?.full ?? null;
+  const parts = splitVersion(entry.driver_version ?? entry.platform_version ?? null);
+  return parts ? (parts.suffix ? `${parts.core}…` : parts.core) : null;
 }
 
 /**
@@ -216,6 +222,61 @@ function platformCompareGuidanceMessage(
 export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const resultsScrollerRef = useRef<HTMLDivElement>(null);
   const [rows, setRows] = useState<PlatformIndexRowRow[] | null>(null);
+  const [basis, setBasis] = useUrlState(BASIS_URL_KEY, DEFAULT_BASIS, basisSerde);
+  const detailCache = useRef(new Map<string, Promise<DetailResult | null>>());
+  const [basisDetails, setBasisDetails] = useState<Map<string, DetailResult>>(new Map());
+  const [basisOptions, setBasisOptions] = useState([DEFAULT_BASIS, { ...DEFAULT_BASIS, statistic: "min" as const }]);
+  const [basisLoading, setBasisLoading] = useState(false);
+  const [basisError, setBasisError] = useState<string | null>(null);
+  const requestedRows = useMemo(() => platformRowsForRequest(rows ?? [], platform), [rows, platform]);
+  useEffect(() => {
+    let cancelled = false;
+    const defaults = [DEFAULT_BASIS, { ...DEFAULT_BASIS, statistic: "min" as const }];
+    setBasisOptions(defaults);
+    if (requestedRows.length === 0) return;
+    void getResultsBasisAvailability(requestedRows.map((row) => row.result_id)).catch(() => []).then((available) => {
+      if (cancelled) return;
+      const options = new Map(defaults.map((option) => [encodeBasis(option), option]));
+      for (const row of available) for (const option of parseAvailableBases(row?.available_bases)) options.set(encodeBasis(option), option);
+      options.set(encodeBasis(basis), basis);
+      setBasisOptions([...options.values()]);
+    });
+    return () => { cancelled = true; };
+  }, [requestedRows]);
+  useEffect(() => {
+    let cancelled = false;
+    setBasisError(null);
+    if (isDefaultBasis(basis)) { setBasisLoading(false); return; }
+    setBasisLoading(true);
+    const loadDetails = async () => {
+      const details: DetailResult[] = [];
+      let next = 0;
+      await Promise.all(Array.from({ length: Math.min(4, requestedRows.length) }, async () => {
+        while (next < requestedRows.length && !cancelled) {
+          const row = requestedRows[next++]!;
+          let pending = detailCache.current.get(row.result_id);
+          if (!pending) {
+            pending = getDetailResult(row.result_id).catch((error: unknown) => { detailCache.current.delete(row.result_id); throw error; });
+            detailCache.current.set(row.result_id, pending);
+          }
+          const detail = await pending;
+          if (detail) details.push(detail);
+        }
+      }));
+      return details;
+    };
+    void loadDetails().then((details) => {
+      if (cancelled) return;
+      setBasisDetails(new Map(details.filter((detail): detail is DetailResult => detail !== null).map((detail) => [detail.result_id, detail])));
+      setBasisLoading(false);
+    }).catch(() => {
+      if (cancelled) return;
+      setBasisDetails(new Map());
+      setBasisError("Could not load measurement passes. Choose the published basis or retry.");
+      setBasisLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [requestedRows, basis]);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [visibleLimit, setVisibleLimit] = useState(TABLE_RENDER_LIMIT);
@@ -347,7 +408,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   // Match by platform_id (URL slug) - platform_id is stable and URL-safe.
   // Fall back to matching by display name for backward compatibility with any
   // old links constructed from the display name.
-  const allPlatformResults = platformRowsForRequest(rows, platform);
+  const allPlatformResults = platformRowsForBasis(requestedRows, basisDetails, basis);
   const routeMetricContracts = new Set(
     allPlatformResults.map((row) => primaryMetricContract(row.primary_metric)),
   );
@@ -422,7 +483,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     const row = rowsByResultId.get(resultId);
     return row ? compareIdForRow(row) : resultId;
   });
-  const compareUrl = selected.size >= 2 ? buildCompareUrl(selectedCompareIds) : null;
+  const compareUrl = selected.size >= 2 ? `${buildCompareUrl(selectedCompareIds)}${isDefaultBasis(basis) ? "" : `&basis=${encodeBasis(basis)}`}` : null;
   const compareGuidance = platformCompareGuidanceMessage(selectedRows, selected.size, platformDisplayName);
 
   const platformResults = [...platformResultsRaw].sort((a, b) => {
@@ -831,6 +892,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         </section>
       )}
 
+      <PlatformBasisControl basis={basis} options={basisOptions} onChange={setBasis} loading={basisLoading} error={basisError} />
       {platformResults.length === 0 ? (
         <p class="text-[var(--bb-data-fg-muted)]">
           {allPlatformResults.length > 0 && hasActivePlatformResultFacets(facets)
@@ -884,9 +946,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
           leaderboards cannot describe the same reduction differently.
           */}
           <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]" data-testid="basis-statement">
-          Geomean query time uses the median of each query's published measurement passes, then the
-          geometric mean across queries. Warmup passes are excluded. Dates, counts, and power scores use
-          the definitions shown in their columns and receipts.
+          {isDefaultBasis(basis) ? "Geomean query time uses the median of each query’s published measurement passes, then the geometric mean across queries. Warmup passes are excluded." : `Geomean query time uses ${formatBasisLabel(basis)} across each run’s available queries. Published power scores are hidden for this basis.`}
           </p>
           <DataTable
             ariaLabel={`${platformDisplayName} results`}
@@ -894,7 +954,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             caption={
               hoistedMetricContract ? (
                 <span data-testid="platform-hoisted-metric-contract">
-                  Route-wide metric contract: {hoistedMetricContract}
+                  Results are ranked by: {hoistedMetricContract}
                 </span>
               ) : (
                 "Platform results"
@@ -1211,7 +1271,7 @@ function PlatformRow({ entry, runIdentityLabel, versionLabel, checked, onToggle,
         <a
           href={resultReceiptHref(entry)}
           aria-label={resultIdentityAriaLabel(entry, "receipt")}
-          title={runIdentityLabel}
+          title={`${runIdentityLabel} · ${splitVersion(entry.driver_version ?? entry.platform_version)?.full ?? "Version not recorded"}`}
           class="font-medium no-underline hover:underline"
           data-testid="run-identity-label"
         >

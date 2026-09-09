@@ -128,22 +128,22 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
         <div class="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-[var(--bb-data-border)] pb-4">
           <div>
             <h2 id="summary-metric-overview-title" class="text-lg font-semibold text-[var(--bb-data-fg-primary)]">
-              Which engines lead on speed and throughput?
+              Which platforms lead on speed and throughput?
             </h2>
             <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
-              Display geomean and Power@Size in one compact comparison. Lower latency and higher throughput are better.
+              Geomean query time and power score in one comparison. Lower latency and higher throughput are better.
             </p>
           </div>
-          <p class="font-mono text-xs text-[var(--bb-data-fg-subtle)]">display_geomean_ms · Power@Size</p>
+          <p class="font-mono text-xs text-[var(--bb-data-fg-subtle)]">Geomean query time · Power score</p>
         </div>
 
         <div class="overflow-x-auto">
           <table
             class="summary-metric-table min-w-[38rem] w-full border-collapse"
-            aria-label="Speed and throughput by engine"
+            aria-label="Speed and throughput by platform"
           >
             <caption class="sr-only">
-              Display geomean latency and Power@Size for every submitted engine in this cohort
+              Display geomean latency and Power@Size for every submitted platform in this cohort
             </caption>
             <thead>
               <tr class="border-b border-[var(--bb-data-border-strong)]">

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { JSX } from "preact";
+import type { ComponentChildren, JSX } from "preact";
 import type { BenchmarkSummary, RankingConfig } from "@/types";
 import {
   applicableCharts,
@@ -29,7 +29,7 @@ import { RankTable } from "@/components/RankTable";
 import { SummaryChartOverview } from "@/components/SummaryChartOverview";
 import { fmtGeomean, fmtScore } from "@/utils";
 import { paletteColor } from "@/lib/chartTheme";
-import { formatRunDateWithAge } from "@/lib/runAge";
+import { RunDateChip } from "@/components/RunAge";
 import {
   formatRunIdentitiesForCohort,
   formatRunIdentityLabelsForCohort,
@@ -689,7 +689,7 @@ function ChartPanelLong({
             >
             <h3
               id={`chart-panel-group-${group.id}`}
-              class="border-b border-[var(--bb-data-border)] pb-1 text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]"
+              class="sr-only"
             >
               {groupCopy.label}
             </h3>
@@ -1333,7 +1333,7 @@ function SummaryBoxPanel({
       <div class="grid gap-3 sm:grid-cols-3">
         <SummaryStat label="Runs" value={String(historical.length)} />
         <SummaryStat label="Benchmarks" value={String(benchmarks.size)} />
-        <SummaryStat label="Latest run" value={latest ? formatRunDateWithAge(latest.run_date) : "-"} />
+        <SummaryStat label="Latest run" value={latest ? <RunDateChip runDate={latest.run_date} /> : "-"} />
       </div>
     );
   }
@@ -1399,7 +1399,7 @@ function SummaryBoxPanel({
   );
 }
 
-function SummaryStat({ label, value, title }: { label: string; value: string; title?: string }) {
+function SummaryStat({ label, value, title }: { label: string; value: ComponentChildren; title?: string }) {
   return (
     <div class="rounded-lg panel-muted px-4 py-3" title={title}>
       <div class="text-xs font-medium uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">{label}</div>

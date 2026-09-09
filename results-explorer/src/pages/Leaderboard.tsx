@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/PageHeader";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import type {
@@ -460,10 +461,7 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
             mobile keep the roomier padding; their fold budget is 1200px. */}
         <div class={LEADERBOARD_SHELL_GEOMETRY_CLASSES.heroWrapper} data-testid="home-hero-wrapper">
           <div class={LEADERBOARD_SHELL_GEOMETRY_CLASSES.heroIntro} data-testid="home-hero-intro">
-            <h1 class={LEADERBOARD_SHELL_GEOMETRY_CLASSES.headline}>Compare benchmark results</h1>
-            <p class={LEADERBOARD_SHELL_GEOMETRY_CLASSES.subtitle}>
-              See how published platform runs compare across BenchBox rankings. Open any result to inspect its evidence.
-            </p>
+            <PageHeader crumbs={[{ label: "Results", href: "/results/" }, { label: "Compare" }]} eyebrow="Compare" title="Compare benchmark results" subtitle="See how published platform runs compare across BenchBox rankings. Open any result to inspect its evidence." />
             {notice && (
               <div
                 class="mt-4 rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] px-4 py-3 text-sm text-[var(--bb-fg-muted)]"
@@ -663,10 +661,7 @@ function LeaderboardLoadingSkeleton({
         {/* Loaded/skeleton geometry is owned by LEADERBOARD_SHELL_GEOMETRY_CLASSES. */}
         <div class={LEADERBOARD_SHELL_GEOMETRY_CLASSES.heroWrapper} data-testid="home-hero-wrapper">
           <div class={LEADERBOARD_SHELL_GEOMETRY_CLASSES.heroIntro} data-testid="home-hero-intro">
-            <h1 class={LEADERBOARD_SHELL_GEOMETRY_CLASSES.headline}>Compare benchmark results</h1>
-            <p class={LEADERBOARD_SHELL_GEOMETRY_CLASSES.subtitle}>
-              See how published platform runs compare across BenchBox rankings. Open any result to inspect its evidence.
-            </p>
+            <PageHeader crumbs={[{ label: "Results", href: "/results/" }, { label: "Compare" }]} eyebrow="Compare" title="Compare benchmark results" subtitle="See how published platform runs compare across BenchBox rankings. Open any result to inspect its evidence." />
           </div>
 
           {showActiveSummary && (

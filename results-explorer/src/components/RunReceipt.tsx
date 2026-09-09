@@ -19,7 +19,8 @@ import { visibleResultIdForRow } from "@/lib/resultLinks";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TuningVerificationBadge } from "@/components/TuningVerificationBadge";
 import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
-import { formatRunDateWithAge } from "@/lib/runAge";
+import { RunDateChip } from "@/components/RunAge";
+import { VersionLabel } from "@/components/VersionLabel";
 
 interface RunReceiptProps {
   detail: DetailResult;
@@ -101,7 +102,7 @@ export function RunReceipt({
       rows: [
         recordedRow("Benchmark", humanizeBenchmark(detail.benchmark)),
         recordedRow("Scale factor", `SF ${detail.scale_factor}`),
-        recordedRow("Run date", formatRunDateWithAge(detail.run_date)),
+        recordedRow("Run date", <RunDateChip runDate={detail.run_date} />),
         formattedRow("Test phase", detail.test_type, formatEnumLabel),
         recordedRow("Query count", String(queryCount)),
         recordedRow("Measurement samples", String(sampleCount)),
@@ -111,8 +112,8 @@ export function RunReceipt({
       title: "Platform",
       rows: [
         recordedRow("Platform", detail.platform),
-        rowFromString("Platform version", detail.platform_version),
-        rowFromString("Driver version", detail.driver_version),
+        detail.platform_version ? recordedRow("Platform version", <VersionLabel version={detail.platform_version} />) : missingRow("Platform version"),
+        detail.driver_version ? recordedRow("Driver version", <VersionLabel version={detail.driver_version} />) : missingRow("Driver version"),
         formattedRow("Execution mode", detail.execution_mode, formatExecutionMode),
         formattedRow("Tuning mode", detail.tuning_mode, formatTuningMode),
         rowFromString("Tuning hash", detail.tuning_hash),

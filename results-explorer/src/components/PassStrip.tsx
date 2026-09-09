@@ -1,4 +1,4 @@
-import { useRef } from "preact/hooks";
+import { useRef, useState } from "preact/hooks";
 import type { QueryTiming } from "@/types";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { median } from "@/lib/measurementBasis";
@@ -150,9 +150,10 @@ function ratioText(ratio: number | null): string {
 
 export function PassStrip({ queries, limit = 25 }: PassStripProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const [visibleLimit, setVisibleLimit] = useState(limit);
   const summaries = summarizeQueryPasses(queries);
   if (summaries.length === 0) return null;
-  const shown = summaries.slice(0, limit);
+  const shown = summaries.slice(0, visibleLimit);
   const noWarmup = hasNoRecordedWarmup(summaries);
   const totals = summarizeRunPasses(summaries);
   const totalsScope =
@@ -244,6 +245,11 @@ export function PassStrip({ queries, limit = 25 }: PassStripProps) {
           </tfoot>
         </table>
       </div>
+      {shown.length < summaries.length && (
+        <button type="button" class="btn btn-secondary mt-3" onClick={() => setVisibleLimit((count) => count + limit)}>
+          Show more query summaries
+        </button>
+      )}
       <p class="mt-2 text-xs text-[var(--bb-data-fg-subtle)]">{totalsScope}</p>
     </section>
   );

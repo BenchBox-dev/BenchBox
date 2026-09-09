@@ -1,5 +1,5 @@
 import type { JSX } from "preact";
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import type { DetailResult } from "@/types";
 import {
@@ -175,7 +175,6 @@ export function Compare({ url }: CompareProps) {
   const [compareState, setCompareState] = useState<CompareState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
   const [baselineResultId, setBaselineResultId] = useUrlState(BASELINE_URL_KEY, "", stringSerde);
   // Through the model's serde, not a hand-rolled parser: the grammar is the
   // model's to define, and a shared link has to reproduce the sender's figures
@@ -194,7 +193,6 @@ export function Compare({ url }: CompareProps) {
   const [showBuilder, setShowBuilder] = useState(false);
   const [compareNotice, setCompareNotice] = useState<string | null>(null);
   const [preserveRequestedIds, setPreserveRequestedIds] = useState(false);
-  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const results = compareState?.results ?? EMPTY_RESULTS;
   const [availabilityRows, setAvailabilityRows] = useState<Record<string, string>>({});
 
@@ -305,6 +303,7 @@ export function Compare({ url }: CompareProps) {
           }
           // Keep this run selected and send the reader to the shared run
           // finder instead of returning to the page they came from.
+          setCompareState({ results: [detail], primaryMetric: "display_geomean_ms" });
           setShowBuilder(true);
           setLoading(false);
         })
@@ -395,7 +394,6 @@ export function Compare({ url }: CompareProps) {
 
     return () => {
       cancelled = true;
-      if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
     };
   }, [requestedIdsToken]);
 
@@ -477,7 +475,13 @@ export function Compare({ url }: CompareProps) {
   // to rank runs against each other. The ranking table and its filters answer
   // that directly, so they stand in for what used to be a link to a picker.
   if (showBuilder) {
-    return <Leaderboard notice={compareNotice} />;
+    return <>
+      {results.length === 1 && <div class="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8" role="status">
+        <p>Selected run: {results[0]!.platform} · {visibleResultIdForRow(results[0]!)}</p>
+        <a class="btn btn-primary mt-2" href={`/results/query?pick=${encodeURIComponent(results[0]!.result_id)}`}>Find runs to compare with this run</a>
+      </div>}
+      <Leaderboard notice={compareNotice} />
+    </>;
   }
 
   if (results.length === 0) return null;
@@ -623,18 +627,6 @@ export function Compare({ url }: CompareProps) {
   }));
   const isMultiRun = compareLayoutForSelection(results.map((r) => r.result_id)).kind === "multi_run";
 
-  function handleShare() {
-    navigator.clipboard
-      .writeText(window.location.href)
-      .then(() => {
-        setCopied(true);
-        copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => {
-        /* clipboard not available */
-      });
-  }
-
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader
@@ -661,11 +653,7 @@ export function Compare({ url }: CompareProps) {
             })()}
           </>
         }
-        actions={
-          <button class="btn btn-secondary text-sm" onClick={handleShare}>
-            {copied ? "Copied!" : "Share URL"}
-          </button>
-        }
+
       />
 
       {compareNotice && (

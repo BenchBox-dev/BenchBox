@@ -277,8 +277,7 @@ describe("QueryHeatmap rendering", () => {
       />,
     );
 
-    expect(screen.getAllByText(/aaaaaaaa/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/bbbbbbbb/).length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("visible-run-qualifier").map((node) => node.textContent)).toEqual(["aaaaaaaa", "bbbbbbbb"]);
   });
 
   it("surfaces a not_run validation badge in the labels column without expanding anything", () => {
@@ -735,4 +734,11 @@ describe("QueryHeatmap rendering", () => {
     );
     await expectNoAxeViolations(container);
   });
+});
+
+it("allows metadata after the identity column to scroll past the frozen region", () => {
+  const { container } = render(<QueryHeatmap summary={makeSummary()} />);
+  const table = container.querySelector("table")!;
+  const headers = [...table.querySelectorAll("thead th")];
+  expect(headers.filter((cell) => (cell as HTMLElement).style.position === "static").length).toBeGreaterThanOrEqual(3);
 });

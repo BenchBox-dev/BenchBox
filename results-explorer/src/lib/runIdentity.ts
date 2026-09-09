@@ -1,3 +1,4 @@
+import { splitVersion } from "@/lib/versionLabel";
 // Run-identity formatter: produces stable, distinguishable labels for
 // benchmark runs across charts, compare controls, and tables.
 //
@@ -68,7 +69,10 @@ const RESULT_ID_QUALIFIER_KEYS = new Set(["short_result_id", "result_id"]);
 const NATURAL_QUALIFIERS: QualifierDescriptor[] = [
   {
     key: "version",
-    value: (s) => versionLabel(s.driver_version ?? s.platform_version ?? null),
+    value: (s) => {
+      const parts = splitVersion(s.driver_version ?? s.platform_version ?? null);
+      return parts ? `${parts.core}${parts.suffix ? "…" : ""}` : null;
+    },
   },
   // The calendar date alone. A run's age is a reading of the same value that
   // changes every day and doubles the length of every label carrying it; it

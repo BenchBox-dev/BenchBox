@@ -227,6 +227,8 @@ describe("Compare", () => {
     // ranking table rather than to a page whose only content was a link.
     await waitFor(() => expect(screen.getByTestId("home-hero-filter-band")).toBeTruthy());
     expect(screen.getByRole("heading", { level: 1, name: "Compare benchmark results" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Find runs to compare with this run" }).getAttribute("href")).toBe(`/results/query?pick=${DUCKDB.result_id}`);
+    expect(getDetailResult).toHaveBeenCalledWith("tpch-duckdb-sf0.01-20260403-7fe93365");
     expect(route).not.toHaveBeenCalledWith(expect.stringMatching(/^\/results\/r\//), true);
   });
 
