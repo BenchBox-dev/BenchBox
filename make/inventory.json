@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "80e7d8c25dd3c405bd63a3fae16cb6662b83e1ae067e8b5e8a59364ac6c652af",
+  "contract_sha256": "5325a1d4ebcac4f83bb7c04d6da051f9efb43c03fa48ad7f04d0fef388feab4a",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -985,8 +985,8 @@
     "local-validation-show": [
       {
         "header": "local-validation-show:",
-        "recipe": "\t@[ -n \"$(GATE)\" ] || { echo \"GATE is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/local_validation.py show --gate \"$(GATE)\" $(BATCH_ARGS)",
-        "recipe_sha256": "3f124fdbcde8bdfb8c3f6207b0ba28e86c173073f7e2d6c1d6ee1a5621ef01db"
+        "recipe": "\t@[ -n \"$(GATE)\" ] || { echo \"GATE is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/local_validation.py show --gate \"$(GATE)\" $(BATCH_ARGS) $(if $(CMD),-- $(CMD),)",
+        "recipe_sha256": "0f93f61710e4f4fb52373a0ba0ade6dad2ce2803217b17102b83a4884115edac"
       }
     ],
     "makefile-inventory-check": [
@@ -2031,7 +2031,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "3906ea384e6e27d227424b33bb52fdd36abcdd315eb9912ffbcb0c66e0897fac",
+  "semantic_sha256": "7db5f4595defc1add23a22d21edcc3cbf04e3baeab7c8d6e8d65b3a4351e1262",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3634,9 +3634,9 @@
       ]
     },
     {
-      "body": "local-validation-show:\n\t@[ -n \"$(GATE)\" ] || { echo \"GATE is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/local_validation.py show --gate \"$(GATE)\" $(BATCH_ARGS)",
+      "body": "local-validation-show:\n\t@[ -n \"$(GATE)\" ] || { echo \"GATE is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/local_validation.py show --gate \"$(GATE)\" $(BATCH_ARGS) $(if $(CMD),-- $(CMD),)",
       "kind": "rule",
-      "sha256": "939f68b1fce55d9a9fee8153fa76380739d65bb24344cc2450f56c3fcdb5fcb3",
+      "sha256": "e640083950b17af4e5f80d769af03447c4afc122ddf36df13689f6c328a45597",
       "targets": [
         "local-validation-show"
       ]

@@ -1,6 +1,9 @@
 ---
 date: 2026-09-08
 baseline: _project/analysis/ci-lifecycle-baseline.json (349 in-window PRs, frozen window 2026-08-11 through 2026-09-08)
+develop_sha: b221e852dba0ec2aa4bce79f15100fb909ff5599
+checked_sha: 17dddd9265ff7c37a5e36293370d5263b79bf688
+measured_at_sha: 17dddd9265ff7c37a5e36293370d5263b79bf688
 ---
 
 # Exact-refresh eligibility: shadow distribution and timing analysis
@@ -48,12 +51,12 @@ and a non-merge parent (`chained_refresh` otherwise).
 
 No `refresh_audit_v1` observations block is embedded in this audit. The block
 validator requires one observation identity (pr/head/run/attempt) per
-denominator head with a classifier reason code, and the frozen lifecycle
-baseline retains per-head aggregates only — no run IDs, attempt numbers, or
-per-context check conclusions. Reconstructing `prior_check_not_success` vs
-`prior_check_unbound` vs `chained_refresh` per historical refresh would need
-prior-gate conclusions at refresh time, which only the develop-refresh-shadow
-lane artifacts record as they are emitted.
+denominator head with a classifier reason code. The frozen lifecycle baseline
+now retains retrieval IDs for observed workflow data, but it does not retain
+the historical per-refresh classifier verdict. Reconstructing
+`prior_check_not_success` vs `prior_check_unbound` vs `chained_refresh` per
+historical refresh would need prior-gate conclusions at refresh time, which
+only the develop-refresh-shadow lane artifacts record as they are emitted.
 
 Next condition: the shadow lane accrues verdict-bearing artifacts prospectively;
 a later audit pass embeds the observations block once run/attempt identities
