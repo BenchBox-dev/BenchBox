@@ -295,3 +295,65 @@ def test_consume_retry_persists_spent_budget(tmp_path: Path) -> None:
     assert landing.consume_retry(tmp_path, "k", "rerun", HEAD)["allowed"] is True
     second = landing.consume_retry(tmp_path, "k", "rerun", HEAD)
     assert second["allowed"] is False and "exhausted" in second["reason"]
+
+
+def _live_checks_payload(head: str, conclusion: str = "success") -> dict:
+    runs = [{"name": name, "conclusion": conclusion, "head_sha": head} for name in landing.REQUIRED_CONTEXTS]
+    return {"total": len(runs), "runs": runs}
+
+
+def _live_pr(head: str, decision: str = "APPROVED") -> dict:
+    return {
+        "number": 3,
+        "headRefName": "feat/x",
+        "headRefOid": head,
+        "labels": [],
+        "reviewDecision": decision,
+    }
+
+
+def test_verify_evidence_live_accepts_fresh_evidence() -> None:
+    run = FakeRun([(0, _live_checks_payload(HEAD))])
+    landing.verify_evidence_live(run, "o/r", _live_pr(HEAD), _evidence(HEAD))
+
+
+def test_verify_evidence_live_refuses_stale_check() -> None:
+    stale = _live_checks_payload(HEAD)
+    stale["runs"][0] = {
+        "name": landing.REQUIRED_CONTEXTS[0],
+        "conclusion": "failure",
+        "head_sha": HEAD,
+    }
+    run = FakeRun([(0, stale)])
+    with pytest.raises(landing.LandingError, match="live verification"):
+        landing.verify_evidence_live(run, "o/r", _live_pr(HEAD), _evidence(HEAD))
+
+
+def test_verify_evidence_live_refuses_decision_mismatch() -> None:
+    run = FakeRun([(0, _live_checks_payload(HEAD))])
+    with pytest.raises(landing.LandingError, match="review decision"):
+        landing.verify_evidence_live(run, "o/r", _live_pr(HEAD, "CHANGES_REQUESTED"), _evidence(HEAD))
+
+
+def test_consume_retry_allows_exactly_once_under_concurrency(tmp_path: Path) -> None:
+    import threading
+
+    landing.record_followup(tmp_path, "k", landing.FollowupState(owner="o", session="s", scope="pr", head=HEAD))
+    results = []
+    threads = [
+        threading.Thread(target=lambda: results.append(landing.consume_retry(tmp_path, "k", "rerun", HEAD)))
+        for _ in range(4)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+    assert sum(1 for r in results if r["allowed"]) == 1
+
+
+def test_rerecord_never_restores_spent_budget(tmp_path: Path) -> None:
+    landing.record_followup(tmp_path, "k", landing.FollowupState(owner="o", session="s", scope="pr", head=HEAD))
+    assert landing.consume_retry(tmp_path, "k", "rerun", HEAD)["allowed"] is True
+    landing.record_followup(tmp_path, "k", landing.FollowupState(owner="o", session="s2", scope="pr", head=HEAD))
+    assert landing.load_followup(tmp_path, "k").attempts == 1
+    assert landing.consume_retry(tmp_path, "k", "rerun", HEAD)["allowed"] is False

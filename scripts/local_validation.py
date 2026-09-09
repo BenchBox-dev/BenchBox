@@ -181,11 +181,14 @@ def content_identity(repo: Path, argv: list[str]) -> dict:
 
 
 def store_dir(repo: Path) -> Path:
+    """Content-shared receipt store: identity already binds head/base SHAs,
+    tree digests, argv, interpreter, and lockfile, so identical validated
+    inputs coalesce across worktrees instead of re-executing per clone."""
     override = os.environ.get("BENCHBOX_VALIDATION_RECEIPTS_DIR")
     if override:
         return Path(override).expanduser()
-    slug = hashlib.sha1(str(repo.resolve()).encode()).hexdigest()[:16]
-    return Path.home() / ".benchbox" / "validation-receipts" / slug
+    _ = repo
+    return Path.home() / ".benchbox" / "validation-receipts" / "shared"
 
 
 def receipt_path(store: Path, gate: str, identity: dict, batch: dict | None) -> Path:

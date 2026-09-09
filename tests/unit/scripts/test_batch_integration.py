@@ -91,9 +91,35 @@ def test_single_integrator_enforcement(tmp_path: Path) -> None:
     repo = _repo(tmp_path / "r")
     record = _start(repo)
     _commit(repo, "member-a.txt", author="T <t@example.com>")
-    assert bi.verify_single_integrator(repo, record["base_oid"], "T <t@example.com>") == []
+    head = _head(repo)
+    assert bi.verify_single_integrator(repo, record["base_oid"], "T <t@example.com>", head) == []
     _commit(repo, "rogue.txt", author="Rogue <rogue@example.com>")
-    assert bi.verify_single_integrator(repo, record["base_oid"], "T <t@example.com>") == ["Rogue <rogue@example.com>"]
+    assert bi.verify_single_integrator(repo, record["base_oid"], "T <t@example.com>", _head(repo)) == [
+        "Rogue <rogue@example.com>"
+    ]
+
+
+def test_receipt_resolves_head_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Committer, ancestry, and timestamp gates must evaluate one revision."""
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A"])
+    member_head = _commit(repo, "member-a.txt")
+    head = _head(repo)
+    real_git = bi._git
+    resolutions = []
+
+    def counting_git(repo_arg: Path, *args: str) -> str:
+        if list(args)[:2] == ["rev-parse", "HEAD"]:
+            resolutions.append(True)
+        return real_git(repo_arg, *args)
+
+    monkeypatch.setattr(bi, "_git", counting_git)
+    bi.delivery_receipt(
+        repo,
+        [{"id": "A", "head": member_head}],
+        {"integration_head": head, "integrator": "T <t@example.com>", "items": {"A": "pass"}},
+    )
+    assert len(resolutions) == 1
 
 
 def test_member_ancestry_and_receipt_binding(tmp_path: Path) -> None:

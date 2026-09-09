@@ -133,7 +133,7 @@ def resolve_pr(run: Runner, repo_full: str, branch: str) -> dict | None:
             "--state",
             "open",
             "--json",
-            "number,url,headRefName,headRefOid",
+            "number,url,headRefName,headRefOid,labels,reviewDecision",
         ]
     )
     if rc != 0:
@@ -219,6 +219,70 @@ class ReadyEvidence:
     soundness_paths_changed: bool = False
     maintainer_approved: bool = False
     batch: dict | None = None
+
+
+def live_check_verdicts(run: Runner, repo_full: str, head: str) -> dict[str, dict]:
+    """Latest live conclusion per check context at *head* (single page, fail closed).
+
+    Refuses when the commit carries more check runs than one page holds:
+    silently verifying a subset would reintroduce the staleness hole.
+    """
+    rc, out = run(
+        [
+            "gh",
+            "api",
+            f"repos/{repo_full}/commits/{head}/check-runs",
+            "--paginate=false",
+            "-F",
+            "per_page=100",
+            "--jq",
+            "{total: .total_count, runs: [.check_runs[] | {name, conclusion, head_sha}]}",
+        ]
+    )
+    if rc != 0:
+        raise LandingError(f"live check verification failed for {head[:12]}")
+    try:
+        payload = json.loads(out or "{}")
+    except ValueError as exc:
+        raise LandingError(f"unparseable live check payload: {exc}") from exc
+    runs = payload.get("runs") or []
+    if int(payload.get("total") or 0) > len(runs):
+        raise LandingError("live check runs exceed the single-page verification bound; refusing")
+    verdicts: dict[str, dict] = {}
+    for check in runs:
+        verdicts.setdefault(str(check.get("name") or ""), check)
+    return verdicts
+
+
+def verify_evidence_live(run: Runner, repo_full: str, pr: dict, evidence: ReadyEvidence) -> None:
+    """Re-verify caller evidence against live API state before arming.
+
+    Caller JSON assembles the claim, but the transaction trusts only what it
+    re-reads: every required context must be live-success at the expected
+    head, the live review decision must equal the claimed one, and the live
+    labels must still carry every claimed label. Anything else is stale or
+    fabricated evidence and refuses.
+    """
+    head = evidence.expected_head
+    verdicts = live_check_verdicts(run, repo_full, head)
+    for name in evidence.required:
+        live = verdicts.get(name)
+        if live is None:
+            raise LandingError(f"live verification: required context {name!r} has no check run at {head[:12]}")
+        if str(live.get("head_sha") or "") != head or live.get("conclusion") != "success":
+            raise LandingError(
+                f"live verification: {name!r} is {live.get('conclusion')} "
+                f"at {str(live.get('head_sha') or '')[:12]}, not success at {head[:12]}"
+            )
+    live_decision = str(pr.get("reviewDecision") or "")
+    if live_decision != evidence.review_decision:
+        raise LandingError(
+            f"live verification: review decision is {live_decision!r}, evidence claims {evidence.review_decision!r}"
+        )
+    live_labels = {str(label.get("name") or "") for label in pr.get("labels") or []}
+    for claimed in evidence.hold_labels or []:
+        if claimed not in live_labels:
+            raise LandingError(f"live verification: claimed label {claimed!r} absent from live labels")
 
 
 def checks_green_at_head(check_runs: list, required: tuple, head: str) -> list[str]:
@@ -374,23 +438,38 @@ def followup_path(directory: Path, key: str) -> Path:
     return directory / f"{safe}.json"
 
 
+def _followup_locked(directory: Path, key: str) -> object:
+    """Exclusive per-key lock so check-then-act sequences do not interleave."""
+    import fcntl
+
+    directory.mkdir(parents=True, exist_ok=True)
+    handle = open(followup_path(directory, key).with_suffix(".lock"), "a+b")  # noqa: PTH123
+    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    return handle
+
+
 def record_followup(directory: Path, key: str, state: FollowupState) -> Path:
     """Atomically persist continuation state (crash-safe via rename).
 
     Refuses to overwrite another owner's record: same-principal sessions may
-    rotate `session`, but a different `owner` must use its own key.
+    rotate `session`, but a different `owner` must use its own key. Retry
+    counters are monotonic: re-recording state never restores spent budget.
     """
     for field in ("owner", "session", "scope"):
         if not getattr(state, field, None):
             raise LandingError(f"followup state lacks required field {field!r}")
     directory.mkdir(parents=True, exist_ok=True)
     path = followup_path(directory, key)
-    existing = load_followup(directory, key)
-    if existing is not None and existing.owner != state.owner:
-        raise LandingError(f"followup {key!r} is owned by {existing.owner!r}; refusing cross-owner overwrite")
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(asdict(state), indent=2) + "\n", encoding="utf-8")
-    tmp.replace(path)
+    with _followup_locked(directory, key):
+        existing = load_followup(directory, key)
+        if existing is not None and existing.owner != state.owner:
+            raise LandingError(f"followup {key!r} is owned by {existing.owner!r}; refusing cross-owner overwrite")
+        if existing is not None:
+            state.attempts = max(state.attempts, existing.attempts)
+            state.reentries = max(state.reentries, existing.reentries)
+        tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+        tmp.write_text(json.dumps(asdict(state), indent=2) + "\n", encoding="utf-8")
+        tmp.replace(path)
     return path
 
 
@@ -452,17 +531,21 @@ def consume_retry(directory: Path, key: str, kind: str, head: str) -> dict:
     A pure decision function would authorize the same retry forever; consuming
     here makes the second identical call observe the spent budget.
     """
-    state = load_followup(directory, key)
-    if state is None:
-        raise LandingError(f"no followup {key!r} recorded; record state before retrying")
-    decision = allow_retry(state, kind, head)
-    if not decision["allowed"]:
-        return decision
-    if kind == "rerun":
-        state.attempts += 1
-    else:
-        state.reentries += 1
-    record_followup(directory, key, state)
+    with _followup_locked(directory, key):
+        state = load_followup(directory, key)
+        if state is None:
+            raise LandingError(f"no followup {key!r} recorded; record state before retrying")
+        decision = allow_retry(state, kind, head)
+        if not decision["allowed"]:
+            return decision
+        if kind == "rerun":
+            state.attempts += 1
+        else:
+            state.reentries += 1
+        path = followup_path(directory, key)
+        tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+        tmp.write_text(json.dumps(asdict(state), indent=2) + "\n", encoding="utf-8")
+        tmp.replace(path)
     return {**decision, "remaining": True}
 
 
@@ -548,6 +631,7 @@ def main(argv: list[str] | None = None) -> int:
                 maintainer_approved=bool(evidence_data.get("maintainer_approved")),
                 batch=evidence_data.get("batch"),
             )
+            verify_evidence_live(live_run, args.repo, pr, evidence)
             failures = ready_failures(identity, str(pr.get("headRefOid") or ""), evidence, repo)
             if failures:
                 print("NOT READY:")

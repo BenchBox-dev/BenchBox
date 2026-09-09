@@ -210,14 +210,52 @@ def test_changed_command_invalidates_receipt(repo: Path, tmp_path: Path) -> None
 
 
 def test_tracked_edit_preserving_status_invalidates(repo: Path, tmp_path: Path) -> None:
+    """Same porcelain status text, different content: status alone must not hit."""
     tracked = Path(str(repo)) / "tracked.txt"
-    tracked.write_text("v1")
-    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+    tracked.write_text("work1")
     marker = tmp_path / "count.txt"
     gate = _counter_gate(marker)
     assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
     assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
     assert _count(marker) == 1
-    tracked.write_text("v2")
+    before = subprocess.run(
+        ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    tracked.write_text("work2")
+    after = subprocess.run(
+        ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert after == before
     assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
     assert _count(marker) == 2
+
+
+def test_different_gates_proceed_in_parallel(repo: Path, tmp_path: Path) -> None:
+    """Per-receipt locks: unrelated gates must not serialize on one lock."""
+    marker = tmp_path / "slow.txt"
+    gate = [sys.executable, "-c", f"import time; time.sleep(2); open({str(marker)!r}, 'a').write('x')"]
+    store = lv.store_dir(repo)
+    results = []
+    threads = [
+        threading.Thread(
+            target=lambda gate_name=gate_name: results.append(lv.run_gate(gate_name, gate, None, 30.0, repo, store))
+        )
+        for gate_name in ("g1", "g2")
+    ]
+    started = time.monotonic()
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+    elapsed = time.monotonic() - started
+    assert results == [0, 0]
+    assert len(marker.read_text(encoding="utf-8")) == 2
+    assert elapsed < 3.5

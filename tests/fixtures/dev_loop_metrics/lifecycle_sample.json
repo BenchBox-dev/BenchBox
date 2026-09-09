@@ -34,7 +34,18 @@
           "execution_runner_minutes": 0.0,
           "public_standard_runner_usd": 0.0,
           "failed_runner_minutes": 0.0,
-          "failed_job_count": 0
+          "failed_job_count": 0,
+          "retrieval_ids": {
+            "runs": [
+              {
+                "id": 100,
+                "attempt": 1,
+                "name": "Develop PR"
+              }
+            ],
+            "jobs": [],
+            "checks": []
+          }
         },
         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {
           "schema": "event_fanout_v1",
@@ -53,7 +64,18 @@
           "execution_runner_minutes": 0.0,
           "public_standard_runner_usd": 0.0,
           "failed_runner_minutes": 0.0,
-          "failed_job_count": 0
+          "failed_job_count": 0,
+          "retrieval_ids": {
+            "runs": [
+              {
+                "id": 101,
+                "attempt": 1,
+                "name": "Develop PR"
+              }
+            ],
+            "jobs": [],
+            "checks": []
+          }
         }
       },
       "attempts": {

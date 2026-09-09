@@ -902,7 +902,7 @@ jobs:
           gh issue create \
             --title "Auto-revert advisory: ${FAILING_SHA:0:12} did not own the failing test" \
             --label incident:develop-red \
-            --body "${body}" || true
+            --body "${body}"
 
       - name: Upsert develop-red incident issue
         id: upsert-incident

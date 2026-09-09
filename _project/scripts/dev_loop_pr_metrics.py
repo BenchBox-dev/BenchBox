@@ -728,7 +728,42 @@ def event_fanout_metrics(
         "all_workflow_seconds": all_workflow_seconds(runs),
         "queue_delay_seconds": queue_delay_seconds(gate_end, merged_at),
         "workflow_run_counts": by_workflow,
+        "retrieval_ids": retrieval_identities(runs, jobs, check_runs),
         **report,
+    }
+
+
+def retrieval_identities(runs: list[dict], jobs: list[dict], check_runs: list[dict]) -> dict[str, list[dict]]:
+    """Slim retrieval identities so aggregates stay replayable.
+
+    Only IDs, names, conclusions, and attempts — enough to re-fetch the
+    exact runs/jobs/checks behind any number. Full payloads would bloat the
+    baseline without adding replay power.
+    """
+    return {
+        "runs": [
+            {"id": run.get("id"), "attempt": run.get("run_attempt"), "name": str(run.get("name") or "")}
+            for run in runs
+            if isinstance(run, dict)
+        ],
+        "jobs": [
+            {
+                "id": job.get("id"),
+                "name": str(job.get("name") or ""),
+                "conclusion": job.get("conclusion"),
+            }
+            for job in jobs
+            if isinstance(job, dict)
+        ],
+        "checks": [
+            {
+                "id": check.get("id"),
+                "name": str(check.get("name") or ""),
+                "conclusion": check.get("conclusion"),
+            }
+            for check in check_runs
+            if isinstance(check, dict)
+        ],
     }
 
 
@@ -1017,6 +1052,13 @@ def _check_lifecycle_entry(entry: dict) -> list[str]:
     for sha in attempts:
         if sha not in per_head:
             errors.append(f"PR #{number}: attempt count for unobserved head {sha[:12]}")
+    for sha in per_head:
+        ids = (per_head[sha].get("retrieval_ids") or {}).get("runs") or []
+        if not any(isinstance(r, dict) and r.get("id") for r in ids):
+            errors.append(
+                f"PR #{number}: observed head {sha[:12]} carries no run retrieval IDs; "
+                "aggregates without IDs are not replayable"
+            )
     errors.extend(_check_lifecycle_totals(number, heads, per_head, attempts, missing, totals))
     return errors
 

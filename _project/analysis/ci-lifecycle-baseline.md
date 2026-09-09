@@ -6,6 +6,9 @@ Method: every synchronize head enumerated via pulls/commits plus a branch-runs o
 (force-pushed-away tips still carrying workflow runs: 239 recovered across 83 PRs); runs+jobs+checks
 per head; intra-push non-tip commits classified separately (never ran CI by construction), true tips
 with zero observable runs recorded as missing-artifact, never dropped.
+Each observed head records the workflow-run IDs behind its aggregates
+(actions/runs?head_sha=, created at or before collection completion), so any
+figure re-fetches exactly; the validator refuses observed heads without IDs.
 Refresh classification: two-parent head whose files(P1...M) are a subset of files(B...P2).
 Report numbers and validation come from ci-lifecycle-baseline.json via --validate-lifecycle-baseline.
 

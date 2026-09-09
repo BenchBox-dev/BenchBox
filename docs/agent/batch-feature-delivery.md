@@ -23,8 +23,10 @@ One shared integration branch per batch, one recorded base, one integrator.
    since the base, and member-head ancestry in the integration head. Any
    failure blocks the delivery receipt.
 5. **Receipt** (`... receipt`): binds tracker-side per-item acceptance to
-   the exact integration head it was evaluated against, with first-prepare /
-   first-integration timestamps from branch history. Late members, content
+   the exact integration head it was evaluated against, with branch-history
+   timestamps (first commit / first merge since the base — the observable
+   proxies for first-prepare / first-integration, named as what they are).
+   Late members, content
    edits, a moved head, or a moved base invalidate the binding. Member
    preparation evidence never certifies the integrated tree.
 

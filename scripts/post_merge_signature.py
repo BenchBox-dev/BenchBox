@@ -369,15 +369,24 @@ def _build_command(args: argparse.Namespace) -> int:
 def changed_paths_for_sha(sha: str) -> list[str]:
     """List paths changed by ``sha`` (stdlib git, no shell).
 
-    ``--first-parent`` keeps merge commits honest: a bare multi-parent
-    diff-tree otherwise yields no paths and would downgrade real failures.
+    Diffed against the first parent so merge commits report their
+    feature-side paths: a bare multi-parent diff-tree yields no paths and
+    would downgrade real failures to advisory. Root commits (no parent)
+    diff against the empty tree.
     """
     result = subprocess.run(
-        ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "--first-parent", sha],
+        ["git", "diff", "--name-only", f"{sha}^1", sha],
         check=False,
         capture_output=True,
         text=True,
     )
+    if result.returncode != 0:
+        result = subprocess.run(
+            ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "--root", sha],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
     if result.returncode != 0:
         raise SignatureError(result.stderr.strip() or f"git diff-tree failed for {sha}")
     return [line for line in result.stdout.splitlines() if line]

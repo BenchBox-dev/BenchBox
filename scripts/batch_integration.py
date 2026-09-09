@@ -12,8 +12,9 @@ shared integration branch. This helper makes that discipline mechanical:
   not — reported, never auto-fixed), single-integrator authorship since the
   base, and member-head ancestry in the integration head.
 * ``receipt`` binds per-item acceptance evidence (produced tracker-side) to
-  the exact integration head it was evaluated against, with first-prepare /
-  first-integration timestamps read from the branch history. A moved head or
+  the exact integration head it was evaluated against, with branch-history
+  timestamps (first commit / first merge since the base, the observable
+  proxies for first-prepare / first-integration). A moved head or
   base invalidates the binding instead of silently carrying it forward.
 
 Member preparation evidence never certifies the integrated tree: acceptance
@@ -49,7 +50,7 @@ def _config_set(repo: Path, key: str, value: str) -> None:
 
 
 def _config_delete(repo: Path, key: str) -> None:
-    subprocess.run(
+    proc = subprocess.run(
         ["git", "config", "--worktree", "--unset", f"{CONFIG_PREFIX}.{key}"],
         cwd=repo,
         check=False,
@@ -57,6 +58,8 @@ def _config_delete(repo: Path, key: str) -> None:
         capture_output=True,
         timeout=60,
     )
+    if proc.returncode not in (0, 5):
+        raise BatchError(f"git config --unset {CONFIG_PREFIX}.{key} failed: {proc.stderr.strip()[:200]}")
 
 
 def _config_get(repo: Path, key: str) -> str | None:
@@ -99,8 +102,14 @@ def record_start(
 
 
 def reset_batch(repo: Path) -> None:
-    """Clear a batch start record (audited recovery from a crashed start)."""
-    for key in ("id", "base-ref", "base-oid", "started-at", "members", "sealed"):
+    """Clear a batch start record (audited recovery from a crashed start).
+
+    Deletes the seal FIRST so an interrupted reset can never leave a sealed
+    record with half-cleared fields: any crash past the first delete reads
+    as absent, never as valid.
+    """
+    _config_delete(repo, "sealed")
+    for key in ("id", "base-ref", "base-oid", "started-at", "members"):
         _config_delete(repo, key)
 
 
@@ -133,21 +142,22 @@ def verify_base(repo: Path, record: dict) -> dict:
     return {"recorded_oid": record["base_oid"], "current_oid": current, "moved": current != record["base_oid"]}
 
 
-def committers_since_base(repo: Path, base_oid: str) -> list[str]:
-    """Distinct committer identities on the first-parent chain past the base.
+def committers_since_base(repo: Path, base_oid: str, head: str) -> list[str]:
+    """Distinct committer identities on the first-parent chain base..head.
 
     Committer (who applied), not author (who wrote), and first-parent only:
     legitimate member merges preserve member authorship/committer off-chain,
     while any commit applied directly to the integration branch — member or
-    rogue — records its writer as a first-parent committer.
+    rogue — records its writer as a first-parent committer. The head is
+    passed in (never re-resolved) so all receipt gates evaluate one revision.
     """
-    out = _git(repo, "log", "--first-parent", f"{base_oid}..HEAD", "--format=%cn <%ce>")
+    out = _git(repo, "log", "--first-parent", f"{base_oid}..{head}", "--format=%cn <%ce>")
     return sorted(set(out.splitlines()) if out else [])
 
 
-def verify_single_integrator(repo: Path, base_oid: str, integrator: str) -> list[str]:
+def verify_single_integrator(repo: Path, base_oid: str, integrator: str, head: str) -> list[str]:
     """Offending committers when anyone but the integrator applied work (w3)."""
-    return [committer for committer in committers_since_base(repo, base_oid) if committer != integrator]
+    return [committer for committer in committers_since_base(repo, base_oid, head) if committer != integrator]
 
 
 def member_ancestry(repo: Path, members: object, integration_head: str) -> dict[str, bool]:
@@ -174,16 +184,19 @@ def member_ancestry(repo: Path, members: object, integration_head: str) -> dict[
 
 
 def branch_timestamps(repo: Path, base_oid: str, head: str) -> dict:
-    """First commit (preparation evidence) and first merge (integration evidence).
+    """Branch-history timestamps: first commit and first merge since the base.
 
-    Ranges are pinned to one resolved *head* so a concurrent commit cannot mix
-    an old integration head with new history.
+    These are the observable proxies for first-prepare / first-integration,
+    named as what they are: a first commit is not proof of preparation, and
+    a first merge is not proof of integration. Ranges are pinned to one
+    resolved *head* so a concurrent commit cannot mix an old integration
+    head with new history.
     """
     first = _git(repo, "log", "--reverse", "--format=%H %cI", f"{base_oid}..{head}").splitlines()
     merges = _git(repo, "log", "--reverse", "--merges", "--format=%H %cI", f"{base_oid}..{head}").splitlines()
     return {
-        "first_commit": first[0] if first else None,
-        "first_merge": merges[0] if merges else None,
+        "first_commit_since_base": first[0] if first else None,
+        "first_merge_since_base": merges[0] if merges else None,
         "commit_count": len(first),
     }
 
@@ -212,14 +225,14 @@ def delivery_receipt(repo: Path, member_heads: list[dict], acceptance: dict) -> 
     integrator = acceptance.get("integrator")
     if not integrator:
         raise BatchError("acceptance names no integrator; single-integrator gate cannot pass")
-    offenders = verify_single_integrator(repo, record["base_oid"], str(integrator))
+    head = _git(repo, "rev-parse", "HEAD")
+    offenders = verify_single_integrator(repo, record["base_oid"], str(integrator), head)
     if offenders:
         raise BatchError(f"work applied by someone other than the integrator: {offenders}")
     items = acceptance.get("items", {}) or {}
     unaccepted = sorted(mid for mid in manifested if not items.get(mid))
     if unaccepted:
         raise BatchError(f"members without passing acceptance: {unaccepted}")
-    head = _git(repo, "rev-parse", "HEAD")
     if acceptance.get("integration_head") != head:
         raise BatchError("acceptance names a different integration head; re-evaluate, never carry forward")
     base_check = verify_base(repo, record)
@@ -280,7 +293,7 @@ def main(argv: list[str] | None = None) -> int:
             members = json.loads(args.members_json.read_text(encoding="utf-8"))
             report = {
                 "base": verify_base(repo, record),
-                "offending_committers": verify_single_integrator(repo, record["base_oid"], args.integrator),
+                "offending_committers": verify_single_integrator(repo, record["base_oid"], args.integrator, head),
                 "member_ancestry": member_ancestry(repo, members, head),
             }
             print(json.dumps(report, indent=2))

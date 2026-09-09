@@ -699,6 +699,21 @@ def test_acceptance_validator_rejects_weakened_frozen_requirements() -> None:
     errors = metrics.validate_process_acceptance(no_hold, process, digest)
     assert any("human hold" in e for e in errors)
 
+    weak_days = conforming()
+    weak_days["cohort"]["required"]["min_days"] = frozen["min_days"] - 1
+    errors = metrics.validate_process_acceptance(weak_days, process, digest)
+    assert any("weakens the frozen floor" in e for e in errors)
+
+    changed_strata = conforming()
+    changed_strata["cohort"]["required"]["strata"] = list(frozen["strata"]) + ["invented"]
+    errors = metrics.validate_process_acceptance(changed_strata, process, digest)
+    assert any("frozen strata" in e for e in errors)
+
+    weak_reduction = conforming()
+    weak_reduction["efficiency"]["observed_avoidable_actions"] = 60
+    errors = metrics.validate_process_acceptance(weak_reduction, process, digest)
+    assert any("below frozen 50%" in e for e in errors)
+
 
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:
     import copy
@@ -758,3 +773,17 @@ def test_lifecycle_nontip_split_and_failed_bucket() -> None:
     assert lifecycle["totals"]["non_tip_head_count"] == 2
     assert lifecycle["totals"]["failed_runner_minutes"] == pytest.approx(4.0)
     assert lifecycle["totals"]["completed_runner_minutes"] == pytest.approx(6.0)
+
+
+def test_lifecycle_rejects_observed_head_without_retrieval_ids() -> None:
+    import copy
+    import json as _json
+
+    lifecycle = _json.loads((FIXTURES / "lifecycle_sample.json").read_text(encoding="utf-8"))
+    lifecycle = copy.deepcopy(lifecycle)
+    first = lifecycle["prs"][0]
+    sha = next(iter(first["per_head"]))
+    del first["per_head"][sha]["retrieval_ids"]
+    process = {"schema": "pr_process_acceptance_baseline_v1", "criteria_version": "1.0.0"}
+    errors = metrics.validate_lifecycle_baseline(lifecycle, process, "digest-of-frozen-process-baseline")
+    assert any("no run retrieval IDs" in e for e in errors)

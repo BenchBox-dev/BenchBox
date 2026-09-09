@@ -123,3 +123,25 @@ def test_diff_reports_only_new_ids(tmp_path: Path) -> None:
     assert sig.diff_signatures(
         json.loads(prev.read_text(encoding="utf-8")), json.loads(curr.read_text(encoding="utf-8"))
     ) == ["c"]
+
+
+def test_merge_commit_lists_first_parent_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A merge commit must report its feature-side paths, never an empty diff."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for args in (["init", "-b", "main"], ["config", "user.email", "t@e.com"], ["config", "user.name", "T"]):
+        subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+    (repo / "base.txt").write_text("b\n")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-qm", "base"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "checkout", "-qb", "feature"], cwd=repo, check=True, capture_output=True)
+    (repo / "feature.txt").write_text("f\n")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-qm", "feature"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "checkout", "-q", "main"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "merge", "--no-ff", "-qm", "merge", "feature"], cwd=repo, check=True, capture_output=True)
+    merge = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    monkeypatch.chdir(repo)
+    assert sig.changed_paths_for_sha(merge) == ["feature.txt"]

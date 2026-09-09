@@ -1336,7 +1336,7 @@ local-validation:
 
 local-validation-show:
 	@[ -n "$(GATE)" ] || { echo "GATE is required" >&2; exit 2; }; \
-	uv run -- python scripts/local_validation.py show --gate "$(GATE)" $(BATCH_ARGS)
+	uv run -- python scripts/local_validation.py show --gate "$(GATE)" $(BATCH_ARGS) $(if $(CMD),-- $(CMD),)
 
 # Revision/readiness transactions behind one helper (scripts/pr_landing.py).
 # Existing pr-open/pr-ready recipes are unchanged; these stage readiness

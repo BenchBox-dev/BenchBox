@@ -556,3 +556,30 @@ def test_isolated_replay_mirror_drift_breaks_bidirectional(tmp_path: Path) -> No
     assert result.returncode == 0, result.stderr
     assert drift["main_source"] == main_sha
     assert json.loads((dest / "d.json").read_text(encoding="utf-8")) == {"id": "d"}
+
+
+def test_isolated_replay_mirror_only_refuses_without_immutable_main(tmp_path: Path) -> None:
+    """A mirror-only path with a live-tree main source fails closed, never guessed."""
+    repo, snapshot = _isolated_corpus_repo(tmp_path / "iso")
+
+    def cli(*args: str) -> subprocess.CompletedProcess[str]:
+        return _run_cli("--repo-root", repo, *args, cwd=Path(repo))
+
+    seed_path = tmp_path / "seed.json"
+    result = cli("--accepted-ref", snapshot, "--output", str(seed_path))
+    assert result.returncode == 0, result.stderr
+    seed = json.loads(seed_path.read_text(encoding="utf-8"))
+    assert seed["main_source"] == "working-tree"
+    assert seed["dispositions"]["results-data/bundles/c.json"] == "legacy_overlay"
+    (Path(repo) / "results-data" / "bundles" / "c.json").write_text('{"id": "drifted"}')
+    dest = tmp_path / "archive"
+    result = cli(
+        "--accepted-ref",
+        snapshot,
+        "--ledger-seed",
+        str(seed_path),
+        "--materialize-dest",
+        str(dest),
+    )
+    assert result.returncode != 0
+    assert "no immutable main SHA" in result.stderr
