@@ -49,15 +49,15 @@ test.describe("Compare guardrails", () => {
     await page.goto(`/results/compare?ids=${TPCH_ID},tpch-unknown-does-not-exist`);
     await waitForShell(page);
 
-    await waitForDataLoaded(page, /Find another run/);
+    await waitForDataLoaded(page, /Compare benchmark results/);
     await expect(page.getByTestId("compare-url-notice")).toContainText("Ignored unavailable result ID");
-    await expect(page.getByTestId("compare-picker-query-link")).toHaveAttribute("href", /\/results\/query\?pick=/);
+    await expect(page.getByRole("link", { name: "Find runs to compare with this run" })).toHaveAttribute("href", /\/results\/query\?pick=/);
     await expect(page.getByRole("heading", { name: /Cannot compare/i })).toHaveCount(0);
 
     expect(page.url()).toContain("tpch-unknown-does-not-exist");
     await page.reload();
-    await waitForDataLoaded(page, /Find another run/);
-    await expect(page.getByTestId("compare-picker-query-link")).toBeVisible();
+    await waitForDataLoaded(page, /Compare benchmark results/);
+    await expect(page.getByRole("link", { name: "Find runs to compare with this run" })).toBeVisible();
   });
 
   test("all-unavailable compare IDs retain the removal-hint error", async ({ page }) => {

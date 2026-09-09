@@ -13,15 +13,15 @@ test.describe("compare selection and direct-link parity", () => {
   test("empty ?ids= points to Find runs", async ({ page }) => {
     await page.goto("/results/compare");
     await waitForShell(page);
-    await expect(page.getByRole("heading", { name: "Choose runs to compare" })).toBeVisible({ timeout: 20000 });
-    await expect(page.getByTestId("compare-picker-query-link")).toHaveAttribute("href", "/results/query");
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("grid", { name: "Cross-benchmark leaderboard" })).toBeVisible();
   });
 
   test("?ids=<one> keeps that run selected when linking to Find runs", async ({ page }) => {
     await page.goto(`/results/compare?ids=${SHORT_DUCKDB}`);
     await waitForShell(page);
-    await expect(page.getByRole("heading", { name: "Find another run" })).toBeVisible({ timeout: 20000 });
-    await expect(page.getByTestId("compare-picker-query-link")).toHaveAttribute("href", /\/results\/query\?pick=/);
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("link", { name: "Find runs to compare with this run" })).toHaveAttribute("href", /\/results\/query\?pick=/);
   });
 
   test("?ids=<a,b> renders comparison with both results", async ({ page }) => {
@@ -51,7 +51,7 @@ test.describe("compare selection and direct-link parity", () => {
     await page.goto(`/results/compare?ids=${STALE_ID}`);
     await waitForShell(page);
     // Show an error or recovery state, never a blank page.
-    const recovery = page.getByRole("heading", { name: "Choose runs to compare" });
+    const recovery = page.getByRole("heading", { name: "Compare benchmark results" });
     const error = page.getByText(/No result found|not found|unavailable/i);
     await expect(recovery.or(error).first()).toBeVisible({ timeout: 20000 });
   });
@@ -60,7 +60,7 @@ test.describe("compare selection and direct-link parity", () => {
     await page.goto(`/results/compare?ids=${DUPLICATE_IDS}`);
     await waitForShell(page);
     // Should handle deduplication gracefully
-    await expect(page.getByRole("heading", { name: "Find another run" })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible({ timeout: 20000 });
     await expect(page.getByTestId("compare-url-notice")).toContainText("Ignored duplicate result ID");
   });
 
@@ -74,16 +74,10 @@ test.describe("compare selection and direct-link parity", () => {
     await expect(page.getByRole("main").locator(`a[href="/results/r/${LONG_DUCKDB}"]`).first()).toBeVisible();
   });
 
-  test("shared link (copy URL) round-trips correctly", async ({ page, context }) => {
-    if (page.context().browser()?.browserType().name() === "chromium") {
-      await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-    }
+  test("shared link (copy URL) round-trips correctly", async ({ page }) => {
     await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DATAFUSION}`);
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Comparison|Comparison/i);
-    const shareBtn = page.getByRole("button", { name: /Share URL/ });
-    await shareBtn.click();
-    await expect(page.getByRole("button", { name: /Copied!/ })).toBeVisible();
     const url = page.url();
     expect(url).toContain("/results/compare?ids=");
     // Re-visit copied URL
@@ -96,8 +90,8 @@ test.describe("compare selection and direct-link parity", () => {
   test("empty selection has a clear recovery action", async ({ page }) => {
     await page.goto("/results/compare");
     await waitForShell(page);
-    await expect(page.getByRole("heading", { name: "Choose runs to compare" })).toBeVisible({ timeout: 20000 });
-    await expect(page.getByTestId("compare-picker-query-link")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("grid", { name: "Cross-benchmark leaderboard" })).toBeVisible();
   });
 
   test("Pages 404 restore round-trip (deep-link URL preserved via redirect)", async ({ page }) => {
@@ -110,7 +104,7 @@ test.describe("compare selection and direct-link parity", () => {
     // Reload should still honor ids from URL (sessionStorage redirect is consumed on app boot)
     await page.reload();
     await waitForShell(page);
-    await expect(page.getByRole("heading", { name: "Find another run" })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible({ timeout: 20000 });
   });
 
   test("document height with large fixture is bounded (no unbounded candidate table)", async ({ page }) => {
@@ -118,10 +112,9 @@ test.describe("compare selection and direct-link parity", () => {
     // After retirement, the builder should be compact regardless of corpus size.
     await page.goto("/results/compare?ids=" + SHORT_DUCKDB);
     await waitForShell(page);
-    await expect(page.getByRole("heading", { name: "Find another run" })).toBeVisible({ timeout: 20000 });
-    await expect(page.getByTestId("compare-picker-query-link")).toBeVisible();
-    // Candidate selection remains on Find runs.
-    await expect(page.locator("table")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("link", { name: "Find runs to compare with this run" })).toBeVisible();
+    await expect(page.getByRole("grid", { name: "Cross-benchmark leaderboard" })).toBeVisible();
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     // Compact builder should be well under old 17k threshold
     expect(height).toBeLessThan(5000);

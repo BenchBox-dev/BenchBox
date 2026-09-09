@@ -51,7 +51,7 @@ test.describe("responsive explorer assertions", () => {
       await waitForShell(page);
 
       const nav = page.getByTestId("results-explorer-nav");
-      for (const label of ["Leaderboards", "Benchmarks", "Platforms", "Compare", "Find runs"]) {
+      for (const label of ["Overview", "Benchmarks", "Platforms", "Compare", "Find runs"]) {
         await expect(nav.getByRole("link", { name: label })).toBeVisible();
       }
       await expect(nav.getByRole("link", { name: "Find runs" })).toHaveAttribute("aria-current", "page");
@@ -61,8 +61,8 @@ test.describe("responsive explorer assertions", () => {
       page,
     }) => {
       await setViewport(page, viewport);
-      await page.goto("/results/");
-      await waitForDataLoaded(page, /Recent Results/i);
+      await page.goto("/results/compare/");
+      await waitForDataLoaded(page, /Compare benchmark results/i);
 
       await expectTopWithin(
         page.getByRole("heading", { name: "Compare benchmark results" }),
@@ -333,10 +333,10 @@ test.describe("responsive explorer assertions", () => {
   }
 
   for (const homeRoute of [
-    { name: "default", path: "/results/" },
+    { name: "default", path: "/results/compare/" },
     {
       name: "filtered deep link",
-      path: "/results/?bm=clickbench&scale_factor=0.1&trust_tier=maintainer-run",
+      path: "/results/compare/?bm=clickbench&scale_factor=0.1&trust_tier=maintainer-run",
     },
   ]) {
     test(`home skeleton and loaded shell keep the same rendered mobile geometry for the ${homeRoute.name} route`, async ({
@@ -360,7 +360,7 @@ test.describe("responsive explorer assertions", () => {
       const skeletonGeometry = await homeSharedGeometry(page);
 
       releaseSnapshot();
-      await expect(page.getByText("Recent Results")).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toHaveCount(0, { timeout: 30_000 });
       await expect(page.getByRole("region", { name: "Leaderboard ranking selector" })).toBeVisible();
       const loadedGeometry = await homeSharedGeometry(page);
 

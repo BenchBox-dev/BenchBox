@@ -5,8 +5,8 @@ test.describe("accessibility and responsive regressions", () => {
   test("reduced motion and forced contrast preserve keyboard focus", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce", forcedColors: "active" });
     await page.setViewportSize({ width: 640, height: 900 });
-    await page.goto("/results/");
-    await waitForDataLoaded(page, /Recent Results/i);
+    await page.goto("/results/compare/");
+    await waitForDataLoaded(page, /Compare benchmark results/i);
 
     await page.getByText("Advanced filters").click();
     const control = page.getByRole("button", { name: /All (tuning labels|trust tiers|time)/ }).first();
@@ -29,8 +29,8 @@ test.describe("accessibility and responsive regressions", () => {
 
   test("the home surface remains horizontally contained at 200 percent zoom", async ({ page }) => {
     await page.setViewportSize({ width: 640, height: 900 });
-    await page.goto("/results/");
-    await waitForDataLoaded(page, /Recent Results/i);
+    await page.goto("/results/compare/");
+    await waitForDataLoaded(page, /Compare benchmark results/i);
 
     await page.evaluate(() => {
       document.documentElement.style.zoom = "2";

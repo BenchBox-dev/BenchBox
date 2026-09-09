@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 test.describe("Home", () => {
-  test("@smoke renders the leaderboard-first header, corpus summary, and recent-results table", async ({ page }) => {
+  test("@smoke renders the overview header, corpus summary, and recent-results table", async ({ page }) => {
     await page.goto("/results/");
     await waitForShell(page);
 
@@ -15,7 +15,7 @@ test.describe("Home", () => {
     // wait would resolve against the skeleton and prove nothing about the
     // loaded page - which is exactly how this test passed while never once
     // exercising loaded Home content.
-    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
 
     const summary = page.getByRole("region", { name: "Corpus summary" });
     // Corpus Summary labels are count-aware: when the fixture corpus has
@@ -27,7 +27,7 @@ test.describe("Home", () => {
       /^supported benchmarks?$/,
       /^published runs?$/,
       /^platforms? with public results$/,
-      /^leaderboard rankings?$/,
+      /^rankings?$/,
     ]) {
       await expect(summary.getByText(label).first()).toBeVisible();
     }
@@ -42,8 +42,8 @@ test.describe("Home", () => {
         localStorage.setItem("benchbox:theme", "light");
       }
     });
-    await page.goto("/results/");
-    await waitForDataLoaded(page, /Recent Results/i);
+    await page.goto("/results/compare/");
+    await waitForDataLoaded(page, /Compare benchmark results/i);
 
     const hero = page.getByTestId("home-hero-filter-band");
     const dataSurface = page.getByTestId("home-data-surface");
@@ -59,7 +59,7 @@ test.describe("Home", () => {
 
     await page.evaluate(() => localStorage.setItem("benchbox:theme", "dark"));
     await page.reload();
-    await waitForDataLoaded(page, /Recent Results/i);
+    await waitForDataLoaded(page, /Compare benchmark results/i);
 
     const [darkHeroBg, darkDataBg] = await Promise.all([
       page.getByTestId("home-hero-filter-band").evaluate((element) => getComputedStyle(element).backgroundColor),

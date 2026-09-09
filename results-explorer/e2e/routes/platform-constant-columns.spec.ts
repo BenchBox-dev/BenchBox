@@ -8,7 +8,7 @@ test("constant column hoisting keeps sparse columns and stable column indexes", 
   await waitForDataElement(page, polarsTable);
 
   await expect(page.getByTestId("platform-hoisted-metric-contract")).toContainText(
-    "Route-wide metric contract",
+    "Results are ranked by:",
   );
   await expect(polarsTable.getByRole("columnheader", { name: "Ranked on" })).toHaveCount(0);
   await expect(polarsTable.getByRole("button", { name: /Power score/ }).locator("xpath=..")).toHaveAttribute(

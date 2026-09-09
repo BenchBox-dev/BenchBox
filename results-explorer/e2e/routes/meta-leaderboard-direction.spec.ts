@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 test("matrix direction uses one reading rule across every visible column", async ({ page }) => {
-  await page.goto("/results/");
+  await page.goto("/results/compare/");
   await waitForShell(page);
   await waitForDataLoaded(page, /Cross-benchmark rankings/);
 

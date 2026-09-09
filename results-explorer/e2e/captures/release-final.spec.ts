@@ -60,7 +60,7 @@ const ROUTES: Array<{ slug: string; url: string; readyText: RegExp }> = [
   {
     slug: "compare-empty",
     url: "/results/compare",
-    readyText: /Choose runs to compare|Cannot compare/,
+    readyText: /Compare benchmark results|Cannot compare/,
   },
   { slug: "query", url: "/results/query", readyText: /matching run/ },
   { slug: "not-found", url: "/results/clickbench/", readyText: /No published results yet/ },

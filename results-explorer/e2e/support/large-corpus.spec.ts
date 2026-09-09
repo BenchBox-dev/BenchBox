@@ -99,9 +99,9 @@ test.describe("large corpus fixture", () => {
         await page.goto(`${baseUrl}/results/compare`);
         await waitForShell(page);
 
-        await expect(page.getByRole("heading", { name: "Choose runs to compare" })).toBeVisible();
-        await expect(page.getByTestId("compare-picker-query-link")).toBeVisible();
-        await expect(page.locator("table")).toHaveCount(0);
+        await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible();
+        await expect(page.getByRole("grid", { name: "Cross-benchmark leaderboard" })).toBeVisible();
+        expect(await page.getByRole("grid", { name: "Cross-benchmark leaderboard" }).locator("tbody tr").count()).toBeLessThanOrEqual(200);
         const documentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
         expect(documentHeight).toBeLessThan(6000);
         expect(documentHeight).toBeLessThan(viewport.height * 8);
