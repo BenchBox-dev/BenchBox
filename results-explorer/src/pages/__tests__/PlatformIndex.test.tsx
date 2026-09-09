@@ -14,6 +14,8 @@ vi.mock("@/lib/duckdbQueries", async () => {
   return {
     ...actual,
     getPlatformIndexRows: vi.fn(),
+    getResultsBasisAvailability: vi.fn().mockResolvedValue([]),
+    getDetailResult: vi.fn().mockResolvedValue(null),
   };
 });
 
@@ -25,7 +27,7 @@ vi.mock("preact-router", async () => {
   };
 });
 
-import { getPlatformIndexRows } from "@/lib/duckdbQueries";
+import { getDetailResult, getResultsBasisAvailability, getPlatformIndexRows } from "@/lib/duckdbQueries";
 import { PlatformIndex } from "@/pages/PlatformIndex";
 
 function makeRow(overrides: Partial<PlatformIndexRowRow> = {}): PlatformIndexRowRow {
@@ -118,7 +120,7 @@ describe("PlatformIndex - sortable table headers", () => {
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
     await waitFor(() => expect(document.title).toBe("DuckDB · BenchBox Results"));
     expect(getRowOrder(container)).toEqual(["r-null-geo", "r-tpch-fast", "r-tpch-slow", "r-ssb-mid"]);
-    expect(screen.getAllByLabelText(/Run age:/)).toHaveLength(4);
+    expect(screen.getAllByLabelText(/^Run date /)).toHaveLength(4);
   });
 
   it("matches lower-case platform URLs against mixed-case platform IDs", async () => {
@@ -264,15 +266,15 @@ describe("PlatformIndex - sortable table headers", () => {
 
     const filterStrip = screen.getByTestId("platform-detail-filters");
     expect(filterStrip).toBeTruthy();
-    expect(screen.getByText("Showing 30 of 30 results")).toBeTruthy();
+    expect(screen.getByTestId("platform-run-count").textContent).toBe("30 published runs");
 
     fireEvent.change(screen.getByTestId("platform-filter-benchmark"), {
       target: { value: "clickbench" },
     });
-    await waitFor(() => expect(screen.getByText("Showing 12 of 12 results")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("platform-run-count").textContent).toBe("12 of 30 published runs"));
 
     fireEvent.click(screen.getByTestId("platform-filter-reset"));
-    await waitFor(() => expect(screen.getByText("Showing 30 of 30 results")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("platform-run-count").textContent).toBe("30 published runs"));
     expect(screen.queryByTestId("platform-filter-reset")).toBeNull();
   });
 
@@ -388,7 +390,7 @@ describe("PlatformIndex - sortable table headers", () => {
       "4 results selected (maximum)",
     );
     expect(screen.queryByText("Use sticky tray to compare")).toBeNull();
-    expect(screen.getByText("Showing 5 of 5 results").parentElement?.textContent).toBe("Showing 5 of 5 results");
+    expect(screen.getByTestId("platform-run-count").textContent).toBe("5 published runs");
   });
 
   it("disables Platform compare selection for non-comparable rows", async () => {
@@ -483,8 +485,13 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(status).toHaveAttribute("aria-atomic", "true");
     expect(status?.textContent).toContain("0 results selected");
     expect(guidance.textContent).toContain("Select two or more DuckDB results");
-    expect((screen.getByRole("button", { name: "Select 2 comparable results" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByTestId("platform-table-scroll-hint").textContent).toContain("Scroll table");
+    // No dead button: the pending state is status text, and the real
+    // affordance appears in the same slot once it can be used.
+    expect(screen.queryByRole("button", { name: /Select 2 / })).toBeNull();
+    expect(screen.getByTestId("platform-compare-cta-pending").textContent).toBe(
+      "Select 2 results to compare",
+    );
+    expect(screen.getByTestId("platform-table-scroll-hint").textContent).toContain("Scroll for dates, timings, and source labels");
     expect(screen.getAllByText(/Geomean latency \(lower is better\)/).length).toBeGreaterThan(0);
   });
 
@@ -695,7 +702,7 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(screen.getByTestId("platform-compare-guidance").textContent).toContain("differ by benchmark");
     expect(screen.queryByText("Use sticky tray to compare")).toBeNull();
 
-    const compareLink = screen.getByRole("link", { name: /Compare 2 selected/ }) as HTMLAnchorElement;
+    const compareLink = screen.getAllByRole("link", { name: /Compare 2 selected/ })[0] as HTMLAnchorElement;
     expect(compareLink.getAttribute("href")).toBe("/results/compare?ids=aaaabbbb,ccccdddd");
   });
 
@@ -715,13 +722,13 @@ describe("PlatformIndex - sortable table headers", () => {
     const { container } = render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
-    expect(screen.getByText("Showing 200 of 205 results")).toBeTruthy();
+    expect(screen.getByText("Showing 200 of 205 published runs")).toBeTruthy();
     expect(getRowOrder(container)).toHaveLength(200);
 
     fireEvent.click(screen.getByRole("button", { name: "Show more results" }));
 
     expect(getRowOrder(container)).toHaveLength(205);
-    expect(screen.getByText("Showing 205 of 205 results")).toBeTruthy();
+    expect(screen.queryByText(/^Showing /)).toBeNull();
   });
 
   it("splits platform trend charts by comparable benchmark cohorts", async () => {
@@ -952,4 +959,86 @@ describe("PlatformIndex - sortable table headers", () => {
 
     expect(getRowOrder(container)).toEqual(["r14"]);
   });
+});
+
+describe("platform measurement basis", () => {
+  it("reduces mixed benchmarks independently and reuses loaded executions", async () => {
+    vi.clearAllMocks();
+    window.history.replaceState(null, "", "/results/p/duckdb/");
+    const rows = [makeRow({ result_id: "run-a", benchmark: "tpch", short_id: "aaaaaaaa" }), makeRow({ result_id: "run-b", benchmark: "clickbench", short_id: "bbbbbbbb" })];
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(rows);
+    vi.mocked(getResultsBasisAvailability).mockResolvedValue([]);
+    vi.mocked(getDetailResult).mockImplementation(async (id) => ({
+      ...rows.find((row) => row.result_id === id)!,
+      queries: [{ query_id: id === "run-a" ? "Q1" : "Q99", duration_ms: id === "run-a" ? 4 : 25, status: "pass", run_type: "measurement", iter: 1, stream: null }],
+      display_timings: [],
+      logical_query_count: 1,
+    } as unknown as import("@/types").DetailResult));
+    render(<PlatformIndex platform="duckdb" />);
+    const selector = await screen.findByRole("combobox", { name: "Measurement basis" });
+    expect(getDetailResult).not.toHaveBeenCalled();
+    fireEvent.change(selector, { target: { value: "all_warm:min" } });
+    await waitFor(() => expect(within(screen.getByTestId("run-a")).getByText("4 ms")).toBeTruthy());
+    expect(within(screen.getByTestId("run-b")).getByText("25 ms")).toBeTruthy();
+    expect(screen.queryByText("3,000")).toBeNull();
+    fireEvent.change(selector, { target: { value: "default" } });
+    await waitFor(() => expect(within(screen.getByTestId("run-a")).getByText("15 ms")).toBeTruthy());
+    fireEvent.change(selector, { target: { value: "all_warm:min" } });
+    await waitFor(() => expect(within(screen.getByTestId("run-a")).getByText("4 ms")).toBeTruthy());
+    expect(getDetailResult).toHaveBeenCalledTimes(2);
+    expect(getResultsBasisAvailability).toHaveBeenCalledTimes(1);
+  });
+});
+
+it("updates selection eligibility when warmup availability differs from the published basis", async () => {
+  vi.clearAllMocks();
+  window.history.replaceState(null, "", "/results/p/duckdb/");
+  const rows = [
+    makeRow({ result_id: "no-warmup", short_id: "cccccccc" }),
+    makeRow({ result_id: "warmup-only", short_id: "dddddddd", comparison_exclusion_reason: "missing_timings", display_exclusion_reason: "missing_timings" }),
+  ];
+  vi.mocked(getPlatformIndexRows).mockResolvedValue(rows);
+  vi.mocked(getResultsBasisAvailability).mockResolvedValue([{ result_id: "warmup-only", available_bases: "default,warmup", has_warmup: true, measurement_pass_count: 0, warmup_status: "available", varying_pass_queries: null }]);
+  vi.mocked(getDetailResult).mockImplementation(async (id) => ({
+    ...rows.find((row) => row.result_id === id)!,
+    queries: ["Q1", "Q2"].map((query_id) => ({ query_id, duration_ms: 10, status: "pass", run_type: id === "warmup-only" ? "warmup" : "measurement", iter: id === "warmup-only" ? 0 : 1, stream: null })),
+    display_timings: [], logical_query_count: 2,
+  } as unknown as import("@/types").DetailResult));
+  render(<PlatformIndex platform="duckdb" />);
+  const selector = await screen.findByRole("combobox", { name: "Measurement basis" });
+  const unavailable = screen.getByTestId("platform-compare-checkbox-no-warmup") as HTMLInputElement;
+  fireEvent.click(unavailable);
+  expect(unavailable.checked).toBe(true);
+  expect((screen.getByTestId("platform-compare-checkbox-warmup-only") as HTMLInputElement).disabled).toBe(true);
+  await waitFor(() => expect(selector.querySelector('option[value="warmup"]')).toBeTruthy());
+  fireEvent.change(selector, { target: { value: "warmup" } });
+  await waitFor(() => expect(unavailable.disabled).toBe(true));
+  await waitFor(() => expect(unavailable.checked).toBe(false));
+  expect((screen.getByTestId("platform-compare-checkbox-warmup-only") as HTMLInputElement).disabled).toBe(false);
+});
+
+it("suspends comparison during pass loading and clears selections after a failed load", async () => {
+  vi.clearAllMocks();
+  window.history.replaceState(null, "", "/results/p/duckdb/");
+  vi.mocked(getPlatformIndexRows).mockResolvedValue([makeRow({ result_id: "first" }), makeRow({ result_id: "second" })]);
+  vi.mocked(getResultsBasisAvailability).mockResolvedValue([]);
+  let reject!: (error: Error) => void;
+  vi.mocked(getDetailResult).mockImplementation(() => new Promise((_resolve, fail) => { reject = fail; }));
+  render(<PlatformIndex platform="duckdb" />);
+  const selector = await screen.findByRole("combobox", { name: "Measurement basis" });
+  fireEvent.click(screen.getByTestId("platform-compare-checkbox-first"));
+  fireEvent.click(screen.getByTestId("platform-compare-checkbox-second"));
+  expect(screen.getByTestId("compare-tray-compare-link")).toBeTruthy();
+  fireEvent.change(selector, { target: { value: "all_warm:min" } });
+  await waitFor(() => expect(screen.queryByTestId("compare-tray-compare-link")).toBeNull());
+  reject(new Error("Pass loading failed"));
+  await waitFor(() => expect(screen.getByText(/Could not load measurement passes/)).toBeTruthy());
+  expect((screen.getByTestId("platform-compare-checkbox-first") as HTMLInputElement).checked).toBe(false);
+  expect((screen.getByTestId("platform-compare-checkbox-second") as HTMLInputElement).checked).toBe(false);
+  expect(screen.queryByTestId("compare-tray-compare-link")).toBeNull();
+  fireEvent.change(selector, { target: { value: "default" } });
+  await waitFor(() => expect((screen.getByTestId("platform-compare-checkbox-first") as HTMLInputElement).disabled).toBe(false));
+  fireEvent.click(screen.getByTestId("platform-compare-checkbox-first"));
+  fireEvent.click(screen.getByTestId("platform-compare-checkbox-second"));
+  expect(screen.getByTestId("compare-tray-compare-link")).toBeTruthy();
 });

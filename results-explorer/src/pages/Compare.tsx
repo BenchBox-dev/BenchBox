@@ -1,5 +1,5 @@
 import type { JSX } from "preact";
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import type { DetailResult } from "@/types";
 import {
@@ -15,7 +15,6 @@ import { resultDetailHref, visibleResultIdForRow, MAX_COMPARE_SELECTIONS } from 
 import { formatRunIdentitiesForCohort, type RunIdentitySource } from "@/lib/runIdentity";
 import { CompareSummarySkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
-import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
 import { TuningBadge } from "@/components/TuningBadge";
@@ -65,7 +64,9 @@ import { isValidTimingValue, timingValueForQuery } from "@/lib/displayEligibilit
 import { formatWarningClassSummary, formatWarningCount } from "@/lib/copyFormatters";
 import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
-import { RunDateWithAge } from "@/components/RunAge";
+import { RunDateChip } from "@/components/RunAge";
+import { PageHeader } from "@/components/PageHeader";
+import { Leaderboard } from "@/pages/Leaderboard";
 import { Select } from "@/components/Select";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
@@ -174,7 +175,6 @@ export function Compare({ url }: CompareProps) {
   const [compareState, setCompareState] = useState<CompareState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
   const [baselineResultId, setBaselineResultId] = useUrlState(BASELINE_URL_KEY, "", stringSerde);
   // Through the model's serde, not a hand-rolled parser: the grammar is the
   // model's to define, and a shared link has to reproduce the sender's figures
@@ -190,11 +190,9 @@ export function Compare({ url }: CompareProps) {
   // Was previously an error string ("No result IDs provided. Add ?ids=...")
   // or a silent redirect back to ResultDetail; both forced URL editing or
   // dead-ended the user on the page they came from.
-  const [builderPinnedId, setBuilderPinnedId] = useState<string | null>(null);
   const [showBuilder, setShowBuilder] = useState(false);
   const [compareNotice, setCompareNotice] = useState<string | null>(null);
   const [preserveRequestedIds, setPreserveRequestedIds] = useState(false);
-  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const results = compareState?.results ?? EMPTY_RESULTS;
   const [availabilityRows, setAvailabilityRows] = useState<Record<string, string>>({});
 
@@ -265,7 +263,6 @@ export function Compare({ url }: CompareProps) {
     setCompareState(null);
     setError(null);
     setLoading(true);
-    setBuilderPinnedId(null);
     setShowBuilder(false);
     setCompareNotice(null);
     setPreserveRequestedIds(false);
@@ -284,7 +281,6 @@ export function Compare({ url }: CompareProps) {
 
     if (ids.length === 0) {
       setShowBuilder(true);
-      setBuilderPinnedId(null);
       setLoading(false);
       return () => {
         cancelled = true;
@@ -307,7 +303,7 @@ export function Compare({ url }: CompareProps) {
           }
           // Keep this run selected and send the reader to the shared run
           // finder instead of returning to the page they came from.
-          setBuilderPinnedId(resolvedId);
+          setCompareState({ results: [detail], primaryMetric: "display_geomean_ms" });
           setShowBuilder(true);
           setLoading(false);
         })
@@ -382,7 +378,6 @@ export function Compare({ url }: CompareProps) {
         const metric = await getPrimaryMetricForBenchmark(details[0]!.benchmark);
         if (cancelled) return;
         if (details.length === 1) {
-          setBuilderPinnedId(details[0]!.result_id);
           setShowBuilder(true);
         } else {
           setShowBuilder(false);
@@ -399,7 +394,6 @@ export function Compare({ url }: CompareProps) {
 
     return () => {
       cancelled = true;
-      if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
     };
   }, [requestedIdsToken]);
 
@@ -477,8 +471,17 @@ export function Compare({ url }: CompareProps) {
       </div>
     );
 
+  // The compare route with nothing selected is where a reader arrives wanting
+  // to rank runs against each other. The ranking table and its filters answer
+  // that directly, so they stand in for what used to be a link to a picker.
   if (showBuilder) {
-    return <ComparePickerLaunch pinnedId={builderPinnedId} notice={compareNotice} />;
+    return <>
+      {results.length === 1 && <div class="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8" role="status">
+        <p>Selected run: {results[0]!.platform} · {visibleResultIdForRow(results[0]!)}</p>
+        <a class="btn btn-primary mt-2" href={`/results/query?pick=${encodeURIComponent(results[0]!.result_id)}`}>Find runs to compare with this run</a>
+      </div>}
+      <Leaderboard notice={compareNotice} />
+    </>;
   }
 
   if (results.length === 0) return null;
@@ -624,21 +627,9 @@ export function Compare({ url }: CompareProps) {
   }));
   const isMultiRun = compareLayoutForSelection(results.map((r) => r.result_id)).kind === "multi_run";
 
-  function handleShare() {
-    navigator.clipboard
-      .writeText(window.location.href)
-      .then(() => {
-        setCopied(true);
-        copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => {
-        /* clipboard not available */
-      });
-  }
-
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <Breadcrumb
+      <PageHeader
         crumbs={
           mixedBenchmark
             ? [{ label: "Results", href: "/results/" }, { label: "Compare" }]
@@ -648,40 +639,32 @@ export function Compare({ url }: CompareProps) {
                 { label: "Compare" },
               ]
         }
+        eyebrow="Compare"
+        title={`${benchmarkLabel} Comparison`}
+        meta={
+          <>
+            <span class="bb-meta-chip">{rowCount} runs</span>
+            <span class="bb-meta-chip">SF {scaleFactorLabel.replace(/^SF\s*/, "")}</span>
+            {(() => {
+              const tiers = [...new Set(rowData.map((r) => r.trustLabel))];
+              return tiers.length > 1 ? (
+                <span class="bb-meta-chip">Across trust tiers: {tiers.join(", ")}</span>
+              ) : null;
+            })()}
+          </>
+        }
+
       />
 
       {compareNotice && (
         <div
-          class="mt-4 rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]"
+          class="mb-6 rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]"
           role="status"
           data-testid="compare-url-notice"
         >
           {compareNotice}
         </div>
       )}
-
-      <section class="mt-6 mb-8 panel-elevated p-5">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Compare</p>
-            <h1 class="mt-1 text-3xl font-bold text-[var(--bb-data-fg-primary)]">{benchmarkLabel} Comparison</h1>
-            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
-              Scale factor: {scaleFactorLabel} - {rowCount}{" "}
-              runs
-            </p>
-            {/* Trust tier diversity note - informational, not a warning */}
-            {(() => {
-              const tiers = [...new Set(rowData.map((r) => r.trustLabel))];
-              return tiers.length > 1 ? (
-                <p class="mt-1 text-xs text-[var(--bb-data-fg-subtle)]">Comparing across trust tiers: {tiers.join(", ")}</p>
-              ) : null;
-            })()}
-          </div>
-          <button class="btn btn-secondary" onClick={handleShare}>
-            {copied ? "Copied!" : "Share URL"}
-          </button>
-        </div>
-      </section>
 
       <CompareGuardrailSummary
         warningCount={comparabilityWarningCount}
@@ -696,60 +679,68 @@ export function Compare({ url }: CompareProps) {
         baselineIndex={normalizedBaselineIndex}
         runLabels={cohortIdentitiesCompact}
       />
+      {/* The three controls that govern every figure below - what is measured,
+          what it is measured against, and over which queries - read as one
+          set, so they sit in one row rather than three stacked bars. */}
       {results.length > 1 && (
-        <MeasurementBasisBar
-          basis={basis}
-          onBasisChange={setBasis}
-          availablePasses={availablePasses}
-          comparableQueryCount={queryCoverage.shared}
-          totalQueryCount={queryCoverage.total}
-          runCount={results.length}
-          statisticCollapsed={resolvedStatisticsCollapsed(resolvedResults)}
-        />
-      )}
-      {results.length > 1 && (
-        <div class="panel mb-4 flex flex-wrap items-center justify-between gap-3 px-3 py-2 shadow-sm">
-          <div>
+        <div
+          class="panel mb-4 grid gap-x-6 gap-y-4 px-4 py-3 shadow-sm lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
+          data-testid="compare-controls"
+        >
+          <MeasurementBasisBar
+            layout="card"
+            basis={basis}
+            onBasisChange={setBasis}
+            availablePasses={availablePasses}
+            comparableQueryCount={queryCoverage.shared}
+            totalQueryCount={queryCoverage.total}
+            runCount={results.length}
+            statisticCollapsed={resolvedStatisticsCollapsed(resolvedResults)}
+          />
+
+          <div class="min-w-0">
             <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="compare-baseline">
               Baseline
             </label>
-            <p class="text-xs text-[var(--bb-data-fg-muted)]">Ratios and differences compare every other selected run with this run.</p>
+            <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
+              Ratios and differences compare every other selected run with this run.
+            </p>
+            <div class="mt-2">
+              <Select
+                id="compare-baseline"
+                ariaLabel="Baseline"
+                value={results[normalizedBaselineIndex]?.result_id ?? ""}
+                onChange={setBaselineResultId}
+                options={results.map((result, index) => ({
+                  value: result.result_id,
+                  label: cohortIdentitiesCompact[index]!,
+                }))}
+                size="sm"
+              />
+            </div>
           </div>
-          <Select
-            id="compare-baseline"
-            ariaLabel="Baseline"
-            value={results[normalizedBaselineIndex]?.result_id ?? ""}
-            onChange={setBaselineResultId}
-            options={results.map((result, index) => ({
-              value: result.result_id,
-              label: cohortIdentitiesCompact[index]!,
-            }))}
-            size="sm"
-          />
-        </div>
-      )}
 
-      {results.length > 1 && (
-        <div class="panel mb-4 flex flex-wrap items-center justify-between gap-3 px-3 py-2 shadow-sm">
-          <div>
+          <div class="min-w-0">
             <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="query-limiter">
               Queries shown
             </label>
-            <p class="text-xs text-[var(--bb-data-fg-muted)]">
+            <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
               Applies to the chart and the table together.
             </p>
+            <div class="mt-2">
+              <Select
+                id="query-limiter"
+                ariaLabel="Queries shown"
+                size="sm"
+                value={queryLimiter}
+                onChange={(value) => setQueryLimiter(value as QueryDiffLimiter)}
+                options={(Object.keys(QUERY_DIFF_LIMITER_LABELS) as QueryDiffLimiter[]).map((key) => ({
+                  value: key,
+                  label: QUERY_DIFF_LIMITER_LABELS[key],
+                }))}
+              />
+            </div>
           </div>
-          <Select
-            id="query-limiter"
-            ariaLabel="Queries shown"
-            size="sm"
-            value={queryLimiter}
-            onChange={(value) => setQueryLimiter(value as QueryDiffLimiter)}
-            options={(Object.keys(QUERY_DIFF_LIMITER_LABELS) as QueryDiffLimiter[]).map((key) => ({
-              value: key,
-              label: QUERY_DIFF_LIMITER_LABELS[key],
-            }))}
-          />
         </div>
       )}
 
@@ -763,10 +754,13 @@ export function Compare({ url }: CompareProps) {
             suppressWinnerClaims={decisionSummary.claimSuppressed}
             suppressionReason={decisionSummary.claimSuppressionReason ?? undefined}
             queryFilter={queryLimiter === "all" ? undefined : limitedQueryIds}
-            // The compact sparkline table already carries the per-platform
-            // geomean and Power@Size figures, so the large single-metric bar
-            // charts would only repeat them.
-            excludeChartIds={["performance_bar", "power_bar"]}
+            // One chart per question. The sparkline table already carries the
+            // per-platform geomean and Power@Size figures, so the single-metric
+            // bar charts repeat them; comparison_bar and query_histogram are
+            // both per-query bars across the selected runs, and diverging_bar
+            // and normalized_speedup are both per-query change against the
+            // baseline. In each pair the responsive drawing survives.
+            excludeChartIds={["performance_bar", "power_bar", "comparison_bar", "normalized_speedup"]}
           />
         </div>
       )}
@@ -824,7 +818,7 @@ export function Compare({ url }: CompareProps) {
                 </div>
               </div>
               <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]">
-                <RunDateWithAge runDate={r.runDate} />
+                <RunDateChip runDate={r.runDate} />
                 {r.driverVersion && !r.label.includes(`v${r.driverVersion}`) && ` · v${r.driverVersion}`}
               </p>
               <p class="mb-3 font-mono text-xs text-[var(--bb-data-fg-muted)]">Public ID {r.publicId}</p>
@@ -1072,41 +1066,4 @@ function severeCohortMismatchReason(results: DetailResult[]) {
     reasons.push("phases differ");
   }
   return reasons.length > 0 ? reasons.join(" and ") : null;
-}
-
-function ComparePickerLaunch({ pinnedId, notice }: { pinnedId: string | null; notice: string | null }) {
-  const queryHref = pinnedId
-    ? `/results/query?pick=${encodeURIComponent(pinnedId)}`
-    : "/results/query";
-
-  return (
-    <div class="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8" data-testid="compare-picker-launch">
-      <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: "Compare" }]} />
-
-      {notice && (
-        <div
-          class="mt-4 rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]"
-          role="status"
-          data-testid="compare-url-notice"
-        >
-          {notice}
-        </div>
-      )}
-
-      <section class="mt-6 panel-elevated p-5" aria-labelledby="compare-picker-title">
-        <p class="text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Compare</p>
-        <h1 id="compare-picker-title" class="mt-1 text-2xl font-bold text-[var(--bb-data-fg-primary)]">
-          {pinnedId ? "Find another run" : "Choose runs to compare"}
-        </h1>
-        <p class="mt-2 text-sm text-[var(--bb-data-fg-muted)]">
-          {pinnedId
-            ? "One run is selected. Find another run from the same benchmark, scale, and test phase."
-            : "Find two to four runs from the same benchmark, scale, and test phase."}
-        </p>
-        <a href={queryHref} class="btn btn-primary mt-4 no-underline" data-testid="compare-picker-query-link">
-          Find runs
-        </a>
-      </section>
-    </div>
-  );
 }

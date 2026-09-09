@@ -11,7 +11,7 @@ Choose the first row that matches.
 | Question | Home | Published? |
 |---|---|---|
 | Must every agent session load it? | `AGENTS.md` (byte-budgeted) | No |
-| Canonical cross-project behavior? | `~/.skill-sync/skills/SHARED/` | No |
+| Canonical cross-project behavior? | The `skill-sync-skills` catalog checkout named in `skill-sync.conf` (`shared-*` skills) | No |
 | BenchBox binding, rationale, or harness boundary? | `docs/agent/` | No |
 | How a human runs CI, UAT, release, or GitHub admin? | `docs/operations/` | Only if nav needs it |
 | How a human adds a platform, runs tests, or extends a benchmark? | `docs/development/` | Yes |

@@ -22,7 +22,7 @@ import { formatTimingExclusion, isTimingDisplayable, platformTimingValue } from 
 import { formatLatencyMs } from "@/lib/metricFormatters";
 import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
-const LABEL_W = 144;
+const LABEL_W = 200;
 const ROW_H = 48;
 const AXIS_H = 24;
 const PADDING_TOP = 12;
@@ -41,13 +41,14 @@ export function DistributionBox({ summary }: Props) {
   const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
   );
-  // Truncation budget = 20 chars (LABEL_W=144 px / ~7 px per char). When
-  // truncation would collapse otherwise-unique cohort identities to the same
+  // Truncation budget = 26 chars (LABEL_W=200 px / ~7.5 px per char at the
+  // 13px label size, which matches the speed-and-throughput table beside it).
+  // When truncation would collapse otherwise-unique cohort identities to the same
   // prefix (e.g. four "DataFusion v53.0.0 …"), preserveUniqueAfterTruncation
   // preserves the distinguishing suffix (date or short id) inside the same
   // budget. Audit finding #7.
   const rawLabels = summary.platforms.map((p, i) => cohortLabels[i]?.disambiguated ?? p.platform);
-  const displayLabels = preserveUniqueAfterTruncation(rawLabels, 20);
+  const displayLabels = preserveUniqueAfterTruncation(rawLabels, 26);
   const rows = summary.platforms
     .map((p, i) => ({
       label: displayLabels[i] ?? p.platform,
@@ -104,7 +105,7 @@ export function DistributionBox({ summary }: Props) {
                 x={layout.labelAbove ? 0 : LABEL_W - 6}
                 y={y + layout.labelBaseline}
                 text-anchor={layout.labelAbove ? "start" : "end"}
-                style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}
+                style={{ fontSize: "13px", fill: "var(--bb-chart-label)" }}
               >
                 <title>{row.fullLabel}</title>
                 {row.label}

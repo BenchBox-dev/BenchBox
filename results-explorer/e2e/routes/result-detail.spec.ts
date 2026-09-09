@@ -25,41 +25,35 @@ test.describe("ResultDetail", () => {
     await expect(main.getByRole("heading", { name: /Query timings/ })).toBeVisible();
   });
 
-  test("sorting the median table toggles the indicator arrow", async ({ page }) => {
+  test("the pass table reports every query once and closes with run totals", async ({ page }) => {
     await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
     await waitForDataLoaded(page, /Query timings/);
 
-    const header = page.getByRole("columnheader", { name: /Median latency/ });
-    // First click sorts ascending; second click flips to descending. We
-    // assert on the arrow indicator because row-order comparison is noisy
-    // across browsers.
-    await header.click();
-    await expect(header).toContainText("↑");
-    await header.click();
-    await expect(header).toContainText("↓");
+    // One per-query table, not two: the median table would repeat the warm
+    // median this one already reports beside the passes behind it.
+    await expect(page.getByRole("columnheader", { name: /Median latency/ })).toHaveCount(0);
+    const totals = page.getByTestId("pass-strip-totals");
+    await expect(totals).toBeVisible();
+    await expect(totals.locator("th")).toHaveText("Overall");
+    await expect(totals.locator("td").first()).not.toHaveText("");
   });
 
   test("sortable headers expose state and native Space activation does not scroll", async ({ page }) => {
     await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
     await waitForDataLoaded(page, /Query timings/);
 
-    const medianHeader = page.locator('th[aria-sort]').filter({ hasText: "Median latency" }).first();
-    await expect(medianHeader).toHaveAttribute("aria-sort", "none");
-    const medianButton = medianHeader.getByRole("button");
-    await medianButton.click();
-    await expect(medianHeader).toHaveAttribute("aria-sort", "ascending");
-
-    const scrollBeforeSpace = await page.evaluate(() => window.scrollY);
-    await medianButton.press("Space");
-    await expect(medianHeader).toHaveAttribute("aria-sort", "descending");
-    expect(await page.evaluate(() => window.scrollY)).toBe(scrollBeforeSpace);
-
     await page.getByText(/Individual samples \(/).click();
     const durationHeader = page.locator('th[aria-sort]').filter({ hasText: "Duration" }).first();
     await expect(durationHeader.locator('[role="button"]')).toHaveCount(0);
     await expect(durationHeader).toHaveAttribute("aria-sort", "none");
-    await durationHeader.getByRole("button").click();
+    const durationButton = durationHeader.getByRole("button");
+    await durationButton.click();
     await expect(durationHeader).toHaveAttribute("aria-sort", "ascending");
+
+    const scrollBeforeSpace = await page.evaluate(() => window.scrollY);
+    await durationButton.press("Space");
+    await expect(durationHeader).toHaveAttribute("aria-sort", "descending");
+    expect(await page.evaluate(() => window.scrollY)).toBe(scrollBeforeSpace);
   });
 
   test("'Find a run to compare' opens Find runs with the result selected", async ({ page }) => {

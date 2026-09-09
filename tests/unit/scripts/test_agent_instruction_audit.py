@@ -99,7 +99,8 @@ def test_audit_entrypoint_is_stdlib_only() -> None:
         ".claude/skills/shared-investigation-framework/SKILL.md",
         "_project/evals/agent-instructions/scenarios.json",
         "docs/agent/review-protocol.md",
-        "skill-sync.lock",
+        "skill-sync.conf",
+        "tools/skill-sync",
     ],
 )
 def test_governed_paths_route_to_a_required_instruction_lane(path: str) -> None:
@@ -107,7 +108,7 @@ def test_governed_paths_route_to_a_required_instruction_lane(path: str) -> None:
     decision = classify_paths([path], rules)
 
     assert decision["needs_code_ci"] is True or decision["skill_integrity_needed"] is True
-    if path.startswith(".claude/skills/") or path == "skill-sync.lock":
+    if path.startswith(".claude/skills/") or path in ("skill-sync.conf", "tools/skill-sync"):
         assert decision["skill_integrity_needed"] is True
 
 

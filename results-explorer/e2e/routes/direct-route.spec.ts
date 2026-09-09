@@ -59,7 +59,7 @@ test.describe("direct route parity", () => {
     await waitForDataElement(page, page.getByRole("heading", { name: /^Find benchmark runs$/ }));
 
     await page.goto("/results/compare");
-    await waitForDataElement(page, page.getByRole("heading", { name: /^Choose runs to compare$/ }));
+    await waitForDataElement(page, page.getByRole("heading", { name: /^Compare benchmark results$/ }));
   });
 
   test("flywheel documentation CTAs use real native navigation", async ({ page }) => {

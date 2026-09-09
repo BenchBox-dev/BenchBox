@@ -1,3 +1,4 @@
+import { RunDateChip } from "@/components/RunAge";
 import type { JSX } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { route } from "preact-router";
@@ -68,7 +69,8 @@ const SORT_TITLES: Record<MetaLeaderboardSort, string> = {
   recent_activity: "Sort by the most recent visible run date.",
 };
 const MISSING_COHORT_TITLE = `No published run for this ranking. ${COVERAGE_POLICY_COPY}`;
-const PLATFORM_RENDER_LIMIT = 200;
+// Keep the initial ranking readable; further rows remain explicitly reachable.
+const PLATFORM_RENDER_LIMIT = 25;
 const PLATFORM_RENDER_INCREMENT = 200;
 
 export function MetaLeaderboard({
@@ -231,12 +233,13 @@ export function MetaLeaderboard({
         </div>
         <div
           role="group"
-          class="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-2"
+          class="flex min-w-0 max-w-full flex-wrap items-center gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-2"
           aria-label="Leaderboard display controls"
         >
-          <div class="flex items-center gap-2">
+          <div class="flex min-w-0 max-w-full flex-wrap items-center gap-2">
             <span class="text-[11px] font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Sort</span>
             <SegmentedControl
+              class="max-w-full flex-wrap"
               ariaLabel="Sort leaderboard"
               value={sortKey}
               onChange={setSortKey}
@@ -248,9 +251,10 @@ export function MetaLeaderboard({
               }))}
             />
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex min-w-0 max-w-full flex-wrap items-center gap-2">
             <span class="text-[11px] font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Mode</span>
             <SegmentedControl
+              class="max-w-full flex-wrap"
               ariaLabel="Display mode"
               value={mode}
               onChange={onModeChange}
@@ -446,7 +450,7 @@ export function MetaLeaderboard({
                         )}
                         {metadata && cellState.kind !== "missing" && (
                           <div class="mt-0.5 text-[10px] font-normal text-[var(--bb-data-fg-muted)]">
-                            Run age: {runAgeLabel}
+                            <RunDateChip runDate={metadata.run_date} />
                           </div>
                         )}
                         {metadata && cellState.kind !== "missing" && (

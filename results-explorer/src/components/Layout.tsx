@@ -113,7 +113,7 @@ function Header() {
             class="flex min-h-12 flex-wrap items-center gap-x-5 gap-y-1 py-1 text-sm sm:flex-nowrap sm:overflow-x-auto"
           >
             <ExplorerNavLink href="/results/" active={currentPath === "/results" || currentPath === "/results/"}>
-              Leaderboards
+              Overview
             </ExplorerNavLink>
             <ExplorerNavLink href="/results/benchmarks/" active={isBenchmarkPath(currentPath)}>
               Benchmarks

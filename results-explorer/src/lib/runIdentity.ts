@@ -1,3 +1,4 @@
+import { splitVersion } from "@/lib/versionLabel";
 // Run-identity formatter: produces stable, distinguishable labels for
 // benchmark runs across charts, compare controls, and tables.
 //
@@ -18,7 +19,7 @@
 //     deployment fingerprint → trust tier → short result_id (last
 //     resort, only when nothing else differs).
 
-import { formatRunDateWithAge } from "@/lib/runAge";
+import { formatRunDate, formatRunDateWithAge } from "@/lib/runAge";
 
 export interface RunIdentitySource {
   result_id: string;
@@ -68,9 +69,16 @@ const RESULT_ID_QUALIFIER_KEYS = new Set(["short_result_id", "result_id"]);
 const NATURAL_QUALIFIERS: QualifierDescriptor[] = [
   {
     key: "version",
-    value: (s) => versionLabel(s.driver_version ?? s.platform_version ?? null),
+    value: (s) => {
+      const parts = splitVersion(s.driver_version ?? s.platform_version ?? null);
+      return parts ? `${parts.core}${parts.suffix ? "…" : ""}` : null;
+    },
   },
-  { key: "run_date", value: (s) => (s.run_date ? formatRunDateWithAge(s.run_date) : null) },
+  // The calendar date alone. A run's age is a reading of the same value that
+  // changes every day and doubles the length of every label carrying it; it
+  // belongs to the date's own display treatment (RunDateChip), not to the
+  // run's identity.
+  { key: "run_date", value: (s) => (s.run_date ? formatRunDate(s.run_date) : null) },
   {
     key: "scale_factor",
     value: (s) => (s.scale_factor !== null && s.scale_factor !== undefined ? `SF ${s.scale_factor}` : null),

@@ -38,7 +38,7 @@ export const STRIP_AXES = [
 ] as const;
 
 export const AXIS_DISPLAY_LABEL: Record<(typeof STRIP_AXES)[number], string> = {
-  "Platform version": "Engine version",
+  "Platform version": "Platform version",
   "Driver version": "Driver",
   Architecture: "Architecture",
   "CPU family": "CPU family",
@@ -102,9 +102,9 @@ export function IdentityDiffStrip({ results, baselineIndex = 0, runLabels }: Ide
     const baselineRun = results[baseIndex];
 
     return (
-      <section class="panel mb-4 px-3 py-2 shadow-sm" aria-label="Engine and hardware identity">
+      <section class="panel mb-4 px-3 py-2 shadow-sm" aria-label="Platform and hardware identity">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <h2 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">Engine and hardware</h2>
+          <h2 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">Platform and hardware</h2>
           <p class="text-xs text-[var(--bb-data-fg-muted)]">
             {diffCount === 0
               ? `No differences were recorded for these ${fields.length} fields. Other recorded or unrecorded factors may differ.`
@@ -177,9 +177,9 @@ export function IdentityDiffStrip({ results, baselineIndex = 0, runLabels }: Ide
   }
 
   return (
-    <section class="panel mb-4 px-3 py-2 shadow-sm" aria-label="Engine and hardware identity">
+    <section class="panel mb-4 px-3 py-2 shadow-sm" aria-label="Platform and hardware identity">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <h2 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">Engine and hardware</h2>
+        <h2 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">Platform and hardware</h2>
         <p class="text-xs text-[var(--bb-data-fg-muted)]">
           {diffCount === 0
             ? `No differences were recorded for these ${fields.length} fields. Other recorded or unrecorded factors may differ.`

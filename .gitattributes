@@ -16,6 +16,7 @@
 /_binaries/**/tpcds.dst -text
 /_binaries/**/dists.dss -text
 
-# >>> skill-sync managed (do not edit) >>>
+# skill-sync snapshot (hand-maintained; the rsync wrapper owns no ignore
+# machinery). Keep the committed `.claude/skills` snapshot byte-stable across
+# checkouts: no CRLF conversion, same as the old managed block.
 /.claude/skills/** -text
-# <<< skill-sync managed <<<

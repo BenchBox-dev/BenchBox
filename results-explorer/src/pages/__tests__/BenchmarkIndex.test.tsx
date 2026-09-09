@@ -414,13 +414,15 @@ describe("BenchmarkIndex", () => {
     });
   });
 
-  it("shows the cohort hero with live counts and anchored sections", async () => {
+  it("states the cohort scope in the page header and anchors the matrix", async () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => expect(screen.getByTestId("cohort-hero")).toBeTruthy());
-    expect(screen.getByTestId("cohort-counts").textContent).toContain("2 published runs");
-    expect(screen.getByTestId("cohort-counts").textContent).toContain("2 queries");
-    const jump = screen.getByText(/Jump to matrix/) as HTMLAnchorElement;
-    expect(jump.getAttribute("href")).toBe("#evidence-matrix");
+    await waitFor(() => expect(screen.getByTestId("cohort-counts")).toBeTruthy());
+    const meta = screen.getByTestId("page-header-meta");
+    expect(meta.textContent).toContain("2 published runs");
+    expect(meta.textContent).toContain("2 queries");
+    // The hero's prose and its "Jump to matrix" link are gone: the link moved
+    // the reader a quarter of a page, and the matrix follows immediately.
+    expect(screen.queryByText(/Jump to matrix/)).toBeNull();
     expect(container.querySelector("#evidence-matrix")).not.toBeNull();
     expect(container.querySelector("#provenance-legend")).not.toBeNull();
     // The matrix itself is the heatmap: the long layout must not render a
@@ -456,46 +458,28 @@ describe("BenchmarkIndex", () => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
 
-    for (const details of screen.getAllByText("Run details")) {
-      fireEvent.click(details);
-    }
+    // The platform name is the receipt link, and the labels column carries
+    // validation status; neither is behind a disclosure any more.
+    expect(screen.queryByText("Run details")).toBeNull();
     const receiptLinks = screen.getAllByRole("link", { name: /Open receipt for/ }) as HTMLAnchorElement[];
     expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r1#run-receipt");
     expect(screen.getAllByText("exact").length).toBeGreaterThan(0);
     expect(screen.getAllByText("loose").length).toBeGreaterThan(0);
   });
 
-  it("matrix and ranks views expose canonical public detail and receipt links", async () => {
+  it("reaches each run's receipt from its row, without a separate link list", async () => {
     render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => expect(screen.getByTestId("matrix-result-links")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
-    const matrixLinks = screen.getByTestId("matrix-result-links");
-    expect(within(matrixLinks).getByText("Public ID r1")).toBeTruthy();
+    // The "Result links" sections repeated one link per row that the rows
+    // already carried.
+    expect(screen.queryByTestId("matrix-result-links")).toBeNull();
     expect(
-      within(matrixLinks).getByRole("link", {
-        name: /Open details for DuckDB public ID r1 from 2026-04-01 \(.*days ago\)/,
-      }),
-    ).toHaveAttribute("href", "/results/r/r1");
-    expect(
-      within(matrixLinks).getByRole("link", {
-        name: /Open receipt for DuckDB public ID r1 from 2026-04-01 \(.*days ago\)/,
-      }),
+      screen.getAllByRole("link", { name: /Open receipt for DuckDB/ })[0],
     ).toHaveAttribute("href", "/results/r/r1#run-receipt");
 
     fireEvent.click(screen.getByText("Ranks"));
-    await waitFor(() => expect(screen.getByTestId("ranks-result-links")).toBeTruthy());
-
-    const rankLinks = screen.getByTestId("ranks-result-links");
-    expect(
-      within(rankLinks).getByRole("link", {
-        name: /Open details for SQLite public ID r2 from 2026-04-01 \(.*days ago\)/,
-      }),
-    ).toHaveAttribute("href", "/results/r/r2");
-    expect(
-      within(rankLinks).getByRole("link", {
-        name: /Open receipt for SQLite public ID r2 from 2026-04-01 \(.*days ago\)/,
-      }),
-    ).toHaveAttribute("href", "/results/r/r2#run-receipt");
+    await waitFor(() => expect(screen.queryByTestId("ranks-result-links")).toBeNull());
   });
 
   it("shows persistent compare guidance before any rows are selected", async () => {
@@ -507,8 +491,12 @@ describe("BenchmarkIndex", () => {
     expect(status).toHaveAttribute("aria-atomic", "true");
     expect(status?.textContent).toContain("0 results selected");
     expect(guidance.textContent).toContain("Select two or more platforms");
-    const disabledAction = screen.getByRole("button", { name: "Select 2 comparable results" }) as HTMLButtonElement;
-    expect(disabledAction.disabled).toBe(true);
+    // No dead button: the pending state is status text, and the real
+    // affordance appears in the same slot once it can be used.
+    expect(screen.queryByRole("button", { name: /Select 2 / })).toBeNull();
+    expect(screen.getByTestId("benchmark-compare-cta-pending").textContent).toBe(
+      "Select 2 results to compare",
+    );
   });
 
   it("renders a Benchmark switcher that routes to a sibling and clears benchmark-specific params", async () => {
@@ -666,7 +654,7 @@ describe("BenchmarkIndex", () => {
     expect(duckRow.textContent).toContain("Public ID r1");
     expect(sqliteRow.textContent).toContain("SQLite");
 
-    const compareLink = screen.getByRole("link", { name: /Compare 2 selected/ }) as HTMLAnchorElement;
+    const compareLink = screen.getAllByRole("link", { name: /Compare 2 selected/ })[0] as HTMLAnchorElement;
     expect(compareLink.getAttribute("href")).toBe("/results/compare?ids=aaaaaaaa,bbbbbbbb");
   });
 
@@ -727,7 +715,7 @@ describe("BenchmarkIndex", () => {
       "4 results selected (maximum)",
     );
     expect(screen.queryByText("Use sticky tray to compare")).toBeNull();
-    expect(screen.getByRole("link", { name: /Compare 4 selected/ })).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: /Compare 4 selected/ }).length).toBeGreaterThan(0);
   });
 
   it("excludes no-timing rows from analysis and keeps receipt provenance in Excluded runs", async () => {
@@ -857,7 +845,7 @@ describe("BenchmarkIndex", () => {
     await waitFor(() => screen.getAllByText("DuckDB"));
 
     expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
-    expect(screen.queryByText("SQLite")).toBeNull();
+    expect(within(screen.getByRole("grid")).queryByText("SQLite")).toBeNull();
 
     const resultCall = vi
       .mocked(queryRows)
@@ -894,7 +882,7 @@ describe("BenchmarkIndex", () => {
     expect(new URL(window.location.href).searchParams.get("view")).toBe("list");
     expect(screen.queryByRole("button", { name: /^Q1/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Q2/ })).toBeNull();
-    expect(screen.getAllByLabelText(/Run age:/).length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText(/^Run date .* days ago\)\./).length).toBeGreaterThan(0);
   });
 
   it("restores benchmark view mode from the URL", async () => {
@@ -1011,7 +999,7 @@ describe("BenchmarkIndex", () => {
     fireEvent.click(communityBtn);
 
     // SQLite (community-submission) should now be gone
-    await waitFor(() => expect(screen.queryByText("SQLite")).toBeNull());
+    await waitFor(() => expect(within(screen.getByRole("grid")).queryByText("SQLite")).toBeNull());
 
     // DuckDB (maintainer-run) should still be visible
     expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
@@ -1027,13 +1015,13 @@ describe("BenchmarkIndex", () => {
     fireEvent.click(checkboxes[0]!);
     fireEvent.click(checkboxes[1]!);
 
-    await waitFor(() => expect(screen.getByRole("link", { name: /Compare 2 selected/ })).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByRole("link", { name: /Compare 2 selected/ }).length).toBeGreaterThan(0));
     fireEvent.click(screen.getByRole("button", { name: /community/i }));
 
     await waitFor(() => expect(within(grid).queryByText("SQLite")).toBeNull());
     expect(screen.getByTestId("benchmark-compare-guidance").textContent).toContain("2 results selected");
     expect(screen.getByTestId("compare-tray-row-bbbbbbbb").textContent).toContain("SQLite");
-    expect(screen.getByRole("link", { name: /Compare 2 selected/ })).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: /Compare 2 selected/ }).length).toBeGreaterThan(0);
   });
 
   // -----------------------------------------------------------------------

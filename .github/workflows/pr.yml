@@ -296,37 +296,45 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Validate skill source and target trust policy
-        run: python3 scripts/skill_sync_ci_policy.py validate --manifest skill-sync.yaml
+      - name: Validate skill config, receipt, and tool pin
+        # Stdlib-only and offline: checks skill-sync.conf shape and skill
+        # selection, the committed receipt's approved source URLs, and the
+        # vendored tools/skill-sync bytes against the pinned tool revision.
+        run: python3 scripts/skill_sync_ci_policy.py validate --manifest skill-sync.conf
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Build independently pinned skill-sync verifier
+      - name: Clone skill sources to the configured checkout paths
+        # The wrapper resolves every configured rev from these checkouts and
+        # fails closed when one is absent, so a transient local SHA can never
+        # pass: only published upstream commits survive this step.
         shell: bash
         run: |
           set -euo pipefail
-          git clone --quiet --filter=blob:none \
-            https://github.com/joeharris76/skill-sync.git \
-            "$RUNNER_TEMP/skill-sync-verifier"
-          git -C "$RUNNER_TEMP/skill-sync-verifier" checkout --quiet \
-            6d09682dabe2ff0d68f400d60f8ba8b87f8c02aa
-          (
-            cd "$RUNNER_TEMP/skill-sync-verifier"
-            npm ci --ignore-scripts
-            npm run build
-          )
+          mkdir -p "$RUNNER_TEMP/skill-home/Developer"
+          git clone --quiet https://github.com/joeharris76/skill-sync-skills.git \
+            "$RUNNER_TEMP/skill-home/Developer/skill-sync-skills"
+          git clone --quiet https://github.com/joeharris76/todo-db.git \
+            "$RUNNER_TEMP/skill-home/Developer/todo-db"
+          git clone --quiet https://github.com/joeharris76/skill-sync.git \
+            "$RUNNER_TEMP/skill-home/Developer/skill-sync"
 
-      - name: Verify tracked skill mirror and lock
+      - name: Preview, apply, verify, and re-check the skill mirrors
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/empty-home"
-          HOME="$RUNNER_TEMP/empty-home" node \
-            "$RUNNER_TEMP/skill-sync-verifier/dist/cli/index.js" \
-            verify --project "$GITHUB_WORKSPACE"
+          export HOME="$RUNNER_TEMP/skill-home"
+          echo "--- preview (read-only) ---"
+          sh tools/skill-sync preview
+          echo "--- apply ---"
+          sh tools/skill-sync apply
+          echo "--- the committed snapshot must be untouched by apply ---"
+          # Apply may only write gitignored paths (the agents mirror and the
+          # curated-out blog skill). Any tracked modification means the PR's
+          # committed snapshot drifted from its own config.
+          test -z "$(git status --porcelain)"
+          echo "--- verify the payload offline against its manifest ---"
+          sh tools/skill-sync verify
+          echo "--- second check must be clean ---"
+          sh tools/skill-sync check
 
       - name: Enforce untracked mirror boundary
         run: sh scripts/check_untracked_skill_mirrors.sh
@@ -344,9 +352,13 @@ jobs:
       - name: Install focused test dependencies
         run: uv sync --group dev
 
-      - name: Run agent instruction audit contracts
+      - name: Run skill policy and instruction audit contracts
         run: |
           uv run -- python -m pytest \
+            tests/unit/scripts/test_skill_sync_ci_policy.py \
+            tests/unit/scripts/test_path_filter_decision.py \
+            tests/unit/scripts/test_ci_lint_environment_boundary.py \
+            tests/unit/workflows/test_pr_workflow_path_classifier.py \
             tests/unit/scripts/test_agent_instruction_audit.py \
             -q
 
@@ -525,11 +537,11 @@ jobs:
         run: uv run -- python scripts/check_release_curation.py
 
       - name: Untracked skill-mirror drift guard (cloud parity)
-        # The codex/gemini/antigravity mirrors and the curated-out `blog` skill are
-        # deliberately untracked: cloud is Claude-only and `blog` is published
-        # separately. `skill-sync verify` only inspects the tracked `claude` target
-        # (it skips untracked targets and `ignore`d paths), so it cannot catch these
-        # being force-added. Fail the build if any become git-tracked.
+        # The agents mirror and the curated-out `blog` skill are deliberately
+        # untracked: cloud is Claude-only and `blog` is published separately.
+        # `skill-sync verify` checks payload bytes, not Git tracking state, so
+        # it cannot catch these being force-added. Fail the build if any
+        # become git-tracked.
         # Rationale: _project/decisions/claude-settings-cloud-ownership-2026-06-29.md
         id: guard-skill-mirror-drift
         continue-on-error: true

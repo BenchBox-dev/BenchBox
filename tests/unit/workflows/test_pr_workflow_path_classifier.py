@@ -358,14 +358,23 @@ def test_skill_integrity_job_is_required_read_only_and_pinned() -> None:
     workflow_text = (REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8")
     workflow = yaml.safe_load(workflow_text)
     job = workflow["jobs"]["skill-integrity"]
+    job_text = yaml.safe_dump(job)
 
     assert job["needs"] == "ci-paths"
     assert job["if"] == "${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }}"
     assert job["timeout-minutes"] == 10
     assert "permissions" not in job  # inherits workflow-level contents: read
-    assert "6d09682dabe2ff0d68f400d60f8ba8b87f8c02aa" in workflow_text
-    assert "scripts/skill_sync_ci_policy.py validate" in workflow_text
-    assert 'verify --project "$GITHUB_WORKSPACE"' in workflow_text
+    assert "scripts/skill_sync_ci_policy.py validate --manifest skill-sync.conf" in workflow_text
+    # The vendored shell wrapper runs the full cycle with no Node build.
+    assert "sh tools/skill-sync preview" in workflow_text
+    assert "sh tools/skill-sync apply" in workflow_text
+    assert "sh tools/skill-sync verify" in workflow_text
+    assert "sh tools/skill-sync check" in workflow_text
+    # The retired TypeScript verifier must not come back: no npm build of a
+    # verifier checkout and no node dist CLI inside this job.
+    assert "npm ci" not in job_text
+    assert "dist/cli/index.js" not in job_text
+    assert "6d09682dabe2ff0d68f400d60f8ba8b87f8c02aa" not in workflow_text
     assert '--check-commit-range "$BASE_SHA"' in workflow_text
 
 

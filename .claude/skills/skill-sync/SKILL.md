@@ -1,37 +1,48 @@
 ---
 name: skill-sync
-description: Use when the user asks to sync, set up, inspect, validate, verify, pin, prune, promote, or configure skills managed by skill-sync.
+description: Use when the user asks to sync, preview, check, or configure skills managed by skill-sync.
 ---
 
 # Skill Sync
 
-Read the project-root `skill-sync.yaml`, then read
-`references/operations.md` before acting.
+`skill-sync` copies selected skill packages from Git-managed catalogs into a
+project. rsync copies the payload; Git supplies history, review, and rollback.
+
+Read the project-root `skill-sync.conf`, then read `references/operations.md`
+before acting.
 
 ## Critical rules
 
-- Resolve the authoritative source before any write: use `source_name` when set;
-  otherwise use the first configured source containing the skill.
-- Never edit a generated target as the source of truth.
-- The `skill-sync` product repository owns its bundled `skills/skill-sync`
-  operator skill. Installed and catalog copies are generated consumers.
-- Stop before sync when managed tracked files are dirty. Review and commit
-  produced tracked changes before unrelated work.
+- The catalog checkout named in `skill-sync.conf` is the only place to edit a
+  managed skill. Files under a `target` directory are generated copies; editing
+  them is lost work.
+- Bytes always come from the `rev` recorded in the config, never from the
+  catalog's working tree. To ship an edit, commit it in the catalog and bump
+  `rev`.
+- Run `preview` before `apply`. `apply` refuses to overwrite uncommitted
+  changes to the files it would rewrite; commit or discard them first.
+- `apply` does not commit or push. Review the resulting Git diff and commit it
+  through the project's normal workflow.
+- The product repository owns its bundled `skills/skill-sync` operator skill.
+  Installed copies are generated consumers.
 
 ## Actions
 
-| Action | Read |
+| Action | Command |
 |---|---|
-| `setup`, `sync`, `status`, `validate`, `verify`, `diff`, `doctor` | `references/operations.md` |
-| `pin`, `unpin`, `prune`, `promote`, `settings` | `references/operations.md` |
-| `agent-config` | `references/operations.md` |
-| `help` | this table |
+| Show what a sync would change | `skill-sync preview` |
+| Fail if a sync is pending | `skill-sync check` (exit 3 when changes are pending) |
+| Copy the payload into the project | `skill-sync apply` |
+| Gate a committed payload offline | `skill-sync verify` |
 
-## Flags
+All four take `-C DIR` (project root, default `.`) and `-f FILE` (config,
+default `PROJECT/skill-sync.conf`). `preview`, `check`, and `apply` need the
+catalog checkout; `verify` reads only committed project files.
 
-- Global: `--json`/`-j`, `--project`/`-p`, `--help`/`-h`.
-- Sync: `--dry-run`/`-n`, `--force`/`-f`.
-- Validate: `--exit-code`. Settings: `--agent`. Prune: `--dry-run`.
-- Agent config: `capture`, `validate`, or `restore`; supports `--dry-run`,
-  `--force` for restore, and `--json`.
-- Use `--force` only when source and target ownership is known.
+## Retired commands
+
+`sync`, `status`, `validate`, `diff`, `doctor`, `pin`, `unpin`, `prune`,
+`promote`, `settings`, `align-agents`, and `agent-config` belonged to the
+TypeScript implementation. The CLI rejects them with a pointer to
+`MIGRATION.md`. Do not reintroduce them; read `references/operations.md` for
+what replaced each one.

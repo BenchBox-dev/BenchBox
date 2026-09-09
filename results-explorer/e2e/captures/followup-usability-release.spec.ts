@@ -87,7 +87,7 @@ async function launchFirstBuilderComparison(page: Page): Promise<void> {
   if (await duckdb.count() > 0 && await datafusion.count() > 0) {
     await duckdb.check().catch(() => {});
     await datafusion.check().catch(() => {});
-    const link = page.getByRole("link", { name: /Compare 2 selected/ });
+    const link = page.getByTestId("compare-tray-compare-link");
     if (await link.count() > 0) {
       await link.click();
       await waitForDataLoaded(page, /Comparison/i);
@@ -101,7 +101,7 @@ async function launchFirstBuilderComparison(page: Page): Promise<void> {
 }
 
 async function openFirstSparseResultDetail(page: Page): Promise<void> {
-  await page.goto("/results/");
+  await page.goto("/results/compare/");
   await waitForShell(page);
   await waitForDataLoaded(page, /Cross-benchmark rankings/);
   const hrefs = await page.locator('a[href^="/results/r/"]').evaluateAll((links) =>
@@ -160,7 +160,7 @@ test.describe("@followup-usability release-gate route walk", () => {
   });
 
   test("Home renders the ranking selector above the matrix with a compare entrypoint", async ({ page }) => {
-    await page.goto("/results/");
+    await page.goto("/results/compare/");
     await waitForShell(page);
     await waitForDataLoaded(page, /Cross-benchmark rankings/);
 
@@ -198,10 +198,9 @@ test.describe("@followup-usability release-gate route walk", () => {
 
     const firstHeatmapRow = page.locator("tbody tr[data-testid]").first();
     await expect(firstHeatmapRow).toBeVisible();
-    // Matrix reachability now lives behind the compact per-row
-    // "Run details" disclosure so the dense timing cells stay
-    // scannable. Open the disclosure before asserting receipt links.
-    await firstHeatmapRow.locator("summary", { hasText: /Run details/ }).click();
+    // The platform name is the receipt link, so matrix reachability needs no
+    // disclosure and costs the row no extra height.
+    await expect(firstHeatmapRow.locator("summary")).toHaveCount(0);
     await expect(firstHeatmapRow.getByRole("link", { name: /^Open receipt for / }).first()).toBeVisible();
 
     await maybeCapture(page, "benchmark-detail-switcher-and-sticky-header");
@@ -247,8 +246,8 @@ test.describe("@followup-usability release-gate route walk", () => {
     await waitForShell(page);
     await waitForDataLoaded(page, /Compare/);
 
-    await expect(page.getByRole("heading", { name: "Choose runs to compare" })).toBeVisible();
-    await expect(page.getByTestId("compare-picker-query-link")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Results Explorer" }).getByRole("link", { name: "Find runs" })).toBeVisible();
 
     await maybeCapture(page, "compare-builder-empty-state");
   });
@@ -258,9 +257,9 @@ test.describe("@followup-usability release-gate route walk", () => {
     await waitForShell(page);
     await waitForDataLoaded(page, /Compare/);
 
-    await expect(page.getByRole("heading", { name: "Choose runs to compare" })).toBeVisible();
-    await expect(page.getByTestId("compare-picker-query-link")).toHaveAttribute("href", "/results/query");
-    await expect(page.locator("table")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Results Explorer" }).getByRole("link", { name: "Find runs" })).toHaveAttribute("href", "/results/query");
+    await expect(page.getByRole("grid", { name: "Cross-benchmark leaderboard" })).toBeVisible();
   });
 
   test("Query compare tray defaults compatible-only after first selection", async ({ page }) => {

@@ -413,6 +413,39 @@
         color: var(--bb-data-fg-primary);
     }
 
+    /* Dense variants for wide evidence tables (the benchmark matrix and the
+       per-query compare grid), where row height multiplied across dozens of
+       rows is the dominant cost of reading the page. */
+    .table-th-dense {
+        @apply px-2.5 py-2 text-left text-xs font-semibold uppercase tracking-wide;
+        color: var(--bb-data-fg-subtle);
+    }
+
+    .table-td-dense {
+        @apply px-2.5 py-1.5 text-sm;
+        color: var(--bb-data-fg-primary);
+    }
+
+    /* Metadata chip: a short scalar value (a run date, a version) that must
+       read as one atom and never wrap mid-value. Button variants toggle to a
+       second reading of the same value. */
+    .bb-meta-chip {
+        @apply inline-flex max-w-full items-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 text-xs leading-tight;
+        border-color: var(--bb-data-border);
+        background: var(--bb-surface-data-muted);
+        color: var(--bb-data-fg-muted);
+        font-variant-numeric: tabular-nums;
+    }
+
+    button.bb-meta-chip {
+        cursor: pointer;
+    }
+
+    button.bb-meta-chip:hover {
+        border-color: var(--bb-data-border-strong);
+        color: var(--bb-data-fg-primary);
+    }
+
     .bb-skeleton {
         border-radius: var(--bb-skeleton-radius-md);
         background: linear-gradient(

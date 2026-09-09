@@ -8,7 +8,9 @@ import { formatCount } from "@/lib/copyFormatters";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { useUrlState, type UrlSerde } from "@/lib/useUrlState";
 import { errMsg } from "@/utils";
-import { RunAge } from "@/components/RunAge";
+import { SubmissionActivity } from "@/components/SubmissionActivity";
+import { PageHeader } from "@/components/PageHeader";
+import { RunDateChip } from "@/components/RunAge";
 
 type SectionKind = "benchmarks" | "platforms";
 type SectionSort = "name" | "results" | "recent";
@@ -20,6 +22,7 @@ interface SectionEntry {
   resultCount: number;
   coverageCount: number;
   latestRun: string;
+  runDates: string[];
 }
 
 const sectionSortSerde: UrlSerde<SectionSort> = {
@@ -63,15 +66,16 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <header class="mb-8 max-w-3xl">
-        <p class="mb-2 text-sm font-semibold uppercase tracking-wide text-[var(--bb-accent)]">Published results</p>
-        <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">{title}</h1>
-        <p class="mt-3 text-[var(--bb-data-fg-muted)]">
-          {isBenchmarks
+      <PageHeader
+        crumbs={[{ label: "Results", href: "/results/" }, { label: title }]}
+        eyebrow="Published results"
+        title={title}
+        subtitle={
+          isBenchmarks
             ? "Choose a benchmark to see its published runs, participating platforms, and rankings."
-            : "Choose a platform to see its published runs across benchmarks and scales."}
-        </p>
-      </header>
+            : "Choose a platform to see its published runs across benchmarks and scales."
+        }
+      />
 
       {rows === null && error === null ? (
         <LoadingSpinner message={`Loading ${kind}...`} />
@@ -89,6 +93,16 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
         />
       ) : (
         <>
+          <SubmissionActivity
+            subject={singular}
+            rows={entries.map((entry) => ({
+              id: entry.id,
+              label: entry.label,
+              href: entry.href,
+              dates: entry.runDates,
+            }))}
+          />
+
           <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
             <p class="text-sm text-[var(--bb-data-fg-muted)]">
               {formatCount(entries.length, `published ${singular}`)}
@@ -107,36 +121,31 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
             </label>
           </div>
 
-          <ul class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid={`${kind}-index-list`}>
-            {entries.map((entry) => (
-              <li key={entry.id}>
-                <a
-                  href={entry.href}
-                  class="group block h-full rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-5 no-underline shadow-sm transition-colors hover:border-[var(--bb-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring)]"
-                >
-                  <h2 class="text-lg font-semibold text-[var(--bb-data-fg-primary)] group-hover:text-[var(--bb-accent)]">
-                    {entry.label}
-                  </h2>
-                  <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <dt class="text-[var(--bb-data-fg-subtle)]">Runs</dt>
-                      <dd class="mt-1 font-medium text-[var(--bb-data-fg-primary)]">
-                        {entry.resultCount.toLocaleString()}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt class="text-[var(--bb-data-fg-subtle)]">{isBenchmarks ? "Platforms" : "Benchmarks"}</dt>
-                      <dd class="mt-1 font-medium text-[var(--bb-data-fg-primary)]">
-                        {entry.coverageCount.toLocaleString()}
-                      </dd>
-                    </div>
-                  </dl>
-                  <p class="mt-4 text-xs text-[var(--bb-data-fg-muted)]">
-                    Latest result {formatRunDate(entry.latestRun)}<RunAge runDate={entry.latestRun} />
-                  </p>
-                </a>
-              </li>
-            ))}
+          <ul
+            class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            data-testid={`${kind}-index-list`}
+          >
+            {entries.map((entry) => {
+              return (
+                <li key={entry.id}>
+                  <div
+                    class="group block h-full rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 no-underline shadow-sm transition-colors hover:border-[var(--bb-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring)]"
+                  >
+                    <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)] group-hover:text-[var(--bb-accent)]">
+                      <a href={entry.href}>{entry.label}</a>
+                    </h2>
+                    <p class="mt-1.5 text-sm text-[var(--bb-data-fg-muted)]">
+                      {entry.resultCount.toLocaleString()} runs ·{" "}
+                      {entry.coverageCount.toLocaleString()} {isBenchmarks ? "platforms" : "benchmarks"}
+                    </p>
+                    <p class="mt-2.5 text-xs text-[var(--bb-data-fg-muted)]">
+                      Latest{" "}
+                      <RunDateChip runDate={entry.latestRun} />
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </>
       )}
@@ -168,6 +177,7 @@ function buildEntries(rows: ResultRow[], kind: SectionKind): SectionEntry[] {
         ? new Set(group.rows.map((row) => row.platform_id)).size
         : new Set(group.rows.map((row) => canonicalBenchmarkSlug(row.benchmark))).size,
     latestRun: group.rows.reduce((latest, row) => (row.run_date > latest ? row.run_date : latest), ""),
+    runDates: group.rows.map((row) => row.run_date),
   }));
 }
 
@@ -177,13 +187,4 @@ function sortEntries(entries: SectionEntry[], sort: SectionSort): SectionEntry[]
     if (sort === "recent" && left.latestRun !== right.latestRun) return right.latestRun.localeCompare(left.latestRun);
     return left.label.localeCompare(right.label);
   });
-}
-
-function formatRunDate(raw: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(raw));
 }
