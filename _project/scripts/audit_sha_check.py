@@ -135,11 +135,20 @@ def _require_sha(path: Path, frontmatter: Frontmatter, field: str) -> str:
     return value.lower()
 
 
-def validate_audit(path: Path, target_ref: str, require_current: int | None = None) -> AuditValidation:
+def validate_audit(
+    path: Path,
+    target_ref: str,
+    require_current: int | None = None,
+    ancestry_ref: str = "HEAD",
+) -> AuditValidation:
     """Validate one audit file and return its bound provenance.
 
     `distance` is the number of commits between the stamped SHA and the target
     ref when freshness checking is requested; otherwise it is omitted.
+    `ancestry_ref` is the ref the stamped measurement/replay SHAs must descend
+    from. It defaults to HEAD, but merge-queue runs check out a squashed
+    preview commit whose single-parent history never contains the PR's branch
+    commits, so those runs pass the PR head instead.
     """
     if not path.exists():
         raise AuditShaError(f"{path}: file does not exist")
@@ -184,8 +193,8 @@ def validate_audit(path: Path, target_ref: str, require_current: int | None = No
                 f"{path}: measured_at_sha {measured_at_sha} does not match the declared exact tree "
                 f"{expected_measurement}"
             )
-        if not git_ok(["merge-base", "--is-ancestor", measured_at_sha, "HEAD"]):
-            raise AuditShaError(f"{path}: measured_at_sha {measured_at_sha} is not reachable from HEAD")
+        if not git_ok(["merge-base", "--is-ancestor", measured_at_sha, ancestry_ref]):
+            raise AuditShaError(f"{path}: measured_at_sha {measured_at_sha} is not reachable from {ancestry_ref}")
 
     replay_sha: str | None = None
     if frontmatter.fields.get("replay_sha") or frontmatter.fields.get("replay_scope"):
@@ -197,8 +206,8 @@ def validate_audit(path: Path, target_ref: str, require_current: int | None = No
             raise AuditShaError(f"{path}: replay_sha requires a non-empty replay_scope")
         if not git_ok(["merge-base", "--is-ancestor", measured_at_sha, replay_sha]):
             raise AuditShaError(f"{path}: replay_sha {replay_sha} must descend from measured_at_sha {measured_at_sha}")
-        if not git_ok(["merge-base", "--is-ancestor", replay_sha, "HEAD"]):
-            raise AuditShaError(f"{path}: replay_sha {replay_sha} is not reachable from HEAD")
+        if not git_ok(["merge-base", "--is-ancestor", replay_sha, ancestry_ref]):
+            raise AuditShaError(f"{path}: replay_sha {replay_sha} is not reachable from {ancestry_ref}")
 
     return AuditValidation(develop_sha, distance, measured_at_sha, replay_sha)
 
@@ -218,6 +227,16 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="N",
         help="Require develop_sha to be within N commits of --target-ref",
     )
+    parser.add_argument(
+        "--ancestry-ref",
+        default="HEAD",
+        help=(
+            "Ref the stamped measured_at_sha/replay_sha must descend from "
+            "(default: HEAD). Merge-queue runs check out a squashed preview "
+            "commit that never contains the PR branch history, so those runs "
+            "pass the PR head ref instead."
+        ),
+    )
     return parser
 
 
@@ -226,8 +245,10 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         for file_path in args.files:
-            result = validate_audit(file_path, args.target_ref, args.require_current)
+            result = validate_audit(file_path, args.target_ref, args.require_current, args.ancestry_ref)
             details = [f"develop_sha={result.develop_sha}", f"target_ref={args.target_ref}"]
+            if args.ancestry_ref != "HEAD":
+                details.append(f"ancestry_ref={args.ancestry_ref}")
             if result.distance is not None:
                 details.append(f"distance={result.distance}")
             if result.measured_at_sha is not None:

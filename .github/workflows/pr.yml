@@ -1319,6 +1319,22 @@ jobs:
           BASE_REF: ${{ github.base_ref || 'develop' }}
         run: git fetch --no-tags origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
 
+      - name: Fetch PR head for audit ancestry (merge queue only)
+        # Merge-queue runs check out a squashed preview commit whose
+        # single-parent history never contains the PR's branch commits, so an
+        # audit measured on the branch tree cannot descend from HEAD. Fetch
+        # the PR head (parsed from the queue's gh-readonly-queue/.../pr-N-...
+        # branch name) and validate measurement ancestry against it instead.
+        # Falls back to HEAD with a warning if the PR number cannot be parsed.
+        if: github.event_name == 'merge_group'
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF:-}" =~ /pr-([0-9]+)- ]]; then
+            git fetch --no-tags origin "pull/${BASH_REMATCH[1]}/head:refs/remotes/origin/audit-ancestry-pr-head"
+          else
+            echo "::warning::Could not parse PR number from ${GITHUB_REF:-}; audit measurement ancestry falls back to HEAD."
+          fi
+
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
@@ -1332,8 +1348,12 @@ jobs:
             echo "No changed audit Markdown files to validate."
             exit 0
           fi
+          ANCESTRY_REF="HEAD"
+          if [ "${{ github.event_name }}" = "merge_group" ] && git rev-parse --verify --quiet origin/audit-ancestry-pr-head >/dev/null; then
+            ANCESTRY_REF="origin/audit-ancestry-pr-head"
+          fi
           while IFS= read -r audit_path; do
-            make audit-sha-check FILE="$audit_path" AUDIT_SHA_TARGET_REF="origin/${{ github.base_ref || 'develop' }}"
+            make audit-sha-check FILE="$audit_path" AUDIT_SHA_TARGET_REF="origin/${{ github.base_ref || 'develop' }}" AUDIT_SHA_ANCESTRY_REF="$ANCESTRY_REF"
           done < /tmp/changed-audits.txt
 
   certification-identity:

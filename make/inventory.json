@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "2302ea857d59e3997be00b632d494bacf2e37d791b6f5db994296208d5408a2e",
+  "contract_sha256": "1d830581fa4ad3673edf65af980b0ba0039aad08c8062bddfc7b56aa15873462",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -497,8 +497,8 @@
       },
       {
         "header": "audit-sha-check:",
-        "recipe": "\t@test -n \"$(FILE)\" || { echo \"Usage: make audit-sha-check FILE=<audit.md>\"; exit 1; }\n\tuv run --no-project -- python _project/scripts/audit_sha_check.py \\\n\t\t--target-ref \"$(AUDIT_SHA_TARGET_REF)\" \\\n\t\t$(if $(AUDIT_SHA_REQUIRE_CURRENT),--require-current $(AUDIT_SHA_REQUIRE_CURRENT),) \\\n\t\t\"$(FILE)\"",
-        "recipe_sha256": "a56d25d7a388170eb7c4f9866515d85eb5b44aadb1ff672f404963d87f2026fc"
+        "recipe": "\t@test -n \"$(FILE)\" || { echo \"Usage: make audit-sha-check FILE=<audit.md>\"; exit 1; }\n\tuv run --no-project -- python _project/scripts/audit_sha_check.py \\\n\t\t--target-ref \"$(AUDIT_SHA_TARGET_REF)\" \\\n\t\t--ancestry-ref \"$(or $(AUDIT_SHA_ANCESTRY_REF),HEAD)\" \\\n\t\t$(if $(AUDIT_SHA_REQUIRE_CURRENT),--require-current $(AUDIT_SHA_REQUIRE_CURRENT),) \\\n\t\t\"$(FILE)\"",
+        "recipe_sha256": "3a8b262cfe050b1f8b73e6d668b28f2af5a2743cf596ba4af86444660ee2bd42"
       }
     ],
     "blind-spots-list": [
@@ -2040,7 +2040,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "b64a6a778f438924ce7002261451210bdaa0f76fe86dd32d95047eef358675fd",
+  "semantic_sha256": "c3c2a8015d1fb77670381cdfa931a16d7409d3979928420afbffd7bdbd9aadd4",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3035,9 +3035,9 @@
       ]
     },
     {
-      "body": "audit-sha-check:\n\t@test -n \"$(FILE)\" || { echo \"Usage: make audit-sha-check FILE=<audit.md>\"; exit 1; }\n\tuv run --no-project -- python _project/scripts/audit_sha_check.py \\\n\t\t--target-ref \"$(AUDIT_SHA_TARGET_REF)\" \\\n\t\t$(if $(AUDIT_SHA_REQUIRE_CURRENT),--require-current $(AUDIT_SHA_REQUIRE_CURRENT),) \\\n\t\t\"$(FILE)\"",
+      "body": "audit-sha-check:\n\t@test -n \"$(FILE)\" || { echo \"Usage: make audit-sha-check FILE=<audit.md>\"; exit 1; }\n\tuv run --no-project -- python _project/scripts/audit_sha_check.py \\\n\t\t--target-ref \"$(AUDIT_SHA_TARGET_REF)\" \\\n\t\t--ancestry-ref \"$(or $(AUDIT_SHA_ANCESTRY_REF),HEAD)\" \\\n\t\t$(if $(AUDIT_SHA_REQUIRE_CURRENT),--require-current $(AUDIT_SHA_REQUIRE_CURRENT),) \\\n\t\t\"$(FILE)\"",
       "kind": "rule",
-      "sha256": "066e4b507333fa6b8feccbcd0e11dddbbf7a6e1450460d4a6961fec3ab139099",
+      "sha256": "a47dc8588a1d9eba836b5ab43fc1c22099ca6939bc5fc209bcda2e987e16ebec",
       "targets": [
         "audit-sha-check"
       ]

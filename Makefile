@@ -454,6 +454,7 @@ audit-sha-check:
 	@test -n "$(FILE)" || { echo "Usage: make audit-sha-check FILE=<audit.md>"; exit 1; }
 	uv run --no-project -- python _project/scripts/audit_sha_check.py \
 		--target-ref "$(AUDIT_SHA_TARGET_REF)" \
+		--ancestry-ref "$(or $(AUDIT_SHA_ANCESTRY_REF),HEAD)" \
 		$(if $(AUDIT_SHA_REQUIRE_CURRENT),--require-current $(AUDIT_SHA_REQUIRE_CURRENT),) \
 		"$(FILE)"
 
