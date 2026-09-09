@@ -62,9 +62,9 @@ def _repo(path: Path) -> Path:
     return path
 
 
-def _identity(repo: Path, head: str = HEAD) -> landing.GitIdentity:
+def _identity(repo: Path, head: str = HEAD, base: str | None = None) -> landing.GitIdentity:
     return landing.GitIdentity(
-        repo=str(repo), branch="feat/x", worktree=str(repo), head=head, base=OTHER, upstream="origin/main"
+        repo=str(repo), branch="feat/x", worktree=str(repo), head=head, base=base or head, upstream="origin/main"
     )
 
 
@@ -156,20 +156,33 @@ def test_ready_rejects_late_review_unpublished_and_stale_checks(tmp_path: Path) 
     assert any("not expected head" in f for f in failures)
 
 
-def test_ready_holds_soundness_without_approval(tmp_path: Path) -> None:
+def test_ready_holds_soundness_even_with_caller_approval(tmp_path: Path) -> None:
     repo = _repo(tmp_path / "r")
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    (repo / "publication").mkdir()
+    (repo / "publication" / "policy.json").write_text("{}")
+    subprocess.run(["git", "add", "publication/policy.json"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "soundness"], cwd=repo, check=True, capture_output=True)
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
     ).stdout.strip()
     failures = landing.ready_failures(
-        _identity(repo, head), head, _evidence(head, hold_labels=["no-auto-merge"], soundness_paths_changed=True), repo
+        _identity(repo, head, base),
+        head,
+        _evidence(head, hold_labels=["no-auto-merge"], soundness_paths_changed=False),
+        repo,
     )
     assert any("no-auto-merge" in f for f in failures)
     assert any("soundness" in f for f in failures)
-    ok = landing.ready_failures(
-        _identity(repo, head), head, _evidence(head, soundness_paths_changed=True, maintainer_approved=True), repo
+    still_blocked = landing.ready_failures(
+        _identity(repo, head, base),
+        head,
+        _evidence(head, soundness_paths_changed=False, maintainer_approved=True),
+        repo,
     )
-    assert ok == []
+    assert any("soundness" in failure for failure in still_blocked)
 
 
 def test_enqueue_refuses_moved_head() -> None:
@@ -311,18 +324,18 @@ def _live_checks_payload(head: str, conclusion: str = "success") -> dict:
     return {"total": len(runs), "runs": runs}
 
 
-def _live_pr(head: str, decision: str = "APPROVED") -> dict:
+def _live_pr(head: str, decision: str = "APPROVED", labels: list[dict] | None = None) -> dict:
     return {
         "number": 3,
         "headRefName": "feat/x",
         "headRefOid": head,
-        "labels": [],
+        "labels": labels or [],
         "reviewDecision": decision,
     }
 
 
 def test_verify_evidence_live_accepts_fresh_evidence() -> None:
-    run = FakeRun([(0, _live_checks_payload(HEAD))])
+    run = FakeRun([(0, _live_checks_payload(HEAD)), (0, _live_threads())])
     landing.verify_evidence_live(run, "o/r", _live_pr(HEAD), _evidence(HEAD))
 
 
@@ -342,6 +355,49 @@ def test_verify_evidence_live_refuses_decision_mismatch() -> None:
     run = FakeRun([(0, _live_checks_payload(HEAD))])
     with pytest.raises(landing.LandingError, match="review decision"):
         landing.verify_evidence_live(run, "o/r", _live_pr(HEAD, "CHANGES_REQUESTED"), _evidence(HEAD))
+
+
+def _live_threads(nodes: list[dict] | None = None, *, has_next: bool = False, cursor: str | None = None) -> dict:
+    return {
+        "data": {
+            "repository": {
+                "pullRequest": {
+                    "reviewThreads": {
+                        "nodes": nodes or [],
+                        "pageInfo": {"hasNextPage": has_next, "endCursor": cursor},
+                    }
+                }
+            }
+        }
+    }
+
+
+def test_verify_evidence_live_refuses_unclaimed_live_hold() -> None:
+    run = FakeRun([(0, _live_checks_payload(HEAD))])
+    with pytest.raises(landing.LandingError, match="durable hold"):
+        landing.verify_evidence_live(
+            run,
+            "o/r",
+            _live_pr(HEAD, labels=[{"name": "no-auto-merge"}]),
+            _evidence(HEAD, hold_labels=[]),
+        )
+
+
+def test_verify_evidence_live_refuses_unresolved_review_thread() -> None:
+    run = FakeRun([(0, _live_checks_payload(HEAD)), (0, _live_threads([{"isResolved": False, "isOutdated": False}]))])
+    with pytest.raises(landing.LandingError, match="unresolved"):
+        landing.verify_evidence_live(run, "o/r", _live_pr(HEAD), _evidence(HEAD))
+
+
+def test_review_thread_verification_accepts_resolved_and_outdated_pages() -> None:
+    run = FakeRun(
+        [
+            (0, _live_threads([{"isResolved": True, "isOutdated": False}], has_next=True, cursor="next")),
+            (0, _live_threads([{"isResolved": False, "isOutdated": True}])),
+        ]
+    )
+    assert landing.unresolved_review_threads(run, "o/r", 3) is False
+    assert "cursor=next" in run.calls[1]
 
 
 def test_consume_retry_allows_exactly_once_under_concurrency(tmp_path: Path) -> None:

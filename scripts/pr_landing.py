@@ -39,6 +39,12 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from _project.scripts.auto_merge_soundness_paths import any_soundness_path  # noqa: E402
+
 HOLD_LABEL = "no-auto-merge"
 REQUIRED_CONTEXTS: tuple[str, ...] = (
     "ci-required-result",
@@ -284,9 +290,82 @@ def verify_evidence_live(run: Runner, repo_full: str, pr: dict, evidence: ReadyE
             f"live verification: review decision is {live_decision!r}, evidence claims {evidence.review_decision!r}"
         )
     live_labels = {str(label.get("name") or "") for label in pr.get("labels") or []}
+    if HOLD_LABEL in live_labels:
+        raise LandingError(f"live verification: durable hold label {HOLD_LABEL!r} is present")
     for claimed in evidence.hold_labels or []:
         if claimed not in live_labels:
             raise LandingError(f"live verification: claimed label {claimed!r} absent from live labels")
+    if unresolved_review_threads(run, repo_full, int(pr.get("number") or 0)):
+        raise LandingError("live verification: unresolved, non-outdated review threads remain")
+
+
+def unresolved_review_threads(run: Runner, repo_full: str, pr_number: int) -> bool:
+    """Return whether the PR has a live unresolved, non-outdated review thread.
+
+    GitHub's aggregate review decision does not cover comment-only review
+    threads, and this repository's ruleset does not require thread resolution.
+    Read every page so a caller-provided disposition claim cannot hide one.
+    """
+    try:
+        owner, name = repo_full.split("/", 1)
+    except ValueError as exc:
+        raise LandingError(f"repository must be owner/name, got {repo_full!r}") from exc
+    if not owner or not name or not pr_number:
+        raise LandingError("live review-thread verification lacks a repository or PR number")
+    query = """
+      query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
+        repository(owner:$owner, name:$name) {
+          pullRequest(number:$number) {
+            reviewThreads(first:100, after:$cursor) {
+              nodes { isResolved isOutdated }
+              pageInfo { hasNextPage endCursor }
+            }
+          }
+        }
+      }
+    """
+    cursor: str | None = None
+    seen_cursors: set[str] = set()
+    while True:
+        cmd = [
+            "gh",
+            "api",
+            "graphql",
+            "-f",
+            f"query={query}",
+            "-F",
+            f"owner={owner}",
+            "-F",
+            f"name={name}",
+            "-F",
+            f"number={pr_number}",
+        ]
+        if cursor is not None:
+            cmd.extend(["-F", f"cursor={cursor}"])
+        rc, out = run(cmd)
+        if rc != 0:
+            raise LandingError(f"live review-thread verification failed for PR #{pr_number}")
+        try:
+            payload = json.loads(out or "{}")
+            threads = payload["data"]["repository"]["pullRequest"]["reviewThreads"]
+            nodes = threads["nodes"]
+            page = threads["pageInfo"]
+        except (KeyError, TypeError, ValueError) as exc:
+            raise LandingError(f"unparseable live review-thread payload for PR #{pr_number}") from exc
+        if not isinstance(nodes, list):
+            raise LandingError(f"live review threads for PR #{pr_number} are not a list")
+        if any(
+            isinstance(thread, dict) and not thread.get("isResolved") and not thread.get("isOutdated")
+            for thread in nodes
+        ):
+            return True
+        if not page.get("hasNextPage"):
+            return False
+        next_cursor = str(page.get("endCursor") or "")
+        if not next_cursor or next_cursor in seen_cursors:
+            raise LandingError("live review-thread pagination did not advance; refusing")
+        seen_cursors.add(next_cursor)
+        cursor = next_cursor
 
 
 def checks_green_at_head(check_runs: list, required: tuple, head: str) -> list[str]:
@@ -354,11 +433,22 @@ def ready_failures(
     holds = evidence.hold_labels or []
     if HOLD_LABEL in holds:
         failures.append(f"durable hold label {HOLD_LABEL!r} present; a human removes it, never this helper")
-    if evidence.soundness_paths_changed and not evidence.maintainer_approved:
-        failures.append("soundness paths changed without maintainer approval")
+    if soundness_paths_changed(repo, identity.base, evidence.expected_head):
+        failures.append("soundness paths changed; auto-enqueue is forbidden and requires manual maintainer merge")
     if evidence.batch is not None:
         failures.extend(check_batch_binding(repo, evidence.batch, evidence.expected_head))
     return failures
+
+
+def soundness_paths_changed(repo: Path, base: str | None, head: str) -> bool:
+    """Derive the auto-merge classification from the canonical path predicate."""
+    if not base:
+        raise LandingError("origin/develop is unavailable; cannot classify soundness paths")
+    try:
+        paths = _git(repo, "diff", "--name-only", "--no-renames", f"{base}...{head}").splitlines()
+    except subprocess.CalledProcessError as exc:
+        raise LandingError("could not derive soundness paths from the exact base and head") from exc
+    return any_soundness_path(paths)
 
 
 def enqueue_pr(run: Runner, repo_full: str, pr_number: int, expected_head: str, remote_head: str) -> dict:

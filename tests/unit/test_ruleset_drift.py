@@ -192,7 +192,17 @@ def _live_with_queue(params: dict | None) -> dict:
 
 
 def test_merge_queue_approved_params_pass() -> None:
-    live = _live_with_queue(dict(ruleset_drift_check.APPROVED_MERGE_QUEUE))
+    live = _live_with_queue(
+        {
+            "merge_method": "SQUASH",
+            "grouping_strategy": "ALLGREEN",
+            "min_entries_to_merge": 1,
+            "max_entries_to_build": 5,
+            "max_entries_to_merge": 5,
+            "check_response_timeout_minutes": 60,
+            "min_entries_to_merge_wait_minutes": 0,
+        }
+    )
     assert ruleset_drift_check.merge_queue_findings(live, "develop-squash-only") == []
 
 
