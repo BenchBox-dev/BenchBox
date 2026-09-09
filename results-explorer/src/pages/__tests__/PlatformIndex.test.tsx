@@ -491,7 +491,7 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(screen.getByTestId("platform-compare-cta-pending").textContent).toBe(
       "Select 2 results to compare",
     );
-    expect(screen.getByTestId("platform-table-scroll-hint").textContent).toContain("Scroll table");
+    expect(screen.getByTestId("platform-table-scroll-hint").textContent).toContain("Scroll for dates, timings, and source labels");
     expect(screen.getAllByText(/Geomean latency \(lower is better\)/).length).toBeGreaterThan(0);
   });
 
