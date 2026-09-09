@@ -84,8 +84,11 @@ def _repo(path: Path) -> tuple[Path, str]:
 
 
 def _identity(repo: Path, head: str):
+    base = subprocess.run(
+        ["git", "rev-parse", "origin/develop"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
     return landing.GitIdentity(
-        repo=str(repo), branch="feat/x", worktree=str(repo), head=head, base=OTHER, upstream="origin/main"
+        repo=str(repo), branch="feat/x", worktree=str(repo), head=head, base=base, upstream="origin/main"
     )
 
 

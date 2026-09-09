@@ -605,8 +605,8 @@ def _valid_delivery_receipts() -> list[dict]:
     import subprocess
 
     repo_root = Path(metrics.__file__).resolve().parents[2]
-    head, parent, grandparent = subprocess.run(
-        ["git", "rev-parse", "HEAD", "HEAD^", "HEAD^^"],
+    head, parent = subprocess.run(
+        ["git", "rev-parse", "HEAD", "HEAD^"],
         cwd=repo_root,
         check=True,
         capture_output=True,
@@ -642,7 +642,7 @@ def _valid_delivery_receipts() -> list[dict]:
 
     return [
         receipt("batch-one", head, [head, parent], True),
-        receipt("batch-two", parent, [parent, grandparent], False),
+        receipt("batch-two", parent, [parent, parent], False),
     ]
 
 
