@@ -281,7 +281,7 @@ def _query_page(benchmark_id: str, display: str, query_id: str) -> DocFile:
 def _catalog_table(benchmark_id: str, query_ids: list[str]) -> list[str]:
     rows = ["| Query | Name |", "|---|---|"]
     for query_id in query_ids:
-        name = query_display_name(benchmark_id, query_id) or ""
+        name = (query_display_name(benchmark_id, query_id) or "").replace("|", "\\|")
         rows.append(f"| [{_query_label(query_id)}]({_query_slug(query_id)}.md) | {name} |")
     return rows
 
