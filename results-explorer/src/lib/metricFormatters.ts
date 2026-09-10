@@ -25,6 +25,7 @@ interface PowerScoreOptions extends ScalarMetricOptions {
 
 interface LatencyOptions extends ScalarMetricOptions {
   subMillisecond?: "precise" | "compact";
+  maximumSignificantDigits?: number;
 }
 
 interface SpeedupOptions extends ScalarMetricOptions {
@@ -94,6 +95,12 @@ export function formatLatencyMs(value: number | null | undefined, options: Laten
   if (numeric === null) return missing(options.missingText ?? "N/A", "latency");
 
   const abs = Math.abs(numeric);
+  // Axis positions need distinct numeric labels even across narrow ranges.
+  if (options.context === "axis") {
+    const unit = abs >= 1000 ? "s" : "ms";
+    const text = `${formatNumber(unit === "s" ? numeric / 1000 : numeric, { maximumSignificantDigits: options.maximumSignificantDigits ?? 12 })} ${unit}`;
+    return result(text, unit, numeric, `${text} latency`);
+  }
   if (abs > 0 && abs < 1 && options.subMillisecond === "compact") {
     const text = numeric < 0 ? ">-1 ms" : "<1 ms";
     return result(text, "ms", numeric, `${text} latency`);
@@ -110,6 +117,19 @@ export function formatLatencyMs(value: number | null | undefined, options: Laten
   const maximumFractionDigits = abs > 0 && abs < 10 ? 1 : 0;
   const text = `${formatNumber(numeric, { maximumFractionDigits })} ms`;
   return result(text, "ms", numeric, `${text} latency`);
+}
+
+/** Use the shortest precision that keeps every latency tick distinguishable. */
+export function formatLatencyAxisLabels(ticks: readonly number[]): string[] {
+  const distinctValues = new Set(ticks).size;
+  let labels: string[] = [];
+  for (let precision = 1; precision <= 15; precision += 1) {
+    labels = ticks.map((value) => formatLatencyMs(value, {
+      context: "axis", maximumSignificantDigits: precision,
+    }).valueText);
+    if (new Set(labels).size === distinctValues) break;
+  }
+  return labels;
 }
 
 export function formatDurationSeconds(value: number | null | undefined, options: ScalarMetricOptions = {}): MetricFormatResult {
@@ -199,12 +219,14 @@ function formatNumber(
   value: number,
   options: {
     minimumFractionDigits?: number;
-    maximumFractionDigits: number;
+    maximumFractionDigits?: number;
+    maximumSignificantDigits?: number;
   },
 ): string {
   return value.toLocaleString(undefined, {
     minimumFractionDigits: options.minimumFractionDigits ?? 0,
     maximumFractionDigits: options.maximumFractionDigits,
+    maximumSignificantDigits: options.maximumSignificantDigits,
   });
 }
 

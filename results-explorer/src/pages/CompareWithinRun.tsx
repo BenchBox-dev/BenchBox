@@ -217,6 +217,9 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
   const [detail, setDetail] = useState<DetailResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Bumped by the ErrorMessage retry button so a reader can re-issue this
+  // read after a DuckDB worker fault without reloading the page.
+  const [detailRetryToken, setDetailRetryToken] = useState(0);
   const search = typeof window === "undefined" ? "" : window.location.search;
   const parsed = useMemo(() => parseBasesParam(search), [search]);
   const [bases, setBases] = useState<MeasurementBasis[]>(parsed.bases);
@@ -232,6 +235,7 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
     let cancelled = false;
     if (!resultId) return;
     setLoading(true);
+    setError(null);
     resolveShortId(resultId)
       .then(async (resolvedId) => {
         if (cancelled) return null;
@@ -253,7 +257,7 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
     return () => {
       cancelled = true;
     };
-  }, [resultId]);
+  }, [resultId, detailRetryToken]);
 
   function updateBasesAndRef(nextBases: MeasurementBasis[], nextRef: number) {
     const unique = deduplicateBases(nextBases);
@@ -350,7 +354,7 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
   const hasSufficientAggregateEvidence = grid.sharedQueryIds.length >= 2;
 
   if (loading) return <CompareSummarySkeleton />;
-  if (error) return <ErrorMessage message={error} />;
+  if (error) return <ErrorMessage message={error} onRetry={() => setDetailRetryToken((t) => t + 1)} />;
   if (!detail) return <ErrorMessage message="Result not found." />;
   if (comparablePair === null) {
     return <ErrorMessage message="This run does not have two measurement bases with shared query evidence." />;

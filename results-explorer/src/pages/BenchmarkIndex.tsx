@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import { route } from "preact-router";
 import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
@@ -16,7 +16,6 @@ import {
   visibleResultIdForRow,
   MAX_COMPARE_SELECTIONS,
 } from "@/lib/resultLinks";
-import { stringSerde, useUrlState } from "@/lib/useUrlState";
 import {
   formatCohortExclusion,
   formatTimingExclusion,
@@ -33,7 +32,6 @@ import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 import { QueryHeatmap } from "@/components/QueryHeatmap";
 import { RankTable } from "@/components/RankTable";
 import { ChartPanel } from "@/components/ChartPanel";
-import { SegmentedControl } from "@/components/SegmentedControl";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { RunIdentityLabel } from "@/components/DataTable";
 import { PageHeader } from "@/components/PageHeader";
@@ -67,10 +65,6 @@ interface BenchmarkIndexProps extends RoutableProps {
 
 type ViewMode = "matrix" | "ranks" | "list";
 type BenchmarkListSortKey = "platform" | "scale_factor" | "run_date" | "power_score" | "display_geomean_ms" | "query_count";
-const VIEW_MODES = new Set<ViewMode>(["matrix", "ranks", "list"]);
-function coerceViewMode(value: string): ViewMode {
-  return VIEW_MODES.has(value as ViewMode) ? (value as ViewMode) : "matrix";
-}
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
 const BENCHMARK_RESULT_FACET_KEYS: ExplorerFacetKey[] = [
@@ -115,6 +109,15 @@ const TRUST_LABEL_ABBREV: Record<string, string> = {
 
 function trustAbbrev(label: string): string {
   return TRUST_LABEL_ABBREV[label] ?? label.split("-")[0] ?? label;
+}
+
+function requestedBenchmarkSection(): ViewMode | null {
+  const hash = window.location.hash.replace("#benchmark-section-", "");
+  if (window.location.hash.startsWith("#benchmark-section-") && ["matrix", "ranks", "list"].includes(hash)) {
+    return hash as ViewMode;
+  }
+  const legacyView = new URLSearchParams(window.location.search).get("view");
+  return legacyView === "ranks" || legacyView === "list" ? legacyView : null;
 }
 
 function benchmarkContextNote(benchmark: string): string | null {
@@ -203,7 +206,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   }, [benchmark]);
 
   // Filter state - URL-synced so views are shareable.
-  const { facets, setFacet } = useFacetState();
+  const { facets, setFacet, resetFacets } = useFacetState();
   const requestedSf = singleFacetValue(facets.scale_factor);
   const phaseFilter = singleFacetValue(facets.phase, "power") ?? "power";
   const tuningFilter = singleFacetValue(facets.tuning_mode, "all") ?? "all";
@@ -274,15 +277,19 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const setTuningFilter = (value: string) => setFacet("tuning_mode", value === "all" ? [] : [value]);
   const setTrustFilter = (value: Set<string> | null) => setFacet("trust_tier", value ? [...value].sort() : []);
 
-  // View: matrix (default), ranks, or list. URL-synced so matrix/list/ranks
-  // screenshots and shared links preserve the same browse state.
-  const [viewModeRaw, setViewModeRaw] = useUrlState<string>("view", "matrix", stringSerde);
-  const viewMode = coerceViewMode(viewModeRaw);
-  const setViewMode = (value: ViewMode) => setViewModeRaw(value);
-
+  const [sectionNavigation, setSectionNavigation] = useState(0);
+  const completedSectionScroll = useRef<string | null>(null);
+  const [settledSummaryKey, setSettledSummaryKey] = useState<string | null>(null);
+  const requestedSection = requestedBenchmarkSection();
   useEffect(() => {
-    if (viewModeRaw !== viewMode) setViewModeRaw(viewMode);
-  }, [setViewModeRaw, viewMode, viewModeRaw]);
+    const onNavigation = () => setSectionNavigation((value) => value + 1);
+    window.addEventListener("hashchange", onNavigation);
+    window.addEventListener("popstate", onNavigation);
+    return () => {
+      window.removeEventListener("hashchange", onNavigation);
+      window.removeEventListener("popstate", onNavigation);
+    };
+  }, []);
 
   // High contrast / reduced-color mode for the heatmap (explicit user toggle).
   // Also activates automatically via CSS prefers-contrast: more media query.
@@ -291,8 +298,13 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   // Row selection for Compare
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Bumped by the ErrorMessage retry button so a reader can re-issue this
+  // read after a DuckDB worker fault without reloading the page.
+  const [resultsRetryToken, setResultsRetryToken] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
+    setError(null);
     listResults(benchmarkResultWhere)
       .then((r) => {
         if (!cancelled) setResults(r);
@@ -303,7 +315,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     return () => {
       cancelled = true;
     };
-  }, [benchmarkResultWhere]);
+  }, [benchmarkResultWhere, resultsRetryToken]);
 
   useEffect(() => {
     if (facets.platform_version.length === 0) {
@@ -358,6 +370,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   // If the stored phaseFilter isn't available for the current SF, fall back to
   // the first available phase so we never request a non-existent artifact.
   const effectivePhase = phases.includes(phaseFilter) ? phaseFilter : (phases[0] ?? phaseFilter);
+  const summaryKey = JSON.stringify([benchmark, effectiveSf, effectivePhase]);
 
   useEffect(() => {
     if (!results || phases.length === 0 || phaseFilter === effectivePhase) return;
@@ -376,17 +389,20 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     setSummary(null);
     setSummaryError(null);
     setSummaryLoading(true);
+    setSettledSummaryKey(null);
     getBenchmarkSummaryFromDuckDB(benchmark, Number(effectiveSf), effectivePhase)
       .then((s) => {
         if (!cancelled) {
           setSummary(s);
           setSummaryLoading(false);
+          setSettledSummaryKey(summaryKey);
         }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
           setSummaryError(errMsg(err));
           setSummaryLoading(false);
+          setSettledSummaryKey(summaryKey);
         }
       });
     return () => {
@@ -399,7 +415,19 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [results, benchmark, effectiveSf, effectivePhase]);
 
-  if (error) return <ErrorMessage message={error} />;
+  // Native fragment navigation happens before async sections exist. Wait for
+  // the current cohort so replacing its skeleton cannot move the target away.
+  useEffect(() => {
+    if (!requestedSection || summaryLoading || settledSummaryKey !== summaryKey) return;
+    const navigationKey = `${benchmark}:${requestedSection}:${sectionNavigation}`;
+    if (completedSectionScroll.current === navigationKey) return;
+    const target = document.getElementById(`benchmark-section-${requestedSection}`);
+    if (!target) return;
+    target.scrollIntoView?.({ block: "start" });
+    completedSectionScroll.current = navigationKey;
+  }, [benchmark, requestedSection, sectionNavigation, settledSummaryKey, summaryKey, summaryLoading]);
+
+  if (error) return <ErrorMessage message={error} onRetry={() => setResultsRetryToken((t) => t + 1)} />;
   if (!results) {
     return (
       <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -592,10 +620,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         }
         actions={
           <>
-          {/* Benchmark switcher (sibling pivot). View mode is the only piece
-              of UI state that survives the switch; scale, phase, and tuning
-              are benchmark-specific so we drop them rather than risk an
-              empty page on the destination. */}
+          {/* Keep the section link while clearing benchmark-specific filters. */}
           <div class="flex items-center gap-2">
             <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-switcher">
               Benchmark:
@@ -608,10 +633,9 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               onChange={(event) => {
                 const next = (event.target as HTMLSelectElement).value;
                 if (next === benchmark) return;
-                const params = new URLSearchParams();
-                if (viewMode !== "matrix") params.set("view", viewMode);
-                const query = params.toString();
-                route(`/results/${next}/${query ? `?${query}` : ""}`);
+                const section = requestedBenchmarkSection();
+                resetFacets();
+                route(`/results/${next}/${section ? `#benchmark-section-${section}` : ""}`);
               }}
             >
               {benchmarkOptions.map((option) => (
@@ -625,17 +649,16 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             </select>
           </div>
 
-          {/* View toggle */}
-          <SegmentedControl
-            ariaLabel="Benchmark view"
-            value={viewMode}
-            onChange={(value) => setViewMode(value)}
-            options={[
-              { value: "matrix", label: "Matrix" },
-              { value: "ranks", label: rankGateReason ? "Rank Evidence" : "Ranks" },
-              { value: "list", label: "List" },
-            ]}
-          />
+          {/* Jump nav. Matrix, Ranks, and List are all rendered below - these
+              are anchor links to the section on this same page, not a control
+              that swaps one section in for the other two. */}
+          <nav aria-label="Jump to section" class="flex items-center gap-3 text-sm font-medium text-[var(--bb-data-fg-muted)]">
+            <a href="#benchmark-section-matrix" class="no-underline hover:text-[var(--bb-data-fg-primary)] hover:underline">Matrix</a>
+            <a href="#benchmark-section-ranks" class="no-underline hover:text-[var(--bb-data-fg-primary)] hover:underline">
+              {rankGateReason ? "Rank Evidence" : "Ranks"}
+            </a>
+            <a href="#benchmark-section-list" class="no-underline hover:text-[var(--bb-data-fg-primary)] hover:underline">List</a>
+          </nav>
 
           </>
         }
@@ -938,90 +961,92 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         </section>
       )}
 
-      {/* Matrix view */}
-      {viewMode === "matrix" && (
-        <>
-          {summaryError ? (
-            <div class="rounded-lg tone-warning border border-[var(--bb-data-border)] px-4 py-3 text-sm">
-              Could not load benchmark matrix: {summaryError}
+      <section id="benchmark-section-matrix" class="scroll-mt-24" aria-labelledby="benchmark-heading-matrix">
+        <h2 id="benchmark-heading-matrix" class="mb-3 text-lg font-semibold text-[var(--bb-data-fg-primary)]">
+          Matrix
+        </h2>
+        {summaryError ? (
+          <div class="rounded-lg tone-warning border border-[var(--bb-data-border)] px-4 py-3 text-sm">
+            Could not load benchmark matrix: {summaryError}
+          </div>
+        ) : summaryLoading ? (
+          <BenchmarkMatrixSkeleton message="Loading matrix..." />
+        ) : !filteredSummary ? (
+          <div class="rounded-lg border border-dashed border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] p-10 text-center text-[var(--bb-data-fg-subtle)]">
+            <p class="font-medium">
+              No benchmark data available for {humanizeBenchmark(benchmark)} SF{effectiveSf} phase {effectivePhase}.
+            </p>
+          </div>
+        ) : (
+          <div id="evidence-matrix" data-testid="evidence-matrix">
+            {/* Palette control sits with the thing it repaints. In the page
+                filter row it read as another cohort filter. */}
+            <div class="mb-2 flex justify-end">
+              <button
+                type="button"
+                class={`rounded-md border px-3 py-1 text-xs transition-colors ${
+                  highContrast
+                    ? "border-[var(--bb-accent-hover)] bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
+                    : "border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data-muted)]"
+                }`}
+                onClick={() => setHighContrast((v) => !v)}
+                aria-pressed={highContrast}
+                title="Switch the heatmap palette to greyscale for color-vision accessibility"
+              >
+                Reduced color
+              </button>
             </div>
-          ) : summaryLoading ? (
-            <BenchmarkMatrixSkeleton message="Loading matrix..." />
-          ) : !filteredSummary ? (
-            <div class="rounded-lg border border-dashed border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] p-10 text-center text-[var(--bb-data-fg-subtle)]">
-              <p class="font-medium">
-                No benchmark data available for {humanizeBenchmark(benchmark)} SF{effectiveSf} phase {effectivePhase}.
-              </p>
-            </div>
-          ) : (
-            <div id="evidence-matrix" class="scroll-mt-24" data-testid="evidence-matrix">
-              {/* Palette control sits with the thing it repaints. In the page
-                  filter row it read as another cohort filter. */}
-              <div class="mb-2 flex justify-end">
-                <button
-                  type="button"
-                  class={`rounded-md border px-3 py-1 text-xs transition-colors ${
-                    highContrast
-                      ? "border-[var(--bb-accent-hover)] bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
-                      : "border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data-muted)]"
-                  }`}
-                  onClick={() => setHighContrast((v) => !v)}
-                  aria-pressed={highContrast}
-                  title="Switch the heatmap palette to greyscale for color-vision accessibility"
-                >
-                  Reduced color
-                </button>
-              </div>
-              <QueryHeatmap
-                summary={analysisSummary ?? filteredSummary}
-                selectedIds={selectedIds}
-                onSelectionChange={updateSelectedIds}
-                selectionLimitReasonId={selectionLimitCopy ? BENCHMARK_SELECTION_LIMIT_REASON_ID : undefined}
-                highContrast={highContrast}
-              />
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Rank table view */}
-      {viewMode === "ranks" && (
-        <>
-          {summaryError ? (
-            <div class="rounded-lg tone-warning border border-[var(--bb-data-border)] px-4 py-3 text-sm">
-              Could not load rank data: {summaryError}
-            </div>
-          ) : summaryLoading ? (
-            <BenchmarkMatrixSkeleton message="Loading ranks..." />
-          ) : !filteredSummary ? (
-            <div class="rounded-lg border border-dashed border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] p-10 text-center text-[var(--bb-data-fg-subtle)]">
-              <p class="font-medium">
-                No benchmark data available for {humanizeBenchmark(benchmark)} SF{effectiveSf} phase {effectivePhase}.
-              </p>
-            </div>
-          ) : rankGateReason ? (
-            <RankGateNotice
-              reason={rankGateReason}
-              benchmark={title}
-              scaleFactor={effectiveSf}
-              phase={effectivePhase}
+            <QueryHeatmap
+              summary={analysisSummary ?? filteredSummary}
+              selectedIds={selectedIds}
+              onSelectionChange={updateSelectedIds}
+              selectionLimitReasonId={selectionLimitCopy ? BENCHMARK_SELECTION_LIMIT_REASON_ID : undefined}
+              highContrast={highContrast}
             />
-          ) : (
-            <div class="card">
-              <RankTable summary={analysisSummary ?? filteredSummary} />
-            </div>
-          )}
-        </>
-      )}
+          </div>
+        )}
+      </section>
 
-      {/* List view (mobile-friendly fallback) */}
-      {viewMode === "list" && (
+      <section id="benchmark-section-ranks" class="mt-8 scroll-mt-24 overflow-x-hidden" aria-labelledby="benchmark-heading-ranks">
+        <h2 id="benchmark-heading-ranks" class="mb-3 text-lg font-semibold text-[var(--bb-data-fg-primary)]">
+          {rankGateReason ? "Rank Evidence" : "Ranks"}
+        </h2>
+        {summaryError ? (
+          <div class="rounded-lg tone-warning border border-[var(--bb-data-border)] px-4 py-3 text-sm">
+            Could not load rank data: {summaryError}
+          </div>
+        ) : summaryLoading ? (
+          <BenchmarkMatrixSkeleton message="Loading ranks..." />
+        ) : !filteredSummary ? (
+          <div class="rounded-lg border border-dashed border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] p-10 text-center text-[var(--bb-data-fg-subtle)]">
+            <p class="font-medium">
+              No benchmark data available for {humanizeBenchmark(benchmark)} SF{effectiveSf} phase {effectivePhase}.
+            </p>
+          </div>
+        ) : rankGateReason ? (
+          <RankGateNotice
+            reason={rankGateReason}
+            benchmark={title}
+            scaleFactor={effectiveSf}
+            phase={effectivePhase}
+          />
+        ) : (
+          <div class="card">
+            <RankTable summary={analysisSummary ?? filteredSummary} />
+          </div>
+        )}
+      </section>
+
+      <section id="benchmark-section-list" class="mt-8 scroll-mt-24 overflow-x-hidden" aria-labelledby="benchmark-heading-list">
+        <h2 id="benchmark-heading-list" class="mb-3 text-lg font-semibold text-[var(--bb-data-fg-primary)]">
+          List
+        </h2>
         <ListTable benchmark={benchmark} results={results} scaleFactor={effectiveSf} facets={facets} />
-      )}
+      </section>
 
-      {viewMode !== "list" && <ExcludedRunsDisclosure rows={excludedRows} />}
+      <ExcludedRunsDisclosure rows={excludedRows} />
 
-      {analysisSummary && analysisSummary.platforms.length > 0 && viewMode !== "list" && (
+      {analysisSummary && analysisSummary.platforms.length > 0 && (
         <div class="mt-8">
           <ChartPanel
             context={{
@@ -1029,8 +1054,8 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               summary: analysisSummary,
               historical: historicalEntries,
             }}
-            summaryLayout={viewMode === "matrix" ? "long" : "tabs"}
-            excludeChartIds={viewMode === "matrix" ? ["query_heatmap"] : undefined}
+            summaryLayout="long"
+            excludeChartIds={["query_heatmap"]}
           />
         </div>
       )}
@@ -1159,7 +1184,7 @@ function ListTable({
     direction: "asc",
   });
   const [visibleLimit, setVisibleLimit] = useState(TABLE_RENDER_LIMIT);
-  const benchmarkResults = results.filter((r) => r.benchmark === benchmark);
+  const benchmarkResults = results.filter((r) => canonicalBenchmarkSlug(r.benchmark) === canonicalBenchmarkSlug(benchmark));
 
   const byScale = benchmarkResults.filter((r) => String(r.scale_factor) === scaleFactor);
 
@@ -1272,6 +1297,7 @@ function ListTable({
         geometric mean across queries. Warmup passes are excluded. Dates, counts, and power scores use
         the definitions shown in their columns and receipts.
       </p>
+      <div class="overflow-x-auto">
       <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
         <thead class="bg-[var(--bb-surface-data-muted)]">
           <tr>
@@ -1352,6 +1378,7 @@ function ListTable({
               ))}
         </tbody>
       </table>
+      </div>
       {visibleRows.length < filtered.length && (
         <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
           <button
@@ -1369,7 +1396,7 @@ function ListTable({
 
 function BenchmarkRow({ entry, runIdentityLabel }: { entry: ResultRow; runIdentityLabel: string }) {
   return (
-    <tr class="hover:bg-[var(--bb-surface-data-muted)]" data-testid={entry.result_id}>
+    <tr class="hover:bg-[var(--bb-surface-data-muted)]" data-testid={`list-${entry.result_id}`}>
       <td class="table-td">
         <RunIdentityLabel label={runIdentityLabel} href={`/results/p/${entry.platform_id}/`} />
         {entry.compliance_class && entry.compliance_class !== "official" && (
@@ -1426,7 +1453,7 @@ function ListSortHeader({
     <th class="p-0" scope="col" aria-sort={ariaSort(sortKey)}>
       <button
         type="button"
-        class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left"
+        class="table-th relative block w-full cursor-pointer select-none border-0 bg-transparent text-left"
         onClick={() => onSort(sortKey)}
       >
         {label}{sortArrow(sortKey)}

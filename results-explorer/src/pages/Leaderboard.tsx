@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/PageHeader";
+import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import type {
@@ -98,6 +99,9 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
   const retriedEmptyResults = useRef(false);
   const [emptyResultsRetryFinished, setEmptyResultsRetryFinished] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by the ErrorMessage retry button so a reader can re-issue this
+  // read after a DuckDB worker fault without reloading the page.
+  const [resultsRetryToken, setResultsRetryToken] = useState(0);
   const { facets, where: facetWhere, setFacet, resetFacets } = useFacetState();
   const [modeRaw, setModeRaw] = useUrlState<string>("mode", "speedup", stringSerde);
   const benchmarkFilters = facets.benchmark;
@@ -131,6 +135,7 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
 
   useEffect(() => {
     let cancelled = false;
+    setError(null);
     listResults(facetWhere)
       .then((rows) => {
         if (!cancelled) setResults(rows);
@@ -141,7 +146,7 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
     return () => {
       cancelled = true;
     };
-  }, [facetWhere]);
+  }, [facetWhere, resultsRetryToken]);
 
   useEffect(() => {
     if (facets.platform_version.length === 0) {
@@ -330,7 +335,7 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
     scaleFilters,
   ]);
 
-  if (error) return <ErrorMessage title="Could not load results" message={error} />;
+  if (error) return <ErrorMessage title="Could not load results" message={error} onRetry={() => setResultsRetryToken((t) => t + 1)} />;
   if (hasPersistentInconsistentEmptySnapshot) {
     return (
       <ErrorMessage
@@ -633,6 +638,7 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
           />
         )}
 
+        <ProvenanceLegend />
       </div>
 </div>
   );

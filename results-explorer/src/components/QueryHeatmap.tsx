@@ -609,8 +609,21 @@ export function QueryHeatmap({
                   />
                 )}
                 <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-1">
-                    <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{rowIdentity}</h2>
+                  <div class="flex flex-wrap items-baseline gap-1.5">
+                    <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">
+                      <a
+                        href={resultReceiptHref(row)}
+                        aria-label={resultIdentityAriaLabel(row, "receipt")}
+                        title={rowIdentity}
+                        class="text-[var(--bb-data-fg-primary)] no-underline hover:text-[var(--bb-accent-hover)] hover:underline"
+                      >
+                        {row.platform}
+                      </a>
+                    </h2>
+                    {row.platform_version && (
+                      <VersionLabel version={row.platform_version} plain class="shrink-0 text-[var(--bb-data-fg-subtle)]" />
+                    )}
+                    <RunDateChip runDate={row.run_date} />
                     {rankingExclusion && (
                       <span
                         role="img"
@@ -624,19 +637,12 @@ export function QueryHeatmap({
                       </span>
                     )}
                   </div>
-                  {row.platform_version && (
-                    <VersionLabel version={row.platform_version} plain class="mt-0.5 text-[var(--bb-data-fg-subtle)]" />
+                  {(identityCounts.get(`${row.platform}\0${row.platform_version}`) ?? 0) > 1 && (
+                    <span class="block font-mono text-xs text-[var(--bb-data-fg-muted)]" data-testid="visible-run-qualifier-mobile">{row.short_id || row.result_id}</span>
                   )}
-                    {hasSelection && comparisonCopy && (
+                  {hasSelection && comparisonCopy && (
                     <CompareDisabledReason id={comparisonReasonId} copy={comparisonCopy} />
                   )}
-                  <a
-                    href={resultReceiptHref(row)}
-                    aria-label={resultIdentityAriaLabel(row, "receipt")}
-                    class="mt-1 inline-block text-xs font-medium no-underline"
-                  >
-                    Receipt →
-                  </a>
                 </div>
                 <dl class="shrink-0 text-right">
                   <dt class="text-[0.65rem] font-semibold uppercase text-[var(--bb-data-fg-subtle)]">{primaryLabel}</dt>
@@ -652,7 +658,7 @@ export function QueryHeatmap({
                 <ValidationBadge validationStatus={row.validation_status} showMissing />
                 {showGeomeanCol && (
                   <span class="rounded-full bg-[var(--bb-surface-app)] px-2 py-0.5 font-mono text-xs text-[var(--bb-data-fg-muted)]">
-                    Geomean latency {fmtGeomean(validPrimaryMetricValue(row, "display_geomean_ms"))}
+                    Geomean {fmtGeomean(validPrimaryMetricValue(row, "display_geomean_ms"))}
                   </span>
                 )}
               </div>

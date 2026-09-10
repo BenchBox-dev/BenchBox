@@ -567,6 +567,20 @@ function makeEntry(
 }
 
 describe("TimeSeries", () => {
+  it("keeps narrow-range latency axis labels distinct", () => {
+    const entries = Array.from({ length: 7 }, (_, index) => makeEntry({
+      result_id: `narrow-${index}`,
+      run_date: `2026-04-0${index + 1}`,
+      display_geomean_ms: 11.1 + index * 0.01,
+    }));
+    const { container } = render(<TimeSeries entries={entries} />);
+    const labels = [...container.querySelectorAll("svg text")]
+      .map((node) => node.textContent ?? "")
+      .filter((label) => label.endsWith(" ms"));
+    expect(labels.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
   it("shows an insufficient-data message when fewer than 2 runs per platform", () => {
     const { container } = render(
       <TimeSeries entries={[makeEntry({ result_id: "r1" })]} />,

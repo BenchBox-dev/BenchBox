@@ -124,14 +124,24 @@ test.describe("tray geometry: collapsed and expanded clearance", () => {
     await page.evaluate(() => {
       document.documentElement.style.zoom = "2";
     });
+    const expectPageContained = async () => {
+      const dimensions = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+    };
+    await expectPageContained();
+    // Off-screen sort announcements must stay inside the table's scroller.
+    const queriesHeader = page.locator("#benchmark-section-list").getByRole("columnheader", { name: /Queries/ });
+    await queriesHeader.getByRole("button").click();
+    await expect(queriesHeader).toHaveAttribute("aria-sort", "ascending");
+    await expect(queriesHeader.locator(".sr-only")).toHaveText("sorted ascending");
+    await expectPageContained();
     await checkFixtureRow(page, fixtureIds.ids.duckdb);
     await checkFixtureRow(page, fixtureIds.ids.datafusion);
     await expect(page.getByTestId("compare-tray")).toBeVisible();
-    const dimensions = await page.evaluate(() => ({
-      scrollWidth: document.documentElement.scrollWidth,
-      clientWidth: document.documentElement.clientWidth,
-    }));
-    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+    await expectPageContained();
   });
 });
 

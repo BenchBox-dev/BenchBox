@@ -161,6 +161,8 @@ export function MetaLeaderboard({
   if (platforms.length === 0 || cohorts.length === 0) return null;
 
   function handleCellKey(event: KeyboardEvent, rowIdx: number, colIdx: number) {
+    // Nested links and date buttons keep their own keyboard behavior.
+    if (event.target !== event.currentTarget) return;
     let nextRow = rowIdx;
     let nextCol = colIdx;
     switch (event.key) {
@@ -309,6 +311,7 @@ export function MetaLeaderboard({
           >
             <thead class="bg-[var(--bb-surface-data-muted)]">
               <tr role="row">
+                {/* Keep row labels visible while timing columns scroll. */}
                 <th scope="col" class="table-th sticky left-0 z-10 min-w-40 bg-[var(--bb-surface-data-muted)] py-2">
                   Platform
                 </th>

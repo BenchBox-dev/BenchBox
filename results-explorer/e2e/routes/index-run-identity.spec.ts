@@ -5,11 +5,16 @@ const SAME_VERSION_RUNS = [fixtureIds.ids.duckdb, fixtureIds.ids.duckdbTuned] as
 
 test.describe("run identity in index tables", () => {
   test("run identity: same-version runs have distinguishable benchmark and platform index labels", async ({ page }) => {
+    // Matrix, Ranks, and List are all sections of one page now (rather than
+    // mutually exclusive states), so List's rows carry a `list-` prefixed
+    // testid to stay distinct from Matrix's rows, which keep the bare
+    // result-id testid used across the rest of the app.
     await page.goto("/results/tpch/?view=list");
     await waitForShell(page);
-    await waitForDataElement(page, page.getByTestId(SAME_VERSION_RUNS[0]));
+    const listRunIds = SAME_VERSION_RUNS.map((id) => `list-${id}`);
+    await waitForDataElement(page, page.getByTestId(listRunIds[0]!));
 
-    const benchmarkLabels = await labelsForRows(page, SAME_VERSION_RUNS);
+    const benchmarkLabels = await labelsForRows(page, listRunIds);
     expectDistinctSameVersionLabels(benchmarkLabels);
 
     await page.goto("/results/p/duckdb/");
@@ -41,8 +46,8 @@ test.describe("run identity in index tables", () => {
   });
 });
 
-async function labelsForRows(page: Page, resultIds: readonly string[]): Promise<string[]> {
-  return Promise.all(resultIds.map((resultId) => runIdentityLabel(page.getByTestId(resultId)).innerText()));
+async function labelsForRows(scope: Page | Locator, resultIds: readonly string[]): Promise<string[]> {
+  return Promise.all(resultIds.map((resultId) => runIdentityLabel(scope.getByTestId(resultId)).innerText()));
 }
 
 function runIdentityLabel(row: Locator): Locator {

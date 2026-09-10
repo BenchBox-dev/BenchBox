@@ -452,6 +452,34 @@ describe("QueryHeatmap rendering", () => {
     expect(sqliteCard.textContent).toContain("10.00× slower than fastest");
   });
 
+  it("gives the mobile card a linked platform name, a date chip, and a unit-only geomean label", () => {
+    // Audit findings A1-A4: the mobile card used to concatenate the run date
+    // into the heading text, render a redundant "Receipt →" link next to
+    // a non-link heading (with no space before it), and say "Geomean latency"
+    // where the desktop matrix column just says "Geomean" (the value already
+    // carries the unit).
+    render(<QueryHeatmap summary={makeSummary()} />);
+    const card = screen.getByTestId("query-heatmap-mobile-card-r1");
+
+    // The platform name itself is the receipt link, same as desktop.
+    const receiptLink = within(card).getByRole("link", { name: /Open receipt for/ });
+    expect(receiptLink.textContent).toBe("DuckDB");
+    expect(receiptLink.getAttribute("href")).toBe("/results/r/r1#run-receipt");
+
+    // No separate "Receipt →" link, and no run-together text.
+    expect(card.textContent).not.toContain("Receipt →");
+    expect(card.textContent).not.toMatch(/\d Receipt/);
+
+    // The run date renders as its own chip, not appended into the heading.
+    expect(within(card).getByTestId("run-date-chip").textContent).toBe("2026-04-01");
+    const heading = card.querySelector("h2")!;
+    expect(heading.textContent).not.toContain("2026-04-01");
+
+    // The geomean chip matches the desktop column's unit-only label.
+    expect(card.textContent).toContain("Geomean 10 ms");
+    expect(card.textContent).not.toContain("Geomean latency");
+  });
+
   it("uses the same comparison selection ids from compact mobile cards", () => {
     let selected: Set<string> | null = null;
     render(

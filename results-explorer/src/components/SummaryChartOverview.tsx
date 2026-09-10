@@ -30,7 +30,7 @@ import {
   summarizeChartDatasetExclusions,
   validPrimaryMetricValue,
 } from "@/lib/displayEligibility";
-import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
+import { formatRunIdentitiesForCohort, formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 import { fmtGeomean, fmtScore } from "@/utils";
 import { DistributionBox } from "@/components/DistributionBox";
 import { QueryHeatmap } from "@/components/QueryHeatmap";
@@ -61,17 +61,6 @@ const LONG_LAYOUT_CHART_IDS = [
   "rank_table",
   "cost_scatter",
 ] as const;
-
-const CHART_QUESTIONS: Record<string, string> = {
-  query_heatmap: "Which queries drive the difference?",
-  percentile_ladder: "Where does the tail sit, not just the middle?",
-  cdf_chart: "What share of queries finish under a given time?",
-  query_histogram: "Which individual queries are slow?",
-  stacked_phase: "Where does the wall-clock time go?",
-  time_series: "Is this platform getting faster over time?",
-  rank_table: "Who wins query by query, not on average?",
-  cost_scatter: "What does a unit of speed cost?",
-};
 
 const CHART_DISPLAY_TITLES: Record<string, string> = {
   rank_table: "Query ranks",
@@ -124,19 +113,7 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
 
   return (
     <div class="scroll-mt-24 space-y-6" data-testid="summary-chart-overview" id="cohort-charts">
-      <section class="card" aria-labelledby="summary-metric-overview-title">
-        <div class="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-[var(--bb-data-border)] pb-4">
-          <div>
-            <h2 id="summary-metric-overview-title" class="text-lg font-semibold text-[var(--bb-data-fg-primary)]">
-              Which platforms lead on speed and throughput?
-            </h2>
-            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
-              Geomean query time and power score in one comparison. Lower latency and higher throughput are better.
-            </p>
-          </div>
-          <p class="font-mono text-xs text-[var(--bb-data-fg-subtle)]">Geomean query time · Power score</p>
-        </div>
-
+      <section class="card">
         <div class="overflow-x-auto">
           <table
             class="summary-metric-table min-w-[38rem] w-full border-collapse"
@@ -241,21 +218,14 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
         </div>
       </section>
 
-      <section class="card" aria-labelledby="summary-distribution-title">
-        <div class="mb-4 border-b border-[var(--bb-data-border)] pb-4">
-          <h2 id="summary-distribution-title" class="text-lg font-semibold text-[var(--bb-data-fg-primary)]">
-            How wide is the query-latency spread?
-          </h2>
-          <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
-            Full distribution view for display-safe rows. Whiskers show the observed per-query range.
-          </p>
-        </div>
+      <section class="card">
         <div data-chart-container>
           <DistributionBox summary={summary} />
         </div>
         <div class="mt-3 border-t border-[var(--bb-data-border)] pt-3 text-sm text-[var(--bb-data-fg-muted)]">
           <p>
-            The spread is across different queries, not repeated runs of the same query.{" "}
+            The spread is across different queries, not repeated runs of the same query.
+            Whiskers show the observed per-query range.{" "}
             <a class="font-medium text-[var(--bb-accent)]" href="#evidence-matrix">
               See the per-query matrix
             </a>
@@ -317,9 +287,6 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
                         <h3 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">
                           {CHART_DISPLAY_TITLES[chart.id] ?? chart.shortTitle}
                         </h3>
-                        <p class="mt-1 text-xs leading-5 text-[var(--bb-data-fg-muted)]">
-                          {CHART_QUESTIONS[chart.id] ?? chart.description}
-                        </p>
                       </div>
                       {!isOpen && (
                         <ChartThumbnail
@@ -472,7 +439,15 @@ function renderExpandedChart(
   switch (chart.id) {
     case "query_heatmap":
       return <QueryHeatmap summary={summary} />;
-    case "percentile_ladder":
+    case "percentile_ladder": {
+      // Use the same cohort-aware identity labels as the other expanded
+      // charts (query heatmap, CDF, etc.) instead of the bare platform
+      // name, which collapses to indistinguishable "DuckDB", "DuckDB 2"
+      // rows once two runs share a platform.
+      const cohortLabels = formatRunIdentitiesForCohort(
+        summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+        "chart",
+      );
       return (
         <PercentileLadder
           rows={summary.platforms.flatMap((platform, index) =>
@@ -481,7 +456,7 @@ function renderExpandedChart(
                   {
                     result_id: platform.result_id,
                     platform: platform.platform,
-                    displayLabel: platform.platform,
+                    displayLabel: cohortLabels[index] ?? platform.platform,
                     percentile_stats: platform.percentile_stats,
                     colorIdx: index,
                   },
@@ -490,6 +465,7 @@ function renderExpandedChart(
           )}
         />
       );
+    }
     case "cdf_chart":
       return <CDFChart summary={summary} />;
     case "query_histogram":

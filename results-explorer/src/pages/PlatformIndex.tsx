@@ -286,6 +286,9 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     return () => { cancelled = true; };
   }, [requestedRows, basis]);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by the ErrorMessage retry button so a reader can re-issue this
+  // read after a DuckDB worker fault without reloading the page.
+  const [rowsRetryToken, setRowsRetryToken] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [visibleLimit, setVisibleLimit] = useState(TABLE_RENDER_LIMIT);
   const [groupBy, setGroupBy] = useState<CohortGroupBy>("none");
@@ -346,6 +349,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
 
   useEffect(() => {
     let cancelled = false;
+    setError(null);
     // Fetch all platform index rows so we can also accept legacy display-name URLs.
     // Cost stays small in the committed corpus; the query projects only the table
     // columns plus cohort metadata needed to avoid mixed-cohort trend charts.
@@ -365,7 +369,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [rowsRetryToken]);
 
   useEffect(() => {
     if (!rows) return;
@@ -400,7 +404,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     sort.direction,
   ]);
 
-  if (error) return <ErrorMessage message={error} />;
+  if (error) return <ErrorMessage message={error} onRetry={() => setRowsRetryToken((t) => t + 1)} />;
   if (!rows) return <LoadingSpinner message="Loading results..." />;
   if (rows.length === 0) {
     return (

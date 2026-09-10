@@ -468,133 +468,6 @@ function chartButtonLabel(chart: ChartRegistryEntry): string {
   return chart.shortTitle;
 }
 
-const LONG_LAYOUT_GROUP_COPY: Readonly<
-  Record<string, { label: string; description: string }>
-> = {
-  overview: {
-    label: "Headline metrics",
-    description: "Start with the aggregate measures, then inspect the queries behind them.",
-  },
-  per_query: {
-    label: "Per-query evidence",
-    description: "See where the selected runs separate query by query.",
-  },
-  distribution: {
-    label: "Distribution",
-    description: "See the middle and the tail across the selected queries.",
-  },
-  cost: {
-    label: "Cost",
-    description: "Compare normalized cost only where the pricing record supports it.",
-  },
-  trend: {
-    label: "Trend",
-    description: "Put these runs in historical context when prior runs are available.",
-  },
-  rank: {
-    label: "Rankings",
-    description: "See which engine wins individual queries, not just the average.",
-  },
-};
-
-const LONG_LAYOUT_CHART_COPY: Readonly<
-  Record<string, { title: string; description: string }>
-> = {
-  performance_bar: {
-    title: "Which engines minimize display geomean latency?",
-    description: "Aggregate display timing across comparable queries. Lower is better.",
-  },
-  power_bar: {
-    title: "Which engines maximize Power@Size?",
-    description: "Throughput at size for rank-safe rows. Higher is better.",
-  },
-  sparkline_table: {
-    title: "Which engines lead on speed and throughput?",
-    description: "Display geomean and Power@Size in one compact comparison.",
-  },
-  distribution_box: {
-    title: "How wide is the query-latency spread?",
-    description: "Variation across queries, not run-to-run variability. Whiskers show the observed range.",
-  },
-  query_heatmap: {
-    title: "Which queries drive the difference?",
-    description: "Per-query latency across the selected runs. Lower is better.",
-  },
-  comparison_bar: {
-    title: "How does each query compare with the baseline?",
-    description: "Paired query timings for the selected runs. Lower is better.",
-  },
-  diverging_bar: {
-    title: "Where are the largest regressions and improvements?",
-    description: "Per-query change relative to the selected baseline, sorted by magnitude.",
-  },
-  normalized_speedup: {
-    title: "How much faster or slower is each query?",
-    description: "Per-query results relative to the selected baseline.",
-  },
-  query_histogram: {
-    title: "Which individual queries are slow?",
-    description: "Latency for each query across the selected runs.",
-  },
-  percentile_ladder: {
-    title: "Where does the tail sit, not just the middle?",
-    description: "P50, P90, P95, and P99 across the selected runs. Lower is better.",
-  },
-  cdf_chart: {
-    title: "What share of queries finish under a given time?",
-    description: "Cumulative query-latency share across the selected runs.",
-  },
-  stacked_phase: {
-    title: "Where does the wall-clock time go?",
-    description: "Phase durations for the selected runs, shown as a breakdown of total time.",
-  },
-  time_series: {
-    title: "Is this platform getting faster over time?",
-    description: "Historical performance for the selected runs, ordered by run date.",
-  },
-  rank_table: {
-    title: "Who wins query by query, not on average?",
-    description: "Per-query ranks show how the aggregate result is assembled.",
-  },
-  cost_scatter: {
-    title: "What does a unit of speed cost?",
-    description: "Normalized cost versus performance where comparable cost data exists.",
-  },
-  summary_box: {
-    title: "What is the aggregate result?",
-    description: "Aggregate geomean, total time, and per-query outcome counts.",
-  },
-};
-
-function longLayoutGroupCopy(group: { id: string; label: string; description: string }) {
-  return LONG_LAYOUT_GROUP_COPY[group.id] ?? group;
-}
-
-// A single run has nothing to lead and no difference to drive, so the few
-// cohort-shaped questions get a run-shaped one instead.
-const SINGLE_RUN_CHART_COPY: Readonly<Record<string, { title: string; description: string }>> = {
-  query_heatmap: {
-    title: "How long did each query take?",
-    description: "Per-query latency for this run. Lower is better.",
-  },
-  summary_box: {
-    title: "What did this run record?",
-    description: "Aggregate geomean, total time, and per-query outcome counts.",
-  },
-  distribution_box: {
-    title: "How wide is the query-latency spread?",
-    description: "Variation across queries in this run, not run-to-run variability.",
-  },
-};
-
-function longLayoutChartCopy(chart: ChartRegistryEntry, singleRun = false) {
-  if (singleRun && SINGLE_RUN_CHART_COPY[chart.id]) return SINGLE_RUN_CHART_COPY[chart.id]!;
-  return LONG_LAYOUT_CHART_COPY[chart.id] ?? {
-    title: chart.title,
-    description: chart.description,
-  };
-}
-
 // The open layout renders every applicable chart group and chart at once,
 // with no tab or disclosure gating: a reader who lands on the page sees the
 // charts, not the controls that would reveal them.
@@ -650,13 +523,9 @@ function ChartPanelLong({
     !isBaselineControlled &&
     context.kind === "compare" &&
     charts.some((chart) => chart.id === "normalized_speedup" || chart.id === "diverging_bar");
-  const singleRun = context.kind === "detail";
 
   return (
     <section class="card" data-testid="chart-panel-long">
-      {/* No panel-level or group-level restatement of the question: each
-          chart already carries the question it answers, and three nested
-          headings that paraphrase each other read as scaffolding. */}
       <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
         {showBaseline && summary && summary.platforms.length > 1 && (
           <div class="ml-auto flex items-center gap-2">
@@ -679,39 +548,23 @@ function ChartPanelLong({
         )}
       </div>
       <div class="space-y-8">
-        {chartGroups.map((group) => {
-          const groupCopy = longLayoutGroupCopy(group);
-          return (
-            <section
-              key={group.id}
-              aria-labelledby={`chart-panel-group-${group.id}`}
-              data-testid={`chart-panel-group-${group.id}`}
-            >
-            <h3
-              id={`chart-panel-group-${group.id}`}
-              class="sr-only"
-            >
-              {groupCopy.label}
-            </h3>
-            <div class="mt-4 space-y-8">
-              {group.charts.map((chart) => (
-                <ChartFigure
-                  key={chart.id}
-                  chart={chart}
-                  context={context}
-                  summary={summary}
-                  historical={historical}
-                  baselineIdx={baselineIdx}
-                  suppressWinnerClaims={suppressWinnerClaims}
-                  suppressionReason={suppressionReason}
-                  queryFilter={queryFilter}
-                  singleRun={singleRun}
-                />
-              ))}
-            </div>
-            </section>
-          );
-        })}
+        {chartGroups.map((group) => (
+          <div key={group.id} class="space-y-8" data-testid={`chart-panel-group-${group.id}`}>
+            {group.charts.map((chart) => (
+              <ChartFigure
+                key={chart.id}
+                chart={chart}
+                context={context}
+                summary={summary}
+                historical={historical}
+                baselineIdx={baselineIdx}
+                suppressWinnerClaims={suppressWinnerClaims}
+                suppressionReason={suppressionReason}
+                queryFilter={queryFilter}
+              />
+            ))}
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -726,7 +579,6 @@ function ChartFigure({
   suppressWinnerClaims = false,
   suppressionReason,
   queryFilter,
-  singleRun = false,
 }: {
   chart: ChartRegistryEntry;
   context: ChartContext;
@@ -736,7 +588,6 @@ function ChartFigure({
   suppressWinnerClaims?: boolean;
   suppressionReason?: string;
   queryFilter?: readonly string[];
-  singleRun?: boolean;
 }) {
   const chartSummary = useMemo(
     () => buildChartSummary(summary, chart.eligibilityClass, queryFilter),
@@ -773,15 +624,12 @@ function ChartFigure({
   );
   const datasetEmpty = shouldShowChartDatasetEmpty(chart.eligibilityClass, summary, chartSummary);
   const fewUsableQueries = Boolean(queryFilter && (chartSummary?.query_ids.length ?? 0) < 2);
-  const copy = longLayoutChartCopy(chart, singleRun);
 
   return (
     <div data-chart-container data-chart-id={chart.id} data-testid={`chart-panel-chart-${chart.id}`}>
-      <h4 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{copy.title}</h4>
-      <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">{copy.description}</p>
       <div class="mt-3">
         {datasetEmpty ? (
-          <ChartDatasetEmptyState chart={chart} summary={summary!} displayTitle={copy.title} />
+          <ChartDatasetEmptyState chart={chart} summary={summary!} />
         ) : queryFilter && chartSummary && chartSummary.query_ids.length === 0 ? (
           <div class="panel-muted rounded p-6 text-center text-sm text-[var(--bb-data-fg-muted)]">
             No queries match the selected filter.

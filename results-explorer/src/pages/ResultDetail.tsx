@@ -50,6 +50,9 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
   const samplesScrollerRef = useRef<HTMLDivElement>(null);
   const [detailState, setDetailState] = useState<DetailState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by the ErrorMessage retry button so a reader can re-issue this
+  // read after a DuckDB worker fault without reloading the page.
+  const [detailRetryToken, setDetailRetryToken] = useState(0);
   const [sort, setSort] = useState<SortState<MedianSortKey>>({
     key: "query_id",
     direction: "asc",
@@ -124,7 +127,7 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
       tuningAbortRef.current?.abort();
       tuningAbortRef.current = null;
     };
-  }, [isLocal, localResultState.preview, resultId]);
+  }, [isLocal, localResultState.preview, resultId, detailRetryToken]);
 
   // Hooks must run in the same order on every render - compute memos before
   // any conditional return, guarding inside the factory for the null case.
@@ -170,7 +173,7 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
       <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: isLocal ? "Local preview" : "Result detail" }]} />
         <div class="mt-8">
-          <ErrorMessage message={error} />
+          <ErrorMessage message={error} onRetry={() => setDetailRetryToken((t) => t + 1)} />
           <div class="mt-4 flex flex-wrap gap-2">
             {isLocal && <LocalResultPicker label="Open result file again" />}
             <a href="/results/query" class="btn btn-primary no-underline">Find runs</a>

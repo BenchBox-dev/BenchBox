@@ -209,6 +209,13 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("loose")).toBeTruthy();
     expect(screen.getAllByRole("gridcell", { name: /Run age:/ })).toHaveLength(2);
     expect(screen.getByRole("button", { name: /Run date .*ago/ })).toBeTruthy();
+    const dateControl = screen.getByRole("button", { name: /Run date .*ago/ });
+    for (const key of ["Enter", " ", "ArrowRight"]) {
+      const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      dateControl.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    }
+    expect(routeMock).not.toHaveBeenCalled();
   });
 
   it("shows coverage counts and can sort by covered ranking count", () => {

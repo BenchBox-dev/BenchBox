@@ -8,6 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 import { buildLogLatencyScale, logLatencyTicks, logLatencyFraction } from "@/lib/chartMath";
+import { formatLatencyAxisLabels } from "@/lib/metricFormatters";
 
 describe("logLatencyTicks", () => {
   it("uses whole decades when the range spans several", () => {
@@ -38,6 +39,30 @@ describe("logLatencyTicks", () => {
   it("never crowds the axis with more labels than it can show", () => {
     const scale = buildLogLatencyScale([1.2, 90])!;
     expect(logLatencyTicks(scale).length).toBeLessThanOrEqual(8);
+  });
+
+  it("densifies a narrow padded range instead of stopping short of the axis end", () => {
+    // Audit finding: queries spanning 10-15 ms, padded to an ~8-18 ms domain,
+    // used to label only "10 ms" and "15 ms" - the fixed mantissa grid
+    // (1, 1.5, 2, 3, 5, 7 x each decade) happens to land on those two values
+    // and nothing closer to the 18 ms axis end, leaving the top third of the
+    // axis unlabeled even though the plotted line extends well past 15 ms.
+    const scale = buildLogLatencyScale([10, 15], { lowerPad: 0.3, upperPad: 0.3 })!;
+    const ticks = logLatencyTicks(scale);
+    expect(ticks.length).toBeGreaterThanOrEqual(4);
+    const domainMax = 2 ** scale.logMax;
+    expect(Math.max(...ticks)).toBeGreaterThan(15);
+    expect(Math.max(...ticks)).toBeLessThanOrEqual(domainMax);
+  });
+
+  it("does not repeat the same rendered label across the linear-fallback ticks", () => {
+    for (const domain of [[10, 10.9], [0.55, 0.95], [11.1, 11.2], [1100, 1101]] as const) {
+      const scale = buildLogLatencyScale(domain, { lowerPad: 0, upperPad: 0 })!;
+      const ticks = logLatencyTicks(scale, 0);
+      const labels = formatLatencyAxisLabels(ticks);
+      expect(labels.length).toBeGreaterThanOrEqual(2);
+      expect(new Set(labels).size).toBe(labels.length);
+    }
   });
 });
 

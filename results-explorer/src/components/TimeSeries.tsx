@@ -15,7 +15,7 @@ import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
 import { useElementSize } from "@/lib/useElementSize";
 import { axisLabelAnchor, chartFrame } from "@/lib/chartFrame";
 import { timeSeriesColor } from "@/lib/chartTheme";
-import { formatLatencyMs, formatPowerScore } from "@/lib/metricFormatters";
+import { formatLatencyMs, formatPowerScore, formatLatencyAxisLabels } from "@/lib/metricFormatters";
 import { formatRunDateWithAge } from "@/lib/runAge";
 import {
   resultDetailHref,
@@ -190,6 +190,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
 
   const metricLabel = metric === "power_score" ? "Power score" : "Geomean latency";
   const yTicks = [yMin, (yMin + yMax) / 2, yMax];
+  const latencyLabels = formatLatencyAxisLabels(yTicks);
   const duplicateDayState =
     duplicateDayGroups.length > 0 ? (
       <DuplicateDayTrendState
@@ -216,12 +217,12 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
           aria-label={`${metricLabel} trend over time`}
         >
           {/* Y-axis grid + labels */}
-          {yTicks.map((val) => {
+          {yTicks.map((val, index) => {
             const y = yFor(val);
             const label =
               metric === "power_score"
                 ? formatPowerScore(val).valueText
-                : formatLatencyMs(val, { subMillisecond: "compact" }).valueText;
+                : latencyLabels[index];
             return (
               <g key={val}>
                 <line

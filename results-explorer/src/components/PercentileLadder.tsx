@@ -15,7 +15,7 @@ import { useElementSize } from "@/lib/useElementSize";
 import { axisLabelAnchor, barRowLayout, chartFrame, edgeSafeValueLabel } from "@/lib/chartFrame";
 import { paletteColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
-import { formatLatencyMs } from "@/lib/metricFormatters";
+import { formatLatencyMs, formatLatencyAxisLabels } from "@/lib/metricFormatters";
 import { preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
 // Neutral gray for opacity-only legend swatches (shows opacity levels, not platform identity).
@@ -48,7 +48,9 @@ const PERCENTILE_LABELS = ["P99", "P95", "P90", "P50"] as const;
 
 const ROW_H = 36;
 const LABEL_W = 140;
-const AXIS_H = 22;
+// +12px over the tick-label row for the axis title (see the x-axis title
+// below, matching the "Normalized cost (USD)" convention in CostScatter).
+const AXIS_H = 34;
 const PADDING_TOP = 28; // space for legend
 
 export function PercentileLadder({ rows }: Props) {
@@ -78,6 +80,7 @@ export function PercentileLadder({ rows }: Props) {
   const totalHeight = PADDING_TOP + rows.length * layout.rowHeight + AXIS_H;
 
   const axisTicks = logLatencyTicks(logScale, 0.1);
+  const tickLabels = formatLatencyAxisLabels(axisTicks);
   // A label on its own line has the full column to itself; one in the gutter
   // has 140 units. preserveUniqueAfterTruncation keeps the distinguishing
   // suffix inside whichever budget applies.
@@ -204,7 +207,7 @@ export function PercentileLadder({ rows }: Props) {
             stroke="var(--bb-chart-grid)"
             stroke-width={1}
           />
-          {axisTicks.map((ms) => {
+          {axisTicks.map((ms, index) => {
             const x = xForMs(ms);
             return (
               <g key={ms}>
@@ -216,11 +219,19 @@ export function PercentileLadder({ rows }: Props) {
                   class="text-[10px] fill-[var(--bb-data-fg-subtle)] font-mono"
                   style={{ fontSize: "10px" }}
                 >
-                  {formatLatencyMs(ms, { subMillisecond: "compact" }).valueText}
+                  {tickLabels[index]}
                 </text>
               </g>
             );
           })}
+          <text
+            x={layout.plotX + barAreaWidth / 2}
+            y={30}
+            text-anchor="middle"
+            style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}
+          >
+            Latency (ms, log scale)
+          </text>
         </g>
       </svg>
     </div>

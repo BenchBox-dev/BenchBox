@@ -1,9 +1,17 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/db", () => ({
-  queryRows: vi.fn(),
-}));
+vi.mock("@/db", async () => {
+  // Vitest throws for a named import a factory omits, so `queryRows` still
+  // needs a fake here - but re-export the real constant rather than a
+  // hardcoded copy, so a future change to DUCKDB_USER_QUERY_TIMEOUT_MS can't
+  // drift from what these tests assert against.
+  const actual = await vi.importActual<typeof import("@/db")>("@/db");
+  return {
+    ...actual,
+    queryRows: vi.fn(),
+  };
+});
 
 vi.mock("@/lib/duckdbQueries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/duckdbQueries")>("@/lib/duckdbQueries");
@@ -14,7 +22,7 @@ vi.mock("@/lib/duckdbQueries", async () => {
   };
 });
 
-import { queryRows } from "@/db";
+import { DUCKDB_USER_QUERY_TIMEOUT_MS, queryRows } from "@/db";
 import { clearDuckdbQueryCachesForTests, getDetailResult, resolveShortId } from "@/lib/duckdbQueries";
 import { DEFAULT_ROW_LIMIT, UNLIMITED_ROW_LIMIT } from "@/lib/queryFilters";
 import { Query } from "@/pages/Query";
@@ -568,6 +576,40 @@ describe("Query", () => {
     await waitFor(() => expect(within(resultsTable).getByText("65.25 s")).toBeTruthy());
   });
 
+  it("does not pin the results-table action column, so it can't paint over trailing cells", async () => {
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    const scrollContainer = screen.getByTestId("query-results-scroll-container");
+    const headerRow = scrollContainer.querySelector("thead tr")!;
+    const bodyRow = scrollContainer.querySelector("tbody tr")!;
+
+    // Every cell except the leading compare-select column is unpinned - in
+    // particular the trailing action column, which is what used to overlap
+    // a data cell. The leading column stays pinned deliberately (see the
+    // comment on it in Query.tsx); iterate every cell, not just the last
+    // one, so a stray re-pin anywhere in the row would fail this test.
+    const headerCells = Array.from(headerRow.children) as HTMLElement[];
+    const bodyCells = Array.from(bodyRow.children) as HTMLElement[];
+    headerCells.forEach((cell, index) => {
+      if (index === 0) {
+        expect(cell.className).toMatch(/\bsticky\b/);
+      } else {
+        expect(cell.className).not.toMatch(/\bsticky\b/);
+      }
+    });
+    bodyCells.forEach((cell, index) => {
+      if (index === 0) {
+        expect(cell.className).toMatch(/\bsticky\b/);
+      } else {
+        expect(cell.className).not.toMatch(/\bsticky\b/);
+      }
+    });
+
+    const actionCell = bodyCells[bodyCells.length - 1]!;
+    expect(within(actionCell).getByText("View →")).toBeTruthy();
+  });
+
   it("orders mobile query controls so results appear before deep filters", async () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
@@ -1009,5 +1051,11 @@ describe("Query", () => {
     fireEvent.click(screen.getByRole("button", { name: "Run SQL" }));
 
     await waitFor(() => expect(screen.getByText("read-only connection")).toBeTruthy());
+
+    // Workbench SQL is user-authored and can legitimately run long, so
+    // runSql must give it the generous user-query bound rather than the
+    // default meant for the app's own bounded reads (see Query.tsx runSql).
+    const sqlCall = vi.mocked(queryRows).mock.calls.find(([sql]) => String(sql).startsWith("CREATE TABLE"));
+    expect(sqlCall?.[2]).toBe(DUCKDB_USER_QUERY_TIMEOUT_MS);
   });
 });

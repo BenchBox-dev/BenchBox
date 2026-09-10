@@ -26,7 +26,10 @@ export interface QueryPassSummary {
   queryId: string;
   executions: QueryTiming[];
   warmValues: number[];
+  /** Median of passing warmup durations across every stream and iteration. */
   warmupMs: number | null;
+  /** Total recorded warmup time, distinct from the median used by the ratio. */
+  warmupTotalMs: number | null;
   warmMedian: number | null;
   warmMin: number | null;
   /** Max − min across warm passes; null when fewer than two are usable. */
@@ -57,18 +60,23 @@ export function summarizeQueryPasses(queries: QueryTiming[]): QueryPassSummary[]
     .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
     .map(([queryId, executions]) => {
       const warm = passing(executions).filter((r) => r.run_type === "measurement" || r.run_type === null);
-      const warmup = passing(executions).find((r) => r.run_type === "warmup");
+      const warmupValues = passing(executions)
+        .filter((r) => r.run_type === "warmup")
+        .map((r) => r.duration_ms)
+        .filter((ms) => Number.isFinite(ms) && ms > 0);
       const warmValues = warm.map((r) => r.duration_ms).filter((ms) => Number.isFinite(ms) && ms > 0);
       const warmMedian = median(warmValues);
       const warmMin = warmValues.length > 0 ? Math.min(...warmValues) : null;
       const spreadMs =
         warmValues.length > 1 ? Math.max(...warmValues) - Math.min(...warmValues) : null;
-      const warmupMs = warmup ? warmup.duration_ms : null;
+      const warmupMs = median(warmupValues);
+      const warmupTotalMs = warmupValues.length > 0 ? warmupValues.reduce((total, ms) => total + ms, 0) : null;
       return {
         queryId,
         executions,
         warmValues,
         warmupMs,
+        warmupTotalMs,
         warmMedian,
         warmMin,
         spreadMs,
@@ -94,7 +102,7 @@ export interface RunPassTotals {
   /** Queries that recorded a warmup, which may be fewer than `queryCount`. */
   warmupQueryCount: number;
   /**
-   * Total warmup over the total warm median FOR THE SAME QUERIES.
+   * Sum of warmup medians over the sum of warm medians for the same queries.
    *
    * Not an average of the per-query ratios, and never the full-run median
    * total as the denominator: comparing every query's warmup against every
@@ -122,7 +130,7 @@ export function summarizeRunPasses(summaries: readonly QueryPassSummary[]): RunP
   // it against, so it is excluded from the numerator as well as the denominator
   // rather than inflating the ratio against a smaller denominator.
   const comparable = withWarmup.filter((s) => s.warmMedian !== null);
-  const warmupMs = sum((s) => s.warmupMs);
+  const warmupMs = sum((s) => s.warmupTotalMs);
   const comparableWarmupMs = comparable.reduce((total, s) => total + (s.warmupMs ?? 0), 0);
   const comparableWarmMedianMs = comparable.reduce((total, s) => total + (s.warmMedian ?? 0), 0);
 
@@ -167,19 +175,12 @@ export function PassStrip({ queries, limit = 25 }: PassStripProps) {
         <h2 id="pass-view-title" class="text-base font-semibold text-[var(--bb-data-fg-primary)]">
           Passes within this run
         </h2>
-        {/*
-          Names the reduction actually performed. w0 measured the corpus-wide
-          warmup penalty at a p50 of 1.01x, with a third of warmups FASTER than
-          the warm median -- so a caption promising a penalty would leave a
-          reader thinking a column reading 1.00x was broken. The exclusion is
-          justified by the tail (p99 3.18x, max 61.5x), not by a typical cost.
-        */}
         <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
-          {`Warm median is the median of this run's passing measurement passes, per query — the same reduction the published figure uses. Warmup is shown for comparison and is excluded from it. Showing ${shown.length} of ${summaries.length} ${summaries.length === 1 ? "query" : "queries"}.`}
+          {`Warm median is the median of this run's passing measurement passes, per query — the same reduction the published figure uses. Warmup median includes all passing warmup streams and iterations and is excluded from the warm median. Showing ${shown.length} of ${summaries.length} ${summaries.length === 1 ? "query" : "queries"}.`}
         </p>
         {noWarmup ? (
           <p class="mt-1 text-xs text-[var(--bb-data-fg-subtle)]" data-testid="no-warmup-note">
-            This run recorded no warmup pass, so no warmup penalty is shown. It is absent, not zero.
+            This run has no usable passing warmup duration, so no warmup ratio is shown. It is absent, not zero.
           </p>
         ) : null}
       </div>
@@ -194,7 +195,7 @@ export function PassStrip({ queries, limit = 25 }: PassStripProps) {
               <th class="table-th">Warm median</th>
               <th class="table-th">Warm min</th>
               <th class="table-th">Spread</th>
-              <th class="table-th">Warmup</th>
+              <th class="table-th">Warmup median</th>
               <th class="table-th">Warmup vs warm</th>
             </tr>
           </thead>
@@ -231,9 +232,7 @@ export function PassStrip({ queries, limit = 25 }: PassStripProps) {
               <td
                 class="table-td font-mono"
                 title={
-                  totals.warmupQueryCount === totals.queryCount
-                    ? undefined
-                    : `Summed over the ${totals.warmupQueryCount} of ${totals.queryCount} queries that recorded a warmup pass.`
+                  `Total recorded warmup time across all passing warmup executions for ${totals.warmupQueryCount} of ${totals.queryCount} queries.`
                 }
               >
                 {totals.warmupMs !== null ? fmtMs(totals.warmupMs) : "—"}
@@ -250,7 +249,10 @@ export function PassStrip({ queries, limit = 25 }: PassStripProps) {
           Show more query summaries
         </button>
       )}
-      <p class="mt-2 text-xs text-[var(--bb-data-fg-subtle)]">{totalsScope}</p>
+      <p class="mt-2 text-xs text-[var(--bb-data-fg-subtle)]">
+        {totalsScope} Warmup overall is the total of all passing warmup executions.
+        The overall ratio compares summed warmup medians with summed warm medians for queries with both.
+      </p>
     </section>
   );
 }

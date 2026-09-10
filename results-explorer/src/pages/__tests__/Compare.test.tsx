@@ -58,7 +58,7 @@ describe("buildComparisonBoundary", () => {
         { label: "CPU model", status: "missing" },
       ]),
     ).toBe(
-      "Hardware boundary: architecture differs; CPU model is not recorded for every run. This compares recorded runs, not engines in isolation.",
+      "Hardware boundary: architecture differs; CPU model is not recorded for every run. This compares recorded runs, not platforms in isolation.",
     );
   });
 });
@@ -761,7 +761,7 @@ describe("Compare", () => {
     });
 
     const summary = screen.getByRole("heading", { name: "Comparison summary" });
-    const chartsHeading = screen.getByRole("heading", { name: "Headline metrics" });
+    const chartsHeading = screen.getByTestId("chart-panel-group-overview");
     const queryDiffHeading = screen.getByRole("heading", { name: "Query-level differences" });
 
     expect(summary.closest("section")).toHaveTextContent(
@@ -1222,7 +1222,7 @@ describe("Compare", () => {
     const summary = await screen.findByRole("heading", { name: "Comparison summary" });
     const summarySection = summary.closest("section");
     expect(summarySection).toHaveTextContent("Leading run on Power score");
-    expect(summarySection).toHaveTextContent("This compares recorded runs, not engines in isolation.");
+    expect(summarySection).toHaveTextContent("This compares recorded runs, not platforms in isolation.");
     expect(summarySection).toHaveTextContent("architecture");
     expect(summarySection).toHaveTextContent("CPU model");
     expect(screen.queryByText("Winner", { exact: true })).toBeNull();
@@ -1392,7 +1392,7 @@ describe("Compare", () => {
     });
 
     const receipt = screen.getByRole("region", { name: "Comparison checks" });
-    const chartsHeading = screen.getByRole("heading", { name: "Headline metrics" });
+    const chartsHeading = screen.getByTestId("chart-panel-group-overview");
     const queryDiffHeading = screen.getByRole("heading", { name: "Query-level differences" });
 
     expect(receipt).toHaveTextContent("Benchmark");

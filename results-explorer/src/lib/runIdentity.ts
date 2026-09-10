@@ -95,6 +95,19 @@ const NATURAL_QUALIFIERS: QualifierDescriptor[] = [
   { key: "trust_label", value: (s) => (s.trust_label ? s.trust_label : null) },
 ];
 
+// Chart axes and legends are tight on space, and a run's age reads as noise
+// once truncated (e.g. a calendar date cut mid-string conveys nothing). The
+// 8-char run id already disambiguates runs that share every other qualifier,
+// so chart labels skip the date qualifier and let the id fallback do that
+// job instead. Tables and tooltips keep the date — it stays useful there.
+const NATURAL_QUALIFIERS_CHART: QualifierDescriptor[] = NATURAL_QUALIFIERS.filter(
+  (qualifier) => qualifier.key !== "run_date",
+);
+
+function qualifiersForVariant(variant: RunIdentityVariant): QualifierDescriptor[] {
+  return variant === "chart" ? NATURAL_QUALIFIERS_CHART : NATURAL_QUALIFIERS;
+}
+
 function describeNaturalQualifiers(source: RunIdentitySource): string[] {
   const out: string[] = [];
   for (const qualifier of NATURAL_QUALIFIERS) {
@@ -125,9 +138,9 @@ function compactIdToken(source: RunIdentitySource): string {
 // a guaranteed-unique terminal fallback. BenchBox result_ids end in the
 // content hash segment, so the trailing token distinguishes typical
 // same-platform duplicate runs without appending their shared prefix.
-function describeCohortQualifierSlots(source: RunIdentitySource): QualifierSlot[] {
+function describeCohortQualifierSlots(source: RunIdentitySource, qualifiers: readonly QualifierDescriptor[]): QualifierSlot[] {
   const slots: QualifierSlot[] = [];
-  for (const qualifier of NATURAL_QUALIFIERS) {
+  for (const qualifier of qualifiers) {
     const value = qualifier.value(source);
     if (value !== null && value !== "") slots.push({ key: qualifier.key, value });
   }
@@ -251,8 +264,10 @@ export function formatRunIdentitiesForCohort(
     bucketsByLabel.get(label)!.push(i);
   });
 
-  // Per-source qualifier slots (natural + last-resort ids).
-  const slotsBySource = sources.map(describeCohortQualifierSlots);
+  // Per-source qualifier slots (natural + last-resort ids). Chart labels use
+  // a date-free natural-qualifier set (see NATURAL_QUALIFIERS_CHART above).
+  const qualifiers = qualifiersForVariant(variant);
+  const slotsBySource = sources.map((source) => describeCohortQualifierSlots(source, qualifiers));
   // Qualifiers selected for each source. Sources whose bucket has only one
   // entry stay empty.
   const usedQualifiers = sources.map((): string[] => []);
