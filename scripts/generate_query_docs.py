@@ -300,7 +300,7 @@ def _grouping(benchmark_id: str, query_ids: list[str]) -> dict[str, list[str]] |
     return buckets
 
 
-def _benchmark_files(benchmark_id: str, display: str, meta: dict) -> list[DocFile]:
+def _benchmark_files(benchmark_id: str, display: str) -> list[DocFile]:
     query_ids = list_query_ids(benchmark_id)
     files = [_query_page(benchmark_id, display, qid) for qid in query_ids]
 
@@ -409,7 +409,7 @@ def render_all(benchmarks: set[str] | None = None) -> dict[str, str]:
             continue
         display = meta.get("display_name", benchmark_id)
         rows.append((benchmark_id, display, len(query_ids)))
-        for doc in _benchmark_files(benchmark_id, display, meta):
+        for doc in _benchmark_files(benchmark_id, display):
             out[doc.rel_path] = doc.text
     top = _top_index(rows)
     out[top.rel_path] = top.text
