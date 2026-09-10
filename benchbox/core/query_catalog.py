@@ -83,17 +83,24 @@ class DataFrameRender:
 def _benchmark_instance(benchmark_id: str) -> Any | None:
     """Instantiate a benchmark at its default scale, or ``None`` if unavailable.
 
-    Cached: instantiation is cheap but the doc generator asks for the same
+    A fixed ``seed`` is passed so benchmarks with randomised query parameters
+    (nyctaxi, tsbs_devops) render deterministically -- the drift gate over the
+    generated docs depends on it. Cached: the doc generator asks for the same
     benchmark once per query.
     """
     cls = get_public_benchmark_class(benchmark_id)
     if cls is None:
         return None
-    try:
-        return cls(scale_factor=get_benchmark_default_scale(benchmark_id))
-    except Exception:  # pragma: no cover - benchmark needs optional deps
-        logger.debug("query_catalog: cannot instantiate benchmark %r", benchmark_id, exc_info=True)
-        return None
+    scale = get_benchmark_default_scale(benchmark_id)
+    for kwargs in ({"scale_factor": scale, "seed": 0}, {"scale_factor": scale}):
+        try:
+            return cls(**kwargs)
+        except TypeError:
+            continue
+        except Exception:  # pragma: no cover - benchmark needs optional deps
+            logger.debug("query_catalog: cannot instantiate benchmark %r", benchmark_id, exc_info=True)
+            return None
+    return None
 
 
 def _all_queries(bm: Any, *, dialect: str | None = None) -> dict[str, str]:
@@ -166,6 +173,19 @@ def list_query_ids(benchmark_id: str) -> list[str]:
     if bm is None:
         return []
     return list(_all_queries(bm).keys())
+
+
+def supports_dialect_translation(benchmark_id: str) -> bool:
+    """True when the benchmark can render its queries in a requested SQL dialect."""
+    bm = _benchmark_instance(benchmark_id)
+    if bm is None:
+        return False
+    if _get_query_accepts_dialect(bm):
+        return True
+    try:
+        return bool(bm.get_queries(dialect=REFERENCE_DIALECT))
+    except Exception:
+        return False
 
 
 def _lookup(queries: dict[str, str], query_id: str) -> str | None:

@@ -506,6 +506,11 @@ jobs:
         continue-on-error: true
         run: make compat-docs-check
 
+      - name: Query docs drift check
+        id: guard-query-docs
+        continue-on-error: true
+        run: make query-docs-check
+
       - name: Platform manifest drift check
         id: guard-platform-manifest
         continue-on-error: true

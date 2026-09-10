@@ -289,6 +289,7 @@ benchbox-primitives
 ai-ml-benchmarks
 benchbox-experimental
 support-status
+queries/index
 ```
 
 #### **Development and CI/CD**

@@ -54,8 +54,16 @@ prompt-quickstarts-write:
 prompt-quickstarts-check:
 	@uv run -- python scripts/generate_landing_quickstarts.py --check
 
+# Regenerate the per-query documentation tree under docs/benchmarks/queries/.
+query-docs:
+	uv run -- python scripts/generate_query_docs.py
+
+# Fail if the committed per-query docs are stale vs benchbox.core.query_catalog.
+query-docs-check:
+	uv run -- python scripts/generate_query_docs.py --check
+
 # Run all documentation checks (build, linkcheck, validate)
-docs-check: docs-validate docs-linkcheck docs-build
+docs-check: docs-validate query-docs-check docs-linkcheck docs-build
 	@echo ""
 	@echo "✅ All documentation checks passed!"
 
