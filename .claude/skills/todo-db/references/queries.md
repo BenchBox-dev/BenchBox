@@ -1,38 +1,29 @@
 # Queries and item management
 
-Inspect, filter, and manage tracker items using MCP tools without direct
-database queries.
+Inspect, filter, and read tracker items with bounded output. Filtering,
+sorting, readiness, and unlock counts run inside the program — never scan
+history yourself.
 
-## Query tools
+## Query patterns
 
 | Goal | Tool call | Notes |
 |---|---|---|
-| View ready items | `ready(fields=[...], limit=20, cursor=0)` | Returns unblocked items with satisfied dependencies. |
-| List items | `list_items(fields=[...], limit=20, cursor=0)` | Supports field projection and paging; filter client-side. |
-| Inspect one item | `show_item(id=..., fields=[...])` | Retrieves full item details or selected fields. |
-| Check dependencies | `deps(id=...)` | Returns upstream prerequisite items (`needs`). |
-| View open deferrals | `deferrals()` | Lists open work parked for later triage. |
-| Full backup snapshot | `export()` | Exports all items and verification ladders (large payload). |
-| Check held claims | `claims()` | Shows all active claims held by your principal. |
-| System statistics | `stats()` | Item counts by priority, state, and findings. |
+| Ready work | `list_items(ready_only=true)` | `open`, unclaimed, dependencies all `done`. |
+| List or search | `list_items(status=..., priority=..., text=...)` | Brief rows; default 5 per page. |
+| Inspect one task | `show_item(id=...)` | Needs, unmet needs, unlock count, sections. |
+| Next page | `list_items(cursor=<next_cursor>)` | Cursors bind to a state revision. |
 
 ## Managing output limits
 
-Responses are capped at 16 KiB. To avoid `E_OUTPUT_TRUNCATED`:
-- Request only necessary fields:
-  `list_items(fields=["id", "title", "priority", "state"])`
-- Use pagination:
-  Pass `limit=20` and increment `cursor` across pages.
-- Note that `export()` produces an uncapped payload intended for full snapshots;
-  use `list_items` or `ready` during normal sessions.
+Responses are capped at 16 KiB at their final serialization.
 
-## Administrative mutations (profile: full)
-
-When running with `--profile full`, agents can manage item lifecycle flags:
-
-- **Block an item**:
-  `block(id="ITEM-1", reason="Waiting for API access")`
-- **Unblock an item**:
-  `unblock(id="ITEM-1")`
-- **Drop an item**:
-  `drop(id="ITEM-1", reason="Superseded by architectural refactor")`
+- Page with `limit` + `cursor`. Every page with items remaining carries
+  `next_cursor`; an empty page means you are done.
+- `E_CURSOR_STALE` means the branch moved under you. Restart without a
+  cursor; never skip ahead.
+- Large fields arrive as section reads:
+  `show_item(id=..., field="description", offset=0, budget=6000)`.
+  Follow `continuation` until it disappears; each step is guaranteed to
+  make progress.
+- There is no full-dump tool. If the eight tools omit data you need,
+  report the gap instead of probing for an export.

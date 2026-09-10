@@ -19,9 +19,9 @@ creating tracker items.
    data safety.
 5. **Shape candidate tracker fields**:
    Identify the primary components to prepare for `create_item`:
-   - Work units: natural divisions of verifiable implementation.
-   - Candidate scope: directories and files that should be modified.
-   - Invariants: existing behaviors and tests that must be preserved.
+   - Candidate IDs and titles (kebab-case, imperative).
+   - Dependencies between the candidate items.
+   - Acceptance criteria for each item.
 6. **Define boundaries**:
    - **In scope**: The minimal set of changes that solves the core problem.
    - **Out of scope**: Explicit non-goals and deferred enhancements.
@@ -29,5 +29,4 @@ creating tracker items.
 
 ## Next step
 
-Once the user agrees with the problem framing and scope boundaries, proceed to
-`references/spec.md` to format the work for the tracker.
+`create_item` one task per independent piece of work, linked with `needs`.

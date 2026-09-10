@@ -3,7 +3,7 @@
 # carries no hashes and attests nothing about the current contents.
 
 source = https://github.com/joeharris76/skill-sync-skills.git
-rev = d22ea7fab6b7b9608e54a3910ab4dfa9bb407d42
+rev = 872689923e9f707a44e0aff0c71ac7a7e98d28be
 dir = skills
 skill = benchbox
 skill = blog
@@ -18,7 +18,7 @@ skill = test
 skill = tidy-perms
 
 source = https://github.com/joeharris76/todo-db.git
-rev = b8dda65c53f4a8fa443ec09a7419576ea8362e90
+rev = 5151458a1535426272007ae32911d8fbb54988e6
 dir = skills
 skill = todo-db
 

@@ -11,24 +11,20 @@ Include these sections in order:
    - Batch name and list of all TODO IDs.
    - State whether the next phase is implementation (`batch`) or close-out (`closeout`).
 2. **Tracker preflight**:
-   - Instructions to call `get_instructions` and `doctor` before writing.
-   - State the target database location and project identity.
+   - Instructions to call `get_instructions` before writing.
+   - State remote URL and state branch.
 3. **Current verified state**:
    - Live branch names, commit SHAs, and open PR numbers.
    - Location of the local ledger file (for example, `.todo-batch/<slug>.txt`).
-   - Active claims or claim tokens held by the session.
+   - Active claims (holder + generation) held by this session.
 4. **Execution order**:
    - Ordered list of remaining items and reasons for dependencies.
 5. **Scope boundaries**:
-   - Paths allowed to be modified.
-   - Known preserves and anti-patterns.
+   - What the work may touch; known constraints.
 6. **Known blockers and recovery**:
    - Unresolved issues, waiting CI gates, or flaky tests with remediation steps.
-7. **Verification checklist**:
-   - Exact test commands required before completion.
-   - Human verification status (`todo-db verify-run`).
-8. **Next concrete step**:
-   - The exact MCP tool call or command the incoming agent should execute first.
+7. **Next concrete step**:
+   - The single tool call the next session should run first.
 
 ## Writing rules
 

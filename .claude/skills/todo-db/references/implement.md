@@ -6,64 +6,27 @@ Drive a claimed tracker item from start to completion using MCP tools.
 
 ### 1. Claim the work
 
-1. Call `next` to inspect the ready queue or resume an active claim.
-2. Call `take(id=...)` to claim the item. Store the returned `claim_token`.
-3. Call `context(id=...)` to retrieve the full work breakdown, scope rules,
-   preserves, and verifications.
+1. Call `list_items(ready_only=true)` to find claimable work.
+2. Call `take(id=...)` to claim the item. Store the returned
+   `generation`. The response already carries the context to begin:
+   title, priority, needs, unmet needs, and a description excerpt.
+3. Call `show_item(id=...)` only if you need sections beyond the excerpt.
 
-### 2. Execute work units
+### 2. Do the work
 
-Work through the units defined in `context`:
+Edit code, test locally, keep the change focused on the task. There are
+no work units to tick off and no scope gate to satisfy — the task
+description and your judgment define the work.
 
-1. Call `start_unit(id=..., wid=...)` if you want the unit marked in progress
-   before making edits (optional).
-2. Edit code only within the paths listed under `only_modify`.
-3. Test changes locally to generate verifiable evidence.
-4. Record progress on the unit:
-   ```json
-   {
-     "id": "ITEM-1",
-     "wid": "w1",
-     "evidence": "uv run pytest tests/test_feature.py (all passed)",
-     "claim_token": "<token>"
-   }
-   ```
-   Calling `progress` updates the unit and refreshes your claim lease.
+If the claim may outlast its lease (default 24h), call
+`renew(id=..., generation=...)`. Same generation, no milestones needed.
 
-### 3. Handle side work and deferrals
+### 3. Finish or hand back
 
-If you find necessary changes outside the item's scope:
-- Do not edit outside approved scope.
-- Call `defer(id=..., summary=..., reason=...)` to record the discovered work.
-- Continue with the claimed item's approved scope.
+1. Call `finish(id=..., generation=...)` to close the item.
+2. If you must abandon work, call `release(id=..., generation=...)` so
+   the task returns to the ready queue.
 
-### 4. Check scope before closing
-
-Call `check_scope(id=...)`. When `files` is omitted, it automatically checks all
-modified files against the item's git baseline.
-- If an unapproved file was touched, revert the change or move it to a deferral.
-- If the scope was legitimately too narrow, call `update_item` with `add_scope`
-  and provide an audited reason:
-  ```json
-  {
-    "id": "ITEM-1",
-    "add_scope": [["only_modify", "src/new_path.py"]],
-    "reason": "Include helper module required for implementation"
-  }
-  ```
-
-### 5. Verification gate and finish
-
-1. Call `lint(id=...)` to confirm planning consistency.
-2. Call `finish(id=..., claim_token=...)`.
-3. If `finish` returns `E_VERIFY_GATE`:
-   - Agents cannot run verification commands directly.
-   - Copy the exact `todo-db verify-run` command from the `recovery` envelope.
-   - Ask the human to execute it:
-     ```sh
-     todo-db verify-run <id> --claim-token <token> --actor <principal>
-     ```
-   - Once the human runs the command and attests the workspace, call `finish`
-     again to complete the item.
-4. If you must abandon work, call `release(id=..., claim_token=...)` to return
-   the claim to the ready queue.
+If you find necessary work outside the task, `create_item` a follow-up
+with `needs` pointing at the current item rather than widening scope
+silently.
