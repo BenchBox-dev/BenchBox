@@ -203,7 +203,7 @@ def _query_page(benchmark_id: str, display: str, query_id: str) -> DocFile:
     if description:
         lines += [description, ""]
 
-    render = get_sql_render(benchmark_id, query_id)
+    render = get_sql_render(benchmark_id, query_id, bulk=True)
     lines += ["## Representative SQL", ""]
     if render is None:
         lines += ["_This query could not be rendered as standalone SQL._", ""]

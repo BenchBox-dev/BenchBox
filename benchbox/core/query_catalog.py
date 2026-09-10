@@ -212,12 +212,60 @@ def native_query_key(benchmark_id: str, query_id: str) -> Any:
     return query_id
 
 
-def supports_dialect_translation(benchmark_id: str) -> bool:
+def _collect_translation_targets(bm: Any) -> list[Any]:
+    objs: list[Any] = []
+    if bm is not None:
+        objs.append(bm)
+        impl = getattr(bm, "_impl", None)
+        if impl is not None:
+            objs.append(impl)
+            qm = getattr(impl, "query_manager", None)
+            if qm is not None:
+                objs.append(qm)
+        qm = getattr(bm, "query_manager", None)
+        if qm is not None and qm not in objs:
+            objs.append(qm)
+    return objs
+
+
+def _benchmark_supports_dialect(bm: Any, dialect: str | None) -> bool:
+    """True when *bm* can actually translate or provide variants for *dialect*."""
+    if bm is None or dialect is None:
+        return False
+    dialect_lower = dialect.lower().strip()
+    objs = _collect_translation_targets(bm)
+    # If the benchmark or its query manager declares an explicit list of supported dialects,
+    # obey it directly.
+    for obj in objs:
+        if hasattr(obj, "supported_dialects"):
+            try:
+                supported = [str(d).lower().strip() for d in obj.supported_dialects()]
+                return dialect_lower in supported
+            except Exception:
+                pass
+    # Otherwise check for translation capability (translate_query_text or catalog variants).
+    # Benchmarks without this capability (e.g. TSBS DevOps, NYC Taxi, DataVault) silently ignore
+    # dialect in get_queries / get_query and return native SQL.
+    for obj in objs:
+        if hasattr(obj, "translate_query_text") or hasattr(obj, "has_dialect_variant"):
+            return True
+    return False
+
+
+def supports_dialect_translation(benchmark_id: str, dialect: str | None = None) -> bool:
     """True when the benchmark can render its queries in a requested SQL dialect."""
     bm = _benchmark_instance(benchmark_id)
-    if bm is not None and _get_query_accepts_dialect(bm):
-        return True
-    return bool(_query_dict(benchmark_id, REFERENCE_DIALECT))
+    if bm is None:
+        return False
+    if dialect is not None:
+        return _benchmark_supports_dialect(bm, dialect)
+    objs = _collect_translation_targets(bm)
+    for obj in objs:
+        if hasattr(obj, "supported_dialects") and bool(obj.supported_dialects()):
+            return True
+        if hasattr(obj, "translate_query_text") or hasattr(obj, "has_dialect_variant"):
+            return True
+    return False
 
 
 def _lookup(queries: dict[str, str], query_id: str) -> str | None:
@@ -236,18 +284,26 @@ def get_sql_render(
     query_id: str,
     *,
     dialect: str | None = REFERENCE_DIALECT,
+    bulk: bool = False,
 ) -> SqlRender | None:
     """Return a representative SQL rendering of ``query_id``.
 
-    With ``dialect`` set, looks it up in the cached ``get_queries(dialect=...)``
-    set; falls back to the untranslated set, then a per-query ``get_query``,
-    both reporting ``dialect="default"``. With ``dialect=None`` no translation
-    is attempted.
+    With ``dialect`` set, checks if the benchmark actually supports translation
+    for that dialect. Benchmarks with per-query dialect support render on the
+    single-query path unless ``bulk=True`` is passed, avoiding whole-suite
+    generation latency for interactive callers. If the dialect is unsupported
+    or untranslated, falls back to reporting ``dialect="default"``. With
+    ``dialect=None`` no translation is attempted.
     """
-    if _benchmark_instance(benchmark_id) is None:
+    bm = _benchmark_instance(benchmark_id)
+    if bm is None:
         return None
 
-    if dialect is not None:
+    if dialect is not None and _benchmark_supports_dialect(bm, dialect):
+        if not bulk and _get_query_accepts_dialect(bm):
+            sql = _get_query_single(benchmark_id, query_id, dialect)
+            if sql:
+                return _make_sql_render(sql, dialect)
         sql = _lookup(_query_dict(benchmark_id, dialect), query_id)
         if sql:
             return _make_sql_render(sql, dialect)
@@ -443,13 +499,37 @@ def query_groups(benchmark_id: str) -> dict[str, list[str]] | None:
 
 def query_source_path(benchmark_id: str, query_id: str) -> str | None:
     """Repo-relative path of the file a query's text comes from, or ``None``."""
-    candidates: list[str] = []
     if benchmark_id in {"tpch", "tpch_skew"} and query_id.isdigit():
-        candidates.append(f"benchbox/_binaries/tpc-h/templates/queries/{query_id}.sql")
+        path = f"benchbox/_binaries/tpc-h/templates/queries/{query_id}.sql"
+        if (_REPO_ROOT / path).exists():
+            return path
     if benchmark_id == "tpcds" and query_id.isdigit():
-        candidates.append(f"_sources/tpc-ds/query_templates/query{query_id}.tpl")
-    candidates.append(f"benchbox/core/{benchmark_id}/queries.py")
-    candidates.append(f"benchbox/core/{benchmark_id}/operations.py")
+        path = f"_sources/tpc-ds/query_templates/query{query_id}.tpl"
+        if (_REPO_ROOT / path).exists():
+            return path
+    if benchmark_id == "tpchavoc":
+        base_id = query_id.split("_")[0]
+        if base_id.isdigit():
+            path = f"benchbox/core/tpchavoc/variant_sets/q{int(base_id):02d}.py"
+            if (_REPO_ROOT / path).exists():
+                return path
+    if benchmark_id == "tpcdi":
+        qid = query_id.upper()
+        if qid.startswith("AQ"):
+            path = "benchbox/core/tpcdi/query_analytics.py"
+        elif qid.startswith("EQ"):
+            path = "benchbox/core/tpcdi/query_etl.py"
+        elif qid.startswith("VQ"):
+            path = "benchbox/core/tpcdi/query_validation.py"
+        else:
+            path = "benchbox/core/tpcdi/queries.py"
+        if (_REPO_ROOT / path).exists():
+            return path
+
+    candidates: list[str] = [
+        f"benchbox/core/{benchmark_id}/queries.py",
+        f"benchbox/core/{benchmark_id}/operations.py",
+    ]
     for rel in candidates:
         if (_REPO_ROOT / rel).exists():
             return rel

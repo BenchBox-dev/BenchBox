@@ -92,6 +92,16 @@ class TestGetSqlRender:
         assert with_prefix.sql == without_prefix.sql
         assert without_prefix.dialect == "snowflake"
 
+    def test_vector_search_unsupported_dialect_falls_back_to_default(self):
+        render = get_sql_render("vector_search", "Q1", dialect="datafusion")
+        assert render is not None
+        assert render.dialect == "default"
+
+    def test_vector_search_supported_dialect_returns_dialect(self):
+        render = get_sql_render("vector_search", "Q1", dialect="postgresql")
+        assert render is not None
+        assert render.dialect == "postgresql"
+
     @pytest.mark.parametrize("benchmark_id", _ALL_BENCHMARK_IDS)
     def test_first_query_of_every_benchmark_renders(self, benchmark_id):
         first = list_query_ids(benchmark_id)[0]
@@ -203,6 +213,12 @@ class TestSupportsDialectTranslation:
         assert supports_dialect_translation("tpch") is True
         assert supports_dialect_translation("clickbench") is True
         assert supports_dialect_translation("datavault") is False
+        assert supports_dialect_translation("tsbs_devops") is False
+
+    def test_dialect_specific_support(self):
+        assert supports_dialect_translation("vector_search", "postgresql") is True
+        assert supports_dialect_translation("vector_search", "datafusion") is False
+        assert supports_dialect_translation("tpch", "duckdb") is True
 
 
 class TestQuerySourcePath:
@@ -214,6 +230,14 @@ class TestQuerySourcePath:
 
     def test_generic_benchmark_points_at_queries_module(self):
         assert query_source_path("clickbench", "Q1") == "benchbox/core/clickbench/queries.py"
+
+    def test_tpcdi_query_submodule_resolution(self):
+        assert query_source_path("tpcdi", "AQ1") == "benchbox/core/tpcdi/query_analytics.py"
+        assert query_source_path("tpcdi", "EQ1") == "benchbox/core/tpcdi/query_etl.py"
+        assert query_source_path("tpcdi", "VQ1") == "benchbox/core/tpcdi/query_validation.py"
+
+    def test_tpchavoc_variant_set_resolution(self):
+        assert query_source_path("tpchavoc", "1_v1") == "benchbox/core/tpchavoc/variant_sets/q01.py"
 
     @pytest.mark.parametrize("benchmark_id", _ALL_BENCHMARK_IDS)
     def test_path_when_present_exists_on_disk(self, benchmark_id):
