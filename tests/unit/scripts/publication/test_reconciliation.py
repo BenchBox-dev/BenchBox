@@ -765,3 +765,36 @@ def test_operational_cli(tmp_path: Path) -> None:
 
     (d / receipts_mod.TAKEDOWN_DRILL_FILE).write_text("{bad", encoding="utf-8")
     assert receipts_mod.main(["--receipts-dir", str(d), "--json"]) == 2
+
+
+def test_validate_live_receipt_contract_with_none_max_age_preserves_syntax_and_skew(
+    attestor_keypair: Path,
+) -> None:
+    """Disabling receipt expiry via max_age_hours=None still rejects invalid timestamps and future skew."""
+    from datetime import datetime, timezone
+
+    now = datetime(2026, 9, 10, 12, 0, 0, tzinfo=timezone.utc)
+    _, _, _, valid_receipt = _distinct_states()
+    _sign_receipt(valid_receipt, attestor_keypair)
+
+    # 1. Very old receipt passes when max_age_hours=None
+    old_receipt = dict(valid_receipt)
+    old_receipt["timestamp"] = "2025-01-01T00:00:00Z"
+    findings = recon_mod.validate_live_receipt_contract(old_receipt, now=now, max_age_hours=None)
+    assert not any(f.drift_type == "STALE_RECEIPT" for f in findings)
+
+    # 2. Unparseable timestamp fails even when max_age_hours=None
+    bad_ts_receipt = dict(valid_receipt)
+    bad_ts_receipt["timestamp"] = "not-a-date"
+    findings = recon_mod.validate_live_receipt_contract(bad_ts_receipt, now=now, max_age_hours=None)
+    stale_findings = [f for f in findings if f.drift_type == "STALE_RECEIPT"]
+    assert len(stale_findings) == 1
+    assert "unparseable" in stale_findings[0].description
+
+    # 3. Future-skew timestamp fails even when max_age_hours=None
+    future_receipt = dict(valid_receipt)
+    future_receipt["timestamp"] = "2026-09-11T12:00:00Z"
+    findings = recon_mod.validate_live_receipt_contract(future_receipt, now=now, max_age_hours=None)
+    stale_findings = [f for f in findings if f.drift_type == "STALE_RECEIPT"]
+    assert len(stale_findings) == 1
+    assert "in the future" in stale_findings[0].description

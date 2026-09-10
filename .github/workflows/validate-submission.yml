@@ -261,12 +261,25 @@ jobs:
                   | STEM="$stem" SUFFIX="$suffix" awk -v RS='\0' \
                     'length($0) == length(ENVIRON["STEM"]) + length(ENVIRON["SUFFIX"]) && \
                      substr($0, 1, length(ENVIRON["STEM"])) == ENVIRON["STEM"] && \
-                     tolower(substr($0, length(ENVIRON["STEM"]) + 1)) == tolower(ENVIRON["SUFFIX"]) { print; exit }')
+                     tolower(substr($0, length(ENVIRON["STEM"]) + 1)) == tolower(ENVIRON["SUFFIX"]) { if (!found) { print; found=1 } }')
                 if [ -n "$companion" ]; then
                   echo "::error file=${companion}::Deleting ${deleted_bundle} also requires deleting its same-stem companion"
                   exit 1
                 fi
               done
+
+              deleted_dir="${deleted_bundle%/*}"
+              deleted_name="${deleted_bundle##*/}"
+              legacy_manifest=$(git ls-tree -rz --name-only "$EFFECTIVE_MERGE" -- "$deleted_dir" \
+                | awk -v RS='\0' -v dir="$deleted_dir" \
+                  'tolower($0) == tolower(dir "/submission-manifest.json") { if (!found) { print; found=1 } }')
+              if [ -n "$legacy_manifest" ]; then
+                referenced_bundle=$(git cat-file -p "$EFFECTIVE_MERGE:${legacy_manifest}" | python3 -c "import json, sys; data = json.load(sys.stdin); print(data.get('bundle_file', '') if isinstance(data, dict) else '')" 2>/dev/null || true)
+                if [ "$referenced_bundle" = "$deleted_name" ]; then
+                  echo "::error file=${legacy_manifest}::Deleting ${deleted_bundle} also requires deleting its referencing legacy manifest"
+                  exit 1
+                fi
+              fi
           done < <(git diff --no-renames --name-only -z --diff-filter=D \
             "$BASE_SHA...$EFFECTIVE_MERGE" -- \
             ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
@@ -284,7 +297,7 @@ jobs:
             while IFS= read -r manifest; do
               stem="${manifest:0:${#manifest}-14}"
               bundle=$(git ls-tree -r --name-only "$EFFECTIVE_MERGE" -- results-data/bundles \
-                | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { print; exit }')
+                | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { if (!found) { print; found=1 } }')
               if [ -n "$bundle" ] && git cat-file -e "$EFFECTIVE_MERGE:${bundle}" 2>/dev/null \
                   && ! printf '%s\n' "$CHANGED" | grep -qxF "$bundle"; then
                 CHANGED="${CHANGED:+${CHANGED}$'\n'}${bundle}"
@@ -301,7 +314,7 @@ jobs:
             while IFS= read -r applied; do
               stem="${applied:0:${#applied}-13}"
               bundle=$(git ls-tree -r --name-only "$EFFECTIVE_MERGE" -- results-data/bundles \
-                | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { print; exit }')
+                | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { if (!found) { print; found=1 } }')
               if [ -n "$bundle" ] && git cat-file -e "$EFFECTIVE_MERGE:${bundle}" 2>/dev/null \
                   && ! printf '%s\n' "$CHANGED" | grep -qxF "$bundle"; then
                 CHANGED="${CHANGED:+${CHANGED}$'\n'}${bundle}"
@@ -313,6 +326,7 @@ jobs:
             "$BASE_SHA...$EFFECTIVE_MERGE" -- \
             ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
             | grep -iE '\.(plans|tuning)\.json$' \
+            | grep -ivE '(corpus-inventory|submission-manifest)\.json$' \
             || true)
           if [ -n "$CHANGED_COMPANIONS" ]; then
             while IFS= read -r companion; do
@@ -324,7 +338,7 @@ jobs:
               esac
               stem="${companion:0:$(( ${#companion} - strip ))}"
               bundle=$(git ls-tree -r --name-only "$EFFECTIVE_MERGE" -- results-data/bundles \
-                | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { print; exit }')
+                | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { if (!found) { print; found=1 } }')
               if [ -z "$bundle" ] && git cat-file -e "$EFFECTIVE_MERGE:${companion}" 2>/dev/null; then
                 echo "::error file=${companion}::Live companion has no primary bundle at ${stem}.json"
                 exit 1

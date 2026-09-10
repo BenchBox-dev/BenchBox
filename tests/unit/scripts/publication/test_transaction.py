@@ -393,3 +393,28 @@ def test_invalid_state_transition_raises_error(base_context: dict[str, dict[str,
 
     with pytest.raises(tx_mod.TransactionError, match="Invalid transition"):
         tx_mod.transition(tx, tx_mod.EVENT_COMMIT_DURABLE)
+
+
+def test_transition_start_write_with_explicit_pages_build_version(base_context: dict[str, dict[str, str]]) -> None:
+    tx, _ = tx_mod.prepare_promotion(
+        target=base_context["target"],
+        generation=2,
+        parent_transaction_id="parent-uuid-001",
+        approval=base_context["approval"],
+        controller=base_context["controller"],
+        owner=base_context["owner"],
+        content=base_context["content"],
+        artifact=base_context["artifact"],
+    )
+    intent_oid = "1" * 40
+    wire_sha = "2" * 40
+    tx, effect = tx_mod.transition(
+        tx,
+        tx_mod.EVENT_START_WRITE,
+        {"intent_commit_oid": intent_oid, "pages_build_version": wire_sha},
+    )
+    assert tx.state == tx_mod.STATE_WRITE_STARTED
+    assert effect.action == "create_deployment"
+    assert effect.data["pages_build_version"] == wire_sha
+    assert tx.write["intent_commit_oid"] == intent_oid
+    assert tx.write["pages_build_version"] == wire_sha
