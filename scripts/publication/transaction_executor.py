@@ -437,8 +437,11 @@ def cmd_start_write(args: argparse.Namespace) -> int:
     if tx.state not in (STATE_PREPARED, STATE_ROLLBACK_WRITE_STARTED):
         raise TransactionError(f"Cannot start write from state {tx.state}")
 
-    # Create a unique write-intent commit on the repository
-    # Intent commit OID is the pages_build_version passed to Pages API
+    # Create a unique write-intent commit on the repository. The intent OID
+    # stays a journal-internal correlator: the provider resolves
+    # pages_build_version as a commit, so the workflow sends the run's
+    # pushed source SHA on the wire instead (an unpushed intent OID makes
+    # the provider reject the create request).
     msg = f"write-intent: transaction {tx.transaction_id} gen {tx.generation}"
     tree_oid = subprocess.run(
         ["git", "rev-parse", f"{journal_state.tip_commit_oid}^{{tree}}"],
@@ -498,7 +501,9 @@ def cmd_start_write(args: argparse.Namespace) -> int:
     if args.output_tx:
         _write_json(args.output_tx, updated_tx.to_dict())
 
-    print(f"Started write for {tx.transaction_id}: pages_build_version={intent_commit_oid}")
+    print(
+        f"Started write for {tx.transaction_id}: intent={intent_commit_oid} (wire build version is the run source SHA)"
+    )
     return 0
 
 

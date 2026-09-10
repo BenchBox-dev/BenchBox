@@ -358,7 +358,12 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 artifact_id: deployedArtifactId,
-                pages_build_version: '${{ steps.start_write.outputs.pages_build_version }}',
+                // The provider resolves pages_build_version as a commit, so
+                // this must be a pushed commit (the run's source), never the
+                // journal's dangling write-intent OID: an unresolvable
+                // version makes the provider reject the create request.
+                // Intent correlation stays in the journal's write record.
+                pages_build_version: '${{ github.sha }}',
               }
             });
             const deploymentId = result.id || 'pages-deploy-${{ github.run_id }}';
