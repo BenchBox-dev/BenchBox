@@ -927,12 +927,23 @@ class TestPopulateDataframeQueryDetails:
 
         assert "error" in response
 
-    def test_unsupported_benchmark_returns_error(self):
-        """Test that unsupported benchmark for DataFrame returns error."""
+    def test_benchmark_with_dataframe_registry_returns_source(self):
+        """Any benchmark with a DataFrame registry resolves, not just tpch/tpcds."""
         from benchbox.mcp.tools.benchmark import _populate_dataframe_query_details
 
         response: dict = {}
         _populate_dataframe_query_details(response, "clickbench", "1", "polars-df")
+
+        assert "error" not in response
+        assert response["source_code"]
+        assert response["has_expression_impl"] is True
+
+    def test_benchmark_without_dataframe_registry_returns_error(self):
+        """A benchmark with no DataFrame implementations still reports the gap."""
+        from benchbox.mcp.tools.benchmark import _populate_dataframe_query_details
+
+        response: dict = {}
+        _populate_dataframe_query_details(response, "tpcdi", "1", "polars-df")
         assert "error" in response
 
 
