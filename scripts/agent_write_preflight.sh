@@ -120,19 +120,24 @@ hook_path="$common_abs/hooks/pre-commit"
 hooks_usable=no
 hook_reason="no pre-commit hook is installed"
 if [ -e "$hook_path" ]; then
-  # A hook pre-commit did not generate has no INSTALL_PYTHON line; leave it be.
-  hook_interpreter=$(sed -n 's/^INSTALL_PYTHON=//p' "$hook_path" | head -n 1)
-  if [ -z "$hook_interpreter" ] || [ -x "$hook_interpreter" ]; then
-    hooks_usable=yes
-  else
-    hook_reason="its recorded interpreter is gone ($hook_interpreter)"
-  fi
+  hooks_usable=yes
+  for hook_name in pre-commit pre-push commit-msg; do
+    h_path="$common_abs/hooks/$hook_name"
+    if [ -e "$h_path" ]; then
+      hook_interpreter=$(sed -n 's/^INSTALL_PYTHON=//p' "$h_path" | head -n 1)
+      if [ -n "$hook_interpreter" ] && [ ! -x "$hook_interpreter" ]; then
+        hooks_usable=no
+        hook_reason="$hook_name recorded interpreter is gone ($hook_interpreter)"
+        break
+      fi
+    fi
+  done
 fi
 
 if [ "$hooks_usable" != yes ]; then
   # Hook types come from default_install_hook_types in .pre-commit-config.yaml,
   # so all configured stages stay in sync.
-  if (cd "$primary_abs" && uv run -- pre-commit install >/dev/null 2>&1); then
+  if (cd "$primary_abs" && uv run --frozen --no-sync -- pre-commit install >/dev/null 2>&1); then
     printf 'Repaired commit-time hooks from %s (%s).\n' "$primary_abs" "$hook_reason"
   else
     echo "note: pre-commit install failed/unavailable; commit-time guards will not run here (CI still enforces them)" >&2

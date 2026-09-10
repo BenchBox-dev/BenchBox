@@ -74,7 +74,7 @@ that aggregates the jobs in its `needs` contract: `ci-paths`,
 (added 2026-07-11, #1139 — the medium tier now gates code PRs pre-merge via
 the same umbrella, no ruleset change needed), `explorer-tokens`,
 `site-theme-tokens`, `explorer-vitest`, `audit-sha`, `package-smoke`,
-`dependency-audit`, and `parity-check`. This list intentionally mirrors the
+`dependency-audit`, `parity-check`, and `publication-reconciliation`. This list intentionally mirrors the
 `needs` list in `.github/workflows/pr.yml`; path-filtered jobs report as
 skipped where their classifier says they are not applicable.
 
