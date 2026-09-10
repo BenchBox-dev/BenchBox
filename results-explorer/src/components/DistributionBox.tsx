@@ -19,12 +19,14 @@ import { axisLabelAnchor, barRowLayout, chartFrame } from "@/lib/chartFrame";
 import { paletteColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, computeBoxStats, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
 import { formatTimingExclusion, isTimingDisplayable, platformTimingValue } from "@/lib/displayEligibility";
-import { formatLatencyMs } from "@/lib/metricFormatters";
+import { formatLatencyAxisLabels } from "@/lib/metricFormatters";
 import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
 const LABEL_W = 200;
 const ROW_H = 48;
-const AXIS_H = 24;
+// +12px over the tick-label row for the axis title (see the x-axis title
+// below, matching the "Normalized cost (USD)" convention in CostScatter).
+const AXIS_H = 36;
 const PADDING_TOP = 12;
 const PADDING_RIGHT = 12;
 
@@ -81,6 +83,7 @@ export function DistributionBox({ summary }: Props) {
   }
 
   const xTicks = logLatencyTicks(logScale);
+  const tickLabels = formatLatencyAxisLabels(xTicks);
 
   return (
     <div ref={containerRef} class="w-full">
@@ -167,7 +170,7 @@ export function DistributionBox({ summary }: Props) {
         {/* X-axis */}
         <g transform={`translate(0, ${PADDING_TOP + rows.length * layout.rowHeight})`}>
           <line x1={layout.plotX} y1={0} x2={layout.plotX + plotW} y2={0} stroke="var(--bb-chart-grid)" stroke-width={1} />
-          {xTicks.map((ms) => {
+          {xTicks.map((ms, index) => {
             const x = xFor(ms);
             return (
               <g key={ms}>
@@ -178,11 +181,19 @@ export function DistributionBox({ summary }: Props) {
                   text-anchor={axisLabelAnchor(x, w)}
                   style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}
                 >
-                  {formatLatencyMs(ms, { subMillisecond: "compact" }).valueText}
+                  {tickLabels[index]}
                 </text>
               </g>
             );
           })}
+          <text
+            x={layout.plotX + plotW / 2}
+            y={30}
+            text-anchor="middle"
+            style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}
+          >
+            Latency (ms, log scale)
+          </text>
         </g>
       </svg>
       <p class="mt-1 text-[10px] text-[var(--bb-data-fg-subtle)]">

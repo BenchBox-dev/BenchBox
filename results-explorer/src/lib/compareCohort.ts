@@ -170,7 +170,7 @@ export function lockCrossRunBasis(
       "A comparison across runs reads every run through one measurement basis. " +
       `This selection carries ${distinct.length}: ` +
       `${distinct.map(formatBasisLabel).join(", ")}. ` +
-      "Comparing one run's basis against another's measures the basis, not the engine.",
+      "Comparing one run's basis against another's measures the basis, not the platform.",
   };
 }
 

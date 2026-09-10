@@ -86,17 +86,60 @@ function renderOverview(summary: BenchmarkSummary = makeSummary()) {
 }
 
 describe("SummaryChartOverview section chrome", () => {
+  it("labels the expanded Percentiles view with cohort-aware identities, not bare platform names", () => {
+    // Audit finding: the expanded Percentiles view under "More views" used
+    // to pass the raw platform name as displayLabel, so two same-platform
+    // rows collapsed to identical "DuckDB" strings, and preserveUniqueAfterTruncation's
+    // last-resort repair then rendered them as "DuckDB 2", "DuckDB 3" - a
+    // third, inconsistent labelling scheme next to the other expanded charts.
+    const summary = makeSummary({
+      platforms: [
+        makePlatform({
+          result_id: "r1",
+          platform: "DuckDB",
+          platform_version: "1.4.3",
+          percentile_stats: { p50: 10, p90: 20, p95: 25, p99: 30 },
+        }),
+        makePlatform({
+          result_id: "r2",
+          platform: "DuckDB",
+          platform_version: "1.5.0",
+          percentile_stats: { p50: 12, p90: 22, p95: 27, p99: 32 },
+        }),
+      ],
+    });
+    renderOverview(summary);
+
+    const preview = screen.getByTestId("summary-chart-preview-percentile_ladder") as HTMLDetailsElement;
+    preview.open = true;
+    fireEvent(preview, new Event("toggle"));
+
+    const full = screen.getByTestId("summary-chart-full-percentile_ladder");
+    expect(full.textContent).toContain("v1.4.3");
+    expect(full.textContent).toContain("v1.5.0");
+    // The old bug's bare index-suffixed labels must not appear.
+    expect(full.textContent).not.toMatch(/DuckDB\s*2\b/);
+  });
+
   it("leads with the first chart rather than a restatement of the page", () => {
     const { container } = renderOverview();
     // The section used to open with a question heading, a "shared scope"
     // callout, and a copy-link button, none of which said anything the charts
-    // below do not say for themselves.
+    // below do not say for themselves. A later round replaced the callout
+    // with a "Which platforms lead..." heading/description pair that
+    // restated the table's own column headers ("Display geomean", "lower is
+    // better") - that pair is gone too, and the table (with its own
+    // aria-label and caption) leads instead.
     expect(screen.queryByText("What does this cohort show?")).toBeNull();
     expect(screen.queryByText(/Shared scope:/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Copy chart-section link/ })).toBeNull();
-    expect(screen.getByText("Which platforms lead on speed and throughput?")).not.toBeNull();
+    expect(screen.queryByText("Which platforms lead on speed and throughput?")).toBeNull();
+    expect(
+      screen.queryByText(/Geomean query time and power score in one comparison/),
+    ).toBeNull();
     const root = container.querySelector("[data-testid='summary-chart-overview']");
     expect(root?.getAttribute("id")).toBe("cohort-charts");
+    expect(screen.getByRole("table", { name: "Speed and throughput by platform" })).not.toBeNull();
   });
 
   it("names the platform column consistently and puts each value beside its bar", () => {

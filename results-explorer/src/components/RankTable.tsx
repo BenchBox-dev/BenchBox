@@ -101,6 +101,7 @@ export function RankTable({ summary, preserveOrder = false }: Props) {
         >
         <thead>
           <tr>
+            {/* Keep row labels visible while timing columns scroll. */}
             <th class="text-left px-2 py-1.5 border-b border-[var(--bb-data-border)] text-[var(--bb-data-fg-muted)] font-normal sticky left-0 bg-[var(--bb-surface-data)] min-w-[4rem]">
               Query
             </th>

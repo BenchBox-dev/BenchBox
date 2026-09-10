@@ -14,13 +14,15 @@ import { axisLabelAnchor, chartFrame } from "@/lib/chartFrame";
 import { timeSeriesColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, computeECDFPoints, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
 import { formatTimingExclusion, isTimingDisplayable, platformTimingValue } from "@/lib/displayEligibility";
-import { formatLatencyMs } from "@/lib/metricFormatters";
+import { formatLatencyAxisLabels } from "@/lib/metricFormatters";
 import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
 const Y_TICKS_PCT = [0, 25, 50, 75, 100];
 
 const LABEL_W = 36;
-const AXIS_H = 28;
+// +12px over the tick-label row for the axis title (see the x-axis title
+// below, matching the "Normalized cost (USD)" convention in CostScatter).
+const AXIS_H = 40;
 const PADDING_TOP = 8;
 const PADDING_RIGHT = 12;
 const PLOT_H = 180;
@@ -70,6 +72,7 @@ export function CDFChart({ summary }: Props) {
   }
 
   const xTicks = logLatencyTicks(logScale);
+  const tickLabels = formatLatencyAxisLabels(xTicks);
 
   return (
     <div ref={containerRef} class="w-full">
@@ -115,7 +118,7 @@ export function CDFChart({ summary }: Props) {
         {/* X-axis */}
         <g transform={`translate(0, ${PADDING_TOP + PLOT_H})`}>
           <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" stroke-width={1} />
-          {xTicks.map((ms) => {
+          {xTicks.map((ms, index) => {
             const x = xFor(ms);
             return (
               <g key={ms}>
@@ -126,11 +129,19 @@ export function CDFChart({ summary }: Props) {
                   text-anchor={axisLabelAnchor(x, w)}
                   style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}
                 >
-                  {formatLatencyMs(ms, { subMillisecond: "compact" }).valueText}
+                  {tickLabels[index]}
                 </text>
               </g>
             );
           })}
+          <text
+            x={LABEL_W + plotW / 2}
+            y={30}
+            text-anchor="middle"
+            style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}
+          >
+            Latency (ms, log scale)
+          </text>
         </g>
       </svg>
 

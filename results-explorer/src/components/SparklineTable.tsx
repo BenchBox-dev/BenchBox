@@ -94,7 +94,10 @@ export function SparklineTable({ summary }: Props) {
       >
         <thead>
           <tr class="border-b border-[var(--bb-data-border)]">
-            <th class="text-left px-2 py-1.5 text-[var(--bb-data-fg-muted)] font-normal min-w-[10rem]">Platform</th>
+            {/* Keep labels compact on wide screens and wrap long cohort
+                identities on phones. The table scrolls horizontally when
+                its minimum readable width exceeds the available space. */}
+            <th class="text-left px-2 py-1.5 text-[var(--bb-data-fg-muted)] font-normal w-px whitespace-normal sm:whitespace-nowrap">Platform</th>
             <th class="text-right px-2 py-1.5 text-[var(--bb-data-fg-muted)] font-normal whitespace-nowrap" colSpan={2}>
               Geomean
             </th>
@@ -122,7 +125,7 @@ export function SparklineTable({ summary }: Props) {
             const p99Value = isTimingDisplayable(p) ? p.percentile_stats?.p99 ?? null : null;
             return (
               <tr key={p.result_id} class="border-b border-[var(--bb-data-border)] hover:bg-[var(--bb-surface-data-muted)]">
-                <td class="px-2 py-1.5 font-medium text-[var(--bb-data-fg-primary)]">
+                <td class="w-px whitespace-normal sm:whitespace-nowrap px-2 py-1.5 font-medium text-[var(--bb-data-fg-primary)]">
                   <span
                     class="inline-block w-2 h-2 rounded-full mr-1.5 align-middle"
                     style={{ backgroundColor: color }}
@@ -130,7 +133,7 @@ export function SparklineTable({ summary }: Props) {
                   {cohortLabels[i] ?? p.platform}
                 </td>
                 {/* Geomean spark + value */}
-                <td class="w-1/3 px-1 py-1.5">
+                <td class="w-2/5 px-1 py-1.5">
                   <SparkBar value={geomeanValue} max={maxGeomean} color={color} />
                 </td>
                 <td class="w-px whitespace-nowrap px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-primary)]">
@@ -139,7 +142,7 @@ export function SparklineTable({ summary }: Props) {
                 {/* Power score spark + value */}
                 {showPower && (
                   <>
-                    <td class="w-1/3 px-1 py-1.5">
+                    <td class="w-2/5 px-1 py-1.5">
                       <SparkBar
                         value={powerValue}
                         max={maxPower}

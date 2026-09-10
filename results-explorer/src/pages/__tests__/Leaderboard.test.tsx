@@ -177,6 +177,20 @@ describe("Leaderboard", () => {
 
 
 
+  it("carries the provenance legend at the bottom of the data surface, since Leaderboard is /results/compare's empty-selection state", async () => {
+    // Home no longer renders this legend (it moved here); Compare's loaded-
+    // comparison branch still renders its own copy. Leaderboard is the
+    // component Compare falls back to when nothing is selected, so
+    // /results/compare needs the legend in both states.
+    render(<Leaderboard />);
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
+
+    const dataSurface = screen.getByTestId("home-data-surface");
+    const legend = within(dataSurface).getByTestId("provenance-legend");
+    expect(legend).toBeTruthy();
+    expect(dataSurface.lastElementChild).toBe(legend);
+  });
+
   it("keeps tuning metadata visible while hiding a non-discriminating tuning filter", async () => {
     const unlabelledRows = RESULT_ROWS.map((row) => ({ ...row, tuning_mode: null }));
     vi.mocked(queryRows).mockImplementation(async (sql: string) => {

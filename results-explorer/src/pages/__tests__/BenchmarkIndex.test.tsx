@@ -10,7 +10,7 @@
  */
 
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/preact";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { BenchmarkSummary } from "@/types";
 import { expectNoAxeViolations } from "@/testing/axe-helper";
 
@@ -59,6 +59,11 @@ vi.mock("@/components/QueryHeatmap", async () => {
 import { queryRows } from "@/db";
 import { clearDuckdbQueryCachesForTests } from "@/lib/duckdbQueries";
 import { BenchmarkIndex } from "@/pages/BenchmarkIndex";
+
+const originalScrollIntoView = Element.prototype.scrollIntoView;
+afterEach(() => {
+  Element.prototype.scrollIntoView = originalScrollIntoView;
+});
 
 // ---------------------------------------------------------------------------
 // Fixtures - raw DuckDB row shapes
@@ -389,6 +394,21 @@ function getRenderedResultOrder(container: ParentNode): string[] {
   ).filter((id) => !id.startsWith("excluded-run-"));
 }
 
+// Matrix, Ranks, and List all render at once now (the long-page migration),
+// and the Matrix heatmap and the List table both key their rows by the same
+// result-id testids - so row-order assertions need to scope to the one
+// section under test rather than the whole page.
+function matrixRoot(container: ParentNode): ParentNode {
+  const root = container.querySelector("#evidence-matrix");
+  if (!root) throw new Error("expected #evidence-matrix to be rendered");
+  return root;
+}
+function listRoot(container: ParentNode): ParentNode {
+  const root = container.querySelector("#benchmark-section-list");
+  if (!root) throw new Error("expected #benchmark-section-list to be rendered");
+  return root;
+}
+
 // ---------------------------------------------------------------------------
 // (a) Matrix view is the default
 // ---------------------------------------------------------------------------
@@ -437,11 +457,11 @@ describe("BenchmarkIndex", () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());
 
-    expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
+    expect(getRenderedResultOrder(matrixRoot(container))).toEqual(["r1", "r2"]);
     fireEvent.click(screen.getByRole("button", { name: /^Q1/ }));
-    expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
+    expect(getRenderedResultOrder(matrixRoot(container))).toEqual(["r1", "r2"]);
     fireEvent.click(screen.getByRole("button", { name: /^Q1/ }));
-    expect(getRenderedResultOrder(container)).toEqual(["r2", "r1"]);
+    expect(getRenderedResultOrder(matrixRoot(container))).toEqual(["r2", "r1"]);
   });
 
   it("shows platform names from the summary", async () => {
@@ -474,12 +494,10 @@ describe("BenchmarkIndex", () => {
     // The "Result links" sections repeated one link per row that the rows
     // already carried.
     expect(screen.queryByTestId("matrix-result-links")).toBeNull();
+    expect(screen.queryByTestId("ranks-result-links")).toBeNull();
     expect(
       screen.getAllByRole("link", { name: /Open receipt for DuckDB/ })[0],
     ).toHaveAttribute("href", "/results/r/r1#run-receipt");
-
-    fireEvent.click(screen.getByText("Ranks"));
-    await waitFor(() => expect(screen.queryByTestId("ranks-result-links")).toBeNull());
   });
 
   it("shows persistent compare guidance before any rows are selected", async () => {
@@ -521,7 +539,24 @@ describe("BenchmarkIndex", () => {
 
     fireEvent.change(switcher, { target: { value: "clickbench" } });
     expect(routeMock).toHaveBeenCalledTimes(1);
-    expect(routeMock).toHaveBeenCalledWith("/results/clickbench/?view=ranks");
+    expect(routeMock).toHaveBeenCalledWith("/results/clickbench/#benchmark-section-ranks");
+  });
+
+  it("preserves the clicked section over a stale legacy view when switching benchmarks", async () => {
+    const { route } = await import("preact-router");
+    window.history.replaceState(null, "", "/results/tpch/?view=ranks#benchmark-section-list");
+    vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS, ["tpch", "ssb"]));
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await screen.findByRole("option", { name: "SSB" });
+    fireEvent.change(screen.getByTestId("benchmark-switcher"), { target: { value: "ssb" } });
+    expect(route).toHaveBeenCalledWith("/results/ssb/#benchmark-section-list");
+  });
+
+  it.each(["ssb", "star_schema"])("includes raw alias rows in the List section on /%s/", async (benchmark) => {
+    const rows = RESULT_ROWS.map((row) => ({ ...row, benchmark: "star_schema" }));
+    vi.mocked(queryRows).mockImplementation(defaultImpl(rows, [], [], ["ssb"]));
+    render(<BenchmarkIndex benchmark={benchmark} />);
+    expect(await screen.findByTestId("list-r1")).toBeTruthy();
   });
 
   it("hides no-result benchmarks from the switcher once the public corpus list resolves", async () => {
@@ -750,7 +785,7 @@ describe("BenchmarkIndex", () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());
 
-    expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
+    expect(getRenderedResultOrder(matrixRoot(container))).toEqual(["r1", "r2"]);
 
     const excluded = screen.getByTestId("excluded-runs");
     expect(excluded.textContent).toContain("Excluded runs (1)");
@@ -778,7 +813,10 @@ describe("BenchmarkIndex", () => {
     render(<BenchmarkIndex benchmark="tpch" />);
 
     await waitFor(() => expect(screen.getByTestId("rank-gate-notice")).toBeTruthy());
-    expect(screen.getByRole("radio", { name: "Rank Evidence" })).toBeTruthy();
+    // "Rank Evidence" is the section heading's label swap, not a selected
+    // toggle state - Ranks renders alongside Matrix and List, not instead of
+    // them.
+    expect(screen.getByRole("heading", { name: "Rank Evidence" })).toBeTruthy();
     expect(screen.getByTestId("rank-gate-notice").textContent).toContain("Ranks are unavailable");
     expect(screen.getByTestId("rank-gate-notice").textContent).toContain("No results meet the requirements for ranking");
     expect(new URL(window.location.href).searchParams.get("view")).toBe("ranks");
@@ -797,9 +835,11 @@ describe("BenchmarkIndex", () => {
     vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, rows, CELL_ROWS));
 
     render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0));
-
-    const sqliteCheckboxes = screen.getAllByLabelText(/Select SQLite/) as HTMLInputElement[];
+    // The compare checkbox is Matrix-only (List has no selection UI), and
+    // List's rows - which need no async summary query - can render before
+    // Matrix's do, so wait on the checkbox itself rather than on "SQLite"
+    // text that now appears in both sections at different times.
+    const sqliteCheckboxes = (await screen.findAllByLabelText(/Select SQLite/)) as HTMLInputElement[];
     expect(sqliteCheckboxes.length).toBeGreaterThan(0);
     for (const sqliteCheckbox of sqliteCheckboxes) {
       expect(sqliteCheckbox.disabled).toBe(true);
@@ -842,7 +882,11 @@ describe("BenchmarkIndex", () => {
     );
 
     render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => screen.getAllByText("DuckDB"));
+    // List's rows render as soon as the (unfiltered by cohort ranking) result
+    // rows resolve, ahead of the Matrix grid's async summary query - wait for
+    // the grid itself rather than "DuckDB" text, which now also appears in
+    // List before Matrix is ready.
+    await waitFor(() => expect(screen.getByRole("grid")).toBeTruthy());
 
     expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     expect(within(screen.getByRole("grid")).queryByText("SQLite")).toBeNull();
@@ -869,40 +913,68 @@ describe("BenchmarkIndex", () => {
   // (c) List view toggle
   // -----------------------------------------------------------------------
 
-  it("list-view toggle hides query columns and shows geomean column", async () => {
+  it("list section renders a Geomean column alongside the Matrix's query columns", async () => {
+    // Matrix, Ranks, and List are sections of one long page now, not
+    // mutually exclusive states - the List section's own Geomean column
+    // header renders at the same time as Matrix's per-query Q1/Q2 columns,
+    // not "instead of" them.
     render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => screen.getAllByText("DuckDB"));
-
-    // Switch to list view
-    const listBtn = screen.getByText("List");
-    fireEvent.click(listBtn);
-
-    // List view shows a table with Geomean column but no query columns
     await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
-    expect(new URL(window.location.href).searchParams.get("view")).toBe("list");
-    expect(screen.queryByRole("button", { name: /^Q1/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Q2/ })).toBeNull();
+    // Matrix's columns come from an async summary query and can resolve
+    // after List's (sync) rows do.
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());
+
+    expect(screen.getByRole("button", { name: /^Q2/ })).toBeTruthy();
     expect(screen.getAllByLabelText(/^Run date .* days ago\)\./).length).toBeGreaterThan(0);
   });
 
-  it("restores benchmark view mode from the URL", async () => {
+  it("scrolls to the List section for a `?view=list` deep link, without hiding Matrix or Ranks", async () => {
     window.history.replaceState(null, "", "/results/tpch/?view=list");
+    // jsdom does not implement scrollIntoView; stub it so the page's
+    // mount-time deep-link scroll has something to call.
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
 
-    render(<BenchmarkIndex benchmark="tpch" />);
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
 
     await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
-    expect(screen.queryByRole("button", { name: /^Q1/ })).toBeNull();
+    // The section is scrolled to, not switched to: Matrix's Q1/Q2 columns
+    // are still rendered (they resolve from an async query, after List's).
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ block: "start" })));
+    const listSection = container.querySelector("#benchmark-section-list");
+    expect(scrollIntoView.mock.instances[0]).toBe(listSection);
+  });
+
+  it("waits for the matrix before honoring a section hash and prefers it to legacy view", async () => {
+    window.history.replaceState(null, "", "/results/tpch/?view=ranks#benchmark-section-list");
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    let finishRanking!: (rows: unknown[]) => void;
+    const ranking = new Promise<unknown[]>((resolve) => { finishRanking = resolve; });
+    const fallback = defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS);
+    vi.mocked(queryRows).mockImplementation((sql, params) =>
+      sql.includes("FROM bench.benchmark_rankings") ? ranking : fallback(sql, params),
+    );
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await screen.findByTestId("list-r1");
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    finishRanking([...RANKING_ROWS]);
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+    expect(scrollIntoView.mock.instances[0]).toBe(container.querySelector("#benchmark-section-list"));
+
+    window.history.pushState(null, "", "/results/tpch/#benchmark-section-ranks");
+    fireEvent(window, new Event("hashchange"));
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(2));
+    expect(scrollIntoView.mock.instances[1]).toBe(container.querySelector("#benchmark-section-ranks"));
   });
 
   it("list view sorts rows from table headers", async () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => screen.getAllByText("DuckDB"));
-    fireEvent.click(screen.getByText("List"));
-
     await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
-    expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
+    expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r1", "list-r2"]);
     fireEvent.click(screen.getByRole("button", { name: /Geomean/ }));
-    expect(getRenderedResultOrder(container)).toEqual(["r2", "r1"]);
+    expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r2", "list-r1"]);
   });
 
   it("list view caps rendered rows and expands them with Show more", async () => {
@@ -914,18 +986,35 @@ describe("BenchmarkIndex", () => {
       display_geomean_ms: index + 1,
       geomean_ms: index + 1,
     }));
-    vi.mocked(queryRows).mockImplementation(defaultImpl(manyRows, RANKING_ROWS, CELL_ROWS));
+    // Hold the Matrix/Ranks summary back while List paginates: ListTable's
+    // visible-limit reset effect depends only on benchmark, scale factor,
+    // facets, and sort, so a late summary resolution must not collapse the
+    // expanded List. Resolving the deferred ranking afterwards proves that
+    // directly, instead of waiting on the Matrix's unrelated async section
+    // before exercising List (which flaked on slower hosted runners).
+    let finishRanking!: (rows: unknown[]) => void;
+    const ranking = new Promise<unknown[]>((resolve) => { finishRanking = resolve; });
+    const fallback = defaultImpl(manyRows, RANKING_ROWS, CELL_ROWS);
+    vi.mocked(queryRows).mockImplementation((sql, params) =>
+      sql.includes("FROM bench.benchmark_rankings") ? ranking : fallback(sql, params),
+    );
 
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => screen.getAllByText("DuckDB"));
-    fireEvent.click(screen.getByText("List"));
-
+    // List's own readiness signal - independent of the Matrix summary.
     await waitFor(() => expect(screen.getByText("Showing 200 of 205 results for SF 0.1")).toBeTruthy());
-    expect(getRenderedResultOrder(container)).toHaveLength(200);
+    expect(getRenderedResultOrder(listRoot(container))).toHaveLength(200);
 
     fireEvent.click(screen.getByRole("button", { name: "Show more results" }));
 
-    expect(getRenderedResultOrder(container)).toHaveLength(205);
+    await waitFor(() => expect(getRenderedResultOrder(listRoot(container))).toHaveLength(205));
+    expect(screen.getByText("Showing 205 of 205 results for SF 0.1")).toBeTruthy();
+
+    // A late summary resolution re-renders the page but must leave the
+    // expanded List alone. The trailing Q1 assertion proves the summary
+    // actually resolved, so the stability check above it is non-vacuous.
+    finishRanking([...RANKING_ROWS]);
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());
+    expect(getRenderedResultOrder(listRoot(container))).toHaveLength(205);
     expect(screen.getByText("Showing 205 of 205 results for SF 0.1")).toBeTruthy();
   });
 
@@ -938,9 +1027,6 @@ describe("BenchmarkIndex", () => {
     vi.mocked(queryRows).mockImplementation(defaultImpl(listRows, RANKING_ROWS, CELL_ROWS));
 
     render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => screen.getAllByText("DuckDB"));
-    fireEvent.click(screen.getByText("List"));
-
     await waitFor(() => expect(screen.getByTestId("benchmark-list-group-by")).toBeTruthy());
     fireEvent.change(screen.getByTestId("benchmark-list-group-by"), { target: { value: "engine_version" } });
     expect(screen.getByText(/1.4.0 \(2 results\)/)).toBeTruthy();
@@ -957,7 +1043,7 @@ describe("BenchmarkIndex", () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => screen.getAllByText("DuckDB"));
 
-    expect(getRenderedResultOrder(container)).toEqual(["r1"]);
+    expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r1"]);
     expect(vi.mocked(queryRows).mock.calls.some(([sql]) => String(sql).includes("platform_version IN (?)"))).toBe(true);
   });
 
@@ -979,9 +1065,8 @@ describe("BenchmarkIndex", () => {
 
   it("keeps active matrix controls on the data surface theme contract", async () => {
     render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => screen.getAllByText("DuckDB"));
 
-    const reducedColor = screen.getByRole("button", { name: "Reduced color" });
+    const reducedColor = await screen.findByRole("button", { name: "Reduced color" });
     fireEvent.click(reducedColor);
 
     expect(reducedColor.className).toContain("--bb-tone-info-bg");
@@ -990,12 +1075,13 @@ describe("BenchmarkIndex", () => {
 
   it("deselecting community chip hides community rows without extra fetch", async () => {
     render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => screen.getAllByText("SQLite"));
+    // The trust chips come from the same async summary query as Matrix's
+    // grid, which can resolve after List's (sync) "SQLite" text does.
+    const communityBtn = await screen.findByRole("button", { name: /community/i });
 
     const callsBefore = vi.mocked(queryRows).mock.calls.length;
 
     // Click the community chip to deselect it
-    const communityBtn = screen.getByRole("button", { name: /community/i });
     fireEvent.click(communityBtn);
 
     // SQLite (community-submission) should now be gone
@@ -1031,8 +1117,11 @@ describe("BenchmarkIndex", () => {
   it("empty cohort shows empty-state message", async () => {
     vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, [], []));
     render(<BenchmarkIndex benchmark="tpch" />);
+    // Matrix and Ranks each render their own empty state now that both are
+    // always on the page - two instances of the same message, one per
+    // section, not one shared message for whichever view was active.
     await waitFor(() =>
-      expect(screen.getByText(/No benchmark data available/)).toBeTruthy(),
+      expect(screen.getAllByText(/No benchmark data available/).length).toBe(2),
     );
   });
 

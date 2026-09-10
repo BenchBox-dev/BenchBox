@@ -1102,21 +1102,19 @@ describe("ChartPanel", () => {
     expect(screen.getByTestId("chart-panel-long")).toBeTruthy();
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryAllByRole("tab")).toHaveLength(0);
-    // The panel no longer restates the page: each chart carries its own
-    // question, so a panel-level and a group-level paraphrase of it are gone.
     expect(screen.queryByRole("heading", { name: "What does this comparison show?" })).toBeNull();
-    expect(screen.getByRole("heading", { name: "Headline metrics" })).toBeTruthy();
-    expect(screen.getByTestId("chart-panel-chart-comparison_bar")).toHaveTextContent(
+    expect(screen.queryByText("Headline metrics")).toBeNull();
+    expect(screen.getByTestId("chart-panel-chart-comparison_bar")).not.toHaveTextContent(
       "How does each query compare with the baseline?",
     );
-    expect(screen.getByTestId("chart-panel-chart-query_heatmap")).toHaveTextContent(
+    expect(screen.getByTestId("chart-panel-chart-query_heatmap")).not.toHaveTextContent(
       "Which queries drive the difference?",
     );
     expect(screen.queryByText("Top-line metric summaries and phase composition")).toBeNull();
     expect(
       screen.queryByText("Paired side-by-side bars comparing two runs per query with % change annotations"),
     ).toBeNull();
-    // Question-group sections carry their chrome without any clicks.
+    expect(container.querySelector("h3.sr-only")).toBeNull();
     expect(screen.getByTestId("chart-panel-group-overview")).toBeTruthy();
     expect(screen.getByTestId("chart-panel-group-per_query")).toBeTruthy();
     // Charts from several groups are on the page at once.
@@ -1126,6 +1124,31 @@ describe("ChartPanel", () => {
     // Comparison content that used to hide behind the Overview/Per-query tabs
     // renders immediately.
     expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
+  });
+
+  it("renders summary_box and sparkline_table with no caption, since their own labels already say what they show", () => {
+    render(
+      <ChartPanel
+        summaryLayout="long"
+        context={{
+          kind: "compare",
+          results: [makeDetail(), makeDetail({ result_id: "detail-2" })],
+        }}
+      />,
+    );
+
+    // Neither chart gets a title/description above it: summary_box's stat
+    // tiles are labeled Platforms/Queries/Best.../Phase, and sparkline_table's
+    // columns are labeled Platform/Geomean/Power@Size/etc - a caption above
+    // either only restated those labels (the user's "weird title-bullet
+    // slugs" complaint).
+    const summaryBox = screen.getByTestId("chart-panel-chart-summary_box");
+    expect(summaryBox.querySelector("h4")).toBeNull();
+    expect(summaryBox.querySelector("p")).toBeNull();
+
+    const sparklineTable = screen.getByTestId("chart-panel-chart-sparkline_table");
+    expect(sparklineTable.querySelector("h4")).toBeNull();
+    expect(sparklineTable.querySelector("p")).toBeNull();
   });
 
   it("honors excludeChartIds in the long layout", () => {

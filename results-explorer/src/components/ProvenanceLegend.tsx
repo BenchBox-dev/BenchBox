@@ -17,7 +17,9 @@ import { TrustBadge, trustLabelDescription } from "@/components/TrustBadge";
 // explains - there is one source for each string.
 //
 // Rendered on every page that shows a TrustBadge or FundingChip - ResultDetail,
-// BenchmarkIndex, PlatformIndex, Compare, and Home (meta leaderboard) - per the
+// BenchmarkIndex, PlatformIndex, Compare (loaded comparison), and Leaderboard
+// (the compare landing / meta leaderboard view, so /results/compare carries
+// the legend whether or not runs are selected) - per the
 // hosted-results-contract rule that a legend explaining the labels is reachable
 // from every surface that displays them. It is collapsed by default so it costs
 // a line of chrome, not a screenful.

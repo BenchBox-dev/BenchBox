@@ -16,7 +16,6 @@ import { SkeletonBlock } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { PageHeader } from "@/components/PageHeader";
 import { TableScrollHint } from "@/components/TableScrollHint";
-import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { RunDateChip } from "@/components/RunAge";
 import { formatCount } from "@/lib/copyFormatters";
 import { normalizedCostLabel, normalizedCostValue } from "@/lib/costDisplay";
@@ -39,9 +38,13 @@ export function Home(_: RoutableProps) {
   const [results, setResults] = useState<ResultRow[] | null>(null);
   const [metaLeaderboard, setMetaLeaderboard] = useState<MetaLeaderboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by the ErrorMessage retry button so a reader can re-issue this
+  // read after a DuckDB worker fault without reloading the page.
+  const [resultsRetryToken, setResultsRetryToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setError(null);
     // The overview reports the whole corpus, so it reads it unfiltered rather
     // than through the facet state the ranking table maintains.
     listResults()
@@ -54,7 +57,7 @@ export function Home(_: RoutableProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [resultsRetryToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,9 +73,9 @@ export function Home(_: RoutableProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [resultsRetryToken]);
 
-  if (error) return <ErrorMessage title="Could not load results" message={error} />;
+  if (error) return <ErrorMessage title="Could not load results" message={error} onRetry={() => setResultsRetryToken((t) => t + 1)} />;
   if (!results) return <OverviewSkeleton />;
 
   const benchmarks = [...new Set(results.map((result) => canonicalBenchmarkSlug(result.benchmark)))].sort();
@@ -86,6 +89,7 @@ export function Home(_: RoutableProps) {
   const recent = [...results]
     .sort((a, b) => b.run_date.localeCompare(a.run_date))
     .slice(0, RECENT_RESULT_COUNT);
+  const showRecentPower = recent.some((result) => result.power_score != null);
   const showRecentCost = recent.some((result) => normalizedCostValue(result) !== null);
   const leaderboardCohortCount = metaLeaderboard?.cohorts.length ?? 0;
   const rankedPlatformCount =
@@ -126,9 +130,9 @@ export function Home(_: RoutableProps) {
           detail="published platform IDs"
         />
         <StatCard
-          value={leaderboardCohortCount}
+          value={metaLeaderboard === null ? "—" : leaderboardCohortCount}
           label={{ singular: "ranking", plural: "rankings" }}
-          detail={`${formatCount(rankedPlatformCount, "ranked platform")}`}
+          detail={metaLeaderboard === null ? "Ranking data unavailable" : formatCount(rankedPlatformCount, "ranked platform")}
         />
       </section>
 
@@ -150,12 +154,12 @@ export function Home(_: RoutableProps) {
                   <th class="table-th">Platform</th>
                   <th class="table-th">Scale</th>
                   <th class="table-th">Date</th>
-                  <th class="table-th">Power score</th>
+                  {showRecentPower && <th class="table-th">Power score</th>}
                   <th
                     class="table-th"
                     title="Geometric mean of per-query execution times (measurement runs only). Lower is faster."
                   >
-                    Geomean latency
+                    Geomean
                   </th>
                   {showRecentCost && (
                     <th
@@ -165,12 +169,17 @@ export function Home(_: RoutableProps) {
                       Normalized cost
                     </th>
                   )}
-                  <th class="table-th sticky right-0 z-10 bg-[var(--bb-surface-data-muted)]" />
+                  <th class="table-th" />
                 </tr>
               </thead>
               <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
                 {recent.map((result) => (
-                  <RecentRow key={result.result_id} entry={result} showCost={showRecentCost} />
+                  <RecentRow
+                    key={result.result_id}
+                    entry={result}
+                    showPower={showRecentPower}
+                    showCost={showRecentCost}
+                  />
                 ))}
               </tbody>
             </table>
@@ -194,8 +203,6 @@ export function Home(_: RoutableProps) {
           labelFn={(platformId) => platformIdToName.get(platformId) ?? platformId}
         />
       </div>
-
-      <ProvenanceLegend />
     </div>
   );
 }
@@ -273,7 +280,15 @@ function StatCard({
   );
 }
 
-function RecentRow({ entry, showCost }: { entry: ResultRow; showCost: boolean }) {
+function RecentRow({
+  entry,
+  showPower,
+  showCost,
+}: {
+  entry: ResultRow;
+  showPower: boolean;
+  showCost: boolean;
+}) {
   return (
     <tr class="hover:bg-[var(--bb-surface-data-muted)]">
       <td class="table-td font-medium">{humanizeBenchmark(entry.benchmark)}</td>
@@ -282,15 +297,17 @@ function RecentRow({ entry, showCost }: { entry: ResultRow; showCost: boolean })
       </td>
       <td class="table-td">SF {entry.scale_factor}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]"><RunDateChip runDate={entry.run_date} /></td>
-      <td
-        class="table-td font-mono"
-        title={entry.power_score != null ? `Exact power score: ${fmtScoreExact(entry.power_score)}` : undefined}
-      >
-        {fmtScoreCompact(entry.power_score)}
-      </td>
+      {showPower && (
+        <td
+          class="table-td font-mono"
+          title={entry.power_score != null ? `Exact power score: ${fmtScoreExact(entry.power_score)}` : undefined}
+        >
+          {fmtScoreCompact(entry.power_score)}
+        </td>
+      )}
       <td class="table-td font-mono">{fmtGeomean(entry.geomean_ms)}</td>
       {showCost && <td class="table-td font-mono text-[var(--bb-data-fg-muted)]">{normalizedCostLabel(entry)}</td>}
-      <td class="table-td sticky right-0 z-10 bg-[var(--bb-surface-data)] text-right">
+      <td class="table-td text-right">
         <a href={`/results/r/${entry.result_id}`} class="text-xs font-medium no-underline">
           View →
         </a>

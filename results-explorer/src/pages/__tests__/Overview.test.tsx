@@ -7,14 +7,15 @@
  * without reintroducing a filter.
  */
 
-import { render, screen, waitFor, within } from "@testing-library/preact";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/db", () => ({
   queryRows: vi.fn(),
+  resetDuckDbInitializationFailures: vi.fn(),
 }));
 
-import { queryRows } from "@/db";
+import { queryRows, resetDuckDbInitializationFailures } from "@/db";
 import { clearDuckdbQueryCachesForTests } from "@/lib/duckdbQueries";
 import { Home } from "@/pages/Home";
 import { COHORT_ROWS, META_LEADERBOARD_ROWS, RESULT_ROWS } from "./fixtures/corpus";
@@ -139,6 +140,44 @@ describe("Overview", () => {
     expect(screen.queryAllByText("Normalized cost")).toHaveLength(1);
   });
 
+  it("shows power score in recent results only when a power score is present", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Recent results")).toBeTruthy());
+    // RESULT_ROWS carries one non-null power_score (r3), so the column shows.
+    expect(screen.getByText("Power score")).toBeTruthy();
+
+    const withoutPower = RESULT_ROWS.map((row) => ({ ...row, power_score: null }));
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.includes("FROM bench.results")) return withoutPower;
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        return META_LEADERBOARD_ROWS;
+      }
+      if (s.includes("FROM bench.cohort_metadata")) return COHORT_ROWS;
+      return [];
+    });
+    clearDuckdbQueryCachesForTests();
+    render(<Home />);
+    await waitFor(() => expect(screen.getAllByText("Recent results").length).toBe(2));
+    expect(screen.queryAllByText("Power score")).toHaveLength(1);
+  });
+
+  it("does not pin the recent-results action column, so it can't paint over trailing cells", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Recent results")).toBeTruthy());
+
+    const scrollContainer = screen.getByTestId("recent-results-scroll-container");
+    const headerRow = scrollContainer.querySelector("thead tr")!;
+    expect(headerRow.className).not.toMatch(/\bsticky\b/);
+    for (const cell of Array.from(headerRow.children)) {
+      expect(cell.className).not.toMatch(/\bsticky\b/);
+    }
+    const bodyRow = scrollContainer.querySelector("tbody tr")!;
+    for (const cell of Array.from(bodyRow.children)) {
+      expect(cell.className).not.toMatch(/\bsticky\b/);
+    }
+  });
+
   it("keeps the contribution workflow and both browse sections", async () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Recent results")).toBeTruthy());
@@ -159,4 +198,38 @@ describe("Overview", () => {
     expect(screen.getByRole("heading", { name: "Browse public benchmark results" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Browse public platform results" })).toBeTruthy();
   });
+
+  it("no longer carries the provenance legend - it moved to the compare landing page", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Recent results")).toBeTruthy());
+
+    expect(screen.queryByTestId("provenance-legend")).toBeNull();
+    expect(screen.queryByText("What do these labels mean?")).toBeNull();
+  });
+});
+
+it("retries ranking metadata along with results after an initialization failure", async () => {
+  const healthy = vi.mocked(queryRows).getMockImplementation()!;
+  vi.mocked(queryRows).mockRejectedValue(new Error("worker lost"));
+  render(<Home />);
+  await screen.findByRole("button", { name: "Retry" });
+  vi.mocked(queryRows).mockImplementation(healthy);
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  await screen.findByText("Recent results");
+  await waitFor(() => expect(screen.queryByText("0 ranked platforms")).toBeNull());
+  expect(resetDuckDbInitializationFailures).toHaveBeenCalledOnce();
+  const metadataCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => String(sql).includes("FROM bench.meta_leaderboard"));
+  expect(metadataCalls).toHaveLength(2);
+});
+
+it("does not report zero rankings when only ranking metadata fails", async () => {
+  const healthy = vi.mocked(queryRows).getMockImplementation()!;
+  vi.mocked(queryRows).mockImplementation(async (...args) => {
+    if (String(args[0]).includes("FROM bench.meta_leaderboard")) throw new Error("worker lost");
+    return healthy(...args);
+  });
+  render(<Home />);
+  await screen.findByText("Recent results");
+  expect(screen.getByText("Ranking data unavailable")).toBeTruthy();
+  expect(screen.queryByText("0 ranked platforms")).toBeNull();
 });

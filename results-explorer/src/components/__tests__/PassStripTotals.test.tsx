@@ -109,3 +109,40 @@ describe("PassStrip totals row", () => {
     expect(screen.getByText(/including the 5 not listed above/)).toBeTruthy();
   });
 });
+
+it("includes every warmup stream in totals while comparing per-query medians", () => {
+  const queries = [
+    { ...warmup("Q1", 10), stream: 1 },
+    { ...warmup("Q1", 30), stream: 2 },
+    { ...warmup("Q1", 50), stream: 2, iter: 1 },
+    { ...measurement("Q1", 5, 1), stream: 1 },
+    { ...measurement("Q1", 15, 1), stream: 2 },
+  ];
+  for (const rows of [queries, [...queries].reverse()]) {
+    const summaries = summarizeQueryPasses(rows);
+    expect(summaries[0]!.warmupMs).toBe(30);
+    expect(summaries[0]!.warmupTotalMs).toBe(90);
+    const totals = summarizeRunPasses(summaries);
+    expect(totals.warmupMs).toBe(90);
+    expect(totals.warmupRatio).toBe(3);
+    expect(totals.passCount).toBe(2);
+  }
+  render(<PassStrip queries={queries} />);
+  expect(screen.getByRole("columnheader", { name: "Warmup median" })).toBeTruthy();
+  expect(screen.getByTestId("pass-strip-totals").textContent).toContain("90 ms");
+  expect(screen.getByText(/Warmup overall is the total of all passing warmup executions/)).toBeTruthy();
+});
+
+it("excludes failed and invalid warmup durations from both reductions", () => {
+  const rows = [
+    warmup("Q1", Number.NaN),
+    warmup("Q1", 0),
+    warmup("Q1", -1),
+    { ...warmup("Q1", 1000), status: "fail" as const },
+    warmup("Q1", 20),
+    measurement("Q1", 10, 1),
+  ];
+  const summaries = summarizeQueryPasses(rows);
+  expect(summaries[0]!.warmupMs).toBe(20);
+  expect(summarizeRunPasses(summaries).warmupMs).toBe(20);
+});

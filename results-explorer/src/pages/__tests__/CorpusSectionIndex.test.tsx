@@ -112,6 +112,32 @@ describe("corpus section indexes", () => {
     },
   );
 
+  it.each(SECTION_CASES)(
+    "$title uses singular nouns on a card with exactly one run and one covered counterpart",
+    async ({ kind, listId }) => {
+      const oneRunRow = resultRow({
+        result_id: "only-run",
+        benchmark: "tpch",
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        run_date: "2026-08-20T12:00:00Z",
+      });
+      vi.mocked(listResults).mockResolvedValue([oneRunRow]);
+
+      renderIndex(kind);
+
+      const list = await screen.findByTestId(listId);
+      // Benchmarks index cards report coverage in platforms; the platforms
+      // index reports coverage in benchmarks. Either way, one of each stays
+      // singular rather than defaulting to "1 runs · 1 benchmarks".
+      const coverageNoun = kind === "benchmarks" ? "platform" : "benchmark";
+      expect(within(list).getByText(`1 run · 1 ${coverageNoun}`)).toBeTruthy();
+      expect(within(list).queryByText(/1 runs/)).toBeNull();
+      expect(within(list).queryByText(/1 platforms/)).toBeNull();
+      expect(within(list).queryByText(/1 benchmarks/)).toBeNull();
+    },
+  );
+
   it.each(SECTION_CASES)("$title renders the settled empty state after the retry is also empty", async ({ kind }) => {
     vi.mocked(listResults).mockResolvedValue([]);
 

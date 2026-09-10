@@ -166,6 +166,6 @@ describe("a cross-run comparison locks exactly one basis", () => {
     expect(locked.reason).toContain("one measurement basis");
     expect(locked.reason).toContain("published median");
     expect(locked.reason).toContain("fastest warm pass");
-    expect(locked.reason).toContain("measures the basis, not the engine");
+    expect(locked.reason).toContain("measures the basis, not the platform");
   });
 });

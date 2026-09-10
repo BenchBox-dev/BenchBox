@@ -175,6 +175,9 @@ export function Compare({ url }: CompareProps) {
   const [compareState, setCompareState] = useState<CompareState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Bumped by the ErrorMessage retry button so a reader can re-issue this
+  // read after a DuckDB worker fault without reloading the page.
+  const [compareRetryToken, setCompareRetryToken] = useState(0);
   const [baselineResultId, setBaselineResultId] = useUrlState(BASELINE_URL_KEY, "", stringSerde);
   // Through the model's serde, not a hand-rolled parser: the grammar is the
   // model's to define, and a shared link has to reproduce the sender's figures
@@ -395,7 +398,7 @@ export function Compare({ url }: CompareProps) {
     return () => {
       cancelled = true;
     };
-  }, [requestedIdsToken]);
+  }, [requestedIdsToken, compareRetryToken]);
 
   // A stale baseline token must not make the visible selector disagree with
   // the figures. Fall back to the first selected run and remove the invalid
@@ -464,7 +467,7 @@ export function Compare({ url }: CompareProps) {
   if (error)
     return (
       <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <ErrorMessage title="Cannot compare" message={error} />
+        <ErrorMessage title="Cannot compare" message={error} onRetry={() => setCompareRetryToken((t) => t + 1)} />
         <a href="/results/" class="mt-4 inline-block text-sm no-underline">
           ← Back to Results
         </a>
@@ -1034,7 +1037,7 @@ export function buildComparisonBoundary(fields: readonly { label: string; status
     );
   }
   if (limits.length > 0) {
-    return `Hardware boundary: ${limits.join("; ")}. This compares recorded runs, not engines in isolation.`;
+    return `Hardware boundary: ${limits.join("; ")}. This compares recorded runs, not platforms in isolation.`;
   }
   return "Hardware boundary: the recorded architecture, CPU family, CPU model, CPU count, memory, and locality match. Other hardware details may differ.";
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
-import { queryRows } from "@/db";
+import { DUCKDB_USER_QUERY_TIMEOUT_MS, queryRows } from "@/db";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { FacetDrawer, FacetRail, type ActiveFacetChip, type FacetGroup } from "@/components/FacetRail";
@@ -146,6 +146,9 @@ export function Query({ url }: QueryProps) {
   const [sort, setSort] = useState<QuerySort>({ column: "run_date", direction: "desc" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by the ErrorMessage retry button so a reader can re-issue the
+  // schema/facet/page reads after a DuckDB worker fault without reloading.
+  const [resultsRetryToken, setResultsRetryToken] = useState(0);
   const [sqlText, setSqlText] = useState("SELECT * FROM bench.results ORDER BY run_date DESC");
   const [sqlRows, setSqlRows] = useState<ResultRow[]>([]);
   const [sqlError, setSqlError] = useState<string | null>(null);
@@ -361,7 +364,7 @@ export function Query({ url }: QueryProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [resultsRetryToken]);
 
   useEffect(() => {
     if (facetQueries === null) return;
@@ -385,7 +388,7 @@ export function Query({ url }: QueryProps) {
     return () => {
       cancelled = true;
     };
-  }, [facetQueries]);
+  }, [facetQueries, resultsRetryToken]);
 
   useEffect(() => {
     if (pageQueries === null) return;
@@ -418,7 +421,7 @@ export function Query({ url }: QueryProps) {
     return () => {
       cancelled = true;
     };
-  }, [currentPage, pageQueries, setPageRaw]);
+  }, [currentPage, pageQueries, setPageRaw, resultsRetryToken]);
 
   useEffect(() => {
     if (loading || rows.length === 0 || visibleColumns.length === 0) return;
@@ -442,7 +445,7 @@ export function Query({ url }: QueryProps) {
   if (error) {
     return (
       <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <ErrorMessage title="Could not load results" message={error} />
+        <ErrorMessage title="Could not load results" message={error} onRetry={() => setResultsRetryToken((t) => t + 1)} />
         <div class="mt-4 flex flex-wrap gap-2">
           <a href="/results/query" class="btn btn-primary no-underline">Try again</a>
           <a href="/results/" class="btn btn-secondary no-underline">Browse leaderboards</a>
@@ -694,7 +697,9 @@ export function Query({ url }: QueryProps) {
         buildSelectQuery(activeFilters, visibleColumns, sort, rowLimit),
         searchText,
       );
-      const exportRows = await queryRows<ResultRow>(query.sql, query.params);
+      // A full result-set export has no stated performance budget and can
+      // legitimately take longer than the default per-page query bound.
+      const exportRows = await queryRows<ResultRow>(query.sql, query.params, DUCKDB_USER_QUERY_TIMEOUT_MS);
       const exportName = `benchbox-query-export-${Date.now()}.json`;
       const blob = new Blob(
         [JSON.stringify(exportRows.map((row) => projectVisibleRow(row, visibleColumns)), null, 2)],
@@ -726,7 +731,8 @@ export function Query({ url }: QueryProps) {
 
     setDownloadError(null);
     try {
-      const exportRows = await queryRows<ResultRow>(selectQuery.sql, selectQuery.params);
+      // Same rationale as downloadJson: a full export can run long.
+      const exportRows = await queryRows<ResultRow>(selectQuery.sql, selectQuery.params, DUCKDB_USER_QUERY_TIMEOUT_MS);
       const blob = new Blob([serializeCsv(exportRows, visibleColumns)], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -742,7 +748,10 @@ export function Query({ url }: QueryProps) {
   async function runSql() {
     setSqlError(null);
     try {
-      const nextRows = await queryRows<ResultRow>(sqlText);
+      // Workbench SQL is user-authored and arbitrary; give it the same
+      // generous budget as the exports above instead of the default bound
+      // meant for the app's own bounded, index-shaped page reads.
+      const nextRows = await queryRows<ResultRow>(sqlText, [], DUCKDB_USER_QUERY_TIMEOUT_MS);
       setSqlRows(nextRows);
     } catch (err: unknown) {
       setSqlError(err instanceof Error ? err.message : "SQL query failed");
@@ -1029,6 +1038,7 @@ export function Query({ url }: QueryProps) {
                         <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                           <thead class="bg-[var(--bb-surface-data-muted)]">
                             <tr>
+                              {/* Keep selection controls reachable while result columns scroll. */}
                               <th
                                 scope="col"
                                 class="table-th sticky left-0 z-10 w-12 min-w-12 bg-[var(--bb-surface-data-muted)] text-left"
@@ -1056,7 +1066,7 @@ export function Query({ url }: QueryProps) {
                                   </th>
                                 );
                               })}
-                              <th class="table-th sticky right-0 z-10 bg-[var(--bb-surface-data-muted)]" />
+                              <th class="table-th" />
                             </tr>
                           </thead>
                           <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
@@ -1105,7 +1115,7 @@ export function Query({ url }: QueryProps) {
                                       {formatQueryRowCell(column, row[column])}
                                     </td>
                                   ))}
-                                  <td class="table-td sticky right-0 z-10 bg-[var(--bb-surface-data)] text-right">
+                                  <td class="table-td text-right">
                                     <a href={`/results/r/${row.result_id}`} class="text-xs font-medium no-underline">
                                       View →
                                     </a>

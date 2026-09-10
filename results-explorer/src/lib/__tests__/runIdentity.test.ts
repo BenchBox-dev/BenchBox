@@ -89,7 +89,10 @@ describe("formatRunIdentitiesForCohort", () => {
     expect(labels[1]).toContain("v53");
   });
 
-  it("falls through to run date when versions also match", () => {
+  it("falls through to the short result id, not the run date, when versions also match", () => {
+    // Chart labels deliberately skip the date qualifier (it truncates to
+    // nothing at chart-label widths); the short result id disambiguates
+    // instead.
     const cohort = [
       source({
         result_id: "r1",
@@ -106,8 +109,10 @@ describe("formatRunIdentitiesForCohort", () => {
     ];
     const labels = formatRunIdentitiesForCohort(cohort, "chart");
     expect(new Set(labels).size).toBe(2);
-    expect(labels[0]).toContain("2026-04-01");
-    expect(labels[1]).toContain("2026-05-01");
+    expect(labels.join(" ")).not.toContain("2026-04-01");
+    expect(labels.join(" ")).not.toContain("2026-05-01");
+    expect(labels[0]).toContain("r1");
+    expect(labels[1]).toContain("r2");
   });
 
   it("omits qualifiers that are invariant within the current cohort", () => {
@@ -129,10 +134,14 @@ describe("formatRunIdentitiesForCohort", () => {
     ];
     const labels = formatRunIdentitiesForCohort(cohort, "chart");
 
-    expect(labels[0]).toMatch(/^DataFusion 2026-05-01$/);
-    expect(labels[1]).toMatch(/^DataFusion 2026-05-02$/);
-    expect(labels.join(" ")).not.toContain("SF 0.01");
-    expect(labels.join(" ")).not.toContain("v53.0.0");
+    // Version and scale are invariant within the cohort, and the calendar
+    // date is excluded from chart labels entirely, so the short result id
+    // is what disambiguates.
+    expect(new Set(labels).size).toBe(2);
+    expect(labels.join(" ")).not.toContain("2026-05-01");
+    expect(labels.join(" ")).not.toContain("2026-05-02");
+    expect(labels[0]).toContain("a276dae0");
+    expect(labels[1]).toContain("bb1d4f90");
   });
 
   it("keeps shared natural qualifiers ahead of the result id fallback", () => {
@@ -153,9 +162,12 @@ describe("formatRunIdentitiesForCohort", () => {
     ];
     const labels = formatRunIdentitiesForCohort(cohort, "chart");
 
+    // The run date is excluded from chart labels, so the next natural
+    // qualifier (scale) disambiguates instead of the result-id fallback.
     expect(labels[0]).toBe("Spark v3.5.0");
-    expect(labels[1]).toMatch(/^Spark 2026-05-01$/);
+    expect(labels[1]).toMatch(/^Spark SF 0\.01$/);
     expect(labels.join(" ")).not.toMatch(/1111aaaa|2222bbbb/);
+    expect(labels.join(" ")).not.toContain("2026-05-01");
   });
 
   it("uses short result_id as the last-resort tiebreaker", () => {
@@ -223,6 +235,31 @@ describe("formatRunIdentitiesForCohort", () => {
     ];
     const labels = formatRunIdentitiesForCohort(cohort, "chart");
     expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it("keeps the run date out of chart labels entirely, even when nothing else disambiguates", () => {
+    // Audit finding: chart labels used to render "DuckDB v1.4.3 20…
+    // c138f960" where the truncated date consumed label budget without
+    // conveying anything. The short id already disambiguates, so the date
+    // qualifier is dropped from the chart variant's qualifier chain.
+    const cohort = [
+      source({
+        result_id: "tpch-duckdb-sf0.01-20260403-c138f960",
+        platform: "DuckDB",
+        driver_version: "1.4.3",
+        run_date: "2026-04-03",
+      }),
+      source({
+        result_id: "tpch-duckdb-sf0.01-20260403-d9e88a11",
+        platform: "DuckDB",
+        driver_version: "1.4.3",
+        run_date: "2026-04-03",
+      }),
+    ];
+    const labels = formatRunIdentitiesForCohort(cohort, "chart");
+    expect(labels.join(" ")).not.toContain("2026-04-03");
+    expect(labels[0]).toBe("DuckDB v1.4.3 c138f960");
+    expect(labels[1]).toBe("DuckDB v1.4.3 d9e88a11");
   });
 
   it("table variant uses bullet separators when disambiguating", () => {

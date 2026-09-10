@@ -37,6 +37,22 @@ async function platformCellLabels(rows: Locator, columnIndex: number): Promise<s
 }
 
 test.describe("Index sortable headers", () => {
+  test("benchmark section deep links survive loading and sibling navigation", async ({ page }) => {
+    for (const target of ["?view=list&sf=0.01&phase=standard", "?sf=0.01&phase=standard#benchmark-section-list"]) {
+      await page.goto(`/results/tpch/${target}`);
+      await waitForDataLoaded(page, /TPC-H Results/);
+      await waitForResultRows(page, page.getByRole("grid"), 3);
+      const list = page.locator("#benchmark-section-list");
+      await expect.poll(async () => Math.abs(((await list.boundingBox())?.y ?? Infinity) - 96)).toBeLessThan(2);
+    }
+
+    await page.selectOption("#benchmark-switcher", "ssb");
+    await expect(page).toHaveURL(/\/results\/ssb\/(?:\?phase=standard)?#benchmark-section-list$/);
+    const list = page.locator("#benchmark-section-list");
+    await expect(list.locator("tbody tr")).not.toHaveCount(0);
+    await expect.poll(async () => Math.abs(((await list.boundingBox())?.y ?? Infinity) - 96)).toBeLessThan(2);
+  });
+
   test("PlatformIndex headers update aria-sort and row order", async ({ page }) => {
     await page.goto("/results/p/duckdb/");
     await waitForShell(page);
@@ -84,12 +100,15 @@ test.describe("Index sortable headers", () => {
   });
 
   test("BenchmarkIndex list headers update aria-sort and row order", async ({ page }) => {
+    // Matrix, Ranks, and List are sections of one page now, not mutually
+    // exclusive states behind a toggle - List needs no click to reveal it,
+    // so scope to its section rather than "the first table" (Matrix's grid
+    // now precedes it in document order).
     await page.goto("/results/tpch/?sf=0.01&phase=standard");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
 
-    await page.getByRole("radio", { name: "List" }).click();
-    const table = page.locator("table").first();
+    const table = page.locator("#benchmark-section-list table").first();
     const rows = table.locator("tbody tr[data-testid]");
     await expect.poll(() => rows.count()).toBeGreaterThanOrEqual(3);
 

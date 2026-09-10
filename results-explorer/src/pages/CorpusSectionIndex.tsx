@@ -38,10 +38,14 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
   const [error, setError] = useState<string | null>(null);
   const retriedEmpty = useRef(false);
   const [sort, setSort] = useUrlState<SectionSort>("sort", "name", sectionSortSerde);
+  // Bumped by the ErrorMessage retry button so a reader can re-issue this
+  // read after a DuckDB worker fault without reloading the page.
+  const [rowsRetryToken, setRowsRetryToken] = useState(0);
   useDocumentTitle(`${title} · BenchBox Results`);
 
   useEffect(() => {
     let cancelled = false;
+    setError(null);
 
     async function loadRows() {
       try {
@@ -60,7 +64,7 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [rowsRetryToken]);
 
   const entries = useMemo(() => sortEntries(buildEntries(rows ?? [], kind), sort), [kind, rows, sort]);
 
@@ -80,7 +84,7 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
       {rows === null && error === null ? (
         <LoadingSpinner message={`Loading ${kind}...`} />
       ) : error !== null ? (
-        <ErrorMessage title={`Could not load ${kind}`} message={error} />
+        <ErrorMessage title={`Could not load ${kind}`} message={error} onRetry={() => setRowsRetryToken((t) => t + 1)} />
       ) : entries.length === 0 ? (
         <EmptyState
           title={`No published ${kind}`}
@@ -135,8 +139,8 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
                       <a href={entry.href}>{entry.label}</a>
                     </h2>
                     <p class="mt-1.5 text-sm text-[var(--bb-data-fg-muted)]">
-                      {entry.resultCount.toLocaleString()} runs ·{" "}
-                      {entry.coverageCount.toLocaleString()} {isBenchmarks ? "platforms" : "benchmarks"}
+                      {formatCount(entry.resultCount, "run")} ·{" "}
+                      {formatCount(entry.coverageCount, isBenchmarks ? "platform" : "benchmark")}
                     </p>
                     <p class="mt-2.5 text-xs text-[var(--bb-data-fg-muted)]">
                       Latest{" "}

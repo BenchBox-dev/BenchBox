@@ -206,14 +206,51 @@ export function logLatencyTicks(scale: LogLatencyScale, tolerance = 0.05): numbe
       if (inRange(ms, 0)) subdivided.push(ms);
     }
   }
+  // A sparse subdivision (fewer than 4 rungs) can still under-cover the
+  // domain: the fixed mantissa grid finds "10 ms" and "15 ms" inside an
+  // 8-18 ms padded domain and stops there, leaving the top third of the
+  // axis bare. Evenly spaced, nicely rounded ticks over the real domain
+  // fill that gap without abandoning round numbers.
+  const domainMin = Math.max(scale.floorMs, 2 ** scale.logMin);
+  const domainMax = 2 ** scale.logMax;
+  if (subdivided.length < 4 && Number.isFinite(domainMin) && Number.isFinite(domainMax) && domainMax > domainMin) {
+    const linear = niceLinearTicks(domainMin, domainMax, MAX_LOG_LATENCY_TICKS);
+    if (linear.length > subdivided.length) return thinTicks(linear, MAX_LOG_LATENCY_TICKS);
+  }
+
   if (subdivided.length >= 2) return thinTicks(subdivided, MAX_LOG_LATENCY_TICKS);
 
   // Nothing lands inside the range - a very narrow span such as 11-13 ms.
   // Label its ends rather than one arbitrary rung, or nothing at all.
-  const min = Math.max(scale.floorMs, 2 ** scale.logMin);
-  const max = 2 ** scale.logMax;
-  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return subdivided;
-  return [min, Math.sqrt(min * max), max];
+  if (!Number.isFinite(domainMin) || !Number.isFinite(domainMax) || domainMax <= domainMin) return subdivided;
+  return [domainMin, Math.sqrt(domainMin * domainMax), domainMax];
+}
+
+/** Rounds a rough step to a "nice" 1-2-5-10 multiple of a power of ten. */
+function niceStep(roughStep: number): number {
+  if (!(roughStep > 0)) return 1;
+  const magnitude = 10 ** Math.floor(Math.log10(roughStep));
+  const residual = roughStep / magnitude;
+  const niceResidual = residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 5 ? 5 : 10;
+  return niceResidual * magnitude;
+}
+
+/**
+ * Evenly spaced, nicely rounded ticks across a real (non-log) domain.
+ * Used for narrow latency ranges where the fixed decade/mantissa grid
+ * (LOG_LATENCY_TICKS_MS / LOG_LATENCY_TICK_MANTISSAS) is too sparse: e.g. an
+ * 8-18 ms domain lands on only "10 ms" and "15 ms" from that grid, leaving
+ * the top third of the axis unlabeled even though the axis extends to 18 ms.
+ */
+function niceLinearTicks(min: number, max: number, targetCount: number): number[] {
+  if (!(max > min)) return [min];
+  const step = niceStep((max - min) / Math.max(1, targetCount - 1));
+  const start = Math.ceil(min / step) * step;
+  const raw: number[] = [];
+  for (let v = start; v <= max + step * 1e-6; v += step) {
+    raw.push(Number(v.toFixed(6)));
+  }
+  return raw;
 }
 
 /** Keeps the first and last tick and drops interior ones evenly until it fits. */

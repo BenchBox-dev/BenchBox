@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { FundingChip } from "@/components/FundingChip";
 import { RunDateWithAge } from "@/components/RunAge";
 import { TrustBadge } from "@/components/TrustBadge";
+import { useIsNarrowViewport } from "@/lib/useIsNarrowViewport";
 
 export interface CompareTrayItem {
   id: string;
@@ -29,16 +30,7 @@ export function CompareTray({ summary, items, compareHref, compareLabel, onClear
   const trayRef = useRef<HTMLDivElement>(null);
   const [trayHeight, setTrayHeight] = useState(0);
   const [expanded, setExpanded] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-    const mql = window.matchMedia("(max-width: 639px)");
-    const update = () => setIsMobile(mql.matches);
-    update();
-    mql.addEventListener("change", update);
-    return () => mql.removeEventListener("change", update);
-  }, []);
+  const isMobile = useIsNarrowViewport("(max-width: 639px)");
 
   const collapsed = isMobile && !expanded;
 
