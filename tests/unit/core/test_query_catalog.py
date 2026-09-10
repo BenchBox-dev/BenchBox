@@ -20,7 +20,10 @@ from benchbox.core.query_catalog import (
     get_dataframe_render,
     get_sql_render,
     list_query_ids,
+    query_description,
     query_display_name,
+    query_groups,
+    query_source_path,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -124,5 +127,56 @@ class TestQueryDisplayName:
     def test_tpch_uses_dataframe_query_name(self):
         assert query_display_name("tpch", "1") == "Pricing Summary Report"
 
+    def test_get_query_info_name_wins(self):
+        # flightdata exposes get_query_info; nyctaxi/tsbs_devops likewise.
+        assert query_display_name("flightdata", "ontime-by-carrier") == "On-Time Rate by Carrier"
+
     def test_missing_name_is_none(self):
         assert query_display_name("does-not-exist", "1") is None
+
+    def test_description_available_for_named_benchmarks(self):
+        assert query_description("tpch", "1")
+        assert query_description("flightdata", "ontime-by-carrier")
+
+
+class TestQueryGroups:
+    def test_benchmark_without_scheme_is_none(self):
+        assert query_groups("tpch") is None
+        assert query_groups("does-not-exist") is None
+
+    def test_clickbench_dict_categories(self):
+        groups = query_groups("clickbench")
+        assert groups is not None
+        flat = [q for members in groups.values() for q in members]
+        assert sorted(flat) == sorted(list_query_ids("clickbench"))
+        assert len(flat) == len(set(flat)), "a query landed in two groups"
+
+    def test_list_categories_via_get_queries_by_category(self):
+        groups = query_groups("read_primitives")
+        assert groups is not None
+        flat = {q for members in groups.values() for q in members}
+        assert flat == set(list_query_ids("read_primitives"))
+
+    def test_query_info_category_field(self):
+        groups = query_groups("nyctaxi")
+        assert groups is not None
+        assert "temporal" in groups
+
+
+class TestQuerySourcePath:
+    def test_tpch_points_at_template_file(self):
+        assert query_source_path("tpch", "1") == "benchbox/_binaries/tpc-h/templates/queries/1.sql"
+
+    def test_tpcds_points_at_template_file(self):
+        assert query_source_path("tpcds", "1") == "_sources/tpc-ds/query_templates/query1.tpl"
+
+    def test_generic_benchmark_points_at_queries_module(self):
+        assert query_source_path("clickbench", "Q1") == "benchbox/core/clickbench/queries.py"
+
+    @pytest.mark.parametrize("benchmark_id", _ALL_BENCHMARK_IDS)
+    def test_path_when_present_exists_on_disk(self, benchmark_id):
+        from benchbox.core.query_catalog import _REPO_ROOT
+
+        rel = query_source_path(benchmark_id, list_query_ids(benchmark_id)[0])
+        if rel is not None:
+            assert (_REPO_ROOT / rel).is_file()

@@ -31,6 +31,7 @@ import logging
 import re
 from dataclasses import dataclass
 from functools import cache
+from pathlib import Path
 from typing import Any
 
 from benchbox.core.benchmark_registry import (
@@ -39,6 +40,8 @@ from benchbox.core.benchmark_registry import (
 )
 
 logger = logging.getLogger(__name__)
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 #: Reference platform for representative renderings. DataFusion has both a SQL
 #: dialect and a DataFrame surface (the "expression" family), so a single
@@ -290,13 +293,117 @@ def _resolve_impl(query: Any, family: str) -> tuple[Any | None, str]:
     return None, family
 
 
-def query_display_name(benchmark_id: str, query_id: str) -> str | None:
-    """Human name for a query from its DataFrame registry entry, or ``None``.
+def _query_info(benchmark_id: str, query_id: str) -> dict[str, Any] | None:
+    """Return ``benchmark.get_query_info(id)`` when the benchmark exposes it."""
+    bm = _benchmark_instance(benchmark_id)
+    if bm is None or not hasattr(bm, "get_query_info"):
+        return None
+    for candidate in (query_id, f"Q{query_id}", query_id.lstrip("Qq")):
+        try:
+            info = bm.get_query_info(candidate)
+        except Exception:
+            continue
+        if isinstance(info, dict):
+            return info
+    return None
 
-    Only the DataFrame registry carries a reliable per-query name today. Callers
-    fall back to the bare id when this returns ``None``.
+
+def query_display_name(benchmark_id: str, query_id: str) -> str | None:
+    """Human name for a query, or ``None`` (caller falls back to the bare id).
+
+    Priority: the benchmark's own ``get_query_info`` -> the DataFrame registry
+    entry's ``query_name``.
     """
+    info = _query_info(benchmark_id, query_id)
+    if info and info.get("name"):
+        return str(info["name"])
     query = get_dataframe_query(benchmark_id, query_id)
     if query is not None and getattr(query, "query_name", None):
         return str(query.query_name)
+    return None
+
+
+def query_description(benchmark_id: str, query_id: str) -> str | None:
+    """One-line description of a query, or ``None``."""
+    info = _query_info(benchmark_id, query_id)
+    if info and info.get("description"):
+        return str(info["description"])
+    query = get_dataframe_query(benchmark_id, query_id)
+    if query is not None and getattr(query, "description", None):
+        return str(query.description)
+    return None
+
+
+def query_groups(benchmark_id: str) -> dict[str, list[str]] | None:
+    """Group a benchmark's query ids by category, or ``None`` if it has no scheme.
+
+    Sources, in order: ``get_query_categories()`` returning a ``{category:
+    [ids]}`` map; ``get_query_categories()`` returning category names plus
+    ``get_queries_by_category(name)``; a ``category`` field on
+    ``get_query_info(id)``. Returned lists are filtered to ids the catalog
+    actually lists, in catalog order; ids matched by no group are collected
+    under ``"other"``.
+    """
+    ids = list_query_ids(benchmark_id)
+    if not ids:
+        return None
+    known = set(ids)
+    bm = _benchmark_instance(benchmark_id)
+    raw: dict[str, list[str]] = {}
+
+    categories = None
+    if bm is not None and hasattr(bm, "get_query_categories"):
+        try:
+            categories = bm.get_query_categories()
+        except Exception:
+            categories = None
+
+    if isinstance(categories, dict) and categories:
+        raw = {str(name): [str(q) for q in members] for name, members in categories.items()}
+    elif isinstance(categories, (list, tuple)) and categories and hasattr(bm, "get_queries_by_category"):
+        for name in categories:
+            try:
+                members = bm.get_queries_by_category(name)
+            except Exception:
+                continue
+            keys = list(members.keys()) if isinstance(members, dict) else list(members)
+            if keys:
+                raw[str(name)] = [str(q) for q in keys]
+    else:
+        by_info: dict[str, list[str]] = {}
+        for query_id in ids:
+            info = _query_info(benchmark_id, query_id)
+            category = info.get("category") if info else None
+            if category:
+                by_info.setdefault(str(category), []).append(query_id)
+        raw = by_info
+
+    if not raw:
+        return None
+
+    grouped: dict[str, list[str]] = {}
+    seen: set[str] = set()
+    for name, members in raw.items():
+        kept = [q for q in ids if q in members and q in known]
+        if kept:
+            grouped[name] = kept
+            seen.update(kept)
+    leftover = [q for q in ids if q not in seen]
+    if leftover:
+        grouped["other"] = leftover
+    return grouped or None
+
+
+def query_source_path(benchmark_id: str, query_id: str) -> str | None:
+    """Repo-relative path of the file a query's text comes from, or ``None``."""
+    candidates: list[str] = []
+    if benchmark_id in {"tpch", "tpch_skew"} and query_id.isdigit():
+        candidates.append(f"benchbox/_binaries/tpc-h/templates/queries/{query_id}.sql")
+    if benchmark_id == "tpcds" and query_id.isdigit():
+        candidates.append(f"_sources/tpc-ds/query_templates/query{query_id}.tpl")
+    candidates.append(f"benchbox/core/{benchmark_id}/queries.py")
+    candidates.append(f"benchbox/core/{benchmark_id}/operations.py")
+    for rel in candidates:
+        if (_REPO_ROOT / rel).exists():
+            return rel
     return None
