@@ -125,6 +125,7 @@ LANE_PREFIXES: dict[str, tuple[str, ...]] = {
         "landing/",
         "_blog/",
         "scripts/assemble_public_site.py",
+        "scripts/generate_query_docs.py",
         ".github/workflows/publication-lane-docs.yml",
     ),
     "explorer": (
