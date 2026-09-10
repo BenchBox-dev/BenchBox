@@ -348,7 +348,7 @@ jobs:
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
         with:
           script: |
-            const { createDeployment, getDeploymentStatus } = require('./scripts/publication/pages.cjs');
+            const { createDeployment, getDeploymentStatus, classifyDeploymentStatus } = require('./scripts/publication/pages.cjs');
             const deployedArtifactId = ${{ needs.prepare.outputs.kind == 'rollback' && needs.prepare.outputs.artifact_id || steps.upload_pages.outputs.artifact_id }};
             const result = await createDeployment({
               github,
@@ -371,20 +371,27 @@ jobs:
             let terminal = false;
             let statusUrl = result.status_url || '';
             let pageUrl = result.page_url || 'https://benchbox.dev';
+            let lastObserved = 'none';
             if (result.id) {
-              for (let i = 0; i < 12; i++) {
+              // 60 x 10s = 10 minutes. GitHub Pages deployments normally reach a
+              // terminal state in seconds, but CDN purge and file sync can lag.
+              const maxPolls = 60;
+              for (let i = 0; i < maxPolls; i++) {
                 try {
                   const s = await getDeploymentStatus({
                     github,
                     context,
                     options: { owner: context.repo.owner, repo: context.repo.repo, deployment_id: result.id }
                   });
-                  if (s.status === 'SUCCESS' || s.status === 'ACTIVE') {
+                  lastObserved = s.status;
+                  const cls = classifyDeploymentStatus(s.status);
+                  core.info(`Pages deployment poll ${i + 1}/${maxPolls}: provider status=${s.status} class=${cls}`);
+                  if (cls === 'terminal-success') {
                     status = 'SUCCESS';
                     terminal = true;
                     if (s.page_url) pageUrl = s.page_url;
                     break;
-                  } else if (s.status === 'FAILED' || s.status === 'FAILURE') {
+                  } else if (cls === 'terminal-failure') {
                     status = 'FAILED';
                     terminal = true;
                     break;
@@ -392,12 +399,12 @@ jobs:
                 } catch (e) {
                   core.warning(`Status check warning: ${e.message}`);
                 }
-                await new Promise(r => setTimeout(r, 5000));
+                await new Promise(r => setTimeout(r, 10000));
               }
             }
             if (!terminal) {
               status = 'FAILED';
-              throw new Error(`Pages deployment did not reach a terminal successful state for ${deploymentId}`);
+              throw new Error(`Pages deployment ${deploymentId} did not reach a terminal state within the poll budget (last observed provider status: ${lastObserved})`);
             }
             core.setOutput('deployment_id', deploymentId);
             core.setOutput('status_url', statusUrl);
@@ -405,7 +412,7 @@ jobs:
             core.setOutput('deployed_artifact_id', deployedArtifactId);
             core.setOutput('status', status);
             if (status === 'FAILED') {
-              throw new Error(`Pages deployment failed for ${deploymentId}`);
+              throw new Error(`Pages deployment failed for ${deploymentId} (last observed provider status: ${lastObserved})`);
             }
 
       - name: Record write acknowledgement in journal CAS

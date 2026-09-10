@@ -131,6 +131,8 @@ async function run() {
       });
     } else if (action === 'validate') {
       result = pages.validateCreateInputs(effect);
+    } else if (action === 'classify') {
+      result = { status: payload.status, classification: pages.classifyDeploymentStatus(payload.status) };
     } else {
       throw new Error(`Unknown action: ${action}`);
     }
