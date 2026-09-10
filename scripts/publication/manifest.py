@@ -152,8 +152,13 @@ def _validate_generation_and_parent(data: dict[str, Any], errors: list[str]) -> 
     else:
         if not _is_valid_sha40(parent_sha):
             errors.append(f"parent_sha must be a 40-char hex string for generation {gen}, got {parent_sha}")
-        if not isinstance(parent_gen, int) or parent_gen != gen - 1:
-            errors.append(f"parent_generation must be {gen - 1} for generation {gen}, got {parent_gen}")
+        # Generations are monotonic but not dense: a voided pre-send
+        # reservation retires its number, so the parent is the attested live
+        # head strictly before this generation, not necessarily gen - 1. The
+        # journal (not the manifest) is the authority that the named parent
+        # is the actual durable head; prepare validates that equality.
+        if not isinstance(parent_gen, int) or not 1 <= parent_gen < gen:
+            errors.append(f"parent_generation must precede generation {gen}, got {parent_gen}")
 
 
 def _validate_source(data: dict[str, Any], errors: list[str]) -> None:
