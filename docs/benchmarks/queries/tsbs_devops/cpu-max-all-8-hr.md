@@ -20,8 +20,8 @@ SELECT hostname,
        MAX(usage_system) as max_system,
        MAX(usage_iowait) as max_iowait
 FROM cpu
-WHERE time >= '2024-01-02 12:00:00'
-  AND time < '2024-01-02 20:00:00'
+WHERE time >= '2024-01-01 15:00:00'
+  AND time < '2024-01-01 23:00:00'
 GROUP BY hostname
 ORDER BY max_user DESC
 ```

@@ -21,8 +21,8 @@ SELECT
     AVG(c.usage_user + c.usage_system) as avg_cpu_total
 FROM cpu c
 JOIN tags t ON c.hostname = t.hostname
-WHERE c.time >= '2024-01-01 18:00:00'
-  AND c.time < '2024-01-01 19:00:00'
+WHERE c.time >= '2024-01-02 17:00:00'
+  AND c.time < '2024-01-02 18:00:00'
 GROUP BY t.service
 ORDER BY avg_cpu_total DESC
 ```

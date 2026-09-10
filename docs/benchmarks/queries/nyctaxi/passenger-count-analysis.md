@@ -22,8 +22,8 @@ SELECT
     AVG(total_amount) as avg_fare,
     AVG(total_amount / NULLIF(trip_distance, 0)) as avg_fare_per_mile
 FROM trips
-WHERE pickup_datetime >= '2019-10-24'
-  AND pickup_datetime < '2019-11-23'
+WHERE pickup_datetime >= '2019-06-25'
+  AND pickup_datetime < '2019-07-25'
   AND passenger_count BETWEEN 1 AND 6
 GROUP BY passenger_count
 ORDER BY passenger_count

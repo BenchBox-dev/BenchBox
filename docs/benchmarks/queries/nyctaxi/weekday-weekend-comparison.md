@@ -22,8 +22,8 @@ SELECT
     AVG(trip_distance) as avg_distance,
     AVG(total_amount) as avg_fare
 FROM trips
-WHERE pickup_datetime >= '2019-04-09'
-  AND pickup_datetime < '2019-05-09'
+WHERE pickup_datetime >= '2019-07-10'
+  AND pickup_datetime < '2019-08-09'
 GROUP BY
     CASE WHEN EXTRACT(DOW FROM pickup_datetime) IN (0, 6) THEN 'weekend' ELSE 'weekday' END,
     EXTRACT(HOUR FROM pickup_datetime)

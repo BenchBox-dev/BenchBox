@@ -40,12 +40,14 @@ from benchbox.core.benchmark_registry import (
     get_benchmark_class_name,
     get_benchmark_default_scale,
     get_benchmark_surface,
+    get_core_benchmark_class_name,
 )
 from benchbox.core.query_catalog import (
     REFERENCE_DIALECT,
     get_dataframe_render,
     get_sql_render,
     list_query_ids,
+    native_query_key,
     query_description,
     query_display_name,
     query_groups,
@@ -136,12 +138,19 @@ def _fence(code: str, lang: str) -> str:
     return f"{ticks}{lang}\n{code}\n{ticks}"
 
 
-def _import_line(benchmark_id: str, class_name: str) -> str:
+def _recipe_class(benchmark_id: str) -> tuple[str, str]:
+    """Return ``(import_line, class_name)`` for a runnable doc snippet.
+
+    Prefers the public class re-exported from ``benchbox``; falls back to the
+    core ``<Name>Benchmark`` class for benchmarks that are not re-exported.
+    """
     import benchbox
 
-    if hasattr(benchbox, class_name):
-        return f"from benchbox import {class_name}"
-    return f"from benchbox.core.{benchmark_id}.benchmark import {class_name}"
+    public = get_benchmark_class_name(benchmark_id)
+    if public and hasattr(benchbox, public):
+        return f"from benchbox import {public}", public
+    core = get_core_benchmark_class_name(benchmark_id) or public or benchmark_id
+    return f"from benchbox.core.{benchmark_id}.benchmark import {core}", core
 
 
 class DocFile:
@@ -154,7 +163,7 @@ class DocFile:
         self.text = "\n".join(line.rstrip() for line in body.split("\n")).rstrip() + "\n"
 
 
-def _query_page(benchmark_id: str, display: str, class_name: str, query_id: str) -> DocFile:
+def _query_page(benchmark_id: str, display: str, query_id: str) -> DocFile:
     slug = _query_slug(query_id)
     label = _query_label(query_id)
     name = query_display_name(benchmark_id, query_id)
@@ -210,20 +219,21 @@ def _query_page(benchmark_id: str, display: str, class_name: str, query_id: str)
         "",
     ]
     scale = get_benchmark_default_scale(benchmark_id)
-    import_line = _import_line(benchmark_id, class_name)
+    import_line, class_name = _recipe_class(benchmark_id)
+    key = native_query_key(benchmark_id, query_id)
     if supports_dialect_translation(benchmark_id):
         sql_recipe = (
             f"{import_line}\n\n"
             f"bench = {class_name}(scale_factor={scale})            # your scale factor\n"
             f'queries = bench.get_queries(dialect="{REFERENCE_DIALECT}")   # your platform\'s dialect; '
             f"drop dialect= for native SQL\n"
-            f"print(queries[{query_id!r}])"
+            f"print(queries[{key!r}])"
         )
     else:
         sql_recipe = (
             f"{import_line}\n\n"
             f"bench = {class_name}(scale_factor={scale})            # your scale factor\n"
-            f"print(bench.get_queries()[{query_id!r}])"
+            f"print(bench.get_queries()[{key!r}])"
         )
     lines += [_fence(sql_recipe, "python"), ""]
 
@@ -278,8 +288,7 @@ def _grouping(benchmark_id: str, query_ids: list[str]) -> dict[str, list[str]] |
 
 def _benchmark_files(benchmark_id: str, display: str, meta: dict) -> list[DocFile]:
     query_ids = list_query_ids(benchmark_id)
-    class_name = get_benchmark_class_name(benchmark_id) or display.replace(" ", "")
-    files = [_query_page(benchmark_id, display, class_name, qid) for qid in query_ids]
+    files = [_query_page(benchmark_id, display, qid) for qid in query_ids]
 
     groups = _grouping(benchmark_id, query_ids)
     header = [

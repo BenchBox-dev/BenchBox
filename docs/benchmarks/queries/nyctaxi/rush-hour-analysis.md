@@ -26,8 +26,8 @@ SELECT
     AVG(total_amount) as avg_fare,
     AVG(EXTRACT(EPOCH FROM (dropoff_datetime - pickup_datetime)) / 60) as avg_duration_min
 FROM trips
-WHERE pickup_datetime >= '2019-04-08'
-  AND pickup_datetime < '2019-05-08'
+WHERE pickup_datetime >= '2019-04-18'
+  AND pickup_datetime < '2019-05-18'
   AND dropoff_datetime > pickup_datetime
 GROUP BY
     CASE

@@ -21,9 +21,9 @@ SELECT
     AVG(c.usage_system) as avg_cpu_system
 FROM cpu c
 JOIN tags t ON c.hostname = t.hostname
-WHERE c.time >= '2024-01-02 18:00:00'
-  AND c.time < '2024-01-02 19:00:00'
-  AND t.region = 'eu-west-1'
+WHERE c.time >= '2024-01-01 14:00:00'
+  AND c.time < '2024-01-01 15:00:00'
+  AND t.region = 'ap-southeast-1'
 GROUP BY t.region
 ```
 

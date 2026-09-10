@@ -20,8 +20,8 @@ SELECT
     COUNT(*) as trip_count,
     AVG(total_amount) as avg_fare
 FROM trips
-WHERE pickup_datetime >= '2019-01-03'
-  AND pickup_datetime < '2019-02-02'
+WHERE pickup_datetime >= '2019-08-29'
+  AND pickup_datetime < '2019-09-28'
   AND trip_distance BETWEEN 0 AND 30
 GROUP BY FLOOR(trip_distance)
 ORDER BY distance_miles

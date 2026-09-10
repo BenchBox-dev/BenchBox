@@ -21,8 +21,8 @@ SELECT
     AVG(usage_user) as avg_user,
     MAX(usage_user) as max_user
 FROM cpu
-WHERE time >= '2024-01-01 02:00:00'
-  AND time < '2024-01-01 03:00:00'
+WHERE time >= '2024-01-02 03:00:00'
+  AND time < '2024-01-02 04:00:00'
 GROUP BY hostname, DATE_TRUNC('minute', time)
 ORDER BY hostname, minute
 ```

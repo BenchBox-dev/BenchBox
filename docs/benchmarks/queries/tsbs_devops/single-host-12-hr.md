@@ -17,9 +17,9 @@ Rendered for **DataFusion** with default parameters.
 ```sql
 SELECT time, usage_user, usage_system, usage_idle
 FROM cpu
-WHERE hostname = 'host_33'
-  AND time >= '2024-01-02 00:00:00'
-  AND time < '2024-01-02 12:00:00'
+WHERE hostname = 'host_98'
+  AND time >= '2024-01-02 04:00:00'
+  AND time < '2024-01-02 16:00:00'
 ORDER BY time
 ```
 

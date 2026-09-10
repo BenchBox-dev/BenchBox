@@ -17,8 +17,8 @@ Rendered for **DataFusion** with default parameters.
 ```sql
 SELECT hostname, MIN(available_percent) as min_avail_pct
 FROM mem
-WHERE time >= '2024-01-01 10:00:00'
-  AND time < '2024-01-01 11:00:00'
+WHERE time >= '2024-01-02 02:00:00'
+  AND time < '2024-01-02 03:00:00'
 GROUP BY hostname
 HAVING MIN(available_percent) < 10
 ORDER BY min_avail_pct

@@ -22,8 +22,8 @@ SELECT
 FROM cpu c
 JOIN mem m ON c.hostname = m.hostname
           AND DATE_TRUNC('minute', c.time) = DATE_TRUNC('minute', m.time)
-WHERE c.time >= '2024-01-01 22:00:00'
-  AND c.time < '2024-01-01 23:00:00'
+WHERE c.time >= '2024-01-01 02:00:00'
+  AND c.time < '2024-01-01 03:00:00'
 GROUP BY c.hostname
 ORDER BY avg_cpu_total DESC
 ```

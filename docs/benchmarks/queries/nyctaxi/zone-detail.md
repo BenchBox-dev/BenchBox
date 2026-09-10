@@ -24,9 +24,9 @@ SELECT
     SUM(t.total_amount) as total_revenue
 FROM trips t
 JOIN taxi_zones z ON t.pickup_location_id = z.location_id
-WHERE t.pickup_datetime >= '2019-04-29'
-  AND t.pickup_datetime < '2019-05-29'
-  AND t.pickup_location_id = 237
+WHERE t.pickup_datetime >= '2019-09-12'
+  AND t.pickup_datetime < '2019-10-12'
+  AND t.pickup_location_id = 164
 GROUP BY z.zone, z.borough
 ```
 

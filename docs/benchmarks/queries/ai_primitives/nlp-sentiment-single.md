@@ -25,9 +25,9 @@ _No DataFrame implementation is registered for this query._
 The blocks above are representative. To get the precise statement a specific platform runs at a specific scale, substitute your own values:
 
 ```python
-from benchbox.core.ai_primitives.benchmark import AIPrimitives
+from benchbox.core.ai_primitives.benchmark import AIPrimitivesBenchmark
 
-bench = AIPrimitives(scale_factor=0.01)            # your scale factor
+bench = AIPrimitivesBenchmark(scale_factor=0.01)            # your scale factor
 print(bench.get_queries()['nlp_sentiment_single'])
 ```
 

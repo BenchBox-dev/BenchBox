@@ -21,8 +21,8 @@ SELECT
     AVG(trip_distance) as avg_distance,
     AVG(total_amount) as avg_fare
 FROM trips
-WHERE pickup_datetime >= '2019-08-28'
-  AND pickup_datetime < '2019-09-27'
+WHERE pickup_datetime >= '2019-04-14'
+  AND pickup_datetime < '2019-05-14'
   AND dropoff_datetime > pickup_datetime
   AND EXTRACT(EPOCH FROM (dropoff_datetime - pickup_datetime)) BETWEEN 60 AND 7200
 GROUP BY FLOOR(EXTRACT(EPOCH FROM (dropoff_datetime - pickup_datetime)) / 60 / 5) * 5

@@ -16,12 +16,7 @@ from pathlib import Path
 
 import pytest
 
-# medium, not fast: rendering even two benchmarks runs sqlglot dialect
-# translation over dozens of queries. The authoritative drift gate is the
-# `query-docs-check` CI step (scripts/generate_query_docs.py --check); this
-# suite pins the generator's structure and helpers and runs in the pre-merge
-# medium lane.
-pytestmark = [pytest.mark.unit, pytest.mark.medium]
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPT = _REPO_ROOT / "scripts" / "generate_query_docs.py"

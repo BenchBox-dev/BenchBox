@@ -22,8 +22,8 @@ SELECT
     COUNT(*) as trip_count
 FROM trips t
 LEFT JOIN taxi_zones z ON t.dropoff_location_id = z.location_id
-WHERE t.pickup_datetime >= '2019-05-19'
-  AND t.pickup_datetime < '2019-06-18'
+WHERE t.pickup_datetime >= '2019-09-26'
+  AND t.pickup_datetime < '2019-10-26'
 GROUP BY t.dropoff_location_id, z.zone, z.borough
 ORDER BY trip_count DESC
 LIMIT 20

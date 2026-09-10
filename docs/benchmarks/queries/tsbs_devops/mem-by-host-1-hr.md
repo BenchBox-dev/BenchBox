@@ -21,8 +21,8 @@ SELECT
     MAX(used_percent) as max_used_pct,
     MIN(available) as min_available
 FROM mem
-WHERE time >= '2024-01-01 08:00:00'
-  AND time < '2024-01-01 09:00:00'
+WHERE time >= '2024-01-02 00:00:00'
+  AND time < '2024-01-02 01:00:00'
 GROUP BY hostname
 ORDER BY avg_used_pct DESC
 ```

@@ -21,8 +21,8 @@ SELECT
     AVG(usage_user) as avg_user,
     AVG(usage_system) as avg_system
 FROM cpu
-WHERE time >= '2024-01-01 09:00:00'
-  AND time < '2024-01-01 09:05:00'
+WHERE time >= '2024-01-02 00:00:00'
+  AND time < '2024-01-02 00:05:00'
 GROUP BY hostname, DATE_TRUNC('second', time)
 ORDER BY hostname, second
 ```

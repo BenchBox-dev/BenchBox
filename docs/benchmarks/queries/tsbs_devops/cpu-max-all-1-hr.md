@@ -17,8 +17,8 @@ Rendered for **DataFusion** with default parameters.
 ```sql
 SELECT hostname, MAX(usage_user) as max_user, MAX(usage_system) as max_system
 FROM cpu
-WHERE time >= '2024-01-01 00:00:00'
-  AND time < '2024-01-01 01:00:00'
+WHERE time >= '2024-01-02 15:00:00'
+  AND time < '2024-01-02 16:00:00'
 GROUP BY hostname
 ORDER BY max_user DESC
 ```

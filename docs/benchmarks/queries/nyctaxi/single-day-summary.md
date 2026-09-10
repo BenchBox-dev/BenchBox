@@ -24,8 +24,8 @@ SELECT
     MIN(pickup_datetime) as first_trip,
     MAX(pickup_datetime) as last_trip
 FROM trips
-WHERE pickup_datetime >= '2019-07-23'
-  AND pickup_datetime < '2019-07-24'
+WHERE pickup_datetime >= '2019-07-03'
+  AND pickup_datetime < '2019-07-04'
 ```
 
 ## Representative DataFrame

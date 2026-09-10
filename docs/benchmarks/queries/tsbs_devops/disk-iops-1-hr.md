@@ -21,8 +21,8 @@ SELECT
     SUM(reads_completed) as total_reads,
     SUM(writes_completed) as total_writes
 FROM disk
-WHERE time >= '2024-01-01 19:00:00'
-  AND time < '2024-01-01 20:00:00'
+WHERE time >= '2024-01-02 09:00:00'
+  AND time < '2024-01-02 10:00:00'
 GROUP BY hostname, device
 ORDER BY total_writes DESC
 ```

@@ -24,8 +24,8 @@ SELECT
     AVG(tip_amount) as avg_tip
 FROM trips t
 LEFT JOIN taxi_zones z ON t.pickup_location_id = z.location_id
-WHERE t.pickup_datetime >= '2019-02-27'
-  AND t.pickup_datetime < '2019-05-28'
+WHERE t.pickup_datetime >= '2019-09-01'
+  AND t.pickup_datetime < '2019-11-30'
   AND t.rate_code_id IN (2, 3)
 GROUP BY rate_code_id, z.zone
 ORDER BY trip_count DESC

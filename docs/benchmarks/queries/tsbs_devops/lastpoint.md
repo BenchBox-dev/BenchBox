@@ -20,10 +20,10 @@ FROM cpu c
 JOIN (
     SELECT hostname, MAX(time) AS max_time
     FROM cpu
-    WHERE time >= '2024-01-01 12:00:00'
+    WHERE time >= '2024-01-01 19:00:00'
     GROUP BY hostname
 ) latest ON c.hostname = latest.hostname AND c.time = latest.max_time
-WHERE c.time >= '2024-01-01 12:00:00'
+WHERE c.time >= '2024-01-01 19:00:00'
 ORDER BY c.hostname
 ```
 

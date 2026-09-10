@@ -20,10 +20,12 @@ from benchbox.core.query_catalog import (
     get_dataframe_render,
     get_sql_render,
     list_query_ids,
+    native_query_key,
     query_description,
     query_display_name,
     query_groups,
     query_source_path,
+    supports_dialect_translation,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -161,6 +163,46 @@ class TestQueryGroups:
         groups = query_groups("nyctaxi")
         assert groups is not None
         assert "temporal" in groups
+
+
+class TestNativeQueryKey:
+    def test_str_keyed_benchmark_returns_str(self):
+        assert native_query_key("tpch", "6") == "6"
+        assert isinstance(native_query_key("tpch", "6"), str)
+
+    def test_int_keyed_benchmark_returns_int(self):
+        # datavault's get_queries() keys are ints; a doc snippet indexing it
+        # directly needs the int, not "1".
+        assert native_query_key("datavault", "1") == 1
+        assert isinstance(native_query_key("datavault", "1"), int)
+
+    def test_q_prefixed_registry_still_resolves(self):
+        assert native_query_key("clickbench", "Q1") == "Q1"
+
+
+class TestDeterminism:
+    @pytest.mark.parametrize("benchmark_id", ["nyctaxi", "tsbs_devops", "tpcds_obt"])
+    def test_repeated_renders_are_identical(self, benchmark_id):
+        # These benchmarks derive query parameters from a stateful RNG or a
+        # per-process hash; the catalog must still render them identically on
+        # every call or the docs drift gate is unusable.
+        import benchbox.core.query_catalog as qc
+
+        def snapshot():
+            return {q: get_sql_render(benchmark_id, q).sql for q in list_query_ids(benchmark_id)}
+
+        first = snapshot()
+        qc._benchmark_instance.cache_clear()
+        qc._query_dict.cache_clear()
+        qc._raw_query_keys.cache_clear()
+        assert snapshot() == first
+
+
+class TestSupportsDialectTranslation:
+    def test_translating_and_non_translating_benchmarks(self):
+        assert supports_dialect_translation("tpch") is True
+        assert supports_dialect_translation("clickbench") is True
+        assert supports_dialect_translation("datavault") is False
 
 
 class TestQuerySourcePath:

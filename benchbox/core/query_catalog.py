@@ -103,20 +103,26 @@ def _benchmark_instance(benchmark_id: str) -> Any | None:
     return None
 
 
-def _all_queries(bm: Any, *, dialect: str | None = None) -> dict[str, str]:
-    """Return ``bm.get_queries()`` keyed by ``str``.
+@cache
+def _query_dict(benchmark_id: str, dialect: str | None) -> dict[str, str]:
+    """``benchmark.get_queries([dialect])`` keyed by ``str``, cached.
 
-    With ``dialect`` set, returns the translated set only if the benchmark
-    actually accepts and applies ``dialect``; otherwise returns ``{}`` so the
-    caller does not mistake an untranslated set for a translated one.
+    Cached because some benchmarks (nyctaxi, tsbs_devops) regenerate randomised
+    parameters on every ``get_queries()`` call from a stateful RNG -- calling it
+    more than once per benchmark yields different SQL and breaks the drift gate.
+    With ``dialect`` set, returns ``{}`` unless the benchmark actually applied
+    it, so the caller does not mistake an untranslated set for a translated one.
     """
+    bm = _benchmark_instance(benchmark_id)
+    if bm is None:
+        return {}
     if dialect is not None:
         try:
             queries = bm.get_queries(dialect=dialect)
         except TypeError:
             return {}
         except Exception:
-            logger.debug("query_catalog: get_queries(dialect=%r) failed", dialect, exc_info=True)
+            logger.debug("query_catalog: get_queries(dialect=%r) failed for %r", dialect, benchmark_id, exc_info=True)
             return {}
         return {str(k): v for k, v in (queries or {}).items()}
     try:
@@ -146,8 +152,11 @@ def _get_query_accepts_dialect(bm: Any) -> bool:
     return "dialect" in params
 
 
-def _get_query_single(bm: Any, query_id: str, dialect: str | None) -> str | None:
-    """Try ``bm.get_query`` with the id shapes benchmarks variously expect."""
+def _get_query_single(benchmark_id: str, query_id: str, dialect: str | None) -> str | None:
+    """Last-resort per-query ``bm.get_query`` for keys absent from the bulk dict."""
+    bm = _benchmark_instance(benchmark_id)
+    if bm is None:
+        return None
     candidates: list[Any] = [query_id]
     if query_id.isdigit():
         candidates.append(int(query_id))
@@ -167,25 +176,48 @@ def _get_query_single(bm: Any, query_id: str, dialect: str | None) -> str | None
     return None
 
 
-def list_query_ids(benchmark_id: str) -> list[str]:
-    """Return the benchmark's query ids in canonical (definition) order."""
+@cache
+def _raw_query_keys(benchmark_id: str) -> tuple[Any, ...]:
+    """``benchmark.get_queries()`` keys in native form (some benchmarks key by int)."""
     bm = _benchmark_instance(benchmark_id)
     if bm is None:
-        return []
-    return list(_all_queries(bm).keys())
+        return ()
+    try:
+        return tuple(bm.get_queries().keys())
+    except Exception:
+        return ()
+
+
+def list_query_ids(benchmark_id: str) -> list[str]:
+    """Return the benchmark's query ids in canonical (definition) order."""
+    return list(_query_dict(benchmark_id, None).keys())
+
+
+def native_query_key(benchmark_id: str, query_id: str) -> Any:
+    """The key ``benchmark.get_queries()`` actually holds this query under.
+
+    ``list_query_ids`` normalises every key to ``str``; a few benchmarks
+    (datavault) key by ``int``. Doc snippets that index ``get_queries()``
+    directly need the native key.
+    """
+    keys = _raw_query_keys(benchmark_id)
+    if query_id in keys:
+        return query_id
+    if query_id.isdigit() and int(query_id) in keys:
+        return int(query_id)
+    wanted = _normalize_query_key(query_id)
+    for key in keys:
+        if _normalize_query_key(str(key)) == wanted:
+            return key
+    return query_id
 
 
 def supports_dialect_translation(benchmark_id: str) -> bool:
     """True when the benchmark can render its queries in a requested SQL dialect."""
     bm = _benchmark_instance(benchmark_id)
-    if bm is None:
-        return False
-    if _get_query_accepts_dialect(bm):
+    if bm is not None and _get_query_accepts_dialect(bm):
         return True
-    try:
-        return bool(bm.get_queries(dialect=REFERENCE_DIALECT))
-    except Exception:
-        return False
+    return bool(_query_dict(benchmark_id, REFERENCE_DIALECT))
 
 
 def _lookup(queries: dict[str, str], query_id: str) -> str | None:
@@ -207,32 +239,24 @@ def get_sql_render(
 ) -> SqlRender | None:
     """Return a representative SQL rendering of ``query_id``.
 
-    With ``dialect`` set: benchmarks whose ``get_query`` names ``dialect`` are
-    translated one query at a time (cheap -- avoids regenerating a whole
-    qgen/dsqgen query set for one row); the rest go through
-    ``get_queries(dialect=...)``. Either translated hit reports that dialect.
-    Falls back to ``get_queries()`` / ``get_query(id)`` reporting
-    ``dialect="default"``. With ``dialect=None`` no translation is attempted.
+    With ``dialect`` set, looks it up in the cached ``get_queries(dialect=...)``
+    set; falls back to the untranslated set, then a per-query ``get_query``,
+    both reporting ``dialect="default"``. With ``dialect=None`` no translation
+    is attempted.
     """
-    bm = _benchmark_instance(benchmark_id)
-    if bm is None:
+    if _benchmark_instance(benchmark_id) is None:
         return None
 
     if dialect is not None:
-        if _get_query_accepts_dialect(bm):
-            sql = _get_query_single(bm, query_id, dialect)
-            if sql:
-                return _make_sql_render(sql, dialect)
-        else:
-            sql = _lookup(_all_queries(bm, dialect=dialect), query_id)
-            if sql:
-                return _make_sql_render(sql, dialect)
+        sql = _lookup(_query_dict(benchmark_id, dialect), query_id)
+        if sql:
+            return _make_sql_render(sql, dialect)
 
-    sql = _lookup(_all_queries(bm), query_id)
+    sql = _lookup(_query_dict(benchmark_id, None), query_id)
     if sql:
         return _make_sql_render(sql, "default")
 
-    sql = _get_query_single(bm, query_id, None)
+    sql = _get_query_single(benchmark_id, query_id, None)
     if sql:
         return _make_sql_render(sql, "default")
 

@@ -21,8 +21,8 @@ SELECT
     AVG(CASE WHEN reads_completed > 0 THEN read_time_ms * 1.0 / reads_completed ELSE 0 END) as avg_read_latency_ms,
     AVG(CASE WHEN writes_completed > 0 THEN write_time_ms * 1.0 / writes_completed ELSE 0 END) as avg_write_latency_ms
 FROM disk
-WHERE time >= '2024-01-01 06:00:00'
-  AND time < '2024-01-01 07:00:00'
+WHERE time >= '2024-01-01 15:00:00'
+  AND time < '2024-01-01 16:00:00'
 GROUP BY hostname, device
 ORDER BY avg_write_latency_ms DESC
 ```

@@ -22,8 +22,8 @@ SELECT
     AVG(total_amount) as avg_fare,
     SUM(total_amount) as total_revenue
 FROM trips
-WHERE pickup_datetime >= '2019-03-12'
-  AND pickup_datetime < '2019-06-10'
+WHERE pickup_datetime >= '2019-05-14'
+  AND pickup_datetime < '2019-08-12'
 GROUP BY rate_code_id
 ORDER BY trip_count DESC
 ```

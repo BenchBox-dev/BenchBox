@@ -22,8 +22,8 @@ SELECT
     SUM(tip_amount) as total_tips,
     AVG(tip_amount / NULLIF(fare_amount, 0)) * 100 as avg_tip_percentage
 FROM trips
-WHERE pickup_datetime >= '2019-11-26'
-  AND pickup_datetime < '2019-12-26'
+WHERE pickup_datetime >= '2019-10-08'
+  AND pickup_datetime < '2019-11-07'
   AND fare_amount > 0
 GROUP BY payment_type
 ORDER BY total_revenue DESC

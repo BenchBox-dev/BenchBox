@@ -19,8 +19,8 @@ SELECT
     EXTRACT(HOUR FROM pickup_datetime) as hour,
     COUNT(*) as trip_count
 FROM trips
-WHERE pickup_datetime >= '2019-03-30'
-  AND pickup_datetime < '2019-04-29'
+WHERE pickup_datetime >= '2019-06-25'
+  AND pickup_datetime < '2019-07-25'
 GROUP BY EXTRACT(HOUR FROM pickup_datetime)
 ORDER BY hour
 ```

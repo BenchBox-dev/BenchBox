@@ -23,8 +23,8 @@ SELECT
     AVG(tip_amount) as avg_tip,
     SUM(total_amount) as total_revenue
 FROM trips
-WHERE pickup_datetime >= '2019-06-02'
-  AND pickup_datetime < '2019-07-02'
+WHERE pickup_datetime >= '2019-11-08'
+  AND pickup_datetime < '2019-12-08'
 GROUP BY vendor_id
 ORDER BY trip_count DESC
 ```

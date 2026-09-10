@@ -26,8 +26,8 @@ SELECT
 FROM trips t
 LEFT JOIN taxi_zones pz ON t.pickup_location_id = pz.location_id
 LEFT JOIN taxi_zones dz ON t.dropoff_location_id = dz.location_id
-WHERE t.pickup_datetime >= '2019-11-29'
-  AND t.pickup_datetime < '2019-12-29'
+WHERE t.pickup_datetime >= '2019-05-07'
+  AND t.pickup_datetime < '2019-06-06'
 GROUP BY t.pickup_location_id, pz.zone, t.dropoff_location_id, dz.zone
 ORDER BY trip_count DESC
 LIMIT 50

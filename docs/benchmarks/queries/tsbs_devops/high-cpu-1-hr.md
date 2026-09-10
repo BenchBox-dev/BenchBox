@@ -18,8 +18,8 @@ Rendered for **DataFusion** with default parameters.
 SELECT DISTINCT hostname
 FROM cpu
 WHERE usage_user > 90
-  AND time >= '2024-01-01 02:00:00'
-  AND time < '2024-01-01 03:00:00'
+  AND time >= '2024-01-01 19:00:00'
+  AND time < '2024-01-01 20:00:00'
 ```
 
 ## Representative DataFrame
