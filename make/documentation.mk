@@ -37,6 +37,9 @@ docs-validate:
 	@echo "Validating visualization screenshot sync..."
 	@uv run -- python scripts/validate_visualization_images.py
 	@echo ""
+	@echo "Generating per-query template pages (link targets, not committed)..."
+	@uv run -- python scripts/generate_query_docs.py
+	@echo ""
 	@echo "Checking repo-local doc relative links..."
 	@uv run -- python scripts/check_doc_relative_links.py
 
@@ -53,6 +56,13 @@ prompt-quickstarts-write:
 # Wired into docs CI by `landing-prompts-launch-gates`.
 prompt-quickstarts-check:
 	@uv run -- python scripts/generate_landing_quickstarts.py --check
+
+# Regenerate the per-query documentation tree under docs/benchmarks/queries/.
+# The tree is not committed (see docs/conf.py) -- the Sphinx build regenerates
+# it for the building host's platform, since TPC query text is not byte-stable
+# across architectures. This target is for previewing it outside a build.
+query-docs:
+	uv run -- python scripts/generate_query_docs.py
 
 # Run all documentation checks (build, linkcheck, validate)
 docs-check: docs-validate docs-linkcheck docs-build

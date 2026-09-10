@@ -6,6 +6,8 @@
 ```
 
 > **CLI name:** `flightdata` - use `benchbox run --benchmark flightdata`
+>
+> **Query templates:** [every Flight Data query](queries/flightdata/index.md)
 
 The Flight Data benchmark uses US Bureau of Transportation Statistics (BTS)
 On-Time Performance data to exercise real-world aviation analytics - delays,

@@ -6,6 +6,8 @@
 ```
 
 > **CLI name:** `read_primitives` - use `benchbox run --benchmark read_primitives`
+>
+> **Query templates:** [every Read Primitives query](queries/read_primitives/index.md)
 
 ## Overview
 

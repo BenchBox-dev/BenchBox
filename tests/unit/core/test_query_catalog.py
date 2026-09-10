@@ -20,7 +20,12 @@ from benchbox.core.query_catalog import (
     get_dataframe_render,
     get_sql_render,
     list_query_ids,
+    native_query_key,
+    query_description,
     query_display_name,
+    query_groups,
+    query_source_path,
+    supports_dialect_translation,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -87,6 +92,16 @@ class TestGetSqlRender:
         assert with_prefix.sql == without_prefix.sql
         assert without_prefix.dialect == "snowflake"
 
+    def test_vector_search_unsupported_dialect_falls_back_to_default(self):
+        render = get_sql_render("vector_search", "Q1", dialect="datafusion")
+        assert render is not None
+        assert render.dialect == "default"
+
+    def test_vector_search_supported_dialect_returns_dialect(self):
+        render = get_sql_render("vector_search", "Q1", dialect="postgresql")
+        assert render is not None
+        assert render.dialect == "postgresql"
+
     @pytest.mark.parametrize("benchmark_id", _ALL_BENCHMARK_IDS)
     def test_first_query_of_every_benchmark_renders(self, benchmark_id):
         first = list_query_ids(benchmark_id)[0]
@@ -124,5 +139,110 @@ class TestQueryDisplayName:
     def test_tpch_uses_dataframe_query_name(self):
         assert query_display_name("tpch", "1") == "Pricing Summary Report"
 
+    def test_get_query_info_name_wins(self):
+        # flightdata exposes get_query_info; nyctaxi/tsbs_devops likewise.
+        assert query_display_name("flightdata", "ontime-by-carrier") == "On-Time Rate by Carrier"
+
     def test_missing_name_is_none(self):
         assert query_display_name("does-not-exist", "1") is None
+
+    def test_description_available_for_named_benchmarks(self):
+        assert query_description("tpch", "1")
+        assert query_description("flightdata", "ontime-by-carrier")
+
+
+class TestQueryGroups:
+    def test_benchmark_without_scheme_is_none(self):
+        assert query_groups("tpch") is None
+        assert query_groups("does-not-exist") is None
+
+    def test_clickbench_dict_categories(self):
+        groups = query_groups("clickbench")
+        assert groups is not None
+        flat = [q for members in groups.values() for q in members]
+        assert sorted(flat) == sorted(list_query_ids("clickbench"))
+        assert len(flat) == len(set(flat)), "a query landed in two groups"
+
+    def test_list_categories_via_get_queries_by_category(self):
+        groups = query_groups("read_primitives")
+        assert groups is not None
+        flat = {q for members in groups.values() for q in members}
+        assert flat == set(list_query_ids("read_primitives"))
+
+    def test_query_info_category_field(self):
+        groups = query_groups("nyctaxi")
+        assert groups is not None
+        assert "temporal" in groups
+
+
+class TestNativeQueryKey:
+    def test_str_keyed_benchmark_returns_str(self):
+        assert native_query_key("tpch", "6") == "6"
+        assert isinstance(native_query_key("tpch", "6"), str)
+
+    def test_int_keyed_benchmark_returns_int(self):
+        # datavault's get_queries() keys are ints; a doc snippet indexing it
+        # directly needs the int, not "1".
+        assert native_query_key("datavault", "1") == 1
+        assert isinstance(native_query_key("datavault", "1"), int)
+
+    def test_q_prefixed_registry_still_resolves(self):
+        assert native_query_key("clickbench", "Q1") == "Q1"
+
+
+class TestDeterminism:
+    @pytest.mark.parametrize("benchmark_id", ["nyctaxi", "tsbs_devops", "tpcds_obt"])
+    def test_repeated_renders_are_identical(self, benchmark_id):
+        # These benchmarks derive query parameters from a stateful RNG or a
+        # per-process hash; the catalog must still render them identically on
+        # every call or the docs drift gate is unusable.
+        import benchbox.core.query_catalog as qc
+
+        def snapshot():
+            return {q: get_sql_render(benchmark_id, q).sql for q in list_query_ids(benchmark_id)}
+
+        first = snapshot()
+        qc._benchmark_instance.cache_clear()
+        qc._query_dict.cache_clear()
+        qc._raw_query_keys.cache_clear()
+        assert snapshot() == first
+
+
+class TestSupportsDialectTranslation:
+    def test_translating_and_non_translating_benchmarks(self):
+        assert supports_dialect_translation("tpch") is True
+        assert supports_dialect_translation("clickbench") is True
+        assert supports_dialect_translation("datavault") is False
+        assert supports_dialect_translation("tsbs_devops") is False
+
+    def test_dialect_specific_support(self):
+        assert supports_dialect_translation("vector_search", "postgresql") is True
+        assert supports_dialect_translation("vector_search", "datafusion") is False
+        assert supports_dialect_translation("tpch", "duckdb") is True
+
+
+class TestQuerySourcePath:
+    def test_tpch_points_at_template_file(self):
+        assert query_source_path("tpch", "1") == "benchbox/_binaries/tpc-h/templates/queries/1.sql"
+
+    def test_tpcds_points_at_template_file(self):
+        assert query_source_path("tpcds", "1") == "_sources/tpc-ds/query_templates/query1.tpl"
+
+    def test_generic_benchmark_points_at_queries_module(self):
+        assert query_source_path("clickbench", "Q1") == "benchbox/core/clickbench/queries.py"
+
+    def test_tpcdi_query_submodule_resolution(self):
+        assert query_source_path("tpcdi", "AQ1") == "benchbox/core/tpcdi/query_analytics.py"
+        assert query_source_path("tpcdi", "EQ1") == "benchbox/core/tpcdi/query_etl.py"
+        assert query_source_path("tpcdi", "VQ1") == "benchbox/core/tpcdi/query_validation.py"
+
+    def test_tpchavoc_variant_set_resolution(self):
+        assert query_source_path("tpchavoc", "1_v1") == "benchbox/core/tpchavoc/variant_sets/q01.py"
+
+    @pytest.mark.parametrize("benchmark_id", _ALL_BENCHMARK_IDS)
+    def test_path_when_present_exists_on_disk(self, benchmark_id):
+        from benchbox.core.query_catalog import _REPO_ROOT
+
+        rel = query_source_path(benchmark_id, list_query_ids(benchmark_id)[0])
+        if rel is not None:
+            assert (_REPO_ROOT / rel).is_file()

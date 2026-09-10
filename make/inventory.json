@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "1d830581fa4ad3673edf65af980b0ba0039aad08c8062bddfc7b56aa15873462",
+  "contract_sha256": "8a8264a08ba97bb2265518e793afca2bcdb7aeb65c8d09e733d06235e8464851",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -105,6 +105,7 @@
     "pr-status",
     "publication-help",
     "quality-governance-typecheck",
+    "query-docs",
     "read-primitives-cross-surface-equivalence-report",
     "release-cut",
     "release-cut-abort",
@@ -168,7 +169,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 198,
+  "public_target_count": 199,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -270,6 +271,7 @@
     "prompt-quickstarts-write",
     "publication-help",
     "quality-governance-typecheck",
+    "query-docs",
     "read-primitives-cross-surface-equivalence-report",
     "release-cut",
     "release-cut-abort",
@@ -815,8 +817,8 @@
     "docs-validate": [
       {
         "header": "docs-validate:",
-        "recipe": "\t@echo \"Validating example file references...\"\n\t@uv run -- python scripts/validate_example_references.py\n\t@echo \"\"\n\t@echo \"Checking example file syntax...\"\n\t@uv run -- python scripts/check_example_syntax.py\n\t@echo \"\"\n\t@echo \"Validating visualization screenshot sync...\"\n\t@uv run -- python scripts/validate_visualization_images.py\n\t@echo \"\"\n\t@echo \"Checking repo-local doc relative links...\"\n\t@uv run -- python scripts/check_doc_relative_links.py",
-        "recipe_sha256": "b0629e6ec2bc8b5860a97aff1bc5f418669782ab9b1a9a807e5163659ebd519f"
+        "recipe": "\t@echo \"Validating example file references...\"\n\t@uv run -- python scripts/validate_example_references.py\n\t@echo \"\"\n\t@echo \"Checking example file syntax...\"\n\t@uv run -- python scripts/check_example_syntax.py\n\t@echo \"\"\n\t@echo \"Validating visualization screenshot sync...\"\n\t@uv run -- python scripts/validate_visualization_images.py\n\t@echo \"\"\n\t@echo \"Generating per-query template pages (link targets, not committed)...\"\n\t@uv run -- python scripts/generate_query_docs.py\n\t@echo \"\"\n\t@echo \"Checking repo-local doc relative links...\"\n\t@uv run -- python scripts/check_doc_relative_links.py",
+        "recipe_sha256": "cab876f65ecfb55e3d0cb8802137d51ed2978fc85c680589307a7ca5d8b5962d"
       }
     ],
     "docstring-coverage": [
@@ -1239,6 +1241,13 @@
         "header": "quality-governance-typecheck:",
         "recipe": "\tuv run ty check --error all _project/scripts/check_complexity.py",
         "recipe_sha256": "9fd2ca88508859aa29f452c7ac3c9a60edd6101a4f81e1576cbf54a8ea7decc7"
+      }
+    ],
+    "query-docs": [
+      {
+        "header": "query-docs:",
+        "recipe": "\tuv run -- python scripts/generate_query_docs.py",
+        "recipe_sha256": "36fe22ca95051c2090f117fc7efaf642608101eddfc90588eb974edba1b457aa"
       }
     ],
     "read-primitives-cross-surface-equivalence-report": [
@@ -2040,7 +2049,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "c3c2a8015d1fb77670381cdfa931a16d7409d3979928420afbffd7bdbd9aadd4",
+  "semantic_sha256": "978b00645fc5b9db6bd149c66e853a4366ed7f01407116747b1d5afbcf825f63",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2157,9 +2166,9 @@
       "sha256": "08788a1d7d394407fce2eb0df7e8ca4b9912570a8ae5fd607011d0650021033f"
     },
     {
-      "body": ".PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check platform-manifest platform-manifest-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit",
+      "body": ".PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit",
       "kind": "rule",
-      "sha256": "37978e04bc98e8a469be7a0cd11e23b16b91b7baf4c68440f8bf074534f10943",
+      "sha256": "690189a9c2b128932cb03e2e3a48a90bfcd79bdd8d65fb972dbcf7aa43ae3d26",
       "targets": [
         ".PHONY"
       ]
@@ -3453,9 +3462,9 @@
       ]
     },
     {
-      "body": "docs-validate:\n\t@echo \"Validating example file references...\"\n\t@uv run -- python scripts/validate_example_references.py\n\t@echo \"\"\n\t@echo \"Checking example file syntax...\"\n\t@uv run -- python scripts/check_example_syntax.py\n\t@echo \"\"\n\t@echo \"Validating visualization screenshot sync...\"\n\t@uv run -- python scripts/validate_visualization_images.py\n\t@echo \"\"\n\t@echo \"Checking repo-local doc relative links...\"\n\t@uv run -- python scripts/check_doc_relative_links.py",
+      "body": "docs-validate:\n\t@echo \"Validating example file references...\"\n\t@uv run -- python scripts/validate_example_references.py\n\t@echo \"\"\n\t@echo \"Checking example file syntax...\"\n\t@uv run -- python scripts/check_example_syntax.py\n\t@echo \"\"\n\t@echo \"Validating visualization screenshot sync...\"\n\t@uv run -- python scripts/validate_visualization_images.py\n\t@echo \"\"\n\t@echo \"Generating per-query template pages (link targets, not committed)...\"\n\t@uv run -- python scripts/generate_query_docs.py\n\t@echo \"\"\n\t@echo \"Checking repo-local doc relative links...\"\n\t@uv run -- python scripts/check_doc_relative_links.py",
       "kind": "rule",
-      "sha256": "357f8497eba33af62f80053a22f696264c06ddc4b19e3c8576f01979593f82f0",
+      "sha256": "cc7ed1c8baf5896e794fdc0b70d602635fa310a1e6af6ff1d51fba0bfe8b041c",
       "targets": [
         "docs-validate"
       ]
@@ -3482,6 +3491,14 @@
       "sha256": "86041e12be84dcb4c50ff94959c2e9bbf9a8bd91efe25d282be3c7a572871546",
       "targets": [
         "prompt-quickstarts-check"
+      ]
+    },
+    {
+      "body": "query-docs:\n\tuv run -- python scripts/generate_query_docs.py",
+      "kind": "rule",
+      "sha256": "4c4f089ef07834427964eecc20323daee6cfded27f1c3600eeef0f260a77f35b",
+      "targets": [
+        "query-docs"
       ]
     },
     {
@@ -4149,7 +4166,7 @@
       ]
     }
   ],
-  "target_count": 204,
+  "target_count": 205,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -4254,6 +4271,7 @@
     "prompt-quickstarts-write",
     "publication-help",
     "quality-governance-typecheck",
+    "query-docs",
     "read-primitives-cross-surface-equivalence-report",
     "release-cut",
     "release-cut-abort",

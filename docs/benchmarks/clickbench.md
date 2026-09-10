@@ -99,7 +99,13 @@ The HITS table contains realistic web analytics distributions:
 
 ## Query Characteristics
 
-ClickBench includes 43 queries that test different aspects of analytical performance:
+ClickBench includes 43 queries that test different aspects of analytical performance.
+
+```{tip}
+Each query has a [query template](queries/clickbench/index.md) with a
+representative SQL and DataFrame rendering, plus how to extract the exact
+statement for your platform and scale.
+```
 
 ### Basic Aggregation Queries (Q1-Q7)
 

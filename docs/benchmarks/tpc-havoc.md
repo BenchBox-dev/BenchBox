@@ -6,6 +6,8 @@
 ```
 
 > **CLI name:** `tpchavoc` - use `benchbox run --benchmark tpchavoc`
+>
+> **Query templates:** [every TPC-Havoc query](queries/tpchavoc/index.md)
 
 ## Overview
 

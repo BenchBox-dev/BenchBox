@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 import re
+import zlib
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -247,7 +248,10 @@ class TemplateLoader:
         if not count_match:
             return None
         count = int(count_match.group(1))
-        rng = random.Random(self.query_id * 1000 + hash(name) % 10000)
+        # zlib.crc32, not hash(): the builtin str hash is salted per process
+        # (PYTHONHASHSEED), which made these "default" ulist values differ
+        # between runs and broke reproducibility of the rendered query text.
+        rng = random.Random(self.query_id * 1000 + zlib.crc32(name.encode()) % 10000)
         if hi - lo + 1 < count:
             return None  # Range too small for unique values
         return rng.sample(range(lo, hi + 1), count)

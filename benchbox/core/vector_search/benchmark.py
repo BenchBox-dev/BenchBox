@@ -191,6 +191,10 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
         """Return all queries, optionally applying compat-gated dialect variants."""
         return self.query_manager.get_all_queries(dialect=dialect, platform_version=platform_version)
 
+    def supported_dialects(self) -> list[str]:
+        """Return list of dialects with explicit variant SQL."""
+        return self.query_manager.supported_dialects()
+
     # ------------------------------------------------------------------
     # Query execution
     # ------------------------------------------------------------------

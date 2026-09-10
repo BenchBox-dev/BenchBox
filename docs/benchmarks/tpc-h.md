@@ -70,34 +70,37 @@ erDiagram
 
 ## Query Characteristics
 
-The 22 TPC-H queries test different aspects of query processing:
+The 22 TPC-H queries test different aspects of query processing. Each query
+below links to its [query template](queries/tpch/index.md) — a representative
+SQL and DataFrame rendering plus how to extract the exact statement for your
+platform and scale.
 
 ### Query Categories
 
 | Query | Type | Key Features |
 |-------|------|-------------|
-| Q1 | **Pricing Summary Report** | Aggregation, GROUP BY, no joins |
-| Q2 | **Minimum Cost Supplier** | Nested subqueries, correlated queries |
-| Q3 | **Shipping Priority** | 3-table join, ORDER BY, LIMIT |
-| Q4 | **Order Priority Checking** | EXISTS subquery, temporal predicates |
-| Q5 | **Local Supplier Volume** | 6-table join, regional aggregation |
-| Q6 | **Forecasting Revenue** | Simple filter, aggregation |
-| Q7 | **Volume Shipping** | Nation-to-nation shipping analysis |
-| Q8 | **National Market Share** | Complex aggregation, CASE expressions |
-| Q9 | **Product Type Profit** | Multi-year profit analysis |
-| Q10 | **Returned Item Reporting** | Customer analysis with joins |
-| Q11 | **Important Stock** | Subquery with aggregation |
-| Q12 | **Shipping Modes** | Mail type analysis |
-| Q13 | **Customer Distribution** | Outer join, customer classification |
-| Q14 | **Promotion Effect** | Revenue analysis with CASE |
-| Q15 | **Top Supplier** | VIEW creation, supplier ranking |
-| Q16 | **Parts/Supplier Relationship** | Complex filtering, NOT IN |
-| Q17 | **Small-Quantity-Order Revenue** | Subquery with aggregation |
-| Q18 | **Large Volume Customer** | Customer ranking by volume |
-| Q19 | **Discounted Revenue** | Complex OR conditions |
-| Q20 | **Potential Part Promotion** | Multi-level subqueries |
-| Q21 | **Suppliers Who Kept Orders** | Multiple EXISTS/NOT EXISTS |
-| Q22 | **Global Sales Opportunity** | Geographic analysis |
+| [Q1](queries/tpch/q1.md) | **Pricing Summary Report** | Aggregation, GROUP BY, no joins |
+| [Q2](queries/tpch/q2.md) | **Minimum Cost Supplier** | Nested subqueries, correlated queries |
+| [Q3](queries/tpch/q3.md) | **Shipping Priority** | 3-table join, ORDER BY, LIMIT |
+| [Q4](queries/tpch/q4.md) | **Order Priority Checking** | EXISTS subquery, temporal predicates |
+| [Q5](queries/tpch/q5.md) | **Local Supplier Volume** | 6-table join, regional aggregation |
+| [Q6](queries/tpch/q6.md) | **Forecasting Revenue** | Simple filter, aggregation |
+| [Q7](queries/tpch/q7.md) | **Volume Shipping** | Nation-to-nation shipping analysis |
+| [Q8](queries/tpch/q8.md) | **National Market Share** | Complex aggregation, CASE expressions |
+| [Q9](queries/tpch/q9.md) | **Product Type Profit** | Multi-year profit analysis |
+| [Q10](queries/tpch/q10.md) | **Returned Item Reporting** | Customer analysis with joins |
+| [Q11](queries/tpch/q11.md) | **Important Stock** | Subquery with aggregation |
+| [Q12](queries/tpch/q12.md) | **Shipping Modes** | Mail type analysis |
+| [Q13](queries/tpch/q13.md) | **Customer Distribution** | Outer join, customer classification |
+| [Q14](queries/tpch/q14.md) | **Promotion Effect** | Revenue analysis with CASE |
+| [Q15](queries/tpch/q15.md) | **Top Supplier** | VIEW creation, supplier ranking |
+| [Q16](queries/tpch/q16.md) | **Parts/Supplier Relationship** | Complex filtering, NOT IN |
+| [Q17](queries/tpch/q17.md) | **Small-Quantity-Order Revenue** | Subquery with aggregation |
+| [Q18](queries/tpch/q18.md) | **Large Volume Customer** | Customer ranking by volume |
+| [Q19](queries/tpch/q19.md) | **Discounted Revenue** | Complex OR conditions |
+| [Q20](queries/tpch/q20.md) | **Potential Part Promotion** | Multi-level subqueries |
+| [Q21](queries/tpch/q21.md) | **Suppliers Who Kept Orders** | Multiple EXISTS/NOT EXISTS |
+| [Q22](queries/tpch/q22.md) | **Global Sales Opportunity** | Geographic analysis |
 
 ### Complexity Patterns
 
