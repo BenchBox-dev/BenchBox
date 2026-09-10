@@ -205,9 +205,8 @@ jobs:
             DURABLE_ID=$(printf '%s' "$STATE_JSON" | jq -r '.durable_transaction_id // empty')
             if [ -n "$DURABLE_ID" ]; then
               git show "refs/heads/publication:publication/transaction-state/transactions/$DURABLE_ID.json" > durable-parent.json
-              if EXPECTED_PARENT_GENERATION="$((GENERATION - 1))" uv run python - <<'PY'
+              if uv run python - <<'PY'
           import json
-          import os
           from pathlib import Path
           from scripts.publication.reconciliation import verify_live_receipt_signature
 
@@ -218,8 +217,6 @@ jobs:
           valid, _ = verify_live_receipt_signature(receipt)
           if not valid or receipt.get("target") != "benchbox.dev":
               raise SystemExit(1)
-          if receipt.get("generation") != int(os.environ["EXPECTED_PARENT_GENERATION"]):
-              raise SystemExit(1)
           PY
               then
                 PRIOR_LIVE_RECEIPT_ID=$(jq -r '.attestation.receipt_id // empty' durable-parent.json)
@@ -228,6 +225,13 @@ jobs:
                 PARENT_ARTIFACT_ID=$(jq -r '.artifact.artifact_id // empty' durable-parent.json)
                 [ -n "$PRIOR_LIVE_RECEIPT_ID" ] && [ -n "$PARENT_SHA" ] && [ -n "$PARENT_ARTIFACT_ID" ] || {
                   echo "::error::durable publication head lacks a complete attested parent binding"
+                  exit 1
+                }
+                # Generations are monotonic but not dense: a voided pre-send
+                # reservation retires its number, so the durable head may
+                # precede this generation by more than one.
+                [ "$PARENT_GENERATION" -lt "$GENERATION" ] || {
+                  echo "::error::durable generation $PARENT_GENERATION does not precede generation $GENERATION"
                   exit 1
                 }
                 printf '%s\n' "$PARENT_SHA" > prior-live-receipt/parent-sha
@@ -292,14 +296,17 @@ jobs:
                 echo "::error::prior_live_receipt_id is stale; current live head is $RECEIPT_ID"
                 exit 1
               }
-              [ "$RECEIPT_GENERATION" = "$((GENERATION - 1))" ] || {
-                echo "::error::generation $GENERATION is not the successor of live generation $RECEIPT_GENERATION"
+              # Same density rule as the durable branch above: the new
+              # generation must strictly advance beyond the attested live
+              # head, which need not be its immediate predecessor.
+              [ "$RECEIPT_GENERATION" -lt "$GENERATION" ] || {
+                echo "::error::generation $GENERATION does not advance beyond live generation $RECEIPT_GENERATION"
                 exit 1
               }
               cp prior-candidate/live-receipt.json prior-live-receipt/live-receipt.json
               PARENT_SHA=$(uv run python -c "import json; print(json.load(open('prior-live-receipt/live-receipt.json'))['source_commit'])")
               echo "parent_sha=$PARENT_SHA" >> "$GITHUB_OUTPUT"
-              echo "parent_generation=$((GENERATION - 1))" >> "$GITHUB_OUTPUT"
+              echo "parent_generation=$RECEIPT_GENERATION" >> "$GITHUB_OUTPUT"
               echo "parent_artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
               exit 0
             fi

@@ -147,7 +147,42 @@ def test_reject_invalid_generation_and_parent():
         corpus=sample_corpus(),
     )
     errors = validate_manifest_dict(m2_bad_parent_gen.to_dict())
-    assert any("parent_generation must be 1" in e for e in errors)
+    assert any("parent_generation must precede generation 2" in e for e in errors)
+
+
+def test_accept_retired_generation_gap_parent():
+    # A voided pre-send reservation retires its number: generation 5 may
+    # follow durable generation 3 directly.
+    m5_gap = PublicationManifest(
+        generation=5,
+        parent_sha="0" * 40,
+        parent_generation=3,
+        source_commit="f" * 40,
+        source_branch="develop",
+        develop_sha="d" * 40,
+        published_results_sha="c" * 40,
+        build_closure=sample_closure(),
+        artifacts=sample_artifacts(),
+        corpus=sample_corpus(),
+    )
+    errors = validate_manifest_dict(m5_gap.to_dict())
+    assert not any("parent_generation" in e for e in errors)
+
+    # A parent at or beyond the generation is still rejected.
+    m5_bad_parent = PublicationManifest(
+        generation=5,
+        parent_sha="0" * 40,
+        parent_generation=5,
+        source_commit="f" * 40,
+        source_branch="develop",
+        develop_sha="d" * 40,
+        published_results_sha="c" * 40,
+        build_closure=sample_closure(),
+        artifacts=sample_artifacts(),
+        corpus=sample_corpus(),
+    )
+    errors = validate_manifest_dict(m5_bad_parent.to_dict())
+    assert any("parent_generation must precede generation 5" in e for e in errors)
 
 
 def test_reject_incomplete_build_closure():
