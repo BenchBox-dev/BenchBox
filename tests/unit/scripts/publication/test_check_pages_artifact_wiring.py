@@ -134,3 +134,13 @@ def test_matching_step_output_reference_passes(tmp_path: Path) -> None:
 def test_publication_workflow_step_outputs_resolve(workflow_path: Path) -> None:
     assert workflow_path.is_file()
     assert find_unknown_step_outputs(workflow_path) == []
+
+
+def test_deploy_script_sends_resolvable_build_version() -> None:
+    # The provider resolves pages_build_version as a commit. Sending the
+    # journal's dangling write-intent OID made it reject the create request
+    # with 404, so the wire value must be the run's pushed source SHA while
+    # intent correlation stays in the journal's write record.
+    text = (REPO_ROOT / ".github/workflows/publication-transaction.yml").read_text(encoding="utf-8")
+    assert "pages_build_version: '${{ github.sha }}'" in text
+    assert "start_write.outputs.pages_build_version" not in text
