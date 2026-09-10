@@ -986,19 +986,35 @@ describe("BenchmarkIndex", () => {
       display_geomean_ms: index + 1,
       geomean_ms: index + 1,
     }));
-    vi.mocked(queryRows).mockImplementation(defaultImpl(manyRows, RANKING_ROWS, CELL_ROWS));
+    // Hold the Matrix/Ranks summary back while List paginates: ListTable's
+    // visible-limit reset effect depends only on benchmark, scale factor,
+    // facets, and sort, so a late summary resolution must not collapse the
+    // expanded List. Resolving the deferred ranking afterwards proves that
+    // directly, instead of waiting on the Matrix's unrelated async section
+    // before exercising List (which flaked on slower hosted runners).
+    let finishRanking!: (rows: unknown[]) => void;
+    const ranking = new Promise<unknown[]>((resolve) => { finishRanking = resolve; });
+    const fallback = defaultImpl(manyRows, RANKING_ROWS, CELL_ROWS);
+    vi.mocked(queryRows).mockImplementation((sql, params) =>
+      sql.includes("FROM bench.benchmark_rankings") ? ranking : fallback(sql, params),
+    );
 
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    // List's own readiness signal - independent of the Matrix summary.
     await waitFor(() => expect(screen.getByText("Showing 200 of 205 results for SF 0.1")).toBeTruthy());
-    // Let the Matrix section's async summary query settle too, so its
-    // resolution doesn't re-render the page (and reset List's visible-limit
-    // effect) after the click below.
-    await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());
     expect(getRenderedResultOrder(listRoot(container))).toHaveLength(200);
 
     fireEvent.click(screen.getByRole("button", { name: "Show more results" }));
 
     await waitFor(() => expect(getRenderedResultOrder(listRoot(container))).toHaveLength(205));
+    expect(screen.getByText("Showing 205 of 205 results for SF 0.1")).toBeTruthy();
+
+    // A late summary resolution re-renders the page but must leave the
+    // expanded List alone. The trailing Q1 assertion proves the summary
+    // actually resolved, so the stability check above it is non-vacuous.
+    finishRanking([...RANKING_ROWS]);
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());
+    expect(getRenderedResultOrder(listRoot(container))).toHaveLength(205);
     expect(screen.getByText("Showing 205 of 205 results for SF 0.1")).toBeTruthy();
   });
 

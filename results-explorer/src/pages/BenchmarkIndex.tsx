@@ -1206,7 +1206,15 @@ function ListTable({
   }, [filtered, groupBy, visibleLimit]);
   const runIdentityLabels = formatRunIdentitiesForCohort(filtered, "table");
 
+  // Skip the mount run: visibleLimit already starts at TABLE_RENDER_LIMIT,
+  // and a mount-time reset would silently eat a Show more click that lands
+  // before this effect flushes.
+  const skipVisibleLimitResetOnMount = useRef(true);
   useEffect(() => {
+    if (skipVisibleLimitResetOnMount.current) {
+      skipVisibleLimitResetOnMount.current = false;
+      return;
+    }
     setVisibleLimit(TABLE_RENDER_LIMIT);
   }, [
     benchmark,
