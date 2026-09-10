@@ -1,0 +1,107 @@
+{
+  "schema": "pr_process_acceptance_baseline_v1",
+  "criteria_version": "1.0.0",
+  "source_session": "01a07292-20c8-7883-b146-8027bf733ac1",
+  "handoff": "/tmp/benchbox-pr-batch-implementation-handoff-2026-09-08.md",
+  "registered_at": "2026-09-08T12:33:43Z",
+  "base_ref": "develop",
+  "base_commit_at_freeze": "b221e852dba0ec2aa4bce79f15100fb909ff5599",
+  "note": "FROZEN PREREGISTRATION. Thresholds, scenarios, strata and metric definitions below are fixed before dependent implementation. Measured values are filled by ci-baseline w2 remeasurement under these frozen definitions; any later criteria change requires a criteria_version bump and disclosure, never silent application to a measured cohort. The registration commit is bound externally (introducing-commit digest in commit message and batch ledger), not inside this file, to avoid a self-referential commit field.",
+  "historical_cohort": {
+    "window": "trailing 28 days of merged develop PRs ending at registration",
+    "unit": "one legitimate merged develop PR, complete lifecycle",
+    "completeness": "every synchronize head SHA and every workflow run attempt per PR, including cancelled and superseded runs; merge_group and post-merge runs correlated separately, never credited to the authored head",
+    "missing_evidence_policy": "expired/incomplete artifact observations are quantified as missing with explicit missing-artifact status, never silently excluded and never counted as green"
+  },
+  "incident_scenarios": [
+    "2051-integrated-ranking-browser-partial-fixture",
+    "2055-2056-queued-branch-push-revision-race",
+    "2076-late-fix-merge-before-corrections",
+    "2071-2068-bigquery-dotted-junit-unrelated-revert",
+    "2073-ledger-moving-ref-wrong-attribution",
+    "test-lock-contention-shared-flock-collision",
+    "pending-review-at-turn-end-unowned-continuation",
+    "external-ref-movement-mirror-drift",
+    "concurrent-writer-conflicting-integration-edit",
+    "late-member-after-readiness"
+  ],
+  "metric_definitions": {
+    "collector": "_project/scripts/dev_loop_pr_metrics.py",
+    "schema": "event_fanout_v1",
+    "fields": [
+      "pushes_after_open",
+      "open_to_merge_seconds",
+      "first_pass_green",
+      "required_gate_seconds",
+      "merge_unblock_seconds",
+      "all_workflow_seconds",
+      "queue_delay_seconds",
+      "completed_runner_minutes",
+      "cancelled_runner_minutes",
+      "medium_test_job_seconds_p95"
+    ],
+    "avoidable_action": "one authored push whose tree equals its parent feature tree and only moves the base (ancestry-only refresh), or one local validation execution duplicated against an identical already-completed input identity",
+    "denominator": "equivalent delivered outcomes over the cohort window, counting worker plus integration work, local plus hosted checks, all heads and attempts, cancellations, abandoned work and human effort; fewer PRs or a shorter post-open interval alone is not a saving"
+  },
+  "thresholds": {
+    "avoidable_action_reduction": 0.5,
+    "safety": "no added required-lane failure and no weakened trust boundary attributable to coordination",
+    "p95": "no measured medium-test p95 regression attributable to coordination",
+    "baseline_avoidable_actions": "to_be_measured_in_w2"
+  },
+  "prospective_cohort": {
+    "min_prs": 10,
+    "min_days": 7,
+    "strata": [
+      "product",
+      "content-or-skill",
+      "concurrent-or-base-movement",
+      "review-remediation"
+    ],
+    "human_hold": "at least one operator-approved soundness flow held until its real approval",
+    "batch_deliveries": {
+      "min_deliveries": 2,
+      "members_per_delivery_min": 2,
+      "internal_implementation_dependency_min": 1,
+      "counting": "a batch delivery counts toward the PR cohort as the PRs it lands as, never as one sample per member"
+    },
+    "insufficiency_policy": "missing strata or observations keep acceptance insufficient; no fabricated traffic and no synthetic canaries"
+  },
+  "prior_evidence_disclosed": {
+    "concurrency_audit": "195 merged PRs: 0.27 cancelled vs 15682.1 completed runner-minutes on final heads; 15 superseded pushes averaged 42.5 runner-minutes discarded mid-flight (_project/audits/develop-pr-concurrency-2026-09-06.md); final-head-only aggregates do not prove whole-lifecycle cost",
+    "refresh_shadow_snapshot": "single-afternoon sample, 3 shadow_eligible first-refresh hits; weak, not a skip-safety measure",
+    "skill_lane": "one legitimate sample (PR #1996); durable budget requires three",
+    "pre_lane_baseline": "behind-pr-occurrence-02 / PR #1756, 2026-08-14 through 2026-08-17 interarrival p50 31.3 minutes"
+  },
+  "feature_batch_preregistration": {
+    "delivery_id": "pr-batch-process-improvements",
+    "members": [
+      "ci-baseline-representative-remeasure-sample",
+      "publication-ledger-reproducible-inputs",
+      "pr-local-validation-singleflight",
+      "batch-prepared-delivery-tracker-and-skill",
+      "batch-feature-branch-integration",
+      "pr-revision-readiness-transaction",
+      "native-queue-local-landing",
+      "post-merge-attribution-recovery",
+      "pr-followup-resumable-ownership",
+      "batch-skill-pinned-rollout",
+      "review-remediations-verify-per-instance",
+      "develop-pr-concurrency-discards-nearly-complete-gates",
+      "exact-refresh-eligibility-penalises-staying-current",
+      "skill-integrity-ci-lane-live-validation",
+      "pr-process-low-drama-acceptance"
+    ],
+    "comparison_units": "feature-start-to-land lead time and total agent/user effort per equivalent delivered outcome, including assembly, worker plus integration validation, cancelled/abandoned work and backlog throughput",
+    "timestamps_to_record": [
+      "feature_start",
+      "first_commit",
+      "first_prepare",
+      "first_integration",
+      "pr_open",
+      "merge"
+    ],
+    "branch": "feat/pr-batch-process-improvements"
+  },
+  "change_policy": "Any criteria change after registration is a new criteria_version with a disclosed diff; measured cohorts are never re-scored under changed criteria."
+}

@@ -335,6 +335,57 @@ def _fetch_environment(repo: str, token: str, name: str = PYPI_ENVIRONMENT) -> d
     return _api_json(f"https://api.github.com/repos/{repo}/environments/{name}", token)
 
 
+# Approved native merge-queue parameters for refs/heads/develop, per
+# _project/decisions/native-merge-queue-activation-20260822.md (2026-08-31
+# amendment: ALLGREEN, 60-minute timeout, max 5 build / 5 merge). One
+# expected-policy source; protected-setting changes are reported for
+# operator action, never silently repaired.
+APPROVED_MERGE_QUEUE: dict[str, object] = {
+    "merge_method": "SQUASH",
+    "grouping_strategy": "ALLGREEN",
+    "min_entries_to_merge": 1,
+    "max_entries_to_build": 5,
+    "max_entries_to_merge": 5,
+    "check_response_timeout_minutes": 60,
+    "min_entries_to_merge_wait_minutes": 0,
+}
+APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (
+    "ci-required-result",
+    "Results Explorer browser gate",
+    "ruleset-drift",
+)
+
+
+def merge_queue_findings(live: dict[str, Any], name: str) -> list[str]:
+    """Validate the live merge_queue rule against the approved parameters.
+
+    A missing rule is blocking when the payload is otherwise well-formed
+    (other rules visible proves the API is not redacting): an absent queue
+    rule invalidates queue-aware publication policy. Only an empty or
+    unreadable payload stays a non-blocking warning; present-but-different
+    parameters are blocking findings for operator action.
+    """
+    findings: list[str] = []
+    rule = _rule_by_type(live, "merge_queue")
+    if rule is None:
+        if live.get("rules"):
+            return [
+                f"{name}: ruleset payload lists rules but no merge_queue rule; "
+                "queue-aware publication is unverified, verify queue parameters "
+                "(SQUASH/ALLGREEN/1/5/5/60m/0) in repository settings"
+            ]
+        return [
+            f"{WARNING_PREFIX}{name}: no merge_queue rule in this ruleset payload; "
+            "verify queue parameters (SQUASH/ALLGREEN/1/5/5/60m/0) in repository settings"
+        ]
+    params = rule.get("parameters", {}) or {}
+    for key, approved in APPROVED_MERGE_QUEUE.items():
+        live_value = params.get(key)
+        if live_value != approved:
+            findings.append(f"{name}: merge_queue {key} is {live_value!r}, expected {approved!r}")
+    return findings
+
+
 def blocking_findings(findings: list[str]) -> list[str]:
     """Findings that should fail the check (excludes WARNING_PREFIX entries)."""
     return [finding for finding in findings if not finding.startswith(WARNING_PREFIX)]
@@ -409,6 +460,9 @@ def main(argv: list[str] | None = None) -> int:
                 require_bypass_actor_visibility=args.require_bypass_actor_visibility,
             )
         )
+    develop_live = live_by_name.get("develop-squash-only")
+    if develop_live is not None:
+        findings.extend(merge_queue_findings(develop_live, "develop-squash-only"))
     findings.extend(
         tag_creation_findings(
             list(live_by_name.values()),

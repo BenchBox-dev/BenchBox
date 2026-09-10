@@ -258,3 +258,15 @@ All 274 PRs merged to `develop` between 2026-08-17 and 2026-09-06 were examined 
 - **Action:** TODO item `skill-integrity-ci-lane-live-validation` remains blocked awaiting two additional legitimate consumer PRs. No synthetic canaries or artificial triggers will be created.
 - **Next review date:** `2026-09-20` (14 days from this interim checkpoint).
 - **Durable budget:** Unmeasured. No durable budget or gate weakening is derived from an incomplete 1-sample cohort.
+
+### Addendum: Day-22 scan (2026-09-08, still INSUFFICIENT SAMPLE)
+
+24 PRs merged to `develop` between 2026-09-06 and the frozen window end
+(2026-09-08T12:33:43Z). The `origin/develop` first-parent range contains zero
+commits touching `.claude/skills/**`, `skill-sync.yaml`, or `skill-sync.lock`
+in that span. The only skill-titled merges are PR #2076 and PR #2077, which
+touch only this decision file (docs evidence checkpoint, not a consumer PR);
+PR #2042 (todo-db vendor, merged 2026-09-05) touches `AGENTS.md`, `.mcp.json`,
+and a vendored wheel, so it is mixed-lane, not skill-only. Observed samples
+remain 1 of 3; `sample-2` and `sample-3` still pending legitimate consumer
+PRs. Next review date unchanged (`2026-09-20`). No synthetic canaries created.

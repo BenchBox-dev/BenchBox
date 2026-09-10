@@ -1,8 +1,10 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-09-07T12:56:56.870379+00:00",
+  "generated_at": "2026-09-08T12:44:25.700532+00:00",
   "source": "086cb68d585a188585774b91d039ae7f243e4cde",
   "source_ref": "origin/published-results",
+  "source_resolved_at": "2026-09-08T12:44:25.700532+00:00",
+  "source_resolved_from": "origin/published-results",
   "main_source": "working-tree",
   "bidirectional": true,
   "union": [

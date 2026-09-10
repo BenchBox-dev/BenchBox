@@ -1,0 +1,94 @@
+{
+  "schema": "pr_process_acceptance_v1",
+  "status": "INCOMPLETE",
+  "note": "Live acceptance record. The validator exits non-zero until every dimension passes; incomplete stays incomplete. Do not edit thresholds or scenarios after observing results \u2014 any criteria change is a new criteria_version with disclosure. Baseline avoidable actions corrected 65 -> 284 with the full-cohort lifecycle rebuild (correction commit, same frozen window). 2051-integrated-ranking-browser-partial-fixture stays pending: it needs a hosted browser lane and cannot replay locally; next condition is a CI browser run against the partial fixture.",
+  "process_binding": {
+    "criteria_version": "1.0.0",
+    "process_digest": "88a5e3b19f8dac60d89909a336baa084333ed52645ecad26409a8ebaadead118"
+  },
+  "registration": {
+    "commit": "d2fa960e4ab81d71af0ba0f5f13ad0f844c5e577",
+    "time": "2026-09-08T12:33:43Z"
+  },
+  "incident_replays": [
+    {
+      "scenario": "2051-integrated-ranking-browser-partial-fixture",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "scenario": "2055-2056-queued-branch-push-revision-race",
+      "status": "pass",
+      "evidence": "tests/unit/scripts/test_pr_landing.py::test_enqueue_refuses_moved_head, ::test_withdraw_on_merged_pr_stops_with_race"
+    },
+    {
+      "scenario": "2076-late-fix-merge-before-corrections",
+      "status": "pass",
+      "evidence": "tests/unit/scripts/test_pr_landing.py::test_ready_rejects_late_review_unpublished_and_stale_checks"
+    },
+    {
+      "scenario": "2071-2068-bigquery-dotted-junit-unrelated-revert",
+      "status": "pass",
+      "evidence": "tests/unit/scripts/test_post_merge_signature.py::test_dotted_bigquery_style_classname_normalizes"
+    },
+    {
+      "scenario": "2073-ledger-moving-ref-wrong-attribution",
+      "status": "pass",
+      "evidence": "tests/unit/scripts/publication/test_ledger_seed.py::test_isolated_replay_moved_ref_fails_closed_snapshot_reproduces"
+    },
+    {
+      "scenario": "test-lock-contention-shared-flock-collision",
+      "status": "pass",
+      "evidence": "tests/unit/scripts/test_local_validation.py::test_concurrent_identical_requests_execute_once"
+    },
+    {
+      "scenario": "pending-review-at-turn-end-unowned-continuation",
+      "status": "pass",
+      "evidence": "tests/unit/scripts/test_pr_landing.py::test_followup_never_reports_done_from_emptiness"
+    },
+    {
+      "scenario": "external-ref-movement-mirror-drift",
+      "status": "pass",
+      "evidence": "tests/unit/scripts/publication/test_ledger_seed.py::test_isolated_replay_mirror_drift_breaks_bidirectional"
+    },
+    {
+      "scenario": "concurrent-writer-conflicting-integration-edit",
+      "status": "pass",
+      "evidence": "tests/unit/scripts/test_batch_integration.py::test_single_integrator_enforcement, tests/integration/worktree/test_pr_process.py::test_two_writers_second_blocked_without_mutation"
+    },
+    {
+      "scenario": "late-member-after-readiness",
+      "status": "pass",
+      "evidence": "tests/unit/scripts/test_batch_integration.py::test_late_member_after_readiness_requires_revalidation"
+    }
+  ],
+  "cohort": {
+    "required": {
+      "window_start": "2026-09-08T12:33:43+00:00",
+      "window_end": null,
+      "min_prs": 10,
+      "min_days": 7,
+      "strata": [
+        "product",
+        "content-or-skill",
+        "concurrent-or-base-movement",
+        "review-remediation"
+      ]
+    },
+    "observed": {
+      "window_start": "2026-09-08T12:33:43+00:00",
+      "window_end": null,
+      "prs": 0,
+      "days": 0,
+      "strata": [],
+      "batch_deliveries": [],
+      "human_hold": false
+    }
+  },
+  "efficiency": {
+    "baseline_avoidable_actions": 284,
+    "observed_avoidable_actions": null,
+    "added_required_lane_failure": false,
+    "p95_regression_attributable": false
+  }
+}

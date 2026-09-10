@@ -20,6 +20,9 @@ const BASELINE = process.env.PUBLIC_SITE_VISUAL_BASELINE
   : undefined;
 const REQUIRE_BASELINE = process.env.PUBLIC_SITE_VISUAL_REQUIRE_BASELINE === "1";
 const SOURCE_SHA = process.env.PUBLIC_SITE_VISUAL_SOURCE_SHA ?? "unknown";
+// Match the protected baseline's UTC capture day so relative run ages do not
+// make an otherwise unchanged screenshot expire every midnight.
+const VISUAL_REFERENCE_TIME = new Date("2026-09-08T19:35:00Z");
 const VIEWPORTS = [390, 768, 1280, 1600] as const;
 const ROUTES = [
   { slug: "landing", path: "/", heading: /benchbox/i },
@@ -61,6 +64,7 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
     for (const route of ROUTES) {
       const context = await browser.newContext({ viewport: { width, height: 900 } });
       const page = await context.newPage();
+      await page.clock.setFixedTime(VISUAL_REFERENCE_TIME);
       await page.goto(route.path, { waitUntil: "networkidle" });
       await expect(page.locator("body")).toContainText(route.heading);
       if ("ready" in route) await waitForDataLoaded(page, route.ready);

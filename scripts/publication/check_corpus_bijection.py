@@ -289,6 +289,11 @@ def check(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check corpus path-to-result-id bijection")
     parser.add_argument("--accepted-ref", default="origin/published-results", help="Git ref for accepted corpus")
+    parser.add_argument(
+        "--expect-source",
+        default=None,
+        help="Fail unless --accepted-ref resolves to this immutable commit SHA (moved-mirror guard)",
+    )
     parser.add_argument("--artifact", type=Path, default=None, help="DuckDB/SQLite read model to check 1:1")
     parser.add_argument("--require-artifact", action="store_true", help="Fail if --artifact is absent or unreadable")
     parser.add_argument("--bundles-dir", type=Path, default=ROOT / "results-data/bundles")
@@ -297,6 +302,26 @@ def main(argv: list[str] | None = None) -> int:
 
     artifact_expected = args.require_artifact or args.artifact is not None
     artifact = args.artifact if args.artifact is not None else _DEFAULT_ARTIFACT
+
+    if args.expect_source is not None:
+        try:
+            resolved = subprocess.run(
+                ["git", "rev-parse", "--verify", f"{args.accepted_ref}^{{commit}}"],
+                cwd=ROOT,
+                check=True,
+                text=True,
+                capture_output=True,
+            ).stdout.strip()
+        except subprocess.CalledProcessError:
+            print(f"❌ Corpus bijection check FAILED: git rev-parse failed on ref {args.accepted_ref!r}")
+            return 1
+        if resolved != args.expect_source:
+            print(
+                "❌ Corpus bijection check FAILED: accepted ref "
+                f"{args.accepted_ref!r} resolved to {resolved}, expected recorded input "
+                f"{args.expect_source}: the accepted ref moved"
+            )
+            return 1
 
     try:
         if artifact_expected and not artifact.exists():

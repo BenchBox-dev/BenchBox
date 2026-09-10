@@ -454,6 +454,7 @@ audit-sha-check:
 	@test -n "$(FILE)" || { echo "Usage: make audit-sha-check FILE=<audit.md>"; exit 1; }
 	uv run --no-project -- python _project/scripts/audit_sha_check.py \
 		--target-ref "$(AUDIT_SHA_TARGET_REF)" \
+		--ancestry-ref "$(or $(AUDIT_SHA_ANCESTRY_REF),HEAD)" \
 		$(if $(AUDIT_SHA_REQUIRE_CURRENT),--require-current $(AUDIT_SHA_REQUIRE_CURRENT),) \
 		"$(FILE)"
 
@@ -1342,6 +1343,47 @@ pr-preflight-fast-tests:
 	else \
 		echo "No code changes detected; skipping fast tests."; \
 	fi
+
+# Local validation singleflight. Runs CMD once per identical validated input
+# across worktrees; identical repeats reuse the recorded receipt instead of
+# re-executing and colliding on the shared test lock. Receipts never certify
+# hosted checks and never cross changed trees. Usage:
+#   make local-validation GATE=fast-tests CMD="pytest tests/unit -q"
+local-validation:
+	@[ -n "$(GATE)" ] || { echo "GATE is required" >&2; exit 2; }; \
+	@[ -n "$(CMD)" ] || { echo "CMD is required" >&2; exit 2; }; \
+	uv run -- python scripts/local_validation.py run --gate "$(GATE)" $(BATCH_ARGS) -- $(CMD)
+
+local-validation-show:
+	@[ -n "$(GATE)" ] || { echo "GATE is required" >&2; exit 2; }; \
+	uv run -- python scripts/local_validation.py show --gate "$(GATE)" $(BATCH_ARGS) $(if $(CMD),-- $(CMD),)
+
+# Revision/readiness transactions behind one helper (scripts/pr_landing.py).
+# Existing pr-open/pr-ready recipes are unchanged; these stage readiness
+# explicitly: start records identity, withdraw disarms auto-merge before a
+# revision, ready verifies the exact head and enqueues only with --arm.
+pr-landing-start:
+	uv run -- python scripts/pr_landing.py --worktree . start
+
+pr-landing-withdraw:
+	@[ -n "$(PR)" ] || { echo "PR is required" >&2; exit 2; }; \
+	uv run -- python scripts/pr_landing.py --worktree . withdraw --pr "$(PR)"
+
+pr-landing-ready:
+	@[ -n "$(PR)" ] || { echo "PR is required" >&2; exit 2; }; \
+	@[ -n "$(HEAD)" ] || { echo "HEAD is required" >&2; exit 2; }; \
+	@[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required" >&2; exit 2; }; \
+	uv run -- python scripts/pr_landing.py --worktree . ready --pr "$(PR)" \
+		--expected-head "$(HEAD)" --evidence-json "$(EVIDENCE)" $(if $(ARM),--arm,)
+
+pr-followup-record:
+	@[ -n "$(KEY)" ] || { echo "KEY is required" >&2; exit 2; }; \
+	@[ -n "$(STATE)" ] || { echo "STATE is required" >&2; exit 2; }; \
+	uv run -- python scripts/pr_landing.py --worktree . followup-record --key "$(KEY)" --state-json "$(STATE)"
+
+pr-followup-resume:
+	@[ -n "$(KEY)" ] || { echo "KEY is required" >&2; exit 2; }; \
+	uv run -- python scripts/pr_landing.py --worktree . followup-resume --key "$(KEY)"
 
 pr-content-guard:
 	@[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
