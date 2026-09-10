@@ -137,7 +137,10 @@ fi
 if [ "$hooks_usable" != yes ]; then
   # Hook types come from default_install_hook_types in .pre-commit-config.yaml,
   # so all configured stages stay in sync.
-  if (cd "$primary_abs" && uv run --frozen --no-sync -- pre-commit install >/dev/null 2>&1); then
+  # --frozen keeps the lockfile read-only; the environment must stay syncable so a
+  # cold-start clone (preflight before `uv sync`) can still install pre-commit and
+  # repair hooks pinned to a deleted interpreter.
+  if (cd "$primary_abs" && uv run --frozen -- pre-commit install >/dev/null 2>&1); then
     printf 'Repaired commit-time hooks from %s (%s).\n' "$primary_abs" "$hook_reason"
   else
     echo "note: pre-commit install failed/unavailable; commit-time guards will not run here (CI still enforces them)" >&2

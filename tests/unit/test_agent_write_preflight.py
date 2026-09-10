@@ -560,3 +560,38 @@ def test_preflight_repairs_sibling_hook_with_stale_interpreter(tmp_path: Path) -
     assert "Repaired commit-time hooks" in result.stdout
     assert "commit-msg recorded interpreter is gone" in result.stdout
     assert record.exists()
+
+
+def _fake_uv_recording_args(bin_dir: Path, args_record: Path) -> None:
+    """A stand-in for `uv` that appends its argv (one arg per line) to a record."""
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    fake = bin_dir / "uv"
+    fake.write_text(f'#!/bin/sh\nfor arg in "$@"; do echo "$arg" >> "{args_record}"; done\nexit 0\n', encoding="utf-8")
+    fake.chmod(0o755)
+
+
+def test_preflight_hook_repair_lets_uv_provision_a_cold_environment(tmp_path: Path) -> None:
+    """Repair must stay able to sync so a clone without a populated venv still installs hooks.
+
+    `pre-commit` is a dev dependency, so `uv run` provisions it only when the
+    environment may be synced. Passing `--no-sync` makes the repair a silent no-op
+    on a cold-start clone (preflight runs before `uv sync`), which is exactly the
+    case the stale-interpreter guard is meant to heal. `--frozen` still protects
+    the lockfile.
+    """
+    primary, linked = _linked_worktree(tmp_path)
+    _write_generated_hook(primary, str(tmp_path / "BenchBox.wt-deleted" / ".venv" / "bin" / "python"))
+    args_record = tmp_path / "uv-args.txt"
+    _fake_uv_recording_args(tmp_path / "fake-bin", args_record)
+
+    result = _run_in_clone(
+        linked,
+        extra_env={"PATH": f"{tmp_path / 'fake-bin'}{os.pathsep}{os.environ['PATH']}"},
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Repaired commit-time hooks" in result.stdout
+    args = args_record.read_text(encoding="utf-8").split()
+    assert "--frozen" in args
+    assert "--no-sync" not in args
+    assert args[-2:] == ["pre-commit", "install"]
