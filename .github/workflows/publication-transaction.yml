@@ -349,7 +349,7 @@ jobs:
         with:
           script: |
             const { createDeployment, getDeploymentStatus } = require('./scripts/publication/pages.cjs');
-            const deployedArtifactId = ${{ needs.prepare.outputs.kind == 'rollback' && needs.prepare.outputs.artifact_id || steps.upload_pages.outputs.artifact-id }};
+            const deployedArtifactId = ${{ needs.prepare.outputs.kind == 'rollback' && needs.prepare.outputs.artifact_id || steps.upload_pages.outputs.artifact_id }};
             const result = await createDeployment({
               github,
               core,
