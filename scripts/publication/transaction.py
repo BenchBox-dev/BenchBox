@@ -520,6 +520,44 @@ def _handle_recovery_required(
             "reason": payload.get("reason", "Marked terminal due to unresolvable ambiguity"),
         }
         return Transaction(**data), Effect(action="terminal_stop", data=data["failure"])
+
+    if event_type == EVENT_VERIFY_SUCCESS:
+        # Forward reconciliation of a post-send failure whose provider write
+        # provably landed: the deployment reached the provider's terminal-success
+        # state and the live routes serve the approved candidate. Only a
+        # promotion whose failure was recorded at the post-send stage qualifies;
+        # a pre-send or verification failure has no landed write to reconcile.
+        # Allowlist promotions rather than denylist rollbacks: this handler also
+        # serves legacy_recovery, whose journal states exclude externally-verified,
+        # so reconciling one forward would corrupt the journal on reload.
+        if current.kind != KIND_PROMOTION:
+            raise TransactionError(f"Recovery reconciliation applies only to promotions, not kind {current.kind!r}")
+        failure = current.failure or {}
+        if failure.get("stage") != "post_send":
+            raise TransactionError("Recovery reconciliation requires a post-send failure with a landed provider write")
+        obs_digest = payload.get("observation_digest")
+        if not obs_digest:
+            raise TransactionError("observation_digest is required for recovery reconciliation")
+        pages_status = str(payload.get("pages_deployment_status") or "").lower()
+        if pages_status != "succeed":
+            raise TransactionError(
+                "Recovery reconciliation requires a Pages deployment status of 'succeed', "
+                f"got: {payload.get('pages_deployment_status')!r}"
+            )
+        attestation = validate_live_receipt(current, payload)
+        data["state"] = STATE_EXTERNALLY_VERIFIED
+        data["verification"] = {
+            "challenge": payload.get("challenge"),
+            "verifier_sha": payload.get("verifier_sha"),
+            "observation_digest": obs_digest,
+            "pages_deployment_status": pages_status,
+            "reconciled_from": STATE_RECOVERY_REQUIRED,
+            "verified_at": ev["timestamp"],
+        }
+        data["attestation"] = attestation
+        tx = Transaction(**data)
+        return tx, Effect(action="commit_durable", data={"transaction_id": tx.transaction_id})
+
     raise TransactionError(f"Invalid transition: event '{event_type}' from state '{current.state}'")
 
 

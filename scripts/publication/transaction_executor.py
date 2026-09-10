@@ -552,16 +552,18 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
     attestation = _load_json(args.attestation) if args.attestation else None
 
     event_type = EVENT_VERIFY_ROLLBACK if tx.kind == KIND_ROLLBACK else EVENT_VERIFY_SUCCESS
-    updated_tx, effect = transaction.transition(
-        tx,
-        event_type,
-        payload={
-            "observation_digest": obs_digest,
-            "challenge": args.challenge or "challenge-ok",
-            "verifier_sha": args.verifier_sha or os.environ.get("GITHUB_SHA", "0" * 40),
-            "attestation": attestation,
-        },
-    )
+    payload = {
+        "observation_digest": obs_digest,
+        "challenge": args.challenge or "challenge-ok",
+        "verifier_sha": args.verifier_sha or os.environ.get("GITHUB_SHA", "0" * 40),
+        "attestation": attestation,
+    }
+    # Forward reconciliation of a recovery-required transaction additionally
+    # requires the provider's terminal Pages deployment status.
+    pages_deployment_status = getattr(args, "pages_deployment_status", None)
+    if pages_deployment_status:
+        payload["pages_deployment_status"] = pages_deployment_status
+    updated_tx, effect = transaction.transition(tx, event_type, payload=payload)
 
     updated_state, commit_oid = journal.write_journal_update(
         repo_path=repo_path,
@@ -888,6 +890,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_ver.add_argument("--attestation", default=None)
     p_ver.add_argument("--challenge", default=None)
     p_ver.add_argument("--verifier-sha", default=None)
+    p_ver.add_argument(
+        "--pages-deployment-status",
+        default=None,
+        help="Provider Pages deployment status (e.g. 'succeed'); required to reconcile a recovery-required transaction forward",
+    )
     p_ver.add_argument("--ref", default=journal.DEFAULT_REF)
     p_ver.add_argument("--repo-path", default=".")
     p_ver.add_argument("--output-tx", default=None)
