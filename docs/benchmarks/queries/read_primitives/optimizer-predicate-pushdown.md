@@ -15,7 +15,23 @@ Test predicate pushdown through joins
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Test predicate pushdown through joins optimization */ /* Good optimizers should push predicates down past joins to reduce intermediate results */ SELECT c.c_name, c.c_mktsegment, o.o_orderdate, o.o_totalprice FROM customer AS c JOIN orders AS o ON c.c_custkey = o.o_custkey WHERE c.c_nationkey = 15 /* Should push down before join to reduce customer rows */ AND o.o_orderdate >= CAST('1995-01-01' /* Should push down before join to reduce order rows */ AS DATE) AND o.o_orderdate < CAST('1996-01-01' AS DATE) AND c.c_mktsegment = 'BUILDING' /* Additional selectivity on customer */ ORDER BY o.o_totalprice DESC LIMIT 1000
+/* Test predicate pushdown through joins optimization */ /* Good optimizers should push predicates down past joins to reduce intermediate results */
+SELECT
+  c.c_name,
+  c.c_mktsegment,
+  o.o_orderdate,
+  o.o_totalprice
+FROM customer AS c
+JOIN orders AS o
+  ON c.c_custkey = o.o_custkey
+WHERE
+  c.c_nationkey = 15 /* Should push down before join to reduce customer rows */
+  AND o.o_orderdate >= CAST('1995-01-01' /* Should push down before join to reduce order rows */ AS DATE)
+  AND o.o_orderdate < CAST('1996-01-01' AS DATE)
+  AND c.c_mktsegment = 'BUILDING' /* Additional selectivity on customer */
+ORDER BY
+  o.o_totalprice DESC
+LIMIT 1000
 ```
 
 ## Representative DataFrame

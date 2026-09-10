@@ -15,7 +15,15 @@ Low selectivity filter - many rows match
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Non-selective broad filter on lineitem */ SELECT l_orderkey, l_partkey, l_quantity, l_extendedprice FROM lineitem WHERE l_quantity > 1
+/* Non-selective broad filter on lineitem */
+SELECT
+  l_orderkey,
+  l_partkey,
+  l_quantity,
+  l_extendedprice
+FROM lineitem
+WHERE
+  l_quantity > 1
 ```
 
 ## Representative DataFrame

@@ -13,7 +13,82 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'ETL Error Tracking and Recovery Validation' AS validation_name, error_category, error_count, resolved_errors, unresolved_errors, error_resolution_rate_pct, avg_resolution_time_hours, impact_severity, CASE WHEN error_resolution_rate_pct >= 85.0 AND unresolved_errors = 0 THEN 'EXCELLENT' WHEN error_resolution_rate_pct >= 85.0 THEN 'GOOD' WHEN error_resolution_rate_pct >= 50 THEN 'NEEDS IMPROVEMENT' ELSE 'CRITICAL' END AS error_management_status FROM (SELECT 'Data Quality Errors' AS error_category, 50 AS error_count /* Simulated error counts */, 45 AS resolved_errors, 5 AS unresolved_errors, 45 / 50 * 100 AS error_resolution_rate_pct, 2.5 AS avg_resolution_time_hours, 'Medium' AS impact_severity UNION ALL SELECT 'Transformation Errors' AS error_category, 15 AS error_count, 13 AS resolved_errors, 2 AS unresolved_errors, 13 / 15 * 100 AS error_resolution_rate_pct, 4.0 AS avg_resolution_time_hours, 'High' AS impact_severity UNION ALL SELECT 'Loading Errors' AS error_category, 8 AS error_count, 8 AS resolved_errors, 0 AS unresolved_errors, 100.0 AS error_resolution_rate_pct, 1.5 AS avg_resolution_time_hours, 'Low' AS impact_severity UNION ALL SELECT 'Referential Integrity Errors' AS error_category, 3 AS error_count, 2 AS resolved_errors, 1 AS unresolved_errors, 2 / 3 * 100 AS error_resolution_rate_pct, 8.0 AS avg_resolution_time_hours, 'Critical' AS impact_severity UNION ALL SELECT 'Business Rule Violations' AS error_category, 25 AS error_count, 20 AS resolved_errors, 5 AS unresolved_errors, 20 / 25 * 100 AS error_resolution_rate_pct, 3.0 AS avg_resolution_time_hours, 'Medium' AS impact_severity) AS error_tracking ORDER BY CASE impact_severity WHEN 'Critical' THEN 1 WHEN 'High' THEN 2 WHEN 'Medium' THEN 3 WHEN 'Low' THEN 4 END, error_count DESC
+SELECT
+  'ETL Error Tracking and Recovery Validation' AS validation_name,
+  error_category,
+  error_count,
+  resolved_errors,
+  unresolved_errors,
+  error_resolution_rate_pct,
+  avg_resolution_time_hours,
+  impact_severity,
+  CASE
+    WHEN error_resolution_rate_pct >= 85.0 AND unresolved_errors = 0
+    THEN 'EXCELLENT'
+    WHEN error_resolution_rate_pct >= 85.0
+    THEN 'GOOD'
+    WHEN error_resolution_rate_pct >= 50
+    THEN 'NEEDS IMPROVEMENT'
+    ELSE 'CRITICAL'
+  END AS error_management_status
+FROM (
+  SELECT
+    'Data Quality Errors' AS error_category,
+    50 AS error_count, /* Simulated error counts */
+    45 AS resolved_errors,
+    5 AS unresolved_errors,
+    45 / 50 * 100 AS error_resolution_rate_pct,
+    2.5 AS avg_resolution_time_hours,
+    'Medium' AS impact_severity
+  UNION ALL
+  SELECT
+    'Transformation Errors' AS error_category,
+    15 AS error_count,
+    13 AS resolved_errors,
+    2 AS unresolved_errors,
+    13 / 15 * 100 AS error_resolution_rate_pct,
+    4.0 AS avg_resolution_time_hours,
+    'High' AS impact_severity
+  UNION ALL
+  SELECT
+    'Loading Errors' AS error_category,
+    8 AS error_count,
+    8 AS resolved_errors,
+    0 AS unresolved_errors,
+    100.0 AS error_resolution_rate_pct,
+    1.5 AS avg_resolution_time_hours,
+    'Low' AS impact_severity
+  UNION ALL
+  SELECT
+    'Referential Integrity Errors' AS error_category,
+    3 AS error_count,
+    2 AS resolved_errors,
+    1 AS unresolved_errors,
+    2 / 3 * 100 AS error_resolution_rate_pct,
+    8.0 AS avg_resolution_time_hours,
+    'Critical' AS impact_severity
+  UNION ALL
+  SELECT
+    'Business Rule Violations' AS error_category,
+    25 AS error_count,
+    20 AS resolved_errors,
+    5 AS unresolved_errors,
+    20 / 25 * 100 AS error_resolution_rate_pct,
+    3.0 AS avg_resolution_time_hours,
+    'Medium' AS impact_severity
+) AS error_tracking
+ORDER BY
+  CASE impact_severity
+    WHEN 'Critical'
+    THEN 1
+    WHEN 'High'
+    THEN 2
+    WHEN 'Medium'
+    THEN 3
+    WHEN 'Low'
+    THEN 4
+  END,
+  error_count DESC
 ```
 
 ## Representative DataFrame

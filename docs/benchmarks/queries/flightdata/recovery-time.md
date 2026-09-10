@@ -16,32 +16,46 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    CASE
-        WHEN f.dep_delay <= 0 THEN 'No departure delay'
-        WHEN f.dep_delay <= 15 THEN '1-15 min departure delay'
-        WHEN f.dep_delay <= 30 THEN '16-30 min departure delay'
-        WHEN f.dep_delay <= 60 THEN '31-60 min departure delay'
-        ELSE '60+ min departure delay'
-    END AS delay_bucket,
-    COUNT(*) AS flight_count,
-    ROUND(AVG(f.dep_delay), 2) AS avg_dep_delay,
-    ROUND(AVG(f.arr_delay), 2) AS avg_arr_delay,
-    ROUND(AVG(f.dep_delay - f.arr_delay), 2) AS avg_minutes_recovered,
-    ROUND(100.0 * SUM(CASE WHEN f.arr_delay < f.dep_delay THEN 1 ELSE 0 END) / COUNT(*), 2) AS pct_recovered
-FROM flights f
-WHERE f.cancelled = 0
-  AND f.dep_delay IS NOT NULL
-  AND f.arr_delay IS NOT NULL
+  CASE
+    WHEN f.dep_delay <= 0
+    THEN 'No departure delay'
+    WHEN f.dep_delay <= 15
+    THEN '1-15 min departure delay'
+    WHEN f.dep_delay <= 30
+    THEN '16-30 min departure delay'
+    WHEN f.dep_delay <= 60
+    THEN '31-60 min departure delay'
+    ELSE '60+ min departure delay'
+  END AS delay_bucket,
+  COUNT(*) AS flight_count,
+  ROUND(CAST(AVG(f.dep_delay) AS DECIMAL), 2) AS avg_dep_delay,
+  ROUND(CAST(AVG(f.arr_delay) AS DECIMAL), 2) AS avg_arr_delay,
+  ROUND(CAST(AVG(f.dep_delay - f.arr_delay) AS DECIMAL), 2) AS avg_minutes_recovered,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.arr_delay < f.dep_delay THEN 1 ELSE 0 END) / COUNT(*) AS DECIMAL),
+    2
+  ) AS pct_recovered
+FROM flights AS f
+WHERE
+  f.cancelled = 0
+  AND NOT f.dep_delay IS NULL
+  AND NOT f.arr_delay IS NULL
   AND f.flight_date >= '2021-08-01'
   AND f.flight_date < '2025-01-01'
-GROUP BY CASE
-    WHEN f.dep_delay <= 0 THEN 'No departure delay'
-    WHEN f.dep_delay <= 15 THEN '1-15 min departure delay'
-    WHEN f.dep_delay <= 30 THEN '16-30 min departure delay'
-    WHEN f.dep_delay <= 60 THEN '31-60 min departure delay'
+GROUP BY
+  CASE
+    WHEN f.dep_delay <= 0
+    THEN 'No departure delay'
+    WHEN f.dep_delay <= 15
+    THEN '1-15 min departure delay'
+    WHEN f.dep_delay <= 30
+    THEN '16-30 min departure delay'
+    WHEN f.dep_delay <= 60
+    THEN '31-60 min departure delay'
     ELSE '60+ min departure delay'
-END
-ORDER BY avg_dep_delay
+  END
+ORDER BY
+  avg_dep_delay
 ```
 
 ## Representative DataFrame

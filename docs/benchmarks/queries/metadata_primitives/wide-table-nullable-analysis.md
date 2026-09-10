@@ -14,13 +14,15 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_name,
-    SUM(CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END) AS nullable_count,
-    SUM(CASE WHEN is_nullable = 'NO' THEN 1 ELSE 0 END) AS not_null_count,
-    COUNT(*) AS total_columns
+  table_name,
+  SUM(CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END) AS nullable_count,
+  SUM(CASE WHEN is_nullable = 'NO' THEN 1 ELSE 0 END) AS not_null_count,
+  COUNT(*) AS total_columns
 FROM information_schema.columns
-WHERE table_name LIKE 'benchbox_wide_%'
-GROUP BY table_name;
+WHERE
+  table_name LIKE 'benchbox_wide_%'
+GROUP BY
+  table_name
 ```
 
 ## Representative DataFrame

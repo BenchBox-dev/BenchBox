@@ -14,11 +14,19 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 DELETE FROM delete_ops_orders
-WHERE NOT EXISTS (
-  SELECT 1 FROM lineitem
-  WHERE lineitem.l_orderkey = delete_ops_orders.o_orderkey
-)
-AND delete_ops_orders.o_orderkey <= (SELECT MIN(o_orderkey) + 50 FROM delete_ops_orders)
+WHERE
+  NOT EXISTS(
+    SELECT
+      1
+    FROM lineitem
+    WHERE
+      lineitem.l_orderkey = delete_ops_orders.o_orderkey
+  )
+  AND delete_ops_orders.o_orderkey <= (
+    SELECT
+      MIN(o_orderkey) + 50
+    FROM delete_ops_orders
+  )
 ```
 
 ## Representative DataFrame

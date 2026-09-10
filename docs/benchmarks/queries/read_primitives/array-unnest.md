@@ -15,7 +15,21 @@ Unnest/explode array back to rows
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Unnest/explode array back to rows */ WITH supplier_parts AS (SELECT ps_suppkey, ARRAY_AGG(ps_partkey) AS parts FROM partsupp WHERE ps_suppkey <= 10 GROUP BY ps_suppkey) SELECT ps_suppkey, UNNEST(parts) AS part_key FROM supplier_parts
+/* Unnest/explode array back to rows */
+WITH supplier_parts AS (
+  SELECT
+    ps_suppkey,
+    ARRAY_AGG(ps_partkey) AS parts
+  FROM partsupp
+  WHERE
+    ps_suppkey <= 10
+  GROUP BY
+    ps_suppkey
+)
+SELECT
+  ps_suppkey,
+  UNNEST(parts) AS part_key
+FROM supplier_parts
 ```
 
 ## Representative DataFrame

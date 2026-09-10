@@ -138,6 +138,20 @@ def _fence(code: str, lang: str) -> str:
     return f"{ticks}{lang}\n{code}\n{ticks}"
 
 
+def _prettify_sql(sql: str, dialect: str) -> str:
+    """Reformat a one-line rendered query for readable display, best-effort."""
+    try:
+        import sqlglot
+
+        from benchbox.utils.dialect_utils import normalize_dialect_for_sqlglot
+
+        read = normalize_dialect_for_sqlglot(dialect) if dialect != "default" else None
+        pretty = sqlglot.transpile(sql, read=read, write=read, pretty=True)[0]
+        return pretty if pretty.strip() else sql
+    except Exception:
+        return sql
+
+
 def _recipe_class(benchmark_id: str) -> tuple[str, str]:
     """Return ``(import_line, class_name)`` for a runnable doc snippet.
 
@@ -200,7 +214,7 @@ def _query_page(benchmark_id: str, display: str, query_id: str) -> DocFile:
             note = "Rendered in the benchmark's native SQL with default parameters (no dialect translation available)."
         if render.is_template:
             note += " Parameter placeholders are shown literally."
-        lines += [note, "", _fence(render.sql, "sql"), ""]
+        lines += [note, "", _fence(_prettify_sql(render.sql, render.dialect), "sql"), ""]
 
     df_render = get_dataframe_render(benchmark_id, query_id)
     lines += ["## Representative DataFrame", ""]

@@ -15,7 +15,23 @@ Daily revenue and order volume by region with NULLIF avg order value
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT ol.order_date, dl.region, COUNT(DISTINCT ol.order_id) AS order_count, SUM(ol.total_price) AS gross_revenue, SUM(ol.total_price) / NULLIF(COUNT(DISTINCT ol.order_id), 0) AS avg_order_value FROM order_lines AS ol JOIN dim_locations AS dl ON ol.location_record_id = dl.record_id WHERE ol.order_date BETWEEN CAST('2023-01-01' AS DATE) AND CAST('2023-01-31' AS DATE) GROUP BY ol.order_date, dl.region ORDER BY ol.order_date, dl.region
+SELECT
+  ol.order_date,
+  dl.region,
+  COUNT(DISTINCT ol.order_id) AS order_count,
+  SUM(ol.total_price) AS gross_revenue,
+  SUM(ol.total_price) / NULLIF(COUNT(DISTINCT ol.order_id), 0) AS avg_order_value
+FROM order_lines AS ol
+JOIN dim_locations AS dl
+  ON ol.location_record_id = dl.record_id
+WHERE
+  ol.order_date BETWEEN CAST('2023-01-01' AS DATE) AND CAST('2023-01-31' AS DATE)
+GROUP BY
+  ol.order_date,
+  dl.region
+ORDER BY
+  ol.order_date,
+  dl.region
 ```
 
 ## Representative DataFrame

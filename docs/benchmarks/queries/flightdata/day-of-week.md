@@ -16,27 +16,38 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    f.day_of_week,
-    CASE f.day_of_week
-        WHEN 1 THEN 'Monday'
-        WHEN 2 THEN 'Tuesday'
-        WHEN 3 THEN 'Wednesday'
-        WHEN 4 THEN 'Thursday'
-        WHEN 5 THEN 'Friday'
-        WHEN 6 THEN 'Saturday'
-        WHEN 7 THEN 'Sunday'
-    END AS day_name,
-    COUNT(*) AS total_flights,
-    SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS cancelled_count,
-    ROUND(AVG(CASE WHEN f.cancelled = 0 THEN f.dep_delay END), 2) AS avg_dep_delay,
-    ROUND(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay END), 2) AS avg_arr_delay,
-    ROUND(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END)
-        / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0), 2) AS ontime_pct
-FROM flights f
-WHERE f.flight_date >= '2021-08-01'
-  AND f.flight_date < '2025-01-01'
-GROUP BY f.day_of_week
-ORDER BY f.day_of_week
+  f.day_of_week,
+  CASE f.day_of_week
+    WHEN 1
+    THEN 'Monday'
+    WHEN 2
+    THEN 'Tuesday'
+    WHEN 3
+    THEN 'Wednesday'
+    WHEN 4
+    THEN 'Thursday'
+    WHEN 5
+    THEN 'Friday'
+    WHEN 6
+    THEN 'Saturday'
+    WHEN 7
+    THEN 'Sunday'
+  END AS day_name,
+  COUNT(*) AS total_flights,
+  SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS cancelled_count,
+  ROUND(CAST(AVG(CASE WHEN f.cancelled = 0 THEN f.dep_delay END) AS DECIMAL), 2) AS avg_dep_delay,
+  ROUND(CAST(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay END) AS DECIMAL), 2) AS avg_arr_delay,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0) AS DECIMAL),
+    2
+  ) AS ontime_pct
+FROM flights AS f
+WHERE
+  f.flight_date >= '2021-08-01' AND f.flight_date < '2025-01-01'
+GROUP BY
+  f.day_of_week
+ORDER BY
+  f.day_of_week
 ```
 
 ## Representative DataFrame

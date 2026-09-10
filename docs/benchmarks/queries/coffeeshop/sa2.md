@@ -15,7 +15,22 @@ Top products by revenue for a given year with JOIN to dim_products
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT dp.subcategory, dp.name AS product_name, SUM(ol.quantity) AS total_quantity, SUM(ol.total_price) AS total_revenue FROM order_lines AS ol JOIN dim_products AS dp ON ol.product_record_id = dp.record_id WHERE EXTRACT(YEAR FROM ol.order_date) = 2023 GROUP BY dp.subcategory, dp.name ORDER BY total_revenue DESC LIMIT 15
+SELECT
+  dp.subcategory,
+  dp.name AS product_name,
+  SUM(ol.quantity) AS total_quantity,
+  SUM(ol.total_price) AS total_revenue
+FROM order_lines AS ol
+JOIN dim_products AS dp
+  ON ol.product_record_id = dp.record_id
+WHERE
+  EXTRACT(YEAR FROM ol.order_date) = 2023
+GROUP BY
+  dp.subcategory,
+  dp.name
+ORDER BY
+  total_revenue DESC
+LIMIT 15
 ```
 
 ## Representative DataFrame

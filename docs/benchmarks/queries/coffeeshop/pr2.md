@@ -15,7 +15,25 @@ Price-band distribution using multi-way CASE WHEN binning
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT CASE WHEN ol.unit_price < 4 THEN 'Under $4' WHEN ol.unit_price < 6 THEN '$4-$5.99' WHEN ol.unit_price < 8 THEN '$6-$7.99' ELSE '$8+' END AS price_band, COUNT(*) AS line_count, SUM(ol.total_price) AS revenue FROM order_lines AS ol WHERE ol.order_date BETWEEN CAST('2023-01-01' AS DATE) AND CAST('2024-12-31' AS DATE) GROUP BY price_band ORDER BY price_band
+SELECT
+  CASE
+    WHEN ol.unit_price < 4
+    THEN 'Under $4'
+    WHEN ol.unit_price < 6
+    THEN '$4-$5.99'
+    WHEN ol.unit_price < 8
+    THEN '$6-$7.99'
+    ELSE '$8+'
+  END AS price_band,
+  COUNT(*) AS line_count,
+  SUM(ol.total_price) AS revenue
+FROM order_lines AS ol
+WHERE
+  ol.order_date BETWEEN CAST('2023-01-01' AS DATE) AND CAST('2024-12-31' AS DATE)
+GROUP BY
+  price_band
+ORDER BY
+  price_band
 ```
 
 ## Representative DataFrame

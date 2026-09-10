@@ -15,7 +15,36 @@ Find orders with increasing price using LAG
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Find orders where the price increased from the previous order for each customer using QUALIFY */ /* o_orderkey is the deterministic tie-break in the LAG window ORDER BY so the */ /* comparison (and the QUALIFY filter) is well-defined when a customer has */ /* multiple orders on the same date. */ SELECT c_custkey, c_name, o_orderkey, o_orderdate, o_totalprice, prev_order_price FROM (/* Find orders where the price increased from the previous order for each customer using QUALIFY */ /* o_orderkey is the deterministic tie-break in the LAG window ORDER BY so the */ /* comparison (and the QUALIFY filter) is well-defined when a customer has */ /* multiple orders on the same date. */ SELECT c_custkey, c_name, o_orderkey, o_orderdate, o_totalprice, LAG(o_totalprice) OVER (PARTITION BY c_custkey ORDER BY o_orderdate, o_orderkey) AS prev_order_price, LAG(o_totalprice) OVER (PARTITION BY c_custkey ORDER BY o_orderdate, o_orderkey) AS _w FROM customer AS c JOIN orders AS o ON c.c_custkey = o.o_custkey WHERE o_orderdate >= CAST('1995-01-01' AS DATE) ORDER BY c_custkey, o_orderdate, o_orderkey) AS _t WHERE o_totalprice > _w
+/* Find orders where the price increased from the previous order for each customer using QUALIFY */ /* o_orderkey is the deterministic tie-break in the LAG window ORDER BY so the */ /* comparison (and the QUALIFY filter) is well-defined when a customer has */ /* multiple orders on the same date. */
+SELECT
+  c_custkey,
+  c_name,
+  o_orderkey,
+  o_orderdate,
+  o_totalprice,
+  prev_order_price
+FROM (
+  /* Find orders where the price increased from the previous order for each customer using QUALIFY */ /* o_orderkey is the deterministic tie-break in the LAG window ORDER BY so the */ /* comparison (and the QUALIFY filter) is well-defined when a customer has */ /* multiple orders on the same date. */
+  SELECT
+    c_custkey,
+    c_name,
+    o_orderkey,
+    o_orderdate,
+    o_totalprice,
+    LAG(o_totalprice) OVER (PARTITION BY c_custkey ORDER BY o_orderdate, o_orderkey) AS prev_order_price,
+    LAG(o_totalprice) OVER (PARTITION BY c_custkey ORDER BY o_orderdate, o_orderkey) AS _w
+  FROM customer AS c
+  JOIN orders AS o
+    ON c.c_custkey = o.o_custkey
+  WHERE
+    o_orderdate >= CAST('1995-01-01' AS DATE)
+  ORDER BY
+    c_custkey,
+    o_orderdate,
+    o_orderkey
+) AS _t
+WHERE
+  o_totalprice > _w
 ```
 
 ## Representative DataFrame

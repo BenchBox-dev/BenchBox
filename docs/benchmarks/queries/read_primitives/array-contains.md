@@ -15,20 +15,22 @@ Check if array contains a specific value
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Check if array contains a value
+/* Check if array contains a value */
 WITH supplier_parts AS (
-    SELECT
-        ps_suppkey,
-        ARRAY_AGG(ps_partkey) as parts
-    FROM partsupp
-    GROUP BY ps_suppkey
+  SELECT
+    ps_suppkey,
+    ARRAY_AGG(ps_partkey) AS parts
+  FROM partsupp
+  GROUP BY
+    ps_suppkey
 )
 SELECT
-    ps_suppkey,
-    ARRAY_CONTAINS(parts, 100) as has_part_100
+  ps_suppkey,
+  ARRAY_CONTAINS(parts, 100) AS has_part_100
 FROM supplier_parts
-ORDER BY ps_suppkey
-LIMIT 100;
+ORDER BY
+  ps_suppkey
+LIMIT 100
 ```
 
 ## Representative DataFrame

@@ -16,17 +16,26 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    FLOOR(EXTRACT(EPOCH FROM (dropoff_datetime - pickup_datetime)) / 60 / 5) * 5 as duration_bucket_min,
-    COUNT(*) as trip_count,
-    AVG(trip_distance) as avg_distance,
-    AVG(total_amount) as avg_fare
+  FLOOR(EXTRACT(EPOCH FROM (
+    dropoff_datetime - pickup_datetime
+  )) / 60 / 5) * 5 AS duration_bucket_min,
+  COUNT(*) AS trip_count,
+  AVG(trip_distance) AS avg_distance,
+  AVG(total_amount) AS avg_fare
 FROM trips
-WHERE pickup_datetime >= '2019-04-14'
+WHERE
+  pickup_datetime >= '2019-04-14'
   AND pickup_datetime < '2019-05-14'
   AND dropoff_datetime > pickup_datetime
-  AND EXTRACT(EPOCH FROM (dropoff_datetime - pickup_datetime)) BETWEEN 60 AND 7200
-GROUP BY FLOOR(EXTRACT(EPOCH FROM (dropoff_datetime - pickup_datetime)) / 60 / 5) * 5
-ORDER BY duration_bucket_min
+  AND EXTRACT(EPOCH FROM (
+    dropoff_datetime - pickup_datetime
+  )) BETWEEN 60 AND 7200
+GROUP BY
+  FLOOR(EXTRACT(EPOCH FROM (
+    dropoff_datetime - pickup_datetime
+  )) / 60 / 5) * 5
+ORDER BY
+  duration_bucket_min
 ```
 
 ## Representative DataFrame

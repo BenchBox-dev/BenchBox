@@ -15,7 +15,19 @@ Two small tables broadcast to join with one large table
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Two small tables broadcast to join with one large table. Hints are optional. */ /* + BROADCAST(n), BROADCAST(r) */ SELECT r.r_name, n.n_name, COUNT(*) AS supplier_count FROM supplier AS s JOIN nation AS n ON s.s_nationkey = n.n_nationkey JOIN region AS r ON n.n_regionkey = r.r_regionkey GROUP BY r.r_name, n.n_name
+/* Two small tables broadcast to join with one large table. Hints are optional. */ /* + BROADCAST(n), BROADCAST(r) */
+SELECT
+  r.r_name,
+  n.n_name,
+  COUNT(*) AS supplier_count
+FROM supplier AS s
+JOIN nation AS n
+  ON s.s_nationkey = n.n_nationkey
+JOIN region AS r
+  ON n.n_regionkey = r.r_regionkey
+GROUP BY
+  r.r_name,
+  n.n_name
 ```
 
 ## Representative DataFrame

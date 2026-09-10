@@ -15,7 +15,19 @@ Aggregate part keys into arrays per supplier
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Aggregate part keys into arrays per supplier */ SELECT ps_suppkey, ARRAY_AGG(ps_partkey ORDER BY ps_partkey) AS supplied_parts, COUNT(*) AS part_count FROM partsupp GROUP BY ps_suppkey HAVING COUNT(*) <= 100 ORDER BY ps_suppkey LIMIT 100
+/* Aggregate part keys into arrays per supplier */
+SELECT
+  ps_suppkey,
+  ARRAY_AGG(ps_partkey ORDER BY ps_partkey) AS supplied_parts,
+  COUNT(*) AS part_count
+FROM partsupp
+GROUP BY
+  ps_suppkey
+HAVING
+  COUNT(*) <= 100
+ORDER BY
+  ps_suppkey
+LIMIT 100
 ```
 
 ## Representative DataFrame

@@ -13,12 +13,10 @@
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Approximate Top-K aggregate returning the most-frequent values as an array.
--- Result shapes diverge across engines: DuckDB / ClickHouse / Snowflake return
--- ARRAY of values; BigQuery's APPROX_TOP_COUNT returns ARRAY<STRUCT<value,count>>.
--- Validation enforces capability + array type_class, not deep equality.
-SELECT APPROX_TOP_K(l_shipmode, 5) as top_shipmodes
-FROM lineitem;
+/* Approximate Top-K aggregate returning the most-frequent values as an array. */ /* Result shapes diverge across engines: DuckDB / ClickHouse / Snowflake return */ /* ARRAY of values; BigQuery's APPROX_TOP_COUNT returns ARRAY<STRUCT<value,count>>. */ /* Validation enforces capability + array type_class, not deep equality. */
+SELECT
+  APPROX_TOP_K(l_shipmode, 5) AS top_shipmodes
+FROM lineitem
 ```
 
 ## Representative DataFrame

@@ -13,7 +13,48 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Broker Performance Analysis' AS analysis_name, b.FirstName || ' ' || b.LastName AS broker_name, b.Branch, b.Office, COUNT(DISTINCT t.SK_CustomerID) AS unique_customers, COUNT(t.TradeID) AS total_trades, SUM(t.Quantity) AS total_quantity_traded, SUM(t.Quantity * t.TradePrice) AS total_trade_value, SUM(t.Commission) AS total_commission_generated, AVG(t.Commission) AS avg_commission_per_trade, AVG(t.TradePrice) AS avg_trade_price, SUM(t.Commission) / SUM(t.Quantity * t.TradePrice) * 100 AS commission_rate_pct, COUNT(t.TradeID) / COUNT(DISTINCT t.SK_CustomerID) AS trades_per_customer, SUM(t.Quantity * t.TradePrice) / COUNT(DISTINCT t.SK_CustomerID) AS value_per_customer, COUNT(CASE WHEN tt.TT_IS_SELL IS TRUE THEN 1 END) AS sell_trades, COUNT(CASE WHEN tt.TT_IS_SELL IS FALSE THEN 1 END) AS buy_trades, COUNT(CASE WHEN tt.TT_IS_SELL IS TRUE THEN 1 END) / COUNT(t.TradeID) * 100 AS sell_ratio_pct FROM DimBroker AS b LEFT JOIN FactTrade AS t ON b.SK_BrokerID = t.SK_BrokerID LEFT JOIN TradeType AS tt ON t.Type = tt.TT_ID LEFT JOIN DimDate AS d ON t.SK_CreateDateID = d.SK_DateID WHERE b.IsCurrent IS TRUE AND (d.CalendarYearID >= 2015 AND d.CalendarYearID <= 2019) AND t.Status = 'Completed' GROUP BY b.FirstName, b.LastName, b.Branch, b.Office HAVING COUNT(t.TradeID) > 10 ORDER BY total_commission_generated DESC, total_trade_value DESC LIMIT 50
+SELECT
+  'Broker Performance Analysis' AS analysis_name,
+  b.FirstName || ' ' || b.LastName AS broker_name,
+  b.Branch,
+  b.Office,
+  COUNT(DISTINCT t.SK_CustomerID) AS unique_customers,
+  COUNT(t.TradeID) AS total_trades,
+  SUM(t.Quantity) AS total_quantity_traded,
+  SUM(t.Quantity * t.TradePrice) AS total_trade_value,
+  SUM(t.Commission) AS total_commission_generated,
+  AVG(t.Commission) AS avg_commission_per_trade,
+  AVG(t.TradePrice) AS avg_trade_price,
+  SUM(t.Commission) / SUM(t.Quantity * t.TradePrice) * 100 AS commission_rate_pct,
+  COUNT(t.TradeID) / COUNT(DISTINCT t.SK_CustomerID) AS trades_per_customer,
+  SUM(t.Quantity * t.TradePrice) / COUNT(DISTINCT t.SK_CustomerID) AS value_per_customer,
+  COUNT(CASE WHEN tt.TT_IS_SELL IS TRUE THEN 1 END) AS sell_trades,
+  COUNT(CASE WHEN tt.TT_IS_SELL IS FALSE THEN 1 END) AS buy_trades,
+  COUNT(CASE WHEN tt.TT_IS_SELL IS TRUE THEN 1 END) / COUNT(t.TradeID) * 100 AS sell_ratio_pct
+FROM DimBroker AS b
+LEFT JOIN FactTrade AS t
+  ON b.SK_BrokerID = t.SK_BrokerID
+LEFT JOIN TradeType AS tt
+  ON t.Type = tt.TT_ID
+LEFT JOIN DimDate AS d
+  ON t.SK_CreateDateID = d.SK_DateID
+WHERE
+  b.IsCurrent IS TRUE
+  AND (
+    d.CalendarYearID >= 2015 AND d.CalendarYearID <= 2019
+  )
+  AND t.Status = 'Completed'
+GROUP BY
+  b.FirstName,
+  b.LastName,
+  b.Branch,
+  b.Office
+HAVING
+  COUNT(t.TradeID) > 10
+ORDER BY
+  total_commission_generated DESC,
+  total_trade_value DESC
+LIMIT 50
 ```
 
 ## Representative DataFrame

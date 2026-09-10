@@ -15,7 +15,15 @@ Data is redistributed based on the join keys
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Inner join with aggregation */ SELECT o.o_orderkey, SUM(l.l_quantity) AS total_qty FROM orders AS o JOIN lineitem AS l ON o.o_orderkey = l.l_orderkey GROUP BY o.o_orderkey
+/* Inner join with aggregation */
+SELECT
+  o.o_orderkey,
+  SUM(l.l_quantity) AS total_qty
+FROM orders AS o
+JOIN lineitem AS l
+  ON o.o_orderkey = l.l_orderkey
+GROUP BY
+  o.o_orderkey
 ```
 
 ## Representative DataFrame

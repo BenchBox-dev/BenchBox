@@ -14,10 +14,17 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 DELETE FROM delete_ops_orders
-WHERE o_totalprice < (
-  SELECT AVG(o_totalprice) FROM delete_ops_orders
-)
-AND delete_ops_orders.o_orderkey <= (SELECT MIN(o_orderkey) + 30 FROM delete_ops_orders)
+WHERE
+  o_totalprice < (
+    SELECT
+      AVG(o_totalprice)
+    FROM delete_ops_orders
+  )
+  AND delete_ops_orders.o_orderkey <= (
+    SELECT
+      MIN(o_orderkey) + 30
+    FROM delete_ops_orders
+  )
 ```
 
 ## Representative DataFrame

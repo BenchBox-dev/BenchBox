@@ -15,7 +15,12 @@ Range predicate with low selectivity on large table
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* range predicate with low selectivity on large table */ SELECT COUNT(*) FROM lineitem WHERE l_orderkey > 1000
+/* range predicate with low selectivity on large table */
+SELECT
+  COUNT(*)
+FROM lineitem
+WHERE
+  l_orderkey > 1000
 ```
 
 ## Representative DataFrame

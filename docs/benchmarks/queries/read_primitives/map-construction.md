@@ -16,15 +16,15 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    ps_suppkey,
-    MAP(
-        ARRAY_AGG(CAST(ps_partkey AS VARCHAR)),
-        ARRAY_AGG(ps_supplycost)
-    ) as part_costs
+  ps_suppkey,
+  MAP(ARRAY_AGG(CAST(ps_partkey AS VARCHAR)), ARRAY_AGG(ps_supplycost)) AS part_costs
 FROM partsupp
-WHERE ps_suppkey <= 10
-GROUP BY ps_suppkey
-ORDER BY ps_suppkey;
+WHERE
+  ps_suppkey <= 10
+GROUP BY
+  ps_suppkey
+ORDER BY
+  ps_suppkey
 ```
 
 ## Representative DataFrame

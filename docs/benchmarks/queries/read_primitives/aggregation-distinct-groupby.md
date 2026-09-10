@@ -15,7 +15,16 @@ Distinct count of high cardinality keys in low cardinality groups
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Distinct count of high cardinality keys in low cardinality groups. */ SELECT l_returnflag, l_linestatus, COUNT(DISTINCT l_orderkey) AS unique_orders, COUNT(DISTINCT l_partkey) AS unique_parts FROM lineitem GROUP BY l_returnflag, l_linestatus
+/* Distinct count of high cardinality keys in low cardinality groups. */
+SELECT
+  l_returnflag,
+  l_linestatus,
+  COUNT(DISTINCT l_orderkey) AS unique_orders,
+  COUNT(DISTINCT l_partkey) AS unique_parts
+FROM lineitem
+GROUP BY
+  l_returnflag,
+  l_linestatus
 ```
 
 ## Representative DataFrame

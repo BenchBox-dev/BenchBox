@@ -15,14 +15,15 @@ Extract from JSON with simple path expressions
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Extract from JSON with simple path expressions
+/* Extract from JSON with simple path expressions */
 SELECT
-    o_orderkey,
-    JSON_EXTRACT(o_comment, '$.priority') as order_priority,
-    JSON_EXTRACT(o_comment, '$.notes') as order_notes
+  o_orderkey,
+  JSON_EXTRACT(o_comment, '$.priority') AS order_priority,
+  JSON_EXTRACT(o_comment, '$.notes') AS order_notes
 FROM orders
-WHERE JSON_EXTRACT(o_comment, '$.priority') IS NOT NULL
-LIMIT 1000;
+WHERE
+  NOT JSON_EXTRACT(o_comment, '$.priority') IS NULL
+LIMIT 1000
 ```
 
 ## Representative DataFrame

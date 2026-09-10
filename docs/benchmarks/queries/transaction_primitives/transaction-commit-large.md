@@ -13,14 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-BEGIN TRANSACTION;
-DELETE FROM txn_lineitem WHERE l_comment = 'tx_large';
-INSERT INTO txn_lineitem
-SELECT 9300000 + n, 1, 1, 1, 10.0, 1000.0, 0.05, 0.02, 'N', 'O',
-       DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20',
-       'DELIVER IN PERSON', 'TRUCK', 'tx_large'
-FROM (SELECT unnest(generate_series(1, 1000)) AS n) t;
-COMMIT;
+BEGIN
 ```
 
 ## Representative DataFrame

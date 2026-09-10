@@ -13,11 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
-BEGIN TRANSACTION;
-INSERT INTO txn_orders VALUES (9710001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'repeatable_read');
-INSERT INTO txn_orders VALUES (9710002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'repeatable_read');
-COMMIT;
+SET TRANSACTION   ISOLATION LEVEL REPEATABLE READ
 ```
 
 ## Representative DataFrame

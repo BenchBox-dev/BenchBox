@@ -14,13 +14,15 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_schema,
-    table_name,
-    table_type
+  table_schema,
+  table_name,
+  table_type
 FROM information_schema.tables
-WHERE table_name LIKE '%order%'
-   OR table_name LIKE '%customer%'
-ORDER BY table_schema, table_name;
+WHERE
+  table_name LIKE '%order%' OR table_name LIKE '%customer%'
+ORDER BY
+  table_schema,
+  table_name
 ```
 
 ## Representative DataFrame

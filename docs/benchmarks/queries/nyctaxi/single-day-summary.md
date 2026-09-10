@@ -16,16 +16,16 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    COUNT(*) as trip_count,
-    SUM(total_amount) as total_revenue,
-    AVG(trip_distance) as avg_distance,
-    AVG(total_amount) as avg_fare,
-    AVG(tip_amount) as avg_tip,
-    MIN(pickup_datetime) as first_trip,
-    MAX(pickup_datetime) as last_trip
+  COUNT(*) AS trip_count,
+  SUM(total_amount) AS total_revenue,
+  AVG(trip_distance) AS avg_distance,
+  AVG(total_amount) AS avg_fare,
+  AVG(tip_amount) AS avg_tip,
+  MIN(pickup_datetime) AS first_trip,
+  MAX(pickup_datetime) AS last_trip
 FROM trips
-WHERE pickup_datetime >= '2019-07-03'
-  AND pickup_datetime < '2019-07-04'
+WHERE
+  pickup_datetime >= '2019-07-03' AND pickup_datetime < '2019-07-04'
 ```
 
 ## Representative DataFrame

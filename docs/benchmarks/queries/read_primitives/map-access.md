@@ -16,23 +16,23 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 WITH supplier_costs AS (
-    SELECT
-        ps_suppkey,
-        MAP(
-            ARRAY_AGG(CAST(ps_partkey AS VARCHAR)),
-            ARRAY_AGG(ps_supplycost)
-        ) as part_costs
-    FROM partsupp
-    WHERE ps_suppkey <= 10
-    GROUP BY ps_suppkey
+  SELECT
+    ps_suppkey,
+    MAP(ARRAY_AGG(CAST(ps_partkey AS VARCHAR)), ARRAY_AGG(ps_supplycost)) AS part_costs
+  FROM partsupp
+  WHERE
+    ps_suppkey <= 10
+  GROUP BY
+    ps_suppkey
 )
 SELECT
-    ps_suppkey,
-    MAP_EXTRACT(part_costs, '1')[1] as cost_for_part_1,
-    MAP_EXTRACT(part_costs, '5')[1] as cost_for_part_5
+  ps_suppkey,
+  MAP_EXTRACT(part_costs, '1')[1] AS cost_for_part_1,
+  MAP_EXTRACT(part_costs, '5')[1] AS cost_for_part_5
 FROM supplier_costs
-ORDER BY ps_suppkey
-LIMIT 10;
+ORDER BY
+  ps_suppkey
+LIMIT 10
 ```
 
 ## Representative DataFrame

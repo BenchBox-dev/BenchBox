@@ -15,7 +15,8 @@ Count all trips (baseline scan query)
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT COUNT(*) as total_trips
+SELECT
+  COUNT(*) AS total_trips
 FROM trips
 ```
 

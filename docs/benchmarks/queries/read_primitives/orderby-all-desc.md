@@ -16,13 +16,18 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    p_brand,
-    p_type,
-    AVG(p_retailprice) as avg_price
+  p_brand,
+  p_type,
+  AVG(p_retailprice) AS avg_price
 FROM part
-GROUP BY p_brand, p_type
-ORDER BY p_brand DESC, p_type DESC, avg_price DESC
-LIMIT 100;
+GROUP BY
+  p_brand,
+  p_type
+ORDER BY
+  p_brand DESC,
+  p_type DESC,
+  avg_price DESC
+LIMIT 100
 ```
 
 ## Representative DataFrame

@@ -14,10 +14,9 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 CREATE TABLE test_alter (
-  id INTEGER,
+  id INT,
   name VARCHAR(100)
-);
-ALTER TABLE test_alter ADD COLUMN created DATE
+)
 ```
 
 ## Representative DataFrame

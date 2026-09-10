@@ -13,19 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-TRUNCATE TABLE bulk_load_ops_target;
-INSERT INTO bulk_load_ops_target
-SELECT
-  CAST(o_orderkey AS INTEGER),
-  CAST(o_custkey AS INTEGER),
-  UPPER(o_orderstatus),
-  CAST(o_totalprice AS DECIMAL(15,2)),
-  CAST(o_orderdate AS DATE),
-  o_orderpriority,
-  o_clerk,
-  o_shippriority,
-  CONCAT('TRANSFORMED: ', o_comment)
-FROM read_csv_auto('{file_path}/csv_small_1k.csv')
+TRUNCATE TABLE   bulk_load_ops_target
 ```
 
 ## Representative DataFrame

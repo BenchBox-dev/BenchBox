@@ -13,10 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-TRUNCATE TABLE bulk_load_ops_target;
-INSERT INTO bulk_load_ops_target (o_orderkey, o_custkey, o_orderstatus, o_totalprice, o_orderdate)
-SELECT o_orderkey, o_custkey, o_orderstatus, o_totalprice, o_orderdate
-FROM read_csv_auto('{file_path}/csv_medium_100k.csv')
+TRUNCATE TABLE   bulk_load_ops_target
 ```
 
 ## Representative DataFrame

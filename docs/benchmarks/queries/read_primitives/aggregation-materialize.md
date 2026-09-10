@@ -15,7 +15,18 @@ Nested aggregation requiring CTE materialization
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Nested aggregation requiring CTE materialization */ WITH order_totals AS (SELECT o_custkey, SUM(o_totalprice) AS customer_total FROM orders GROUP BY o_custkey) SELECT AVG(customer_total) AS avg_customer_spending FROM order_totals
+/* Nested aggregation requiring CTE materialization */
+WITH order_totals AS (
+  SELECT
+    o_custkey,
+    SUM(o_totalprice) AS customer_total
+  FROM orders
+  GROUP BY
+    o_custkey
+)
+SELECT
+  AVG(customer_total) AS avg_customer_spending
+FROM order_totals
 ```
 
 ## Representative DataFrame

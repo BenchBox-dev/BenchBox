@@ -15,7 +15,29 @@ Find orders in top 10% per priority using PERCENT_RANK
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Find orders in the top 10% by value for each order priority using QUALIFY */ SELECT o_orderpriority, o_orderkey, o_totalprice, price_percentile FROM (/* Find orders in the top 10% by value for each order priority using QUALIFY */ SELECT o_orderpriority, o_orderkey, o_totalprice, PERCENT_RANK() OVER (PARTITION BY o_orderpriority ORDER BY o_totalprice) AS price_percentile, PERCENT_RANK() OVER (PARTITION BY o_orderpriority ORDER BY o_totalprice) AS _w FROM orders WHERE o_orderdate >= CAST('1995-01-01' AS DATE) ORDER BY o_orderpriority, o_totalprice DESC) AS _t WHERE _w >= 0.9
+/* Find orders in the top 10% by value for each order priority using QUALIFY */
+SELECT
+  o_orderpriority,
+  o_orderkey,
+  o_totalprice,
+  price_percentile
+FROM (
+  /* Find orders in the top 10% by value for each order priority using QUALIFY */
+  SELECT
+    o_orderpriority,
+    o_orderkey,
+    o_totalprice,
+    PERCENT_RANK() OVER (PARTITION BY o_orderpriority ORDER BY o_totalprice) AS price_percentile,
+    PERCENT_RANK() OVER (PARTITION BY o_orderpriority ORDER BY o_totalprice) AS _w
+  FROM orders
+  WHERE
+    o_orderdate >= CAST('1995-01-01' AS DATE)
+  ORDER BY
+    o_orderpriority,
+    o_totalprice DESC
+) AS _t
+WHERE
+  _w >= 0.9
 ```
 
 ## Representative DataFrame

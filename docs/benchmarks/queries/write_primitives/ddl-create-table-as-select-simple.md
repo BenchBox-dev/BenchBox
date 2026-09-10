@@ -14,10 +14,12 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 CREATE TABLE orders_1995 AS
-SELECT *
+SELECT
+  *
 FROM orders
-WHERE o_orderdate >= DATE '1995-01-01'
-  AND o_orderdate < DATE '1996-01-01'
+WHERE
+  o_orderdate >= CAST('1995-01-01' AS DATE)
+  AND o_orderdate < CAST('1996-01-01' AS DATE)
 ```
 
 ## Representative DataFrame

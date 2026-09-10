@@ -13,7 +13,69 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Data Completeness - Core Tables' AS validation_name, table_name, total_records, null_key_columns, CASE WHEN null_key_columns = 0 THEN 'PASS' ELSE 'FAIL' END AS status FROM (SELECT 'DimCustomer' AS table_name, COUNT(*) AS total_records, SUM(CASE WHEN CustomerID IS NULL OR TaxID IS NULL OR Status IS NULL THEN 1 ELSE 0 END) AS null_key_columns FROM DimCustomer WHERE IsCurrent IS TRUE UNION ALL SELECT 'DimAccount' AS table_name, COUNT(*) AS total_records, SUM(CASE WHEN AccountID IS NULL OR SK_CustomerID IS NULL OR Status IS NULL THEN 1 ELSE 0 END) AS null_key_columns FROM DimAccount WHERE IsCurrent IS TRUE UNION ALL SELECT 'DimSecurity' AS table_name, COUNT(*) AS total_records, SUM(CASE WHEN Symbol IS NULL OR Name IS NULL OR ExchangeID IS NULL THEN 1 ELSE 0 END) AS null_key_columns FROM DimSecurity WHERE IsCurrent IS TRUE UNION ALL SELECT 'DimCompany' AS table_name, COUNT(*) AS total_records, SUM(CASE WHEN CompanyID IS NULL OR Name IS NULL OR Industry IS NULL THEN 1 ELSE 0 END) AS null_key_columns FROM DimCompany WHERE IsCurrent IS TRUE UNION ALL SELECT 'FactTrade' AS table_name, COUNT(*) AS total_records, SUM(CASE WHEN TradeID IS NULL OR SK_CustomerID IS NULL OR SK_SecurityID IS NULL THEN 1 ELSE 0 END) AS null_key_columns FROM FactTrade) AS completeness_check ORDER BY table_name
+SELECT
+  'Data Completeness - Core Tables' AS validation_name,
+  table_name,
+  total_records,
+  null_key_columns,
+  CASE WHEN null_key_columns = 0 THEN 'PASS' ELSE 'FAIL' END AS status
+FROM (
+  SELECT
+    'DimCustomer' AS table_name,
+    COUNT(*) AS total_records,
+    SUM(
+      CASE WHEN CustomerID IS NULL OR TaxID IS NULL OR Status IS NULL THEN 1 ELSE 0 END
+    ) AS null_key_columns
+  FROM DimCustomer
+  WHERE
+    IsCurrent IS TRUE
+  UNION ALL
+  SELECT
+    'DimAccount' AS table_name,
+    COUNT(*) AS total_records,
+    SUM(
+      CASE
+        WHEN AccountID IS NULL OR SK_CustomerID IS NULL OR Status IS NULL
+        THEN 1
+        ELSE 0
+      END
+    ) AS null_key_columns
+  FROM DimAccount
+  WHERE
+    IsCurrent IS TRUE
+  UNION ALL
+  SELECT
+    'DimSecurity' AS table_name,
+    COUNT(*) AS total_records,
+    SUM(CASE WHEN Symbol IS NULL OR Name IS NULL OR ExchangeID IS NULL THEN 1 ELSE 0 END) AS null_key_columns
+  FROM DimSecurity
+  WHERE
+    IsCurrent IS TRUE
+  UNION ALL
+  SELECT
+    'DimCompany' AS table_name,
+    COUNT(*) AS total_records,
+    SUM(
+      CASE WHEN CompanyID IS NULL OR Name IS NULL OR Industry IS NULL THEN 1 ELSE 0 END
+    ) AS null_key_columns
+  FROM DimCompany
+  WHERE
+    IsCurrent IS TRUE
+  UNION ALL
+  SELECT
+    'FactTrade' AS table_name,
+    COUNT(*) AS total_records,
+    SUM(
+      CASE
+        WHEN TradeID IS NULL OR SK_CustomerID IS NULL OR SK_SecurityID IS NULL
+        THEN 1
+        ELSE 0
+      END
+    ) AS null_key_columns
+  FROM FactTrade
+) AS completeness_check
+ORDER BY
+  table_name
 ```
 
 ## Representative DataFrame

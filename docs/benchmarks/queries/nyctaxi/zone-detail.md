@@ -16,18 +16,22 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    z.zone,
-    z.borough,
-    COUNT(*) as pickup_count,
-    AVG(t.trip_distance) as avg_distance,
-    AVG(t.total_amount) as avg_fare,
-    SUM(t.total_amount) as total_revenue
-FROM trips t
-JOIN taxi_zones z ON t.pickup_location_id = z.location_id
-WHERE t.pickup_datetime >= '2019-09-12'
+  z.zone,
+  z.borough,
+  COUNT(*) AS pickup_count,
+  AVG(t.trip_distance) AS avg_distance,
+  AVG(t.total_amount) AS avg_fare,
+  SUM(t.total_amount) AS total_revenue
+FROM trips AS t
+JOIN taxi_zones AS z
+  ON t.pickup_location_id = z.location_id
+WHERE
+  t.pickup_datetime >= '2019-09-12'
   AND t.pickup_datetime < '2019-10-12'
   AND t.pickup_location_id = 164
-GROUP BY z.zone, z.borough
+GROUP BY
+  z.zone,
+  z.borough
 ```
 
 ## Representative DataFrame

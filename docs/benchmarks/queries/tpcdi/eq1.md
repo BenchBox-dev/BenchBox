@@ -13,7 +13,62 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Batch Processing Validation' AS validation_name, batch_id, table_name, records_loaded, processing_time_seconds, records_per_second, error_count, warning_count, CASE WHEN error_count = 0 AND records_per_second > 100 THEN 'PASS' WHEN error_count = 0 AND records_per_second <= 100 THEN 'SLOW' ELSE 'FAIL' END AS batch_status FROM (SELECT 1 AS batch_id, 'DimCustomer' AS table_name, COUNT(*) AS records_loaded, 60.0 AS processing_time_seconds /* Simulated processing time */, COUNT(*) / 60.0 AS records_per_second, SUM(CASE WHEN Status IS NULL OR CustomerID IS NULL THEN 1 ELSE 0 END) AS error_count, SUM(CASE WHEN CreditRating < 300 OR CreditRating > 850 THEN 1 ELSE 0 END) AS warning_count FROM DimCustomer WHERE BatchID = 1 UNION ALL SELECT 1 AS batch_id, 'DimAccount' AS table_name, COUNT(*) AS records_loaded, 45.0 AS processing_time_seconds, COUNT(*) / 45.0 AS records_per_second, SUM(CASE WHEN Status IS NULL OR AccountID IS NULL THEN 1 ELSE 0 END) AS error_count, SUM(CASE WHEN SK_CustomerID IS NULL THEN 1 ELSE 0 END) AS warning_count FROM DimAccount WHERE BatchID = 1 UNION ALL SELECT 1 AS batch_id, 'FactTrade' AS table_name, COUNT(*) AS records_loaded, 120.0 AS processing_time_seconds, COUNT(*) / 120.0 AS records_per_second, SUM(CASE WHEN TradeID IS NULL OR SK_CustomerID IS NULL THEN 1 ELSE 0 END) AS error_count, SUM(CASE WHEN TradePrice <= 0 OR Quantity <= 0 THEN 1 ELSE 0 END) AS warning_count FROM FactTrade WHERE BatchID = 1) AS batch_metrics ORDER BY batch_id, table_name
+SELECT
+  'Batch Processing Validation' AS validation_name,
+  batch_id,
+  table_name,
+  records_loaded,
+  processing_time_seconds,
+  records_per_second,
+  error_count,
+  warning_count,
+  CASE
+    WHEN error_count = 0 AND records_per_second > 100
+    THEN 'PASS'
+    WHEN error_count = 0 AND records_per_second <= 100
+    THEN 'SLOW'
+    ELSE 'FAIL'
+  END AS batch_status
+FROM (
+  SELECT
+    1 AS batch_id,
+    'DimCustomer' AS table_name,
+    COUNT(*) AS records_loaded,
+    60.0 AS processing_time_seconds, /* Simulated processing time */
+    COUNT(*) / 60.0 AS records_per_second,
+    SUM(CASE WHEN Status IS NULL OR CustomerID IS NULL THEN 1 ELSE 0 END) AS error_count,
+    SUM(CASE WHEN CreditRating < 300 OR CreditRating > 850 THEN 1 ELSE 0 END) AS warning_count
+  FROM DimCustomer
+  WHERE
+    BatchID = 1
+  UNION ALL
+  SELECT
+    1 AS batch_id,
+    'DimAccount' AS table_name,
+    COUNT(*) AS records_loaded,
+    45.0 AS processing_time_seconds,
+    COUNT(*) / 45.0 AS records_per_second,
+    SUM(CASE WHEN Status IS NULL OR AccountID IS NULL THEN 1 ELSE 0 END) AS error_count,
+    SUM(CASE WHEN SK_CustomerID IS NULL THEN 1 ELSE 0 END) AS warning_count
+  FROM DimAccount
+  WHERE
+    BatchID = 1
+  UNION ALL
+  SELECT
+    1 AS batch_id,
+    'FactTrade' AS table_name,
+    COUNT(*) AS records_loaded,
+    120.0 AS processing_time_seconds,
+    COUNT(*) / 120.0 AS records_per_second,
+    SUM(CASE WHEN TradeID IS NULL OR SK_CustomerID IS NULL THEN 1 ELSE 0 END) AS error_count,
+    SUM(CASE WHEN TradePrice <= 0 OR Quantity <= 0 THEN 1 ELSE 0 END) AS warning_count
+  FROM FactTrade
+  WHERE
+    BatchID = 1
+) AS batch_metrics
+ORDER BY
+  batch_id,
+  table_name
 ```
 
 ## Representative DataFrame

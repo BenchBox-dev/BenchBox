@@ -15,7 +15,19 @@ Pivot ship modes into columns
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Pivot ship modes into columns */ SELECT * FROM (SELECT l_returnflag, l_shipmode, l_quantity FROM lineitem WHERE l_shipdate >= CAST('1995-01-01' AS DATE) AND l_shipdate < CAST('1995-04-01' AS DATE))
+/* Pivot ship modes into columns */
+SELECT
+  *
+FROM (
+  SELECT
+    l_returnflag,
+    l_shipmode,
+    l_quantity
+  FROM lineitem
+  WHERE
+    l_shipdate >= CAST('1995-01-01' AS DATE)
+    AND l_shipdate < CAST('1995-04-01' AS DATE)
+)
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,12 @@ Distinct count of high cardinality key on a large table
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Distinct count of high cardinality key on a large table */ SELECT COUNT(DISTINCT o_custkey) AS unique_customers FROM orders WHERE o_orderdate >= CAST('1995-01-01' AS DATE)
+/* Distinct count of high cardinality key on a large table */
+SELECT
+  COUNT(DISTINCT o_custkey) AS unique_customers
+FROM orders
+WHERE
+  o_orderdate >= CAST('1995-01-01' AS DATE)
 ```
 
 ## Representative DataFrame

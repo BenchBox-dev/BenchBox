@@ -14,11 +14,13 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_name AS view_name,
-    definition AS view_definition
+  table_name AS view_name,
+  definition AS view_definition
 FROM information_schema.views
-WHERE table_name LIKE 'benchbox_view_%'
-ORDER BY table_name;
+WHERE
+  table_name LIKE 'benchbox_view_%'
+ORDER BY
+  table_name
 ```
 
 ## Representative DataFrame

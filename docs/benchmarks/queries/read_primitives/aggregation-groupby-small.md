@@ -15,7 +15,14 @@ Aggregates within low cardinality grouping
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Aggregates within low cardinality grouping */ SELECT n_regionkey, COUNT(*) AS nation_count, MAX(n_name) AS last_nation FROM nation GROUP BY n_regionkey
+/* Aggregates within low cardinality grouping */
+SELECT
+  n_regionkey,
+  COUNT(*) AS nation_count,
+  MAX(n_name) AS last_nation
+FROM nation
+GROUP BY
+  n_regionkey
 ```
 
 ## Representative DataFrame

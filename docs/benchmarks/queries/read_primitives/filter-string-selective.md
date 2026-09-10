@@ -15,7 +15,12 @@ Exact string equality with high selectivity on varchar column
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Exact string equality with high selectivity on varchar column */ SELECT * FROM customer WHERE c_name = 'Customer#000001234'
+/* Exact string equality with high selectivity on varchar column */
+SELECT
+  *
+FROM customer
+WHERE
+  c_name = 'Customer#000001234'
 ```
 
 ## Representative DataFrame

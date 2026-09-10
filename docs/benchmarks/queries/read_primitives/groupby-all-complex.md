@@ -16,14 +16,19 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    DATE_TRUNC('month', o_orderdate) as order_month,
-    o_orderpriority,
-    COUNT(o_orderkey) as order_count,
-    SUM(o_totalprice) as monthly_revenue
+  DATE_TRUNC('MONTH', o_orderdate) AS order_month,
+  o_orderpriority,
+  COUNT(o_orderkey) AS order_count,
+  SUM(o_totalprice) AS monthly_revenue
 FROM orders
-WHERE o_orderdate >= DATE '1995-01-01'
-GROUP BY DATE_TRUNC('month', o_orderdate), o_orderpriority
-ORDER BY order_month, o_orderpriority;
+WHERE
+  o_orderdate >= CAST('1995-01-01' AS DATE)
+GROUP BY
+  DATE_TRUNC('MONTH', o_orderdate),
+  o_orderpriority
+ORDER BY
+  order_month,
+  o_orderpriority
 ```
 
 ## Representative DataFrame

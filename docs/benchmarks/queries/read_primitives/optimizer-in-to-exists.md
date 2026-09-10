@@ -13,7 +13,27 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Test IN-to-EXISTS transformation optimization */ /* Good optimizers should transform IN subqueries to EXISTS when beneficial */ SELECT c.c_name, c.c_mktsegment, c.c_nationkey, c.c_acctbal FROM customer AS c WHERE c.c_custkey IN (SELECT o.o_custkey FROM orders AS o WHERE o.o_orderdate >= CAST('1995-01-01' AS DATE) AND o.o_orderdate < CAST('1996-01-01' AS DATE) AND o.o_totalprice > 100000) AND c.c_nationkey IN (1, 2, 3, 4, 5) /* Additional IN predicate */ ORDER BY c.c_acctbal DESC LIMIT 200
+/* Test IN-to-EXISTS transformation optimization */ /* Good optimizers should transform IN subqueries to EXISTS when beneficial */
+SELECT
+  c.c_name,
+  c.c_mktsegment,
+  c.c_nationkey,
+  c.c_acctbal
+FROM customer AS c
+WHERE
+  c.c_custkey IN (
+    SELECT
+      o.o_custkey
+    FROM orders AS o
+    WHERE
+      o.o_orderdate >= CAST('1995-01-01' AS DATE)
+      AND o.o_orderdate < CAST('1996-01-01' AS DATE)
+      AND o.o_totalprice > 100000
+  )
+  AND c.c_nationkey IN (1, 2, 3, 4, 5) /* Additional IN predicate */
+ORDER BY
+  c.c_acctbal DESC
+LIMIT 200
 ```
 
 ## Representative DataFrame

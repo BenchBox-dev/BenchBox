@@ -14,15 +14,27 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_name,
-    column_name,
-    data_type,
-    numeric_precision,
-    numeric_scale
+  table_name,
+  column_name,
+  data_type,
+  numeric_precision,
+  numeric_scale
 FROM information_schema.columns
-WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-  AND data_type IN ('integer', 'bigint', 'smallint', 'decimal', 'numeric', 'real', 'double precision', 'float')
-ORDER BY table_name, column_name;
+WHERE
+  NOT table_schema IN ('information_schema', 'pg_catalog')
+  AND data_type IN (
+    'integer',
+    'bigint',
+    'smallint',
+    'decimal',
+    'numeric',
+    'real',
+    'double precision',
+    'float'
+  )
+ORDER BY
+  table_name,
+  column_name
 ```
 
 ## Representative DataFrame

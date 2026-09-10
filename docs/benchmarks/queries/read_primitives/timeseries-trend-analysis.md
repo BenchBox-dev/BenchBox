@@ -17,24 +17,25 @@ Rendered for **DataFusion** with default parameters.
 ```sql
 WITH monthly_totals AS (
   SELECT
-    DATE_TRUNC('month', o_orderdate) as order_month,
-    COUNT(*) as order_count,
-    SUM(o_totalprice) as monthly_revenue,
-    AVG(o_totalprice) as avg_order_value,
-    EXTRACT(EPOCH FROM DATE_TRUNC('month', o_orderdate)) as month_epoch
+    DATE_TRUNC('MONTH', o_orderdate) AS order_month,
+    COUNT(*) AS order_count,
+    SUM(o_totalprice) AS monthly_revenue,
+    AVG(o_totalprice) AS avg_order_value,
+    EXTRACT(EPOCH FROM DATE_TRUNC('MONTH', o_orderdate)) AS month_epoch
   FROM orders
-  WHERE o_orderdate >= DATE '1995-01-01'
-    AND o_orderdate < DATE '1997-01-01'
-  GROUP BY DATE_TRUNC('month', o_orderdate)
-),
-monthly_with_lag AS (
+  WHERE
+    o_orderdate >= CAST('1995-01-01' AS DATE)
+    AND o_orderdate < CAST('1997-01-01' AS DATE)
+  GROUP BY
+    DATE_TRUNC('MONTH', o_orderdate)
+), monthly_with_lag AS (
   SELECT
     order_month,
     order_count,
     monthly_revenue,
     avg_order_value,
     month_epoch,
-    LAG(monthly_revenue, 1) OVER (ORDER BY order_month) as prev_month_revenue
+    LAG(monthly_revenue, 1) OVER (ORDER BY order_month) AS prev_month_revenue
   FROM monthly_totals
 )
 SELECT
@@ -42,11 +43,14 @@ SELECT
   order_count,
   monthly_revenue,
   avg_order_value,
-  REGR_SLOPE(monthly_revenue, month_epoch) OVER () as revenue_trend_slope,
+  REGR_SLOPE(monthly_revenue, month_epoch) OVER () AS revenue_trend_slope,
   prev_month_revenue,
-  (monthly_revenue - prev_month_revenue) / NULLIF(prev_month_revenue, 0) * 100 as mom_growth_pct
+  (
+    monthly_revenue - prev_month_revenue
+  ) / NULLIF(prev_month_revenue, 0) * 100 AS mom_growth_pct
 FROM monthly_with_lag
-ORDER BY order_month;
+ORDER BY
+  order_month
 ```
 
 ## Representative DataFrame

@@ -15,20 +15,22 @@ Reduce array to single value
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Reduce array to single value
+/* Reduce array to single value */
 WITH quantities AS (
-    SELECT
-        l_orderkey,
-        ARRAY_AGG(l_quantity) as qtys
-    FROM lineitem
-    GROUP BY l_orderkey
+  SELECT
+    l_orderkey,
+    ARRAY_AGG(l_quantity) AS qtys
+  FROM lineitem
+  GROUP BY
+    l_orderkey
 )
 SELECT
-    l_orderkey,
-    REDUCE(qtys, 0, (acc, x) -> acc + x) as total_qty
+  l_orderkey,
+  REDUCE(qtys, 0, (acc, x) -> acc + x) AS total_qty
 FROM quantities
-ORDER BY l_orderkey
-LIMIT 100;
+ORDER BY
+  l_orderkey
+LIMIT 100
 ```
 
 ## Representative DataFrame

@@ -17,15 +17,16 @@ MERGE INTO merge_ops_target AS target
 USING (
   SELECT
     o_orderkey,
-    o_orderdate + INTERVAL '30' DAY AS shifted_date,
+    o_orderdate + INTERVAL '30 DAY' AS shifted_date,
     'merge_date_shift' AS marker
   FROM orders
-  WHERE o_orderkey BETWEEN 1 AND 50
+  WHERE
+    o_orderkey BETWEEN 1 AND 50
 ) AS source
 ON target.o_orderkey = source.o_orderkey
-WHEN MATCHED THEN
-  UPDATE SET o_orderdate = source.shifted_date,
-             o_comment = source.marker
+WHEN MATCHED THEN UPDATE SET
+  o_orderdate = source.shifted_date,
+  o_comment = source.marker
 ```
 
 ## Representative DataFrame

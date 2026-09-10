@@ -16,19 +16,26 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    f.year,
-    COUNT(*) AS total_flights,
-    SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS cancelled_flights,
-    ROUND(100.0 * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) / COUNT(*), 2) AS cancellation_rate_pct,
-    SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END) AS ontime_flights,
-    ROUND(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END)
-        / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0), 2) AS ontime_pct,
-    ROUND(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay END), 2) AS avg_arr_delay
-FROM flights f
-WHERE f.flight_date >= '2021-08-01'
-  AND f.flight_date < '2025-01-01'
-GROUP BY f.year
-ORDER BY f.year
+  f.year,
+  COUNT(*) AS total_flights,
+  SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS cancelled_flights,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) / COUNT(*) AS DECIMAL),
+    2
+  ) AS cancellation_rate_pct,
+  SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END) AS ontime_flights,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0) AS DECIMAL),
+    2
+  ) AS ontime_pct,
+  ROUND(CAST(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay END) AS DECIMAL), 2) AS avg_arr_delay
+FROM flights AS f
+WHERE
+  f.flight_date >= '2021-08-01' AND f.flight_date < '2025-01-01'
+GROUP BY
+  f.year
+ORDER BY
+  f.year
 ```
 
 ## Representative DataFrame

@@ -16,24 +16,36 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    f.origin,
-    f.dest,
-    ao.city AS origin_city,
-    ad.city AS dest_city,
-    COUNT(*) AS total_flights,
-    ROUND(100.0 * SUM(CASE WHEN f.arr_delay <= 15 THEN 1 ELSE 0 END) / COUNT(*), 2) AS ontime_pct,
-    ROUND(AVG(f.arr_delay), 2) AS avg_arr_delay,
-    ROUND(AVG(f.distance), 0) AS avg_distance_miles
-FROM flights f
-LEFT JOIN airports ao ON f.origin = ao.code
-LEFT JOIN airports ad ON f.dest = ad.code
-WHERE f.cancelled = 0
-  AND f.arr_delay IS NOT NULL
+  f.origin,
+  f.dest,
+  ao.city AS origin_city,
+  ad.city AS dest_city,
+  COUNT(*) AS total_flights,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.arr_delay <= 15 THEN 1 ELSE 0 END) / COUNT(*) AS DECIMAL),
+    2
+  ) AS ontime_pct,
+  ROUND(CAST(AVG(f.arr_delay) AS DECIMAL), 2) AS avg_arr_delay,
+  ROUND(CAST(AVG(f.distance) AS DECIMAL), 0) AS avg_distance_miles
+FROM flights AS f
+LEFT JOIN airports AS ao
+  ON f.origin = ao.code
+LEFT JOIN airports AS ad
+  ON f.dest = ad.code
+WHERE
+  f.cancelled = 0
+  AND NOT f.arr_delay IS NULL
   AND f.flight_date >= '2021-08-01'
   AND f.flight_date < '2025-01-01'
-GROUP BY f.origin, f.dest, ao.city, ad.city
-HAVING COUNT(*) >= 50
-ORDER BY ontime_pct DESC
+GROUP BY
+  f.origin,
+  f.dest,
+  ao.city,
+  ad.city
+HAVING
+  COUNT(*) >= 50
+ORDER BY
+  ontime_pct DESC
 LIMIT 25
 ```
 

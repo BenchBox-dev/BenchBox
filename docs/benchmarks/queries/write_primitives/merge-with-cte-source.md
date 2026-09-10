@@ -19,18 +19,19 @@ WITH enriched_orders AS (
     o.o_totalprice,
     c.c_name,
     c.c_mktsegment
-  FROM orders o
-  JOIN customer c ON o.o_custkey = c.c_custkey
-  WHERE o.o_orderkey BETWEEN 1 AND 50
+  FROM orders AS o
+  JOIN customer AS c
+    ON o.o_custkey = c.c_custkey
+  WHERE
+    o.o_orderkey BETWEEN 1 AND 50
 )
 MERGE INTO merge_ops_summary_target AS target
 USING enriched_orders AS source
 ON target.o_orderkey = source.o_orderkey
-WHEN MATCHED THEN
-  UPDATE SET o_totalprice = source.o_totalprice,
-             customer_name = source.c_name
-WHEN NOT MATCHED THEN
-  INSERT VALUES (source.o_orderkey, NULL, NULL, source.o_totalprice, source.c_name, NULL)
+WHEN MATCHED THEN UPDATE SET
+  o_totalprice = source.o_totalprice,
+  customer_name = source.c_name
+WHEN NOT MATCHED THEN INSERT VALUES (source.o_orderkey, NULL, NULL, source.o_totalprice, source.c_name, NULL)
 ```
 
 ## Representative DataFrame

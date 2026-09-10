@@ -15,7 +15,12 @@ Sort on full table with simple integer ordering
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Sort on full table with simple integer ordering */ SELECT * FROM customer ORDER BY c_custkey
+/* Sort on full table with simple integer ordering */
+SELECT
+  *
+FROM customer
+ORDER BY
+  c_custkey
 ```
 
 ## Representative DataFrame

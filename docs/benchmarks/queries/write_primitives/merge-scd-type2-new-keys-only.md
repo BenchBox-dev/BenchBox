@@ -14,12 +14,31 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 INSERT INTO scd2_ops_dim_customer
-SELECT (SELECT MAX(sk) FROM scd2_ops_dim_customer) + ROW_NUMBER() OVER (ORDER BY s.c_custkey),
-       s.c_custkey, s.c_name, s.c_address, s.c_acctbal, s.c_mktsegment, s.row_hash,
-       true, s.effective_ts, DATE '9999-12-31'
-FROM scd2_ops_stage_customer s
-WHERE s.change_type = 'new'
-  AND NOT EXISTS (SELECT 1 FROM scd2_ops_dim_customer d WHERE d.c_custkey = s.c_custkey)
+SELECT
+  (
+    SELECT
+      MAX(sk)
+    FROM scd2_ops_dim_customer
+  ) + ROW_NUMBER() OVER (ORDER BY s.c_custkey),
+  s.c_custkey,
+  s.c_name,
+  s.c_address,
+  s.c_acctbal,
+  s.c_mktsegment,
+  s.row_hash,
+  TRUE,
+  s.effective_ts,
+  CAST('9999-12-31' AS DATE)
+FROM scd2_ops_stage_customer AS s
+WHERE
+  s.change_type = 'new'
+  AND NOT EXISTS(
+    SELECT
+      1
+    FROM scd2_ops_dim_customer AS d
+    WHERE
+      d.c_custkey = s.c_custkey
+  )
 ```
 
 ## Representative DataFrame

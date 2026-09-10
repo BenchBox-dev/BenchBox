@@ -15,7 +15,13 @@ COUNT, AVG, MAX of pageRank with threshold filter
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT COUNT(*) AS total_pages, AVG(pageRank) AS avg_pagerank, MAX(pageRank) AS max_pagerank FROM rankings WHERE pageRank > 1000
+SELECT
+  COUNT(*) AS total_pages,
+  AVG(pageRank) AS avg_pagerank,
+  MAX(pageRank) AS max_pagerank
+FROM rankings
+WHERE
+  pageRank > 1000
 ```
 
 ## Representative DataFrame

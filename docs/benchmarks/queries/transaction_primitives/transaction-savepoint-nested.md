@@ -13,14 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-BEGIN TRANSACTION;
-INSERT INTO txn_orders VALUES (9600001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'outer_tx');
-SAVEPOINT sp1;
-INSERT INTO txn_orders VALUES (9600002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'inner_tx');
-SAVEPOINT sp2;
-INSERT INTO txn_orders VALUES (9600003, 3, 'O', 3000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'innermost_tx');
-ROLLBACK TO SAVEPOINT sp2;
-COMMIT;
+BEGIN
 ```
 
 ## Representative DataFrame

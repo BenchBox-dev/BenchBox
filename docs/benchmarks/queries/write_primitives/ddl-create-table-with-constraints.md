@@ -14,9 +14,9 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 CREATE TABLE test_constrained (
-  id INTEGER PRIMARY KEY,
+  id INT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
-  value DECIMAL(15,2) NOT NULL,
+  value DECIMAL(15, 2) NOT NULL,
   created DATE NOT NULL,
   status VARCHAR(10)
 )

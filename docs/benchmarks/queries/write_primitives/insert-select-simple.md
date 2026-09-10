@@ -13,10 +13,9 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-DELETE FROM insert_ops_lineitem WHERE l_orderkey BETWEEN 1 AND 10;
-INSERT INTO insert_ops_lineitem
-SELECT * FROM lineitem
-WHERE l_orderkey BETWEEN 1 AND 10
+DELETE FROM insert_ops_lineitem
+WHERE
+  l_orderkey BETWEEN 1 AND 10
 ```
 
 ## Representative DataFrame

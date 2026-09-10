@@ -16,13 +16,15 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    DATE_TRUNC('day', pickup_datetime) as day,
-    COUNT(*) as trip_count
+  DATE_TRUNC('DAY', pickup_datetime) AS day,
+  COUNT(*) AS trip_count
 FROM trips
-WHERE pickup_datetime >= '2019-01-01'
-  AND pickup_datetime < '2020-01-01'
-GROUP BY DATE_TRUNC('day', pickup_datetime)
-ORDER BY day
+WHERE
+  pickup_datetime >= '2019-01-01' AND pickup_datetime < '2020-01-01'
+GROUP BY
+  DATE_TRUNC('DAY', pickup_datetime)
+ORDER BY
+  day
 ```
 
 ## Representative DataFrame

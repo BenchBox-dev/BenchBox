@@ -15,11 +15,11 @@ Hosts with CPU usage above threshold
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT DISTINCT hostname
+SELECT DISTINCT
+  hostname
 FROM cpu
-WHERE usage_user > 90
-  AND time >= '2024-01-01 19:00:00'
-  AND time < '2024-01-01 20:00:00'
+WHERE
+  usage_user > 90 AND time >= '2024-01-01 19:00:00' AND time < '2024-01-01 20:00:00'
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,15 @@ ORDER BY with descending sort
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Descending sort with limit */ SELECT o_orderkey, o_totalprice, o_orderdate FROM orders ORDER BY o_totalprice DESC LIMIT 100
+/* Descending sort with limit */
+SELECT
+  o_orderkey,
+  o_totalprice,
+  o_orderdate
+FROM orders
+ORDER BY
+  o_totalprice DESC
+LIMIT 100
 ```
 
 ## Representative DataFrame

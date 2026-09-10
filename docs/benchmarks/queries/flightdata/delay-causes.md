@@ -16,19 +16,23 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    SUM(CASE WHEN f.carrier_delay > 0 THEN 1 ELSE 0 END) AS carrier_delay_count,
-    ROUND(AVG(CASE WHEN f.carrier_delay > 0 THEN f.carrier_delay END), 2) AS avg_carrier_delay,
-    SUM(CASE WHEN f.weather_delay > 0 THEN 1 ELSE 0 END) AS weather_delay_count,
-    ROUND(AVG(CASE WHEN f.weather_delay > 0 THEN f.weather_delay END), 2) AS avg_weather_delay,
-    SUM(CASE WHEN f.nas_delay > 0 THEN 1 ELSE 0 END) AS nas_delay_count,
-    ROUND(AVG(CASE WHEN f.nas_delay > 0 THEN f.nas_delay END), 2) AS avg_nas_delay,
-    SUM(CASE WHEN f.security_delay > 0 THEN 1 ELSE 0 END) AS security_delay_count,
-    ROUND(AVG(CASE WHEN f.security_delay > 0 THEN f.security_delay END), 2) AS avg_security_delay,
-    SUM(CASE WHEN f.late_aircraft_delay > 0 THEN 1 ELSE 0 END) AS late_aircraft_count,
-    ROUND(AVG(CASE WHEN f.late_aircraft_delay > 0 THEN f.late_aircraft_delay END), 2) AS avg_late_aircraft_delay,
-    COUNT(*) AS total_delayed_flights
-FROM flights f
-WHERE f.cancelled = 0
+  SUM(CASE WHEN f.carrier_delay > 0 THEN 1 ELSE 0 END) AS carrier_delay_count,
+  ROUND(CAST(AVG(CASE WHEN f.carrier_delay > 0 THEN f.carrier_delay END) AS DECIMAL), 2) AS avg_carrier_delay,
+  SUM(CASE WHEN f.weather_delay > 0 THEN 1 ELSE 0 END) AS weather_delay_count,
+  ROUND(CAST(AVG(CASE WHEN f.weather_delay > 0 THEN f.weather_delay END) AS DECIMAL), 2) AS avg_weather_delay,
+  SUM(CASE WHEN f.nas_delay > 0 THEN 1 ELSE 0 END) AS nas_delay_count,
+  ROUND(CAST(AVG(CASE WHEN f.nas_delay > 0 THEN f.nas_delay END) AS DECIMAL), 2) AS avg_nas_delay,
+  SUM(CASE WHEN f.security_delay > 0 THEN 1 ELSE 0 END) AS security_delay_count,
+  ROUND(CAST(AVG(CASE WHEN f.security_delay > 0 THEN f.security_delay END) AS DECIMAL), 2) AS avg_security_delay,
+  SUM(CASE WHEN f.late_aircraft_delay > 0 THEN 1 ELSE 0 END) AS late_aircraft_count,
+  ROUND(
+    CAST(AVG(CASE WHEN f.late_aircraft_delay > 0 THEN f.late_aircraft_delay END) AS DECIMAL),
+    2
+  ) AS avg_late_aircraft_delay,
+  COUNT(*) AS total_delayed_flights
+FROM flights AS f
+WHERE
+  f.cancelled = 0
   AND f.arr_delay > 15
   AND f.flight_date >= '2021-08-01'
   AND f.flight_date < '2025-01-01'

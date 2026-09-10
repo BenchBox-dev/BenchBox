@@ -16,35 +16,82 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    CASE
-        WHEN (f.month = 11 AND f.day_of_month BETWEEN 21 AND 27) THEN 'Thanksgiving Week'
-        WHEN (f.month = 12 AND f.day_of_month BETWEEN 23 AND 27) THEN 'Christmas'
-        WHEN (f.month = 1 AND f.day_of_month BETWEEN 1 AND 2)
-          OR (f.month = 12 AND f.day_of_month = 31) THEN 'New Year'
-        WHEN (f.month = 7 AND f.day_of_month BETWEEN 3 AND 5) THEN 'July 4th'
-        WHEN (f.month = 5 AND f.day_of_week = 1 AND f.day_of_month BETWEEN 25 AND 31) THEN 'Memorial Day'
-        WHEN (f.month = 9 AND f.day_of_week = 1 AND f.day_of_month BETWEEN 1 AND 7) THEN 'Labor Day'
-        ELSE 'Regular Day'
-    END AS period,
-    COUNT(*) AS total_flights,
-    ROUND(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay END), 2) AS avg_arr_delay,
-    ROUND(100.0 * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) / COUNT(*), 2) AS cancellation_rate_pct,
-    ROUND(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END)
-        / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0), 2) AS ontime_pct
-FROM flights f
-WHERE f.flight_date >= '2021-08-01'
-  AND f.flight_date < '2025-01-01'
-GROUP BY CASE
-        WHEN (f.month = 11 AND f.day_of_month BETWEEN 21 AND 27) THEN 'Thanksgiving Week'
-        WHEN (f.month = 12 AND f.day_of_month BETWEEN 23 AND 27) THEN 'Christmas'
-        WHEN (f.month = 1 AND f.day_of_month BETWEEN 1 AND 2)
-          OR (f.month = 12 AND f.day_of_month = 31) THEN 'New Year'
-        WHEN (f.month = 7 AND f.day_of_month BETWEEN 3 AND 5) THEN 'July 4th'
-        WHEN (f.month = 5 AND f.day_of_week = 1 AND f.day_of_month BETWEEN 25 AND 31) THEN 'Memorial Day'
-        WHEN (f.month = 9 AND f.day_of_week = 1 AND f.day_of_month BETWEEN 1 AND 7) THEN 'Labor Day'
-        ELSE 'Regular Day'
-    END
-ORDER BY avg_arr_delay DESC
+  CASE
+    WHEN (
+      f.month = 11 AND f.day_of_month BETWEEN 21 AND 27
+    )
+    THEN 'Thanksgiving Week'
+    WHEN (
+      f.month = 12 AND f.day_of_month BETWEEN 23 AND 27
+    )
+    THEN 'Christmas'
+    WHEN (
+      f.month = 1 AND f.day_of_month BETWEEN 1 AND 2
+    )
+    OR (
+      f.month = 12 AND f.day_of_month = 31
+    )
+    THEN 'New Year'
+    WHEN (
+      f.month = 7 AND f.day_of_month BETWEEN 3 AND 5
+    )
+    THEN 'July 4th'
+    WHEN (
+      f.month = 5 AND f.day_of_week = 1 AND f.day_of_month BETWEEN 25 AND 31
+    )
+    THEN 'Memorial Day'
+    WHEN (
+      f.month = 9 AND f.day_of_week = 1 AND f.day_of_month BETWEEN 1 AND 7
+    )
+    THEN 'Labor Day'
+    ELSE 'Regular Day'
+  END AS period,
+  COUNT(*) AS total_flights,
+  ROUND(CAST(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay END) AS DECIMAL), 2) AS avg_arr_delay,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) / COUNT(*) AS DECIMAL),
+    2
+  ) AS cancellation_rate_pct,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0) AS DECIMAL),
+    2
+  ) AS ontime_pct
+FROM flights AS f
+WHERE
+  f.flight_date >= '2021-08-01' AND f.flight_date < '2025-01-01'
+GROUP BY
+  CASE
+    WHEN (
+      f.month = 11 AND f.day_of_month BETWEEN 21 AND 27
+    )
+    THEN 'Thanksgiving Week'
+    WHEN (
+      f.month = 12 AND f.day_of_month BETWEEN 23 AND 27
+    )
+    THEN 'Christmas'
+    WHEN (
+      f.month = 1 AND f.day_of_month BETWEEN 1 AND 2
+    )
+    OR (
+      f.month = 12 AND f.day_of_month = 31
+    )
+    THEN 'New Year'
+    WHEN (
+      f.month = 7 AND f.day_of_month BETWEEN 3 AND 5
+    )
+    THEN 'July 4th'
+    WHEN (
+      f.month = 5 AND f.day_of_week = 1 AND f.day_of_month BETWEEN 25 AND 31
+    )
+    THEN 'Memorial Day'
+    WHEN (
+      f.month = 9 AND f.day_of_week = 1 AND f.day_of_month BETWEEN 1 AND 7
+    )
+    THEN 'Labor Day'
+    ELSE 'Regular Day'
+  END
+ORDER BY
+  avg_arr_delay DESC
 ```
 
 ## Representative DataFrame

@@ -16,22 +16,30 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    f.reporting_airline,
-    a.name AS airline_name,
-    COUNT(*) AS total_flights,
-    SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS total_cancelled,
-    ROUND(100.0 * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) / COUNT(*), 3) AS cancellation_rate_pct,
-    SUM(CASE WHEN f.cancellation_code = 'A' THEN 1 ELSE 0 END) AS carrier_cancellations,
-    SUM(CASE WHEN f.cancellation_code = 'B' THEN 1 ELSE 0 END) AS weather_cancellations,
-    SUM(CASE WHEN f.cancellation_code = 'C' THEN 1 ELSE 0 END) AS nas_cancellations,
-    SUM(CASE WHEN f.cancellation_code = 'D' THEN 1 ELSE 0 END) AS security_cancellations
-FROM flights f
-LEFT JOIN airlines a ON f.reporting_airline = a.code
-WHERE f.flight_date >= '2021-08-01'
-  AND f.flight_date < '2025-01-01'
-GROUP BY f.reporting_airline, a.name
-HAVING COUNT(*) >= 100
-ORDER BY cancellation_rate_pct DESC
+  f.reporting_airline,
+  a.name AS airline_name,
+  COUNT(*) AS total_flights,
+  SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS total_cancelled,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) / COUNT(*) AS DECIMAL),
+    3
+  ) AS cancellation_rate_pct,
+  SUM(CASE WHEN f.cancellation_code = 'A' THEN 1 ELSE 0 END) AS carrier_cancellations,
+  SUM(CASE WHEN f.cancellation_code = 'B' THEN 1 ELSE 0 END) AS weather_cancellations,
+  SUM(CASE WHEN f.cancellation_code = 'C' THEN 1 ELSE 0 END) AS nas_cancellations,
+  SUM(CASE WHEN f.cancellation_code = 'D' THEN 1 ELSE 0 END) AS security_cancellations
+FROM flights AS f
+LEFT JOIN airlines AS a
+  ON f.reporting_airline = a.code
+WHERE
+  f.flight_date >= '2021-08-01' AND f.flight_date < '2025-01-01'
+GROUP BY
+  f.reporting_airline,
+  a.name
+HAVING
+  COUNT(*) >= 100
+ORDER BY
+  cancellation_rate_pct DESC
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,25 @@ Window aggregations with the same unbounded frame definition
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Window aggregations with the same unbounded frame definition */ SELECT l_orderkey, l_linenumber, l_shipdate, l_quantity, FIRST_VALUE(l_quantity) OVER (PARTITION BY l_orderkey ORDER BY l_linenumber ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS first_line_qty, LAST_VALUE(l_quantity) OVER (PARTITION BY l_orderkey ORDER BY l_linenumber ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS last_line_qty FROM lineitem WHERE l_orderkey BETWEEN 1 AND 5000
+/* Window aggregations with the same unbounded frame definition */
+SELECT
+  l_orderkey,
+  l_linenumber,
+  l_shipdate,
+  l_quantity,
+  FIRST_VALUE(l_quantity) OVER (
+    PARTITION BY l_orderkey
+    ORDER BY l_linenumber
+    ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+  ) AS first_line_qty,
+  LAST_VALUE(l_quantity) OVER (
+    PARTITION BY l_orderkey
+    ORDER BY l_linenumber
+    ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+  ) AS last_line_qty
+FROM lineitem
+WHERE
+  l_orderkey BETWEEN 1 AND 5000
 ```
 
 ## Representative DataFrame

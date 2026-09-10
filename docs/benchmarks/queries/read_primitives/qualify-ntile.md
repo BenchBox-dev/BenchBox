@@ -15,7 +15,32 @@ Find orders in top quartile per segment using NTILE
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Find orders in the top quartile by value for each market segment using QUALIFY */ /* o_orderkey is the deterministic tie-break in the NTILE window ORDER BY so bucket */ /* assignment at tied o_totalprice values is well-defined across engines. */ SELECT c_mktsegment, o_orderkey, o_totalprice, quartile FROM (/* Find orders in the top quartile by value for each market segment using QUALIFY */ /* o_orderkey is the deterministic tie-break in the NTILE window ORDER BY so bucket */ /* assignment at tied o_totalprice values is well-defined across engines. */ SELECT c_mktsegment, o_orderkey, o_totalprice, NTILE(4) OVER (PARTITION BY c_mktsegment ORDER BY o_totalprice, o_orderkey) AS quartile, NTILE(4) OVER (PARTITION BY c_mktsegment ORDER BY o_totalprice, o_orderkey) AS _w FROM orders AS o JOIN customer AS c ON o.o_custkey = c.c_custkey WHERE o_orderdate >= CAST('1995-01-01' AS DATE) ORDER BY c_mktsegment, o_totalprice DESC, o_orderkey DESC) AS _t WHERE _w = 4
+/* Find orders in the top quartile by value for each market segment using QUALIFY */ /* o_orderkey is the deterministic tie-break in the NTILE window ORDER BY so bucket */ /* assignment at tied o_totalprice values is well-defined across engines. */
+SELECT
+  c_mktsegment,
+  o_orderkey,
+  o_totalprice,
+  quartile
+FROM (
+  /* Find orders in the top quartile by value for each market segment using QUALIFY */ /* o_orderkey is the deterministic tie-break in the NTILE window ORDER BY so bucket */ /* assignment at tied o_totalprice values is well-defined across engines. */
+  SELECT
+    c_mktsegment,
+    o_orderkey,
+    o_totalprice,
+    NTILE(4) OVER (PARTITION BY c_mktsegment ORDER BY o_totalprice, o_orderkey) AS quartile,
+    NTILE(4) OVER (PARTITION BY c_mktsegment ORDER BY o_totalprice, o_orderkey) AS _w
+  FROM orders AS o
+  JOIN customer AS c
+    ON o.o_custkey = c.c_custkey
+  WHERE
+    o_orderdate >= CAST('1995-01-01' AS DATE)
+  ORDER BY
+    c_mktsegment,
+    o_totalprice DESC,
+    o_orderkey DESC
+) AS _t
+WHERE
+  _w = 4
 ```
 
 ## Representative DataFrame

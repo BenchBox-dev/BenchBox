@@ -15,7 +15,27 @@ Top-performing locations by revenue with multi-column GROUP BY
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT dl.location_id, dl.city, dl.state, dl.region, COUNT(DISTINCT ol.order_id) AS orders, SUM(ol.total_price) AS revenue, AVG(ol.total_price) AS avg_line_value FROM order_lines AS ol JOIN dim_locations AS dl ON ol.location_record_id = dl.record_id WHERE ol.order_date BETWEEN CAST('2023-01-01' AS DATE) AND CAST('2024-12-31' AS DATE) GROUP BY dl.location_id, dl.city, dl.state, dl.region ORDER BY revenue DESC LIMIT 20
+SELECT
+  dl.location_id,
+  dl.city,
+  dl.state,
+  dl.region,
+  COUNT(DISTINCT ol.order_id) AS orders,
+  SUM(ol.total_price) AS revenue,
+  AVG(ol.total_price) AS avg_line_value
+FROM order_lines AS ol
+JOIN dim_locations AS dl
+  ON ol.location_record_id = dl.record_id
+WHERE
+  ol.order_date BETWEEN CAST('2023-01-01' AS DATE) AND CAST('2024-12-31' AS DATE)
+GROUP BY
+  dl.location_id,
+  dl.city,
+  dl.state,
+  dl.region
+ORDER BY
+  revenue DESC
+LIMIT 20
 ```
 
 ## Representative DataFrame

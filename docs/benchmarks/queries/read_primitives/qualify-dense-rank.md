@@ -15,7 +15,28 @@ Find top N parts by price per category using DENSE_RANK
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Find the top 2 most expensive parts in each category using QUALIFY */ SELECT p_type, p_name, p_retailprice, price_rank FROM (/* Find the top 2 most expensive parts in each category using QUALIFY */ SELECT p_type, p_name, p_retailprice, DENSE_RANK() OVER (PARTITION BY p_type ORDER BY p_retailprice DESC) AS price_rank, DENSE_RANK() OVER (PARTITION BY p_type ORDER BY p_retailprice DESC) AS _w FROM part ORDER BY p_type, price_rank, p_name) AS _t WHERE _w <= 2
+/* Find the top 2 most expensive parts in each category using QUALIFY */
+SELECT
+  p_type,
+  p_name,
+  p_retailprice,
+  price_rank
+FROM (
+  /* Find the top 2 most expensive parts in each category using QUALIFY */
+  SELECT
+    p_type,
+    p_name,
+    p_retailprice,
+    DENSE_RANK() OVER (PARTITION BY p_type ORDER BY p_retailprice DESC) AS price_rank,
+    DENSE_RANK() OVER (PARTITION BY p_type ORDER BY p_retailprice DESC) AS _w
+  FROM part
+  ORDER BY
+    p_type,
+    price_rank,
+    p_name
+) AS _t
+WHERE
+  _w <= 2
 ```
 
 ## Representative DataFrame

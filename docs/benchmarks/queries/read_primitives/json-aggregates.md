@@ -15,17 +15,20 @@ Create JSON arrays and objects from aggregations
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Create JSON array and object with JSON aggregate functions
+/* Create JSON array and object with JSON aggregate functions */
 SELECT
-    p_brand,
-    JSON_ARRAYAGG(p_name) as part_names,
-    JSON_OBJECTAGG(p_partkey, p_retailprice) as part_prices,
-    COUNT(*) as part_count
+  p_brand,
+  JSON_ARRAYAGG(p_name) AS part_names,
+  JSON_OBJECTAGG(p_partkey: p_retailprice) AS part_prices,
+  COUNT(*) AS part_count
 FROM part
-WHERE p_type LIKE '%STEEL%'
-GROUP BY p_brand
-ORDER BY p_brand
-LIMIT 100;
+WHERE
+  p_type LIKE '%STEEL%'
+GROUP BY
+  p_brand
+ORDER BY
+  p_brand
+LIMIT 100
 ```
 
 ## Representative DataFrame

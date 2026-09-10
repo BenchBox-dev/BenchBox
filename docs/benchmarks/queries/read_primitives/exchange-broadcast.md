@@ -15,7 +15,21 @@ One small table is copied to all nodes that have the large table
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* One small table is copied to all nodes that have the large table. The `BROADCAST(small_parts)` hint is optional */ /* + BROADCAST(small_parts) */ SELECT l.l_orderkey, SUM(l.l_quantity) AS total_qty FROM lineitem AS l JOIN (SELECT p_partkey FROM part WHERE p_size = 1) AS small_parts ON l.l_partkey = small_parts.p_partkey GROUP BY l.l_orderkey
+/* One small table is copied to all nodes that have the large table. The `BROADCAST(small_parts)` hint is optional */ /* + BROADCAST(small_parts) */
+SELECT
+  l.l_orderkey,
+  SUM(l.l_quantity) AS total_qty
+FROM lineitem AS l
+JOIN (
+  SELECT
+    p_partkey
+  FROM part
+  WHERE
+    p_size = 1
+) AS small_parts
+  ON l.l_partkey = small_parts.p_partkey
+GROUP BY
+  l.l_orderkey
 ```
 
 ## Representative DataFrame

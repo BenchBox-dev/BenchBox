@@ -13,7 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-TRUNCATE TABLE ddl_truncate_target
+TRUNCATE TABLE   ddl_truncate_target
 ```
 
 ## Representative DataFrame

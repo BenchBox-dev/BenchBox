@@ -14,13 +14,16 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_name,
-    SUM(CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END) AS nullable_count,
-    SUM(CASE WHEN is_nullable = 'NO' THEN 1 ELSE 0 END) AS not_nullable_count
+  table_name,
+  SUM(CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END) AS nullable_count,
+  SUM(CASE WHEN is_nullable = 'NO' THEN 1 ELSE 0 END) AS not_nullable_count
 FROM information_schema.columns
-WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-GROUP BY table_name
-ORDER BY table_name;
+WHERE
+  NOT table_schema IN ('information_schema', 'pg_catalog')
+GROUP BY
+  table_name
+ORDER BY
+  table_name
 ```
 
 ## Representative DataFrame

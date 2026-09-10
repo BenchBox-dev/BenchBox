@@ -15,14 +15,22 @@ Rendered for **DataFusion** with default parameters.
 ```sql
 MERGE INTO merge_ops_target AS target
 USING (
-  SELECT o_orderkey, o_totalprice * 1.1 AS o_totalprice, 'merge_all_update' AS o_comment
+  SELECT
+    o_orderkey,
+    o_totalprice * 1.1 AS o_totalprice,
+    'merge_all_update' AS o_comment
   FROM merge_ops_target
-  WHERE o_orderkey <= (SELECT MIN(o_orderkey) + 100 FROM merge_ops_target)
+  WHERE
+    o_orderkey <= (
+      SELECT
+        MIN(o_orderkey) + 100
+      FROM merge_ops_target
+    )
 ) AS source
 ON target.o_orderkey = source.o_orderkey
-WHEN MATCHED THEN
-  UPDATE SET o_totalprice = source.o_totalprice,
-             o_comment = source.o_comment
+WHEN MATCHED THEN UPDATE SET
+  o_totalprice = source.o_totalprice,
+  o_comment = source.o_comment
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,21 @@ Product mix by subcategory with date validity check on dim_products
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT dp.subcategory, COUNT(DISTINCT dp.product_id) AS active_products, SUM(ol.quantity) AS quantity_sold, SUM(ol.total_price) AS revenue FROM order_lines AS ol JOIN dim_products AS dp ON ol.product_record_id = dp.record_id WHERE ol.order_date BETWEEN CAST('2023-01-01' AS DATE) AND CAST('2023-12-31' AS DATE) AND ol.order_date BETWEEN dp.from_date AND dp.to_date GROUP BY dp.subcategory ORDER BY revenue DESC
+SELECT
+  dp.subcategory,
+  COUNT(DISTINCT dp.product_id) AS active_products,
+  SUM(ol.quantity) AS quantity_sold,
+  SUM(ol.total_price) AS revenue
+FROM order_lines AS ol
+JOIN dim_products AS dp
+  ON ol.product_record_id = dp.record_id
+WHERE
+  ol.order_date BETWEEN CAST('2023-01-01' AS DATE) AND CAST('2023-12-31' AS DATE)
+  AND ol.order_date BETWEEN dp.from_date AND dp.to_date
+GROUP BY
+  dp.subcategory
+ORDER BY
+  revenue DESC
 ```
 
 ## Representative DataFrame

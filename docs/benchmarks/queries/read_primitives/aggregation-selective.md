@@ -15,7 +15,12 @@ Aggregate on a small subset of rows
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Aggregate on a small subset of rows */ SELECT SUM(l_extendedprice * l_discount) AS total_discount_amount FROM lineitem WHERE l_discount > 0.05 AND l_quantity < 24
+/* Aggregate on a small subset of rows */
+SELECT
+  SUM(l_extendedprice * l_discount) AS total_discount_amount
+FROM lineitem
+WHERE
+  l_discount > 0.05 AND l_quantity < 24
 ```
 
 ## Representative DataFrame

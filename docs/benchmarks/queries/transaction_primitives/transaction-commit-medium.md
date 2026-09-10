@@ -13,11 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-BEGIN TRANSACTION;
-INSERT INTO txn_orders
-SELECT 9200000 + n, 1, 'O', 1000.0 * n, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'tx_medium'
-FROM (SELECT unnest(generate_series(1, 100)) AS n) t;
-COMMIT;
+BEGIN
 ```
 
 ## Representative DataFrame

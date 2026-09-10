@@ -13,7 +13,103 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Trading Pattern Analysis' AS analysis_name, trading_frequency_profile, customer_count, avg_trades_per_customer, avg_trade_size, avg_holding_period_days, total_commission_generated, avg_portfolio_turnover_rate FROM (SELECT CASE WHEN trades_per_month >= 50 THEN 'High Frequency (50+ trades/month)' WHEN trades_per_month >= 10 THEN 'Active (10-49 trades/month)' WHEN trades_per_month >= 2 THEN 'Regular (2-9 trades/month)' WHEN trades_per_month >= 0.5 THEN 'Occasional (0.5-2 trades/month)' ELSE 'Long-term (<0.5 trades/month)' END AS trading_frequency_profile, COUNT(DISTINCT customer_id) AS customer_count, AVG(total_trades) AS avg_trades_per_customer, AVG(avg_trade_size) AS avg_trade_size, AVG(avg_holding_period) AS avg_holding_period_days, SUM(total_commission) AS total_commission_generated, AVG(portfolio_turnover) AS avg_portfolio_turnover_rate FROM (SELECT c.SK_CustomerID AS customer_id, c.Tier, COUNT(t.TradeID) AS total_trades, COUNT(t.TradeID) / GREATEST((MAX(d.DateValue) - MIN(d.DateValue)), 1) * 30.44 AS trades_per_month, AVG(t.Quantity * t.TradePrice) AS avg_trade_size, AVG(CASE WHEN NOT sell_date.DateValue IS NULL THEN (sell_date.DateValue - buy_date.DateValue) ELSE NULL END) AS avg_holding_period, SUM(t.Commission) AS total_commission, COALESCE(SUM(CASE WHEN tt.TT_IS_SELL IS TRUE THEN t.Quantity * t.TradePrice ELSE 0 END) / NULLIF(SUM(h.CurrentHolding * h.CurrentPrice), 0), 0) AS portfolio_turnover FROM DimCustomer AS c LEFT JOIN FactTrade AS t ON c.SK_CustomerID = t.SK_CustomerID LEFT JOIN DimDate AS d ON t.SK_CreateDateID = d.SK_DateID LEFT JOIN TradeType AS tt ON t.Type = tt.TT_ID LEFT JOIN FactHoldings AS h ON c.SK_CustomerID = h.SK_CustomerID LEFT JOIN DimDate AS buy_date ON t.SK_CreateDateID = buy_date.SK_DateID AND tt.TT_IS_SELL IS FALSE LEFT JOIN DimDate AS sell_date ON t.SK_CloseDateID = sell_date.SK_DateID AND tt.TT_IS_SELL IS TRUE WHERE c.IsCurrent IS TRUE AND t.Status = 'Completed' AND d.CalendarYearID >= 2015 GROUP BY c.SK_CustomerID, c.Tier HAVING COUNT(t.TradeID) > 10) AS customer_trading_patterns GROUP BY CASE WHEN trades_per_month >= 50 THEN 'High Frequency (50+ trades/month)' WHEN trades_per_month >= 10 THEN 'Active (10-49 trades/month)' WHEN trades_per_month >= 2 THEN 'Regular (2-9 trades/month)' WHEN trades_per_month >= 0.5 THEN 'Occasional (0.5-2 trades/month)' ELSE 'Long-term (<0.5 trades/month)' END) AS pattern_analysis ORDER BY CASE trading_frequency_profile WHEN 'High Frequency (50+ trades/month)' THEN 1 WHEN 'Active (10-49 trades/month)' THEN 2 WHEN 'Regular (2-9 trades/month)' THEN 3 WHEN 'Occasional (0.5-2 trades/month)' THEN 4 ELSE 5 END
+SELECT
+  'Trading Pattern Analysis' AS analysis_name,
+  trading_frequency_profile,
+  customer_count,
+  avg_trades_per_customer,
+  avg_trade_size,
+  avg_holding_period_days,
+  total_commission_generated,
+  avg_portfolio_turnover_rate
+FROM (
+  SELECT
+    CASE
+      WHEN trades_per_month >= 50
+      THEN 'High Frequency (50+ trades/month)'
+      WHEN trades_per_month >= 10
+      THEN 'Active (10-49 trades/month)'
+      WHEN trades_per_month >= 2
+      THEN 'Regular (2-9 trades/month)'
+      WHEN trades_per_month >= 0.5
+      THEN 'Occasional (0.5-2 trades/month)'
+      ELSE 'Long-term (<0.5 trades/month)'
+    END AS trading_frequency_profile,
+    COUNT(DISTINCT customer_id) AS customer_count,
+    AVG(total_trades) AS avg_trades_per_customer,
+    AVG(avg_trade_size) AS avg_trade_size,
+    AVG(avg_holding_period) AS avg_holding_period_days,
+    SUM(total_commission) AS total_commission_generated,
+    AVG(portfolio_turnover) AS avg_portfolio_turnover_rate
+  FROM (
+    SELECT
+      c.SK_CustomerID AS customer_id,
+      c.Tier,
+      COUNT(t.TradeID) AS total_trades,
+      COUNT(t.TradeID) / GREATEST((
+        MAX(d.DateValue) - MIN(d.DateValue)
+      ), 1) * 30.44 AS trades_per_month,
+      AVG(t.Quantity * t.TradePrice) AS avg_trade_size,
+      AVG(
+        CASE
+          WHEN NOT sell_date.DateValue IS NULL
+          THEN (
+            sell_date.DateValue - buy_date.DateValue
+          )
+          ELSE NULL
+        END
+      ) AS avg_holding_period,
+      SUM(t.Commission) AS total_commission,
+      COALESCE(
+        SUM(CASE WHEN tt.TT_IS_SELL IS TRUE THEN t.Quantity * t.TradePrice ELSE 0 END) / NULLIF(SUM(h.CurrentHolding * h.CurrentPrice), 0),
+        0
+      ) AS portfolio_turnover
+    FROM DimCustomer AS c
+    LEFT JOIN FactTrade AS t
+      ON c.SK_CustomerID = t.SK_CustomerID
+    LEFT JOIN DimDate AS d
+      ON t.SK_CreateDateID = d.SK_DateID
+    LEFT JOIN TradeType AS tt
+      ON t.Type = tt.TT_ID
+    LEFT JOIN FactHoldings AS h
+      ON c.SK_CustomerID = h.SK_CustomerID
+    LEFT JOIN DimDate AS buy_date
+      ON t.SK_CreateDateID = buy_date.SK_DateID AND tt.TT_IS_SELL IS FALSE
+    LEFT JOIN DimDate AS sell_date
+      ON t.SK_CloseDateID = sell_date.SK_DateID AND tt.TT_IS_SELL IS TRUE
+    WHERE
+      c.IsCurrent IS TRUE AND t.Status = 'Completed' AND d.CalendarYearID >= 2015
+    GROUP BY
+      c.SK_CustomerID,
+      c.Tier
+    HAVING
+      COUNT(t.TradeID) > 10
+  ) AS customer_trading_patterns
+  GROUP BY
+    CASE
+      WHEN trades_per_month >= 50
+      THEN 'High Frequency (50+ trades/month)'
+      WHEN trades_per_month >= 10
+      THEN 'Active (10-49 trades/month)'
+      WHEN trades_per_month >= 2
+      THEN 'Regular (2-9 trades/month)'
+      WHEN trades_per_month >= 0.5
+      THEN 'Occasional (0.5-2 trades/month)'
+      ELSE 'Long-term (<0.5 trades/month)'
+    END
+) AS pattern_analysis
+ORDER BY
+  CASE trading_frequency_profile
+    WHEN 'High Frequency (50+ trades/month)'
+    THEN 1
+    WHEN 'Active (10-49 trades/month)'
+    THEN 2
+    WHEN 'Regular (2-9 trades/month)'
+    THEN 3
+    WHEN 'Occasional (0.5-2 trades/month)'
+    THEN 4
+    ELSE 5
+  END
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,18 @@ ORDER BY multiple columns
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Multi-column sort with limit */ SELECT l_orderkey, l_linenumber, l_shipdate, l_quantity FROM lineitem ORDER BY l_shipdate, l_orderkey, l_linenumber LIMIT 100
+/* Multi-column sort with limit */
+SELECT
+  l_orderkey,
+  l_linenumber,
+  l_shipdate,
+  l_quantity
+FROM lineitem
+ORDER BY
+  l_shipdate,
+  l_orderkey,
+  l_linenumber
+LIMIT 100
 ```
 
 ## Representative DataFrame

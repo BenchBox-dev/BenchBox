@@ -16,18 +16,28 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    CASE WHEN EXTRACT(DOW FROM pickup_datetime) IN (0, 6) THEN 'weekend' ELSE 'weekday' END as day_type,
-    EXTRACT(HOUR FROM pickup_datetime) as hour,
-    COUNT(*) as trip_count,
-    AVG(trip_distance) as avg_distance,
-    AVG(total_amount) as avg_fare
+  CASE
+    WHEN EXTRACT(DOW FROM pickup_datetime) IN (0, 6)
+    THEN 'weekend'
+    ELSE 'weekday'
+  END AS day_type,
+  EXTRACT(HOUR FROM pickup_datetime) AS hour,
+  COUNT(*) AS trip_count,
+  AVG(trip_distance) AS avg_distance,
+  AVG(total_amount) AS avg_fare
 FROM trips
-WHERE pickup_datetime >= '2019-07-10'
-  AND pickup_datetime < '2019-08-09'
+WHERE
+  pickup_datetime >= '2019-07-10' AND pickup_datetime < '2019-08-09'
 GROUP BY
-    CASE WHEN EXTRACT(DOW FROM pickup_datetime) IN (0, 6) THEN 'weekend' ELSE 'weekday' END,
-    EXTRACT(HOUR FROM pickup_datetime)
-ORDER BY day_type, hour
+  CASE
+    WHEN EXTRACT(DOW FROM pickup_datetime) IN (0, 6)
+    THEN 'weekend'
+    ELSE 'weekday'
+  END,
+  EXTRACT(HOUR FROM pickup_datetime)
+ORDER BY
+  day_type,
+  hour
 ```
 
 ## Representative DataFrame

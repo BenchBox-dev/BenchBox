@@ -15,7 +15,12 @@ Compound equality predicate with multiple decimal columns
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* compound equality predicate with multiple decimal columns */ SELECT * FROM lineitem WHERE l_extendedprice = 12345.67 AND l_discount = 0.05
+/* compound equality predicate with multiple decimal columns */
+SELECT
+  *
+FROM lineitem
+WHERE
+  l_extendedprice = 12345.67 AND l_discount = 0.05
 ```
 
 ## Representative DataFrame

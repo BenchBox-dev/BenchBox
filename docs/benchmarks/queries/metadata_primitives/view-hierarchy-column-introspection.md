@@ -14,15 +14,17 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    v.table_name AS view_name,
-    c.column_name,
-    c.data_type
-FROM information_schema.views v
-JOIN information_schema.columns c
-  ON v.table_name = c.table_name
-  AND v.table_schema = c.table_schema
-WHERE v.table_name LIKE 'benchbox_view_%'
-ORDER BY v.table_name, c.ordinal_position;
+  v.table_name AS view_name,
+  c.column_name,
+  c.data_type
+FROM information_schema.views AS v
+JOIN information_schema.columns AS c
+  ON v.table_name = c.table_name AND v.table_schema = c.table_schema
+WHERE
+  v.table_name LIKE 'benchbox_view_%'
+ORDER BY
+  v.table_name,
+  c.ordinal_position
 ```
 
 ## Representative DataFrame

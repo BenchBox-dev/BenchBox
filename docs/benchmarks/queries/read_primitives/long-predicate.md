@@ -15,7 +15,25 @@ Query with many conjunctive predicates across multiple tables
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Query with many conjunctive predicates across multiple tables */ SELECT COUNT(*) FROM lineitem AS l JOIN orders AS o ON l.l_orderkey = o.o_orderkey JOIN customer AS c ON o.o_custkey = c.c_custkey WHERE l.l_shipdate >= CAST('1994-01-01' AS DATE) AND l.l_shipdate < CAST('1995-01-01' AS DATE) AND l.l_discount BETWEEN 0.05 AND 0.07 AND l.l_quantity < 24 AND o.o_orderpriority = '1-URGENT' AND c.c_mktsegment = 'BUILDING' AND l.l_returnflag = 'R' AND l.l_linestatus = 'F' AND o.o_totalprice > 100000 AND c.c_nationkey IN (1, 2, 3, 4, 5)
+/* Query with many conjunctive predicates across multiple tables */
+SELECT
+  COUNT(*)
+FROM lineitem AS l
+JOIN orders AS o
+  ON l.l_orderkey = o.o_orderkey
+JOIN customer AS c
+  ON o.o_custkey = c.c_custkey
+WHERE
+  l.l_shipdate >= CAST('1994-01-01' AS DATE)
+  AND l.l_shipdate < CAST('1995-01-01' AS DATE)
+  AND l.l_discount BETWEEN 0.05 AND 0.07
+  AND l.l_quantity < 24
+  AND o.o_orderpriority = '1-URGENT'
+  AND c.c_mktsegment = 'BUILDING'
+  AND l.l_returnflag = 'R'
+  AND l.l_linestatus = 'F'
+  AND o.o_totalprice > 100000
+  AND c.c_nationkey IN (1, 2, 3, 4, 5)
 ```
 
 ## Representative DataFrame

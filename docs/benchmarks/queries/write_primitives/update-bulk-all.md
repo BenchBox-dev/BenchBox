@@ -13,8 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-UPDATE update_ops_orders
-SET o_comment = 'bulk_all_update'
+UPDATE update_ops_orders SET o_comment = 'bulk_all_update'
 ```
 
 ## Representative DataFrame

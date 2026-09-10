@@ -13,13 +13,13 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-UPDATE update_ops_orders
-SET o_totalprice = o_totalprice * 1.05,
-    o_orderpriority = '1-URGENT',
-    o_comment = 'multi_col_update',
-    o_shippriority = 1,
-    o_clerk = 'Clerk#000000001'
-WHERE o_orderkey = (SELECT MIN(o_orderkey) FROM update_ops_orders)
+UPDATE update_ops_orders SET o_totalprice = o_totalprice * 1.05, o_orderpriority = '1-URGENT', o_comment = 'multi_col_update', o_shippriority = 1, o_clerk = 'Clerk#000000001'
+WHERE
+  o_orderkey = (
+    SELECT
+      MIN(o_orderkey)
+    FROM update_ops_orders
+  )
 ```
 
 ## Representative DataFrame

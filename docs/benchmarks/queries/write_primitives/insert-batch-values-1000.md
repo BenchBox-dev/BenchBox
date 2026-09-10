@@ -14,10 +14,27 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 INSERT INTO insert_ops_lineitem
-SELECT 9001000 + n, 1, 1, 1, 10.0 * n, 1000.0 * n, 0.05, 0.02, 'N', 'O',
-       DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20',
-       'DELIVER IN PERSON', 'TRUCK', 'large_batch_' || CAST(n AS VARCHAR)
-FROM (SELECT unnest(generate_series(0, 999)) AS n) t
+SELECT
+  9001000 + n,
+  1,
+  1,
+  1,
+  10.0 * n,
+  1000.0 * n,
+  0.05,
+  0.02,
+  'N',
+  'O',
+  CAST('1998-01-01' AS DATE),
+  CAST('1998-01-15' AS DATE),
+  CAST('1998-01-20' AS DATE),
+  'DELIVER IN PERSON',
+  'TRUCK',
+  'large_batch_' || CAST(n AS VARCHAR)
+FROM (
+  SELECT
+    UNNEST(GENERATE_SERIES(0, 999)) AS n
+) AS t
 ```
 
 ## Representative DataFrame

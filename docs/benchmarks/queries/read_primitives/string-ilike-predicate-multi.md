@@ -15,7 +15,12 @@ Case insensitive matching multipart pattern
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Case insensitive matching multipart pattern */ SELECT COUNT(*) FROM part WHERE p_name LIKE '%sTeEl%bRaSs%'
+/* Case insensitive matching multipart pattern */
+SELECT
+  COUNT(*)
+FROM part
+WHERE
+  p_name LIKE '%sTeEl%bRaSs%'
 ```
 
 ## Representative DataFrame

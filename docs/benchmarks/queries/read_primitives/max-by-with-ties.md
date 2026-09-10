@@ -21,23 +21,26 @@ WITH ranked AS (
     p.p_name,
     s.s_name,
     ps.ps_supplycost,
-    ROW_NUMBER() OVER (
-      PARTITION BY p.p_partkey, p.p_name
-      ORDER BY ps.ps_supplycost DESC, s.s_name
-    ) as rn
-  FROM partsupp ps
-  JOIN part p ON ps.ps_partkey = p.p_partkey
-  JOIN supplier s ON ps.ps_suppkey = s.s_suppkey
+    ROW_NUMBER() OVER (PARTITION BY p.p_partkey, p.p_name ORDER BY ps.ps_supplycost DESC, s.s_name) AS rn
+  FROM partsupp AS ps
+  JOIN part AS p
+    ON ps.ps_partkey = p.p_partkey
+  JOIN supplier AS s
+    ON ps.ps_suppkey = s.s_suppkey
 )
 SELECT
   p_partkey,
   p_name,
-  s_name as supplier_name,
-  ps_supplycost as max_supply_cost
+  s_name AS supplier_name,
+  ps_supplycost AS max_supply_cost
 FROM ranked
-WHERE rn = 1
-ORDER BY max_supply_cost DESC, p_partkey, p_name
-LIMIT 100;
+WHERE
+  rn = 1
+ORDER BY
+  max_supply_cost DESC,
+  p_partkey,
+  p_name
+LIMIT 100
 ```
 
 ## Representative DataFrame

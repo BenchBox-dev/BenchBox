@@ -13,14 +13,13 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-EXPLAIN
-SELECT t.table_name, c.column_name
+EXPLAIN SELECT t.table_name, c.column_name
 FROM information_schema.tables t
 JOIN information_schema.columns c
   ON t.table_name = c.table_name
   AND t.table_schema = c.table_schema
 WHERE t.table_schema NOT IN ('information_schema', 'pg_catalog')
-LIMIT 100;
+LIMIT 100
 ```
 
 ## Representative DataFrame

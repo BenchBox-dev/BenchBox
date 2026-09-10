@@ -15,7 +15,24 @@ Get slice/subset of array
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Get array slice/subset */ WITH order_prices AS (SELECT o_custkey, ARRAY_AGG(o_totalprice ORDER BY o_totalprice DESC) AS prices FROM orders GROUP BY o_custkey HAVING COUNT(*) >= 5) SELECT o_custkey, ARRAY_SLICE(prices, 1, 3) AS top_3_orders FROM order_prices ORDER BY o_custkey LIMIT 100
+/* Get array slice/subset */
+WITH order_prices AS (
+  SELECT
+    o_custkey,
+    ARRAY_AGG(o_totalprice ORDER BY o_totalprice DESC) AS prices
+  FROM orders
+  GROUP BY
+    o_custkey
+  HAVING
+    COUNT(*) >= 5
+)
+SELECT
+  o_custkey,
+  ARRAY_SLICE(prices, 1, 3) AS top_3_orders
+FROM order_prices
+ORDER BY
+  o_custkey
+LIMIT 100
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,12 @@ Equality predicate with high selectivity on integer column
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* equality predicate with high selectivity on integer column */ SELECT * FROM orders WHERE o_orderkey = 1234567
+/* equality predicate with high selectivity on integer column */
+SELECT
+  *
+FROM orders
+WHERE
+  o_orderkey = 1234567
 ```
 
 ## Representative DataFrame

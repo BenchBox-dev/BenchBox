@@ -13,7 +13,27 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Test EXISTS subquery decorrelation to semijoin optimization */ /* Good optimizers should convert the EXISTS to a semijoin for better performance */ SELECT c_custkey, c_name, c_mktsegment, c_nationkey FROM customer AS c WHERE EXISTS(SELECT 1 FROM orders AS o WHERE o.o_custkey = c.c_custkey AND o.o_orderdate >= CAST('1995-01-01' AS DATE) AND o.o_orderdate < CAST('1996-01-01' AS DATE) AND o.o_totalprice > 100000) ORDER BY c_custkey LIMIT 1000
+/* Test EXISTS subquery decorrelation to semijoin optimization */ /* Good optimizers should convert the EXISTS to a semijoin for better performance */
+SELECT
+  c_custkey,
+  c_name,
+  c_mktsegment,
+  c_nationkey
+FROM customer AS c
+WHERE
+  EXISTS(
+    SELECT
+      1
+    FROM orders AS o
+    WHERE
+      o.o_custkey = c.c_custkey
+      AND o.o_orderdate >= CAST('1995-01-01' AS DATE)
+      AND o.o_orderdate < CAST('1996-01-01' AS DATE)
+      AND o.o_totalprice > 100000
+  )
+ORDER BY
+  c_custkey
+LIMIT 1000
 ```
 
 ## Representative DataFrame

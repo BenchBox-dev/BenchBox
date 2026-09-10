@@ -15,7 +15,20 @@ Variance and standard deviation calculations
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Variance and standard deviation calculations */ SELECT o_orderpriority, COUNT(*) AS order_count, AVG(o_totalprice) AS avg_price, VAR_SAMP(o_totalprice) AS price_variance, STDDEV(o_totalprice) AS price_stddev, STDDEV_POP(o_totalprice) AS price_stddev_pop, STDDEV_SAMP(o_totalprice) AS price_stddev_samp FROM orders WHERE o_orderdate >= CAST('1995-01-01' AS DATE) GROUP BY o_orderpriority
+/* Variance and standard deviation calculations */
+SELECT
+  o_orderpriority,
+  COUNT(*) AS order_count,
+  AVG(o_totalprice) AS avg_price,
+  VAR_SAMP(o_totalprice) AS price_variance,
+  STDDEV(o_totalprice) AS price_stddev,
+  STDDEV_POP(o_totalprice) AS price_stddev_pop,
+  STDDEV_SAMP(o_totalprice) AS price_stddev_samp
+FROM orders
+WHERE
+  o_orderdate >= CAST('1995-01-01' AS DATE)
+GROUP BY
+  o_orderpriority
 ```
 
 ## Representative DataFrame

@@ -13,10 +13,19 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-UPDATE update_ops_orders
-SET o_totalprice = o_totalprice * 1.1 + 50.0 - (o_totalprice * 0.02),
-    o_comment = 'computed_update'
-WHERE o_orderkey BETWEEN (SELECT MIN(o_orderkey) FROM update_ops_orders) AND (SELECT MIN(o_orderkey) + 50 FROM update_ops_orders)
+UPDATE update_ops_orders SET o_totalprice = o_totalprice * 1.1 + 50.0 - (
+  o_totalprice * 0.02
+), o_comment = 'computed_update'
+WHERE
+  o_orderkey BETWEEN (
+    SELECT
+      MIN(o_orderkey)
+    FROM update_ops_orders
+  ) AND (
+    SELECT
+      MIN(o_orderkey) + 50
+    FROM update_ops_orders
+  )
 ```
 
 ## Representative DataFrame

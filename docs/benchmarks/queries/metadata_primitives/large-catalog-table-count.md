@@ -13,9 +13,11 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT COUNT(*) AS table_count
+SELECT
+  COUNT(*) AS table_count
 FROM information_schema.tables
-WHERE table_name LIKE 'benchbox_catalog_%';
+WHERE
+  table_name LIKE 'benchbox_catalog_%'
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,11 @@ Aggregate over all rows in table
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Aggregate over all rows in table */ SELECT COUNT(*) AS total_orders, SUM(o_totalprice) AS total_revenue FROM orders
+/* Aggregate over all rows in table */
+SELECT
+  COUNT(*) AS total_orders,
+  SUM(o_totalprice) AS total_revenue
+FROM orders
 ```
 
 ## Representative DataFrame

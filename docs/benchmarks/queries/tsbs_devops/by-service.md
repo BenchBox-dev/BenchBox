@@ -16,15 +16,18 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    t.service,
-    COUNT(DISTINCT c.hostname) as host_count,
-    AVG(c.usage_user + c.usage_system) as avg_cpu_total
-FROM cpu c
-JOIN tags t ON c.hostname = t.hostname
-WHERE c.time >= '2024-01-02 17:00:00'
-  AND c.time < '2024-01-02 18:00:00'
-GROUP BY t.service
-ORDER BY avg_cpu_total DESC
+  t.service,
+  COUNT(DISTINCT c.hostname) AS host_count,
+  AVG(c.usage_user + c.usage_system) AS avg_cpu_total
+FROM cpu AS c
+JOIN tags AS t
+  ON c.hostname = t.hostname
+WHERE
+  c.time >= '2024-01-02 17:00:00' AND c.time < '2024-01-02 18:00:00'
+GROUP BY
+  t.service
+ORDER BY
+  avg_cpu_total DESC
 ```
 
 ## Representative DataFrame

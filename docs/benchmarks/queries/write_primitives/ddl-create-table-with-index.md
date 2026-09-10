@@ -14,11 +14,10 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 CREATE TABLE test_indexed (
-  id INTEGER,
+  id INT,
   name VARCHAR(100),
-  value DECIMAL(15,2)
-);
-CREATE INDEX idx_test_value ON test_indexed(value)
+  value DECIMAL(15, 2)
+)
 ```
 
 ## Representative DataFrame

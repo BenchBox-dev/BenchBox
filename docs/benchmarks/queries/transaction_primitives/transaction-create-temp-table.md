@@ -13,12 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-BEGIN TRANSACTION;
-CREATE TEMP TABLE IF NOT EXISTS temp_orders_9980000 AS SELECT * FROM orders WHERE 1=0;
-INSERT INTO temp_orders_9980000 VALUES (9980001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'temp_test');
-INSERT INTO txn_orders SELECT * FROM temp_orders_9980000;
-DROP TABLE IF EXISTS temp_orders_9980000;
-COMMIT;
+BEGIN
 ```
 
 ## Representative DataFrame

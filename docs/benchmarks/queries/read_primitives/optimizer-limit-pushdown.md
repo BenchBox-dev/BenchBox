@@ -15,7 +15,23 @@ Test limit pushdown through operations
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Test limit pushdown through operations optimization */ /* Good optimizers should push partial limits down to reduce work in upstream operations */ SELECT c.c_name, c.c_mktsegment, o.o_orderdate, o.o_totalprice, o.o_orderpriority FROM customer AS c JOIN orders AS o ON c.c_custkey = o.o_custkey WHERE c.c_mktsegment = 'BUILDING' AND o.o_orderdate >= CAST('1995-01-01' AS DATE) AND o.o_orderdate < CAST('1996-01-01' AS DATE) ORDER BY o.o_totalprice DESC LIMIT 100
+/* Test limit pushdown through operations optimization */ /* Good optimizers should push partial limits down to reduce work in upstream operations */
+SELECT
+  c.c_name,
+  c.c_mktsegment,
+  o.o_orderdate,
+  o.o_totalprice,
+  o.o_orderpriority
+FROM customer AS c
+JOIN orders AS o
+  ON c.c_custkey = o.o_custkey
+WHERE
+  c.c_mktsegment = 'BUILDING'
+  AND o.o_orderdate >= CAST('1995-01-01' AS DATE)
+  AND o.o_orderdate < CAST('1996-01-01' AS DATE)
+ORDER BY
+  o.o_totalprice DESC
+LIMIT 100
 ```
 
 ## Representative DataFrame

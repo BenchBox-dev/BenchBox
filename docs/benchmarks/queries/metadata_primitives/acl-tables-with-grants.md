@@ -14,13 +14,17 @@ Rendered in the benchmark's native SQL with default parameters (no dialect trans
 
 ```sql
 SELECT DISTINCT
-    table_schema,
-    table_name,
-    COUNT(*) AS total_grants
+  table_schema,
+  table_name,
+  COUNT(*) AS total_grants
 FROM information_schema.table_privileges
-WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-GROUP BY table_schema, table_name
-ORDER BY total_grants DESC;
+WHERE
+  NOT table_schema IN ('information_schema', 'pg_catalog')
+GROUP BY
+  table_schema,
+  table_name
+ORDER BY
+  total_grants DESC
 ```
 
 ## Representative DataFrame

@@ -13,7 +13,49 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Extended Tables Referential Integrity' AS validation_name, SUM(CASE WHEN orphaned_cash_balances > 0 THEN 1 ELSE 0 END) + SUM(CASE WHEN orphaned_holdings > 0 THEN 1 ELSE 0 END) + SUM(CASE WHEN orphaned_market_history > 0 THEN 1 ELSE 0 END) + SUM(CASE WHEN orphaned_watches > 0 THEN 1 ELSE 0 END) AS integrity_violations, 4 AS total_checks FROM (SELECT (SELECT COUNT(*) FROM FactCashBalances AS f LEFT JOIN DimCustomer AS c ON f.SK_CustomerID = c.SK_CustomerID WHERE c.SK_CustomerID IS NULL) AS orphaned_cash_balances, (SELECT COUNT(*) FROM FactHoldings AS f LEFT JOIN DimSecurity AS s ON f.SK_SecurityID = s.SK_SecurityID WHERE s.SK_SecurityID IS NULL) AS orphaned_holdings, (SELECT COUNT(*) FROM FactMarketHistory AS f LEFT JOIN DimSecurity AS s ON f.SK_SecurityID = s.SK_SecurityID WHERE s.SK_SecurityID IS NULL) AS orphaned_market_history, (SELECT COUNT(*) FROM FactWatches AS f LEFT JOIN DimCustomer AS c ON f.SK_CustomerID = c.SK_CustomerID WHERE c.SK_CustomerID IS NULL) AS orphaned_watches) AS checks
+SELECT
+  'Extended Tables Referential Integrity' AS validation_name,
+  SUM(CASE WHEN orphaned_cash_balances > 0 THEN 1 ELSE 0 END) + SUM(CASE WHEN orphaned_holdings > 0 THEN 1 ELSE 0 END) + SUM(CASE WHEN orphaned_market_history > 0 THEN 1 ELSE 0 END) + SUM(CASE WHEN orphaned_watches > 0 THEN 1 ELSE 0 END) AS integrity_violations,
+  4 AS total_checks
+FROM (
+  SELECT
+    (
+      SELECT
+        COUNT(*)
+      FROM FactCashBalances AS f
+      LEFT JOIN DimCustomer AS c
+        ON f.SK_CustomerID = c.SK_CustomerID
+      WHERE
+        c.SK_CustomerID IS NULL
+    ) AS orphaned_cash_balances,
+    (
+      SELECT
+        COUNT(*)
+      FROM FactHoldings AS f
+      LEFT JOIN DimSecurity AS s
+        ON f.SK_SecurityID = s.SK_SecurityID
+      WHERE
+        s.SK_SecurityID IS NULL
+    ) AS orphaned_holdings,
+    (
+      SELECT
+        COUNT(*)
+      FROM FactMarketHistory AS f
+      LEFT JOIN DimSecurity AS s
+        ON f.SK_SecurityID = s.SK_SecurityID
+      WHERE
+        s.SK_SecurityID IS NULL
+    ) AS orphaned_market_history,
+    (
+      SELECT
+        COUNT(*)
+      FROM FactWatches AS f
+      LEFT JOIN DimCustomer AS c
+        ON f.SK_CustomerID = c.SK_CustomerID
+      WHERE
+        c.SK_CustomerID IS NULL
+    ) AS orphaned_watches
+) AS checks
 ```
 
 ## Representative DataFrame

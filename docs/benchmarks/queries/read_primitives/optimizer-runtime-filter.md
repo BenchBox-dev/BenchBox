@@ -15,7 +15,27 @@ Test runtime filter / dynamic partition pruning
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Test runtime filter generation optimization */ /* Good optimizers should generate bloom filters or hash filters for selective joins */ SELECT l.l_orderkey, l.l_partkey, l.l_suppkey, l.l_quantity, l.l_extendedprice, p.p_name, p.p_type FROM lineitem AS l JOIN part AS p ON l.l_partkey = p.p_partkey WHERE p.p_type LIKE '%STEEL%' /* Selective filter should generate runtime filter */ AND p.p_size BETWEEN 10 AND 20 AND l.l_shipdate >= CAST('1995-01-01' AS DATE) AND l.l_shipdate < CAST('1996-01-01' AS DATE) AND l.l_quantity > 20 ORDER BY l.l_extendedprice DESC LIMIT 1000
+/* Test runtime filter generation optimization */ /* Good optimizers should generate bloom filters or hash filters for selective joins */
+SELECT
+  l.l_orderkey,
+  l.l_partkey,
+  l.l_suppkey,
+  l.l_quantity,
+  l.l_extendedprice,
+  p.p_name,
+  p.p_type
+FROM lineitem AS l
+JOIN part AS p
+  ON l.l_partkey = p.p_partkey
+WHERE
+  p.p_type LIKE '%STEEL%' /* Selective filter should generate runtime filter */
+  AND p.p_size BETWEEN 10 AND 20
+  AND l.l_shipdate >= CAST('1995-01-01' AS DATE)
+  AND l.l_shipdate < CAST('1996-01-01' AS DATE)
+  AND l.l_quantity > 20
+ORDER BY
+  l.l_extendedprice DESC
+LIMIT 1000
 ```
 
 ## Representative DataFrame

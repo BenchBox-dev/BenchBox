@@ -16,16 +16,19 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    EXTRACT(HOUR FROM pickup_datetime) as hour,
-    COUNT(*) as trip_count,
-    AVG(tip_amount) as avg_tip,
-    AVG(CASE WHEN fare_amount > 0 THEN tip_amount / fare_amount * 100 END) as avg_tip_pct
+  EXTRACT(HOUR FROM pickup_datetime) AS hour,
+  COUNT(*) AS trip_count,
+  AVG(tip_amount) AS avg_tip,
+  AVG(CASE WHEN fare_amount > 0 THEN tip_amount / fare_amount * 100 END) AS avg_tip_pct
 FROM trips
-WHERE pickup_datetime >= '2019-10-20'
+WHERE
+  pickup_datetime >= '2019-10-20'
   AND pickup_datetime < '2019-11-19'
   AND payment_type = 1
-GROUP BY EXTRACT(HOUR FROM pickup_datetime)
-ORDER BY hour
+GROUP BY
+  EXTRACT(HOUR FROM pickup_datetime)
+ORDER BY
+  hour
 ```
 
 ## Representative DataFrame

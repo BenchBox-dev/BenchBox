@@ -16,31 +16,45 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    CASE
-        WHEN f.distance < 250 THEN 'Short-haul (<250 mi)'
-        WHEN f.distance < 500 THEN 'Medium-haul (250-499 mi)'
-        WHEN f.distance < 1000 THEN 'Long-haul (500-999 mi)'
-        WHEN f.distance < 2000 THEN 'Cross-country (1000-1999 mi)'
-        ELSE 'Ultra-long (2000+ mi)'
-    END AS distance_bucket,
-    COUNT(*) AS total_flights,
-    ROUND(AVG(f.distance), 0) AS avg_distance_miles,
-    ROUND(AVG(f.dep_delay), 2) AS avg_dep_delay,
-    ROUND(AVG(f.arr_delay), 2) AS avg_arr_delay,
-    ROUND(100.0 * SUM(CASE WHEN f.arr_delay <= 15 THEN 1 ELSE 0 END) / COUNT(*), 2) AS ontime_pct
-FROM flights f
-WHERE f.cancelled = 0
-  AND f.arr_delay IS NOT NULL
+  CASE
+    WHEN f.distance < 250
+    THEN 'Short-haul (<250 mi)'
+    WHEN f.distance < 500
+    THEN 'Medium-haul (250-499 mi)'
+    WHEN f.distance < 1000
+    THEN 'Long-haul (500-999 mi)'
+    WHEN f.distance < 2000
+    THEN 'Cross-country (1000-1999 mi)'
+    ELSE 'Ultra-long (2000+ mi)'
+  END AS distance_bucket,
+  COUNT(*) AS total_flights,
+  ROUND(CAST(AVG(f.distance) AS DECIMAL), 0) AS avg_distance_miles,
+  ROUND(CAST(AVG(f.dep_delay) AS DECIMAL), 2) AS avg_dep_delay,
+  ROUND(CAST(AVG(f.arr_delay) AS DECIMAL), 2) AS avg_arr_delay,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.arr_delay <= 15 THEN 1 ELSE 0 END) / COUNT(*) AS DECIMAL),
+    2
+  ) AS ontime_pct
+FROM flights AS f
+WHERE
+  f.cancelled = 0
+  AND NOT f.arr_delay IS NULL
   AND f.flight_date >= '2021-08-01'
   AND f.flight_date < '2025-01-01'
-GROUP BY CASE
-    WHEN f.distance < 250 THEN 'Short-haul (<250 mi)'
-    WHEN f.distance < 500 THEN 'Medium-haul (250-499 mi)'
-    WHEN f.distance < 1000 THEN 'Long-haul (500-999 mi)'
-    WHEN f.distance < 2000 THEN 'Cross-country (1000-1999 mi)'
+GROUP BY
+  CASE
+    WHEN f.distance < 250
+    THEN 'Short-haul (<250 mi)'
+    WHEN f.distance < 500
+    THEN 'Medium-haul (250-499 mi)'
+    WHEN f.distance < 1000
+    THEN 'Long-haul (500-999 mi)'
+    WHEN f.distance < 2000
+    THEN 'Cross-country (1000-1999 mi)'
     ELSE 'Ultra-long (2000+ mi)'
-END
-ORDER BY avg_distance_miles
+  END
+ORDER BY
+  avg_distance_miles
 ```
 
 ## Representative DataFrame

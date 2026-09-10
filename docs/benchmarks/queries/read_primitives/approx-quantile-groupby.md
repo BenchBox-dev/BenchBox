@@ -16,10 +16,11 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    l_shipmode,
-    approx_percentile_cont(l_quantity, 0.5) as median_quantity
+  l_shipmode,
+  APPROX_PERCENTILE_CONT(l_quantity, 0.5) AS median_quantity
 FROM lineitem
-GROUP BY l_shipmode;
+GROUP BY
+  l_shipmode
 ```
 
 ## Representative DataFrame

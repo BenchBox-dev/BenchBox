@@ -14,11 +14,18 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 DELETE FROM delete_ops_lineitem
-WHERE l_suppkey IN (
-  SELECT DISTINCT l_suppkey
-  FROM lineitem
-  WHERE l_suppkey <= (SELECT MAX(l_suppkey) * 0.01 FROM lineitem)
-)
+WHERE
+  l_suppkey IN (
+    SELECT DISTINCT
+      l_suppkey
+    FROM lineitem
+    WHERE
+      l_suppkey <= (
+        SELECT
+          MAX(l_suppkey) * 0.01
+        FROM lineitem
+      )
+  )
 ```
 
 ## Representative DataFrame

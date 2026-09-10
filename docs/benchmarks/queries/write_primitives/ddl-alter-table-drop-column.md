@@ -14,11 +14,10 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 CREATE TABLE test_drop_col (
-  id INTEGER,
+  id INT,
   name VARCHAR(100),
   temp_col VARCHAR(50)
-);
-ALTER TABLE test_drop_col DROP COLUMN temp_col
+)
 ```
 
 ## Representative DataFrame

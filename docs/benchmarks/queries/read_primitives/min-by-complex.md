@@ -21,20 +21,20 @@ WITH ranked AS (
     p_name,
     p_type,
     p_retailprice,
-    ROW_NUMBER() OVER (
-      PARTITION BY p_brand
-      ORDER BY p_retailprice ASC, p_name
-    ) as rn
+    ROW_NUMBER() OVER (PARTITION BY p_brand ORDER BY p_retailprice ASC, p_name) AS rn
   FROM part
 )
 SELECT
   p_brand,
-  p_name as cheapest_part_name,
-  p_type as cheapest_part_type,
-  p_retailprice as min_price
+  p_name AS cheapest_part_name,
+  p_type AS cheapest_part_type,
+  p_retailprice AS min_price
 FROM ranked
-WHERE rn = 1
-ORDER BY min_price ASC, p_brand;
+WHERE
+  rn = 1
+ORDER BY
+  min_price ASC,
+  p_brand
 ```
 
 ## Representative DataFrame

@@ -16,14 +16,16 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    DATE_TRUNC('month', pickup_datetime) as month,
-    COUNT(*) as trip_count,
-    SUM(total_amount) as total_revenue
+  DATE_TRUNC('MONTH', pickup_datetime) AS month,
+  COUNT(*) AS trip_count,
+  SUM(total_amount) AS total_revenue
 FROM trips
-WHERE pickup_datetime >= '2019-01-01'
-  AND pickup_datetime < '2020-01-01'
-GROUP BY DATE_TRUNC('month', pickup_datetime)
-ORDER BY month
+WHERE
+  pickup_datetime >= '2019-01-01' AND pickup_datetime < '2020-01-01'
+GROUP BY
+  DATE_TRUNC('MONTH', pickup_datetime)
+ORDER BY
+  month
 ```
 
 ## Representative DataFrame

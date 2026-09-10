@@ -13,12 +13,16 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-UPDATE update_ops_orders
-SET o_comment = 'joined_update'
+UPDATE update_ops_orders SET o_comment = 'joined_update'
 FROM customer
-WHERE update_ops_orders.o_custkey = customer.c_custkey
+WHERE
+  update_ops_orders.o_custkey = customer.c_custkey
   AND customer.c_mktsegment = 'BUILDING'
-  AND update_ops_orders.o_orderkey <= (SELECT MIN(o_orderkey) + 100 FROM update_ops_orders)
+  AND update_ops_orders.o_orderkey <= (
+    SELECT
+      MIN(o_orderkey) + 100
+    FROM update_ops_orders
+  )
 ```
 
 ## Representative DataFrame

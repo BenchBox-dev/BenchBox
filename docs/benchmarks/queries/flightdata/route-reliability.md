@@ -16,25 +16,39 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    f.origin,
-    f.dest,
-    ao.city AS origin_city,
-    ad.city AS dest_city,
-    COUNT(*) AS total_scheduled,
-    SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS cancelled_count,
-    ROUND(100.0 * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) / COUNT(*), 2) AS cancellation_rate_pct,
-    SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END) AS ontime_count,
-    ROUND(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END)
-        / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0), 2) AS ontime_pct,
-    ROUND(AVG(f.distance), 0) AS distance_miles
-FROM flights f
-LEFT JOIN airports ao ON f.origin = ao.code
-LEFT JOIN airports ad ON f.dest = ad.code
-WHERE f.flight_date >= '2021-08-01'
-  AND f.flight_date < '2025-01-01'
-GROUP BY f.origin, f.dest, ao.city, ad.city
-HAVING COUNT(*) >= 100
-ORDER BY ontime_pct DESC, cancellation_rate_pct ASC
+  f.origin,
+  f.dest,
+  ao.city AS origin_city,
+  ad.city AS dest_city,
+  COUNT(*) AS total_scheduled,
+  SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS cancelled_count,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) / COUNT(*) AS DECIMAL),
+    2
+  ) AS cancellation_rate_pct,
+  SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END) AS ontime_count,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0) AS DECIMAL),
+    2
+  ) AS ontime_pct,
+  ROUND(CAST(AVG(f.distance) AS DECIMAL), 0) AS distance_miles
+FROM flights AS f
+LEFT JOIN airports AS ao
+  ON f.origin = ao.code
+LEFT JOIN airports AS ad
+  ON f.dest = ad.code
+WHERE
+  f.flight_date >= '2021-08-01' AND f.flight_date < '2025-01-01'
+GROUP BY
+  f.origin,
+  f.dest,
+  ao.city,
+  ad.city
+HAVING
+  COUNT(*) >= 100
+ORDER BY
+  ontime_pct DESC,
+  cancellation_rate_pct ASC
 LIMIT 30
 ```
 

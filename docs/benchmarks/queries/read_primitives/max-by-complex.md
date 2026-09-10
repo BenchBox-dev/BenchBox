@@ -21,21 +21,22 @@ WITH ranked AS (
     o.o_orderkey,
     o.o_orderdate,
     o.o_totalprice,
-    ROW_NUMBER() OVER (
-      PARTITION BY c.c_mktsegment
-      ORDER BY o.o_totalprice DESC, o.o_orderkey
-    ) as rn
-  FROM orders o
-  JOIN customer c ON o.o_custkey = c.c_custkey
+    ROW_NUMBER() OVER (PARTITION BY c.c_mktsegment ORDER BY o.o_totalprice DESC, o.o_orderkey) AS rn
+  FROM orders AS o
+  JOIN customer AS c
+    ON o.o_custkey = c.c_custkey
 )
 SELECT
   c_mktsegment,
-  o_orderkey as most_expensive_order_id,
-  o_orderdate as most_expensive_order_date,
-  o_totalprice as max_order_value
+  o_orderkey AS most_expensive_order_id,
+  o_orderdate AS most_expensive_order_date,
+  o_totalprice AS max_order_value
 FROM ranked
-WHERE rn = 1
-ORDER BY max_order_value DESC, c_mktsegment;
+WHERE
+  rn = 1
+ORDER BY
+  max_order_value DESC,
+  c_mktsegment
 ```
 
 ## Representative DataFrame

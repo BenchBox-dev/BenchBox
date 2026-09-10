@@ -14,11 +14,15 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 DELETE FROM delete_ops_lineitem
-WHERE l_orderkey IN (
-  SELECT o_orderkey FROM delete_ops_orders
-  WHERE o_orderpriority = '1-URGENT'
-  LIMIT 5
-)
+WHERE
+  l_orderkey IN (
+    SELECT
+      o_orderkey
+    FROM delete_ops_orders
+    WHERE
+      o_orderpriority = '1-URGENT'
+    LIMIT 5
+  )
 ```
 
 ## Representative DataFrame

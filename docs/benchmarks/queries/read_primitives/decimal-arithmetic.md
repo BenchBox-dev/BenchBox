@@ -15,7 +15,19 @@ Decimal precision arithmetic with complex expressions
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* decimal precision arithmetic with complex expressions */ SELECT l_orderkey, l_extendedprice * (1 - l_discount) * (1 + l_tax) AS final_price, l_extendedprice / l_quantity AS unit_price FROM lineitem WHERE l_quantity > 0 LIMIT 1000
+/* decimal precision arithmetic with complex expressions */
+SELECT
+  l_orderkey,
+  l_extendedprice * (
+    1 - l_discount
+  ) * (
+    1 + l_tax
+  ) AS final_price,
+  l_extendedprice / l_quantity AS unit_price
+FROM lineitem
+WHERE
+  l_quantity > 0
+LIMIT 1000
 ```
 
 ## Representative DataFrame

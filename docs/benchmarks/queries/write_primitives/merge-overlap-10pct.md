@@ -15,14 +15,19 @@ Rendered for **DataFusion** with default parameters.
 ```sql
 MERGE INTO merge_ops_target AS target
 USING (
-  SELECT * FROM orders
-  WHERE o_orderkey > (
-    SELECT CAST(MAX(o_orderkey) * 0.9 AS INTEGER) FROM merge_ops_target
-  )
+  SELECT
+    *
+  FROM orders
+  WHERE
+    o_orderkey > (
+      SELECT
+        CAST(MAX(o_orderkey) * 0.9 AS INT)
+      FROM merge_ops_target
+    )
 ) AS source
 ON target.o_orderkey = source.o_orderkey
-WHEN MATCHED THEN
-  UPDATE SET o_comment = 'merge_10pct'
+WHEN MATCHED THEN UPDATE SET
+  o_comment = 'merge_10pct'
 WHEN NOT MATCHED THEN INSERT
 ```
 

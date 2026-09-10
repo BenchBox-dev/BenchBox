@@ -16,16 +16,19 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    c.hostname,
-    AVG(c.usage_user + c.usage_system) as avg_cpu_total,
-    AVG(m.used_percent) as avg_mem_used
-FROM cpu c
-JOIN mem m ON c.hostname = m.hostname
-          AND DATE_TRUNC('minute', c.time) = DATE_TRUNC('minute', m.time)
-WHERE c.time >= '2024-01-01 02:00:00'
-  AND c.time < '2024-01-01 03:00:00'
-GROUP BY c.hostname
-ORDER BY avg_cpu_total DESC
+  c.hostname,
+  AVG(c.usage_user + c.usage_system) AS avg_cpu_total,
+  AVG(m.used_percent) AS avg_mem_used
+FROM cpu AS c
+JOIN mem AS m
+  ON c.hostname = m.hostname
+  AND DATE_TRUNC('MINUTE', c.time) = DATE_TRUNC('MINUTE', m.time)
+WHERE
+  c.time >= '2024-01-01 02:00:00' AND c.time < '2024-01-01 03:00:00'
+GROUP BY
+  c.hostname
+ORDER BY
+  avg_cpu_total DESC
 ```
 
 ## Representative DataFrame

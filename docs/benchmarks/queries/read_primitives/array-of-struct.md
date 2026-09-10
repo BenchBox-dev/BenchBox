@@ -15,7 +15,22 @@ Create array of structs from grouped data
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Array of structs - orders with line items summary */ SELECT o_orderkey, ARRAY_AGG(STRUCT(l_linenumber, l_partkey, l_quantity, l_extendedprice) ORDER BY l_linenumber) AS line_items FROM orders AS o JOIN lineitem AS l ON o.o_orderkey = l.l_orderkey WHERE o_orderdate = CAST('1995-03-15' AS DATE) GROUP BY o_orderkey ORDER BY o_orderkey LIMIT 50
+/* Array of structs - orders with line items summary */
+SELECT
+  o_orderkey,
+  ARRAY_AGG(
+    STRUCT(l_linenumber, l_partkey, l_quantity, l_extendedprice) ORDER BY l_linenumber
+  ) AS line_items
+FROM orders AS o
+JOIN lineitem AS l
+  ON o.o_orderkey = l.l_orderkey
+WHERE
+  o_orderdate = CAST('1995-03-15' AS DATE)
+GROUP BY
+  o_orderkey
+ORDER BY
+  o_orderkey
+LIMIT 50
 ```
 
 ## Representative DataFrame

@@ -19,21 +19,32 @@ USING (
     o_orderkey,
     o_totalprice * 1.15 + 100.0 AS computed_price,
     CASE
-      WHEN o_totalprice < 100000 THEN '5-LOW'
-      WHEN o_totalprice < 250000 THEN '3-MEDIUM'
+      WHEN o_totalprice < 100000
+      THEN '5-LOW'
+      WHEN o_totalprice < 250000
+      THEN '3-MEDIUM'
       ELSE '1-URGENT'
     END AS computed_priority
   FROM orders
-  WHERE o_orderkey BETWEEN 1 AND 50
+  WHERE
+    o_orderkey BETWEEN 1 AND 50
 ) AS source
 ON target.o_orderkey = source.o_orderkey
-WHEN MATCHED THEN
-  UPDATE SET o_totalprice = source.computed_price,
-             o_orderpriority = source.computed_priority,
-             o_comment = 'merge_computed'
-WHEN NOT MATCHED THEN
-  INSERT VALUES (source.o_orderkey, 1, 'O', source.computed_price, CURRENT_DATE,
-                 source.computed_priority, 'Clerk#000000001', 0, 'merge_computed')
+WHEN MATCHED THEN UPDATE SET
+  o_totalprice = source.computed_price,
+  o_orderpriority = source.computed_priority,
+  o_comment = 'merge_computed'
+WHEN NOT MATCHED THEN INSERT VALUES (
+  source.o_orderkey,
+  1,
+  'O',
+  source.computed_price,
+  CURRENT_DATE,
+  source.computed_priority,
+  'Clerk#000000001',
+  0,
+  'merge_computed'
+)
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,12 @@ Average lines and items per order with NULLIF protection
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT COUNT(*) * 1.0 / NULLIF(COUNT(DISTINCT ol.order_id), 0) AS avg_lines_per_order, SUM(ol.quantity) / NULLIF(COUNT(DISTINCT ol.order_id), 0) AS avg_items_per_order FROM order_lines AS ol WHERE ol.order_date BETWEEN CAST('2023-01-01' AS DATE) AND CAST('2024-12-31' AS DATE)
+SELECT
+  COUNT(*) * 1.0 / NULLIF(COUNT(DISTINCT ol.order_id), 0) AS avg_lines_per_order,
+  SUM(ol.quantity) / NULLIF(COUNT(DISTINCT ol.order_id), 0) AS avg_items_per_order
+FROM order_lines AS ol
+WHERE
+  ol.order_date BETWEEN CAST('2023-01-01' AS DATE) AND CAST('2024-12-31' AS DATE)
 ```
 
 ## Representative DataFrame

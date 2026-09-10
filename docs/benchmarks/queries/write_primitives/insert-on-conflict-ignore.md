@@ -14,8 +14,11 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 INSERT INTO insert_ops_orders
-SELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 10
-ON CONFLICT (o_orderkey) DO NOTHING
+SELECT
+  *
+FROM orders
+WHERE
+  o_orderkey BETWEEN 1 AND 10 ON CONFLICT(o_orderkey) DO NOTHING
 ```
 
 ## Representative DataFrame

@@ -16,26 +16,34 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    CASE
-        WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN 7 AND 9 THEN 'morning_rush'
-        WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN 17 AND 19 THEN 'evening_rush'
-        ELSE 'off_peak'
-    END as period,
-    COUNT(*) as trip_count,
-    AVG(trip_distance) as avg_distance,
-    AVG(total_amount) as avg_fare,
-    AVG(EXTRACT(EPOCH FROM (dropoff_datetime - pickup_datetime)) / 60) as avg_duration_min
+  CASE
+    WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN 7 AND 9
+    THEN 'morning_rush'
+    WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN 17 AND 19
+    THEN 'evening_rush'
+    ELSE 'off_peak'
+  END AS period,
+  COUNT(*) AS trip_count,
+  AVG(trip_distance) AS avg_distance,
+  AVG(total_amount) AS avg_fare,
+  AVG(EXTRACT(EPOCH FROM (
+    dropoff_datetime - pickup_datetime
+  )) / 60) AS avg_duration_min
 FROM trips
-WHERE pickup_datetime >= '2019-04-18'
+WHERE
+  pickup_datetime >= '2019-04-18'
   AND pickup_datetime < '2019-05-18'
   AND dropoff_datetime > pickup_datetime
 GROUP BY
-    CASE
-        WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN 7 AND 9 THEN 'morning_rush'
-        WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN 17 AND 19 THEN 'evening_rush'
-        ELSE 'off_peak'
-    END
-ORDER BY trip_count DESC
+  CASE
+    WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN 7 AND 9
+    THEN 'morning_rush'
+    WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN 17 AND 19
+    THEN 'evening_rush'
+    ELSE 'off_peak'
+  END
+ORDER BY
+  trip_count DESC
 ```
 
 ## Representative DataFrame

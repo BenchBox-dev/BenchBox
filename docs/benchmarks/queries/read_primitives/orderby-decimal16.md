@@ -15,7 +15,17 @@ Multi-column sort with mixed ASC/DESC on decimal columns
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Multi-column sort with mixed ASC/DESC on decimal columns */ /* l_orderkey is the tertiary tie-break so the LIMIT 100 boundary is a total order */ /* (l_extendedprice, l_discount tie at the cutoff). */ SELECT l_orderkey, l_extendedprice, l_discount FROM lineitem ORDER BY l_extendedprice DESC, l_discount ASC, l_orderkey ASC LIMIT 100
+/* Multi-column sort with mixed ASC/DESC on decimal columns */ /* l_orderkey is the tertiary tie-break so the LIMIT 100 boundary is a total order */ /* (l_extendedprice, l_discount tie at the cutoff). */
+SELECT
+  l_orderkey,
+  l_extendedprice,
+  l_discount
+FROM lineitem
+ORDER BY
+  l_extendedprice DESC,
+  l_discount ASC,
+  l_orderkey ASC
+LIMIT 100
 ```
 
 ## Representative DataFrame

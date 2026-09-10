@@ -13,7 +13,111 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'ETL Performance Metrics Validation' AS validation_name, etl_phase, total_records_processed, processing_time_minutes, records_per_minute, memory_usage_mb, cpu_utilization_pct, io_operations, performance_rating, CASE WHEN performance_rating >= 70 THEN 'OPTIMAL' WHEN performance_rating >= 70 * 0.7 THEN 'ACCEPTABLE' ELSE 'NEEDS OPTIMIZATION' END AS performance_status FROM (SELECT 'Data Extraction' AS etl_phase, 10000 AS total_records_processed /* Simulated metrics */, 2.5 AS processing_time_minutes, 10000 / 2.5 AS records_per_minute, 256 AS memory_usage_mb, 45 AS cpu_utilization_pct, 5000 AS io_operations, LEAST(100, (10000 / 2.5) / 100 * 50 + (100 - 45) * 0.3 + (1000 - 256) / 10 * 0.2) AS performance_rating /* Performance rating formula (0-100 scale) */ UNION ALL SELECT 'Data Transformation' AS etl_phase, 10000 AS total_records_processed, 8.0 AS processing_time_minutes, 10000 / 8.0 AS records_per_minute, 512 AS memory_usage_mb, 75 AS cpu_utilization_pct, 15000 AS io_operations, LEAST(100, (10000 / 8.0) / 100 * 50 + (100 - 75) * 0.3 + (1000 - 512) / 10 * 0.2) AS performance_rating UNION ALL SELECT 'Data Loading' AS etl_phase, 10000 AS total_records_processed, 5.0 AS processing_time_minutes, 10000 / 5.0 AS records_per_minute, 128 AS memory_usage_mb, 30 AS cpu_utilization_pct, 25000 AS io_operations, LEAST(100, (10000 / 5.0) / 100 * 50 + (100 - 30) * 0.3 + (1000 - 128) / 10 * 0.2) AS performance_rating UNION ALL SELECT 'Data Validation' AS etl_phase, 10000 AS total_records_processed, 3.0 AS processing_time_minutes, 10000 / 3.0 AS records_per_minute, 64 AS memory_usage_mb, 20 AS cpu_utilization_pct, 8000 AS io_operations, LEAST(100, (10000 / 3.0) / 100 * 50 + (100 - 20) * 0.3 + (1000 - 64) / 10 * 0.2) AS performance_rating) AS performance_metrics ORDER BY CASE etl_phase WHEN 'Data Extraction' THEN 1 WHEN 'Data Transformation' THEN 2 WHEN 'Data Loading' THEN 3 WHEN 'Data Validation' THEN 4 END
+SELECT
+  'ETL Performance Metrics Validation' AS validation_name,
+  etl_phase,
+  total_records_processed,
+  processing_time_minutes,
+  records_per_minute,
+  memory_usage_mb,
+  cpu_utilization_pct,
+  io_operations,
+  performance_rating,
+  CASE
+    WHEN performance_rating >= 70
+    THEN 'OPTIMAL'
+    WHEN performance_rating >= 70 * 0.7
+    THEN 'ACCEPTABLE'
+    ELSE 'NEEDS OPTIMIZATION'
+  END AS performance_status
+FROM (
+  SELECT
+    'Data Extraction' AS etl_phase,
+    10000 AS total_records_processed, /* Simulated metrics */
+    2.5 AS processing_time_minutes,
+    10000 / 2.5 AS records_per_minute,
+    256 AS memory_usage_mb,
+    45 AS cpu_utilization_pct,
+    5000 AS io_operations,
+    LEAST(
+      100,
+      (
+        10000 / 2.5
+      ) / 100 * 50 + (
+        100 - 45
+      ) * 0.3 + (
+        1000 - 256
+      ) / 10 * 0.2
+    ) AS performance_rating /* Performance rating formula (0-100 scale) */
+  UNION ALL
+  SELECT
+    'Data Transformation' AS etl_phase,
+    10000 AS total_records_processed,
+    8.0 AS processing_time_minutes,
+    10000 / 8.0 AS records_per_minute,
+    512 AS memory_usage_mb,
+    75 AS cpu_utilization_pct,
+    15000 AS io_operations,
+    LEAST(
+      100,
+      (
+        10000 / 8.0
+      ) / 100 * 50 + (
+        100 - 75
+      ) * 0.3 + (
+        1000 - 512
+      ) / 10 * 0.2
+    ) AS performance_rating
+  UNION ALL
+  SELECT
+    'Data Loading' AS etl_phase,
+    10000 AS total_records_processed,
+    5.0 AS processing_time_minutes,
+    10000 / 5.0 AS records_per_minute,
+    128 AS memory_usage_mb,
+    30 AS cpu_utilization_pct,
+    25000 AS io_operations,
+    LEAST(
+      100,
+      (
+        10000 / 5.0
+      ) / 100 * 50 + (
+        100 - 30
+      ) * 0.3 + (
+        1000 - 128
+      ) / 10 * 0.2
+    ) AS performance_rating
+  UNION ALL
+  SELECT
+    'Data Validation' AS etl_phase,
+    10000 AS total_records_processed,
+    3.0 AS processing_time_minutes,
+    10000 / 3.0 AS records_per_minute,
+    64 AS memory_usage_mb,
+    20 AS cpu_utilization_pct,
+    8000 AS io_operations,
+    LEAST(
+      100,
+      (
+        10000 / 3.0
+      ) / 100 * 50 + (
+        100 - 20
+      ) * 0.3 + (
+        1000 - 64
+      ) / 10 * 0.2
+    ) AS performance_rating
+) AS performance_metrics
+ORDER BY
+  CASE etl_phase
+    WHEN 'Data Extraction'
+    THEN 1
+    WHEN 'Data Transformation'
+    THEN 2
+    WHEN 'Data Loading'
+    THEN 3
+    WHEN 'Data Validation'
+    THEN 4
+  END
 ```
 
 ## Representative DataFrame

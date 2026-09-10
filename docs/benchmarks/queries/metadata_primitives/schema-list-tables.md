@@ -14,12 +14,14 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_name,
-    table_type,
-    table_schema
+  table_name,
+  table_type,
+  table_schema
 FROM information_schema.tables
-WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-ORDER BY table_name;
+WHERE
+  NOT table_schema IN ('information_schema', 'pg_catalog')
+ORDER BY
+  table_name
 ```
 
 ## Representative DataFrame

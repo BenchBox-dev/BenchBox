@@ -15,7 +15,16 @@ Data is redistributed based on the join keys so matching rows end up on the same
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Data is redistributed based on the join keys so matching rows end up on the same node */ SELECT ps1.ps_partkey, ps1.ps_suppkey AS supp1, ps2.ps_suppkey AS supp2 FROM partsupp AS ps1 JOIN partsupp AS ps2 ON ps1.ps_partkey = ps2.ps_partkey WHERE ps1.ps_suppkey < ps2.ps_suppkey AND ps1.ps_supplycost > 100
+/* Data is redistributed based on the join keys so matching rows end up on the same node */
+SELECT
+  ps1.ps_partkey,
+  ps1.ps_suppkey AS supp1,
+  ps2.ps_suppkey AS supp2
+FROM partsupp AS ps1
+JOIN partsupp AS ps2
+  ON ps1.ps_partkey = ps2.ps_partkey
+WHERE
+  ps1.ps_suppkey < ps2.ps_suppkey AND ps1.ps_supplycost > 100
 ```
 
 ## Representative DataFrame

@@ -13,8 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-TRUNCATE TABLE bulk_load_ops_target;
-COPY bulk_load_ops_target FROM '{file_path}/csv_small_1k.csv.gz' (FORMAT CSV, HEADER true, COMPRESSION 'gzip')
+TRUNCATE TABLE   bulk_load_ops_target
 ```
 
 ## Representative DataFrame

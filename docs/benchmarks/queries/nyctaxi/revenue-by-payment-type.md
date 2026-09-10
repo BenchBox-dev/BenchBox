@@ -16,17 +16,20 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    payment_type,
-    COUNT(*) as trip_count,
-    SUM(total_amount) as total_revenue,
-    SUM(tip_amount) as total_tips,
-    AVG(tip_amount / NULLIF(fare_amount, 0)) * 100 as avg_tip_percentage
+  payment_type,
+  COUNT(*) AS trip_count,
+  SUM(total_amount) AS total_revenue,
+  SUM(tip_amount) AS total_tips,
+  AVG(tip_amount / NULLIF(fare_amount, 0)) * 100 AS avg_tip_percentage
 FROM trips
-WHERE pickup_datetime >= '2019-10-08'
+WHERE
+  pickup_datetime >= '2019-10-08'
   AND pickup_datetime < '2019-11-07'
   AND fare_amount > 0
-GROUP BY payment_type
-ORDER BY total_revenue DESC
+GROUP BY
+  payment_type
+ORDER BY
+  total_revenue DESC
 ```
 
 ## Representative DataFrame

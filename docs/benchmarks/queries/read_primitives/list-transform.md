@@ -15,20 +15,22 @@ Transform each array element
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Transform each array element
+/* Transform each array element */
 WITH part_prices AS (
-    SELECT
-        p_brand,
-        ARRAY_AGG(p_retailprice) as prices
-    FROM part
-    GROUP BY p_brand
+  SELECT
+    p_brand,
+    ARRAY_AGG(p_retailprice) AS prices
+  FROM part
+  GROUP BY
+    p_brand
 )
 SELECT
-    p_brand,
-    TRANSFORM(prices, x -> x * 1.1) as prices_with_tax
+  p_brand,
+  TRANSFORM(prices, x -> x * 1.1) AS prices_with_tax
 FROM part_prices
-ORDER BY p_brand
-LIMIT 50;
+ORDER BY
+  p_brand
+LIMIT 50
 ```
 
 ## Representative DataFrame

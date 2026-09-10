@@ -15,7 +15,14 @@ Automatic grouping by all non-aggregate columns
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Automatic grouping by all non-aggregate columns */ SELECT l_returnflag, l_linestatus, SUM(l_quantity) AS total_qty, AVG(l_extendedprice) AS avg_price FROM lineitem GROUP BY ALL
+/* Automatic grouping by all non-aggregate columns */
+SELECT
+  l_returnflag,
+  l_linestatus,
+  SUM(l_quantity) AS total_qty,
+  AVG(l_extendedprice) AS avg_price
+FROM lineitem
+GROUP BY ALL
 ```
 
 ## Representative DataFrame

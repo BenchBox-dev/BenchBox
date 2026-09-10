@@ -16,26 +16,51 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    f.month,
-    CASE f.month
-        WHEN 1 THEN 'January' WHEN 2 THEN 'February'
-        WHEN 3 THEN 'March' WHEN 4 THEN 'April'
-        WHEN 5 THEN 'May' WHEN 6 THEN 'June'
-        WHEN 7 THEN 'July' WHEN 8 THEN 'August'
-        WHEN 9 THEN 'September' WHEN 10 THEN 'October'
-        WHEN 11 THEN 'November' WHEN 12 THEN 'December'
-    END AS month_name,
-    COUNT(*) AS total_flights,
-    SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS cancelled_count,
-    ROUND(100.0 * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) / COUNT(*), 2) AS cancellation_rate_pct,
-    ROUND(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay END), 2) AS avg_arr_delay,
-    ROUND(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END)
-        / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0), 2) AS ontime_pct
-FROM flights f
-WHERE f.flight_date >= '2021-08-01'
-  AND f.flight_date < '2025-01-01'
-GROUP BY f.month
-ORDER BY f.month
+  f.month,
+  CASE f.month
+    WHEN 1
+    THEN 'January'
+    WHEN 2
+    THEN 'February'
+    WHEN 3
+    THEN 'March'
+    WHEN 4
+    THEN 'April'
+    WHEN 5
+    THEN 'May'
+    WHEN 6
+    THEN 'June'
+    WHEN 7
+    THEN 'July'
+    WHEN 8
+    THEN 'August'
+    WHEN 9
+    THEN 'September'
+    WHEN 10
+    THEN 'October'
+    WHEN 11
+    THEN 'November'
+    WHEN 12
+    THEN 'December'
+  END AS month_name,
+  COUNT(*) AS total_flights,
+  SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS cancelled_count,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) / COUNT(*) AS DECIMAL),
+    2
+  ) AS cancellation_rate_pct,
+  ROUND(CAST(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay END) AS DECIMAL), 2) AS avg_arr_delay,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0) AS DECIMAL),
+    2
+  ) AS ontime_pct
+FROM flights AS f
+WHERE
+  f.flight_date >= '2021-08-01' AND f.flight_date < '2025-01-01'
+GROUP BY
+  f.month
+ORDER BY
+  f.month
 ```
 
 ## Representative DataFrame

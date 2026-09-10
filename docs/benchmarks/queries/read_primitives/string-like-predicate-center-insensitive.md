@@ -15,7 +15,12 @@ Case insensitive matching pattern in any location
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Case insensitive matching pattern in any location */ SELECT COUNT(*) FROM part WHERE p_name LIKE '%steel%'
+/* Case insensitive matching pattern in any location */
+SELECT
+  COUNT(*)
+FROM part
+WHERE
+  p_name LIKE '%steel%'
 ```
 
 ## Representative DataFrame

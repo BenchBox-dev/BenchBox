@@ -15,7 +15,25 @@ Test join+aggregate fusion into a single grouped-join pass
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Test group-join (join+aggregate fusion) optimization */ /* Good optimizers fuse the JOIN and GROUP BY into a single grouped-join pass, */ /* avoiding full intermediate materialization of all lineitem rows per order */ SELECT o.o_orderkey, o.o_custkey, o.o_orderdate, COUNT(l.l_linenumber) AS line_count, SUM(l.l_extendedprice * (1 - l.l_discount)) AS revenue FROM orders AS o JOIN lineitem AS l ON o.o_orderkey = l.l_orderkey GROUP BY o.o_orderkey, o.o_custkey, o.o_orderdate ORDER BY revenue DESC LIMIT 100
+/* Test group-join (join+aggregate fusion) optimization */ /* Good optimizers fuse the JOIN and GROUP BY into a single grouped-join pass, */ /* avoiding full intermediate materialization of all lineitem rows per order */
+SELECT
+  o.o_orderkey,
+  o.o_custkey,
+  o.o_orderdate,
+  COUNT(l.l_linenumber) AS line_count,
+  SUM(l.l_extendedprice * (
+    1 - l.l_discount
+  )) AS revenue
+FROM orders AS o
+JOIN lineitem AS l
+  ON o.o_orderkey = l.l_orderkey
+GROUP BY
+  o.o_orderkey,
+  o.o_custkey,
+  o.o_orderdate
+ORDER BY
+  revenue DESC
+LIMIT 100
 ```
 
 ## Representative DataFrame

@@ -20,17 +20,21 @@ WITH ranked AS (
     n.n_name,
     c.c_name,
     c.c_acctbal,
-    ROW_NUMBER() OVER (PARTITION BY n.n_name ORDER BY c.c_acctbal DESC, c.c_name) as rn
-  FROM customer c
-  JOIN nation n ON c.c_nationkey = n.n_nationkey
+    ROW_NUMBER() OVER (PARTITION BY n.n_name ORDER BY c.c_acctbal DESC, c.c_name) AS rn
+  FROM customer AS c
+  JOIN nation AS n
+    ON c.c_nationkey = n.n_nationkey
 )
 SELECT
   n_name,
-  c_name as richest_customer,
-  c_acctbal as max_balance
+  c_name AS richest_customer,
+  c_acctbal AS max_balance
 FROM ranked
-WHERE rn = 1
-ORDER BY max_balance DESC, n_name;
+WHERE
+  rn = 1
+ORDER BY
+  max_balance DESC,
+  n_name
 ```
 
 ## Representative DataFrame

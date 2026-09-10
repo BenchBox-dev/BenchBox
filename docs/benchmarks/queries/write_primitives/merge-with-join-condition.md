@@ -15,20 +15,37 @@ Rendered for **DataFusion** with default parameters.
 ```sql
 MERGE INTO merge_ops_lineitem_target AS target
 USING (
-  SELECT l.*, o.o_custkey
-  FROM lineitem l
-  JOIN orders o ON l.l_orderkey = o.o_orderkey
-  WHERE l.l_orderkey BETWEEN 1 AND 10
+  SELECT
+    l.*,
+    o.o_custkey
+  FROM lineitem AS l
+  JOIN orders AS o
+    ON l.l_orderkey = o.o_orderkey
+  WHERE
+    l.l_orderkey BETWEEN 1 AND 10
 ) AS source
 ON target.l_orderkey = source.l_orderkey
-   AND target.l_linenumber = source.l_linenumber
-WHEN MATCHED THEN
-  UPDATE SET l_comment = 'merge_multi_key'
-WHEN NOT MATCHED THEN
-  INSERT VALUES (source.l_orderkey, source.l_partkey, source.l_suppkey, source.l_linenumber,
-                 source.l_quantity, source.l_extendedprice, source.l_discount, source.l_tax,
-                 source.l_returnflag, source.l_linestatus, source.l_shipdate, source.l_commitdate,
-                 source.l_receiptdate, source.l_shipinstruct, source.l_shipmode, source.l_comment)
+AND target.l_linenumber = source.l_linenumber
+WHEN MATCHED THEN UPDATE SET
+  l_comment = 'merge_multi_key'
+WHEN NOT MATCHED THEN INSERT VALUES (
+  source.l_orderkey,
+  source.l_partkey,
+  source.l_suppkey,
+  source.l_linenumber,
+  source.l_quantity,
+  source.l_extendedprice,
+  source.l_discount,
+  source.l_tax,
+  source.l_returnflag,
+  source.l_linestatus,
+  source.l_shipdate,
+  source.l_commitdate,
+  source.l_receiptdate,
+  source.l_shipinstruct,
+  source.l_shipmode,
+  source.l_comment
+)
 ```
 
 ## Representative DataFrame

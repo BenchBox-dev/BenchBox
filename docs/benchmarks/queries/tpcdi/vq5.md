@@ -13,7 +13,157 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'SCD Type 2 Date Range Validation' AS validation_name, table_name, invalid_date_ranges, overlapping_date_ranges, future_effective_dates, CASE WHEN (invalid_date_ranges + overlapping_date_ranges + future_effective_dates) = 0 THEN 'PASS' ELSE 'FAIL' END AS status FROM (SELECT 'DimCustomer' AS table_name, (SELECT COUNT(*) FROM DimCustomer WHERE EffectiveDate >= EndDate) AS invalid_date_ranges, (SELECT COUNT(*) FROM DimCustomer AS c1 JOIN DimCustomer AS c2 ON c1.CustomerID = c2.CustomerID AND c1.SK_CustomerID <> c2.SK_CustomerID AND c1.EffectiveDate < c2.EndDate AND c2.EffectiveDate < c1.EndDate) AS overlapping_date_ranges, (SELECT COUNT(*) FROM DimCustomer WHERE EffectiveDate > CURRENT_DATE) AS future_effective_dates UNION ALL SELECT 'DimAccount' AS table_name, (SELECT COUNT(*) FROM DimAccount WHERE EffectiveDate >= EndDate) AS invalid_date_ranges, (SELECT COUNT(*) FROM DimAccount AS a1 JOIN DimAccount AS a2 ON a1.AccountID = a2.AccountID AND a1.SK_AccountID <> a2.SK_AccountID AND a1.EffectiveDate < a2.EndDate AND a2.EffectiveDate < a1.EndDate) AS overlapping_date_ranges, (SELECT COUNT(*) FROM DimAccount WHERE EffectiveDate > CURRENT_DATE) AS future_effective_dates UNION ALL SELECT 'DimSecurity' AS table_name, (SELECT COUNT(*) FROM DimSecurity WHERE EffectiveDate >= EndDate) AS invalid_date_ranges, (SELECT COUNT(*) FROM DimSecurity AS s1 JOIN DimSecurity AS s2 ON s1.Symbol = s2.Symbol AND s1.SK_SecurityID <> s2.SK_SecurityID AND s1.EffectiveDate < s2.EndDate AND s2.EffectiveDate < s1.EndDate) AS overlapping_date_ranges, (SELECT COUNT(*) FROM DimSecurity WHERE EffectiveDate > CURRENT_DATE) AS future_effective_dates UNION ALL SELECT 'DimCompany' AS table_name, (SELECT COUNT(*) FROM DimCompany WHERE EffectiveDate >= EndDate) AS invalid_date_ranges, (SELECT COUNT(*) FROM DimCompany AS comp1 JOIN DimCompany AS comp2 ON comp1.CompanyID = comp2.CompanyID AND comp1.SK_CompanyID <> comp2.SK_CompanyID AND comp1.EffectiveDate < comp2.EndDate AND comp2.EffectiveDate < comp1.EndDate) AS overlapping_date_ranges, (SELECT COUNT(*) FROM DimCompany WHERE EffectiveDate > CURRENT_DATE) AS future_effective_dates UNION ALL SELECT 'DimBroker' AS table_name, (SELECT COUNT(*) FROM DimBroker WHERE EffectiveDate >= EndDate) AS invalid_date_ranges, (SELECT COUNT(*) FROM DimBroker AS b1 JOIN DimBroker AS b2 ON b1.BrokerID = b2.BrokerID AND b1.SK_BrokerID <> b2.SK_BrokerID AND b1.EffectiveDate < b2.EndDate AND b2.EffectiveDate < b1.EndDate) AS overlapping_date_ranges, (SELECT COUNT(*) FROM DimBroker WHERE EffectiveDate > CURRENT_DATE) AS future_effective_dates) AS date_validation ORDER BY table_name
+SELECT
+  'SCD Type 2 Date Range Validation' AS validation_name,
+  table_name,
+  invalid_date_ranges,
+  overlapping_date_ranges,
+  future_effective_dates,
+  CASE
+    WHEN (
+      invalid_date_ranges + overlapping_date_ranges + future_effective_dates
+    ) = 0
+    THEN 'PASS'
+    ELSE 'FAIL'
+  END AS status
+FROM (
+  SELECT
+    'DimCustomer' AS table_name,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimCustomer
+      WHERE
+        EffectiveDate >= EndDate
+    ) AS invalid_date_ranges,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimCustomer AS c1
+      JOIN DimCustomer AS c2
+        ON c1.CustomerID = c2.CustomerID
+        AND c1.SK_CustomerID <> c2.SK_CustomerID
+        AND c1.EffectiveDate < c2.EndDate
+        AND c2.EffectiveDate < c1.EndDate
+    ) AS overlapping_date_ranges,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimCustomer
+      WHERE
+        EffectiveDate > CURRENT_DATE
+    ) AS future_effective_dates
+  UNION ALL
+  SELECT
+    'DimAccount' AS table_name,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimAccount
+      WHERE
+        EffectiveDate >= EndDate
+    ) AS invalid_date_ranges,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimAccount AS a1
+      JOIN DimAccount AS a2
+        ON a1.AccountID = a2.AccountID
+        AND a1.SK_AccountID <> a2.SK_AccountID
+        AND a1.EffectiveDate < a2.EndDate
+        AND a2.EffectiveDate < a1.EndDate
+    ) AS overlapping_date_ranges,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimAccount
+      WHERE
+        EffectiveDate > CURRENT_DATE
+    ) AS future_effective_dates
+  UNION ALL
+  SELECT
+    'DimSecurity' AS table_name,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimSecurity
+      WHERE
+        EffectiveDate >= EndDate
+    ) AS invalid_date_ranges,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimSecurity AS s1
+      JOIN DimSecurity AS s2
+        ON s1.Symbol = s2.Symbol
+        AND s1.SK_SecurityID <> s2.SK_SecurityID
+        AND s1.EffectiveDate < s2.EndDate
+        AND s2.EffectiveDate < s1.EndDate
+    ) AS overlapping_date_ranges,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimSecurity
+      WHERE
+        EffectiveDate > CURRENT_DATE
+    ) AS future_effective_dates
+  UNION ALL
+  SELECT
+    'DimCompany' AS table_name,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimCompany
+      WHERE
+        EffectiveDate >= EndDate
+    ) AS invalid_date_ranges,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimCompany AS comp1
+      JOIN DimCompany AS comp2
+        ON comp1.CompanyID = comp2.CompanyID
+        AND comp1.SK_CompanyID <> comp2.SK_CompanyID
+        AND comp1.EffectiveDate < comp2.EndDate
+        AND comp2.EffectiveDate < comp1.EndDate
+    ) AS overlapping_date_ranges,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimCompany
+      WHERE
+        EffectiveDate > CURRENT_DATE
+    ) AS future_effective_dates
+  UNION ALL
+  SELECT
+    'DimBroker' AS table_name,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimBroker
+      WHERE
+        EffectiveDate >= EndDate
+    ) AS invalid_date_ranges,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimBroker AS b1
+      JOIN DimBroker AS b2
+        ON b1.BrokerID = b2.BrokerID
+        AND b1.SK_BrokerID <> b2.SK_BrokerID
+        AND b1.EffectiveDate < b2.EndDate
+        AND b2.EffectiveDate < b1.EndDate
+    ) AS overlapping_date_ranges,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimBroker
+      WHERE
+        EffectiveDate > CURRENT_DATE
+    ) AS future_effective_dates
+) AS date_validation
+ORDER BY
+  table_name
 ```
 
 ## Representative DataFrame

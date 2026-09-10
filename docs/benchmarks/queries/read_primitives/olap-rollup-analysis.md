@@ -15,7 +15,34 @@ ROLLUP operation for hierarchical aggregation
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* ROLLUP operation for hierarchical aggregation */ SELECT r.r_name AS region, n.n_name AS nation, c.c_mktsegment AS market_segment, COUNT(DISTINCT c.c_custkey) AS customer_count, COUNT(*) AS order_count, SUM(o.o_totalprice) AS total_revenue, AVG(o.o_totalprice) AS avg_order_value FROM orders AS o JOIN customer AS c ON o.o_custkey = c.c_custkey JOIN nation AS n ON c.c_nationkey = n.n_nationkey JOIN region AS r ON n.n_regionkey = r.r_regionkey WHERE o.o_orderdate >= CAST('1995-01-01' AS DATE) GROUP BY ROLLUP (r.r_name, n.n_name, c.c_mktsegment) ORDER BY r.r_name, n.n_name, c.c_mktsegment
+/* ROLLUP operation for hierarchical aggregation */
+SELECT
+  r.r_name AS region,
+  n.n_name AS nation,
+  c.c_mktsegment AS market_segment,
+  COUNT(DISTINCT c.c_custkey) AS customer_count,
+  COUNT(*) AS order_count,
+  SUM(o.o_totalprice) AS total_revenue,
+  AVG(o.o_totalprice) AS avg_order_value
+FROM orders AS o
+JOIN customer AS c
+  ON o.o_custkey = c.c_custkey
+JOIN nation AS n
+  ON c.c_nationkey = n.n_nationkey
+JOIN region AS r
+  ON n.n_regionkey = r.r_regionkey
+WHERE
+  o.o_orderdate >= CAST('1995-01-01' AS DATE)
+GROUP BY
+  ROLLUP (
+    r.r_name,
+    n.n_name,
+    c.c_mktsegment
+  )
+ORDER BY
+  r.r_name,
+  n.n_name,
+  c.c_mktsegment
 ```
 
 ## Representative DataFrame

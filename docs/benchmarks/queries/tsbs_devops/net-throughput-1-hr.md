@@ -16,15 +16,18 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    hostname,
-    interface,
-    SUM(bytes_sent) as total_bytes_sent,
-    SUM(bytes_recv) as total_bytes_recv
+  hostname,
+  interface,
+  SUM(bytes_sent) AS total_bytes_sent,
+  SUM(bytes_recv) AS total_bytes_recv
 FROM net
-WHERE time >= '2024-01-01 15:00:00'
-  AND time < '2024-01-01 16:00:00'
-GROUP BY hostname, interface
-ORDER BY total_bytes_sent DESC
+WHERE
+  time >= '2024-01-01 15:00:00' AND time < '2024-01-01 16:00:00'
+GROUP BY
+  hostname,
+  interface
+ORDER BY
+  total_bytes_sent DESC
 ```
 
 ## Representative DataFrame

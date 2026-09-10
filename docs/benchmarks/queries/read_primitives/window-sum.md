@@ -15,7 +15,13 @@ Window function SUM() OVER (PARTITION BY ...)
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Partitioned window SUM */ SELECT l_orderkey, l_linenumber, l_extendedprice, SUM(l_extendedprice) OVER (PARTITION BY l_orderkey) AS order_total FROM lineitem
+/* Partitioned window SUM */
+SELECT
+  l_orderkey,
+  l_linenumber,
+  l_extendedprice,
+  SUM(l_extendedprice) OVER (PARTITION BY l_orderkey) AS order_total
+FROM lineitem
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,10 @@ Metadata-based count optimization vs full table scan
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* metadata-based count optimization vs full table scan performance */ SELECT COUNT(*) AS total_lineitems FROM lineitem
+/* metadata-based count optimization vs full table scan performance */
+SELECT
+  COUNT(*) AS total_lineitems
+FROM lineitem
 ```
 
 ## Representative DataFrame

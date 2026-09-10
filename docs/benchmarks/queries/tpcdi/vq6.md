@@ -14,51 +14,59 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    'Trade-Holdings Consistency Validation' AS validation_name,
+  'Trade-Holdings Consistency Validation' AS validation_name,
+  customer_id,
+  security_id,
+  total_buy_quantity,
+  total_sell_quantity,
+  net_position,
+  current_holdings,
+  position_discrepancy,
+  CASE WHEN ABS(position_discrepancy) <= 100 THEN 'PASS' ELSE 'FAIL' END AS status
+FROM (
+  SELECT
     customer_id,
     security_id,
     total_buy_quantity,
     total_sell_quantity,
     net_position,
     current_holdings,
-    position_discrepancy,
-    CASE WHEN ABS(position_discrepancy) <= 100 THEN 'PASS' ELSE 'FAIL' END AS status
-FROM (
+    net_position - current_holdings AS position_discrepancy
+  FROM (
     SELECT
-        customer_id,
-        security_id,
-        total_buy_quantity,
-        total_sell_quantity,
-        net_position,
-        current_holdings,
-        net_position - current_holdings AS position_discrepancy
+      trade_rows.SK_CustomerID AS customer_id,
+      trade_rows.SK_SecurityID AS security_id,
+      SUM(trade_rows.buy_quantity) AS total_buy_quantity,
+      SUM(trade_rows.sell_quantity) AS total_sell_quantity,
+      SUM(trade_rows.signed_quantity) AS net_position,
+      COALESCE(fh.CurrentHolding, 0) AS current_holdings
     FROM (
-        SELECT
-            trade_rows.SK_CustomerID AS customer_id,
-            trade_rows.SK_SecurityID AS security_id,
-            SUM(trade_rows.buy_quantity) AS total_buy_quantity,
-            SUM(trade_rows.sell_quantity) AS total_sell_quantity,
-            SUM(trade_rows.signed_quantity) AS net_position,
-            COALESCE(fh.CurrentHolding, 0) AS current_holdings
-        FROM (
-            SELECT
-                ft.SK_CustomerID,
-                ft.SK_SecurityID,
-                CASE WHEN tt.TT_IS_SELL IS FALSE THEN ft.Quantity ELSE 0 END AS buy_quantity,
-                CASE WHEN tt.TT_IS_SELL IS TRUE THEN ft.Quantity ELSE 0 END AS sell_quantity,
-                CASE WHEN tt.TT_IS_SELL IS FALSE THEN ft.Quantity ELSE -ft.Quantity END AS signed_quantity
-            FROM FactTrade ft
-            JOIN TradeType tt ON ft.Type = tt.TT_ID
-            WHERE ft.Status = 'Completed'
-        ) trade_rows
-        LEFT JOIN FactHoldings fh ON trade_rows.SK_CustomerID = fh.SK_CustomerID
-                                  AND trade_rows.SK_SecurityID = fh.SK_SecurityID
-        GROUP BY trade_rows.SK_CustomerID, trade_rows.SK_SecurityID, fh.CurrentHolding
-    ) grouped_positions
-) position_check
-WHERE ABS(position_discrepancy) > 0
-ORDER BY ABS(position_discrepancy) DESC
-LIMIT 100;
+      SELECT
+        ft.SK_CustomerID,
+        ft.SK_SecurityID,
+        CASE WHEN tt.TT_IS_SELL IS FALSE THEN ft.Quantity ELSE 0 END AS buy_quantity,
+        CASE WHEN tt.TT_IS_SELL IS TRUE THEN ft.Quantity ELSE 0 END AS sell_quantity,
+        CASE WHEN tt.TT_IS_SELL IS FALSE THEN ft.Quantity ELSE -ft.Quantity END AS signed_quantity
+      FROM FactTrade AS ft
+      JOIN TradeType AS tt
+        ON ft.Type = tt.TT_ID
+      WHERE
+        ft.Status = 'Completed'
+    ) AS trade_rows
+    LEFT JOIN FactHoldings AS fh
+      ON trade_rows.SK_CustomerID = fh.SK_CustomerID
+      AND trade_rows.SK_SecurityID = fh.SK_SecurityID
+    GROUP BY
+      trade_rows.SK_CustomerID,
+      trade_rows.SK_SecurityID,
+      fh.CurrentHolding
+  ) AS grouped_positions
+) AS position_check
+WHERE
+  ABS(position_discrepancy) > 0
+ORDER BY
+  ABS(position_discrepancy) DESC
+LIMIT 100
 ```
 
 ## Representative DataFrame

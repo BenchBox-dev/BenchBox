@@ -15,7 +15,12 @@ Case insensitive matching prefix pattern
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Case insensitive matching prefix pattern */ SELECT COUNT(*) FROM part WHERE p_name ILIKE 'standard%'
+/* Case insensitive matching prefix pattern */
+SELECT
+  COUNT(*)
+FROM part
+WHERE
+  p_name ILIKE 'standard%'
 ```
 
 ## Representative DataFrame

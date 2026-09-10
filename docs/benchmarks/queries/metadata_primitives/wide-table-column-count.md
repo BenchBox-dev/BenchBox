@@ -14,12 +14,15 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_name,
-    COUNT(*) AS column_count
+  table_name,
+  COUNT(*) AS column_count
 FROM information_schema.columns
-WHERE table_name LIKE 'benchbox_wide_%'
-GROUP BY table_name
-ORDER BY column_count DESC;
+WHERE
+  table_name LIKE 'benchbox_wide_%'
+GROUP BY
+  table_name
+ORDER BY
+  column_count DESC
 ```
 
 ## Representative DataFrame

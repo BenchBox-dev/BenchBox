@@ -14,12 +14,20 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 DELETE FROM delete_ops_orders
-WHERE EXISTS (
-  SELECT 1 FROM customer
-  WHERE customer.c_custkey = delete_ops_orders.o_custkey
-    AND customer.c_mktsegment = 'AUTOMOBILE'
-)
-AND delete_ops_orders.o_orderkey <= (SELECT MIN(o_orderkey) + 20 FROM delete_ops_orders)
+WHERE
+  EXISTS(
+    SELECT
+      1
+    FROM customer
+    WHERE
+      customer.c_custkey = delete_ops_orders.o_custkey
+      AND customer.c_mktsegment = 'AUTOMOBILE'
+  )
+  AND delete_ops_orders.o_orderkey <= (
+    SELECT
+      MIN(o_orderkey) + 20
+    FROM delete_ops_orders
+  )
 ```
 
 ## Representative DataFrame

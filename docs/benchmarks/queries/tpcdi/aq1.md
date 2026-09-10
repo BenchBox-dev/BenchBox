@@ -13,7 +13,42 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Customer Profitability Analysis' AS analysis_name, c.Tier, c.Country, c.Gender, COUNT(DISTINCT c.SK_CustomerID) AS customer_count, COUNT(t.TradeID) AS total_trades, SUM(t.Quantity * t.TradePrice) AS total_trade_value, SUM(t.Fee + t.Commission + t.Tax) AS total_fees_generated, AVG(t.TradePrice) AS avg_trade_price, AVG(c.NetWorth) AS avg_net_worth, AVG(c.CreditRating) AS avg_credit_rating, SUM(t.Quantity * t.TradePrice) / COUNT(DISTINCT c.SK_CustomerID) AS revenue_per_customer, SUM(t.Fee + t.Commission + t.Tax) / COUNT(DISTINCT c.SK_CustomerID) AS fees_per_customer, COUNT(t.TradeID) / COUNT(DISTINCT c.SK_CustomerID) AS trades_per_customer FROM DimCustomer AS c LEFT JOIN FactTrade AS t ON c.SK_CustomerID = t.SK_CustomerID LEFT JOIN DimDate AS d ON t.SK_CreateDateID = d.SK_DateID WHERE c.IsCurrent IS TRUE AND (d.CalendarYearID >= 2015 AND d.CalendarYearID <= 2019) AND t.Status = 'Completed' GROUP BY c.Tier, c.Country, c.Gender HAVING COUNT(t.TradeID) > 10 ORDER BY total_fees_generated DESC, total_trade_value DESC LIMIT 50
+SELECT
+  'Customer Profitability Analysis' AS analysis_name,
+  c.Tier,
+  c.Country,
+  c.Gender,
+  COUNT(DISTINCT c.SK_CustomerID) AS customer_count,
+  COUNT(t.TradeID) AS total_trades,
+  SUM(t.Quantity * t.TradePrice) AS total_trade_value,
+  SUM(t.Fee + t.Commission + t.Tax) AS total_fees_generated,
+  AVG(t.TradePrice) AS avg_trade_price,
+  AVG(c.NetWorth) AS avg_net_worth,
+  AVG(c.CreditRating) AS avg_credit_rating,
+  SUM(t.Quantity * t.TradePrice) / COUNT(DISTINCT c.SK_CustomerID) AS revenue_per_customer,
+  SUM(t.Fee + t.Commission + t.Tax) / COUNT(DISTINCT c.SK_CustomerID) AS fees_per_customer,
+  COUNT(t.TradeID) / COUNT(DISTINCT c.SK_CustomerID) AS trades_per_customer
+FROM DimCustomer AS c
+LEFT JOIN FactTrade AS t
+  ON c.SK_CustomerID = t.SK_CustomerID
+LEFT JOIN DimDate AS d
+  ON t.SK_CreateDateID = d.SK_DateID
+WHERE
+  c.IsCurrent IS TRUE
+  AND (
+    d.CalendarYearID >= 2015 AND d.CalendarYearID <= 2019
+  )
+  AND t.Status = 'Completed'
+GROUP BY
+  c.Tier,
+  c.Country,
+  c.Gender
+HAVING
+  COUNT(t.TradeID) > 10
+ORDER BY
+  total_fees_generated DESC,
+  total_trade_value DESC
+LIMIT 50
 ```
 
 ## Representative DataFrame

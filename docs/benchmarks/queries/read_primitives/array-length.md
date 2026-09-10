@@ -15,20 +15,23 @@ Get array length/cardinality
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Get array length/cardinality
+/* Get array length/cardinality */
 WITH supplier_parts AS (
-    SELECT
-        ps_suppkey,
-        ARRAY_AGG(ps_partkey) as parts
-    FROM partsupp
-    GROUP BY ps_suppkey
+  SELECT
+    ps_suppkey,
+    ARRAY_AGG(ps_partkey) AS parts
+  FROM partsupp
+  GROUP BY
+    ps_suppkey
 )
 SELECT
-    ps_suppkey,
-    CARDINALITY(parts) as num_parts
+  ps_suppkey,
+  CARDINALITY(parts) AS num_parts
 FROM supplier_parts
-ORDER BY num_parts DESC, ps_suppkey
-LIMIT 100;
+ORDER BY
+  num_parts DESC,
+  ps_suppkey
+LIMIT 100
 ```
 
 ## Representative DataFrame

@@ -16,17 +16,19 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    DATE_TRUNC('month', pickup_datetime) as month,
-    SUM(extra) as extra_revenue,
-    SUM(mta_tax) as mta_tax_revenue,
-    SUM(improvement_surcharge) as improvement_revenue,
-    SUM(congestion_surcharge) as congestion_revenue,
-    SUM(tolls_amount) as tolls_revenue
+  DATE_TRUNC('MONTH', pickup_datetime) AS month,
+  SUM(extra) AS extra_revenue,
+  SUM(mta_tax) AS mta_tax_revenue,
+  SUM(improvement_surcharge) AS improvement_revenue,
+  SUM(congestion_surcharge) AS congestion_revenue,
+  SUM(tolls_amount) AS tolls_revenue
 FROM trips
-WHERE pickup_datetime >= '2019-01-01'
-  AND pickup_datetime < '2020-01-01'
-GROUP BY DATE_TRUNC('month', pickup_datetime)
-ORDER BY month
+WHERE
+  pickup_datetime >= '2019-01-01' AND pickup_datetime < '2020-01-01'
+GROUP BY
+  DATE_TRUNC('MONTH', pickup_datetime)
+ORDER BY
+  month
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,16 @@ Complex multi-column sort with string, date, and decimal columns
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Complex multi-column sort with string, date, and decimal columns */ /* o_orderkey (PK) is the trailing tie-break so the LIMIT 100 boundary is a */ /* total order across engines (the three leading keys tie at the cutoff). */ SELECT * FROM orders ORDER BY o_orderpriority, o_orderdate DESC, o_totalprice DESC, o_orderkey LIMIT 100
+/* Complex multi-column sort with string, date, and decimal columns */ /* o_orderkey (PK) is the trailing tie-break so the LIMIT 100 boundary is a */ /* total order across engines (the three leading keys tie at the cutoff). */
+SELECT
+  *
+FROM orders
+ORDER BY
+  o_orderpriority,
+  o_orderdate DESC,
+  o_totalprice DESC,
+  o_orderkey
+LIMIT 100
 ```
 
 ## Representative DataFrame

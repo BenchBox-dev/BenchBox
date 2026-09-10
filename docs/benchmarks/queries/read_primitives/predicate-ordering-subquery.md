@@ -15,7 +15,21 @@ Order filter predicates by selectivity with subquery predicate
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Order filter predicates by selectivity with subquery predicate */ SELECT o_orderkey, o_totalprice FROM orders WHERE o_totalprice > 100000 AND o_orderdate >= CAST('1995-01-01' AS DATE) AND o_custkey IN (SELECT c_custkey FROM customer WHERE c_mktsegment = 'BUILDING' AND c_nationkey = 1)
+/* Order filter predicates by selectivity with subquery predicate */
+SELECT
+  o_orderkey,
+  o_totalprice
+FROM orders
+WHERE
+  o_totalprice > 100000
+  AND o_orderdate >= CAST('1995-01-01' AS DATE)
+  AND o_custkey IN (
+    SELECT
+      c_custkey
+    FROM customer
+    WHERE
+      c_mktsegment = 'BUILDING' AND c_nationkey = 1
+  )
 ```
 
 ## Representative DataFrame

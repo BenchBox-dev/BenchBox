@@ -16,16 +16,19 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    FLOOR(fare_amount / 5) * 5 as fare_bucket,
-    COUNT(*) as trip_count,
-    AVG(trip_distance) as avg_distance,
-    AVG(tip_amount) as avg_tip
+  FLOOR(fare_amount / 5) * 5 AS fare_bucket,
+  COUNT(*) AS trip_count,
+  AVG(trip_distance) AS avg_distance,
+  AVG(tip_amount) AS avg_tip
 FROM trips
-WHERE pickup_datetime >= '2019-08-24'
+WHERE
+  pickup_datetime >= '2019-08-24'
   AND pickup_datetime < '2019-09-23'
   AND fare_amount BETWEEN 0 AND 100
-GROUP BY FLOOR(fare_amount / 5) * 5
-ORDER BY fare_bucket
+GROUP BY
+  FLOOR(fare_amount / 5) * 5
+ORDER BY
+  fare_bucket
 ```
 
 ## Representative DataFrame

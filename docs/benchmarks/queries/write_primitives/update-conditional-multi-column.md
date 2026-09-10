@@ -13,18 +13,19 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-UPDATE update_ops_orders
-SET o_totalprice = CASE
-    WHEN o_orderpriority = '1-URGENT' THEN o_totalprice * 1.2
-    WHEN o_orderpriority = '2-HIGH' THEN o_totalprice * 1.1
-    ELSE o_totalprice
-  END,
-  o_orderpriority = CASE
-    WHEN o_totalprice > 250000 THEN '1-URGENT'
-    ELSE o_orderpriority
-  END,
-  o_comment = 'complex_conditional'
-WHERE o_orderkey <= (SELECT MIN(o_orderkey) + 100 FROM update_ops_orders)
+UPDATE update_ops_orders SET o_totalprice = CASE
+  WHEN o_orderpriority = '1-URGENT'
+  THEN o_totalprice * 1.2
+  WHEN o_orderpriority = '2-HIGH'
+  THEN o_totalprice * 1.1
+  ELSE o_totalprice
+END, o_orderpriority = CASE WHEN o_totalprice > 250000 THEN '1-URGENT' ELSE o_orderpriority END, o_comment = 'complex_conditional'
+WHERE
+  o_orderkey <= (
+    SELECT
+      MIN(o_orderkey) + 100
+    FROM update_ops_orders
+  )
 ```
 
 ## Representative DataFrame

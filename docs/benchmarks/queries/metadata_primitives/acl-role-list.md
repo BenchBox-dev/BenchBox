@@ -14,13 +14,15 @@ Rendered in the benchmark's native SQL with default parameters (no dialect trans
 
 ```sql
 SELECT
-    rolname AS role_name,
-    rolsuper AS is_superuser,
-    rolcreatedb AS can_create_db,
-    rolcreaterole AS can_create_role
+  rolname AS role_name,
+  rolsuper AS is_superuser,
+  rolcreatedb AS can_create_db,
+  rolcreaterole AS can_create_role
 FROM pg_roles
-WHERE rolname NOT LIKE 'pg_%'
-ORDER BY rolname;
+WHERE
+  NOT rolname LIKE 'pg_%'
+ORDER BY
+  rolname
 ```
 
 ## Representative DataFrame

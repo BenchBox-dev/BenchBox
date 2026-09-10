@@ -15,7 +15,14 @@ String starts_with pattern matching
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* String prefix match */ SELECT p_partkey, p_name, p_type FROM part WHERE p_type LIKE 'STANDARD%'
+/* String prefix match */
+SELECT
+  p_partkey,
+  p_name,
+  p_type
+FROM part
+WHERE
+  p_type LIKE 'STANDARD%'
 ```
 
 ## Representative DataFrame

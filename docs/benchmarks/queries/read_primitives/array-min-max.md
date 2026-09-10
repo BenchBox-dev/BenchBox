@@ -15,21 +15,23 @@ Get min and max from array
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Get min/max from array
+/* Get min/max from array */
 WITH order_prices AS (
-    SELECT
-        o_custkey,
-        ARRAY_AGG(o_totalprice) as prices
-    FROM orders
-    GROUP BY o_custkey
+  SELECT
+    o_custkey,
+    ARRAY_AGG(o_totalprice) AS prices
+  FROM orders
+  GROUP BY
+    o_custkey
 )
 SELECT
-    o_custkey,
-    ARRAY_MIN(prices) as min_order,
-    ARRAY_MAX(prices) as max_order
+  o_custkey,
+  ARRAY_MIN(prices) AS min_order,
+  ARRAY_MAX(prices) AS max_order
 FROM order_prices
-ORDER BY o_custkey
-LIMIT 100;
+ORDER BY
+  o_custkey
+LIMIT 100
 ```
 
 ## Representative DataFrame

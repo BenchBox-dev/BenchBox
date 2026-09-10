@@ -15,7 +15,14 @@ LIMIT clause with ordering on large result set
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* LIMIT clause with ordering on large result set */ SELECT * FROM lineitem ORDER BY l_orderkey, l_linenumber LIMIT 100
+/* LIMIT clause with ordering on large result set */
+SELECT
+  *
+FROM lineitem
+ORDER BY
+  l_orderkey,
+  l_linenumber
+LIMIT 100
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,12 @@ IN predicate with string values
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* IN predicate with string values */ SELECT COUNT(*) FROM orders WHERE o_orderpriority IN ('1-URGENT', '2-HIGH')
+/* IN predicate with string values */
+SELECT
+  COUNT(*)
+FROM orders
+WHERE
+  o_orderpriority IN ('1-URGENT', '2-HIGH')
 ```
 
 ## Representative DataFrame

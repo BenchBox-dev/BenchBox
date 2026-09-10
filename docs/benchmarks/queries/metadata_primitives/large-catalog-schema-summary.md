@@ -14,20 +14,25 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    COUNT(DISTINCT t.table_name) AS table_count,
-    COUNT(c.column_name) AS total_columns,
-    AVG(col_counts.column_count) AS avg_columns
-FROM information_schema.tables t
-LEFT JOIN information_schema.columns c
-  ON t.table_name = c.table_name
-  AND t.table_schema = c.table_schema
+  COUNT(DISTINCT t.table_name) AS table_count,
+  COUNT(c.column_name) AS total_columns,
+  AVG(col_counts.column_count) AS avg_columns
+FROM information_schema.tables AS t
+LEFT JOIN information_schema.columns AS c
+  ON t.table_name = c.table_name AND t.table_schema = c.table_schema
 LEFT JOIN (
-    SELECT table_name, COUNT(*) AS column_count
-    FROM information_schema.columns
-    WHERE table_name LIKE 'benchbox_catalog_%'
-    GROUP BY table_name
-) col_counts ON t.table_name = col_counts.table_name
-WHERE t.table_name LIKE 'benchbox_catalog_%';
+  SELECT
+    table_name,
+    COUNT(*) AS column_count
+  FROM information_schema.columns
+  WHERE
+    table_name LIKE 'benchbox_catalog_%'
+  GROUP BY
+    table_name
+) AS col_counts
+  ON t.table_name = col_counts.table_name
+WHERE
+  t.table_name LIKE 'benchbox_catalog_%'
 ```
 
 ## Representative DataFrame

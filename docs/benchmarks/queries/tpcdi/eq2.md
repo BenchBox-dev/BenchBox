@@ -13,7 +13,94 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Incremental Load Validation' AS validation_name, table_name, batch_id, new_records, updated_records, unchanged_records, total_records, new_records / total_records * 100 AS new_record_pct, updated_records / total_records * 100 AS updated_record_pct, CASE WHEN (new_records + updated_records) > 0 AND unchanged_records >= 0 THEN 'PASS' WHEN (new_records + updated_records) = 0 THEN 'NO CHANGES' ELSE 'FAIL' END AS incremental_status FROM (SELECT 'DimCustomer' AS table_name, BatchID AS batch_id, COUNT(*) AS total_records, SUM(CASE WHEN EffectiveDate >= '2023-01-01' AND EndDate = '9999-12-31' THEN 1 ELSE 0 END) AS new_records, SUM(CASE WHEN EffectiveDate >= '2023-01-01' AND EndDate <> '9999-12-31' THEN 1 ELSE 0 END) AS updated_records, SUM(CASE WHEN EffectiveDate < '2023-01-01' THEN 1 ELSE 0 END) AS unchanged_records FROM DimCustomer WHERE BatchID >= 1 GROUP BY BatchID UNION ALL SELECT 'DimAccount' AS table_name, BatchID AS batch_id, COUNT(*) AS total_records, SUM(CASE WHEN EffectiveDate >= '2023-01-01' AND EndDate = '9999-12-31' THEN 1 ELSE 0 END) AS new_records, SUM(CASE WHEN EffectiveDate >= '2023-01-01' AND EndDate <> '9999-12-31' THEN 1 ELSE 0 END) AS updated_records, SUM(CASE WHEN EffectiveDate < '2023-01-01' THEN 1 ELSE 0 END) AS unchanged_records FROM DimAccount WHERE BatchID >= 1 GROUP BY BatchID UNION ALL SELECT 'DimSecurity' AS table_name, BatchID AS batch_id, COUNT(*) AS total_records, SUM(CASE WHEN EffectiveDate >= '2023-01-01' AND EndDate = '9999-12-31' THEN 1 ELSE 0 END) AS new_records, SUM(CASE WHEN EffectiveDate >= '2023-01-01' AND EndDate <> '9999-12-31' THEN 1 ELSE 0 END) AS updated_records, SUM(CASE WHEN EffectiveDate < '2023-01-01' THEN 1 ELSE 0 END) AS unchanged_records FROM DimSecurity WHERE BatchID >= 1 GROUP BY BatchID) AS incremental_metrics ORDER BY batch_id, table_name
+SELECT
+  'Incremental Load Validation' AS validation_name,
+  table_name,
+  batch_id,
+  new_records,
+  updated_records,
+  unchanged_records,
+  total_records,
+  new_records / total_records * 100 AS new_record_pct,
+  updated_records / total_records * 100 AS updated_record_pct,
+  CASE
+    WHEN (
+      new_records + updated_records
+    ) > 0 AND unchanged_records >= 0
+    THEN 'PASS'
+    WHEN (
+      new_records + updated_records
+    ) = 0
+    THEN 'NO CHANGES'
+    ELSE 'FAIL'
+  END AS incremental_status
+FROM (
+  SELECT
+    'DimCustomer' AS table_name,
+    BatchID AS batch_id,
+    COUNT(*) AS total_records,
+    SUM(
+      CASE WHEN EffectiveDate >= '2023-01-01' AND EndDate = '9999-12-31' THEN 1 ELSE 0 END
+    ) AS new_records,
+    SUM(
+      CASE
+        WHEN EffectiveDate >= '2023-01-01' AND EndDate <> '9999-12-31'
+        THEN 1
+        ELSE 0
+      END
+    ) AS updated_records,
+    SUM(CASE WHEN EffectiveDate < '2023-01-01' THEN 1 ELSE 0 END) AS unchanged_records
+  FROM DimCustomer
+  WHERE
+    BatchID >= 1
+  GROUP BY
+    BatchID
+  UNION ALL
+  SELECT
+    'DimAccount' AS table_name,
+    BatchID AS batch_id,
+    COUNT(*) AS total_records,
+    SUM(
+      CASE WHEN EffectiveDate >= '2023-01-01' AND EndDate = '9999-12-31' THEN 1 ELSE 0 END
+    ) AS new_records,
+    SUM(
+      CASE
+        WHEN EffectiveDate >= '2023-01-01' AND EndDate <> '9999-12-31'
+        THEN 1
+        ELSE 0
+      END
+    ) AS updated_records,
+    SUM(CASE WHEN EffectiveDate < '2023-01-01' THEN 1 ELSE 0 END) AS unchanged_records
+  FROM DimAccount
+  WHERE
+    BatchID >= 1
+  GROUP BY
+    BatchID
+  UNION ALL
+  SELECT
+    'DimSecurity' AS table_name,
+    BatchID AS batch_id,
+    COUNT(*) AS total_records,
+    SUM(
+      CASE WHEN EffectiveDate >= '2023-01-01' AND EndDate = '9999-12-31' THEN 1 ELSE 0 END
+    ) AS new_records,
+    SUM(
+      CASE
+        WHEN EffectiveDate >= '2023-01-01' AND EndDate <> '9999-12-31'
+        THEN 1
+        ELSE 0
+      END
+    ) AS updated_records,
+    SUM(CASE WHEN EffectiveDate < '2023-01-01' THEN 1 ELSE 0 END) AS unchanged_records
+  FROM DimSecurity
+  WHERE
+    BatchID >= 1
+  GROUP BY
+    BatchID
+) AS incremental_metrics
+ORDER BY
+  batch_id,
+  table_name
 ```
 
 ## Representative DataFrame

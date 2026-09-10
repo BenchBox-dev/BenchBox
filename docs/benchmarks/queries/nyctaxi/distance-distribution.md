@@ -16,15 +16,18 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    FLOOR(trip_distance) as distance_miles,
-    COUNT(*) as trip_count,
-    AVG(total_amount) as avg_fare
+  FLOOR(trip_distance) AS distance_miles,
+  COUNT(*) AS trip_count,
+  AVG(total_amount) AS avg_fare
 FROM trips
-WHERE pickup_datetime >= '2019-08-29'
+WHERE
+  pickup_datetime >= '2019-08-29'
   AND pickup_datetime < '2019-09-28'
   AND trip_distance BETWEEN 0 AND 30
-GROUP BY FLOOR(trip_distance)
-ORDER BY distance_miles
+GROUP BY
+  FLOOR(trip_distance)
+ORDER BY
+  distance_miles
 ```
 
 ## Representative DataFrame

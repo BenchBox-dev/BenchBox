@@ -13,9 +13,10 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-CREATE TABLE test_drop_idx (id INTEGER, value DECIMAL(15,2));
-CREATE INDEX idx_test_drop ON test_drop_idx(value);
-DROP INDEX idx_test_drop
+CREATE TABLE test_drop_idx (
+  id INT,
+  value DECIMAL(15, 2)
+)
 ```
 
 ## Representative DataFrame

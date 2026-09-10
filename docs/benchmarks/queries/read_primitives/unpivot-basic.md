@@ -16,19 +16,23 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    p_partkey,
-    'p_size' as dimension_name,
-    CAST(p_size AS DECIMAL(15, 2)) as dimension_value
+  p_partkey,
+  'p_size' AS dimension_name,
+  CAST(p_size AS DECIMAL(15, 2)) AS dimension_value
 FROM part
-WHERE p_partkey <= 100
+WHERE
+  p_partkey <= 100
 UNION ALL
 SELECT
-    p_partkey,
-    'p_retailprice' as dimension_name,
-    p_retailprice as dimension_value
+  p_partkey,
+  'p_retailprice' AS dimension_name,
+  p_retailprice AS dimension_value
 FROM part
-WHERE p_partkey <= 100
-ORDER BY p_partkey, dimension_name;
+WHERE
+  p_partkey <= 100
+ORDER BY
+  p_partkey,
+  dimension_name
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,25 @@ Three small tables broadcast to join with one large table
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Three small tables broadcast to join with one large table. Hints are optional. */ /* + BROADCAST(n), BROADCAST(r), BROADCAST(p) */ SELECT r.r_name, p.p_type, SUM(ps.ps_supplycost * ps.ps_availqty) AS total_value FROM partsupp AS ps JOIN supplier AS s ON ps.ps_suppkey = s.s_suppkey JOIN nation AS n ON s.s_nationkey = n.n_nationkey JOIN region AS r ON n.n_regionkey = r.r_regionkey JOIN part AS p ON ps.ps_partkey = p.p_partkey WHERE p.p_size = 15 GROUP BY r.r_name, p.p_type
+/* Three small tables broadcast to join with one large table. Hints are optional. */ /* + BROADCAST(n), BROADCAST(r), BROADCAST(p) */
+SELECT
+  r.r_name,
+  p.p_type,
+  SUM(ps.ps_supplycost * ps.ps_availqty) AS total_value
+FROM partsupp AS ps
+JOIN supplier AS s
+  ON ps.ps_suppkey = s.s_suppkey
+JOIN nation AS n
+  ON s.s_nationkey = n.n_nationkey
+JOIN region AS r
+  ON n.n_regionkey = r.r_regionkey
+JOIN part AS p
+  ON ps.ps_partkey = p.p_partkey
+WHERE
+  p.p_size = 15
+GROUP BY
+  r.r_name,
+  p.p_type
 ```
 
 ## Representative DataFrame

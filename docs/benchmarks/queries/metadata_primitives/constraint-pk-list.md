@@ -14,16 +14,17 @@ Rendered in the benchmark's native SQL with default parameters (no dialect trans
 
 ```sql
 SELECT
-    tc.table_name,
-    tc.constraint_name,
-    kcu.column_name
-FROM information_schema.table_constraints tc
-JOIN information_schema.key_column_usage kcu
-  ON tc.constraint_name = kcu.constraint_name
-  AND tc.table_schema = kcu.table_schema
-WHERE tc.table_name LIKE 'benchbox_%'
-  AND tc.constraint_type = 'PRIMARY KEY'
-ORDER BY tc.table_name, kcu.ordinal_position;
+  tc.table_name,
+  tc.constraint_name,
+  kcu.column_name
+FROM information_schema.table_constraints AS tc
+JOIN information_schema.key_column_usage AS kcu
+  ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+WHERE
+  tc.table_name LIKE 'benchbox_%' AND tc.constraint_type = 'PRIMARY KEY'
+ORDER BY
+  tc.table_name,
+  kcu.ordinal_position
 ```
 
 ## Representative DataFrame

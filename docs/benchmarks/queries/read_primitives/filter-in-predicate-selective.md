@@ -15,7 +15,18 @@ IN predicate with subquery and selective filtering
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* IN predicate with subquery and selective filtering */ SELECT * FROM part WHERE p_partkey IN (SELECT l_partkey FROM lineitem WHERE l_quantity > 45)
+/* IN predicate with subquery and selective filtering */
+SELECT
+  *
+FROM part
+WHERE
+  p_partkey IN (
+    SELECT
+      l_partkey
+    FROM lineitem
+    WHERE
+      l_quantity > 45
+  )
 ```
 
 ## Representative DataFrame

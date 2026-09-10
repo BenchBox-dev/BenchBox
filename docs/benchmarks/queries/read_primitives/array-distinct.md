@@ -15,20 +15,22 @@ Get distinct elements from array
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Get distinct array elements
+/* Get distinct array elements */
 WITH ship_modes AS (
-    SELECT
-        l_orderkey,
-        ARRAY_AGG(l_shipmode) as modes
-    FROM lineitem
-    GROUP BY l_orderkey
+  SELECT
+    l_orderkey,
+    ARRAY_AGG(l_shipmode) AS modes
+  FROM lineitem
+  GROUP BY
+    l_orderkey
 )
 SELECT
-    l_orderkey,
-    ARRAY_SORT(ARRAY_DISTINCT(modes)) as unique_modes
+  l_orderkey,
+  ARRAY_SORT(ARRAY_DISTINCT(modes)) AS unique_modes
 FROM ship_modes
-ORDER BY l_orderkey
-LIMIT 100;
+ORDER BY
+  l_orderkey
+LIMIT 100
 ```
 
 ## Representative DataFrame

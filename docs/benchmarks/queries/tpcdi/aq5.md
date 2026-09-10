@@ -13,7 +13,75 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-WITH price_returns AS (SELECT mh.SK_SecurityID, mh.SK_DateID, mh.ClosePrice, mh.PERatio, mh.Yield, (mh.ClosePrice / LAG(mh.ClosePrice) OVER (PARTITION BY mh.SK_SecurityID ORDER BY mh.SK_DateID) - 1) AS daily_return FROM FactMarketHistory AS mh) SELECT 'Portfolio Risk and Return Analysis' AS analysis_name, c.SK_CustomerID, c.Tier, c.NetWorth, c.CreditRating, COUNT(DISTINCT h.SK_SecurityID) AS portfolio_diversification, SUM(h.CurrentHolding * h.CurrentPrice) AS total_portfolio_value, SUM(cb.Cash) AS cash_balance, (SUM(h.CurrentHolding * h.CurrentPrice) + SUM(cb.Cash)) AS total_account_value, SUM(h.CurrentHolding * h.CurrentPrice) / (SUM(h.CurrentHolding * h.CurrentPrice) + SUM(cb.Cash)) * 100 AS equity_allocation_pct, SUM(cb.Cash) / (SUM(h.CurrentHolding * h.CurrentPrice) + SUM(cb.Cash)) * 100 AS cash_allocation_pct, AVG(pr.PERatio) AS avg_portfolio_pe_ratio, AVG(pr.Yield) AS avg_portfolio_yield, STDDEV(pr.daily_return) * 100 AS portfolio_volatility_pct, SUM(CASE WHEN comp.SPrating IN ('AAA', 'AA+', 'AA', 'AA-') THEN h.CurrentHolding * h.CurrentPrice ELSE 0 END) / SUM(h.CurrentHolding * h.CurrentPrice) * 100 AS high_grade_allocation_pct, COUNT(fw.SK_SecurityID) AS watchlist_securities FROM DimCustomer AS c LEFT JOIN FactHoldings AS h ON c.SK_CustomerID = h.SK_CustomerID LEFT JOIN FactCashBalances AS cb ON c.SK_CustomerID = cb.SK_CustomerID LEFT JOIN price_returns AS pr ON h.SK_SecurityID = pr.SK_SecurityID AND h.SK_DateID = pr.SK_DateID LEFT JOIN DimSecurity AS s ON h.SK_SecurityID = s.SK_SecurityID LEFT JOIN DimCompany AS comp ON s.SK_CompanyID = comp.SK_CompanyID LEFT JOIN FactWatches AS fw ON c.SK_CustomerID = fw.SK_CustomerID WHERE c.IsCurrent IS TRUE AND s.IsCurrent IS TRUE AND comp.IsCurrent IS TRUE AND h.CurrentHolding > 0 GROUP BY c.SK_CustomerID, c.Tier, c.NetWorth, c.CreditRating HAVING SUM(h.CurrentHolding * h.CurrentPrice) > 10000.0 ORDER BY total_portfolio_value DESC LIMIT 50
+WITH price_returns AS (
+  SELECT
+    mh.SK_SecurityID,
+    mh.SK_DateID,
+    mh.ClosePrice,
+    mh.PERatio,
+    mh.Yield,
+    (
+      mh.ClosePrice / LAG(mh.ClosePrice) OVER (PARTITION BY mh.SK_SecurityID ORDER BY mh.SK_DateID) - 1
+    ) AS daily_return
+  FROM FactMarketHistory AS mh
+)
+SELECT
+  'Portfolio Risk and Return Analysis' AS analysis_name,
+  c.SK_CustomerID,
+  c.Tier,
+  c.NetWorth,
+  c.CreditRating,
+  COUNT(DISTINCT h.SK_SecurityID) AS portfolio_diversification,
+  SUM(h.CurrentHolding * h.CurrentPrice) AS total_portfolio_value,
+  SUM(cb.Cash) AS cash_balance,
+  (
+    SUM(h.CurrentHolding * h.CurrentPrice) + SUM(cb.Cash)
+  ) AS total_account_value,
+  SUM(h.CurrentHolding * h.CurrentPrice) / (
+    SUM(h.CurrentHolding * h.CurrentPrice) + SUM(cb.Cash)
+  ) * 100 AS equity_allocation_pct,
+  SUM(cb.Cash) / (
+    SUM(h.CurrentHolding * h.CurrentPrice) + SUM(cb.Cash)
+  ) * 100 AS cash_allocation_pct,
+  AVG(pr.PERatio) AS avg_portfolio_pe_ratio,
+  AVG(pr.Yield) AS avg_portfolio_yield,
+  STDDEV(pr.daily_return) * 100 AS portfolio_volatility_pct,
+  SUM(
+    CASE
+      WHEN comp.SPrating IN ('AAA', 'AA+', 'AA', 'AA-')
+      THEN h.CurrentHolding * h.CurrentPrice
+      ELSE 0
+    END
+  ) / SUM(h.CurrentHolding * h.CurrentPrice) * 100 AS high_grade_allocation_pct,
+  COUNT(fw.SK_SecurityID) AS watchlist_securities
+FROM DimCustomer AS c
+LEFT JOIN FactHoldings AS h
+  ON c.SK_CustomerID = h.SK_CustomerID
+LEFT JOIN FactCashBalances AS cb
+  ON c.SK_CustomerID = cb.SK_CustomerID
+LEFT JOIN price_returns AS pr
+  ON h.SK_SecurityID = pr.SK_SecurityID AND h.SK_DateID = pr.SK_DateID
+LEFT JOIN DimSecurity AS s
+  ON h.SK_SecurityID = s.SK_SecurityID
+LEFT JOIN DimCompany AS comp
+  ON s.SK_CompanyID = comp.SK_CompanyID
+LEFT JOIN FactWatches AS fw
+  ON c.SK_CustomerID = fw.SK_CustomerID
+WHERE
+  c.IsCurrent IS TRUE
+  AND s.IsCurrent IS TRUE
+  AND comp.IsCurrent IS TRUE
+  AND h.CurrentHolding > 0
+GROUP BY
+  c.SK_CustomerID,
+  c.Tier,
+  c.NetWorth,
+  c.CreditRating
+HAVING
+  SUM(h.CurrentHolding * h.CurrentPrice) > 10000.0
+ORDER BY
+  total_portfolio_value DESC
+LIMIT 50
 ```
 
 ## Representative DataFrame

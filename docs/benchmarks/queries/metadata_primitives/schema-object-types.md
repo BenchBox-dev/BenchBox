@@ -14,12 +14,15 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_type,
-    COUNT(*) AS object_count
+  table_type,
+  COUNT(*) AS object_count
 FROM information_schema.tables
-WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-GROUP BY table_type
-ORDER BY object_count DESC;
+WHERE
+  NOT table_schema IN ('information_schema', 'pg_catalog')
+GROUP BY
+  table_type
+ORDER BY
+  object_count DESC
 ```
 
 ## Representative DataFrame

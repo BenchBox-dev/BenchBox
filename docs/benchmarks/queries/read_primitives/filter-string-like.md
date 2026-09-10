@@ -15,7 +15,12 @@ LIKE predicate with substring pattern matching
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* LIKE predicate with substring pattern matching */ SELECT * FROM part WHERE p_name LIKE '%green%'
+/* LIKE predicate with substring pattern matching */
+SELECT
+  *
+FROM part
+WHERE
+  p_name LIKE '%green%'
 ```
 
 ## Representative DataFrame

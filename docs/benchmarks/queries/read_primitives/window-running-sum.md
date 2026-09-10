@@ -15,7 +15,16 @@ Window function SUM() OVER (ORDER BY ...) - cumulative sum
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Cumulative running sum */ SELECT o_orderkey, o_orderdate, o_totalprice, SUM(o_totalprice) OVER (ORDER BY o_orderdate) AS cumulative_revenue FROM orders ORDER BY o_orderdate LIMIT 100
+/* Cumulative running sum */
+SELECT
+  o_orderkey,
+  o_orderdate,
+  o_totalprice,
+  SUM(o_totalprice) OVER (ORDER BY o_orderdate) AS cumulative_revenue
+FROM orders
+ORDER BY
+  o_orderdate
+LIMIT 100
 ```
 
 ## Representative DataFrame

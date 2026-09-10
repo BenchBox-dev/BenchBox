@@ -15,7 +15,29 @@ Test join reordering based on cardinality
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Test join reordering optimization */ /* Good optimizers should reorder joins based on cardinality (nation smallest, then customer, then orders) */ SELECT n.n_name, c.c_name, COUNT(o.o_orderkey) AS order_count, SUM(o.o_totalprice) AS total_value FROM orders AS o /* Largest table listed first (suboptimal order) */ JOIN customer AS c ON o.o_custkey = c.c_custkey /* Medium table */ JOIN nation AS n ON c.c_nationkey = n.n_nationkey /* Smallest table */ WHERE n.n_regionkey = 1 /* High selectivity on smallest table */ AND o.o_orderdate >= CAST('1995-01-01' AS DATE) AND o.o_orderdate < CAST('1996-01-01' AS DATE) GROUP BY n.n_name, c.c_name HAVING COUNT(o.o_orderkey) > 5 ORDER BY total_value DESC LIMIT 100
+/* Test join reordering optimization */ /* Good optimizers should reorder joins based on cardinality (nation smallest, then customer, then orders) */
+SELECT
+  n.n_name,
+  c.c_name,
+  COUNT(o.o_orderkey) AS order_count,
+  SUM(o.o_totalprice) AS total_value
+FROM orders AS o /* Largest table listed first (suboptimal order) */
+JOIN customer AS c
+  ON o.o_custkey = c.c_custkey /* Medium table */
+JOIN nation AS n
+  ON c.c_nationkey = n.n_nationkey /* Smallest table */
+WHERE
+  n.n_regionkey = 1 /* High selectivity on smallest table */
+  AND o.o_orderdate >= CAST('1995-01-01' AS DATE)
+  AND o.o_orderdate < CAST('1996-01-01' AS DATE)
+GROUP BY
+  n.n_name,
+  c.c_name
+HAVING
+  COUNT(o.o_orderkey) > 5
+ORDER BY
+  total_value DESC
+LIMIT 100
 ```
 
 ## Representative DataFrame

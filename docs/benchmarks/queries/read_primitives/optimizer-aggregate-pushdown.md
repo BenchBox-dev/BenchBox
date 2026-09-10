@@ -15,7 +15,31 @@ Test aggregate pushdown before join
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Test aggregate pushdown through joins optimization */ /* Good optimizers should partially compute aggregates before joins when possible */ SELECT c.c_name, c.c_mktsegment, c.c_nationkey, COUNT(o.o_orderkey) AS order_count, SUM(o.o_totalprice) AS total_spent, AVG(o.o_totalprice) AS avg_order_value FROM customer AS c JOIN orders AS o ON c.c_custkey = o.o_custkey WHERE c.c_nationkey = 15 AND o.o_orderdate >= CAST('1995-01-01' AS DATE) AND o.o_orderdate < CAST('1996-01-01' AS DATE) GROUP BY c.c_custkey, c.c_name, c.c_mktsegment, c.c_nationkey HAVING SUM(o.o_totalprice) > 500000 /* HAVING can influence pushdown strategy */ ORDER BY total_spent DESC LIMIT 50
+/* Test aggregate pushdown through joins optimization */ /* Good optimizers should partially compute aggregates before joins when possible */
+SELECT
+  c.c_name,
+  c.c_mktsegment,
+  c.c_nationkey,
+  COUNT(o.o_orderkey) AS order_count,
+  SUM(o.o_totalprice) AS total_spent,
+  AVG(o.o_totalprice) AS avg_order_value
+FROM customer AS c
+JOIN orders AS o
+  ON c.c_custkey = o.o_custkey
+WHERE
+  c.c_nationkey = 15
+  AND o.o_orderdate >= CAST('1995-01-01' AS DATE)
+  AND o.o_orderdate < CAST('1996-01-01' AS DATE)
+GROUP BY
+  c.c_custkey,
+  c.c_name,
+  c.c_mktsegment,
+  c.c_nationkey
+HAVING
+  SUM(o.o_totalprice) > 500000 /* HAVING can influence pushdown strategy */
+ORDER BY
+  total_spent DESC
+LIMIT 50
 ```
 
 ## Representative DataFrame

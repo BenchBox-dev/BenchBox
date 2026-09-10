@@ -15,7 +15,18 @@ Aggregates within high cardinality grouping
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Aggregates within high cardinality grouping */ SELECT l_orderkey, l_partkey, l_suppkey, SUM(l_quantity) AS total_qty, AVG(l_extendedprice) AS avg_price FROM lineitem GROUP BY l_orderkey, l_partkey, l_suppkey
+/* Aggregates within high cardinality grouping */
+SELECT
+  l_orderkey,
+  l_partkey,
+  l_suppkey,
+  SUM(l_quantity) AS total_qty,
+  AVG(l_extendedprice) AS avg_price
+FROM lineitem
+GROUP BY
+  l_orderkey,
+  l_partkey,
+  l_suppkey
 ```
 
 ## Representative DataFrame

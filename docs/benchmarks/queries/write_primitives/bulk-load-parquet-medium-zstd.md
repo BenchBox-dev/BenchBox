@@ -13,8 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-TRUNCATE TABLE bulk_load_ops_target;
-COPY bulk_load_ops_target FROM '{file_path}/parquet_medium_100k_zstd.parquet' (FORMAT PARQUET)
+TRUNCATE TABLE   bulk_load_ops_target
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,12 @@ Equality predicate after applying case conversion
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Equality predicate after applying case conversion to the base table */ SELECT COUNT(*) FROM part WHERE LOWER(p_brand) = 'brand#23'
+/* Equality predicate after applying case conversion to the base table */
+SELECT
+  COUNT(*)
+FROM part
+WHERE
+  LOWER(p_brand) = 'brand#23'
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,30 @@ Seasonal revenue comparison across regions using CASE WHEN month mapping
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT dl.region, CASE WHEN EXTRACT(MONTH FROM ol.order_date) IN (12, 1, 2) THEN 'Winter' WHEN EXTRACT(MONTH FROM ol.order_date) IN (3, 4, 5) THEN 'Spring' WHEN EXTRACT(MONTH FROM ol.order_date) IN (6, 7, 8) THEN 'Summer' ELSE 'Fall' END AS season, SUM(ol.total_price) AS revenue, COUNT(DISTINCT ol.order_id) AS orders FROM order_lines AS ol JOIN dim_locations AS dl ON ol.location_record_id = dl.record_id WHERE EXTRACT(YEAR FROM ol.order_date) BETWEEN 2023 AND 2024 GROUP BY dl.region, season ORDER BY dl.region, season
+SELECT
+  dl.region,
+  CASE
+    WHEN EXTRACT(MONTH FROM ol.order_date) IN (12, 1, 2)
+    THEN 'Winter'
+    WHEN EXTRACT(MONTH FROM ol.order_date) IN (3, 4, 5)
+    THEN 'Spring'
+    WHEN EXTRACT(MONTH FROM ol.order_date) IN (6, 7, 8)
+    THEN 'Summer'
+    ELSE 'Fall'
+  END AS season,
+  SUM(ol.total_price) AS revenue,
+  COUNT(DISTINCT ol.order_id) AS orders
+FROM order_lines AS ol
+JOIN dim_locations AS dl
+  ON ol.location_record_id = dl.record_id
+WHERE
+  EXTRACT(YEAR FROM ol.order_date) BETWEEN 2023 AND 2024
+GROUP BY
+  dl.region,
+  season
+ORDER BY
+  dl.region,
+  season
 ```
 
 ## Representative DataFrame

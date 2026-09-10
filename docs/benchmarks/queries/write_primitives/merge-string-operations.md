@@ -19,11 +19,12 @@ USING (
     o_orderkey,
     CONCAT('ORDER-', CAST(o_orderkey AS VARCHAR), '-', o_orderpriority) AS computed_comment
   FROM orders
-  WHERE o_orderkey BETWEEN 1 AND 50
+  WHERE
+    o_orderkey BETWEEN 1 AND 50
 ) AS source
 ON target.o_orderkey = source.o_orderkey
-WHEN MATCHED THEN
-  UPDATE SET o_comment = source.computed_comment
+WHEN MATCHED THEN UPDATE SET
+  o_comment = source.computed_comment
 ```
 
 ## Representative DataFrame

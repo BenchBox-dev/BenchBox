@@ -15,7 +15,12 @@ Range predicate on decimal column with low selectivity
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* range predicate on decimal column with low selectivity */ SELECT COUNT(*) FROM lineitem WHERE l_extendedprice > 1000.00
+/* range predicate on decimal column with low selectivity */
+SELECT
+  COUNT(*)
+FROM lineitem
+WHERE
+  l_extendedprice > 1000.00
 ```
 
 ## Representative DataFrame

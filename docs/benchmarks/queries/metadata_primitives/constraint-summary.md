@@ -14,13 +14,16 @@ Rendered in the benchmark's native SQL with default parameters (no dialect trans
 
 ```sql
 SELECT
-    constraint_type,
-    COUNT(*) AS constraint_count,
-    COUNT(DISTINCT table_name) AS tables_with_constraint
+  constraint_type,
+  COUNT(*) AS constraint_count,
+  COUNT(DISTINCT table_name) AS tables_with_constraint
 FROM information_schema.table_constraints
-WHERE table_name LIKE 'benchbox_%'
-GROUP BY constraint_type
-ORDER BY constraint_count DESC;
+WHERE
+  table_name LIKE 'benchbox_%'
+GROUP BY
+  constraint_type
+ORDER BY
+  constraint_count DESC
 ```
 
 ## Representative DataFrame

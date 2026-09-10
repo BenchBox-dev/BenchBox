@@ -15,7 +15,13 @@ Top-10 limit returning all columns after ordering over all table rows
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Top-10 limit returning all columns after ordering over all table rows */ SELECT * FROM lineitem ORDER BY l_extendedprice DESC LIMIT 10
+/* Top-10 limit returning all columns after ordering over all table rows */
+SELECT
+  *
+FROM lineitem
+ORDER BY
+  l_extendedprice DESC
+LIMIT 10
 ```
 
 ## Representative DataFrame

@@ -13,12 +13,13 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-UPDATE update_ops_orders
-SET o_comment = 'bulk_50pct_update'
-WHERE o_orderkey <= (
-  SELECT CAST(MAX(o_orderkey) * 0.5 AS INTEGER)
-  FROM update_ops_orders
-)
+UPDATE update_ops_orders SET o_comment = 'bulk_50pct_update'
+WHERE
+  o_orderkey <= (
+    SELECT
+      CAST(MAX(o_orderkey) * 0.5 AS INT)
+    FROM update_ops_orders
+  )
 ```
 
 ## Representative DataFrame

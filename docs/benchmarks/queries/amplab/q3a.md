@@ -15,7 +15,17 @@ Text analysis on documents with keyword matching via CASE WHEN
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT url, LENGTH(contents) AS content_length, CASE WHEN contents LIKE '%web%' THEN 1 ELSE 0 END AS has_keyword1, CASE WHEN contents LIKE '%data%' THEN 1 ELSE 0 END AS has_keyword2 FROM documents WHERE LENGTH(contents) > 1000 ORDER BY content_length DESC LIMIT 100
+SELECT
+  url,
+  LENGTH(contents) AS content_length,
+  CASE WHEN contents LIKE '%web%' THEN 1 ELSE 0 END AS has_keyword1,
+  CASE WHEN contents LIKE '%data%' THEN 1 ELSE 0 END AS has_keyword2
+FROM documents
+WHERE
+  LENGTH(contents) > 1000
+ORDER BY
+  content_length DESC
+LIMIT 100
 ```
 
 ## Representative DataFrame

@@ -13,7 +13,21 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Credit Rating Validation' AS validation_name, COUNT(*) AS total_customers, SUM(CASE WHEN CreditRating < 300 OR CreditRating > 850 THEN 1 ELSE 0 END) AS invalid_credit_ratings, MIN(CreditRating) AS min_credit_rating, MAX(CreditRating) AS max_credit_rating, AVG(CreditRating) AS avg_credit_rating, CASE WHEN SUM(CASE WHEN CreditRating < 300 OR CreditRating > 850 THEN 1 ELSE 0 END) = 0 THEN 'PASS' ELSE 'FAIL' END AS status FROM DimCustomer WHERE IsCurrent IS TRUE
+SELECT
+  'Credit Rating Validation' AS validation_name,
+  COUNT(*) AS total_customers,
+  SUM(CASE WHEN CreditRating < 300 OR CreditRating > 850 THEN 1 ELSE 0 END) AS invalid_credit_ratings,
+  MIN(CreditRating) AS min_credit_rating,
+  MAX(CreditRating) AS max_credit_rating,
+  AVG(CreditRating) AS avg_credit_rating,
+  CASE
+    WHEN SUM(CASE WHEN CreditRating < 300 OR CreditRating > 850 THEN 1 ELSE 0 END) = 0
+    THEN 'PASS'
+    ELSE 'FAIL'
+  END AS status
+FROM DimCustomer
+WHERE
+  IsCurrent IS TRUE
 ```
 
 ## Representative DataFrame

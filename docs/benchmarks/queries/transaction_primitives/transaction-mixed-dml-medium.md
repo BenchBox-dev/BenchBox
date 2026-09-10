@@ -13,13 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-BEGIN TRANSACTION;
-INSERT INTO txn_orders
-SELECT 9910000 + n, 1, 'O', 1000.0 * n, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'mixed_medium'
-FROM (SELECT unnest(generate_series(1, 50)) AS n) t;
-UPDATE txn_orders SET o_totalprice = o_totalprice * 1.1 WHERE o_orderkey BETWEEN 9910001 AND 9910025;
-DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9910026 AND 9910050;
-COMMIT;
+BEGIN
 ```
 
 ## Representative DataFrame

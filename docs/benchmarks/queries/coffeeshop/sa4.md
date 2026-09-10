@@ -15,7 +15,20 @@ Revenue share by region using SUM OVER() window function
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT dl.region, COUNT(DISTINCT ol.order_id) AS orders, SUM(ol.total_price) AS revenue, SUM(ol.total_price) / SUM(SUM(ol.total_price)) OVER () AS revenue_share FROM order_lines AS ol JOIN dim_locations AS dl ON ol.location_record_id = dl.record_id WHERE ol.order_date BETWEEN CAST('2023-01-01' AS DATE) AND CAST('2024-12-31' AS DATE) GROUP BY dl.region ORDER BY revenue DESC
+SELECT
+  dl.region,
+  COUNT(DISTINCT ol.order_id) AS orders,
+  SUM(ol.total_price) AS revenue,
+  SUM(ol.total_price) / SUM(SUM(ol.total_price)) OVER () AS revenue_share
+FROM order_lines AS ol
+JOIN dim_locations AS dl
+  ON ol.location_record_id = dl.record_id
+WHERE
+  ol.order_date BETWEEN CAST('2023-01-01' AS DATE) AND CAST('2024-12-31' AS DATE)
+GROUP BY
+  dl.region
+ORDER BY
+  revenue DESC
 ```
 
 ## Representative DataFrame

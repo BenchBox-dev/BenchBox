@@ -15,7 +15,15 @@ Sort with aggregation results on integer column
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Sort with aggregation results on integer column */ SELECT l_orderkey, SUM(l_quantity) AS total_qty FROM lineitem GROUP BY l_orderkey ORDER BY l_orderkey
+/* Sort with aggregation results on integer column */
+SELECT
+  l_orderkey,
+  SUM(l_quantity) AS total_qty
+FROM lineitem
+GROUP BY
+  l_orderkey
+ORDER BY
+  l_orderkey
 ```
 
 ## Representative DataFrame

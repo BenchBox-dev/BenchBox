@@ -15,7 +15,16 @@ Standard inner join with one-to-many relationship
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Standard inner join with one-to-many relationship */ SELECT c.c_mktsegment, COUNT(*) AS order_count, SUM(o.o_totalprice) AS total_revenue FROM customer AS c INNER JOIN orders AS o ON c.c_custkey = o.o_custkey GROUP BY c.c_mktsegment
+/* Standard inner join with one-to-many relationship */
+SELECT
+  c.c_mktsegment,
+  COUNT(*) AS order_count,
+  SUM(o.o_totalprice) AS total_revenue
+FROM customer AS c
+INNER JOIN orders AS o
+  ON c.c_custkey = o.o_custkey
+GROUP BY
+  c.c_mktsegment
 ```
 
 ## Representative DataFrame

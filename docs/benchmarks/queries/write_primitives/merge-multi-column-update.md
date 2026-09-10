@@ -23,16 +23,20 @@ USING (
     o_shippriority + 1 AS o_shippriority,
     'merge_multi_col' AS o_comment
   FROM merge_ops_target
-  WHERE o_orderkey <= (SELECT MIN(o_orderkey) + 50 FROM merge_ops_target)
+  WHERE
+    o_orderkey <= (
+      SELECT
+        MIN(o_orderkey) + 50
+      FROM merge_ops_target
+    )
 ) AS source
 ON target.o_orderkey = source.o_orderkey
-WHEN MATCHED THEN
-  UPDATE SET
-    o_totalprice = source.o_totalprice,
-    o_orderpriority = source.o_orderpriority,
-    o_clerk = source.o_clerk,
-    o_shippriority = source.o_shippriority,
-    o_comment = source.o_comment
+WHEN MATCHED THEN UPDATE SET
+  o_totalprice = source.o_totalprice,
+  o_orderpriority = source.o_orderpriority,
+  o_clerk = source.o_clerk,
+  o_shippriority = source.o_shippriority,
+  o_comment = source.o_comment
 ```
 
 ## Representative DataFrame

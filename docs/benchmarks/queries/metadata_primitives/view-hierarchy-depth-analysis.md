@@ -14,18 +14,26 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_name AS view_name,
-    CASE
-        WHEN table_name LIKE '%_d1' THEN 1
-        WHEN table_name LIKE '%_d2' THEN 2
-        WHEN table_name LIKE '%_d3' THEN 3
-        WHEN table_name LIKE '%_d4' THEN 4
-        WHEN table_name LIKE '%_d5' THEN 5
-        ELSE 0
-    END AS depth_level
+  table_name AS view_name,
+  CASE
+    WHEN table_name LIKE '%_d1'
+    THEN 1
+    WHEN table_name LIKE '%_d2'
+    THEN 2
+    WHEN table_name LIKE '%_d3'
+    THEN 3
+    WHEN table_name LIKE '%_d4'
+    THEN 4
+    WHEN table_name LIKE '%_d5'
+    THEN 5
+    ELSE 0
+  END AS depth_level
 FROM information_schema.views
-WHERE table_name LIKE 'benchbox_view_%'
-ORDER BY depth_level, table_name;
+WHERE
+  table_name LIKE 'benchbox_view_%'
+ORDER BY
+  depth_level,
+  table_name
 ```
 
 ## Representative DataFrame

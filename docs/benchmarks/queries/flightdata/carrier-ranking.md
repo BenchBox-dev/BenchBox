@@ -16,24 +16,34 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    f.reporting_airline,
-    a.name AS airline_name,
-    COUNT(*) AS total_scheduled,
-    SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END) AS operated_flights,
-    SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS cancelled_flights,
-    ROUND(100.0 * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) / COUNT(*), 2) AS cancellation_rate_pct,
-    ROUND(AVG(CASE WHEN f.cancelled = 0 THEN f.dep_delay END), 2) AS avg_dep_delay,
-    ROUND(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay END), 2) AS avg_arr_delay,
-    ROUND(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END)
-        / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0), 2) AS ontime_pct,
-    ROUND(AVG(f.distance), 0) AS avg_route_distance_miles
-FROM flights f
-LEFT JOIN airlines a ON f.reporting_airline = a.code
-WHERE f.flight_date >= '2021-08-01'
-  AND f.flight_date < '2025-01-01'
-GROUP BY f.reporting_airline, a.name
-HAVING COUNT(*) >= 1000
-ORDER BY ontime_pct DESC
+  f.reporting_airline,
+  a.name AS airline_name,
+  COUNT(*) AS total_scheduled,
+  SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END) AS operated_flights,
+  SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS cancelled_flights,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) / COUNT(*) AS DECIMAL),
+    2
+  ) AS cancellation_rate_pct,
+  ROUND(CAST(AVG(CASE WHEN f.cancelled = 0 THEN f.dep_delay END) AS DECIMAL), 2) AS avg_dep_delay,
+  ROUND(CAST(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay END) AS DECIMAL), 2) AS avg_arr_delay,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0) AS DECIMAL),
+    2
+  ) AS ontime_pct,
+  ROUND(CAST(AVG(f.distance) AS DECIMAL), 0) AS avg_route_distance_miles
+FROM flights AS f
+LEFT JOIN airlines AS a
+  ON f.reporting_airline = a.code
+WHERE
+  f.flight_date >= '2021-08-01' AND f.flight_date < '2025-01-01'
+GROUP BY
+  f.reporting_airline,
+  a.name
+HAVING
+  COUNT(*) >= 1000
+ORDER BY
+  ontime_pct DESC
 ```
 
 ## Representative DataFrame

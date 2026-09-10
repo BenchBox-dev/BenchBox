@@ -15,7 +15,15 @@ Distinct array aggregation
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Distinct array aggregation */ SELECT c_mktsegment, ARRAY_AGG(DISTINCT c_nationkey ORDER BY c_nationkey) AS nation_keys FROM customer GROUP BY c_mktsegment ORDER BY c_mktsegment
+/* Distinct array aggregation */
+SELECT
+  c_mktsegment,
+  ARRAY_AGG(DISTINCT c_nationkey ORDER BY c_nationkey) AS nation_keys
+FROM customer
+GROUP BY
+  c_mktsegment
+ORDER BY
+  c_mktsegment
 ```
 
 ## Representative DataFrame

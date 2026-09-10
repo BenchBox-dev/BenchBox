@@ -15,7 +15,22 @@ Sort array elements
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Sort array elements */ WITH part_sizes AS (SELECT p_brand, ARRAY_AGG(p_size) AS sizes FROM part GROUP BY p_brand) SELECT p_brand, ARRAY_SORT(sizes) AS sorted_sizes FROM part_sizes ORDER BY p_brand LIMIT 50
+/* Sort array elements */
+WITH part_sizes AS (
+  SELECT
+    p_brand,
+    ARRAY_AGG(p_size) AS sizes
+  FROM part
+  GROUP BY
+    p_brand
+)
+SELECT
+  p_brand,
+  ARRAY_SORT(sizes) AS sorted_sizes
+FROM part_sizes
+ORDER BY
+  p_brand
+LIMIT 50
 ```
 
 ## Representative DataFrame

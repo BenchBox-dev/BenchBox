@@ -15,7 +15,12 @@ IN-list predicate with decimal values and selectivity
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* IN-list predicate with decimal values and selectivity */ SELECT * FROM lineitem WHERE l_extendedprice IN (1000.00, 5000.00, 10000.00, 50000.00)
+/* IN-list predicate with decimal values and selectivity */
+SELECT
+  *
+FROM lineitem
+WHERE
+  l_extendedprice IN (1000.00, 5000.00, 10000.00, 50000.00)
 ```
 
 ## Representative DataFrame

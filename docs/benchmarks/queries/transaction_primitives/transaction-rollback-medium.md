@@ -13,13 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-BEGIN TRANSACTION;
-INSERT INTO txn_lineitem
-SELECT 9500000 + n, 1, 1, 1, 10.0, 1000.0, 0.05, 0.02, 'N', 'O',
-       DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20',
-       'DELIVER IN PERSON', 'TRUCK', 'rollback_medium'
-FROM (SELECT unnest(generate_series(1, 100)) AS n) t;
-ROLLBACK;
+BEGIN
 ```
 
 ## Representative DataFrame

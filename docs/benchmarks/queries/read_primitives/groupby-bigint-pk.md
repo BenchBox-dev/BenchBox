@@ -15,7 +15,13 @@ GROUP BY on primary key (one row per group)
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* GROUP BY on primary key (one row per group) */ SELECT c_custkey, MAX(c_name) AS customer_name FROM customer GROUP BY c_custkey
+/* GROUP BY on primary key (one row per group) */
+SELECT
+  c_custkey,
+  MAX(c_name) AS customer_name
+FROM customer
+GROUP BY
+  c_custkey
 ```
 
 ## Representative DataFrame

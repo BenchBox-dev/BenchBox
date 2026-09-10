@@ -16,15 +16,17 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    EXTRACT(DOW FROM pickup_datetime) as day_of_week,
-    COUNT(*) as trip_count,
-    AVG(trip_distance) as avg_distance,
-    AVG(total_amount) as avg_fare
+  EXTRACT(DOW FROM pickup_datetime) AS day_of_week,
+  COUNT(*) AS trip_count,
+  AVG(trip_distance) AS avg_distance,
+  AVG(total_amount) AS avg_fare
 FROM trips
-WHERE pickup_datetime >= '2019-07-29'
-  AND pickup_datetime < '2019-10-27'
-GROUP BY EXTRACT(DOW FROM pickup_datetime)
-ORDER BY day_of_week
+WHERE
+  pickup_datetime >= '2019-07-29' AND pickup_datetime < '2019-10-27'
+GROUP BY
+  EXTRACT(DOW FROM pickup_datetime)
+ORDER BY
+  day_of_week
 ```
 
 ## Representative DataFrame

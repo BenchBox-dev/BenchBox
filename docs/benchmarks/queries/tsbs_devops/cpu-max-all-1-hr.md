@@ -15,12 +15,17 @@ Maximum CPU usage across all hosts in 1 hour
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT hostname, MAX(usage_user) as max_user, MAX(usage_system) as max_system
+SELECT
+  hostname,
+  MAX(usage_user) AS max_user,
+  MAX(usage_system) AS max_system
 FROM cpu
-WHERE time >= '2024-01-02 15:00:00'
-  AND time < '2024-01-02 16:00:00'
-GROUP BY hostname
-ORDER BY max_user DESC
+WHERE
+  time >= '2024-01-02 15:00:00' AND time < '2024-01-02 16:00:00'
+GROUP BY
+  hostname
+ORDER BY
+  max_user DESC
 ```
 
 ## Representative DataFrame

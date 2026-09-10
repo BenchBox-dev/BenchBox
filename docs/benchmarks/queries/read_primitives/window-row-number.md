@@ -15,7 +15,16 @@ Window function ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Row number calculation window function with different ordering */ SELECT o_custkey, o_orderkey, o_totalprice, ROW_NUMBER() OVER (PARTITION BY o_custkey ORDER BY o_totalprice DESC) AS order_rank FROM orders WHERE o_orderdate >= CAST('1995-01-01' AS DATE) AND o_orderdate < CAST('1996-01-01' AS DATE)
+/* Row number calculation window function with different ordering */
+SELECT
+  o_custkey,
+  o_orderkey,
+  o_totalprice,
+  ROW_NUMBER() OVER (PARTITION BY o_custkey ORDER BY o_totalprice DESC) AS order_rank
+FROM orders
+WHERE
+  o_orderdate >= CAST('1995-01-01' AS DATE)
+  AND o_orderdate < CAST('1996-01-01' AS DATE)
 ```
 
 ## Representative DataFrame

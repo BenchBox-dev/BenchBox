@@ -15,7 +15,17 @@ Offset window functions over the same frame
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Offset window functions over the same frame with 'natural' ordering */ /* o_orderkey is the deterministic tie-break within the window ORDER BY so LAG/LEAD */ /* are well-defined across engines when a customer has multiple orders on one date. */ SELECT o_orderkey, o_orderdate, o_totalprice, LAG(o_totalprice, 1) OVER (PARTITION BY o_custkey ORDER BY o_orderdate, o_orderkey) AS prev_order_price, LEAD(o_totalprice, 1) OVER (PARTITION BY o_custkey ORDER BY o_orderdate, o_orderkey) AS next_order_price FROM orders WHERE o_orderdate >= CAST('1995-01-01' AS DATE) AND o_orderdate < CAST('1996-01-01' AS DATE)
+/* Offset window functions over the same frame with 'natural' ordering */ /* o_orderkey is the deterministic tie-break within the window ORDER BY so LAG/LEAD */ /* are well-defined across engines when a customer has multiple orders on one date. */
+SELECT
+  o_orderkey,
+  o_orderdate,
+  o_totalprice,
+  LAG(o_totalprice, 1) OVER (PARTITION BY o_custkey ORDER BY o_orderdate, o_orderkey) AS prev_order_price,
+  LEAD(o_totalprice, 1) OVER (PARTITION BY o_custkey ORDER BY o_orderdate, o_orderkey) AS next_order_price
+FROM orders
+WHERE
+  o_orderdate >= CAST('1995-01-01' AS DATE)
+  AND o_orderdate < CAST('1996-01-01' AS DATE)
 ```
 
 ## Representative DataFrame

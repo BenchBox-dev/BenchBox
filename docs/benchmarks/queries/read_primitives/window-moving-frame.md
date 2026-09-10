@@ -15,7 +15,20 @@ Window aggregations with complex moving frame definitions
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Window aggregations with complex moving frame definitions */ /* The ROWS frame is order-sensitive, so o_orderkey is the deterministic tie-break */ /* in its window ORDER BY (and the outer ORDER BY) when several orders share a */ /* date. The RANGE frame keeps a single ordering column (INTERVAL requires it) and */ /* is order-insensitive by construction. */ SELECT o_orderkey, o_orderdate, o_totalprice, AVG(o_totalprice) OVER (ORDER BY o_orderdate, o_orderkey ROWS BETWEEN 5 PRECEDING AND CURRENT ROW) AS moving_avg_6_orders /* Moving average with preceding rows */, SUM(o_totalprice) OVER (ORDER BY o_orderdate RANGE BETWEEN INTERVAL '30 DAY' PRECEDING AND CURRENT ROW) AS monthly_running_total /* Running total with range-based frame */ FROM orders WHERE o_orderdate >= CAST('1995-01-01' AS DATE) AND o_orderdate < CAST('1996-01-01' AS DATE) ORDER BY o_orderdate, o_orderkey
+/* Window aggregations with complex moving frame definitions */ /* The ROWS frame is order-sensitive, so o_orderkey is the deterministic tie-break */ /* in its window ORDER BY (and the outer ORDER BY) when several orders share a */ /* date. The RANGE frame keeps a single ordering column (INTERVAL requires it) and */ /* is order-insensitive by construction. */
+SELECT
+  o_orderkey,
+  o_orderdate,
+  o_totalprice,
+  AVG(o_totalprice) OVER (ORDER BY o_orderdate, o_orderkey ROWS BETWEEN 5 PRECEDING AND CURRENT ROW) AS moving_avg_6_orders, /* Moving average with preceding rows */
+  SUM(o_totalprice) OVER (ORDER BY o_orderdate RANGE BETWEEN INTERVAL '30 DAY' PRECEDING AND CURRENT ROW) AS monthly_running_total /* Running total with range-based frame */
+FROM orders
+WHERE
+  o_orderdate >= CAST('1995-01-01' AS DATE)
+  AND o_orderdate < CAST('1996-01-01' AS DATE)
+ORDER BY
+  o_orderdate,
+  o_orderkey
 ```
 
 ## Representative DataFrame

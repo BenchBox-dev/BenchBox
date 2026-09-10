@@ -16,20 +16,29 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    f.reporting_airline,
-    a.name AS airline_name,
-    COUNT(*) AS total_flights,
-    SUM(CASE WHEN f.late_aircraft_delay > 0 THEN 1 ELSE 0 END) AS cascade_delayed,
-    ROUND(100.0 * SUM(CASE WHEN f.late_aircraft_delay > 0 THEN 1 ELSE 0 END) / COUNT(*), 2) AS cascade_rate_pct,
-    ROUND(AVG(CASE WHEN f.late_aircraft_delay > 0 THEN f.late_aircraft_delay END), 2) AS avg_cascade_delay,
-    ROUND(SUM(CASE WHEN f.late_aircraft_delay > 0 THEN f.late_aircraft_delay ELSE 0 END), 0) AS total_cascade_minutes
-FROM flights f
-LEFT JOIN airlines a ON f.reporting_airline = a.code
-WHERE f.cancelled = 0
-  AND f.flight_date >= '2021-08-01'
-  AND f.flight_date < '2025-01-01'
-GROUP BY f.reporting_airline, a.name
-ORDER BY cascade_rate_pct DESC
+  f.reporting_airline,
+  a.name AS airline_name,
+  COUNT(*) AS total_flights,
+  SUM(CASE WHEN f.late_aircraft_delay > 0 THEN 1 ELSE 0 END) AS cascade_delayed,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.late_aircraft_delay > 0 THEN 1 ELSE 0 END) / COUNT(*) AS DECIMAL),
+    2
+  ) AS cascade_rate_pct,
+  ROUND(
+    CAST(AVG(CASE WHEN f.late_aircraft_delay > 0 THEN f.late_aircraft_delay END) AS DECIMAL),
+    2
+  ) AS avg_cascade_delay,
+  ROUND(SUM(CASE WHEN f.late_aircraft_delay > 0 THEN f.late_aircraft_delay ELSE 0 END), 0) AS total_cascade_minutes
+FROM flights AS f
+LEFT JOIN airlines AS a
+  ON f.reporting_airline = a.code
+WHERE
+  f.cancelled = 0 AND f.flight_date >= '2021-08-01' AND f.flight_date < '2025-01-01'
+GROUP BY
+  f.reporting_airline,
+  a.name
+ORDER BY
+  cascade_rate_pct DESC
 ```
 
 ## Representative DataFrame

@@ -13,16 +13,28 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-UPDATE update_ops_orders
-SET o_totalprice = (
-  SELECT SUM(l_extendedprice * (1 - l_discount))
+UPDATE update_ops_orders SET o_totalprice = (
+  SELECT
+    SUM(l_extendedprice * (
+      1 - l_discount
+    ))
   FROM lineitem
-  WHERE l_orderkey = update_ops_orders.o_orderkey
+  WHERE
+    l_orderkey = update_ops_orders.o_orderkey
 )
-WHERE EXISTS (
-  SELECT 1 FROM lineitem WHERE l_orderkey = update_ops_orders.o_orderkey
-)
-AND o_orderkey <= (SELECT MIN(o_orderkey) + 100 FROM update_ops_orders)
+WHERE
+  EXISTS(
+    SELECT
+      1
+    FROM lineitem
+    WHERE
+      l_orderkey = update_ops_orders.o_orderkey
+  )
+  AND o_orderkey <= (
+    SELECT
+      MIN(o_orderkey) + 100
+    FROM update_ops_orders
+  )
 ```
 
 ## Representative DataFrame

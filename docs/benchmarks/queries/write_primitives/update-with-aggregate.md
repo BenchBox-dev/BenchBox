@@ -13,15 +13,26 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-UPDATE update_ops_orders
-SET o_totalprice = (
-  SELECT AVG(l_extendedprice)
+UPDATE update_ops_orders SET o_totalprice = (
+  SELECT
+    AVG(l_extendedprice)
   FROM lineitem
-  WHERE l_orderkey = update_ops_orders.o_orderkey
-),
-o_comment = 'agg_update'
-WHERE EXISTS (SELECT 1 FROM lineitem WHERE l_orderkey = update_ops_orders.o_orderkey)
-  AND o_orderkey <= (SELECT MIN(o_orderkey) + 50 FROM update_ops_orders)
+  WHERE
+    l_orderkey = update_ops_orders.o_orderkey
+), o_comment = 'agg_update'
+WHERE
+  EXISTS(
+    SELECT
+      1
+    FROM lineitem
+    WHERE
+      l_orderkey = update_ops_orders.o_orderkey
+  )
+  AND o_orderkey <= (
+    SELECT
+      MIN(o_orderkey) + 50
+    FROM update_ops_orders
+  )
 ```
 
 ## Representative DataFrame

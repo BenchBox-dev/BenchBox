@@ -15,15 +15,16 @@ Basic full-text search using string pattern matching
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Basic full-text search capabilities on text columns
+/* Basic full-text search capabilities on text columns */
 SELECT
-    p_partkey,
-    p_name,
-    p_mfgr,
-    p_comment
+  p_partkey,
+  p_name,
+  p_mfgr,
+  p_comment
 FROM part
-WHERE MATCH(p_name, p_comment) AGAINST ('STEEL COPPER' IN NATURAL LANGUAGE MODE)
-LIMIT 100;
+WHERE
+  MATCH(p_name, p_comment) AGAINST('STEEL COPPER' IN NATURAL LANGUAGE MODE)
+LIMIT 100
 ```
 
 ## Representative DataFrame

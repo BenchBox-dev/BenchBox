@@ -16,15 +16,18 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    t.region,
-    AVG(c.usage_user) as avg_cpu_user,
-    AVG(c.usage_system) as avg_cpu_system
-FROM cpu c
-JOIN tags t ON c.hostname = t.hostname
-WHERE c.time >= '2024-01-01 14:00:00'
+  t.region,
+  AVG(c.usage_user) AS avg_cpu_user,
+  AVG(c.usage_system) AS avg_cpu_system
+FROM cpu AS c
+JOIN tags AS t
+  ON c.hostname = t.hostname
+WHERE
+  c.time >= '2024-01-01 14:00:00'
   AND c.time < '2024-01-01 15:00:00'
   AND t.region = 'ap-southeast-1'
-GROUP BY t.region
+GROUP BY
+  t.region
 ```
 
 ## Representative DataFrame

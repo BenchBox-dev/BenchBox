@@ -15,7 +15,15 @@ Sort on computed expressions with DESC ordering
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Sort on computed expressions with DESC ordering */ SELECT l_orderkey, l_partkey, l_quantity * l_extendedprice AS total_value FROM lineitem ORDER BY l_quantity * l_extendedprice DESC LIMIT 100
+/* Sort on computed expressions with DESC ordering */
+SELECT
+  l_orderkey,
+  l_partkey,
+  l_quantity * l_extendedprice AS total_value
+FROM lineitem
+ORDER BY
+  l_quantity * l_extendedprice DESC
+LIMIT 100
 ```
 
 ## Representative DataFrame

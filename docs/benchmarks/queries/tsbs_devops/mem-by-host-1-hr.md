@@ -16,15 +16,17 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    hostname,
-    AVG(used_percent) as avg_used_pct,
-    MAX(used_percent) as max_used_pct,
-    MIN(available) as min_available
+  hostname,
+  AVG(used_percent) AS avg_used_pct,
+  MAX(used_percent) AS max_used_pct,
+  MIN(available) AS min_available
 FROM mem
-WHERE time >= '2024-01-02 00:00:00'
-  AND time < '2024-01-02 01:00:00'
-GROUP BY hostname
-ORDER BY avg_used_pct DESC
+WHERE
+  time >= '2024-01-02 00:00:00' AND time < '2024-01-02 01:00:00'
+GROUP BY
+  hostname
+ORDER BY
+  avg_used_pct DESC
 ```
 
 ## Representative DataFrame

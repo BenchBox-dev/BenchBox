@@ -14,65 +14,171 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    'ETL Data Quality Score Calculation' AS validation_name,
-    table_name,
-    total_records,
-    null_key_fields,
-    invalid_values,
-    constraint_violations,
-    business_rule_violations,
-    completeness_score,
-    validity_score,
-    consistency_score,
-    (completeness_score * 0.4 + validity_score * 0.3 + consistency_score * 0.3) AS overall_quality_score,
-    CASE
-        WHEN (completeness_score * 0.4 + validity_score * 0.3 + consistency_score * 0.3) >= 95.0 THEN 'EXCELLENT'
-        WHEN (completeness_score * 0.4 + validity_score * 0.3 + consistency_score * 0.3) >= 85.0 THEN 'GOOD'
-        WHEN (completeness_score * 0.4 + validity_score * 0.3 + consistency_score * 0.3) >= 75.0 THEN 'ACCEPTABLE'
-        ELSE 'POOR'
-    END AS quality_rating
+  'ETL Data Quality Score Calculation' AS validation_name,
+  table_name,
+  total_records,
+  null_key_fields,
+  invalid_values,
+  constraint_violations,
+  business_rule_violations,
+  completeness_score,
+  validity_score,
+  consistency_score,
+  (
+    completeness_score * 0.4 + validity_score * 0.3 + consistency_score * 0.3
+  ) AS overall_quality_score,
+  CASE
+    WHEN (
+      completeness_score * 0.4 + validity_score * 0.3 + consistency_score * 0.3
+    ) >= 95.0
+    THEN 'EXCELLENT'
+    WHEN (
+      completeness_score * 0.4 + validity_score * 0.3 + consistency_score * 0.3
+    ) >= 85.0
+    THEN 'GOOD'
+    WHEN (
+      completeness_score * 0.4 + validity_score * 0.3 + consistency_score * 0.3
+    ) >= 75.0
+    THEN 'ACCEPTABLE'
+    ELSE 'POOR'
+  END AS quality_rating
 FROM (
-    SELECT
-        'DimCustomer' AS table_name,
-        COUNT(*) AS total_records,
-        SUM(CASE WHEN CustomerID IS NULL OR TaxID IS NULL OR Status IS NULL THEN 1 ELSE 0 END) AS null_key_fields,
-        SUM(CASE WHEN Gender NOT IN ('M', 'F') OR Tier NOT IN (1,2,3) THEN 1 ELSE 0 END) AS invalid_values,
-        SUM(CASE WHEN CreditRating < 300 OR CreditRating > 850 THEN 1 ELSE 0 END) AS constraint_violations,
-        SUM(CASE WHEN (Tier = 1 AND NetWorth < 1000000) OR (Tier = 3 AND NetWorth > 250000) THEN 1 ELSE 0 END) AS business_rule_violations,
-        (COUNT(*) - SUM(CASE WHEN CustomerID IS NULL OR TaxID IS NULL OR Status IS NULL THEN 1 ELSE 0 END)) / COUNT(*) * 100 AS completeness_score,
-        (COUNT(*) - SUM(CASE WHEN Gender NOT IN ('M', 'F') OR Tier NOT IN (1,2,3) THEN 1 ELSE 0 END)) / COUNT(*) * 100 AS validity_score,
-        (COUNT(*) - SUM(CASE WHEN CreditRating < 300 OR CreditRating > 850 THEN 1 ELSE 0 END)
-         - SUM(CASE WHEN (Tier = 1 AND NetWorth < 1000000) OR (Tier = 3 AND NetWorth > 250000) THEN 1 ELSE 0 END)) / COUNT(*) * 100 AS consistency_score
-    FROM DimCustomer
-    WHERE IsCurrent IS TRUE
-    UNION ALL
-    SELECT
-        'DimAccount' AS table_name,
-        COUNT(*) AS total_records,
-        SUM(CASE WHEN AccountID IS NULL OR SK_CustomerID IS NULL OR Status IS NULL THEN 1 ELSE 0 END) AS null_key_fields,
-        SUM(CASE WHEN Status NOT IN ('Active', 'Inactive', 'Closed') THEN 1 ELSE 0 END) AS invalid_values,
-        SUM(CASE WHEN TaxStatus NOT IN (0, 1, 2) THEN 1 ELSE 0 END) AS constraint_violations,
-        0 AS business_rule_violations,
-        (COUNT(*) - SUM(CASE WHEN AccountID IS NULL OR SK_CustomerID IS NULL OR Status IS NULL THEN 1 ELSE 0 END)) / COUNT(*) * 100 AS completeness_score,
-        (COUNT(*) - SUM(CASE WHEN Status NOT IN ('Active', 'Inactive', 'Closed') THEN 1 ELSE 0 END)) / COUNT(*) * 100 AS validity_score,
-        (COUNT(*) - SUM(CASE WHEN TaxStatus NOT IN (0, 1, 2) THEN 1 ELSE 0 END)) / COUNT(*) * 100 AS consistency_score
-    FROM DimAccount
-    WHERE IsCurrent IS TRUE
-    UNION ALL
-    SELECT
-        'FactTrade' AS table_name,
-        COUNT(*) AS total_records,
-        SUM(CASE WHEN TradeID IS NULL OR SK_CustomerID IS NULL OR SK_SecurityID IS NULL THEN 1 ELSE 0 END) AS null_key_fields,
-        SUM(CASE WHEN Status NOT IN ('Pending', 'Completed', 'Cancelled') OR Type NOT IN ('Buy', 'Sell') THEN 1 ELSE 0 END) AS invalid_values,
-        SUM(CASE WHEN TradePrice <= 0 OR Quantity <= 0 OR Fee < 0 OR Commission < 0 THEN 1 ELSE 0 END) AS constraint_violations,
-        SUM(CASE WHEN TradePrice > 10000 OR Quantity > 1000000 THEN 1 ELSE 0 END) AS business_rule_violations,
-        (COUNT(*) - SUM(CASE WHEN TradeID IS NULL OR SK_CustomerID IS NULL OR SK_SecurityID IS NULL THEN 1 ELSE 0 END)) / COUNT(*) * 100 AS completeness_score,
-        (COUNT(*) - SUM(CASE WHEN Status NOT IN ('Pending', 'Completed', 'Cancelled') OR Type NOT IN ('Buy', 'Sell') THEN 1 ELSE 0 END)) / COUNT(*) * 100 AS validity_score,
-        (COUNT(*) - SUM(CASE WHEN TradePrice <= 0 OR Quantity <= 0 OR Fee < 0 OR Commission < 0 THEN 1 ELSE 0 END)
-         - SUM(CASE WHEN TradePrice > 10000 OR Quantity > 1000000 THEN 1 ELSE 0 END)) / COUNT(*) * 100 AS consistency_score
-    FROM FactTrade
+  SELECT
+    'DimCustomer' AS table_name,
+    COUNT(*) AS total_records,
+    SUM(
+      CASE WHEN CustomerID IS NULL OR TaxID IS NULL OR Status IS NULL THEN 1 ELSE 0 END
+    ) AS null_key_fields,
+    SUM(CASE WHEN NOT Gender IN ('M', 'F') OR NOT Tier IN (1, 2, 3) THEN 1 ELSE 0 END) AS invalid_values,
+    SUM(CASE WHEN CreditRating < 300 OR CreditRating > 850 THEN 1 ELSE 0 END) AS constraint_violations,
+    SUM(
+      CASE
+        WHEN (
+          Tier = 1 AND NetWorth < 1000000
+        ) OR (
+          Tier = 3 AND NetWorth > 250000
+        )
+        THEN 1
+        ELSE 0
+      END
+    ) AS business_rule_violations,
+    (
+      COUNT(*) - SUM(
+        CASE WHEN CustomerID IS NULL OR TaxID IS NULL OR Status IS NULL THEN 1 ELSE 0 END
+      )
+    ) / COUNT(*) * 100 AS completeness_score,
+    (
+      COUNT(*) - SUM(CASE WHEN NOT Gender IN ('M', 'F') OR NOT Tier IN (1, 2, 3) THEN 1 ELSE 0 END)
+    ) / COUNT(*) * 100 AS validity_score,
+    (
+      COUNT(*) - SUM(CASE WHEN CreditRating < 300 OR CreditRating > 850 THEN 1 ELSE 0 END) - SUM(
+        CASE
+          WHEN (
+            Tier = 1 AND NetWorth < 1000000
+          ) OR (
+            Tier = 3 AND NetWorth > 250000
+          )
+          THEN 1
+          ELSE 0
+        END
+      )
+    ) / COUNT(*) * 100 AS consistency_score
+  FROM DimCustomer
+  WHERE
+    IsCurrent IS TRUE
+  UNION ALL
+  SELECT
+    'DimAccount' AS table_name,
+    COUNT(*) AS total_records,
+    SUM(
+      CASE
+        WHEN AccountID IS NULL OR SK_CustomerID IS NULL OR Status IS NULL
+        THEN 1
+        ELSE 0
+      END
+    ) AS null_key_fields,
+    SUM(CASE WHEN NOT Status IN ('Active', 'Inactive', 'Closed') THEN 1 ELSE 0 END) AS invalid_values,
+    SUM(CASE WHEN NOT TaxStatus IN (0, 1, 2) THEN 1 ELSE 0 END) AS constraint_violations,
+    0 AS business_rule_violations,
+    (
+      COUNT(*) - SUM(
+        CASE
+          WHEN AccountID IS NULL OR SK_CustomerID IS NULL OR Status IS NULL
+          THEN 1
+          ELSE 0
+        END
+      )
+    ) / COUNT(*) * 100 AS completeness_score,
+    (
+      COUNT(*) - SUM(CASE WHEN NOT Status IN ('Active', 'Inactive', 'Closed') THEN 1 ELSE 0 END)
+    ) / COUNT(*) * 100 AS validity_score,
+    (
+      COUNT(*) - SUM(CASE WHEN NOT TaxStatus IN (0, 1, 2) THEN 1 ELSE 0 END)
+    ) / COUNT(*) * 100 AS consistency_score
+  FROM DimAccount
+  WHERE
+    IsCurrent IS TRUE
+  UNION ALL
+  SELECT
+    'FactTrade' AS table_name,
+    COUNT(*) AS total_records,
+    SUM(
+      CASE
+        WHEN TradeID IS NULL OR SK_CustomerID IS NULL OR SK_SecurityID IS NULL
+        THEN 1
+        ELSE 0
+      END
+    ) AS null_key_fields,
+    SUM(
+      CASE
+        WHEN NOT Status IN ('Pending', 'Completed', 'Cancelled')
+        OR NOT Type IN ('Buy', 'Sell')
+        THEN 1
+        ELSE 0
+      END
+    ) AS invalid_values,
+    SUM(
+      CASE
+        WHEN TradePrice <= 0 OR Quantity <= 0 OR Fee < 0 OR Commission < 0
+        THEN 1
+        ELSE 0
+      END
+    ) AS constraint_violations,
+    SUM(CASE WHEN TradePrice > 10000 OR Quantity > 1000000 THEN 1 ELSE 0 END) AS business_rule_violations,
+    (
+      COUNT(*) - SUM(
+        CASE
+          WHEN TradeID IS NULL OR SK_CustomerID IS NULL OR SK_SecurityID IS NULL
+          THEN 1
+          ELSE 0
+        END
+      )
+    ) / COUNT(*) * 100 AS completeness_score,
+    (
+      COUNT(*) - SUM(
+        CASE
+          WHEN NOT Status IN ('Pending', 'Completed', 'Cancelled')
+          OR NOT Type IN ('Buy', 'Sell')
+          THEN 1
+          ELSE 0
+        END
+      )
+    ) / COUNT(*) * 100 AS validity_score,
+    (
+      COUNT(*) - SUM(
+        CASE
+          WHEN TradePrice <= 0 OR Quantity <= 0 OR Fee < 0 OR Commission < 0
+          THEN 1
+          ELSE 0
+        END
+      ) - SUM(CASE WHEN TradePrice > 10000 OR Quantity > 1000000 THEN 1 ELSE 0 END)
+    ) / COUNT(*) * 100 AS consistency_score
+  FROM FactTrade
 ) AS quality_metrics
-ORDER BY (completeness_score * 0.4 + validity_score * 0.3 + consistency_score * 0.3) DESC
+ORDER BY
+  (
+    completeness_score * 0.4 + validity_score * 0.3 + consistency_score * 0.3
+  ) DESC
 ```
 
 ## Representative DataFrame

@@ -13,10 +13,13 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-UPDATE update_ops_orders
-SET o_totalprice = o_totalprice * 1.15,
-    o_comment = 'returning_update'
-WHERE o_orderkey = (SELECT MIN(o_orderkey) FROM update_ops_orders)
+UPDATE update_ops_orders SET o_totalprice = o_totalprice * 1.15, o_comment = 'returning_update'
+WHERE
+  o_orderkey = (
+    SELECT
+      MIN(o_orderkey)
+    FROM update_ops_orders
+  )
 RETURNING o_orderkey, o_totalprice, o_comment
 ```
 

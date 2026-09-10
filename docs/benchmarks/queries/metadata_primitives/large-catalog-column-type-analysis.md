@@ -14,13 +14,16 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    data_type,
-    COUNT(*) AS column_count,
-    COUNT(DISTINCT table_name) AS tables_with_type
+  data_type,
+  COUNT(*) AS column_count,
+  COUNT(DISTINCT table_name) AS tables_with_type
 FROM information_schema.columns
-WHERE table_name LIKE 'benchbox_catalog_%'
-GROUP BY data_type
-ORDER BY column_count DESC;
+WHERE
+  table_name LIKE 'benchbox_catalog_%'
+GROUP BY
+  data_type
+ORDER BY
+  column_count DESC
 ```
 
 ## Representative DataFrame

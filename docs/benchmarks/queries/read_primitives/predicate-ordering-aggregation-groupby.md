@@ -15,7 +15,18 @@ Order filter predicates by selectivity for aggregation within a low cardinality 
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Order filter predicates by selectivity for aggregation within a low cardinality grouping */ SELECT l_returnflag, SUM(l_quantity) AS total_qty FROM lineitem WHERE l_shipdate <= CAST('1998-09-01' AS DATE) AND l_discount > 0.05 AND l_tax < 0.08 AND l_quantity BETWEEN 10 AND 30 GROUP BY l_returnflag
+/* Order filter predicates by selectivity for aggregation within a low cardinality grouping */
+SELECT
+  l_returnflag,
+  SUM(l_quantity) AS total_qty
+FROM lineitem
+WHERE
+  l_shipdate <= CAST('1998-09-01' AS DATE)
+  AND l_discount > 0.05
+  AND l_tax < 0.08
+  AND l_quantity BETWEEN 10 AND 30
+GROUP BY
+  l_returnflag
 ```
 
 ## Representative DataFrame

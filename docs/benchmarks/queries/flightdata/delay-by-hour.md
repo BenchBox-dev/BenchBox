@@ -16,20 +16,30 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    (f.crs_dep_time / 100) AS dep_hour,
-    COUNT(*) AS total_flights,
-    ROUND(AVG(f.dep_delay), 2) AS avg_dep_delay,
-    ROUND(AVG(f.arr_delay), 2) AS avg_arr_delay,
-    SUM(CASE WHEN f.dep_delay > 15 THEN 1 ELSE 0 END) AS delayed_count,
-    ROUND(100.0 * SUM(CASE WHEN f.dep_delay > 15 THEN 1 ELSE 0 END) / COUNT(*), 2) AS delay_rate_pct
-FROM flights f
-WHERE f.cancelled = 0
-  AND f.dep_delay IS NOT NULL
-  AND f.crs_dep_time IS NOT NULL
+  (
+    f.crs_dep_time / 100
+  ) AS dep_hour,
+  COUNT(*) AS total_flights,
+  ROUND(CAST(AVG(f.dep_delay) AS DECIMAL), 2) AS avg_dep_delay,
+  ROUND(CAST(AVG(f.arr_delay) AS DECIMAL), 2) AS avg_arr_delay,
+  SUM(CASE WHEN f.dep_delay > 15 THEN 1 ELSE 0 END) AS delayed_count,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.dep_delay > 15 THEN 1 ELSE 0 END) / COUNT(*) AS DECIMAL),
+    2
+  ) AS delay_rate_pct
+FROM flights AS f
+WHERE
+  f.cancelled = 0
+  AND NOT f.dep_delay IS NULL
+  AND NOT f.crs_dep_time IS NULL
   AND f.flight_date >= '2021-08-01'
   AND f.flight_date < '2025-01-01'
-GROUP BY (f.crs_dep_time / 100)
-ORDER BY dep_hour
+GROUP BY
+  (
+    f.crs_dep_time / 100
+  )
+ORDER BY
+  dep_hour
 ```
 
 ## Representative DataFrame

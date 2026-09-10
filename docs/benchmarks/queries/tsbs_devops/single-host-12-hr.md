@@ -15,12 +15,18 @@ CPU usage for a single host over 12 hours
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT time, usage_user, usage_system, usage_idle
+SELECT
+  time,
+  usage_user,
+  usage_system,
+  usage_idle
 FROM cpu
-WHERE hostname = 'host_98'
+WHERE
+  hostname = 'host_98'
   AND time >= '2024-01-02 04:00:00'
   AND time < '2024-01-02 16:00:00'
-ORDER BY time
+ORDER BY
+  time
 ```
 
 ## Representative DataFrame

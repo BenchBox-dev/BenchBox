@@ -15,7 +15,17 @@ Order filter predicates by selectivity with result projection only
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Order filter predicates by selectivity with result projection only */ SELECT * FROM lineitem WHERE l_quantity > 45 AND l_extendedprice > 50000 AND l_discount < 0.05 AND l_shipinstruct = 'DELIVER IN PERSON' AND l_shipmode IN ('AIR', 'AIR REG') LIMIT 100
+/* Order filter predicates by selectivity with result projection only */
+SELECT
+  *
+FROM lineitem
+WHERE
+  l_quantity > 45
+  AND l_extendedprice > 50000
+  AND l_discount < 0.05
+  AND l_shipinstruct = 'DELIVER IN PERSON'
+  AND l_shipmode IN ('AIR', 'AIR REG')
+LIMIT 100
 ```
 
 ## Representative DataFrame

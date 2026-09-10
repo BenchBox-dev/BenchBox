@@ -15,7 +15,18 @@ Self-join with hash collision handling on large table
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Self-join with hash collision handling on large table */ SELECT l1.l_orderkey, COUNT(*) AS match_count FROM lineitem AS l1 JOIN lineitem AS l2 ON l1.l_partkey = l2.l_partkey WHERE l1.l_orderkey <> l2.l_orderkey AND l1.l_shipdate = l2.l_shipdate GROUP BY l1.l_orderkey LIMIT 10000
+/* Self-join with hash collision handling on large table */
+SELECT
+  l1.l_orderkey,
+  COUNT(*) AS match_count
+FROM lineitem AS l1
+JOIN lineitem AS l2
+  ON l1.l_partkey = l2.l_partkey
+WHERE
+  l1.l_orderkey <> l2.l_orderkey AND l1.l_shipdate = l2.l_shipdate
+GROUP BY
+  l1.l_orderkey
+LIMIT 10000
 ```
 
 ## Representative DataFrame

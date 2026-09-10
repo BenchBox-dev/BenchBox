@@ -14,9 +14,14 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 CREATE VIEW orders_view AS
-SELECT o_orderkey, o_custkey, o_totalprice, o_orderdate
+SELECT
+  o_orderkey,
+  o_custkey,
+  o_totalprice,
+  o_orderdate
 FROM orders
-WHERE o_orderkey <= 1000
+WHERE
+  o_orderkey <= 1000
 ```
 
 ## Representative DataFrame

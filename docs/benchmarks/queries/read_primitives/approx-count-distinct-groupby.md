@@ -15,7 +15,16 @@ HLL distinct counts per low-cardinality group (sketch on Polars/PySpark/DataFusi
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Approximate distinct counts (HLL) per low-cardinality group */ /* Companion to aggregation_distinct_groupby. Cross-dialect rewrites */ /* (ClickHouse uniq, Redshift APPROXIMATE COUNT(DISTINCT)) are handled */ /* by sqlglot. */ SELECT l_returnflag, l_linestatus, APPROX_DISTINCT(l_orderkey) AS unique_orders, APPROX_DISTINCT(l_partkey) AS unique_parts FROM lineitem GROUP BY l_returnflag, l_linestatus
+/* Approximate distinct counts (HLL) per low-cardinality group */ /* Companion to aggregation_distinct_groupby. Cross-dialect rewrites */ /* (ClickHouse uniq, Redshift APPROXIMATE COUNT(DISTINCT)) are handled */ /* by sqlglot. */
+SELECT
+  l_returnflag,
+  l_linestatus,
+  APPROX_DISTINCT(l_orderkey) AS unique_orders,
+  APPROX_DISTINCT(l_partkey) AS unique_parts
+FROM lineitem
+GROUP BY
+  l_returnflag,
+  l_linestatus
 ```
 
 ## Representative DataFrame

@@ -14,11 +14,12 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    COUNT(*) AS total_columns,
-    COUNT(DISTINCT table_name) AS total_tables,
-    CAST(COUNT(*) AS FLOAT) / NULLIF(COUNT(DISTINCT table_name), 0) AS avg_columns_per_table
+  COUNT(*) AS total_columns,
+  COUNT(DISTINCT table_name) AS total_tables,
+  CAST(COUNT(*) AS DOUBLE PRECISION) / NULLIF(COUNT(DISTINCT table_name), 0) AS avg_columns_per_table
 FROM information_schema.columns
-WHERE table_name LIKE 'benchbox_catalog_%';
+WHERE
+  table_name LIKE 'benchbox_catalog_%'
 ```
 
 ## Representative DataFrame

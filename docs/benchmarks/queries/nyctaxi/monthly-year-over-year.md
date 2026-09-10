@@ -16,16 +16,20 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    EXTRACT(YEAR FROM pickup_datetime) as year,
-    EXTRACT(MONTH FROM pickup_datetime) as month,
-    COUNT(*) as trip_count,
-    SUM(total_amount) as total_revenue,
-    AVG(total_amount) as avg_fare
+  EXTRACT(YEAR FROM pickup_datetime) AS year,
+  EXTRACT(MONTH FROM pickup_datetime) AS month,
+  COUNT(*) AS trip_count,
+  SUM(total_amount) AS total_revenue,
+  AVG(total_amount) AS avg_fare
 FROM trips
-WHERE pickup_datetime >= '2019-01-01'
-  AND pickup_datetime < '2020-12-31'
-GROUP BY EXTRACT(YEAR FROM pickup_datetime), EXTRACT(MONTH FROM pickup_datetime)
-ORDER BY year, month
+WHERE
+  pickup_datetime >= '2019-01-01' AND pickup_datetime < '2020-12-31'
+GROUP BY
+  EXTRACT(YEAR FROM pickup_datetime),
+  EXTRACT(MONTH FROM pickup_datetime)
+ORDER BY
+  year,
+  month
 ```
 
 ## Representative DataFrame

@@ -13,7 +13,114 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Data Transformation Validation' AS validation_name, transformation_type, source_records, target_records, transformation_success_rate, data_quality_score, CASE WHEN transformation_success_rate >= 95.0 AND data_quality_score >= 90.0 THEN 'PASS' WHEN transformation_success_rate >= 95.0 THEN 'QUALITY ISSUES' ELSE 'TRANSFORMATION FAILURE' END AS transformation_status FROM (SELECT 'Customer Demographics' AS transformation_type, (SELECT COUNT(*) FROM (/* Simulated source data count */ SELECT COUNT(*) AS source_count FROM DimCustomer WHERE BatchID = 1)) AS source_records, COUNT(*) AS target_records, COUNT(*) / (SELECT COUNT(*) FROM DimCustomer WHERE BatchID = 1) * 100 AS transformation_success_rate, 100 - (SUM(CASE WHEN CustomerID IS NULL OR TaxID IS NULL OR Status IS NULL THEN 1 ELSE 0 END) / COUNT(*) * 100) AS data_quality_score FROM DimCustomer WHERE BatchID = 1 UNION ALL SELECT 'Account Information' AS transformation_type, (SELECT COUNT(*) FROM DimAccount WHERE BatchID = 1) AS source_records, COUNT(*) AS target_records, 100.0 AS transformation_success_rate /* Assume 100% transformation success */, 100 - (SUM(CASE WHEN AccountID IS NULL OR SK_CustomerID IS NULL THEN 1 ELSE 0 END) / COUNT(*) * 100) AS data_quality_score FROM DimAccount WHERE BatchID = 1 UNION ALL SELECT 'Trade Transactions' AS transformation_type, (SELECT COUNT(*) FROM FactTrade WHERE BatchID = 1) AS source_records, COUNT(*) AS target_records, 100.0 AS transformation_success_rate, 100 - (SUM(CASE WHEN TradeID IS NULL OR SK_CustomerID IS NULL OR TradePrice <= 0 THEN 1 ELSE 0 END) / COUNT(*) * 100) AS data_quality_score FROM FactTrade WHERE BatchID = 1 UNION ALL SELECT 'Market History Data' AS transformation_type, (SELECT COUNT(*) FROM FactMarketHistory WHERE BatchID = 1) AS source_records, COUNT(*) AS target_records, 100.0 AS transformation_success_rate, 100 - (SUM(CASE WHEN SK_SecurityID IS NULL OR ClosePrice <= 0 OR Volume < 0 THEN 1 ELSE 0 END) / COUNT(*) * 100) AS data_quality_score FROM FactMarketHistory WHERE BatchID = 1) AS transformation_metrics
+SELECT
+  'Data Transformation Validation' AS validation_name,
+  transformation_type,
+  source_records,
+  target_records,
+  transformation_success_rate,
+  data_quality_score,
+  CASE
+    WHEN transformation_success_rate >= 95.0 AND data_quality_score >= 90.0
+    THEN 'PASS'
+    WHEN transformation_success_rate >= 95.0
+    THEN 'QUALITY ISSUES'
+    ELSE 'TRANSFORMATION FAILURE'
+  END AS transformation_status
+FROM (
+  SELECT
+    'Customer Demographics' AS transformation_type,
+    (
+      SELECT
+        COUNT(*)
+      FROM (
+        /* Simulated source data count */
+        SELECT
+          COUNT(*) AS source_count
+        FROM DimCustomer
+        WHERE
+          BatchID = 1
+      )
+    ) AS source_records,
+    COUNT(*) AS target_records,
+    COUNT(*) / (
+      SELECT
+        COUNT(*)
+      FROM DimCustomer
+      WHERE
+        BatchID = 1
+    ) * 100 AS transformation_success_rate,
+    100 - (
+      SUM(
+        CASE WHEN CustomerID IS NULL OR TaxID IS NULL OR Status IS NULL THEN 1 ELSE 0 END
+      ) / COUNT(*) * 100
+    ) AS data_quality_score
+  FROM DimCustomer
+  WHERE
+    BatchID = 1
+  UNION ALL
+  SELECT
+    'Account Information' AS transformation_type,
+    (
+      SELECT
+        COUNT(*)
+      FROM DimAccount
+      WHERE
+        BatchID = 1
+    ) AS source_records,
+    COUNT(*) AS target_records,
+    100.0 AS transformation_success_rate, /* Assume 100% transformation success */
+    100 - (
+      SUM(CASE WHEN AccountID IS NULL OR SK_CustomerID IS NULL THEN 1 ELSE 0 END) / COUNT(*) * 100
+    ) AS data_quality_score
+  FROM DimAccount
+  WHERE
+    BatchID = 1
+  UNION ALL
+  SELECT
+    'Trade Transactions' AS transformation_type,
+    (
+      SELECT
+        COUNT(*)
+      FROM FactTrade
+      WHERE
+        BatchID = 1
+    ) AS source_records,
+    COUNT(*) AS target_records,
+    100.0 AS transformation_success_rate,
+    100 - (
+      SUM(
+        CASE
+          WHEN TradeID IS NULL OR SK_CustomerID IS NULL OR TradePrice <= 0
+          THEN 1
+          ELSE 0
+        END
+      ) / COUNT(*) * 100
+    ) AS data_quality_score
+  FROM FactTrade
+  WHERE
+    BatchID = 1
+  UNION ALL
+  SELECT
+    'Market History Data' AS transformation_type,
+    (
+      SELECT
+        COUNT(*)
+      FROM FactMarketHistory
+      WHERE
+        BatchID = 1
+    ) AS source_records,
+    COUNT(*) AS target_records,
+    100.0 AS transformation_success_rate,
+    100 - (
+      SUM(
+        CASE WHEN SK_SecurityID IS NULL OR ClosePrice <= 0 OR Volume < 0 THEN 1 ELSE 0 END
+      ) / COUNT(*) * 100
+    ) AS data_quality_score
+  FROM FactMarketHistory
+  WHERE
+    BatchID = 1
+) AS transformation_metrics
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,12 @@ HLL distinct count on a high-cardinality key (sketch on Polars/PySpark/DataFusio
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Approximate distinct count (HLL) on a high-cardinality key */ /* Companion to aggregation_distinct; tests one-shot approx-distinct latency. */ /* Cross-dialect rewrites are handled by sqlglot: */ /*   ClickHouse: uniq(o_custkey) */ /*   Redshift:   APPROXIMATE COUNT(DISTINCT o_custkey) */ SELECT APPROX_DISTINCT(o_custkey) AS unique_customers FROM orders WHERE o_orderdate >= CAST('1995-01-01' AS DATE)
+/* Approximate distinct count (HLL) on a high-cardinality key */ /* Companion to aggregation_distinct; tests one-shot approx-distinct latency. */ /* Cross-dialect rewrites are handled by sqlglot: */ /*   ClickHouse: uniq(o_custkey) */ /*   Redshift:   APPROXIMATE COUNT(DISTINCT o_custkey) */
+SELECT
+  APPROX_DISTINCT(o_custkey) AS unique_customers
+FROM orders
+WHERE
+  o_orderdate >= CAST('1995-01-01' AS DATE)
 ```
 
 ## Representative DataFrame

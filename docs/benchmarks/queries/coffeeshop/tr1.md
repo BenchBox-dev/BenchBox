@@ -15,7 +15,22 @@ Quarterly revenue and order growth using FLOOR quarter calculation
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT EXTRACT(YEAR FROM ol.order_date) AS year, FLOOR((EXTRACT(MONTH FROM ol.order_date) - 1) / 3) + 1 AS quarter, COUNT(DISTINCT ol.order_id) AS orders, SUM(ol.total_price) AS revenue FROM order_lines AS ol WHERE EXTRACT(YEAR FROM ol.order_date) BETWEEN 2023 AND 2024 GROUP BY year, quarter ORDER BY year, quarter
+SELECT
+  EXTRACT(YEAR FROM ol.order_date) AS year,
+  FLOOR((
+    EXTRACT(MONTH FROM ol.order_date) - 1
+  ) / 3) + 1 AS quarter,
+  COUNT(DISTINCT ol.order_id) AS orders,
+  SUM(ol.total_price) AS revenue
+FROM order_lines AS ol
+WHERE
+  EXTRACT(YEAR FROM ol.order_date) BETWEEN 2023 AND 2024
+GROUP BY
+  year,
+  quarter
+ORDER BY
+  year,
+  quarter
 ```
 
 ## Representative DataFrame

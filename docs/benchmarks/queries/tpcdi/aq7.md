@@ -13,7 +13,106 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Customer Lifecycle and Retention Analysis' AS analysis_name, customer_tenure_months, customer_count, avg_trades_per_customer, avg_trade_value_per_customer, avg_fees_per_customer, retention_rate_pct, avg_portfolio_value, avg_cash_balance FROM (SELECT CASE WHEN months_since_first_trade <= 6 THEN '0-6 months' WHEN months_since_first_trade <= 12 THEN '7-12 months' WHEN months_since_first_trade <= 24 THEN '1-2 years' WHEN months_since_first_trade <= 36 THEN '2-3 years' ELSE '3+ years' END AS customer_tenure_months, COUNT(DISTINCT c.SK_CustomerID) AS customer_count, AVG(customer_metrics.total_trades) AS avg_trades_per_customer, AVG(customer_metrics.total_trade_value) AS avg_trade_value_per_customer, AVG(customer_metrics.total_fees) AS avg_fees_per_customer, SUM(CASE WHEN customer_metrics.recent_activity = 1 THEN 1 ELSE 0 END) / COUNT(*) * 100 AS retention_rate_pct, AVG(customer_metrics.portfolio_value) AS avg_portfolio_value, AVG(customer_metrics.cash_balance) AS avg_cash_balance FROM DimCustomer AS c JOIN (SELECT c.SK_CustomerID, MIN(d.DateValue) AS first_trade_date, MAX(d.DateValue) AS last_trade_date, (CURRENT_DATE - MIN(d.DateValue)) AS days_since_first_trade, ((CURRENT_DATE - MIN(d.DateValue))) / 30.44 AS months_since_first_trade, COUNT(t.TradeID) AS total_trades, SUM(t.Quantity * t.TradePrice) AS total_trade_value, SUM(t.Fee + t.Commission + t.Tax) AS total_fees, CASE WHEN MAX(d.DateValue) >= (CURRENT_DATE - INTERVAL '90 DAYS') THEN 1 ELSE 0 END AS recent_activity, COALESCE(SUM(h.CurrentHolding * h.CurrentPrice), 0) AS portfolio_value, COALESCE(SUM(cb.Cash), 0) AS cash_balance FROM DimCustomer AS c LEFT JOIN FactTrade AS t ON c.SK_CustomerID = t.SK_CustomerID LEFT JOIN DimDate AS d ON t.SK_CreateDateID = d.SK_DateID LEFT JOIN FactHoldings AS h ON c.SK_CustomerID = h.SK_CustomerID LEFT JOIN FactCashBalances AS cb ON c.SK_CustomerID = cb.SK_CustomerID WHERE c.IsCurrent IS TRUE AND t.Status = 'Completed' GROUP BY c.SK_CustomerID HAVING COUNT(t.TradeID) > 0) AS customer_metrics ON c.SK_CustomerID = customer_metrics.SK_CustomerID WHERE c.IsCurrent IS TRUE GROUP BY CASE WHEN customer_metrics.months_since_first_trade <= 6 THEN '0-6 months' WHEN customer_metrics.months_since_first_trade <= 12 THEN '7-12 months' WHEN customer_metrics.months_since_first_trade <= 24 THEN '1-2 years' WHEN customer_metrics.months_since_first_trade <= 36 THEN '2-3 years' ELSE '3+ years' END) AS tenure_analysis ORDER BY CASE customer_tenure_months WHEN '0-6 months' THEN 1 WHEN '7-12 months' THEN 2 WHEN '1-2 years' THEN 3 WHEN '2-3 years' THEN 4 ELSE 5 END
+SELECT
+  'Customer Lifecycle and Retention Analysis' AS analysis_name,
+  customer_tenure_months,
+  customer_count,
+  avg_trades_per_customer,
+  avg_trade_value_per_customer,
+  avg_fees_per_customer,
+  retention_rate_pct,
+  avg_portfolio_value,
+  avg_cash_balance
+FROM (
+  SELECT
+    CASE
+      WHEN months_since_first_trade <= 6
+      THEN '0-6 months'
+      WHEN months_since_first_trade <= 12
+      THEN '7-12 months'
+      WHEN months_since_first_trade <= 24
+      THEN '1-2 years'
+      WHEN months_since_first_trade <= 36
+      THEN '2-3 years'
+      ELSE '3+ years'
+    END AS customer_tenure_months,
+    COUNT(DISTINCT c.SK_CustomerID) AS customer_count,
+    AVG(customer_metrics.total_trades) AS avg_trades_per_customer,
+    AVG(customer_metrics.total_trade_value) AS avg_trade_value_per_customer,
+    AVG(customer_metrics.total_fees) AS avg_fees_per_customer,
+    SUM(CASE WHEN customer_metrics.recent_activity = 1 THEN 1 ELSE 0 END) / COUNT(*) * 100 AS retention_rate_pct,
+    AVG(customer_metrics.portfolio_value) AS avg_portfolio_value,
+    AVG(customer_metrics.cash_balance) AS avg_cash_balance
+  FROM DimCustomer AS c
+  JOIN (
+    SELECT
+      c.SK_CustomerID,
+      MIN(d.DateValue) AS first_trade_date,
+      MAX(d.DateValue) AS last_trade_date,
+      (
+        CURRENT_DATE - MIN(d.DateValue)
+      ) AS days_since_first_trade,
+      (
+        (
+          CURRENT_DATE - MIN(d.DateValue)
+        )
+      ) / 30.44 AS months_since_first_trade,
+      COUNT(t.TradeID) AS total_trades,
+      SUM(t.Quantity * t.TradePrice) AS total_trade_value,
+      SUM(t.Fee + t.Commission + t.Tax) AS total_fees,
+      CASE
+        WHEN MAX(d.DateValue) >= (
+          CURRENT_DATE - INTERVAL '90 DAYS'
+        )
+        THEN 1
+        ELSE 0
+      END AS recent_activity,
+      COALESCE(SUM(h.CurrentHolding * h.CurrentPrice), 0) AS portfolio_value,
+      COALESCE(SUM(cb.Cash), 0) AS cash_balance
+    FROM DimCustomer AS c
+    LEFT JOIN FactTrade AS t
+      ON c.SK_CustomerID = t.SK_CustomerID
+    LEFT JOIN DimDate AS d
+      ON t.SK_CreateDateID = d.SK_DateID
+    LEFT JOIN FactHoldings AS h
+      ON c.SK_CustomerID = h.SK_CustomerID
+    LEFT JOIN FactCashBalances AS cb
+      ON c.SK_CustomerID = cb.SK_CustomerID
+    WHERE
+      c.IsCurrent IS TRUE AND t.Status = 'Completed'
+    GROUP BY
+      c.SK_CustomerID
+    HAVING
+      COUNT(t.TradeID) > 0
+  ) AS customer_metrics
+    ON c.SK_CustomerID = customer_metrics.SK_CustomerID
+  WHERE
+    c.IsCurrent IS TRUE
+  GROUP BY
+    CASE
+      WHEN customer_metrics.months_since_first_trade <= 6
+      THEN '0-6 months'
+      WHEN customer_metrics.months_since_first_trade <= 12
+      THEN '7-12 months'
+      WHEN customer_metrics.months_since_first_trade <= 24
+      THEN '1-2 years'
+      WHEN customer_metrics.months_since_first_trade <= 36
+      THEN '2-3 years'
+      ELSE '3+ years'
+    END
+) AS tenure_analysis
+ORDER BY
+  CASE customer_tenure_months
+    WHEN '0-6 months'
+    THEN 1
+    WHEN '7-12 months'
+    THEN 2
+    WHEN '1-2 years'
+    THEN 3
+    WHEN '2-3 years'
+    THEN 4
+    ELSE 5
+  END
 ```
 
 ## Representative DataFrame

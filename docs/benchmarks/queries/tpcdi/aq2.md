@@ -13,7 +13,56 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Security Performance Analysis' AS analysis_name, s.Symbol, s.Name AS security_name, comp.Name AS company_name, comp.Industry, comp.SPrating, COUNT(t.TradeID) AS total_trades, SUM(t.Quantity) AS total_volume, AVG(t.TradePrice) AS avg_trade_price, MIN(t.TradePrice) AS min_trade_price, MAX(t.TradePrice) AS max_trade_price, (MAX(t.TradePrice) - MIN(t.TradePrice)) / MIN(t.TradePrice) * 100 AS price_volatility_pct, SUM(t.Quantity * t.TradePrice) AS total_market_value, AVG(mh.ClosePrice) AS avg_market_close, AVG(mh.Volume) AS avg_daily_volume, AVG(mh.PERatio) AS avg_pe_ratio, AVG(mh.Yield) AS avg_dividend_yield, MAX(mh.FiftyTwoWeekHigh) AS week52_high, MIN(mh.FiftyTwoWeekLow) AS week52_low FROM DimSecurity AS s JOIN DimCompany AS comp ON s.SK_CompanyID = comp.SK_CompanyID LEFT JOIN FactTrade AS t ON s.SK_SecurityID = t.SK_SecurityID LEFT JOIN FactMarketHistory AS mh ON s.SK_SecurityID = mh.SK_SecurityID LEFT JOIN DimDate AS d ON t.SK_CreateDateID = d.SK_DateID WHERE s.IsCurrent IS TRUE AND comp.IsCurrent IS TRUE AND (d.CalendarYearID >= 2015 AND d.CalendarYearID <= 2019) AND t.Status = 'Completed' GROUP BY s.Symbol, s.Name, comp.Name, comp.Industry, comp.SPrating HAVING COUNT(t.TradeID) > 10 ORDER BY total_market_value DESC, price_volatility_pct DESC LIMIT 50
+SELECT
+  'Security Performance Analysis' AS analysis_name,
+  s.Symbol,
+  s.Name AS security_name,
+  comp.Name AS company_name,
+  comp.Industry,
+  comp.SPrating,
+  COUNT(t.TradeID) AS total_trades,
+  SUM(t.Quantity) AS total_volume,
+  AVG(t.TradePrice) AS avg_trade_price,
+  MIN(t.TradePrice) AS min_trade_price,
+  MAX(t.TradePrice) AS max_trade_price,
+  (
+    MAX(t.TradePrice) - MIN(t.TradePrice)
+  ) / MIN(t.TradePrice) * 100 AS price_volatility_pct,
+  SUM(t.Quantity * t.TradePrice) AS total_market_value,
+  AVG(mh.ClosePrice) AS avg_market_close,
+  AVG(mh.Volume) AS avg_daily_volume,
+  AVG(mh.PERatio) AS avg_pe_ratio,
+  AVG(mh.Yield) AS avg_dividend_yield,
+  MAX(mh.FiftyTwoWeekHigh) AS week52_high,
+  MIN(mh.FiftyTwoWeekLow) AS week52_low
+FROM DimSecurity AS s
+JOIN DimCompany AS comp
+  ON s.SK_CompanyID = comp.SK_CompanyID
+LEFT JOIN FactTrade AS t
+  ON s.SK_SecurityID = t.SK_SecurityID
+LEFT JOIN FactMarketHistory AS mh
+  ON s.SK_SecurityID = mh.SK_SecurityID
+LEFT JOIN DimDate AS d
+  ON t.SK_CreateDateID = d.SK_DateID
+WHERE
+  s.IsCurrent IS TRUE
+  AND comp.IsCurrent IS TRUE
+  AND (
+    d.CalendarYearID >= 2015 AND d.CalendarYearID <= 2019
+  )
+  AND t.Status = 'Completed'
+GROUP BY
+  s.Symbol,
+  s.Name,
+  comp.Name,
+  comp.Industry,
+  comp.SPrating
+HAVING
+  COUNT(t.TradeID) > 10
+ORDER BY
+  total_market_value DESC,
+  price_volatility_pct DESC
+LIMIT 50
 ```
 
 ## Representative DataFrame

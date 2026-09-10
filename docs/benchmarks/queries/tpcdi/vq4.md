@@ -13,7 +13,126 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'SCD Type 2 Current Record Validation' AS validation_name, table_name, total_records, current_records, multiple_current_per_business_key, CASE WHEN multiple_current_per_business_key = 0 THEN 'PASS' ELSE 'FAIL' END AS status FROM (SELECT 'DimCustomer' AS table_name, COUNT(*) AS total_records, SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records, (SELECT COUNT(*) FROM (SELECT CustomerID, COUNT(*) AS current_count FROM DimCustomer WHERE IsCurrent IS TRUE GROUP BY CustomerID HAVING COUNT(*) > 1) AS violations) AS multiple_current_per_business_key FROM DimCustomer UNION ALL SELECT 'DimAccount' AS table_name, COUNT(*) AS total_records, SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records, (SELECT COUNT(*) FROM (SELECT AccountID, COUNT(*) AS current_count FROM DimAccount WHERE IsCurrent IS TRUE GROUP BY AccountID HAVING COUNT(*) > 1) AS violations) AS multiple_current_per_business_key FROM DimAccount UNION ALL SELECT 'DimSecurity' AS table_name, COUNT(*) AS total_records, SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records, (SELECT COUNT(*) FROM (SELECT Symbol, COUNT(*) AS current_count FROM DimSecurity WHERE IsCurrent IS TRUE GROUP BY Symbol HAVING COUNT(*) > 1) AS violations) AS multiple_current_per_business_key FROM DimSecurity UNION ALL SELECT 'DimCompany' AS table_name, COUNT(*) AS total_records, SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records, (SELECT COUNT(*) FROM (SELECT CompanyID, COUNT(*) AS current_count FROM DimCompany WHERE IsCurrent IS TRUE GROUP BY CompanyID HAVING COUNT(*) > 1) AS violations) AS multiple_current_per_business_key FROM DimCompany UNION ALL SELECT 'DimBroker' AS table_name, COUNT(*) AS total_records, SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records, (SELECT COUNT(*) FROM (SELECT BrokerID, COUNT(*) AS current_count FROM DimBroker WHERE IsCurrent IS TRUE GROUP BY BrokerID HAVING COUNT(*) > 1) AS violations) AS multiple_current_per_business_key FROM DimBroker) AS scd_validation ORDER BY table_name
+SELECT
+  'SCD Type 2 Current Record Validation' AS validation_name,
+  table_name,
+  total_records,
+  current_records,
+  multiple_current_per_business_key,
+  CASE WHEN multiple_current_per_business_key = 0 THEN 'PASS' ELSE 'FAIL' END AS status
+FROM (
+  SELECT
+    'DimCustomer' AS table_name,
+    COUNT(*) AS total_records,
+    SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records,
+    (
+      SELECT
+        COUNT(*)
+      FROM (
+        SELECT
+          CustomerID,
+          COUNT(*) AS current_count
+        FROM DimCustomer
+        WHERE
+          IsCurrent IS TRUE
+        GROUP BY
+          CustomerID
+        HAVING
+          COUNT(*) > 1
+      ) AS violations
+    ) AS multiple_current_per_business_key
+  FROM DimCustomer
+  UNION ALL
+  SELECT
+    'DimAccount' AS table_name,
+    COUNT(*) AS total_records,
+    SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records,
+    (
+      SELECT
+        COUNT(*)
+      FROM (
+        SELECT
+          AccountID,
+          COUNT(*) AS current_count
+        FROM DimAccount
+        WHERE
+          IsCurrent IS TRUE
+        GROUP BY
+          AccountID
+        HAVING
+          COUNT(*) > 1
+      ) AS violations
+    ) AS multiple_current_per_business_key
+  FROM DimAccount
+  UNION ALL
+  SELECT
+    'DimSecurity' AS table_name,
+    COUNT(*) AS total_records,
+    SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records,
+    (
+      SELECT
+        COUNT(*)
+      FROM (
+        SELECT
+          Symbol,
+          COUNT(*) AS current_count
+        FROM DimSecurity
+        WHERE
+          IsCurrent IS TRUE
+        GROUP BY
+          Symbol
+        HAVING
+          COUNT(*) > 1
+      ) AS violations
+    ) AS multiple_current_per_business_key
+  FROM DimSecurity
+  UNION ALL
+  SELECT
+    'DimCompany' AS table_name,
+    COUNT(*) AS total_records,
+    SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records,
+    (
+      SELECT
+        COUNT(*)
+      FROM (
+        SELECT
+          CompanyID,
+          COUNT(*) AS current_count
+        FROM DimCompany
+        WHERE
+          IsCurrent IS TRUE
+        GROUP BY
+          CompanyID
+        HAVING
+          COUNT(*) > 1
+      ) AS violations
+    ) AS multiple_current_per_business_key
+  FROM DimCompany
+  UNION ALL
+  SELECT
+    'DimBroker' AS table_name,
+    COUNT(*) AS total_records,
+    SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records,
+    (
+      SELECT
+        COUNT(*)
+      FROM (
+        SELECT
+          BrokerID,
+          COUNT(*) AS current_count
+        FROM DimBroker
+        WHERE
+          IsCurrent IS TRUE
+        GROUP BY
+          BrokerID
+        HAVING
+          COUNT(*) > 1
+      ) AS violations
+    ) AS multiple_current_per_business_key
+  FROM DimBroker
+) AS scd_validation
+ORDER BY
+  table_name
 ```
 
 ## Representative DataFrame

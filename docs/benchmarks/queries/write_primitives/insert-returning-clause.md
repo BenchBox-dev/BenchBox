@@ -14,9 +14,25 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 INSERT INTO insert_ops_lineitem
-VALUES (9000500, 1, 1, 1, 10.0, 1000.0, 0.05, 0.02, 'N', 'O',
-        DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20',
-        'DELIVER IN PERSON', 'TRUCK', 'returning_test')
+VALUES
+  (
+    9000500,
+    1,
+    1,
+    1,
+    10.0,
+    1000.0,
+    0.05,
+    0.02,
+    'N',
+    'O',
+    CAST('1998-01-01' AS DATE),
+    CAST('1998-01-15' AS DATE),
+    CAST('1998-01-20' AS DATE),
+    'DELIVER IN PERSON',
+    'TRUCK',
+    'returning_test'
+  )
 RETURNING l_orderkey, l_partkey, l_quantity
 ```
 

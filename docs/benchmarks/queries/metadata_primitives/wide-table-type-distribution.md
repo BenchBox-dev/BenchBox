@@ -14,14 +14,19 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_name,
-    data_type,
-    COUNT(*) AS type_count,
-    COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (PARTITION BY table_name) AS percentage
+  table_name,
+  data_type,
+  COUNT(*) AS type_count,
+  COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (PARTITION BY table_name) AS percentage
 FROM information_schema.columns
-WHERE table_name LIKE 'benchbox_wide_%'
-GROUP BY table_name, data_type
-ORDER BY table_name, type_count DESC;
+WHERE
+  table_name LIKE 'benchbox_wide_%'
+GROUP BY
+  table_name,
+  data_type
+ORDER BY
+  table_name,
+  type_count DESC
 ```
 
 ## Representative DataFrame

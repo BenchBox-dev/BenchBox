@@ -13,8 +13,12 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-CREATE TABLE test_idx_existing AS SELECT * FROM orders WHERE o_orderkey <= 100;
-CREATE INDEX idx_existing_price ON test_idx_existing(o_totalprice)
+CREATE TABLE test_idx_existing AS
+SELECT
+  *
+FROM orders
+WHERE
+  o_orderkey <= 100
 ```
 
 ## Representative DataFrame

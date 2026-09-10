@@ -15,7 +15,15 @@ High selectivity filter - few rows match
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Selective compound filter on lineitem */ SELECT l_orderkey, l_partkey, l_quantity, l_extendedprice FROM lineitem WHERE l_quantity > 45 AND l_extendedprice > 50000 AND l_discount < 0.05
+/* Selective compound filter on lineitem */
+SELECT
+  l_orderkey,
+  l_partkey,
+  l_quantity,
+  l_extendedprice
+FROM lineitem
+WHERE
+  l_quantity > 45 AND l_extendedprice > 50000 AND l_discount < 0.05
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,32 @@ CUBE operation for multidimensional analysis
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* CUBE operation for multidimensional analysis */ SELECT n.n_name AS nation, r.r_name AS region, EXTRACT(YEAR FROM o.o_orderdate) AS order_year, EXTRACT(QUARTER FROM o.o_orderdate) AS order_quarter, COUNT(*) AS order_count, SUM(o.o_totalprice) AS total_revenue, AVG(o.o_totalprice) AS avg_order_value FROM orders AS o JOIN customer AS c ON o.o_custkey = c.c_custkey JOIN nation AS n ON c.c_nationkey = n.n_nationkey JOIN region AS r ON n.n_regionkey = r.r_regionkey WHERE o.o_orderdate >= CAST('1995-01-01' AS DATE) AND o.o_orderdate < CAST('1997-01-01' AS DATE) GROUP BY CUBE (n.n_name, r.r_name, EXTRACT(YEAR FROM o.o_orderdate), EXTRACT(QUARTER FROM o.o_orderdate))
+/* CUBE operation for multidimensional analysis */
+SELECT
+  n.n_name AS nation,
+  r.r_name AS region,
+  EXTRACT(YEAR FROM o.o_orderdate) AS order_year,
+  EXTRACT(QUARTER FROM o.o_orderdate) AS order_quarter,
+  COUNT(*) AS order_count,
+  SUM(o.o_totalprice) AS total_revenue,
+  AVG(o.o_totalprice) AS avg_order_value
+FROM orders AS o
+JOIN customer AS c
+  ON o.o_custkey = c.c_custkey
+JOIN nation AS n
+  ON c.c_nationkey = n.n_nationkey
+JOIN region AS r
+  ON n.n_regionkey = r.r_regionkey
+WHERE
+  o.o_orderdate >= CAST('1995-01-01' AS DATE)
+  AND o.o_orderdate < CAST('1997-01-01' AS DATE)
+GROUP BY
+  CUBE (
+    n.n_name,
+    r.r_name,
+    EXTRACT(YEAR FROM o.o_orderdate),
+    EXTRACT(QUARTER FROM o.o_orderdate)
+  )
 ```
 
 ## Representative DataFrame

@@ -15,15 +15,16 @@ Extract from JSON with complex path expressions
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Extract from JSON with complex path expressions
+/* Extract from JSON with complex path expressions */
 SELECT
-    c_custkey,
-    JSON_EXTRACT(c_comment, '$.profile.segment') as customer_segment,
-    JSON_EXTRACT(c_comment, '$.profile.preferences[0]') as primary_preference,
-    JSON_EXTRACT(c_comment, '$.history.last_order.date') as last_order_date
+  c_custkey,
+  JSON_EXTRACT(c_comment, '$.profile.segment') AS customer_segment,
+  JSON_EXTRACT(c_comment, '$.profile.preferences[0]') AS primary_preference,
+  JSON_EXTRACT(c_comment, '$.history.last_order.date') AS last_order_date
 FROM customer
-WHERE JSON_VALID(c_comment)
-LIMIT 500;
+WHERE
+  JSON_VALID(c_comment)
+LIMIT 500
 ```
 
 ## Representative DataFrame

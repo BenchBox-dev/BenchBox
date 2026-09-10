@@ -16,15 +16,18 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    hostname,
-    device,
-    SUM(reads_completed) as total_reads,
-    SUM(writes_completed) as total_writes
+  hostname,
+  device,
+  SUM(reads_completed) AS total_reads,
+  SUM(writes_completed) AS total_writes
 FROM disk
-WHERE time >= '2024-01-02 09:00:00'
-  AND time < '2024-01-02 10:00:00'
-GROUP BY hostname, device
-ORDER BY total_writes DESC
+WHERE
+  time >= '2024-01-02 09:00:00' AND time < '2024-01-02 10:00:00'
+GROUP BY
+  hostname,
+  device
+ORDER BY
+  total_writes DESC
 ```
 
 ## Representative DataFrame

@@ -15,14 +15,15 @@ Any value with additional aggregates
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Any value with additional aggregates
+/* Any value with additional aggregates */
 SELECT
-    n_regionkey,
-    ANY_VALUE(n_name) as sample_nation,
-    ANY_VALUE(n_comment) as sample_comment,
-    COUNT(*) as nation_count
+  n_regionkey,
+  ANY_VALUE(n_name) AS sample_nation,
+  ANY_VALUE(n_comment) AS sample_comment,
+  COUNT(*) AS nation_count
 FROM nation
-GROUP BY n_regionkey;
+GROUP BY
+  n_regionkey
 ```
 
 ## Representative DataFrame

@@ -15,22 +15,17 @@ Canonical JoinOrder SQL query 7b; generated DataFrame translation
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
-SELECT MIN(n.name) AS of_person,
-       MIN(t.title) AS biography_movie
-FROM aka_name AS an,
-     cast_info AS ci,
-     info_type AS it,
-     link_type AS lt,
-     movie_link AS ml,
-     name AS n,
-     person_info AS pi,
-     title AS t
-WHERE an.name LIKE '%a%'
-  AND it.info ='mini biography'
-  AND lt.link ='features'
+SELECT
+  MIN(n.name) AS of_person,
+  MIN(t.title) AS biography_movie
+FROM aka_name AS an, cast_info AS ci, info_type AS it, link_type AS lt, movie_link AS ml, name AS n, person_info AS pi, title AS t
+WHERE
+  an.name LIKE '%a%'
+  AND it.info = 'mini biography'
+  AND lt.link = 'features'
   AND n.name_pcode_cf LIKE 'D%'
-  AND n.gender='m'
-  AND pi.note ='Volker Boehm'
+  AND n.gender = 'm'
+  AND pi.note = 'Volker Boehm'
   AND t.production_year BETWEEN 1980 AND 1984
   AND n.id = an.person_id
   AND n.id = pi.person_id
@@ -42,7 +37,7 @@ WHERE an.name LIKE '%a%'
   AND pi.person_id = an.person_id
   AND pi.person_id = ci.person_id
   AND an.person_id = ci.person_id
-  AND ci.movie_id = ml.linked_movie_id;
+  AND ci.movie_id = ml.linked_movie_id
 ```
 
 ## Representative DataFrame

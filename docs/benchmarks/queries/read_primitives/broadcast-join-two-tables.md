@@ -15,7 +15,12 @@ One small table broadcast to join with one large table
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* One small table broadcast to join with one large table. Hint is optional. */ /* + BROADCAST(n) */ SELECT COUNT(*) AS supplier_count FROM supplier AS s JOIN nation AS n ON s.s_nationkey = n.n_nationkey
+/* One small table broadcast to join with one large table. Hint is optional. */ /* + BROADCAST(n) */
+SELECT
+  COUNT(*) AS supplier_count
+FROM supplier AS s
+JOIN nation AS n
+  ON s.s_nationkey = n.n_nationkey
 ```
 
 ## Representative DataFrame

@@ -14,10 +14,11 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    schema_name,
-    catalog_name
+  schema_name,
+  catalog_name
 FROM information_schema.schemata
-ORDER BY schema_name;
+ORDER BY
+  schema_name
 ```
 
 ## Representative DataFrame

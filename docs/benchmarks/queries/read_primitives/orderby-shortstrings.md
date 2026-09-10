@@ -15,7 +15,14 @@ Sort on short string columns with DISTINCT operation
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Sort on short string columns with DISTINCT operation */ SELECT DISTINCT l_returnflag, l_linestatus FROM lineitem ORDER BY l_returnflag, l_linestatus
+/* Sort on short string columns with DISTINCT operation */
+SELECT DISTINCT
+  l_returnflag,
+  l_linestatus
+FROM lineitem
+ORDER BY
+  l_returnflag,
+  l_linestatus
 ```
 
 ## Representative DataFrame

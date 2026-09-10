@@ -16,19 +16,28 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    (f.crs_dep_time / 100) AS hour_of_day,
-    COUNT(*) AS total_flights,
-    ROUND(AVG(CASE WHEN f.cancelled = 0 THEN f.dep_delay END), 2) AS avg_dep_delay,
-    ROUND(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay END), 2) AS avg_arr_delay,
-    SUM(CASE WHEN f.dep_delay > 60 THEN 1 ELSE 0 END) AS severely_delayed,
-    ROUND(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END)
-        / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0), 2) AS ontime_pct
-FROM flights f
-WHERE f.crs_dep_time IS NOT NULL
+  (
+    f.crs_dep_time / 100
+  ) AS hour_of_day,
+  COUNT(*) AS total_flights,
+  ROUND(CAST(AVG(CASE WHEN f.cancelled = 0 THEN f.dep_delay END) AS DECIMAL), 2) AS avg_dep_delay,
+  ROUND(CAST(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay END) AS DECIMAL), 2) AS avg_arr_delay,
+  SUM(CASE WHEN f.dep_delay > 60 THEN 1 ELSE 0 END) AS severely_delayed,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0) AS DECIMAL),
+    2
+  ) AS ontime_pct
+FROM flights AS f
+WHERE
+  NOT f.crs_dep_time IS NULL
   AND f.flight_date >= '2021-08-01'
   AND f.flight_date < '2025-01-01'
-GROUP BY (f.crs_dep_time / 100)
-ORDER BY hour_of_day
+GROUP BY
+  (
+    f.crs_dep_time / 100
+  )
+ORDER BY
+  hour_of_day
 ```
 
 ## Representative DataFrame

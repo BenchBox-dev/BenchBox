@@ -13,7 +13,23 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Trade Price Reasonableness Validation' AS validation_name, COUNT(*) AS total_trades, SUM(CASE WHEN TradePrice <= 0 THEN 1 ELSE 0 END) AS negative_or_zero_prices, SUM(CASE WHEN TradePrice > 10000.0 THEN 1 ELSE 0 END) AS extremely_high_prices, SUM(CASE WHEN Fee < 0 OR Commission < 0 OR Tax < 0 THEN 1 ELSE 0 END) AS negative_fees, MIN(TradePrice) AS min_trade_price, MAX(TradePrice) AS max_trade_price, AVG(TradePrice) AS avg_trade_price, CASE WHEN (SUM(CASE WHEN TradePrice <= 0 THEN 1 ELSE 0 END) + SUM(CASE WHEN TradePrice > 10000.0 THEN 1 ELSE 0 END) + SUM(CASE WHEN Fee < 0 OR Commission < 0 OR Tax < 0 THEN 1 ELSE 0 END)) = 0 THEN 'PASS' ELSE 'FAIL' END AS status FROM FactTrade
+SELECT
+  'Trade Price Reasonableness Validation' AS validation_name,
+  COUNT(*) AS total_trades,
+  SUM(CASE WHEN TradePrice <= 0 THEN 1 ELSE 0 END) AS negative_or_zero_prices,
+  SUM(CASE WHEN TradePrice > 10000.0 THEN 1 ELSE 0 END) AS extremely_high_prices,
+  SUM(CASE WHEN Fee < 0 OR Commission < 0 OR Tax < 0 THEN 1 ELSE 0 END) AS negative_fees,
+  MIN(TradePrice) AS min_trade_price,
+  MAX(TradePrice) AS max_trade_price,
+  AVG(TradePrice) AS avg_trade_price,
+  CASE
+    WHEN (
+      SUM(CASE WHEN TradePrice <= 0 THEN 1 ELSE 0 END) + SUM(CASE WHEN TradePrice > 10000.0 THEN 1 ELSE 0 END) + SUM(CASE WHEN Fee < 0 OR Commission < 0 OR Tax < 0 THEN 1 ELSE 0 END)
+    ) = 0
+    THEN 'PASS'
+    ELSE 'FAIL'
+  END AS status
+FROM FactTrade
 ```
 
 ## Representative DataFrame

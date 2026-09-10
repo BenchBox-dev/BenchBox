@@ -14,13 +14,16 @@ Rendered in the benchmark's native SQL with default parameters (no dialect trans
 
 ```sql
 SELECT
-    table_schema,
-    table_name,
-    constraint_name,
-    constraint_type
+  table_schema,
+  table_name,
+  constraint_name,
+  constraint_type
 FROM information_schema.table_constraints
-WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-ORDER BY table_name, constraint_type;
+WHERE
+  NOT table_schema IN ('information_schema', 'pg_catalog')
+ORDER BY
+  table_name,
+  constraint_type
 ```
 
 ## Representative DataFrame

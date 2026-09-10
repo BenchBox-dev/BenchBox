@@ -15,14 +15,25 @@ Window function RANK() OVER (PARTITION BY ... ORDER BY ...)
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT l_orderkey, l_returnflag, l_quantity, qty_rank
+SELECT
+  l_orderkey,
+  l_returnflag,
+  l_quantity,
+  qty_rank
 FROM (
-    SELECT l_orderkey, l_returnflag, l_quantity,
-           RANK() OVER (PARTITION BY l_returnflag ORDER BY l_quantity DESC) as qty_rank
-    FROM lineitem
-) ranked
-WHERE qty_rank <= 5
-ORDER BY l_returnflag, qty_rank, l_orderkey;
+  SELECT
+    l_orderkey,
+    l_returnflag,
+    l_quantity,
+    RANK() OVER (PARTITION BY l_returnflag ORDER BY l_quantity DESC) AS qty_rank
+  FROM lineitem
+) AS ranked
+WHERE
+  qty_rank <= 5
+ORDER BY
+  l_returnflag,
+  qty_rank,
+  l_orderkey
 ```
 
 ## Representative DataFrame

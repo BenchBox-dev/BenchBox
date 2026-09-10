@@ -13,11 +13,24 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-INSERT INTO insert_ops_orders_summary (o_orderkey, o_custkey, o_orderdate, o_totalprice, customer_name)
-SELECT o.o_orderkey, o.o_custkey, o.o_orderdate, o.o_totalprice, c.c_name
-FROM orders o
-JOIN customer c ON o.o_custkey = c.c_custkey
-WHERE o.o_orderkey BETWEEN 1 AND 100
+INSERT INTO insert_ops_orders_summary (
+  o_orderkey,
+  o_custkey,
+  o_orderdate,
+  o_totalprice,
+  customer_name
+)
+SELECT
+  o.o_orderkey,
+  o.o_custkey,
+  o.o_orderdate,
+  o.o_totalprice,
+  c.c_name
+FROM orders AS o
+JOIN customer AS c
+  ON o.o_custkey = c.c_custkey
+WHERE
+  o.o_orderkey BETWEEN 1 AND 100
 ```
 
 ## Representative DataFrame

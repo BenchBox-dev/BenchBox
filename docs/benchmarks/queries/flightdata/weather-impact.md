@@ -16,18 +16,22 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    f.month,
-    COUNT(*) AS total_flights,
-    SUM(CASE WHEN f.weather_delay > 0 THEN 1 ELSE 0 END) AS weather_delayed,
-    ROUND(100.0 * SUM(CASE WHEN f.weather_delay > 0 THEN 1 ELSE 0 END) / COUNT(*), 2) AS weather_delay_rate_pct,
-    ROUND(AVG(CASE WHEN f.weather_delay > 0 THEN f.weather_delay END), 2) AS avg_weather_delay_min,
-    ROUND(SUM(COALESCE(f.weather_delay, 0)), 0) AS total_weather_minutes
-FROM flights f
-WHERE f.cancelled = 0
-  AND f.flight_date >= '2021-08-01'
-  AND f.flight_date < '2025-01-01'
-GROUP BY f.month
-ORDER BY f.month
+  f.month,
+  COUNT(*) AS total_flights,
+  SUM(CASE WHEN f.weather_delay > 0 THEN 1 ELSE 0 END) AS weather_delayed,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.weather_delay > 0 THEN 1 ELSE 0 END) / COUNT(*) AS DECIMAL),
+    2
+  ) AS weather_delay_rate_pct,
+  ROUND(CAST(AVG(CASE WHEN f.weather_delay > 0 THEN f.weather_delay END) AS DECIMAL), 2) AS avg_weather_delay_min,
+  ROUND(SUM(COALESCE(f.weather_delay, 0)), 0) AS total_weather_minutes
+FROM flights AS f
+WHERE
+  f.cancelled = 0 AND f.flight_date >= '2021-08-01' AND f.flight_date < '2025-01-01'
+GROUP BY
+  f.month
+ORDER BY
+  f.month
 ```
 
 ## Representative DataFrame

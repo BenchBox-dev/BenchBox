@@ -14,10 +14,12 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 DELETE FROM delete_ops_orders
-WHERE o_orderkey > (
-  SELECT CAST(MAX(o_orderkey) * 0.9 AS INTEGER)
-  FROM delete_ops_orders
-)
+WHERE
+  o_orderkey > (
+    SELECT
+      CAST(MAX(o_orderkey) * 0.9 AS INT)
+    FROM delete_ops_orders
+  )
 ```
 
 ## Representative DataFrame

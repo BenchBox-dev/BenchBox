@@ -15,7 +15,36 @@ Test union optimization with multiple scans
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Test union/set operation optimization */ /* Good optimizers should optimize UNION ALL operations and eliminate redundant sorting */ SELECT c_name, c_mktsegment, 'high_value' AS customer_type, c_acctbal FROM customer WHERE c_acctbal > 8000 AND c_nationkey IN (1, 2, 3) UNION ALL SELECT c_name, c_mktsegment, 'medium_value' AS customer_type, c_acctbal FROM customer WHERE c_acctbal BETWEEN 4000 AND 8000 AND c_nationkey IN (1, 2, 3) UNION ALL SELECT c_name, c_mktsegment, 'low_value' AS customer_type, c_acctbal FROM customer WHERE c_acctbal BETWEEN 1000 AND 4000 AND c_nationkey IN (1, 2, 3) ORDER BY c_acctbal DESC LIMIT 300
+/* Test union/set operation optimization */ /* Good optimizers should optimize UNION ALL operations and eliminate redundant sorting */
+SELECT
+  c_name,
+  c_mktsegment,
+  'high_value' AS customer_type,
+  c_acctbal
+FROM customer
+WHERE
+  c_acctbal > 8000 AND c_nationkey IN (1, 2, 3)
+UNION ALL
+SELECT
+  c_name,
+  c_mktsegment,
+  'medium_value' AS customer_type,
+  c_acctbal
+FROM customer
+WHERE
+  c_acctbal BETWEEN 4000 AND 8000 AND c_nationkey IN (1, 2, 3)
+UNION ALL
+SELECT
+  c_name,
+  c_mktsegment,
+  'low_value' AS customer_type,
+  c_acctbal
+FROM customer
+WHERE
+  c_acctbal BETWEEN 1000 AND 4000 AND c_nationkey IN (1, 2, 3)
+ORDER BY
+  c_acctbal DESC
+LIMIT 300
 ```
 
 ## Representative DataFrame

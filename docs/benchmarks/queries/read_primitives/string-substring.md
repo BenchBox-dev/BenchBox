@@ -15,7 +15,12 @@ String substring extraction
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Substring extraction */ SELECT c_custkey, SUBSTRING(c_phone FROM 1 FOR 3) AS country_code FROM customer LIMIT 100
+/* Substring extraction */
+SELECT
+  c_custkey,
+  SUBSTRING(c_phone FROM 1 FOR 3) AS country_code
+FROM customer
+LIMIT 100
 ```
 
 ## Representative DataFrame

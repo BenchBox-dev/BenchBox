@@ -14,7 +14,23 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    'Market Maker and Liquidity Analysis' AS analysis_name,
+  'Market Maker and Liquidity Analysis' AS analysis_name,
+  Symbol,
+  security_name,
+  market_makers,
+  total_sell_orders,
+  total_buy_orders,
+  avg_sell_price,
+  avg_buy_price,
+  bid_ask_spread,
+  bid_ask_spread / avg_trade_price * 100 AS bid_ask_spread_pct,
+  total_volume,
+  avg_daily_volume,
+  market_share_of_volume,
+  price_volatility,
+  price_volatility / avg_trade_price * 100 AS coefficient_of_variation
+FROM (
+  SELECT
     Symbol,
     security_name,
     market_makers,
@@ -22,72 +38,64 @@ SELECT
     total_buy_orders,
     avg_sell_price,
     avg_buy_price,
-    bid_ask_spread,
-    bid_ask_spread / avg_trade_price * 100 AS bid_ask_spread_pct,
+    avg_sell_price - avg_buy_price AS bid_ask_spread,
+    avg_trade_price,
     total_volume,
     avg_daily_volume,
-    market_share_of_volume,
-    price_volatility,
-    price_volatility / avg_trade_price * 100 AS coefficient_of_variation
-FROM (
+    total_volume / avg_daily_volume AS market_share_of_volume,
+    price_volatility
+  FROM (
     SELECT
-        Symbol,
-        security_name,
-        market_makers,
-        total_sell_orders,
-        total_buy_orders,
-        avg_sell_price,
-        avg_buy_price,
-        avg_sell_price - avg_buy_price AS bid_ask_spread,
-        avg_trade_price,
-        total_volume,
-        avg_daily_volume,
-        total_volume / avg_daily_volume AS market_share_of_volume,
-        price_volatility
+      trade_rows.Symbol,
+      trade_rows.Name AS security_name,
+      COUNT(*) AS total_trades,
+      COUNT(DISTINCT trade_rows.SK_BrokerID) AS market_makers,
+      SUM(trade_rows.sell_order) AS total_sell_orders,
+      SUM(trade_rows.buy_order) AS total_buy_orders,
+      AVG(trade_rows.sell_price) AS avg_sell_price,
+      AVG(trade_rows.buy_price) AS avg_buy_price,
+      AVG(trade_rows.TradePrice) AS avg_trade_price,
+      SUM(trade_rows.Quantity) AS total_volume,
+      AVG(trade_rows.Volume) AS avg_daily_volume,
+      STDDEV(trade_rows.TradePrice) AS price_volatility
     FROM (
-        SELECT
-            trade_rows.Symbol,
-            trade_rows.Name AS security_name,
-            COUNT(*) AS total_trades,
-            COUNT(DISTINCT trade_rows.SK_BrokerID) AS market_makers,
-            SUM(trade_rows.sell_order) AS total_sell_orders,
-            SUM(trade_rows.buy_order) AS total_buy_orders,
-            AVG(trade_rows.sell_price) AS avg_sell_price,
-            AVG(trade_rows.buy_price) AS avg_buy_price,
-            AVG(trade_rows.TradePrice) AS avg_trade_price,
-            SUM(trade_rows.Quantity) AS total_volume,
-            AVG(trade_rows.Volume) AS avg_daily_volume,
-            STDDEV(trade_rows.TradePrice) AS price_volatility
-        FROM (
-            SELECT
-                s.Symbol,
-                s.Name,
-                t.SK_BrokerID,
-                t.TradePrice,
-                t.Quantity,
-                mh.Volume,
-                CASE WHEN tt.TT_IS_SELL IS TRUE THEN 1 ELSE 0 END AS sell_order,
-                CASE WHEN tt.TT_IS_SELL IS FALSE THEN 1 ELSE 0 END AS buy_order,
-                CASE WHEN tt.TT_IS_SELL IS TRUE THEN t.TradePrice END AS sell_price,
-                CASE WHEN tt.TT_IS_SELL IS FALSE THEN t.TradePrice END AS buy_price
-            FROM DimSecurity s
-            JOIN FactTrade t ON s.SK_SecurityID = t.SK_SecurityID
-            JOIN TradeType tt ON t.Type = tt.TT_ID
-            JOIN FactMarketHistory mh ON s.SK_SecurityID = mh.SK_SecurityID
-            JOIN DimDate d ON t.SK_CreateDateID = d.SK_DateID
-            WHERE s.IsCurrent IS TRUE
-              AND t.Status = 'Completed'
-              AND d.CalendarYearID >= 2015
-              AND d.CalendarYearID <= 2019
-        ) trade_rows
-        GROUP BY trade_rows.Symbol, trade_rows.Name
-    ) metrics
-    WHERE total_trades > 10
-      AND total_sell_orders > 0
-      AND total_buy_orders > 0
-) derived_metrics
-ORDER BY market_share_of_volume DESC, bid_ask_spread_pct ASC
-LIMIT 50;
+      SELECT
+        s.Symbol,
+        s.Name,
+        t.SK_BrokerID,
+        t.TradePrice,
+        t.Quantity,
+        mh.Volume,
+        CASE WHEN tt.TT_IS_SELL IS TRUE THEN 1 ELSE 0 END AS sell_order,
+        CASE WHEN tt.TT_IS_SELL IS FALSE THEN 1 ELSE 0 END AS buy_order,
+        CASE WHEN tt.TT_IS_SELL IS TRUE THEN t.TradePrice END AS sell_price,
+        CASE WHEN tt.TT_IS_SELL IS FALSE THEN t.TradePrice END AS buy_price
+      FROM DimSecurity AS s
+      JOIN FactTrade AS t
+        ON s.SK_SecurityID = t.SK_SecurityID
+      JOIN TradeType AS tt
+        ON t.Type = tt.TT_ID
+      JOIN FactMarketHistory AS mh
+        ON s.SK_SecurityID = mh.SK_SecurityID
+      JOIN DimDate AS d
+        ON t.SK_CreateDateID = d.SK_DateID
+      WHERE
+        s.IsCurrent IS TRUE
+        AND t.Status = 'Completed'
+        AND d.CalendarYearID >= 2015
+        AND d.CalendarYearID <= 2019
+    ) AS trade_rows
+    GROUP BY
+      trade_rows.Symbol,
+      trade_rows.Name
+  ) AS metrics
+  WHERE
+    total_trades > 10 AND total_sell_orders > 0 AND total_buy_orders > 0
+) AS derived_metrics
+ORDER BY
+  market_share_of_volume DESC,
+  bid_ask_spread_pct ASC
+LIMIT 50
 ```
 
 ## Representative DataFrame

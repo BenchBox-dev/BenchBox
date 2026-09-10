@@ -15,21 +15,23 @@ ASOF join to find closest prior order for shipments
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- ASOF join: find closest prior order for each lineitem shipment
+/* ASOF join: find closest prior order for each lineitem shipment */
 SELECT
-    l.l_orderkey,
-    l.l_shipdate,
-    o.o_orderdate,
-    o.o_totalprice,
-    l.l_shipdate - o.o_orderdate as days_to_ship
-FROM lineitem l
-ASOF JOIN orders o
-    ON l.l_orderkey = o.o_orderkey
-    AND l.l_shipdate >= o.o_orderdate
-WHERE l.l_shipdate >= DATE '1995-01-01'
-  AND l.l_shipdate < DATE '1995-02-01'
-ORDER BY l.l_orderkey, l.l_shipdate
-LIMIT 100;
+  l.l_orderkey,
+  l.l_shipdate,
+  o.o_orderdate,
+  o.o_totalprice,
+  l.l_shipdate - o.o_orderdate AS days_to_ship
+FROM lineitem AS l
+ASOF JOIN orders AS o
+  ON l.l_orderkey = o.o_orderkey AND l.l_shipdate >= o.o_orderdate
+WHERE
+  l.l_shipdate >= CAST('1995-01-01' AS DATE)
+  AND l.l_shipdate < CAST('1995-02-01' AS DATE)
+ORDER BY
+  l.l_orderkey,
+  l.l_shipdate
+LIMIT 100
 ```
 
 ## Representative DataFrame

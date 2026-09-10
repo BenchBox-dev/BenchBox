@@ -15,7 +15,12 @@ IN-list predicate with highly selective integer values
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* IN-list predicate with highly selective integer values */ SELECT * FROM orders WHERE o_orderkey IN (1, 100, 1000, 10000, 100000)
+/* IN-list predicate with highly selective integer values */
+SELECT
+  *
+FROM orders
+WHERE
+  o_orderkey IN (1, 100, 1000, 10000, 100000)
 ```
 
 ## Representative DataFrame

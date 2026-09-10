@@ -13,11 +13,20 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-INSERT INTO insert_ops_orders_summary (o_custkey, o_totalprice, order_count)
-SELECT o_custkey, SUM(o_totalprice), COUNT(*)
+INSERT INTO insert_ops_orders_summary (
+  o_custkey,
+  o_totalprice,
+  order_count
+)
+SELECT
+  o_custkey,
+  SUM(o_totalprice),
+  COUNT(*)
 FROM orders
-WHERE o_orderkey <= 1000
-GROUP BY o_custkey
+WHERE
+  o_orderkey <= 1000
+GROUP BY
+  o_custkey
 ```
 
 ## Representative DataFrame

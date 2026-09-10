@@ -15,17 +15,21 @@ Rendered for **DataFusion** with default parameters.
 ```sql
 MERGE INTO merge_ops_summary_target AS target
 USING (
-  SELECT o_custkey, SUM(o_totalprice) AS total_price, COUNT(*) AS order_count
+  SELECT
+    o_custkey,
+    SUM(o_totalprice) AS total_price,
+    COUNT(*) AS order_count
   FROM orders
-  WHERE o_orderkey <= 500
-  GROUP BY o_custkey
+  WHERE
+    o_orderkey <= 500
+  GROUP BY
+    o_custkey
 ) AS source
 ON target.o_custkey = source.o_custkey
-WHEN MATCHED THEN
-  UPDATE SET o_totalprice = source.total_price,
-             order_count = source.order_count
-WHEN NOT MATCHED THEN
-  INSERT VALUES (NULL, source.o_custkey, NULL, source.total_price, NULL, source.order_count)
+WHEN MATCHED THEN UPDATE SET
+  o_totalprice = source.total_price,
+  order_count = source.order_count
+WHEN NOT MATCHED THEN INSERT VALUES (NULL, source.o_custkey, NULL, source.total_price, NULL, source.order_count)
 ```
 
 ## Representative DataFrame

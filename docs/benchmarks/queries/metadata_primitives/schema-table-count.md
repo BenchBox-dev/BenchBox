@@ -13,9 +13,11 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT COUNT(*) AS table_count
+SELECT
+  COUNT(*) AS table_count
 FROM information_schema.tables
-WHERE table_schema NOT IN ('information_schema', 'pg_catalog');
+WHERE
+  NOT table_schema IN ('information_schema', 'pg_catalog')
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,19 @@ Aggregates over the partition key
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Aggregates over the partition key */ SELECT l_shipdate, l_shipmode, SUM(l_quantity) AS daily_quantity, COUNT(*) AS shipment_count FROM lineitem WHERE l_shipdate >= CAST('1995-01-01' AS DATE) AND l_shipdate < CAST('1996-01-01' AS DATE) GROUP BY l_shipdate, l_shipmode
+/* Aggregates over the partition key */
+SELECT
+  l_shipdate,
+  l_shipmode,
+  SUM(l_quantity) AS daily_quantity,
+  COUNT(*) AS shipment_count
+FROM lineitem
+WHERE
+  l_shipdate >= CAST('1995-01-01' AS DATE)
+  AND l_shipdate < CAST('1996-01-01' AS DATE)
+GROUP BY
+  l_shipdate,
+  l_shipmode
 ```
 
 ## Representative DataFrame

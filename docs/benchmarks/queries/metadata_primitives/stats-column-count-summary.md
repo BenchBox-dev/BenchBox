@@ -14,11 +14,12 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    COUNT(DISTINCT table_name) AS total_tables,
-    COUNT(*) AS total_columns,
-    CAST(COUNT(*) AS FLOAT) / COUNT(DISTINCT table_name) AS avg_columns_per_table
+  COUNT(DISTINCT table_name) AS total_tables,
+  COUNT(*) AS total_columns,
+  CAST(COUNT(*) AS DOUBLE PRECISION) / COUNT(DISTINCT table_name) AS avg_columns_per_table
 FROM information_schema.columns
-WHERE table_schema NOT IN ('information_schema', 'pg_catalog');
+WHERE
+  NOT table_schema IN ('information_schema', 'pg_catalog')
 ```
 
 ## Representative DataFrame

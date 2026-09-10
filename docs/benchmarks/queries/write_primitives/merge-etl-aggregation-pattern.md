@@ -17,20 +17,32 @@ MERGE INTO merge_ops_target AS target
 USING (
   SELECT
     l_orderkey,
-    SUM(l_extendedprice * (1 - l_discount)) as computed_revenue,
-    MAX(l_shipdate) as latest_ship_date,
-    COUNT(*) as line_count
+    SUM(l_extendedprice * (
+      1 - l_discount
+    )) AS computed_revenue,
+    MAX(l_shipdate) AS latest_ship_date,
+    COUNT(*) AS line_count
   FROM lineitem
-  WHERE l_orderkey BETWEEN 1 AND 1000
-  GROUP BY l_orderkey
+  WHERE
+    l_orderkey BETWEEN 1 AND 1000
+  GROUP BY
+    l_orderkey
 ) AS source
 ON target.o_orderkey = source.l_orderkey
-WHEN MATCHED THEN
-  UPDATE SET
-    o_totalprice = target.o_totalprice + source.computed_revenue,
-    o_comment = 'etl_agg_lines_' || CAST(source.line_count AS VARCHAR)
-WHEN NOT MATCHED THEN
-  INSERT VALUES (source.l_orderkey, 1, 'O', source.computed_revenue, DATE '1998-01-01', '1-URGENT', 'Clerk#000000001', 0, 'etl_new')
+WHEN MATCHED THEN UPDATE SET
+  o_totalprice = target.o_totalprice + source.computed_revenue,
+  o_comment = 'etl_agg_lines_' || CAST(source.line_count AS VARCHAR)
+WHEN NOT MATCHED THEN INSERT VALUES (
+  source.l_orderkey,
+  1,
+  'O',
+  source.computed_revenue,
+  CAST('1998-01-01' AS DATE),
+  '1-URGENT',
+  'Clerk#000000001',
+  0,
+  'etl_new'
+)
 ```
 
 ## Representative DataFrame

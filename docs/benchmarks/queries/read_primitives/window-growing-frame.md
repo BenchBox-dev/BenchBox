@@ -15,7 +15,19 @@ Running sum window aggregation with growing frame size
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Running sum window aggregation with growing frame size */ SELECT l_orderkey, l_linenumber, l_quantity, SUM(l_quantity) OVER (PARTITION BY l_orderkey ORDER BY l_linenumber ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_quantity FROM lineitem WHERE l_orderkey <= 1000
+/* Running sum window aggregation with growing frame size */
+SELECT
+  l_orderkey,
+  l_linenumber,
+  l_quantity,
+  SUM(l_quantity) OVER (
+    PARTITION BY l_orderkey
+    ORDER BY l_linenumber
+    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+  ) AS running_quantity
+FROM lineitem
+WHERE
+  l_orderkey <= 1000
 ```
 
 ## Representative DataFrame

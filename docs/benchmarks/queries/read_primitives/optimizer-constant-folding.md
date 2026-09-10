@@ -15,7 +15,36 @@ Test constant folding at compile time
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Test constant folding and expression simplification optimization */ /* Good optimizers should pre-compute constants and simplify expressions at compile time */ SELECT l_orderkey, l_partkey, l_suppkey, l_linenumber, l_quantity * (1.0 + 0.0) AS simplified_qty /* Should fold to l_quantity */, l_extendedprice * (2 * 3 + 4) AS constant_folded /* Should fold to l_extendedprice * 10 */, l_discount + 0.0 - 0.0 AS zero_folded /* Should fold to l_discount */, CASE WHEN 1 = 1 THEN l_tax ELSE 0 END AS condition_folded /* Should fold to l_tax */, l_quantity / 1.0 AS division_folded /* Should fold to l_quantity */, l_extendedprice + (5 - 5) AS addition_folded /* Should fold to l_extendedprice */ FROM lineitem WHERE l_quantity * 1 > 10 /* Should simplify to l_quantity > 10 */ AND l_shipdate >= CAST('1995-01-01' AS DATE) AND l_discount + 0 < 0.1 /* Should simplify to l_discount < 0.1 */ ORDER BY l_quantity * (1 + 0) DESC, l_orderkey, l_linenumber /* Should simplify to l_quantity DESC */ LIMIT 1000
+/* Test constant folding and expression simplification optimization */ /* Good optimizers should pre-compute constants and simplify expressions at compile time */
+SELECT
+  l_orderkey,
+  l_partkey,
+  l_suppkey,
+  l_linenumber,
+  l_quantity * (
+    1.0 + 0.0
+  ) AS simplified_qty, /* Should fold to l_quantity */
+  l_extendedprice * (
+    2 * 3 + 4
+  ) AS constant_folded, /* Should fold to l_extendedprice * 10 */
+  l_discount + 0.0 - 0.0 AS zero_folded, /* Should fold to l_discount */
+  CASE WHEN 1 = 1 THEN l_tax ELSE 0 END AS condition_folded, /* Should fold to l_tax */
+  l_quantity / 1.0 AS division_folded, /* Should fold to l_quantity */
+  l_extendedprice + (
+    5 - 5
+  ) AS addition_folded /* Should fold to l_extendedprice */
+FROM lineitem
+WHERE
+  l_quantity * 1 > 10 /* Should simplify to l_quantity > 10 */
+  AND l_shipdate >= CAST('1995-01-01' AS DATE)
+  AND l_discount + 0 < 0.1 /* Should simplify to l_discount < 0.1 */
+ORDER BY
+  l_quantity * (
+    1 + 0
+  ) DESC,
+  l_orderkey,
+  l_linenumber /* Should simplify to l_quantity DESC */
+LIMIT 1000
 ```
 
 ## Representative DataFrame

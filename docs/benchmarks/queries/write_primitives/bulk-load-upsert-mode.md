@@ -15,19 +15,20 @@ Rendered for **DataFusion** with default parameters.
 ```sql
 MERGE INTO bulk_load_ops_target AS target
 USING (
-  SELECT * FROM read_csv_auto('{file_path}/csv_upsert_data.csv')
+  SELECT
+    *
+  FROM READ_CSV_AUTO('{file_path}/csv_upsert_data.csv')
 ) AS source
 ON target.o_orderkey = source.o_orderkey
-WHEN MATCHED THEN
-  UPDATE SET
-    o_custkey = source.o_custkey,
-    o_orderstatus = source.o_orderstatus,
-    o_totalprice = source.o_totalprice,
-    o_orderdate = source.o_orderdate,
-    o_orderpriority = source.o_orderpriority,
-    o_clerk = source.o_clerk,
-    o_shippriority = source.o_shippriority,
-    o_comment = source.o_comment
+WHEN MATCHED THEN UPDATE SET
+  o_custkey = source.o_custkey,
+  o_orderstatus = source.o_orderstatus,
+  o_totalprice = source.o_totalprice,
+  o_orderdate = source.o_orderdate,
+  o_orderpriority = source.o_orderpriority,
+  o_clerk = source.o_clerk,
+  o_shippriority = source.o_shippriority,
+  o_comment = source.o_comment
 WHEN NOT MATCHED THEN INSERT
 ```
 

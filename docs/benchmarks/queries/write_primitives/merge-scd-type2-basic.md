@@ -13,26 +13,24 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-UPDATE scd2_ops_dim_customer
-SET is_current = false,
-    valid_to = (SELECT MIN(s.effective_ts) FROM scd2_ops_stage_customer s
-                WHERE s.c_custkey = scd2_ops_dim_customer.c_custkey AND s.change_type = 'changed')
-WHERE scd2_ops_dim_customer.is_current = true
-  AND EXISTS (SELECT 1 FROM scd2_ops_stage_customer s
-              WHERE s.c_custkey = scd2_ops_dim_customer.c_custkey
-                AND s.change_type = 'changed'
-                AND s.row_hash <> scd2_ops_dim_customer.row_hash);
-INSERT INTO scd2_ops_dim_customer
-SELECT (SELECT MAX(sk) FROM scd2_ops_dim_customer) + ROW_NUMBER() OVER (ORDER BY s.c_custkey),
-       s.c_custkey, s.c_name, s.c_address, s.c_acctbal, s.c_mktsegment, s.row_hash,
-       true, s.effective_ts, DATE '9999-12-31'
-FROM scd2_ops_stage_customer s
-WHERE (s.change_type = 'new'
-       OR (s.change_type = 'changed'
-           AND EXISTS (SELECT 1 FROM scd2_ops_dim_customer d
-                       WHERE d.c_custkey = s.c_custkey AND d.is_current = false AND d.valid_to = s.effective_ts)))
-  AND NOT EXISTS (SELECT 1 FROM scd2_ops_dim_customer d2
-                  WHERE d2.c_custkey = s.c_custkey AND d2.is_current = true)
+UPDATE scd2_ops_dim_customer SET is_current = FALSE, valid_to = (
+  SELECT
+    MIN(s.effective_ts)
+  FROM scd2_ops_stage_customer AS s
+  WHERE
+    s.c_custkey = scd2_ops_dim_customer.c_custkey AND s.change_type = 'changed'
+)
+WHERE
+  scd2_ops_dim_customer.is_current = TRUE
+  AND EXISTS(
+    SELECT
+      1
+    FROM scd2_ops_stage_customer AS s
+    WHERE
+      s.c_custkey = scd2_ops_dim_customer.c_custkey
+      AND s.change_type = 'changed'
+      AND s.row_hash <> scd2_ops_dim_customer.row_hash
+  )
 ```
 
 ## Representative DataFrame

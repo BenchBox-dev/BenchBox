@@ -16,21 +16,26 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    f.origin,
-    ap.name AS airport_name,
-    ap.city,
-    ap.state,
-    COUNT(DISTINCT f.dest) AS unique_destinations,
-    COUNT(DISTINCT f.reporting_airline) AS serving_carriers,
-    COUNT(*) AS total_departures,
-    ROUND(AVG(f.dep_delay), 2) AS avg_dep_delay
-FROM flights f
-LEFT JOIN airports ap ON f.origin = ap.code
-WHERE f.cancelled = 0
-  AND f.flight_date >= '2021-08-01'
-  AND f.flight_date < '2025-01-01'
-GROUP BY f.origin, ap.name, ap.city, ap.state
-ORDER BY total_departures DESC
+  f.origin,
+  ap.name AS airport_name,
+  ap.city,
+  ap.state,
+  COUNT(DISTINCT f.dest) AS unique_destinations,
+  COUNT(DISTINCT f.reporting_airline) AS serving_carriers,
+  COUNT(*) AS total_departures,
+  ROUND(CAST(AVG(f.dep_delay) AS DECIMAL), 2) AS avg_dep_delay
+FROM flights AS f
+LEFT JOIN airports AS ap
+  ON f.origin = ap.code
+WHERE
+  f.cancelled = 0 AND f.flight_date >= '2021-08-01' AND f.flight_date < '2025-01-01'
+GROUP BY
+  f.origin,
+  ap.name,
+  ap.city,
+  ap.state
+ORDER BY
+  total_departures DESC
 LIMIT 30
 ```
 

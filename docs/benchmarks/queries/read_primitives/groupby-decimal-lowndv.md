@@ -15,7 +15,14 @@ GROUP BY with low cardinality decimal column
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* GROUP BY with low cardinality decimal column */ SELECT l_discount, COUNT(*) AS discount_frequency, AVG(l_quantity) AS avg_qty FROM lineitem GROUP BY l_discount
+/* GROUP BY with low cardinality decimal column */
+SELECT
+  l_discount,
+  COUNT(*) AS discount_frequency,
+  AVG(l_quantity) AS avg_qty
+FROM lineitem
+GROUP BY
+  l_discount
 ```
 
 ## Representative DataFrame

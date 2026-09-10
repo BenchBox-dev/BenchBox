@@ -13,16 +13,15 @@
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Approximate quantiles returned as a single array per group
--- Companion to statistical_percentiles, but exercises the
--- vector-quantile path (one sketch evaluation per group instead of
--- four PERCENTILE_CONT calls).
+/* Approximate quantiles returned as a single array per group */ /* Companion to statistical_percentiles, but exercises the */ /* vector-quantile path (one sketch evaluation per group instead of */ /* four PERCENTILE_CONT calls). */
 SELECT
-    l_returnflag,
-    l_linestatus,
-    APPROX_QUANTILE(l_quantity, [0.25, 0.5, 0.75, 0.95]) as quantity_quantiles
+  l_returnflag,
+  l_linestatus,
+  APPROX_QUANTILE(l_quantity, ARRAY(0.25, 0.5, 0.75, 0.95)) AS quantity_quantiles
 FROM lineitem
-GROUP BY l_returnflag, l_linestatus;
+GROUP BY
+  l_returnflag,
+  l_linestatus
 ```
 
 ## Representative DataFrame

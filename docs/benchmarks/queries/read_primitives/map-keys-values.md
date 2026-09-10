@@ -16,22 +16,22 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 WITH supplier_costs AS (
-    SELECT
-        ps_suppkey,
-        MAP(
-            ARRAY_AGG(CAST(ps_partkey AS VARCHAR)),
-            ARRAY_AGG(ps_supplycost)
-        ) as part_costs
-    FROM partsupp
-    WHERE ps_suppkey <= 5
-    GROUP BY ps_suppkey
+  SELECT
+    ps_suppkey,
+    MAP(ARRAY_AGG(CAST(ps_partkey AS VARCHAR)), ARRAY_AGG(ps_supplycost)) AS part_costs
+  FROM partsupp
+  WHERE
+    ps_suppkey <= 5
+  GROUP BY
+    ps_suppkey
 )
 SELECT
-    ps_suppkey,
-    MAP_KEYS(part_costs) as part_ids,
-    MAP_VALUES(part_costs) as costs
+  ps_suppkey,
+  MAP_KEYS(part_costs) AS part_ids,
+  MAP_VALUES(part_costs) AS costs
 FROM supplier_costs
-ORDER BY ps_suppkey;
+ORDER BY
+  ps_suppkey
 ```
 
 ## Representative DataFrame

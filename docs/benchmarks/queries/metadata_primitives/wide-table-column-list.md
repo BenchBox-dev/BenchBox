@@ -14,13 +14,16 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_name,
-    column_name,
-    data_type,
-    ordinal_position
+  table_name,
+  column_name,
+  data_type,
+  ordinal_position
 FROM information_schema.columns
-WHERE table_name LIKE 'benchbox_wide_%'
-ORDER BY table_name, ordinal_position;
+WHERE
+  table_name LIKE 'benchbox_wide_%'
+ORDER BY
+  table_name,
+  ordinal_position
 ```
 
 ## Representative DataFrame

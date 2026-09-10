@@ -15,7 +15,29 @@ Order cadence by day-part (Morning/Midday/Afternoon/Evening) for a region
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT CASE WHEN EXTRACT(HOUR FROM ol.order_time) BETWEEN 5 AND 10 THEN 'Morning' WHEN EXTRACT(HOUR FROM ol.order_time) BETWEEN 11 AND 14 THEN 'Midday' WHEN EXTRACT(HOUR FROM ol.order_time) BETWEEN 15 AND 17 THEN 'Afternoon' ELSE 'Evening' END AS day_part, COUNT(DISTINCT ol.order_id) AS orders, SUM(ol.total_price) AS revenue, AVG(ol.total_price) AS avg_line_value FROM order_lines AS ol JOIN dim_locations AS dl ON ol.location_record_id = dl.record_id WHERE dl.region = 'South' AND ol.order_date BETWEEN CAST('2023-01-01' AS DATE) AND CAST('2024-12-31' AS DATE) GROUP BY day_part ORDER BY day_part
+SELECT
+  CASE
+    WHEN EXTRACT(HOUR FROM ol.order_time) BETWEEN 5 AND 10
+    THEN 'Morning'
+    WHEN EXTRACT(HOUR FROM ol.order_time) BETWEEN 11 AND 14
+    THEN 'Midday'
+    WHEN EXTRACT(HOUR FROM ol.order_time) BETWEEN 15 AND 17
+    THEN 'Afternoon'
+    ELSE 'Evening'
+  END AS day_part,
+  COUNT(DISTINCT ol.order_id) AS orders,
+  SUM(ol.total_price) AS revenue,
+  AVG(ol.total_price) AS avg_line_value
+FROM order_lines AS ol
+JOIN dim_locations AS dl
+  ON ol.location_record_id = dl.record_id
+WHERE
+  dl.region = 'South'
+  AND ol.order_date BETWEEN CAST('2023-01-01' AS DATE) AND CAST('2024-12-31' AS DATE)
+GROUP BY
+  day_part
+ORDER BY
+  day_part
 ```
 
 ## Representative DataFrame

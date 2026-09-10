@@ -13,8 +13,17 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-INSERT INTO write_ops_log (log_id, operation_id, operation_category, timestamp, rows_affected, duration_ms, success)
-VALUES (1, 'test_insert', 'insert', CURRENT_TIMESTAMP, 0, 0.0, true)
+INSERT INTO write_ops_log (
+  log_id,
+  operation_id,
+  operation_category,
+  timestamp,
+  rows_affected,
+  duration_ms,
+  success
+)
+VALUES
+  (1, 'test_insert', 'insert', CURRENT_TIMESTAMP, 0, 0.0, TRUE)
 ```
 
 ## Representative DataFrame

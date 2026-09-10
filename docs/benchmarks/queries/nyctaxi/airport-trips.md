@@ -16,19 +16,24 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    rate_code_id,
-    z.zone as pickup_zone,
-    COUNT(*) as trip_count,
-    AVG(trip_distance) as avg_distance,
-    AVG(total_amount) as avg_fare,
-    AVG(tip_amount) as avg_tip
-FROM trips t
-LEFT JOIN taxi_zones z ON t.pickup_location_id = z.location_id
-WHERE t.pickup_datetime >= '2019-09-01'
+  rate_code_id,
+  z.zone AS pickup_zone,
+  COUNT(*) AS trip_count,
+  AVG(trip_distance) AS avg_distance,
+  AVG(total_amount) AS avg_fare,
+  AVG(tip_amount) AS avg_tip
+FROM trips AS t
+LEFT JOIN taxi_zones AS z
+  ON t.pickup_location_id = z.location_id
+WHERE
+  t.pickup_datetime >= '2019-09-01'
   AND t.pickup_datetime < '2019-11-30'
   AND t.rate_code_id IN (2, 3)
-GROUP BY rate_code_id, z.zone
-ORDER BY trip_count DESC
+GROUP BY
+  rate_code_id,
+  z.zone
+ORDER BY
+  trip_count DESC
 LIMIT 20
 ```
 

@@ -13,7 +13,169 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'SCD Type 2 Processing Validation' AS validation_name, table_name, business_key_count, total_scd_records, current_records, historical_records, scd_processing_errors, CASE WHEN scd_processing_errors = 0 AND current_records = business_key_count THEN 'PASS' WHEN scd_processing_errors = 0 THEN 'HISTORICAL DATA ISSUES' ELSE 'SCD PROCESSING ERRORS' END AS scd_status FROM (SELECT 'DimCustomer' AS table_name, COUNT(DISTINCT CustomerID) AS business_key_count, COUNT(*) AS total_scd_records, SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records, SUM(CASE WHEN IsCurrent IS FALSE THEN 1 ELSE 0 END) AS historical_records, (SELECT COUNT(*) FROM (SELECT CustomerID FROM DimCustomer WHERE IsCurrent IS TRUE GROUP BY CustomerID HAVING COUNT(*) > 1 /* Multiple current records for same business key */) AS errors) /* Count SCD processing errors */ + (SELECT COUNT(*) FROM DimCustomer WHERE EffectiveDate >= EndDate) AS scd_processing_errors FROM DimCustomer UNION ALL SELECT 'DimAccount' AS table_name, COUNT(DISTINCT AccountID) AS business_key_count, COUNT(*) AS total_scd_records, SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records, SUM(CASE WHEN IsCurrent IS FALSE THEN 1 ELSE 0 END) AS historical_records, (SELECT COUNT(*) FROM (SELECT AccountID FROM DimAccount WHERE IsCurrent IS TRUE GROUP BY AccountID HAVING COUNT(*) > 1) AS errors) + (SELECT COUNT(*) FROM DimAccount WHERE EffectiveDate >= EndDate) AS scd_processing_errors FROM DimAccount UNION ALL SELECT 'DimSecurity' AS table_name, COUNT(DISTINCT Symbol) AS business_key_count, COUNT(*) AS total_scd_records, SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records, SUM(CASE WHEN IsCurrent IS FALSE THEN 1 ELSE 0 END) AS historical_records, (SELECT COUNT(*) FROM (SELECT Symbol FROM DimSecurity WHERE IsCurrent IS TRUE GROUP BY Symbol HAVING COUNT(*) > 1) AS errors) + (SELECT COUNT(*) FROM DimSecurity WHERE EffectiveDate >= EndDate) AS scd_processing_errors FROM DimSecurity UNION ALL SELECT 'DimCompany' AS table_name, COUNT(DISTINCT CompanyID) AS business_key_count, COUNT(*) AS total_scd_records, SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records, SUM(CASE WHEN IsCurrent IS FALSE THEN 1 ELSE 0 END) AS historical_records, (SELECT COUNT(*) FROM (SELECT CompanyID FROM DimCompany WHERE IsCurrent IS TRUE GROUP BY CompanyID HAVING COUNT(*) > 1) AS errors) + (SELECT COUNT(*) FROM DimCompany WHERE EffectiveDate >= EndDate) AS scd_processing_errors FROM DimCompany UNION ALL SELECT 'DimBroker' AS table_name, COUNT(DISTINCT BrokerID) AS business_key_count, COUNT(*) AS total_scd_records, SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records, SUM(CASE WHEN IsCurrent IS FALSE THEN 1 ELSE 0 END) AS historical_records, (SELECT COUNT(*) FROM (SELECT BrokerID FROM DimBroker WHERE IsCurrent IS TRUE GROUP BY BrokerID HAVING COUNT(*) > 1) AS errors) + (SELECT COUNT(*) FROM DimBroker WHERE EffectiveDate >= EndDate) AS scd_processing_errors FROM DimBroker) AS scd_validation ORDER BY table_name
+SELECT
+  'SCD Type 2 Processing Validation' AS validation_name,
+  table_name,
+  business_key_count,
+  total_scd_records,
+  current_records,
+  historical_records,
+  scd_processing_errors,
+  CASE
+    WHEN scd_processing_errors = 0 AND current_records = business_key_count
+    THEN 'PASS'
+    WHEN scd_processing_errors = 0
+    THEN 'HISTORICAL DATA ISSUES'
+    ELSE 'SCD PROCESSING ERRORS'
+  END AS scd_status
+FROM (
+  SELECT
+    'DimCustomer' AS table_name,
+    COUNT(DISTINCT CustomerID) AS business_key_count,
+    COUNT(*) AS total_scd_records,
+    SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records,
+    SUM(CASE WHEN IsCurrent IS FALSE THEN 1 ELSE 0 END) AS historical_records,
+    (
+      SELECT
+        COUNT(*)
+      FROM (
+        SELECT
+          CustomerID
+        FROM DimCustomer
+        WHERE
+          IsCurrent IS TRUE
+        GROUP BY
+          CustomerID
+        HAVING
+          COUNT(*) > 1 /* Multiple current records for same business key */
+      ) AS errors
+    ) /* Count SCD processing errors */ + (
+      SELECT
+        COUNT(*)
+      FROM DimCustomer
+      WHERE
+        EffectiveDate >= EndDate
+    ) AS scd_processing_errors
+  FROM DimCustomer
+  UNION ALL
+  SELECT
+    'DimAccount' AS table_name,
+    COUNT(DISTINCT AccountID) AS business_key_count,
+    COUNT(*) AS total_scd_records,
+    SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records,
+    SUM(CASE WHEN IsCurrent IS FALSE THEN 1 ELSE 0 END) AS historical_records,
+    (
+      SELECT
+        COUNT(*)
+      FROM (
+        SELECT
+          AccountID
+        FROM DimAccount
+        WHERE
+          IsCurrent IS TRUE
+        GROUP BY
+          AccountID
+        HAVING
+          COUNT(*) > 1
+      ) AS errors
+    ) + (
+      SELECT
+        COUNT(*)
+      FROM DimAccount
+      WHERE
+        EffectiveDate >= EndDate
+    ) AS scd_processing_errors
+  FROM DimAccount
+  UNION ALL
+  SELECT
+    'DimSecurity' AS table_name,
+    COUNT(DISTINCT Symbol) AS business_key_count,
+    COUNT(*) AS total_scd_records,
+    SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records,
+    SUM(CASE WHEN IsCurrent IS FALSE THEN 1 ELSE 0 END) AS historical_records,
+    (
+      SELECT
+        COUNT(*)
+      FROM (
+        SELECT
+          Symbol
+        FROM DimSecurity
+        WHERE
+          IsCurrent IS TRUE
+        GROUP BY
+          Symbol
+        HAVING
+          COUNT(*) > 1
+      ) AS errors
+    ) + (
+      SELECT
+        COUNT(*)
+      FROM DimSecurity
+      WHERE
+        EffectiveDate >= EndDate
+    ) AS scd_processing_errors
+  FROM DimSecurity
+  UNION ALL
+  SELECT
+    'DimCompany' AS table_name,
+    COUNT(DISTINCT CompanyID) AS business_key_count,
+    COUNT(*) AS total_scd_records,
+    SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records,
+    SUM(CASE WHEN IsCurrent IS FALSE THEN 1 ELSE 0 END) AS historical_records,
+    (
+      SELECT
+        COUNT(*)
+      FROM (
+        SELECT
+          CompanyID
+        FROM DimCompany
+        WHERE
+          IsCurrent IS TRUE
+        GROUP BY
+          CompanyID
+        HAVING
+          COUNT(*) > 1
+      ) AS errors
+    ) + (
+      SELECT
+        COUNT(*)
+      FROM DimCompany
+      WHERE
+        EffectiveDate >= EndDate
+    ) AS scd_processing_errors
+  FROM DimCompany
+  UNION ALL
+  SELECT
+    'DimBroker' AS table_name,
+    COUNT(DISTINCT BrokerID) AS business_key_count,
+    COUNT(*) AS total_scd_records,
+    SUM(CASE WHEN IsCurrent IS TRUE THEN 1 ELSE 0 END) AS current_records,
+    SUM(CASE WHEN IsCurrent IS FALSE THEN 1 ELSE 0 END) AS historical_records,
+    (
+      SELECT
+        COUNT(*)
+      FROM (
+        SELECT
+          BrokerID
+        FROM DimBroker
+        WHERE
+          IsCurrent IS TRUE
+        GROUP BY
+          BrokerID
+        HAVING
+          COUNT(*) > 1
+      ) AS errors
+    ) + (
+      SELECT
+        COUNT(*)
+      FROM DimBroker
+      WHERE
+        EffectiveDate >= EndDate
+    ) AS scd_processing_errors
+  FROM DimBroker
+) AS scd_validation
+ORDER BY
+  table_name
 ```
 
 ## Representative DataFrame

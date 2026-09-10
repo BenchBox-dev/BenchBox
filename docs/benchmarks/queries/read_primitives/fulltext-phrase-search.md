@@ -15,15 +15,17 @@ Phrase-based text search with ranking
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Phrase-based full-text search with ranking
+/* Phrase-based full-text search with ranking */
 SELECT
-    s_suppkey,
-    s_name,
-    s_comment,
-    MATCH(s_comment) AGAINST ('"Customer Complaints"' IN BOOLEAN MODE) as phrase_match_score
+  s_suppkey,
+  s_name,
+  s_comment,
+  MATCH(s_comment) AGAINST('"Customer Complaints"' IN BOOLEAN MODE) AS phrase_match_score
 FROM supplier
-WHERE MATCH(s_comment) AGAINST ('"Customer Complaints"' IN BOOLEAN MODE)
-ORDER BY phrase_match_score DESC;
+WHERE
+  MATCH(s_comment) AGAINST('"Customer Complaints"' IN BOOLEAN MODE)
+ORDER BY
+  phrase_match_score DESC
 ```
 
 ## Representative DataFrame

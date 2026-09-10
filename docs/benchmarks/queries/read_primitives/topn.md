@@ -15,7 +15,15 @@ Top-N query with ORDER BY and LIMIT
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Top-N by value (descending sort + limit) */ SELECT l_orderkey, l_partkey, l_extendedprice FROM lineitem ORDER BY l_extendedprice DESC LIMIT 10
+/* Top-N by value (descending sort + limit) */
+SELECT
+  l_orderkey,
+  l_partkey,
+  l_extendedprice
+FROM lineitem
+ORDER BY
+  l_extendedprice DESC
+LIMIT 10
 ```
 
 ## Representative DataFrame

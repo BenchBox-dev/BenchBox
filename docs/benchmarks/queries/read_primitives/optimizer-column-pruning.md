@@ -15,7 +15,22 @@ Test column pruning at scan
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Test column pruning (projection pushdown) optimization */ /* Good optimizers should only read columns needed for the query result */ SELECT c.c_name /* Only need c_name from customer table */ FROM customer AS c JOIN orders AS o ON c.c_custkey = o.o_custkey /* Only need c_custkey for join from customer */ JOIN lineitem AS l ON o.o_orderkey = l.l_orderkey /* Only need o_orderkey for join from orders */ WHERE o.o_orderdate >= CAST('1995-01-01' /* Only need o_orderdate for filtering */ AS DATE) AND o.o_orderdate < CAST('1996-01-01' AS DATE) AND l.l_quantity > 40 /* Only need l_quantity for filtering */ AND c.c_nationkey = 15 /* Only need c_nationkey for filtering */ ORDER BY c.c_name LIMIT 500
+/* Test column pruning (projection pushdown) optimization */ /* Good optimizers should only read columns needed for the query result */
+SELECT
+  c.c_name /* Only need c_name from customer table */
+FROM customer AS c
+JOIN orders AS o
+  ON c.c_custkey = o.o_custkey /* Only need c_custkey for join from customer */
+JOIN lineitem AS l
+  ON o.o_orderkey = l.l_orderkey /* Only need o_orderkey for join from orders */
+WHERE
+  o.o_orderdate >= CAST('1995-01-01' /* Only need o_orderdate for filtering */ AS DATE)
+  AND o.o_orderdate < CAST('1996-01-01' AS DATE)
+  AND l.l_quantity > 40 /* Only need l_quantity for filtering */
+  AND c.c_nationkey = 15 /* Only need c_nationkey for filtering */
+ORDER BY
+  c.c_name
+LIMIT 500
 ```
 
 ## Representative DataFrame

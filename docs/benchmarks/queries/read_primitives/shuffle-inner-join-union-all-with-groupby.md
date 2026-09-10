@@ -15,7 +15,29 @@ Complex join with UNION ALL and different data sources
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Complex join with UNION ALL and different data sources */ SELECT source_type, COUNT(*) AS record_count FROM (SELECT 'ORDER' AS source_type, o_custkey AS cust_id FROM orders WHERE o_orderdate >= CAST('1995-01-01' AS DATE) UNION ALL SELECT 'LINEITEM' AS source_type, o_custkey AS cust_id FROM orders AS o JOIN lineitem AS l ON o.o_orderkey = l.l_orderkey WHERE l.l_shipdate >= CAST('1995-01-01' AS DATE)) AS combined GROUP BY source_type
+/* Complex join with UNION ALL and different data sources */
+SELECT
+  source_type,
+  COUNT(*) AS record_count
+FROM (
+  SELECT
+    'ORDER' AS source_type,
+    o_custkey AS cust_id
+  FROM orders
+  WHERE
+    o_orderdate >= CAST('1995-01-01' AS DATE)
+  UNION ALL
+  SELECT
+    'LINEITEM' AS source_type,
+    o_custkey AS cust_id
+  FROM orders AS o
+  JOIN lineitem AS l
+    ON o.o_orderkey = l.l_orderkey
+  WHERE
+    l.l_shipdate >= CAST('1995-01-01' AS DATE)
+) AS combined
+GROUP BY
+  source_type
 ```
 
 ## Representative DataFrame

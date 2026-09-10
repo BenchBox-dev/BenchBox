@@ -15,7 +15,20 @@ Test DISTINCT elimination when result is already unique
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Test DISTINCT elimination optimization */ /* Good optimizers should eliminate the DISTINCT when it's redundant due to primary key */ SELECT DISTINCT o_orderkey, o_custkey, o_orderdate, o_totalprice FROM orders AS o WHERE o_orderdate >= CAST('1995-01-01' AS DATE) AND o_orderdate < CAST('1996-01-01' AS DATE) AND o_totalprice > 50000 ORDER BY o_orderkey LIMIT 2000
+/* Test DISTINCT elimination optimization */ /* Good optimizers should eliminate the DISTINCT when it's redundant due to primary key */
+SELECT DISTINCT
+  o_orderkey,
+  o_custkey,
+  o_orderdate,
+  o_totalprice
+FROM orders AS o
+WHERE
+  o_orderdate >= CAST('1995-01-01' AS DATE)
+  AND o_orderdate < CAST('1996-01-01' AS DATE)
+  AND o_totalprice > 50000
+ORDER BY
+  o_orderkey
+LIMIT 2000
 ```
 
 ## Representative DataFrame

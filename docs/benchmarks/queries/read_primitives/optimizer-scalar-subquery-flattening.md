@@ -13,25 +13,32 @@
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Test scalar subquery flattening optimization
--- Good optimizers should convert scalar subqueries to joins for better performance
+/* Test scalar subquery flattening optimization */ /* Good optimizers should convert scalar subqueries to joins for better performance */
 SELECT
-    c.c_name,
-    c.c_mktsegment,
-    c.c_acctbal,
-    (SELECT AVG(o.o_totalprice)
-     FROM orders o
-     WHERE o.o_custkey = c.c_custkey
-       AND o.o_orderdate >= DATE '1995-01-01') as avg_order_value,
-    (SELECT COUNT(o.o_orderkey)
-     FROM orders o
-     WHERE o.o_custkey = c.c_custkey
-       AND o.o_orderdate >= DATE '1995-01-01') as order_count
-FROM customer c
-WHERE c.c_nationkey = 15
-  AND c.c_acctbal > 5000
-ORDER BY avg_order_value DESC, c.c_name
-LIMIT 100;
+  c.c_name,
+  c.c_mktsegment,
+  c.c_acctbal,
+  (
+    SELECT
+      AVG(o.o_totalprice)
+    FROM orders AS o
+    WHERE
+      o.o_custkey = c.c_custkey AND o.o_orderdate >= CAST('1995-01-01' AS DATE)
+  ) AS avg_order_value,
+  (
+    SELECT
+      COUNT(o.o_orderkey)
+    FROM orders AS o
+    WHERE
+      o.o_custkey = c.c_custkey AND o.o_orderdate >= CAST('1995-01-01' AS DATE)
+  ) AS order_count
+FROM customer AS c
+WHERE
+  c.c_nationkey = 15 AND c.c_acctbal > 5000
+ORDER BY
+  avg_order_value DESC,
+  c.c_name
+LIMIT 100
 ```
 
 ## Representative DataFrame

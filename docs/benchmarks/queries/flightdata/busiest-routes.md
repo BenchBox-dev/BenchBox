@@ -16,24 +16,35 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    f.origin,
-    f.dest,
-    ao.city AS origin_city,
-    ao.state AS origin_state,
-    ad.city AS dest_city,
-    ad.state AS dest_state,
-    COUNT(*) AS total_flights,
-    ROUND(AVG(f.distance), 0) AS avg_distance_miles,
-    ROUND(AVG(f.actual_elapsed_time), 0) AS avg_duration_min,
-    ROUND(100.0 * SUM(CASE WHEN f.arr_delay <= 15 THEN 1 ELSE 0 END) / COUNT(*), 2) AS ontime_pct
-FROM flights f
-LEFT JOIN airports ao ON f.origin = ao.code
-LEFT JOIN airports ad ON f.dest = ad.code
-WHERE f.cancelled = 0
-  AND f.flight_date >= '2021-08-01'
-  AND f.flight_date < '2025-01-01'
-GROUP BY f.origin, f.dest, ao.city, ao.state, ad.city, ad.state
-ORDER BY total_flights DESC
+  f.origin,
+  f.dest,
+  ao.city AS origin_city,
+  ao.state AS origin_state,
+  ad.city AS dest_city,
+  ad.state AS dest_state,
+  COUNT(*) AS total_flights,
+  ROUND(CAST(AVG(f.distance) AS DECIMAL), 0) AS avg_distance_miles,
+  ROUND(CAST(AVG(f.actual_elapsed_time) AS DECIMAL), 0) AS avg_duration_min,
+  ROUND(
+    CAST(100.0 * SUM(CASE WHEN f.arr_delay <= 15 THEN 1 ELSE 0 END) / COUNT(*) AS DECIMAL),
+    2
+  ) AS ontime_pct
+FROM flights AS f
+LEFT JOIN airports AS ao
+  ON f.origin = ao.code
+LEFT JOIN airports AS ad
+  ON f.dest = ad.code
+WHERE
+  f.cancelled = 0 AND f.flight_date >= '2021-08-01' AND f.flight_date < '2025-01-01'
+GROUP BY
+  f.origin,
+  f.dest,
+  ao.city,
+  ao.state,
+  ad.city,
+  ad.state
+ORDER BY
+  total_flights DESC
 LIMIT 25
 ```
 

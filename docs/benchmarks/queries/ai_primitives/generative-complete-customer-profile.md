@@ -13,7 +13,8 @@
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
-SELECT 'placeholder - use platform variant' as result
+SELECT
+  'placeholder - use platform variant' AS result
 ```
 
 ## Representative DataFrame

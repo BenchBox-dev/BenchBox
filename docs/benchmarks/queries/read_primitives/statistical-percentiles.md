@@ -15,7 +15,23 @@ Percentile calculation functions for distribution analysis
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Percentile calculation functions for distribution analysis */ SELECT l_returnflag, l_linestatus, COUNT(*) AS record_count, PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY l_quantity) AS quantity_q1, PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY l_quantity) AS quantity_median, PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY l_quantity) AS quantity_q3, PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY l_extendedprice) AS price_p95 FROM lineitem GROUP BY l_returnflag, l_linestatus
+/* Percentile calculation functions for distribution analysis */
+SELECT
+  l_returnflag,
+  l_linestatus,
+  COUNT(*) AS record_count,
+  PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY
+    l_quantity) AS quantity_q1,
+  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY
+    l_quantity) AS quantity_median,
+  PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY
+    l_quantity) AS quantity_q3,
+  PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY
+    l_extendedprice) AS price_p95
+FROM lineitem
+GROUP BY
+  l_returnflag,
+  l_linestatus
 ```
 
 ## Representative DataFrame

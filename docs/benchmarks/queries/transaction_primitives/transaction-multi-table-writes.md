@@ -13,11 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-BEGIN TRANSACTION;
-INSERT INTO txn_customer VALUES (9000010, 'Customer#000000010', '789 Pine Rd', 1, '555-9999', 5000.00, 'MACHINERY', 'multi_table_test');
-INSERT INTO txn_orders VALUES (9950001, 9000010, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'multi_table_test');
-INSERT INTO txn_orders VALUES (9950002, 9000010, 'O', 2000.0, DATE '1998-01-02', '5-LOW', 'Clerk#000000001', 0, 'multi_table_test');
-COMMIT;
+BEGIN
 ```
 
 ## Representative DataFrame

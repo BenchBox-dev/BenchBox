@@ -13,11 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-BEGIN TRANSACTION;
-INSERT INTO txn_customer VALUES (9000001, 'Customer#000000001', '123 Main St', 1, '555-1234', 1000.00, 'AUTOMOBILE', 'initial');
-INSERT INTO txn_customer VALUES (9000002, 'Customer#000000002', '456 Oak Ave', 1, '555-5678', 2000.00, 'BUILDING', 'initial');
-UPDATE txn_customer SET c_comment = 'updated', c_acctbal = c_acctbal * 1.5 WHERE c_custkey >= 9000001;
-COMMIT;
+BEGIN
 ```
 
 ## Representative DataFrame

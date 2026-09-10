@@ -13,7 +13,11 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-COPY bulk_load_ops_target FROM '{file_path}/csv_small_1k.csv' WITH (FORMAT CSV, HEADER true)
+COPY bulk_load_ops_target
+FROM '{file_path}/csv_small_1k.csv' WITH (
+  FORMAT CSV,
+  HEADER TRUE
+)
 ```
 
 ## Representative DataFrame

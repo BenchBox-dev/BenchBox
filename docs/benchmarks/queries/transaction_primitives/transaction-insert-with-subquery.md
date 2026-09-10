@@ -13,12 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-BEGIN TRANSACTION;
-INSERT INTO txn_orders VALUES (9940001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'source');
-INSERT INTO txn_orders
-SELECT o_orderkey + 1, o_custkey, o_orderstatus, o_totalprice * 2, o_orderdate, o_orderpriority, o_clerk, o_shippriority, 'derived'
-FROM txn_orders WHERE o_orderkey = 9940001;
-COMMIT;
+BEGIN
 ```
 
 ## Representative DataFrame

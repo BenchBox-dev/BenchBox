@@ -13,18 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-BEGIN TRANSACTION;
-INSERT INTO txn_orders
-SELECT 8000000 + n, 1, 'O', 1000.0 * n, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'subquery_update'
-FROM (SELECT unnest(generate_series(1, 20)) AS n) t;
-UPDATE txn_orders
-SET o_totalprice = (
-  SELECT AVG(o_totalprice) * 1.5
-  FROM txn_orders
-  WHERE o_orderkey BETWEEN 8000001 AND 8000020
-)
-WHERE o_orderkey BETWEEN 8000001 AND 8000010;
-COMMIT;
+BEGIN
 ```
 
 ## Representative DataFrame

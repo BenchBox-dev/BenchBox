@@ -15,7 +15,34 @@ Find lineitems in top 5% quantity per shipdate using CUME_DIST
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Find lineitems with quantity in the top 5% of their shipment date using QUALIFY */ SELECT l_shipdate, l_orderkey, l_linenumber, l_quantity, quantity_cumulative_dist FROM (/* Find lineitems with quantity in the top 5% of their shipment date using QUALIFY */ SELECT l_shipdate, l_orderkey, l_linenumber, l_quantity, CUME_DIST() OVER (PARTITION BY l_shipdate ORDER BY l_quantity) AS quantity_cumulative_dist, CUME_DIST() OVER (PARTITION BY l_shipdate ORDER BY l_quantity) AS _w FROM lineitem WHERE l_shipdate >= CAST('1995-01-01' AS DATE) AND l_shipdate < CAST('1996-01-01' AS DATE) ORDER BY l_shipdate, l_quantity DESC, l_orderkey, l_linenumber) AS _t WHERE _w >= 0.95
+/* Find lineitems with quantity in the top 5% of their shipment date using QUALIFY */
+SELECT
+  l_shipdate,
+  l_orderkey,
+  l_linenumber,
+  l_quantity,
+  quantity_cumulative_dist
+FROM (
+  /* Find lineitems with quantity in the top 5% of their shipment date using QUALIFY */
+  SELECT
+    l_shipdate,
+    l_orderkey,
+    l_linenumber,
+    l_quantity,
+    CUME_DIST() OVER (PARTITION BY l_shipdate ORDER BY l_quantity) AS quantity_cumulative_dist,
+    CUME_DIST() OVER (PARTITION BY l_shipdate ORDER BY l_quantity) AS _w
+  FROM lineitem
+  WHERE
+    l_shipdate >= CAST('1995-01-01' AS DATE)
+    AND l_shipdate < CAST('1996-01-01' AS DATE)
+  ORDER BY
+    l_shipdate,
+    l_quantity DESC,
+    l_orderkey,
+    l_linenumber
+) AS _t
+WHERE
+  _w >= 0.95
 ```
 
 ## Representative DataFrame

@@ -15,7 +15,16 @@ FULL OUTER JOIN with string grouping and aggregation
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* FULL OUTER JOIN with string grouping and aggregation */ SELECT c.c_mktsegment, COUNT(o.o_orderkey) AS order_count, COUNT(c.c_custkey) AS customer_count FROM customer AS c FULL OUTER JOIN orders AS o ON c.c_custkey = o.o_custkey GROUP BY c.c_mktsegment
+/* FULL OUTER JOIN with string grouping and aggregation */
+SELECT
+  c.c_mktsegment,
+  COUNT(o.o_orderkey) AS order_count,
+  COUNT(c.c_custkey) AS customer_count
+FROM customer AS c
+FULL OUTER JOIN orders AS o
+  ON c.c_custkey = o.o_custkey
+GROUP BY
+  c.c_mktsegment
 ```
 
 ## Representative DataFrame

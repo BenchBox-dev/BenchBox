@@ -13,10 +13,17 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-UPDATE update_ops_orders
-SET o_orderdate = o_orderdate + INTERVAL '7' DAY,
-    o_comment = 'date_update'
-WHERE o_orderkey BETWEEN (SELECT MIN(o_orderkey) FROM update_ops_orders) AND (SELECT MIN(o_orderkey) + 50 FROM update_ops_orders)
+UPDATE update_ops_orders SET o_orderdate = o_orderdate + INTERVAL '7 DAY', o_comment = 'date_update'
+WHERE
+  o_orderkey BETWEEN (
+    SELECT
+      MIN(o_orderkey)
+    FROM update_ops_orders
+  ) AND (
+    SELECT
+      MIN(o_orderkey) + 50
+    FROM update_ops_orders
+  )
 ```
 
 ## Representative DataFrame

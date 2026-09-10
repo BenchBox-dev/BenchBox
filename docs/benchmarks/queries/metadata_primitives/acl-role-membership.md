@@ -14,14 +14,19 @@ Rendered in the benchmark's native SQL with default parameters (no dialect trans
 
 ```sql
 SELECT
-    r.rolname AS role_name,
-    m.rolname AS member_name,
-    am.admin_option
-FROM pg_auth_members am
-JOIN pg_roles r ON am.roleid = r.oid
-JOIN pg_roles m ON am.member = m.oid
-WHERE r.rolname NOT LIKE 'pg_%'
-ORDER BY r.rolname, m.rolname;
+  r.rolname AS role_name,
+  m.rolname AS member_name,
+  am.admin_option
+FROM pg_auth_members AS am
+JOIN pg_roles AS r
+  ON am.roleid = r.oid
+JOIN pg_roles AS m
+  ON am.member = m.oid
+WHERE
+  NOT r.rolname LIKE 'pg_%'
+ORDER BY
+  r.rolname,
+  m.rolname
 ```
 
 ## Representative DataFrame

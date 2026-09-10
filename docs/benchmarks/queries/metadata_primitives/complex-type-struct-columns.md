@@ -14,13 +14,18 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_name,
-    column_name,
-    data_type
+  table_name,
+  column_name,
+  data_type
 FROM information_schema.columns
-WHERE table_name LIKE 'benchbox_%'
-  AND (data_type LIKE 'STRUCT%' OR data_type LIKE 'ROW%')
-ORDER BY table_name, column_name;
+WHERE
+  table_name LIKE 'benchbox_%'
+  AND (
+    data_type LIKE 'STRUCT%' OR data_type LIKE 'ROW%'
+  )
+ORDER BY
+  table_name,
+  column_name
 ```
 
 ## Representative DataFrame

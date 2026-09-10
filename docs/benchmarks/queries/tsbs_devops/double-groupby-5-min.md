@@ -16,15 +16,19 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    hostname,
-    DATE_TRUNC('second', time) as second,
-    AVG(usage_user) as avg_user,
-    AVG(usage_system) as avg_system
+  hostname,
+  DATE_TRUNC('SECOND', time) AS second,
+  AVG(usage_user) AS avg_user,
+  AVG(usage_system) AS avg_system
 FROM cpu
-WHERE time >= '2024-01-02 00:00:00'
-  AND time < '2024-01-02 00:05:00'
-GROUP BY hostname, DATE_TRUNC('second', time)
-ORDER BY hostname, second
+WHERE
+  time >= '2024-01-02 00:00:00' AND time < '2024-01-02 00:05:00'
+GROUP BY
+  hostname,
+  DATE_TRUNC('SECOND', time)
+ORDER BY
+  hostname,
+  second
 ```
 
 ## Representative DataFrame

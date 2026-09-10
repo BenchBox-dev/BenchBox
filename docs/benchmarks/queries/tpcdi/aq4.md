@@ -13,7 +13,47 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Market Trend Analysis' AS analysis_name, d.CalendarYearID, d.CalendarQtrID, d.CalendarMonthID, COUNT(t.TradeID) AS monthly_trade_count, COUNT(DISTINCT t.SK_CustomerID) AS active_customers, COUNT(DISTINCT t.SK_SecurityID) AS securities_traded, SUM(t.Quantity) AS monthly_volume, SUM(t.Quantity * t.TradePrice) AS monthly_trade_value, AVG(t.TradePrice) AS avg_monthly_price, SUM(t.Fee + t.Commission + t.Tax) AS monthly_fees, AVG(mh.ClosePrice) AS avg_market_close, AVG(mh.Volume) AS avg_market_volume, SUM(CASE WHEN tt.TT_IS_SELL IS TRUE THEN t.Quantity * t.TradePrice ELSE 0 END) AS sell_volume, SUM(CASE WHEN tt.TT_IS_SELL IS FALSE THEN t.Quantity * t.TradePrice ELSE 0 END) AS buy_volume, (SUM(CASE WHEN tt.TT_IS_SELL IS TRUE THEN t.Quantity * t.TradePrice ELSE 0 END) - SUM(CASE WHEN tt.TT_IS_SELL IS FALSE THEN t.Quantity * t.TradePrice ELSE 0 END)) AS net_market_flow, LAG(SUM(t.Quantity * t.TradePrice)) OVER (ORDER BY d.CalendarYearID, d.CalendarMonthID) AS prev_month_value, (SUM(t.Quantity * t.TradePrice) - LAG(SUM(t.Quantity * t.TradePrice)) OVER (ORDER BY d.CalendarYearID, d.CalendarMonthID)) / LAG(SUM(t.Quantity * t.TradePrice)) OVER (ORDER BY d.CalendarYearID, d.CalendarMonthID) * 100 AS month_over_month_growth_pct FROM DimDate AS d LEFT JOIN FactTrade AS t ON d.SK_DateID = t.SK_CreateDateID LEFT JOIN FactMarketHistory AS mh ON d.SK_DateID = mh.SK_DateID LEFT JOIN TradeType AS tt ON t.Type = tt.TT_ID WHERE d.CalendarYearID >= 2015 AND d.CalendarYearID <= 2019 AND t.Status = 'Completed' GROUP BY d.CalendarYearID, d.CalendarQtrID, d.CalendarMonthID HAVING COUNT(t.TradeID) > 10 ORDER BY d.CalendarYearID, d.CalendarMonthID
+SELECT
+  'Market Trend Analysis' AS analysis_name,
+  d.CalendarYearID,
+  d.CalendarQtrID,
+  d.CalendarMonthID,
+  COUNT(t.TradeID) AS monthly_trade_count,
+  COUNT(DISTINCT t.SK_CustomerID) AS active_customers,
+  COUNT(DISTINCT t.SK_SecurityID) AS securities_traded,
+  SUM(t.Quantity) AS monthly_volume,
+  SUM(t.Quantity * t.TradePrice) AS monthly_trade_value,
+  AVG(t.TradePrice) AS avg_monthly_price,
+  SUM(t.Fee + t.Commission + t.Tax) AS monthly_fees,
+  AVG(mh.ClosePrice) AS avg_market_close,
+  AVG(mh.Volume) AS avg_market_volume,
+  SUM(CASE WHEN tt.TT_IS_SELL IS TRUE THEN t.Quantity * t.TradePrice ELSE 0 END) AS sell_volume,
+  SUM(CASE WHEN tt.TT_IS_SELL IS FALSE THEN t.Quantity * t.TradePrice ELSE 0 END) AS buy_volume,
+  (
+    SUM(CASE WHEN tt.TT_IS_SELL IS TRUE THEN t.Quantity * t.TradePrice ELSE 0 END) - SUM(CASE WHEN tt.TT_IS_SELL IS FALSE THEN t.Quantity * t.TradePrice ELSE 0 END)
+  ) AS net_market_flow,
+  LAG(SUM(t.Quantity * t.TradePrice)) OVER (ORDER BY d.CalendarYearID, d.CalendarMonthID) AS prev_month_value,
+  (
+    SUM(t.Quantity * t.TradePrice) - LAG(SUM(t.Quantity * t.TradePrice)) OVER (ORDER BY d.CalendarYearID, d.CalendarMonthID)
+  ) / LAG(SUM(t.Quantity * t.TradePrice)) OVER (ORDER BY d.CalendarYearID, d.CalendarMonthID) * 100 AS month_over_month_growth_pct
+FROM DimDate AS d
+LEFT JOIN FactTrade AS t
+  ON d.SK_DateID = t.SK_CreateDateID
+LEFT JOIN FactMarketHistory AS mh
+  ON d.SK_DateID = mh.SK_DateID
+LEFT JOIN TradeType AS tt
+  ON t.Type = tt.TT_ID
+WHERE
+  d.CalendarYearID >= 2015 AND d.CalendarYearID <= 2019 AND t.Status = 'Completed'
+GROUP BY
+  d.CalendarYearID,
+  d.CalendarQtrID,
+  d.CalendarMonthID
+HAVING
+  COUNT(t.TradeID) > 10
+ORDER BY
+  d.CalendarYearID,
+  d.CalendarMonthID
 ```
 
 ## Representative DataFrame

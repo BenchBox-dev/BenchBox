@@ -15,7 +15,21 @@ Window function DENSE_RANK() OVER (PARTITION BY ... ORDER BY ...)
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Ranking window aggregations with multiple frame orderings */ SELECT l_orderkey, l_partkey, l_quantity, l_extendedprice, DENSE_RANK() OVER (PARTITION BY l_orderkey ORDER BY l_extendedprice DESC) AS price_rank, PERCENT_RANK() OVER (PARTITION BY l_orderkey ORDER BY l_quantity) AS quantity_percentile, CUME_DIST() OVER (PARTITION BY l_orderkey ORDER BY l_extendedprice) AS price_distribution FROM lineitem WHERE l_orderkey <= 10000 ORDER BY l_orderkey, price_rank
+/* Ranking window aggregations with multiple frame orderings */
+SELECT
+  l_orderkey,
+  l_partkey,
+  l_quantity,
+  l_extendedprice,
+  DENSE_RANK() OVER (PARTITION BY l_orderkey ORDER BY l_extendedprice DESC) AS price_rank,
+  PERCENT_RANK() OVER (PARTITION BY l_orderkey ORDER BY l_quantity) AS quantity_percentile,
+  CUME_DIST() OVER (PARTITION BY l_orderkey ORDER BY l_extendedprice) AS price_distribution
+FROM lineitem
+WHERE
+  l_orderkey <= 10000
+ORDER BY
+  l_orderkey,
+  price_rank
 ```
 
 ## Representative DataFrame

@@ -13,17 +13,38 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-INSERT INTO insert_ops_lineitem_enriched
-  (l_orderkey, l_partkey, l_suppkey, l_quantity, l_extendedprice,
-   o_orderdate, c_name, s_name, p_name)
-SELECT l.l_orderkey, l.l_partkey, l.l_suppkey, l.l_quantity, l.l_extendedprice,
-       o.o_orderdate, c.c_name, s.s_name, p.p_name
-FROM lineitem l
-JOIN orders o ON l.l_orderkey = o.o_orderkey
-JOIN customer c ON o.o_custkey = c.c_custkey
-JOIN supplier s ON l.l_suppkey = s.s_suppkey
-JOIN part p ON l.l_partkey = p.p_partkey
-WHERE l.l_orderkey BETWEEN 1 AND 50
+INSERT INTO insert_ops_lineitem_enriched (
+  l_orderkey,
+  l_partkey,
+  l_suppkey,
+  l_quantity,
+  l_extendedprice,
+  o_orderdate,
+  c_name,
+  s_name,
+  p_name
+)
+SELECT
+  l.l_orderkey,
+  l.l_partkey,
+  l.l_suppkey,
+  l.l_quantity,
+  l.l_extendedprice,
+  o.o_orderdate,
+  c.c_name,
+  s.s_name,
+  p.p_name
+FROM lineitem AS l
+JOIN orders AS o
+  ON l.l_orderkey = o.o_orderkey
+JOIN customer AS c
+  ON o.o_custkey = c.c_custkey
+JOIN supplier AS s
+  ON l.l_suppkey = s.s_suppkey
+JOIN part AS p
+  ON l.l_partkey = p.p_partkey
+WHERE
+  l.l_orderkey BETWEEN 1 AND 50
 ```
 
 ## Representative DataFrame

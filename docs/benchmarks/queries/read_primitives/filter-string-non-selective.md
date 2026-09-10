@@ -15,7 +15,12 @@ String comparison with low selectivity (most rows match)
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* string comparison with low selectivity (most rows match) */ SELECT COUNT(*) FROM customer WHERE c_mktsegment >= 'A'
+/* string comparison with low selectivity (most rows match) */
+SELECT
+  COUNT(*)
+FROM customer
+WHERE
+  c_mktsegment >= 'A'
 ```
 
 ## Representative DataFrame

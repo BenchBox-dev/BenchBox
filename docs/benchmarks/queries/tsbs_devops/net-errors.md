@@ -16,16 +16,20 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    hostname,
-    interface,
-    SUM(err_in + err_out) as total_errors,
-    SUM(drop_in + drop_out) as total_drops
+  hostname,
+  interface,
+  SUM(err_in + err_out) AS total_errors,
+  SUM(drop_in + drop_out) AS total_drops
 FROM net
-WHERE time >= '2024-01-01 10:00:00'
-  AND time < '2024-01-01 11:00:00'
-GROUP BY hostname, interface
-HAVING SUM(err_in + err_out + drop_in + drop_out) > 0
-ORDER BY total_errors DESC
+WHERE
+  time >= '2024-01-01 10:00:00' AND time < '2024-01-01 11:00:00'
+GROUP BY
+  hostname,
+  interface
+HAVING
+  SUM(err_in + err_out + drop_in + drop_out) > 0
+ORDER BY
+  total_errors DESC
 ```
 
 ## Representative DataFrame

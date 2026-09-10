@@ -13,7 +13,50 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Customer Tier-NetWorth Validation' AS validation_name, Tier, COUNT(*) AS customer_count, MIN(NetWorth) AS min_net_worth, MAX(NetWorth) AS max_net_worth, AVG(NetWorth) AS avg_net_worth, SUM(CASE WHEN Tier = 1 AND NetWorth < 1000000 THEN 1 WHEN Tier = 2 AND (NetWorth < 250000 OR NetWorth >= 1000000) THEN 1 WHEN Tier = 3 AND NetWorth >= 250000 THEN 1 ELSE 0 END) AS tier_violations, CASE WHEN SUM(CASE WHEN Tier = 1 AND NetWorth < 1000000 THEN 1 WHEN Tier = 2 AND (NetWorth < 250000 OR NetWorth >= 1000000) THEN 1 WHEN Tier = 3 AND NetWorth >= 250000 THEN 1 ELSE 0 END) = 0 THEN 'PASS' ELSE 'FAIL' END AS status FROM DimCustomer WHERE IsCurrent IS TRUE GROUP BY Tier ORDER BY Tier
+SELECT
+  'Customer Tier-NetWorth Validation' AS validation_name,
+  Tier,
+  COUNT(*) AS customer_count,
+  MIN(NetWorth) AS min_net_worth,
+  MAX(NetWorth) AS max_net_worth,
+  AVG(NetWorth) AS avg_net_worth,
+  SUM(
+    CASE
+      WHEN Tier = 1 AND NetWorth < 1000000
+      THEN 1
+      WHEN Tier = 2 AND (
+        NetWorth < 250000 OR NetWorth >= 1000000
+      )
+      THEN 1
+      WHEN Tier = 3 AND NetWorth >= 250000
+      THEN 1
+      ELSE 0
+    END
+  ) AS tier_violations,
+  CASE
+    WHEN SUM(
+      CASE
+        WHEN Tier = 1 AND NetWorth < 1000000
+        THEN 1
+        WHEN Tier = 2 AND (
+          NetWorth < 250000 OR NetWorth >= 1000000
+        )
+        THEN 1
+        WHEN Tier = 3 AND NetWorth >= 250000
+        THEN 1
+        ELSE 0
+      END
+    ) = 0
+    THEN 'PASS'
+    ELSE 'FAIL'
+  END AS status
+FROM DimCustomer
+WHERE
+  IsCurrent IS TRUE
+GROUP BY
+  Tier
+ORDER BY
+  Tier
 ```
 
 ## Representative DataFrame

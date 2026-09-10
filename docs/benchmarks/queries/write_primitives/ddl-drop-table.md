@@ -13,8 +13,12 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-CREATE TABLE test_drop AS SELECT * FROM orders WHERE o_orderkey <= 50;
-DROP TABLE test_drop
+CREATE TABLE test_drop AS
+SELECT
+  *
+FROM orders
+WHERE
+  o_orderkey <= 50
 ```
 
 ## Representative DataFrame

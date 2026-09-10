@@ -13,7 +13,54 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Industry Sector Performance Analysis' AS analysis_name, comp.Industry, COUNT(DISTINCT comp.SK_CompanyID) AS companies_in_sector, COUNT(DISTINCT s.SK_SecurityID) AS securities_in_sector, COUNT(t.TradeID) AS total_sector_trades, SUM(t.Quantity * t.TradePrice) AS total_sector_value, AVG(t.TradePrice) AS avg_sector_price, SUM(t.Quantity) AS total_sector_volume, AVG(comp.MarketCap) AS avg_market_cap, AVG(mh.PERatio) AS avg_sector_pe_ratio, AVG(mh.Yield) AS avg_sector_yield, AVG(mh.ClosePrice) AS avg_closing_price, STDDEV(mh.ClosePrice) AS price_volatility, COUNT(CASE WHEN comp.SPrating IN ('AAA', 'AA+', 'AA', 'AA-', 'A+', 'A', 'A-') THEN 1 END) AS investment_grade_companies, COUNT(CASE WHEN comp.SPrating IN ('BBB+', 'BBB', 'BBB-', 'BB+', 'BB', 'BB-', 'B+', 'B', 'B-', 'CCC') THEN 1 END) AS speculative_grade_companies, SUM(t.Quantity * t.TradePrice) / SUM(SUM(t.Quantity * t.TradePrice)) OVER () * 100 AS sector_market_share_pct FROM DimCompany AS comp JOIN DimSecurity AS s ON comp.SK_CompanyID = s.SK_CompanyID LEFT JOIN FactTrade AS t ON s.SK_SecurityID = t.SK_SecurityID LEFT JOIN FactMarketHistory AS mh ON s.SK_SecurityID = mh.SK_SecurityID LEFT JOIN DimDate AS d ON t.SK_CreateDateID = d.SK_DateID WHERE comp.IsCurrent IS TRUE AND s.IsCurrent IS TRUE AND (d.CalendarYearID >= 2015 AND d.CalendarYearID <= 2019) AND t.Status = 'Completed' GROUP BY comp.Industry HAVING COUNT(t.TradeID) > 10 ORDER BY total_sector_value DESC, avg_sector_pe_ratio ASC LIMIT 50
+SELECT
+  'Industry Sector Performance Analysis' AS analysis_name,
+  comp.Industry,
+  COUNT(DISTINCT comp.SK_CompanyID) AS companies_in_sector,
+  COUNT(DISTINCT s.SK_SecurityID) AS securities_in_sector,
+  COUNT(t.TradeID) AS total_sector_trades,
+  SUM(t.Quantity * t.TradePrice) AS total_sector_value,
+  AVG(t.TradePrice) AS avg_sector_price,
+  SUM(t.Quantity) AS total_sector_volume,
+  AVG(comp.MarketCap) AS avg_market_cap,
+  AVG(mh.PERatio) AS avg_sector_pe_ratio,
+  AVG(mh.Yield) AS avg_sector_yield,
+  AVG(mh.ClosePrice) AS avg_closing_price,
+  STDDEV(mh.ClosePrice) AS price_volatility,
+  COUNT(
+    CASE WHEN comp.SPrating IN ('AAA', 'AA+', 'AA', 'AA-', 'A+', 'A', 'A-') THEN 1 END
+  ) AS investment_grade_companies,
+  COUNT(
+    CASE
+      WHEN comp.SPrating IN ('BBB+', 'BBB', 'BBB-', 'BB+', 'BB', 'BB-', 'B+', 'B', 'B-', 'CCC')
+      THEN 1
+    END
+  ) AS speculative_grade_companies,
+  SUM(t.Quantity * t.TradePrice) / SUM(SUM(t.Quantity * t.TradePrice)) OVER () * 100 AS sector_market_share_pct
+FROM DimCompany AS comp
+JOIN DimSecurity AS s
+  ON comp.SK_CompanyID = s.SK_CompanyID
+LEFT JOIN FactTrade AS t
+  ON s.SK_SecurityID = t.SK_SecurityID
+LEFT JOIN FactMarketHistory AS mh
+  ON s.SK_SecurityID = mh.SK_SecurityID
+LEFT JOIN DimDate AS d
+  ON t.SK_CreateDateID = d.SK_DateID
+WHERE
+  comp.IsCurrent IS TRUE
+  AND s.IsCurrent IS TRUE
+  AND (
+    d.CalendarYearID >= 2015 AND d.CalendarYearID <= 2019
+  )
+  AND t.Status = 'Completed'
+GROUP BY
+  comp.Industry
+HAVING
+  COUNT(t.TradeID) > 10
+ORDER BY
+  total_sector_value DESC,
+  avg_sector_pe_ratio ASC
+LIMIT 50
 ```
 
 ## Representative DataFrame

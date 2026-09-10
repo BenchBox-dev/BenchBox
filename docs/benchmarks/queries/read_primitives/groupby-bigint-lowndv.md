@@ -15,7 +15,13 @@ GROUP BY with low distinct value count (few groups)
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* GROUP BY with low distinct value count (few groups) */ SELECT o_orderpriority, COUNT(*) AS order_count FROM orders GROUP BY o_orderpriority
+/* GROUP BY with low distinct value count (few groups) */
+SELECT
+  o_orderpriority,
+  COUNT(*) AS order_count
+FROM orders
+GROUP BY
+  o_orderpriority
 ```
 
 ## Representative DataFrame

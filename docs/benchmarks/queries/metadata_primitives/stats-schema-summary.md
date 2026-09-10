@@ -14,13 +14,16 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_schema,
-    COUNT(DISTINCT table_name) AS table_count,
-    COUNT(*) AS total_columns
+  table_schema,
+  COUNT(DISTINCT table_name) AS table_count,
+  COUNT(*) AS total_columns
 FROM information_schema.columns
-WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-GROUP BY table_schema
-ORDER BY table_count DESC;
+WHERE
+  NOT table_schema IN ('information_schema', 'pg_catalog')
+GROUP BY
+  table_schema
+ORDER BY
+  table_count DESC
 ```
 
 ## Representative DataFrame

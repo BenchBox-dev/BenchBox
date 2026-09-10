@@ -16,14 +16,21 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    r_name,
-    n_name,
-    COUNT(*) as supplier_count
-FROM supplier s
-JOIN nation n ON s.s_nationkey = n.n_nationkey
-JOIN region r ON n.n_regionkey = r.r_regionkey
-GROUP BY r_name, n_name
-ORDER BY r_name, n_name, supplier_count;
+  r_name,
+  n_name,
+  COUNT(*) AS supplier_count
+FROM supplier AS s
+JOIN nation AS n
+  ON s.s_nationkey = n.n_nationkey
+JOIN region AS r
+  ON n.n_regionkey = r.r_regionkey
+GROUP BY
+  r_name,
+  n_name
+ORDER BY
+  r_name,
+  n_name,
+  supplier_count
 ```
 
 ## Representative DataFrame

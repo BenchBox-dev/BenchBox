@@ -13,9 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-TRUNCATE TABLE bulk_load_ops_target;
-COPY bulk_load_ops_target FROM '{file_path}/csv_quoted_fields.csv'
-WITH (FORMAT CSV, HEADER true, QUOTE '"', ESCAPE '"')
+TRUNCATE TABLE   bulk_load_ops_target
 ```
 
 ## Representative DataFrame

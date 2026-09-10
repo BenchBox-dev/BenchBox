@@ -13,14 +13,20 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-UPDATE update_ops_orders
-SET o_comment = 'exists_update'
-WHERE EXISTS (
-  SELECT 1 FROM lineitem
-  WHERE lineitem.l_orderkey = update_ops_orders.o_orderkey
-    AND lineitem.l_quantity > 40
-)
-AND o_orderkey <= (SELECT MIN(o_orderkey) + 100 FROM update_ops_orders)
+UPDATE update_ops_orders SET o_comment = 'exists_update'
+WHERE
+  EXISTS(
+    SELECT
+      1
+    FROM lineitem
+    WHERE
+      lineitem.l_orderkey = update_ops_orders.o_orderkey AND lineitem.l_quantity > 40
+  )
+  AND o_orderkey <= (
+    SELECT
+      MIN(o_orderkey) + 100
+    FROM update_ops_orders
+  )
 ```
 
 ## Representative DataFrame

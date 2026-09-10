@@ -15,7 +15,16 @@ LEFT JOIN with preservation of all left-side rows
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* LEFT JOIN with preservation of all left-side rows */ SELECT c.c_mktsegment, COUNT(o.o_orderkey) AS order_count, COUNT(*) AS total_rows FROM customer AS c LEFT JOIN orders AS o ON c.c_custkey = o.o_custkey GROUP BY c.c_mktsegment
+/* LEFT JOIN with preservation of all left-side rows */
+SELECT
+  c.c_mktsegment,
+  COUNT(o.o_orderkey) AS order_count,
+  COUNT(*) AS total_rows
+FROM customer AS c
+LEFT JOIN orders AS o
+  ON c.c_custkey = o.o_custkey
+GROUP BY
+  c.c_mktsegment
 ```
 
 ## Representative DataFrame

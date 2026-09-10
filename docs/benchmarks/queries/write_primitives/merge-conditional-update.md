@@ -15,14 +15,18 @@ Rendered for **DataFusion** with default parameters.
 ```sql
 MERGE INTO merge_ops_target AS target
 USING (
-  SELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 50
+  SELECT
+    *
+  FROM orders
+  WHERE
+    o_orderkey BETWEEN 1 AND 50
 ) AS source
 ON target.o_orderkey = source.o_orderkey
-WHEN MATCHED AND source.o_totalprice > 100000 THEN
-  UPDATE SET o_comment = 'merge_high_value',
-             o_orderpriority = '1-URGENT'
-WHEN MATCHED THEN
-  UPDATE SET o_comment = 'merge_low_value'
+WHEN MATCHED AND source.o_totalprice > 100000 THEN UPDATE SET
+  o_comment = 'merge_high_value',
+  o_orderpriority = '1-URGENT'
+WHEN MATCHED THEN UPDATE SET
+  o_comment = 'merge_low_value'
 WHEN NOT MATCHED THEN INSERT
 ```
 

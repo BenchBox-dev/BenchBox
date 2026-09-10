@@ -14,22 +14,23 @@ Rendered in the benchmark's native SQL with default parameters (no dialect trans
 
 ```sql
 SELECT
-    tc.table_name AS child_table,
-    rc.unique_constraint_name,
-    ccu.table_name AS parent_table,
-    kcu.column_name AS fk_column
-FROM information_schema.table_constraints tc
-JOIN information_schema.referential_constraints rc
+  tc.table_name AS child_table,
+  rc.unique_constraint_name,
+  ccu.table_name AS parent_table,
+  kcu.column_name AS fk_column
+FROM information_schema.table_constraints AS tc
+JOIN information_schema.referential_constraints AS rc
   ON tc.constraint_name = rc.constraint_name
   AND tc.table_schema = rc.constraint_schema
-JOIN information_schema.constraint_column_usage ccu
+JOIN information_schema.constraint_column_usage AS ccu
   ON rc.unique_constraint_name = ccu.constraint_name
   AND rc.unique_constraint_schema = ccu.constraint_schema
-JOIN information_schema.key_column_usage kcu
-  ON tc.constraint_name = kcu.constraint_name
-  AND tc.table_schema = kcu.table_schema
-WHERE tc.table_name LIKE 'benchbox_fk_%'
-ORDER BY child_table;
+JOIN information_schema.key_column_usage AS kcu
+  ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+WHERE
+  tc.table_name LIKE 'benchbox_fk_%'
+ORDER BY
+  child_table
 ```
 
 ## Representative DataFrame

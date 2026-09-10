@@ -15,7 +15,23 @@ Monthly orders, items sold, revenue with NULLIF derived metrics
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT EXTRACT(YEAR FROM ol.order_date) AS year, EXTRACT(MONTH FROM ol.order_date) AS month, COUNT(DISTINCT ol.order_id) AS orders, SUM(ol.quantity) AS items_sold, SUM(ol.total_price) AS revenue, SUM(ol.total_price) / NULLIF(COUNT(DISTINCT ol.order_id), 0) AS avg_order_value, SUM(ol.quantity) / NULLIF(COUNT(DISTINCT ol.order_id), 0) AS avg_items_per_order FROM order_lines AS ol WHERE EXTRACT(YEAR FROM ol.order_date) = 2023 GROUP BY year, month ORDER BY year, month
+SELECT
+  EXTRACT(YEAR FROM ol.order_date) AS year,
+  EXTRACT(MONTH FROM ol.order_date) AS month,
+  COUNT(DISTINCT ol.order_id) AS orders,
+  SUM(ol.quantity) AS items_sold,
+  SUM(ol.total_price) AS revenue,
+  SUM(ol.total_price) / NULLIF(COUNT(DISTINCT ol.order_id), 0) AS avg_order_value,
+  SUM(ol.quantity) / NULLIF(COUNT(DISTINCT ol.order_id), 0) AS avg_items_per_order
+FROM order_lines AS ol
+WHERE
+  EXTRACT(YEAR FROM ol.order_date) = 2023
+GROUP BY
+  year,
+  month
+ORDER BY
+  year,
+  month
 ```
 
 ## Representative DataFrame

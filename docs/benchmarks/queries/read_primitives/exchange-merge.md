@@ -15,7 +15,17 @@ Sorted data from multiple nodes is combined while keeping the sort order
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Sorted data from multiple nodes is combined while keeping the sort order. */ SELECT o.o_orderkey, l.l_linenumber, l.l_quantity FROM orders AS o JOIN lineitem AS l ON o.o_orderkey = l.l_orderkey ORDER BY o.o_orderkey, l.l_linenumber
+/* Sorted data from multiple nodes is combined while keeping the sort order. */
+SELECT
+  o.o_orderkey,
+  l.l_linenumber,
+  l.l_quantity
+FROM orders AS o
+JOIN lineitem AS l
+  ON o.o_orderkey = l.l_orderkey
+ORDER BY
+  o.o_orderkey,
+  l.l_linenumber
 ```
 
 ## Representative DataFrame

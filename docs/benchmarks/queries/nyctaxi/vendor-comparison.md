@@ -16,17 +16,19 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    vendor_id,
-    COUNT(*) as trip_count,
-    AVG(trip_distance) as avg_distance,
-    AVG(total_amount) as avg_fare,
-    AVG(tip_amount) as avg_tip,
-    SUM(total_amount) as total_revenue
+  vendor_id,
+  COUNT(*) AS trip_count,
+  AVG(trip_distance) AS avg_distance,
+  AVG(total_amount) AS avg_fare,
+  AVG(tip_amount) AS avg_tip,
+  SUM(total_amount) AS total_revenue
 FROM trips
-WHERE pickup_datetime >= '2019-11-08'
-  AND pickup_datetime < '2019-12-08'
-GROUP BY vendor_id
-ORDER BY trip_count DESC
+WHERE
+  pickup_datetime >= '2019-11-08' AND pickup_datetime < '2019-12-08'
+GROUP BY
+  vendor_id
+ORDER BY
+  trip_count DESC
 ```
 
 ## Representative DataFrame

@@ -14,15 +14,20 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_name,
-    column_name,
-    data_type,
-    ordinal_position
+  table_name,
+  column_name,
+  data_type,
+  ordinal_position
 FROM information_schema.columns
-WHERE table_name LIKE 'benchbox_wide_%'
-  AND (column_name LIKE '%integer%' OR column_name LIKE '%varchar%')
-ORDER BY table_name, ordinal_position
-LIMIT 100;
+WHERE
+  table_name LIKE 'benchbox_wide_%'
+  AND (
+    column_name LIKE '%integer%' OR column_name LIKE '%varchar%'
+  )
+ORDER BY
+  table_name,
+  ordinal_position
+LIMIT 100
 ```
 
 ## Representative DataFrame

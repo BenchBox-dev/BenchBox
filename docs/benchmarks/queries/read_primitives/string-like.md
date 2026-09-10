@@ -15,7 +15,14 @@ String LIKE pattern matching
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* String contains (LIKE %pattern%) */ SELECT p_partkey, p_name, p_type FROM part WHERE p_name LIKE '%blue%'
+/* String contains (LIKE %pattern%) */
+SELECT
+  p_partkey,
+  p_name,
+  p_type
+FROM part
+WHERE
+  p_name LIKE '%blue%'
 ```
 
 ## Representative DataFrame

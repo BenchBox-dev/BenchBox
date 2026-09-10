@@ -15,7 +15,17 @@ Construct struct from columns
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Construct struct/row from columns */ SELECT c_custkey, STRUCT(c_name, c_address, c_phone) AS contact_info, c_acctbal FROM customer WHERE c_nationkey = 1 ORDER BY c_custkey LIMIT 100
+/* Construct struct/row from columns */
+SELECT
+  c_custkey,
+  STRUCT(c_name, c_address, c_phone) AS contact_info,
+  c_acctbal
+FROM customer
+WHERE
+  c_nationkey = 1
+ORDER BY
+  c_custkey
+LIMIT 100
 ```
 
 ## Representative DataFrame

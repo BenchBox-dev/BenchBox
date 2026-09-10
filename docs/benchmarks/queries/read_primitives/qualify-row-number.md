@@ -15,7 +15,35 @@ Find top N orders per customer using ROW_NUMBER
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Find the top 3 orders by total price for each customer using QUALIFY */ SELECT c_custkey, c_name, o_orderkey, o_orderdate, o_totalprice, order_rank FROM (/* Find the top 3 orders by total price for each customer using QUALIFY */ SELECT c_custkey, c_name, o_orderkey, o_orderdate, o_totalprice, ROW_NUMBER() OVER (PARTITION BY c_custkey ORDER BY o_totalprice DESC) AS order_rank, ROW_NUMBER() OVER (PARTITION BY c_custkey ORDER BY o_totalprice DESC) AS _w FROM customer AS c JOIN orders AS o ON c.c_custkey = o.o_custkey WHERE o_orderdate >= CAST('1995-01-01' AS DATE) ORDER BY c_custkey, order_rank) AS _t WHERE _w <= 3
+/* Find the top 3 orders by total price for each customer using QUALIFY */
+SELECT
+  c_custkey,
+  c_name,
+  o_orderkey,
+  o_orderdate,
+  o_totalprice,
+  order_rank
+FROM (
+  /* Find the top 3 orders by total price for each customer using QUALIFY */
+  SELECT
+    c_custkey,
+    c_name,
+    o_orderkey,
+    o_orderdate,
+    o_totalprice,
+    ROW_NUMBER() OVER (PARTITION BY c_custkey ORDER BY o_totalprice DESC) AS order_rank,
+    ROW_NUMBER() OVER (PARTITION BY c_custkey ORDER BY o_totalprice DESC) AS _w
+  FROM customer AS c
+  JOIN orders AS o
+    ON c.c_custkey = o.o_custkey
+  WHERE
+    o_orderdate >= CAST('1995-01-01' AS DATE)
+  ORDER BY
+    c_custkey,
+    order_rank
+) AS _t
+WHERE
+  _w <= 3
 ```
 
 ## Representative DataFrame

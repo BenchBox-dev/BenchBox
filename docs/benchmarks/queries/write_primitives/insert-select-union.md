@@ -13,11 +13,9 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-DELETE FROM insert_ops_orders WHERE o_orderkey BETWEEN 1 AND 50;
-INSERT INTO insert_ops_orders
-SELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 25
-UNION ALL
-SELECT * FROM orders WHERE o_orderkey BETWEEN 26 AND 50
+DELETE FROM insert_ops_orders
+WHERE
+  o_orderkey BETWEEN 1 AND 50
 ```
 
 ## Representative DataFrame

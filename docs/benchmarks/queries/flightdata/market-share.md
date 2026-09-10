@@ -16,32 +16,36 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 WITH carrier_totals AS (
-    SELECT
-        f.reporting_airline,
-        a.name AS airline_name,
-        COUNT(*) AS flight_count,
-        COUNT(DISTINCT f.origin || '-' || f.dest) AS routes_served,
-        ROUND(AVG(f.distance), 0) AS avg_distance_miles
-    FROM flights f
-    LEFT JOIN airlines a ON f.reporting_airline = a.code
-    WHERE f.cancelled = 0
-      AND f.flight_date >= '2021-08-01'
-      AND f.flight_date < '2025-01-01'
-    GROUP BY f.reporting_airline, a.name
-),
-total AS (
-    SELECT SUM(flight_count) AS grand_total FROM carrier_totals
+  SELECT
+    f.reporting_airline,
+    a.name AS airline_name,
+    COUNT(*) AS flight_count,
+    COUNT(DISTINCT f.origin || '-' || f.dest) AS routes_served,
+    ROUND(CAST(AVG(f.distance) AS DECIMAL), 0) AS avg_distance_miles
+  FROM flights AS f
+  LEFT JOIN airlines AS a
+    ON f.reporting_airline = a.code
+  WHERE
+    f.cancelled = 0 AND f.flight_date >= '2021-08-01' AND f.flight_date < '2025-01-01'
+  GROUP BY
+    f.reporting_airline,
+    a.name
+), total AS (
+  SELECT
+    SUM(flight_count) AS grand_total
+  FROM carrier_totals
 )
 SELECT
-    ct.reporting_airline,
-    ct.airline_name,
-    ct.flight_count,
-    ct.routes_served,
-    ct.avg_distance_miles,
-    ROUND(100.0 * ct.flight_count / t.grand_total, 2) AS market_share_pct
-FROM carrier_totals ct
-CROSS JOIN total t
-ORDER BY ct.flight_count DESC
+  ct.reporting_airline,
+  ct.airline_name,
+  ct.flight_count,
+  ct.routes_served,
+  ct.avg_distance_miles,
+  ROUND(100.0 * ct.flight_count / t.grand_total, 2) AS market_share_pct
+FROM carrier_totals AS ct
+CROSS JOIN total AS t
+ORDER BY
+  ct.flight_count DESC
 LIMIT 20
 ```
 

@@ -16,17 +16,20 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    passenger_count,
-    COUNT(*) as trip_count,
-    AVG(trip_distance) as avg_distance,
-    AVG(total_amount) as avg_fare,
-    AVG(total_amount / NULLIF(trip_distance, 0)) as avg_fare_per_mile
+  passenger_count,
+  COUNT(*) AS trip_count,
+  AVG(trip_distance) AS avg_distance,
+  AVG(total_amount) AS avg_fare,
+  AVG(total_amount / NULLIF(trip_distance, 0)) AS avg_fare_per_mile
 FROM trips
-WHERE pickup_datetime >= '2019-06-25'
+WHERE
+  pickup_datetime >= '2019-06-25'
   AND pickup_datetime < '2019-07-25'
   AND passenger_count BETWEEN 1 AND 6
-GROUP BY passenger_count
-ORDER BY passenger_count
+GROUP BY
+  passenger_count
+ORDER BY
+  passenger_count
 ```
 
 ## Representative DataFrame

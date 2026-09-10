@@ -15,7 +15,18 @@ Correlation analysis between numeric columns
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Correlation analysis between numeric columns */ SELECT CORR(l_quantity, l_extendedprice) AS qty_price_correlation, COVAR_POP(l_quantity, l_discount) AS qty_discount_covariance, COVAR_SAMP(l_tax, l_extendedprice) AS tax_price_covariance, REGR_SLOPE(l_extendedprice, l_quantity) AS price_qty_slope, REGR_INTERCEPT(l_extendedprice, l_quantity) AS price_qty_intercept, REGR_R2(l_extendedprice, l_quantity) AS regression_r_squared FROM lineitem WHERE l_shipdate >= CAST('1995-01-01' AS DATE) AND l_shipdate < CAST('1996-01-01' AS DATE)
+/* Correlation analysis between numeric columns */
+SELECT
+  CORR(l_quantity, l_extendedprice) AS qty_price_correlation,
+  COVAR_POP(l_quantity, l_discount) AS qty_discount_covariance,
+  COVAR_SAMP(l_tax, l_extendedprice) AS tax_price_covariance,
+  REGR_SLOPE(l_extendedprice, l_quantity) AS price_qty_slope,
+  REGR_INTERCEPT(l_extendedprice, l_quantity) AS price_qty_intercept,
+  REGR_R2(l_extendedprice, l_quantity) AS regression_r_squared
+FROM lineitem
+WHERE
+  l_shipdate >= CAST('1995-01-01' AS DATE)
+  AND l_shipdate < CAST('1996-01-01' AS DATE)
 ```
 
 ## Representative DataFrame

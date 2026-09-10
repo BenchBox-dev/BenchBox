@@ -14,14 +14,16 @@ Rendered in the benchmark's native SQL with default parameters (no dialect trans
 
 ```sql
 SELECT
-    grantee,
-    table_schema,
-    table_name,
-    privilege_type
+  grantee,
+  table_schema,
+  table_name,
+  privilege_type
 FROM information_schema.table_privileges
-WHERE is_grantable = 'YES'
-  AND table_schema NOT IN ('information_schema', 'pg_catalog')
-ORDER BY table_name, grantee;
+WHERE
+  is_grantable = 'YES' AND NOT table_schema IN ('information_schema', 'pg_catalog')
+ORDER BY
+  table_name,
+  grantee
 ```
 
 ## Representative DataFrame

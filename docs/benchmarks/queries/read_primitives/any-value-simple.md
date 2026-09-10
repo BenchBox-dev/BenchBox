@@ -15,13 +15,14 @@ Select any customer name per market segment (faster than MIN/MAX)
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Select any customer name per market segment (faster than MIN/MAX)
+/* Select any customer name per market segment (faster than MIN/MAX) */
 SELECT
-    c_mktsegment,
-    ANY_VALUE(c_name) as sample_customer,
-    COUNT(*) as customer_count
+  c_mktsegment,
+  ANY_VALUE(c_name) AS sample_customer,
+  COUNT(*) AS customer_count
 FROM customer
-GROUP BY c_mktsegment;
+GROUP BY
+  c_mktsegment
 ```
 
 ## Representative DataFrame

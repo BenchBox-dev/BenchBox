@@ -13,14 +13,13 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-EXPLAIN
-SELECT
+EXPLAIN SELECT
     table_schema,
     COUNT(*) AS table_count,
     SUM(CASE WHEN table_type = 'BASE TABLE' THEN 1 ELSE 0 END) AS base_tables
 FROM information_schema.tables
 WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-GROUP BY table_schema;
+GROUP BY table_schema
 ```
 
 ## Representative DataFrame

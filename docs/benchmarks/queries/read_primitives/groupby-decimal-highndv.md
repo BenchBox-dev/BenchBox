@@ -15,7 +15,13 @@ GROUP BY with high cardinality decimal column
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* GROUP BY with high cardinality decimal column */ SELECT l_extendedprice, COUNT(*) AS price_frequency FROM lineitem GROUP BY l_extendedprice
+/* GROUP BY with high cardinality decimal column */
+SELECT
+  l_extendedprice,
+  COUNT(*) AS price_frequency
+FROM lineitem
+GROUP BY
+  l_extendedprice
 ```
 
 ## Representative DataFrame

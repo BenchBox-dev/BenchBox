@@ -16,23 +16,31 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    f.origin,
-    ap.name AS airport_name,
-    ap.city,
-    ap.state,
-    COUNT(*) AS total_flights,
-    ROUND(AVG(f.dep_delay), 2) AS avg_dep_delay,
-    ROUND(AVG(f.arr_delay), 2) AS avg_arr_delay,
-    SUM(CASE WHEN f.dep_delay > 15 THEN 1 ELSE 0 END) AS delayed_flights
-FROM flights f
-LEFT JOIN airports ap ON f.origin = ap.code
-WHERE f.cancelled = 0
-  AND f.dep_delay IS NOT NULL
+  f.origin,
+  ap.name AS airport_name,
+  ap.city,
+  ap.state,
+  COUNT(*) AS total_flights,
+  ROUND(CAST(AVG(f.dep_delay) AS DECIMAL), 2) AS avg_dep_delay,
+  ROUND(CAST(AVG(f.arr_delay) AS DECIMAL), 2) AS avg_arr_delay,
+  SUM(CASE WHEN f.dep_delay > 15 THEN 1 ELSE 0 END) AS delayed_flights
+FROM flights AS f
+LEFT JOIN airports AS ap
+  ON f.origin = ap.code
+WHERE
+  f.cancelled = 0
+  AND NOT f.dep_delay IS NULL
   AND f.flight_date >= '2021-08-01'
   AND f.flight_date < '2025-01-01'
-GROUP BY f.origin, ap.name, ap.city, ap.state
-HAVING COUNT(*) >= 100
-ORDER BY avg_dep_delay DESC
+GROUP BY
+  f.origin,
+  ap.name,
+  ap.city,
+  ap.state
+HAVING
+  COUNT(*) >= 100
+ORDER BY
+  avg_dep_delay DESC
 LIMIT 50
 ```
 

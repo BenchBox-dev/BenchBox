@@ -13,7 +13,7 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-EXPLAIN SELECT * FROM information_schema.tables LIMIT 10;
+EXPLAIN SELECT * FROM information_schema.tables LIMIT 10
 ```
 
 ## Representative DataFrame

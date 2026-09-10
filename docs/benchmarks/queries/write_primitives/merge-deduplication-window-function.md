@@ -25,24 +25,26 @@ USING (
     o_clerk,
     o_shippriority,
     o_comment,
-    ROW_NUMBER() OVER (
-      PARTITION BY o_orderkey
-      ORDER BY o_orderdate DESC, o_totalprice DESC
-    ) as rn
+    ROW_NUMBER() OVER (PARTITION BY o_orderkey ORDER BY o_orderdate DESC, o_totalprice DESC) AS rn
   FROM orders
-  WHERE o_orderkey BETWEEN 1 AND 500
+  WHERE
+    o_orderkey BETWEEN 1 AND 500
 ) AS source
 ON target.o_orderkey = source.o_orderkey
-WHEN MATCHED AND source.rn = 1 THEN
-  UPDATE SET
-    o_totalprice = source.o_totalprice,
-    o_comment = 'dedup_update'
-WHEN NOT MATCHED AND source.rn = 1 THEN
-  INSERT VALUES (
-    source.o_orderkey, source.o_custkey, source.o_orderstatus,
-    source.o_totalprice, source.o_orderdate, source.o_orderpriority,
-    source.o_clerk, source.o_shippriority, 'dedup_insert'
-  )
+WHEN MATCHED AND source.rn = 1 THEN UPDATE SET
+  o_totalprice = source.o_totalprice,
+  o_comment = 'dedup_update'
+WHEN NOT MATCHED AND source.rn = 1 THEN INSERT VALUES (
+  source.o_orderkey,
+  source.o_custkey,
+  source.o_orderstatus,
+  source.o_totalprice,
+  source.o_orderdate,
+  source.o_orderpriority,
+  source.o_clerk,
+  source.o_shippriority,
+  'dedup_insert'
+)
 ```
 
 ## Representative DataFrame

@@ -61,6 +61,12 @@ class TestSlugsAndLabels:
         assert fenced.startswith("````text\n")
         assert fenced.endswith("\n````")
 
+    def test_prettify_sql_reformats_and_falls_back(self):
+        pretty = gqd._prettify_sql("SELECT a, b FROM t WHERE a = 1", "datafusion")
+        assert "\n" in pretty and "SELECT" in pretty
+        # Unparseable input is returned unchanged, never dropped.
+        assert gqd._prettify_sql("-- not sql at all", "default") == "-- not sql at all"
+
     def test_overview_link_depth_reaches_docs_benchmarks(self):
         # docs/benchmarks/queries/<bm>/<page>.md -> docs/benchmarks/<slug>.md
         assert gqd._overview_link("clickbench") == "../../clickbench.md"

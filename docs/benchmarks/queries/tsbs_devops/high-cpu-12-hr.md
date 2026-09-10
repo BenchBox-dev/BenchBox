@@ -15,14 +15,18 @@ Hosts with sustained high CPU usage
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT hostname, COUNT(*) as high_cpu_count
+SELECT
+  hostname,
+  COUNT(*) AS high_cpu_count
 FROM cpu
-WHERE usage_user > 90
-  AND time >= '2024-01-02 08:00:00'
-  AND time < '2024-01-02 20:00:00'
-GROUP BY hostname
-HAVING COUNT(*) > 10
-ORDER BY high_cpu_count DESC
+WHERE
+  usage_user > 90 AND time >= '2024-01-02 08:00:00' AND time < '2024-01-02 20:00:00'
+GROUP BY
+  hostname
+HAVING
+  COUNT(*) > 10
+ORDER BY
+  high_cpu_count DESC
 ```
 
 ## Representative DataFrame

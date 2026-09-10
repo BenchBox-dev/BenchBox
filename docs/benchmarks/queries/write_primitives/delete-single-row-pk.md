@@ -14,7 +14,12 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 DELETE FROM delete_ops_orders
-WHERE o_orderkey = (SELECT MAX(o_orderkey) FROM delete_ops_orders)
+WHERE
+  o_orderkey = (
+    SELECT
+      MAX(o_orderkey)
+    FROM delete_ops_orders
+  )
 ```
 
 ## Representative DataFrame

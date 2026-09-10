@@ -14,14 +14,17 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_schema,
-    COUNT(*) AS table_count,
-    SUM(CASE WHEN table_type = 'BASE TABLE' THEN 1 ELSE 0 END) AS base_tables,
-    SUM(CASE WHEN table_type = 'VIEW' THEN 1 ELSE 0 END) AS views
+  table_schema,
+  COUNT(*) AS table_count,
+  SUM(CASE WHEN table_type = 'BASE TABLE' THEN 1 ELSE 0 END) AS base_tables,
+  SUM(CASE WHEN table_type = 'VIEW' THEN 1 ELSE 0 END) AS views
 FROM information_schema.tables
-WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-GROUP BY table_schema
-ORDER BY table_count DESC;
+WHERE
+  NOT table_schema IN ('information_schema', 'pg_catalog')
+GROUP BY
+  table_schema
+ORDER BY
+  table_count DESC
 ```
 
 ## Representative DataFrame

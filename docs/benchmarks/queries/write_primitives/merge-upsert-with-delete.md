@@ -15,14 +15,17 @@ Rendered for **DataFusion** with default parameters.
 ```sql
 MERGE INTO merge_ops_target AS target
 USING (
-  SELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 20
+  SELECT
+    *
+  FROM orders
+  WHERE
+    o_orderkey BETWEEN 1 AND 20
 ) AS source
 ON target.o_orderkey = source.o_orderkey
-WHEN MATCHED THEN
-  UPDATE SET o_comment = 'merge_matched'
-WHEN NOT MATCHED BY TARGET THEN INSERT
-WHEN NOT MATCHED BY SOURCE AND target.o_orderkey <= 25 THEN
-  DELETE
+WHEN MATCHED THEN UPDATE SET
+  o_comment = 'merge_matched'
+WHEN NOT MATCHED THEN INSERT
+WHEN NOT MATCHED BY SOURCE AND target.o_orderkey <= 25 THEN DELETE
 ```
 
 ## Representative DataFrame

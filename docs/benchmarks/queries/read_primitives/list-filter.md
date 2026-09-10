@@ -15,20 +15,22 @@ Filter array elements by condition
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Filter array elements by condition
+/* Filter array elements by condition */
 WITH order_prices AS (
-    SELECT
-        o_custkey,
-        ARRAY_AGG(o_totalprice) as prices
-    FROM orders
-    GROUP BY o_custkey
+  SELECT
+    o_custkey,
+    ARRAY_AGG(o_totalprice) AS prices
+  FROM orders
+  GROUP BY
+    o_custkey
 )
 SELECT
-    o_custkey,
-    FILTER(prices, x -> x > 100000) as large_orders
+  o_custkey,
+  FILTER(prices, x -> x > 100000) AS large_orders
 FROM order_prices
-ORDER BY o_custkey
-LIMIT 100;
+ORDER BY
+  o_custkey
+LIMIT 100
 ```
 
 ## Representative DataFrame

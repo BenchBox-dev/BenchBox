@@ -13,9 +13,17 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-UPDATE update_ops_orders
-SET o_comment = CONCAT('Updated:', SUBSTRING(o_orderpriority, 1, 5), '|', CAST(o_orderkey AS VARCHAR))
-WHERE o_orderkey BETWEEN (SELECT MIN(o_orderkey) FROM update_ops_orders) AND (SELECT MIN(o_orderkey) + 50 FROM update_ops_orders)
+UPDATE update_ops_orders SET o_comment = CONCAT('Updated:', SUBSTRING(o_orderpriority FROM 1 FOR 5), '|', CAST(o_orderkey AS VARCHAR))
+WHERE
+  o_orderkey BETWEEN (
+    SELECT
+      MIN(o_orderkey)
+    FROM update_ops_orders
+  ) AND (
+    SELECT
+      MIN(o_orderkey) + 50
+    FROM update_ops_orders
+  )
 ```
 
 ## Representative DataFrame

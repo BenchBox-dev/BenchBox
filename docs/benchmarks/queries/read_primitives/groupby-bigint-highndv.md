@@ -15,7 +15,13 @@ GROUP BY with high distinct value count (many groups)
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* GROUP BY with high distinct value count (many groups) */ SELECT l_orderkey, COUNT(*) AS line_count FROM lineitem GROUP BY l_orderkey
+/* GROUP BY with high distinct value count (many groups) */
+SELECT
+  l_orderkey,
+  COUNT(*) AS line_count
+FROM lineitem
+GROUP BY
+  l_orderkey
 ```
 
 ## Representative DataFrame

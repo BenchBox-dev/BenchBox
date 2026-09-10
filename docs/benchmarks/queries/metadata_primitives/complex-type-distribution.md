@@ -14,21 +14,34 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_name,
-    SUM(CASE
-        WHEN data_type LIKE '%[]%' OR data_type LIKE 'ARRAY%'
-             OR data_type LIKE 'STRUCT%' OR data_type LIKE 'MAP%'
-        THEN 1 ELSE 0
-    END) AS complex_columns,
-    SUM(CASE
-        WHEN data_type NOT LIKE '%[]%' AND data_type NOT LIKE 'ARRAY%'
-             AND data_type NOT LIKE 'STRUCT%' AND data_type NOT LIKE 'MAP%'
-        THEN 1 ELSE 0
-    END) AS scalar_columns
+  table_name,
+  SUM(
+    CASE
+      WHEN data_type LIKE '%[]%'
+      OR data_type LIKE 'ARRAY%'
+      OR data_type LIKE 'STRUCT%'
+      OR data_type LIKE 'MAP%'
+      THEN 1
+      ELSE 0
+    END
+  ) AS complex_columns,
+  SUM(
+    CASE
+      WHEN NOT data_type LIKE '%[]%'
+      AND NOT data_type LIKE 'ARRAY%'
+      AND NOT data_type LIKE 'STRUCT%'
+      AND NOT data_type LIKE 'MAP%'
+      THEN 1
+      ELSE 0
+    END
+  ) AS scalar_columns
 FROM information_schema.columns
-WHERE table_name LIKE 'benchbox_%'
-GROUP BY table_name
-ORDER BY table_name;
+WHERE
+  table_name LIKE 'benchbox_%'
+GROUP BY
+  table_name
+ORDER BY
+  table_name
 ```
 
 ## Representative DataFrame

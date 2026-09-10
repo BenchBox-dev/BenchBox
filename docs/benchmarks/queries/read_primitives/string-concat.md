@@ -15,7 +15,12 @@ String concatenation
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* String concatenation */ SELECT c_custkey, c_name || ' - ' || c_mktsegment AS customer_info FROM customer LIMIT 100
+/* String concatenation */
+SELECT
+  c_custkey,
+  c_name || ' - ' || c_mktsegment AS customer_info
+FROM customer
+LIMIT 100
 ```
 
 ## Representative DataFrame

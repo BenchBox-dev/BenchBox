@@ -14,10 +14,9 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 CREATE TABLE test_rename_col (
-  id INTEGER,
+  id INT,
   old_name VARCHAR(100)
-);
-ALTER TABLE test_rename_col RENAME COLUMN old_name TO new_name
+)
 ```
 
 ## Representative DataFrame

@@ -16,16 +16,21 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    t.pickup_location_id,
-    z.zone,
-    z.borough,
-    COUNT(*) as trip_count
-FROM trips t
-LEFT JOIN taxi_zones z ON t.pickup_location_id = z.location_id
-WHERE t.pickup_datetime >= '2019-06-03'
-  AND t.pickup_datetime < '2019-07-03'
-GROUP BY t.pickup_location_id, z.zone, z.borough
-ORDER BY trip_count DESC
+  t.pickup_location_id,
+  z.zone,
+  z.borough,
+  COUNT(*) AS trip_count
+FROM trips AS t
+LEFT JOIN taxi_zones AS z
+  ON t.pickup_location_id = z.location_id
+WHERE
+  t.pickup_datetime >= '2019-06-03' AND t.pickup_datetime < '2019-07-03'
+GROUP BY
+  t.pickup_location_id,
+  z.zone,
+  z.borough
+ORDER BY
+  trip_count DESC
 LIMIT 20
 ```
 

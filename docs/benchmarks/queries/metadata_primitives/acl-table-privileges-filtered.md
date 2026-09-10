@@ -14,14 +14,18 @@ Rendered in the benchmark's native SQL with default parameters (no dialect trans
 
 ```sql
 SELECT
-    grantee,
-    table_schema,
-    table_name,
-    privilege_type,
-    is_grantable
+  grantee,
+  table_schema,
+  table_name,
+  privilege_type,
+  is_grantable
 FROM information_schema.table_privileges
-WHERE table_name LIKE 'benchbox_%'
-ORDER BY table_name, grantee, privilege_type;
+WHERE
+  table_name LIKE 'benchbox_%'
+ORDER BY
+  table_name,
+  grantee,
+  privilege_type
 ```
 
 ## Representative DataFrame

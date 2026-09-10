@@ -15,7 +15,18 @@ Join when build side produces no rows (edge case handling)
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* join when build side produces no rows (edge case handling) */ SELECT l.* FROM lineitem AS l LEFT JOIN (SELECT * FROM orders WHERE o_totalprice < 0) AS o ON l.l_orderkey = o.o_orderkey
+/* join when build side produces no rows (edge case handling) */
+SELECT
+  l.*
+FROM lineitem AS l
+LEFT JOIN (
+  SELECT
+    *
+  FROM orders
+  WHERE
+    o_totalprice < 0
+) AS o
+  ON l.l_orderkey = o.o_orderkey
 ```
 
 ## Representative DataFrame

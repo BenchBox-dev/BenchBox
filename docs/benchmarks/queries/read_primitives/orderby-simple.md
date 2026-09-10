@@ -15,7 +15,15 @@ Simple ORDER BY single column
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Simple single-column sort with limit */ SELECT o_orderkey, o_orderdate, o_totalprice FROM orders ORDER BY o_orderdate LIMIT 100
+/* Simple single-column sort with limit */
+SELECT
+  o_orderkey,
+  o_orderdate,
+  o_totalprice
+FROM orders
+ORDER BY
+  o_orderdate
+LIMIT 100
 ```
 
 ## Representative DataFrame

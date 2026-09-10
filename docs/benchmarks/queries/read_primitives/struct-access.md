@@ -15,7 +15,25 @@ Access struct fields by name
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Access struct fields */ WITH customer_info AS (SELECT c_custkey, STRUCT(c_name AS name, c_phone AS phone, c_acctbal AS balance) AS info FROM customer WHERE c_nationkey = 1) SELECT c_custkey, info.name, info.balance FROM customer_info WHERE info.balance > 5000 ORDER BY c_custkey LIMIT 100
+/* Access struct fields */
+WITH customer_info AS (
+  SELECT
+    c_custkey,
+    STRUCT(c_name AS name, c_phone AS phone, c_acctbal AS balance) AS info
+  FROM customer
+  WHERE
+    c_nationkey = 1
+)
+SELECT
+  c_custkey,
+  info.name,
+  info.balance
+FROM customer_info
+WHERE
+  info.balance > 5000
+ORDER BY
+  c_custkey
+LIMIT 100
 ```
 
 ## Representative DataFrame

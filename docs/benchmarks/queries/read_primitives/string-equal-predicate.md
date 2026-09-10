@@ -15,7 +15,12 @@ Exact string equality with selective matching
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Exact string equality with selective matching */ SELECT COUNT(*) FROM part WHERE p_brand = 'Brand#23'
+/* Exact string equality with selective matching */
+SELECT
+  COUNT(*)
+FROM part
+WHERE
+  p_brand = 'Brand#23'
 ```
 
 ## Representative DataFrame

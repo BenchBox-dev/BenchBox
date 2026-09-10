@@ -14,14 +14,17 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    table_name,
-    column_name,
-    data_type,
-    character_maximum_length
+  table_name,
+  column_name,
+  data_type,
+  character_maximum_length
 FROM information_schema.columns
-WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+WHERE
+  NOT table_schema IN ('information_schema', 'pg_catalog')
   AND data_type IN ('character varying', 'varchar', 'text', 'char', 'character')
-ORDER BY table_name, column_name;
+ORDER BY
+  table_name,
+  column_name
 ```
 
 ## Representative DataFrame

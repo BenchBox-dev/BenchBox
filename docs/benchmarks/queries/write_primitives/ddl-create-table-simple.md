@@ -14,9 +14,9 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 CREATE TABLE test_simple (
-  id INTEGER,
+  id INT,
   name VARCHAR(100),
-  value DECIMAL(15,2),
+  value DECIMAL(15, 2),
   created DATE,
   status VARCHAR(10)
 )

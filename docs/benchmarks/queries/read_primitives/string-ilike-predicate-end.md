@@ -15,7 +15,12 @@ Case insensitive matching suffix pattern
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Case insensitive matching suffix pattern */ SELECT COUNT(*) FROM part WHERE p_name LIKE '%copper'
+/* Case insensitive matching suffix pattern */
+SELECT
+  COUNT(*)
+FROM part
+WHERE
+  p_name LIKE '%copper'
 ```
 
 ## Representative DataFrame

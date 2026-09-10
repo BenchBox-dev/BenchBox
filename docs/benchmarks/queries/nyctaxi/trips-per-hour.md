@@ -16,13 +16,15 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    EXTRACT(HOUR FROM pickup_datetime) as hour,
-    COUNT(*) as trip_count
+  EXTRACT(HOUR FROM pickup_datetime) AS hour,
+  COUNT(*) AS trip_count
 FROM trips
-WHERE pickup_datetime >= '2019-06-25'
-  AND pickup_datetime < '2019-07-25'
-GROUP BY EXTRACT(HOUR FROM pickup_datetime)
-ORDER BY hour
+WHERE
+  pickup_datetime >= '2019-06-25' AND pickup_datetime < '2019-07-25'
+GROUP BY
+  EXTRACT(HOUR FROM pickup_datetime)
+ORDER BY
+  hour
 ```
 
 ## Representative DataFrame

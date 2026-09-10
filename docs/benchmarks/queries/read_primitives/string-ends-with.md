@@ -15,7 +15,14 @@ String ends_with pattern matching
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* String suffix match */ SELECT p_partkey, p_name, p_type FROM part WHERE p_type LIKE '%BRASS'
+/* String suffix match */
+SELECT
+  p_partkey,
+  p_name,
+  p_type
+FROM part
+WHERE
+  p_type LIKE '%BRASS'
 ```
 
 ## Representative DataFrame

@@ -13,7 +13,40 @@
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT 'Core Tables Referential Integrity' AS validation_name, SUM(CASE WHEN orphaned_customers > 0 THEN 1 ELSE 0 END) + SUM(CASE WHEN orphaned_accounts > 0 THEN 1 ELSE 0 END) + SUM(CASE WHEN orphaned_securities > 0 THEN 1 ELSE 0 END) AS integrity_violations, COUNT(*) AS total_checks FROM (SELECT (SELECT COUNT(*) FROM FactTrade AS f LEFT JOIN DimCustomer AS c ON f.SK_CustomerID = c.SK_CustomerID WHERE c.SK_CustomerID IS NULL) AS orphaned_customers, (SELECT COUNT(*) FROM FactTrade AS f LEFT JOIN DimAccount AS a ON f.SK_AccountID = a.SK_AccountID WHERE a.SK_AccountID IS NULL) AS orphaned_accounts, (SELECT COUNT(*) FROM FactTrade AS f LEFT JOIN DimSecurity AS s ON f.SK_SecurityID = s.SK_SecurityID WHERE s.SK_SecurityID IS NULL) AS orphaned_securities) AS checks
+SELECT
+  'Core Tables Referential Integrity' AS validation_name,
+  SUM(CASE WHEN orphaned_customers > 0 THEN 1 ELSE 0 END) + SUM(CASE WHEN orphaned_accounts > 0 THEN 1 ELSE 0 END) + SUM(CASE WHEN orphaned_securities > 0 THEN 1 ELSE 0 END) AS integrity_violations,
+  COUNT(*) AS total_checks
+FROM (
+  SELECT
+    (
+      SELECT
+        COUNT(*)
+      FROM FactTrade AS f
+      LEFT JOIN DimCustomer AS c
+        ON f.SK_CustomerID = c.SK_CustomerID
+      WHERE
+        c.SK_CustomerID IS NULL
+    ) AS orphaned_customers,
+    (
+      SELECT
+        COUNT(*)
+      FROM FactTrade AS f
+      LEFT JOIN DimAccount AS a
+        ON f.SK_AccountID = a.SK_AccountID
+      WHERE
+        a.SK_AccountID IS NULL
+    ) AS orphaned_accounts,
+    (
+      SELECT
+        COUNT(*)
+      FROM FactTrade AS f
+      LEFT JOIN DimSecurity AS s
+        ON f.SK_SecurityID = s.SK_SecurityID
+      WHERE
+        s.SK_SecurityID IS NULL
+    ) AS orphaned_securities
+) AS checks
 ```
 
 ## Representative DataFrame

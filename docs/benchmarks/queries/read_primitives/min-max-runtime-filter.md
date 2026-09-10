@@ -15,7 +15,18 @@ Bloom filter and runtime filter effectiveness for join optimization
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Bloom filter and runtime filter effectiveness for join optimization */ SELECT l.* FROM lineitem AS l WHERE l.l_orderkey IN (SELECT o_orderkey FROM orders WHERE o_orderdate BETWEEN CAST('1995-01-01' AS DATE) AND CAST('1995-03-31' AS DATE))
+/* Bloom filter and runtime filter effectiveness for join optimization */
+SELECT
+  l.*
+FROM lineitem AS l
+WHERE
+  l.l_orderkey IN (
+    SELECT
+      o_orderkey
+    FROM orders
+    WHERE
+      o_orderdate BETWEEN CAST('1995-01-01' AS DATE) AND CAST('1995-03-31' AS DATE)
+  )
 ```
 
 ## Representative DataFrame

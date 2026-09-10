@@ -15,16 +15,18 @@ Boolean text search with AND/NOT operators
 Rendered in the benchmark's native SQL with default parameters (no dialect translation available).
 
 ```sql
--- Boolean full-text search with operators
+/* Boolean full-text search with operators */
 SELECT
-    c_custkey,
-    c_name,
-    c_comment,
-    MATCH(c_comment) AGAINST ('+BUILDING -FURNITURE' IN BOOLEAN MODE) as relevance_score
+  c_custkey,
+  c_name,
+  c_comment,
+  MATCH(c_comment) AGAINST('+BUILDING -FURNITURE' IN BOOLEAN MODE) AS relevance_score
 FROM customer
-WHERE MATCH(c_comment) AGAINST ('+BUILDING -FURNITURE' IN BOOLEAN MODE)
-ORDER BY relevance_score DESC
-LIMIT 50;
+WHERE
+  MATCH(c_comment) AGAINST('+BUILDING -FURNITURE' IN BOOLEAN MODE)
+ORDER BY
+  relevance_score DESC
+LIMIT 50
 ```
 
 ## Representative DataFrame

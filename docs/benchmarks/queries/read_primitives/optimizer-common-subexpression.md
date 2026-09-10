@@ -15,7 +15,55 @@ Test Common Subexpression Elimination (CSE)
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Test Common Subexpression Elimination (CSE) optimization */ /* Good optimizers should compute the complex expression once and reuse it */ SELECT l_orderkey, l_partkey, l_suppkey, l_linenumber, l_quantity * l_extendedprice * (1 - l_discount) * (1 + l_tax) AS revenue_with_tax, CASE WHEN l_quantity * l_extendedprice * (1 - l_discount) * (1 + l_tax) > 50000 THEN 'High Value' WHEN l_quantity * l_extendedprice * (1 - l_discount) * (1 + l_tax) > 10000 THEN 'Medium Value' ELSE 'Low Value' END AS value_category, ROUND(l_quantity * l_extendedprice * (1 - l_discount) * (1 + l_tax), 2) AS rounded_revenue FROM lineitem WHERE l_shipdate >= CAST('1995-01-01' AS DATE) AND l_shipdate < CAST('1996-01-01' AS DATE) AND l_quantity * l_extendedprice * (1 - l_discount) * (1 + l_tax) > 1000 ORDER BY l_quantity * l_extendedprice * (1 - l_discount) * (1 + l_tax) DESC, l_orderkey, l_linenumber LIMIT 5000
+/* Test Common Subexpression Elimination (CSE) optimization */ /* Good optimizers should compute the complex expression once and reuse it */
+SELECT
+  l_orderkey,
+  l_partkey,
+  l_suppkey,
+  l_linenumber,
+  l_quantity * l_extendedprice * (
+    1 - l_discount
+  ) * (
+    1 + l_tax
+  ) AS revenue_with_tax,
+  CASE
+    WHEN l_quantity * l_extendedprice * (
+      1 - l_discount
+    ) * (
+      1 + l_tax
+    ) > 50000
+    THEN 'High Value'
+    WHEN l_quantity * l_extendedprice * (
+      1 - l_discount
+    ) * (
+      1 + l_tax
+    ) > 10000
+    THEN 'Medium Value'
+    ELSE 'Low Value'
+  END AS value_category,
+  ROUND(l_quantity * l_extendedprice * (
+    1 - l_discount
+  ) * (
+    1 + l_tax
+  ), 2) AS rounded_revenue
+FROM lineitem
+WHERE
+  l_shipdate >= CAST('1995-01-01' AS DATE)
+  AND l_shipdate < CAST('1996-01-01' AS DATE)
+  AND l_quantity * l_extendedprice * (
+    1 - l_discount
+  ) * (
+    1 + l_tax
+  ) > 1000
+ORDER BY
+  l_quantity * l_extendedprice * (
+    1 - l_discount
+  ) * (
+    1 + l_tax
+  ) DESC,
+  l_orderkey,
+  l_linenumber
+LIMIT 5000
 ```
 
 ## Representative DataFrame

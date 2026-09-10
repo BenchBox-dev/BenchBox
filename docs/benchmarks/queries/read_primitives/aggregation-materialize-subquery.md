@@ -15,7 +15,28 @@ Complex nested aggregation with joins
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-/* Complex nested aggregation requiring materialization of a subquery with joins */ SELECT c_mktsegment, AVG(order_total) AS avg_segment_order FROM (SELECT c.c_mktsegment, o.o_orderkey, SUM(l.l_extendedprice * (1 - l.l_discount)) AS order_total FROM customer AS c JOIN orders AS o ON c.c_custkey = o.o_custkey JOIN lineitem AS l ON o.o_orderkey = l.l_orderkey GROUP BY c.c_mktsegment, o.o_orderkey) AS subq GROUP BY c_mktsegment
+/* Complex nested aggregation requiring materialization of a subquery with joins */
+SELECT
+  c_mktsegment,
+  AVG(order_total) AS avg_segment_order
+FROM (
+  SELECT
+    c.c_mktsegment,
+    o.o_orderkey,
+    SUM(l.l_extendedprice * (
+      1 - l.l_discount
+    )) AS order_total
+  FROM customer AS c
+  JOIN orders AS o
+    ON c.c_custkey = o.o_custkey
+  JOIN lineitem AS l
+    ON o.o_orderkey = l.l_orderkey
+  GROUP BY
+    c.c_mktsegment,
+    o.o_orderkey
+) AS subq
+GROUP BY
+  c_mktsegment
 ```
 
 ## Representative DataFrame

@@ -16,9 +16,10 @@ Rendered for **DataFusion** with default parameters.
 
 ```sql
 SELECT
-    COUNT(*) as orders_by_month
+  COUNT(*) AS orders_by_month
 FROM orders
-WHERE o_orderdate = TO_DATE('1995-03-15');
+WHERE
+  o_orderdate = TO_DATE('1995-03-15')
 ```
 
 ## Representative DataFrame

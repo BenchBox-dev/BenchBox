@@ -15,7 +15,20 @@ Join uservisits to rankings with pageRank filter
 Rendered for **DataFusion** with default parameters.
 
 ```sql
-SELECT uv.destURL, uv.visitDate, uv.adRevenue, r.pageRank, r.avgDuration FROM uservisits AS uv JOIN rankings AS r ON uv.destURL = r.pageURL WHERE r.pageRank > 1000 AND uv.visitDate >= '2000-01-01' ORDER BY r.pageRank DESC LIMIT 100
+SELECT
+  uv.destURL,
+  uv.visitDate,
+  uv.adRevenue,
+  r.pageRank,
+  r.avgDuration
+FROM uservisits AS uv
+JOIN rankings AS r
+  ON uv.destURL = r.pageURL
+WHERE
+  r.pageRank > 1000 AND uv.visitDate >= '2000-01-01'
+ORDER BY
+  r.pageRank DESC
+LIMIT 100
 ```
 
 ## Representative DataFrame
