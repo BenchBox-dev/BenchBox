@@ -381,3 +381,29 @@ html_sidebars = {
         "sidebar/scroll-end.html",  # Scroll container end
     ],
 }
+
+
+# =============================================================================
+# Per-query template pages
+# =============================================================================
+# docs/benchmarks/queries/ is generated, not committed: TPC query text is not
+# byte-identical across CPU architectures, so a committed tree cannot be
+# drift-checked. Regenerate it here so every build -- local or CI -- renders
+# the pages for its own host. Runs in a subprocess to keep the generator's
+# imports out of the autodoc process.
+def _generate_query_docs(app, config):
+    import subprocess
+
+    script = DOCS_ROOT.parent / "scripts" / "generate_query_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script)],
+        capture_output=True,
+        text=True,
+        cwd=DOCS_ROOT.parent,
+    )
+    if result.returncode != 0:
+        raise RuntimeError("generate_query_docs.py failed:\n" + result.stdout + result.stderr)
+
+
+def setup(app):
+    app.connect("config-inited", _generate_query_docs)

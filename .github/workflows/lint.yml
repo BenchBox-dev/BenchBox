@@ -55,9 +55,6 @@ jobs:
       - name: Compatibility docs drift check
         run: make compat-docs-check
 
-      - name: Query docs drift check
-        run: make query-docs-check
-
       - name: Platform manifest drift check
         if: hashFiles('_project/scripts/platform_manifest.py') != ''
         run: make platform-manifest-check
