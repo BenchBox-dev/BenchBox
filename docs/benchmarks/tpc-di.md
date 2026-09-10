@@ -137,6 +137,12 @@ queries (in `benchbox/core/tpcdi/queries.py`) plus 30 extended queries
 spread across `query_validation.py` (12), `query_analytics.py` (10), and
 `query_etl.py` (8).
 
+```{tip}
+Each query has a [query template](queries/tpcdi/index.md) with a representative
+SQL rendering, plus how to extract the exact statement for your platform and
+scale.
+```
+
 ### Base Validation Queries (V1-V3)
 
 | Query | Purpose | Validation Focus |

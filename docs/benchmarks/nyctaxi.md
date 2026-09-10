@@ -6,6 +6,8 @@
 ```
 
 > **CLI name:** `nyctaxi` - use `benchbox run --benchmark nyctaxi`
+>
+> **Query templates:** [every NYC Taxi query](queries/nyctaxi/index.md)
 
 ## Overview
 

@@ -132,7 +132,13 @@ erDiagram
 
 ## Query Characteristics
 
-The 13 SSB queries are organized into 4 flights that test different aspects of analytical query performance:
+The 13 SSB queries are organized into 4 flights that test different aspects of analytical query performance.
+
+```{tip}
+Each query has a [query template](queries/ssb/index.md) with a representative
+SQL and DataFrame rendering, plus how to extract the exact statement for your
+platform and scale.
+```
 
 ### Flight 1: Simple Aggregation Queries (Q1.1 - Q1.3)
 

@@ -4,6 +4,8 @@
 ```
 
 > **CLI name:** `joinorder` - use `benchbox run --benchmark joinorder --scale 1`
+>
+> **Query templates:** [every Join Order Benchmark query](queries/joinorder/index.md)
 
 BenchBox's public Join Order Benchmark implementation uses the canonical IMDb
 2013 dataset used by the JOB paper, "How Good Are Query Optimizers, Really?"

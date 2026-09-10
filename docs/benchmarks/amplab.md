@@ -93,7 +93,13 @@ erDiagram
 
 ## Query Characteristics
 
-The AMPLab benchmark includes three primary query patterns that test different aspects of big data processing:
+The AMPLab benchmark includes three primary query patterns that test different aspects of big data processing.
+
+```{tip}
+Each query has a [query template](queries/amplab/index.md) with a representative
+SQL and DataFrame rendering, plus how to extract the exact statement for your
+platform and scale.
+```
 
 ### Query 1: Scan Query (Data Filtering and Aggregation)
 

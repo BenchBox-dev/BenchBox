@@ -6,6 +6,8 @@
 ```
 
 > **CLI name:** `coffeeshop` - use `benchbox run --benchmark coffeeshop`
+>
+> **Query templates:** [every CoffeeShop query](queries/coffeeshop/index.md)
 
 ## Overview
 

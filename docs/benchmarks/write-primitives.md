@@ -6,6 +6,8 @@
 ```
 
 > **CLI name:** `write_primitives` - use `benchbox run --benchmark write_primitives`
+>
+> **Query templates:** [every Write Primitives query](queries/write_primitives/index.md)
 
 ## Overview
 

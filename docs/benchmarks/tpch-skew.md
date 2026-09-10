@@ -6,6 +6,8 @@
 ```
 
 > **CLI name:** `tpch_skew` - use `benchbox run --benchmark tpch_skew`
+>
+> **Query templates:** [every TPC-H Skew query](queries/tpch_skew/index.md)
 
 ## Overview
 
