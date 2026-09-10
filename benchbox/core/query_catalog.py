@@ -428,7 +428,10 @@ def query_groups(benchmark_id: str) -> dict[str, list[str]] | None:
     grouped: dict[str, list[str]] = {}
     seen: set[str] = set()
     for name, members in raw.items():
-        kept = [q for q in ids if q in members and q in known]
+        member_set = set(members)
+        # First group to claim a query keeps it: overlapping source categories
+        # would otherwise place one query page under two group-page toctrees.
+        kept = [q for q in ids if q in member_set and q in known and q not in seen]
         if kept:
             grouped[name] = kept
             seen.update(kept)
