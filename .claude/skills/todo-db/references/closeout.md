@@ -20,32 +20,16 @@ Before modifying code, confirm that the review report matches reality:
 
 ## Phase 2 — remediate findings
 
-1. Fix all critical and required findings within the item's scope rules.
+1. Fix all critical and required findings.
 2. Run local tests to prove each fix.
 3. Record fixes with git commits using explicit paths (`git add <file>`).
-4. If a finding uncovers necessary work outside the batch scope, call
-   `defer(id=..., summary=..., reason=...)` rather than widening scope.
+4. If a finding uncovers necessary work outside the batch scope,
+   `create_item` a follow-up with `needs` pointing at the current item
+   rather than widening scope silently.
 
 ## Phase 3 — close tracker items
 
-1. **Resolve deferrals**:
-   - Call `promote_deferral(deferral_id=...)` to generate a follow-up item
-     (the new item ID is returned in `new_item`).
-   - Call `dismiss_deferral(deferral_id=..., reason=...)` for rejected items.
-2. **Complete items**:
-   - If the agent holds the claim, call `finish(id=..., claim_token=...)`.
-   - If closing externally merged work without an active claim, tell the human
-     to run the floor verb:
-     `todo-db complete <id> --pr <pr-number>`
-3. **Drop unneeded items**:
-   - If work proved unnecessary, call `drop(id=..., reason=...)` (requires `--profile full`).
-
-## Close-out report
-
-Provide a final summary table:
-
-| TODO | Finding | Action Taken | Verification | PR / Commit |
-|---|---|---|---|---|
-| `ITEM-1` | Scope leak in auth | Refactored into helper | `pytest tests/test_auth.py` | `abc1234` |
-
-State whether the batch is completely closed or what blockers remain.
+1. If you hold the claim, call `finish(id=..., generation=...)`.
+2. If closing externally merged work without an active claim, `take` the
+   item first (or tell the human to close it if it is claimed by someone
+   else).

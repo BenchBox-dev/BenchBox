@@ -43,10 +43,7 @@ fall back to the Makefile, manifests, and project agent docs.
   authorized-write PRs.
 - The `commit` action handles existing changes; other repository write actions
   commit without a separate commit request.
-- `review`, `adversarial`, `research`, `compare`, `to-spec`, and `handoff`
-  are read-only under `shared-review-protocol/SKILL.md`. Remediation requires a
-  later user message after findings. `review --chain` and `shrink` follow their
-  action references.
+- A request asking only for `review`, `adversarial`, `research`, `compare`, `to-spec`, or `handoff` remains read-only under `shared-review-protocol/SKILL.md`: report findings and stop, with remediation requiring a later user message authorizing it. A request that explicitly asks for both the review-shaped action and remediation authorizes both in the same turn (see §1 [REVIEW-AUTH-001]). `review --chain` and `shrink` follow their action references.
 - An inspection-only request for `sweep` or `backlog` remains read-only under
   `shared-review-protocol/SKILL.md`. A request to run, execute, or clear
   executes their authorized workflow.

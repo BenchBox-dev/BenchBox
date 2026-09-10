@@ -1,43 +1,47 @@
 ---
 name: todo-db
-description: Use when working in a project tracked by todo-db — "what should I work on", "what's ready", "claim a TODO", "start work on an item", "record progress", "finish an item", "create a TODO", "add a work item", "check scope", "release my claim", "why did finish fail", "tracker stats", "prioritize TODOs", "batch implementation", "batch handoff", "closeout", "write a spec", "ideate", "review TODO", "capture a finding". Drives the tracker through the todo-db MCP server.
+description: Use when working in a project tracked by todo-db — "what should I work on", "what's ready", "claim a TODO", "finish an item", "create a TODO", "release my claim", "why did finish fail", "batch implementation", "batch handoff", "closeout", "write a spec", "ideate", "review TODO". Drives the tracker through the todo-db MCP server.
 ---
 
 # todo-db
 
-The tracker is driven through **MCP tool calls**, not shell commands. Planning
-and the working loop exist only as tools; the `todo-db` CLI keeps a small floor
-of human and CI verbs listed at the end of this page. If the tools are not
-available, the MCP server is not registered — see
-`docs/operations/mcp-clients.md` in the todo-db repository.
+The tracker is driven through **MCP tool calls**, not shell commands. The
+working loop exists only as tools; the `todo-db` CLI keeps bootstrap,
+validation, migration, and recovery for humans and CI, listed at the end
+of this page. If the tools are not available, the MCP server is not
+registered — see `docs/operations/mcp-clients.md` in the todo-db
+repository.
+
+Task state is JSON (`index.json` plus `items/<id>.json`) published on a
+dedicated Git state branch. Never hand-edit state-branch files; every
+change goes through a tool so publication stays atomic.
 
 ## Critical rules
 
-- Call `get_instructions` first in a session. It returns this protocol and, on
-  clients that supply no explicit actor, pins your audit principal.
-- The loop tools (`next`, `take`, `context`, `progress`) return a
-  `next_action`: `{"tool": ..., "arguments": {...}}`. Follow it rather than
-  guessing. Query and planning tools return their result alone. An idle `next`
-  returns `{"action": "wait", ...}` with no tool to call.
-- One active claim per principal. Taking a second item without releasing or
-  finishing is refused; call `claims` to see what you hold.
-- Only the claim holder may `progress`, `finish`, or `release` an item. Keep
-  the `claim_token` from `take`; re-read it with `context` after a restart.
-- Never hand-edit tracker state, and never create tracker files. The database
-  is the only store.
-- Do **not** run the stored verification commands yourself. A human runs them
-  with `todo-db verify-run`.
+- Call `get_instructions` first in a session. It returns this protocol and,
+  on clients that supply no explicit actor, pins your worker identity.
+- One server instance is one worker identity. Run separate servers with
+  different `--actor` values for concurrent workers.
+- One live claim per worker. Taking a second item without releasing or
+  finishing is refused with `E_MULTIPLE_CLAIMS`.
+- Only the claim holder may `renew`, `finish`, or `release` an item. Keep
+  the `generation` from `take`; after a restart, `take` the same item
+  again to re-adopt (fresh generation, refreshed lease — any earlier
+  process image holding the old generation goes stale).
+- Never hand-edit tracker state, and never invent a second store. The
+  state branch is the only store.
 
 ## The loop
 
 | Step | Tool | Notes |
 |---|---|---|
-| 1 | `next` | Ready queue, or the claim you already hold. |
-| 2 | `take` | Claim an item. Omit `id` to take the top of the queue. |
-| 3 | `context` | Bounded context for the claimed item; re-reads `claim_token`. |
-| 4 | `progress` | One work unit at a time, with real evidence. Refreshes the lease. |
-| 5 | `finish` | The close gate. |
-| — | `release` | Hand the claim back without finishing. |
+| 1 | `list_items` | Brief rows; filters `status`, `priority`, `text`, `ready_only`; paging with `limit` (default 5) + `cursor`. |
+| 2 | `take` | Claim a task. Returns the claim `generation` plus enough context to begin work. |
+| 3 | `show_item` | One task with needs, readiness, and sections. Large fields spill to `field`/`offset`/`budget` reads. |
+| 4 | `renew` | Extend a long-running claim. Same generation; no progress milestones required. |
+| 5 | `finish` | Close the task with the `generation` from `take`. No work breakdown or attestation required. |
+| — | `release` | Hand the claim back without finishing (needs the `generation`). |
+| — | `drop` | Abandon a task as dropped. Unclaimed tasks drop freely; a live claim needs its `generation`. |
 
 ## Reading the response envelope
 
@@ -46,74 +50,59 @@ available, the MCP server is not registered — see
 {"ok": false, "code": "E_...", "error": "...", "recovery": [...], "kind": "gate|error"}
 ```
 
-`get_instructions` returns markdown text directly; all other query, work, and
-planning tools return the `{ok, ...}` JSON envelope.
+`get_instructions` returns markdown text directly; the nine task tools
+return the `{ok, ...}` JSON envelope.
 
 `kind: "gate"` is an expected result you should act on. `kind: "error"` is an
 environment or protocol failure — stop and report it. The `recovery` list names
 concrete next steps; read it before improvising.
 
-Responses are capped at 16 KiB. List tools page rather than truncate silently:
-pass a smaller `limit` and a `cursor`, or request a `section`.
+Responses are capped at 16 KiB. Lists page with cursors scoped to a state
+revision: `E_CURSOR_STALE` means the branch moved under you — restart from
+the first page, never skip ahead.
 
 ## Gates and what to do about them
 
 | Code | Meaning | Do |
 |---|---|---|
-| `E_NOTHING_READY` | Ready queue is empty. | Report it. Do not invent work. |
-| `E_MULTIPLE_CLAIMS` | You already hold a claim. | `claims`, then finish or `release` it. |
-| `E_CLAIM_STALE` | Your lease expired or the token is wrong. | `context` to re-read, or `take` again. |
-| `E_SCOPE_GATE` | A changed file is outside the item's scope rules. | `check_scope`; narrow the change or amend scope with `update_item`. |
-| `E_LINT_GATE` | The item's planning quality is insufficient. | `lint` to see why; fix with `update_item`. |
-| `E_VERIFY_GATE` | No current workspace attestation. | Stop. A human runs the `todo-db verify-run` command in `recovery`. |
-| `E_BASE_DIVERGED` / `E_BASE_UNREACHABLE` | The scope git baseline no longer resolves. | Stop and report; a human runs `todo-db rebaseline`. |
-| `E_NO_PRINCIPAL` | Principal not resolved. | Call `get_instructions`, then retry. |
-| `E_OUTPUT_TRUNCATED` | Response exceeded 16 KiB. | Retry with a smaller `limit` plus `cursor`, or a `section`. |
-| `E_IDENTITY` | The database belongs to another project. | Stop. This is the isolation guarantee, not a bug. |
-| `E_SCHEMA` / `E_SCHEMA_BEHIND` / `E_SCHEMA_DIVERGED` | Schema mismatch. | Stop; a human runs `todo-db migrate`. |
-| `E_NO_PROJECT` | No project identity resolved. | Run `doctor`; a human fixes `.todo-db/config.json`. |
-| `E_AUDIT` | Audit chain verification failed. | Stop immediately and report; do not write. |
-| `E_HOSTED` | Hosted backend problem. | Report it; hosted access is configured outside the agent. |
-| `E_AUTH_MISSING` / `E_AUTH_REJECTED` | Hosted credential missing or rejected. | Stop writing. Report it; credentials are provisioned outside the agent. |
-
-`E_SCOPE_GATE` and `E_VERIFY_GATE` are the two that most often end a session.
-Neither is worked around — scope is narrowed or amended deliberately, and
-verification is a human step.
+| `E_NOTHING_READY` | Nothing claimable. | Report it. Do not invent work. |
+| `E_MULTIPLE_CLAIMS` | You already hold a claim. | Finish or `release` it first. |
+| `E_CLAIM_STALE` | Wrong generation or another holder. | `show_item`, then `take` again if it is free. |
+| `E_CONFLICT` | Someone changed the task first. | Re-read, re-evaluate; never overwrite blindly. |
+| `E_CURSOR_STALE` | State moved under your pages. | Restart listing without a cursor. |
+| `E_OVERSIZED` | One field exceeds the cap. | Read it with `show_item` `field`/`offset`/`budget`. |
+| `E_OUTPUT_TRUNCATED` | Response exceeded 16 KiB. | Narrow filters, smaller `limit`, or a section read. |
+| `E_NO_PRINCIPAL` | Identity not resolved. | Call `get_instructions`, then retry. |
+| `E_OFFLINE` | Remote unreachable. | Reads may be cached and marked stale; mutations fail — retry when reachable. |
+| `E_UNKNOWN` | Outcome undetermined. | Reconcile with the operation ID in `recovery`; do not re-apply blindly. |
+| `E_STATE` | Malformed state or rejected request. | Read the message; report it if you cannot fix the request. |
+| `E_SCHEMA` | State format newer than this package. | Stop; a human upgrades the package. |
 
 ## Planning
 
-`create_item` takes the work breakdown, scope rules, preserves, and
-verifications together. Titles must be non-empty and descriptions must be at
-least 10 characters. An item created without scope rules or verifications will
-fail `lint` and then `finish`, so supply them up front:
+`create_item` takes `id`, `title`, and optionally `priority` (default
+`medium`), `description`, `needs` (IDs this task waits on), `acceptance`,
+`links`, and `context`. IDs use `a-z0-9-` (start/end alphanumeric).
+Titles are 1–200 characters. There is no work breakdown, scope gate, or
+verification ladder: an ordinary task closes with `take` + `finish`.
 
-- **work** — the ordered work units, each independently evidenced.
-- **scope** — the paths the item may touch (`only_modify` and optional
-  `do_not_modify`). Keep it tight; a wide scope defeats the gate.
-- **verifications** — the commands with `description` and `command` that prove
-  the work, for a human to run.
+`update_item` amends title/priority/description/needs/sections, or moves
+status between `open` and `blocked`. Closing goes through `finish`;
+dropping a task is a human decision reported to the user.
 
-Use `update_item` to amend an item without touching its lifecycle, and
-`add_dependency(id=..., needs=...)` to record that one item needs another.
-`ready` only returns items whose dependencies are met and that are not blocked.
+`list_items(ready_only=true)` returns only claimable tasks: `open`,
+unclaimed, dependencies all `done`. Readiness and unlock counts are
+computed by the program — never scan history yourself.
 
 ## Finding the right tool
 
 | You want to | Tool |
 |---|---|
-| See what is ready | `ready`, `next` |
-| Inspect one item | `show_item`, `context` |
-| List items | `list_items`, `deps` |
-| Create or amend work | `create_item`, `update_item`, `add_dependency` |
-| Record or close work | `start_unit`, `progress`, `finish`, `release` |
-| Check before committing | `check_scope`, `lint`, `verify_list` |
-| Park work | `defer`, `deferrals`, `promote_deferral`, `dismiss_deferral` |
-| Health check | `doctor`, `stats` |
-| Back up or audit | `export` |
-| See what you hold | `claims` |
-| Capture an observation | `finding_create` (needs `--profile full`) |
-
-`verify_list` shows the stored verification commands; it never runs them.
+| See what is ready | `list_items(ready_only=true)` |
+| Inspect one item | `show_item` |
+| List or search items | `list_items` with `status`/`priority`/`text` |
+| Create or amend work | `create_item`, `update_item` |
+| Claim, extend, close, hand back, drop | `take`, `renew`, `finish`, `release`, `drop` |
 
 ## Process guides
 
@@ -128,24 +117,19 @@ For multi-step workflows, follow the dedicated reference guide:
 | ideate | Refine a rough idea into an actionable problem statement | `references/ideate.md` |
 | spec | Structure a specification for ingestion by `create_item` | `references/spec.md` |
 | implement | Drive a claimed item through the working loop | `references/implement.md` |
-| review | Audit planning quality, scope precision, and verification commands | `references/review.md` |
-| queries | Search, filter, and manage items without direct SQL | `references/queries.md` |
-| bootstrap | Initialize project config and verify hosted database health | `references/bootstrap.md` |
-| recovery | Resolve gate codes, claim conflicts, and environment errors | `references/recovery.md` |
+| review | Audit task quality and readiness before closing | `references/review.md` |
+| queries | Search, filter, and read items with bounded output | `references/queries.md` |
+| bootstrap | Initialize state-branch config for a repository | `references/bootstrap.md` |
+| recovery | Resolve error codes, conflicts, and offline states | `references/recovery.md` |
 
 ## Human-only floor verbs
 
-These are not tools. When you hit a gate that needs one, stop and tell the
+These are not tools. When you hit a condition that needs one, stop and tell the
 human the exact command:
 
-- `todo-db verify-run <id> --claim-token <token> --actor <principal>` — runs the
-  verification ladder once and binds a workspace attestation. It attests; it
-  does not complete the item. Your `finish` call remains the closer.
-- `todo-db --actor <principal> rebaseline <id> --reason "<why>"` — audited update
-  of an item's scope baseline.
-- `todo-db complete <id>` — human completion path.
-- `todo-db finding sync` — lands finding drafts into the tracker.
+- `todo-db bootstrap --state-remote <url> [--write-config]` — create the state branch.
+- `todo-db validate` — check the accepted tip and report counts.
+- `todo-db migrate --from-export <file> --backup-dir <dir> [--dry-run]` — migrate a legacy v2 export onto a freshly bootstrapped branch. Dry-run first; a real run requires `--backup-dir`.
+- `todo-db recover --op-id <id>` / `--restore-rev <sha>` / `--limit N` — reconcile, restore, history.
 
-Details: `references/recovery.md` and `references/implement.md`.
-
-
+Details: `references/recovery.md` and `references/bootstrap.md`.
