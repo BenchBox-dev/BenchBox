@@ -1199,4 +1199,26 @@ describe("BenchmarkIndex", () => {
     );
     expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "power"]);
   });
+
+  it("filters list view rows by the selected phase when multiple phases exist at the same scale", async () => {
+    const mixedRows = [
+      ...RESULT_ROWS,
+      {
+        ...RESULT_ROWS[0],
+        result_id: "standard-r1",
+        test_type: "standard",
+        platform: "ClickHouse",
+        platform_id: "clickhouse",
+      },
+    ];
+    vi.mocked(queryRows).mockImplementation(defaultImpl(mixedRows, RANKING_ROWS, CELL_ROWS));
+
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+
+    const listSection = container.querySelector("#benchmark-section-list");
+    expect(listSection).toBeTruthy();
+    expect(within(listSection as HTMLElement).getByText("Showing 2 of 2 results for SF 0.1")).toBeTruthy();
+    expect(within(listSection as HTMLElement).queryByText("ClickHouse")).toBeNull();
+  });
 });

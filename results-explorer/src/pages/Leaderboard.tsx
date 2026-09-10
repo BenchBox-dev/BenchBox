@@ -168,6 +168,7 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
 
   useEffect(() => {
     let cancelled = false;
+    setMetaLeaderboardLoaded(false);
     markExplorerPerformance(EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_START, { once: true });
     getMetaLeaderboardData()
       .then((data) => {
@@ -192,7 +193,7 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [resultsRetryToken]);
 
   // Cold-load mitigation (N5 in pass-2 review): unfiltered listResults() can briefly
   // resolve to [] on a cold DuckDB-WASM attach while the meta-leaderboard
