@@ -1041,7 +1041,13 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         <h2 id="benchmark-heading-list" class="mb-3 text-lg font-semibold text-[var(--bb-data-fg-primary)]">
           List
         </h2>
-        <ListTable benchmark={benchmark} results={results} scaleFactor={effectiveSf} facets={facets} />
+        <ListTable
+          benchmark={benchmark}
+          results={results}
+          scaleFactor={effectiveSf}
+          phase={effectivePhase}
+          facets={facets}
+        />
       </section>
 
       <ExcludedRunsDisclosure rows={excludedRows} />
@@ -1172,11 +1178,13 @@ function ListTable({
   benchmark,
   results,
   scaleFactor,
+  phase,
   facets,
 }: {
   benchmark: string;
   results: ResultRow[];
   scaleFactor: string;
+  phase?: string;
   facets: FacetState;
 }) {
   const [sort, setSort] = useState<SortState<BenchmarkListSortKey>>({
@@ -1186,9 +1194,13 @@ function ListTable({
   const [visibleLimit, setVisibleLimit] = useState(TABLE_RENDER_LIMIT);
   const benchmarkResults = results.filter((r) => canonicalBenchmarkSlug(r.benchmark) === canonicalBenchmarkSlug(benchmark));
 
-  const byScale = benchmarkResults.filter((r) => String(r.scale_factor) === scaleFactor);
+  const byCohort = benchmarkResults.filter((r) => {
+    if (String(r.scale_factor) !== scaleFactor) return false;
+    if (phase && canonicalPhase(r.test_type) !== phase) return false;
+    return true;
+  });
 
-  const filtered = byScale
+  const filtered = byCohort
     .filter((row) => matchesFacetRow(row, facets, { keys: BENCHMARK_ROW_FACET_KEYS }))
     .sort((a, b) => compareListRows(a, b, sort));
   const [groupBy, setGroupBy] = useState<CohortGroupBy>("none");
@@ -1219,6 +1231,7 @@ function ListTable({
   }, [
     benchmark,
     scaleFactor,
+    phase,
     facets.platform,
     facets.execution_mode,
     facets.tuning_mode,

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/db", () => ({
   queryRows: vi.fn(),
+  resetDuckDbInitializationFailures: vi.fn(),
 }));
 
 import { queryRows } from "@/db";
@@ -151,6 +152,43 @@ describe("Leaderboard", () => {
     expect(screen.getByText(/The rankings loaded, but the run list did not/)).toBeTruthy();
     expect(screen.queryByText("Initializing static DuckDB snapshot...")).toBeNull();
     expect(screen.queryByText("Recent results")).toBeNull();
+  });
+
+  it("retries both results and meta-leaderboard data when onRetry is clicked", async () => {
+    let resultCalls = 0;
+    let metaCalls = 0;
+    let shouldFail = true;
+
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.includes("FROM bench.results")) {
+        resultCalls += 1;
+        if (shouldFail) throw new Error("Network error loading results");
+        return RESULT_ROWS;
+      }
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        metaCalls += 1;
+        if (shouldFail) throw new Error("Network error loading metadata");
+        return META_LEADERBOARD_ROWS;
+      }
+      if (s.includes("FROM bench.cohort_metadata")) {
+        return COHORT_ROWS;
+      }
+      return [];
+    });
+
+    render(<Leaderboard />);
+
+    await waitFor(() => expect(screen.getByText("Could not load results")).toBeTruthy());
+    expect(resultCalls).toBe(1);
+    expect(metaCalls).toBe(1);
+
+    shouldFail = false;
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
+    expect(resultCalls).toBe(2);
+    expect(metaCalls).toBe(2);
   });
 
   it("renders the leaderboard-first product identity and dense cohort controls", async () => {
