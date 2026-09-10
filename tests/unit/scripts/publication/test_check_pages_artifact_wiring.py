@@ -47,6 +47,11 @@ def _iter_step_strings(workflow: dict) -> tuple[str, str, str]:
     for job_name, job in jobs.items():
         if not isinstance(job, dict):
             continue
+        job_outputs = job.get("outputs") or {}
+        if isinstance(job_outputs, dict):
+            for output_name, value in job_outputs.items():
+                if isinstance(value, str):
+                    yield job_name, f"outputs.{output_name}", value
         steps = job.get("steps") or []
         for step in steps:
             if not isinstance(step, dict):
@@ -125,6 +130,40 @@ def test_matching_step_output_reference_passes(tmp_path: Path) -> None:
         "      - uses: actions/github-script@v7\n"
         "        with:\n"
         "          script: const id = ${{ steps.upload_pages.outputs.artifact_id }};\n",
+        "utf-8",
+    )
+    assert find_unknown_step_outputs(workflow) == []
+
+
+def test_unknown_job_output_reference_is_reported(tmp_path: Path) -> None:
+    workflow = tmp_path / "workflow.yml"
+    workflow.write_text(
+        "jobs:\n"
+        "  build:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    outputs:\n"
+        "      candidate_id: ${{ steps.upload_candidate.outputs.artifact_id }}\n"
+        "    steps:\n"
+        "      - id: upload_candidate\n"
+        "        uses: actions/upload-artifact@v4\n",
+        "utf-8",
+    )
+    problems = find_unknown_step_outputs(workflow)
+    assert len(problems) == 1
+    assert "steps.upload_candidate.outputs.artifact_id" in problems[0]
+
+
+def test_matching_job_output_reference_passes(tmp_path: Path) -> None:
+    workflow = tmp_path / "workflow.yml"
+    workflow.write_text(
+        "jobs:\n"
+        "  build:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    outputs:\n"
+        "      candidate_id: ${{ steps.upload_candidate.outputs.artifact-id }}\n"
+        "    steps:\n"
+        "      - id: upload_candidate\n"
+        "        uses: actions/upload-artifact@v4\n",
         "utf-8",
     )
     assert find_unknown_step_outputs(workflow) == []

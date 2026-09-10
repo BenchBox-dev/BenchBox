@@ -89,9 +89,11 @@ jobs:
           git fetch origin refs/heads/publication:refs/heads/publication || true
           DEVELOP_SHA="${INPUT_DEVELOP_SHA:-$(git rev-parse refs/remotes/origin/develop)}"
           PUBLISHED_RESULTS_SHA="${INPUT_PUBLISHED_RESULTS_SHA:-$(git rev-parse refs/remotes/origin/published-results)}"
+          STATE_JSON=$(git show refs/heads/publication:publication/transaction-state/state.json 2>/dev/null || echo '{}')
+          JOURNAL_NEXT_GEN=$(printf '%s' "$STATE_JSON" | jq -r '.next_generation // empty')
           GENERATION="$INPUT_GENERATION"
           if [ -z "$GENERATION" ]; then
-            GENERATION=$(git show refs/heads/publication:publication/transaction-state/state.json 2>/dev/null | jq -r '.next_generation // 1' || echo 1)
+            GENERATION="${JOURNAL_NEXT_GEN:-1}"
           fi
           APPROVED_MANIFEST_DIGEST="$INPUT_APPROVED_MANIFEST_DIGEST"
           APPROVED_CANDIDATE_RUN_ID="$INPUT_APPROVED_CANDIDATE_RUN_ID"
@@ -133,6 +135,15 @@ jobs:
             echo "::error::generation must be a positive decimal CAS generation"
             exit 1
           }
+          if [ -n "$JOURNAL_NEXT_GEN" ]; then
+            [ "$GENERATION" -le "$JOURNAL_NEXT_GEN" ] || {
+              echo "::error::generation $GENERATION exceeds journal next_generation $JOURNAL_NEXT_GEN"
+              exit 1
+            }
+          elif [ "$GENERATION" -gt 1 ]; then
+            echo "::error::generation $GENERATION exceeds initial journal generation 1"
+            exit 1
+          fi
           if [ -n "$APPROVED_MANIFEST_DIGEST" ]; then
             printf '%s' "$APPROVED_MANIFEST_DIGEST" | grep -qE '^[0-9a-f]{64}$' || {
               echo "::error::approved_manifest_digest must be a lowercase SHA-256 digest"
@@ -234,6 +245,13 @@ jobs:
                   echo "::error::durable generation $PARENT_GENERATION does not precede generation $GENERATION"
                   exit 1
                 }
+                JOURNAL_NEXT_GEN=$(printf '%s' "$STATE_JSON" | jq -r '.next_generation // empty')
+                if [ -n "$JOURNAL_NEXT_GEN" ]; then
+                  [ "$GENERATION" -le "$JOURNAL_NEXT_GEN" ] || {
+                    echo "::error::generation $GENERATION exceeds journal next_generation $JOURNAL_NEXT_GEN"
+                    exit 1
+                  }
+                fi
                 printf '%s\n' "$PARENT_SHA" > prior-live-receipt/parent-sha
                 printf '%s\n' "$PARENT_GENERATION" > prior-live-receipt/parent-generation
                 printf '%s\n' "$PARENT_ARTIFACT_ID" > prior-live-receipt/parent-artifact-id
@@ -303,6 +321,14 @@ jobs:
                 echo "::error::generation $GENERATION does not advance beyond live generation $RECEIPT_GENERATION"
                 exit 1
               }
+              STATE_JSON=$(git show refs/heads/publication:publication/transaction-state/state.json 2>/dev/null || echo '{}')
+              JOURNAL_NEXT_GEN=$(printf '%s' "$STATE_JSON" | jq -r '.next_generation // empty')
+              if [ -n "$JOURNAL_NEXT_GEN" ]; then
+                [ "$GENERATION" -le "$JOURNAL_NEXT_GEN" ] || {
+                  echo "::error::generation $GENERATION exceeds journal next_generation $JOURNAL_NEXT_GEN"
+                  exit 1
+                }
+              fi
               cp prior-candidate/live-receipt.json prior-live-receipt/live-receipt.json
               PARENT_SHA=$(uv run python -c "import json; print(json.load(open('prior-live-receipt/live-receipt.json'))['source_commit'])")
               echo "parent_sha=$PARENT_SHA" >> "$GITHUB_OUTPUT"

@@ -436,6 +436,47 @@ def test_deleted_primary_requires_deleting_every_same_stem_companion(tmp_path: P
     assert "also requires deleting its same-stem companion" in result.stdout
 
 
+def test_deleted_primary_with_many_surviving_files_does_not_sigpipe(tmp_path: Path) -> None:
+    """Consuming the full stream prevents git ls-tree SIGPIPE (exit 141) under pipefail."""
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+
+    bundle_dir = tmp_path / "results-data" / "bundles"
+    bundle_dir.mkdir(parents=True)
+    primary = bundle_dir / "000_gone.json"
+    companion = bundle_dir / "000_gone.manifest.json"
+    primary.write_text('{"gone": 1}\n', encoding="utf-8")
+    companion.write_text("{}\n", encoding="utf-8")
+    # Add enough files so git ls-tree output exceeds pipe buffer
+    for i in range(1500):
+        (bundle_dir / f"zzz_{i:04d}.json").write_text("{}\n", encoding="utf-8")
+
+    _git(tmp_path, "add", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    primary.unlink()
+    _git(tmp_path, "add", "-u", str(primary.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "delete primary only")
+
+    skip_without_posix_shell()
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "BASE_SHA": base_sha},
+    )
+
+    # Must emit the actionable annotation, not exit 141 (SIGPIPE)
+    assert result.returncode != 0
+    assert result.returncode != 141
+    assert "file=results-data/bundles/000_gone.manifest.json" in result.stdout
+    assert "also requires deleting its same-stem companion" in result.stdout
+
+
 def test_deleted_primary_does_not_match_differently_cased_stem(tmp_path: Path) -> None:
     """Companion suffixes are case-insensitive, but bundle stems are not."""
     _git(tmp_path, "init", "--quiet")
@@ -534,3 +575,109 @@ def test_deleted_backslash_primary_requires_deleting_companion(tmp_path: Path) -
 
     assert result.returncode != 0
     assert "foo\\bar.manifest.json" in result.stdout
+
+
+def test_deleted_bundle_requires_deleting_referencing_legacy_manifest(tmp_path: Path) -> None:
+    """Deleting a primary bundle must not leave a surviving legacy manifest referencing it."""
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+
+    bundle_dir = tmp_path / "results-data" / "bundles" / "duckdb"
+    bundle_dir.mkdir(parents=True)
+    primary = bundle_dir / "gone.json"
+    legacy_manifest = bundle_dir / "submission-manifest.json"
+    primary.write_text('{"gone": 1}\n', encoding="utf-8")
+    legacy_manifest.write_text('{"bundle_file": "gone.json"}\n', encoding="utf-8")
+    _git(tmp_path, "add", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    primary.unlink()
+    _git(tmp_path, "add", "-u", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "delete primary only")
+
+    skip_without_posix_shell()
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "BASE_SHA": base_sha},
+    )
+
+    assert result.returncode != 0
+    assert "file=results-data/bundles/duckdb/submission-manifest.json" in result.stdout
+    assert "also requires deleting its referencing legacy manifest" in result.stdout
+
+
+def test_deleted_bundle_and_referencing_legacy_manifest_together_is_allowed(tmp_path: Path) -> None:
+    """Deleting both the primary bundle and its referencing legacy manifest passes."""
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+
+    bundle_dir = tmp_path / "results-data" / "bundles" / "duckdb"
+    bundle_dir.mkdir(parents=True)
+    primary = bundle_dir / "gone.json"
+    legacy_manifest = bundle_dir / "submission-manifest.json"
+    primary.write_text('{"gone": 1}\n', encoding="utf-8")
+    legacy_manifest.write_text('{"bundle_file": "gone.json"}\n', encoding="utf-8")
+    _git(tmp_path, "add", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    primary.unlink()
+    legacy_manifest.unlink()
+    _git(tmp_path, "add", "-u", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "delete primary and legacy manifest")
+
+    skip_without_posix_shell()
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "BASE_SHA": base_sha},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == ""
+
+
+def test_deleted_bundle_with_surviving_legacy_manifest_for_other_bundle_is_allowed(tmp_path: Path) -> None:
+    """Deleting an unrelated bundle when legacy manifest references another live bundle is allowed."""
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+
+    bundle_dir = tmp_path / "results-data" / "bundles" / "duckdb"
+    bundle_dir.mkdir(parents=True)
+    surviving = bundle_dir / "keep.json"
+    primary = bundle_dir / "gone.json"
+    legacy_manifest = bundle_dir / "submission-manifest.json"
+    surviving.write_text('{"keep": 1}\n', encoding="utf-8")
+    primary.write_text('{"gone": 1}\n', encoding="utf-8")
+    legacy_manifest.write_text('{"bundle_file": "keep.json"}\n', encoding="utf-8")
+    _git(tmp_path, "add", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    primary.unlink()
+    _git(tmp_path, "add", "-u", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "delete gone only")
+
+    skip_without_posix_shell()
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "BASE_SHA": base_sha},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == ""

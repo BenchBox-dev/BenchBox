@@ -769,7 +769,7 @@ def _check_receipt_contract_fields(observed: dict[str, Any] | None) -> list[Drif
 def _check_receipt_freshness(
     observed: dict[str, Any] | None,
     live: bool,
-    max_age_hours: float,
+    max_age_hours: float | None,
     now: datetime,
 ) -> tuple[list[DriftFinding], float | None]:
     """Verify live observation receipt freshness and age (fails closed)."""
@@ -777,11 +777,14 @@ def _check_receipt_freshness(
     receipt_age_hours: float | None = None
 
     if observed is None:
+        expected_msg = (
+            f"receipt <= {max_age_hours}h old" if max_age_hours is not None else "valid live-observation receipt"
+        )
         drifts.append(
             DriftFinding(
                 drift_type="STALE_RECEIPT",
                 description="No live-observation receipt to age-check",
-                expected=f"receipt <= {max_age_hours}h old",
+                expected=expected_msg,
                 actual="None",
             )
         )
@@ -827,7 +830,7 @@ def _check_receipt_freshness(
         return drifts, round(age_sec / 3600.0, 2)
 
     receipt_age_hours = round(age_sec / 3600.0, 2)
-    if receipt_age_hours > max_age_hours:
+    if max_age_hours is not None and receipt_age_hours > max_age_hours:
         drifts.append(
             DriftFinding(
                 drift_type="STALE_RECEIPT",
@@ -849,9 +852,7 @@ def validate_live_receipt_contract(
     """Validate the complete signed live-receipt contract and freshness boundary."""
     findings = _check_receipt_contract_fields(receipt)
     probe_findings, _ = _check_observed_probes(receipt)
-    freshness: list[DriftFinding] = []
-    if max_age_hours is not None and max_age_hours > 0:
-        freshness, _ = _check_receipt_freshness(receipt, True, max_age_hours, now or datetime.now(timezone.utc))
+    freshness, _ = _check_receipt_freshness(receipt, True, max_age_hours, now or datetime.now(timezone.utc))
     return [*findings, *probe_findings, *freshness]
 
 

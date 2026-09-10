@@ -341,6 +341,7 @@ jobs:
             --transaction-id "${{ needs.prepare.outputs.transaction_id }}" \
             --ref "publication" \
             --repo-path "." \
+            --pages-build-version "${{ github.sha }}" \
             --output-tx transaction-artifacts/tx_writing.json
 
       - name: Deploy to GitHub Pages via Pages adapter

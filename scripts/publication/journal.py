@@ -177,6 +177,8 @@ def read_transaction(repo_path: Path, tx_id: str, ref: str = DEFAULT_REF) -> Tra
         }:
             if not isinstance(loaded.attestation, dict):
                 raise CorruptJournalError("Verified transaction must retain a live-receipt attestation")
+            is_durable = loaded.state in {STATE_DURABLE, STATE_ROLLBACK_DURABLE}
+            kwargs = {"max_age_hours": None} if is_durable else {}
             try:
                 try:
                     transaction_module.validate_live_receipt(
@@ -185,7 +187,7 @@ def read_transaction(repo_path: Path, tx_id: str, ref: str = DEFAULT_REF) -> Tra
                             "attestation": loaded.attestation,
                             "observation_digest": loaded.attestation.get("observation_digest"),
                         },
-                        max_age_hours=None,
+                        **kwargs,
                     )
                 except TypeError:
                     transaction_module.validate_live_receipt(
