@@ -787,6 +787,102 @@ def _execute_simple_promotion(test_repo: Path, tmp_path: Path, tx_id: str, gen: 
     )
 
 
+def test_cmd_start_write_with_explicit_pages_build_version(
+    test_repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """start-write CLI command records explicit pages_build_version and preserves intent OID."""
+    tx_id = "tx-explicit-version"
+    permit_path = tmp_path / f"p_{tx_id}.json"
+    tx_path = tmp_path / f"t_{tx_id}.json"
+    approval_path = tmp_path / f"a_{tx_id}.json"
+    github_output = tmp_path / "github_output.txt"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(github_output))
+
+    candidate_digest = "c" * 64
+    cmd_prepare(
+        argparse.Namespace(
+            kind=KIND_PROMOTION,
+            target_repo="BenchBox-dev/BenchBox",
+            target_env="github-pages",
+            target_url="https://benchbox.dev",
+            develop_sha="c" * 40,
+            published_results_sha="c" * 40,
+            candidate_manifest_digest=candidate_digest,
+            candidate_artifact_id="111",
+            candidate_archive_sha256=candidate_digest,
+            candidate_site_tree_sha256="s" * 64,
+            candidate_parent_sha="",
+            candidate_parent_generation="",
+            restore_transaction_id=None,
+            failed_transaction_id=None,
+            barrier_evidence=None,
+            transaction_id=tx_id,
+            workflow_path=".github/workflows/publication-transaction.yml",
+            workflow_sha="c" * 40,
+            writer_run_id=f"run-{tx_id}",
+            ref="publication",
+            repo_path=str(test_repo),
+            output_permit=str(permit_path),
+            output_tx=str(tx_path),
+        )
+    )
+    permit = json.loads(permit_path.read_text(encoding="utf-8"))
+    permit_digest = hashlib.sha256(canonical_json(permit).encode("utf-8")).hexdigest()
+
+    cmd_authenticate_approval(
+        argparse.Namespace(
+            permit=str(permit_path),
+            run_id=f"run-{tx_id}",
+            run_attempt=1,
+            repo="BenchBox-dev/BenchBox",
+            github_token=None,
+            simulated_approval=str(
+                _write_temp_json(
+                    tmp_path / f"sim_{tx_id}.json",
+                    {
+                        "state": "approved",
+                        "environment": {"name": "github-pages"},
+                        "comment": f"publication-approval:{permit_digest}",
+                        "user": {"id": 1, "login": "joe"},
+                    },
+                )
+            ),
+            output_approval=str(approval_path),
+        )
+    )
+    cmd_record_prepared(
+        argparse.Namespace(
+            permit=str(permit_path),
+            approval=str(approval_path),
+            tx=str(tx_path),
+            ref="publication",
+            repo_path=str(test_repo),
+            output_tx=str(tx_path),
+        )
+    )
+
+    wire_sha = "w" * 40
+    cmd_start_write(
+        argparse.Namespace(
+            transaction_id=tx_id,
+            ref="publication",
+            repo_path=str(test_repo),
+            pages_build_version=wire_sha,
+            output_tx=str(tx_path),
+        )
+    )
+    tx = journal.read_transaction(test_repo, tx_id, ref="publication")
+    assert tx.state == STATE_WRITE_STARTED
+    assert tx.write["pages_build_version"] == wire_sha
+    assert tx.write["intent_commit_oid"] != wire_sha
+    assert len(tx.write["intent_commit_oid"]) == 40
+
+    # Verify GITHUB_OUTPUT contents
+    output_text = github_output.read_text(encoding="utf-8")
+    assert f"pages_build_version={wire_sha}" in output_text
+    assert f"intent_commit_oid={tx.write['intent_commit_oid']}" in output_text
+
+
 def test_fetch_pages_deployment_status_live(monkeypatch: pytest.MonkeyPatch) -> None:
     class MockResponse:
         def __init__(self, data: dict[str, Any]) -> None:

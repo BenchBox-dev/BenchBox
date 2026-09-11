@@ -492,13 +492,15 @@ def cmd_start_write(args: argparse.Namespace) -> int:
         check=True,
     ).stdout.strip()
 
+    pages_build_version = getattr(args, "pages_build_version", None) or intent_commit_oid
+
     if tx.kind == KIND_ROLLBACK:
         updated_tx = replace(
             tx,
             write={
                 "write_id": tx.transaction_id,
                 "intent_commit_oid": intent_commit_oid,
-                "pages_build_version": intent_commit_oid,
+                "pages_build_version": pages_build_version,
                 "status": "in_flight",
                 "started_at": datetime.now(timezone.utc).isoformat(),
             },
@@ -507,7 +509,11 @@ def cmd_start_write(args: argparse.Namespace) -> int:
         updated_tx, _ = transaction.transition(
             tx,
             EVENT_START_WRITE,
-            payload={"intent_commit_oid": intent_commit_oid, "write_id": tx.transaction_id},
+            payload={
+                "intent_commit_oid": intent_commit_oid,
+                "pages_build_version": pages_build_version,
+                "write_id": tx.transaction_id,
+            },
         )
 
     updated_state, commit_oid = journal.write_journal_update(
@@ -523,14 +529,15 @@ def cmd_start_write(args: argparse.Namespace) -> int:
     github_output = os.environ.get("GITHUB_OUTPUT")
     if github_output:
         with open(github_output, "a", encoding="utf-8") as f:
-            f.write(f"pages_build_version={intent_commit_oid}\n")
+            f.write(f"pages_build_version={pages_build_version}\n")
+            f.write(f"intent_commit_oid={intent_commit_oid}\n")
             f.write(f"write_id={tx.transaction_id}\n")
 
     if args.output_tx:
         _write_json(args.output_tx, updated_tx.to_dict())
 
     print(
-        f"Started write for {tx.transaction_id}: intent={intent_commit_oid} (wire build version is the run source SHA)"
+        f"Started write for {tx.transaction_id}: intent={intent_commit_oid} pages_build_version={pages_build_version}"
     )
     return 0
 
@@ -951,6 +958,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_start.add_argument("--transaction-id", required=True)
     p_start.add_argument("--ref", default=journal.DEFAULT_REF)
     p_start.add_argument("--repo-path", default=".")
+    p_start.add_argument(
+        "--pages-build-version",
+        default=None,
+        help="Wire pages_build_version sent to provider (defaults to intent_commit_oid)",
+    )
     p_start.add_argument("--output-tx", default=None)
     p_start.set_defaults(func=cmd_start_write)
 

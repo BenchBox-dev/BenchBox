@@ -410,3 +410,85 @@ def test_historical_durable_transaction_reads_without_stale_receipt_error(
     )
     loaded = journal_mod.read_transaction(git_repo, state.durable_transaction_id, ref="publication")
     assert loaded.transaction_id == genesis_tx.transaction_id
+
+
+def test_unfinalized_verified_transaction_with_stale_receipt_fails_read(
+    git_repo: Path, genesis_tx: tx_mod.Transaction, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Unfinalized transactions in externally-verified state must NOT be exempt from receipt freshness."""
+    from scripts.publication.reconciliation import validate_live_receipt_contract as real_validate
+
+    monkeypatch.setattr(tx_mod, "validate_live_receipt_contract", real_validate)
+    monkeypatch.setattr("scripts.publication.reconciliation.verify_live_receipt_signature", lambda r: (True, None))
+
+    base_oid = subprocess.run(
+        ["git", "rev-parse", "refs/heads/publication"],
+        cwd=git_repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    target = {"repository": "BenchBox-dev/BenchBox", "environment": "github-pages", "url": "https://benchbox.dev"}
+    genesis_tx.attestation.update(
+        {
+            "schema_version": 2,
+            "receipt_id": "live-genesis-stale-test",
+            "timestamp": "2025-01-01T00:00:00Z",
+            "develop_sha": "0" * 40,
+            "published_results_sha": "0" * 40,
+            "artifact": {"archive_sha256": genesis_tx.artifact["archive_sha256"]},
+            "artifacts": {"pages_assembly": {"digest": genesis_tx.artifact["archive_sha256"]}},
+            "observation_origin": "github-actions:publication-verify",
+            "nonce": "test-nonce",
+            "freshness_window": "24h",
+            "attestor": "github-actions:publication-deploy",
+            "signature": "mock-sig",
+            "status": "BUILT",
+            "target": "benchbox.dev",
+            "routes": [
+                {"path": "/", "status_code": 200, "ok": True, "sha256": "abc"},
+                {"path": "/docs/", "status_code": 200, "ok": True, "sha256": "abc"},
+                {"path": "/results/", "status_code": 200, "ok": True, "sha256": "abc"},
+                {"path": "/results/data/results.duckdb", "status_code": 200, "ok": True, "sha256": "abc"},
+            ],
+        }
+    )
+
+    state, commit_oid = journal_mod.init_genesis_journal(
+        repo_path=git_repo,
+        target=target,
+        genesis_transaction=genesis_tx,
+        base_commit_oid=base_oid,
+        ref="publication",
+    )
+
+    # Transition an active transaction to externally-verified with the stale receipt
+    from dataclasses import replace
+
+    active_tx = replace(
+        genesis_tx,
+        transaction_id="tx-stale-unfinalized",
+        generation=2,
+        state=tx_mod.STATE_EXTERNALLY_VERIFIED,
+    )
+    new_state = journal_mod.JournalState(
+        target=target,
+        next_generation=3,
+        active_transaction_id="tx-stale-unfinalized",
+        durable_transaction_id=state.durable_transaction_id,
+        write_block=None,
+        policy_digest="p-active",
+        tip_commit_oid=commit_oid,
+    )
+    journal_mod.write_journal_update(
+        repo_path=git_repo,
+        expected_parent_oid=commit_oid,
+        new_state=new_state,
+        transaction=active_tx,
+        ref="publication",
+    )
+
+    # Reading the unfinalized transaction with an expired receipt must raise JournalError
+    with pytest.raises(journal_mod.JournalError, match="stale"):
+        journal_mod.read_transaction(git_repo, "tx-stale-unfinalized", ref="publication")

@@ -432,6 +432,20 @@ def test_isolated_job_rollback_contract(tmp_path: Path, monkeypatch: pytest.Monk
     assert report_success.matched_checksums["/results/data/results.duckdb"] == restored_db_sha
 
 
+def test_publication_deploy_validates_generation_against_journal_next_generation() -> None:
+    """publication-deploy.yml must reject requested generations beyond journal next_generation."""
+    deploy_wf = _load_yaml(DEPLOY_PATH)
+    inputs_step = next(s for s in deploy_wf["jobs"]["build"]["steps"] if s.get("id") == "inputs")
+    run_inputs = inputs_step.get("run", "")
+    assert "generation $GENERATION exceeds journal next_generation $JOURNAL_NEXT_GEN" in run_inputs
+    assert '[ "$GENERATION" -le "$JOURNAL_NEXT_GEN" ]' in run_inputs
+
+    lineage_step = next(s for s in deploy_wf["jobs"]["build"]["steps"] if s.get("id") == "lineage")
+    run_lineage = lineage_step.get("run", "")
+    assert "generation $GENERATION exceeds journal next_generation $JOURNAL_NEXT_GEN" in run_lineage
+    assert '[ "$GENERATION" -le "$JOURNAL_NEXT_GEN" ]' in run_lineage
+
+
 def test_transaction_workflow_reconciliation_wiring() -> None:
     """Verify reconciliation path wiring: failure overrides, step inputs, and token binding."""
     wf = _load_yaml(TX_WORKFLOW_PATH)

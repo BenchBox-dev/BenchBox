@@ -339,11 +339,12 @@ def _handle_prepared(
         intent_commit_oid = payload.get("intent_commit_oid")
         if not intent_commit_oid:
             raise TransactionError("intent_commit_oid is required to start write")
+        pages_build_version = payload.get("pages_build_version") or intent_commit_oid
         data["state"] = STATE_WRITE_STARTED
         data["write"] = {
             "write_id": payload.get("write_id", str(uuid.uuid4())),
             "intent_commit_oid": intent_commit_oid,
-            "pages_build_version": intent_commit_oid,
+            "pages_build_version": pages_build_version,
             "status": "in_flight",
             "started_at": ev["timestamp"],
         }
@@ -352,7 +353,7 @@ def _handle_prepared(
             action="create_deployment",
             data={
                 "artifact_id": tx.artifact.get("artifact_id"),
-                "pages_build_version": intent_commit_oid,
+                "pages_build_version": pages_build_version,
             },
         )
 
