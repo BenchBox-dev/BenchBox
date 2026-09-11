@@ -66,6 +66,12 @@ const DATE_WINDOW_OPTIONS: { value: DateWindowFacet; label: string }[] = [
   { value: "365d", label: "Last year" },
 ];
 
+// Filters stay mounted even when they offer no real choice (see
+// singleValueFilterReason), so every select needs a visible disabled state
+// rather than just vanishing from the layout.
+const FILTER_SELECT_CLASS =
+  "rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50";
+
 interface BenchmarkIndexProps extends RoutableProps {
   benchmark?: string;
 }
@@ -88,6 +94,7 @@ const BENCHMARK_RESULT_FACET_KEYS: ExplorerFacetKey[] = [
   "platform_version",
   "arch",
   "cpu_family",
+  "memory_gb",
 ];
 const BENCHMARK_ROW_FACET_KEYS: ExplorerFacetKey[] = [
   "platform",
@@ -105,6 +112,7 @@ const BENCHMARK_ROW_FACET_KEYS: ExplorerFacetKey[] = [
   "platform_version",
   "arch",
   "cpu_family",
+  "memory_gb",
 ];
 
 const TRUST_LABEL_ABBREV: Record<string, string> = {
@@ -116,6 +124,20 @@ const TRUST_LABEL_ABBREV: Record<string, string> = {
 
 function trustAbbrev(label: string): string {
   return TRUST_LABEL_ABBREV[label] ?? label.split("-")[0] ?? label;
+}
+
+/**
+ * Filters stay visible at all times (a filter that pops in and out of
+ * existence as other filters narrow the cohort is disorienting), but one
+ * offering no real choice is disabled with an explanation rather than
+ * hidden. A filter with an active selection stays enabled even at zero or
+ * one remaining option, so it's never impossible to see or clear.
+ */
+function singleValueFilterReason(availableCount: number, hasActiveSelection: boolean): string | null {
+  if (hasActiveSelection) return null;
+  if (availableCount === 0) return "No data recorded for this filter in the current results.";
+  if (availableCount === 1) return "Only one value is present in the current results.";
+  return null;
 }
 
 function requestedBenchmarkSection(): ViewMode | null {
@@ -247,6 +269,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       facets.platform_version,
       facets.arch,
       facets.cpu_family,
+      facets.memory_gb,
       facets.storage_format,
       facets.validation_status,
     ],
@@ -274,6 +297,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       facets.platform,
       facets.arch,
       facets.cpu_family,
+      facets.memory_gb,
       facets.storage_format,
       facets.validation_status,
     ],
@@ -510,6 +534,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             validation_status: platform.validation_status ?? metadata?.validation_status ?? null,
             arch: metadata?.arch ?? null,
             cpu_family: metadata?.cpu_family ?? null,
+            memory_gb: metadata?.memory_gb ?? null,
           };
         }),
       }
@@ -533,6 +558,33 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             .filter((status): status is string => status !== null && status !== ""),
         ),
       ].sort()
+    : [];
+  const archOptions = summaryWithResultMetadata
+    ? [
+        ...new Set(
+          summaryWithResultMetadata.platforms
+            .map((p) => p.arch)
+            .filter((a): a is string => a !== null && a !== undefined),
+        ),
+      ].sort()
+    : [];
+  const cpuFamilyOptions = summaryWithResultMetadata
+    ? [
+        ...new Set(
+          summaryWithResultMetadata.platforms
+            .map((p) => p.cpu_family)
+            .filter((c): c is string => c !== null && c !== undefined),
+        ),
+      ].sort()
+    : [];
+  const memoryOptions = summaryWithResultMetadata
+    ? [
+        ...new Set(
+          summaryWithResultMetadata.platforms
+            .map((p) => p.memory_gb)
+            .filter((m): m is number => m !== null && m !== undefined),
+        ),
+      ].sort((a, b) => a - b)
     : [];
   const platformVersions = [
     ...new Set(
@@ -677,187 +729,316 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       {/* Every filter that narrows the cohort, in one place. These were
           previously split between the title row and nowhere at all: platform,
           validation status, and the date window were plumbed through the facet
-          model but had no control. */}
+          model but had no control.
+
+          Every filter stays mounted regardless of how many values it offers -
+          a filter that appears and disappears as other filters narrow the
+          cohort is disorienting. One with no real choice is disabled (see
+          singleValueFilterReason) with a title explaining why, rather than
+          removed from the layout. */}
       <section
         class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3"
         data-testid="benchmark-filters"
         aria-label="Cohort filters"
       >
           {/* Scale factor filter */}
-          {scaleFactors.length > 1 && (
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="scale-filter">
-                Scale:
-              </label>
-              <select
-                id="scale-filter"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
-                value={effectiveSf}
-                onChange={(e) => setScaleFilter((e.target as HTMLSelectElement).value)}
-              >
-                {scaleFactors.map((sf) => (
-                  <option key={sf} value={sf}>
-                    SF {sf}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          {(() => {
+            const reason = singleValueFilterReason(scaleFactors.length, false);
+            return (
+              <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="scale-filter">
+                  Scale:
+                </label>
+                <select
+                  id="scale-filter"
+                  class={FILTER_SELECT_CLASS}
+                  value={effectiveSf}
+                  disabled={reason !== null}
+                  title={reason ?? undefined}
+                  onChange={(e) => setScaleFilter((e.target as HTMLSelectElement).value)}
+                >
+                  {scaleFactors.map((sf) => (
+                    <option key={sf} value={sf}>
+                      SF {sf}
+                    </option>
+                  ))}
+                  {scaleFactors.length === 0 && <option value={effectiveSf}>SF {effectiveSf}</option>}
+                </select>
+              </div>
+            );
+          })()}
 
           {/* Phase filter */}
-          {phases.length > 1 && (
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="phase-filter">
-                Phase:
-              </label>
-              <select
-                id="phase-filter"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
-                value={effectivePhase}
-                onChange={(e) => setPhaseFilter((e.target as HTMLSelectElement).value)}
-              >
-                {phases.map((ph) => (
-                  <option key={ph} value={ph}>
-                    {ph.charAt(0).toUpperCase() + ph.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          {(() => {
+            const reason = singleValueFilterReason(phases.length, false);
+            return (
+              <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="phase-filter">
+                  Phase:
+                </label>
+                <select
+                  id="phase-filter"
+                  class={FILTER_SELECT_CLASS}
+                  value={effectivePhase}
+                  disabled={reason !== null}
+                  title={reason ?? undefined}
+                  onChange={(e) => setPhaseFilter((e.target as HTMLSelectElement).value)}
+                >
+                  {phases.map((ph) => (
+                    <option key={ph} value={ph}>
+                      {ph.charAt(0).toUpperCase() + ph.slice(1)}
+                    </option>
+                  ))}
+                  {phases.length === 0 && <option value={effectivePhase}>{effectivePhase}</option>}
+                </select>
+              </div>
+            );
+          })()}
 
           {/* Tuning filter */}
-          {tuningModes.length > 1 && (
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="tuning-filter">
-                Tuning:
-              </label>
-              <select
-                id="tuning-filter"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
-                value={tuningFilter}
-                onChange={(e) => setTuningFilter((e.target as HTMLSelectElement).value)}
-              >
-                <option value="all">All</option>
-                {tuningModes.map((m) => (
-                  <option key={m} value={m}>
-                    {tuningLabel(m)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {(platformVersionFilter !== "all" || platformVersions.length > 1) && (
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-version-filter">
-                Platform version:
-              </label>
-              <select
-                id="benchmark-version-filter"
-                data-testid="benchmark-version-filter"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
-                value={platformVersionFilter}
-                onChange={(event) => {
-                  const value = (event.target as HTMLSelectElement).value;
-                  setFacet("platform_version", value === "all" ? [] : [value]);
-                }}
-              >
-                <option value="all">All versions</option>
-                {platformVersionFilter === "__multiple__" && (
-                  <option value="__multiple__" disabled>{facets.platform_version.length} versions selected</option>
-                )}
-                {platformVersions.map((version) => (
-                  <option key={version} value={version}>{version}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Trust filter chips - default "all tiers shown"; shown only when >1 tier present */}
-          {trustLabels.length > 1 && (
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium text-[var(--bb-data-fg-primary)]">Trust:</span>
-              <div class="flex flex-wrap gap-1">
-                {trustLabels.map((tier) => {
-                  const active = trustFilter === null || trustFilter.has(tier);
-                  return (
-                    <button
-                      key={tier}
-                      class={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                        active
-                          ? "bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
-                          : "bg-[var(--bb-surface-app)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-data-border)]"
-                      }`}
-                      aria-pressed={active}
-                      onClick={() => {
-                        // Toggle this tier in/out of the active set.
-                        const current = trustFilter ?? new Set(trustLabels);
-                        const next = new Set(current);
-                        if (next.has(tier)) {
-                          next.delete(tier);
-                          // Never allow empty selection - reset to "all"
-                          setTrustFilter(next.size === 0 ? null : next);
-                        } else {
-                          next.add(tier);
-                          // Full selection is equivalent to "all"
-                          setTrustFilter(next.size === trustLabels.length ? null : next);
-                        }
-                      }}
-                    >
-                      {trustAbbrev(tier)}
-                    </button>
-                  );
-                })}
+          {(() => {
+            const reason = singleValueFilterReason(tuningModes.length, tuningFilter !== "all");
+            return (
+              <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="tuning-filter">
+                  Tuning:
+                </label>
+                <select
+                  id="tuning-filter"
+                  class={FILTER_SELECT_CLASS}
+                  value={tuningFilter}
+                  disabled={reason !== null}
+                  title={reason ?? undefined}
+                  onChange={(e) => setTuningFilter((e.target as HTMLSelectElement).value)}
+                >
+                  <option value="all">All</option>
+                  {tuningModes.map((m) => (
+                    <option key={m} value={m}>
+                      {tuningLabel(m)}
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
+          {(() => {
+            const reason = singleValueFilterReason(platformVersions.length, platformVersionFilter !== "all");
+            return (
+              <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-version-filter">
+                  Platform version:
+                </label>
+                <select
+                  id="benchmark-version-filter"
+                  data-testid="benchmark-version-filter"
+                  class={FILTER_SELECT_CLASS}
+                  value={platformVersionFilter}
+                  disabled={reason !== null}
+                  title={reason ?? undefined}
+                  onChange={(event) => {
+                    const value = (event.target as HTMLSelectElement).value;
+                    setFacet("platform_version", value === "all" ? [] : [value]);
+                  }}
+                >
+                  <option value="all">All versions</option>
+                  {platformVersionFilter === "__multiple__" && (
+                    <option value="__multiple__" disabled>{facets.platform_version.length} versions selected</option>
+                  )}
+                  {platformVersions.map((version) => (
+                    <option key={version} value={version}>{version}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
 
-          {platformOptions.length > 1 && (
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-platform-filter">
-                Platform:
-              </label>
-              <select
-                id="benchmark-platform-filter"
-                data-testid="benchmark-platform-filter"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
-                value={facets.platform.length === 1 ? facets.platform[0]! : "all"}
-                onChange={(event) => {
-                  const value = (event.target as HTMLSelectElement).value;
-                  setFacet("platform", value === "all" ? [] : [value]);
-                }}
-              >
-                <option value="all">All platforms</option>
-                {platformOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </div>
-          )}
+          {/* Trust filter chips - default "all tiers shown" */}
+          {(() => {
+            const reason = singleValueFilterReason(trustLabels.length, trustFilter !== null);
+            return (
+              <div class="flex items-center gap-2" title={reason ?? undefined}>
+                <span class="text-sm font-medium text-[var(--bb-data-fg-primary)]">Trust:</span>
+                <div class="flex flex-wrap gap-1">
+                  {trustLabels.map((tier) => {
+                    const active = trustFilter === null || trustFilter.has(tier);
+                    return (
+                      <button
+                        key={tier}
+                        type="button"
+                        disabled={reason !== null}
+                        class={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                          active
+                            ? "bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
+                            : "bg-[var(--bb-surface-app)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-data-border)]"
+                        }`}
+                        aria-pressed={active}
+                        onClick={() => {
+                          // Toggle this tier in/out of the active set.
+                          const current = trustFilter ?? new Set(trustLabels);
+                          const next = new Set(current);
+                          if (next.has(tier)) {
+                            next.delete(tier);
+                            // Never allow empty selection - reset to "all"
+                            setTrustFilter(next.size === 0 ? null : next);
+                          } else {
+                            next.add(tier);
+                            // Full selection is equivalent to "all"
+                            setTrustFilter(next.size === trustLabels.length ? null : next);
+                          }
+                        }}
+                      >
+                        {trustAbbrev(tier)}
+                      </button>
+                    );
+                  })}
+                  {trustLabels.length === 0 && (
+                    <span class="text-sm text-[var(--bb-data-fg-subtle)]">None recorded</span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
-          {validationOptions.length > 1 && (
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-validation-filter">
-                Validation:
-              </label>
-              <select
-                id="benchmark-validation-filter"
-                data-testid="benchmark-validation-filter"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
-                value={facets.validation_status.length === 1 ? facets.validation_status[0]! : "all"}
-                onChange={(event) => {
-                  const value = (event.target as HTMLSelectElement).value;
-                  setFacet("validation_status", value === "all" ? [] : [value]);
-                }}
-              >
-                <option value="all">Any status</option>
-                {validationOptions.map((status) => (
-                  <option key={status} value={status}>{formatValidationStatus(status)}</option>
-                ))}
-              </select>
-            </div>
-          )}
+          {(() => {
+            const reason = singleValueFilterReason(platformOptions.length, facets.platform.length > 0);
+            return (
+              <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-platform-filter">
+                  Platform:
+                </label>
+                <select
+                  id="benchmark-platform-filter"
+                  data-testid="benchmark-platform-filter"
+                  class={FILTER_SELECT_CLASS}
+                  value={facets.platform.length === 1 ? facets.platform[0]! : "all"}
+                  disabled={reason !== null}
+                  title={reason ?? undefined}
+                  onChange={(event) => {
+                    const value = (event.target as HTMLSelectElement).value;
+                    setFacet("platform", value === "all" ? [] : [value]);
+                  }}
+                >
+                  <option value="all">All platforms</option>
+                  {platformOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
+
+          {(() => {
+            const reason = singleValueFilterReason(validationOptions.length, facets.validation_status.length > 0);
+            return (
+              <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-validation-filter">
+                  Validation:
+                </label>
+                <select
+                  id="benchmark-validation-filter"
+                  data-testid="benchmark-validation-filter"
+                  class={FILTER_SELECT_CLASS}
+                  value={facets.validation_status.length === 1 ? facets.validation_status[0]! : "all"}
+                  disabled={reason !== null}
+                  title={reason ?? undefined}
+                  onChange={(event) => {
+                    const value = (event.target as HTMLSelectElement).value;
+                    setFacet("validation_status", value === "all" ? [] : [value]);
+                  }}
+                >
+                  <option value="all">Any status</option>
+                  {validationOptions.map((status) => (
+                    <option key={status} value={status}>{formatValidationStatus(status)}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
+
+          {(() => {
+            const reason = singleValueFilterReason(archOptions.length, facets.arch.length > 0);
+            return (
+              <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-arch-filter">
+                  Architecture:
+                </label>
+                <select
+                  id="benchmark-arch-filter"
+                  data-testid="benchmark-arch-filter"
+                  class={FILTER_SELECT_CLASS}
+                  value={facets.arch.length === 1 ? facets.arch[0]! : "all"}
+                  disabled={reason !== null}
+                  title={reason ?? undefined}
+                  onChange={(event) => {
+                    const value = (event.target as HTMLSelectElement).value;
+                    setFacet("arch", value === "all" ? [] : [value]);
+                  }}
+                >
+                  <option value="all">All architectures</option>
+                  {archOptions.map((option) => (
+                    <option key={option} value={option}>{formatArchitecture(option)}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
+
+          {(() => {
+            const reason = singleValueFilterReason(cpuFamilyOptions.length, facets.cpu_family.length > 0);
+            return (
+              <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-cpu-family-filter">
+                  CPU family:
+                </label>
+                <select
+                  id="benchmark-cpu-family-filter"
+                  data-testid="benchmark-cpu-family-filter"
+                  class={FILTER_SELECT_CLASS}
+                  value={facets.cpu_family.length === 1 ? facets.cpu_family[0]! : "all"}
+                  disabled={reason !== null}
+                  title={reason ?? undefined}
+                  onChange={(event) => {
+                    const value = (event.target as HTMLSelectElement).value;
+                    setFacet("cpu_family", value === "all" ? [] : [value]);
+                  }}
+                >
+                  <option value="all">All CPU families</option>
+                  {cpuFamilyOptions.map((option) => (
+                    <option key={option} value={option}>{formatCpuFamily(option)}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
+
+          {(() => {
+            const reason = singleValueFilterReason(memoryOptions.length, facets.memory_gb.length > 0);
+            return (
+              <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-memory-filter">
+                  Memory:
+                </label>
+                <select
+                  id="benchmark-memory-filter"
+                  data-testid="benchmark-memory-filter"
+                  class={FILTER_SELECT_CLASS}
+                  value={facets.memory_gb.length === 1 ? facets.memory_gb[0]! : "all"}
+                  disabled={reason !== null}
+                  title={reason ?? undefined}
+                  onChange={(event) => {
+                    const value = (event.target as HTMLSelectElement).value;
+                    setFacet("memory_gb", value === "all" ? [] : [value]);
+                  }}
+                >
+                  <option value="all">All memory sizes</option>
+                  {memoryOptions.map((option) => (
+                    <option key={option} value={String(option)}>{formatMemoryGb(option)}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
 
           <div class="flex items-center gap-2">
             <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-date-window-filter">
@@ -866,7 +1047,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             <select
               id="benchmark-date-window-filter"
               data-testid="benchmark-date-window-filter"
-              class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
+              class={FILTER_SELECT_CLASS}
               value={facets.date_window}
               onChange={(event) => {
                 setFacet("date_window", (event.target as HTMLSelectElement).value as DateWindowFacet);

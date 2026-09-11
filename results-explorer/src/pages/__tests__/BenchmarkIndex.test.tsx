@@ -136,6 +136,7 @@ const RESULT_ROWS = [
     bundle_download_url: "",
     arch: "arm64",
     cpu_family: "apple_silicon",
+    memory_gb: 64,
   },
   {
     result_id: "r2",
@@ -179,6 +180,7 @@ const RESULT_ROWS = [
     bundle_download_url: "",
     arch: "x86_64",
     cpu_family: "amd_epyc",
+    memory_gb: 128,
   },
 ];
 
@@ -914,6 +916,54 @@ describe("BenchmarkIndex", () => {
       String(sql).replace(/\s+/g, " ").includes("FROM bench.benchmark_rankings"),
     );
     expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "power"]);
+  });
+
+  it("keeps a filter with no real choice visible but disabled, with an explanation", async () => {
+    // Regression: filters used to unmount entirely once their option count
+    // dropped to <=1, which made the filter bar's contents shift for
+    // reasons the reader could not see. Every fixture row here has a null
+    // platform_version, so the filter should stay mounted, disabled, and
+    // explain why rather than disappear.
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByRole("grid")).toBeTruthy());
+
+    const versionFilter = screen.getByTestId("benchmark-version-filter") as HTMLSelectElement;
+    expect(versionFilter).toBeDisabled();
+    expect(versionFilter.title).toBe("No data recorded for this filter in the current results.");
+  });
+
+  it("filters the cohort by architecture", async () => {
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByRole("grid")).toBeTruthy());
+    expect(within(screen.getByRole("grid")).getByText("SQLite")).toBeTruthy();
+
+    const archFilter = screen.getByTestId("benchmark-arch-filter") as HTMLSelectElement;
+    expect(archFilter).not.toBeDisabled();
+    fireEvent.change(archFilter, { target: { value: "arm64" } });
+    await waitFor(() => expect(within(screen.getByRole("grid")).queryByText("SQLite")).toBeNull());
+    expect(within(screen.getByRole("grid")).getByText("DuckDB")).toBeTruthy();
+  });
+
+  it("filters the cohort by CPU family", async () => {
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByRole("grid")).toBeTruthy());
+    expect(within(screen.getByRole("grid")).getByText("DuckDB")).toBeTruthy();
+
+    const cpuFamilyFilter = screen.getByTestId("benchmark-cpu-family-filter") as HTMLSelectElement;
+    fireEvent.change(cpuFamilyFilter, { target: { value: "amd_epyc" } });
+    await waitFor(() => expect(within(screen.getByRole("grid")).queryByText("DuckDB")).toBeNull());
+    expect(within(screen.getByRole("grid")).getByText("SQLite")).toBeTruthy();
+  });
+
+  it("filters the cohort by memory", async () => {
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByRole("grid")).toBeTruthy());
+    expect(within(screen.getByRole("grid")).getByText("SQLite")).toBeTruthy();
+
+    const memoryFilter = screen.getByTestId("benchmark-memory-filter") as HTMLSelectElement;
+    fireEvent.change(memoryFilter, { target: { value: "64" } });
+    await waitFor(() => expect(within(screen.getByRole("grid")).queryByText("SQLite")).toBeNull());
+    expect(within(screen.getByRole("grid")).getByText("DuckDB")).toBeTruthy();
   });
 
   // -----------------------------------------------------------------------
