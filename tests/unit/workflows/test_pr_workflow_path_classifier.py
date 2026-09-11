@@ -112,9 +112,8 @@ def test_pr_path_classifier_fetches_base_history_for_merge_base() -> None:
     #   - content-guard (recreates path lists for content validators)
     #   - explorer-tokens and site-theme-tokens (each greps the diff for its
     #     own source changes)
-    #   - publication-plan-reconciliation (trusted script diff)
     assert '--depth=1 origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"' not in workflow
-    assert workflow.count(base_fetch) == 5
+    assert workflow.count(base_fetch) == 4
 
 
 def test_ci_required_result_preserves_content_guard_failure() -> None:

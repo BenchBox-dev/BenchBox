@@ -1,23 +1,19 @@
 #!/usr/bin/env python3
 """Check that publication migration plans cite all controlling surfaces.
 
-The A0-A11 tracker sequence is sourced from the live tracker (a single lossless
-``todo-db export`` envelope) rather than a hard-coded list, so the check cannot
-silently pass on a stale expected sequence. The check fails closed: if the live
-tracker cannot be reached (no credential or offline), reconciliation is a hard
-failure rather than an advisory pass, because without live evidence the gate
-cannot prove the plan matches the currently pending migration order.
+The A0-A11 tracker sequence is sourced from the live JSON/Git state branch
+rather than a hard-coded list, so the check cannot silently pass on stale
+expected data. The check fails closed when the authoritative branch cannot be
+reached or its revision changes during the read.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -86,13 +82,7 @@ EXPECTED_EXTERNAL_DEPS: dict[str, frozenset[str]] = {
         {"independent-production-deployer-and-retirement"}
     ),
 }
-# Tracker identity -- must match .todo-db/config.json (project_id / repository).
-TRACKER_PROJECT_ID = "benchbox"
-TRACKER_REPOSITORY = "https://github.com/joeharris76/BenchBox"
-# Environment variables forwarded to the floor CLI for a hosted read. The
-# credentialed CI step supplies them; without TODO_DB_AUTH_CONTRACT=v2 a hosted
-# call returns a legacy-safe exit 2, which this gate then treats as fail-closed.
-_EXPORT_ENV_KEYS = ("TODO_DB_URL", "TODO_DB_RO_AUTH_TOKEN", "TODO_DB_AUTH_CONTRACT")
+TRACKER_CONFIG = ROOT / ".todo-db/config.json"
 
 
 def planned_tracker_ids(text: str, prefix: str) -> list[str]:
@@ -199,105 +189,57 @@ def dependency_violations(plan_order: list[str], deps: dict[str, list[str]]) -> 
     return violations
 
 
-def _export_command(output_path: Path) -> list[str]:
-    return [
-        "uv",
-        "run",
-        "--project",
-        "_project/scripts",
-        "--locked",
-        "--",
-        "todo-db",
-        "--project-id",
-        TRACKER_PROJECT_ID,
-        "--repository",
-        TRACKER_REPOSITORY,
-        "export",
-        "--output",
-        str(output_path),
-    ]
+def load_tracker_snapshot(prefix: str | None = None) -> dict | None:
+    """Read the live JSON/Git tracker once and shape it, or ``None`` if unavailable.
 
-
-def _run_export(output_path: Path) -> bool:
-    """Run the floor-CLI export, writing the lossless envelope to ``output_path``.
-
-    Returns ``False`` on any failure so the caller fails closed. The hosted-read
-    credentials are forwarded from the process environment (the credentialed CI
-    step sets them); they are never hard-coded here.
+    The state branch is cloned at one shallow tip. The scheduled state workflow
+    runs the package validator separately; this check then reads the same
+    validated index atomically instead of issuing one network read per page.
     """
-    env = dict(os.environ)
-    for key in _EXPORT_ENV_KEYS:
-        value = os.environ.get(key)
-        if value is not None:
-            env[key] = value
     try:
+        config = json.loads(TRACKER_CONFIG.read_text(encoding="utf-8"))
+        remote = config["state_remote"]
+        branch = config["state_branch"]
+    except (KeyError, OSError, TypeError, json.JSONDecodeError):
+        return None
+    try:
+        origin = subprocess.run(
+            ["git", "config", "--get", "remote.origin.url"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+            cwd=ROOT,
+        ).stdout.strip()
+        if origin.rstrip("/").removesuffix(".git") != remote.rstrip("/").removesuffix(".git"):
+            return None
         subprocess.run(
-            _export_command(output_path),
+            ["git", "fetch", "--quiet", "--no-tags", "--depth", "1", "origin", f"refs/heads/{branch}"],
             capture_output=True,
             text=True,
             check=True,
             timeout=120,
             cwd=ROOT,
-            env=env,
         )
-    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
-        return False
-    return True
-
-
-def parse_envelope(raw: str) -> dict | None:
-    """Shape a ``todo-db export`` envelope into the maps reconciliation needs.
-
-    Returns ``{"states": {item_id: state}, "deps": {item_id: [needs_item, ...]}}``
-    built from the top-level ``tables.items`` and ``tables.item_deps`` rows, or
-    ``None`` when the envelope is malformed or missing a required table so the
-    caller fails closed.
-    """
-    try:
-        envelope = json.loads(raw)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(envelope, dict):
-        return None
-    tables = envelope.get("tables")
-    if not isinstance(tables, dict):
-        return None
-    items = tables.get("items")
-    item_deps = tables.get("item_deps")
-    if not isinstance(items, list) or not isinstance(item_deps, list):
-        return None
-    states: dict[str, str] = {}
-    for row in items:
-        if not isinstance(row, dict) or "id" not in row:
+        raw_index = subprocess.run(
+            ["git", "show", "FETCH_HEAD:index.json"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+            cwd=ROOT,
+        ).stdout
+        index = json.loads(raw_index)
+        entries = index["items"]
+        if not isinstance(entries, dict):
             return None
-        states[str(row["id"])] = str(row.get("state", ""))
-    deps: dict[str, list[str]] = {item_id: [] for item_id in states}
-    for row in item_deps:
-        if not isinstance(row, dict) or "item_id" not in row or "needs_item" not in row:
-            return None
-        deps.setdefault(str(row["item_id"]), []).append(str(row["needs_item"]))
-    return {"states": states, "deps": {item_id: sorted(values) for item_id, values in deps.items()}}
-
-
-def load_tracker_snapshot() -> dict | None:
-    """Export the live tracker once and shape it, or ``None`` if unavailable.
-
-    A single ``todo-db export`` is an atomic snapshot of the whole tracker, so
-    the item states and the dependency graph it returns are mutually consistent
-    with no re-read needed (the retired ``todo list``/``todo show`` path had to
-    re-read to detect concurrent edits). Any failure -- the export command, an
-    unreadable file, or a malformed envelope -- returns ``None`` and the gate
-    fails closed.
-    """
-    with tempfile.TemporaryDirectory() as tmp:
-        output_path = Path(tmp) / "tracker-export.json"
-        if not _run_export(output_path):
-            return None
-        try:
-            raw = output_path.read_text(encoding="utf-8")
-        except OSError:
-            return None
-    return parse_envelope(raw)
+        states = {str(item_id): str(entry["status"]) for item_id, entry in entries.items()}
+        deps = {
+            str(item_id): sorted(str(value) for value in entry.get("needs", [])) for item_id, entry in entries.items()
+        }
+    except (KeyError, OSError, TypeError, ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return None
+    return {"states": states, "deps": deps}
 
 
 def main() -> int:
@@ -308,7 +250,7 @@ def main() -> int:
     missing = [surface for surface in REQUIRED_SURFACES if surface not in text]
     missing.extend(gate for gate in REQUIRED_GATES if gate not in text)
     tracker_ids = planned_tracker_ids(text, args.todo_prefix)
-    snapshot = load_tracker_snapshot()
+    snapshot = load_tracker_snapshot(args.todo_prefix)
 
     if snapshot is None:
         print(

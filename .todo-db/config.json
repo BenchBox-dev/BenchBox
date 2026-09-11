@@ -1,5 +1,4 @@
 {
-  "db": "libsql://benchbox-todo-joeharris76.aws-us-east-1.turso.io",
-  "project_id": "benchbox",
-  "repository": "https://github.com/joeharris76/BenchBox"
+  "state_branch": "todo-state",
+  "state_remote": "https://github.com/BenchBox-dev/BenchBox.git"
 }

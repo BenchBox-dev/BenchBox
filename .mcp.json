@@ -8,12 +8,8 @@
         "_project/scripts",
         "--locked",
         "--",
-        "todo-db-mcp",
-        "--allow-hosted"
-      ],
-      "env": {
-        "TODO_DB_CREDENTIAL_COMMAND": "security find-generic-password -w -s benchbox-todo-rw"
-      }
+        "todo-db-mcp"
+      ]
     }
   }
 }

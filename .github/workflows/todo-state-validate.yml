@@ -1,0 +1,47 @@
+name: TODO Git state validation
+
+# The tracker is authoritative on the dedicated JSON/Git state branch. This
+# scheduled read-only check confirms that the accepted tip remains internally
+# consistent and reachable without database credentials.
+
+on:
+  schedule:
+    - cron: '0 9 * * 0'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: todo-state-validate
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate TODO Git state
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Sync locked package-only runtime
+        run: uv sync --project _project/scripts --locked
+
+      - name: Validate authoritative state branch
+        run: >-
+          uv run --project _project/scripts --locked --
+          todo-db validate
+          --config .todo-db/config.json
+          --repo-root "$GITHUB_WORKSPACE"

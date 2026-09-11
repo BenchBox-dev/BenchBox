@@ -1,4 +1,8 @@
-# Hosted credential operations
+# Hosted credential operations (historical)
+
+> The SQLite/libSQL tracker was retired in favor of the JSON/Git `todo-state`
+> branch. This page is retained only as an audit record for the former hosted
+> service; it is not part of the current tracker workflow.
 
 This runbook covers database-scoped Turso credentials for BenchBox's todo tracker.
 Keep bearer tokens out of the repository, command arguments, logs, tracker
