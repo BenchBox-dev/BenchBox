@@ -61,6 +61,14 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     expect(sql).toContain("is_ranking_eligible");
   });
 
+  it("joins hardware fields when a raw WHERE clause filters memory", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await listResults({ sql: "WHERE memory_gb >= ?", params: [64] });
+    const [sql] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toContain("FROM (SELECT r.*, d.arch, d.cpu_family, d.memory_gb FROM bench.results r");
+    expect(sql).toContain("WHERE memory_gb >= ?");
+  });
+
   it("memoizes listResults by WHERE clause and params for the current snapshot", async () => {
     const rows = [{ result_id: "r1" }];
     mockedQueryRows.mockResolvedValueOnce(rows);

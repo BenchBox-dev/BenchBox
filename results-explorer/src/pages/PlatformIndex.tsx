@@ -921,10 +921,10 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               wrapperClassName={null}
             />
           </div>
-          <div ref={resultsScrollerRef} class="overflow-x-auto" data-testid="platform-results-scroll-container">
           <ResultsBasisStatement>
-          {isDefaultBasis(basis) ? "Geomean query time uses the median of each query’s published measurement passes, then the geometric mean across queries. Warmup passes are excluded." : `Geomean query time uses ${formatBasisLabel(basis)} across each run’s available queries. Published power scores are hidden for this basis.`}
+            {isDefaultBasis(basis) ? "Geomean query time uses the median of each query’s published measurement passes, then the geometric mean across queries. Warmup passes are excluded." : `Geomean query time uses ${formatBasisLabel(basis)} across each run’s available queries. Published power scores are hidden for this basis.`}
           </ResultsBasisStatement>
+          <div ref={resultsScrollerRef} class="overflow-x-auto" data-testid="platform-results-scroll-container">
           <DataTable
             ariaLabel={`${platformDisplayName} results`}
             ariaColCount={platformColumnCount}

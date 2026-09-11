@@ -49,7 +49,7 @@ export function GroupBySelect({
 /** The basis-statement strip: identical wrapper classes on both pages, different wording. */
 export function ResultsBasisStatement({ children }: { children: ComponentChildren }) {
   return (
-    <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]" data-testid="basis-statement">
+    <p class="mb-3 px-4 pt-3 text-xs text-[var(--bb-data-fg-muted)]" data-testid="basis-statement">
       {children}
     </p>
   );

@@ -680,11 +680,11 @@ export async function listResults(
   options: { includeHardware?: boolean } = {},
 ): Promise<ResultRow[]> {
   // Only pay for the result_detail_metrics join when a caller filters on
-  // hardware (arch/cpu_family appear in the facet WHERE clause) or explicitly
+  // hardware (arch/cpu_family/memory_gb appear in the facet WHERE clause) or explicitly
   // asks to display those columns (includeHardware) -- unfiltered browse
   // queries like Home and CorpusSectionIndex don't touch arch/cpu_family and
   // shouldn't carry the join cost.
-  const needsHardware = options.includeHardware === true || /\b(?:arch|cpu_family)\b/.test(where.sql);
+  const needsHardware = options.includeHardware === true || /\b(?:arch|cpu_family|memory_gb)\b/.test(where.sql);
   const columns = needsHardware ? RESULT_HARDWARE_COLUMNS : RESULT_COLUMNS;
   const source = needsHardware
     ? "(SELECT r.*, d.arch, d.cpu_family, d.memory_gb FROM bench.results r LEFT JOIN bench.result_detail_metrics d USING (result_id))"
